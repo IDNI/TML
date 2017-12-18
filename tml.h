@@ -4,7 +4,19 @@
 #include <cstring>
 #include <cstdint>
 #include <iostream>
-using namespace std;
+using std::vector;
+using std::map;
+using std::set;
+using std::wstring;
+using std::wstringstream;
+using std::wcout;
+using std::wcin;
+using std::wcerr;
+using std::wistream;
+using std::wostream;
+using std::pair;
+using std::endl;
+using std::runtime_error;
 
 #ifdef _DEBUG
 #define DEBUG(x) (wcout<<x).flush()
@@ -24,8 +36,9 @@ extern dict_t dict;
 
 template<typename T = uint64_t>
 struct hash {
+	typedef const unsigned char* buf;
 	T h = 0;
-	void operator()(const unsigned char *s, size_t sz) {
+	void operator()(buf s, size_t sz) {
 		while (sz--) h = *s+++((h<<6)+(h<<16));
 	}
 };
@@ -36,25 +49,25 @@ class literal : protected vector<int32_t> {
 	const int32_t* parg() const { return &((*((base*)this))[1]); }
 	int32_t* prel() { return &((*((base*)this))[0]); }
 	int32_t* parg() { return &((*((base*)this))[1]); }
-public:
 	typedef vector<int32_t> base;
-	literal() {}
-	literal(size_t sz) : vector<int32_t>(sz) {}
+public:
+	hash<> h;
+	literal() : base() {}
+	literal(size_t sz) : base(sz) {}
 	literal(const literal &, env& e);
 
-	bool same_atom(const literal &l) const;
-	void push_back(int32_t i) { base::push_back(i); }
+	void push_back(int32_t i);
 	void clear() { base::clear(); }
+	void flip();
+
+	bool same_atom(const literal &l) const;
 	int32_t rel() const { return at(0); }
-	void flip() { *prel() = -*prel(); }
 	friend wostream& operator<<(wostream &os, const literal&);
 	int operator<(const literal &l) const;
 	size_t size() const { return base::size(); }
 	bool unify(const literal &g, env &e) const;
 	bool operator==(const literal&) const;
 	bool operator!=(const literal& l) const { return !(l==*(this)); }
-
-//	hash h;
 };
 
 struct clause : public vector<literal*> {

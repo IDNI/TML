@@ -18,6 +18,15 @@ literal::literal(const literal &l, env& e) {
 //	DEBUG(r << endl);
 } 
 
+void literal::push_back(int32_t i) {
+	base::push_back(i), h((hash<>::buf)&i, sizeof(int32_t));
+}
+
+void literal::flip() {
+	*prel() = -*prel(),
+	(h=hash<>())((hash<>::buf)prel(), sizeof(int32_t)*size());
+}
+
 bool literal::unify(const literal &g, env &e) const {
 	//DEBUG(endl<<L"unifying "<<*this<<L" with "<<g<<L" given "<<e);
 	size_t sz = size();
