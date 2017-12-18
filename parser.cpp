@@ -25,32 +25,35 @@ void parse_error(const wchar_t *s, size_t pos, const wchar_t *err) {
 	wcerr << s << endl << t << L"^ " << err;
 	throw runtime_error("");
 }
+void parse_error(const strbuf &s, intptr_t p, const wchar_t *err) {
+	parse_error(s.s, size_t(p), err);
+}
 
-bool dlp::word_read(int32_t &t) {
+bool dlp::word_read(strbuf& in, int32_t &t) {
 	wstring r;
 	bool quote;
-	const wchar_t *_s = in;
+	const strbuf _s(in.s);
 	// TODO: handle literal strings
 	while (iswspace(*in)) ++in;
-	if (*in == L'?') r += *in++;
+	if (*in == L'?') (r += *in), ++in;
 	do {	quote = false;
 		if (quote) {
 			if (wcschr(L"()->=\\\"", *in)) quote = false, r += *in;
-			else parse_error(_s, in-_s, err_misquote);
+			else parse_error(_s, in - _s, err_misquote);
 		}
-		while (iswalnum(*in)) r += *in++;
+		while (iswalnum(*in)) (r += *in), ++in;
 		if (*in == L'\\') quote = true;
 	} while (quote);
 	while (iswspace(*in)) ++in;
 	return r.size() ? t = dict[r], true : false;
 }
 
-bool dlp::literal_read(clause &c, bool negate) {
+bool dlp::literal_read(strbuf &in, clause &c, bool negate) {
 	bool eq;
-	const wchar_t *_s = in;
+	const strbuf _s(in.s);
 	int32_t w;
 	literal l;
-	if (!word_read(w)) return false;
+	if (!word_read(in, w)) return false;
 	l.push_back(w);
 	if (l.rel() < 0) parse_error(_s, in - _s, err_relvars);
 	if (negate) l.flip();
@@ -60,11 +63,11 @@ bool dlp::literal_read(clause &c, bool negate) {
 	if (eq) {
 		l.clear(), l.push_back(0), l.push_back(w);
 		while (iswspace(*in)) ++in;
-		if (!word_read(w)) return false;
+		if (!word_read(in, w)) return false;
 		l.push_back(w);
 	} else do {
 		while (iswspace(*in)) ++in;
-		if (word_read(w)) {
+		if (word_read(in, w)) {
 			l.push_back(w);
 			while (iswspace(*in)) ++in;
 			if (*in == L',') ++in;
@@ -75,25 +78,26 @@ bool dlp::literal_read(clause &c, bool negate) {
 	return c += l, ++in, true;
 }
 
-bool dlp::clause_read() {
+bool dlp::clause_read(strbuf &in) {
 	clause c;
-	const wchar_t *_s = in;
+	const strbuf _s(in.s);
 	while (iswspace(*in)) ++in;
 	if (!*in) return false;
-	while (literal_read(c, true));
+	while (literal_read(in, c, true));
 	if (*in == L'.') c.flip();
-	else if (*in++!=L'-'||*in++!=L'>')parse_error(_s, in-_s, err_expected3);
-	else while (*in != L'.' && literal_read(c, false))
+	else if (in.adv()!=L'-'||in.adv()!=L'>')parse_error(_s, in-_s, err_expected3);
+	else while (*in != L'.' && literal_read(in, c, false))
 		if (!c.lastrel()) parse_error(_s, in - _s, err_eq_in_head);
-	if (*in++ != L'.') parse_error(_s, in-_s, err_expected4);
+	if (in.adv() != L'.') parse_error(_s, in-_s, err_expected4);
 	return (*this += new clause(c)), c.clear(), true;
 }
 
-void dlp::program_read() { while (clause_read()); }
+void dlp::program_read(strbuf &in) { while (clause_read(in)); }
 
 void dlp::program_read(wistream &is) {
 	wstring s, r;
 	while (std::getline(is, s)) if (s == L"fin.") break; else r += s;
-	in = r.c_str(), program_read(), in = 0;
+	strbuf b(r.c_str());
+	program_read(b);
 //	DEBUG(L"finished reading program: " << endl << *this);
 }

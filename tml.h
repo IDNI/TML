@@ -35,6 +35,15 @@ public:
 };
 extern dict_t dict;
 
+struct strbuf {
+	const wchar_t *s;
+	strbuf(const wchar_t *s) : s(s) {}
+	strbuf& operator++() { ++s; return *this; }
+	wchar_t operator*() const { return *s; }
+	intptr_t operator-(const strbuf& t) const { return s - t.s; }
+	wchar_t adv() { return *s++; }
+};
+
 template<typename T = uint64_t>
 struct hash {
 	typedef const unsigned char* buf;
@@ -100,14 +109,13 @@ public:
 };
 
 class dlp : protected vector<const clause*> { // disjunctive logic program
-	const wchar_t *in;
 	typedef map<int32_t, map<size_t, size_t>> index_t;
 	index_t index;
 
-	bool word_read(int32_t&);
-	bool literal_read(clause&, bool negate);
-	bool clause_read();
-	void program_read();
+	bool word_read(strbuf&, int32_t&);
+	bool literal_read(strbuf&, clause&, bool negate);
+	bool clause_read(strbuf&);
+	void program_read(strbuf&);
 
 	void pe(const clause*, const literal*, const literal*, dlp&);
 
