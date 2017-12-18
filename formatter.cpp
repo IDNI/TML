@@ -24,9 +24,9 @@ wostream& operator<<(wostream &os, const literal &l) {
 }
 
 wostream& operator<<(wostream &os, const clause &c) {
-	for (const literal *l : c) if ((*l)[0] <=0) os << *l << L' ';
+	for (const literal *l : c) if (l->rel() <=0) os << *l << L' ';
 	os << L" -> ";
-	for (const literal *l : c) if ((*l)[0] > 0) os << *l << L' ';
+	for (const literal *l : c) if (l->rel() > 0) os << *l << L' ';
 	(os << L'.').flush();
 	return os;
 }

@@ -49,17 +49,19 @@ bool dlp::literal_read(clause &c, bool negate) {
 	bool eq;
 	const wchar_t *_s = in;
 	int32_t w;
-	literal l(1);
-	if (!word_read(l[0])) return false;
-	if (l[0] < 0) parse_error(_s, in - _s, err_relvars);
-	if (negate) l[0] = -l[0];
+	literal l;
+	if (!word_read(w)) return false;
+	l.push_back(w);
+	if (l.rel() < 0) parse_error(_s, in - _s, err_relvars);
+	if (negate) l.flip();
 	while (iswspace(*in)) ++in;
 	if (!(eq = *in==L'=')&&*in!=L'(') parse_error(_s, in-_s, err_expected1);
 	++in;
 	if (eq) {
-		l.resize(3), l[1] = l[0], l[0] = 0;
+		l.clear(), l.push_back(0), l.push_back(w);
 		while (iswspace(*in)) ++in;
-		if (!word_read(l[2])) return false;
+		if (!word_read(w)) return false;
+		l.push_back(w);
 	} else do {
 		while (iswspace(*in)) ++in;
 		if (word_read(w)) {
@@ -79,10 +81,10 @@ bool dlp::clause_read() {
 	while (iswspace(*in)) ++in;
 	if (!*in) return false;
 	while (literal_read(c, true));
-	if (*in == L'.') for (literal *l : c) (*l)[0] = -(*l)[0];
+	if (*in == L'.') for (literal *l : c) l->flip();
 	else if (*in++!=L'-'||*in++!=L'>')parse_error(_s, in-_s, err_expected3);
 	else while (*in != L'.' && literal_read(c, false))
-		if (!(*c.back())[0]) parse_error(_s, in - _s, err_eq_in_head);
+		if (!c.back()->rel()) parse_error(_s, in - _s, err_eq_in_head);
 	if (*in++ != L'.') parse_error(_s, in-_s, err_expected4);
 	return (*this += new clause(c)), c.clear(), true;
 }
