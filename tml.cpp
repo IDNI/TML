@@ -1,4 +1,5 @@
 #include "tml.h"
+#define ever ;;
 
 int32_t evaluate(int32_t v, env &e) {
 	if (v > 0) return v;
@@ -80,17 +81,22 @@ void dlp::pe(dlp &q) {
 	typedef const pair<size_t, size_t> index_element;
 	const clause *d;
 	const literal *g;
-	size_t  szp, szq, iter = 0;
-	do {	++iter, szp = size(), szq = q.size();
+	size_t  iter = 0;
+	set<hash<>, hash<>::hashcmp> hs;
+	hash<> h;
+	for (ever) {
+		++iter;
 		for (size_t n = 0; n < q.size(); ++n)
 			for (size_t k = 0; k < q[n]->size(); ++k) {
 				g = q.at(n)->at(k);
 				for(index_element& x : index[-g->rel()])
 					d = at(x.first),
 					pe(d, d->at(x.second), g, q);
-			//DEBUG(L"finished iteration "<<iter<< L" program len " << szp << endl);
+			}
+		if (hs.find(h = q.rehash()) == hs.end()) break;
+		hs.emplace(h);
+		//DEBUG(L"finished iteration "<<iter<< L" program len " << szp << endl);
 	}	
-	} while (size() != szp || q.size() != szq);
 }
 
 void dlp::pe(const clause *c, const literal *l, const literal *g, dlp &q) {

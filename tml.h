@@ -38,6 +38,11 @@ extern dict_t dict;
 template<typename T = uint64_t>
 struct hash {
 	typedef const unsigned char* buf;
+	struct hashcmp {
+		bool operator()(const hash<T> &x, const hash<T> &y) const {
+			return x.h < y.h;
+		}
+	};
 	T h = 0;
 	void operator()(buf s, size_t sz) {
 		while (sz--) h = *s+++((h<<6)+(h<<16));
@@ -94,7 +99,7 @@ public:
 	virtual ~clause();
 };
 
-class dlp : public vector<const clause*> { // disjunctive logic program
+class dlp : protected vector<const clause*> { // disjunctive logic program
 	const wchar_t *in;
 	typedef map<int32_t, map<size_t, size_t>> index_t;
 	index_t index;
@@ -105,6 +110,13 @@ class dlp : public vector<const clause*> { // disjunctive logic program
 	void program_read();
 
 	void pe(const clause*, const literal*, const literal*, dlp&);
+
+	hash<> rehash() {
+		hash<> h;
+		sort(begin(), end());
+		for (const clause *c : *this) h(c->h);
+		return h;
+	}
 public:
 	void program_read(wistream&);
 	void pe(dlp&);
