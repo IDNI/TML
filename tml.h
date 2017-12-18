@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cstdint>
 #include <iostream>
+#include <algorithm>
 using std::vector;
 using std::map;
 using std::set;
@@ -41,6 +42,8 @@ struct hash {
 	void operator()(buf s, size_t sz) {
 		while (sz--) h = *s+++((h<<6)+(h<<16));
 	}
+	void operator()(const hash<T> &h) { (*this)((buf)&h, sizeof(hash<T>)); }
+	void clear() { h = 0; }
 };
 
 typedef map<int32_t, int32_t> env;
@@ -70,11 +73,22 @@ public:
 	bool operator!=(const literal& l) const { return !(l==*(this)); }
 };
 
-struct clause : public vector<literal*> {
+class clause : protected vector<literal*> {
+	typedef vector<literal*> base;
+	void rehash() { h.clear(); for (literal *l : *this) h(l->h); }
+public:
 	clause() {}
 	clause(const clause&, env&);
+	hash<> h;
 
+	void sort() { std::sort(begin(), end()); rehash(); }
 	clause& operator+=(const literal &t);
+	void flip() { for (literal *l : *this) l->flip(); rehash(); }
+	void clear() { base::clear(), h.h = 0; }
+
+	size_t size() const { return base::size(); }
+	int32_t lastrel() const { return back()->rel(); }
+	const literal* at(size_t k) const { return base::at(k); }
 	friend wostream& operator<<(wostream &os, const clause&);
 	bool operator==(const clause&) const;
 	virtual ~clause();

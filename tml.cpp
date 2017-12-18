@@ -1,5 +1,4 @@
 #include "tml.h"
-#include <algorithm>
 
 int32_t evaluate(int32_t v, env &e) {
 	if (v > 0) return v;
@@ -69,7 +68,7 @@ clause& clause::operator+=(const literal &t) {
 }
 ////////////////////////////////////////////////////////////////////////////////
 dlp& dlp::operator+=(clause *c) {
-	sort(c->begin(), c->end());
+	c->sort();
 	for (const clause *d : *this) if (*d == *c) return *this;
 	for (size_t k = 0; k < c->size(); ++k)
 		index[c->at(k)->rel()][size()] = k;

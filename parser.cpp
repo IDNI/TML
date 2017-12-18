@@ -81,10 +81,10 @@ bool dlp::clause_read() {
 	while (iswspace(*in)) ++in;
 	if (!*in) return false;
 	while (literal_read(c, true));
-	if (*in == L'.') for (literal *l : c) l->flip();
+	if (*in == L'.') c.flip();
 	else if (*in++!=L'-'||*in++!=L'>')parse_error(_s, in-_s, err_expected3);
 	else while (*in != L'.' && literal_read(c, false))
-		if (!c.back()->rel()) parse_error(_s, in - _s, err_eq_in_head);
+		if (!c.lastrel()) parse_error(_s, in - _s, err_eq_in_head);
 	if (*in++ != L'.') parse_error(_s, in-_s, err_expected4);
 	return (*this += new clause(c)), c.clear(), true;
 }
