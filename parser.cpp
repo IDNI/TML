@@ -2,14 +2,6 @@
 
 dict_t dict;
 
-const wchar_t err_misquote[]  = L"The only quotable chars are ()->=\\\"";
-const wchar_t err_relvars[]   = L"Relation variables are not allowed";
-const wchar_t err_eq_in_head[]= L"Equality not allowed in head";
-const wchar_t err_expected1[] = L"Expected ( or =";
-const wchar_t err_expected2[] = L"Unexpected character";
-const wchar_t err_expected3[] = L"Expected . or ->";
-const wchar_t err_expected4[] = L"Expected '.'";
-
 int32_t dict_t::operator[](const wstring &s) {
 	map<wstring, size_t>::const_iterator it = m.find(s);
 	if (it != m.end()) return it->second;
@@ -29,7 +21,7 @@ void parse_error(const strbuf &s, intptr_t p, const wchar_t *err) {
 	parse_error(s.s, size_t(p), err);
 }
 
-bool dlp::word_read(strbuf& in, int32_t &t) {
+bool word_read(strbuf& in, int32_t &t) {
 	wstring r;
 	bool quote;
 	const strbuf _s(in.s);
@@ -48,7 +40,7 @@ bool dlp::word_read(strbuf& in, int32_t &t) {
 	return r.size() ? t = dict[r], true : false;
 }
 
-bool dlp::literal_read(strbuf &in, clause &c, bool negate) {
+bool literal_read(strbuf &in, clause &c, bool negate) {
 	bool eq;
 	const strbuf _s(in.s);
 	int32_t w;
@@ -75,25 +67,35 @@ bool dlp::literal_read(strbuf &in, clause &c, bool negate) {
 				parse_error(_s, in-_s, err_expected2);
 		}
 	} while (*in != L')');
+	l.rehash();
 	return c += l, ++in, true;
 }
 
-bool dlp::clause_read(strbuf &in) {
+clause* clause::clause_read(strbuf &in) {
 	clause c;
 	const strbuf _s(in.s);
 	while (iswspace(*in)) ++in;
-	if (!*in) return false;
+	if (!*in) return 0;
 	while (literal_read(in, c, true));
 	if (*in == L'.') c.flip();
-	else if (in.adv()!=L'-'||in.adv()!=L'>')parse_error(_s, in-_s, err_expected3);
-	else while (*in != L'.' && literal_read(in, c, false))
+	else if (in.adv() != L'-' || in.adv() != L'>')
+		parse_error(_s, in - _s, err_expected3);
+	else while (*in != L'.' && literal_read(in, c, 0))
 		if (!c.lastrel()) parse_error(_s, in - _s, err_eq_in_head);
 	if (in.adv() != L'.') parse_error(_s, in-_s, err_expected4);
-	return (*this += new clause(c)), c.clear(), true;
+	clause *r = new clause(c);
+	return r->rehash(), c.clear(), r;
 }
 
-void dlp::program_read(strbuf &in) { while (clause_read(in)); }
+void dlp::program_read(strbuf &in) { clause *c; while ((c=clause::clause_read(in))) *this+=c; }
 
+clause* clause::clause_read(wistream &is) {
+	wstring s, r;
+	while (std::getline(is, s)) if (s == L"fin.") break; else r += s;
+	strbuf b(r.c_str());
+	return clause_read(b);
+//	DEBUG(L"finished reading program: " << endl << *this);
+}
 void dlp::program_read(wistream &is) {
 	wstring s, r;
 	while (std::getline(is, s)) if (s == L"fin.") break; else r += s;

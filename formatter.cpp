@@ -18,7 +18,7 @@ wostream& operator<<(wostream &os, const literal &l) {
 	else {	os << dict[l[0]] << L'(';
 		if (l.size() > 1) os << dict[l[1]];
 		for (size_t n = 2; n < l.size(); ++n) os << L',' << dict[l[n]];
-		(os << L')' << L'[' << l.h.h << L']').flush();
+		(os << L')'/* << L'[' << l.hash << L']'*/).flush();
 	}
 	return os;
 }
@@ -27,7 +27,7 @@ wostream& operator<<(wostream &os, const clause &c) {
 	for (const literal *l : c) if (l->rel() <=0) os << *l << L' ';
 	os << L" -> ";
 	for (const literal *l : c) if (l->rel() > 0) os << *l << L' ';
-	(os << L'.' << L'[' << c.h.h << L']').flush();
+	(os << L'.' << L'[' << c.hash << L']').flush();
 	return os;
 }
 
