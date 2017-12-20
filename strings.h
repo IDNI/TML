@@ -24,6 +24,7 @@ const wchar_t err_expected1[] = L"Expected '(' or variables or constants";
 const wchar_t err_expected2[] = L"Unexpected character";
 const wchar_t err_expected3[] = L"Expected . or ->";
 const wchar_t err_expected4[] = L"Expected '.'";
+const wchar_t err_neg[]=L"Only predicates (relations) allowed to be negated";
 
 class dict_t {
 	vector<wstring> strings;

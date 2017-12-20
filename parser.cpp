@@ -30,7 +30,7 @@ bool part_of_word(wchar_t c) {
 	return iswalnum(c) || wcschr(L"?!=+*/_:;~`'[]{}", c);
 }
 
-bool word_read(strbuf& in, int32_t &t) {
+bool word_read(strbuf& in, int32_t &t, bool &neg) {
 	wstring r;
 //	bool quote;
 	const strbuf _s(in.s);
@@ -46,35 +46,42 @@ bool word_read(strbuf& in, int32_t &t) {
 //		if (*in == L'\\') quote = true;
 //	} while (quote);
 	while (iswspace(*in)) ++in;
+	if ((neg = r[0] == L'!')) r.erase(r.begin());
 	return r.size() ? t = dict[r], true : false;
 }
 
-bool literal_read(strbuf &in, clause &c, bool negate) {
-	bool triple;
+bool literal_read(strbuf &in, clause &c, bool body) {
+	bool triple, neg;
 	const strbuf _s(in.s);
 	int32_t w;
 	literal l;
-	if (!word_read(in, w)) return false;
+	if (!word_read(in, w, neg)) return false;
 	while (iswspace(*in)) ++in;
 	if ((triple = *in != L'(')) {
 		int32_t _w = w;
-		if (!word_read(in, w)) parse_error(_s, in - _s, err_expected1);
+		bool _neg;
+		if (!word_read(in, w, _neg))
+		if (_neg) parse_error(_s, in - _s, err_neg);
 		l.push_back(w), l.push_back(_w); // pred is second
-		while (word_read(in, w)) l.push_back(w);
-		if (negate) l.flip();
+		while (word_read(in, w, _neg))
+			if (_neg) parse_error(_s, in - _s, err_neg);
+			else l.push_back(w);
+		if (neg) l.flip();
+		if (body) l.flip();
 	} else {
 		if (w < 0) parse_error(_s, in - _s, err_relvars);
 		++in, l.push_back(w);
-		if (negate) l.flip();
+		if (neg) l.flip();
+		if (body) l.flip();
 		do {
+			if (!word_read(in, w, neg))
+				parse_error(_s, in - _s, err_expected1);
+			if (neg) parse_error(_s, in - _s, err_neg);
+			l.push_back(w);
 			while (iswspace(*in)) ++in;
-			if (word_read(in, w)) {
-				l.push_back(w);
-				while (iswspace(*in)) ++in;
-				if (*in == L',') ++in;
-				else if (!part_of_word(*in) && *in != L')')
-					parse_error(_s, in-_s, err_expected2);
-			}
+			if (*in == L',') ++in;
+			else if (!part_of_word(*in) && *in != L')')
+				parse_error(_s, in-_s, err_expected2);
 		} while (*in != L')');
 	}
 	l.rehash();

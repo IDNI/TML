@@ -1,0 +1,4 @@
+edge(?x,?y) -> path(?x,?y).
+path(?x,?y) edge(?y, ?z) -> !path(?x, ?z).
+fin.
+edge(1,2) edge(2,3) edge(3,4).
