@@ -3,6 +3,7 @@
 #define ever ;;
 
 dlp& dlp::operator+=(clause *c) {
+	if (!c->size()) return *this;
 	c->sort();
 	for (const clause *d : *this) if (*d == *c) return *this;
 	for (size_t k = 0; k < c->size(); ++k)
@@ -14,33 +15,42 @@ dlp& dlp::operator+=(clause *c) {
 void dlp::pe(clause &q) {
 	typedef const pair<size_t, size_t> index_element;
 	const clause *d;
-	clause *t;
 	const literal *g;
+	bool fail;
+	clause *t;
 	env e;
-	size_t  iter = 0;
+	size_t iter = 0;
 	uint64_t h = 0;
 	set<uint64_t> hs;
 	for (ever) {
 		++iter;
 		for (size_t k = 0; k < q.size(); ++k) {
 			g = q.at(k);
+			DEBUG(L"g: " << *g);
 			for(index_element& x : index[-g->rel()]) {
 				d = at(x.first);
-				if (!d->at(x.second)->unify(*g, e)) { e.clear(); continue; }
+				DEBUG(L"d: " << *d << endl);
+				if (!d->at(x.second)->unify(*g, e)) goto next;
+				DEBUG(L" unification passed with e: "<<e<<endl);
 				t = new clause(*d, e);
-				if ((*t += *g).size() == 1) q += *t->unit();
-				else *this += t;
-				e.clear();
+				DEBUG(L" t1: " << *t << endl);
+//				if (t->add(*g, fail) && !fail && !t->size())
+//					goto unsat;
+				if (t->size() == 1) {
+					if (!q.add(*t->unit(), fail))goto unsat;
+				} else *this += t;
+next:				e.clear();
+				DEBUG(endl<<L"finished iteration "<<iter<<endl);
+				DEBUG(*this << endl << endl << q << endl);
 			}
 		}
-		if (h == q.hash) {
+		if (h == q.rehash() && q.size()) {
 			wcout<<L"Done, satisfiable"<<endl;
 			return;
-		} else if (hs.find(q.hash) != hs.end()) {
-			wcout<<L"Done, unsatisfiable"<<endl;
+		} else if (hs.find(q.hash) != hs.end() || !q.size()) {
+unsat:			wcout<<L"Done, unsatisfiable"<<endl;
 			return;
 		} else hs.emplace(h = q.hash);
-		//DEBUG(L"finished iteration "<<iter<< L" program len " << szp << endl);
 	}	
 }
 
@@ -51,7 +61,7 @@ int32_t main() {
 	dlp p;
 	clause *q;
 	p.program_read(wcin), q = clause::clause_read(wcin);
-	wcout<<p<<endl<<*q<<endl;
+//	wcout<<p<<endl<<*q<<endl;
 	p.pe(*q);
-	wcout<<p<<endl<<*q<<endl;
+//	wcout<<p<<endl<<*q<<endl;
 }

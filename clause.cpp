@@ -12,14 +12,23 @@ bool clause::operator==(const clause &l) const {
 	return true;
 }
 
-clause& clause::operator+=(const literal &t) {
+clause& clause::operator+=(const literal &t) { bool b; add(t, b); return *this;}
+
+bool clause::add(const literal &t, bool &eqfail) {
+	if (t.at(1) > 0 && t.at(2) > 0) {
+		if (	(t.rel() == rel_equality && t.at(1) != t.at(2)) ||
+			(t.rel() ==-rel_equality && t.at(1) == t.at(2)))
+			return eqfail = false;
+	}
+	if (t.at(1) == t.at(2) && t.rel() ==-rel_equality)return eqfail = false;
 	for (size_t n = 0, s = size(); n != s; ++n)
 		if (t.same_atom(*at(n))) {
-			if (at(n)->rel() != t.rel()) erase(begin()+n), rehash();
-			return *this;
+			if (at(n)->rel() != t.rel())
+				return erase(begin() + n), rehash(), false;
+			return eqfail = true;
 		}
 	literal *l = new literal(t);
-	return (hash += l->hash * size()), push_back(l), *this;
+	return (hash += l->hash * size()), push_back(l), eqfail = true;
 }
 
 uint64_t clause::rehash() {

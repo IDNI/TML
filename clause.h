@@ -14,10 +14,11 @@ public:
 	uint64_t hash = 0;
 	uint64_t rehash();
 	void sort();
-	clause& operator+=(const literal &t);
+	bool add(const literal&, bool&);
 	void flip();
 	void clear();
 	literal *unit() const;
+	clause& operator+=(const literal&);
 
 	size_t size() const;
 	int32_t lastrel() const;

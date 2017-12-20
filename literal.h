@@ -19,13 +19,15 @@ public:
 	uint64_t hash;
 	literal();
 	literal(size_t sz);
-	literal(const literal &, env& e);
+	literal(const literal&);
+	literal(const literal&, env&);
 
 	void push_back(int32_t i);
 	void clear();
 	void flip();
 	uint64_t rehash();
 
+	int32_t at(size_t k) const;
 	bool same_atom(const literal &l) const;
 	int32_t rel() const;
 	friend wostream& operator<<(wostream &os, const literal&);

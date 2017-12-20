@@ -4,7 +4,6 @@ dict_t dict;
 
 dict_t::dict_t() {
 	if ((*this)[L"="] != 1) { wcerr<<L"dict error"; throw L""; }
-	if ((*this)[L"!="] != 2) { wcerr<<L"dict error"; throw L""; }
 }
 
 int32_t dict_t::operator[](const wstring &s) {
@@ -109,14 +108,18 @@ void dlp::program_read(strbuf &in) { clause *c; while ((c=clause::clause_read(in
 
 clause* clause::clause_read(wistream &is) {
 	wstring s, r;
-	while (std::getline(is, s)) if (s == L"fin.") break; else r += s;
+	while (std::getline(is, s))
+		if (s == L"fin.") break;
+		else if (s[0] != L'#') r += s;
 	strbuf b(r.c_str());
 	return clause_read(b);
 //	DEBUG(L"finished reading program: " << endl << *this);
 }
 void dlp::program_read(wistream &is) {
 	wstring s, r;
-	while (std::getline(is, s)) if (s == L"fin.") break; else r += s;
+	while (std::getline(is, s)) 
+		if (s == L"fin.") break; 
+		else if (s[0] != L'#') r += s;
 	strbuf b(r.c_str());
 	program_read(b);
 //	DEBUG(L"finished reading program: " << endl << *this);

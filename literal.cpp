@@ -10,6 +10,7 @@ int32_t evaluate(int32_t v, env &e) {
 	return e[v] = u;
 } 
 
+literal::literal(const literal &l) : base(l), hash(l.hash) {}
 literal::literal(const literal &l, env& e) {
 //	DEBUG(endl<<L"evaluating "<<(*this)<<L" with "<<e<<L" giving ");
 	push_back(l[0]);
@@ -56,3 +57,4 @@ literal::literal(size_t sz) : base(sz) {}
 void literal::clear() { base::clear(); }
 int32_t literal::rel() const { return at(0); }
 size_t literal::size() const { return base::size(); }
+int32_t literal::at(size_t k) const { return base::at(k); }
