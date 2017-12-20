@@ -20,7 +20,7 @@ using std::wostream;
 const wchar_t err_misquote[]  = L"The only quotable chars are ()->=\\\"";
 const wchar_t err_relvars[]   = L"Relation variables are not allowed";
 //const wchar_t err_eq_in_head[]= L"Equality not allowed in head";
-const wchar_t err_expected1[] = L"Expected ( or =";
+const wchar_t err_expected1[] = L"Expected '(' or variables or constants";
 const wchar_t err_expected2[] = L"Unexpected character";
 const wchar_t err_expected3[] = L"Expected . or ->";
 const wchar_t err_expected4[] = L"Expected '.'";
@@ -29,6 +29,7 @@ class dict_t {
 	vector<wstring> strings;
 	map<wstring, size_t> m;
 public:
+	dict_t();
 	int32_t operator[](const wstring&);
 	wstring operator[](int32_t) const;
 	friend wostream& operator<<(wostream &os, const dict_t&);
