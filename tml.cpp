@@ -14,7 +14,9 @@ dlp& dlp::operator+=(clause *c) {
 void dlp::pe(clause &q) {
 	typedef const pair<size_t, size_t> index_element;
 	const clause *d;
+	clause *t;
 	const literal *g;
+	env e;
 	size_t  iter = 0;
 	uint64_t h = 0;
 	set<uint64_t> hs;
@@ -22,8 +24,14 @@ void dlp::pe(clause &q) {
 		++iter;
 		for (size_t k = 0; k < q.size(); ++k) {
 			g = q.at(k);
-			for(index_element& x : index[-g->rel()])
-				d = at(x.first), pe(d, d->at(x.second), g, q);
+			for(index_element& x : index[-g->rel()]) {
+				d = at(x.first);
+				if (!d->at(x.second)->unify(*g, e)) { e.clear(); continue; }
+				t = new clause(*d, e);
+				if ((*t += *g).size() == 1) q += *t->unit();
+				else *this += t;
+				e.clear();
+			}
 		}
 		if (h == q.hash) {
 			wcout<<L"Done, satisfiable"<<endl;
@@ -34,17 +42,6 @@ void dlp::pe(clause &q) {
 		} else hs.emplace(h = q.hash);
 		//DEBUG(L"finished iteration "<<iter<< L" program len " << szp << endl);
 	}	
-}
-
-void dlp::pe(const clause *c, const literal *l, const literal *g, clause &q) {
-	env e;
-	clause *d;
-//	DEBUG(L"pe: c="<<*c<<L" l="<<*l<<L" g="<<*g<<endl);
-	if (l->unify(*g, e)) {
-		d = new clause(*c, e);
-		if ((*d += *g).size() == 1) q += *d->unit();
-		else *this += d;
-	}
 }
 
 dlp::~dlp()  { for (const clause *c : *this) delete c; clear(); }

@@ -24,10 +24,7 @@ using std::runtime_error;
 class dlp : protected vector<const clause*> { // disjunctive logic program
 	typedef map<int32_t, map<size_t, size_t>> index_t;
 	index_t index;
-
 	void program_read(strbuf&);
-
-	void pe(const clause*, const literal*, const literal*, clause&);
 public:
 	void program_read(wistream&);
 	void pe(clause&);
