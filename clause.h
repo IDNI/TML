@@ -14,7 +14,7 @@ public:
 	uint64_t hash = 0;
 	uint64_t rehash();
 	void sort();
-	bool add(const literal&, bool&);
+	bool add(const literal&);
 	void flip();
 	void clear();
 	literal *unit() const;

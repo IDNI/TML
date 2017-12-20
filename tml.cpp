@@ -16,7 +16,6 @@ void dlp::pe(clause &q) {
 	typedef const pair<size_t, size_t> index_element;
 	const clause *d;
 	const literal *g;
-	bool fail;
 	clause *t;
 	env e;
 	size_t iter = 0;
@@ -34,10 +33,8 @@ void dlp::pe(clause &q) {
 				DEBUG(L" unification passed with e: "<<e<<endl);
 				t = new clause(*d, e);
 				DEBUG(L" t1: " << *t << endl);
-//				if (t->add(*g, fail) && !fail && !t->size())
-//					goto unsat;
 				if (t->size() == 1) {
-					if (!q.add(*t->unit(), fail))goto unsat;
+					if (!q.add(*t->unit()))goto unsat;
 				} else *this += t;
 next:				e.clear();
 				DEBUG(endl<<L"finished iteration "<<iter<<endl);
