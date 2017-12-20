@@ -20,14 +20,11 @@ void dlp::pe(clause &q) {
 	set<uint64_t> hs;
 	for (ever) {
 		++iter;
-//		for (size_t n = 0; n < q.size(); ++n)
-			//for (size_t k = 0; k < q[n]->size(); ++k) {
-			for (size_t k = 0; k < q.size(); ++k) {
-				g = q.at(k);
-				for(index_element& x : index[-g->rel()])
-					d = at(x.first),
-					pe(d, d->at(x.second), g, q);
-			}
+		for (size_t k = 0; k < q.size(); ++k) {
+			g = q.at(k);
+			for(index_element& x : index[-g->rel()])
+				d = at(x.first), pe(d, d->at(x.second), g, q);
+		}
 		if (h == q.hash) {
 			wcout<<L"Done, satisfiable"<<endl;
 			return;

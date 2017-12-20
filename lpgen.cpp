@@ -21,7 +21,7 @@ nat fpl(mpreal x) {
 	return (nat)ceil(f);
 }
 int main() {
-	mpreal::set_default_prec(4096);
+	mpreal::set_default_prec(128);
 	std::cout<<"// this is an automatically generated file"<<std::endl;
 	std::cout<<"const uint64_t logprimes[256] = {";
 	for (nat n = 3, k = 0;k < 256;++n)

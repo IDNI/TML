@@ -19,13 +19,12 @@ using std::wostream;
 
 const wchar_t err_misquote[]  = L"The only quotable chars are ()->=\\\"";
 const wchar_t err_relvars[]   = L"Relation variables are not allowed";
-const wchar_t err_eq_in_head[]= L"Equality not allowed in head";
+//const wchar_t err_eq_in_head[]= L"Equality not allowed in head";
 const wchar_t err_expected1[] = L"Expected ( or =";
 const wchar_t err_expected2[] = L"Unexpected character";
 const wchar_t err_expected3[] = L"Expected . or ->";
 const wchar_t err_expected4[] = L"Expected '.'";
 
-uint64_t lphash(const int32_t& t);
 class dict_t {
 	vector<wstring> strings;
 	map<wstring, size_t> m;

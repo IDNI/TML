@@ -47,28 +47,32 @@ bool literal_read(strbuf &in, clause &c, bool negate) {
 	literal l;
 	if (!word_read(in, w)) return false;
 	l.push_back(w);
-	if (l.rel() < 0) parse_error(_s, in - _s, err_relvars);
-	if (negate) l.flip();
 	while (iswspace(*in)) ++in;
 	if (!(eq = *in==L'=')&&*in!=L'(') parse_error(_s, in-_s, err_expected1);
 	++in;
 	if (eq) {
 		l.clear(), l.push_back(0), l.push_back(w);
+		if (negate) l.flip();
 		while (iswspace(*in)) ++in;
 		if (!word_read(in, w)) return false;
 		l.push_back(w);
-	} else do {
-		while (iswspace(*in)) ++in;
-		if (word_read(in, w)) {
-			l.push_back(w);
+	} else {
+		if (l.rel() < 0) parse_error(_s, in - _s, err_relvars);
+		if (negate) l.flip();
+		do {
 			while (iswspace(*in)) ++in;
-			if (*in == L',') ++in;
-			else if (!iswalnum(*in) && *in != L')')
-				parse_error(_s, in-_s, err_expected2);
-		}
-	} while (*in != L')');
+			if (word_read(in, w)) {
+				l.push_back(w);
+				while (iswspace(*in)) ++in;
+				if (*in == L',') ++in;
+				else if (!iswalnum(*in) && *in != L')')
+					parse_error(_s, in-_s, err_expected2);
+			}
+		} while (*in != L')');
+	}
 	l.rehash();
-	return c += l, ++in, true;
+	if (!eq) ++in;
+	return c += l, true;
 }
 
 clause* clause::clause_read(strbuf &in) {
@@ -80,8 +84,8 @@ clause* clause::clause_read(strbuf &in) {
 	if (*in == L'.') c.flip();
 	else if (in.adv() != L'-' || in.adv() != L'>')
 		parse_error(_s, in - _s, err_expected3);
-	else while (*in != L'.' && literal_read(in, c, 0))
-		if (!c.lastrel()) parse_error(_s, in - _s, err_eq_in_head);
+	else while (*in != L'.' && literal_read(in, c, 0));
+//		if (!c.lastrel()) parse_error(_s, in - _s, err_eq_in_head);
 	if (in.adv() != L'.') parse_error(_s, in-_s, err_expected4);
 	clause *r = new clause(c);
 	return r->rehash(), c.clear(), r;

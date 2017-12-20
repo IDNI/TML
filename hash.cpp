@@ -4,9 +4,9 @@
 
 uint64_t lphash(const int32_t& t) {
 	uint64_t h = 0;
-	size_t len = sizeof(int32_t);
 	const unsigned char *c = (const unsigned char*)&t;
-	for (size_t n = 0; n < len; ++n)
-		h += logprimes[*c] * n; // order dependant
-	return h;
+	h += logprimes[*c++];
+	h += logprimes[*c++] * 2;
+	h += logprimes[*c++] * 3;
+	return h + logprimes[*c] * 4;
 }
