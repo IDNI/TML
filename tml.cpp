@@ -12,7 +12,7 @@ dlp& dlp::operator+=(clause *c) {
 	return *this;
 }
 
-void dlp::pe(clause &q) {
+bool dlp::pe(clause &q, size_t dep) {
 	typedef const pair<size_t, size_t> index_element;
 	const clause *d;
 	const literal *g;
@@ -20,33 +20,53 @@ void dlp::pe(clause &q) {
 	env e;
 	size_t iter = 0;
 	uint64_t h = 0;
-	set<uint64_t> hs;
+	static set<uint64_t> hs;
 	for (ever) {
 		++iter;
 		for (size_t k = 0; k < q.size(); ++k) {
 			g = q.at(k);
-			DEBUG(L"g: " << *g);
+			//DEBUG(L"g: " << *g);
 			for(index_element& x : index[-g->rel()]) {
 				d = at(x.first);
-				DEBUG(L"d: " << *d << endl);
+				//DEBUG(L" d: " << *d << endl);
 				if (!d->at(x.second)->unify(*g, e)) goto next;
-				DEBUG(L" unification passed with e: "<<e<<endl);
-				t = new clause(*d, e);
-				DEBUG(L" t1: " << *t << endl);
+				//DEBUG(L" unification passed with e: "<<e<<endl);
+				if (!(t=new clause(*d, e))->add(*g))goto unsat;
+				//DEBUG(L" t: " << *t << endl);
 				if (t->size() == 1) {
-					if (!q.add(*t->unit()))goto unsat;
-				} else *this += t;
+					if (!q.add(*t->unit())) goto unsat;
+				} else if (t->ground()) {
+					bool s = false, f = false;
+					for (size_t k = 0; k < t->size(); ++k){
+						dlp &pp = *new dlp(*this);
+						clause &qq = *new clause(q);
+						size_t sz = qq.size();
+						if (!qq.add(*t->at(k)) ||
+							sz==qq.size()  ||
+							hs.find(qq.rehash()) ==
+							hs.end()) continue;
+						f = true;
+						hs.emplace(qq.hash),
+						(s|=pp.pe(qq,1+dep));
+					}
+					if (!s) {
+						if (!f) { *this+=t; goto next; }
+						else goto unsat;
+					}
+				}
+				else *this += t;
 next:				e.clear();
-				DEBUG(endl<<L"finished iteration "<<iter<<endl);
-				DEBUG(*this << endl << endl << q << endl);
+				DEBUG(	endl<<L"finished iteration "<<iter
+					<< " dep " << dep <<endl
+					<< *this << endl << endl << q << endl);
 			}
 		}
 		if (h == q.rehash() && q.size()) {
 			wcout<<L"Done, satisfiable"<<endl;
-			return;
+			return true;
 		} else if (hs.find(q.hash) != hs.end() || !q.size()) {
 unsat:			wcout<<L"Done, unsatisfiable"<<endl;
-			return;
+			return false;
 		} else hs.emplace(h = q.hash);
 	}	
 }
@@ -60,5 +80,5 @@ int32_t main() {
 	p.program_read(wcin), q = clause::clause_read(wcin);
 //	wcout<<p<<endl<<*q<<endl;
 	p.pe(*q);
-//	wcout<<p<<endl<<*q<<endl;
+	wcout<<p<<endl<<*q<<endl;
 }

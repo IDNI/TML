@@ -38,6 +38,13 @@ uint64_t clause::rehash() {
 	return hash;
 }
 
+bool clause::ground() const {
+	for (const literal* l : *this)
+		if (!l->ground())
+			return false;
+	return true;
+}
+
 void clause::sort() { std::sort(begin(), end()); rehash(); }
 void clause::flip() { for (literal *l : *this) l->flip(); rehash(); }
 void clause::clear() { base::clear(); }

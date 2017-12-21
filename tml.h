@@ -27,7 +27,7 @@ class dlp : protected vector<const clause*> { // disjunctive logic program
 	void program_read(strbuf&);
 public:
 	void program_read(wistream&);
-	void pe(clause&);
+	bool pe(clause&, size_t = 0);
 	void index_write(wostream&) const;
 	uint64_t hash;
 	friend wostream& operator<<(wostream&, const dlp&);

@@ -17,9 +17,10 @@ public:
 	bool add(const literal&);
 	void flip();
 	void clear();
-	literal *unit() const;
 	clause& operator+=(const literal&);
 
+	literal *unit() const;
+	bool ground() const;
 	size_t size() const;
 	int32_t lastrel() const;
 	const literal* at(size_t k) const;

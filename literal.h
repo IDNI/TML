@@ -27,6 +27,7 @@ public:
 	void flip();
 	uint64_t rehash();
 
+	bool ground() const;
 	int32_t at(size_t k) const;
 	bool same_atom(const literal &l) const;
 	int32_t rel() const;

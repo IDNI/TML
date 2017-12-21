@@ -46,6 +46,11 @@ bool literal::same_atom(const literal &l) const {
 		!memcmp(parg(), l.parg(), (size() - 1)*sizeof(int32_t));
 }
 
+bool literal::ground() const {
+	for (size_t n = 1; n < size(); ++n) if (at(n) < 0) return false;
+	return true;
+}
+
 bool literal::operator==(const literal &l) const{return ((base)*this)==(base)l;}
 bool literal::operator!=(const literal& l) const { return !(l==*(this)); }
 const int32_t* literal::prel() const { return &((*((base*)this))[0]); }
