@@ -15,7 +15,7 @@ Datalog with negation.
 One major aspect in TML is recursion. In general, recursion is made of an
 iteration together with a stopping condition, but on TML we don't have an
 arbitrary stopping condition as in usual programming languages. A TML program
-defines what happens with every teration, and the backend then iterates the
+defines what happens with every iteration, and the backend then iterates the
 program until one of the two happens:
 
 1. Two consequetive iterations returned the same result, means that the state of
