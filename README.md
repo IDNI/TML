@@ -189,7 +189,7 @@ and our program becomes:
 Note the negation operator '!' in the third and fourth line. The fourth line
 further looks like a contradiction, but a close look shows it has a well-defined
 meaning: if on some iteration `S(1,4)` is set, then we unset it. Note that on our
-case, `S(1,4) is concluded only in an iteration where the third line yields
+case, `S(1,4)` is concluded only in an iteration where the third line yields
 it (as `T(1,4) & !E(1,4)`). Then iteration after the fourth line can be
 activated, and `S(1,4)` is unset. Our program is therefore satisfiable. If we
 had contradicting updates at the same iteration, then the relation must be empty
@@ -197,6 +197,9 @@ which in turn means going back to a previous nonconsequetive state (precisely
 the first step), therefore is evaluated as "fail".
 
 TODO on this README, partial list:
+
 	1. fix and finish
+
 	2. explain how partial evaluation works here
+
 	3. explain how to input/output strings/trees
