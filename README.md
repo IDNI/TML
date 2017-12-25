@@ -210,7 +210,7 @@ had contradicting updates at the same iteration, then the relation must be empty
 which in turn means going back to a previous nonconsequetive state (precisely
 the first step), therefore is evaluated as "fail".
 
-## Bytes and Bits
+## Bits and Bytes
 
 A bitstring is a monadic relation where the universe is the string's positions.
 If we have a string of N bits, our monadic relation will be the set of the
@@ -239,7 +239,7 @@ represents the set of literals:
 	...		// the first, last, and next character. note that we
 			// don't need it per string but just once globally
 	
-L# Formal Syntax
+## Formal Syntax
 
 The set of all TML programs can be defined by the following context-free grammar
 (in fact a regular grammar):
