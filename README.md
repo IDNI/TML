@@ -9,20 +9,21 @@ Can find us on ##idni @freenode
 
 # TML Tutorial (Unfinished Draft)
 
-We introduct TML (Tau Meta-Language). The language is quite similar flavors of
+We introduce TML (Tau Meta-Language). The language is quite similar flavors of
 Datalog with negation. It is intended to define other languages (hence Meta-
 Langauage) in a logical fashion. Our explanation comes in a top-down manner:
 Globally speaking, a TML program is a loop. We first describe the higher level
-behavior of the language and then turn to describe what happens in every loop,
-and then the actual input and output of TML programs.
+behavior of the loop and then turn to describe what happens in every iteration
+together with actual input and output of TML programs. This tutorial attempts to
+assume no math background and attempts to be self-contained.
 
 ## Recursion
 
-Specifically, maybe the most major aspect in TML is recursion. In general,
-recursion is made of an iteration together with a stopping condition, however
-on TML we don't have an arbitrary stopping condition as in usual programming
-languages. A TML program defines what happens within a single iteration, while
-evaluator then iterates the program until one of the two happens:
+Maybe the most major aspect in TML is recursion. In general, recursion is made
+of an iteration with a stopping condition, however on TML we don't have an
+arbitrary stopping condition as usual in programming languages. A TML program
+defines what happens within a single iteration, while evaluator then iterates
+the program until one of the two happens:
 
 1. Two consequetive iterations returned the same result, means that the state of
 the computation hasn't changed. This is called a Fixed-Point, and indeed TML is
@@ -37,20 +38,24 @@ There are only those two possibilities because the state space is finite, as we
 shall see. In both cases we actually detect a loop, we just consider it as fail
 if the loop has length greater than one, and accept the result otherwise. Those
 conditions characterize TML's fixed-point operator as what known as PFP (or
-Partial Fixed Point). In Finite Model Theory (resp. Descriptive Complexity) it
+Partial Fixed Point).
+
+*Remark: In Finite Model Theory (resp. Descriptive Complexity) it
 has been shown that PFP logic over finite ordered structures captures precisely
-all problems solvable in PSPACE.
+all problems solvable in PSPACE.*
 
 ## Models
 
 Every iteration is a map from a relational structure to itself, under the same
 vocabulary. A __relational structure__ (or a relational model, or just a
-"__model__" here sometimes) is a set of relations, and a relation is just a
-table. As in a table, each row is a tuple, and all rows have same number of
+"__model__" here sometimes) is a set of *relations*, while we think of relations
+as tables. As in a table, each row is a tuple, and all rows have same number of
 cells. If a relation is a table, then the width of every row, is what we call
 the Arity of the relation, as in binary (width 2), monadic (width 1), ternary,
 k-ary (width k) etc. Last, every table has a name, still two relations with the
 same name but with different arity are treated as if they had a different name.
+A relation over a set S is therefore a subset of a power of S (wrt Cartesian
+product).
 
 So the following is a just fine relational structure:
 
@@ -108,16 +113,14 @@ If they'd be considered the same, we'd call it an undirected graph.
 words, every digraph can be written as a table with two columns, and every such
 table represents a digraph.*
 
-The __transitive closure__ of a digraph is simply another
-digraph representing paths in the original graph. In other words, B=T(A) if
-and only if every two path-connected vertices in A are edge connected in B.
-Take the example graph G with vertices numbered 1,2,3,4:
+The __transitive closure__ of a digraph is simply another digraph representing
+paths in the original graph. In other words, B=TC(A) if and only if every two
+path-connected vertices in A are edge connected in B. Take the example graph G
+with vertices numbered 1,2,3,4:
 
-	1---->2
-	^ \   |
-	|  \  |
-	|   _|⌄
-	4<----3
+	1→2
+	↑↘↓
+	4←3
 
 Or explicitly, denoting the edge relation by E, we have five tuples:
 
@@ -130,64 +133,68 @@ Or explicitly, denoting the edge relation by E, we have five tuples:
 The transitive closure of the graph contains the following tuples in addition
 to the above five:
 
-	T(1,2) // the original edges
-	T(2,3)
-	T(3,4)
-	T(4,1)
-	T(1,3)
+	TC(1,2) // the original edges
+	TC(2,3)
+	TC(3,4)
+	TC(4,1)
+	TC(1,3)
 
-	T(1,4) // the new edges
-	T(2,1)
-	T(2,4)
-	T(3,1)
-	T(3,2)
-	T(4,2)
-	T(4,3)
+	TC(1,4) // the new edges
+	TC(2,1)
+	TC(2,4)
+	TC(3,1)
+	TC(3,2)
+	TC(4,2)
+	TC(4,3)
 
 On our case, the transitive closure forms a clique graph. The following TML
 TML defines the transitive closure of a binary relation E:
 
-	E(?x,?y)	 -> T(?x,?y)
-	T(?x,?y) E(?y,?z)-> T(?x,?z)
+	E(?x,?y)	  -> TC(?x,?y)
+	TC(?x,?y) E(?y,?z)-> TC(?x,?z)
 
 The arrow sign means to update the relational structure as we mentioned above
 and will demonstrate later on. The question mark in front of x,y,z denotes that
-they are [first-order] variables.This program is equivalent to the logical
+they are [first-order] variables. This program is equivalent to the logical
 formula:
 	
-	∀x,y,z E(x,y)->T(x,y) & [T(x,y)&E(y,z)->T(x,z)]
+	∀x,y,z E(x,y)->TC(x,y) & [TC(x,y)&E(y,z)->TC(x,z)]
 
 taken under the partial fixed point semantics as mentioned and will be detailed
 more. Observe that this formula has all its first-order variables bound, but all
-its second-order (relational) variables (T,E) free. What bounds then is the
-fixed point operator. So the formula is evaluated to "true" once the relations
-(or tables) are not changed if we apply the program again.
-In pseudocode we could write a single iteration as:
+its second-order (relational) variables (TC,E) free. What bounds them is the
+fixed point operator, namely they are meant to be calculated iteratively as
+above. The formula is evaluated to "true" once the relations (or tables) are not
+changed if we apply the program again.  In pseudocode we could write a single
+iteration of our TC program as:
 
 	for (x : vertices)
 		for (y : vertices)
 			for (z : vertices) {
-				if (E(x,y)) set T(x,y):=1;
-				if (T(x,y) && T(y,z)) set T(x,z):=1;
+				if (E(x,y)) set TC(x,y):=1;
+				if (TC(x,y) && TC(y,z)) set TC(x,z):=1;
 			}
 
 and the iteration is repeated as long as either the "set" operations don't
 change anything (a "pass" case), or when we repeat to a previous state and
 therefore will loop if will continue the same way (a "fail" case).
 
-Remark: Note that the definition of T is recursive, as it depends on T as well.
-Further, on our example graph we have a cycle, so without any care, the
+*Remark: Note that the definition of TC is recursive, as it depends on TC as
+well.  Further, on our example graph we have a cycle, so without any care, the
 recursion will never halt. We will demonstrate how PFP termination conditions
-avoid infinite loops.
+avoid infinite loops.*
+
+## Negation
 
 Our example contains no negation, or more precisely, it is made of Horn clauses
-only. It demonstrates a weaker case than PFP's being LFP or IFP. To demonstrate
-the full power of TML we add negation to our example. Suppose we're interested
-only on the new edges created by the transitive closure process, namely we
-remove from the relation T all edges from the original graph E. We denote this
-relation by S. In addition we explicitly remove from S the edge 1->4. So S is
-given by:
+only. It demonstrates LFP or IFP being weaker logics than PFP. We now add
+negation to our example. Suppose we're interested only on the new edges created
+by the transitive closure process, namely we remove from the relation TC all
+edges from the original graph E. We denote this relation by S. In addition we
+explicitly remove from S the edge 1->4. So S is given by:
 
+	S(2,1)
+	S(2,4)
 	S(3,1)
 	S(3,2)
 	S(4,2)
@@ -195,16 +202,16 @@ given by:
 
 and our program becomes:
 
-	E(?x,?y)	 	-> T(?x,?y)
-	T(?x,?y) E(?y,?z)	-> T(?x,?z)
-	T(?x,?y) !E(?x,?y)	-> S(?x,?y)
+	E(?x,?y)	 	-> TC(?x,?y)
+	TC(?x,?y) E(?y,?z)	-> TC(?x,?z)
+	TC(?x,?y) !E(?x,?y)	-> S(?x,?y)
 	S(1,4)			-> !S(1,4)
 
 Note the negation operator '!' in the third and fourth line. The fourth line
 further looks like a contradiction, but a close look shows it has a well-defined
 meaning: if on some iteration `S(1,4)` is set, then we unset it. Note that on our
 case, `S(1,4)` is concluded only in an iteration where the third line yields
-it (as `T(1,4) & !E(1,4)`). Then iteration after the fourth line can be
+it (as `TC(1,4) & !E(1,4)`). Then iteration after the fourth line can be
 activated, and `S(1,4)` is unset. Our program is therefore satisfiable. If we
 had contradicting updates at the same iteration, then the relation must be empty
 which in turn means going back to a previous nonconsequetive state (precisely
@@ -223,10 +230,10 @@ So for the bitstring 01000110 we'll have a monadic relation, call it M, having:
 
 A bytestring is a binary relation where the first argument is the string's
 position as in bitstrings, and the second argument represent the value of that
-byte, from -127 to 128. The built-in predicates +-\*\<=/ on those elements (chars
-and positions) will behave as usual and will overflow. A byte will overflow at
-8 bits and length will overflow at 64 bits.
-A relation may be defined as a string:
+byte, from -127 to 128. The built-in predicates +-\*\<=/ on those elements
+(chars and positions) will behave as usual and will overflow. A byte will
+overflow at 8 bits and length will overflow at 64 bits. A relation may be
+initialized from a string:
 
 	S"hello world"
 
@@ -238,7 +245,47 @@ represents the set of literals:
 	succ(1, 2) 	// builtin successor relation, using it can determine
 	...		// the first, last, and next character. note that we
 			// don't need it per string but just once globally
-	
+
+## Input and Output
+
+TML program really defines is a set of second-order variables, aka relations aka
+tables. On our TC example we had two relations, E and TC. We considered E as
+input and TC as output, but we could have take the same program and consider
+them the other way around. A TML program doesn't come with prescribed input and
+output relation names, but they come afterwards. But in order to continue from
+here we need to get a little deeper into the our fixed-point mechanism.
+
+When we ran the TC example we assumed that the table E has some information in
+it but the table TC begins empty and being filled during the execution of the
+program. Indeed, the fixed-point operator in PFP is defined to begin with the
+empty set. And this points to some asymmetry between input and output: it boils
+down to the initial state of the tables being "filled" for inputs and empty for
+outputs, and from there the program runs as usual. We therefore need TML's
+evaluator to be able to initialize relation before running the program, and to
+mark which relations are desired as output. Note that this is in contrast to
+most logic or database languges in which the output may be more flexible than
+whole tables.
+
+*Remark: A TML program has a fixed number of relation symbols, as it is
+impossible to dynamically create new relations in TML. Therefore per program
+one can define a fixed number of input and output relations.*
+
+## Partial Evaluation (PE)
+
+Partial evaluation is about a program that takes several inputs, and we're
+concerned with updating the program given part (but not all) of the inputs. In
+other words, consider a TML program involving 3 tables, where we're interested
+in two of them being input and the third being output. Further we'd like to
+specify only the first input, and generate a *reduct* (or *residue*) program
+that'd take one input relation but will perform the same computation as the
+original function over the two inputs.
+
+The canonical example of a program that takes two inputs at the scope of PE is
+an interpreter, and is very relevant to TML being a meta-language. An
+interpreter takes two parameters, a program and its input, and evaluates the
+program wrt the input. Partially-evaluating the interpreter wrt a given program
+yields a compiled program, and that'd be the first Futamura projection.
+
 ## Formal Syntax
 
 The set of all TML programs can be defined by the following context-free grammar
@@ -246,10 +293,9 @@ The set of all TML programs can be defined by the following context-free grammar
 
 	program		:= clause+ .
 	clause		:= [literal ws]* [->] [literal ws]*.
-	literal		:= snd([fst[,fst]*]) | fst snd fst
+	literal		:= snd([fst[,fst]*]) | fst snd fst | snd'"'identifier'"'
 	fst		:= [?]identifier
 	snd		:= [!]identifier // can be '=' and '!='
-			   | '"'identifier'"'
 	wchar 		:= <any UTF-8 char>
 	ws		:= <whitespace>
 	identifier	:= wchar-{ '-', '>', '!', '(', ')', ',', '.', '"', ws }
@@ -258,7 +304,7 @@ A model (as input or output of TML programs) is specified using the syntax:
 
 	model		:= clause+ .
 	clause		:= [equality|inequality ws]* [->] [literal ws]*.
-	literal		:= snd([fst[,fst]*]) | fst snd fst
+	literal		:= snd([fst[,fst]*]) | fst snd fst | snd'"'identifier'"'
 	fst		:= identifier // ground only
 	snd		:= [!]identifier | '"'identifier'"'
 
