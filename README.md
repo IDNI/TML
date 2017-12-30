@@ -3,14 +3,15 @@ Partial Evaluator (Futamura's style) to PFP (Partial Fixed Points, those logics
 that capture PSPACE over finite ordered structures). Nothing here is ready yet.
 
 Materials about PFP and Datalog can be found in any Finite Model Theory (or
-Descriptive Complexity Theory) book.
+Descriptive Complexity Theory) book. PFP was originally introduced by Abiteboul
+and Vianu (1989).
 
 Can find us on ##idni @freenode
 
 # TML Tutorial (Unfinished Draft)
 
-We introduce TML (Tau Meta-Language). The language is quite similar flavors of
-Datalog with negation. It is intended to define other languages (hence Meta-
+We introduce TML (Tau Meta-Language). The language is quite similar to flavors
+of Datalog with negation. It is intended to define other languages (hence Meta-
 Langauage) in a logical fashion. Our explanation comes in a top-down manner:
 Globally speaking, a TML program is a loop. We first describe the higher level
 behavior of the loop and then turn to describe what happens in every iteration
@@ -25,12 +26,12 @@ arbitrary stopping condition as usual in programming languages. A TML program
 defines what happens within a single iteration, while evaluator then iterates
 the program until one of the two happens:
 
-1. Two consequetive iterations returned the same result, means that the state of
+1. Two consecutive iterations returned the same result, means that the state of
 the computation hasn't changed. This is called a Fixed-Point, and indeed TML is
 a fixed-point logic language. If this happens, then this result is considered as
 the final result.
 
-2. Or, two nonconsequetive iterations returned the same result, in which case we
+2. Or, two nonconsecutive iterations returned the same result, in which case we
 consider the program ending with status "fail", or "no result" (this is not same
 as "empty result").
 
@@ -98,6 +99,8 @@ order only.*
 Each iteration is written as update conditions, of the form "if the current
 state satisfies ... then update the state to be ...". By "state" (or sometimes
 "stage") we refer to the relational structure evolving with each iteration.
+
+*This "update-based" presentation of PFP/Datalog semantics is taken from [2].*
 
 ## Example: Transitive Closure
 
@@ -212,10 +215,16 @@ further looks like a contradiction, but a close look shows it has a well-defined
 meaning: if on some iteration `S(1,4)` is set, then we unset it. Note that on our
 case, `S(1,4)` is concluded only in an iteration where the third line yields
 it (as `TC(1,4) & !E(1,4)`). Then iteration after the fourth line can be
-activated, and `S(1,4)` is unset. Our program is therefore satisfiable. If we
-had contradicting updates at the same iteration, then the relation must be empty
-which in turn means going back to a previous nonconsequetive state (precisely
-the first step), therefore is evaluated as "fail".
+activated, and `S(1,4)` is unset. Our program therefore doesn't contain a
+contradiction, nevertheless it fails because it has no fixed point, as it keeps
+adding and removing S(1,4) with every iteration, which is a loop of length 2. If
+we had contradicting updates at the same iteration, then the relation must be
+empty which in turn means going back to a previous nonconsecutive state
+(precisely the first step), therefore is evaluated also as "fail". Removing the
+fourth line completely gives an example of a program with both fixed point and
+negation. This is however still a weak case of negation called Stratified
+Negation. PFP further negations that allowed to appear everywhere including
+recursive statements.
 
 ## Bits and Bytes
 
@@ -248,27 +257,48 @@ represents the set of literals:
 
 ## Input and Output
 
-TML program really defines is a set of second-order variables, aka relations aka
-tables. On our TC example we had two relations, E and TC. We considered E as
-input and TC as output, but we could have take the same program and consider
-them the other way around. A TML program doesn't come with prescribed input and
-output relation names, but they come afterwards. But in order to continue from
-here we need to get a little deeper into the our fixed-point mechanism.
+What a TML program really defines is a set of second-order variables, aka
+relations aka tables. On our TC example we had two relations, E and TC. We
+considered E as input and TC as output, but we could have take the same program
+and consider them the other way around. A TML program doesn't come with
+prescribed input and output relation names, but they come afterwards. But in
+order to continue from here we need to get a little deeper into the our fixed-
+point mechanism.
 
 When we ran the TC example we assumed that the table E has some information in
 it but the table TC begins empty and being filled during the execution of the
 program. Indeed, the fixed-point operator in PFP is defined to begin with the
-empty set. And this points to some asymmetry between input and output: it boils
-down to the initial state of the tables being "filled" for inputs and empty for
-outputs, and from there the program runs as usual. We therefore need TML's
+empty set. And this points to some asymmetry between input and output: it
+amounts to the initial state of the tables being "filled" for inputs and empty
+for outputs, and from there the program runs as usual. We therefore need TML's
 evaluator to be able to initialize relation before running the program, and to
 mark which relations are desired as output. Note that this is in contrast to
 most logic or database languges in which the output may be more flexible than
 whole tables.
 
-*Remark: A TML program has a fixed number of relation symbols, as it is
-impossible to dynamically create new relations in TML. Therefore per program
-one can define a fixed number of input and output relations.*
+
+*Remark: A TML program has a fixed number of relation symbols which are the ones
+mentioned explicitly in the program, as the language deliberately offers no means
+to dynamically create new relations. Therefore per program one can define a fixed
+number of input and output relations.*
+
+## Combining Programs
+
+*On this section we follow terminology from [1]*
+
+The input-output design in the last section yields natural means of composing 
+rograms. The input which is a starting condition for the PFP iteration can be
+the output of another TML program. It would mean to run the first program, and
+then run the second program with the output of the first's. Apparently, this
+might not end with a PFP program, as we will have two loops instead of one.
+But turns out it is possible to combine two PFP programs into one program
+indeed. This is referred in the literature as the Transitivity property of PFP.
+
+First, we have to consider the case that the first program doesn't even have a
+fixed point, on which case the composition fails disregarding the second
+program. But we might be interested in cases where even if the first program
+fails, the second program continues with empty input. A program that always has
+a fixed point is called *totally defined*.
 
 ## Partial Evaluation (PE)
 
@@ -313,3 +343,10 @@ A model (as input or output of TML programs) is specified using the syntax:
 Note that TML supports both triple notation "subject predicate object" for
 binary predicates as well as and list notation "predicate(subject, object)".
 However the latter offers unbounded arity.
+
+## References
+
+[1] "Finite Model Theory" by Ebbinghaus and Flum.
+[2] "Finite Model Theory and Its Applications" by Gradel et al.
+[3] "Partial Evaluation of Computation Process – An Approach to a Compiler-
+    Compiler" by Futamura.
