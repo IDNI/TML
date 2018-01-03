@@ -175,7 +175,7 @@ iteration of our TC program as:
 		for (y : vertices)
 			for (z : vertices) {
 				if (E(x,y)) set TC(x,y):=1;
-				if (TC(x,y) && TC(y,z)) set TC(x,z):=1;
+				if (TC(x,y) && E(y,z)) set TC(x,z):=1;
 			}
 
 and the iteration is repeated as long as either the "set" operations don't
@@ -276,29 +276,10 @@ mark which relations are desired as output. Note that this is in contrast to
 most logic or database languges in which the output may be more flexible than
 whole tables.
 
-
 *Remark: A TML program has a fixed number of relation symbols which are the ones
 mentioned explicitly in the program, as the language deliberately offers no means
 to dynamically create new relations. Therefore per program one can define a fixed
 number of input and output relations.*
-
-## Combining Programs
-
-*On this section we follow terminology from [1]*
-
-The input-output design in the last section yields natural means of composing 
-rograms. The input which is a starting condition for the PFP iteration can be
-the output of another TML program. It would mean to run the first program, and
-then run the second program with the output of the first's. Apparently, this
-might not end with a PFP program, as we will have two loops instead of one.
-But turns out it is possible to combine two PFP programs into one program
-indeed. This is referred in the literature as the Transitivity property of PFP.
-
-First, we have to consider the case that the first program doesn't even have a
-fixed point, on which case the composition fails disregarding the second
-program. But we might be interested in cases where even if the first program
-fails, the second program continues with empty input. A program that always has
-a fixed point is called *totally defined*.
 
 ## Partial Evaluation (PE)
 
@@ -315,6 +296,36 @@ an interpreter, and is very relevant to TML being a meta-language. An
 interpreter takes two parameters, a program and its input, and evaluates the
 program wrt the input. Partially-evaluating the interpreter wrt a given program
 yields a compiled program, and that'd be the first Futamura projection.
+
+We support partial evaluation of whole relations only, means that one cannot
+supply an input table row by row but the whole table at once. Similarly, partial
+evaluation wrt a string cannot be done char by char but given the whole string.
+
+The PFP iteration number can be treated inside the program, by defining:
+
+	round(x) succ(x,y)	-> round(y)
+	round(x)		-> !round(x)
+
+We can then use this in order to perform partial evaluation. Suppose we'd like
+to partially evaluate the TC program wrt a graph with a single edge E(1,2). As
+we showed, this is equivalent to beginning the fixed point iteration with an
+initialized relation.  So we invoke as much rules as we can and we explicitly
+exclude the non-specialized original parts:
+
+	# the iteration number rules
+	round(x) succ(x,y)	-> round(y)
+	round(x)		-> !round(x)
+	# the evaluated part
+	round(0)		-> E(1,2)
+	# we keep evaluating as long as we can
+	round(1)		-> TC(1,2)
+	round(1) TC(x,1) E(1,2) -> TC(x,2)
+	# the unevaluated part. includes an explicit exclusion of the first
+	# rounds because we assume that the input relation E is fully given, so
+	# these rules may never be invoked again even with new input.
+	# otherwise they shouldv'e left untouched.
+	!round(0) !round(1) E(x,y)		-> TC(x,y)
+	!round(0) !round(1) TC(x,y) E(y,z)	-> TC(x,z)
 
 ## Formal Syntax
 
