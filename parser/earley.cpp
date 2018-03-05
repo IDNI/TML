@@ -10,6 +10,15 @@
 #include <sstream>
 #include <algorithm>
 using namespace std;
+
+#define DEBUG
+#ifdef DEBUG
+typedef const wchar_t* wsptr;
+wsptr dbg[10];
+void db(size_t n, const wstring& s) { dbg[n] = wcsdup(s.c_str()); }
+#else
+#define db(x, y)
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 typedef vector<wstring> rule;
 wstring format(wchar_t c) {
@@ -67,10 +76,9 @@ class cfg {
 	wstring es2str(size_t) const;
 
 	size_t find(const wstring& nt) const {
-		size_t r = distance(g.begin(), lower_bound(g.begin(), g.end(), rule{nt}));
-		return r;
+		return distance(g.begin(),
+				lower_bound(g.begin(), g.end(), rule{nt}));
        	}
-	void add_item(size_t d, size_t i, size_t k);
 	void print_cache(const dig<size_t>& d) const {
 		for (auto x : d.out) {
 			wcout << dr2str(x.first) << L" => ";
@@ -78,6 +86,9 @@ class cfg {
 			wcout << endl;
 		}
 	}
+	void add_item(size_t d, size_t i, size_t k);
+	void predict();
+	void complete();
 public:
 	cfg(const vector<rule>&, const wstring&);
 	void operator()(const wstring& in);
@@ -97,56 +108,60 @@ cfg::cfg(const vector<rule>& _g, const wstring& S) : g(_g),
 					c.add(k * w + g[k].size(), i*w+j+1);
 				else	c.add(k * w + g[k].size()-1, i*w+j+1);
 			}
-	wcout << L"predictor cache:" << endl; print_cache(p);
-	wcout << L"completer cache:" << endl; print_cache(c);
 	p.close(), c.close();
 	wcout << L"predictor tc:" << endl; print_cache(p);
 	wcout << L"completer tc:" << endl; print_cache(c);
 }
 void cfg::add_item(size_t d, size_t i, size_t k) {
-	//wcout << L"add_item(" << dr2str(d) << L", " << i << L")" << endl;
-	if (d%w==g[d/w].size() || !g[d/w][d%w].size())
-		ec[k].emplace(len*d+i);
+	db(1, dr2str(d));
+	db(2, ei2str(len*d+i));
+	if (d % w == g[d / w].size() || !g[d / w][d % w].size())
+		ec[k].emplace(len * d + i);
 	else if (find(g[d / w][d % w]) < g.size())
-		ep[k].emplace(len * d + i);
+		db(3, g[d / w][d % w]), ep[k].emplace(len * d + i);
 	else if (samechar(in[k], g[d / w][d % w]))
 		add_item(d + 1, i, k + 1);
+}
+void cfg::predict() {
+	for (size_t d : ep[n]) { // predict
+		db(1, ei2str(d));
+		if (p.has_outgoing(d / len))
+			for (size_t t : p.outgoing(d / len)) {
+				db(2, dr2str(t));
+				add_item(t, n, n);
+			}
+	}
+}
+void cfg::complete() {
+	for (size_t d : ec[n]) { // complete
+		db(1, ei2str(d));
+		if (c.has_outgoing(d / len))
+			for (size_t t : c.outgoing(d / len)) {
+				db(2, dr2str(t));
+				db(3, dr2str(t-1));
+				for (auto it=ep[d%len].lower_bound((t-1)*len);
+					it != ep[d%len].end() && *it==(t-1)*len; ++it){
+					db(4,ei2str(*it));
+					add_item(t, d%len, n);
+				}
+			}
+	}
 }
 void cfg::operator()(const wstring& _in) {
 	len = (in = _in).size() + 1;
 	es = new set<size_t>[in.size() + 1];
 	ep = new set<size_t>[in.size() + 1];
 	ec = new set<size_t>[in.size() + 1];
-	// eitem(d, i) to size_t: d*|a|+i i=e%|a| d=e/|a|
 	add_item(1 + w * find(L"S'"), 0, 0); 
 	for (n = 0; n < len; ++n) {
-//		wcout << es2str(n) << endl;
+		db(1, es2str(n));
 		size_t sp, sc;
 		do {
-		sp = ep[n].size();
-		sc = ec[n].size();
-		for (size_t d : ep[n]) { // predict
-			wcout << L"predicting " << ei2str(d) << endl;
-			if (p.has_outgoing(d / len))
-				for (size_t t : p.outgoing(d / len))
-					wcout << ei2str(d) <<
-						L" has p.outgoing " <<
-						dr2str(t) << endl,
-					add_item(t, n, n);
-		}
-		for (size_t d : ec[n]) { // complete
-			wcout << L"completing " << ei2str(d) << endl;
-			if (c.has_outgoing(d / len))
-				for (size_t t : c.outgoing(d / len)) {
-					wcout << ei2str(d) << L" has c.outgoing " << dr2str(t) << endl;
-					for (auto it=ep[d%len].lower_bound(t-1);
-						it != ep[d / len].end() &&
-						*it == t-1; ++it)
-						add_item(*it%len, d%len, n);
-				}
-		}
+			sp = ep[n].size();
+			sc = ec[n].size();
+			predict();
+			complete();
 		} while (sp != ep[n].size() && sc != ec[n].size());
-		wcout << es2str(n);
 	}
 	for (n = 0; n < len; ++n)
 		wcout << es2str(n);
@@ -158,6 +173,7 @@ void cfg::operator()(const wstring& _in) {
 wstring cfg::dr2str(size_t d) const {
 	const rule& r = g[d / w];
 	wstringstream ss;
+	ss << d << L':';
 	if (!(d % w)) ss << L"* ";
 	ss << L'[' << r[0] << L" -> ";
 	for (size_t n = 1; n < r.size(); ++n) {
@@ -169,6 +185,7 @@ wstring cfg::dr2str(size_t d) const {
 }
 wstring cfg::ei2str(size_t i) const {
 	wstringstream ss;
+	ss << i << L':';
 	ss << L"{ " << dr2str(i / len) << L", " << i % len << L" }";
 	return ss.str();
 }
@@ -185,13 +202,13 @@ int main(int, char**) {
 	setlocale(LC_ALL, "");
 	wstring S(L"S"), T(L"T"), B(L"B"), a(L"a"), b(L"b"), ws(L"ws"), eps,
 		A(L"A");
-	cfg g({ { S, a, S }, { S, eps }}, S);
-//	cfg g({ { S, S, T },
-//		{ S, a },
-//		{ B, eps },
-//		{ T, a, b },
-//		{ T, a }
-//		}, S);
-	g(L"a");
+//	cfg g({ { S, a, S }, { S, eps }}, S);
+	cfg g({ { S, S, T },
+		{ S, a },
+		{ B, eps },
+		{ T, a, b },
+		{ T, a }
+		}, S);
+	g(L"aa");
 	return 0;
 }
