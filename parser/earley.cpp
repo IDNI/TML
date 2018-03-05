@@ -1,233 +1,183 @@
-// a yet nonworking earley-scott parsing alog impl
-// -std=c++1z (for std::variant)
-
-#include <map>
-#include <set>
-#include <utility>
-#include <vector>
-#include <variant>
-#include <cwctype>
-#include <cassert>
+// -std=c++1z for std::sort and std::max_element
+#include <string>
 #include <iostream>
-
+#include <set>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <functional>
+#include <sstream>
+#include <algorithm>
 using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
-typedef vector	<wstring>				prod;
-typedef tuple	<wstring, prod, size_t>			drule;
-typedef tuple	<variant<wstring,drule>, size_t, size_t>node;
-typedef variant	<nullptr_t, node>			pnode;
-typedef tuple	<drule, size_t, pnode>			eitem;
-typedef map	<wstring, set<prod>>			cfg;
-typedef map	<node, set<pair<pnode, pnode>>>		sppf;
-typedef map	<wstring, set<eitem>>			eset;
-////////////////////////////////////////////////////////////////////////////////
-#define isnull(x) holds_alternative<nullptr_t>(x)
-#define rl(x) get<drule>(x)
-wstring afterdot(const drule& d) {
-	const prod& p = get<prod>(d);
-	return get<size_t>(d) >= p.size() ? wstring() : p[get<size_t>(d)];
-}
-eitem next(const eitem& e) {
-	eitem r(e);
-	return ++get<size_t>(rl(r)), r;
-}
-template<typename C, typename V> bool has(const C& x, const V& y) {
-	return x.find(y) != x.end();
-}
-bool nonterm(const cfg& g, const drule& d) { return has(g, afterdot(d)); }
-////////////////////////////////////////////////////////////////////////////////
+typedef vector<wstring> rule;
 wstring format(wchar_t c) {
 	if (!c) return L"eps";
 	if (iswspace(c)) return L"ws";
 	if (c == L'\r') return L"cr";
 	if (c == L'\n') return L"lf";
 	if (c == L'\t') return L"tab";
-	wstring r(1, c);
-	return r.push_back(0), r;
+	return wstring(1,c);
 }
 bool samechar(wchar_t c, const wstring& s) {
-	if (s == L"alnum") return iswalnum(c);
-	return s == format(c);
+	return s == L"alnum" ? iswalnum(c) : s == format(c);
 }
-wostream& operator<<(wostream& os, const pnode&);
-wostream& operator<<(wostream& os, const node&);
-wostream& operator<<(wostream& os, const drule&);
-wostream& operator<<(wostream& os, const wstring& s) {
-	return s.size() < 1 ? os << format(s[0]) : os << s.c_str();
-}
-#include "generic-formatting.hpp"
-wostream& operator<<(wostream& os, const node& n) {
-	os << L"< ";
-	if (holds_alternative<wstring>(get<0>(n))) os<<get<wstring>(get<0>(n));
-	else os << rl(get<0>(n));
-	return os << L',' << get<1>(n) << L',' << get<2>(n) << L" >";
-}
-wostream& operator<<(wostream& os, const pnode& p) {
-	return isnull(p) ? os << L"(null)" : os << get<node>(p);
-}
-wostream& operator<<(wostream& os, const drule& d) {
-	os << get<wstring>(d) << L" -> ";
-	for (size_t n = 0; n < get<prod>(d).size(); ++n) {
-		os << get<prod>(d)[n] << L" ";
-		if (n == get<size_t>(d)) os << L"* ";
-	}
-	if (get<prod>(d).size() == get<size_t>(d)) os << L"*";
-	return os;
-}
-wostream& operator<<(wostream& os, const sppf& F) {
-	for (auto x : F) {
-		os << x.first;
-		for (auto y : x.second)
-			os << L'(' << y.first << L", " << y.second << L"); ";
-		os << endl;
-	}
-	return os;
-}
+template<typename T> bool have_common(const T& x, const T& y) {
+	for (auto ix = x.begin(), iy = y.begin(); ix!=x.end() && iy!=y.end();)
+		if (*ix < *iy) ++ix; else if (*ix > *iy) ++iy; else return true;
+	return false;	
+} 
 ////////////////////////////////////////////////////////////////////////////////
-void copy(set<eitem>& l, const eset& e) {
-	l.clear();
-        for (auto x : e) for (auto y : x.second) l.emplace(y);
-}
-eitem pop(set<eitem>& s) {
-	eitem r = *s.begin();
-	s.erase(s.begin());
-	return r;
-}
-////////////////////////////////////////////////////////////////////////////////
-class earley {
-	set<eitem> R, _Q, Q;
-	set<node> V;
-	map<wstring, set<pnode>> H;
-	eset *E;
-	cfg& P;
-	sppf F;
-	wstring in, S;
-	size_t i = 0;
-	bool nonterm(const wstring& s) const { return has(P, s); }
-	void add_item(const wstring& X, eitem ei, pnode p) {
-		get<pnode>(ei) = p;
-		if (nonterm(X)) {
-		       	if (!has(E[i][X], ei))
-				E[i][X].emplace(ei), R.emplace(ei), 
-				wcout<<L"add_item(E, R): "<<X<<L' '<<ei<<endl;
-		}
-		else if (	(i < in.size()-1 && samechar(in[i+1], X)) ||
-				(i >= in.size()-1 && !X.size()))
-			Q.emplace(ei),
-			wcout<<L"add_item(Q): "<<X<<L' '<<ei<<endl;
-	}
-	node make_node(const eitem& e, pnode v, size_t k) {
-		bool b = true;
-		const drule& dr = rl(e);
-		variant<wstring, drule> s;
-		for (size_t j = get<size_t>(dr); j<get<prod>(dr).size()&&b; ++j)
-			b &= !get<prod>(dr)[j].size();
-		if (b) s = get<wstring>(dr);
-		else {	s = dr, b = true;
-			for (int j = 0; j < ((int)get<size_t>(dr)) - 1 &&b;++j)
-				b &= !get<prod>(dr)[j].size();
-			if (b) return (wcout<<L"returned node: " << v << endl),
-					get<node>(v);
-		}
-		node y(s, get<size_t>(e), k);
-		V.emplace(y);
-		if (isnull(get<pnode>(e))) F[y].emplace(v, nullptr);
-		else F[y].emplace(get<node>(get<pnode>(e)), v);
-		wcout << L"made node: " << y << endl;
-		return y;
-	}
-	void Rprocess(eitem lambda);
-	void Qprocess(eitem lambda, node& v);
+template<typename T>
+class dig { // digraph
 public:
-	earley(cfg& P, const wstring& in, wstring S) : P(P), in(in), S(S) {}
-	pair<const pnode&, const sppf&> operator()();
+	map<T, set<T>> in, out;
+	size_t sz = 0;
+	void add(const T& x, const T& y) {
+		if (out[x].emplace(y).second) in[y].emplace(x), ++sz;
+	}
+	bool has(const T& x, const T& y) {
+		auto it = out.find(x);
+		return it != out.end() && it->second.find(y) != it->second.end();
+	}
+	bool has_outgoing(const T& t) const { return out.find(t) != out.end(); }
+	bool has_incoming(const T& t) const { return in.find(t) != in.end(); }
+	const set<T>& outgoing(const T& t) const { return out.at(t); }
+	const set<T>& incoming(const T& t) const { return in.at(t); }
+	void close() {
+		for (size_t s = 0; s != sz;) {
+			s = sz;
+			for (const auto& x : out)
+				for (const auto& y : in)
+					if (have_common(x.second, y.second))
+						add(x.first, y.first);
+		}
+	}
 };
 ////////////////////////////////////////////////////////////////////////////////
-void earley::Rprocess(eitem lambda) {
-	wcout << L"lambda (R): " << lambda << endl;
-	const drule& dr = rl(lambda);
-	eitem x1, l1;
-	pnode w;
-	size_t h;
-	if (get<size_t>(dr) < get<prod>(dr).size()) {
-		const wstring& C = afterdot(rl(lambda));
-		for (const prod& delta : P[C])
-			add_item(C, {drule(C,delta,0),i,nullptr} , nullptr);
-		for (pnode v : H[C])
-			l1 = next(lambda), 
-			add_item(afterdot(rl(l1)), l1 , make_node(l1, v, i));
-	} else {
-		const wstring& D = get<wstring>(rl(lambda));
-		if (isnull(w = get<pnode>(lambda)))
-			get<pnode>(lambda) = w = node(D, i, i),
-			V.emplace(get<node>(w)),
-			F[get<node>(w)].emplace( node({}, i, i), nullptr);
-		if ((h = get<size_t>(lambda)) == i)
-			H[D].emplace(w);
-		for (const eitem& x : E[h][D])
-			x1 = next(x),
-			add_item(afterdot(rl(x1)), x1, make_node(x1, w, i));
+class cfg {
+	vector<rule> g;
+	dig<size_t> p, c;
+	const size_t w;
+	set<size_t> *es, *ep, *ec;
+	wstring in;
+	size_t n, len;
+
+	wstring dr2str(size_t) const;
+	wstring ei2str(size_t) const;
+	wstring es2str(size_t) const;
+
+	size_t find(const wstring& nt) const {
+		size_t r = distance(g.begin(), lower_bound(g.begin(), g.end(), rule{nt}));
+		return r;
+       	}
+	void add_item(size_t d, size_t i, size_t k) {
+		wcout << L"add_item(" << ei2str(d) << L", " << i << L")" << endl;
+		size_t rn = d / w, dot = d % w;
+		if (find(g[rn][dot]) < g.size())
+			(d%w == g[d/w].size() ? ec : ep)[k].emplace(len*d + i);
+		else if (samechar(in[k], g[rn][dot]))
+			add_item(d + 1, i, k + 1);
+	};
+	void print_cache(const dig<size_t>& d) const;
+public:
+	cfg(const vector<rule>&, const wstring&);
+	void operator()(const wstring& in);
+};
+////////////////////////////////////////////////////////////////////////////////
+void cfg::print_cache(const dig<size_t>& d) const {
+	for (auto x : d.out) {
+		wcout << dr2str(x.first) << L" => ";
+		for (auto y : x.second) wcout << dr2str(y) << L" ";
+		wcout << endl;
 	}
-}	
-void earley::Qprocess(eitem lambda, node& v) {
-	drule& dr = rl(lambda);
-	if (get<size_t>(dr) < get<prod>(dr).size())
-		++get<size_t>(dr);
-	wcout << L"lambda (Q): " << lambda << endl;
-	get<pnode>(lambda) = make_node(lambda, v, i + 1);
-	wstring nx(afterdot(dr));
-	if (nonterm(nx) || (!nx.size() && i<in.size()))
-		E[i+1][nx].emplace(lambda);
-	else if (i < in.size()-2 && !nonterm(nx) &&
-		get<size_t>(dr) < get<prod>(dr).size()-1 &&samechar(in[i+2],nx))
-		_Q.emplace(lambda);
 }
-pair<const pnode&, const sppf&> earley::operator()() {
-	E = new eset[in.size() + 1];
-	wstring nx;
-	for (const prod& alpha : P[S])
-		if (nonterm(alpha[0]))
-			E[0][alpha[0]].emplace(drule(S, alpha, 0), 0, nullptr);
-		else if (alpha[0][0] == in[0])
-			_Q.emplace(drule(S, alpha, 0), 0, nullptr);
-	for (i = 0; i <= in.size(); ++i) {
-		wcout<<L"E["<<i<<L']'<<endl<< E[i] << endl;
-		copy(R, E[i]), Q = _Q;
-		_Q.clear(), H.clear();
-		while (!R.empty())
-			Rprocess(pop(R));
-		wcout	<<L"Q["<<i<<L']'<<endl << Q << endl << L"E["<<i<<L']'
-			<< endl << E[i] << endl;
-		V.clear();
-		node v(format(in[i+1]), i, i + 1);
-		while (!Q.empty())
-			Qprocess(pop(Q), v);
-		wcout<<L"E["<<i<<L']'<<endl<< E[i] << endl;
-		if (i != in.size()) wcout<<L"E["<<i+1<<L']'<<endl<<E[i+1]<<endl;
+cfg::cfg(const vector<rule>& _g, const wstring& S) : g(_g),
+	w(max_element(g.begin(), g.end(), [](const rule& x, const rule& y) {
+			return x.size() < y.size(); })->size() + 1) {
+	g.push_back(rule{L"S'", S});
+	sort(g.begin(), g.end());
+	for (size_t i = 0, j, k; i < g.size(); ++i)
+		for (j = 1; j < g[i].size(); ++j)
+			if ((k = find(g[i][j])) == g.size()) p.add(i*w+j,i*w+j);
+			else for (;k < g.size() && g[k][0] == g[i][j]; ++k)
+				p.add(i * w + j, k * w + 1),
+				c.add(k * w + g[k].size(), i * w + j);
+	wcout << L"predictor cache:" << endl; print_cache(p);
+	wcout << L"completer cache:" << endl; print_cache(c);
+	p.close();
+	wcout << L"predictor tc:" << endl; print_cache(p);
+}
+void cfg::operator()(const wstring& _in) {
+	len = (in = _in).size() + 1;
+	es = new set<size_t>[in.size() + 1];
+	ep = new set<size_t>[in.size() + 1];
+	ec = new set<size_t>[in.size() + 1];
+	// eitem(d, i) to size_t: d*|a|+i i=e%|a| d=e/|a|
+	add_item(w * find(L"S'"), 0, 0); 
+	for (n = 0; n < len; ++n) {
+		wcout << es2str(n);
+		size_t sp, sc;
+		do {
+		sp = ep[n].size();
+		sc = ec[n].size();
+		for (size_t d : ep[n]) // predict
+			if (p.has_outgoing(d / len))
+				for (size_t t : p.outgoing(d / len))
+					add_item(t * w + 1, n, n);
+		for (size_t d : ec[n]) // complete
+			if (c.has_outgoing(d / len))
+				for (size_t t : c.outgoing(d / len))
+					for (auto it=ep[d/len].lower_bound(t);
+						it != ep[d / len].end() &&
+						*it == t; ++it)
+						add_item(w*(*it%len)+*it/len+1
+								, d%len, n);
+		} while (sp != ep[n].size() && sc != ec[n].size());
+		wcout << es2str(n);
 	}
-	drule dr;
-	wcout << node();
-	for (auto t : E[in.size()])
-		for (eitem i : t.second)
-			if (S == get<wstring>(dr = rl(i)) &&
-				get<size_t>(dr) == get<prod>(dr).size())
-				return { get<pnode>(i), F };
-	return { nullptr, F };
+	delete[] es;
+	delete[] ep;
+	delete[] ec;
+}
+////////////////////////////////////////////////////////////////////////////////
+wstring cfg::dr2str(size_t d) const {
+	const rule& r = g[d / w];
+	wstringstream ss;
+	ss << L'[' << r[0] << L" -> ";
+	if (!(d % w)) ss << L"* ";
+	for (size_t n = 1; n < r.size(); ++n) {
+		if (n == d % w) ss << L"* ";
+		ss << r[n] << L' ';
+	}
+	if (r.size() == d % w) ss << L"* ";
+	return ss << L"]", ss.str();
+}
+wstring cfg::ei2str(size_t i) const {
+	wstringstream ss;
+	ss << L"{ " << dr2str(i / len) << L", " << i % len << L" }";
+	return ss.str();
+}
+wstring cfg::es2str(size_t s) const {
+	wstringstream ss;
+	ss << L"E[" << s << L"]" << endl;
+	for (size_t i : es[s]) ss << ei2str(i) << endl;
+	for (size_t i : ep[s]) ss << ei2str(i) << endl;
+	for (size_t i : ec[s]) ss << ei2str(i) << endl;
+	return ss.str();
 }
 ////////////////////////////////////////////////////////////////////////////////
 int main(int, char**) {
 	setlocale(LC_ALL, "");
-	wstring S(L"S"), T(L"T"), B(L"B"), a(L"a"), b(L"b"), ws(L"ws"), eps;
-	cfg g;
-	g[S].emplace(prod{ S, T });
-	g[S].emplace(prod{ a });
-	g[B].emplace(prod{ eps });
-	g[T].emplace(prod{ a, B });
-	g[T].emplace(prod{ a });
-
-	earley &e = *new earley(g, L"aa", S);
-	auto r = e();
-	wcout << endl << r.second << endl;
-
+	wstring S(L"S"), T(L"T"), B(L"B"), a(L"a"), b(L"b"), ws(L"ws"), eps,
+		A(L"A");
+	cfg g({ { S, S, T },
+		{ S, a },
+		{ B, eps },
+		{ T, a, b },
+		{ T, a }
+		}, S);
+	g(L"aa");
 	return 0;
 }
