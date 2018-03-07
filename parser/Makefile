@@ -1,2 +1,2 @@
 all:
-	g++ earley.cpp -W -Wall -Wpedantic -oearley -flto -g
+	clang++ earley.cpp -W -Wall -Wpedantic -oearley -flto -g -std=c++11
