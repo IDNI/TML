@@ -9,6 +9,7 @@
 #include <functional>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 #define DEBUG
@@ -38,8 +39,8 @@ template<typename C, typename T> bool has(const C& c, const T& t) {
 template<typename T> bool have_common(const T& x, const T& y) {
 	for (auto ix = x.begin(), iy = y.begin(); ix!=x.end() && iy!=y.end();)
 		if (*ix < *iy) ++ix; else if (*ix > *iy) ++iy; else return true;
-	return false;	
-} 
+	return false;
+}
 ////////////////////////////////////////////////////////////////////////////////
 template<typename T>
 class dig { // digraph
@@ -87,10 +88,10 @@ class cfg {
        	}
 	void print_cache(const dig<size_t>& d) const {
 		for (auto x : d.out) {
-			wcout << dr2str(x.first) << L" => ";
-			for (auto y : x.second) wcout << dr2str(y) << L" ";
+			wcout<<left<<setw(w*4)<< dr2str(x.first) << L"\t=>\t";
+			for (auto y : x.second) wcout<<left<<setw(w*4) << dr2str(y) << L" ";
 			wcout << endl;
-		}
+		} wcout << endl;
 	}
 	void add_item(size_t d, size_t i, size_t k);
 	void predict(size_t);
@@ -107,10 +108,18 @@ cfg::cfg(const vector<rule>& _g, const wstring& S) : g(_g),
 	set<wstring> nulls;
 
 	g.push_back(rule{L"S'", S});
-	sort(g.begin(), g.end());
-
+	for (const rule& r : g) {
+		wcout << r[0] << L"\t => ";
+		if (r.size() == 1) wcout << L"ε ";
+		else for (i = 1; i < r.size(); ++i)
+			if (r[i].size()) wcout << r[i] << L' ';
+			else wcout << L"ε ";
+		wcout << endl;
+	}
+	nulls.emplace(wstring());
+	wcout << endl; sort(g.begin(), g.end());
 	for (i = 0; i < g.size(); ++i)
-		if (g[i].size() == 1)
+		if (g[i].size() == 1 || (g[i].size() == 2 && !g[i][1].size()))
 			nulls.emplace(g[i][0]);
 	for (size_t sz = 0; sz != nulls.size();) {
 		sz = nulls.size();
@@ -121,13 +130,21 @@ cfg::cfg(const vector<rule>& _g, const wstring& S) : g(_g),
 			if (j == g[i].size()) nulls.emplace(g[i][0]);
 		}
 	}
-	for (i = 0; i < g.size(); ++i)
-		for (j = 1; j < g[i].size(); ++j)
-			if ((k = find(g[i][j])) == g.size()) p.add(i*w+j,i*w+j);
-		else for (;k < g.size() && g[k][0] == g[i][j]; ++k) {
-			p.add(i * w + j, k * w + 1);
-			c.add(k * w + g[k].size(), i * w + j + 1);
+	wcout << L"nullables: ";
+	for (wstring d : nulls) if (d.size()) wcout << d << L' '; else wcout << L"ε ";
+	wcout << endl;
+	for (i = 0; i < g.size(); ++i) {
+		for (j = 1; j < g[i].size(); ++j) {
+			if (has(nulls, g[i][j]))
+				p.add(i * w + j, i * w + j + 1);
+			if ((k = find(g[i][j])) == g.size())
+				p.add(i*w+j,i*w+j);
+			else for (;k < g.size() && g[k][0] == g[i][j]; ++k) {
+				p.add(i * w + j, k * w + 1);
+				c.add(k * w + g[k].size(), i * w + j + 1);
+			}
 		}
+	}
 	p.close(), c.close();
 	wcout << L"predictor tc:" << endl; print_cache(p);
 	wcout << L"completer tc:" << endl; print_cache(c);
@@ -139,7 +156,7 @@ void cfg::add_item(size_t d, size_t i, size_t k) {
 		ec[k].emplace(len * d + i);
 	else if (find(g[d / w][d % w]) < g.size()) {
 		db(3, g[d / w][d % w]);
-		ep[k].emplace(len * d + i).second;
+		ep[k].emplace(len * d + i);
 	}
 	else if (samechar(in[k], g[d / w][d % w]))
 		add_item(d + 1, i, k + 1);
@@ -171,7 +188,7 @@ void cfg::operator()(const wstring& _in) {
 	len = (in = _in).size() + 1;
 	ep = new set<size_t>[in.size() + 1];
 	ec = new set<size_t>[in.size() + 1];
-	add_item(1 + w * find(L"S'"), 0, 0); 
+	add_item(1 + w * find(L"S'"), 0, 0);
 	for (n = 0; n < len; ++n) {
 		db(1, es2str(n));
 		size_t sp, sc;
@@ -189,20 +206,24 @@ void cfg::operator()(const wstring& _in) {
 wstring cfg::dr2str(size_t d) const {
 	const rule& r = g[d / w];
 	wstringstream ss;
-	ss << d << L':'; if (!(d % w)) ss << L"* "; ss << L'[' << r[0]<<L" -> ";
-	for(size_t n=1; n<r.size(); ++n){if (n==d%w) ss<<L"* "; ss<<r[n]<<L' ';}
+	ss<<setw(3)<<d<<L" "; if(!(d%w)) ss<<L"* ";ss<<L'['<<r[0]<<L" => ";
+	for(size_t n=1;n<r.size();++n) {
+		if (n == d%w) ss << L"* ";
+		if (r[n].size()) ss << r[n] <<L' ';
+		else ss << L"ε ";
+	}
 	if (r.size() == d % w) ss << L"* ";
-	return ss << L"]", ss.str();
+	return ss << L']', ss.str();
 }
 wstring cfg::ei2str(size_t i) const {
 	wstringstream ss;
-	ss << i << L':' << L"{ " << dr2str(i / len) << L", " << i % len <<L" }";
+	ss << setw(4) << i << L" {" << left << setw(w*5) << dr2str(i / len) << L"," << i%len <<L" }";
 	return ss.str();
 }
 wstring cfg::es2str(size_t s) const {
 	wstringstream ss;
-	ss<<L"\tP["<<s<<L"]"<<endl; for (size_t i:ep[s]) ss<<ei2str(i)<<endl;
-	ss<<L"\tC["<<s<<L"]"<<endl; for (size_t i:ec[s]) ss<<ei2str(i)<<endl;
+	for (size_t i : ep[s]) ss << L"P[" << s << L"]: " << ei2str(i) <<endl;
+	for (size_t i : ec[s]) ss << L"C[" << s << L"]: " << ei2str(i) <<endl;
 	return ss.str();
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,7 +231,8 @@ int main(int, char**) {
 	setlocale(LC_ALL, "");
 	wstring S(L"S"), T(L"T"), B(L"B"), a(L"a"), b(L"b"), ws(L"ws"), eps,
 		A(L"A");
-	cfg g({ { S, a, S }, { S/*, eps*/ }}, S);
+//	cfg g({ { S, a, S }, { S/*, eps*/ }}, S);
+	cfg g({ { S, a, S }, {S, eps} }, S);
 //	cfg g({ { S, S, T }, { S, a }, { B, eps }, { T, a, b }, { T, a } }, S);
 	g(L"aaaa");
 	return 0;
