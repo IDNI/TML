@@ -4,12 +4,12 @@
 
 std::wstring dr2str(const cfg& G, size_t d) {
 	const auto& g = G.g;
-	const std::vector<std::wstring>& r = g[d / G.w];
+	const std::vector<const wchar_t*>& r = g[d / G.w];
 	std::wstringstream ss;
 	ss<<std::setw(3)<<d<<" "; if(!(d%G.w)) ss<<"* ";ss<<L'['<<r[0]<<" => ";
 	for(size_t n=1;n<r.size();++n) {
 		if (n == d%G.w) ss << "* ";
-		if (r[n].size()) ss << r[n] <<L' ';
+		if (wcslen(r[n])) ss << r[n] <<L' ';
 		else ss << L"ε ";
 	}
 	if (r.size() == d % G.w) ss << "* ";
@@ -48,12 +48,12 @@ void print_cache(const cfg& G, const dig<size_t>& d) {
 	std::wcout << std::endl;
 }
 
-void print_grammar(const std::vector<std::vector<std::wstring>>& g) {
+void print_grammar(const std::vector<std::vector<const wchar_t*>>& g) {
 	for (auto& r : g) {
 		std::wcout << r[0] << "\t => ";
 		if (r.size() == 1) std::wcout << L"ε ";
 		else for (size_t i = 1; i < r.size(); ++i)
-			if (r[i].size()) std::wcout << r[i] << L' ';
+			if (wcslen(r[i])) std::wcout << r[i] << L' ';
 			else std::wcout << L"ε ";
 		std::wcout << std::endl;
 	}

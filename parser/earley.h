@@ -1,10 +1,9 @@
 #include <vector>
 #include <set>
-#include <string>
 #include "dig.h"
 
 struct cfg {
-	std::vector<std::vector<std::wstring>> g;
+	std::vector<std::vector<const wchar_t*>> g;
 	dig<size_t> p, c;//, ep, ec;
 	size_t w, n, len;
 	std::set<size_t> *ep, *ec;
@@ -15,5 +14,7 @@ struct cfg {
 // tc optimization for len*ei = es:
 // can have an edge only to larger items (poswise)
 // (setwise)
-cfg* cfg_create(std::vector<std::vector<std::wstring>>, const std::wstring& S);
+cfg* cfg_create(const std::vector<std::vector<const wchar_t*>>&, const wchar_t* S);
 void cfg_parse(cfg*, const wchar_t*);
+// for convenience:
+cfg* cfg_create(const std::vector<std::vector<std::wstring>>&, const wchar_t* S);

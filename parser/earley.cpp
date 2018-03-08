@@ -40,22 +40,41 @@ template<typename C, typename T> bool has(const C& c, const T& t) {
 	return c.find(t) != c.end();
 }
 
-size_t find(const vector<vector<wstring>>& g, const wstring& nt) {
-	return	distance(g.begin(),
-		lower_bound(g.begin(), g.end(), vector<wstring>{nt}));
+bool rlcmp(const vector<const wchar_t*>& x, const vector<const wchar_t*>& y) {
+	int r;
+	for (size_t i = 0, e = min(x.size(), y.size()); i < e; ++i)
+		if (!(r = wcscmp(x[i], y[i]))) continue;
+		else return r < 0;
+	return x.size() == y.size() ? false : x.size() < y.size();
 }
 
-cfg* cfg_create(vector<vector<wstring>> _g, const wstring& S) {
+size_t find(const vector<vector<const wchar_t*>>& g, const wchar_t* nt) {
+	return	distance(g.begin(),
+		lower_bound(g.begin(), g.end(), vector<const wchar_t*>{nt}, rlcmp));
+}
+
+cfg* cfg_create(const vector<vector<wstring>>& g, const wchar_t* S) {
+	vector<vector<const wchar_t*>> t;
+	t.resize(g.size());
+	for (size_t n = 0; n < g.size(); ++n) {
+		t[n].resize(g[n].size());
+		for (size_t k = 0; k < g[n].size(); ++k)
+			t[n][k] = wcsdup(g[n][k].c_str());
+	}
+	return cfg_create(t, S);
+}
+
+cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 	cfg &G = *new cfg;
 	size_t i, j, k;
 	set<wstring> nulls;
 
 	(G.g = _g).push_back({L"S'", S}); DEBUG(print_grammar(G.g));
-	nulls.emplace(wstring()), sort(G.g.begin(), G.g.end()), G.w = 0;
+	nulls.emplace(wstring()), G.w = 0, sort(G.g.begin(), G.g.end(), rlcmp);
 
 	for (i = 0; i < G.g.size(); ++i) {
 		G.w = max(G.w, G.g[i].size());
-		if (G.g[i].size()==1 || (G.g[i].size()==2 && !G.g[i][1].size()))
+		if (G.g[i].size()==1 || (G.g[i].size()==2 && !wcslen(G.g[i][1])))
 			nulls.emplace(G.g[i][0]);
 	}
 	++G.w;
@@ -72,7 +91,7 @@ cfg* cfg_create(vector<vector<wstring>> _g, const wstring& S) {
 	for (i = 0; i < G.g.size(); ++i) {
 		for (j = 1; j < G.g[i].size(); ++j)
 			if ((k = find(G.g, G.g[i][j])) != G.g.size()) {
-				for (;k<G.g.size() && G.g[k][0]==G.g[i][j]; ++k)
+				for (;k<G.g.size() && !wcscmp(G.g[k][0],G.g[i][j]); ++k)
 					G.p.add(i*G.w + j, k * G.w + 1),
 					G.c.add(k*G.w+G.g[k].size(), i*G.w+j+1);
 				if (has(nulls, G.g[i][j]))

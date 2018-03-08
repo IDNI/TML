@@ -9,7 +9,7 @@ int main(int, char**) {
 //	cfg g({ { S, a, S }, { S/*, eps*/ }}, S);
 //	cfg &g = *cfg_create({ { S, a, S }, {S, a, eps} }, S);
 	cfg &g = *cfg_create({ { S, S, T }, { S, a }, { B, eps }, { T, a, b },
-		{ T, a } }, S);
+		{ T, a } }, S.c_str());
 	cfg_parse(&g, L"aa");
 	delete &g;
 	return 0;
