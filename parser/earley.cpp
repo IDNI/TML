@@ -24,16 +24,17 @@ void db(size_t n, const wstring& s) { dbg[n] = wcsdup(s.c_str()); }
 #endif
 
 wstring format(wchar_t c) {
-	if (!c)		return L"eps";
-	if (iswspace(c))return L"ws";
-	if (c == L'\r') return L"cr";
-	if (c == L'\n') return L"lf";
-	if (c == L'\t') return L"tab";
+	static const wchar_t eps[]=L"eps",ws[]=L"ws",cr[]=L"cr",lf[]=L"lf",tab[]=L"tab";
+	if (!c)		return eps;
+	if (iswspace(c))return ws;
+	if (c == L'\r') return cr;
+	if (c == L'\n') return lf;
+	if (c == L'\t') return tab;
 	return wstring(1, c);
 }
 
-bool samechar(wchar_t c, const wstring& s) {
-	return s == L"alnum" ? iswalnum(c) : s == format(c);
+bool samechar(wchar_t c, const wchar_t* s) {
+	return !wcscmp(s, L"alnum") ? iswalnum(c) : s == format(c);
 }
 
 template<typename C, typename T> bool has(const C& c, const T& t) {
@@ -136,11 +137,12 @@ void cfg_parse(cfg *_G, const wchar_t *in) {
 						for_alt(it, G.ep[d % G.len])
 							add_item(G, t,
 								 *it%G.len,G.n),
-							G.done[G.n].emplace(d);
+							G.done[G.n*G.len+d%G.len].emplace(d/G.len);
+							//G.done[G.n].emplace(d);
 						for_alt(it, G.ec[d % G.len])
 							add_item(G, t,
 								 *it%G.len,G.n),
-							G.done[G.n].emplace(d);
+							G.done[G.n*G.len+d%G.len].emplace(d/G.len);
 					}
 		}
 	}
@@ -149,13 +151,19 @@ void cfg_parse(cfg *_G, const wchar_t *in) {
 	for (size_t n = 0; n < G.len - 1; ++n) {
 		G.ep[n].clear();
 		for (size_t i : G.ec[n])
-			if (!has(G.done[n], i))
+			if (!has(G.done[G.n*G.len+i%G.len], i/G.len))
 				todel.emplace(i);
-		for (size_t i : todel) G.ec[n].erase(i);
+	//	for (size_t i : todel) G.ec[n].erase(i);
 		todel.clear();
 	}
 	G.ep[G.len-1].clear();
-	DEBUG(for (size_t n = 0; n < G.len; ++n) wcout << es2str(G, n) << endl);
+	wcout << "SPPF:" << endl;
+	for (auto t : G.done) {
+		wcout << '(' << t.first%G.len << ',' << t.first/G.len << "): {";
+		for (auto d : t.second) wcout << dr2str(G,d) << ' ';
+		wcout << '}' << endl;
+	}
+//	DEBUG(for (size_t n = 0; n < G.len; ++n) wcout << es2str(G, n) << endl);
 
 	delete[] G.ep; delete[] G.ec;
 }
