@@ -11,6 +11,6 @@ int main(int, char**) {
 	cfg &g = *cfg_create({ { S, S, T }, { S, a }, { B, eps }, { T, a, b },
 		{ T, a } }, S.c_str());
 	cfg_parse(&g, L"aa");
-	delete &g;
+	cfg_delete(&g);
 	return 0;
 }
