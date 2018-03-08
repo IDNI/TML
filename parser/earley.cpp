@@ -25,61 +25,62 @@ void db(size_t n, const wstring& s) { dbg[n] = wcsdup(s.c_str()); }
 #endif
 
 wstring format(wchar_t c) {
-	if (!c) return L"eps";
-	if (iswspace(c)) return L"ws";
+	if (!c)		return L"eps";
+	if (iswspace(c))return L"ws";
 	if (c == L'\r') return L"cr";
 	if (c == L'\n') return L"lf";
 	if (c == L'\t') return L"tab";
-	return wstring(1,c);
+	return wstring(1, c);
 }
+
 bool samechar(wchar_t c, const wstring& s) {
 	return s == L"alnum" ? iswalnum(c) : s == format(c);
 }
+
 template<typename C, typename T> bool has(const C& c, const T& t) {
 	return c.find(t) != c.end();
 }
 
-typedef vector<wstring> rule;
-
-size_t find(const vector<rule>& g, const wstring& nt) {
-	return distance(g.begin(), lower_bound(g.begin(), g.end(), rule{nt}));
+size_t find(const vector<vector<wstring>>& g, const wstring& nt) {
+	return	distance(g.begin(),
+		lower_bound(g.begin(), g.end(), vector<wstring>{nt}));
 }
 
-cfg* cfg_create(vector<rule> g, const wstring& S) {
+cfg* cfg_create(vector<vector<wstring>> _g, const wstring& S) {
 	cfg &G = *new cfg;
-	G.w = max_element(g.begin(), g.end(), [](const rule& x, const rule& y) {
-			return x.size() < y.size(); })->size() + 1;
-	const size_t w = G.w;
 	size_t i, j, k;
 	set<wstring> nulls;
-	dig<size_t> &p = G.p, &c = G.c;
 
-	g.push_back(rule{L"S'", S}), DEBUG(print_grammar(g)),
-	nulls.emplace(wstring()), sort(g.begin(), g.end());
+	(G.g = _g).push_back({L"S'", S}), DEBUG(print_grammar(G.g)),
+	nulls.emplace(wstring()), sort(G.g.begin(), G.g.end());
 
-	for (i = 0; i < g.size(); ++i)
-		if (g[i].size() == 1 || (g[i].size() == 2 && !g[i][1].size()))
-			nulls.emplace(g[i][0]);
+	for (i = 0; i < G.g.size(); ++i) {
+		G.w = max(G.w, G.g[i].size());
+		if (G.g[i].size()==1 || (G.g[i].size()==2 && !G.g[i][1].size()))
+			nulls.emplace(G.g[i][0]);
+	}
+	++G.w;
 	for (size_t sz = 0; sz != nulls.size();) {
 		sz = nulls.size();
-		for (i = 0; i < g.size(); ++i) {
-			if (has(nulls, g[i][0])) continue;
-			for (j = 1; j < g[i].size(); ++j)
-				if (!has(nulls, g[i][j])) break;
-			if (j == g[i].size()) nulls.emplace(g[i][0]);
+		for (i = 0; i < G.g.size(); ++i) {
+			if (has(nulls, G.g[i][0])) continue;
+			for (j = 1; j < G.g[i].size(); ++j)
+				if (!has(nulls, G.g[i][j])) break;
+			if (j == G.g[i].size()) nulls.emplace(G.g[i][0]);
 		}
 	}
 	DEBUG(print_nullables(nulls));
-	for (i = 0; i < g.size(); ++i) {
-		for (j = 1; j < g[i].size(); ++j) {
-			if (has(nulls, g[i][j])) p.add(i*w + j, i*w + j + 1);
-			if ((k=find(g, g[i][j]))==g.size())p.add(i*w+j, i*w+j);
-			else for (;k < g.size() && g[k][0] == g[i][j]; ++k)
-				p.add(i * w + j, k * w + 1),
-				c.add(k * w + g[k].size(), i * w + j + 1);
-		}
+	for (i = 0; i < G.g.size(); ++i) {
+		for (j = 1; j < G.g[i].size(); ++j)
+			if ((k = find(G.g, G.g[i][j])) != G.g.size()) {
+				for (;k<G.g.size() && G.g[k][0]==G.g[i][j]; ++k)
+					G.p.add(i*G.w + j, k * G.w + 1),
+					G.c.add(k*G.w+G.g[k].size(), i*G.w+j+1);
+				if (has(nulls, G.g[i][j]))
+					G.p.add(i*G.w+j, i*G.w+j+1);
+			} else G.p.add(i*G.w + j, i * G.w + j);
 	}
-	return nulls.clear(), G.g = g, p.close(), c.close(), &G;
+	return nulls.clear(), G.p.close(), G.c.close(), &G;
 }
 
 void add_item(cfg& G, size_t d, size_t i, size_t k) {
@@ -96,12 +97,12 @@ void add_item(cfg& G, size_t d, size_t i, size_t k) {
 		it != s.end() && *it < t * G.len; ++it)
 
 void cfg_parse(cfg &G, const wstring& in) {
-	size_t len = G.len = (G.in = in).size() + 1, sp, sc;
-	G.ep = new set<size_t>[in.size() + 1];
-	G.ec = new set<size_t>[in.size() + 1];
+	size_t sp, sc;
+	G.len = (G.in = in).size() + 1;
+	G.ep = new set<size_t>[G.len], G.ec = new set<size_t>[G.len];
 	const size_t w = G.w;
 	add_item(G, 1 + w * find(G.g, L"S'"), 0, 0);
-	for (G.n = 0; G.n < len; ++G.n) {
+	for (G.n = 0; G.n < G.len; ++G.n) {
 		db(1, es2str(G, G.n));
 		for (sp=sc=0; sp!=G.ep[G.n].size() || sc!=G.ec[G.n].size();) {
 			sp = G.ep[G.n].size(), sc = G.ec[G.n].size();
@@ -114,25 +115,24 @@ void cfg_parse(cfg &G, const wstring& in) {
 					for (size_t t : G.c.out.at(d / G.len)) {
 						for_alt(it, G.ep[d % G.len])
 							add_item(G, t,
-								 *it%G.len,G.n);
+								 *it%G.len,G.n),
+							G.done[G.n].emplace(d);
 						for_alt(it, G.ec[d % G.len])
 							add_item(G, t,
-								 *it%G.len,G.n);
+								 *it%G.len,G.n),
+							G.done[G.n].emplace(d);
 					}
 		}
 	}
-	DEBUG(for (size_t n = 0; n < len; ++n) wcout << es2str(G, n) << endl);
-	delete[] G.ep; delete[] G.ec;
-}
+	//DEBUG(for (size_t n=0; n<G.len; ++n) wcout << es2str(G, n) << endl);
+	for (size_t n = 0; n < G.len - 1; ++n) {
+		G.ep[n].clear();
+		for (size_t i : G.ec[n])
+			if (!has(G.done[n], i))
+				G.ec[n].erase(i);
+	}
+	G.ep[G.len-1].clear();
+	DEBUG(for (size_t n = 0; n < G.len; ++n) wcout << es2str(G, n) << endl);
 
-int main(int, char**) {
-	setlocale(LC_ALL, "");
-	wstring S(L"S"), T(L"T"), B(L"B"), a(L"a"), b(L"b"), ws(L"ws"), eps,
-		A(L"A");
-//	cfg g({ { S, a, S }, { S/*, eps*/ }}, S);
-//	cfg &g = *cfg_create({ { S, a, S }, {S, a, eps} }, S);
-	cfg &g = *cfg_create({ { S, S, T }, { S, a }, { B, eps }, { T, a, b },
-		{ T, a } }, S);
-	cfg_parse(g, L"aa");
-	return 0;
+	delete[] G.ep; delete[] G.ec;
 }

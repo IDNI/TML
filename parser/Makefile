@@ -1,2 +1,5 @@
 all:
-	clang++ earley.cpp -W -Wall -Wpedantic -oearley -flto -g -std=c++11
+	clang++ earley.cpp earley_test.cpp -W -Wall -Wpedantic -oearley -flto -std=c++11 -g
+small:
+	g++ earley.cpp earley_test.cpp -W -Wall -Wpedantic -oearley -flto -std=c++11 -Os
+	strip earley
