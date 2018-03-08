@@ -10,7 +10,6 @@
 #include "earley.h"
 using namespace std;
 
-#define _DEBUG
 #ifdef _DEBUG
 #define DEBUG(x) x
 typedef const wchar_t* wsptr;
@@ -51,8 +50,8 @@ cfg* cfg_create(vector<vector<wstring>> _g, const wstring& S) {
 	size_t i, j, k;
 	set<wstring> nulls;
 
-	(G.g = _g).push_back({L"S'", S}), DEBUG(print_grammar(G.g)),
-	nulls.emplace(wstring()), sort(G.g.begin(), G.g.end());
+	(G.g = _g).push_back({L"S'", S}); DEBUG(print_grammar(G.g));
+	nulls.emplace(wstring()), sort(G.g.begin(), G.g.end()), G.w = 0;
 
 	for (i = 0; i < G.g.size(); ++i) {
 		G.w = max(G.w, G.g[i].size());
@@ -96,9 +95,11 @@ void add_item(cfg& G, size_t d, size_t i, size_t k) {
 	for (set<size_t>::const_iterator it = s.lower_bound((t - 1) * G.len); \
 		it != s.end() && *it < t * G.len; ++it)
 
-void cfg_parse(cfg &G, const wstring& in) {
+void cfg_parse(cfg *_G, const wchar_t *in) {
 	size_t sp, sc;
-	G.len = (G.in = in).size() + 1;
+	cfg &G = *_G;
+	G.len = wcslen(in) + 1;
+	G.in = in;
 	G.ep = new set<size_t>[G.len], G.ec = new set<size_t>[G.len];
 	const size_t w = G.w;
 	add_item(G, 1 + w * find(G.g, L"S'"), 0, 0);
@@ -125,11 +126,14 @@ void cfg_parse(cfg &G, const wstring& in) {
 		}
 	}
 	//DEBUG(for (size_t n=0; n<G.len; ++n) wcout << es2str(G, n) << endl);
+	set<size_t> todel;
 	for (size_t n = 0; n < G.len - 1; ++n) {
 		G.ep[n].clear();
 		for (size_t i : G.ec[n])
 			if (!has(G.done[n], i))
-				G.ec[n].erase(i);
+				todel.emplace(i);
+		for (size_t i : todel) G.ec[n].erase(i);
+		todel.clear();
 	}
 	G.ep[G.len-1].clear();
 	DEBUG(for (size_t n = 0; n < G.len; ++n) wcout << es2str(G, n) << endl);
