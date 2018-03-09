@@ -9,6 +9,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <cassert>
 #include "earley.h"
 using namespace std;
 
@@ -22,6 +23,9 @@ void db(size_t n, const wstring& s) { dbg[n] = wcsdup(s.c_str()); }
 #define DEBUG(x)
 #endif
 
+typedef size_t drule;
+typedef size_t item;
+////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring format(wchar_t c) {
 	static const wchar_t 	eps[]=L"eps",ws[]=L"ws",cr[]=L"cr",lf[]=L"lf",
 				tab[]=L"tab";
@@ -32,15 +36,8 @@ wstring format(wchar_t c) {
 	if (c == L'\t') return tab;
 	return wstring(1, c);
 }
-
-bool samechar(wchar_t c, const wchar_t* s) {
-	return !wcscmp(s, L"alnum") ? iswalnum(c) : s == format(c);
-}
-
-template<typename C, typename T> bool has(const C& c, const T& t) {
-	return c.find(t) != c.end();
-}
-
+bool samechar(wchar_t c, const wchar_t* s) {return !wcscmp(s, L"alnum")?iswalnum(c):s==format(c);} 
+template<typename C, typename T> bool has(const C& c, const T& t) { return c.find(t) != c.end(); }
 bool rlcmp(const vector<const wchar_t*>& x, const vector<const wchar_t*>& y) {
 	int r;
 	for (size_t i = 0, e = min(x.size(), y.size()); i < e; ++i)
@@ -48,21 +45,21 @@ bool rlcmp(const vector<const wchar_t*>& x, const vector<const wchar_t*>& y) {
 		else return r < 0;
 	return x.size() == y.size() ? false : x.size() < y.size();
 }
-
 size_t find(const vector<vector<const wchar_t*>>& g, const wchar_t* nt) {
-	return	distance(g.begin(), lower_bound(g.begin(), g.end(),
+	return distance(g.begin(), lower_bound(g.begin(), g.end(),
 		vector<const wchar_t*>{nt}, rlcmp));
 }
-
+size_t find(const vector<vector<const wchar_t*>>& g, size_t i, size_t j) {
+	return (j == g[i].size() || !*g[i][j]) ? g.size() : find(g, g[i][j]);
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
 struct cfg {
 	std::vector<std::vector<const wchar_t*>> g;
-	dig<size_t> p, c, ep, ec;
-	size_t w, n, len;
-	std::map<size_t, std::set<size_t>> done;
-	const wchar_t *in;
+	dig<drule> p, c;
+	size_t w;
 };
 
-wstring dr2str(const cfg& G, size_t d) {
+wstring dr2str(const cfg& G, drule d) {
 	const auto& g = G.g;
 	const vector<const wchar_t*>& r = g[d / G.w];
 	wstringstream ss;
@@ -74,6 +71,9 @@ wstring dr2str(const cfg& G, size_t d) {
 	}
 	if (r.size() == d % G.w) ss << "* ";
 	return ss << L']', ss.str();
+}
+void print_item(const cfg &G, size_t t, size_t len) {
+	wcout<<'['<<(t-t%len)/len-(t/(len*len))*len<<':'<<t%len<<']'<<dr2str(G, t/(len*len))<<endl;
 }
 
 #ifdef _DEBUG
@@ -92,7 +92,7 @@ cfg* cfg_create(const vector<vector<wstring>>& g, const wchar_t* S) {
 }
 
 void cfg_delete(struct cfg* c) { delete c; }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 	cfg &G = *new cfg;
 	size_t i, j, k;
@@ -119,62 +119,53 @@ cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 	DEBUG(print_nullables(nulls));
 	for (i = 0; i < G.g.size(); ++i) {
 		for (j = 1; j < G.g[i].size(); ++j)
-			if ((k = find(G.g, G.g[i][j])) != G.g.size()) {
+			if ((k = find(G.g, i, j)) != G.g.size()) {
 				for (;	k<G.g.size() &&
 					!wcscmp(G.g[k][0],G.g[i][j]); ++k)
-					G.p.add(i*G.w + j, k * G.w + 1),
-					G.c.add(k*G.w+G.g[k].size(), i*G.w+j+1);
+					add(G.p, i*G.w + j, k * G.w + 1),
+					add(G.c, k*G.w+G.g[k].size(), i*G.w+j);
 				if (has(nulls, G.g[i][j]))
-					G.p.add(i*G.w+j, i*G.w+j+1);
-			} else G.p.add(i*G.w + j, i * G.w + j);
+					add(G.p, i*G.w+j, i*G.w+j+1);
+			} else add(G.p, i*G.w + j, i * G.w + j);
 	}
-	return nulls.clear(), G.p.close(), G.c.close(), &G;
+	return nulls.clear(), close(G.p.in, G.p.out, G.p),
+	close(G.c.in, G.c.out, G.c), &G;
 }
 
-void add_item(cfg& G, size_t d, size_t i, size_t k) {
-	const vector<const wchar_t*>& t = G.g[d / G.w];
-	if (d % G.w == t.size()) G.ec.add(k, G.len * d + i);
-	else if (G.ep.add(k, G.len*d+i), find(G.g, t[d%G.w]) == G.g.size()
-		&& samechar(G.in[k], t[d % G.w]))
-			add_item(G, d + 1, i, k + 1);
+bool push(map<size_t, set<item>>& q, size_t x, size_t y) {
+	bool r = !has(q, x);
+	return q[x].emplace(x + y).second || r;
 }
 
-#define for_alt(it, s, t) \
-	for (set<size_t>::const_iterator it = s.lower_bound((t - 1) * G.len); \
-		it != s.end() && *it < t * G.len; ++it)
-#define add_completed(i, t) \
-	add_item(G,t,*it%G.len,G.n),G.done[G.n*G.len+i%G.len].emplace(i/G.len);
-
-void cfg_parse(cfg *_G, const wchar_t *in) {
-	size_t sp, sc;
-	cfg &G = *_G;
-	G.len = wcslen(in) + 1, G.in = in;
-	const size_t w = G.w;
-	add_item(G, 1 + w * find(G.g, L"S'"), 0, 0);
-	for (G.n = 0; G.n < G.len; ++G.n) {
-		for (sp=sc=0; 	sp!=G.ep.out[G.n].size() ||
-				sc!=G.ec.out[G.n].size();) {
-			sp = G.ep.out[G.n].size(), sc = G.ec.out[G.n].size();
-			for (size_t i : G.ep.out[G.n])
-				if (!has(G.p.out, i / G.len)) continue;
-				else for (size_t j : G.p.out.at(i / G.len))
-					add_item(G, j, G.n, G.n);
-			for (size_t i : G.ec.out[G.n])
-				if (!has(G.c.out, i / G.len)) continue;
-				else for (size_t j : G.c.out.at(i / G.len)) {
-					for_alt(it, G.ep.out[j % G.len], j)
-						add_completed(i, j);
-					for_alt(it, G.ec.out[j % G.len], j)
-						add_completed(i, j);
+void cfg_parse(const cfg &G, const wchar_t* in) {
+	size_t len = wcslen(in) + 1, sz = 1, _sz = 0;
+	const size_t w = G.w, l2 = len * len;
+	map<size_t, set<item>> q;
+	q[0].emplace(len * len * (1 + w * find(G.g, L"S'")));
+	for (size_t j = 0; j < len; ++j) {
+		_sz = 0;
+		while (_sz != sz) {
+			_sz = sz;
+			for (const item t : q[j]) {
+				const size_t d = t / l2;
+				if (	d % w < G.g[d / w].size() && j < len &&
+					find(G.g, d / w, d % w) == G.g.size()) {
+					if (	samechar(in[j], G.g[d / w][d % w]) &&
+						push(q, j + 1, t - j + l2))
+						++sz;
+					continue;
 				}
+				if (has(G.p.out, d))
+					for (const drule c : G.p.out.at(d))
+						if (push(q, j, len*(c*len+j))) ++sz;
+				if (has(G.c.out, d))
+					for (const size_t s : q[(t - j) / len - d * len])
+						for (const drule c : G.c.out.at(d))
+							if (	c == s / l2 &&
+								push(q, j, s - s % len + l2))
+								++sz;
+			}
 		}
 	}
-	//DEBUG(for (size_t n=0; n<G.len; ++n) wcout << es2str(G, n) << endl);
-	wcout << "SPPF:" << endl;
-	for (auto t : G.done) {
-		wcout << '(' << t.first%G.len << ',' << t.first/G.len << "): {";
-		for (auto d : t.second) wcout << dr2str(G,d) << ' ';
-		wcout << '}' << endl;
-	}
-//	DEBUG(for (size_t n = 0; n < G.len; ++n) wcout << es2str(G, n) << endl);
+	for (auto x : q) for (auto y : x.second) print_item(G,y, len);
 }

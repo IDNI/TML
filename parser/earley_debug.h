@@ -1,17 +1,3 @@
-std::wstring ei2str(const cfg& G, size_t i) {
-	std::wstringstream ss;
-	ss << std::setw(4) << i << " {" << std::left << std::setw(G.w*4)
-	   << dr2str(G,i/G.len);
-	return ss << ',' << i % G.len << " }", ss.str();
-}
-
-std::wstring es2str(cfg& G, size_t s) {
-	std::wstringstream ss;
-	for (size_t i : G.ep.out[s])ss<<"P[" << s << "]: "<<ei2str(G, i)<<std::endl;
-	for (size_t i : G.ec.out[s])ss<<"C[" << s << "]: "<<ei2str(G, i)<<std::endl;
-	return ss.str();
-}
-
 void print_cache(const cfg& G, const dig<size_t>& d) {
 	for (const auto& x : d.out) {
 		std::wcout << std::left << std::setw(G.w*4)
