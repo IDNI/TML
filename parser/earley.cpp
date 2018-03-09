@@ -56,9 +56,8 @@ size_t find(const vector<vector<const wchar_t*>>& g, const wchar_t* nt) {
 
 struct cfg {
 	std::vector<std::vector<const wchar_t*>> g;
-	dig<size_t> p, c;//, ep, ec;
+	dig<size_t> p, c, ep, ec;
 	size_t w, n, len;
-	std::set<size_t> *ep, *ec;
 	std::map<size_t, std::set<size_t>> done;
 	const wchar_t *in;
 };
@@ -104,7 +103,7 @@ cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 
 	for (i = 0; i < G.g.size(); ++i) {
 		G.w = max(G.w, G.g[i].size());
-		if (G.g[i].size() == 1 || (G.g[i].size() == 2 && *G.g[i][1]))
+		if (G.g[i].size() == 1 || (G.g[i].size() == 2 && !*G.g[i][1]))
 			nulls.emplace(G.g[i][0]);
 	}
 	++G.w;
@@ -134,13 +133,13 @@ cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 
 void add_item(cfg& G, size_t d, size_t i, size_t k) {
 	const vector<const wchar_t*>& t = G.g[d / G.w];
-	if (d % G.w == t.size()) G.ec[k].emplace(G.len * d + i);
-	else if (G.ep[k].emplace(G.len*d+i), find(G.g, t[d%G.w]) == G.g.size()
+	if (d % G.w == t.size()) G.ec.add(k, G.len * d + i);
+	else if (G.ep.add(k, G.len*d+i), find(G.g, t[d%G.w]) == G.g.size()
 		&& samechar(G.in[k], t[d % G.w]))
 			add_item(G, d + 1, i, k + 1);
 }
 
-#define for_alt(it, s) \
+#define for_alt(it, s, t) \
 	for (set<size_t>::const_iterator it = s.lower_bound((t - 1) * G.len); \
 		it != s.end() && *it < t * G.len; ++it)
 #define add_completed(i, t) \
@@ -149,31 +148,28 @@ void add_item(cfg& G, size_t d, size_t i, size_t k) {
 void cfg_parse(cfg *_G, const wchar_t *in) {
 	size_t sp, sc;
 	cfg &G = *_G;
-	G.len = wcslen(in) + 1;
-	G.in = in;
-	G.ep = new set<size_t>[G.len], G.ec = new set<size_t>[G.len];
+	G.len = wcslen(in) + 1, G.in = in;
 	const size_t w = G.w;
 	add_item(G, 1 + w * find(G.g, L"S'"), 0, 0);
 	for (G.n = 0; G.n < G.len; ++G.n) {
-		db(1, es2str(G, G.n));
-		for (sp=sc=0; sp!=G.ep[G.n].size() || sc!=G.ec[G.n].size();) {
-			sp = G.ep[G.n].size(), sc = G.ec[G.n].size();
-			for (size_t i : G.ep[G.n])
+		for (sp=sc=0; 	sp!=G.ep.out[G.n].size() ||
+				sc!=G.ec.out[G.n].size();) {
+			sp = G.ep.out[G.n].size(), sc = G.ec.out[G.n].size();
+			for (size_t i : G.ep.out[G.n])
 				if (!has(G.p.out, i / G.len)) continue;
-				else for (size_t t : G.p.out.at(i / G.len))
-					add_item(G, t, G.n, G.n);
-			for (size_t i : G.ec[G.n])
+				else for (size_t j : G.p.out.at(i / G.len))
+					add_item(G, j, G.n, G.n);
+			for (size_t i : G.ec.out[G.n])
 				if (!has(G.c.out, i / G.len)) continue;
-				else for (size_t t : G.c.out.at(i / G.len)) {
-					for_alt(it, G.ep[i % G.len])
-						add_completed(i, t);
-					for_alt(it, G.ec[i % G.len])
-						add_completed(i, t);
+				else for (size_t j : G.c.out.at(i / G.len)) {
+					for_alt(it, G.ep.out[j % G.len], j)
+						add_completed(i, j);
+					for_alt(it, G.ec.out[j % G.len], j)
+						add_completed(i, j);
 				}
 		}
 	}
 	//DEBUG(for (size_t n=0; n<G.len; ++n) wcout << es2str(G, n) << endl);
-	delete[] G.ep; delete[] G.ec; G.ep = G.ec = 0;
 	wcout << "SPPF:" << endl;
 	for (auto t : G.done) {
 		wcout << '(' << t.first%G.len << ',' << t.first/G.len << "): {";

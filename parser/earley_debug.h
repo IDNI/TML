@@ -5,10 +5,10 @@ std::wstring ei2str(const cfg& G, size_t i) {
 	return ss << ',' << i % G.len << " }", ss.str();
 }
 
-std::wstring es2str(const cfg& G, size_t s) {
+std::wstring es2str(cfg& G, size_t s) {
 	std::wstringstream ss;
-	for (size_t i : G.ep[s])ss<<"P[" << s << "]: "<<ei2str(G, i)<<std::endl;
-	for (size_t i : G.ec[s])ss<<"C[" << s << "]: "<<ei2str(G, i)<<std::endl;
+	for (size_t i : G.ep.out[s])ss<<"P[" << s << "]: "<<ei2str(G, i)<<std::endl;
+	for (size_t i : G.ec.out[s])ss<<"C[" << s << "]: "<<ei2str(G, i)<<std::endl;
 	return ss.str();
 }
 
