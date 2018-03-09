@@ -135,8 +135,9 @@ cfg* cfg_create(const vector<vector<const wchar_t*>>& _g, const wchar_t* S) {
 void add_item(cfg& G, size_t d, size_t i, size_t k) {
 	const vector<const wchar_t*>& t = G.g[d / G.w];
 	if (d % G.w == t.size()) G.ec[k].emplace(G.len * d + i);
-	else if (find(G.g, t[d % G.w]) < G.g.size()) G.ep[k].emplace(G.len*d+i);
-	else if (samechar(G.in[k], t[d % G.w])) add_item(G, d + 1, i, k + 1);
+	else if (G.ep[k].emplace(G.len*d+i), find(G.g, t[d%G.w]) == G.g.size()
+		&& samechar(G.in[k], t[d % G.w]))
+			add_item(G, d + 1, i, k + 1);
 }
 
 #define for_alt(it, s) \
