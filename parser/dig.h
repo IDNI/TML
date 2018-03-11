@@ -4,7 +4,7 @@
 template<typename T>
 struct dig { // digraph
 	size_t sz = 0;
-	std::map<T, std::set<T>> in, out;
+	std::map<T, std::set<T> > in, out;
 };
 
 template<typename T> void add(dig<T>& d, const T& x, const T& y) {
