@@ -1,185 +1,111 @@
-#include <string>
-#include <set>
-#include <map>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
-#include <functional>
+#include <map>
+#include <set>
+#include <array>
+#include <string>
 #include <algorithm>
 #include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <cassert>
-#include "earley.h"
 using namespace std;
 
-#ifdef _DEBUG
-#define DEBUG(x) x
-#else
-#define DEBUG(x)
-#endif
+typedef pair<size_t, size_t> interval;
+typedef array<size_t, 4> eitem;
+enum gitem_t { NULLABLE, TERMINAL, NONTERM };
 
-typedef size_t drule;
-typedef size_t item;
+struct gitem {
+	gitem_t t;
+	union { wchar_t sym;
+		interval i; };
+	gitem() {}
+	void set(wchar_t s) { t = TERMINAL; sym = s; }
+	void set(interval in, bool n) { i = in, t = n ? NULLABLE : TERMINAL; }
+}; 
 
-wstring format(wchar_t c) {
-	static const wchar_t 	eps[]=L"ε",ws[]=L"ws",cr[]=L"cr",lf[]=L"lf",
-				tab[]=L"tab";
-	if (!c)		return eps;
-	if (iswspace(c))return ws;
-	if (c == L'\r') return cr;
-	if (c == L'\n') return lf;
-	if (c == L'\t') return tab;
-	return wstring(1, c);
-}
+#define subset(x, y) includes(x.begin(), x.end(), y.begin(), y.end())
 
-bool samechar(wchar_t c, const wchar_t* s) {
-	return !wcscmp(s, L"alnum") ? iswalnum(c) : s == format(c);
-}
-
-template<typename C, typename T> bool has(const C& c, const T& t) {
-	return c.find(t) != c.end();
-}
-
-bool rlcmp(const vector<const wchar_t*>& x, const vector<const wchar_t*>& y) {
-	int r;
-	for (size_t i = 0, e = min(x.size(), y.size()); i < e; ++i)
-		if (!(r = wcscmp(x[i], y[i]))) continue;
-		else return r < 0;
-	return x.size() == y.size() ? false : x.size() < y.size();
-}
-
-size_t find(const vector<vector<const wchar_t*> >& g, const wchar_t* nt) {
-	return distance(g.begin(), lower_bound(g.begin(), g.end(),
-		vector<const wchar_t*> {nt}, rlcmp));
-}
-
-size_t find(const vector<vector<const wchar_t*> >& g, size_t i, size_t j) {
-	return (j == g[i].size() || !*g[i][j]) ? g.size() : find(g, g[i][j]);
-}
-
-struct cfg {
-	std::vector<std::vector<const wchar_t*> > g;
-	map<drule, set<drule> > p, c;
-	size_t w;
-};
-
-wstring dr2str(const cfg& G, drule d) {
-	const vector<const wchar_t*>& r = G.g[d / G.w];
-	wstringstream ss;
-	ss<<L'['<<r[0]<<" => ";
-	for(size_t n = 1; n < G.g[d / G.w].size(); ++n)
-		ss << (n == d%G.w ? "* " : "") << (*r[n] ? r[n] : L"ε") << ' ';
-	return ss << (r.size() == d % G.w ? "* ]" : "]"), ss.str();
-}
-
-wostream& format_item(wostream& os, const cfg &G, size_t t, size_t len) {
-	return	os << '[' << (t - t % len) / len - (t / (len * len)) * len
-		<< ':' << t % len << ']' << dr2str(G, t / (len * len)) << endl;
-}
-
-void print_cache(const cfg& G, const dig<size_t>& d) {
-	for (const auto& x : d.out) {
-		wcout << dr2str(G, x.first) << "\t=>\t";
-		for (auto y : x.second) wcout << dr2str(G,y)<<" ";
-		wcout << endl;
-	}
-}
-
-void print_grammar(const vector<vector<const wchar_t*>>& g) {
-	for (auto& r : g) {
-		wcout << r[0] << "\t=> ";
-		if (r.size() == 1) wcout << L"ε ";
-		else for (size_t i = 1; i < r.size(); ++i)
-			wcout << (*r[i] ? r[i] : L"ε") << ' ';
-		wcout << endl;
-	}
-}
-
-cfg* cfg_create(const vector<vector<wstring> >& g, const wchar_t* S) {
-	vector<vector<const wchar_t*> > t(g.size());
-	for (size_t n = 0; n < g.size(); ++n) {
-		t[n].resize(g[n].size());
-		for (size_t k = 0; k < g[n].size(); ++k)
-			t[n][k] = wcsdup(g[n][k].c_str());
-	}
-	return cfg_create(t, S);
-}
-
-void cfg_delete(struct cfg* c) { delete c; }
-
-cfg* cfg_create(const vector<vector<const wchar_t*> >& _g, const wchar_t* S) {
-	cfg &G = *new cfg;
-	size_t i, j, k;
+vector<vector<gitem>> cfg_compile(vector<vector<wstring>> g, wstring S) {
+	vector<vector<gitem>> r;
 	set<wstring> nulls;
-	dig<drule> p, c;
-	auto f = [&nulls](const wchar_t* s) { return has(nulls, s); };
+	map<wstring, interval> alts;
+	map<wstring, set<wstring>> in, out;
+	map<wstring, set<wstring>>::const_iterator it, jt;
+	map<wstring, interval>::const_iterator kt;
+	wstring Z = L"Z";
+	size_t s, i = 0, j = 0;
 
-	(G.g = _g).push_back({L"S'", S}); DEBUG(print_grammar(G.g));
-	G.w = 0, sort(G.g.begin(), G.g.end(), rlcmp);
-
-	for (i = 0; i < G.g.size(); ++i)
-		if (G.w = max(G.w, G.g[i].size()), !G.g[i].back())
-			nulls.emplace(G.g[i][0]);
-
-	for (size_t sz = 0; sz != nulls.size();)
-		for (sz = nulls.size(), i = 0; i < G.g.size(); ++i)
-			if (	!has(nulls, G.g[i][0]) &&
-				all_of(&G.g[i][1], &G.g[i][G.g[i].size()], f))
-				nulls.emplace(G.g[i][0]);
-
-	for (i = 0; i < G.g.size(); ++i) {
-		for (j = 1; j < G.g[i].size(); ++j)
-			if ((k = find(G.g, i, j)) != G.g.size()) {
-				for (;	k<G.g.size() &&
-					!wcscmp(G.g[k][0],G.g[i][j]); ++k)
-					add(p, i*G.w + j, k * G.w + 1),
-					add(c, k*G.w+G.g[k].size(), i*G.w+j);
-				if (has(nulls, G.g[i][j]))
-					add(p, i*G.w+j, i*G.w+j+1);
-			} else add(p, i*G.w + j, i * G.w + j);
-	}
-	return nulls.clear(), close(p.in, p.out, p),
-	close(c.in, c.out, c), G.c = move(c.out), G.p = move(p.out), &G;
+	nulls.emplace(), sort(g.begin(), g.end()), r.resize(g.size() + 1);
+	while (Z <= g[g.size()-1][0]) Z += L'Z';
+	g.push_back({Z, S});
+	for (bool b = false; !b; ++i)
+		if ((b = (i == g.size() - 1)) || g[i][0] != g[i+1][0])
+			alts.emplace(g[i][0], interval(j, i + 1)), j = i + 1;
+	for (i = 0; i < g.size(); ++i)
+		for (r[i].resize(g[i].size() - 1), j = 1; j < g[i].size(); ++j)
+			out[g[i][0]].emplace(g[i][j]),
+			in[g[i][j]].emplace(g[i][0]);
+iter:	s = r.size();
+	for (const wstring& t : nulls)
+		if ((it = in.find(t)) == in.end()) continue;
+		else for (const wstring& y : it->second)
+			if (	(jt = out.find(y)) != out.end() &&
+				subset(jt->second, nulls)) nulls.emplace(y);
+	if (s != r.size()) goto iter;
+	for (i = 0; i < g.size(); ++i)
+		for (j = 1; j < g[i].size(); ++j)
+			if ((kt = alts.find(g[i][j])) != alts.end())
+				r[i][j-1].set(kt->second,
+					nulls.find(g[i][j]) != nulls.end());
+			else r[i][j-1].set(g[i][j][0]);
+	return r;
 }
 
-bool push(map<size_t, set<item> >& q, size_t x, size_t y) {
-	bool r = !has(q, x);
-	return q[x].emplace(x + y).second || r;
+#define add_item(i, j) outs[i].emplace(j), ins[j].emplace(i), front.emplace(j)
+
+bool cfg_parse(const vector<vector<gitem>>& g, const wchar_t* in) {
+	eitem i = { 0, 0, g.size() - 1, 0 }, j;
+	set<eitem> front;
+	map<eitem, set<eitem>> ins, outs;
+	set<eitem> s;
+	map<eitem, set<eitem>>::const_iterator it, jt;
+
+start:	gitem x = g[i[2]][i[3]];
+	switch (x.t) {
+	case NULLABLE:	j={i[0], i[1], i[2], i[3] + 1}, add_item(i, j);
+	case NONTERM :	for (size_t n = x.i.first, k = n+x.i.second; n!=k; ++n)
+				j = { i[0], 0, n, 0 }, add_item(i, j);
+			break;
+	case TERMINAL:	if (in[i[0]] == x.sym)
+				j = { i[0] + 1, i[1] + 1, i[2], i[3] + 1 },
+				add_item(i, j);
+			else goto gc;
+	}
+
+cont:	if (front.empty()) return false;
+	i = *front.begin(), front.erase(front.begin());
+	if (front.empty() && i==eitem{ 0, 0, g.size()-1, g[s.size()-1].size() })
+		return true;
+	goto start;
+
+gc:	size_t sz = s.size();
+	s.emplace(i);
+	for (const eitem& t : s)
+		if ((it = ins.find(t)) == ins.end()) continue;
+		else for (const eitem& y : it->second)
+			if ((jt=outs.find(y))!=outs.end()&&subset(jt->second,s))
+				s.emplace(y);
+	if (sz != s.size()) goto gc;
+	for (eitem x : s) {
+		if ((it = outs.find(x)) != outs.end())
+			for (const eitem& ox : it->second) ins[ox].erase(x);
+		if ((it = ins.find(x)) != ins.end())
+			for (const eitem& ix : it->second) outs[ix].erase(x);
+		ins.erase(x), outs.erase(x), front.erase(x);
+	}
+	s.clear();
+	goto cont;
 }
 
-void cfg_parse(const cfg &G, const wchar_t* in) {
-	size_t m, sz = 1, _sz = 0;
-	const size_t len = wcslen(in) + 1, w = G.w, l2 = len * len;
-	map<size_t, set<item> > q;
-	map<size_t, set<item> >::const_iterator it;
-	set<item>::const_iterator lb;
-	q[0].emplace(l2 * (1 + w * find(G.g, L"S'")));
-	for (size_t j = 0; j < len; ++j) {
-		_sz = 0;
-		while (_sz != sz) {
-			_sz = sz;
-			for (const item t : q[j]) {
-				const size_t d = t / l2;
-				if (	d % w < G.g[d / w].size() && j < len &&
-					find(G.g, d / w, d % w) == G.g.size()) {
-					if (samechar(in[j], G.g[d/w][d%w]) &&
-						push(q, j + 1, t - j + l2))
-						++sz;
-					continue;
-				}
-				if (has(G.p, d))
-					for (const drule c : G.p.at(d))
-						if (push(q,j,c*l2+len*j)) ++sz;
-				if (!has(G.c, d)) continue;
-				for (const drule c : G.c.at(d))
-					if ((it=q.find(m=(t-j)/len-d*len))!=q.end())
-						for(lb=it->second.lower_bound(c*l2);
-						    lb!=it->second.end()&&*lb<(c+1)*l2;
-						    ++lb)
-							if(push(q,j,*lb-*lb%len+l2))++sz;
-			}
-		}
-	}
-	for (auto x : q) for (auto y : x.second) format_item(wcout, G, y, len);
+int main(int, char**) {
+	setlocale(LC_ALL, "");
+	cfg_parse(cfg_compile({{L"S",L"a"}},L"S"),L"aa");
+	return 0;
 }
