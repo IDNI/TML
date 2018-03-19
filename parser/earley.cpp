@@ -8,6 +8,9 @@
 #include <cassert>
 #include <climits>
 #include <sstream>
+#include <iterator>
+#include <cstring>
+#include <fstream>
 using namespace std;
 
 typedef array<size_t, 2> interval;
@@ -65,7 +68,7 @@ compiled_cfg cfg_compile(vector<vector<wstring>> g, wstring S) {
 	size_t s, i = 0, j = 0;
 	r.second = new pair<size_t, const wchar_t*>[g.size()+1];
 
-	if (!is_sorted(g.begin(), g.end())) throw 0;
+//	if (!is_sorted(g.begin(), g.end())) throw 0;
 	nulls.emplace(), sort(g.begin(), g.end()), r.first.resize(g.size() + 1);
 	while (Z <= g[g.size()-1][0]) Z += L'Z';
 	g.push_back({Z, S});
@@ -112,8 +115,8 @@ bool cfg_parse(const compiled_cfg& G, const wchar_t* in) {
 	size_t nt;
 	gitem x;
 #define add_item(i, j) \
-	outs[i].emplace(j), ins[j].emplace(i), front.emplace(j), front.erase(i)
-	//, (wcout<<"add_item from "<<format(G,i) << " to " <<format(G,j)<<endl)
+	outs[i].emplace(j), ins[j].emplace(i), front.emplace(j), front.erase(i) \
+	, (wcout<<"add_item from "<<format(G,i) << " to " <<format(G,j)<<endl)
 
 start:	if (g[i.alt].size() == i.dot) {
 		auto it = outs.lower_bound(eitem(i.end - i.len, nt = G.second[i.alt].first, 0, 0, 0));
@@ -130,11 +133,9 @@ start:	if (g[i.alt].size() == i.dot) {
 	case NONTERM :	for (size_t n = x.i[0], k = x.i[1]; n != k; ++n)
 				j = eitem(g,i.end, 0, n, 0), add_item(i, j);
 			break;
-	case TERMINAL:	if (in[i.end] == x.ch)
-				j = eitem(g,i.end+1, i.len+1, i.alt, i.dot+1),
-				add_item(i, j);
-			else
-				goto gc;
+	case TERMINAL:	if (in[i.end] != x.ch) goto gc;
+			j = eitem(g,i.end+1, i.len+1, i.alt, i.dot+1),
+			add_item(i, j);
 	}
 
 cont:	if (front.empty() || outs.find(st) == outs.end()) return false;
@@ -161,10 +162,29 @@ gc:	size_t sz = s.size();
 	goto cont;
 }
 ////////////////////////////////////////////////////////////////////////////////
-int main(int, char**) {
+int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
-	vector<vector<wstring>> g{{L"S",L"a"}};
-	assert(cfg_parse(cfg_compile(g,L"S"),L"a"));
-	assert(!cfg_parse(cfg_compile(g,L"S"),L"aa"));
+	assert(argc == 3);
+	wstring line, w, arg;
+	wifstream fg(argv[1]), fi(argv[2]);
+	while (getline(fi, line)) arg += line;
+	wcout<<"arg: " << arg << endl;
+	//vector<vector<wstring>> g{{L"S",L"a"}};
+	vector<vector<wstring>> g;
+	while (getline(fg, line)) {
+		if (!line.size()) continue;
+		wistringstream ss(line);
+		g.emplace_back();
+		while (ss >> w) g.back().push_back(w);
+		if (g.back().size() == 1) g.back().emplace_back();
+	}
+	for (auto x : g) {
+		for (auto y : x) wcout << y << ' ';
+		wcout << endl;
+	}
+	cfg_parse(cfg_compile(g, L"S"), arg.c_str());
+//	assert(cfg_parse(cfg_compile(g,L"S"),L"a"));
+//	assert(!cfg_parse(cfg_compile(g,L"S"),L"aa"));
+//	assert(!cfg_parse(cfg_compile(g,L"S"),L"b"));
 	return 0;
 }
