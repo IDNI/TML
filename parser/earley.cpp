@@ -29,7 +29,7 @@ struct eitem {
 			g[alt][dot].t != TERMINAL ? g[alt][dot].i[0] : UINT_MAX
 			, len, alt, dot) { }
 };
-typedef pair<vector<vector<gitem>>, map<size_t, const wchar_t*>> compiled_cfg;
+typedef pair<vector<vector<gitem>>, pair<size_t, const wchar_t*>*> compiled_cfg;
 ////////////////////////////////////////////////////////////////////////////////
 #define cmp_(t) x.t!=y.t
 #define cmp(t) cmp_(t)?x.t<y.t
@@ -44,7 +44,7 @@ wstring format(const compiled_cfg& g, size_t i, size_t j) {
 	for (size_t n = 0; n < g.first[i].size(); ++n) {
 		t = g.first[i][n];
 		if (n == j) ss << "* ";
-		(t.t==TERMINAL ? ss<<t.ch : ss<<g.second.at(t.i[0]))<<' ';
+		(t.t==TERMINAL ? ss<<t.ch : ss<<g.second[t.i[0]].second)<<' ';
 	}
 	if (j == g.first[i].size()) ss << "* ";
 	return ss.str();
@@ -52,7 +52,7 @@ wstring format(const compiled_cfg& g, size_t i, size_t j) {
 wstring format(const compiled_cfg& g, eitem i) {
 	wstringstream ss;
 	ss << '[' << i.end-i.len << ':' << i.end << "] " << format(g, i.alt, i.dot);
-	if (i.nt != UINT_MAX) ss << " (" << g.second.at(i.nt) << ')';
+	if (i.nt != UINT_MAX) ss << " (" << g.second[i.nt].second << ')';
 	return ss.str();
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,6 +63,7 @@ compiled_cfg cfg_compile(vector<vector<wstring>> g, wstring S) {
 	map<wstring, set<wstring>> in, out;
 	wstring Z = L"Z";
 	size_t s, i = 0, j = 0;
+	r.second = new pair<size_t, const wchar_t*>[g.size()+1];
 
 	if (!is_sorted(g.begin(), g.end())) throw 0;
 	nulls.emplace(), sort(g.begin(), g.end()), r.first.resize(g.size() + 1);
@@ -73,7 +74,7 @@ compiled_cfg cfg_compile(vector<vector<wstring>> g, wstring S) {
 		if ((b = (i == g.size() - 1)) || g[i][0] != g[i+1][0])
 			alts.emplace(g[i][0], interval{{j, i + 1}}), j = i + 1;
 	for (auto a : alts)
-		r.second.emplace(a.second[0], wcsdup(a.first.c_str())); 
+		r.second[a.second[0]].second = wcsdup(a.first.c_str());
 	for (i = 0; i < g.size(); ++i)
 		for (r.first[i].resize(g[i].size()-1), j=1; j<g[i].size(); ++j)
 			out[g[i][0]].emplace(g[i][j]),
@@ -87,6 +88,11 @@ iter:	s = nulls.size();
 				subset(jt->second, nulls)) nulls.emplace(y);
 	if (s != nulls.size()) goto iter;
 
+	wstring l = g[0][0];
+	for (i = j = 0;; l = g[j = i][0]) {
+		while (i < g.size() && g[i][0] == l) r.second[i++].first = j;
+		if (i == g.size()) break;
+	}
 	for (i = 0; i < g.size(); ++i)
 		for (j = 1; j < g[i].size(); ++j)
 			if (auto kt = alts.find(g[i][j]); kt != alts.end())
@@ -97,26 +103,24 @@ iter:	s = nulls.size();
 }
 
 bool cfg_parse(const compiled_cfg& G, const wchar_t* in) {
-	eitem i(G.first, 0, 0, G.first.size() - 1, 0), j, k;
+	auto &g = G.first;
+	const eitem f(g,wcslen(in),wcslen(in),g.size()-1,g[g.size()-1].size()),
+		st(g, 0, 0, G.first.size() - 1, 0);
+	eitem i = st, j, k;
 	set<eitem> front, s;
 	map<eitem, set<eitem>> ins, outs;
 	size_t nt;
 	gitem x;
-	auto &g = G.first;
 #define add_item(i, j) \
-	outs[i].emplace(j), ins[j].emplace(i), front.emplace(j), (wcout<<"add_item from "<<format(G,i) << " to " <<format(G,j)<<endl)
+	outs[i].emplace(j), ins[j].emplace(i), front.emplace(j), front.erase(i)
+	//, (wcout<<"add_item from "<<format(G,i) << " to " <<format(G,j)<<endl)
 
-start:	wcout <<endl<< format(G, i) << endl << "outs:"<<endl;
-	for (auto x : outs)
-		for (auto y : x.second)
-			wcout << format(G, x.first) << " -> " << format(G, y) << endl;
-	if (g[i.alt].size() == i.dot) {
-		for (auto it = outs.lower_bound(eitem(i.end - i.len, nt = G.second.upper_bound(i.alt)->first, 0, 0, 0));
-			it != outs.end() && it->first.end == i.end - i.len &&
+start:	if (g[i.alt].size() == i.dot) {
+		auto it = outs.lower_bound(eitem(i.end - i.len, nt = G.second[i.alt].first, 0, 0, 0));
+		for (;	it != outs.end() && it->first.end == i.end - i.len &&
 			it->first.nt == nt; ++it)
 			k = it->first,
 			j = eitem(g, i.end, k.len+i.len, k.alt, k.dot + 1),
-		//	add_item(i, j);
 			add_item(i, k), add_item(k, j);
 		goto cont;
 	}
@@ -129,16 +133,14 @@ start:	wcout <<endl<< format(G, i) << endl << "outs:"<<endl;
 	case TERMINAL:	if (in[i.end] == x.ch)
 				j = eitem(g,i.end+1, i.len+1, i.alt, i.dot+1),
 				add_item(i, j);
-			else goto gc;
+			else
+				goto gc;
 	}
 
-cont:	if (outs.find(eitem(g,0, 0, g.size()-1, g[g.size()-1].size())) != outs.end()) return true;
-	if (!front.empty()) {
-		i = *front.begin(), front.erase(front.begin());
-		//if (!front.empty() || i!=eitem(g,0, 0, g.size()-1, g[g.size()-1].size()))
-			goto start;
-		return true;
-	} else return false;
+cont:	if (front.empty() || outs.find(st) == outs.end()) return false;
+	if (ins.find(f) != ins.end()) return true;
+	i = *front.begin(), front.erase(front.begin());
+	goto start;
 
 gc:	size_t sz = s.size();
 	s.emplace(i);
