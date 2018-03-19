@@ -71,7 +71,7 @@ which defines two relations, one binary called "uncle" and one unary called
 tables:
 
 		|Table A: uncle	|Table B: begins_with_j	|
-		|	 arity=2|	 arity=2	|
+		|	 arity=2|	 arity=1	|
 	        ----------------------------------------|
 	Row 1:	|jim	|joe	|Row 1:	|joe		|
 	Row 2:	|joe	|jill	|Row 2:	|jim		|
@@ -88,7 +88,7 @@ It keeps iterating until one of the two stopping conditions above reaches, so a
 "pass" run will determine a set of tables such that if we iterate the program
 again, we'll get the same tables untouched.
 
-*Remark: we numbered the tables' rows just for conveinece, but in TML and in math
+*Remark: we numbered the tables' rows just for convenience, but in TML and in math
 in general, a relation is an unordered set of tuples. So tables are considered
 totally identical if all they differ at is the order of rows. This is not true
 at all when it comes to the columns, where the order matters. Also note that our
@@ -109,7 +109,7 @@ example in texts dealing with fixed-point logics is the Transitive Closure (TC)
 operator. Take a piece of paper, draw some points, then draw arrows between
 the points, and that'd be a directed graph (__digraph__). The points are called
 vertices and the arrows are called edges. Note that arrows are directed: an
-arrow from vertex 1 to vertex 2 isn't the same as from vertex 2 from vertex 1.
+arrow from vertex 1 to vertex 2 isn't the same as from vertex 2 to vertex 1.
 If they'd be considered the same, we'd call it an undirected graph.
 
 *Remark: All directred graphs are all binary relations and vice versa. In other
@@ -151,7 +151,7 @@ to the above five:
 	TC(4,3)
 
 On our case, the transitive closure forms a clique graph. The following TML
-TML defines the transitive closure of a binary relation E:
+defines the transitive closure of a binary relation E:
 
 	E(?x,?y)	  -> TC(?x,?y)
 	TC(?x,?y) E(?y,?z)-> TC(?x,?z)
@@ -180,7 +180,7 @@ iteration of our TC program as:
 
 and the iteration is repeated as long as either the "set" operations don't
 change anything (a "pass" case), or when we repeat to a previous state and
-therefore will loop if will continue the same way (a "fail" case).
+therefore will loop if will continue the same way (a "fail" case) // I don't get the last part of this sentence.
 
 *Remark: Note that the definition of TC is recursive, as it depends on TC as
 well.  Further, on our example graph we have a cycle, so without any care, the
@@ -299,7 +299,7 @@ yields a compiled program, and that'd be the first Futamura projection.
 
 We support partial evaluation of whole relations only, means that one cannot
 supply an input table row by row but the whole table at once. Similarly, partial
-evaluation wrt a string cannot be done char by char but given the whole string.
+evaluation wrt a string cannot be done char by char but given the whole string. // What does wrt mean?
 
 The PFP iteration number can be treated inside the program, by defining:
 
