@@ -1,8 +1,8 @@
 all:
-	clang++ -D_DEBUG earley.cpp -W -Wall -Wpedantic -oearley -flto -std=c++11 -g
+	clang++ -D_DEBUG earley.cpp -W -Wall -Wpedantic -oearley -std=c++11 -g
 small:
-	g++ earley.cpp -W -Wall -Wpedantic -oearley -flto -std=c++11 -Os
+	clang++ -D_DEBUG earley.cpp -W -Wall -Wpedantic -oearley -std=c++11 -Oz
 	strip earley
 fast:
-	g++ earley.cpp -W -Wall -Wpedantic -oearley -flto -std=c++11 -O3
+	clang++ -D_DEBUG earley.cpp -W -Wall -Wpedantic -oearley -std=c++11 -O3
 	strip earley
