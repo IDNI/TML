@@ -19,7 +19,9 @@ enum gitem_t { NULLABLE, TERMINAL, NONTERM };
 
 struct gitem {
 	gitem_t t;
-	union { wchar_t ch; interval i; };
+	//union {
+		wchar_t ch; interval i; 
+	//};
 	void set(wchar_t s) { t = TERMINAL; ch = s; }
 	void set(interval in, bool n) { i = in; t = n ? NULLABLE : NONTERM; }
 }; 
@@ -43,20 +45,25 @@ bool operator!=(const eitem& x, const eitem& y) {
 
 wstring format(const compiled_cfg& g, size_t i, size_t j) {
 	wstringstream ss;
+	wstring r;
 	gitem t;
 	for (size_t n = 0; n < g.first[i].size(); ++n) {
 		t = g.first[i][n];
 		if (n == j) ss << "* ";
-		(t.t==TERMINAL ? ss<<t.ch : ss<<g.second[t.i[0]].second)<<' ';
+		if (t.t == TERMINAL) ss << L'\'' << (t.ch ? t.ch : L'ε') << L"' ";
+		else ss << g.second[t.i[0]].second << ' ';
 	}
 	if (j == g.first[i].size()) ss << "* ";
-	return ss.str();
+	r = ss.str();
+	return r;
 }
 wstring format(const compiled_cfg& g, eitem i) {
 	wstringstream ss;
+	wstring r;
 	ss << '[' << i.end-i.len << ':' << i.end << "] " << format(g, i.alt, i.dot);
 	if (i.nt != UINT_MAX) ss << " (" << g.second[i.nt].second << ')';
-	return ss.str();
+	r = ss.str();
+	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////
 compiled_cfg cfg_compile(vector<vector<wstring>> g, wstring S) {
@@ -70,7 +77,11 @@ compiled_cfg cfg_compile(vector<vector<wstring>> g, wstring S) {
 
 //	if (!is_sorted(g.begin(), g.end())) throw 0;
 	nulls.emplace(), sort(g.begin(), g.end()), r.first.resize(g.size() + 1);
-	while (Z <= g[g.size()-1][0]) Z += L'Z';
+	wcout << g.size() << endl;
+	for (auto x : g) { for (auto y : x) wcout << y << ' '; wcout << endl; }
+	assert(g[g.size()-1].size());
+	while (Z <= g[g.size()-1][0])
+		Z += Z;
 	g.push_back({Z, S});
 
 	for (bool b = false; !b; ++i)
@@ -133,14 +144,20 @@ start:	if (g[i.alt].size() == i.dot) {
 	case NONTERM :	for (size_t n = x.i[0], k = x.i[1]; n != k; ++n)
 				j = eitem(g,i.end, 0, n, 0), add_item(i, j);
 			break;
-	case TERMINAL:	if (in[i.end] != x.ch) goto gc;
-			j = eitem(g,i.end+1, i.len+1, i.alt, i.dot+1),
+	case TERMINAL:	if (!x.ch) break;
+			if (in[i.end] != x.ch) goto gc;
+			j = eitem(g, i.end+1, i.len+1, i.alt, i.dot+1),
 			add_item(i, j);
 	}
 
 cont:	if (front.empty() || outs.find(st) == outs.end()) return false;
 	if (ins.find(f) != ins.end()) return true;
 	i = *front.begin(), front.erase(front.begin());
+	wcout << "processing: " << format(G, i) << endl;
+	{ set<wstring> dbg;
+	for (auto x : ins) for (auto y : x.second) dbg.emplace(format(G, y) + L" -> " + format(G, x.first));
+	for (auto x : outs) for (auto y : x.second) dbg.emplace(format(G, x.first) + L" -> " + format(G, y));
+	for (auto x : dbg) wcout << x << endl; }
 	goto start;
 
 gc:	size_t sz = s.size();
@@ -162,27 +179,34 @@ gc:	size_t sz = s.size();
 	goto cont;
 }
 ////////////////////////////////////////////////////////////////////////////////
+wstring& trim(wstring& s) {
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) { return !iswspace(ch); }));
+	s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) { return !iswspace(ch); }).base(), s.end());
+	return s;
+}
+
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	assert(argc == 3);
-	wstring line, w, arg;
+	wstring w, arg;
 	wifstream fg(argv[1]), fi(argv[2]);
-	while (getline(fi, line)) arg += line;
+	for (wstring line; getline(fi, line); arg += line);
 	wcout<<"arg: " << arg << endl;
-	//vector<vector<wstring>> g{{L"S",L"a"}};
 	vector<vector<wstring>> g;
-	while (getline(fg, line)) {
+	for (wstring line; getline(fg, line);) {
 		if (!line.size()) continue;
 		wistringstream ss(line);
 		g.emplace_back();
-		while (ss >> w) g.back().push_back(w);
+		while (ss >> w) g.back().push_back(trim(w));
 		if (g.back().size() == 1) g.back().emplace_back();
 	}
 	for (auto x : g) {
 		for (auto y : x) wcout << y << ' ';
 		wcout << endl;
 	}
-	cfg_parse(cfg_compile(g, L"S"), arg.c_str());
+	if (cfg_parse(cfg_compile(g, L"S"), arg.c_str())) wcout << "pass";
+	else wcout << "fail";
+	//vector<vector<wstring>> g{{L"S",L"a"}};
 //	assert(cfg_parse(cfg_compile(g,L"S"),L"a"));
 //	assert(!cfg_parse(cfg_compile(g,L"S"),L"aa"));
 //	assert(!cfg_parse(cfg_compile(g,L"S"),L"b"));
