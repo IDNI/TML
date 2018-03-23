@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cassert>
 using namespace std;
-#define ever ;;
 
 int icmp(const int32_t *x, const int32_t *y, size_t len) {
 	for (size_t n = 0; n < len; ++n)
@@ -13,6 +12,7 @@ int icmp(const int32_t *x, const int32_t *y, size_t len) {
 			return x[n] < y[n] ? -1 : 1;
 	return 0;
 }
+
 class tset { // tuple set
 	size_t arity;
 	struct cmp {
@@ -30,12 +30,13 @@ class tset { // tuple set
 		return buf[n] = 0, it;
 	}
 	set<const int32_t*>::const_iterator last(size_t n, int32_t i) {
-		buf[n] = i+1;
+		++(buf[n] = i);
 		auto it = s[n]->upper_bound(buf);
 		return buf[n] = 0, it;
 	}
 public:
-	typedef vector<array<set<const int32_t*>::const_iterator, 2>> iters;
+	typedef pair<size_t, array<set<const int32_t*>::const_iterator, 2>> iter_pair;
+	typedef vector<iter_pair> iters;
 
 	tset(size_t arity) : arity(arity), s(new set<const int32_t*, cmp>*[arity]), buf(new int32_t[arity]) {
 		for (size_t n = 0; n < arity; ++n) s[n] = new set<const int32_t*, cmp>(cmp(n, arity));
@@ -48,32 +49,31 @@ public:
 		for (size_t n = 0; n < arity; ++n)
 			if (pat[n] > 0) {
 				if (auto lb = first(n, pat[n]); lb != s[n]->end())
-					it.emplace_back(array<set<const int32_t*>::const_iterator, 2>{lb, last(n, pat[n])});
+					it.emplace_back(iter_pair{n, {lb, last(n, pat[n])}});
 				else return 0;
 			}
 		return next(it);
 	}
 
 	const int32_t* next(iters& it) {
-		bool b;
-		do {
-			if (it[0][0] == it[0][1]) return 0;
-			b = false;
+		for (bool b = false;; b = false) {
+			if (it[0].second[0] == it[0].second[1]) return 0;
 			for (size_t n = 1; n < it.size(); ++n) {
-				if (it[n][0] == it[n][1]) return 0;
-				while (icmp(*it[n][0], *it[n-1][0], arity) < 0) {
+				if (it[n].second[0] == it[n].second[1]) return 0;
+				if (icmp(*it[n].second[0], *it[n-1].second[0], arity) < 0) {
 					b = true;
-					if (++it[n][0] == it[n][1])
+					if ((it[n].second[0] = s[it[n].first]->lower_bound(*it[n-1].second[0])) == s[it[n].first]->end())
 						return 0;
 				}
-				while (icmp(*it[n][0], *it[n-1][0], arity) > 0) {
+				if (icmp(*it[n].second[0], *it[n-1].second[0], arity) > 0) {
 					b = true;
-					if (++it[n-1][0] == it[n-1][1])
+					if ((it[n-1].second[0] = s[it[n-1].first]->lower_bound(*it[n].second[0])) == s[it[n-1].first]->end())
 						return 0;
 				}
 			}
-		} while (b);
-		return *(it[0][0]++);
+			if (!b) break;
+		}
+		return *(it[0].second[0]++);
 	}
 };
 
