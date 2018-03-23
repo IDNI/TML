@@ -35,45 +35,50 @@ class tset { // tuple set
 		return buf[n] = 0, it;
 	}
 public:
-	typedef pair<size_t, array<set<const int32_t*>::const_iterator, 2>> iter_pair;
+	typedef set<const int32_t*>::const_iterator set_iter;
+	typedef pair<size_t, array<set_iter, 2>> iter_pair;
 	typedef vector<iter_pair> iters;
 
-	tset(size_t arity) : arity(arity), s(new set<const int32_t*, cmp>*[arity]), buf(new int32_t[arity]) {
-		for (size_t n = 0; n < arity; ++n) s[n] = new set<const int32_t*, cmp>(cmp(n, arity));
+	tset(size_t arity): arity(arity),s(new set<const int32_t*,cmp>*[arity]),
+		buf(new int32_t[arity]) {
+		for (size_t n = 0; n < arity; ++n)
+			s[n] = new set<const int32_t*, cmp>(cmp(n, arity));
 		memset(buf, 0, sizeof(int32_t) * arity);
 	}
 
-	void add(const int32_t* t) { for (size_t n = 0; n < arity; ++n) s[n]->emplace(t); }
+	void add(const int32_t* t){for(size_t n=0;n<arity;++n)s[n]->emplace(t);}
 
 	const int32_t* first(const int32_t* pat, iters& it) {
 		for (size_t n = 0; n < arity; ++n)
-			if (pat[n] > 0) {
-				if (auto lb = first(n, pat[n]); lb != s[n]->end())
-					it.emplace_back(iter_pair{n, {lb, last(n, pat[n])}});
-				else return 0;
-			}
+			if (pat[n] < 0) continue;
+			else if (auto lb=first(n, pat[n]); lb!=s[n]->end())
+					it.emplace_back(iter_pair{n, 
+						{lb, last(n, pat[n])}});
+			else return 0;
 		return next(it);
 	}
 
 	const int32_t* next(iters& it) {
-		for (bool b = false;; b = false) {
-			if (it[0].second[0] == it[0].second[1]) return 0;
-			for (size_t n = 1; n < it.size(); ++n) {
-				if (it[n].second[0] == it[n].second[1]) return 0;
-				if (icmp(*it[n].second[0], *it[n-1].second[0], arity) < 0) {
-					b = true;
-					if ((it[n].second[0] = s[it[n].first]->lower_bound(*it[n-1].second[0])) == s[it[n].first]->end())
-						return 0;
-				}
-				if (icmp(*it[n].second[0], *it[n-1].second[0], arity) > 0) {
-					b = true;
-					if ((it[n-1].second[0] = s[it[n-1].first]->lower_bound(*it[n].second[0])) == s[it[n-1].first]->end())
-						return 0;
-				}
+	loop:	bool b = false;
+		if (it[0].second[0] == it[0].second[1]) return 0;
+		for (size_t n = 1; n < it.size(); ++n) {
+			auto &jt = it[n].second[0], &kt = it[n-1].second[0];
+			if (jt == it[n].second[1]) return 0;
+			if (icmp(*jt, *kt, arity) < 0) {
+				b = true;
+				if ((jt = s[it[n].first]->lower_bound(*kt)) ==
+					s[it[n].first]->end())
+					return 0;
 			}
-			if (!b) break;
+			if (icmp(*jt, *kt, arity) > 0) {
+				b = true;
+				if ((kt = s[it[n-1].first]->lower_bound(*jt))==
+					s[it[n-1].first]->end())
+					return 0;
+			}
 		}
-		return *(it[0].second[0]++);
+		if (!b) return *(it[0].second[0]++);
+		goto loop;
 	}
 };
 
