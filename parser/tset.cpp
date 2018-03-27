@@ -6,7 +6,6 @@ int icmp(vecc x, vecc y, size_t len) {
 	for (size_t n=0;n<len;++n) if (x[n]!=y[n]) return x[n]<y[n] ? -1 : 1;
 	return 0;
 }
-int tset::icmp(vecc x, vecc y) const { return ::icmp(x, y, arity); }
 
 bool tset::cmp::operator()(vecc x, vecc y) const {
 	return x[k] != y[k] ? x[k] < y[k] : ::icmp(x, y, a) < 0;
@@ -47,7 +46,7 @@ loop:	bool b = false;
 	for (size_t n = 1; n < it.size(); ++n)
 		if (auto &jt = it[n].second[0], &kt = it[n-1].second[0];
 			jt == it[n].second[1] ||
-			((c = icmp(*jt, *kt)) < 0 && (b = true) &&
+			((c = ::icmp(*jt, *kt, arity)) < 0 && (b = true) &&
 				!has(jt, *s[it[n].first], *kt)) ||
 			(c > 0 && (b = true) && !has(kt,*s[it[n-1].first],*jt)))
 			return 0;
@@ -61,14 +60,8 @@ loop:	bool b = false;
 
 int main(int, char**) {
 	tset s(3);
-	int_t a[]={1,2,3};
-	int_t b[]={1,2,2};
-	int_t c[]={1,2,4};
-	int_t d[]={1,1,3};
-	int_t e[]={4,3,4};
-	int_t q[]={1,-4,-4};
-	//	cin >> q[0] >> q[1] >> q[2];
-	//	cin >> a[0] >> a[1] >> b[2];
+	int_t a[]={1,2,3}, b[]={1,2,2}, c[]={1,2,4}, d[]={1,1,3}, e[]={4,3,4},
+		q[]={1,-4,-4};
 	vecc r;
 	s.add(a), s.add(b), s.add(c), s.add(d), s.add(e);
 	tset::iters it;
