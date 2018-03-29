@@ -1,56 +1,87 @@
-#include <map>
+#include <vector>
 #include <set>
-#include <cstring>
-#include <cstdlib>
-#include <cassert>
+#include <map>
 #include <iostream>
-#include <alloca.h>
 using namespace std;
 
 typedef int32_t int_t;
-typedef int_t* tup;
-typedef int_t* pat;
-typedef int_t* mat; // env
-const size_t max_ar = 256;
+typedef vector<int_t> term;
+template<typename T> using two = pair<T, T>;
 
-mat unify(const pat _p, size_t nvars, tup t, size_t ar) {
-	size_t sz1 = nvars * sizeof(int_t), sz2 = ar * sizeof(int_t);
-	mat r = (mat)memset(alloca(sz1), 0, sz1);
-	pat p = (pat)memcpy(alloca(sz2), _p, sz2);
-	for (size_t n = 0; n < ar; ++n) {
-		while (p[n] < 0) {
-			if (r[abs(p[n])-1]) p[n] = r[abs(p[n])-1];
-			else p[n] = r[abs(p[n])-1] = t[n];
-		}
-		if (t[n] != p[n]) return 0;
+struct env : public map<int_t, int_t> {
+	int_t rep(int_t x) {
+		auto it = find(x);
+		return it == end() ? x : (*this)[x] = rep(it->second);
 	}
-	return (mat)memcpy(new int_t[nvars], r, sz1);
+	int_t rep(int_t x) const {
+		auto it = find(x);
+		return it == end() ? x : rep(it->second);
+	}
+	bool rep(int_t x, int_t y) {
+		if ((x = rep(x)) == (y = rep(y))) return true;
+		return x>0 && y>0 ? x==y : (emplace(min(x, y), max(x, y)),true);
+	}
+};
+set<env> join(set<env>* v, size_t len) { // TODO: sort by size
+	if (len == 1) return v[0];
+	env e;
+	set<env> r, t = v[1];
+	for (const env& x : v[0])
+		for (const env& y : v[1]) {
+			e.clear();
+			bool b = true;
+			for (auto t:x) if(!(b&=e.rep(t.first, t.second)))break;
+			if (!b) break;
+			for (auto t:y) if(!(b&=e.rep(t.first, t.second)))break;
+			if (b) r.emplace(e);
+		}
+	return v[1] = r, r = join(v + 1, len - 1), v[1] = t, r;
 }
-
-void f(const pat* p, size_t np, const tup t, size_t ar, size_t nvars, map<pat, set<mat>> &r) {
-	for (size_t n = 0; n < np; ++n)
-		if (mat m = unify(p[n], nvars, t, ar); m) r[p[n]].emplace(m);
+bool unify(const term& x, const term& y, env& ey) {
+	if (x.size() != y.size()) return false;
+	for (size_t n = 0; n < x.size(); ++n)
+		if (!ey.rep(x[n], ey.rep(y[n])))
+			return false;
+	return true;
+}
+bool sub(const env& e, term& t) {
+	for (size_t n = 0; n < t.size(); ++n)
+		if ((t[n] = e.rep(t[n])) < 0)
+			return false;
+	return true;
+}
+void print(ostream& os, const set<term>& s) {
+	for (const term &t : s) {
+		os << "( ";
+		for (int_t i : t) os << i << ' ';
+		os << ')';
+	}
+}
+void fwd(set<term>& f, vector<vector<term>> b, vector<vector<term>> h) {
+	const size_t sz = f.size();
+	size_t n = 0, k;
+	vector<vector<set<env>>> m(b.size());
+	for (env e; n < b.size(); ++n)
+		for (m[n].resize(b[n].size()), k = 0; k < b[n].size(); ++k)
+			for (const term& t : f)
+				if (e.clear(), unify(t, b[n][k], e))
+					m[n][k].emplace(e);
+	for (n = 0; n < b.size(); ++n)
+			for (size_t k = 0; k < b[n].size(); ++k)
+				for (const env& e : m[n][k])
+					for (term t : h[n])
+						if (sub(e, t))
+							f.emplace(t);
+	if (sz == f.size()) return;
+	fwd(f, b, h);
 }
 
 int main(int, char**) {
-	int_t a = 1, b = 2, c = 3, vx = -1, vy = -2;
-	int_t p1[] = { a, vx, vy };
-	int_t p2[] = { vx, vy, a };
-	int_t x[] = { a,  b,  c };
-	int_t y[] = { a,  c,  a };
-	int_t z[] = { b,  c,  a };
-	pat p[] = {p1, p2};
-	map<pat, set<mat>> m;
-	f(p, 2, x, 3, 2, m);
-	f(p, 2, y, 3, 2, m);
-	f(p, 2, z, 3, 2, m);
-	for (auto t : m) {
-		for (size_t n = 0; n < 3; ++n) cout << t.first[n] << ' ';
-		cout << " =>" << endl;
-		for (auto s : t.second) {
-			for (size_t n = 0; n < 2; ++n) cout << s[n] << ' ';
-			cout << endl;
-		}
-	}
-	return 0;
+	// -1 1 -> -1 2
+	// -1 1, -1 2 -> -1 3
+	// 1 1
+	// 2 1
+	set<term> f = {{1,1},{2,1}};
+	fwd(f,{{{-1,1}},{{-1,1},{-1,2}}},{{{-1,2}},{{-1,3}}});
+	print(cout, f);
 }
