@@ -10,14 +10,16 @@ bool rep(env& e, int_t x, int_t y) {
 	if (x > y) ::swap(x, y);
 	return x > 0 ? x == y : (e[-x-1] = y, true);
 } 
-bool rep(env& r, const env& e) {
-	if (r.size() != e.size()) throw 0;
-	for (size_t n = 0; n < r.size(); ++n)
+bool rep(env& r, const env& e, size_t sz) {
+//	if (r.size() != e.size()) throw 0;
+	for (size_t n = 0; n < sz; ++n)
 		if (e[n] && !rep(r, n+1, e[n])) return false;
 	return true;
 }
+#define mkenv(sz) ((env)memset(alloca(sz * sizeof(int_t)), 0, sz * sizeof(int_t)))
+#define dup(e, sz) (env)memcpy(new int_t[sz], e, sizeof(int_t) * sz)
 // join all combinations of noncontradicting envs
-set<env> join(vector<set<env>>& v) {
+set<env> join(vector<set<env>>& v, size_t nvars) {
 	if (v.size() == 1) return v[0];
 	sort(v.begin(), v.end(), [](const set<env>& x, const set<env>& y) {
 		return x.size() < y.size(); });
@@ -25,8 +27,8 @@ set<env> join(vector<set<env>>& v) {
 	for (size_t pos = 1; pos < v.size() - 1 && !r.empty(); ++pos)
 		for (const env& x : r)
 			for (const env& y : v[pos])
-				if (env e(x.size()); rep(e, x) && rep(e, y))
-					r.emplace(e);
+				if (env e=mkenv(nvars); rep(e, x, nvars) && rep(e, y, nvars))
+					r.emplace(dup(e, nvars));
 	return r;
 }
 // normalize variable names to sequential order
@@ -43,12 +45,11 @@ size_t normvars(clause& t) {
 }
 // calc which positive term (head) may match which negative term (body)
 void fwd::cache(size_t n, size_t k, size_t i, size_t j) {
-	env e(numvars[n]);
-	size_t l;
-	for (l = 0; l < poss[i][j].size(); ++l)
+	env e = mkenv(numvars[n]);
+	for (size_t l = 0; l < poss[i][j].size(); ++l)
 		if (!rep(e, poss[i][j][l], rep(e, negs[n][k][l])))
-			break;
-	if (l == poss[i][j].size()) p2n[pair(i, j)].emplace(n, k);
+			return;
+	p2n[pair(i, j)].emplace(n, k);
 }
 // given the clauses, normalize and calc the cache
 fwd::fwd(vector<clause> negs, vector<clause> poss) :
@@ -70,11 +71,11 @@ fwd::fwd(vector<clause> negs, vector<clause> poss) :
 void fwd::sub_negs(size_t n, size_t k, const term& t) {
 	size_t j;
 	if (t.size() != negs[n][k].size()) return;
-	env e(numvars[n]);
+	env e = mkenv(numvars[n]);
 	for (j = 0; j < t.size(); ++j)
 		if (!rep(e, t[j], rep(e, negs[n][k][j])))
 			break;
-	if (j == t.size()) matches[n][k].emplace(move(e));
+	if (j == t.size()) matches[n][k].emplace(dup(e, numvars[n]));
 }
 // substitute successful negative literal's envs in their matching positives
 void fwd::sub_poss(size_t n, size_t k, terms& facts, const env& e) {
@@ -98,7 +99,7 @@ void fwd::operator()(terms& facts) {
 					sub_negs(n, k, t);
 		}
 		for (n = 0; n < negs.size(); ++n)
-			for (const env& e : join(matches[n]))
+			for (const env& e : join(matches[n], numvars[n]))
 				for (size_t k = 0; k < poss[n].size(); ++k)
 					sub_poss(n, k, facts, e);
 		if (sz == facts.size()) return;

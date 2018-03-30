@@ -10,7 +10,7 @@ typedef int32_t int_t;
 typedef std::vector<int_t> term;
 typedef std::set<term> terms;
 typedef std::vector<term> clause;
-struct env : public std::vector<int_t> {using std::vector<int_t>::vector;};
+typedef int_t* env;
 std::ostream& operator<<(std::ostream&, const env&);
 std::ostream& operator<<(std::ostream&, const term&);
 std::ostream& operator<<(std::ostream&, const terms&);

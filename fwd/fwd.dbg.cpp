@@ -3,10 +3,11 @@
 using namespace std;
 
 ostream& operator<<(ostream& os, const env& e) {
-	os << "{ ";
-	for (int_t n = 0; n < (int_t)e.size(); ++n)
-		if (e[n]) os << -n-1 << '=' << e[n] << ' ';
-	return os << '}';
+	return os;
+//	os << "{ ";
+//	for (int_t n = 0; n < (int_t)e.size(); ++n)
+//		if (e[n]) os << -n-1 << '=' << e[n] << ' ';
+//	return os << '}';
 }
 
 ostream& operator<<(ostream& os, const term& t) {
