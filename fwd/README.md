@@ -118,6 +118,20 @@ the activated body's bin with a bin that contains a single env, the env that
 encode the new fact. We then perform the join step as before, with the temporary
 bin in place. Afterwards we restore the original bin and add to it the new fact.
 
+3. The bins share a subset relation in case where body items are special cases
+of each other. We therefore maintain the bins incrementally. Note that the
+amount of such "splittings" is boudned by the size of the rules, independently
+of the data. Our bins now look like:
+
+	set<pair<size_t, size_t>> **sc;
+
+where sc[i][j] has a set of pairs representing the rule # and the body # of the
+terms that are supercases.
+
+4. The sc relation can guide the join step in the following way. First we join
+all most special cases. Whatever fails we pass to the next supercases. If no
+supercase is left, the join is done.
+
 That's basically all.
 
 The scope of this in TML is to have a forward machine as a backend for backward
