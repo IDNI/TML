@@ -1,107 +1,156 @@
 #include "fwd.h"
 
-using namespace std;
+#define mkenv(sz) ((tmpenv)memset(alloca(sz*sizeof(int_t)),0,sz*sizeof(int_t)))
+#define dup(e, sz) env(e, &e[sz])
 
-// union-find with path compression specialized for vars/consts
-int_t rep(env& e, int_t x) { return x>0?x:e[-x-1]?e[-x-1]=rep(e, e[-x-1]):x; } 
-int_t rep(const env& e, int_t x) { return x>0?x:e[-x-1]?rep(e,e[-x-1]):x; } 
-bool rep(env& e, int_t x, int_t y) {
-	if ((x = rep(e, x)) == (y = rep(e, y))) return true;
-	if (x > y) ::swap(x, y);
-	return x > 0 ? x == y : (e[-x-1] = y, true);
+int_t rep(const tmpenv& e, int_t x) { return x>0||!e[-x-1]?x: rep(e,e[-x-1]); } 
+int_t rep(tmpenv& e, int_t x){return x>0||!e[-x-1]?x:e[-x-1]= rep(e,e[-x-1]); }
+bool rep(tmpenv& e, int_t x, int_t y) {
+	if ((x = rep(e, x)) > (y = rep(e, y))) ::swap(x, y);
+	return x == y || (x < 0 && (e[-x - 1] = y, true));
 } 
-bool rep(env& r, const env& e, size_t sz) {
-//	if (r.size() != e.size()) throw 0;
-	for (size_t n = 0; n < sz; ++n)
-		if (e[n] && !rep(r, n+1, e[n])) return false;
+bool unify(const term& x, const term& g, tmpenv& e) {
+	if (x.size() != g.size()) return false;
+	for (size_t n=0; n<x.size(); ++n) if (!rep(e, x[n], g[n])) return false;
 	return true;
-}
-#define mkenv(sz) ((env)memset(alloca(sz * sizeof(int_t)), 0, sz * sizeof(int_t)))
-#define dup(e, sz) (env)memcpy(new int_t[sz], e, sizeof(int_t) * sz)
-// join all combinations of noncontradicting envs
-set<env> join(vector<set<env>>& v, size_t nvars) {
-	if (v.size() == 1) return v[0];
-	sort(v.begin(), v.end(), [](const set<env>& x, const set<env>& y) {
-		return x.size() < y.size(); });
-	set<env> r = v[0];
-	for (size_t pos = 1; pos < v.size() - 1 && !r.empty(); ++pos)
-		for (const env& x : r)
-			for (const env& y : v[pos])
-				if (env e=mkenv(nvars); rep(e, x, nvars) && rep(e, y, nvars))
-					r.emplace(dup(e, nvars));
+} 
+term sub(const term& t, const tmpenv& e) {
+	term r(t.size());
+	for (size_t n = 0; n < t.size(); ++n) r[n] = rep(e, t[n]);
 	return r;
 }
-// normalize variable names to sequential order
-size_t normvars(clause& t) {
-	map<int_t, size_t> v;
-	size_t k = 0, j, nv = 1;
-	for (; k < t.size(); ++k)
-		for (j = 0; j < t[k].size(); ++j)
-			if (t[k][j] > 0) continue;
-			else if (auto it = v.find(t[k][j]); it == v.end())
-				v.emplace(t[k][j], nv), t[k][j] = -nv++;
-			else t[k][j] = t[k][it->second - 1];
-	return nv - 1;
-}
-// calc which positive term (head) may match which negative term (body)
-void fwd::cache(size_t n, size_t k, size_t i, size_t j) {
-	env e = mkenv(numvars[n]);
-	for (size_t l = 0; l < poss[i][j].size(); ++l)
-		if (!rep(e, poss[i][j][l], rep(e, negs[n][k][l])))
-			return;
-	p2n[pair(i, j)].emplace(n, k);
-}
-// given the clauses, normalize and calc the cache
-fwd::fwd(vector<clause> negs, vector<clause> poss) :
-	negs(negs), poss(poss), numvars(new size_t[negs.size()]),
-	matches(negs.size()) {
 
-	DEBUG(print_clauses());
-	if (negs.size() != poss.size()) throw 0;
-	for (size_t n = 0; n < negs.size(); ++n) {
-		normvars(poss[n]), numvars[n] = normvars(negs[n]);
-		for (size_t k = 0; k < negs[n].size(); ++k)
-			for (size_t i = 0; i < poss.size(); ++i)
-				for (size_t j = 0; j < poss[i].size(); ++j)
-					cache(n, k, i, j);
-	}
-	DEBUG(print_matches());
-}
-// substitute a term in a negative literal, add the env to matches[] in success
-void fwd::sub_negs(size_t n, size_t k, const term& t) {
-	size_t j;
-	if (t.size() != negs[n][k].size()) return;
-	env e = mkenv(numvars[n]);
-	for (j = 0; j < t.size(); ++j)
-		if (!rep(e, t[j], rep(e, negs[n][k][j])))
-			break;
-	if (j == t.size()) matches[n][k].emplace(dup(e, numvars[n]));
-}
-// substitute successful negative literal's envs in their matching positives
-void fwd::sub_poss(size_t n, size_t k, terms& facts, const env& e) {
-	term t = poss[n][k];
-	for (int_t &i : t) i = rep(e, i);
-	facts.emplace(t);
-	for (auto x : p2n[pair(n, k)]) {
-		size_t i = get<0>(x), j = get<1>(x);
-		set<env> s;
-//		swap(s, matches[pair(i, j)]);
+void pfp::Tp(terms& add, terms& del) {
+	for (size_t n = 0; n < b.size(); ++n) {
+		set<frame> q;
+		term x;
+		tmpenv s = mkenv(nvars[n]);
+		for (const term& t : f)
+			if (tmpenv e = mkenv(nvars[n]); unify(b[n][0], t, e))
+				q.emplace(0, dup(e, nvars[n]));
+loop:		auto [k, e] = *q.begin();
+		q.erase(q.begin());
+		x = sub(b[n][k], &e[0]);
+		for (const term& t : f)
+			if (s=(tmpenv)memcpy(s,&e[0],sizeof(int_t)*nvars[n]),
+				!unify(x, t, s)) continue;
+			else if (k+1 < b[n].size())
+				q.emplace(k+1, dup(s,nvars[k]));
+			else for (const term& t : h[n])
+				(t[0]?add:del).emplace(sub(t, &e[0]));
+		if (!q.empty()) goto loop;
 	}
 }
-// main function, loop until fixed point reached
-void fwd::operator()(terms& facts) {
-	size_t sz, n;
-	while ((sz = facts.size())) {
-		for (n = 0; n < negs.size(); ++n) {
-			matches[n] = vector<set<env>>(negs[n].size());
-			for (const term& t : facts)
-				for (size_t k = 0; k < negs[n].size(); ++k)
-					sub_negs(n, k, t);
-		}
-		for (n = 0; n < negs.size(); ++n)
-			for (const env& e : join(matches[n], numvars[n]))
-				for (size_t k = 0; k < poss[n].size(); ++k)
-					sub_poss(n, k, facts, e);
-		if (sz == facts.size()) return;
+pfp::pfp() : nvars(0) {}
+bool pfp::operator()(terms& r) {
+	if (nvars) delete[] nvars;
+	nvars = new size_t[b.size()];
+#define replacevar(x, y) (dict.oldvars[y] = x), (x = y)
+	for (size_t n=0; n<b.size(); ++n) {
+		map<int_t, size_t> v;
+		size_t nv = 1;
+		for (size_t k = 0; k < b[n].size(); ++k)
+			for (size_t j = 0; j < b[n][k].size(); ++j)
+				if (b[n][k][j] > 0) continue;
+				else if (auto it=v.find(b[n][k][j]);it==v.end())
+					v.emplace(b[n][k][j],nv),
+					replacevar(b[n][k][j], -nv), ++nv;
+				else b[n][k][j] = b[n][k][it->second - 1];
+		for (term& i : h[n]) for (int_t& j : i) if (j < 0) j=-v[j];
+		nvars[n] = nv - 1;
 	}
+	set<terms> ss;
+	for (size_t n = 0;; ++n) {
+		terms add, del, lf = f;
+		Tp(add, del);
+		f.insert(add.begin(), add.end());
+		for (auto it = del.begin(); it != del.end(); ++it) f.erase(*it);
+		wcout<<n<<" f:"<<endl;
+		for (term t : f) wcout << t << endl;
+		if (f == lf) return r = f, true;
+		if (!ss.emplace(f).second) return r = f, false;
+	}
+}
+pfp::~pfp() { if (nvars) delete[] nvars; }
+
+wostream& operator<<(wostream& os, const term& t) {
+	for (auto x : t) os << dict(x) << L' ';
+	return os;
+}
+
+wostream& operator<<(wostream& os, const set<term>& s) {
+	size_t sz = s.size();
+	for (auto t : s) os << t << (--sz ? ", " : "");
+	return os;
+}
+
+wstring repl::get_line() const {
+	wstring r;
+	if (!getline(wcin, r)) { cout << "end of input, exiting" << endl; exit(0); }
+	while (iswspace(r[0])) r.erase(0);
+	while (iswspace(r[r.size() - 1])) r.erase(r.size() - 1);
+	return r;
+}
+bool repl::walnum(wchar_t ch) const { return ch == L'?' || iswalnum(ch); }
+int_t repl::peek_word(const wchar_t* s) const {
+	size_t n;
+	for (n = 0; walnum(s[n]); ++n);
+	return dict(wstring(s, n));
+}
+int_t repl::get_word(const wchar_t** s) const {
+	size_t n;
+	for (n = 0; walnum(*((*s)++)); ++n);
+	return dict(wstring(*s - n - 1, n));
+}
+term repl::get_term(const wchar_t** line) const {
+	term r;
+	for (int_t w; **line && **line != L'.';)
+		if (**line == L',') return ++*line, r;
+		else if (peek_word(*line) == thenword) return r;
+		else if ((w=get_word(line))) r.push_back(w);
+	return r;
+}
+vector<term> repl::get_clause(const wchar_t** line) {
+	vector<term> r;
+	for (; **line && **line != L'.';) {
+		while (iswspace(**line)) ++*line;
+		if (peek_word(*line) == thenword) return r;
+		if (term t = get_term(line); !t.size()) return r;
+		else r.push_back(t);
+	}
+	if (**line == L'.') ++*line;
+	return r;
+}
+void repl::run(const wchar_t* line) {
+	wstring w;
+	while (iswspace(*line)) ++line;
+	if (!*line) return;
+	if (peek_word(line) == ifword) {
+		get_word(&line);
+		clause b = get_clause(&line);
+		if (get_word(&line) != thenword)
+			throw runtime_error("'then' expected");
+		clause h = get_clause(&line);
+		p.b.push_back(b), p.h.push_back(h);
+	} else for (const term& t : get_clause(&line))
+		p.f.emplace(t);
+}
+
+repl::repl() : ifword(dict(L"if")), thenword(dict(L"then")) {}
+void repl::run() {
+	for (wstring line;;)
+		if ((line = get_line()) == L"run") {
+			terms t;
+			p(t);
+		} else if (line == L"step") {
+		} else run(line.c_str());
+}
+
+void add_rule(set<term> b, set<term> h) { wcout << b << L" => " << h << endl; }
+void add_fact(term t) { wcout << t << endl; }
+
+int main(int, char**) {
+	setlocale(LC_ALL, "");
+	repl r;
+	r.run();
 }

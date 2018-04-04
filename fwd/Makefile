@@ -1,2 +1,2 @@
 all:
-	clang++ fwd.cpp fwd.dbg.cpp -std=c++17 -W -Wall -Wpedantic -g
+	clang++ fwd.cpp -std=c++17 -W -Wall -Wpedantic -g
