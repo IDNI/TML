@@ -2,8 +2,12 @@
 #include <cstdlib>
 #define mkenv(sz) ((tmpenv)memset(alloca(sz*sizeof(int_t)),0,sz*sizeof(int_t)))
 #define dup(e, sz) env(e, &e[sz])
-int_t rep(const tmpenv& e, int_t x) { return x>0||!e[-x-1]?x: rep(e,e[-x-1]); } 
-int_t rep(tmpenv& e, int_t x){return x>0||!e[-x-1]?x:e[-x-1]= rep(e,e[-x-1]); }
+int_t rep(const tmpenv& e, int_t x) {
+	return x>0||!e[-x-1]||e[-x-1]==x?x: rep(e,e[-x-1]);
+} 
+int_t rep(tmpenv& e, int_t x){
+	return x>0||!e[-x-1]||e[-x-1]==x?x:e[-x-1]= rep(e,e[-x-1]);
+}
 
 bool rep(tmpenv& e, int_t x, int_t y) {
 	if ((x = rep(e, x)) > (y = rep(e, y))) ::swap(x, y);
@@ -43,42 +47,46 @@ void pfp::Tp(terms& add, terms& del) {
 					(t[0]?add:del).emplace(sub(t, &e[0]));
 		}
 	}
+	f.insert(add.begin(), add.end());
+	for (auto it = del.begin(); it != del.end(); ++it)
+		f.erase(term(&(*it)[1],&(*it)[it->size()]));
 }
 
-pfp::pfp() : nvars(0) {}
+pfp::pfp() : nvars(0), stage(0) {}
+pfp::~pfp() { if (nvars) delete[] nvars; }
 
 size_t pfp::operator()(terms& r, size_t &steps) {
 	if (nvars) delete[] nvars;
 	nvars = new size_t[b.size()];
-#define replacevar(x, y) (dict.oldvars[y] = x), (x = y)
-	for (size_t n=0; n<b.size(); ++n) {
-		map<int_t, size_t> v;
-		size_t nv = 1;
-		for (size_t k = 0; k < b[n].size(); ++k)
-			for (size_t j = 0; j < b[n][k].size(); ++j)
-				if (b[n][k][j] > 0) continue;
-				else if (auto it=v.find(b[n][k][j]);it==v.end())
-					v.emplace(b[n][k][j],nv),
-					replacevar(b[n][k][j], -nv), ++nv;
-				else b[n][k][j] = b[n][k][it->second - 1];
-		for (term& i : h[n]) for (int_t& j : i) if (j < 0) j=-v[j];
-		nvars[n] = nv - 1;
-	}
-	map<terms, size_t> ss;
-	size_t n;
-	for (n = 0; n < steps; ++n) {
-		terms add, del, lf = f;
-		Tp(add, del);
-		f.insert(add.begin(), add.end());
-		for (auto it = del.begin(); it != del.end(); ++it)
-			f.erase(term(&(*it)[1],&(*it)[it->size()]));
-		if (f == lf) return r = f, steps = n;
-		auto it = ss.emplace(f, ss.size());
-		if (!it.second) return r = f, steps = n, it.first->second;
-	}
-	return 0;
+	for (size_t n=0; n<b.size(); ++n) normrule(n);
+	for (; stage < steps; ++stage) step(r, steps);
+	return steps;
 }
-pfp::~pfp() { if (nvars) delete[] nvars; }
+
+void pfp::normrule(size_t n) {
+	map<int_t, size_t> v;
+	size_t nv = 1;
+	for (size_t k = 0; k < b[n].size(); ++k)
+		for (size_t j = 0; j < b[n][k].size(); ++j)
+			if (b[n][k][j] > 0) continue;
+			else if (auto it = v.find(b[n][k][j]); it == v.end())
+				v.emplace(b[n][k][j], nv),
+				dict.oldvars[-nv] = b[n][k][j],
+				b[n][k][j] = -nv++;
+			else
+				b[n][k][j] = -b[n][k][it->second - 1];
+	for (term& i : h[n]) for (int_t& j : i) if (j < 0) j = -v[j];
+	nvars[n] = nv - 1;
+}
+
+void pfp::step(terms& r, size_t& l) {
+	terms add, del, lf = f;
+	Tp(add, del);
+	if (f == lf) l = stage;
+	else if (auto it = stages.emplace(f, stages.size()); !it.second)
+		l = it.first->second;
+	r = f;
+}
 
 wostream& operator<<(wostream& os, const term& t) {
 	for (auto x : t) os << dict(x) << L' ';
@@ -165,7 +173,17 @@ void repl::run() {
 			if (n == steps) wcout << "pass after " << steps << " steps" << endl;
 			else wcout << "fail, step " << n << " same as step " << steps << endl;
 			for (auto x : t) wcout << x << endl;
-		} else if (line == L"step") {
+		} else if (line.substr(0, 4) == L"step") {
+			const wchar_t *s = line.c_str() + 4;
+			wchar_t *e;
+			while (iswspace(*s)) ++s;
+			size_t steps = wcstoul(s, &e, 10);
+			if (!e) { wcout << "usage: step <# of steps>"; continue; }
+			terms t;
+			size_t n = p(t, steps);
+			if (n == steps) wcout << "pass after " << steps << " steps" << endl;
+			else wcout << "fail, step " << n << " same as step " << steps << endl;
+			for (auto x : t) wcout << x << endl;
 		} else run(line.c_str());
 }
 

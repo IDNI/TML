@@ -23,7 +23,10 @@ wostream& operator<<(wostream& os, const term& t);
 wostream& operator<<(wostream& os, const set<term>& s);
 
 class pfp {
-	size_t* nvars;
+	size_t *nvars, stage;
+	map<terms, size_t> stages;
+	void normrule(size_t);
+	void step(terms&, size_t&);
 	void Tp(terms& add, terms& del);
 public:
 	size_t operator()(terms&, size_t&);
