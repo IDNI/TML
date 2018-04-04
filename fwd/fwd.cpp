@@ -42,7 +42,7 @@ void pfp::Tp(terms& add, terms& del) {
 				if (s=(tmpenv)memcpy(s,&e[0],sizeof(int_t)*nvars[n]),
 					!unify(x, t, s)) continue;
 				else if (k+1 < b[n].size())
-					q.emplace(k+1, dup(s,nvars[k]));
+					q.emplace(k+1, dup(s,nvars[n]));
 				else for (const term& t : h[n])
 					(t[0]?add:del).emplace(sub(t, &e[0]));
 		}
@@ -119,8 +119,7 @@ int_t repl::peek_word(const wchar_t* s) const {
 int_t repl::get_word(const wchar_t** s) const {
 	while (iswspace(**s)) ++*s;
 	size_t n;
-	for (n = 0; walnum((*s)[n]); ++n);// ++*s;// if (!**s) break;
-	assert(n);
+	for (n = 0; walnum((*s)[n]); ++n);
 	size_t r = dict(wstring(*s, n));
 	*s += n;
 	return r;
