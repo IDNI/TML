@@ -16,7 +16,7 @@ bool unify(const term& x, const term& g, tmpenv& e) {
 } 
 term sub(const term& t, const tmpenv& e) {
 	term r(t.size());
-	for (size_t n = 0; n < t.size(); ++n) r[n] = rep(e, t[n]);
+	for (size_t n = 0; n < t.size(); ++n) r[n] = (t[n] ? rep(e, t[n]) : 0);
 	return r;
 }
 
@@ -64,7 +64,8 @@ bool pfp::operator()(terms& r) {
 		terms add, del, lf = f;
 		Tp(add, del);
 		f.insert(add.begin(), add.end());
-		for (auto it = del.begin(); it != del.end(); ++it) f.erase(*it);
+		for (auto it = del.begin(); it != del.end(); ++it)
+			f.erase(term(&(*it)[1],&(*it)[it->size()]));
 		wcout<<n<<" f:"<<endl;
 		for (term t : f) wcout << t << endl;
 		if (f == lf) return r = f, true;
@@ -106,10 +107,10 @@ int_t repl::get_word(const wchar_t** s) const {
 }
 term repl::get_term(const wchar_t** line) const {
 	term r;
-	for (int_t w; **line && **line != L'.';)
+	for (; **line && **line != L'.';)
 		if (**line == L',') return ++*line, r;
 		else if (peek_word(*line) == thenword) return r;
-		else if ((w=get_word(line))) r.push_back(w);
+		else r.push_back(get_word(line));
 	return r;
 }
 vector<term> repl::get_clause(const wchar_t** line) {
