@@ -1,0 +1,6 @@
+if ?x ?y ?z then ?x ?z ?y
+if 1 ?x 2 then ?x ?x ?x
+if 3 3 3 then not 3 3 3
+1 2 3
+1 2 4
+run

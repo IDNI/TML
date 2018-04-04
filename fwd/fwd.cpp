@@ -1,19 +1,21 @@
 #include "fwd.h"
-
+#include <cstdlib>
 #define mkenv(sz) ((tmpenv)memset(alloca(sz*sizeof(int_t)),0,sz*sizeof(int_t)))
 #define dup(e, sz) env(e, &e[sz])
-
 int_t rep(const tmpenv& e, int_t x) { return x>0||!e[-x-1]?x: rep(e,e[-x-1]); } 
 int_t rep(tmpenv& e, int_t x){return x>0||!e[-x-1]?x:e[-x-1]= rep(e,e[-x-1]); }
+
 bool rep(tmpenv& e, int_t x, int_t y) {
 	if ((x = rep(e, x)) > (y = rep(e, y))) ::swap(x, y);
 	return x == y || (x < 0 && (e[-x - 1] = y, true));
 } 
+
 bool unify(const term& x, const term& g, tmpenv& e) {
 	if (x.size() != g.size()) return false;
 	for (size_t n=0; n<x.size(); ++n) if (!rep(e, x[n], g[n])) return false;
 	return true;
 } 
+
 term sub(const term& t, const tmpenv& e) {
 	term r(t.size());
 	for (size_t n = 0; n < t.size(); ++n) r[n] = (t[n] ? rep(e, t[n]) : 0);
@@ -28,21 +30,24 @@ void pfp::Tp(terms& add, terms& del) {
 		for (const term& t : f)
 			if (tmpenv e = mkenv(nvars[n]); unify(b[n][0], t, e))
 				q.emplace(0, dup(e, nvars[n]));
-loop:		auto [k, e] = *q.begin();
-		q.erase(q.begin());
-		x = sub(b[n][k], &e[0]);
-		for (const term& t : f)
-			if (s=(tmpenv)memcpy(s,&e[0],sizeof(int_t)*nvars[n]),
-				!unify(x, t, s)) continue;
-			else if (k+1 < b[n].size())
-				q.emplace(k+1, dup(s,nvars[k]));
-			else for (const term& t : h[n])
-				(t[0]?add:del).emplace(sub(t, &e[0]));
-		if (!q.empty()) goto loop;
+		while (!q.empty()) {
+			auto [k, e] = *q.begin();
+			q.erase(q.begin());
+			x = sub(b[n][k], &e[0]);
+			for (const term& t : f)
+				if (s=(tmpenv)memcpy(s,&e[0],sizeof(int_t)*nvars[n]),
+					!unify(x, t, s)) continue;
+				else if (k+1 < b[n].size())
+					q.emplace(k+1, dup(s,nvars[k]));
+				else for (const term& t : h[n])
+					(t[0]?add:del).emplace(sub(t, &e[0]));
+		}
 	}
 }
+
 pfp::pfp() : nvars(0) {}
-bool pfp::operator()(terms& r) {
+
+size_t pfp::operator()(terms& r, size_t &steps) {
 	if (nvars) delete[] nvars;
 	nvars = new size_t[b.size()];
 #define replacevar(x, y) (dict.oldvars[y] = x), (x = y)
@@ -59,18 +64,19 @@ bool pfp::operator()(terms& r) {
 		for (term& i : h[n]) for (int_t& j : i) if (j < 0) j=-v[j];
 		nvars[n] = nv - 1;
 	}
-	set<terms> ss;
-	for (size_t n = 0;; ++n) {
+	map<terms, size_t> ss;
+	size_t n;
+	for (n = 0; n < steps; ++n) {
 		terms add, del, lf = f;
 		Tp(add, del);
 		f.insert(add.begin(), add.end());
 		for (auto it = del.begin(); it != del.end(); ++it)
 			f.erase(term(&(*it)[1],&(*it)[it->size()]));
-		wcout<<n<<" f:"<<endl;
-		for (term t : f) wcout << t << endl;
-		if (f == lf) return r = f, true;
-		if (!ss.emplace(f).second) return r = f, false;
+		if (f == lf) return r = f, steps = n;
+		auto it = ss.emplace(f, ss.size());
+		if (!it.second) return r = f, steps = n, it.first->second;
 	}
+	return 0;
 }
 pfp::~pfp() { if (nvars) delete[] nvars; }
 
@@ -92,19 +98,26 @@ wstring repl::get_line() const {
 	while (iswspace(r[r.size() - 1])) r.erase(r.size() - 1);
 	return r;
 }
+
 bool repl::walnum(wchar_t ch) const { return ch == L'?' || iswalnum(ch); }
+
 int_t repl::peek_word(const wchar_t* s) const {
 	while (iswspace(*s)) ++s;
 	size_t n;
 	for (n = 0; walnum(s[n]); ++n);
 	return dict(wstring(s, n));
 }
+
 int_t repl::get_word(const wchar_t** s) const {
 	while (iswspace(**s)) ++*s;
 	size_t n;
-	for (n = 0; walnum(*((*s)++)); ++n) if (!**s) break;
-	return dict(wstring(*s - n - 1, n ? n : 1));
+	for (n = 0; walnum((*s)[n]); ++n);// ++*s;// if (!**s) break;
+	assert(n);
+	size_t r = dict(wstring(*s, n));
+	*s += n;
+	return r;
 }
+
 term repl::get_term(const wchar_t** line) const {
 	term r;
 	for (; **line && **line != L'.';)
@@ -113,6 +126,7 @@ term repl::get_term(const wchar_t** line) const {
 		else r.push_back(get_word(line));
 	return r;
 }
+
 vector<term> repl::get_clause(const wchar_t** line) {
 	vector<term> r;
 	for (; **line && **line != L'.';) {
@@ -124,6 +138,7 @@ vector<term> repl::get_clause(const wchar_t** line) {
 	if (**line == L'.') ++*line;
 	return r;
 }
+
 void repl::run(const wchar_t* line) {
 	wstring w;
 	while (iswspace(*line)) ++line;
@@ -140,11 +155,16 @@ void repl::run(const wchar_t* line) {
 }
 
 repl::repl() : ifword(dict(L"if")), thenword(dict(L"then")) {}
+
 void repl::run() {
 	for (wstring line;;)
 		if ((line = get_line()) == L"run") {
 			terms t;
-			p(t);
+			size_t steps = WINT_MAX, n;
+			n = p(t, steps);
+			if (n == steps) wcout << "pass after " << steps << " steps" << endl;
+			else wcout << "fail, step " << n << " same as step " << steps << endl;
+			for (auto x : t) wcout << x << endl;
 		} else if (line == L"step") {
 		} else run(line.c_str());
 }

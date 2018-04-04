@@ -26,7 +26,7 @@ class pfp {
 	size_t* nvars;
 	void Tp(terms& add, terms& del);
 public:
-	bool operator()(terms&);
+	size_t operator()(terms&, size_t&);
 	terms f;
 	clauses b, h;
 	pfp();
