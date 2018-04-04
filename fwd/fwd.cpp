@@ -44,7 +44,7 @@ void pfp::Tp(terms& add, terms& del) {
 				else if (k+1 < b[n].size())
 					q.emplace(k+1, dup(s,nvars[n]));
 				else for (const term& t : h[n])
-					(t[0]?add:del).emplace(sub(t, &e[0]));
+					(t[0]?add:del).emplace(sub(t, s));
 		}
 	}
 	f.insert(add.begin(), add.end());
@@ -64,18 +64,16 @@ size_t pfp::operator()(terms& r, size_t &steps) {
 }
 
 void pfp::normrule(size_t n) {
-	map<int_t, size_t> v;
+	map<int_t, int_t> v;
 	size_t nv = 1;
 	for (size_t k = 0; k < b[n].size(); ++k)
 		for (size_t j = 0; j < b[n][k].size(); ++j)
 			if (b[n][k][j] > 0) continue;
 			else if (auto it = v.find(b[n][k][j]); it == v.end())
-				v.emplace(b[n][k][j], nv),
-				dict.oldvars[-nv] = b[n][k][j],
-				b[n][k][j] = -nv++;
-			else
-				b[n][k][j] = -b[n][k][it->second - 1];
-	for (term& i : h[n]) for (int_t& j : i) if (j < 0) j = -v[j];
+				v.emplace(b[n][k][j], -nv), b[n][k][j] = -nv++;
+//				dict.oldvars[n][-nv] = b[n][k][j],
+			else b[n][k][j] = it->second;
+	for (term& i : h[n]) for (int_t& j : i) if (j < 0) j = v[j];
 	nvars[n] = nv - 1;
 }
 
@@ -157,8 +155,7 @@ void repl::run(const wchar_t* line) {
 			throw runtime_error("'then' expected");
 		clause h = get_clause(&line);
 		p.b.push_back(b), p.h.push_back(h);
-	} else for (const term& t : get_clause(&line))
-		p.f.emplace(t);
+	} else for (const term& t : get_clause(&line)) p.f.emplace(t);
 }
 
 repl::repl() : ifword(dict(L"if")), thenword(dict(L"then")) {}

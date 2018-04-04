@@ -40,7 +40,7 @@ class dict_t {
 	map<wstring, int_t> m;
 	vector<wstring> v;
 public:
-	map<int_t, int_t> oldvars;
+//	map<size_t, map<int_t, int_t>> oldvars;
 	dict_t() { m.emplace(L"not", 0); }
 	int_t operator()(const wstring& s) {
 		assert(s.size());
@@ -49,9 +49,11 @@ public:
 		return m.emplace(s,s[0]==L'?'?-v.size():v.size()).first->second;
 	}
 	wstring operator()(int_t x) const {
-		if (x < 0)
-			if (auto it = oldvars.find(x); it != oldvars.end())
-				x = it->second;
+//		if (x < 0)
+//			if (oldvars.find(n) != oldvars.end())
+//				if (	auto it = oldvars.at(n).find(x);
+//					it != oldvars.at(n).end())
+//						x = it->second;
 		return x ? v[abs(x) - 1] : L"not";
 	}
 } dict;
