@@ -13,8 +13,9 @@ bool rep(tmpenv& e, int_t x, int_t y) {
 	if ((x = rep(e, x)) > (y = rep(e, y))) ::swap(x, y);
 	return x == y || (x < 0 && (e[-x - 1] = y, true));
 } 
-
+size_t unifications = 0;
 bool unify(const term& x, const term& g, tmpenv& e) {
+	++unifications;
 	if (x.size() != g.size()) return false;
 	for (size_t n=0; n<x.size(); ++n) if (!rep(e, x[n], g[n])) return false;
 	return true;
@@ -37,14 +38,23 @@ void pfp::Tp(terms& add, terms& del) {
 		while (!q.empty()) {
 			auto [k, e] = *q.begin();
 			q.erase(q.begin());
+			if (k == b[n].size()) {
+				for (const term& t : h[n])
+					(t[0]?add:del).emplace(sub(t, &e[0]));
+				continue;
+			}
 			x = sub(b[n][k], &e[0]);
-			for (const term& t : f)
+			bool g = true;
+			for (auto y : x) g &= y > 0;
+			if (g) {
+				if (	add.find(x) != add.end() ||
+					(f.find(x) != f.end() && del.find(x)
+						== del.end()))
+					q.emplace(k+1, e);
+			} else for (const term& t : f)
 				if (s=(tmpenv)memcpy(s,&e[0],sizeof(int_t)*nvars[n]),
 					!unify(x, t, s)) continue;
-				else if (k+1 < b[n].size())
-					q.emplace(k+1, dup(s,nvars[n]));
-				else for (const term& t : h[n])
-					(t[0]?add:del).emplace(sub(t, s));
+				else q.emplace(k+1, dup(s,nvars[n]));
 		}
 	}
 	f.insert(add.begin(), add.end());
@@ -168,7 +178,8 @@ void repl::run() {
 			n = p(t, steps);
 			if (n == steps) wcout << "pass after " << steps << " steps" << endl;
 			else wcout << "fail, step " << n << " same as step " << steps << endl;
-			for (auto x : t) wcout << x << endl;
+			wcout << t.size() << ' ' << unifications << endl;
+//			for (auto x : t) wcout << x << endl;
 		} else if (line.substr(0, 4) == L"step") {
 			const wchar_t *s = line.c_str() + 4;
 			wchar_t *e;
