@@ -93,14 +93,16 @@ wstring repl::get_line() const {
 }
 bool repl::walnum(wchar_t ch) const { return ch == L'?' || iswalnum(ch); }
 int_t repl::peek_word(const wchar_t* s) const {
+	while (iswspace(*s)) ++s;
 	size_t n;
 	for (n = 0; walnum(s[n]); ++n);
 	return dict(wstring(s, n));
 }
 int_t repl::get_word(const wchar_t** s) const {
+	while (iswspace(**s)) ++*s;
 	size_t n;
-	for (n = 0; walnum(*((*s)++)); ++n);
-	return dict(wstring(*s - n - 1, n));
+	for (n = 0; walnum(*((*s)++)); ++n) if (!**s) break;
+	return dict(wstring(*s - n - 1, n ? n : 1));
 }
 term repl::get_term(const wchar_t** line) const {
 	term r;
@@ -114,7 +116,7 @@ vector<term> repl::get_clause(const wchar_t** line) {
 	vector<term> r;
 	for (; **line && **line != L'.';) {
 		while (iswspace(**line)) ++*line;
-		if (peek_word(*line) == thenword) return r;
+		if (!**line || peek_word(*line) == thenword) return r;
 		if (term t = get_term(line); !t.size()) return r;
 		else r.push_back(t);
 	}
