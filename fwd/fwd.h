@@ -2,23 +2,23 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <variant>
 #include <alloca.h>
 #include <cstring>
 #include <cassert>
 #include <stdexcept>
 #include <iostream>
 using namespace std;
-template<typename T> using two = array<T, 2>;
+
 typedef int32_t int_t;
 typedef vector<int_t> term;
-typedef vector<term> clause;
-typedef vector<clause> clauses;
-typedef two<size_t> loc;
-typedef set<loc> locs;
+typedef set<term> clause;
+typedef set<clause> clauses;
 typedef set<term> terms;
 typedef int_t* tmpenv;
 typedef vector<int_t> env;
 typedef pair<size_t, env> frame;
+template<typename T> using two = pair<T, T>;
 wostream& operator<<(wostream& os, const term& t);
 wostream& operator<<(wostream& os, const set<term>& s);
 
@@ -28,10 +28,14 @@ class pfp {
 	void normrule(size_t);
 	void step(terms&, size_t&);
 	void Tp(terms& add, terms& del);
+	terms f;
+	map<two<term>, clause> kb;
+	void add(const term& x, const clause& h);
+	bool add(term x, term y, clause h);
 public:
 	size_t operator()(terms&, size_t&);
-	terms f;
-	clauses b, h;
+	void add(clause x, const clause& y);
+	void add(const term& t) { f.emplace(t); }
 	pfp();
 	~pfp();
 };
@@ -66,11 +70,12 @@ class repl {
 	int_t peek_word(const wchar_t* s) const;
 	int_t get_word(const wchar_t** s) const;
 	term get_term(const wchar_t** line) const;
-	void add_rule(set<term> b, set<term> h);
-	void add_fact(term t);
-	vector<term> get_clause(const wchar_t** line);
+	clause get_clause(const wchar_t** line);
 	void run(const wchar_t* line);
 public:
 	repl();
 	void run();
 };
+
+#define error(x) (cerr<<(x)<<endl)
+#define err_head_var_not_in_body error("Variables that appear on consequences must also appear in the premises")
