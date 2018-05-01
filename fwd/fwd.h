@@ -44,7 +44,6 @@ class dict_t {
 	map<wstring, int_t> m;
 	vector<wstring> v;
 public:
-//	map<size_t, map<int_t, int_t>> oldvars;
 	dict_t() { m.emplace(L"not", 0); }
 	int_t operator()(const wstring& s) {
 		assert(s.size());
@@ -53,12 +52,14 @@ public:
 		return m.emplace(s,s[0]==L'?'?-v.size():v.size()).first->second;
 	}
 	wstring operator()(int_t x) const {
-//		if (x < 0)
-//			if (oldvars.find(n) != oldvars.end())
-//				if (	auto it = oldvars.at(n).find(x);
-//					it != oldvars.at(n).end())
-//						x = it->second;
-		return x ? v[abs(x) - 1] : L"not";
+		return x > 0 ? v[x - 1] : x ? L"v"s+to_wstring(-x) : L"not";
+	}
+	int_t tmp(wstring prefix = L"_") {
+		wstring s;
+		for (size_t n = 1;;++n) {
+			wstring s = prefix + to_wstring(n);
+			if (m.find(s) == m.end()) return (*this)(s);
+		}
 	}
 } dict;
 
@@ -77,5 +78,23 @@ public:
 	void run();
 };
 
-#define error(x) (cerr<<(x)<<endl)
-#define err_head_var_not_in_body error("Variables that appear on consequences must also appear in the premises")
+#define error(x) (wcerr<<(x)<<endl)
+#define err_head_var_not_in_body \
+error("Variables that appear on consequences must also appear in the premises")
+
+#define debug_addxy \
+	wcout << "add: " << x << " => " << y << endl
+#define debug_addxyh \
+	wcout << "add: " << x << ',' << y << " => " << h << endl
+#define debug_unify_begin \
+	wcout << "unifying: " << x << " with " << g << endl
+#define debug_unify_pass \
+	wcout << "passed with: " << e << endl
+#define debug_sub_begin \
+	wcout << "sub("<<t<<") = "
+#define debug_sub_end \
+	wcout << r << endl
+#define debug_interpolate_begin \
+	wcout << "interpolate: " << x << ',' << y
+#define	debug_interpolate_end \
+	wcout << " = " << r

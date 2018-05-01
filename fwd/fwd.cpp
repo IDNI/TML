@@ -6,11 +6,11 @@
 #define dup(e, sz) env(e, &e[sz])
 
 int_t rep(const tmpenv& e, int_t x) {
-	return x>0||!e[-x-1]||e[-x-1]==x?x: rep(e,e[-x-1]);
+	return x>0 || !e[-x-1] || e[-x-1] == x ? x : rep(e, e[-x-1]);
 } 
 
 int_t rep(tmpenv& e, int_t x){
-	return x>0||!e[-x-1]||e[-x-1]==x?x:e[-x-1]= rep(e,e[-x-1]);
+	return x>0 || !e[-x-1] || e[-x-1] == x ? x : e[-x-1] = rep(e, e[-x-1]);
 }
 
 bool rep(tmpenv& e, int_t x, int_t y) {
@@ -20,26 +20,32 @@ bool rep(tmpenv& e, int_t x, int_t y) {
 
 size_t unifications = 0;
 clause& operator+=(clause& c, const term& t) { return c.emplace(t), c; }
-clause& operator+=(clause& x, const clause& y) { return x.insert(y.begin(), y.end()), x; }
+clause& operator+=(clause& x, const clause& y) {
+	return x.insert(y.begin(), y.end()), x;
+}
 
 bool unify(const term& x, const term& g, tmpenv e) {
 	++unifications;
+	debug_unify_begin;
 	if (x.size() != g.size()) return false;
-	for (size_t n=0; n<x.size(); ++n) if (!rep(e, x[n], g[n]))
-		return false;
+	for (size_t n=0; n<x.size(); ++n) if (!rep(e, x[n], g[n])) return false;
+	debug_unify_pass;
 	return true;
 } 
 
 term sub(const term& t, const tmpenv& e) {
 	term r(t.size());
-	for (size_t n = 0; n < t.size(); ++n)
-		r[n] = (t[n] ? rep(e, t[n]) : 0);
+	debug_sub_begin;
+	for (size_t n = 0; n < t.size(); ++n) r[n] = (t[n] ? rep(e, t[n]) : 0);
+	debug_sub_end;
 	return r;
 }
 
 clause sub(const clause& t, const tmpenv e) {
 	clause r;
+	debug_sub_begin;
 	for (const term& x : t) r += sub(x, e);
+	debug_sub_end;
 	return r;
 }
 
@@ -51,12 +57,14 @@ set<int_t> vars(const term& x) {
 
 term interpolate(const term& x, const term& y) {
 	term r;
+	debug_interpolate_begin;
 	set<int_t> vx = vars(x), vy = vars(y);
 	for (	auto ix = vx.begin(), iy = vy.begin();
 		ix != vx.end() && iy != vy.end();)
 		if (*ix == *iy) r.push_back(*ix++), ++iy;
 		else if (*ix < *iy) ++ix;
 		else ++iy;
+	debug_interpolate_end;
 	return r;
 }
 
@@ -73,26 +81,24 @@ void pfp::add(const term& x, const clause& h) {
 }
 
 bool pfp::add(term x, term y, clause h) {
+	debug_addxyh;
 	map<int_t, int_t> v;
-	clause hh;
 	size_t k = 0;
+	clause &hh = kb[two<term>(x, y)];
+	term tt;
 	for (size_t n = 0; n < x.size(); ++n)
 		if (x[n] >= 0) continue;
 		else if (auto it = v.find(x[n]); it == v.end())
 			v.emplace(x[n], -++k);
 		else x[n] = it->second;
 	for (const term& t : h) {
-		term tt = t;
-		for (int_t& i : tt)
+		for (int_t& i : (tt = t))
 			if (i >= 0) continue;
-			else if (auto it = v.find(i); it == v.end()) {
-				err_head_var_not_in_body;
-				return false;
-			}
+			else if (auto it = v.find(i); it == v.end())
+				return err_head_var_not_in_body, false;
 			else i = it->second;
-		hh.emplace(tt);
+		hh.emplace(move(tt));
 	}
-	kb[two<term>(x, y)] += hh; // todo: extract
 	return true;
 }
 
@@ -101,12 +107,13 @@ void test_interpolate() {
 }
 
 void pfp::add(clause x, const clause& y) {
+	debug_addxy;
 	if (x.size() == 1) add(*x.begin(), y);
 	else if (x.size() == 2) add(*x.begin(), *x.rbegin(), y);
 	else {
 		term i = interpolate(*x.begin(), *x.rbegin());
 		kb[two<term>(*x.begin(), *x.rbegin())] += i;
-		x.erase(x.begin()), x.emplace(i), add(x, y);
+		x.erase(x.begin()), x.erase(x.begin()), x.emplace(i), add(x, y);
 	}
 }
 
@@ -290,7 +297,7 @@ void repl::run() {
 
 int main(int, char**) {
 	setlocale(LC_ALL, "");
-	test_interpolate();
+//	test_interpolate();
 	repl r;
 	r.run();
 }
