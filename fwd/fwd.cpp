@@ -55,7 +55,7 @@ set<int_t> vars(const term& x) {
 	return r;
 }
 
-term interpolate(const term& x, const term& y) {
+term interpolate(const term& x, const term& y) { // cf "Craig's interpolant"
 	term r;
 	debug_interpolate_begin;
 	set<int_t> vx = vars(x), vy = vars(y);
@@ -111,9 +111,15 @@ void pfp::add(clause x, const clause& y) {
 	if (x.size() == 1) add(*x.begin(), y);
 	else if (x.size() == 2) add(*x.begin(), *x.rbegin(), y);
 	else {
-		term i = interpolate(*x.begin(), *x.rbegin());
-		kb[two<term>(*x.begin(), *x.rbegin())] += i;
-		x.erase(x.begin()), x.erase(x.begin()), x.emplace(i), add(x, y);
+		term i, j;
+		size_t s = 0;
+		clause::iterator it;
+		for (auto jt = ++x.begin(); jt != x.end(); ++jt) // find longest
+			if ((j=interpolate(*x.begin(), *jt)).size() > s)
+				s = (i = j).size(), it = jt;
+		i.insert(i.begin(), dict.tmp());
+		kb[two<term>(*x.begin(), *it)] += i;
+		x.erase(x.begin()), x.erase(it), x.emplace(i), add(x, y);
 	}
 }
 

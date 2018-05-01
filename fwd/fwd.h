@@ -97,4 +97,4 @@ error("Variables that appear on consequences must also appear in the premises")
 #define debug_interpolate_begin \
 	wcout << "interpolate: " << x << ',' << y
 #define	debug_interpolate_end \
-	wcout << " = " << r
+	wcout << " = " << r << endl
