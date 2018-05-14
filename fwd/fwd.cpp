@@ -1,9 +1,83 @@
-#include "fwd.h"
-#include <cstdlib>
+#include <array>
+#include <vector>
+#include <set>
+#include <map>
+#include <variant>
+#include <alloca.h>
+#include <cstring>
+#include <cassert>
+#include <stdexcept>
+#include <iostream>
+#include <error.h>
+using namespace std;
+template<typename T> using two = pair<T, T>;
+typedef int32_t int_t;
+typedef vector<int_t> term;
+typedef set<term> clause;
+typedef set<term> terms;
+typedef two<terms> rn;
+typedef pair<two<term>, terms> r2;
+typedef pair<term, terms> r1;
+typedef int_t* tmpenv;
 
 #define envclear(e, sz) ((tmpenv)memset((e),0,sz*sizeof(int_t)))
 #define mkenv(sz) envclear(alloca(sz*sizeof(int_t)), sz)
 #define dup(e, sz) env(e, &e[sz])
+
+#define error(x) (wcerr<<(x)<<endl)
+#define err_head_var_not_in_body \
+error("Variables that appear on consequences must also appear in the premises")
+
+#define debug_addxy \
+	wcout << "add: " << x << " => " << y << endl
+#define debug_addxyh \
+	wcout << "add: " << x << ',' << y << " => " << h << endl
+#define debug_unify_begin \
+	wcout << "unifying: " << x << " with " << g << endl
+#define debug_unify_pass \
+	wcout << "passed with: " << e << endl
+#define debug_sub_begin \
+	wcout << "sub("<<t<<") = "
+#define debug_sub_end \
+	wcout << r << endl
+#define debug_interpolate_begin \
+	wcout << "interpolate: " << x << ',' << y
+#define	debug_interpolate_end \
+	wcout << " = " << r << endl
+
+class dict_t {
+	map<wstring, int_t> m;
+	vector<wstring> v;
+public:
+	dict_t() { m.emplace(L"not", 0); }
+	int_t operator()(const wstring& s) {
+		assert(s.size());
+		if (auto it = m.find(s); it != m.end()) return it->second;
+		v.push_back(s);
+		return m.emplace(s,s[0]==L'?'?-v.size():v.size()).first->second;
+	}
+	wstring operator()(int_t x) const {
+		return x > 0 ? v[x - 1] : x ? L"v"s+to_wstring(-x) : L"not";
+	}
+	int_t tmp(wstring prefix = L"_") {
+		wstring s;
+		for (size_t n = 1;;++n) {
+			wstring s = prefix + to_wstring(n);
+			if (m.find(s) == m.end()) return (*this)(s);
+		}
+	}
+} dict;
+
+wostream& operator<<(wostream& os, const term& t) {
+	for (auto x : t) os << dict(x) << L' ';
+	return os;
+}
+
+wostream& operator<<(wostream& os, const set<term>& s) {
+	size_t sz = s.size();
+	for (auto t : s) os << t << (--sz ? ", " : "");
+	return os;
+}
 
 int_t rep(const tmpenv& e, int_t x) {
 	return x>0 || !e[-x-1] || e[-x-1] == x ? x : rep(e, e[-x-1]);
@@ -19,10 +93,6 @@ bool rep(tmpenv& e, int_t x, int_t y) {
 } 
 
 size_t unifications = 0;
-clause& operator+=(clause& c, const term& t) { return c.emplace(t), c; }
-clause& operator+=(clause& x, const clause& y) {
-	return x.insert(y.begin(), y.end()), x;
-}
 
 bool unify(const term& x, const term& g, tmpenv e) {
 	++unifications;
@@ -41,10 +111,10 @@ term sub(const term& t, const tmpenv& e) {
 	return r;
 }
 
-clause sub(const clause& t, const tmpenv e) {
-	clause r;
+terms sub(const terms& t, const tmpenv e) {
+	terms r;
 	debug_sub_begin;
-	for (const term& x : t) r += sub(x, e);
+	for (const term& x : t) r.emplace(sub(x, e));
 	debug_sub_end;
 	return r;
 }
@@ -55,8 +125,16 @@ set<int_t> vars(const term& x) {
 	return r;
 }
 
-term interpolate(const term& x, const term& y) { // cf "Craig's interpolant"
+size_t nvars(const r2& t) {
+	set<int_t> r;
+	for (int_t t : t.first.first) if (t < 0) r.emplace(t);
+	for (int_t t : t.first.second) if (t < 0) r.emplace(t);
+	return r.size();
+}
+
+term interpolate(const term& x, const term& y, int_t relid) {
 	term r;
+	r.push_back(relid);
 	debug_interpolate_begin;
 	set<int_t> vx = vars(x), vy = vars(y);
 	for (	auto ix = vx.begin(), iy = vy.begin();
@@ -68,242 +146,65 @@ term interpolate(const term& x, const term& y) { // cf "Craig's interpolant"
 	return r;
 }
 
-void pfp::add(const term& x, const clause& h) {
-	size_t nv = vars(x).size();
-	for (auto r : kb)
-		for (auto t : h)
-			if (	tmpenv e = mkenv(nv);
-				unify(t, r.first.first, e) ||
-				unify(t, r.first.second, envclear(e, nv)))
-				add(	sub(r.first.first, e),
-					sub(r.first.second, e),
-					sub(r.second, e));
-}
-
-bool pfp::add(term x, term y, clause h) {
+r2 normvars(term x, term y, clause h) {
 	debug_addxyh;
 	map<int_t, int_t> v;
 	size_t k = 0;
-	clause &hh = kb[two<term>(x, y)];
+	clause hh;
 	term tt;
 	for (size_t n = 0; n < x.size(); ++n)
 		if (x[n] >= 0) continue;
-		else if (auto it = v.find(x[n]); it == v.end())
-			v.emplace(x[n], -++k);
+		else if (auto it = v.find(x[n]); it == v.end()) v.emplace(x[n], -++k);
 		else x[n] = it->second;
 	for (const term& t : h) {
 		for (int_t& i : (tt = t))
 			if (i >= 0) continue;
-			else if (auto it = v.find(i); it == v.end())
-				return err_head_var_not_in_body, false;
+			else if (auto it = v.find(i); it == v.end()) err_head_var_not_in_body;
 			else i = it->second;
 		hh.emplace(move(tt));
 	}
-	return true;
+	return { { x, y }, hh } ;
 }
 
-void test_interpolate() {
-	assert(interpolate({1,-1,2,-2},{2,-3,3,-4,-2})==term{-2});
-}
+int main() {
+	set<rn> Rn;
+	set<r2> R2;
+	set<r1> R1;
+	terms F;
+	size_t arity = 0;
 
-void pfp::add(clause x, const clause& y) {
-	debug_addxy;
-	if (x.size() == 1) add(*x.begin(), y);
-	else if (x.size() == 2) add(*x.begin(), *x.rbegin(), y);
-	else {
-		term i, j;
-		size_t s = 0;
-		clause::iterator it;
-		for (auto jt = ++x.begin(); jt != x.end(); ++jt) // find longest
-			if ((j=interpolate(*x.begin(), *jt)).size() > s)
-				s = (i = j).size(), it = jt;
-		i.insert(i.begin(), dict.tmp());
-		kb[two<term>(*x.begin(), *it)] += i;
-		x.erase(x.begin()), x.erase(it), x.emplace(i), add(x, y);
-	}
-}
-
-void pfp::Tp(terms& add, terms& del) {/*
-	for (size_t n = 0; n < b.size(); ++n) {
-		set<frame> q;
-		term x;
-		tmpenv s = mkenv(nvars[n]);
-		for (const term& t : f)
-			if (	tmpenv e = mkenv(nvars[n]);
-				unify(b[n][0], t, e))
-				q.emplace(0, dup(e, nvars[n]));
-		while (!q.empty()) {
-			auto [k, e] = *q.begin();
-			q.erase(q.begin());
-			if (k == b[n].size()) {
-				for (const term& t : h[n])
-					(t[0]?add:del).emplace(
-						sub(t, &e[0]));
-				continue;
+	for (auto r : Rn)
+		for (;;)
+			if (r.first.empty()) break; // safeguard
+			else if (r.first.size() == 1) { R1.emplace(*r.first.begin(), r.second); break; }
+			else {
+				term x = *r.first.erase(r.first.begin()), y = *r.first.erase(r.first.begin());
+				if (r.first.size() == 2) arity = max(arity, nvars(*R2.emplace(two<term>{x, y}, r.second).first));
+				else arity = max(arity, nvars(*R2.emplace(normvars(x, y, { interpolate(x, y, dict.tmp()) })).first));
 			}
-			x = sub(b[n][k], &e[0]);
-			bool g = true;
-			for (auto y : x) g &= y > 0;
-			if (g) {
-				if (	add.find(x) != add.end() ||
-					(f.find(x) != f.end() &&
-					del.find(x) == del.end()))
-					q.emplace(k+1, e);
-			} else for (const term& t : f)
-				if (s=(tmpenv)memcpy(s,&e[0],
-					sizeof(int_t)*nvars[n]),
-					!unify(x, t, s)) continue;
-				else q.emplace(k+1, dup(s,nvars[n]));
+	for (auto r : R2)
+		for (auto f : F) {
+			if (tmpenv e = mkenv(arity); unify(r.first.first, f, e))
+				R1.emplace(sub(r.first.second, e), sub(r.second, e));
+			if (tmpenv e = mkenv(arity); unify(r.first.second, f, e))
+				R1.emplace(sub(r.first.first, e), sub(r.second, e));
 		}
-	}
-	f.insert(add.begin(), add.end());
-	for (auto it = del.begin(); it != del.end(); ++it)
-		f.erase(term(&(*it)[1],&(*it)[it->size()]));*/
-}
-
-pfp::pfp() : nvars(0), stage(0) {}
-pfp::~pfp() { if (nvars) delete[] nvars; }
-
-size_t pfp::operator()(terms& r, size_t &steps) {
-/*	if (nvars) delete[] nvars;
-	nvars = new size_t[b.size()];
-	for (size_t n = 0; n < b.size(); ++n) normrule(n);
-	for (; stage < steps; ++stage) step(r, steps);*/
-	return steps;
-}
-
-void pfp::normrule(size_t n) {
-/*	map<int_t, int_t> v;
-	size_t nv = 1;
-	for (size_t k = 0; k < b[n].size(); ++k)
-		for (size_t j = 0; j < b[n][k].size(); ++j)
-			if (b[n][k][j] > 0) continue;
-			else if (auto it=v.find(b[n][k][j]);it==v.end())
-				v.emplace(b[n][k][j], -nv),
-				b[n][k][j] = -nv++;
-//				dict.oldvars[n][-nv] = b[n][k][j],
-			else b[n][k][j] = it->second;
-	for (term& i : h[n]) for (int_t& j : i) if (j < 0) j = v[j];
-	nvars[n] = nv - 1;*/
-}
-
-void pfp::step(terms& r, size_t& l) {
-	terms add, del, lf = f;
-	Tp(add, del);
-	if (f == lf) l = stage;
-	else if (auto it = stages.emplace(f, stages.size()); !it.second)
-		l = it.first->second;
-	r = f;
-}
-
-wostream& operator<<(wostream& os, const term& t) {
-	for (auto x : t) os << dict(x) << L' ';
-	return os;
-}
-
-wostream& operator<<(wostream& os, const set<term>& s) {
-	size_t sz = s.size();
-	for (auto t : s) os << t << (--sz ? ", " : "");
-	return os;
-}
-
-wstring repl::get_line() const {
-	wstring r;
-	if (!getline(wcin, r)) {
-		cout << "end of input, exiting" << endl; exit(0); }
-	while (iswspace(r[0])) r.erase(0);
-	while (iswspace(r[r.size() - 1])) r.erase(r.size() - 1);
-	return r;
-}
-
-bool repl::walnum(wchar_t ch) const { return ch == L'?' || iswalnum(ch); }
-
-int_t repl::peek_word(const wchar_t* s) const {
-	while (iswspace(*s)) ++s;
-	size_t n;
-	for (n = 0; walnum(s[n]); ++n);
-	return dict(wstring(s, n));
-}
-
-int_t repl::get_word(const wchar_t** s) const {
-	while (iswspace(**s)) ++*s;
-	size_t n;
-	for (n = 0; walnum((*s)[n]); ++n);
-	size_t r = dict(wstring(*s, n));
-	*s += n;
-	return r;
-}
-
-term repl::get_term(const wchar_t** line) const {
-	term r;
-	for (; **line && **line != L'.';)
-		if (**line == L',') return ++*line, r;
-		else if (peek_word(*line) == thenword) return r;
-		else r.push_back(get_word(line));
-	return r;
-}
-
-clause repl::get_clause(const wchar_t** line) {
-	clause r;
-	for (; **line && **line != L'.';) {
-		while (iswspace(**line)) ++*line;
-		if (!**line || peek_word(*line) == thenword) return r;
-		if (term t = get_term(line); !t.size()) return r;
-		else r += t;
-	}
-	if (**line == L'.') ++*line;
-	return r;
-}
-
-void repl::run(const wchar_t* line) {
-	wstring w;
-	while (iswspace(*line)) ++line;
-	if (!*line) return;
-	if (peek_word(line) == ifword) {
-		get_word(&line);
-		clause b = get_clause(&line);
-		if (get_word(&line) != thenword)
-			throw runtime_error("'then' expected");
-		clause h = get_clause(&line);
-		p.add(b, h);
-	} else for (const term& t : get_clause(&line)) p.add(t);
-}
-
-repl::repl() : ifword(dict(L"if")), thenword(dict(L"then")) {}
-
-void repl::run() {
-	for (wstring line;;)
-		if ((line = get_line()) == L"run") {
-			terms t;
-			size_t steps = WINT_MAX, n;
-			n = p(t, steps);
-			if (n == steps) wcout << "pass after " <<
-					steps << " steps" << endl;
-			else 	wcout << "fail, step " << n <<
-				" same as step " << steps << endl;
-			wcout << t.size() << ' ' << unifications << endl;
-//			for (auto x : t) wcout << x << endl;
-		} else if (line.substr(0, 4) == L"step") {
-			const wchar_t *s = line.c_str() + 4;
-			wchar_t *e;
-			while (iswspace(*s)) ++s;
-			size_t steps = wcstoul(s, &e, 10);
-			if (!e) {
-				wcout << "usage: step <# of steps>";
-				continue; }
-			terms t;
-			size_t n = p(t, steps);
-			if (n == steps) wcout << "pass after " <<
-					steps << " steps" << endl;
-			else 	wcout << "fail, step " << n <<
-				" same as step " << steps << endl;
-			for (auto x : t) wcout << x << endl;
-		} else run(line.c_str());
-}
-
-int main(int, char**) {
-	setlocale(LC_ALL, "");
-//	test_interpolate();
-	repl r;
-	r.run();
+	bool b;
+	do {
+		b = false;
+		for (auto r : R1)
+			for (auto ff : F)
+				if (tmpenv e = mkenv(arity); unify(r.first, ff, e)) {
+					terms ff = sub(r.second, e);
+					for (const term& f : ff)
+						if (!F.emplace(f).second) continue;
+						else for (auto r : R2) {
+							if (tmpenv e = mkenv(arity); unify(r.first.first, f, e))
+								b |= R1.emplace(sub(r.first.second, e), sub(r.second, e)).second;
+							if (tmpenv e = mkenv(arity); unify(r.first.second, f, e))
+								b |= R1.emplace(sub(r.first.first, e), sub(r.second, e)).second;
+						}
+				}
+	} while (b);
+	return 0;
 }
