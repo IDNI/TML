@@ -47,8 +47,6 @@ error("Variables that appear on consequences must also appear in the premises")
 
 extern size_t unifications;
 
-#include "misc.h"
-
 class fwd {
 	set<rn> Rn;
 	set<r2> R2;
@@ -58,9 +56,10 @@ class fwd {
 
 	void addrule(clause b, const clause& h);
 	void add2rule(term, term, clause);
+	bool add1rule(term, clause);
 	void add_fact(const term&);
 	void r22r1(const term&, const term&, const clause&, const term&);
-	void r12r2(const term&, const clause&, const term&);
+	void r12r2(const term&, const clause&);
 	void r12r2();
 	void r22r1();
 public:

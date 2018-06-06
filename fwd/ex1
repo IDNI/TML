@@ -2,4 +2,3 @@ if a then b
 if b then c.
 if c then d.
 a
-run
