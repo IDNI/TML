@@ -13,11 +13,7 @@ static wostream& operator<<(wostream& os, const set<term>& s) {
 	for (auto t : s) os << t << (--sz ? ", " : "");
 	return os;
 }
-/*
-static wostream& operator<<(wostream& os, const pair<term, clause>& t) {
-	return os << t.first << " => " << t.second;
-}
-*/
+
 static int_t rep(const tmpenv& e, int_t x) {
 	return x>0 || !e[-x-1] || e[-x-1] == x ? x : rep(e, e[-x-1]);
 }
@@ -89,7 +85,7 @@ static term interpolate(const term& x, const term& y, int_t relid) {
 static void normvars(term &t, size_t& k, map<int_t, int_t>& v) {
 	for (int_t &i : t)
 		if (i >= 0) continue;
-		else if (auto it = v.find(i); it == v.end()) v.emplace(i, -++k);
+		else if (auto it = v.find(i); it == v.end()) i = v.emplace(i, -++k).first->second;
 		else i = it->second;
 }
 
@@ -98,27 +94,24 @@ static void normvars(clause &c, size_t& k, map<int_t, int_t>& v) {
 	for (term t : c) normvars(t, k, v), r.emplace(move(t));
 	c = move(r);
 }
-/*
-static void normvars(clause &b, clause &h) {
-	map<int_t, int_t> v;
-	size_t k = 0;
-	normvars(b, k, v);
-	normvars(h, k, v);
-}
-*/
+
 static void normvars(term &t, clause &h) {
+	wcout << "normvars in: " << t << " => " << h << endl;
 	map<int_t, int_t> v;
 	size_t k = 0;
 	normvars(t, k, v);
 	normvars(h, k, v);
+	wcout << "normvars out: " << t << " => " << h << endl;
 }
 
 static void normvars(term &x, term& y, clause &h) {
+	wcout << "normvars in: " << x << ',' << y << " => " << h << endl;
 	map<int_t, int_t> v;
 	size_t k = 0;
 	normvars(x, k, v);
 	normvars(y, k, v);
 	normvars(h, k, v);
+	wcout << "normvars out: " << x << ',' << y << " => " << h << endl;
 }
 
 bool fwd::add1rule(term b, clause h) {
@@ -145,9 +138,7 @@ loop:	wcout << "add rule: " << b << " => " << h << endl;
 			r12r2(*b.begin(), h);
 			return;
 		}
-	term x = *b.begin();
-	b.erase(*b.begin());
-	term y = *b.begin();
+	term x = *b.begin(), y = (b.erase(*b.begin()), *b.begin());
 	b.erase(*b.begin());
 	if (!b.empty()) {
 		term i = interpolate(x, y, dict.tmp());
