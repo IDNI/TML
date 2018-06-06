@@ -12,7 +12,7 @@ public:
 		return m.emplace(s,s[0]==L'?'?-v.size():v.size()).first->second;
 	}
 	wstring operator()(int_t x) const {
-		return x > 0 ? v[x - 1] : x ? L"v"s+to_wstring(-x) : L"not";
+		return x > 0 ? v[x - 1] : x ? L"?"s+to_wstring(-x) : L"not";
 	}
 	int_t tmp(wstring prefix = L"_") {
 		wstring s;

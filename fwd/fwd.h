@@ -33,9 +33,9 @@ error("Variables that appear on consequences must also appear in the premises")
 #define debug_addxyh \
 	wcout << "add: " << x << ',' << y << " => " << h << endl
 #define debug_unify_begin \
-	wcout << "unifying: " << x << " with " << g << endl
+	wcout << "unifying: " << x << " with " << g << '\t'
 #define debug_unify_pass \
-	wcout << "passed with: " << e << endl
+	(wcout << "passed with: "), format_env(wcout, e) << endl
 #define debug_sub_begin \
 	wcout << "sub("<<t<<") = "
 #define debug_sub_end \
@@ -53,11 +53,13 @@ class fwd {
 	set<r1> R1;
 	clause F;
 	size_t arity = 0;
+	bool unify(const term& x, const term& g, tmpenv e);
+	wostream& format_env(wostream& os, const tmpenv& e);
 
 	void addrule(clause b, const clause& h);
 	void add2rule(term, term, clause);
 	bool add1rule(term, clause);
-	void add_fact(const term&);
+	void add_fact(const term&, bool);
 	void r22r1(const term&, const term&, const clause&, const term&);
 	void r12r2(const term&, const clause&);
 	void r12r2();

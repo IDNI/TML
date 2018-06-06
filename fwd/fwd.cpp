@@ -14,6 +14,13 @@ static wostream& operator<<(wostream& os, const set<term>& s) {
 	return os;
 }
 
+wostream& fwd::format_env(wostream& os, const tmpenv& e) {
+	for (size_t n = 0; n < arity; ++n)
+		if (e[n])
+			wcout << dict(-n-1) << '=' << dict(e[n]) << endl;
+	return os;
+}
+
 static int_t rep(const tmpenv& e, int_t x) {
 	return x>0 || !e[-x-1] || e[-x-1] == x ? x : rep(e, e[-x-1]);
 }
@@ -29,30 +36,30 @@ static bool rep(tmpenv& e, int_t x, int_t y) {
 
 extern size_t unifications;
 
-static bool unify(const term& x, const term& g, tmpenv e) {
+bool fwd::unify(const term& x, const term& g, tmpenv e) {
 	++unifications;
 	debug_unify_begin;
-	if (x.size() != g.size()) return false;
+	if (x.size() != g.size()) { wcout << "failed" << endl; return false; }
 	for (size_t n=0; n<x.size(); ++n)
 		if (!rep(e, x[n], g[n]))
-			return false;
+			{ wcout << "failed" << endl; return false; }
 	debug_unify_pass;
 	return true;
 }
 
 static term sub(const term& t, const tmpenv& e) {
 	term r(t.size());
-	debug_sub_begin;
+//	debug_sub_begin;
 	for (size_t n = 0; n < t.size(); ++n) r[n] = (t[n] ? rep(e, t[n]) : 0);
-	debug_sub_end;
+//	debug_sub_end;
 	return r;
 }
 
 static clause sub(const clause& t, const tmpenv e) {
 	clause r;
-	debug_sub_begin;
+//	debug_sub_begin;
 	for (const term& x : t) r.emplace(sub(x, e));
-	debug_sub_end;
+//	debug_sub_end;
 	return r;
 }
 
@@ -72,13 +79,13 @@ static size_t nvars(const r2& t) {
 static term interpolate(const term& x, const term& y, int_t relid) {
 	term r;
 	r.push_back(relid);
-	debug_interpolate_begin;
+//	debug_interpolate_begin;
 	set<int_t> vx = vars(x), vy = vars(y);
 	for (auto ix = vx.begin(), iy = vy.begin(); ix != vx.end() && iy != vy.end();)
 		if (*ix == *iy) r.push_back(*ix++), ++iy;
 		else if (*ix < *iy) ++ix;
 		else ++iy;
-	debug_interpolate_end;
+//	debug_interpolate_end;
 	return r;
 }
 
@@ -96,38 +103,38 @@ static void normvars(clause &c, size_t& k, map<int_t, int_t>& v) {
 }
 
 static void normvars(term &t, clause &h) {
-	wcout << "normvars in: " << t << " => " << h << endl;
+//	wcout << "normvars in: " << t << " => " << h << endl;
 	map<int_t, int_t> v;
 	size_t k = 0;
 	normvars(t, k, v);
 	normvars(h, k, v);
-	wcout << "normvars out: " << t << " => " << h << endl;
+//	wcout << "normvars out: " << t << " => " << h << endl;
 }
 
 static void normvars(term &x, term& y, clause &h) {
-	wcout << "normvars in: " << x << ',' << y << " => " << h << endl;
+//	wcout << "normvars in: " << x << ',' << y << " => " << h << endl;
 	map<int_t, int_t> v;
 	size_t k = 0;
 	normvars(x, k, v);
 	normvars(y, k, v);
 	normvars(h, k, v);
-	wcout << "normvars out: " << x << ',' << y << " => " << h << endl;
+//	wcout << "normvars out: " << x << ',' << y << " => " << h << endl;
 }
 
 bool fwd::add1rule(term b, clause h) {
 	normvars(b, h);
-	wcout << "added to R1: " << b << " => " << h << endl;
+//	wcout << "added to R1: " << b << " => " << h << endl;
 	return R1.emplace(b, h).second;
 }
 
 void fwd::add2rule(term x, term y, clause h) {
-	wcout << "add2rule: " << x << ' ' << y << " => " << h << endl;
+//	wcout << "add2rule: " << x << ' ' << y << " => " << h << endl;
 	normvars(x, y, h);
 	for (auto f : F) r22r1(x, y, h, f);
 	R2.emplace(r2{{x, y}, h}), arity = max(arity, nvars({{x,y},h}));
 }
 
-void fwd::add(const term& t) { wcout << "add fact: " << t << endl; add_fact(t); }
+void fwd::add(const term& t) { add_fact(t, true); }
 #define pop(x) *x.erase(x.begin())
 
 void fwd::addrule(clause b, const clause& h) {
@@ -149,24 +156,24 @@ loop:	wcout << "add rule: " << b << " => " << h << endl;
 
 
 void fwd::r22r1(const term& x, const term& y, const clause& h, const term& f) {
-	wcout << "r22r1: " << x << ' ' << y << " => " << h << " vs " << f << endl;
+	//wcout << "r22r1: " << x << ' ' << y << " => " << h << " vs " << f << endl;
 	tmpenv e = mkenv(arity);
 	if (unify(x, f, e)) add1rule(sub(y, e), sub(h, e));
 	if (envclear(e, arity), unify(y, f, e)) add1rule(sub(x, e), sub(h, e));
 }
 
 void fwd::r12r2(const term &b, const clause& h) {
-	wcout << "r12r2: " << b << " => " << h << endl;
+	//wcout << "r12r2: " << b << " => " << h << endl;
 	tmpenv e = mkenv(arity);
 	for (const term& f : F)
 		if (envclear(e, arity), unify(b, f, e))
 			for (const term& ff : sub(h, e))
-				add_fact(ff);
+				add_fact(ff, false);
 }
 
-void fwd::add_fact(const term& f) {
-	wcout << "add fact: " << f << endl;
+void fwd::add_fact(const term& f, bool _new) {
 	if (!F.emplace(f).second) return;
+	wcout << (_new ? "given: " : "inferred: ") << f << " (" << unifications << " unifications so far)" << endl;
 	tmpenv e = mkenv(arity);
 	for (const auto[b,h] : R1) r12r2(b, h);
 	for (auto r : R2) {
