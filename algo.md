@@ -18,17 +18,21 @@ it as (1, 3+5=8, 4+2\*5=14, 6+3\*5=21), so the resulted set of pairs is
 
 We convert our Datalog program in the very same fashion. Take for example
 the rule
+
 	```
 	T(1,1,1,?x,?y) :- R(1,3,?x,7,?y) S(?y,2,4,5,?z)
 	```
+
 where |A| = 10, and k=5 as we can see. We first mentally convert it into the
 rule:
+
 	```
 	T(1,6,16,?x,?y) :- R(1,8,?x,22,?y) S(?y,7,14,20,?z)
 	```
 
 then we write down (note that the variable ?t in the head should be interpreted
 as existentially quantified, as it defines a new tuple):
+
 	```
 	(?t, 1) (?t, 6) (?t, 16) (?t, ?x) (?t, ?y) :-
 	(?r, 1) (?r, 8) (?r, ?x) (?r, 22) (?r, ?y)
