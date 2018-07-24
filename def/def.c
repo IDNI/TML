@@ -13,16 +13,17 @@
 #define array_append(a, t, l, x) ((((t*)(a = realloc(a, sizeof(t)*(l+1))))[l] = x), ++l)
 #define array_append_zeros(a, t, l, s) memset(((t*)realloc(a,sizeof(t)*(l+s)))+s,0,sizeof(t)*s),l+=s
 #define podcmp(x, y, t) memcmp(&(x), &(y), sizeof(t))
-
 #define def_add_alt_raw(d, b, nb, sz, h, nh) def_add_alt(d, alt_create_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a) def_add_alt(def_get(h, ar), a)
 #define term_create(_r, _ar) ((term){ .r = _r, .ar = _ar})
 #define alt_create_term(a, r, ar) alt_add_term(a, term_create(r, ar))
+#define allocat(x, y) x = wcscat(realloc(x, sizeof(wchar_t)*((x ? wcslen(x) : 0) + wcslen(y) + 1)), y)
 
 struct dict_t {
 	const wchar_t* s;
 	uint32_t h;
 	int32_t id;
+	size_t n;
 	struct dict_t *l, *r;
 } *dict = 0;
 
@@ -30,35 +31,35 @@ wchar_t **gconsts = 0, **gvars = 0;
 void **vardata = 0, **constsdata = 0;
 size_t gnconsts = 0, gnvars = 0;
 
-uint32_t hash(const wchar_t* s) {
+uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
-	while (*s) h *= 1 + *s * __builtin_bswap32(*s), ++s;
+	while (n--) h *= 1 + *s * __builtin_bswap32(*s), ++s;
 	return h;
 }
 
-int32_t _str_to_id(struct dict_t **d, const wchar_t* s) {
-	uint32_t h = hash(s);
+int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n) {
+	uint32_t h = hash(s, n);
 	size_t *sz;
 	wchar_t*** a;
 	void*** data;
 	if (*s == L'?') sz = &gnvars, a = &gvars, data = &vardata;
 	else sz = &gnconsts, a = &gconsts, data = &constsdata;
 	return	!*d ?
-			array_append(*a, const wchar_t*, *sz, s=wcsdup(s)),
+			array_append(*a, const wchar_t*, *sz, s),
 			*data = realloc(*data, sizeof(void*)**sz),
 			data[*sz-1] = 0,
 			(*(*d = new(struct dict_t)) = 
 				(struct dict_t){ .s=s, .h=h,
 				.id = *s==L'?'?*sz:-*sz, .l=0, .r=0 }).id
-			: h == (**d).h && !wcscmp((**d).s, s) ? (**d).id
-			: _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s);
+			: h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n) ? (**d).id
+			: _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
 }
 
 const wchar_t* str_from_id(int32_t id) {
 	return id < 0 ? gconsts[-id-1] : gvars[id-1];
 }
 
-int32_t str_to_id(const wchar_t* s) { return _str_to_id(&dict, s); }
+int32_t str_to_id(const wchar_t* s, size_t n) { return _str_to_id(&dict, s, n); }
 
 void id_set_data(int32_t id, void* data) {
 	if (id > 0) vardata[id] = data; else constsdata[-id] = data;
@@ -68,17 +69,19 @@ void* id_get_data(int32_t id) {
 	return id > 0 ? vardata[id] : constsdata[-id];
 }
 
-wint_t str_read(int_t *r) {
-	wchar_t *s = 0;
-	wint_t c;
-	size_t n = 0;
-	while (iswspace(c = getwc(stdin))) if (c == WEOF) return c;
-	do { array_append(s, wchar_t, n, c); } while (iswalnum(c = getwc(stdin)));
-	while (iswspace(c = getwc(stdin))) ;
-	*r = str_to_id(s);
-	wprintf(L"str_read %d %s\n", *r, s);
-	fflush(stdout);
-	return free(s), c;
+wchar_t* str_read(int_t *r, wchar_t *in) {
+	wchar_t *s = in;
+	while (*s && iswspace(*s)) ++s;
+	if (!*s) return 0;
+	wchar_t *t = s;
+	while (iswalnum(*t)) ++t;
+	if (t == s) return 0;
+	*r = str_to_id(s, t - s);
+	wchar_t *msg = malloc(sizeof(wchar_t)*(t-s+1));
+	wmemcpy(msg, s, t-s+1);
+	wprintf(L"%s\n", msg);
+	while (iswspace(*t)) ++t;
+	return t;
 }
 
 typedef struct {
@@ -94,6 +97,7 @@ typedef struct {
 
 struct def* def_get(int_t h, size_t ar);
 void def_add_alt(struct def *d, alt *a);
+void def_print(int_t t);
 
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
@@ -155,33 +159,45 @@ alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
 	return a;
 }
 
-int_t* term_read(size_t *sz, wint_t *c) {
+int_t* term_read(size_t *sz, wchar_t **in) {
 	int_t x, *t = 0;
 	*sz = 0;
-	while (INT_T_ERR != (*c = str_read(&x))) {
+	while ((*in = str_read(&x, *in))) {
 		array_append(t, int_t, *sz, x);
-		if (!iswalnum(*c)) return t;
+		if (!iswalnum(**in)) return t;
 	}
-	perror("parse error\n"), exit(-1);
+	perror("parse error\n"), exit(1);
 	return t;
 }
 
-alt* alt_read(int_t *h) {
+
+alt* alt_read(int_t **h, wchar_t **in) {
 	int_t **b = 0, *t;
-	size_t nb = 0, *sz = 0, nh = 0, s;
-	wint_t c;
-	if (!(h = term_read(&nh, &c))) return 0;
-	else if (c == L'.') return alt_create_raw(0, 0, 0, h, nh);
-	while ((t = term_read(&s, &c)))
+	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
+	if (!(*h = term_read(&nh, in))) return 0;
+	else if (**in == L'.') return alt_create_raw(0, 0, 0, *h, nh);
+	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
+	while ((t = term_read(&s, in)))
 		if (	array_append(b, int_t*, nb, t),
-			array_append(sz, size_t, nb, s),
-			c != L',')
-			return alt_create_raw(b, nb, sz, h, nh);
+			array_append(sz, size_t, nsz, s),
+			**in != L',')
+			return alt_create_raw(b, nb, sz, *h, nh);
 	return 0;
 }
 
+void prog_read() {
+	wchar_t buf[32], *all = 0;
+	int_t *h;
+	while (fgetws(buf, 32, stdin)) allocat(all, buf);
+	while (*all) {
+		alt_read(&h, &all);
+		def_print(*h);
+	}
+}
+
 void term_print(const term t, size_t v) {
-	wprintf(L"%s", str_from_id(t.r));
+	const wchar_t *s = str_from_id(t.r);
+	while (iswalnum(*s)) putwc(*s++, stdin);
 	for (size_t n = 0; n < t.ar; ++n)
 		wprintf(L" _%d", n + v);
 }
@@ -245,8 +261,6 @@ void def_add_alt(def *d, alt *a) {
 
 int main() {
 	setlocale(LC_CTYPE, "");
-	int_t h;
-	alt_read(&h);
-	def_print(h);
+	prog_read();
 	return 0;
 }
