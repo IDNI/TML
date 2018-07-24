@@ -164,21 +164,22 @@ alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
 			else id_set_data(b[i][j], (void*)v);
 	return def_add_alt(def_get(*h, nh), a);
 }
-/*
+
 alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
-	alt *a = alt_create(*x->varid);
+	alt *a = alt_create(x->hsz);
 	size_t i, v = 0, offset, k;
-	for (i = 0; i < x->nterms; ++i) if (i != t) alt_add_term(a, x->terms[i]); 
+	for (i = 0; i < x->nterms; ++i)
+		if (i != t) alt_add_term(a, x->terms[i]), v += x->terms[i].ar;
 	offset = a->nvars;
 	for (i = 0; i < y->nterms; ++i) alt_add_term(a, y->terms[i]);
 	memcpy(a->eq, x->eq, sizeof(int_t) * x->nvars); // ??
 	memcpy(a->eq + x->nvars, y->eq, sizeof(int_t) * y->nvars);
 	for (i = 0; i < y->nvars; ++i) 
 		if ((k = alt_get_eq(a, i + x->nvars) > 0)) alt_set_eq(a, i + x->nvars, k + x->nvars);
-	for (i = x->varid[t]; i < x->terms[t].ar + x->varid[t]; ++i) alt_add_eq(a, (int_t)i, offset + v++);
+	for (i = v; i < x->terms[t].ar + v; ++i) alt_add_eq(a, (int_t)i, offset + v++);
 	return a;
 }
-*/
+
 int_t* term_read(size_t *sz, wchar_t **in) {
 	int_t x, *t = 0;
 	*sz = 0;
