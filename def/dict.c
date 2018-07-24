@@ -1,6 +1,8 @@
 #include "dict.h"
 #include "macros.h"
 #include <string.h>
+#include <wctype.h>
+#include <stdio.h>
 
 static struct dict_t {
 	const wchar_t* s;
@@ -49,4 +51,13 @@ void id_set_data(int32_t id, void* data) {
 
 void* id_get_data(int32_t id) {
 	return id > 0 ? vardata[id] : constsdata[-id];
+}
+
+wint_t str_read(int_t *r) {
+	wchar_t *s = 0;
+	wint_t c;
+	size_t n = 0;
+	while (iswspace(c = getwc(stdin))) if (c == WEOF) return c;
+	do { array_append(s, wchar_t, n, c); } while (iswalnum(c = getwc(stdin)));
+	return *r = str_to_id(s), free(s), c;
 }
