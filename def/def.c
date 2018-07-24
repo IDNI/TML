@@ -14,7 +14,6 @@
 #define podcmp(x, y, t) memcmp(&(x), &(y), sizeof(t))
 #define def_add_alt_raw(d, b, nb, sz, h, nh) def_add_alt(d, alt_create_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a) def_add_alt(def_get(h, ar), a)
-#define term_create(_r, _ar) ((term){ .r = _r, .ar = _ar})
 #define alt_create_term(a, r, ar) alt_add_term(a, term_create(r, ar))
 #define allocat(x, y) x = wcscat(realloc(x, sizeof(wchar_t)*((x ? wcslen(x) : 0) + wcslen(y) + 1)), y)
 
@@ -100,23 +99,29 @@ struct def* def_get(int_t h, size_t ar);
 alt* def_add_alt(struct def *d, alt *a);
 void def_print(int_t t);
 
+term term_create(int_t r, size_t ar) {
+	return (term){ .r = r, .ar = ar };
+}
+
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
-	*(a->varid = new(size_t)) = hsz;
-	return *a = (alt){ .e = 0, .terms = 0, .nvars = hsz, .nterms = 0 }, a;
+	*a = (alt){ .e = 0, .terms = 0, .nvars = hsz, .nterms = 0 };
+	if (hsz) memset((a->e=malloc(sizeof(int_t)*hsz)),0,sizeof(int_t)*hsz);
+	return *(a->varid = new(size_t)) = hsz, a;
 }
 
 void alt_delete(alt* a) { if (a->e) free(a->e); if (a->terms) free(a->terms); }
 
 void alt_add_term(alt* a, term t) {
-	a->e = realloc(a->e, sizeof(int_t)*(a->nvars+t.ar));
-	a->e = memset(a->e+a->nvars,0,sizeof(int_t)*t.ar);
-	array_append(a->terms, term, a->nterms, t), 
-	array_append(a->varid, size_t, a->nvars, a->nvars), a->nvars = a->nvars + t.ar - 1;
+	if (t.ar) memset((a->e=realloc(a->e, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar);
+	array_append(a->terms, term, a->nterms, t);
+	size_t x = a->nvars+a->varid[a->nterms-1];
+	if (t.ar) array_append(a->varid, size_t, a->nvars, x), a->nvars+=t.ar;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
-	return v < 0 || !a->e[v-1] ? v : (a->e[v-1] = alt_get_rep(a, a->e[v-1]));
+	if (!a->e || v < 0 || !a->e[v-1]) return v;
+	return a->e[v-1] = alt_get_rep(a, a->e[v-1]);
 }
 
 bool alt_add_eq(alt *a, int_t x, int_t y) {
@@ -214,7 +219,8 @@ next:	for (n = 0; n < 31; ++n)
 void term_print(const term t, size_t v) {
 	const wchar_t *s = str_from_id(t.r);
 	while (iswalnum(*s)) wprintf(L"%c", *s++);
-	for (size_t n = 1; n < t.ar; ++n) wprintf(L" _%zu", n + v);
+	// idk why wprintf throws valgrind errors here so i use printf
+	for (size_t n = 1; n <= t.ar; ++n) printf(" _%zu", n + v);
 }
 
 void alt_print(const alt* a) {
@@ -223,8 +229,8 @@ void alt_print(const alt* a) {
 		wprintf(L", ");
 	}
 	for (size_t n = 0; n < a->nvars; ++n)
-		if (a->e[n] > 0) wprintf(L"_%d = _%d; ", n, a->e[n]);
-		else if (a->e[n] < 0) wprintf(L"_%d = %d; ", n, a->e[n]);
+		if (a->e[n] > 0) wprintf(L"_%zu = _%lu; ", n, a->e[n]);
+		else if (a->e[n] < 0) wprintf(L"_%zu = %s; ", n, str_from_id(a->e[n]));
 }
 
 struct index_t { // all alts that contain this head
