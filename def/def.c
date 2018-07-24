@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #define new(x) malloc(sizeof(x))
 #define int_t intptr_t
@@ -90,7 +91,7 @@ typedef struct {
 } term;
 
 typedef struct {
-	int_t *e;
+	int_t *eq;
 	term *terms;
 	size_t nvars, nterms, *varid;
 } alt;
@@ -105,28 +106,37 @@ term term_create(int_t r, size_t ar) {
 
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
-	*a = (alt){ .e = 0, .terms = 0, .nvars = hsz, .nterms = 0 };
-	if (hsz) memset((a->e=malloc(sizeof(int_t)*hsz)),0,sizeof(int_t)*hsz);
+	*a = (alt){ .eq = 0, .terms = 0, .nvars = hsz, .nterms = 0 };
+	if (hsz) memset((a->eq=malloc(sizeof(int_t)*hsz)),0,sizeof(int_t)*hsz);
 	return *(a->varid = new(size_t)) = hsz, a;
 }
 
-void alt_delete(alt* a) { if (a->e) free(a->e); if (a->terms) free(a->terms); }
+void alt_delete(alt* a) { if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
+
+int_t alt_set_eq(alt *a, size_t n, int_t k) {
+	assert(n < a->nvars);
+	return a->eq[n] = k;
+}
+int_t alt_get_eq(const alt *a, size_t n) {
+	assert(n < a->nvars);
+	return a->eq[n];
+}
 
 void alt_add_term(alt* a, term t) {
-	if (t.ar) memset((a->e=realloc(a->e, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar);
+	if (t.ar) memset((a->eq=realloc(a->eq, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar);
 	array_append(a->terms, term, a->nterms, t);
 	size_t x = a->nvars+a->varid[a->nterms-1];
-	if (t.ar) array_append(a->varid, size_t, a->nvars, x), a->nvars+=t.ar;
+	if (t.ar) array_append(a->varid, size_t, a->nvars, x), a->nvars+=t.ar, --a->nvars;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
-	if (!a->e || v < 0 || !a->e[v-1]) return v;
-	return a->e[v-1] = alt_get_rep(a, a->e[v-1]);
+	if (!a->eq || v < 0 || !alt_get_eq(a, v-1)) return v;
+	return alt_set_eq(a, v-1, alt_get_rep(a, alt_get_eq(a, v-1)));
 }
 
 bool alt_add_eq(alt *a, int_t x, int_t y) {
 	x = alt_get_rep(a, x), y = alt_get_rep(a, y);
-	return x==y ? true :x < 0 ? y < 0 ? false : (a->e[y-1] = x), true : (a->e[x-1] = y), true;
+	return x==y ? true :x < 0 ? y < 0 ? false : alt_set_eq(a, y-1, x), true : alt_set_eq(a, x-1, y), true;
 }
 
 alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
@@ -154,14 +164,14 @@ alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
 
 alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
 	alt *a = alt_create(*x->varid);
-	size_t i, v = 0, offset;
+	size_t i, v = 0, offset, k;
 	for (i = 0; i < x->nterms; ++i) if (i != t) alt_add_term(a, x->terms[i]); 
 	offset = a->nvars;
 	for (i = 0; i < y->nterms; ++i) alt_add_term(a, y->terms[i]);
-	memcpy(a->e, x->e, sizeof(int_t) * x->nvars); // ??
-	memcpy(a->e + x->nvars, y->e, sizeof(int_t) * y->nvars);
+	memcpy(a->eq, x->eq, sizeof(int_t) * x->nvars); // ??
+	memcpy(a->eq + x->nvars, y->eq, sizeof(int_t) * y->nvars);
 	for (i = 0; i < y->nvars; ++i) 
-		if (a->e[i + x->nvars] > 0) a->e[i + x->nvars] += x->nvars;
+		if ((k = alt_get_eq(a, i + x->nvars) > 0)) alt_set_eq(a, i + x->nvars, k + x->nvars);
 	for (i = x->varid[t]; i < x->terms[t].ar + x->varid[t]; ++i) alt_add_eq(a, (int_t)i, offset + v++);
 	return a;
 }
@@ -173,12 +183,12 @@ int_t* term_read(size_t *sz, wchar_t **in) {
 		array_append(t, int_t, *sz, x);
 		if (!iswalnum(**in) && **in != L'?') return --*sz, t;
 	}
-	perror("parse error\n"), exit(1);
-	return t;
+	return 0;
 }
 
 
 alt* alt_read(int_t **h, wchar_t **in) {
+	if (!*in) return 0;
 	int_t **b = 0, *t;
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
 	if (!(*h = term_read(&nh, in))) return 0;
@@ -196,7 +206,7 @@ alt* alt_read(int_t **h, wchar_t **in) {
 }
 
 void prog_read() {
-	wchar_t *buf = malloc(sizeof(wchar_t)*32), *all = new(wchar_t);
+	wchar_t buf[32], *all = new(wchar_t);
 	wint_t c;
 	*buf = *all = 0;
 	int_t *h;
@@ -209,11 +219,10 @@ next:	for (n = 0; n < 31; ++n)
 		all = wcscat(realloc(all, sizeof(wchar_t)*(wcslen(all) + 32)), buf);
 		goto next;
 	}
-	while (*all) {
+	while (all) {
 		alt_read(&h, &all);
-		def_print(*h);
+		if (h) def_print(*h);
 	}
-	free(buf);
 }
 
 void term_print(const term t, size_t v) {
@@ -226,11 +235,12 @@ void term_print(const term t, size_t v) {
 void alt_print(const alt* a) {
 	for (size_t n = 0; n < a->nterms; ++n) {
 		term_print(a->terms[n], a->varid[n]);
-		wprintf(L", ");
+		if (n + 1 < a->nterms) wprintf(L", ");
 	}
+	int_t k;
 	for (size_t n = 0; n < a->nvars; ++n)
-		if (a->e[n] > 0) wprintf(L"_%zu = _%lu; ", n, a->e[n]);
-		else if (a->e[n] < 0) wprintf(L"_%zu = %s; ", n, str_from_id(a->e[n]));
+		if ((k = alt_get_eq(a, n)) > 0) wprintf(L"_%zu = _%lu; ", n, k);
+		else if (k < 0) wprintf(L"_%zu = %s; ", n, str_from_id(k));
 }
 
 struct index_t { // all alts that contain this head
@@ -262,9 +272,8 @@ def* def_get(int_t h, size_t ar) {
 void def_print(int_t t) {
 	def *d = id_get_data(t);
 	term_print(d->h, 0);
-	wprintf(L": \t");
-	for (size_t n = 0; n < d->sz; ++n)
-		alt_print(d->a[n]);
+	wprintf(L": ");
+	for (size_t n = 0; n < d->sz; ++n) alt_print(d->a[n]);
 	wprintf(L".\n");
 }
 
