@@ -11,7 +11,6 @@
 #define int_t intptr_t
 #define INT_T_ERR WINT_MAX
 #define array_append(a, t, l, x) ((((t*)(a = realloc(a, sizeof(t)*(l+1))))[l] = x), ++l)
-#define array_append_zeros(a, t, l, s) memset(((t*)realloc(a,sizeof(t)*(l+s)))+s,0,sizeof(t)*s),l+=s
 #define podcmp(x, y, t) memcmp(&(x), &(y), sizeof(t))
 #define def_add_alt_raw(d, b, nb, sz, h, nh) def_add_alt(d, alt_create_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a) def_add_alt(def_get(h, ar), a)
@@ -47,10 +46,10 @@ int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n) {
 	return	!*d ?
 			array_append(*a, const wchar_t*, *sz, s),
 			*data = realloc(*data, sizeof(void*)**sz),
-			data[*sz-1] = 0,
+			(*data)[*sz++-1] = 0,
 			(*(*d = new(struct dict_t)) = 
 				(struct dict_t){ .s=s, .h=h,
-				.id = *s==L'?'?*sz:-*sz, .l=0, .r=0 }).id
+				.id = *s==L'?'?*sz+1:-*sz-1, .l=0, .r=0 }).id
 			: h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n) ? (**d).id
 			: _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
 }
@@ -62,11 +61,11 @@ const wchar_t* str_from_id(int32_t id) {
 int32_t str_to_id(const wchar_t* s, size_t n) { return _str_to_id(&dict, s, n); }
 
 void id_set_data(int32_t id, void* data) {
-	if (id > 0) vardata[id] = data; else constsdata[-id] = data;
+	if (id > 0) vardata[id-1] = data; else constsdata[-id-1] = data;
 }
 
 void* id_get_data(int32_t id) {
-	return id > 0 ? vardata[id] : constsdata[-id];
+	return id > 0 ? vardata[id-1] : constsdata[-id-1];
 }
 
 wchar_t* str_read(int_t *r, wchar_t *in) {
@@ -96,7 +95,7 @@ typedef struct {
 } alt;
 
 struct def* def_get(int_t h, size_t ar);
-void def_add_alt(struct def *d, alt *a);
+alt* def_add_alt(struct def *d, alt *a);
 void def_print(int_t t);
 
 alt* alt_create(size_t hsz) {
@@ -108,9 +107,9 @@ alt* alt_create(size_t hsz) {
 void alt_delete(alt* a) { if (a->e) free(a->e); if (a->terms) free(a->terms); }
 
 void alt_add_term(alt* a, term t) {
+	a->e=memset(((int_t*)realloc(a->e, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar),
 	array_append(a->terms, term, a->nterms, t), 
-	array_append(a->varid, size_t, a->nvars, a->nvars),
-	array_append_zeros(a->e, int_t, a->nvars, t.ar);
+	array_append(a->varid, size_t, a->nvars, a->nvars), a->nvars = a->nvars + t.ar - 1;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
@@ -139,10 +138,10 @@ alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
 		else id_set_data(h[i], (void*)(i+1));
 	for (i = 0, v = 1; i < nb; ++i)
 		for (j = 1; j < sz[i]; ++j, ++v)
-			if (b[i][j] > 0) continue;
+			if (b[i][j] < 0) alt_add_eq(a, v, b[i][j]);
 			else if ((d = (int_t)id_get_data(b[i][j]))) alt_add_eq(a, v, d);
 			else id_set_data(b[i][j], (void*)v);
-	return def_add_alt_by_rel(*h, nh, a), a;
+	return def_add_alt(def_get(*h, nh), a);
 }
 
 alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
@@ -248,7 +247,7 @@ void def_print(int_t t) {
 }
 
 
-void def_add_alt(def *d, alt *a) {
+alt* def_add_alt(def *d, alt *a) {
 	array_append(d->a, alt*, d->sz, a);
 	for (size_t k = 0, n; k < a->nterms; ++k) {
 		def *c = id_get_data(a->terms[k].r);
@@ -257,6 +256,7 @@ void def_add_alt(def *d, alt *a) {
 		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
 		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
 	}
+	return a;
 }
 
 int main() {
