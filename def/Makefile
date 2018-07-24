@@ -1,2 +1,2 @@
 all:
-	cc dict.c alt.c -W -Wpedantic -Wall
+	cc def.c -W -Wpedantic -Wall -g

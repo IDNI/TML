@@ -1,12 +1,96 @@
-#include "alt.h"
-#include "dict.h"
 #include <string.h>
 #include <stdio.h>
 #include <wctype.h>
+#include <wchar.h>
 #include <locale.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+#define new(x) malloc(sizeof(x))
+#define int_t intptr_t
+#define INT_T_ERR WINT_MAX
+#define array_append(a, t, l, x) ((((t*)(a = realloc(a, sizeof(t)*(l+1))))[l] = x), ++l)
+#define array_append_zeros(a, t, l, s) memset(((t*)realloc(a,sizeof(t)*(l+s)))+s,0,sizeof(t)*s),l+=s
+#define podcmp(x, y, t) memcmp(&(x), &(y), sizeof(t))
 
 #define def_add_alt_raw(d, b, nb, sz, h, nh) def_add_alt(d, alt_create_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a) def_add_alt(def_get(h, ar), a)
+#define term_create(_r, _ar) ((term){ .r = _r, .ar = _ar})
+#define alt_create_term(a, r, ar) alt_add_term(a, term_create(r, ar))
+
+struct dict_t {
+	const wchar_t* s;
+	uint32_t h;
+	int32_t id;
+	struct dict_t *l, *r;
+} *dict = 0;
+
+wchar_t **gconsts = 0, **gvars = 0;
+void **vardata = 0, **constsdata = 0;
+size_t gnconsts = 0, gnvars = 0;
+
+uint32_t hash(const wchar_t* s) {
+	uint32_t h = 1;
+	while (*s) h *= 1 + *s * __builtin_bswap32(*s), ++s;
+	return h;
+}
+
+int32_t _str_to_id(struct dict_t **d, const wchar_t* s) {
+	uint32_t h = hash(s);
+	size_t *sz;
+	wchar_t*** a;
+	void*** data;
+	if (*s == L'?') sz = &gnvars, a = &gvars, data = &vardata;
+	else sz = &gnconsts, a = &gconsts, data = &constsdata;
+	return	!*d ?
+			array_append(*a, const wchar_t*, *sz, s=wcsdup(s)),
+			*data = realloc(*data, sizeof(void*)**sz),
+			data[*sz-1] = 0,
+			(*(*d = new(struct dict_t)) = 
+				(struct dict_t){ .s=s, .h=h,
+				.id = *s==L'?'?*sz:-*sz, .l=0, .r=0 }).id
+			: h == (**d).h && !wcscmp((**d).s, s) ? (**d).id
+			: _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s);
+}
+
+const wchar_t* str_from_id(int32_t id) {
+	return id < 0 ? gconsts[-id-1] : gvars[id-1];
+}
+
+int32_t str_to_id(const wchar_t* s) { return _str_to_id(&dict, s); }
+
+void id_set_data(int32_t id, void* data) {
+	if (id > 0) vardata[id] = data; else constsdata[-id] = data;
+}
+
+void* id_get_data(int32_t id) {
+	return id > 0 ? vardata[id] : constsdata[-id];
+}
+
+wint_t str_read(int_t *r) {
+	wchar_t *s = 0;
+	wint_t c;
+	size_t n = 0;
+	while (iswspace(c = getwc(stdin))) if (c == WEOF) return c;
+	do { array_append(s, wchar_t, n, c); } while (iswalnum(c = getwc(stdin)));
+	while (iswspace(c = getwc(stdin))) ;
+	*r = str_to_id(s);
+	wprintf(L"str_read %d %s\n", *r, s);
+	fflush(stdout);
+	return free(s), c;
+}
+
+typedef struct {
+	int_t r;
+	size_t ar;
+} term;
+
+typedef struct {
+	int_t *e;
+	term *terms;
+	size_t nvars, nterms, *varid;
+} alt;
 
 struct def* def_get(int_t h, size_t ar);
 void def_add_alt(struct def *d, alt *a);
