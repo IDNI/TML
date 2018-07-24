@@ -4,7 +4,7 @@
 
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
-	*(a.varid = new(size_t)) = sz;
+	*(a->varid = new(size_t)) = hsz;
 	return *a = (alt){ .e = 0, .terms = 0, .nvars = hsz, .nterms = 0 }, a;
 }
 
@@ -51,10 +51,10 @@ alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
 	for (i = 0; i < x->nterms; ++i) if (i != t) alt_add_term(a, x->terms[i]);
 	offset = a->nvars;
 	for (i = 0; i < y->nterms; ++i) alt_add_term(a, y->terms[i]);
-	memcmp(a->e, x->e, sizeof(int_t) * x->nvars); // ??
-	memcmp(a->e + x->nvars, y->e, sizeof(int_t) * y->nvars);
+	memcpy(a->e, x->e, sizeof(int_t) * x->nvars); // ??
+	memcpy(a->e + x->nvars, y->e, sizeof(int_t) * y->nvars);
 	for (i = 0; i < y->nvars; ++i) 
 		if (a->e[i + x->nvars] > 0) a->e[i + x->nvars] += x->nvars;
-	for (i = x->varid[t]; i < x->terms[t].ar + x->varid[t]; ++i) alt_add_eq(i, offset + v++);
-
+	for (i = x->varid[t]; i < x->terms[t].ar + x->varid[t]; ++i) alt_add_eq(a, (int_t)i, offset + v++);
+	return a;
 }
