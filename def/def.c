@@ -96,7 +96,7 @@ typedef struct {
 typedef struct {
 	int_t *eq;
 	term *terms;
-	size_t nvars, nterms, *varid;
+	size_t nvars, nterms, hsz;
 } alt;
 
 struct def* def_get(int_t h, size_t ar);
@@ -109,9 +109,9 @@ term term_create(int_t r, size_t ar) {
 
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
-	*a = (alt){ .eq = 0, .terms = 0, .nvars = hsz, .nterms = 0 };
+	*a = (alt){ .eq = 0, .terms = 0, .nvars = hsz, .nterms = 0, .hsz = hsz };
 	if (hsz) memset((a->eq=malloc(sizeof(int_t)*hsz)),0,sizeof(int_t)*hsz);
-	return *(a->varid = new(size_t)) = hsz, a;
+	return a;
 }
 
 void alt_delete(alt* a) { if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
@@ -127,9 +127,9 @@ int_t alt_get_eq(const alt *a, size_t n) {
 
 void alt_add_term(alt* a, term t) {
 	if (t.ar) memset((a->eq=realloc(a->eq, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar);
-	array_append(a->terms, term, a->nterms, t);
-	size_t x = t.ar+a->varid[a->nterms-1];
-	if (t.ar) array_append(a->varid, size_t, a->nvars, x), (a->nvars += t.ar), --a->nvars;
+	array_append(a->terms, term, a->nterms, t), a->nvars += t.ar;
+//	size_t x = t.ar+a->varid[a->nterms-1];
+//	if (t.ar) array_append(a->varid, size_t, a->nvars, x), (a->nvars += t.ar), --a->nvars;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
@@ -164,7 +164,7 @@ alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
 			else id_set_data(b[i][j], (void*)v);
 	return def_add_alt(def_get(*h, nh), a);
 }
-
+/*
 alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
 	alt *a = alt_create(*x->varid);
 	size_t i, v = 0, offset, k;
@@ -178,7 +178,7 @@ alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
 	for (i = x->varid[t]; i < x->terms[t].ar + x->varid[t]; ++i) alt_add_eq(a, (int_t)i, offset + v++);
 	return a;
 }
-
+*/
 int_t* term_read(size_t *sz, wchar_t **in) {
 	int_t x, *t = 0;
 	*sz = 0;
@@ -214,8 +214,10 @@ alt* alt_read(int_t **h, wchar_t **in) {
 }
 
 void alt_print(const alt* a) {
+	size_t v = a->hsz;
 	for (size_t n = 0; n < a->nterms; ++n) {
-		term_print(a->terms[n], a->varid[n]);
+		term_print(a->terms[n], v);
+		v += a->terms[n].ar;
 		if (n + 1 < a->nterms) wprintf(L", ");
 	}
 	wprintf(L" [");
@@ -287,7 +289,7 @@ next:	for (n = 0; n < 31; ++n)
 		goto next;
 	}
 	while (all) alt_read(&h, &all);
-	for (int_t n = 0; n < gnconsts; ++n) def_print(-n);
+	for (int_t n = 1; n <= gnconsts; ++n) def_print(-n);
 }
 
 int main() {
