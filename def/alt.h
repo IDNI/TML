@@ -20,3 +20,5 @@ void alt_add_term(alt* a, term t);
 int_t alt_get_rep(alt *a, int_t v);
 bool alt_add_eq(alt *a, int_t x, int_t y);
 alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh);
+alt* alt_read();
+void alt_print(const alt* a);
