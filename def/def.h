@@ -26,6 +26,7 @@ typedef struct {
 
 typedef struct {
 	int_t *eq;		// equality constraints
+	int_t r;
 	term *terms;
 	size_t nvars, nterms, hsz;
 } alt;
@@ -43,8 +44,9 @@ typedef struct {
 
 int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n);
 wchar_t* str_read(int_t *r, wchar_t *in);
+const wchar_t* line_read(FILE *f);
 
-alt* alt_create(size_t hsz);
+alt* alt_create(int_t r, size_t ar);
 void alt_delete(alt* a);
 void alt_add_term(alt* a, term t);
 int_t alt_get_rep(alt *a, int_t v);
