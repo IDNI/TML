@@ -30,20 +30,16 @@ typedef struct {
 	size_t nvars, nterms, hsz;
 } alt;
 
-//struct index_t { // all alts that contain this head
-//	struct def *d;
-//	alt *a;
-//	size_t t;
-//};
-//typedef struct index_t index_t;
-
 struct def {
 	term h;
 	alt **a;
-//	index_t *i;
 	size_t sz;//, isz;
 };
 typedef struct def def;
+
+typedef struct {
+	size_t from, to;
+} prog;
 
 int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n);
 wchar_t* str_read(int_t *r, wchar_t *in);
@@ -69,9 +65,9 @@ alt* alt_read(int_t **h, wchar_t **in);
 void alt_print(alt* a);
 void def_print(int_t t);
 
-size_t prog_read();
-void prog_print(size_t from, size_t to);
-size_t prog_plug(size_t i, size_t j, size_t k, size_t l);
+prog prog_read();
+void prog_print(prog);
+void prog_plug(prog, prog);
 
 #define new(x)				((x*)malloc(sizeof(x)))
 #define arr(x,l)			((x*)malloc(sizeof(x)*(l)))
@@ -87,10 +83,10 @@ size_t prog_plug(size_t i, size_t j, size_t k, size_t l);
 #define allocat(x, y)			x=wcscat(resize(x, wchar_t, (x?wcslen(x):0))+wcslen(y)+1)), y)
 #define str_from_id(id)			(id < 0 ? gconsts[-id-1] : gvars[id-1])
 #define str_to_id(s, n)			_str_to_id(&dict, s, n)
-//#define print_id(n)			(n < 0 ? snprintf(s
 #define id_set_data(id, data)		(id > 0 ? vardata[id-1] = data : (constsdata[-id-1] = data))
 #define id_get_data(id)			(id > 0 ? vardata[id-1] : constsdata[-id-1])
 #define term_create(_r, _ar, _v0)	(term){ .r = _r, .ar = _ar, .v0 = _v0 }
+#define prog_create(f, t)		(prog){ .from = f?f:1, .to = t }
 
 extern dict_t *dict;
 extern wchar_t **gconsts, **gvars;

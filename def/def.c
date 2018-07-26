@@ -218,7 +218,7 @@ void def_print(int_t t) {
 		term_print(d->h, 0), wprintf(L": "), alt_print(d->a[n]), wprintf(L".\n");
 }
 
-size_t prog_read(FILE *f) {
+prog prog_read(FILE *f) {
 	wchar_t buf[32], *all = new(wchar_t);
 	wint_t c;
 	*buf = *all = 0;
@@ -234,8 +234,7 @@ next:	for (n = 0; n < 31; ++n)
 		goto next;
 	}
 	while (all) alt_read(&h, &all);
-	prog_print(pgnconsts ? pgnconsts : 1, gnconsts);
-	return gnconsts - pgnconsts;
+	return prog_create(pgnconsts ? pgnconsts : 1, gnconsts);
 }
 
 void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
@@ -267,43 +266,44 @@ void alt_deflate_print(def *d, alt *a) {
 	for (size_t n = 0; n < nb; ++n) {
 		for (size_t k = 0; k < sz[n]; ++k)
 			id_print(b[n][k]), putwchar(L' ');
-		putwchar(L',');
+		if (n+1!=nb) putwchar(L',');
 	}
+	putwchar(L'\n');
 }
 
 void def_deflate_print(def *d) {
 	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d, d->a[n]);
 }
 
-void prog_print(size_t from, size_t to) {
-	if (!from) ++from;
-	for (int_t n = from; (size_t)n <= to; ++n) {
+void prog_print(prog p) {
+	if (!p.from) ++p.from;
+	for (int_t n = p.from; (size_t)n <= p.to; ++n) {
 		def *d = id_get_data(-n);
 		if (d) def_deflate_print(d);
 	}
+	putwchar(L'\n');
 	// def_print(-n);
 }
 
-size_t prog_plug1(size_t i, size_t j) { // plug the program i..j into the program k..l
-}
-size_t prog_plug(size_t i, size_t j, size_t k, size_t l) { // plug the program i..j into the program k..l
+void prog_plug(prog s, prog d) {
 	def *dn, *dm;
 	alt **r = 0;
-	size_t sz = 0, n, m, t, x, y;
-	for (n = i; n < j; ++n) { // go over the src program's heads
-		if (!(dn = id_get_data(n))) continue;
-		for (m = k; m < l; ++m) { // for each of them go over the dst program bodies
-			if (!(dm = id_get_data(m))) continue;
+	size_t sz = 0, t, x, y;
+	int_t m, n;
+	for (m = d.from; (size_t)m < d.to; ++m) {
+		if (!(dm = id_get_data(-m))) continue;
+		for (n = s.from; (size_t)n < s.to; ++n) {
+			if (!(dn = id_get_data(-n))) continue;
 			for (t = 0; t < dm->sz; ++t) // go over all dm's alts
-				for (x = 0; x < dm->a[t]->nterms; ++x)
-					if (dm->a[t]->terms[x].r == dn->h.r && dm->a[t]->terms[x].ar == dn->h.ar)
-						for (y = 0; y < dn->sz; ++y)
-							array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
-
+			for (x = 0; x < dm->a[t]->nterms; ++x)
+				if (dm->a[t]->terms[x].r == dn->h.r && dm->a[t]->terms[x].ar == dn->h.ar)
+					for (y = 0; y < dn->sz; ++y)
+						array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
 		}
+		for (n = 0; (size_t)n < dm->sz; ++n) if (dm->a[n]) alt_delete(dm->a[n]);
+		dm->a = r;
+		r = 0;
 	}
-
-	return 0;
 }
 
 const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";
@@ -311,6 +311,11 @@ const char usage[] = "Usage: <src filename> <dst filename>\nWill output the prog
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
 	if (argc != 3) perror(usage), exit(1);
-	prog_print(prog_plug1(prog_read(fopen(argv[1], "r")), prog_read(fopen(argv[2], "r"))), gnconsts);
+	prog s = prog_read(fopen(argv[1], "r"));
+	prog d = prog_read(fopen(argv[2], "r"));
+	prog_print(s);
+	prog_print(d);
+	prog_plug(s, d);
+	prog_print(d);
 	return 0;
 }
