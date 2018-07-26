@@ -34,7 +34,7 @@ typedef struct {
 struct def {
 	term h;
 	alt **a;
-	size_t sz;//, isz;
+	size_t sz;
 };
 typedef struct def def;
 
@@ -49,8 +49,9 @@ typedef struct {
 	size_t from, to;
 } prog;
 
-int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n);
-wchar_t* str_read(int_t *r, wchar_t *in);
+uint32_t hash(const wchar_t* s, size_t n);
+int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n, bool src);
+wchar_t* str_read(int_t *r, wchar_t *in, bool);
 const wchar_t* line_read(FILE *f);
 
 alt* alt_create(int_t r, size_t ar);
@@ -58,26 +59,23 @@ void alt_delete(alt* a);
 void alt_add_term(alt* a, term t);
 int_t alt_get_rep(alt *a, int_t v);
 bool alt_add_eq(alt *a, int_t x, int_t y);
-alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz);
+alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz, bool src);
 alt* alt_plug(alt *x, const size_t t, alt *y);
 
-void def_print(int_t t);
-def* def_get(int_t h, size_t ar);
-def* def_create(int_t h, size_t ar);
-def* def_get(int_t h, size_t ar);
+def* def_create(int_t h, size_t ar, bool src);
+def* def_get(int_t h, size_t ar, bool src);
 size_t def_add_alt(def *d, alt *a);
-//alt* def_index_alt(def *d, alt *a);
 
-int_t* term_read(size_t *sz, wchar_t **in);
+int_t* term_read(size_t *sz, wchar_t **in, bool);
 void term_print(const term t, size_t v);
 alt* alt_read(int_t **h, wchar_t **in, bool);
 void alt_print(alt* a);
 void alt_deflate_print(alt *a);
 void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh);
-void def_print(int_t t);
+void def_print(int_t t, bool);
 
 prog prog_read(FILE*, bool);
-void prog_print(prog);
+void prog_print(prog, bool);
 void prog_plug();
 
 #define new(x)				((x*)malloc(sizeof(x)))
@@ -92,9 +90,13 @@ void prog_plug();
 #define alt_create_term(a, r, ar, v0)	alt_add_term(a, term_create(r, ar, v0))
 #define allocat(x, y)			x=wcscat(resize(x, wchar_t, (x?wcslen(x):0))+wcslen(y)+1)), y)
 #define str_from_id(id)			(id < 0 ? gconsts[-id-1] : gvars[id-1])
-#define str_to_id(s, n)			_str_to_id(&dict, s, n)
-#define id_set_data(id, data)		(id > 0 ? vardata[id-1] = data : (constsdata[-id-1] = data))
-#define id_get_data(id)			(id > 0 ? vardata[id-1] : constsdata[-id-1])
+#define str_to_id(s, n, src)		_str_to_id(&dict, s, n, src)
+#define id_set_vardata(id, data)	(vardata[id-1] = (data))
+#define id_set_src(id, data)		(srcdata[-id-1] = (data))
+#define id_set_dst(id, data)		(dstdata[-id-1] = (data))
+#define id_get_vardata(id)		vardata[id-1]
+#define id_get_src(id)			srcdata ? srcdata[-id-1] : 0
+#define id_get_dst(id)			dstdata ? dstdata[-id-1] : 0
 #define term_create(_r, _ar, _v0)	(term){ .r = _r, .ar = _ar, .v0 = _v0 }
 #define same_term(x, y)			(((x).r == (y).r) && ((x).ar == (y).ar))
 #define prog_create(f, t)		(prog){ .from = f?f:1, .to = t }
@@ -102,7 +104,5 @@ void prog_plug();
 extern dict_t *dict;
 extern stack_t *stack;
 extern wchar_t **gconsts, **gvars;
-extern void **vardata, **constsdata;
+extern void **vardata, **srcdata, **dstdata;
 extern size_t gnconsts, gnvars;
-
-uint32_t hash(const wchar_t* s, size_t n);
