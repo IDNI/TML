@@ -36,25 +36,26 @@ int32_t _str_to_id(dict_t **d, const wchar_t* s, size_t n) {
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
 	*a = (alt){ .eq = 0, .terms = 0, .nvars = hsz, .nterms = 0, .hsz = hsz };
-	if (hsz) memset((a->eq=arr(int_t, hsz)),0,sizeof(int_t)*hsz);
+	if (hsz) a->eq=calloc(hsz+1, sizeof(int_t));
 	return a;
 }
 
 void alt_delete(alt* a) { if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
 
 void alt_add_term(alt* a, term t) {
-	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar)+a->nvars,0,sizeof(int_t)*t.ar);
+	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar+1)+a->nvars+1,0,sizeof(int_t)*t.ar);
 	array_append(a->terms, term, a->nterms, t), a->nvars += t.ar;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
+//	if (v > 0) assert(v <= a->nvars);
 	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
 	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
 }
 
 bool alt_add_eq(alt *a, int_t x, int_t y) {
 	x = alt_get_rep(a, x), y = alt_get_rep(a, y);
-	return x==y ? true :x < 0 ? y < 0 ? false : (a->eq[y-1] = x), true : (a->eq[x-1] = y), true;
+	return x==y ? true : x<0 ? y<0 ? false : (a->eq[y-1]=x), true : (x>y?(a->eq[x-1]=y):(a->eq[y-1]=x)), true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,12 +90,14 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 	const size_t v0 = x->terms[t].v0, hsz = y->hsz;
 	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
 	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
-	memcpy(a->eq, x->eq, sizeof(int_t) * x->nvars);
-	for (i = 0; i < y->nvars; ++i) {
+	a->nvars = x->nvars+y->nvars+1;
+	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars+1)), x->eq, sizeof(int_t) * (x->nvars+1));
+	memset(a->eq + x->nvars + 1, 0, sizeof(int_t) *(a->nvars-x->nvars-1));
+	for (i = 1; i <= y->nvars; ++i) {
 		j = alt_get_rep(y, i);
-		if (j < 0) (n = i < hsz ? (i+v0) : (i + x->nvars - hsz)), k = j;
+		if (j < 0) (n = (i<hsz ? (i+v0): (i + x->nvars - hsz))), k = j;
 		else if (i == (size_t)j) continue;
-		else (n = i<hsz ? (i+v0) : (i+x->nvars-hsz)), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
+		else (n = (i<hsz ? (i+v0) : (i+x->nvars-hsz))), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
 		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
 	}
 	return a;
@@ -112,17 +115,6 @@ def* def_get(int_t h, size_t ar) {
 	def *d = id_get_data(h);
 	return d ? d : def_create(h, ar);
 }
-
-//alt* def_index_alt(def *d, alt *a) {
-//	for (size_t k = 0, n; k < a->nterms; ++k) {
-//		def *c = id_get_data(a->terms[k].r);
-//		if (!c) continue;
-//		const index_t i = { .d=d, .a=a, .t=k };
-//		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
-//		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
-//	}
-//	return a;
-//}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -151,7 +143,7 @@ int_t* term_read(size_t *sz, wchar_t **in) {
 
 void id_print(int_t n) {
 	if (n > 0) {
-		wprintf(L"?%d", -n);
+		wprintf(L"?%d", n);
 		return;
 	}
 	const wchar_t *s = str_from_id(n);
@@ -159,8 +151,8 @@ void id_print(int_t n) {
 }
 
 void term_print(const term t, size_t v) {
-	id_print(v);
-	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" _%zu", n + v);
+	id_print(t.r);
+	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" ?%zu", n + v);
 }
 
 alt* alt_read(int_t **h, wchar_t **in) {
@@ -190,9 +182,9 @@ void alt_print(alt* a) {
 	}
 	wprintf(L" [");
 	int_t k;
-	for (size_t n = 0; n < a->nvars; ++n)
-		if ((k = alt_get_rep(a, n)) > 0) wprintf(L" _%zu = _%lu; ", n+1, k);
-		else if (k < 0) wprintf(L" _%zu = %s; ", n+1, str_from_id(k));
+	for (size_t n = 1; n <= a->nvars; ++n)
+		if ((k = alt_get_rep(a, n)) > 0) { if (k != n) wprintf(L" ?%zu = ?%lu; ", n, k); }
+		else if (k < 0) wprintf(L" ?%zu = %s; ", n, str_from_id(k));
 	wprintf(L"]");
 }
 
@@ -200,7 +192,7 @@ int alt_cmp(const alt *x, const alt *y) {
 	if (x->nterms != y->nterms) return x->nterms > y->nterms ? 1 : -1;
 	int r = memcmp(x->terms, y->terms, sizeof(term) * x->nterms);
 	if (!r) return r;
-	if (x->eq && y->eq) return memcmp(x->eq, y->eq, sizeof(int_t) * x->nvars);
+	if (x->eq && y->eq) return memcmp(x->eq, y->eq, sizeof(int_t) * (x->nvars+1));
 	return x->eq > y->eq ? 1 : -1;
 }
 
@@ -238,6 +230,9 @@ next:	for (n = 0; n < 31; ++n)
 }
 
 void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
+	wprintf(L"deflating:\n");
+	alt_print(a);
+	putwchar(L'\n');
 	*h = arr(int_t, d->h.ar+1);
 	**h = d->h.r;
 	*b = arr(int_t*, a->nterms);
@@ -247,12 +242,17 @@ void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb,
 	size_t v = 0;
 	for (size_t n = 0; n < a->hsz; ++n)
 		(*h)[n+1] = alt_get_rep(a, ++v);
-	for (size_t n = 0; n < a->nterms; ++n) {
-		(*b)[n] = arr(int_t, a->terms[n].ar + 1);
-		*((*b)[n]) = a->terms[n].r;
-		(*sz)[n] = a->terms[n].ar+1;
-		for (size_t k = 0; k < a->terms[n].ar; ++k)
-			(*b)[n][k+1] = alt_get_rep(a, ++v);
+	for (size_t n = 0, m = 0; n < a->nterms; ++n, ++m) {
+		(*b)[m] = arr(int_t, a->terms[n].ar + 1);
+		*((*b)[m]) = a->terms[n].r;
+		(*sz)[m] = a->terms[n].ar+1;
+		for (size_t k = 0; k < a->terms[n].ar; ++k) (*b)[n][k+1] = alt_get_rep(a, ++v);
+		for (size_t k = 0; k < n; ++k)
+			if ((*sz)[n] == (*sz)[k] && !memcmp((*b)[n], (*b)[k], (*sz)[n] * sizeof(int_t))) {
+				free((*b)[m]);
+				--m;
+				break;
+			}
 	}
 }
 

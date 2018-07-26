@@ -76,7 +76,6 @@ void prog_plug(prog, prog);
 #define arrdup(x, t, n)			((t*)memdup(x, sizeof(t) * n))
 #define INT_T_ERR WINT_MAX
 #define array_append(a, t, l, x)	(++l, (((t*)resize(a, t, l))[l-1] = (x)))
-#define podcmp(x, y, t)			memcmp(&(x), &(y), sizeof(t))
 #define def_add_alt_raw(d,b,nb,sz,h,nh)	def_add_alt(d, alt_add_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a)	def_add_alt(def_get(h, ar), a)
 #define alt_create_term(a, r, ar, v0)	alt_add_term(a, term_create(r, ar, v0))
