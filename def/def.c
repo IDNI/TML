@@ -48,7 +48,7 @@ void alt_add_term(alt* a, term t) {
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
-	if (v > 0) assert(v <= a->nvars);
+	if (v > 0) assert((size_t)v <= a->nvars);
 	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
 	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
 }
@@ -184,7 +184,7 @@ void alt_print(alt* a) {
 	wprintf(L" [");
 	int_t k;
 	for (size_t n = 1; n <= a->nvars; ++n)
-		if ((k = alt_get_rep(a, n)) > 0) { if (k != n) wprintf(L" ?%zu = ?%lu; ", n, k); }
+		if ((k = alt_get_rep(a, n)) > 0) { if ((size_t)k != n) wprintf(L" ?%zu = ?%lu; ", n, k); }
 		else if (k < 0) wprintf(L" ?%zu = %s; ", n, str_from_id(k));
 	wprintf(L"]");
 }
@@ -241,8 +241,7 @@ void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb,
 	*nb = a->nterms;
 	*nh = a->hsz;
 	size_t v = 0;
-	for (size_t n = 0; n < a->hsz; ++n)
-		(*h)[n+1] = alt_get_rep(a, ++v);
+	for (size_t n = 0; n < a->hsz; ++n) (*h)[n+1] = alt_get_rep(a, ++v);
 	for (size_t n = 0, m = 0; n < a->nterms; ++n, ++m) {
 		(*b)[m] = arr(int_t, a->terms[n].ar + 1);
 		*((*b)[m]) = a->terms[n].r;
@@ -250,8 +249,7 @@ void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb,
 		for (size_t k = 0; k < a->terms[n].ar; ++k) (*b)[n][k+1] = alt_get_rep(a, ++v);
 		for (size_t k = 0; k < n; ++k)
 			if ((*sz)[n] == (*sz)[k] && !memcmp((*b)[n], (*b)[k], (*sz)[n] * sizeof(int_t))) {
-				free((*b)[m]);
-				--m;
+				free((*b)[m--]);
 				break;
 			}
 	}
@@ -283,7 +281,6 @@ void prog_print(prog p) {
 		if (d) def_deflate_print(d);
 	}
 	putwchar(L'\n');
-	// def_print(-n);
 }
 
 void prog_plug(prog s, prog d) {
@@ -295,13 +292,18 @@ void prog_plug(prog s, prog d) {
 		if (!(dm = id_get_data(-m))) continue;
 		for (n = s.from; (size_t)n <= s.to; ++n) {
 			if (!(dn = id_get_data(-n))) continue;
-			for (t = 0; t < dm->sz; ++t) // go over all dm's alts
-			for (x = 0; x < dm->a[t]->nterms; ++x)
-				if (dm->a[t]->terms[x].r == dn->h.r && dm->a[t]->terms[x].ar == dn->h.ar)
-					for (y = 0; y < dn->sz; ++y)
-						array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
+			for (t = 0; t < dm->sz; ++t) { // go over all dm's alts
+				for (x = 0; x < dm->a[t]->nterms; ++x) {
+					if (dm->a[t]->terms[x].r == dn->h.r && dm->a[t]->terms[x].ar == dn->h.ar) {
+						for (y = 0; y < dn->sz; ++y)
+							array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
+						alt_delete(dm->a[t]);
+						memmove(dm->a+t,dm->a+t+1,sizeof(alt*)*(dm->sz---t-1)), --t;
+						break;
+					}
+				}
+			}
 		}
-		for (n = 0; (size_t)n < dm->sz; ++n) if (dm->a[n]) alt_delete(dm->a[n]);
 		dm->a = r;
 		dm->sz = sz;
 		r = 0;
