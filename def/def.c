@@ -290,9 +290,9 @@ void prog_plug(prog s, prog d) {
 	alt **r = 0;
 	size_t sz = 0, t, x, y;
 	int_t m, n;
-	for (m = d.from; (size_t)m < d.to; ++m) {
+	for (m = d.from; (size_t)m <= d.to; ++m) {
 		if (!(dm = id_get_data(-m))) continue;
-		for (n = s.from; (size_t)n < s.to; ++n) {
+		for (n = s.from; (size_t)n <= s.to; ++n) {
 			if (!(dn = id_get_data(-n))) continue;
 			for (t = 0; t < dm->sz; ++t) // go over all dm's alts
 			for (x = 0; x < dm->a[t]->nterms; ++x)
