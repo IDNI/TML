@@ -75,7 +75,7 @@ void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t 
 void def_print(int_t t, bool);
 
 prog prog_read(FILE*, bool);
-void prog_print(prog, bool);
+void prog_print();
 void prog_plug();
 
 #define new(x)				((x*)malloc(sizeof(x)))

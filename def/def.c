@@ -5,8 +5,8 @@ dict_t *dict = 0;
 stack_t *stack = 0;
 wchar_t **gconsts = 0, **gvars = 0;
 void **vardata = 0, **srcdata = 0, **dstdata = 0;
-int_t *srcs = 0;
-size_t gnconsts = 0, gnvars = 0, nsrcs = 0;
+int_t *srcs = 0, *dsts = 0;
+size_t gnconsts = 0, gnvars = 0, nsrcs = 0, ndsts = 0;
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -66,12 +66,14 @@ void alt_add_term(alt* a, term t) {
 int_t alt_get_rep(alt *a, int_t v) {
 	if (v > 0) assert((size_t)v <= a->nvars);
 	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
+	if (v == a->eq[v-1]) return a->eq[v-1] = 0, v;
 	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
 }
 
 bool alt_add_eq(alt *a, int_t x, int_t y) {
 	x = alt_get_rep(a, x), y = alt_get_rep(a, y);
-	return x==y?true:x<0?y<0?false:(a->eq[y-1]=x),true:(x>y?(a->eq[x-1]=y):(a->eq[y-1]=x)),true;
+	bool r = x==y?true:x<0?y<0?false:((a->eq[y-1]=x),true):((x>y?(a->eq[x-1]=y):(a->eq[y-1]=x)),true);
+	return r;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,15 +116,15 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 	const size_t v0 = x->terms[t].v0, hsz = y->hsz;
 	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
 	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
-	a->nvars = x->nvars+y->nvars-hsz;
-	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars)), x->eq, sizeof(int_t) * (x->nvars));
-	memset(a->eq + x->nvars, 0, sizeof(int_t) * (a->nvars-x->nvars));
+	assert(a->nvars == x->nvars+y->nvars-hsz*2);
+//	for (i = 1; i <= x->nvars; ++i) alt_add_eq(a, i, alt_get_rep(x, i < v0 ? i : i + a->terms[t].ar
+	memcpy(a->eq, x->eq + x->hsz, sizeof(int_t) * (x->nvars-x->hsz));
+	memset(a->eq + x->nvars - x->hsz, 0, sizeof(int_t) * (a->nvars-x->nvars+x->hsz));
 	for (i = 1; i <= y->nvars; ++i) {
-		j = alt_get_rep(y, i);
-		if (j < 0) (n = i + x->nvars - hsz), k = j;
+		if ((j = alt_get_rep(y, i)) < 0) n = i + x->nvars - hsz*2, k = j;
 		else if (i == (size_t)j) continue;
-		else (n = i+x->nvars-hsz), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
-		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
+		else (n = i+x->nvars-hsz*2), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz*2));
+		if (!alt_add_eq(a, n, k)) return wprintf(L"alt_plug failed\n"), alt_delete(a), (alt*)0;
 	}
 	wprintf(L"alt_plug result: "), alt_deflate_print(a), putwchar(L'\n');
 	return a;
@@ -187,6 +189,7 @@ alt* alt_read(int_t **h, wchar_t **in, bool src) {
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
 	if (!(*h = term_read(&nh, in, src))) return 0;
 	if (src) array_append(srcs, int_t, nsrcs, **h);
+	else array_append(dsts, int_t, ndsts, **h);
 	if (**in == L'.') return ++*in, alt_add_raw(*h, 0, nh, 0, 0, src);
 	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
 	while ((t = term_read(&s, in, src))) {
@@ -215,9 +218,20 @@ void alt_print(alt* a) {
 }
 
 int alt_cmp(const alt *x, const alt *y) {
+	if (x == y) return 0;
+	if (!x) return 1;
+	if (!y) return -1;
 	if (x->nterms != y->nterms) return x->nterms > y->nterms ? 1 : -1;
+	if (x->nvars != y->nvars) return x->nvars > y->nvars ? 1 : -1;
 	int r = memcmp(x->terms, y->terms, sizeof(term) * x->nterms);
 	if (r) return r;
+	assert(x->hsz == y->hsz);
+	size_t n;
+	for (n = 1; n <= x->hsz; ++n)
+		if (alt_get_rep((alt*)x, n) > 0) break;
+		else if (alt_get_rep((alt*)y, n) > 0) break;
+		else if (alt_get_rep((alt*)x, n) != alt_get_rep((alt*)y, n)) break;
+	if (n == x->hsz+1) return 0;
 	if (x->eq && y->eq) return memcmp(x->eq, y->eq, sizeof(int_t) * (x->nvars+1));
 	return x->eq > y->eq ? 1 : -1;
 }
@@ -297,13 +311,9 @@ void def_deflate_print(def *d) {
 	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d->a[n]);
 }
 
-void prog_print(prog p, bool src) {
-	if (!p.from) ++p.from;
-	for (int_t n = p.from; (size_t)n <= p.to; ++n) {
-//		wprintf(L"search def of %d = %s\n", -n, str_from_id(-n));
-		def *d = src ? id_get_src(-n) : id_get_dst(-n);
-		if (d) def_deflate_print(d);
-	}
+void prog_print() {
+	def *d;
+	for (size_t n = 0; n < ndsts; ++n) if ((d = id_get_dst(dsts[n]))) def_deflate_print(d);
 	putwchar(L'\n');
 }
 
@@ -317,7 +327,7 @@ void prog_plug() {
 		if (!(ad = dd->a[a])) continue;
 		for (i = 0; i < ds->sz; ++i)
 			if ((r = alt_plug(ad, t, ds->a[i])))
-				array_append(dd->a, alt*, dd->sz, r);
+				def_add_alt(dd, r);
 		alt_delete(dd->a[a]), dd->a[a] = 0;
 	}
 }
@@ -329,10 +339,7 @@ int main(int argc, char** argv) {
 	if (argc != 3) perror(usage), exit(1);
 	prog s = prog_read(fopen(argv[1], "r"), true);
 	prog d = prog_read(fopen(argv[2], "r"), false);
-//	prog_print(s);
-//	prog_print(d);
 	prog_plug();
-//	prog_print(s);
-	prog_print(d, false);
+	prog_print();
 	return 0;
 }
