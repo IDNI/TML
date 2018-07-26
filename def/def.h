@@ -65,6 +65,8 @@ int_t* term_read(size_t *sz, wchar_t **in);
 void term_print(const term t, size_t v);
 alt* alt_read(int_t **h, wchar_t **in, bool);
 void alt_print(alt* a);
+void alt_deflate_print(alt *a);
+void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh);
 void def_print(int_t t);
 
 prog prog_read(FILE*, bool);

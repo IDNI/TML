@@ -85,6 +85,8 @@ alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz) {
 }
 
 alt* alt_plug(alt *x, const size_t t, alt *y) {
+	wprintf(L"alt_plug x: "), alt_deflate_print(x), putwchar(L'\n');
+	wprintf(L"alt_plug y: "), alt_deflate_print(y), putwchar(L'\n');
 	alt *a = alt_create(x->r, x->hsz);
 	size_t i, n;
 	int_t j, k;
@@ -101,7 +103,7 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 		else (n = i+x->nvars-hsz), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
 		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
 	}
-	wprintf(L"alt_plug result: "), alt_print(a), putwchar(L'\n');
+	wprintf(L"alt_plug result: "), alt_deflate_print(a), putwchar(L'\n');
 	return a;
 }
 
@@ -180,11 +182,11 @@ void alt_print(alt* a) {
 	term_print(term_create(a->r, a->hsz, 0), 0);
 	size_t v = a->hsz;
 	for (size_t n = 0; n < a->nterms; ++n) {
+		wprintf(L", ");
 		term_print(a->terms[n], v);
 		v += a->terms[n].ar;
-		if (n + 1 < a->nterms) wprintf(L", ");
 	}
-	wprintf(L" [");
+	wprintf(L". [");
 	int_t k;
 	for (size_t n = 1; n <= a->nvars; ++n)
 		if ((k = alt_get_rep(a, n)) > 0) { if ((size_t)k != n) wprintf(L" ?%zu = ?%lu; ", n, k); }
@@ -238,9 +240,9 @@ next:	for (n = l = 0; n < 31; ++n)
 	return prog_create(pgnconsts ? pgnconsts : 1, gnconsts);
 }
 
-void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
-	*h = arr(int_t, d->h.ar+1);
-	**h = d->h.r;
+void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
+	*h = arr(int_t, a->hsz+1);
+	**h = a->r;
 	*b = arr(int_t*, a->nterms);
 	*sz = arr(size_t, a->nterms);
 	*nb = a->nterms;
@@ -262,28 +264,28 @@ void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb,
 	}
 }
 
-void alt_deflate_print(def *d, alt *a) {
+void alt_deflate_print(alt *a) {
 	int_t *h = 0, **b = 0;
 	size_t *sz = 0, nb, nh;
-	alt_deflate(d, a, &h, &b, &sz, &nb, &nh);
+	alt_deflate(a, &h, &b, &sz, &nb, &nh);
 	for (size_t n = 0; n <= nh; ++n) id_print(h[n]), putwchar(L' ');
-	putwchar(L':');
+	if (nb) putwchar(L':');
 	for (size_t n = 0; n < nb; ++n) {
 		for (size_t k = 0; k < sz[n]; ++k)
 			id_print(b[n][k]), putwchar(L' ');
 		if (n+1!=nb) putwchar(L',');
 	}
-	putwchar(L'\n');
+	wprintf(L".\n");
 }
 
 void def_deflate_print(def *d) {
-	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d, d->a[n]);
+	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d->a[n]);
 }
 
 void prog_print(prog p) {
 	if (!p.from) ++p.from;
 	for (int_t n = p.from; (size_t)n <= p.to; ++n) {
-		wprintf(L"search def of %d = %s\n", -n, str_from_id(-n));
+//		wprintf(L"search def of %d = %s\n", -n, str_from_id(-n));
 		def *d = id_get_data(-n);
 		if (d) def_deflate_print(d);
 	}
@@ -295,14 +297,13 @@ void prog_plug() {
 	alt  *r;
 	size_t t, x, y;
 	int_t m, n;
-	for (m = 1; (size_t)m <= gnconsts; ++m) {
+	for (m = 1; (size_t)m <= gnconsts; ++m)
 		if (!(dm = id_get_data(-m))) continue;
-		else for (n = 0; (size_t)n < nintens; ++n) {
+		else for (n = 0; (size_t)n < nintens; ++n)
 			if (!(dn = id_get_data(intens[n]))) continue;
 			else for (t = 0; t < dm->sz; ++t) {
 				for (x = 0; x < dm->a[t]->nterms; ++x) {
-					if (!same_term(dm->a[t]->terms[x], dn->h)) continue;
-					else {
+					if (same_term(dm->a[t]->terms[x], dn->h)) {
 						for (y = 0; y < dn->sz; ++y) {
 							if ((r = alt_plug(dm->a[t],x,dn->a[y])))
 								array_append(dm->a,alt*,dm->sz,r);
@@ -313,8 +314,6 @@ void prog_plug() {
 					}
 				}
 			}
-		}
-	}
 }
 
 const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";
@@ -324,8 +323,8 @@ int main(int argc, char** argv) {
 	if (argc != 3) perror(usage), exit(1);
 	prog s = prog_read(fopen(argv[1], "r"), true);
 	prog d = prog_read(fopen(argv[2], "r"), false);
-	prog_print(s);
-	prog_print(d);
+//	prog_print(s);
+//	prog_print(d);
 	prog_plug();
 //	prog_print(s);
 	prog_print(d);
