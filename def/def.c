@@ -91,8 +91,8 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
 	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
 	a->nvars = x->nvars+y->nvars+1 - hsz;
-	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars+1-hsz)), x->eq, sizeof(int_t) * (x->nvars+1));
-	memset(a->eq + x->nvars + 1, 0, sizeof(int_t) *(a->nvars-x->nvars-1-hsz));
+	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars)), x->eq, sizeof(int_t) * (x->nvars+1));
+	memset(a->eq + x->nvars + 1, 0, sizeof(int_t) * (a->nvars-x->nvars-1));
 	for (i = hsz; i <= y->nvars; ++i) {
 		j = alt_get_rep(y, i);
 		if (j < 0) (n = (/*i<hsz ? (i+v0):*/ (i + x->nvars - hsz))), k = j;
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
 	prog d = prog_read(fopen(argv[2], "r"));
 	prog_print(s);
 	prog_print(d);
-	prog_plug(d, s);
+	prog_plug(s, d);
 	prog_print(d);
 	return 0;
 }
