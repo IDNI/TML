@@ -2,10 +2,11 @@
 #include <unistd.h>
 
 dict_t *dict = 0;
+stack_t *stack = 0;
 wchar_t **gconsts = 0, **gvars = 0;
 void **vardata = 0, **constsdata = 0;
-int_t *intens = 0;
-size_t gnconsts = 0, gnvars = 0, nintens = 0;
+int_t *srcs = 0;
+size_t gnconsts = 0, gnvars = 0, nsrcs = 0;
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -32,6 +33,20 @@ int32_t _str_to_id(dict_t **d, const wchar_t* s, size_t n) {
 	else return  _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
 }
 
+void stack_push(int_t s, int_t d, size_t a, size_t t) {
+	stack_t *k = new(stack_t);
+	*k = (stack_t){ .s = s, .d = d, .a = a, .t = t, .n = stack };
+	stack = k;
+}
+
+bool stack_pop(int_t *s, int_t *d, size_t *a, size_t *t) {
+	if (!stack) return false;
+	*s = stack->s, *d = stack->d, *a = stack->a, *t = stack->t;
+	stack_t *k = stack->n;
+	free(stack), stack = k;
+	return true;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 alt* alt_create(int_t r, size_t ar) {
@@ -41,7 +56,7 @@ alt* alt_create(int_t r, size_t ar) {
 	return a;
 }
 
-void alt_delete(alt* a) { if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
+void alt_delete(alt* a) { if (!a) return; if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
 
 void alt_add_term(alt* a, term t) {
 	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar+1)+a->nvars+1,0,sizeof(int_t)*t.ar);
@@ -62,7 +77,7 @@ bool alt_add_eq(alt *a, int_t x, int_t y) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz) {
-	size_t i, j;
+	size_t i, j, r;
 	int_t d, v;
 	alt *a = alt_create(*h, nh);
 	for (i = 0, v = nh; i < nb; ++i) {
@@ -81,10 +96,16 @@ alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz) {
 			if (b[i][j] < 0) alt_add_eq(a, v, b[i][j]);
 			else if ((d = (int_t)id_get_data(b[i][j]))) alt_add_eq(a, v, d);
 			else id_set_data(b[i][j], (void*)v);
-	return (alt*)def_add_alt(def_get(*h, nh), a);
+	r = def_add_alt(def_get(*h, nh), a);
+	for (i = 0; i < a->nterms; ++i)
+		for (j = 0; j < nsrcs; ++j)
+			if (srcs[j] == a->terms[i].r)
+				stack_push(srcs[j], *h, r, i);
+	return def_get(*h, nh)->a[r];
 }
 
 alt* alt_plug(alt *x, const size_t t, alt *y) {
+	if (!x || !y) return 0;
 	wprintf(L"alt_plug x: "), alt_deflate_print(x), putwchar(L'\n');
 	wprintf(L"alt_plug y: "), alt_deflate_print(y), putwchar(L'\n');
 	alt *a = alt_create(x->r, x->hsz);
@@ -159,15 +180,15 @@ void term_print(const term t, size_t v) {
 	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" ?%zu", n + v);
 }
 
-alt* alt_read(int_t **h, wchar_t **in, bool inten) {
+alt* alt_read(int_t **h, wchar_t **in, bool src) {
 	if (!*in) return 0;
 	int_t **b = 0, *t;
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
 	if (!(*h = term_read(&nh, in))) return 0;
-	if (inten) array_append(intens, int_t, nintens, **h);
+	if (src) array_append(srcs, int_t, nsrcs, **h);
 	if (**in == L'.') return ++*in, alt_add_raw(*h, 0, nh, 0, 0);
 	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
-	while ((t = term_read(&s, in)))
+	while ((t = term_read(&s, in))) {
 		if (	array_append(b, int_t*, nb, t),
 			array_append(sz, size_t, nsz, s),
 			**in != L',') {
@@ -175,6 +196,7 @@ alt* alt_read(int_t **h, wchar_t **in, bool inten) {
 				return alt_add_raw(*h, b, nh, nb, sz);
 			}
 		else ++*in;
+	}
 	return 0;
 }
 
@@ -202,11 +224,11 @@ int alt_cmp(const alt *x, const alt *y) {
 	return x->eq > y->eq ? 1 : -1;
 }
 
-alt* def_add_alt(def *d, alt *a) {
+size_t def_add_alt(def *d, alt *a) {
 	for (size_t n = 0; n < d->sz; ++n)
 		if (!alt_cmp(d->a[n], a))
-			return d->a[n];
-	return array_append(d->a, alt*, d->sz, a), a;
+			return n;
+	return array_append(d->a, alt*, d->sz, a), d->sz-1;
 }
 
 void def_print(int_t t) {
@@ -216,7 +238,7 @@ void def_print(int_t t) {
 		term_print(d->h, 0), wprintf(L": "), alt_print(d->a[n]), wprintf(L".\n");
 }
 
-prog prog_read(FILE *f, bool inten) {
+prog prog_read(FILE *f, bool src) {
 	wchar_t *all = new(wchar_t), buf[32];
 	wint_t c;
 	*buf = *all = 0;
@@ -236,17 +258,15 @@ next:	for (n = l = 0; n < 31; ++n)
 		all = wcscat(resize(all, wchar_t, wcslen(all) + 32), buf);
 		goto next;
 	} else if (skip) goto next;
-	while (all) alt_read(&h, &all, inten);
+	while (all) alt_read(&h, &all, src);
 	return prog_create(pgnconsts ? pgnconsts : 1, gnconsts);
 }
 
 void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
-	*h = arr(int_t, a->hsz+1);
-	**h = a->r;
-	*b = arr(int_t*, a->nterms);
-	*sz = arr(size_t, a->nterms);
-	*nb = a->nterms;
-	*nh = a->hsz;
+	if (!a) return;
+	*h = arr(int_t, a->hsz+1), **h = a->r,
+	*b = arr(int_t*, a->nterms), *sz = arr(size_t, a->nterms);
+	*nb = a->nterms, *nh = a->hsz;
 	size_t v = 0;
 	for (size_t n = 0; n < a->hsz; ++n)
 		(*h)[n+1] = alt_get_rep(a, ++v);
@@ -265,6 +285,7 @@ void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t 
 }
 
 void alt_deflate_print(alt *a) {
+	if (!a) return;
 	int_t *h = 0, **b = 0;
 	size_t *sz = 0, nb, nh;
 	alt_deflate(a, &h, &b, &sz, &nb, &nh);
@@ -293,27 +314,18 @@ void prog_print(prog p) {
 }
 
 void prog_plug() {
-	def *dn, *dm;
-	alt  *r;
-	size_t t, x, y;
-	int_t m, n;
-	for (m = 1; (size_t)m <= gnconsts; ++m)
-		if (!(dm = id_get_data(-m))) continue;
-		else for (n = 0; (size_t)n < nintens; ++n)
-			if (!(dn = id_get_data(intens[n]))) continue;
-			else for (t = 0; t < dm->sz; ++t) {
-				for (x = 0; x < dm->a[t]->nterms; ++x) {
-					if (same_term(dm->a[t]->terms[x], dn->h)) {
-						for (y = 0; y < dn->sz; ++y) {
-							if ((r = alt_plug(dm->a[t],x,dn->a[y])))
-								array_append(dm->a,alt*,dm->sz,r);
-						}
-						alt_delete(dm->a[t]);
-						memmove(dm->a+t,dm->a+t+1,sizeof(alt*)*(dm->sz---t-1)), --t;
-						break;
-					}
-				}
-			}
+	int_t s, d;
+	size_t a, t, i;
+	def *ds, *dd;
+	alt *ad, *r;
+	while (stack_pop(&s, &d, &a, &t)) {
+		ds = id_get_data(s), dd = id_get_data(d);
+		if (!(ad = dd->a[a])) continue;
+		for (i = 0; i < ds->sz; ++i)
+			if ((r = alt_plug(ad, t, ds->a[i])))
+				array_append(dd->a, alt*, dd->sz, r);
+		alt_delete(dd->a[a]), dd->a[a] = 0;
+	}
 }
 
 const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";

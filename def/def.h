@@ -38,6 +38,13 @@ struct def {
 };
 typedef struct def def;
 
+struct stack_t {
+	int_t s, d;
+	size_t a, t;
+	struct stack_t *n;
+};
+typedef struct stack_t stack_t;
+
 typedef struct {
 	size_t from, to;
 } prog;
@@ -58,7 +65,7 @@ void def_print(int_t t);
 def* def_get(int_t h, size_t ar);
 def* def_create(int_t h, size_t ar);
 def* def_get(int_t h, size_t ar);
-alt* def_add_alt(def *d, alt *a);
+size_t def_add_alt(def *d, alt *a);
 //alt* def_index_alt(def *d, alt *a);
 
 int_t* term_read(size_t *sz, wchar_t **in);
@@ -93,6 +100,7 @@ void prog_plug();
 #define prog_create(f, t)		(prog){ .from = f?f:1, .to = t }
 
 extern dict_t *dict;
+extern stack_t *stack;
 extern wchar_t **gconsts, **gvars;
 extern void **vardata, **constsdata;
 extern size_t gnconsts, gnvars;
