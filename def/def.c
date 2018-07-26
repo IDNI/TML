@@ -1,4 +1,5 @@
 #include "def.h"
+#include <search.h>
 
 dict_t *dict = 0;
 wchar_t **gconsts = 0, **gvars = 0;
@@ -104,7 +105,7 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 def* def_create(int_t h, size_t ar) {
 	def *d = new(def);
 	id_set_data(h, d);
-	return *d = (def){ .h = term_create(h, ar, 0), .a = 0, .i = 0, .sz = 0, .isz = 0 }, d;
+	return *d = (def){ .h = term_create(h, ar, 0), .a = 0, /*.i = 0,*/ .sz = 0, /*.isz = 0*/ }, d;
 }
 
 def* def_get(int_t h, size_t ar) {
@@ -112,16 +113,16 @@ def* def_get(int_t h, size_t ar) {
 	return d ? d : def_create(h, ar);
 }
 
-alt* def_index_alt(def *d, alt *a) {
-	for (size_t k = 0, n; k < a->nterms; ++k) {
-		def *c = id_get_data(a->terms[k].r);
-		if (!c) continue;
-		const index_t i = { .d=d, .a=a, .t=k };
-		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
-		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
-	}
-	return a;
-}
+//alt* def_index_alt(def *d, alt *a) {
+//	for (size_t k = 0, n; k < a->nterms; ++k) {
+//		def *c = id_get_data(a->terms[k].r);
+//		if (!c) continue;
+//		const index_t i = { .d=d, .a=a, .t=k };
+//		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
+//		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
+//	}
+//	return a;
+//}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -148,9 +149,17 @@ int_t* term_read(size_t *sz, wchar_t **in) {
 	return 0;
 }
 
+void id_print(int_t n) {
+	if (n > 0) {
+		wprintf(L"?%d", -n);
+		return;
+	}
+	const wchar_t *s = str_from_id(n);
+	while (iswalnum(*s)) putwchar(*s++);
+}
+
 void term_print(const term t, size_t v) {
-	const wchar_t *s = str_from_id(t.r);
-	while (iswalnum(*s)) wprintf(L"%c", *s++);
+	id_print(v);
 	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" _%zu", n + v);
 }
 
@@ -187,6 +196,21 @@ void alt_print(alt* a) {
 	wprintf(L"]");
 }
 
+int alt_cmp(const alt *x, const alt *y) {
+	if (x->nterms != y->nterms) return x->nterms > y->nterms ? 1 : -1;
+	int r = memcmp(x->terms, y->terms, sizeof(term) * x->nterms);
+	if (!r) return r;
+	if (x->eq && y->eq) return memcmp(x->eq, y->eq, sizeof(int_t) * x->nvars);
+	return x->eq > y->eq ? 1 : -1;
+}
+
+alt* def_add_alt(def *d, alt *a) {
+	for (size_t n = 0; n < d->sz; ++n)
+		if (!alt_cmp(d->a[n], a))
+			return d->a[n];
+	return array_append(d->a, alt*, d->sz, a), a;
+}
+
 void def_print(int_t t) {
 	def *d = id_get_data(t);
 	if (!d) return;
@@ -214,12 +238,71 @@ next:	for (n = 0; n < 31; ++n)
 	return gnconsts - pgnconsts;
 }
 
-void prog_print(size_t from, size_t to) {
-	for (int_t n = from; (size_t)n <= to; ++n) def_print(-n);
+void alt_deflate(def *d, alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
+	*h = arr(int_t, d->h.ar+1);
+	**h = d->h.r;
+	*b = arr(int_t*, a->nterms);
+	*sz = arr(size_t, a->nterms);
+	*nb = a->nterms;
+	*nh = a->hsz;
+	size_t v = 0;
+	for (size_t n = 0; n < a->hsz; ++n)
+		(*h)[n+1] = alt_get_rep(a, ++v);
+	for (size_t n = 0; n < a->nterms; ++n) {
+		(*b)[n] = arr(int_t, a->terms[n].ar + 1);
+		*((*b)[n]) = a->terms[n].r;
+		(*sz)[n] = a->terms[n].ar+1;
+		for (size_t k = 0; k < a->terms[n].ar; ++k)
+			(*b)[n][k+1] = alt_get_rep(a, ++v);
+	}
 }
 
-size_t prog_plug(size_t src, size_t dst) {
-	if (src) return dst;
+void alt_deflate_print(def *d, alt *a) {
+	int_t *h = 0, **b = 0;
+	size_t *sz = 0, nb, nh;
+	alt_deflate(d, a, &h, &b, &sz, &nb, &nh);
+	for (size_t n = 0; n <= nh; ++n)
+		id_print(h[n]), putwchar(L' ');
+	putwchar(L':');
+	for (size_t n = 0; n < nb; ++n) {
+		for (size_t k = 0; k < sz[n]; ++k)
+			id_print(b[n][k]), putwchar(L' ');
+		putwchar(L',');
+	}
+}
+
+void def_deflate_print(def *d) {
+	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d, d->a[n]);
+}
+
+void prog_print(size_t from, size_t to) {
+	if (!from) ++from;
+	for (int_t n = from; (size_t)n <= to; ++n) {
+		def *d = id_get_data(-n);
+		if (d) def_deflate_print(d);
+	}
+	// def_print(-n);
+}
+
+size_t prog_plug1(size_t i, size_t j) { // plug the program i..j into the program k..l
+}
+size_t prog_plug(size_t i, size_t j, size_t k, size_t l) { // plug the program i..j into the program k..l
+	def *dn, *dm;
+	alt **r = 0;
+	size_t sz = 0, n, m, t, x, y;
+	for (n = i; n < j; ++n) { // go over the src program's heads
+		if (!(dn = id_get_data(n))) continue;
+		for (m = k; m < l; ++m) { // for each of them go over the dst program bodies
+			if (!(dm = id_get_data(m))) continue;
+			for (t = 0; t < dm->sz; ++t) // go over all dm's alts
+				for (x = 0; x < dm->a[t]->nterms; ++x)
+					if (dm->a[t]->terms[x].r == dn->h.r && dm->a[t]->terms[x].ar == dn->h.ar)
+						for (y = 0; y < dn->sz; ++y)
+							array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
+
+		}
+	}
+
 	return 0;
 }
 
@@ -228,6 +311,6 @@ const char usage[] = "Usage: <src filename> <dst filename>\nWill output the prog
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
 	if (argc != 3) perror(usage), exit(1);
-	prog_print(prog_plug(prog_read(fopen(argv[1], "r")), prog_read(fopen(argv[2], "r"))), gnconsts);
+	prog_print(prog_plug1(prog_read(fopen(argv[1], "r")), prog_read(fopen(argv[2], "r"))), gnconsts);
 	return 0;
 }

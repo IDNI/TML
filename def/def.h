@@ -30,18 +30,18 @@ typedef struct {
 	size_t nvars, nterms, hsz;
 } alt;
 
-struct index_t { // all alts that contain this head
-	struct def *d;
-	alt *a;
-	size_t t;
-};
-typedef struct index_t index_t;
+//struct index_t { // all alts that contain this head
+//	struct def *d;
+//	alt *a;
+//	size_t t;
+//};
+//typedef struct index_t index_t;
 
 struct def {
 	term h;
 	alt **a;
-	index_t *i;
-	size_t sz, isz;
+//	index_t *i;
+	size_t sz;//, isz;
 };
 typedef struct def def;
 
@@ -56,12 +56,12 @@ bool alt_add_eq(alt *a, int_t x, int_t y);
 alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz);
 alt* alt_plug(alt *x, const size_t t, alt *y);
 
-alt* def_add_alt(struct def *d, alt *a);
 void def_print(int_t t);
 def* def_get(int_t h, size_t ar);
 def* def_create(int_t h, size_t ar);
 def* def_get(int_t h, size_t ar);
 alt* def_add_alt(def *d, alt *a);
+//alt* def_index_alt(def *d, alt *a);
 
 int_t* term_read(size_t *sz, wchar_t **in);
 void term_print(const term t, size_t v);
@@ -71,23 +71,23 @@ void def_print(int_t t);
 
 size_t prog_read();
 void prog_print(size_t from, size_t to);
-size_t prog_plug(size_t, size_t);
+size_t prog_plug(size_t i, size_t j, size_t k, size_t l);
 
 #define new(x)				((x*)malloc(sizeof(x)))
-#define arr(x,l)			((x*)malloc(sizeof(x)*l))
+#define arr(x,l)			((x*)malloc(sizeof(x)*(l)))
 #define resize(x,t,l)			((t*)((x)=realloc(x,sizeof(t)*(l))))
 #define memdup(x, l)			memcmp(malloc(l), x, l)
 #define arrdup(x, t, n)			((t*)memdup(x, sizeof(t) * n))
 #define INT_T_ERR WINT_MAX
-#define array_append(a, t, l, x)	((((t*)resize(a, t, l+1))[l] = (x)), ++l)
+#define array_append(a, t, l, x)	(++l, (((t*)resize(a, t, l))[l-1] = (x)))
 #define podcmp(x, y, t)			memcmp(&(x), &(y), sizeof(t))
-#define def_add_alt(d, a)		array_append(d->a, alt*, d->sz, a);
 #define def_add_alt_raw(d,b,nb,sz,h,nh)	def_add_alt(d, alt_add_raw(b, nb, sz, h, nh)
 #define def_add_alt_by_rel(h, ar, a)	def_add_alt(def_get(h, ar), a)
 #define alt_create_term(a, r, ar, v0)	alt_add_term(a, term_create(r, ar, v0))
 #define allocat(x, y)			x=wcscat(resize(x, wchar_t, (x?wcslen(x):0))+wcslen(y)+1)), y)
 #define str_from_id(id)			(id < 0 ? gconsts[-id-1] : gvars[id-1])
 #define str_to_id(s, n)			_str_to_id(&dict, s, n)
+//#define print_id(n)			(n < 0 ? snprintf(s
 #define id_set_data(id, data)		(id > 0 ? vardata[id-1] = data : (constsdata[-id-1] = data))
 #define id_get_data(id)			(id > 0 ? vardata[id-1] : constsdata[-id-1])
 #define term_create(_r, _ar, _v0)	(term){ .r = _r, .ar = _ar, .v0 = _v0 }
