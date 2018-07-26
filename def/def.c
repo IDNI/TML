@@ -93,8 +93,6 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 	a->nvars = x->nvars+y->nvars-hsz;
 	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars)), x->eq, sizeof(int_t) * (x->nvars));
 	memset(a->eq + x->nvars, 0, sizeof(int_t) * (a->nvars-x->nvars));
-//	for (i = 1; i <= hsz; ++i) {
-//		if (!alt_add_eq(a, i, i+v0???)) return alt_delete(a), (alt*)0;
 	for (i = 1; i <= y->nvars; ++i) {
 		j = alt_get_rep(y, i);
 		if (j < 0) (n = i + x->nvars - hsz), k = j;
@@ -102,7 +100,7 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 		else (n = i+x->nvars-hsz), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
 		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
 	}
-	wprintf(L"alt_plug result: "); alt_print(a), putwchar(L'\n');
+	wprintf(L"alt_plug result: "), alt_print(a), putwchar(L'\n');
 	return a;
 }
 
@@ -300,8 +298,8 @@ void prog_print(prog p) {
 
 void prog_plug(prog s, prog d) {
 	def *dn, *dm;
-	alt **r = 0;
-	size_t sz = 0, t, x, y;
+	alt  *r;
+	size_t t, x, y;
 	int_t m, n;
 	for (m = d.from; (size_t)m <= d.to; ++m)
 		if (!(dm = id_get_data(-m))) continue;
@@ -309,15 +307,16 @@ void prog_plug(prog s, prog d) {
 			if (!(dn = id_get_data(-n))) continue;
 			else for (t = 0; t < dm->sz; ++t) {
 				for (x = 0; x < dm->a[t]->nterms; ++x) {
-					if (dm->a[t]->terms[x].r != dn->h.r || dm->a[t]->terms[x].ar != dn->h.ar) continue;
+					if (!same_term(dm->a[t]->terms[x], dn->h)) continue;
 					else {
-						for (y = 0; y < dn->sz; ++y)
-							array_append(r, alt*, sz, alt_plug(dm->a[t], x, dn->a[y]));
+						for (y = 0; y < dn->sz; ++y) {
+							if ((r = alt_plug(dm->a[t],x,dn->a[y])))
+								array_append(dm->a,alt*,dm->sz,r);
+						}
 						alt_delete(dm->a[t]);
 						memmove(dm->a+t,dm->a+t+1,sizeof(alt*)*(dm->sz---t-1)), --t;
 						break;
 					}
-					dm->a = r, dm->sz = sz, r = 0, sz = 0;
 				}
 			}
 }
@@ -329,10 +328,10 @@ int main(int argc, char** argv) {
 	if (argc != 3) perror(usage), exit(1);
 	prog s = prog_read(fopen(argv[1], "r"));
 	prog d = prog_read(fopen(argv[2], "r"));
-	prog_print(s);
-	prog_print(d);
+//	prog_print(s);
+//	prog_print(d);
 	prog_plug(s, d);
-	prog_print(s);
+//	prog_print(s);
 	prog_print(d);
 	return 0;
 }

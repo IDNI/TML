@@ -87,6 +87,7 @@ void prog_plug(prog, prog);
 #define id_set_data(id, data)		(id > 0 ? vardata[id-1] = data : (constsdata[-id-1] = data))
 #define id_get_data(id)			(id > 0 ? vardata[id-1] : constsdata[-id-1])
 #define term_create(_r, _ar, _v0)	(term){ .r = _r, .ar = _ar, .v0 = _v0 }
+#define same_term(x, y)			(((x).r == (y).r) && ((x).ar == (y).ar))
 #define prog_create(f, t)		(prog){ .from = f?f:1, .to = t }
 
 extern dict_t *dict;
