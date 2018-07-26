@@ -63,13 +63,13 @@ alt* def_add_alt(def *d, alt *a);
 
 int_t* term_read(size_t *sz, wchar_t **in);
 void term_print(const term t, size_t v);
-alt* alt_read(int_t **h, wchar_t **in);
+alt* alt_read(int_t **h, wchar_t **in, bool);
 void alt_print(alt* a);
 void def_print(int_t t);
 
-prog prog_read();
+prog prog_read(FILE*, bool);
 void prog_print(prog);
-void prog_plug(prog, prog);
+void prog_plug();
 
 #define new(x)				((x*)malloc(sizeof(x)))
 #define arr(x,l)			((x*)malloc(sizeof(x)*(l)))

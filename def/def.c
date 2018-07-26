@@ -4,7 +4,8 @@
 dict_t *dict = 0;
 wchar_t **gconsts = 0, **gvars = 0;
 void **vardata = 0, **constsdata = 0;
-size_t gnconsts = 0, gnvars = 0;
+int_t *intens = 0;
+size_t gnconsts = 0, gnvars = 0, nintens = 0;
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -156,12 +157,13 @@ void term_print(const term t, size_t v) {
 	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" ?%zu", n + v);
 }
 
-alt* alt_read(int_t **h, wchar_t **in) {
+alt* alt_read(int_t **h, wchar_t **in, bool inten) {
 	if (!*in) return 0;
 	int_t **b = 0, *t;
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
 	if (!(*h = term_read(&nh, in))) return 0;
-	else if (**in == L'.') return ++*in, alt_add_raw(*h, 0, nh, 0, 0);
+	if (inten) array_append(intens, int_t, nintens, **h);
+	if (**in == L'.') return ++*in, alt_add_raw(*h, 0, nh, 0, 0);
 	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
 	while ((t = term_read(&s, in)))
 		if (	array_append(b, int_t*, nb, t),
@@ -212,7 +214,7 @@ void def_print(int_t t) {
 		term_print(d->h, 0), wprintf(L": "), alt_print(d->a[n]), wprintf(L".\n");
 }
 
-prog prog_read(FILE *f) {
+prog prog_read(FILE *f, bool inten) {
 	wchar_t *all = new(wchar_t), buf[32];
 	wint_t c;
 	*buf = *all = 0;
@@ -232,7 +234,7 @@ next:	for (n = l = 0; n < 31; ++n)
 		all = wcscat(resize(all, wchar_t, wcslen(all) + 32), buf);
 		goto next;
 	} else if (skip) goto next;
-	while (all) alt_read(&h, &all);
+	while (all) alt_read(&h, &all, inten);
 	return prog_create(pgnconsts ? pgnconsts : 1, gnconsts);
 }
 
@@ -275,15 +277,7 @@ void alt_deflate_print(def *d, alt *a) {
 }
 
 void def_deflate_print(def *d) {
-/*	if (!d->sz) {
-		int_t *h = arr(int_t, d->h.ar+1);
-		*h = d->h.r;
-		for (size_t n = 0; n < d->h.ar; ++n) h[n+1] = alt_get_rep(a, ++v);
-		for (size_t n = 0; n <= d->h.ar; ++n) id_print(h[n]), putwchar(L' ');
-		putwchar(L':');
-	} else */
-	for (size_t n = 0; n < d->sz; ++n)
-		alt_deflate_print(d, d->a[n]);
+	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d, d->a[n]);
 }
 
 void prog_print(prog p) {
@@ -296,15 +290,15 @@ void prog_print(prog p) {
 	putwchar(L'\n');
 }
 
-void prog_plug(prog s, prog d) {
+void prog_plug() {
 	def *dn, *dm;
 	alt  *r;
 	size_t t, x, y;
 	int_t m, n;
-	for (m = d.from; (size_t)m <= d.to; ++m)
+	for (m = 1; (size_t)m <= gnconsts; ++m) {
 		if (!(dm = id_get_data(-m))) continue;
-		else for (n = s.from; (size_t)n <= s.to; ++n)
-			if (!(dn = id_get_data(-n))) continue;
+		else for (n = 0; (size_t)n < nintens; ++n) {
+			if (!(dn = id_get_data(intens[n]))) continue;
 			else for (t = 0; t < dm->sz; ++t) {
 				for (x = 0; x < dm->a[t]->nterms; ++x) {
 					if (!same_term(dm->a[t]->terms[x], dn->h)) continue;
@@ -319,6 +313,8 @@ void prog_plug(prog s, prog d) {
 					}
 				}
 			}
+		}
+	}
 }
 
 const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";
@@ -326,11 +322,11 @@ const char usage[] = "Usage: <src filename> <dst filename>\nWill output the prog
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
 	if (argc != 3) perror(usage), exit(1);
-	prog s = prog_read(fopen(argv[1], "r"));
-	prog d = prog_read(fopen(argv[2], "r"));
-//	prog_print(s);
-//	prog_print(d);
-	prog_plug(s, d);
+	prog s = prog_read(fopen(argv[1], "r"), true);
+	prog d = prog_read(fopen(argv[2], "r"), false);
+	prog_print(s);
+	prog_print(d);
+	prog_plug();
 //	prog_print(s);
 	prog_print(d);
 	return 0;
