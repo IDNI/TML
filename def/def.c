@@ -1,34 +1,9 @@
-#include <string.h>
-#include <stdio.h>
-#include <wctype.h>
-#include <wchar.h>
-#include <locale.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <assert.h>
+#include "def.h"
 
-#define new(x) malloc(sizeof(x))
-#define int_t intptr_t
-#define INT_T_ERR WINT_MAX
-#define array_append(a, t, l, x) ((((t*)(a = realloc(a, sizeof(t)*(l+1))))[l] = x), ++l)
-#define podcmp(x, y, t) memcmp(&(x), &(y), sizeof(t))
-#define def_add_alt_raw(d, b, nb, sz, h, nh) def_add_alt(d, alt_create_raw(b, nb, sz, h, nh)
-#define def_add_alt_by_rel(h, ar, a) def_add_alt(def_get(h, ar), a)
-#define alt_create_term(a, r, ar) alt_add_term(a, term_create(r, ar))
-#define allocat(x, y) x = wcscat(realloc(x, sizeof(wchar_t)*((x ? wcslen(x) : 0) + wcslen(y) + 1)), y)
-
-struct dict_t {
-	const wchar_t* s;
-	uint32_t h;
-	int32_t id;
-	size_t n;
-	struct dict_t *l, *r;
-} *dict = 0;
-
+dict_t *dict = 0;
 wchar_t **gconsts = 0, **gvars = 0;
 void **vardata = 0, **constsdata = 0;
-int_t gnconsts = 0, gnvars = 0;
+size_t gnconsts = 0, gnvars = 0;
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -36,18 +11,18 @@ uint32_t hash(const wchar_t* s, size_t n) {
 	return h;
 }
 
-int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n) {
+int32_t _str_to_id(dict_t **d, const wchar_t* s, size_t n) {
 	uint32_t h = hash(s, n);
-	int_t *sz;
+	size_t *sz;
 	wchar_t*** a;
 	void*** data;
 	if (*s == L'?') sz = &gnvars, a = &gvars, data = &vardata;
 	else sz = &gnconsts, a = &gconsts, data = &constsdata;
 	if (!*d) {
 		array_append(*a, const wchar_t*, *sz, s);
-		*data = realloc(*data, sizeof(void*)**sz);
+		resize(*data, void*, *sz);
 		(*data)[*sz-1] = 0;
-		(*(*d = new(struct dict_t)) = (struct dict_t){ .s=s, .h=h,
+		(*(*d = new(dict_t)) = (dict_t){ .s=s, .h=h,
 			.id = *s==L'?'?*sz:-*sz, .l=0, .r=0, .n=n });
 		return (**d).id;
 	} else if (h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n))
@@ -55,99 +30,40 @@ int32_t _str_to_id(struct dict_t **d, const wchar_t* s, size_t n) {
 	else return  _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
 }
 
-const wchar_t* str_from_id(int32_t id) {
-	return id < 0 ? gconsts[-id-1] : gvars[id-1];
-}
-
-int_t str_to_id(const wchar_t* s, size_t n) {
-	int_t r = _str_to_id(&dict, s, n);
-	return r;
-}
-
-void id_set_data(int32_t id, void* data) {
-	if (id > 0) vardata[id-1] = data; else constsdata[-id-1] = data;
-}
-
-void* id_get_data(int32_t id) {
-	return id > 0 ? vardata[id-1] : constsdata[-id-1];
-}
-
-wchar_t* str_read(int_t *r, wchar_t *in) {
-	wchar_t *s = in;
-	while (*s && iswspace(*s)) ++s;
-	if (!*s) return 0;
-	wchar_t *t = s;
-	if (*t == L'?') ++t;
-	while (iswalnum(*t)) ++t;
-	if (t == s) return 0;
-	*r = str_to_id(s, t - s);
-//	wchar_t *msg = malloc(sizeof(wchar_t)*(t-s+1));
-//	wmemcpy(msg, s, t-s+1);
-//	wprintf(L"%s\n", msg);
-	while (iswspace(*t)) ++t;
-	return t;
-}
-
-typedef struct {
-	int_t r;
-	size_t ar;
-} term;
-
-typedef struct {
-	int_t *eq;
-	term *terms;
-	size_t nvars, nterms, hsz;
-} alt;
-
-struct def* def_get(int_t h, size_t ar);
-alt* def_add_alt(struct def *d, alt *a);
-void def_print(int_t t);
-
-term term_create(int_t r, size_t ar) {
-	return (term){ .r = r, .ar = ar };
-}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 alt* alt_create(size_t hsz) {
 	alt *a = new(alt);
 	*a = (alt){ .eq = 0, .terms = 0, .nvars = hsz, .nterms = 0, .hsz = hsz };
-	if (hsz) memset((a->eq=malloc(sizeof(int_t)*hsz)),0,sizeof(int_t)*hsz);
+	if (hsz) memset((a->eq=arr(int_t, hsz)),0,sizeof(int_t)*hsz);
 	return a;
 }
 
 void alt_delete(alt* a) { if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
 
-int_t alt_set_eq(alt *a, size_t n, int_t k) {
-	assert(n < a->nvars);
-	return a->eq[n] = k;
-}
-int_t alt_get_eq(const alt *a, size_t n) {
-	assert(n < a->nvars);
-	return a->eq[n];
-}
-
 void alt_add_term(alt* a, term t) {
-	if (t.ar) memset((a->eq=realloc(a->eq, sizeof(int_t)*(a->nvars+t.ar)))+a->nvars,0,sizeof(int_t)*t.ar);
+	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar)+a->nvars,0,sizeof(int_t)*t.ar);
 	array_append(a->terms, term, a->nterms, t), a->nvars += t.ar;
-//	size_t x = t.ar+a->varid[a->nterms-1];
-//	if (t.ar) array_append(a->varid, size_t, a->nvars, x), (a->nvars += t.ar), --a->nvars;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
-	if (!a->eq || v < 0 || !alt_get_eq(a, v-1)) return v;
-	return alt_set_eq(a, v-1, alt_get_rep(a, alt_get_eq(a, v-1)));
+	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
+	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
 }
 
 bool alt_add_eq(alt *a, int_t x, int_t y) {
 	x = alt_get_rep(a, x), y = alt_get_rep(a, y);
-	return x==y ? true :x < 0 ? y < 0 ? false : alt_set_eq(a, y-1, x), true : alt_set_eq(a, x-1, y), true;
+	return x==y ? true :x < 0 ? y < 0 ? false : (a->eq[y-1] = x), true : (a->eq[x-1] = y), true;
 }
 
-alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz) {
 	size_t i, j;
 	int_t d, v;
 	alt *a = alt_create(nh);
-	for (i = 0; i < nb; ++i) {
-		alt_create_term(a, *b[i], sz[i]);
+	for (i = 0, v = nh; i < nb; ++i) {
+		alt_create_term(a, *b[i], sz[i], v), v += sz[i];
 		for (j = 1; j <= sz[i]; ++j)
 			if (b[i][j] > 0)
 				id_set_data(b[i][j], 0);
@@ -162,22 +78,64 @@ alt* alt_create_raw(int_t **b, size_t nb, size_t *sz, int_t *h, size_t nh) {
 			if (b[i][j] < 0) alt_add_eq(a, v, b[i][j]);
 			else if ((d = (int_t)id_get_data(b[i][j]))) alt_add_eq(a, v, d);
 			else id_set_data(b[i][j], (void*)v);
-	return def_add_alt(def_get(*h, nh), a);
+	return (alt*)def_add_alt(def_get(*h, nh), a);
 }
 
-alt* alt_plug(alt *x, size_t t, alt *y) { // replace x->terms[t] with y
+alt* alt_plug(alt *x, const size_t t, alt *y) {
 	alt *a = alt_create(x->hsz);
-	size_t i, v = 0, offset, k;
-	for (i = 0; i < x->nterms; ++i)
-		if (i != t) alt_add_term(a, x->terms[i]), v += x->terms[i].ar;
-	offset = a->nvars;
-	for (i = 0; i < y->nterms; ++i) alt_add_term(a, y->terms[i]);
-	memcpy(a->eq, x->eq, sizeof(int_t) * x->nvars); // ??
-	memcpy(a->eq + x->nvars, y->eq, sizeof(int_t) * y->nvars);
-	for (i = 0; i < y->nvars; ++i) 
-		if ((k = alt_get_eq(a, i + x->nvars) > 0)) alt_set_eq(a, i + x->nvars, k + x->nvars);
-	for (i = v; i < x->terms[t].ar + v; ++i) alt_add_eq(a, (int_t)i, offset + v++);
+	size_t i, n;
+	int_t j, k;
+	const size_t v0 = x->terms[t].v0, hsz = y->hsz;
+	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
+	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
+	memcpy(a->eq, x->eq, sizeof(int_t) * x->nvars);
+	for (i = 0; i < y->nvars; ++i) {
+		j = alt_get_rep(y, i);
+		if (j < 0) (n = i < hsz ? (i+v0) : (i + x->nvars - hsz)), k = j;
+		else if (i == (size_t)j) continue;
+		else (n = i<hsz ? (i+v0) : (i+x->nvars-hsz)), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
+		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
+	}
 	return a;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+def* def_create(int_t h, size_t ar) {
+	def *d = new(def);
+	id_set_data(h, d);
+	return *d = (def){ .h = term_create(h, ar, 0), .a = 0, .i = 0, .sz = 0, .isz = 0 }, d;
+}
+
+def* def_get(int_t h, size_t ar) {
+	def *d = id_get_data(h);
+	return d ? d : def_create(h, ar);
+}
+
+alt* def_index_alt(def *d, alt *a) {
+	for (size_t k = 0, n; k < a->nterms; ++k) {
+		def *c = id_get_data(a->terms[k].r);
+		if (!c) continue;
+		const index_t i = { .d=d, .a=a, .t=k };
+		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
+		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
+	}
+	return a;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+wchar_t* str_read(int_t *r, wchar_t *in) {
+	wchar_t *s = in;
+	while (*s && iswspace(*s)) ++s;
+	if (!*s) return 0;
+	wchar_t *t = s;
+	if (*t == L'?') ++t;
+	while (iswalnum(*t)) ++t;
+	if (t == s) return 0;
+	*r = str_to_id(s, t - s);
+	while (iswspace(*t)) ++t;
+	return t;
 }
 
 int_t* term_read(size_t *sz, wchar_t **in) {
@@ -201,20 +159,20 @@ alt* alt_read(int_t **h, wchar_t **in) {
 	int_t **b = 0, *t;
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
 	if (!(*h = term_read(&nh, in))) return 0;
-	else if (**in == L'.') return alt_create_raw(0, 0, 0, *h, nh);
+	else if (**in == L'.') return alt_add_raw(*h, 0, nh, 0, 0);
 	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
 	while ((t = term_read(&s, in)))
 		if (	array_append(b, int_t*, nb, t),
 			array_append(sz, size_t, nsz, s),
 			**in != L',') {
 				if (*((*in)++) != L'.') perror("'.' expected\n"), exit(1);
-				return alt_create_raw(b, nb, sz, *h, nh);
+				return alt_add_raw(*h, b, nh, nb, sz);
 			}
 		else ++*in;
 	return 0;
 }
 
-void alt_print(const alt* a) {
+void alt_print(alt* a) {
 	size_t v = a->hsz;
 	for (size_t n = 0; n < a->nterms; ++n) {
 		term_print(a->terms[n], v);
@@ -224,35 +182,9 @@ void alt_print(const alt* a) {
 	wprintf(L" [");
 	int_t k;
 	for (size_t n = 0; n < a->nvars; ++n)
-		if ((k = alt_get_eq(a, n)) > 0) wprintf(L" _%zu = _%lu; ", n+1, k);
+		if ((k = alt_get_rep(a, n)) > 0) wprintf(L" _%zu = _%lu; ", n+1, k);
 		else if (k < 0) wprintf(L" _%zu = %s; ", n+1, str_from_id(k));
 	wprintf(L"]");
-}
-
-struct index_t { // all alts that contain this head
-	struct def *d;
-	alt *a;
-	size_t t;
-};
-typedef struct index_t index_t;
-
-struct def {
-	term h;
-	alt **a;
-	index_t *i;
-	size_t sz, isz;
-};
-typedef struct def def;
-
-def* def_create(int_t h, size_t ar) {
-	def *d = new(def);
-	id_set_data(h, d);
-	return *d = (def){ .h = term_create(h, ar), .a = 0, .i = 0, .sz = 0, .isz = 0 }, d;
-}
-
-def* def_get(int_t h, size_t ar) {
-	def *d = id_get_data(h);
-	return d ? d : def_create(h, ar);
 }
 
 void def_print(int_t t) {
@@ -262,39 +194,40 @@ void def_print(int_t t) {
 		term_print(d->h, 0), wprintf(L": "), alt_print(d->a[n]), wprintf(L".\n");
 }
 
-
-alt* def_add_alt(def *d, alt *a) {
-	array_append(d->a, alt*, d->sz, a);
-	for (size_t k = 0, n; k < a->nterms; ++k) {
-		def *c = id_get_data(a->terms[k].r);
-		if (!c) continue;
-		const index_t i = { .d=d, .a=a, .t=k };
-		for (n = 0; n < c->isz; ++n) if (!podcmp(c->i[n], i, index_t)) break;
-		if (n == c->isz) array_append(c->i, index_t, c->isz, i);
-	}
-	return a;
-}
-
-void prog_read() {
+size_t prog_read(FILE *f) {
 	wchar_t buf[32], *all = new(wchar_t);
 	wint_t c;
 	*buf = *all = 0;
 	int_t *h;
 	size_t n;
+	const size_t pgnconsts = gnconsts;
 next:	for (n = 0; n < 31; ++n)
-		if (WEOF == (c = getwc(stdin))) break;
+		if (WEOF == (c = getwc(f))) break;
 		else buf[n] = c;
 	if (n) {
 		buf[n] = 0;
-		all = wcscat(realloc(all, sizeof(wchar_t)*(wcslen(all) + 32)), buf);
+		all = wcscat(resize(all, wchar_t, wcslen(all) + 32), buf);
 		goto next;
 	}
 	while (all) alt_read(&h, &all);
-	for (int_t n = 1; n <= gnconsts; ++n) def_print(-n);
+	prog_print(pgnconsts ? pgnconsts : 1, gnconsts);
+	return gnconsts - pgnconsts;
 }
 
-int main() {
+void prog_print(size_t from, size_t to) {
+	for (int_t n = from; (size_t)n <= to; ++n) def_print(-n);
+}
+
+size_t prog_plug(size_t src, size_t dst) {
+	if (src) return dst;
+	return 0;
+}
+
+const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";
+
+int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
-	prog_read();
+	if (argc != 3) perror(usage), exit(1);
+	prog_print(prog_plug(prog_read(fopen(argv[1], "r")), prog_read(fopen(argv[2], "r"))), gnconsts);
 	return 0;
 }
