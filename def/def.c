@@ -48,7 +48,7 @@ void alt_add_term(alt* a, term t) {
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
-//	if (v > 0) assert(v <= a->nvars);
+	if (v > 0) assert(v <= a->nvars);
 	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
 	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
 }
@@ -87,19 +87,20 @@ alt* alt_plug(alt *x, const size_t t, alt *y) {
 	alt *a = alt_create(x->hsz);
 	size_t i, n;
 	int_t j, k;
-	const size_t v0 = x->terms[t].v0, hsz = y->hsz;
+	const size_t v0 = x->terms[t].v0-1, hsz = y->hsz;
 	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
 	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
-	a->nvars = x->nvars+y->nvars+1;
-	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars+1)), x->eq, sizeof(int_t) * (x->nvars+1));
-	memset(a->eq + x->nvars + 1, 0, sizeof(int_t) *(a->nvars-x->nvars-1));
-	for (i = 1; i <= y->nvars; ++i) {
+	a->nvars = x->nvars+y->nvars+1 - hsz;
+	memcpy(a->eq=realloc(a->eq, sizeof(int_t) * (a->nvars+1-hsz)), x->eq, sizeof(int_t) * (x->nvars+1));
+	memset(a->eq + x->nvars + 1, 0, sizeof(int_t) *(a->nvars-x->nvars-1-hsz));
+	for (i = hsz; i <= y->nvars; ++i) {
 		j = alt_get_rep(y, i);
-		if (j < 0) (n = (i<hsz ? (i+v0): (i + x->nvars - hsz))), k = j;
+		if (j < 0) (n = (/*i<hsz ? (i+v0):*/ (i + x->nvars - hsz))), k = j;
 		else if (i == (size_t)j) continue;
-		else (n = (i<hsz ? (i+v0) : (i+x->nvars-hsz))), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
+		else (n = (/*i<hsz ? (i+v0) :*/ (i+x->nvars-hsz))), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz));
 		if (!alt_add_eq(a, n, k)) return alt_delete(a), (alt*)0;
 	}
+	wprintf(L"alt_plug result: "); alt_print(a), putwchar(L'\n');
 	return a;
 }
 
@@ -302,7 +303,9 @@ void prog_plug(prog s, prog d) {
 		}
 		for (n = 0; (size_t)n < dm->sz; ++n) if (dm->a[n]) alt_delete(dm->a[n]);
 		dm->a = r;
+		dm->sz = sz;
 		r = 0;
+		sz = 0;
 	}
 }
 
@@ -315,7 +318,7 @@ int main(int argc, char** argv) {
 	prog d = prog_read(fopen(argv[2], "r"));
 	prog_print(s);
 	prog_print(d);
-	prog_plug(s, d);
+	prog_plug(d, s);
 	prog_print(d);
 	return 0;
 }
