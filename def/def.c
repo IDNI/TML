@@ -177,7 +177,7 @@ void alt_print(alt* a) {
 	for (size_t n = 1; n <= a->nvars; ++n)
 		if ((k = alt_get_rep(a, n)) > 0) { if ((size_t)k != n) wprintf(L" ?%zu = ?%lu; ", n, k); }
 		else if (k < 0) wprintf(L" ?%zu = %s; ", n, str_from_id(k));
-	wprintf(L"]");
+	wprintf(L"]\n");
 }
 
 int alt_cmp(const alt *x, const alt *y) {
@@ -296,53 +296,72 @@ int main(int argc, char** argv) {
 			v0 = da->terms[t].v0, ar = da->terms[t].ar, v1 = v0 + ar - 1;
 	int_t *ssub = stack_arr(int_t, ar), *dsub = stack_arr(int_t, ar);
 	alt_deflate_print(sa);
+	alt_print(sa);
 	alt_deflate_print(da);
+	alt_print(da);
 	r = alt_create(da->r, da->hsz);
 
 	for (l = 0;	l <  dnterms;++l) if (l != (int_t)t) alt_add_term(r, da->terms[l]);
 	for (l = 0;	l <  snterms;++l) alt_add_term(r, sa->terms[l]);
+
 	for (l = v0;	l <= v1 ; ++l)
-		if ((y=alt_get_rep(da,l+1)) < 0)
+		if ((y = alt_get_rep(da, l+1)) < 0)
 			dsub[l-v0] = y;
+
 	for (l = 0;	l <  ar ; ++l)
-		if ((y=alt_get_rep(sa,l+1)) < 0)
+		if ((y = alt_get_rep(sa, l+1)) < 0 || (y > v0 && y <= v1))
 			ssub[l] = y;
-	for (;		l <= snvars; ++l)
-		if ((y=alt_get_rep(sa,l)) > 0 && y <= ar )
-			if (!ssub[y-1]) ssub[y-1] = l;
+
+	for (;		l < snvars; ++l)
+		if ((y = alt_get_rep(sa, l+1)) > 0 && y <= ar )
+			if (ssub[y-1]>=0) ssub[y-1] = l;
+
 	for (l = 1;	l <= v0;     ++l)
-		if ((y=alt_get_rep(da,l)) > v0 && y <= v1)
-			if (!dsub[y-v0-1]) dsub[y-v0-1] = l;
-	for (l = v1+2;	l <= dnvars; ++l)
-		if ((y=alt_get_rep(da,l)) > v0 && y <= v1)
-			if (!dsub[y-v0-1]) dsub[y-v0-1] = l;
+		if ((y = alt_get_rep(da, l)) > v0 && y <= v1+1)
+			if (dsub[y-v0-1]>=0) dsub[y-v0-1] = l;
+
+	for (;		l < v1+1;    ++l)
+		if ((y = alt_get_rep(da, l)) <= v0 || y > v1+1)
+			dsub[l-v0-1] = y;
+
+	for (;		l <= dnvars; ++l)
+		if ((y=alt_get_rep(da,l)) > v0 && y <= v1+1)
+			if (dsub[y-v0-1]>=0) dsub[y-v0-1] = l;
+
 	for (l = 0;	l < ar; ++l) wprintf(L"ssub %d %d\n", l, ssub[l]);
 	for (l = 0;	l < ar; ++l) wprintf(L"dsub %d %d\n", l, dsub[l]);
 
 	for (l = m = 0;	l <  v0;     ++l)
-		r->eq[m++] = 	da->eq[l] > v0 && da->eq[l] <= v1 
+		r->eq[m++] = 	da->eq[l] > v0 && da->eq[l] <= v1+1
 				? ssub[da->eq[l-v0]] ? ssub[da->eq[l-v0]]
 				: da->eq[l] : da->eq[l];
+
 	for (l = v1+1;	l <  dnvars; ++l)
-		r->eq[m++] =	da->eq[l] > v0 && da->eq[l] <= v1
+		r->eq[m++] =	da->eq[l] > v0 && da->eq[l] <= v1+1
 				? ssub[da->eq[l-v0]] ? ssub[da->eq[l-v0]]
 				: da->eq[l] : da->eq[l];
+
 	for (l = ar+1;	l <  snvars; ++l)
 		r->eq[m++] =	sa->eq[l] <= ar && sa->eq[l] > 0
 				? dsub[sa->eq[l]-1] ? dsub[sa->eq[l]-1]
-				: (sa->eq[l]+dnvars-2*ar) : (sa->eq[l]+dnvars-2*ar);
+				: sa->eq[l] < 0 ? sa->eq[l] :
+				(sa->eq[l]+dnvars-2*ar) : (sa->eq[l]+dnvars-2*ar);
+
 	for (l = v0+1;	l <= v1;     ++l)
 		if (!(y = alt_get_rep(da, l))) continue;
 		else for (m = l + 1; m <= v1; ++m)
 			if (y == alt_get_rep(da, m))
 				alt_add_eq(r, dsub[l-v0-1], dsub[m-v0-1]);
+
 	for (l = 0;	l <  ar;     ++l)
 		if (!(y = alt_get_rep(sa, l+1))) continue;
 		else for (m = l + 1; m < ar; ++m)
 			if (y == alt_get_rep(sa, m+1))
 				if (ssub[l] && ssub[m]) alt_add_eq(r, ssub[l], ssub[m]);
+
 	for (l = 0;	l < ar; ++l) if (ssub[l] && dsub[l]) alt_add_eq(r, ssub[l], dsub[l]);
 
 	alt_deflate_print(r);
+	alt_print(r);
 	}
 }
