@@ -4,9 +4,9 @@
 dict_t *dict = 0;
 stack_t *stack = 0;
 wchar_t **gconsts = 0, **gvars = 0;
-void **vardata = 0, **srcdata = 0, **dstdata = 0;
-int_t *srcs = 0, *dsts = 0;
-size_t gnconsts = 0, gnvars = 0, nsrcs = 0, ndsts = 0;
+int_t *vardata = 0;
+constdata *cdata = 0;
+size_t gnconsts = 0, gnvars = 0;
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -14,37 +14,21 @@ uint32_t hash(const wchar_t* s, size_t n) {
 	return h;
 }
 
-int32_t _str_to_id(dict_t **d, const wchar_t* s, size_t n, bool src) {
+int_t _str_to_id(dict_t **d, const wchar_t* s, size_t n) {
 	uint32_t h = hash(s, n);
-	size_t *sz;
-	wchar_t*** a;
-//	void*** data;
-	if (*s == L'?') sz = &gnvars, a = &gvars;//, data = &vardata;
-	else sz = &gnconsts, a = &gconsts;//, data = src ? &srcdata : &dstdata;
 	if (!*d) {
-		array_append(*a, const wchar_t*, *sz, s);
-		if (*s == L'?') resize(vardata, void*, gnvars), vardata[gnvars-1] = 0;
-		else resize(srcdata, void*, gnconsts), resize(dstdata, void*, gnconsts), srcdata[gnconsts-1]=dstdata[gnconsts-1]=0;
-		(*(*d = new(dict_t)) = (dict_t){ .s=s, .h=h,
-			.id = *s==L'?'?*sz:-*sz, .l=0, .r=0, .n=n });
-		return (**d).id;
-	} else if (h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n))
-		return (**d).id;
-	else return  _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n, src);
-}
-
-void stack_push(int_t s, int_t d, size_t a, size_t t) {
-	stack_t *k = new(stack_t);
-	*k = (stack_t){ .s = s, .d = d, .a = a, .t = t, .n = stack };
-	stack = k;
-}
-
-bool stack_pop(int_t *s, int_t *d, size_t *a, size_t *t) {
-	if (!stack) return false;
-	*s = stack->s, *d = stack->d, *a = stack->a, *t = stack->t;
-	stack_t *k = stack->n;
-	free(stack), stack = k;
-	return true;
+		if (*s == L'?')
+			return	array_append(gvars, const wchar_t*, gnvars, s),
+				resize(vardata, void*, gnvars), vardata[gnvars-1] = 0,
+				(*(*d = new(dict_t)) = (dict_t){ .s=s, .h=h, .id = gnvars, .l=0, .r=0, .n=n }).id;
+		else return array_append(gconsts, const wchar_t*, gnconsts, s),
+			resize(cdata, constdata, gnconsts),
+			memset(&cdata[gnconsts-1], 0, sizeof(constdata)),
+			(*(*d = new(dict_t)) = (dict_t){ .s=s, .h=h, .id = -gnconsts, .l=0, .r=0, .n=n }).id;
+	}
+	return	(h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n))
+		? (**d).id
+		: _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,19 +36,20 @@ bool stack_pop(int_t *s, int_t *d, size_t *a, size_t *t) {
 alt* alt_create(int_t r, size_t ar) {
 	alt *a = new(alt);
 	*a = (alt){ .eq = 0, .terms = 0, .nvars = ar, .nterms = 0, .hsz = ar, .r = r };
-	if (ar) a->eq=calloc(ar+1, sizeof(int_t));
+	if (ar) a->eq=calloc(ar, sizeof(int_t));
 	return a;
 }
 
 void alt_delete(alt* a) { if (!a) return; if (a->eq) free(a->eq); if (a->terms) free(a->terms); }
 
 void alt_add_term(alt* a, term t) {
-	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar+1)+a->nvars+1,0,sizeof(int_t)*t.ar);
+	if (t.ar) memset(resize(a->eq, int_t, a->nvars+t.ar)+a->nvars,0,sizeof(int_t)*t.ar);
 	array_append(a->terms, term, a->nterms, t), a->nvars += t.ar;
 }
 
 int_t alt_get_rep(alt *a, int_t v) {
 	if (v > 0) assert((size_t)v <= a->nvars);
+	else assert((size_t)-v <= gnconsts);
 	if (!a->eq || v < 0 || !a->eq[v-1]) return v;
 	if (v == a->eq[v-1]) return a->eq[v-1] = 0, v;
 	return a->eq[v-1] = alt_get_rep(a, a->eq[v-1]);
@@ -78,75 +63,54 @@ bool alt_add_eq(alt *a, int_t x, int_t y) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz, bool src) {
-	size_t i, j, r;
+alt* alt_add_raw(int_t *h, int_t **b, size_t nh, size_t nb, size_t *sz) {
+	size_t i, j;//, r;
 	int_t d, v;
 	alt *a = alt_create(*h, nh);
 	for (i = 0, v = nh; i < nb; ++i) {
 		alt_create_term(a, *b[i], sz[i], v), v += sz[i];
 		for (j = 1; j <= sz[i]; ++j)
-			if (b[i][j] > 0)
+			if (b[i][j] > 0) {
+				if (gnvars <= (size_t)b[i][j]) alloc_vardata(b[i][j]+1);
 				id_set_vardata(b[i][j], 0);
+			}
 	}
-	for (i = 1; i <= nh; ++i) if (h[i] > 0) id_set_vardata(h[i], 0);
+	for (i = 1; i <= nh; ++i)
+		if (h[i] > 0) {
+			if (gnvars <= (size_t)h[i]) alloc_vardata(h[i]+1);
+			id_set_vardata(h[i], 0);
+		}
 	for (i = 1; i <= nh; ++i)
 		if (h[i] < 0) alt_add_eq(a, i, h[i]);
 		else if ((d = (int_t)id_get_vardata(h[i]))) alt_add_eq(a, i, d);
-		else id_set_vardata(h[i], (void*)(i));
+		else id_set_vardata(h[i], i);
 	for (i = 0, v = nh+1; i < nb; ++i)
 		for (j = 1; j <= sz[i]; ++j, ++v)
 			if (b[i][j] < 0) alt_add_eq(a, v, b[i][j]);
 			else if ((d = (int_t)id_get_vardata(b[i][j]))) alt_add_eq(a, v, d);
-			else id_set_vardata(b[i][j], (void*)v);
-	r = def_add_alt(def_get(*h, nh, src), a);
-	for (i = 0; i < a->nterms; ++i)
-		for (j = 0; j < nsrcs; ++j)
-			if (srcs[j] == a->terms[i].r)
-				stack_push(srcs[j], *h, r, i);
-	return def_get(*h, nh, src)->a[r];
-}
-
-alt* alt_plug(alt *x, const size_t t, alt *y) {
-	if (!x || !y) return 0;
-	wprintf(L"alt_plug x: "), alt_deflate_print(x), putwchar(L'\n');
-	wprintf(L"alt_plug y: "), alt_deflate_print(y), putwchar(L'\n');
-	alt *a = alt_create(x->r, x->hsz);
-	size_t i, n;
-	int_t j, k;
-	const size_t v0 = x->terms[t].v0, hsz = y->hsz;
-	for (i=0; i<x->nterms; ++i) if (i != t)	alt_add_term(a, x->terms[i]);
-	for (i=0; i<y->nterms; ++i)		alt_add_term(a, y->terms[i]);
-	assert(a->nvars == x->nvars+y->nvars-hsz*2);
-//	for (i = 1; i <= x->nvars; ++i) alt_add_eq(a, i, alt_get_rep(x, i < v0 ? i : i + a->terms[t].ar
-	memcpy(a->eq, x->eq + x->hsz, sizeof(int_t) * (x->nvars-x->hsz));
-	memset(a->eq + x->nvars - x->hsz, 0, sizeof(int_t) * (a->nvars-x->nvars+x->hsz));
-	for (i = 1; i <= y->nvars; ++i) {
-		if ((j = alt_get_rep(y, i)) < 0) n = i + x->nvars - hsz*2, k = j;
-		else if (i == (size_t)j) continue;
-		else (n = i+x->nvars-hsz*2), (k = j<(int_t)hsz ? (j+v0) : (j+x->nvars-hsz*2));
-		if (!alt_add_eq(a, n, k)) return wprintf(L"alt_plug failed\n"), alt_delete(a), (alt*)0;
-	}
-	wprintf(L"alt_plug result: "), alt_deflate_print(a), putwchar(L'\n');
+			else id_set_vardata(b[i][j], v);
 	return a;
+//	r = def_add_alt(def_get(*h, nh, src), a);
+//	return def_get(*h, nh, src)->a[r];
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def* def_create(int_t h, size_t ar, bool src) {
 	def *d = new(def);
-	if (src) id_set_src(h, d);
-	else id_set_dst(h, d);
+	if (src) id_get_cdata(h).src = d;
+	else id_get_cdata(h).dst = d;
 	return *d = (def){ .h = term_create(h, ar, 0), .a = 0, .sz = 0 }, d;
 }
 
 def* def_get(int_t h, size_t ar, bool src) {
-	def *d = src ? id_get_src(h) : id_get_dst(h);
+	def *d = src ? id_get_cdata(h).src : id_get_cdata(h).dst;
 	return d ? d : def_create(h, ar, src);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-wchar_t* str_read(int_t *r, wchar_t *in, bool src) {
+wchar_t* str_read(int_t *r, wchar_t *in) {
 	wchar_t *s = in;
 	while (*s && iswspace(*s)) ++s;
 	if (!*s) return 0;
@@ -154,15 +118,15 @@ wchar_t* str_read(int_t *r, wchar_t *in, bool src) {
 	if (*t == L'?') ++t;
 	while (iswalnum(*t)) ++t;
 	if (t == s) return 0;
-	*r = str_to_id(s, t - s, src);
+	*r = str_to_id(s, t - s);
 	while (iswspace(*t)) ++t;
 	return t;
 }
 
-int_t* term_read(size_t *sz, wchar_t **in, bool src) {
+int_t* term_read(size_t *sz, wchar_t **in) {
 	int_t x, *t = 0;
 	*sz = 0;
-	while ((*in = str_read(&x, *in, src))) {
+	while ((*in = str_read(&x, *in))) {
 		array_append(t, int_t, *sz, x);
 		if (!iswalnum(**in) && **in != L'?') return --*sz, t;
 	}
@@ -183,21 +147,20 @@ void term_print(const term t, size_t v) {
 	for (size_t n = 1; n <= t.ar; ++n) wprintf(L" ?%zu", n + v);
 }
 
-alt* alt_read(int_t **h, wchar_t **in, bool src) {
+alt* alt_read(wchar_t **in) {
 	if (!*in) return 0;
-	int_t **b = 0, *t;
+	int_t **b = 0, *h = 0, *t;
 	size_t nb = 0, nsz = 0, *sz = 0, nh = 0, s;
-	if (!(*h = term_read(&nh, in, src))) return 0;
-	if (src) array_append(srcs, int_t, nsrcs, **h);
-	else array_append(dsts, int_t, ndsts, **h);
-	if (**in == L'.') return ++*in, alt_add_raw(*h, 0, nh, 0, 0, src);
+	if (!(h = term_read(&nh, in))) return 0;
+//	if (src) array_append(srcs, int_t, nsrcs, *h); else array_append(dsts, int_t, ndsts, *h);
+	if (**in == L'.') return ++*in, alt_add_raw(h, 0, nh, 0, 0);
 	else if (*((*in)++) != L':') perror("':' expected\n"), exit(1);
-	while ((t = term_read(&s, in, src))) {
+	while ((t = term_read(&s, in))) {
 		if (	array_append(b, int_t*, nb, t),
 			array_append(sz, size_t, nsz, s),
 			**in != L',') {
 				if (*((*in)++) != L'.') perror("'.' expected\n"), exit(1);
-				return alt_add_raw(*h, b, nh, nb, sz, src);
+				return alt_add_raw(h, b, nh, nb, sz);
 			}
 		else ++*in;
 	}
@@ -242,19 +205,17 @@ size_t def_add_alt(def *d, alt *a) {
 }
 
 void def_print(int_t t, bool src) {
-	def *d = src ? id_get_src(t) : id_get_dst(t);
+	def *d = src ? id_get_cdata(t).src : id_get_cdata(t).dst;
 	if (!d) return;
 	for (size_t n = 0; n < d->sz; ++n)
 		term_print(d->h, 0), wprintf(L": "), alt_print(d->a[n]), wprintf(L".\n");
 }
 
-prog prog_read(FILE *f, bool src) {
+wchar_t* file_read_text(FILE *f) {
 	wchar_t *all = new(wchar_t), buf[32];
 	wint_t c;
 	*buf = *all = 0;
-	int_t *h;
 	size_t n, l;
-	const size_t pgnconsts = gnconsts;
 	bool skip = false;
 next:	for (n = l = 0; n < 31; ++n)
 		if (WEOF == (c = getwc(f))) { skip = false; break; }
@@ -266,8 +227,7 @@ next:	for (n = l = 0; n < 31; ++n)
 		all = wcscat(resize(all, wchar_t, wcslen(all) + 32), buf);
 		goto next;
 	} else if (skip) goto next;
-	while (all) alt_read(&h, &all, src);
-	return prog_create(pgnconsts ? pgnconsts : 1, gnconsts);
+	return all;
 }
 
 void alt_deflate(alt *a, int_t **h, int_t ***b, size_t **sz, size_t *nb, size_t *nh) {
@@ -311,35 +271,78 @@ void def_deflate_print(def *d) {
 	for (size_t n = 0; n < d->sz; ++n) alt_deflate_print(d->a[n]);
 }
 
-void prog_print() {
-	def *d;
-	for (size_t n = 0; n < ndsts; ++n) if ((d = id_get_dst(dsts[n]))) def_deflate_print(d);
-	putwchar(L'\n');
-}
-
-void prog_plug() {
-	int_t s, d;
-	size_t a, t, i;
-	def *ds, *dd;
-	alt *ad, *r;
-	while (stack_pop(&s, &d, &a, &t)) {
-		ds = id_get_src(s), dd = id_get_dst(d);
-		if (!(ad = dd->a[a])) continue;
-		for (i = 0; i < ds->sz; ++i)
-			if ((r = alt_plug(ad, t, ds->a[i])))
-				def_add_alt(dd, r);
-		alt_delete(dd->a[a]), dd->a[a] = 0;
-	}
-}
-
 const char usage[] = "Usage: <src filename> <dst filename>\nWill output the program after plugging src into dst.\n)";
 
 int main(int argc, char** argv) {
+	int_t y, l, m;
+	size_t n, k, t, nd, ns, nsrc = 0, ndst = 0;
+	//def *ds, *dd;
+	alt *r, **src = 0, **dst = 0;
+	wchar_t *all;
+
 	setlocale(LC_CTYPE, "");
 	if (argc != 3) perror(usage), exit(1);
-	prog s = prog_read(fopen(argv[1], "r"), true);
-	prog d = prog_read(fopen(argv[2], "r"), false);
-	prog_plug();
-	prog_print();
-	return 0;
+	for (all = file_read_text(fopen(argv[1], "r")); all;) if ((r = alt_read(&all))) array_append(src, alt*, nsrc, r);
+	for (all = file_read_text(fopen(argv[2], "r")); all;) if ((r = alt_read(&all))) array_append(dst, alt*, ndst, r);
+
+	t = k = n = nd = ns = 0;
+	for (nd = 0; nd < ndst; ++nd)
+	for (t = 0; t < dst[nd]->nterms; ++t)
+	for (ns = 0; ns < nsrc; ++ns) {
+	if (dst[nd]->terms[t].r != src[ns]->r || dst[nd]->terms[t].ar != src[ns]->hsz) continue;
+	alt		*da = dst[nd], *sa = src[ns];//dd->a[j], *sa = ds->a[n];
+	const int_t	dnterms = da->nterms, snterms = sa->nterms,
+			dnvars = da->nvars, snvars = sa->nvars,
+			v0 = da->terms[t].v0, ar = da->terms[t].ar, v1 = v0 + ar - 1;
+	int_t *ssub = stack_arr(int_t, ar), *dsub = stack_arr(int_t, ar);
+	alt_deflate_print(sa);
+	alt_deflate_print(da);
+	r = alt_create(da->r, da->hsz);
+
+	for (l = 0;	l <  dnterms;++l) if (l != (int_t)t) alt_add_term(r, da->terms[l]);
+	for (l = 0;	l <  snterms;++l) alt_add_term(r, sa->terms[l]);
+	for (l = v0;	l <= v1 ; ++l)
+		if ((y=alt_get_rep(da,l+1)) < 0)
+			dsub[l-v0] = y;
+	for (l = 0;	l <  ar ; ++l)
+		if ((y=alt_get_rep(sa,l+1)) < 0)
+			ssub[l] = y;
+	for (;		l <= snvars; ++l)
+		if ((y=alt_get_rep(sa,l)) > 0 && y <= ar )
+			if (!ssub[y-1]) ssub[y-1] = l;
+	for (l = 1;	l <= v0;     ++l)
+		if ((y=alt_get_rep(da,l)) > v0 && y <= v1)
+			if (!dsub[y-v0-1]) dsub[y-v0-1] = l;
+	for (l = v1+2;	l <= dnvars; ++l)
+		if ((y=alt_get_rep(da,l)) > v0 && y <= v1)
+			if (!dsub[y-v0-1]) dsub[y-v0-1] = l;
+	for (l = 0;	l < ar; ++l) wprintf(L"ssub %d %d\n", l, ssub[l]);
+	for (l = 0;	l < ar; ++l) wprintf(L"dsub %d %d\n", l, dsub[l]);
+
+	for (l = m = 0;	l <  v0;     ++l)
+		r->eq[m++] = 	da->eq[l] > v0 && da->eq[l] <= v1 
+				? ssub[da->eq[l-v0]] ? ssub[da->eq[l-v0]]
+				: da->eq[l] : da->eq[l];
+	for (l = v1+1;	l <  dnvars; ++l)
+		r->eq[m++] =	da->eq[l] > v0 && da->eq[l] <= v1
+				? ssub[da->eq[l-v0]] ? ssub[da->eq[l-v0]]
+				: da->eq[l] : da->eq[l];
+	for (l = ar+1;	l <  snvars; ++l)
+		r->eq[m++] =	sa->eq[l] <= ar && sa->eq[l] > 0
+				? dsub[sa->eq[l]-1] ? dsub[sa->eq[l]-1]
+				: (sa->eq[l]+dnvars-2*ar) : (sa->eq[l]+dnvars-2*ar);
+	for (l = v0+1;	l <= v1;     ++l)
+		if (!(y = alt_get_rep(da, l))) continue;
+		else for (m = l + 1; m <= v1; ++m)
+			if (y == alt_get_rep(da, m))
+				alt_add_eq(r, dsub[l-v0-1], dsub[m-v0-1]);
+	for (l = 0;	l <  ar;     ++l)
+		if (!(y = alt_get_rep(sa, l+1))) continue;
+		else for (m = l + 1; m < ar; ++m)
+			if (y == alt_get_rep(sa, m+1))
+				if (ssub[l] && ssub[m]) alt_add_eq(r, ssub[l], ssub[m]);
+	for (l = 0;	l < ar; ++l) if (ssub[l] && dsub[l]) alt_add_eq(r, ssub[l], dsub[l]);
+
+	alt_deflate_print(r);
+	}
 }
