@@ -158,11 +158,9 @@ bool clause_compute_dst_term(const term ts, const term td, const term s, term *d
 	for (size_t n = 1, k; n <= s.ar; ++n) {
 		for (k = 1; k <= td.ar; ++k)
 			if (td.t[k] != s.t[n] || ts.t[k] > 0) continue;
-			else {
-				if (td.t[k] < 0 && td.t[k] != ts.t[k]) return false;
-				d->t[n] = ts.t[k];
-				break;
-			}
+			else if (td.t[k] < 0 && td.t[k] != ts.t[k]) return false;
+			else { 	d->t[n] = ts.t[k];
+				break; }
 		if (k == td.ar + 1) d->t[n] = s.t[n];
 	}
 	*d->t = *s.t;
@@ -173,15 +171,11 @@ bool clause_compute_src_term(const term ts, const term td, const term s, term *d
 	d->t = realloc(d->t, sizeof(int_t) * ((d->ar = s.ar) + 1));
 	*d->t = *s.t;
 	for (size_t n = 1, k; n <= s.ar; ++n) {
-		for (k = 1; k <= td.ar; ++k) {
+		for (k = 1; k <= td.ar; ++k)
 			if (td.t[k] != s.t[n]) continue;
-			else {
-				if (ts.t[k] < 0 && td.t[k] < 0 && td.t[k] != ts.t[k])
-					return false;
-				d->t[n] = ts.t[k];
-				break;
-			}
-		}
+			else if (ts.t[k] < 0 && td.t[k] < 0 && td.t[k] != ts.t[k]) return false;
+			else {	d->t[n] = ts.t[k];
+				break; }
 		if (k == td.ar + 1) d->t[n] = s.t[n];
 	}
 	return true;
@@ -205,40 +199,36 @@ int main(int argc, char** argv) {
 	const size_t rlen = mbstowcs(0, argv[1], 0);
 	if (rlen == (size_t)-1) perror("Unable to read the input relation symbol."), exit(1);
 
-	wchar_t rsym[rlen+1];
+	bool b;
+	clause c, d, *srcpos = 0, *srcneg = 0;
+	size_t nsrcpos = 0, nsrcneg = 0, *srcposterm = 0, *srcnegterm = 0, n, k;
+	wchar_t rsym[rlen+1], *all;
 	mbstowcs(rsym, argv[1], rlen);
 	rsym[rlen] = 0;
 	int_t r = str_to_id(rsym, rlen);
 
-	clause c, d, *srcpos = 0, *srcneg = 0;
-	size_t nsrcpos = 0, nsrcneg = 0, *srcposterm = 0, *srcnegterm = 0, n, k;
-	wchar_t *all;
-	for (all = file_read_text(fopen(argv[2], "r")); all;)
-		if ((c = clause_read(&all)).terms) {
-			bool b = false;
-			for (n = 0; n < c.sz; ++n)
-				if (*c.terms[n].t == r)
-					b = array_append2(srcpos, clause, srcposterm, size_t, nsrcpos, c, n);
-				else if (-*c.terms[n].t == r)
-					b = array_append2(srcneg, clause, srcnegterm, size_t, nsrcneg, c, n);
-			if (!b) clause_print(c);
-		}
-	for (all = file_read_text(fopen(argv[3], "r")); all;)
-		if ((c = clause_read(&all)).terms) {
-			bool b = false;
-			for (n = 0; n < c.sz; ++n)
-				if (*c.terms[n].t == r) {
-					b = true;
-					for (k = 0; k < nsrcneg; ++k)
-						if ((d = clause_plug(c, n, srcneg[k], srcnegterm[k])).terms)
-							clause_print(d);
-				} else if (-*c.terms[n].t == r) {
-					b = true;
-					for (k = 0; k < nsrcpos; ++k)
-						if ((d = clause_plug(srcpos[k], srcposterm[k], c, n)).terms)
-							clause_print(d);
-				}
-			if (!b) clause_print(c);
-		}
+	if (!(all = file_read_text(fopen(argv[2], "r")))) perror("Unable to read src file."), exit(1);
+	while ((c = clause_read(&all)).terms) {
+		for (b = false, n = 0; n < c.sz; ++n)
+			if (*c.terms[n].t == r)
+				array_append2(srcpos, clause, srcposterm, size_t, nsrcpos, c, n), b = true;
+			else if (-*c.terms[n].t == r)
+				array_append2(srcneg, clause, srcnegterm, size_t, nsrcneg, c, n), b = true;
+		if (!b) clause_print(c);
+	}
+
+	if (!(all = file_read_text(fopen(argv[3], "r")))) perror("Unable to read dst file."), exit(1);
+	while ((c = clause_read(&all)).terms) {
+		for (b = false, n = 0; n < c.sz; ++n)
+			if (*c.terms[n].t == r) {
+				for (b = true, k = 0; k < nsrcneg; ++k)
+					if ((d = clause_plug(c, n, srcneg[k], srcnegterm[k])).terms)
+						clause_print(d);
+			} else if (-*c.terms[n].t == r)
+				for (b = true, k = 0; k < nsrcpos; ++k)
+					if ((d = clause_plug(srcpos[k], srcposterm[k], c, n)).terms)
+						clause_print(d);
+		if (!b) clause_print(c);
+	}
 	return 0;
 }
