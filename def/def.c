@@ -22,7 +22,6 @@
 		"Will output the program after plugging src into dst.\n)"
 typedef const wchar_t* ws;
 
-
 struct dict_t { // used to store unique strings, map them to ids, and map to ids to general purpose void*
 	const wchar_t* s;	// ptr to the string's beginning
 	uint32_t h;		// hash
@@ -90,7 +89,8 @@ void id_print(int_t n) {
 }
 
 void term_print(const term t) {
-	for (size_t n = 0; n <= t.ar; ++n) id_print(t.t[n]), putwchar(L' ');
+	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L' ');
+	for (size_t n = 1; n <= t.ar; ++n) id_print(t.t[n]), putwchar(L' ');
 }
 
 clause clause_read(wchar_t **in) {
@@ -155,23 +155,25 @@ bool clause_add_term(clause *c, const term t) {
 
 bool clause_compute_dst_term(const term ts, const term td, const term s, term *d) {
 	d->t = realloc(d->t, sizeof(int_t) * ((d->ar = s.ar) + 1));
-	for (size_t n = 1, k; n <= s.ar + 1; ++n) {
-		for (k = 1; k <= td.ar + 1; ++k)
+	for (size_t n = 1, k; n <= s.ar; ++n) {
+		for (k = 1; k <= td.ar; ++k)
 			if (td.t[k] != s.t[n] || ts.t[k] > 0) continue;
 			else {
 				if (td.t[k] < 0 && td.t[k] != ts.t[k]) return false;
 				d->t[n] = ts.t[k];
 				break;
 			}
-		if (k == td.ar+1) d->t[n] = td.t[n];
+		if (k == td.ar + 1) d->t[n] = s.t[n];
 	}
+	*d->t = *s.t;
 	return true;
 }
 
 bool clause_compute_src_term(const term ts, const term td, const term s, term *d) {
 	d->t = realloc(d->t, sizeof(int_t) * ((d->ar = s.ar) + 1));
-	for (size_t n = 1, k; n <= s.ar + 1; ++n) {
-		for (k = 1; k <= td.ar + 1; ++k)
+	*d->t = *s.t;
+	for (size_t n = 1, k; n <= s.ar; ++n) {
+		for (k = 1; k <= td.ar; ++k) {
 			if (td.t[k] != s.t[n]) continue;
 			else {
 				if (ts.t[k] < 0 && td.t[k] < 0 && td.t[k] != ts.t[k])
@@ -179,7 +181,8 @@ bool clause_compute_src_term(const term ts, const term td, const term s, term *d
 				d->t[n] = ts.t[k];
 				break;
 			}
-		if (k == td.ar+1) d->t[n] = td.t[n];
+		}
+		if (k == td.ar + 1) d->t[n] = s.t[n];
 	}
 	return true;
 }
@@ -191,7 +194,7 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 		if (n != td && clause_compute_dst_term(s.terms[ts], d.terms[td], d.terms[n], &t))
 			clause_add_term(&r, t), t.t = 0;
 	for (size_t n = 0; n < s.sz; ++n)
-		if (n != ts && clause_compute_dst_term(d.terms[td], s.terms[ts], s.terms[n], &t))
+		if (n != ts && clause_compute_src_term(d.terms[td], s.terms[ts], s.terms[n], &t))
 			clause_add_term(&r, t), t.t = 0;
 	return r;
 }
@@ -207,12 +210,12 @@ int main(int argc, char** argv) {
 	int_t r = str_to_id(rsym, rlen);
 
 	clause c, d, *srcpos = 0, *srcneg = 0;
-	size_t nsrcpos = 0, nsrcneg = 0, *srcposterm = 0, *srcnegterm = 0;
+	size_t nsrcpos = 0, nsrcneg = 0, *srcposterm = 0, *srcnegterm = 0, n, k;
 	wchar_t *all;
 	for (all = file_read_text(fopen(argv[2], "r")); all;)
 		if ((c = clause_read(&all)).terms) {
 			bool b = false;
-			for (size_t n = 0; n < c.sz; ++n)
+			for (n = 0; n < c.sz; ++n)
 				if (*c.terms[n].t == r)
 					b = array_append2(srcpos, clause, srcposterm, size_t, nsrcpos, c, n);
 				else if (-*c.terms[n].t == r)
@@ -222,15 +225,15 @@ int main(int argc, char** argv) {
 	for (all = file_read_text(fopen(argv[3], "r")); all;)
 		if ((c = clause_read(&all)).terms) {
 			bool b = false;
-			for (size_t n = 0; n < c.sz; ++n)
+			for (n = 0; n < c.sz; ++n)
 				if (*c.terms[n].t == r) {
 					b = true;
-					for (size_t k = 0; k < nsrcneg; ++k)
+					for (k = 0; k < nsrcneg; ++k)
 						if ((d = clause_plug(c, n, srcneg[k], srcnegterm[k])).terms)
 							clause_print(d);
 				} else if (-*c.terms[n].t == r) {
 					b = true;
-					for (size_t k = 0; k < nsrcpos; ++k)
+					for (k = 0; k < nsrcpos; ++k)
 						if ((d = clause_plug(srcpos[k], srcposterm[k], c, n)).terms)
 							clause_print(d);
 				}
