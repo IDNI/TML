@@ -103,8 +103,8 @@ next:	t = term_read(in);
 	if (!t.t) return c;
 	if (neg) *t.t = -*t.t;
 	if (!clause_add_term(&c, t)) return clause_clear(c), c;
-	if (**in == L',' && (++*in, t = term_read(in)).t) goto next;
-	if (**in == L'.') return clause_print(c), ++*in, c;
+	if (**in == L',' && ++*in) goto next;
+	if (**in == L'.') return ++*in, c;
 	if (**in == L':') { neg = true; ++*in; goto next; }
 	if (*((*in)++) != (neg ? L':' : L'.')) perror("Term or ':' or ',' or '.' expected\n"), exit(1);
 	return c;
@@ -131,19 +131,19 @@ next:	for (n = l = 0; n < 31; ++n)
 
 void clause_print(clause a) {
 	if (!a.terms) return;
-	size_t n, k = 0;
+	size_t n, k = 0, lp, ln;
+	for (n = 0; n < a.sz; ++n)
+		if (*a.terms[n].t > 0) lp = n;
+		else ln = n;
 	for (n = 0; n < a.sz; ++n)
 		if (*a.terms[n].t < 0)
-			term_print(a.terms[n]), putwchar(L','), ++k;
-	if (k == a.sz) return;
-	putwchar(L':');
-	for (n = 0; n < a.sz; ++n)
-		if (*a.terms[n].t > 0) {
-			*a.terms[n].t = -*a.terms[n].t;
-			term_print(a.terms[n]), putwchar(L',');
-			*a.terms[n].t = -*a.terms[n].t;
-		}
-	wprintf(L".\n");
+			term_print(a.terms[n]), wprintf(n == ln ? k == a.sz ? L".\n" : L" : " : L", "), ++k;
+	if (k != a.sz)
+		for (n = 0; n < a.sz; ++n)
+			if (*a.terms[n].t > 0)
+				(*a.terms[n].t = -*a.terms[n].t),
+				term_print(a.terms[n]), wprintf(n == lp ? L".\n" : L", "),
+				(*a.terms[n].t = -*a.terms[n].t);
 }
 
 bool clause_add_term(clause *c, const term t) {
