@@ -37,6 +37,7 @@ typedef struct dict_t dict_t;
 wchar_t **gconsts = 0, **gvars = 0;
 size_t gnconsts = 0, gnvars = 0;
 bool clause_add_term(clause *c, const term t);
+void clause_print(clause a);
 
 uint32_t hash(const wchar_t* s, size_t n) {
 	uint32_t h = 1;
@@ -96,16 +97,16 @@ void term_print(const term t) {
 clause clause_read(wchar_t **in) {
 	clause c = (clause){.terms=0,.sz=0};
 	if (!*in) return c;
-	term t = term_read(in);
+	bool neg = false;
+	term t;
+next:	t = term_read(in);
 	if (!t.t) return c;
-	do { clause_add_term(&c, t); } while (**in == L',' && (t = term_read(in)).t);
-	if (**in == L'.') return ++*in, c;
-	if (*((*in)++) != L':') perror("Term or ':' or ',' or '.' expected\n"), exit(1);
-	t = term_read(in);
-	if (!t.t) return clause_clear(c), c;
-	do { if (*t.t = -*t.t, !clause_add_term(&c, t)) return clause_clear(c), c;
-	} while (*((*in)++) == L',' && (t = term_read(in)).t);
-	if (*((*in)-1) != L'.') perror("Term or ',' or '.' expected\n"), exit(1);
+	if (neg) *t.t = -*t.t;
+	if (!clause_add_term(&c, t)) return clause_clear(c), c;
+	if (**in == L',' && (++*in, t = term_read(in)).t) goto next;
+	if (**in == L'.') return clause_print(c), ++*in, c;
+	if (**in == L':') { neg = true; ++*in; goto next; }
+	if (*((*in)++) != (neg ? L':' : L'.')) perror("Term or ':' or ',' or '.' expected\n"), exit(1);
 	return c;
 }
 
