@@ -205,8 +205,9 @@ int main(int argc, char** argv) {
 	const size_t rlen = mbstowcs(0, argv[1], 0);
 	if (rlen == (size_t)-1) perror("Unable to read the input relation symbol."), exit(1);
 
-	wchar_t rsym[rlen];
+	wchar_t rsym[rlen+1];
 	mbstowcs(rsym, argv[1], rlen);
+	rsym[rlen] = 0;
 	int_t r = str_to_id(rsym, rlen);
 
 	clause c, d, *srcpos = 0, *srcneg = 0;
