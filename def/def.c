@@ -9,55 +9,51 @@
 #include <assert.h>
 
 #define int_t				intptr_t
-#define INT_T_ERR			((int_t)-1)
 #define new(x)				((x*)malloc(sizeof(x)))
+#define VOID				((size_t)(-1))
 #define resize(x,t,l)			((t*)((x)=realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)	(++l, (((t*)resize(a, t, l))[l-1] = (x)))
-#define array_append2(a,t,b,s,l,x,y)	(++l, (((t*)resize(a, t, l))[l-1] = (x)), (((s*)resize(b, s, l))[l-1] = (y)))
+#define array_append2(a,t,b,s,l,x,y)	(array_append(a, t, l, x), (((s*)resize(b, s, l))[l-1] = (y)))
 #define same_term(x, y)			((x).ar == (y).ar && !memcmp((x).t, (y).t, sizeof(int_t)*((x).ar+1)))
-#define str_from_id(id)			(id < 0 ? gconsts[-id-1] : gvars[id-1])
-#define str_to_id(s, n)			_str_to_id(&dict, s, n)
+#define str_from_id(id)			(id < 0 ? labels[-id-1].s : labels[id-1].s)
+#define str_to_id(s, n)			_str_to_id(s, n)
 #define clause_clear(c)			((c).terms ? free((c).terms), (c).terms=0, (c).sz=0 : 0)
+#define string_append(x, y)		resize(x, wchar_t, wcslen(x)+wcslen(y)+1), wcscat(x, y)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 typedef const wchar_t* ws;
 
-struct dict_t { // used to store unique strings, map them to ids, and map to ids to general purpose void*
-	const wchar_t* s;	// ptr to the string's beginning
-	uint32_t h;		// hash
-	int32_t id;		// given id, positive for vars, negative for consts
-	size_t n;		// length of the string
-	struct dict_t *l, *r;	// next in hashtable
-} *dict = 0;
+typedef struct	{ int_t *t;	size_t ar;			 } term;
+typedef struct	{ term *terms;	size_t sz;			 } clause;
+typedef struct	{ int32_t id;	size_t n, l, r; ws s; uint32_t h;} dict_t;
 
-typedef struct { int_t *t;	size_t ar;	} term;
-typedef struct { term *terms;	size_t sz;	} clause;
+size_t nlabels = 0;
+dict_t dict = {.id=0, .n=0,.r=0,.l=0,.h=0,.s=0};
+dict_t *labels = 0;
 
-typedef struct dict_t dict_t;
-wchar_t **gconsts = 0, **gvars = 0;
-size_t gnconsts = 0, gnvars = 0;
-bool clause_add_term(clause *c, const term t);
-void clause_print(clause a);
-
-uint32_t hash(const wchar_t* s, size_t n) {
+uint32_t hash(ws s, size_t n) {
 	uint32_t h = 1;
 	while (n--) h *= 1 + *s * __builtin_bswap32(*s), ++s;
 	return h;
 }
 
-int_t _str_to_id(dict_t **d, const wchar_t* s, size_t n) {
+int_t _str_to_id(ws s, size_t n) {
 	uint32_t h = hash(s, n);
-	if (!*d) {
-		if (*s == L'?')
-			return	array_append(gvars, const wchar_t*, gnvars, s),
-				(*(*d = new(dict_t)) =
-					(dict_t){.s=s,.h=h,.id = gnvars,.l=0,.r=0,.n=n }).id;
-		else return array_append(gconsts, const wchar_t*, gnconsts, s),
-			(*(*d = new(dict_t)) =
-			 	(dict_t){.s=s,.h=h,.id=*s==L'~'?gnconsts:-gnconsts,.l=0,.r=0,.n=n}).id;
+	if (!nlabels) goto create;
+	dict_t *d = labels;
+	int_t id;
+try:	if (h == d->h && n == d->n && !wcsncmp(d->s, s, n)) return d->id;
+	if (d->h < h) {
+		if (d->l == VOID) { d->l = nlabels; goto create; }
+		d = &labels[d->l];
+		goto try;
 	}
-	return	(h == (**d).h && n == (**d).n && !wmemcmp((**d).s, s, n))
-		? (**d).id : _str_to_id((**d).h < h ? &(**d).l : &(**d).r, s, n);
+	if (d->r == VOID) { d->r = nlabels; goto create; }
+	d = &labels[d->r];
+	goto try;
+create:	id = (*s == L'?' ? nlabels+1 : -nlabels-1);
+	array_append(labels,dict_t,nlabels,((dict_t){.s=s,.h=h,.id=id,.l=VOID,.r=VOID,.n=n }));
+	return id;
 }
 
 wchar_t* str_read(int_t *r, wchar_t *in) {
@@ -83,15 +79,20 @@ term term_read(wchar_t **in) {
 
 void id_print(int_t n) {
 	if (n > 0) wprintf(L"?%d", n);
-	else {
-		const wchar_t *s = str_from_id(n);
-		while (iswalnum(*s)) putwchar(*s++);
-	}
+	else for (ws s = str_from_id(n); iswalnum(*s);) putwchar(*s++);
 }
 
 void term_print(const term t) {
 	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L' ');
 	for (size_t n = 1; n <= t.ar; ++n) id_print(t.t[n]), putwchar(L' ');
+}
+
+bool clause_add_term(clause *c, const term t) {
+	if (c->terms)
+		for (term *x = &c->terms[0]; x != &c->terms[c->sz]; ++x)// += sizeof(term))
+			if (same_term(*x, t))
+				return -*t.t == *x->t;
+	return array_append(c->terms, term, c->sz, t), true;
 }
 
 clause clause_read(wchar_t **in) {
@@ -144,14 +145,6 @@ void clause_print(clause a) {
 				(*a.terms[n].t = -*a.terms[n].t),
 				term_print(a.terms[n]), wprintf(n == lp ? L".\n" : L", "),
 				(*a.terms[n].t = -*a.terms[n].t);
-}
-
-bool clause_add_term(clause *c, const term t) {
-	if (c->terms)
-		for (term *x = &c->terms[0]; x != &c->terms[c->sz]; ++x)// += sizeof(term))
-			if (same_term(*x, t))
-				return -*t.t == *x->t;
-	return array_append(c->terms, term, c->sz, t), true;
 }
 
 bool clause_compute_dst_term(const term ts, const term td, const term s, term *d) {
@@ -210,6 +203,7 @@ int main(int argc, char** argv) {
 
 	if (!(all = file_read_text(fopen(argv[2], "r")))) perror("Unable to read src file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
+		clause_print(c);
 		for (b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r)
 				array_append2(srcpos, clause, srcposterm, size_t, nsrcpos, c, n), b = true;
