@@ -15,7 +15,6 @@
 #define array_append(a, t, l, x)	(++l, (((t*)resize(a, t, l))[l-1] = (x)))
 #define array_append2(a,t,b,s,l,x,y)	(++l, (((t*)resize(a, t, l))[l-1] = (x)), (((s*)resize(b, s, l))[l-1] = (y)))
 #define same_term(x, y)			((x).ar == (y).ar && !memcmp((x).t, (y).t, sizeof(int_t)*((x).ar+1)))
-//#define term_create(_t, _ar) 		((term){.t=_t, .ar=_ar})
 #define str_from_id(id)			(id < 0 ? gconsts[-id-1] : gvars[id-1])
 #define str_to_id(s, n)			_str_to_id(&dict, s, n)
 #define clause_clear(c)			((c).terms ? free((c).terms), (c).terms=0, (c).sz=0 : 0)
@@ -227,7 +226,12 @@ int main(int argc, char** argv) {
 				if (*c.terms[n].t == r) {
 					b = true;
 					for (size_t k = 0; k < nsrcneg; ++k)
-						if ((d = clause_plug(srcneg[k], srcnegterm[k], c, n)).terms)
+						if ((d = clause_plug(c, n, srcneg[k], srcnegterm[k])).terms)
+							clause_print(d);
+				} else if (-*c.terms[n].t == r) {
+					b = true;
+					for (size_t k = 0; k < nsrcpos; ++k)
+						if ((d = clause_plug(srcpos[k], srcposterm[k], c, n)).terms)
 							clause_print(d);
 				}
 			if (!b) clause_print(c);
