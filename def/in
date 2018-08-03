@@ -1,4 +1,0 @@
-a ?x ?y: b ?x 1, c 2 ?y.
-a: b c.
-a: b, c.
-a: b.

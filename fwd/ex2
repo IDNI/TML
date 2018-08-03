@@ -1,8 +1,0 @@
-if a then b
-if b then c.
-if c then d.
-if d then not c
-if d then not d
-if c then not b
-a
-run
