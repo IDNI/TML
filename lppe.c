@@ -1,3 +1,4 @@
+// logic-programs partial-evaluator
 #include <string.h>
 #include <stdio.h>
 #include <wctype.h>
