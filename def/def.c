@@ -26,7 +26,7 @@
 #define var_clear_rep(v) \
 	((nlabels<(size_t)v?(nlabels=v),resize(labels,dict_t,v):0),labels[v-1].p=0);
 #define memdup(x, t, sz)	memcpy(malloc(sizeof(t)*(sz)),x,sizeof(t)*(sz))
-#define term_dup(x)		(term){.t=memdup(x.t,int_t,x.ar+1),.ar=x.ar}
+#define term_dup(x)		(term){.t=memdup((x).t,int_t,(x).ar+1),.ar=(x).ar}
 #define clause_add_new_term(c, t) clause_add_term(c, term_dup(t))
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
@@ -39,6 +39,8 @@ typedef struct	{ int32_t id;	size_t n,l,r; ws s; uint32_t h; int_t p;}
 
 dict_t *labels = 0;
 size_t nlabels = 0;
+
+void clause_print(const clause a);
 
 uint32_t hash(ws s, size_t n) {
 	uint32_t h = 1;
@@ -206,17 +208,15 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars);
 	clause_reset_vars(s), clause_reset_vars(d);
-	wprintf(L"plug ts=%d src: ", ts);
-	clause_print(s);
-	wprintf(L" into td=%d dst: ", td);
-	clause_print(d);
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
 		if (!var_set_rep(s.terms[ts].t[n], d.terms[td].t[n]))
 			return clause_clear(r), r;
 	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
-		if (x != &d.terms[td]) clause_add_new_term(&r, d.terms[td]);
+		if (x != &d.terms[td])
+			clause_add_new_term(&r, *x);
 	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
-		if (x != &s.terms[ts]) clause_add_new_term(&r, s.terms[ts]);
+		if (x != &s.terms[ts])
+			clause_add_new_term(&r, *x);
 	return r;
 }
 
