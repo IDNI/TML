@@ -67,7 +67,7 @@ create:	id = (*s == L'?' ? nlabels+1 : -nlabels-1);
 }
 
 int_t var_get_rep(int_t v) {
-	assert(v);
+	if (v < 0) return v;
 	while (labels[v-1].p > 0)
 		if (v == labels[v-1].p) return (labels[v-1].p=0), v;
 		else v = labels[v-1].p;
@@ -75,12 +75,13 @@ int_t var_get_rep(int_t v) {
 }
 
 bool var_set_rep(int_t x, int_t y) {
-	x = labels[x-1].p = var_get_rep(x);
-	y = labels[y-1].p = var_get_rep(y);
 	if (x < 0) {
-		if (y < 0) return x == y;
+nx:		if (y < 0 || (y = labels[y-1].p = var_get_rep(y)) < 0)
+			return x == y;
 		labels[y-1].p = x;
-	} else if (y < 0) labels[x-1].p = y;
+	} else if ((x = labels[x-1].p = var_get_rep(x))<0) goto nx;
+	else if (y < 0) labels[x-1].p = y;
+	else if ((y = labels[y-1].p = var_get_rep(y))<0) labels[x-1].p = y;
 	else if (x < y) labels[y-1].p = x;
 	else labels[x-1].p = y;
 	return true;
@@ -99,14 +100,12 @@ wchar_t* str_read(int_t *r, wchar_t *in) {
 	return t;
 }
 
-term term_read(wchar_t **in, size_t *nvars) {
+term term_read(wchar_t **in) {
 	int_t x;
 	term r = (term){ .t = 0, .ar = 0 };
-	while ((*in = str_read(&x, *in))) {
-		if (x > 0) ++nvars;
+	while ((*in = str_read(&x, *in)))
 		if (array_append(r.t,int_t,r.ar,x), !iswalnum(**in)&&**in!=L'?')
 			return --r.ar, r;
-	}
 	return r;
 }
 
@@ -122,7 +121,7 @@ void term_print(const term t) {
 
 bool clause_add_term(clause *c, const term t) {
 	for (int_t *x = &t.t[1]; x != &t.t[t.ar+1]; ++x)
-		if (*x > 0) *x = var_get_rep(*x);
+		if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
 	if (c->terms)
 		for (term *x = &c->terms[0]; x != &c->terms[c->sz]; ++x)
 			if (same_term(*x, t))
@@ -152,7 +151,7 @@ clause clause_read(wchar_t **in) {
 	if (!*in) return c;
 	bool neg = false;
 	term t;
-next:	t = term_read(in, &c.nvars);
+next:	t = term_read(in);
 	if (!t.t) return c;
 	if (neg) *t.t = -*t.t;
 	if (!clause_add_term(&c, t)) return clause_clear(c), c;
@@ -207,13 +206,17 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars);
 	clause_reset_vars(s), clause_reset_vars(d);
+	wprintf(L"plug ts=%d src: ", ts);
+	clause_print(s);
+	wprintf(L" into td=%d dst: ", td);
+	clause_print(d);
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
 		if (!var_set_rep(s.terms[ts].t[n], d.terms[td].t[n]))
 			return clause_clear(r), r;
-	for (size_t n = 0; n < d.sz; ++n)
-		if (n != td) clause_add_new_term(&r, d.terms[td]);
-	for (size_t n = 0; n < s.sz; ++n)
-		if (n != ts) clause_add_new_term(&r, s.terms[ts]);
+	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
+		if (x != &d.terms[td]) clause_add_new_term(&r, d.terms[td]);
+	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
+		if (x != &s.terms[ts]) clause_add_new_term(&r, s.terms[ts]);
 	return r;
 }
 
@@ -235,7 +238,7 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[2], "r"))))
 		perror("Unable to read src file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-		clause_print(c);
+//		clause_print(c);
 		for (b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r)
 				array_append2(srcpos, clause, srcposterm, size_t
@@ -249,7 +252,7 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[3], "r"))))
 		perror("Unable to read dst file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-		for (clause_print(c), b = false, n = 0; n < c.sz; ++n)
+		for (/*clause_print(c), */b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r) {
 				for (b = true, k = 0; k < nsrcneg; ++k)
 					if ((d = clause_plug(c, n, srcneg[k]
