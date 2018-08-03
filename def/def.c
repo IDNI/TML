@@ -235,22 +235,25 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars);
 	clause_reset_vars(s), clause_reset_vars(d);
-	wprintf(L"plug "), clause_print(s), wprintf(L" into "), clause_print(d), wprintf(L" results with ");
+	//wprintf(L"plug "), clause_print(s), wprintf(L" into "), clause_print(d), wprintf(L" results with ");
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
 		if (!var_set_rep(s.terms[ts].t[n], d.terms[td].t[n]))
-			return clause_clear(r), r;
+			return clause_reset_vars(r), clause_clear(r), r;
 	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
 		if (x != &d.terms[td]) clause_add_new_term(&r, *x);
 	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
 		if (x != &s.terms[ts]) clause_add_new_term(&r, *x);
 	clause_renum_vars(r, 0), clause_sort(r);
 	clause_renum_vars(r, 0), clause_sort(r);
+	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
 	return r;
 }
 
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
-	if (argc != 4) perror(usage), exit(1);
+	if (argc != 4 && argc != 5) perror(usage), exit(1);
+	bool rec = !strcmp(argv[2], "-r");
+	if (rec) (argv[2] = argv[3]), argv[3] = argv[4];
 	const size_t rlen = mbstowcs(0, argv[1], 0);
 	if (rlen == (size_t)-1)
 		perror("Unable to read the input relation symbol."), exit(1);
@@ -266,7 +269,7 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[2], "r"))))
 		perror("Unable to read src file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-		clause_print(c), putwchar(L'\n');
+		if (rec) clause_print(c), putwchar(L'\n');
 		for (b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r)
 				array_append2(srcpos, clause, srcposterm, size_t
@@ -280,7 +283,8 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[3], "r"))))
 		perror("Unable to read dst file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-		for (clause_print(c),putwchar(L'\n'), b = false, n = 0; n < c.sz; ++n)
+		//clause_print(c),putwchar(L'\n');
+		for (b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r) {
 				for (b = true, k = 0; k < nsrcneg; ++k)
 					if ((d = clause_plug(c, n, srcneg[k]
