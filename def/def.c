@@ -15,8 +15,6 @@
 #define array_append(a, t, l, x)(++l, (((t*)resize(a, t, l))[l-1] = (x)))
 #define array_append2(a,t,b,s,l,x,y)	(array_append(a, t, l, x), \
 				(((s*)resize(b, s, l))[l-1] = (y)))
-#define same_term(x, y)		((x).ar == (y).ar && \
-				!memcmp((x).t, (y).t, sizeof(int_t)*((x).ar+1)))
 #define str_from_id(id)		(id < 0 ? labels[-id-1] : labels[id-1])
 #define str_to_id(s, n)		_str_to_id(s, n)
 #define clause_clear(c)		((c).terms ? \
@@ -111,6 +109,12 @@ term term_read(wchar_t **in) {
 	return r;
 }
 
+int term_cmp(const void* _x, const void* _y) {
+	const term *x = (const term*)_x, *y = (const term*)_y;
+	return x->ar == y->ar ? memcmp(x->t, y->t, sizeof(int_t)*(x->ar+1))
+		: x->ar > y->ar ? 1 : -1;
+}
+
 void id_print(int_t n) {
 	if (n > 0) wprintf(L"?%d", n);
 	else for (ws s = str_from_id(n).s; iswalnum(*s);) putwchar(*s++);
@@ -126,7 +130,7 @@ bool clause_add_term(clause *c, const term t) {
 		if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
 	if (c->terms)
 		for (term *x = &c->terms[0]; x != &c->terms[c->sz]; ++x)
-			if (same_term(*x, t))
+			if (!term_cmp(x, &t))
 				return -*t.t == *x->t;
 	return array_append(c->terms, term, c->sz, t), true;
 }
@@ -187,36 +191,60 @@ next:	for (n = l = 0; n < 31; ++n)
 
 void clause_print(const clause a) {
 	if (!a.terms) return;
-	size_t n, k = 0, lp, ln;
+	size_t n, k = 0, lp = VOID, ln = VOID;
 	for (n = 0; n < a.sz; ++n)
 		if (*a.terms[n].t > 0) lp = n;
 		else ln = n;
-	for (n = 0; n < a.sz; ++n)
-		if (*a.terms[n].t < 0)
-			term_print(a.terms[n]),
-			fputws(n==ln?k==a.sz?L".\n":L" : ":L", ",stdout), ++k;
-	if (k != a.sz)
+	if (ln != VOID)
+		for (n = 0; n < a.sz; ++n)
+			if (*a.terms[n].t < 0)
+				term_print(a.terms[n]),
+				fputws(n==ln?k==a.sz||lp==VOID?L".":L" : ":L", ",stdout), ++k;
+	if (k != a.sz && ln != VOID)
 		for (n = 0; n < a.sz; ++n)
 			if (*a.terms[n].t > 0)
 				(*a.terms[n].t = -*a.terms[n].t),
 				term_print(a.terms[n]),
-				fputws(n==lp?L".\n":L", ", stdout),
+				fputws(n==lp?L".":L", ", stdout),
 				(*a.terms[n].t = -*a.terms[n].t);
+}
+
+int clause_cmp(const void* _x, const void* _y) {
+	clause x = *(const clause*)_x, y = *(const clause*)_y;
+	wprintf(L"cmp ");
+	clause_print(y),
+	wprintf(L" to ");
+	clause_print(x);
+	if (x.sz != y.sz) return x.sz > y.sz ? 1 : -1;
+	int r;
+	for (size_t n = 0; n < x.sz; ++n)
+		if (!(r = term_cmp(&x.terms[n], &y.terms[n])))
+			return r;
+	return 0;
+}
+
+void clause_sort(clause c) {
+	qsort(&c.terms[0], c.sz, sizeof(term), term_cmp);
+	for (term *b = &c.terms[1], *e = &c.terms[c.sz]; b != e;)
+		if (!term_cmp(b, b-1)) memmove(b, b+1, sizeof(term)*(e-b-1));
+		else ++b;
+
 }
 
 clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars);
 	clause_reset_vars(s), clause_reset_vars(d);
+	wprintf(L"plug "), clause_print(s), wprintf(L" into "), clause_print(d), wprintf(L" results with ");
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
 		if (!var_set_rep(s.terms[ts].t[n], d.terms[td].t[n]))
 			return clause_clear(r), r;
 	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
-		if (x != &d.terms[td])
-			clause_add_new_term(&r, *x);
+		if (x != &d.terms[td]) clause_add_new_term(&r, *x);
 	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
-		if (x != &s.terms[ts])
-			clause_add_new_term(&r, *x);
+		if (x != &s.terms[ts]) clause_add_new_term(&r, *x);
+	clause_renum_vars(r, 0), clause_sort(r);
+	clause_renum_vars(r, 0), clause_sort(r);
 	return r;
 }
 
@@ -238,7 +266,7 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[2], "r"))))
 		perror("Unable to read src file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-//		clause_print(c);
+		clause_print(c), putwchar(L'\n');
 		for (b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r)
 				array_append2(srcpos, clause, srcposterm, size_t
@@ -246,24 +274,24 @@ int main(int argc, char** argv) {
 			else if (-*c.terms[n].t == r)
 				array_append2(srcneg, clause, srcnegterm, size_t
 						, nsrcneg, c, n), b = true;
-		if (!b) clause_print(c);
+		if (!b) clause_print(c), putwchar(L'\n');
 	}
 
 	if (!(all = file_read_text(fopen(argv[3], "r"))))
 		perror("Unable to read dst file."), exit(1);
 	while ((c = clause_read(&all)).terms) {
-		for (/*clause_print(c), */b = false, n = 0; n < c.sz; ++n)
+		for (clause_print(c),putwchar(L'\n'), b = false, n = 0; n < c.sz; ++n)
 			if (*c.terms[n].t == r) {
 				for (b = true, k = 0; k < nsrcneg; ++k)
 					if ((d = clause_plug(c, n, srcneg[k]
 						, srcnegterm[k])).terms)
-						clause_print(d);
+						clause_print(d), putwchar(L'\n');
 			} else if (-*c.terms[n].t == r)
 				for (b = true, k = 0; k < nsrcpos; ++k)
 					if ((d = clause_plug(srcpos[k]
 						, srcposterm[k], c, n)).terms)
-						clause_print(d);
-		if (!b) clause_print(c);
+						clause_print(d), putwchar(L'\n');
+		if (!b) clause_print(c), putwchar(L'\n');
 	}
 	return 0;
 }
