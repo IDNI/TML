@@ -18,7 +18,7 @@
 				(((s*)resize(b, s, l))[l-1] = (y)))
 #define str_from_id(id)		(id < 0 ? labels[-id-1] : labels[id-1])
 #define str_to_id(s, n)		_str_to_id(s, n)
-#define clause_clear(c)		((c).terms ? \
+#define clause_clear(c)		(clause_reset_vars(c), (c).terms ? \
 				free((c).terms), (c).terms=0, (c).sz=0 : 0)
 #define string_append(x, y)	resize(x, wchar_t, wcslen(x)+wcslen(y)+1)\
 				, wcscat(x, y)
@@ -112,6 +112,8 @@ term term_read(wchar_t **in) {
 
 int term_cmp(const void* _x, const void* _y) {
 	const term *x = (const term*)_x, *y = (const term*)_y;
+	if (*x->t < 0 && *y->t > 0) return 1;
+	if (*x->t > 0 && *y->t < 0) return -1;
 	return x->ar == y->ar ? memcmp(x->t, y->t, sizeof(int_t)*(x->ar+1))
 		: x->ar > y->ar ? 1 : -1;
 }
@@ -164,9 +166,12 @@ next:	t = term_read(in);
 	if (!clause_add_term(&c, t)) return clause_clear(c), c;
 	if (**in == L',' && ++*in) goto next;
 	if (**in == L'.') return ++*in, c;
-	if (**in == L':') { neg = true; ++*in; goto next; }
+	if (**in == L':') {
+		if (*(++*in) != L'-') perror("':-' expected\n"), exit(1);
+		neg = true; ++*in; goto next;
+	}
 	if (*((*in)++) != (neg ? L':' : L'.'))
-		perror("Term or ':' or ',' or '.' expected\n"), exit(1);
+		perror("Term or ':-' or ',' or '.' expected\n"), exit(1);
 	clause_renum_vars(c, 0);
 	return c;
 }
@@ -192,60 +197,68 @@ next:	for (n = l = 0; n < 31; ++n)
 
 void clause_print(const clause a) {
 	if (!a.terms) return;
-	size_t n, k = 0, lp = VOID, ln = VOID;
-	for (n = 0; n < a.sz; ++n)
-		if (*a.terms[n].t > 0) lp = n;
-		else ln = n;
-	if (ln != VOID)
-		for (n = 0; n < a.sz; ++n)
-			if (*a.terms[n].t < 0)
-				term_print(a.terms[n]),
-				fputws(n==ln?k==a.sz||lp==VOID?L".":L" : ":L", ",stdout), ++k;
-	if (k != a.sz && ln != VOID)
-		for (n = 0; n < a.sz; ++n)
-			if (*a.terms[n].t > 0)
-				(*a.terms[n].t = -*a.terms[n].t),
-				term_print(a.terms[n]),
-				fputws(n==lp?L".":L", ", stdout),
+	size_t n;//, k = 0, lp = VOID, ln = VOID;
+//	for (n = 0; n < a.sz; ++n)
+//		if (*a.terms[n].t > 0) lp = n;
+//		else ln = n;
+	bool b;
+//	if (ln != VOID)
+//		for (n = 0; n < a.sz; ++n) 
+//			if (*a.terms[n].t < 0)
+//				term_print(a.terms[n]),
+//				fputws(n==ln?k==a.sz||lp==VOID?L".":L" : ":L", ",stdout), ++k;
+//	if (k != a.sz && ln != VOID)
+		for (n = 0; n < a.sz; ++n) {
+			if ((b = *a.terms[n].t > 0))
 				(*a.terms[n].t = -*a.terms[n].t);
+			term_print(a.terms[n]);
+			if (n == a.sz - 1)
+				putwchar(L'.');
+			else if (*a.terms[n+1].t<0 && *a.terms[n].t<0)
+				fputws(L" :- ", stdout);
+			else
+				fputws(L", ", stdout);
+			if (b) *a.terms[n].t = -*a.terms[n].t;
+		}
 }
 
 int clause_cmp(const void* _x, const void* _y) {
 	clause x = *(const clause*)_x, y = *(const clause*)_y;
-	wprintf(L"cmp ");
-	clause_print(y),
-	wprintf(L" to ");
-	clause_print(x);
 	if (x.sz != y.sz) return x.sz > y.sz ? 1 : -1;
-	int r;
-	for (size_t n = 0; n < x.sz; ++n)
-		if (!(r = term_cmp(&x.terms[n], &y.terms[n])))
-			return r;
+	for (int n = 0, r; n < (int)x.sz; ++n)
+		if (!(r = term_cmp(&x.terms[n], &y.terms[n]))) return r;
 	return 0;
 }
 
 void clause_sort(clause c) {
 	qsort(&c.terms[0], c.sz, sizeof(term), term_cmp);
-	for (term *b = &c.terms[1], *e = &c.terms[c.sz]; b != e;)
-		if (!term_cmp(b, b-1)) memmove(b, b+1, sizeof(term)*(e-b-1));
-		else ++b;
+}
 
+char same_ground(clause x, clause y) {
+	for (size_t n = 0, k = 0; n < x.sz && k < y.sz;) {
+
+	}
+	return 0;
+}
+
+void clauses_sort(clause **c, size_t *sz) {
+	qsort(*c, *sz, sizeof(clause), clause_cmp);
+//	for (size_t n = 1; n < sz; ++n)
+//		if (same_
 }
 
 clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
-	clause_renum_vars(s, d.nvars);
-	clause_reset_vars(s), clause_reset_vars(d);
+	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
 	//wprintf(L"plug "), clause_print(s), wprintf(L" into "), clause_print(d), wprintf(L" results with ");
+	const term *ps = &s.terms[ts], *pd = &d.terms[td];
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
-		if (!var_set_rep(s.terms[ts].t[n], d.terms[td].t[n]))
-			return clause_reset_vars(r), clause_clear(r), r;
+		if (!var_set_rep(ps->t[n], pd->t[n])) return clause_clear(r), r;
 	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
-		if (x != &d.terms[td]) clause_add_new_term(&r, *x);
+		if (x != pd) clause_add_new_term(&r, *x);
 	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
-		if (x != &s.terms[ts]) clause_add_new_term(&r, *x);
-	clause_renum_vars(r, 0), clause_sort(r);
-	clause_renum_vars(r, 0), clause_sort(r);
+		if (x != ps) clause_add_new_term(&r, *x);
+	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
 	return r;
 }

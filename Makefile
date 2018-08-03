@@ -1,2 +1,2 @@
 all:
-	cc lppe.c -W -Wpedantic -Wall -Os
+	cc lppe.c -W -Wpedantic -Wall -g
