@@ -20,13 +20,11 @@
 #define str_to_id(s, n)		_str_to_id(s, n)
 #define clause_clear(c)		(clause_reset_vars(c), (c).terms ? \
 				free((c).terms), (c).terms=0, (c).sz=0 : 0)
-#define string_append(x, y)	resize(x, wchar_t, wcslen(x)+wcslen(y)+1)\
-				, wcscat(x, y)
 #define var_clear_rep(v) \
 	((nlabels<(size_t)v?(nlabels=v),resize(labels,dict_t,v):0),labels[v-1].p=0);
 #define memdup(x, t, sz)	memcpy(malloc(sizeof(t)*(sz)),x,sizeof(t)*(sz))
 #define term_dup(x)		(term){.t=memdup((x).t,int_t,(x).ar+1),.ar=(x).ar}
-#define clause_add_new_term(c, t) clause_add_term(c, term_dup(t))
+#define for_all_terms(c, x) for (term* x=(c).terms; x!=&(c).terms[(c).sz]; ++x)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 typedef const wchar_t* ws;
@@ -132,14 +130,13 @@ bool clause_add_term(clause *c, const term t) {
 	for (int_t *x = &t.t[1]; x != &t.t[t.ar+1]; ++x)
 		if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
 	if (c->terms)
-		for (term *x = &c->terms[0]; x != &c->terms[c->sz]; ++x)
-			if (!term_cmp(x, &t))
-				return -*t.t == *x->t;
+		for_all_terms(*c, x)
+			if (!term_cmp(x, &t)) return -*t.t == *x->t;
 	return array_append(c->terms, term, c->sz, t), true;
 }
 
 void clause_reset_vars(const clause c) {
-	for (const term *t = c.terms; t != &c.terms[c.sz]; ++t)
+	for_all_terms(c, t)
 		for (const int_t *x = &t->t[1]; x != &t->t[t->ar+1]; ++x)
 			if (*x > 0) var_clear_rep(*x);
 }
@@ -148,7 +145,8 @@ void clause_renum_vars(clause c, size_t v) {
 	if (nlabels < (v+c.nvars))
 		(nlabels = v+c.nvars+1), resize(labels,dict_t,v+c.nvars);
 	clause_reset_vars(c);
-	for (term *t = c.terms; t != &c.terms[c.sz]; ++t)
+	for_all_terms(c, t)
+//	for (term *t = c.terms; t != &c.terms[c.sz]; ++t)
 		for (int_t *x = &t->t[1]; x != &t->t[t->ar+1]; ++x)
 			if (*x < 0) continue;
 			else if (labels[*x-1].p) *x = labels[*x-1].p;
@@ -254,10 +252,8 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 	const term *ps = &s.terms[ts], *pd = &d.terms[td];
 	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
 		if (!var_set_rep(ps->t[n], pd->t[n])) return clause_clear(r), r;
-	for (term* x = d.terms; x != &d.terms[d.sz]; ++x)
-		if (x != pd) clause_add_new_term(&r, *x);
-	for (term* x = s.terms; x != &s.terms[s.sz]; ++x)
-		if (x != ps) clause_add_new_term(&r, *x);
+	for_all_terms(d, x) if (x != pd) clause_add_term(&r, term_dup(*x));
+	for_all_terms(s, x) if (x != ps) clause_add_term(&r, term_dup(*x));
 	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
 	return r;
