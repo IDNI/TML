@@ -31,11 +31,12 @@ int_t rel;
 #define str_to_id(s, n)		_str_to_id(s, n)
 #define clause_clear(c)		((clause_reset_vars(c), (c).terms ? \
 				free((c).terms), (c).terms=0, (c).sz=0 : 0),c)
-#define var_clear_rep(v) \
-	((nlabels<(size_t)v?(nlabels=v),resize(labels,dict_t,v):0),labels[v-1].p=0);
+#define var_clear_rep(v) 	((nlabels<(size_t)v?(nlabels=v), \
+				resize(labels,dict_t,v):0),labels[v-1].p=0);
 #define memdup(x, t, sz)	memcpy(malloc(sizeof(t)*(sz)),x,sizeof(t)*(sz))
 #define term_dup(x)		(term){.t=memdup((x).t,int_t,(x).ar+1),.ar=(x).ar}
 #define lp_create()		(lp){.c=0,.sz=0}
+#define clause_sort(c)		qsort(&c.terms[0], c.sz, sizeof(term), term_cmp)
 #define for_all_clauses(p, x) for (clause* x=(p).c; x!=&(p).c[(p).sz]; ++x)
 #define for_all_terms(c, x) for (term* x=(c).terms; x!=&(c).terms[(c).sz]; ++x)
 #define for_all_args(tt, x) for (int_t* x=(tt).t+1; x!=&(tt).t[(tt).ar+1]; ++x)
@@ -124,7 +125,7 @@ term term_read(wchar_t **in) {
 	while (**in != L')' && (*in = str_read(&x, *in))) {
 		if (!r.ar && *((*in)++) != L'(') er(oparen_expected);
 		array_append(r.t, int_t, r.ar, x);
-		if (!iswalnum(**in)&&**in!=L'?') break;// return --r.ar, r;
+		if (!iswalnum(**in)&&**in!=L'?') break;
 	}
 	for (++*in; iswspace(**in); ++*in);
 	return --r.ar, r;
@@ -227,10 +228,6 @@ int clause_cmp(const void* _x, const void* _y) {
 	return 0;
 }
 
-void clause_sort(clause c) {
-	qsort(&c.terms[0], c.sz, sizeof(term), term_cmp);
-}
-
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
@@ -265,11 +262,10 @@ int main(int argc, char** argv) {
 	while ((c = clause_read(&all)).terms) {
 //		clause_print(c), putwchar(L'\n');
 		for_all_terms(c, x)
-			if (abs(*x->t) == -rel)
-				for (size_t n = 0; n < src.sz; ++n)
-					for_all_terms(src.c[n], y)
-						if (-*y->t == *x->t)
-							lp_add_clause(clause_plug(src.c[n], y, c, x), false);
+			if (abs(*x->t) == -rel) for (size_t n=0; n<src.sz; ++n)
+				for_all_terms(src.c[n], y) if (-*y->t == *x->t)
+					lp_add_clause(clause_plug(
+						src.c[n], y, c, x), false);
 	}
 	for_all_clauses(res, c) clause_print(*c), putwchar(L'\n');
 	return 0;
