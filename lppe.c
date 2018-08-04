@@ -49,16 +49,6 @@ int_t rel;
 #define err_inrel "Unable to read the input relation symbol.\n"
 #define err_src "Unable to read src file.\n"
 
-void lp_add_clause(clause c, bool bsrc) {
-	if (!bsrc) { array_append(res.c, clause, res.sz, c); return; }
-	term *x = c.terms;
-	for (; x != &c.terms[c.sz]; ++x)
-		if (abs(*x->t) == -rel) {
-			array_append(src.c, clause, src.sz, c);
-			return;
-		}
-}
-
 uint32_t hash(ws s, size_t n) {
 	uint32_t h = 1;
 	while (n--) h *= 1 + *s * __builtin_bswap32(*s), ++s;
@@ -145,7 +135,10 @@ void id_print(int_t n) {
 
 void term_print(const term t) {
 	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L'(');
-	for_all_args(t, x) id_print(*x), putwchar(L' ');
+	for_all_args(t, x) {
+		id_print(*x);
+		if (x != &t.t[t.ar]) putwchar(L' ');
+	}
 	putwchar(L')');
 }
 
@@ -224,9 +217,27 @@ int clause_cmp(const void* _x, const void* _y) {
 	clause x = *(const clause*)_x, y = *(const clause*)_y;
 	if (x.sz != y.sz) return x.sz > y.sz ? 1 : -1;
 	for (int n = 0, r; n < (int)x.sz; ++n)
-		if (!(r = term_cmp(&x.terms[n], &y.terms[n]))) return r;
+		if ((r = term_cmp(&x.terms[n], &y.terms[n]))) return r;
 	return 0;
 }
+
+void lp_add_clause(clause c, bool bsrc) {
+	if (!bsrc) {
+		for (size_t n = 0; n < res.sz; ++n)
+			if (!clause_cmp(&c, &res.c[n])) return;
+		array_append(res.c, clause, res.sz, c); return;
+	}
+	term *x = c.terms;
+	for (; x != &c.terms[c.sz]; ++x)
+		if (abs(*x->t) == -rel) {
+			for (size_t n = 0; n < src.sz; ++n)
+				if (!clause_cmp(&c, &src.c[n]))
+					return;
+			array_append(src.c, clause, src.sz, c);
+			return;
+		}
+}
+
 
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
@@ -267,6 +278,6 @@ int main(int argc, char** argv) {
 					lp_add_clause(clause_plug(
 						src.c[n], y, c, x), false);
 	}
-	for_all_clauses(res, c) clause_print(*c), putwchar(L'\n');
+	for_all_clauses(res, c) if (c->sz) clause_print(*c), putwchar(L'\n');
 	return 0;
 }
