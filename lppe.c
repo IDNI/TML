@@ -10,6 +10,17 @@
 #include <assert.h>
 
 #define int_t			intptr_t
+typedef const wchar_t* ws;
+typedef struct	{ int_t *t;	size_t ar; 		} term;
+typedef struct	{ term *terms;	size_t sz, nvars;	} clause;
+typedef struct	{ clause *c;	size_t sz;		} lp;
+typedef struct	{ int32_t id;	size_t n,l,r; ws s; uint32_t h; int_t p;}
+	dict_t;
+dict_t *labels = 0;
+size_t nlabels = 0;
+lp src, res;
+int_t rel;
+
 #define new(x)			((x*)malloc(sizeof(x)))
 #define VOID			((size_t)(-1))
 #define resize(x,t,l)		((t*)((x)=realloc(x,sizeof(t)*(l))))
@@ -18,26 +29,34 @@
 				(((s*)resize(b, s, l))[l-1] = (y)))
 #define str_from_id(id)		(id < 0 ? labels[-id-1] : labels[id-1])
 #define str_to_id(s, n)		_str_to_id(s, n)
-#define clause_clear(c)		(clause_reset_vars(c), (c).terms ? \
-				free((c).terms), (c).terms=0, (c).sz=0 : 0)
+#define clause_clear(c)		((clause_reset_vars(c), (c).terms ? \
+				free((c).terms), (c).terms=0, (c).sz=0 : 0),c)
 #define var_clear_rep(v) \
 	((nlabels<(size_t)v?(nlabels=v),resize(labels,dict_t,v):0),labels[v-1].p=0);
 #define memdup(x, t, sz)	memcpy(malloc(sizeof(t)*(sz)),x,sizeof(t)*(sz))
 #define term_dup(x)		(term){.t=memdup((x).t,int_t,(x).ar+1),.ar=(x).ar}
+#define lp_create()		(lp){.c=0,.sz=0}
+#define for_all_clauses(p, x) for (clause* x=(p).c; x!=&(p).c[(p).sz]; ++x)
 #define for_all_terms(c, x) for (term* x=(c).terms; x!=&(c).terms[(c).sz]; ++x)
+#define for_all_args(tt, x) for (int_t* x=(tt).t+1; x!=&(tt).t[(tt).ar+1]; ++x)
+#define er(x)	perror(x), exit(0)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
-typedef const wchar_t* ws;
+#define oparen_expected "'(' expected\n"
+#define entail_expected "':-' expected\n"
+#define sep_expected "Term or ':-' or '.' expected\n"
+#define err_inrel "Unable to read the input relation symbol.\n"
+#define err_src "Unable to read src file.\n"
 
-typedef struct	{ int_t *t;	size_t ar; 		} term;
-typedef struct	{ term *terms;	size_t sz, nvars;	} clause;
-typedef struct	{ int32_t id;	size_t n,l,r; ws s; uint32_t h; int_t p;}
-	dict_t;
-
-dict_t *labels = 0;
-size_t nlabels = 0;
-
-void clause_print(const clause a);
+void lp_add_clause(clause c, bool bsrc) {
+	if (!bsrc) { array_append(res.c, clause, res.sz, c); return; }
+	term *x = c.terms;
+	for (; x != &c.terms[c.sz]; ++x)
+		if (abs(*x->t) == -rel) {
+			array_append(src.c, clause, src.sz, c);
+			return;
+		}
+}
 
 uint32_t hash(ws s, size_t n) {
 	uint32_t h = 1;
@@ -91,28 +110,30 @@ wchar_t* str_read(int_t *r, wchar_t *in) {
 	wchar_t *s = in, *t;
 	while (*s && iswspace(*s)) ++s;
 	if (!*s) return 0;
-	if (*(t = s) == L'?' || *t == L'~') ++t;
+	if (*(t = s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
 	if (t == s) return 0;
 	*r = str_to_id(s, t - s);
-	while (iswspace(*t)) ++t;
+	while (*t && iswspace(*t)) ++t;
 	return t;
 }
 
 term term_read(wchar_t **in) {
 	int_t x;
 	term r = (term){ .t = 0, .ar = 0 };
-	while ((*in = str_read(&x, *in)))
-		if (array_append(r.t,int_t,r.ar,x), !iswalnum(**in)&&**in!=L'?')
-			return --r.ar, r;
-	return r;
+	while (**in != L')' && (*in = str_read(&x, *in))) {
+		if (!r.ar && *((*in)++) != L'(') er(oparen_expected);
+		array_append(r.t, int_t, r.ar, x);
+		if (!iswalnum(**in)&&**in!=L'?') break;// return --r.ar, r;
+	}
+	for (++*in; iswspace(**in); ++*in);
+	return --r.ar, r;
 }
 
 int term_cmp(const void* _x, const void* _y) {
 	const term *x = (const term*)_x, *y = (const term*)_y;
-	if (*x->t < 0 && *y->t > 0) return 1;
-	if (*x->t > 0 && *y->t < 0) return -1;
-	return x->ar == y->ar ? memcmp(x->t, y->t, sizeof(int_t)*(x->ar+1))
+	return	*x->t < 0 && *y->t > 0 ? 1 : *x->t > 0 && *y->t < 0 ? -1
+		: x->ar == y->ar ? memcmp(x->t, y->t, sizeof(int_t)*(x->ar+1))
 		: x->ar > y->ar ? 1 : -1;
 }
 
@@ -122,54 +143,47 @@ void id_print(int_t n) {
 }
 
 void term_print(const term t) {
-	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L' ');
-	for (size_t n = 1; n <= t.ar; ++n) id_print(t.t[n]), putwchar(L' ');
+	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L'(');
+	for_all_args(t, x) id_print(*x), putwchar(L' ');
+	putwchar(L')');
 }
 
 bool clause_add_term(clause *c, const term t) {
-	for (int_t *x = &t.t[1]; x != &t.t[t.ar+1]; ++x)
-		if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
-	if (c->terms)
-		for_all_terms(*c, x)
-			if (!term_cmp(x, &t)) return -*t.t == *x->t;
+	for_all_args(t, x) if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
+	if (c->terms) for_all_terms(*c, x)
+		if (!term_cmp(x, &t)) return -*t.t == *x->t;
 	return array_append(c->terms, term, c->sz, t), true;
 }
 
 void clause_reset_vars(const clause c) {
-	for_all_terms(c, t)
-		for (const int_t *x = &t->t[1]; x != &t->t[t->ar+1]; ++x)
-			if (*x > 0) var_clear_rep(*x);
+	for_all_terms(c, t) for_all_args(*t, x) if (*x > 0) var_clear_rep(*x);
 }
 
 void clause_renum_vars(clause c, size_t v) {
 	if (nlabels < (v+c.nvars))
 		(nlabels = v+c.nvars+1), resize(labels,dict_t,v+c.nvars);
 	clause_reset_vars(c);
-	for_all_terms(c, t)
-//	for (term *t = c.terms; t != &c.terms[c.sz]; ++t)
-		for (int_t *x = &t->t[1]; x != &t->t[t->ar+1]; ++x)
-			if (*x < 0) continue;
-			else if (labels[*x-1].p) *x = labels[*x-1].p;
-			else *x = labels[*x -1].p = ++v;
+	for_all_terms(c, t) for_all_args(*t, x)
+		if (*x>0) *x=labels[*x-1].p?labels[*x-1].p:(labels[*x-1].p=++v);
 }
 
 clause clause_read(wchar_t **in) {
 	clause c = (clause){.terms=0,.sz=0,.nvars=0};
-	if (!*in) return c;
+	while (iswspace(**in)) ++*in;
+	if (!**in) return c;
 	bool neg = false;
 	term t;
 next:	t = term_read(in);
 	if (!t.t) return c;
 	if (neg) *t.t = -*t.t;
-	if (!clause_add_term(&c, t)) return clause_clear(c), c;
+	if (!clause_add_term(&c, t)) return clause_clear(c);
 	if (**in == L',' && ++*in) goto next;
 	if (**in == L'.') return ++*in, c;
 	if (**in == L':') {
-		if (*(++*in) != L'-') perror("':-' expected\n"), exit(1);
+		if (*(++*in) != L'-') er(entail_expected);
 		neg = true; ++*in; goto next;
 	}
-	if (*((*in)++) != (neg ? L':' : L'.'))
-		perror("Term or ':-' or ',' or '.' expected\n"), exit(1);
+	if (**in != L'.' || (neg && **in != L':')) er(sep_expected);
 	clause_renum_vars(c, 0);
 	return c;
 }
@@ -194,30 +208,15 @@ next:	for (n = l = 0; n < 31; ++n)
 }
 
 void clause_print(const clause a) {
-	if (!a.terms) return;
-	size_t n;//, k = 0, lp = VOID, ln = VOID;
-//	for (n = 0; n < a.sz; ++n)
-//		if (*a.terms[n].t > 0) lp = n;
-//		else ln = n;
 	bool b;
-//	if (ln != VOID)
-//		for (n = 0; n < a.sz; ++n) 
-//			if (*a.terms[n].t < 0)
-//				term_print(a.terms[n]),
-//				fputws(n==ln?k==a.sz||lp==VOID?L".":L" : ":L", ",stdout), ++k;
-//	if (k != a.sz && ln != VOID)
-		for (n = 0; n < a.sz; ++n) {
-			if ((b = *a.terms[n].t > 0))
-				(*a.terms[n].t = -*a.terms[n].t);
-			term_print(a.terms[n]);
-			if (n == a.sz - 1)
-				putwchar(L'.');
-			else if (*a.terms[n+1].t<0 && *a.terms[n].t<0)
-				fputws(L" :- ", stdout);
-			else
-				fputws(L", ", stdout);
-			if (b) *a.terms[n].t = -*a.terms[n].t;
-		}
+	for (size_t n = 0; n < a.sz; ++n) {
+		term x = a.terms[n];
+		if ((b = *x.t > 0)) (*x.t = -*x.t);
+		if (term_print(x), n == a.sz - 1) putwchar(L'.');
+		else if (*a.terms[n+1].t<0 && *x.t<0) fputws(L" :- ", stdout);
+		else fputws(L", ", stdout);
+		if (b) *x.t = -*x.t;
+	}
 }
 
 int clause_cmp(const void* _x, const void* _y) {
@@ -232,26 +231,13 @@ void clause_sort(clause c) {
 	qsort(&c.terms[0], c.sz, sizeof(term), term_cmp);
 }
 
-char same_ground(clause x, clause y) {
-	for (size_t n = 0, k = 0; n < x.sz && k < y.sz;) {
-
-	}
-	return 0;
-}
-
-void clauses_sort(clause **c, size_t *sz) {
-	qsort(*c, *sz, sizeof(clause), clause_cmp);
-//	for (size_t n = 1; n < sz; ++n)
-//		if (same_
-}
-
-clause clause_plug(clause s, size_t ts, clause d, size_t td) {
+clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
 	//wprintf(L"plug "), clause_print(s), wprintf(L" into "), clause_print(d), wprintf(L" results with ");
-	const term *ps = &s.terms[ts], *pd = &d.terms[td];
-	for (size_t n = 1; n <= s.terms[ts].ar; ++n)
-		if (!var_set_rep(ps->t[n], pd->t[n])) return clause_clear(r), r;
+//	const term *ps = &s.terms[ts], *pd = &d.terms[td];
+	for (size_t n = 1; n <= ps->ar; ++n)
+		if (!var_set_rep(ps->t[n], pd->t[n])) return clause_clear(r);
 	for_all_terms(d, x) if (x != pd) clause_add_term(&r, term_dup(*x));
 	for_all_terms(s, x) if (x != ps) clause_add_term(&r, term_dup(*x));
 	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
@@ -261,51 +247,30 @@ clause clause_plug(clause s, size_t ts, clause d, size_t td) {
 
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
-	if (argc != 4 && argc != 5) perror(usage), exit(1);
+	if (argc != 4 && argc != 5) er(usage);
 	bool rec = !strcmp(argv[2], "-r");
 	if (rec) (argv[2] = argv[3]), argv[3] = argv[4];
 	const size_t rlen = mbstowcs(0, argv[1], 0);
-	if (rlen == (size_t)-1)
-		perror("Unable to read the input relation symbol."), exit(1);
+	if (rlen == (size_t)-1) er(err_inrel);
 
-	bool b;
-	clause c, d, *srcpos = 0, *srcneg = 0;
-	size_t nsrcpos = 0, nsrcneg = 0, *srcposterm = 0, *srcnegterm = 0, n, k;
+	clause c;
 	wchar_t rsym[rlen+1], *all;
-	mbstowcs(rsym, argv[1], rlen);
-	rsym[rlen] = 0;
-	int_t r = str_to_id(rsym, rlen);
-
-	if (!(all = file_read_text(fopen(argv[2], "r"))))
-		perror("Unable to read src file."), exit(1);
+	mbstowcs(rsym, argv[1], rlen), rsym[rlen] = 0;
+	rel = str_to_id(rsym, rlen);
+	if (!(all = file_read_text(fopen(argv[2], "r")))) er(err_src);
+	while (all && (c = clause_read(&all)).terms) lp_add_clause(c, true);
+//	for_all_clauses(src, c) clause_print(*c), putwchar(L'\n');
+	
+	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_src);
 	while ((c = clause_read(&all)).terms) {
-		if (rec) clause_print(c), putwchar(L'\n');
-		for (b = false, n = 0; n < c.sz; ++n)
-			if (*c.terms[n].t == r)
-				array_append2(srcpos, clause, srcposterm, size_t
-						, nsrcpos, c, n), b = true;
-			else if (-*c.terms[n].t == r)
-				array_append2(srcneg, clause, srcnegterm, size_t
-						, nsrcneg, c, n), b = true;
-		if (!b) clause_print(c), putwchar(L'\n');
+//		clause_print(c), putwchar(L'\n');
+		for_all_terms(c, x)
+			if (abs(*x->t) == -rel)
+				for (size_t n = 0; n < src.sz; ++n)
+					for_all_terms(src.c[n], y)
+						if (-*y->t == *x->t)
+							lp_add_clause(clause_plug(src.c[n], y, c, x), false);
 	}
-
-	if (!(all = file_read_text(fopen(argv[3], "r"))))
-		perror("Unable to read dst file."), exit(1);
-	while ((c = clause_read(&all)).terms) {
-		//clause_print(c),putwchar(L'\n');
-		for (b = false, n = 0; n < c.sz; ++n)
-			if (*c.terms[n].t == r) {
-				for (b = true, k = 0; k < nsrcneg; ++k)
-					if ((d = clause_plug(c, n, srcneg[k]
-						, srcnegterm[k])).terms)
-						clause_print(d), putwchar(L'\n');
-			} else if (-*c.terms[n].t == r)
-				for (b = true, k = 0; k < nsrcpos; ++k)
-					if ((d = clause_plug(srcpos[k]
-						, srcposterm[k], c, n)).terms)
-						clause_print(d), putwchar(L'\n');
-		if (!b) clause_print(c), putwchar(L'\n');
-	}
+	for_all_clauses(res, c) clause_print(*c), putwchar(L'\n');
 	return 0;
 }
