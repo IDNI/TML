@@ -222,13 +222,20 @@ int clause_cmp(const void* _x, const void* _y) {
 }
 
 void lp_add_clause(clause c, bool bsrc) {
+	size_t sz = 0;
+	for_all_terms(c, x) sz += x->ar+1;
+	int_t *t = malloc(sizeof(int_t) * sz), *s = t;
+	for_all_terms(c, x)
+		memcpy(t, x->t, sizeof(int_t) * (x->ar+1)),
+		t += x->ar + 1;
+	t = s;
+	for_all_terms(c, x) free(x->t), (x->t = t), t += x->ar+1;
 	if (!bsrc) {
 		for (size_t n = 0; n < res.sz; ++n)
 			if (!clause_cmp(&c, &res.c[n])) return;
 		array_append(res.c, clause, res.sz, c); return;
 	}
-	term *x = c.terms;
-	for (; x != &c.terms[c.sz]; ++x)
+	for_all_terms(c, x)
 		if (abs(*x->t) == -rel) {
 			for (size_t n = 0; n < src.sz; ++n)
 				if (!clause_cmp(&c, &src.c[n]))
@@ -237,7 +244,6 @@ void lp_add_clause(clause c, bool bsrc) {
 			return;
 		}
 }
-
 
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
