@@ -19,7 +19,7 @@ typedef struct	{ int32_t id;	size_t n,l,r; ws s; uint32_t h; int_t p;}
 dict_t *labels = 0;
 size_t nlabels = 0;
 lp src, res;
-int_t rel;
+int_t rel, idctx;
 
 #define new(x)			((x*)malloc(sizeof(x)))
 #define VOID			((size_t)(-1))
@@ -44,6 +44,7 @@ int_t rel;
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 #define oparen_expected "'(' expected\n"
+#define comma_expected "',' or ')' expected\n"
 #define entail_expected "':-' expected\n"
 #define sep_expected "Term or ':-' or '.' expected\n"
 #define err_inrel "Unable to read the input relation symbol.\n"
@@ -96,15 +97,25 @@ nx:		if (y < 0 || (y = labels[y-1].p = var_get_rep(y)) < 0)
 	return true;
 }
 
-
 wchar_t* str_read(int_t *r, wchar_t *in) {
 	wchar_t *s = in, *t;
 	while (*s && iswspace(*s)) ++s;
 	if (!*s) return 0;
 	if (*(t = s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
+	while (iswspace(*t)) ++t;
+	bool b = *t == L':';
+	if (b) while (iswalnum(*t)) ++t;
 	if (t == s) return 0;
-	*r = str_to_id(s, t - s);
+	if (!b && *s != L'?') {
+		const size_t szctx = str_from_id(idctx).n;
+		ws strctx = str_from_id(idctx).s;
+		wchar_t *p = wmemcpy(malloc(sizeof(wchar_t) * (t - s + szctx+2)),
+				strctx, szctx);
+		p[szctx] = L':';
+		wmemcpy(p + szctx + 1, s, t - s);
+		*r = str_to_id(p, t - s + szctx + 1);
+	} else *r = str_to_id(s, t - s);
 	while (*t && iswspace(*t)) ++t;
 	return t;
 }
@@ -115,7 +126,10 @@ term term_read(wchar_t **in) {
 	while (**in != L')' && (*in = str_read(&x, *in))) {
 		if (!r.ar && *((*in)++) != L'(') er(oparen_expected);
 		array_append(r.t, int_t, r.ar, x);
-		if (!iswalnum(**in)&&**in!=L'?') break;
+		if (**in != L',') {
+			if (**in == L')') break;
+			else if (r.ar != 1) er(comma_expected);
+		} else ++*in;
 	}
 	for (++*in; iswspace(**in); ++*in);
 	return --r.ar, r;
@@ -130,7 +144,12 @@ int term_cmp(const void* _x, const void* _y) {
 
 void id_print(int_t n) {
 	if (n > 0) wprintf(L"?%d", n);
-	else for (ws s = str_from_id(n).s; iswalnum(*s);) putwchar(*s++);
+	else {
+		ws s = str_from_id(n).s;
+		size_t l = str_from_id(n).n;
+		if (l >= 8 && !wcsncmp(s,L"default:", 8)) (s += 8), l -= 8;
+		while (l--) putwchar(*s++);
+	}
 }
 
 void term_print(const term t) {
@@ -165,21 +184,22 @@ clause clause_read(wchar_t **in) {
 	clause c = (clause){.terms=0,.sz=0,.nvars=0};
 	while (iswspace(**in)) ++*in;
 	if (!**in) return c;
+	while (!wcsncmp(*in, L"@ctx", 4) && iswspace(*(*in + 4)))
+		*in = str_read(&idctx, *in += 4);
 	bool neg = false;
 	term t;
 next:	t = term_read(in);
 	if (!t.t) return c;
 	if (neg) *t.t = -*t.t;
 	if (!clause_add_term(&c, t)) return clause_clear(c);
-	if (**in == L',' && ++*in) goto next;
-	if (**in == L'.') return ++*in, c;
 	if (**in == L':') {
 		if (*(++*in) != L'-') er(entail_expected);
 		neg = true; ++*in; goto next;
 	}
-	if (**in != L'.' || (neg && **in != L':')) er(sep_expected);
+	if (**in != L'.') goto next;
 	clause_renum_vars(c, 0);
-	return c;
+	return ++*in,  c;
+	//return c;
 }
 
 wchar_t* file_read_text(FILE *f) {
@@ -261,6 +281,7 @@ clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 
 int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
+	idctx = str_to_id(L"default", 7);
 	if (argc != 4 && argc != 5) er(usage);
 	bool rec = !strcmp(argv[2], "-r");
 	if (rec) (argv[2] = argv[3]), argv[3] = argv[4];
@@ -273,11 +294,11 @@ int main(int argc, char** argv) {
 	rel = str_to_id(rsym, rlen);
 	if (!(all = file_read_text(fopen(argv[2], "r")))) er(err_src);
 	while (all && (c = clause_read(&all)).terms) lp_add_clause(c, true);
-//	for_all_clauses(src, c) clause_print(*c), putwchar(L'\n');
+	for_all_clauses(src, c) clause_print(*c), putwchar(L'\n');
 	
 	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_src);
 	while ((c = clause_read(&all)).terms) {
-//		clause_print(c), putwchar(L'\n');
+		clause_print(c), putwchar(L'\n');
 		for_all_terms(c, x)
 			if (abs(*x->t) == -rel) for (size_t n=0; n<src.sz; ++n)
 				for_all_terms(src.c[n], y) if (-*y->t == *x->t)
