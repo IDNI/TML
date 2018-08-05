@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#define DEBUG_
 #define int_t			intptr_t
 typedef const wchar_t* ws;
 typedef struct	{ int_t *t;	size_t ar; 		} term;
@@ -22,6 +23,11 @@ lp src, res;
 int_t rel, idctx;
 
 #define new(x)			((x*)malloc(sizeof(x)))
+#ifdef DEBUG_
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
 #define VOID			((size_t)(-1))
 #define resize(x,t,l)		((t*)((x)=realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)(++l, (((t*)resize(a, t, l))[l-1] = (x)))
@@ -164,8 +170,10 @@ void term_print(const term t) {
 
 bool clause_add_term(clause *c, const term t) {
 	for_all_args(t, x) if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
-	if (c->terms) for_all_terms(*c, x)
-		if (!term_cmp(x, &t)) return -*t.t == *x->t;
+	if (c->terms)
+		for_all_terms(*c, x)
+			if (!term_cmp(x, &t))
+				return -*t.t == *x->t;
 	return array_append(c->terms, term, c->sz, t), true;
 }
 
@@ -227,7 +235,8 @@ void clause_print(const clause a) {
 		term x = a.terms[n];
 		if ((b = (*x.t > 0))) (*x.t = -*x.t);
 		if (term_print(x), n == a.sz - 1) putwchar(L'.');
-		else if (*a.terms[n+1].t>0 && *x.t<0) fputws(L" :- ", stdout);
+		else if (*a.terms[n+1].t>0 && !b)
+			fputws(L" :- ", stdout);
 		else fputws(L" ", stdout);
 		if (b) *x.t = -*x.t;
 	}
@@ -271,17 +280,21 @@ bool lp_add_clause(clause c, bool bsrc) {
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
-//	wprintf(L"plug term %d of ", ps-s.terms), clause_print(s), wprintf(L" into term %d of ", pd-d.terms), clause_print(d), wprintf(L" results with ");
+	DEBUG(	(wprintf(L"plug term %d of ", ps-s.terms), clause_print(s),
+		wprintf(L" into term %d of ", pd-d.terms), clause_print(d),
+		wprintf(L" results with ")));
 	for (size_t n = 1; n <= ps->ar; ++n)
-		if (!var_set_rep(ps->t[n], pd->t[n]))
-			return //wprintf(L"none.\n"),
-			       clause_clear(r);
-	for_all_terms(d, x) if (x != pd) clause_add_term(&r, term_dup(*x));
-	for_all_terms(s, x) if (x != ps) clause_add_term(&r, term_dup(*x));
+		if (!var_set_rep(ps->t[n], pd->t[n])) goto fail;
+	for_all_terms(d, x)
+		if (x != pd && !clause_add_term(&r, term_dup(*x))) goto fail;
+	for_all_terms(s, x)
+		if (x != ps && !clause_add_term(&r, term_dup(*x))) goto fail;
 	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
-//	clause_print(r), newline;
+	DEBUG((clause_print(r), newline));
 	return r;
+fail:	DEBUG(wprintf(L"none.\n"));
+	return clause_clear(r);
 }
 
 int main(int argc, char** argv) {
@@ -311,7 +324,7 @@ int main(int argc, char** argv) {
 					if (-*y->t != *x->t) continue;
 					else b |= lp_add_clause(clause_plug(
 						src.c[n], y, c, x), false);
-		if (rec) clause_print(c), newline; 
+		if (rec) lp_add_clause(c, false);
 	}
 	for_all_clauses(res, c) clause_print(*c), newline;
 	return 0;
