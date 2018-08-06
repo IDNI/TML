@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <assert.h>
 
-//#define DEBUG_
+#define DEBUG_
 #define int_t			intptr_t
 typedef const wchar_t* ws;
 typedef struct	{ int_t *t;	size_t ar; 		} term;
@@ -50,6 +50,10 @@ size_t outlen = 0;
 #define for_all_args(tt, x) for (int_t* x=(tt).t+1; x!=&(tt).t[(tt).ar+1]; ++x)
 #define er(x)	perror(x), exit(0)
 #define newline wcscat(str_resize(sout, outlen, 1),  L"\n")
+#define str_resize(s, n, k) (((s) = realloc(s, sizeof(wchar_t) * (1+(n += k)))), s)
+#define out_strn(s, n) wcscat(str_resize(sout, outlen, n), s)
+#define out_str(s) out_strn(s, wcslen(s))
+#define out_str_f(s, a) swprintf(tmp, 128, s, a), out_str(tmp)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 #define oparen_expected "'(' expected\n"
@@ -152,13 +156,8 @@ int term_cmp(const void* _x, const void* _y) {
 }
 
 wchar_t tmp[128];
-#define str_resize(s, n, k) (((s) = realloc(s, sizeof(wchar_t) * (2+(n += k)))), s)
-
 void id_print(int_t n, wchar_t **out, size_t *len) {
-	if (n > 0) {
-		swprintf(tmp, 128, L"?%d", n);
-		*out = wcscat(str_resize(*out, *len, wcslen(tmp)), tmp);
-	}
+	if (n > 0) out_str_f(L"?%d", n);
 	else {
 		ws s = str_from_id(n).s;
 		size_t l = str_from_id(n).n;
@@ -295,9 +294,9 @@ bool lp_add_clause(clause c, bool bsrc) {
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
-	DEBUG(	(wprintf(L"plug term %d of ", ps-s.terms), clause_print(s, &sout, &outlen),
-		wprintf(L" into term %d of ", pd-d.terms), clause_print(d, &sout, &outlen),
-		wprintf(L" results with ")));
+	DEBUG(	(out_str_f(L"plug term %d of ", ps-s.terms), clause_print(s, &sout, &outlen),
+		out_str_f(L" into term %d of ", pd-d.terms), clause_print(d, &sout, &outlen),
+		out_str(L" results with ")));
 	for (size_t n = 1; n <= ps->ar; ++n)
 		if (!var_set_rep(ps->t[n], pd->t[n])) goto fail;
 	for_all_terms(d, x)
@@ -308,7 +307,7 @@ clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
 	DEBUG((clause_print(r, &sout, &outlen), newline));
 	return r;
-fail:	DEBUG(wprintf(L"none.\n"));
+fail:	DEBUG(out_str(L"none.\n"));
 	return clause_clear(r);
 }
 
@@ -334,7 +333,7 @@ int main(int argc, char** argv) {
 	
 	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_src);
 	while ((c = clause_read(&all)).terms) {
-		DEBUG((wprintf(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
+		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
 		b = false;
 		if (rec) lp_add_clause(c, false);
 		for_all_terms(c, x)
