@@ -274,14 +274,14 @@ bool lp_add_clause(clause c, bool bsrc) {
 			if (!clause_cmp(&c, &res.c[n])) return true;
 		array_append(res.c, clause, res.sz, c); return true;
 	}
-	for_all_terms(c, x)
-		if (abs(*x->t) == -rel) {
+	for_all_terms(c, x) {
+//		if (abs(*x->t) == -rel) {
 			for (size_t n = 0; n < src.sz; ++n)
 				if (!clause_cmp(&c, &src.c[n]))
 					return true;
 			array_append(src.c, clause, src.sz, c);
 			return true;
-		}
+	}
 	return true;
 }
 
@@ -313,6 +313,27 @@ fail://	DEBUG(out_str(L"none.\n"));
 	return clause_clear(r);
 }
 
+void process(int_t r) {
+	clause c;
+	size_t p = 0;
+	while (p < src.sz && !!(c = clause_dup(src.c[p++])).terms) {
+//		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
+		lp_add_clause(c, false);
+		for_all_terms(c, x)
+			if (abs(*x->t) != -r) continue;
+			else for (size_t n=0; n<src.sz; ++n)
+				for_all_terms(src.c[n], y)
+					if (-*y->t != *x->t) continue;
+					else lp_add_clause(clause_plug(
+						src.c[n], y, c, x), false);
+	}
+	for_all_clauses(res, c) {
+		clause_print(*c, &sout, &outlen);
+		newline;
+	}
+	fputws(sout, stdout);
+}
+
 int main(int argc, char** argv) {
 	sout = new(wchar_t);
 	*sout = 0;
@@ -320,13 +341,18 @@ int main(int argc, char** argv) {
 	setlocale(LC_CTYPE, "");
 	idctx = str_to_id(L"default", 7);
 	if (argc != 3 && argc != 4) er(usage);
-	bool rec = argc == 3;// !strcmp(argv[2], "-r"), b;
-	const size_t rlen = mbstowcs(0, argv[1], 0);
+	const bool rec = argc == 3;// !strcmp(argv[2], "-r"), b;
+	size_t rlen = mbstowcs(0, argv[1], 0);
 	if (rlen == (size_t)-1) er(err_inrel);
 
 	clause c;
-	wchar_t rsym[rlen+1], *all;
+	wchar_t rsym[rlen+9], *all;
 	mbstowcs(rsym, argv[1], rlen), rsym[rlen] = 0;
+	if (!wcschr(rsym, L':')) {
+		wmemmove(rsym + 8, rsym, rlen+1);
+		wmemcpy(rsym, L"default:", 8);
+		rlen += 8;
+	}
 	rel = str_to_id(rsym, rlen);
 	if (!(all = file_read_text(fopen(argv[2], "r")))) er(err_src);
 	while (all && (c = clause_read(&all)).terms) {
@@ -334,10 +360,10 @@ int main(int argc, char** argv) {
 //		DEBUG((out_str(L"src clause: "), clause_print(c, &sout, &outlen), newline));
 	}
 	
-	if (!rec && !(all = file_read_text(fopen(argv[3], "r")))) er(err_dst);
+	if (rec) return process(rel), 0;
 
-	size_t p = 0;
-	while (rec ? (p < src.sz) && !!(c = clause_dup(src.c[p++])).terms : !!(c = clause_read(&all)).terms) {
+	if ((all = file_read_text(fopen(argv[3], "r")))) er(err_dst); 
+	while ((c = clause_read(&all)).terms) {
 //		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
 		if (rec) lp_add_clause(c, false);
 		for_all_terms(c, x)
