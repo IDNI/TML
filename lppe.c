@@ -26,7 +26,7 @@ size_t outlen = 0;
 
 #define new(x)			((x*)malloc(sizeof(x)))
 #ifdef DEBUG_
-#define DEBUG(x) x
+#define DEBUG(x) out_str(L"# "), (x)
 #else
 #define DEBUG(x)
 #endif
@@ -62,6 +62,7 @@ size_t outlen = 0;
 #define sep_expected "Term or ':-' or '.' expected\n"
 #define err_inrel "Unable to read the input relation symbol.\n"
 #define err_src "Unable to read src file.\n"
+#define err_dst "Unable to read dst file.\n"
 
 uint32_t hash(ws s, size_t n) {
 	uint32_t h = 1;
@@ -187,8 +188,12 @@ bool clause_add_term(clause *c, const term t) {
 	return array_append(c->terms, term, c->sz, t), true;
 }
 
+void term_reset_vars(const term t) {
+	for_all_args(t, x) if (*x > 0) var_clear_rep(*x);
+}
+
 void clause_reset_vars(const clause c) {
-	for_all_terms(c, t) for_all_args(*t, x) if (*x > 0) var_clear_rep(*x);
+	for_all_terms(c, t) term_reset_vars(*t);
 }
 
 void clause_renum_vars(clause c, size_t v) {
@@ -210,6 +215,7 @@ clause clause_read(wchar_t **in) {
 next:	t = term_read(in);
 	if (!t.t) return c;
 	if (neg) *t.t = -*t.t;
+	term_reset_vars(t);
 	if (!clause_add_term(&c, t)) return clause_clear(c);
 	if (**in == L':') {
 		if (*(++*in) != L'-') er(entail_expected);
@@ -294,9 +300,9 @@ bool lp_add_clause(clause c, bool bsrc) {
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
-	DEBUG(	(out_str_f(L"plug term %d of ", ps-s.terms), clause_print(s, &sout, &outlen),
-		out_str_f(L" into term %d of ", pd-d.terms), clause_print(d, &sout, &outlen),
-		out_str(L" results with ")));
+//	DEBUG(	(out_str_f(L"plug term %d of ", ps-s.terms), clause_print(s, &sout, &outlen),
+//		out_str_f(L" into term %d of ", pd-d.terms), clause_print(d, &sout, &outlen),
+//		out_str(L" results with ")));
 	for (size_t n = 1; n <= ps->ar; ++n)
 		if (!var_set_rep(ps->t[n], pd->t[n])) goto fail;
 	for_all_terms(d, x)
@@ -305,9 +311,9 @@ clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 		if (x != ps && !clause_add_term(&r, term_dup(*x))) goto fail;
 	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
-	DEBUG((clause_print(r, &sout, &outlen), newline));
+//	DEBUG((clause_print(r, &sout, &outlen), newline));
 	return r;
-fail:	DEBUG(out_str(L"none.\n"));
+fail://	DEBUG(out_str(L"none.\n"));
 	return clause_clear(r);
 }
 
@@ -328,12 +334,15 @@ int main(int argc, char** argv) {
 	mbstowcs(rsym, argv[1], rlen), rsym[rlen] = 0;
 	rel = str_to_id(rsym, rlen);
 	if (!(all = file_read_text(fopen(argv[2], "r")))) er(err_src);
-	while (all && (c = clause_read(&all)).terms) lp_add_clause(c, true);
-//	for_all_clauses(src, c) clause_print(*c), newline;
+	while (all && (c = clause_read(&all)).terms) {
+		lp_add_clause(c, true);
+//		DEBUG((out_str(L"src clause: "), clause_print(c, &sout, &outlen), newline));
+	}
 	
-	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_src);
+	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_dst);
+
 	while ((c = clause_read(&all)).terms) {
-		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
+//		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
 		b = false;
 		if (rec) lp_add_clause(c, false);
 		for_all_terms(c, x)
