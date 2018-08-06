@@ -100,8 +100,7 @@ int_t var_get_rep(int_t v) {
 
 bool var_set_rep(int_t x, int_t y) {
 	if (x < 0) {
-nx:		if (y < 0 || (y = labels[y-1].p = var_get_rep(y)) < 0)
-			return x == y;
+nx:		if (y<0 || (y=labels[y-1].p = var_get_rep(y)) < 0) return x==y;
 		labels[y-1].p = x;
 	} else if ((x = labels[x-1].p = var_get_rep(x))<0) goto nx;
 	else if (y < 0) labels[x-1].p = y;
@@ -164,7 +163,6 @@ void id_print(int_t n, wchar_t **out, size_t *len) {
 		size_t l = str_from_id(n).n;
 		if (l >= 8 && !wcsncmp(s,L"default:", 8)) (s += 8), l -= 8;
 		wcsncat(*out = str_resize(*out, *len, l), s, l);
-//		while (l--) putwchar(*s++);
 	}
 }
 void term_print(const term t, wchar_t **out, size_t *len) {
@@ -176,7 +174,6 @@ void term_print(const term t, wchar_t **out, size_t *len) {
 			wcscat(str_resize(*out, *len, 1), L",");
 	}
 	wcscat(str_resize(*out, *len, 1), L")");
-//	putwchar(L')');
 }
 
 bool clause_add_term(clause *c, const term t) {
@@ -188,13 +185,8 @@ bool clause_add_term(clause *c, const term t) {
 	return array_append(c->terms, term, c->sz, t), true;
 }
 
-void term_reset_vars(const term t) {
-	for_all_args(t, x) if (*x > 0) var_clear_rep(*x);
-}
-
-void clause_reset_vars(const clause c) {
-	for_all_terms(c, t) term_reset_vars(*t);
-}
+void term_reset_vars(const term t){for_all_args(t,x) if(*x>0)var_clear_rep(*x);} 
+void clause_reset_vars(const clause c) {for_all_terms(c, t)term_reset_vars(*t);}
 
 void clause_renum_vars(clause c, size_t v) {
 	if (nlabels < (v+c.nvars))
@@ -250,13 +242,11 @@ void clause_print(const clause a, wchar_t **out, size_t *len) {
 	for (size_t n = 0; n < a.sz; ++n) {
 		term x = a.terms[n];
 		if ((b = (*x.t > 0))) (*x.t = -*x.t);
-		if (term_print(x, out, len), n == a.sz - 1)// putwchar(L'.');
+		if (term_print(x, out, len), n == a.sz - 1)
 			wcscat(str_resize(*out, *len, 1), L".");
-		else if (*a.terms[n+1].t>0 && !b) {
+		else if (*a.terms[n+1].t>0 && !b)
 			wcscat(str_resize(*out, *len, 4), L" :- ");
-		}
-		else //fputws(L" ", stdout);
-			wcscat(str_resize(*out, *len, 1), L" ");
+		else wcscat(str_resize(*out, *len, 1), L" ");
 		if (b) *x.t = -*x.t;
 	}
 }
@@ -271,7 +261,6 @@ int clause_cmp(const void* _x, const void* _y) {
 
 bool lp_add_clause(clause c, bool bsrc) {
 	if (!c.terms) return false;
-	//DEBUG((wprintf(bsrc ? L"lp_add_clause(src): " : L"lp_add_clause(dst): "), clause_print(c), newline));
 	size_t sz = 0;
 	for_all_terms(c, x) sz += x->ar+1;
 	int_t *t = malloc(sizeof(int_t) * sz), *s = t;
@@ -281,7 +270,6 @@ bool lp_add_clause(clause c, bool bsrc) {
 	t = s;
 	for_all_terms(c, x) free(x->t), (x->t = t), t += x->ar+1;
 	if (!bsrc) {
-//		if (same_grounded_head(c, res.c[n]
 		for (size_t n = 0; n < res.sz; ++n)
 			if (!clause_cmp(&c, &res.c[n])) return true;
 		array_append(res.c, clause, res.sz, c); return true;
@@ -295,6 +283,14 @@ bool lp_add_clause(clause c, bool bsrc) {
 			return true;
 		}
 	return true;
+}
+
+clause clause_dup(const clause c) {
+	clause r;
+	r.nvars = c.nvars;
+	r.terms = malloc(sizeof(term)*(r.sz = c.sz));
+	for (size_t n = 0; n < r.sz; ++n) r.terms[n] = term_dup(c.terms[n]);
+	return r;
 }
 
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
@@ -323,9 +319,8 @@ int main(int argc, char** argv) {
 
 	setlocale(LC_CTYPE, "");
 	idctx = str_to_id(L"default", 7);
-	if (argc != 4 && argc != 5) er(usage);
-	bool rec = !strcmp(argv[2], "-r"), b;
-	if (rec) (argv[2] = argv[3]), argv[3] = argv[4];
+	if (argc != 3 && argc != 4) er(usage);
+	bool rec = argc == 3;// !strcmp(argv[2], "-r"), b;
 	const size_t rlen = mbstowcs(0, argv[1], 0);
 	if (rlen == (size_t)-1) er(err_inrel);
 
@@ -339,18 +334,18 @@ int main(int argc, char** argv) {
 //		DEBUG((out_str(L"src clause: "), clause_print(c, &sout, &outlen), newline));
 	}
 	
-	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_dst);
+	if (!rec && !(all = file_read_text(fopen(argv[3], "r")))) er(err_dst);
 
-	while ((c = clause_read(&all)).terms) {
+	size_t p = 0;
+	while (rec ? (p < src.sz) && !!(c = clause_dup(src.c[p++])).terms : !!(c = clause_read(&all)).terms) {
 //		DEBUG((out_str(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
-		b = false;
 		if (rec) lp_add_clause(c, false);
 		for_all_terms(c, x)
 			if (abs(*x->t) != -rel) continue;
 			else for (size_t n=0; n<src.sz; ++n)
 				for_all_terms(src.c[n], y)
 					if (-*y->t != *x->t) continue;
-					else b |= lp_add_clause(clause_plug(
+					else lp_add_clause(clause_plug(
 						src.c[n], y, c, x), false);
 	}
 	for_all_clauses(res, c) {
