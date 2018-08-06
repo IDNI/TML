@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <assert.h>
 
-#define DEBUG_
+//#define DEBUG_
 #define int_t			intptr_t
 typedef const wchar_t* ws;
 typedef struct	{ int_t *t;	size_t ar; 		} term;
@@ -21,6 +21,8 @@ dict_t *labels = 0;
 size_t nlabels = 0;
 lp src, res;
 int_t rel, idctx;
+wchar_t *sout = 0;
+size_t outlen = 0;
 
 #define new(x)			((x*)malloc(sizeof(x)))
 #ifdef DEBUG_
@@ -47,7 +49,7 @@ int_t rel, idctx;
 #define for_all_terms(c, x) for (term* x=(c).terms; x!=&(c).terms[(c).sz]; ++x)
 #define for_all_args(tt, x) for (int_t* x=(tt).t+1; x!=&(tt).t[(tt).ar+1]; ++x)
 #define er(x)	perror(x), exit(0)
-#define newline putwchar(L'\n')
+#define newline wcscat(str_resize(sout, outlen, 1),  L"\n")
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 #define oparen_expected "'(' expected\n"
@@ -149,23 +151,32 @@ int term_cmp(const void* _x, const void* _y) {
 		: x->ar > y->ar ? 1 : -1;
 }
 
-void id_print(int_t n) {
-	if (n > 0) wprintf(L"?%d", n);
+wchar_t tmp[128];
+#define str_resize(s, n, k) (((s) = realloc(s, sizeof(wchar_t) * (2+(n += k)))), s)
+
+void id_print(int_t n, wchar_t **out, size_t *len) {
+	if (n > 0) {
+		swprintf(tmp, 128, L"?%d", n);
+		*out = wcscat(str_resize(*out, *len, wcslen(tmp)), tmp);
+	}
 	else {
 		ws s = str_from_id(n).s;
 		size_t l = str_from_id(n).n;
 		if (l >= 8 && !wcsncmp(s,L"default:", 8)) (s += 8), l -= 8;
-		while (l--) putwchar(*s++);
+		wcsncat(*out = str_resize(*out, *len, l), s, l);
+//		while (l--) putwchar(*s++);
 	}
 }
-
-void term_print(const term t) {
-	id_print(*t.t > 0 ? -*t.t : *t.t), putwchar(L'(');
+void term_print(const term t, wchar_t **out, size_t *len) {
+	id_print(*t.t > 0 ? -*t.t : *t.t, out, len);
+	wcscat(str_resize(*out, *len, 1), L"(");
 	for_all_args(t, x) {
-		id_print(*x);
-		if (x != &t.t[t.ar]) putwchar(L',');
+		id_print(*x, out, len);
+		if (x != &t.t[t.ar])// putwchar(L',');
+			wcscat(str_resize(*out, *len, 1), L",");
 	}
-	putwchar(L')');
+	wcscat(str_resize(*out, *len, 1), L")");
+//	putwchar(L')');
 }
 
 bool clause_add_term(clause *c, const term t) {
@@ -229,15 +240,18 @@ next:	for (n = l = 0; n < 31; ++n)
 	return all;
 }
 
-void clause_print(const clause a) {
+void clause_print(const clause a, wchar_t **out, size_t *len) {
 	bool b;
 	for (size_t n = 0; n < a.sz; ++n) {
 		term x = a.terms[n];
 		if ((b = (*x.t > 0))) (*x.t = -*x.t);
-		if (term_print(x), n == a.sz - 1) putwchar(L'.');
-		else if (*a.terms[n+1].t>0 && !b)
-			fputws(L" :- ", stdout);
-		else fputws(L" ", stdout);
+		if (term_print(x, out, len), n == a.sz - 1)// putwchar(L'.');
+			wcscat(str_resize(*out, *len, 1), L".");
+		else if (*a.terms[n+1].t>0 && !b) {
+			wcscat(str_resize(*out, *len, 4), L" :- ");
+		}
+		else //fputws(L" ", stdout);
+			wcscat(str_resize(*out, *len, 1), L" ");
 		if (b) *x.t = -*x.t;
 	}
 }
@@ -252,6 +266,7 @@ int clause_cmp(const void* _x, const void* _y) {
 
 bool lp_add_clause(clause c, bool bsrc) {
 	if (!c.terms) return false;
+	//DEBUG((wprintf(bsrc ? L"lp_add_clause(src): " : L"lp_add_clause(dst): "), clause_print(c), newline));
 	size_t sz = 0;
 	for_all_terms(c, x) sz += x->ar+1;
 	int_t *t = malloc(sizeof(int_t) * sz), *s = t;
@@ -280,8 +295,8 @@ bool lp_add_clause(clause c, bool bsrc) {
 clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 	clause r = (clause){ .terms = 0, .sz = 0, .nvars = 0 };
 	clause_renum_vars(s, d.nvars), clause_reset_vars(s), clause_reset_vars(d);
-	DEBUG(	(wprintf(L"plug term %d of ", ps-s.terms), clause_print(s),
-		wprintf(L" into term %d of ", pd-d.terms), clause_print(d),
+	DEBUG(	(wprintf(L"plug term %d of ", ps-s.terms), clause_print(s, &sout, &outlen),
+		wprintf(L" into term %d of ", pd-d.terms), clause_print(d, &sout, &outlen),
 		wprintf(L" results with ")));
 	for (size_t n = 1; n <= ps->ar; ++n)
 		if (!var_set_rep(ps->t[n], pd->t[n])) goto fail;
@@ -291,13 +306,16 @@ clause clause_plug(clause s, const term *ps, clause d, const term *pd) {
 		if (x != ps && !clause_add_term(&r, term_dup(*x))) goto fail;
 	clause_renum_vars(r, 0), clause_sort(r), clause_renum_vars(r, 0), clause_sort(r);
 	clause_reset_vars(s), clause_reset_vars(d), clause_reset_vars(r);
-	DEBUG((clause_print(r), newline));
+	DEBUG((clause_print(r, &sout, &outlen), newline));
 	return r;
 fail:	DEBUG(wprintf(L"none.\n"));
 	return clause_clear(r);
 }
 
 int main(int argc, char** argv) {
+	sout = new(wchar_t);
+	*sout = 0;
+
 	setlocale(LC_CTYPE, "");
 	idctx = str_to_id(L"default", 7);
 	if (argc != 4 && argc != 5) er(usage);
@@ -316,7 +334,9 @@ int main(int argc, char** argv) {
 	
 	if (!(all = file_read_text(fopen(argv[3], "r")))) er(err_src);
 	while ((c = clause_read(&all)).terms) {
+		DEBUG((wprintf(L"dst clause: "), clause_print(c, &sout, &outlen), newline));
 		b = false;
+		if (rec) lp_add_clause(c, false);
 		for_all_terms(c, x)
 			if (abs(*x->t) != -rel) continue;
 			else for (size_t n=0; n<src.sz; ++n)
@@ -324,8 +344,11 @@ int main(int argc, char** argv) {
 					if (-*y->t != *x->t) continue;
 					else b |= lp_add_clause(clause_plug(
 						src.c[n], y, c, x), false);
-		if (rec) lp_add_clause(c, false);
 	}
-	for_all_clauses(res, c) clause_print(*c), newline;
+	for_all_clauses(res, c) {
+		clause_print(*c, &sout, &outlen);
+		newline;
+	}
+	fputws(sout, stdout);
 	return 0;
 }
