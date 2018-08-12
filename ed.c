@@ -8,23 +8,20 @@
 #define int_t int32_t
 typedef const wchar_t* ws;
 typedef struct term term; typedef struct rule rule;
-typedef struct drule drule; typedef struct node node;
 typedef struct labels labels; typedef struct dict dict;
-typedef struct nodes nodes; typedef struct facts facts;
+typedef struct rules rules; typedef struct facts facts;
 typedef struct db db; typedef struct state state;
 typedef struct dict dict; typedef struct lp lp;
 
-struct term	{ int_t *a;	size_t ar;	};
-struct rule	{ term *a;	size_t sz;	};
-struct drule	{ rule r;	size_t dot;	};
-struct node	{ drule r;	node *up;	};
-struct labels	{ dict *a;	size_t sz;	};
-struct nodes	{ node *n;	int_t h;	nodes *r, *l;	};
+struct term	{ int_t *a;	size_t ar;			};
+struct rule	{ term *a;	size_t sz, nup;	rule **up;	};
+struct labels	{ dict *a;	size_t sz;			};
+struct rules	{ rule *t;	int_t h;	rules *r, *l;	};
 struct facts	{ term *t;	int_t h;	facts *r, *l;	};
 struct db	{ facts *f;	term *t;	size_t sz;	};
 struct lp	{ rule *r;	size_t sz, *nvars; labels l; 	};
-struct state	{ nodes *act, *inact;	
-		  node *acts, *inacts;
+struct state	{ rules *act, *inact;	
+		  rule *acts, *inacts;
 	  	  size_t nacts, ninacts; }; 
 struct dict	{ int_t id, rep, h;
 		  ws s;
@@ -37,8 +34,8 @@ struct dict	{ int_t id, rep, h;
 #define for_each_ft(t, b, e, x) for (t x = (b); x != (e); ++x)
 #define for_each(t, a, sz, x) for_each_ft(t, a, &((a)[sz]) , x) 
 #define lp_for_each_rule(p, x) for_each(const rule*, (p).r, (p).sz, x)
-#define for_each_active_node(s, x) for_each(node*,(s).acts,(s).nacts,x)
-#define for_each_inact_node(s,x) for_each(node*,(s).inacts,(s).ninacts,x)
+#define for_each_active_rule(s, x) for_each(rule*,(s).acts,(s).nacts,x)
+#define for_each_inact_rule(s,x) for_each(rule*,(s).inacts,(s).ninacts,x)
 #define for_each_fact(d,x) for_each(const term*, d.t, d.sz, x)
 #define rule_for_each_term(r, x, o) for_each(term*, (r).a+o, (r).sz, x)
 #define term_for_each_sym(t, x) for_each(int_t*, (t).a, (t).ar+1, x)
@@ -50,7 +47,6 @@ struct dict	{ int_t id, rep, h;
 #define var_rep(p, v) ((p).l.a[(v)-1].rep)
 #define rule_sub(p, x) rule_for_each_arg(x,tt,0) if(*tt>0&&var_rep(p,*tt))*tt=var_rep(p,*tt)
 #define rule_reset_reps(p, r) rule_for_each_arg(r, yy, 0) if (*yy > 0) var_rep(p,*yy) = 0
-#define node_get_dotted(x) ((x).r.r.a[(x).r.dot])
 #define sameterm(x,y) ((x).ar==(y).ar && !memcmp(x.a,y.a,sizeof(int_t)*((x).ar+1)))
 #define samedrule(x,y) (x).dot == (y).dot && samerule((x).r, (y).r)
 
@@ -60,9 +56,9 @@ int_t str_hash(ws s, size_t n) {
 	return h;
 }
 
-int_t drule_hash(drule r) {
+int_t rule_hash(rule r) {
 	int_t h = 1;
-	rule_for_each_sym(r.r, x) h *= 1 + *x * __builtin_bswap32(*x) + r.dot;
+	rule_for_each_sym(r, x) h *= 1 + *x * __builtin_bswap32(*x);
 	return h;
 }
 
@@ -72,21 +68,22 @@ bool samerule(rule x, rule y) {
 	 return true;
 }
 
-node* node_add(nodes **n, node **a, size_t *sz, drule r) {
-	int_t h = drule_hash(r);
+rule* rule_add(rules **n, rule **a, size_t *sz, rule r) {
+	int_t h = rule_hash(r);
 loop:	if (!*n) {
-		array_append(*a, node, *sz, ((node){.r=r,.up=0}));
-		*(*n = new(nodes)) = (nodes){.n=&(*a)[*sz-1],.h=h,.l=0,.r=0};
-		return (**n).n;
+		array_append(*a, rule, *sz, r);
+		*(*n = new(rules)) = (rules){.t=&(*a)[*sz-1],.h=h,.l=0,.r=0};
+		return (**n).t;
 	}
-	if ((**n).h == h && samedrule(r, (**n).n->r))
+	if ((**n).h == h && samerule(r, *(**n).t))
 	n = (**n).h < h ? &(**n).l : &(**n).r;
 	goto loop;
 }
 
-bool state_add_rule(state *s, drule r, node *u) {
+bool state_add_rule(state *s, rule r, rule *u) {
 	const size_t k = s->nacts;
-	node_add(&s->act, &s->acts, &s->nacts, r)->up = u;
+	rule *x = rule_add(&s->act, &s->acts, &s->nacts, r);
+	array_append(x->up, rule*, x->nup, u);
 	return k != s->nacts;
 }
 
@@ -137,25 +134,24 @@ bool var_set_rep(lp p, int_t x, int_t y, size_t offset) {
 	return true;
 }
 
-bool rule_resolve(lp p, size_t r, node *n, rule *res) {
-	if (	*head(p.r[r]).a != *node_get_dotted(*n).a ||
-		head(p.r[r]).ar != node_get_dotted(*n).ar) return false;
+bool rule_resolve(lp p, size_t r, rule *n, rule *res) {
+	if (*head(p.r[r]).a != *n->a->a || head(p.r[r]).ar != n->a->ar) return false;
 	rule_reset_reps(p, p.r[r]);
-	rule_reset_reps(p, n->r.r);
+	rule_reset_reps(p, *n);
 	for (size_t i = 1; i <= head(p.r[r]).ar; ++i)
-		if (!var_set_rep(p, head(p.r[r]).a[i], afterdot(n->r).a[i], p.nvars[r]))
+		if (!var_set_rep(p, head(p.r[r]).a[i], *n->a->a, p.nvars[r]))
 			return false;
 	*res = rule_dup(p, p.r[r], 0);
 	return true;
 }
 
-bool edb_resolve(lp p, term f, node *n, rule *res) {
-	if (*f.a != *node_get_dotted(*n).a || f.ar != node_get_dotted(*n).ar) return false;
-	rule_reset_reps(p, n->r.r);
+bool edb_resolve(lp p, term f, rule *n, rule *res) {
+	if (*f.a != *n->a->a || f.ar !=n->a->ar) return false;
+	rule_reset_reps(p, *n);
 	for (size_t i = 1; i <= f.ar; ++i)
-		if (!var_set_rep(p, f.a[i], afterdot(n->r).a[i], 0))
+		if (!var_set_rep(p, f.a[i], n->a->a[i], 0))
 			return false;
-	*res = rule_dup(p, n->r.r, 1);
+	*res = rule_dup(p, *n, 1);
 	return true;
 }
 
@@ -163,9 +159,9 @@ bool inst(state *s, const lp p, state *ss) {
 	rule r;
 	bool b = false;
 	for (size_t n = 0; n < p.sz; ++n)
-		for_each_active_node(*s, x)
+		for_each_active_rule(*s, x)
 			if (rule_resolve(p, n, x, &r))
-				b |= state_add_rule(ss, (drule){.r=r,.dot=0}, x);
+				b |= state_add_rule(ss, r, x);
 	return b;
 }
 
@@ -173,8 +169,18 @@ bool edb_reduce(lp p, state *s, const db d, state *ss) {
 	rule r;
 	bool b = false;
 	for_each_fact(d, x)
-		for_each_inact_node(*s, y)
+		for_each_inact_rule(*s, y)
 			if (edb_resolve(p, *x, y, &r))
-				b |= state_add_rule(ss, (drule){.r=r,.dot=0}, y);
+				b |= state_add_rule(ss, r, y);
+	return b;
+}
+
+bool idb_reduce(lp p, state *s, const db d, state *ss) {
+	rule r;
+	bool b = false;
+	for_each_fact(d, x)
+		for_each_inact_rule(*s, y)
+			if (edb_resolve(p, *x, y, &r))
+				b |= state_add_rule(ss, r, y);
 	return b;
 }
