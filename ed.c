@@ -125,4 +125,5 @@ int main(int argc, char** argv) {
 	if (!(all = file_read_text(fopen(argv[1], "r")))) er(err_src);
 	while (all && (r = rule_read(&p, &all)).a)
 		lp_add_rule(p, r), rule_print(p, r, &sout, &outlen);
+	fputws(sout, stdout);
 }
