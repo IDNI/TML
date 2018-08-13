@@ -19,7 +19,7 @@ int_t dict_get(labels *l, ws s, size_t n) {
 	const int_t h = str_hash(s, n);
 	dict **d = &l->a;
 loop:	if (!*d) {
-		int_t id = *s == L'?' ? l->sz : -l->sz;
+		int_t id = *s == L'?' ? l->sz+1 : (-l->sz-1);
 		array_append(l->a, dict, l->sz, ((dict){.id=id,.s=s,.n=n,.h=h,.l=0,.r=0}));
 		return id;
 	}
@@ -32,21 +32,20 @@ loop:	if (!*d) {
 
 dict* dict_get_str(labels l, int_t n) { return n > 0 ? &l.a[n-1] : &l.a[-n-1]; }
 
-wchar_t* str_read(lp p, int_t *r, wchar_t *in) {
+wchar_t* str_read(lp *p, int_t *r, wchar_t *in) {
 	wchar_t *s = in, *t;
 	while (*s && iswspace(*s)) ++s;
 	if (!*s) return 0;
 	if (*(t = s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
 	while (iswspace(*t)) ++t;
-	while (iswalnum(*t)) ++t;
 	if (t == s) return 0;
-	*r = dict_get(&p.l, s, t - s);
+	*r = dict_get(&p->l, s, t - s);
 	while (*t && iswspace(*t)) ++t;
 	return t;
 }
 
-term term_read(lp p, wchar_t **in) {
+term term_read(lp *p, wchar_t **in) {
 	int_t x;
 	term r = (term){ .a = 0, .ar = 0 };
 	while (**in != L')' && (*in = str_read(p, &x, *in))) {
@@ -64,10 +63,10 @@ wchar_t tmp[128];
 void id_print(lp p, int_t n, wchar_t **out, size_t *len) {
 	if (n > 0) out_str_f(L"?%d", n);
 	else {
-		ws s = dict_get_str(p.l, n)->s;
-		size_t l = dict_get_str(p.l, n)->n;
-		if (l >= 8 && !wcsncmp(s,L"default:", 8)) (s += 8), l -= 8;
-		wcsncat(*out = str_resize(*out, *len, l), s, l);
+		dict *d = dict_get_str(p.l, n);
+		*out = realloc(*out, sizeof(wchar_t) * (1+(*len += d->n)));
+//		*out = str_resize(*out, *len, d->n);
+		wcsncat(*out, d->s, d->n);
 	}
 }
 
@@ -83,28 +82,31 @@ void term_print(lp p, const term t, wchar_t **out, size_t *len) {
 }
 
 void rule_add_term(rule *c, const term t) {
-//	term_for_each_arg(t, x) if (*x > 0) ++c->nvars, *x = var_get_rep(*x);
-	rule_for_each_term(*c, x, 1)
+	if (c->a) rule_for_each_term(*c, x, 1)
 		if (sameterm(*x, t))
 			return;
 	array_append(c->a, term, c->sz, t);
 }
 
-rule rule_read(lp p, wchar_t **in) {
+rule rule_read(lp *p, wchar_t **in) {
 	rule c = (rule){.a=0,.sz=0};
 	while (iswspace(**in)) ++*in;
 	if (!**in) return c;
 	term t = term_read(p, in);
 	if (!t.a) return c;
-	term_for_each_arg(t, x) if (*x > 0) var_rep(p, *x) = 0;
+	term_for_each_arg(t, x) if (*x > 0) {
+		vars_verify_size(*p, *x);
+		var_rep(*p, *x) = 0;
+	}
 	rule_add_term(&c, t);
 	if (**in == L'.') return ++*in, c;
 	if (*((*in)++) != L':' || *((*in)++) != L'-') er(entail_expected);
 next:	if (!(t = term_read(p, in)).a) return c;
-	term_for_each_arg(t, x) if (*x > 0) var_rep(p, *x) = 0;
+	term_for_each_arg(t, x) if (*x > 0) var_rep(*p, *x) = 0;
 	rule_add_term(&c, t);
 	if (**in != L'.') goto next;
 	rule_normvars(p, c);
+	while (iswspace(**in)) ++*in;
 	return ++*in,  c;
 }
 
@@ -132,5 +134,5 @@ void rule_print(lp p, const rule a, wchar_t **out, size_t *len) {
 	if (a.sz > 1) wcscat(str_resize(*out, *len, 4), L" :- ");
 	for (size_t n = 1; n < a.sz; ++n)
 		term_print(p, a.a[n], out, len),
-		wcscat(str_resize(*out, *len, 1), n == a.sz - 1 ? L" ." : L", ");
+		wcscat(str_resize(*out, *len, 2), n == a.sz - 1 ? L" ." : L", ");
 }
