@@ -1,2 +1,2 @@
 all:
-	cc lppe.c -W -Wpedantic -Wall -g
+	cc ed.c io.c -W -Wpedantic -Wall -g
