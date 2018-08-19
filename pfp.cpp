@@ -38,11 +38,10 @@ term sub(const term& t) {
 
 rule sub_chop(const rule& t, size_t n) {
 	rule r;
-	for (size_t k = 0; k < t.size(); ++k)
-		if (n != k)
-			r.push_back(sub(t[n]));
+	for (size_t k = 0; k < t.size(); ++k) if (n!=k) r.push_back(sub(t[n]));
 	return r;
 }
+
 bool stage::Tp(rule r, delta &add, delta &del) {
 	for (size_t n = 1; n < r.size(); ++n)
 		for (term f : at(make_pair(abs(r[n][0]), r[n].size()-1)))
@@ -61,24 +60,39 @@ bool stage::Tp(rule r, delta &add, delta &del) {
 	return true;
 }
 
-void rule::normalize() {
-	for (term t : *this)
+void normalize(rule &r, size_t &v) {
+	for (term t : r)
 		for (int_t x : t)
 			if (x > 0) var_rep(x) = 0;
-	size_t v = 0;
-	for (term t : *this)
+	for (term &t : r)
 		for (int_t &x : t)
 			if (x < 0) continue;
-			else if (var_rep(x)) x=var_rep(x);
-			else x = var_rep(x) = ++v;
+			else if (var_rep(x)) x = var_rep(x);
+			else x = var_rep(x) = v++;
+}
+
+long long get_rnd() {
+	static random_device d;
+	static mt19937 g(d());
+	static uniform_int_distribution<long long> u;
+	return u(g);
 }
 
 int_t dict_get(const char *s, size_t n) {
 	ditem i(s, n);
 	auto it = dict.find(i);
 	if (it != dict.end()) return it->second;
+	i.hash = get_rnd();
 	ditems.push_back(i);
 	return dict[i] = *s=='?' ? ditems.size() : -ditems.size();
+}
+
+long long term_hash::operator()(const term& t) const {
+	long long h = 0;
+	for (int_t x : t)
+	for (size_t n = 0; n < t.size(); ++n)
+		h ^= str_get_hash(x) << (n + 1);
+	return h;
 }
 
 const wchar_t* str_read(int_t *r, const wchar_t *in) {
@@ -97,23 +111,16 @@ const wchar_t* str_read(int_t *r, const wchar_t *in) {
 term term_read(const wchar_t **in) {
 	int_t x;
 	term r;
-	while (**in != L')' && (*in = str_read(&x, *in))) {
+	while (**in != L')' && (*in = str_read(&x, *in)))
 		if (!r.size() && *((*in)++) != L'(') er(oparen_expected);
-		r.push_back(x);
-		if (**in == L',') ++*in;
+		else if (r.push_back(x); **in == L',') ++*in;
 		else if (**in == L')') break;
 		else if (r.size() != 1) er(comma_expected);
-	}
 	for (++*in; iswspace(**in); ++*in);
 	return r;
 }
 
-void id_print(int_t n, ostream &os) {
-	if (n > 0) os << '?' << n;
-	else os << str_get(n);
-}
-
-rule rule_read(const wchar_t **in) {
+rule rule_read(const wchar_t **in, size_t &v) {
 	rule c;
 	while (iswspace(**in)) ++*in;
 	if (!**in) return c;
@@ -130,20 +137,19 @@ next:	if ((t = term_read(in)).empty()) return c;
 	c.push_back(t);
 	if (**in != L'.') goto next;
 	while (iswspace(**in)) ++*in;
-	return ++*in, c.normalize(), c;
+	return ++*in, normalize(c, v), c;
 }
 
 lp lp_read(const wchar_t *in) {
 	lp p;
-	rule r;
-	while (!(r = rule_read(&in)).empty()) p.push_back(r);
-	return p;
+	size_t v = 1;
+	for (rule r; !(r = rule_read(&in, v)).empty();) p.push_back(r);
+	return memset(e = new int_t[v], 0, v * sizeof(int_t)), p;
 }
 
 ostream& operator<<(ostream& os, const term t) {
-	id_print(t[0] > 0 ? t[0] : -t[0], os);
-	os << '(';
-	cterm_for_each_arg(t, x) if (id_print(*x, os); x != &t[t.size()]) os << ',';
+	id_format(t[0] > 0 ? t[0] : -t[0], os) << '(';
+	cterm_for_each_arg(t, x) if (id_format(*x, os); x != &t[t.size()]) os << ',';
 	return os << ')';
 }
 

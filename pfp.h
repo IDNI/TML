@@ -1,12 +1,14 @@
 #include <set>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <cstdint>
 #include <string>
 #include <cstring>
 #include <cwctype>
 #include <iostream>
+#include <random>
 using namespace std;
 
 typedef int32_t int_t;
@@ -14,7 +16,7 @@ typedef int32_t int_t;
 struct ditem {
 	const char *s = 0;
 	size_t n = 0;
-	int_t rep = 0;
+	long long hash;
 	bool operator<(const ditem& x) const;
 	ditem(){}
 	ditem(const char *s, size_t n) : s(s), n(n) {}
@@ -24,12 +26,10 @@ extern vector<ditem> ditems;
 
 typedef vector<int_t> term;
 typedef vector<term> facts;
-typedef set<term> delta;
+struct term_hash { long long operator()(const term& t) const; };
+typedef unordered_set<term, term_hash> delta;
 
-struct rule : public vector<term> {
-	size_t v1, vn;
-	void normalize();
-};
+struct rule : public vector<term> { size_t v1, vn; };
 typedef vector<rule> lp;
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
@@ -38,10 +38,12 @@ struct stage : public map<pair<int_t, size_t>, set<term>> {
 };
 
 #define str_get(x) string(ditems[abs(x)-1].s, ditems[abs(x)-1].n)
-#define var_rep(x) ditems[(x)-1].rep
+#define str_get_hash(x) ditems[abs(x)-1].hash
+#define var_rep(x) e[(x)-1]
 #define has(x,y) ((x).find(y) != (x).end())
 #define get_key(t) make_pair(abs((t)[0]), (t).size()-1)
 #define dict_getw(ws, n) dict_get((const char*)(ws), (n) * sizeof(wchar_t))
+#define id_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << str_get(n)))
 #define env_clear(from, to) memset(e+(from), 0, sizeof(int_t)*((to)-(from)))
 #define er(x)	perror(x), exit(0)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
