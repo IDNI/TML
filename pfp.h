@@ -30,7 +30,10 @@ struct term_hash { long long operator()(const term& t) const; };
 typedef unordered_set<term, term_hash> delta;
 
 struct rule : public vector<term> { size_t v1, vn; };
-typedef vector<rule> lp;
+struct lp {
+	rule *r;
+	size_t sz;
+};
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
 	bool Tp(rule r, delta &add, delta &del);
@@ -45,13 +48,16 @@ struct stage : public map<pair<int_t, size_t>, set<term>> {
 #define dict_getw(ws, n) dict_get((const char*)(ws), (n) * sizeof(wchar_t))
 #define id_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << str_get(n)))
 #define env_clear(from, to) memset(e+(from), 0, sizeof(int_t)*((to)-(from)))
+#define _resize(x,t,l)		(((x)=(t*)realloc(x,sizeof(t)*(l))))
+#define array_append(a, t, l, x)(++l, (((t*)_resize(a, t, l))[l-1] = (x)))
 #define er(x)	perror(x), exit(0)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
-#define entail_expected "':-' or '.' expected\n"
+#define if_expected "'if' or '.' expected\n"
 #define sep_expected "Term or ':-' or '.' expected\n"
+#define unmatched_quotes "Unmatched \"\n"
 #define err_inrel "Unable to read the input relation symbol.\n"
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"

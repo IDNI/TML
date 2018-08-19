@@ -1,6 +1,6 @@
 #include "pfp.h" 
 
-map<ditem, size_t> dict;
+map<ditem, size_t> dict; 
 vector<ditem> ditems;
 int_t *e;
 
@@ -17,7 +17,8 @@ bool pfp(lp p, stage db) {
 
 bool stage::Tp(lp p) {
 	delta add, del;
-	for (rule r : p) if (!Tp(r, add, del)) return false;
+	for (rule *r = p.r; r != &p.r[p.sz]; ++r)
+		if (!Tp(*r, add, del)) return false;
 	return true;
 }
 
@@ -100,9 +101,15 @@ const wchar_t* str_read(int_t *r, const wchar_t *in) {
 	while (*s && iswspace(*s)) ++s;
 	if (!*s) return 0;
 	if (*(t = s) == L'?') ++t;
-	while (iswalnum(*t)) ++t;
-	while (iswspace(*t)) ++t;
-	if (t == s) return 0;
+	bool p = *t == L'"';
+	if (p) {
+		++t;
+		while (*(t++) != L'"') if (!*t) er(unmatched_quotes);
+	} else {
+		while (iswalnum(*t)) ++t;
+		while (iswspace(*t)) ++t;
+		if (t == s) return 0;
+	}
 	*r = dict_getw(s, t - s);
 	while (*t && iswspace(*t)) ++t;
 	return t;
@@ -111,12 +118,14 @@ const wchar_t* str_read(int_t *r, const wchar_t *in) {
 term term_read(const wchar_t **in) {
 	int_t x;
 	term r;
+	bool neg = **in == L'~';
 	while (**in != L')' && (*in = str_read(&x, *in)))
 		if (!r.size() && *((*in)++) != L'(') er(oparen_expected);
 		else if (r.push_back(x); **in == L',') ++*in;
 		else if (**in == L')') break;
 		else if (r.size() != 1) er(comma_expected);
 	for (++*in; iswspace(**in); ++*in);
+	if (neg) r[0] = -r[0];
 	return r;
 }
 
@@ -131,7 +140,7 @@ rule rule_read(const wchar_t **in, size_t &v) {
 		var_rep(*x) = 0;
 	}
 	if (c.push_back(t), **in == L'.') return ++*in, c;
-	if (*((*in)++) != L':' || *((*in)++) != L'-') er(entail_expected);
+	if (*((*in)++) != L'i' || *((*in)++) != L'f') er(if_expected);
 next:	if ((t = term_read(in)).empty()) return c;
 	term_for_each_arg(t, x) if (*x > 0) var_rep(*x) = 0;
 	c.push_back(t);
@@ -143,7 +152,7 @@ next:	if ((t = term_read(in)).empty()) return c;
 lp lp_read(const wchar_t *in) {
 	lp p;
 	size_t v = 1;
-	for (rule r; !(r = rule_read(&in, v)).empty();) p.push_back(r);
+	for (rule r; !(r = rule_read(&in, v)).empty();) array_append(p.r, rule, p.sz, r);
 	return memset(e = new int_t[v], 0, v * sizeof(int_t)), p;
 }
 
@@ -155,7 +164,7 @@ ostream& operator<<(ostream& os, const term t) {
 
 ostream& operator<<(ostream& os, const rule t) {
 	os << t[0];
-	if (t.size() > 1) os << " :- ";
+	if (t.size() > 1) os << " if ";
 	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?" .":", ");
 	return os;
 }
