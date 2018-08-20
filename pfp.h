@@ -21,8 +21,8 @@ struct ditem {
 	ditem(){}
 	ditem(const char *s, size_t n) : s(s), n(n) {}
 };
-extern map<ditem, size_t> dict;
-extern vector<ditem> ditems;
+//extern map<ditem, size_t> elems, rels, vars; 
+//extern vector<ditem> ditems;
 
 typedef vector<int_t> term;
 typedef vector<term> facts;
@@ -40,13 +40,17 @@ struct stage : public map<pair<int_t, size_t>, set<term>> {
 	bool Tp(lp p);
 };
 
-#define str_get(x) string(ditems[abs(x)-1].s, ditems[abs(x)-1].n)
-#define str_get_hash(x) ditems[abs(x)-1].hash
+#define rel_get_str(x) string(drels[abs(x)-1].s, drels[abs(x)-1].n)
+#define elem_get_str(x) string(delems[abs(x)-1].s, delems[abs(x)-1].n)
+#define elem_get_hash(x) delems[abs(x)-1].hash
+#define rel_get_hash(x) drels[abs(x)-1].hash
 #define var_rep(x) e[(x)-1]
 #define has(x,y) ((x).find(y) != (x).end())
 #define get_key(t) make_pair(abs((t)[0]), (t).size()-1)
-#define dict_getw(ws, n) dict_get((const char*)(ws), (n) * sizeof(wchar_t))
-#define id_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << str_get(n)))
+#define elem_getw(ws, n) elem_get((const char*)(ws), (n) * sizeof(wchar_t))
+#define rel_getw(ws, n) rel_get((const char*)(ws), (n) * sizeof(wchar_t))
+#define rel_format(n, os) (((n) > 0) ? (os << '~' << (n)) : (os << rel_get_str(n)))
+#define elem_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << elem_get_str(n)))
 #define env_clear(from, to) memset(e+(from), 0, sizeof(int_t)*((to)-(from)))
 #define _resize(x,t,l)		(((x)=(t*)realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)(++l, (((t*)_resize(a, t, l))[l-1] = (x)))
