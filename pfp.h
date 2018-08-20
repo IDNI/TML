@@ -17,7 +17,9 @@ struct ditem {
 	const char *s = 0;
 	size_t n = 0;
 	long long hash;
-	bool operator<(const ditem& x) const;
+	bool operator<(const ditem& x) const {
+		return x.n!=n ? x.n>n : (memcmp(x.s, s, n)>0);
+	}
 	ditem(){}
 	ditem(const char *s, size_t n) : s(s), n(n) {}
 };
@@ -54,7 +56,7 @@ struct lp {
 #define rel_getw(ws, n) rel_get((const char*)(ws), (n) * sizeof(wchar_t))
 #define rel_format(n, os) (((n) > 0) ? (os << '~' << rel_get_str(n)) : (os << rel_get_str(n)))
 #define elem_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << elem_get_str(n)))
-#define env_clear(from, to) memset(e+(from)-1, 0, sizeof(int_t)*((to)-(from)))
+#define env_clear(from, to) memset(env+(from)-1, 0, sizeof(int_t)*((to)-(from)))
 #define _resize(x,t,l)		(((x)=(t*)realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)(++l, (((t*)_resize(a, t, l))[l-1] = (x)))
 #define er(x)	perror(x), exit(0)
