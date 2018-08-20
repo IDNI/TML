@@ -30,28 +30,31 @@ struct rule : public vector<term> {
 	set<int_t> derefs;
 	size_t v1, vn;
 };
-struct lp {
-	vector<rule> r;
-	set<term> q;
-};
+
+#define get_key(t) make_pair(abs((t)[0]), (t).size()-1)
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
 	bool Tp(rule r, delta &add, delta &del);
-	bool Tp(lp p);
+	bool Tp(struct lp p);
+	bool add_term(const term& t) { return (*this)[get_key(t)].emplace(t).second; }
+};
+
+struct lp {
+	vector<rule> r;
+	set<term> q;
+	stage db;
 };
 
 #define rel_get_str(x) string(drels[abs(x)-1].s, drels[abs(x)-1].n)
 #define elem_get_str(x) string(delems[abs(x)-1].s, delems[abs(x)-1].n)
 #define elem_get_hash(x) delems[abs(x)-1].hash
 #define rel_get_hash(x) drels[abs(x)-1].hash
-//#define var_rep(x) e[(x)-1]
 #define has(x,y) ((x).find(y) != (x).end())
-#define get_key(t) make_pair(abs((t)[0]), (t).size()-1)
 #define elem_getw(ws, n) elem_get((const char*)(ws), (n) * sizeof(wchar_t))
 #define rel_getw(ws, n) rel_get((const char*)(ws), (n) * sizeof(wchar_t))
 #define rel_format(n, os) (((n) > 0) ? (os << '~' << rel_get_str(n)) : (os << rel_get_str(n)))
 #define elem_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << elem_get_str(n)))
-#define env_clear(from, to) memset(e+(from), 0, sizeof(int_t)*((to)-(from)))
+#define env_clear(from, to) memset(e+(from)-1, 0, sizeof(int_t)*((to)-(from)))
 #define _resize(x,t,l)		(((x)=(t*)realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)(++l, (((t*)_resize(a, t, l))[l-1] = (x)))
 #define er(x)	perror(x), exit(0)

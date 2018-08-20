@@ -3,18 +3,9 @@
 
 map<ditem, size_t> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
-int_t *e;
+int_t *e = 0;
 
 bool ditem::operator<(const ditem& x) const { return x.n!=n ? x.n>n : (memcmp(x.s, s, n)>0); }
-
-bool pfp(lp p, stage db) {
-	map<stage, size_t> stages;
-	pair<map<stage, size_t>::const_iterator, bool> it;
-	for (size_t step = 0; db.size(); ++step)
-		if ((it = stages.emplace(db, step)).second) db.Tp(p);
-		else return it.first->second == step-1;
-	return false;
-}
 
 bool stage::Tp(lp p) {
 	delta add, del;
@@ -24,8 +15,12 @@ bool stage::Tp(lp p) {
 }
 
 int_t& var_rep(int_t n) {
-	if (dvars.size() <= (size_t)n) dvars.resize(n), e = (int_t*)realloc(e, sizeof(int_t) * n);
-	return e[n];
+	if (dvars.size() < (size_t)n) {
+		size_t sz = dvars.size();
+		dvars.resize(n), e = (int_t*)realloc(e, sizeof(int_t) * n);
+		memset(e+sz, 0, (n - sz) * sizeof(int_t));
+	}
+	return e[n-1];
 }
 
 bool unify(const term& f, const term& t) {
@@ -50,8 +45,10 @@ rule sub_chop(const rule& t, size_t n) {
 }
 
 bool stage::Tp(rule r, delta &add, delta &del) {
-	for (size_t n = 1; n < r.size(); ++n)
-		for (term f : at(make_pair(abs(r[n][0]), r[n].size()-1)))
+	for (size_t n = 1; n < r.size(); ++n) {
+		auto it = find(get_key(r[n]));
+		if (it == end()) continue;
+		for (term f : it->second)
 			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
 			else if (rule t = sub_chop(r, n); t.size() == 1) {
 				if ((t[0][0] = -t[0][0]) > 0) {
@@ -61,9 +58,10 @@ bool stage::Tp(rule r, delta &add, delta &del) {
 					if (it != end()) it->second.erase(t[0]);
 				} else {
 					if (has(del, t[0])) return false;
-					t[0][0] = -t[0][0], add.emplace(t[0]), (*this)[get_key(t[0])].emplace(t[0]);
+					t[0][0] = -t[0][0], add.emplace(t[0]), add_term(t[0]);
 				}
 			} else if (!Tp(t, add, del)) return false;
+	}
 	return true;
 }
 
@@ -147,12 +145,15 @@ term term_read(const wchar_t **in) {
 		else if (r.size() != 1) er(comma_expected);
 	for (++*in; iswspace(**in); ++*in);
 	if (neg) r[0] = -r[0];
-	term_for_each_arg(r, x) if (*x > 0) var_rep(*x) = 0;
+	term_for_each_arg(r, x)
+		if (*x > 0)
+			var_rep(*x) = 0;
 	return r;
 }
 
 rule rule_read(lp &p, const wchar_t **in, size_t &v) {
 	rule c;
+	c.v1 = c.vn = v;
 	while (iswspace(**in)) ++*in;
 	if (!**in) return c;
 	bool deref = false;
@@ -163,23 +164,27 @@ rule rule_read(lp &p, const wchar_t **in, size_t &v) {
 	if (deref) {
 		p.q.emplace(t), deref = false;
 		while (iswspace(**in)) ++*in;
-		if (*((*in)++) == L'.') er(dot_after_q);
+		if (*((*in)++) != L'.') er(dot_after_q);
 		return rule_read(p, in, v);
 	}
-	if (c.push_back(t), **in == L'.') return ++*in, c;
+	if (c.push_back(t), **in == L'.') { p.db.add_term(t), ++*in; goto ret; }
 	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
 		er(if_expected);
 next:	while (iswspace(**in)) ++*in;
 	if (**in == L'*') deref = true;
-	if ((t = term_read(in)).empty()) return c;
+	if ((t = term_read(in)).empty()) goto ret;
 	if (deref) c.derefs.emplace(t[0]);
 	c.push_back(t);
 	if (**in != L'.') goto next;
 	while (iswspace(**in)) ++*in;
-	return ++*in, normalize(c, v), c;
+	++*in;
+ret:	for (const term& t : c)
+		cterm_for_each_arg(t, x)
+			if (*x > 0) ++c.vn;
+	return normalize(c, v), c;
 }
 
-ostream& operator<<(ostream& os, const term t) {
+ostream& operator<<(ostream& os, const term& t) {
 	rel_format(t[0], os) << '(';
 	cterm_for_each_arg(t, x)
 		if (elem_format(*x, os); x != &t[t.size()-1])
@@ -187,9 +192,14 @@ ostream& operator<<(ostream& os, const term t) {
 	return os << ')';
 }
 
-ostream& operator<<(ostream& os, const rule t) {
+ostream& operator<<(ostream& os, const rule& t) {
 	if (os << t[0]; t.size() > 1) os << " if ";
 	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?" .":", ");
+	return os;
+}
+
+ostream& operator<<(ostream& os, const stage& t) {
+	for (auto x : t) for (auto y : x.second) os << y << endl;
 	return os;
 }
 
@@ -197,11 +207,20 @@ lp lp_read(const wchar_t *in) {
 	lp p;
 	size_t v = 1;
 	for (rule r; !(r = rule_read(p, &in, v)).empty();)
-		p.r.push_back(r), cout << r << endl;
+		p.r.push_back(r), v = r.vn, cout << r << endl;
 	return memset(e = new int_t[v], 0, v * sizeof(int_t)), p;
+}
+
+bool pfp(lp p) {
+	map<stage, size_t> stages;
+	pair<map<stage, size_t>::const_iterator, bool> it;
+	for (size_t step = 0; p.db.size(); ++step)
+		if ((it = stages.emplace(p.db, step)).second) (cout << "stage " << step << ": " << endl << p.db), p.db.Tp(p);
+		else return it.first->second == step-1;
+	return false;
 }
 
 int main() {
 	wstring prog((istreambuf_iterator(wcin)), istreambuf_iterator<wchar_t>());
-	return pfp(lp_read(prog.c_str()), {});
+	return pfp(lp_read(prog.c_str()));
 }
