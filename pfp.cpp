@@ -1,4 +1,5 @@
 #include "pfp.h" 
+#include <iostream>
 
 map<ditem, size_t> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
@@ -17,9 +18,14 @@ bool pfp(lp p, stage db) {
 
 bool stage::Tp(lp p) {
 	delta add, del;
-	for (rule *r = p.r; r != &p.r[p.sz]; ++r)
-		if (!Tp(*r, add, del)) return false;
+	for (const rule& r : p.r)
+		if (!Tp(r, add, del)) return false;
 	return true;
+}
+
+int_t& var_rep(int_t n) {
+	if (dvars.size() <= (size_t)n) dvars.resize(n), e = (int_t*)realloc(e, sizeof(int_t) * n);
+	return e[n];
 }
 
 bool unify(const term& f, const term& t) {
@@ -63,13 +69,13 @@ bool stage::Tp(rule r, delta &add, delta &del) {
 
 void normalize(rule &r, size_t &v) {
 	for (term t : r)
-		for (int_t x : t)
-			if (x > 0) var_rep(x) = 0;
+		term_for_each_arg(t, x)
+			if (*x > 0) var_rep(*x) = 0;
 	for (term &t : r)
-		for (int_t &x : t)
-			if (x < 0) continue;
-			else if (var_rep(x)) x = var_rep(x);
-			else x = var_rep(x) = v++;
+		term_for_each_arg(t, x)
+			if (*x < 0) continue;
+			else if (var_rep(*x)) *x = var_rep(*x);
+			else *x = var_rep(*x) = v++;
 }
 
 long long get_rnd() {
@@ -83,25 +89,23 @@ int_t elem_get(const char *s, size_t n) {
 	ditem i(s, n);
 	auto it = elems.find(i);
 	if (it != elems.end()) return it->second;
-	i.hash = get_rnd();
-	delems.push_back(i);
-	return elems[i] = *s=='?' ? delems.size() : -delems.size();
+	return i.hash = get_rnd(), delems.push_back(i), elems[i] = *s=='?' ? delems.size() : -delems.size();
 }
 int_t rel_get(const char *s, size_t n) {
 	ditem i(s, n);
 	auto it = rels.find(i);
 	if (it != rels.end()) return it->second;
-	i.hash = get_rnd();
-	drels.push_back(i);
-	return rels[i] = *s=='?' ? drels.size() : -drels.size();
+	return i.hash = get_rnd(), drels.push_back(i), rels[i] = -drels.size();
 }
+
 int_t var_get(const char *s, size_t n) {
 	ditem i(s, n);
+	if (dvars.size() <= n) dvars.resize(n), e = (int_t*)realloc(e, sizeof(int_t) * n);
 	auto it = vars.find(i);
 	if (it != vars.end()) return it->second;
 	i.hash = get_rnd();
 	dvars.push_back(i);
-	return vars[i] = *s=='?' ? dvars.size() : -dvars.size();
+	return vars[i] = dvars.size();
 }
 
 long long term_hash::operator()(const term& t) const {
@@ -135,6 +139,7 @@ term term_read(const wchar_t **in) {
 	int_t x;
 	term r;
 	bool neg = **in == L'~';
+	if (neg) ++*in;
 	while (**in != L')' && (*in = str_read(&x, *in, !r.size())))
 		if (!r.size() && *((*in)++) != L'(') er(oparen_expected);
 		else if (r.push_back(x); **in == L',') ++*in;
@@ -142,50 +147,61 @@ term term_read(const wchar_t **in) {
 		else if (r.size() != 1) er(comma_expected);
 	for (++*in; iswspace(**in); ++*in);
 	if (neg) r[0] = -r[0];
+	term_for_each_arg(r, x) if (*x > 0) var_rep(*x) = 0;
 	return r;
 }
 
-rule rule_read(const wchar_t **in, size_t &v) {
+rule rule_read(lp &p, const wchar_t **in, size_t &v) {
 	rule c;
 	while (iswspace(**in)) ++*in;
 	if (!**in) return c;
+	bool deref = false;
+	set<int_t> dset;
+	if (**in == L'*') deref = true;
 	term t = term_read(in);
 	if (t.empty()) return c;
-	term_for_each_arg(t, x) if (*x > 0) {
-//		if (ditems.size() < (size_t)*x) ditems.resize(*x);
-		var_rep(*x) = 0;
+	if (deref) {
+		p.q.emplace(t), deref = false;
+		while (iswspace(**in)) ++*in;
+		if (*((*in)++) == L'.') er(dot_after_q);
+		return rule_read(p, in, v);
 	}
 	if (c.push_back(t), **in == L'.') return ++*in, c;
-	if (*((*in)++) != L'i' || *((*in)++) != L'f') er(if_expected);
-next:	if ((t = term_read(in)).empty()) return c;
-	term_for_each_arg(t, x) if (*x > 0) var_rep(*x) = 0;
+	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
+		er(if_expected);
+next:	while (iswspace(**in)) ++*in;
+	if (**in == L'*') deref = true;
+	if ((t = term_read(in)).empty()) return c;
+	if (deref) c.derefs.emplace(t[0]);
 	c.push_back(t);
 	if (**in != L'.') goto next;
 	while (iswspace(**in)) ++*in;
 	return ++*in, normalize(c, v), c;
 }
 
-lp lp_read(const wchar_t *in) {
-	lp p;
-	size_t v = 1;
-	for (rule r; !(r = rule_read(&in, v)).empty();) array_append(p.r, rule, p.sz, r);
-	return memset(e = new int_t[v], 0, v * sizeof(int_t)), p;
-}
-
 ostream& operator<<(ostream& os, const term t) {
-	rel_format(t[0] > 0 ? t[0] : -t[0], os) << '(';
-	cterm_for_each_arg(t, x) if (elem_format(*x, os); x != &t[t.size()]) os << ',';
+	rel_format(t[0], os) << '(';
+	cterm_for_each_arg(t, x)
+		if (elem_format(*x, os); x != &t[t.size()-1])
+			os << ',';
 	return os << ')';
 }
 
 ostream& operator<<(ostream& os, const rule t) {
-	os << t[0];
-	if (t.size() > 1) os << " if ";
+	if (os << t[0]; t.size() > 1) os << " if ";
 	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?" .":", ");
 	return os;
 }
 
+lp lp_read(const wchar_t *in) {
+	lp p;
+	size_t v = 1;
+	for (rule r; !(r = rule_read(p, &in, v)).empty();)
+		p.r.push_back(r), cout << r << endl;
+	return memset(e = new int_t[v], 0, v * sizeof(int_t)), p;
+}
+
 int main() {
-	wstring prog((istreambuf_iterator<wchar_t>(wcin)), istreambuf_iterator<wchar_t>());
+	wstring prog((istreambuf_iterator(wcin)), istreambuf_iterator<wchar_t>());
 	return pfp(lp_read(prog.c_str()), {});
 }
