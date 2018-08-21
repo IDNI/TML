@@ -10,6 +10,7 @@
 #include <iostream>
 #include <random>
 #include <sstream>
+#include <climits>
 using namespace std;
 
 typedef int32_t int_t;
@@ -27,6 +28,9 @@ struct ditem_cmp {
 	}
 };
 
+struct var {
+	bool ex, has_outterm_occur;
+};
 typedef vector<int_t> term;
 struct term_hash { long long operator()(const term& t) const; };
 typedef unordered_set<term, term_hash> delta;
@@ -36,11 +40,13 @@ struct rule : public vector<term> {
 	size_t v1 = -1, vn = -1;
 };
 
-struct stage : public map<pair<int_t, size_t>, set<term>> {
-	bool Tp(const rule& r, delta &add, delta &del);
-	bool on_match(const rule &r, size_t n, delta &add, delta &del);
-	bool Tp(const struct lp& p);
-};
+typedef set<term>::const_iterator iter;
+typedef map<pair<int_t, size_t>, set<term>> stage;
+bool Tp(stage &s, const rule& r, delta &add, delta &del);
+bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del);
+bool Tp(struct lp& p);
+bool query(stage &s, const term& q, iter& qit, iter& eit);
+bool set_query(stage &s, const term& q, iter& qit, iter& eit);
 
 struct lp {
 	vector<rule> r;
@@ -48,13 +54,9 @@ struct lp {
 	stage db;
 };
 
-void rel_format(int_t n, wostream& os);
-void elem_format(int_t n, wostream& os);
-
 #define elem_get_hash(x) delems[abs(x)-1].hash
 #define rel_get_hash(x) drels[abs(x)-1].hash
 #define has(x,y) ((x).find(y) != (x).end())
-#define env_clear(from, to) memset(env+(from)-1, 0, sizeof(int_t)*((to)-(from)))
 #define er(x)	perror(x), exit(0)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
 		"Will output the program after plugging src into dst.\n)"
@@ -69,100 +71,22 @@ void elem_format(int_t n, wostream& os);
 #define err_dst "Unable to read dst file.\n"
 #define term_for_each_arg(t, x) for (int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
 #define cterm_for_each_arg(t, x) for (const int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
-#define var_rep(n) env[n-1]
 #define get_key(t) make_pair(abs((t)[0]), (t).size())
-
+#define rel_format(t, os) (((t)>0)? os << L'~' : os << wstring(drels[abs(t)-1].s, drels[abs(t)-1].n))
+#define elem_format(t, os) (((t)>0)? os << L'?' << t : os << wstring(delems[-t-1].s, delems[-t-1].n))
+#define min(x,y) ((x)<(y)?(x):(y))
+#define max(x,y) ((x)>(y)?(x):(y))
 map<ditem, int_t, ditem_cmp> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
 int_t *env = 0;
-wostream& operator<<(wostream& os, const term& t);
-wostream& operator<<(wostream& os, const rule& t);
-
-void rel_format(int_t n, wostream& os) {
-	if (n > 0) os << L'~';
-	os << wstring(drels[abs(n)-1].s, drels[abs(n)-1].n);
-}
-
-void elem_format(int_t n, wostream& os) {
-	if (n > 0) os << L'?' << n;
-	else os << wstring(delems[-n-1].s, delems[-n-1].n);
-}
 
 void normalize(rule &r, size_t v) {
 	r.v1 = r.vn = v;
-	for (term t : r) term_for_each_arg(t, x) if (*x > 0) var_rep(*x) = 0;
+	for (term t : r) term_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0;
 	for (term t : r)
 		term_for_each_arg(t, x)
-			if (*x > 0 && !var_rep(*x)) var_rep(*x) = r.vn++;
-	for (term &t : r) term_for_each_arg(t, x) if (*x > 0) *x = var_rep(*x);
-}
-
-bool unify(const term& f, const term& t) {
-	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
-	for (size_t n = 1; n < t.size(); ++n)
-		if (t[n] < 0) { if (t[n] != f[n]) return false; }
-		else if (!var_rep(t[n])) var_rep(t[n]) = f[n];
-		else if (var_rep(t[n]) != f[n]) return false;
-	return true;
-}
-
-term sub(const term& t) {
-	term r = t;
-	term_for_each_arg(r, x) if (*x > 0 && var_rep(*x)) *x = var_rep(*x);
-	return r;
-}
-
-rule sub_chop(const rule& t, size_t n) {
-	rule r;
-	for (size_t k = 0; k < t.size(); ++k) if (n!=k) r.push_back(sub(t[k]));
-	return normalize(r, 1), r;
-}
-
-bool stage::Tp(const lp &p) {
-	delta add, del;
-	for (const rule& r : p.r) if (!Tp(r, add, del)) return false;
-	wcout << L"adding " << add.size() << " new facts: " << endl;
-	for (const term& t : add) (*this)[get_key(t)].emplace(t), wcout << t << endl;
-	wcout << L"erasing up to " << del.size() << " facts: " << endl;
-	for (const term& t : del)
-		if (auto it = find(get_key(t)); it != end())
-			if (it->second.erase(t))
-				wcout << t << endl;
-	return true;
-}
-
-bool stage::on_match(const rule &r, size_t n, delta &add, delta &del) {
-	rule t = sub_chop(r, n);
-	if (t.size() != 1) return Tp(t, add, del);
-	if (t[0][0] > 0) {
-		if ((t[0][0] = -t[0][0]), has(add, t[0])) return false;
-		del.emplace(t[0]);
-	} else if (has(del, t[0])) return false;
-	else add.emplace(t[0]);
-	return true;
-}
-
-bool stage::Tp(const rule& r, delta &add, delta &del) {
-	for (size_t n = 1; n < r.size(); ++n) {
-		auto it = find(get_key(r[n]));
-		if (r[n][0] > 0) {
-			if (it == end()) {
-				if (!on_match(r, n, add, del)) return false;
-				continue;
-			}
-			bool b = false;
-			for (term f : it->second)
-				if (env_clear(r.v1, r.vn), b = unify(f, r[n]))
-					break;
-			if (!b&&(env_clear(r.v1, r.vn), !on_match(r,n,add,del)))
-				return false;
-		} else if (it == end()) continue;
-		else for (term f : it->second) {
-			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
-			else if (!on_match(r, n, add, del)) return false;
-		}
-	}
-	return true;
+			if (*x > 0 && !env[*x-1]) env[*x-1] = r.vn++;
+	for (term &t : r) term_for_each_arg(t, x) if (*x > 0) *x = env[*x-1];
 }
 
 long long get_rnd() {
@@ -265,7 +189,10 @@ next:	deref = false;
 wostream& operator<<(wostream& os, const term& t) {
 	rel_format(t[0], os);
 	os << L'(';
-	cterm_for_each_arg(t,x)if(elem_format(*x,os);x!=&t[t.size()-1])os<<L',';
+	cterm_for_each_arg(t, x)
+		if (*x < 0 || !env[*x-1]) {
+			if(elem_format(*x,os); x!= &t[t.size()-1]) os << L',';
+		} else if(elem_format(env[*x-1],os); x!= &t[t.size()-1]) os << L',';
 	return os << L')';
 }
 
@@ -278,28 +205,6 @@ wostream& operator<<(wostream& os, const rule& t) {
 wostream& operator<<(wostream& os, const stage& t) {
 	for (auto x : t) for (auto y : x.second) os << y << endl;
 	return os;
-}
-
-lp lp_read(const wchar_t *in) {
-	lp p;
-	for (rule r; !(r = rule_read(p, &in)).empty();) p.r.push_back(r);
-	size_t v = 0, vn = 1;
-	for (const rule& r : p.r) for (const term& t : r)
-		cterm_for_each_arg(t, x) if (*x > 0) ++v;
-	memset(env = new int_t[v], 0, v * sizeof(int_t));
-	for (rule& r : p.r) normalize(r, vn), vn = r.vn, wcout << r << endl;
-	return p;
-}
-
-bool pfp(lp p) {
-	map<stage, size_t> stages;
-	pair<map<stage, size_t>::const_iterator, bool> it;
-	for (size_t step = 0; p.db.size(); ++step)
-		if ((it = stages.emplace(p.db, step)).second)
-			(wcout << L"stage " << step << L": " << endl << p.db),
-			p.db.Tp(p);
-		else return it.first->second == step-1;
-	return false;
 }
 
 wstring file_read_text(FILE *f) {
@@ -317,6 +222,98 @@ next:	for (n = l = 0; n < 31; ++n)
 		goto next;
 	} else if (skip) goto next;
 	return ss.str();
+}
+
+lp lp_read(const wchar_t *in) {
+	lp p;
+	for (rule r; !(r = rule_read(p, &in)).empty();) p.r.push_back(r);
+	size_t v = 0, vn = 1;
+	for (const rule& r : p.r) for (const term& t : r)
+		cterm_for_each_arg(t, x) if (*x > 0) ++v;
+	memset(env = new int_t[v], 0, v * sizeof(int_t));
+	for (rule& r : p.r) normalize(r, vn), vn = r.vn, wcout << r << endl;
+	return p;
+}
+
+void env_clear(const term& t) { cterm_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0; }
+
+bool unify(const term& f, const term& t) {
+	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
+	for (size_t n = 1; n < t.size(); ++n)
+		if (t[n] < 0) { if (t[n] != f[n]) return false; }
+		else if (!env[t[n]-1]) env[t[n]-1] = f[n];
+		else if (env[t[n]-1] != f[n]) return false;
+	return true;
+}
+
+bool Tp(lp &p) {
+	delta add, del;
+	for (const rule& r : p.r) if (!Tp(p.db, r, add, del)) return false;
+	for (const term& t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
+	for (const term& t : del)
+		if (auto it = p.db.find(get_key(t)); it != p.db.end())
+			if (it->second.erase(t)){};// wcout << "erasing " << t << endl;
+	return true;
+}
+
+bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
+	rule t;
+	for (size_t k = 0; k < r.size(); ++k)
+		if (n != k) {
+			term x = r[k];
+			term_for_each_arg(x, y)
+				if (*y > 0 && env[*y-1]) *y = env[*y-1];
+			t.push_back(move(x));
+		}
+	normalize(t, 1);
+	//wcout << "matched " << r[n] << " remains: " << t << endl;
+	memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
+	if (t.size() != 1) return Tp(s, t, add, del);
+	if (t[0][0] > 0) {
+		if ((t[0][0] = -t[0][0]), has(add, t[0])) return false;
+		del.emplace(t[0]);
+	} else if (has(del, t[0])) return false;
+	else add.emplace(t[0]);
+	return true;
+}
+
+bool set_query(stage &s, const term& q, iter& qit, iter& eit) {
+	env_clear(q);
+	auto it = s.find(get_key(q));
+	if (it == s.end()) return false;
+	return qit = it->second.begin(), eit = it->second.end(), true;
+}
+
+bool query(const term& q, iter& qit, iter& eit) {
+next:	if (qit == eit) return false;
+	if (env_clear(q); unify(*qit++, q)) return true;
+	goto next;
+}
+
+bool Tp(stage &s, const rule& r, delta &add, delta &del) {
+	iter qit, eit;
+	for (size_t n = 1; n < r.size(); ++n) {
+		memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
+		if (!set_query(s, r[n], qit, eit)) continue;
+		else while (query(r[n], qit, eit))
+			if (!on_match(s, r,n,add,del))
+				return false;
+	}
+	return true;
+}
+
+bool pfp(lp p) {
+	map<stage, size_t> stages;
+	pair<map<stage, size_t>::const_iterator, bool> it;
+	for (size_t step = 0; p.db.size(); ++step)
+		if ((it = stages.emplace(p.db, step)).second) {
+			wcout << L"stage " << step << L": " << endl << p.db;
+			if (!Tp(p)) wcout << "stopping on contradiction" << endl;
+		} else {
+			wcout << L"same as stage " << it.first->second << endl;
+			return it.first->second == step-1;
+		}
+	return false;
 }
 
 int main() {
