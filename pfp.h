@@ -22,7 +22,7 @@ struct ditem {
 };
 struct ditem_cmp {
 	bool operator()(const ditem& x, const ditem& y) const {
-		return x.n!=y.n ? x.n<y.n : (memcmp(x.s, y.s, y.n)<0);
+		return x.n!=y.n ? x.n<y.n : (memcmp(x.s, y.s, y.n*sizeof(wchar_t))<0);
 	}
 };
 
@@ -38,8 +38,8 @@ struct rule : public vector<term> {
 #define get_key(t) make_pair(abs((t)[0]), (t).size())
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
-	bool Tp(rule r, delta &add, delta &del);
-	bool Tp(struct lp p);
+	bool Tp(const rule& r, delta &add, delta &del);
+	bool Tp(const struct lp& p);
 	bool add_term(const term& t) { return (*this)[get_key(t)].emplace(t).second; }
 };
 

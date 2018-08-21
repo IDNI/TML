@@ -7,13 +7,16 @@ int_t *env = 0;
 wostream& operator<<(wostream& os, const term& t);
 wostream& operator<<(wostream& os, const rule& t);
 
-bool stage::Tp(lp p) {
+bool stage::Tp(const lp &p) {
 	delta add, del;
 	for (const rule& r : p.r) if (!Tp(r, add, del)) return false;
-	for (const term& t : add) add_term(t);//, wcout << L"added " << t << endl;
+	wcout << L"adding " << add.size() << " new facts: " << endl;
+	for (const term& t : add) add_term(t), wcout << t << endl;
+	wcout << L"erasing up to " << del.size() << " facts: " << endl;
 	for (const term& t : del)
 		if (auto it = find(get_key(t)); it != end())
-			it->second.erase(t);//, wcout << L"erased " << t << endl;
+			if (it->second.erase(t))
+				wcout << t << endl;
 	return true;
 }
 
@@ -44,9 +47,9 @@ bool unify(const term& f, const term& t) {
 //	wcout << "unify " << f << " with " << t << endl;
 	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
 	for (size_t n = 1; n < t.size(); ++n)
-		if (t[n] < 0) { if (t[n] != f[n]) return f[0]==t[0]; }
+		if (t[n] < 0) { if (t[n] != f[n]) return f[0]!=t[0]; }
 		else if (!var_rep(t[n])) var_rep(t[n]) = f[n];
-		else if (var_rep(t[n]) != f[n]) return f[0]==t[0];
+		else if (var_rep(t[n]) != f[n]) return f[0]!=t[0];
 //	wcout << "success" << endl;
 	return f[0]==t[0];
 }
@@ -64,22 +67,24 @@ rule sub_chop(const rule& t, size_t n) {
 	return r;
 }
 
-bool stage::Tp(rule r, delta &add, delta &del) {
-	wcout << L"Tp " << r << endl;
+bool stage::Tp(const rule& r, delta &add, delta &del) {
+//	wcout << L"Tp " << r << endl;
 	for (size_t n = 1; n < r.size(); ++n)
 		if (auto it = find(get_key(r[n])); it == end()) continue;
-		else for (term f : it->second)
+		else for (term f : it->second) {
 			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
 			else if (rule t = sub_chop(r, n); t.size() == 1) {
-				if ((t[0][0] = -t[0][0]) < 0) {
-					if (has(add, t[0])) return false;
-					t[0][0] = -t[0][0], del.emplace(t[0]);
-				} else {
-					if (has(del, t[0])) return false;
-					t[0][0] = -t[0][0], add.emplace(t[0]),
-						add_term(t[0]);
-				}
-			} else if (!Tp(t, add, del)) return false;
+				if (t[0][0] > 0) {
+					t[0][0] = -t[0][0];
+					if (has(add, t[0]))
+						return false;
+					del.emplace(t[0]);
+				} else if (has(del, t[0]))
+					return false;
+				else add.emplace(t[0]);
+			} else if (!Tp(t, add, del))
+				return false;
+		}
 	return true;
 }
 
@@ -207,7 +212,6 @@ wostream& operator<<(wostream& os, const term& t) {
 }
 
 wostream& operator<<(wostream& os, const rule& t) {
-	os << L'[' << t.v1 << L',' << t.vn << L"] ";
 	if (os << t[0]; t.size() > 1) os << L" if ";
 	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?L" .":L", ");
 	return os;
