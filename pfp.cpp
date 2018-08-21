@@ -1,12 +1,10 @@
 #include <set>
 #include <map>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <cstdint>
 #include <string>
 #include <cstring>
-#include <cwctype>
 #include <iostream>
 #include <random>
 #include <sstream>
@@ -27,26 +25,16 @@ struct ditem_cmp {
 		return x.n!=y.n ? x.n<y.n : (memcmp(x.s, y.s, y.n*sizeof(wchar_t))<0);
 	}
 };
-
-struct var {
-	bool ex, has_outterm_occur;
-};
 typedef vector<int_t> term;
 struct term_hash { long long operator()(const term& t) const; };
 typedef unordered_set<term, term_hash> delta;
+typedef set<term>::const_iterator iter;
+typedef map<pair<int_t, size_t>, set<term>> stage;
 
 struct rule : public vector<term> {
 	set<int_t> derefs;
 	size_t v1 = -1, vn = -1;
 };
-
-typedef set<term>::const_iterator iter;
-typedef map<pair<int_t, size_t>, set<term>> stage;
-bool Tp(stage &s, const rule& r, delta &add, delta &del);
-bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del);
-bool Tp(struct lp& p);
-bool query(stage &s, const term& q, iter& qit, iter& eit);
-bool set_query(stage &s, const term& q, iter& qit, iter& eit);
 
 struct lp {
 	vector<rule> r;
@@ -76,6 +64,7 @@ struct lp {
 #define elem_format(t, os) (((t)>0)? os << L'?' << t : os << wstring(delems[-t-1].s, delems[-t-1].n))
 #define min(x,y) ((x)<(y)?(x):(y))
 #define max(x,y) ((x)>(y)?(x):(y))
+#define env_clear(t) cterm_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0
 map<ditem, int_t, ditem_cmp> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
 int_t *env = 0;
@@ -129,9 +118,7 @@ const wchar_t* str_read(int_t *r, const wchar_t *in, bool rel) {
 	if (*(t = s) == L'?') ++t;
 	bool p = *t == L'"';
 	if (p) {
-		for (++t; *(t++) != L'"';)
-			if (!*t)
-				er(unmatched_quotes);
+		for (++t; *(t++) != L'"';) if (!*t) er(unmatched_quotes);
 	} else {
 		while (iswalnum(*t)) ++t;
 		while (iswspace(*t)) ++t;
@@ -189,10 +176,10 @@ next:	deref = false;
 wostream& operator<<(wostream& os, const term& t) {
 	rel_format(t[0], os);
 	os << L'(';
-	cterm_for_each_arg(t, x)
-		if (*x < 0 || !env[*x-1]) {
-			if(elem_format(*x,os); x!= &t[t.size()-1]) os << L',';
-		} else if(elem_format(env[*x-1],os); x!= &t[t.size()-1]) os << L',';
+	cterm_for_each_arg(t, x) {
+		elem_format((*x < 0 || !env[*x-1] ? *x : env[*x-1]), os);
+		if (x != &t[t.size()-1]) os << L',';
+	}
 	return os << L')';
 }
 
@@ -235,8 +222,6 @@ lp lp_read(const wchar_t *in) {
 	return p;
 }
 
-void env_clear(const term& t) { cterm_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0; }
-
 bool unify(const term& f, const term& t) {
 	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
 	for (size_t n = 1; n < t.size(); ++n)
@@ -246,16 +231,21 @@ bool unify(const term& f, const term& t) {
 	return true;
 }
 
-bool Tp(lp &p) {
-	delta add, del;
-	for (const rule& r : p.r) if (!Tp(p.db, r, add, del)) return false;
-	for (const term& t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
-	for (const term& t : del)
-		if (auto it = p.db.find(get_key(t)); it != p.db.end())
-			if (it->second.erase(t)){};// wcout << "erasing " << t << endl;
-	return true;
+bool set_query(stage &s, const term& q, iter& qit, iter& eit) {
+	env_clear(q);
+	auto it = s.find(get_key(q));
+	if (it == s.end()) return false;
+	return qit = it->second.begin(), eit = it->second.end(), true;
 }
 
+bool query(const term& q, iter& qit, iter& eit) {
+next:	if (qit == eit) return false;
+	env_clear(q);
+	if (unify(*qit++, q)) return true;
+	goto next;
+}
+
+bool Tp(stage &s, const rule& r, delta &add, delta &del);
 bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
 	rule t;
 	for (size_t k = 0; k < r.size(); ++k)
@@ -277,28 +267,24 @@ bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
 	return true;
 }
 
-bool set_query(stage &s, const term& q, iter& qit, iter& eit) {
-	env_clear(q);
-	auto it = s.find(get_key(q));
-	if (it == s.end()) return false;
-	return qit = it->second.begin(), eit = it->second.end(), true;
-}
-
-bool query(const term& q, iter& qit, iter& eit) {
-next:	if (qit == eit) return false;
-	if (env_clear(q); unify(*qit++, q)) return true;
-	goto next;
-}
-
 bool Tp(stage &s, const rule& r, delta &add, delta &del) {
 	iter qit, eit;
-	for (size_t n = 1; n < r.size(); ++n) {
-		memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
-		if (!set_query(s, r[n], qit, eit)) continue;
-		else while (query(r[n], qit, eit))
-			if (!on_match(s, r,n,add,del))
-				return false;
-	}
+	for (size_t n = 1; n < r.size(); ++n)
+		if (memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
+			set_query(s, r[n], qit, eit))
+			while (query(r[n], qit, eit))
+				if (!on_match(s, r,n,add,del))
+					return false;
+	return true;
+}
+
+bool Tp(lp &p) {
+	delta add, del;
+	for (const rule& r : p.r) if (!Tp(p.db, r, add, del)) return false;
+	for (const term& t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
+	for (const term& t : del)
+		if (auto it = p.db.find(get_key(t)); it != p.db.end())
+			if (it->second.erase(t)){};// wcout << "erasing " << t << endl;
 	return true;
 }
 
