@@ -1,4 +1,5 @@
 #include "pfp.h" 
+#include <sstream>
 #include <iostream>
 
 map<ditem, int_t, ditem_cmp> elems, rels, vars; 
@@ -206,12 +207,12 @@ next:	deref = false;
 	if (**in != L'.') goto next;
 	while (iswspace(**in)) ++*in;
 	++*in;
-ret:	set<int_t> vs;
+ret:/*	set<int_t> vs;
 	for (const term& t : c)
 		cterm_for_each_arg(t, x)
 			if (*x > 0) vs.emplace(*x);
 	if (vs.size()) c.vn = c.v1 + vs.size();
-	else c.v1 = c.vn = 0;
+	else c.v1 = c.vn = 0;*/
 	return c;
 }
 
@@ -237,13 +238,11 @@ wostream& operator<<(wostream& os, const stage& t) {
 
 lp lp_read(const wchar_t *in) {
 	lp p;
-	for (rule r; !(r = rule_read(p, &in)).empty();)
-		p.r.push_back(r);
-	size_t v = 0;
+	for (rule r; !(r = rule_read(p, &in)).empty();) p.r.push_back(r);
+	size_t v = 0, vn = 1;
 	for (const rule& r : p.r) for (const term& t : r)
 		cterm_for_each_arg(t, x) if (*x > 0) ++v;
 	memset(env = new int_t[v], 0, v * sizeof(int_t));
-	size_t vn = 1;
 	for (rule& r : p.r) normalize(r, vn), vn = r.vn, wcout << r << endl;
 	return p;
 }
@@ -259,8 +258,27 @@ bool pfp(lp p) {
 	return false;
 }
 
+wstring file_read_text(FILE *f) {
+	wstringstream ss;
+	wchar_t buf[32];
+	wint_t c;
+	*buf =0;
+	size_t n, l;
+	bool skip = false;
+next:	for (n = l = 0; n < 31; ++n)
+		if (WEOF == (c = getwc(f))) { skip = false; break; }
+		else if (c == L'#') skip = true;
+		else if (c == L'\r' || c == L'\n') skip = false, buf[l++] = c;
+		else if (!skip) buf[l++] = c;
+	if (n) {
+		buf[l] = 0;
+		ss << buf;
+		goto next;
+	} else if (skip) goto next;
+	return ss.str();
+}
+
 int main() {
 	setlocale(LC_ALL, "");
-	wstring prog((istreambuf_iterator<wchar_t>(wcin)),istreambuf_iterator<wchar_t>());
-	return pfp(lp_read(prog.c_str()));
+	return pfp(lp_read(file_read_text(stdin).c_str()));
 }

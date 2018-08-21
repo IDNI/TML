@@ -32,7 +32,7 @@ typedef unordered_set<term, term_hash> delta;
 
 struct rule : public vector<term> {
 	set<int_t> derefs;
-	size_t v1, vn;
+	size_t v1 = -1, vn = -1;
 };
 
 #define get_key(t) make_pair(abs((t)[0]), (t).size())
