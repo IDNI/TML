@@ -1,67 +1,30 @@
 #include "pfp.h" 
 #include <iostream>
 
-map<ditem, size_t> elems, rels, vars; 
+map<ditem, int_t, ditem_cmp> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
 int_t *env = 0;
-ostream& operator<<(ostream& os, const term& t);
+wostream& operator<<(wostream& os, const term& t);
+wostream& operator<<(wostream& os, const rule& t);
 
 bool stage::Tp(lp p) {
 	delta add, del;
 	for (const rule& r : p.r) if (!Tp(r, add, del)) return false;
+	for (const term& t : add) add_term(t);//, wcout << L"added " << t << endl;
+	for (const term& t : del)
+		if (auto it = find(get_key(t)); it != end())
+			it->second.erase(t);//, wcout << L"erased " << t << endl;
 	return true;
 }
 
-int_t& var_rep(int_t n) {
-/*	if (dvars.size() < (size_t)n) {
-		size_t sz = dvars.size();
-		dvars.resize(n), env = (int_t*)realloc(e, sizeof(int_t) * n),
-		memset(e+sz, 0, (n - sz) * sizeof(int_t));
-	}*/
-	return env[n-1];
+void rel_format(int_t n, wostream& os) {
+	if (n > 0) os << L'~';
+	os << wstring(drels[abs(n)-1].s, drels[abs(n)-1].n);
 }
 
-bool unify(const term& f, const term& t) {
-	cout << "unify " << f << " with " << t << endl;
-	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
-	for (size_t n = 1; n < t.size(); ++n)
-		if (t[n] < 0) { if (t[n] != f[n]) return f[0]==t[0]; }
-		else if (!var_rep(t[n])) var_rep(t[n]) = f[n];
-		else if (var_rep(t[n]) != f[n]) return f[0]==t[0];
-	cout << "success" << endl;
-	return f[0]==t[0];
-}
-
-term sub(const term& t) {
-	term r = t;
-	term_for_each_arg(r, x) if (*x > 0 && var_rep(*x)) *x = var_rep(*x);
-	return r;
-}
-
-rule sub_chop(const rule& t, size_t n) {
-	rule r;
-	for (size_t k = 0; k < t.size(); ++k) if (n!=k) r.push_back(sub(t[n]));
-	return r;
-}
-
-bool stage::Tp(rule r, delta &add, delta &del) {
-	for (size_t n = 1; n < r.size(); ++n)
-		if (auto it = find(get_key(r[n])); it == end()) continue;
-		else for (term f : it->second)
-			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
-			else if (rule t = sub_chop(r, n); t.size() == 1) {
-				if ((t[0][0] = -t[0][0]) > 0) {
-					if (has(add, t[0])) return false;
-					t[0][0] = -t[0][0], del.emplace(t[0]);
-					auto it = find(get_key(t[0]));
-					if (it != end()) it->second.erase(t[0]);
-				} else {
-					if (has(del, t[0])) return false;
-					t[0][0] = -t[0][0], add.emplace(t[0]),
-						add_term(t[0]);
-				}
-			} else if (!Tp(t, add, del)) return false;
-	return true;
+void elem_format(int_t n, wostream& os) {
+	if (n > 0) os << L'?' << n;
+	else os << wstring(delems[-n-1].s, delems[-n-1].n);
 }
 
 void normalize(rule &r, size_t v) {
@@ -77,6 +40,49 @@ void normalize(rule &r, size_t v) {
 			if (*x > 0) *x = var_rep(*x);
 }
 
+bool unify(const term& f, const term& t) {
+//	wcout << "unify " << f << " with " << t << endl;
+	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
+	for (size_t n = 1; n < t.size(); ++n)
+		if (t[n] < 0) { if (t[n] != f[n]) return f[0]==t[0]; }
+		else if (!var_rep(t[n])) var_rep(t[n]) = f[n];
+		else if (var_rep(t[n]) != f[n]) return f[0]==t[0];
+//	wcout << "success" << endl;
+	return f[0]==t[0];
+}
+
+term sub(const term& t) {
+	term r = t;
+	term_for_each_arg(r, x) if (*x > 0 && var_rep(*x)) *x = var_rep(*x);
+	return r;
+}
+
+rule sub_chop(const rule& t, size_t n) {
+	rule r;
+	for (size_t k = 0; k < t.size(); ++k) if (n!=k) r.push_back(sub(t[k]));
+	normalize(r, 1);
+	return r;
+}
+
+bool stage::Tp(rule r, delta &add, delta &del) {
+	wcout << L"Tp " << r << endl;
+	for (size_t n = 1; n < r.size(); ++n)
+		if (auto it = find(get_key(r[n])); it == end()) continue;
+		else for (term f : it->second)
+			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
+			else if (rule t = sub_chop(r, n); t.size() == 1) {
+				if ((t[0][0] = -t[0][0]) < 0) {
+					if (has(add, t[0])) return false;
+					t[0][0] = -t[0][0], del.emplace(t[0]);
+				} else {
+					if (has(del, t[0])) return false;
+					t[0][0] = -t[0][0], add.emplace(t[0]),
+						add_term(t[0]);
+				}
+			} else if (!Tp(t, add, del)) return false;
+	return true;
+}
+
 long long get_rnd() {
 	static random_device d;
 	static mt19937 g(d());
@@ -84,21 +90,23 @@ long long get_rnd() {
 	return u(g);
 }
 
-int_t elem_get(const char *s, size_t n) {
+int_t elem_get(const wchar_t *s, size_t n) {
 	ditem i(s, n);
 	auto it = elems.find(i);
 	if (it != elems.end()) return it->second;
 	return	i.hash = get_rnd(), delems.push_back(i),
 		elems[i] = *s=='?' ? delems.size() : -delems.size();
 }
-int_t rel_get(const char *s, size_t n) {
+
+int_t rel_get(const wchar_t *s, size_t n) {
 	ditem i(s, n);
 	auto it = rels.find(i);
-	if (it != rels.end()) return it->second;
-	return i.hash = get_rnd(), drels.push_back(i), rels[i] = -drels.size();
+	if (it != rels.end())
+		return it->second;
+	return (i.hash = get_rnd()), drels.push_back(i), rels[i] = -drels.size();
 }
 
-int_t var_get(const char *s, size_t n) {
+int_t var_get(const wchar_t *s, size_t n) {
 	ditem i(s, n);
 //	if (dvars.size()<=n)dvars.resize(n),e=(int_t*)realloc(e,sizeof(int_t)*n);
 	auto it = vars.find(i);
@@ -131,7 +139,7 @@ const wchar_t* str_read(int_t *r, const wchar_t *in, bool rel) {
 		while (iswspace(*t)) ++t;
 		if (t == s) return 0;
 	}
-	*r = rel ? rel_getw(s, t - s) : elem_getw(s, t - s);
+	*r = rel ? rel_get(s, t - s) : elem_get(s, t - s);
 	while (*t && iswspace(*t)) ++t;
 	return t;
 }
@@ -167,7 +175,8 @@ rule rule_read(lp &p, const wchar_t **in) {
 		if (*((*in)++) != L'.') er(dot_after_q);
 		return rule_read(p, in);
 	}
-	if (c.push_back(t), **in == L'.') { p.db.add_term(t), ++*in; goto ret; }
+	if (c.push_back(t), **in == L'.') 
+		return p.db.add_term(t), ++*in, rule_read(p, in);
 	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
 		er(if_expected);
 next:	deref = false;
@@ -188,22 +197,23 @@ ret:	set<int_t> vs;
 	return c;
 }
 
-ostream& operator<<(ostream& os, const term& t) {
-	rel_format(t[0], os) << '(';
+wostream& operator<<(wostream& os, const term& t) {
+	rel_format(t[0], os);
+	os << L'(';
 	cterm_for_each_arg(t, x)
 		if (elem_format(*x, os); x != &t[t.size()-1])
-			os << ',';
-	return os << ')';
+			os << L',';
+	return os << L')';
 }
 
-ostream& operator<<(ostream& os, const rule& t) {
-	os << '[' << t.v1 << ',' << t.vn << "] ";
-	if (os << t[0]; t.size() > 1) os << " if ";
-	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?" .":", ");
+wostream& operator<<(wostream& os, const rule& t) {
+	os << L'[' << t.v1 << L',' << t.vn << L"] ";
+	if (os << t[0]; t.size() > 1) os << L" if ";
+	for (size_t n=1; n<t.size(); ++n) os<<t[n]<<(n==t.size()-1?L" .":L", ");
 	return os;
 }
 
-ostream& operator<<(ostream& os, const stage& t) {
+wostream& operator<<(wostream& os, const stage& t) {
 	for (auto x : t) for (auto y : x.second) os << y << endl;
 	return os;
 }
@@ -217,7 +227,7 @@ lp lp_read(const wchar_t *in) {
 		cterm_for_each_arg(t, x) if (*x > 0) ++v;
 	memset(env = new int_t[v], 0, v * sizeof(int_t));
 	size_t vn = 1;
-	for (rule& r : p.r) normalize(r, vn), vn = r.vn, cout << r << endl;
+	for (rule& r : p.r) normalize(r, vn), vn = r.vn, wcout << r << endl;
 	return p;
 }
 
@@ -226,7 +236,7 @@ bool pfp(lp p) {
 	pair<map<stage, size_t>::const_iterator, bool> it;
 	for (size_t step = 0; p.db.size(); ++step)
 		if ((it = stages.emplace(p.db, step)).second)
-			(cout << "stage " << step << ": " << endl << p.db),
+			(wcout << L"stage " << step << L": " << endl << p.db),
 			p.db.Tp(p);
 		else return it.first->second == step-1;
 	return false;
@@ -234,6 +244,6 @@ bool pfp(lp p) {
 
 int main() {
 	setlocale(LC_ALL, "");
-	wstring prog((istreambuf_iterator(wcin)),istreambuf_iterator<wchar_t>());
+	wstring prog((istreambuf_iterator<wchar_t>(wcin)),istreambuf_iterator<wchar_t>());
 	return pfp(lp_read(prog.c_str()));
 }

@@ -14,14 +14,16 @@ using namespace std;
 typedef int32_t int_t;
 
 struct ditem {
-	const char *s = 0;
+	const wchar_t *s = 0;
 	size_t n = 0;
 	long long hash;
-	bool operator<(const ditem& x) const {
-		return x.n!=n ? x.n>n : (memcmp(x.s, s, n)>0);
-	}
 	ditem(){}
-	ditem(const char *s, size_t n) : s(s), n(n) {}
+	ditem(const wchar_t *s, size_t n) : s(s), n(n) {}
+};
+struct ditem_cmp {
+	bool operator()(const ditem& x, const ditem& y) const {
+		return x.n!=y.n ? x.n<y.n : (memcmp(x.s, y.s, y.n)<0);
+	}
 };
 
 typedef vector<int_t> term;
@@ -33,7 +35,7 @@ struct rule : public vector<term> {
 	size_t v1, vn;
 };
 
-#define get_key(t) make_pair(abs((t)[0]), (t).size()-1)
+#define get_key(t) make_pair(abs((t)[0]), (t).size())
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
 	bool Tp(rule r, delta &add, delta &del);
@@ -47,15 +49,17 @@ struct lp {
 	stage db;
 };
 
-#define rel_get_str(x) string(drels[abs(x)-1].s, drels[abs(x)-1].n)
-#define elem_get_str(x) string(delems[abs(x)-1].s, delems[abs(x)-1].n)
+void rel_format(int_t n, wostream& os);
+void elem_format(int_t n, wostream& os);
+
+#define s2ws(s) wc2c.from_bytes(s)
+#define rel_get_str(x) s2ws(string(drels[abs(x)-1].s, drels[abs(x)-1].n))
+#define elem_get_str(x) s2ws(string(delems[abs(x)-1].s, delems[abs(x)-1].n))
 #define elem_get_hash(x) delems[abs(x)-1].hash
 #define rel_get_hash(x) drels[abs(x)-1].hash
 #define has(x,y) ((x).find(y) != (x).end())
-#define elem_getw(ws, n) elem_get((const char*)(ws), (n) * sizeof(wchar_t))
-#define rel_getw(ws, n) rel_get((const char*)(ws), (n) * sizeof(wchar_t))
-#define rel_format(n, os) (((n) > 0) ? (os << '~' << rel_get_str(n)) : (os << rel_get_str(n)))
-#define elem_format(n, os) (((n) > 0) ? (os << '?' << (n)) : (os << elem_get_str(n)))
+//#define elem_getw(ws, n) elem_get((const char*)(ws), (n) * sizeof(wchar_t))
+//#define rel_getw(ws, n) rel_get((const char*)(ws), (n) * sizeof(wchar_t))
 #define env_clear(from, to) memset(env+(from)-1, 0, sizeof(int_t)*((to)-(from)))
 #define _resize(x,t,l)		(((x)=(t*)realloc(x,sizeof(t)*(l))))
 #define array_append(a, t, l, x)(++l, (((t*)_resize(a, t, l))[l-1] = (x)))
@@ -73,3 +77,4 @@ struct lp {
 #define err_dst "Unable to read dst file.\n"
 #define term_for_each_arg(t, x) for (int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
 #define cterm_for_each_arg(t, x) for (const int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
+#define var_rep(n) env[n-1]
