@@ -39,6 +39,7 @@ struct rule : public vector<term> {
 
 struct stage : public map<pair<int_t, size_t>, set<term>> {
 	bool Tp(const rule& r, delta &add, delta &del);
+	bool on_match(const rule &r, size_t n, delta &add, delta &del);
 	bool Tp(const struct lp& p);
 	bool add_term(const term& t) { return (*this)[get_key(t)].emplace(t).second; }
 };

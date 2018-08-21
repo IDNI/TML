@@ -47,11 +47,11 @@ bool unify(const term& f, const term& t) {
 //	wcout << "unify " << f << " with " << t << endl;
 	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
 	for (size_t n = 1; n < t.size(); ++n)
-		if (t[n] < 0) { if (t[n] != f[n]) return f[0]!=t[0]; }
+		if (t[n] < 0) { if (t[n] != f[n]) return false; }
 		else if (!var_rep(t[n])) var_rep(t[n]) = f[n];
-		else if (var_rep(t[n]) != f[n]) return f[0]!=t[0];
+		else if (var_rep(t[n]) != f[n]) return false;
 //	wcout << "success" << endl;
-	return f[0]==t[0];
+	return true;
 }
 
 term sub(const term& t) {
@@ -66,25 +66,38 @@ rule sub_chop(const rule& t, size_t n) {
 	normalize(r, 1);
 	return r;
 }
+bool stage::on_match(const rule &r, size_t n, delta &add, delta &del) {
+	if (rule t = sub_chop(r, n); t.size() == 1) {
+		if (t[0][0] > 0) {
+			t[0][0] = -t[0][0];
+			if (has(add, t[0])) return false;
+			del.emplace(t[0]);
+		} else if (has(del, t[0])) return false;
+		else add.emplace(t[0]);
+	} else return Tp(t, add, del);
+	return true;
+}
 
 bool stage::Tp(const rule& r, delta &add, delta &del) {
-//	wcout << L"Tp " << r << endl;
-	for (size_t n = 1; n < r.size(); ++n)
-		if (auto it = find(get_key(r[n])); it == end()) continue;
+	for (size_t n = 1; n < r.size(); ++n) {
+		auto it = find(get_key(r[n]));
+		if (r[n][0] > 0) {
+			if (it == end()) {
+				if (!on_match(r, n, add, del)) return false;
+				continue;
+			}
+			bool b = false;
+			for (term f : it->second)
+				if (env_clear(r.v1, r.vn), b = unify(f, r[n]))
+					break;
+			if (!b&&(env_clear(r.v1, r.vn), !on_match(r,n,add,del)))
+				return false;
+		} else if (it == end()) continue;
 		else for (term f : it->second) {
 			if (env_clear(r.v1, r.vn), !unify(f, r[n])) continue;
-			else if (rule t = sub_chop(r, n); t.size() == 1) {
-				if (t[0][0] > 0) {
-					t[0][0] = -t[0][0];
-					if (has(add, t[0]))
-						return false;
-					del.emplace(t[0]);
-				} else if (has(del, t[0]))
-					return false;
-				else add.emplace(t[0]);
-			} else if (!Tp(t, add, del))
-				return false;
+			else if (!on_match(r, n, add, del)) return false;
 		}
+	}
 	return true;
 }
 
