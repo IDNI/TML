@@ -45,8 +45,6 @@ struct lp {
 	stage db;
 };
 
-#define elem_get_hash(x) delems[abs(x)-1].hash
-#define rel_get_hash(x) drels[abs(x)-1].hash
 #define has(x,y) ((x).find(y) != (x).end())
 #define er(x)	perror(x), exit(0)
 #define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
@@ -62,8 +60,8 @@ struct lp {
 #define err_dst "Unable to read dst file.\n"
 #define term_for_each_arg(t, x) for (int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
 #define cterm_for_each_arg(t, x) for (const int_t *x = &((t)[1]); x != &((t)[(t).size()]); ++x)
-#define get_key(t) make_pair(abs((t)[0]), (t).size())
-#define rel_format(t, os) (((t)>0)? os << L'~' : os << wstring(drels[abs(t)-1].s, drels[abs(t)-1].n))
+#define get_key(t) make_pair((t[0]), (t).size())
+#define rel_format(t, os) (os << wstring(drels[-t-1].s, drels[-t-1].n))
 #define elem_format(t, os) (((t)>0)? os << L'?' << t : os << wstring(delems[-t-1].s, delems[-t-1].n))
 #define min(x,y) ((x)<(y)?(x):(y))
 #define max(x,y) ((x)>(y)?(x):(y))
@@ -109,8 +107,8 @@ int_t var_get(const wchar_t *s, size_t n) {
 
 long long term_hash::operator()(const term& t) const {
 	long long h = 0;
-	h ^= rel_get_hash(t[0]);
-	for (size_t n = 1; n < t.size(); ++n) h ^= elem_get_hash(t[n]) << (n+1);
+	h ^= drels[-t[0]-1].hash;
+	for (size_t n = 1; n < t.size(); ++n) h ^= delems[abs(t[n])-1].hash << (n+1);
 	return h;
 }
 
@@ -242,7 +240,7 @@ lp lp_read(const wchar_t *in) {
 
 bool unify(const term& f, const term& t) {
 	env_clear(t);
-	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
+	if (f.size() != t.size() || f[0] != t[0]) return false;
 	for (size_t n = 1; n < t.size(); ++n)
 		if (t[n] < 0) { if (t[n] != f[n]) return false; }
 		else if (!env[t[n]-1]) env[t[n]-1] = f[n];
@@ -260,8 +258,8 @@ bool query(const term& q, iter& qit, iter& eit) {
 	return false;
 }
 
-bool Tp(stage &s, const rule& r, delta &add, delta &del);
-bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
+bool Tp(stage&, const rule&, delta&, delta&);
+bool on_match(stage &s, const rule &r, size_t n, delta& add, delta& del) {
 	rule t;
 	for (size_t k = 0; k < r.size(); ++k)
 		if (n != k) {
@@ -270,22 +268,17 @@ bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
 				if (*y > 0 && env[*y-1]) *y = env[*y-1];
 			t.push_back(move(x));
 		}
-	normalize(t, 1);
-	//wcout << "matched " << r[n] << " remains: " << t << endl;
-	memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
-	if (t.size() != 1) return Tp(s, t, add, del);
-	if (t[0].neg) {
-		if (has(add, t[0].t)) return false;
-		del.emplace(t[0].t);
-	} else if (has(del, t[0].t)) return false;
-	else add.emplace(t[0].t);
-	return true;
+	normalize(t, 1), memset(env + r.v1 - 1, 0, (r.vn - r.v1)*sizeof(int_t));
+	return	t.size() != 1 ? Tp(s, t, add, del) :
+		(!t[0].neg || !has(add,t[0].t)) && (t[0].neg || !has(del, t[0].t))
+		&& ((t[0].neg ? del : add).emplace(t[0].t), true);
 }
 
-bool Tp(stage &s, const rule& r, delta &add, delta &del) {
+bool Tp(stage &s, const rule& r, delta& add, delta& del) {
 	iter qit, eit;
 	for (size_t n = 1; n < r.size(); ++n)
-		if (set_query(s, r[n].t, qit, eit))
+		if (r[n].neg) {
+		} else if (set_query(s, r[n].t, qit, eit))
 			while (query(r[n].t, qit, eit))
 				if (!on_match(s, r,n,add,del))
 					return false;
