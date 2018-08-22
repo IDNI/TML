@@ -27,13 +27,14 @@ struct ditem_cmp {
 	}
 };
 typedef vector<int_t> term;
+struct lit { term t; bool neg; };
 struct term_hash { long long operator()(const term& t) const; };
 typedef unordered_set<term, term_hash> delta;
 typedef set<term>::const_iterator iter;
 typedef map<pair<int_t, size_t>, set<term>> stage;
 struct stage_hash { long long operator()(const stage& t) const; };
 
-struct rule : public vector<term> {
+struct rule : public vector<lit> {
 	set<int_t> derefs;
 	size_t v1 = -1, vn = -1;
 };
@@ -73,11 +74,11 @@ int_t *env = 0;
 
 void normalize(rule &r, size_t v) {
 	r.v1 = r.vn = v;
-	for (term t : r) term_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0;
-	for (term t : r)
-		term_for_each_arg(t, x)
+	for (const lit& t : r) cterm_for_each_arg(t.t, x) if (*x > 0) env[*x-1] = 0;
+	for (const lit& t : r)
+		cterm_for_each_arg(t.t, x)
 			if (*x > 0 && !env[*x-1]) env[*x-1] = r.vn++;
-	for (term &t : r) term_for_each_arg(t, x) if (*x > 0) *x = env[*x-1];
+	for (lit &t : r) term_for_each_arg(t.t, x) if (*x > 0) *x = env[*x-1];
 }
 
 long long get_rnd() {
@@ -167,7 +168,9 @@ rule rule_read(lp &p, const wchar_t **in) {
 		if (*((*in)++) != L'.') er(dot_after_q);
 		return rule_read(p, in);
 	}
-	if (c.push_back(t), **in == L'.') 
+	lit l;
+	if ((l.neg = t[0] > 0)) t[0] = -t[0];
+	if (l.t = t, c.push_back(l), **in == L'.') 
 		return p.db[get_key(t)].emplace(t), ++*in, rule_read(p, in);
 	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
 		er(if_expected);
@@ -175,8 +178,9 @@ next:	deref = false;
 	while (iswspace(**in)) ++*in;
 	if (**in == L'*') deref = true;
 	if ((t = term_read(in)).empty()) return c;
+	if ((l.neg = t[0] > 0)) t[0] = -t[0];
 	if (deref) c.derefs.emplace(t[0]);
-	if (c.push_back(t); **in != L'.') goto next;
+	if (l.t = t, c.push_back(l); **in != L'.') goto next;
 	++*in;
 	while (iswspace(**in)) ++*in;
 	return c;
@@ -190,6 +194,11 @@ wostream& operator<<(wostream& os, const term& t) {
 		if (x != &t[t.size()-1]) os << L',';
 	}
 	return os << L')';
+}
+
+wostream& operator<<(wostream& os, const lit& t) {
+	if (t.neg) os << L'~';
+	return os << t.t;
 }
 
 wostream& operator<<(wostream& os, const rule& t) {
@@ -224,14 +233,15 @@ lp lp_read(const wchar_t *in) {
 	lp p;
 	for (rule r; !(r = rule_read(p, &in)).empty();) p.r.push_back(r);
 	size_t v = 0, vn = 1;
-	for (const rule& r : p.r) for (const term& t : r)
-		cterm_for_each_arg(t, x) if (*x > 0) ++v;
+	for (const rule& r : p.r) for (const lit& t : r)
+		cterm_for_each_arg(t.t, x) if (*x > 0) ++v;
 	memset(env = new int_t[v], 0, v * sizeof(int_t));
 	for (rule& r : p.r) normalize(r, vn), vn = r.vn, wcout << r << endl;
 	return p;
 }
 
 bool unify(const term& f, const term& t) {
+	env_clear(t);
 	if (f.size() != t.size() || f[0] != -abs(t[0])) return false;
 	for (size_t n = 1; n < t.size(); ++n)
 		if (t[n] < 0) { if (t[n] != f[n]) return false; }
@@ -241,17 +251,13 @@ bool unify(const term& f, const term& t) {
 }
 
 bool set_query(stage &s, const term& q, iter& qit, iter& eit) {
-	env_clear(q);
-	auto it = s.find(get_key(q));
-	if (it == s.end()) return false;
-	return qit = it->second.begin(), eit = it->second.end(), true;
+	if (auto it = s.find(get_key(q)); it == s.end()) return false;
+	else return qit = it->second.begin(), eit = it->second.end(), true;
 }
 
 bool query(const term& q, iter& qit, iter& eit) {
-next:	if (qit == eit) return false;
-	env_clear(q);
-	if (unify(*qit++, q)) return true;
-	goto next;
+	while (qit != eit) if (unify(*qit++, q)) return true;
+	return false;
 }
 
 bool Tp(stage &s, const rule& r, delta &add, delta &del);
@@ -259,8 +265,8 @@ bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
 	rule t;
 	for (size_t k = 0; k < r.size(); ++k)
 		if (n != k) {
-			term x = r[k];
-			term_for_each_arg(x, y)
+			lit x = r[k];
+			term_for_each_arg(x.t, y)
 				if (*y > 0 && env[*y-1]) *y = env[*y-1];
 			t.push_back(move(x));
 		}
@@ -268,20 +274,19 @@ bool on_match(stage &s, const rule &r, size_t n, delta &add, delta &del) {
 	//wcout << "matched " << r[n] << " remains: " << t << endl;
 	memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
 	if (t.size() != 1) return Tp(s, t, add, del);
-	if (t[0][0] > 0) {
-		if ((t[0][0] = -t[0][0]), has(add, t[0])) return false;
-		del.emplace(t[0]);
-	} else if (has(del, t[0])) return false;
-	else add.emplace(t[0]);
+	if (t[0].neg) {
+		if (has(add, t[0].t)) return false;
+		del.emplace(t[0].t);
+	} else if (has(del, t[0].t)) return false;
+	else add.emplace(t[0].t);
 	return true;
 }
 
 bool Tp(stage &s, const rule& r, delta &add, delta &del) {
 	iter qit, eit;
 	for (size_t n = 1; n < r.size(); ++n)
-		if (memset(env + r.v1 - 1, 0, (r.vn - r.v1) * sizeof(int_t));
-			set_query(s, r[n], qit, eit))
-			while (query(r[n], qit, eit))
+		if (set_query(s, r[n].t, qit, eit))
+			while (query(r[n].t, qit, eit))
 				if (!on_match(s, r,n,add,del))
 					return false;
 	return true;
