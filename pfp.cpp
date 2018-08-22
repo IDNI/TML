@@ -1,6 +1,7 @@
 #include <set>
 #include <map>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 #include <cstdint>
 #include <string>
@@ -30,6 +31,7 @@ struct term_hash { long long operator()(const term& t) const; };
 typedef unordered_set<term, term_hash> delta;
 typedef set<term>::const_iterator iter;
 typedef map<pair<int_t, size_t>, set<term>> stage;
+struct stage_hash { long long operator()(const stage& t) const; };
 
 struct rule : public vector<term> {
 	set<int_t> derefs;
@@ -108,6 +110,13 @@ long long term_hash::operator()(const term& t) const {
 	long long h = 0;
 	h ^= rel_get_hash(t[0]);
 	for (size_t n = 1; n < t.size(); ++n) h ^= elem_get_hash(t[n]) << (n+1);
+	return h;
+}
+
+long long stage_hash::operator()(const stage& t) const {
+	long long h = 0;
+	static term_hash th;
+	for (auto x : t) for (auto y : x.second) h ^= th(y);
 	return h;
 }
 
@@ -289,8 +298,8 @@ bool Tp(lp &p) {
 }
 
 bool pfp(lp p) {
-	map<stage, size_t> stages;
-	pair<map<stage, size_t>::const_iterator, bool> it;
+	unordered_map<stage, size_t, stage_hash> stages;
+	pair<unordered_map<stage, size_t, stage_hash>::const_iterator, bool> it;
 	for (size_t step = 0; p.db.size(); ++step)
 		if ((it = stages.emplace(p.db, step)).second) {
 			wcout << L"stage " << step << L": " << endl << p.db;
