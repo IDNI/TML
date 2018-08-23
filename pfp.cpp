@@ -26,8 +26,6 @@ struct ditem_cmp {
 		return x.n!=y.n ? x.n<y.n : (memcmp(x.s, y.s, y.n*sizeof(wchar_t))<0);
 	}
 };
-typedef vector<int_t> term;
-struct lit { int_t* t; bool neg; };
 struct term_hash { long long operator()(const int_t* t) const; };
 struct same_term { long long operator()(const int_t* x, const int_t *y) const; };
 typedef unordered_set<const int_t*, term_hash, same_term> delta;
@@ -41,7 +39,7 @@ struct rule {
 	vector<bool> neg;
 	set<int_t> derefs, ex;
 	size_t v1 = -1, vn = -1;
-	void add_lit(const lit& l);
+	void add_lit(const int_t*, bool);
 	void add_lit(const rule& r, size_t n);
 };
 
@@ -74,7 +72,6 @@ struct lp {
 #define min(x,y) ((x)<(y)?(x):(y))
 #define max(x,y) ((x)>(y)?(x):(y))
 #define env_clear(t) cterm_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0
-#define termlen(r, n) ((r).t[(r).pos[n]]) // ((n==(r).pos.size()-1 ? (r).t.size() : (r).pos[n+1])-(r).pos[n])
 #define resize(x,t,l)		((t*)((x)=(t*)realloc(x,sizeof(t)*(l))))
 #define term_append(a, x)	((int_t*)resize(a, int_t, *a))[(*a)-1] = (x)
 #define rule_clear(r) ((r).t.clear(), (r).pos.clear(), (r).neg.clear(), (r).derefs.clear(), (r).ex.clear(), ((r).v1 = (r).vn = -1))
@@ -171,7 +168,7 @@ int_t* term_read(const wchar_t **in) {
 rule* rule_read(lp &p, const wchar_t **in) {
 	while (iswspace(**in)) ++*in;
 	if (!**in) return 0;
-	bool deref = false;
+	bool deref = false, neg;
 	if (**in == L'*') deref = true;
 	int_t* t = term_read(in);
 	if (!*t) return free(t), nullptr;
@@ -181,10 +178,9 @@ rule* rule_read(lp &p, const wchar_t **in) {
 		if (*((*in)++) != L'.') er(dot_after_q);
 		return rule_read(p, in);
 	}
-	lit l;
 	rule *c = new rule;
-	if ((l.neg = t[1] > 0)) t[1] = -t[1];
-	if (l.t = t, c->add_lit(l), **in == L'.') 
+	if ((neg = t[1] > 0)) t[1] = -t[1];
+	if (c->add_lit(t, neg), **in == L'.') 
 		return p.db[get_key(t)].emplace(&c->t[c->pos.size()-1]), free(t), ++*in, rule_read(p, in);
 	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
 		er(if_expected);
@@ -192,9 +188,9 @@ next:	deref = false;
 	while (iswspace(**in)) ++*in;
 	if (**in == L'*') deref = true;
 	if (!*(t = term_read(in))) return free(t), c;
-	if ((l.neg = t[1] > 0)) t[1] = -t[1];
+	if ((neg = t[1] > 0)) t[1] = -t[1];
 	if (deref) c->derefs.emplace(t[1]);
-	if (l.t = t, c->add_lit(l), free(t); **in != L'.') goto next;
+	if (c->add_lit(t, neg), free(t); **in != L'.') goto next;
 	++*in;
 	while (iswspace(**in)) ++*in;
 	return c;
@@ -213,11 +209,6 @@ wostream& operator<<(wostream& os, const int_t* t) {
 	wstring s = ss.str();
 	os << s;
 	return os << L')';
-}
-
-wostream& operator<<(wostream& os, const lit& t) {
-	if (t.neg) os << L'~';
-	return os << &t.t[0];
 }
 
 wostream& operator<<(wostream& os, const rule& t) {
@@ -252,7 +243,6 @@ next:	for (n = l = 0; n < 31; ++n)
 lp lp_read(const wchar_t *in) {
 	lp p;
 	for (rule *r; (r = rule_read(p, &in)) && !r->t.empty();)
-		//r.t.push_back(0), 
 		p.r.push_back(*r), wcout << *r << endl;
 	size_t v = 0, vn = 1;
 	for (const rule& r : p.r) for (const int_t& t : r.t) if (t > 0) ++v;
@@ -262,15 +252,15 @@ lp lp_read(const wchar_t *in) {
 	return p;
 }
 
-void rule::add_lit(const lit& l) {
-	neg.push_back(l.neg);
+void rule::add_lit(const int_t *l, bool _neg) {
+	neg.push_back(_neg);
 	if (!t.size()) t.push_back(0);
 	pos.push_back(t.size()-1);
-	t.insert(t.end()-1, l.t, l.t + *l.t + 1);
+	t.insert(t.end()-1, l, l + *l + 1);
 }
 
 void rule::add_lit(const rule& r, size_t n) {
-	size_t l = termlen(r, n)+1;
+	size_t l = r.t[r.pos[n]] + 1;
 	if (!t.size()) t.push_back(0);
 	pos.push_back(t.size()-1), neg.push_back(r.neg[n]);
 	t.insert(t.end()-1, &r.t[r.pos[n]], &r.t[r.pos[n] + l]);
@@ -330,12 +320,12 @@ bool Tp(lp &p) {
 	size_t b = 0;
 	for (const rule& r : p.r) b = max(b, r.pos.size());
 	rule *tr = new rule[b];
-	for (const rule& r : p.r) if (!Tp(p.db, r, tr, add, del)) return false;
+	for (const rule& r : p.r) if (!Tp(p.db, r, tr, add, del)) return delete[] tr, false;
 	for (const int_t* t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
 	for (const int_t* t : del)
 		if (auto it = p.db.find(get_key(t)); it != p.db.end())
 			if (it->second.erase(t)){} // wcout << "erasing " << t << endl;
-	return true;
+	return delete[] tr, true;
 }
 
 bool pfp(lp p) {
