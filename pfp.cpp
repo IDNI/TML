@@ -1,7 +1,7 @@
 #include <set>
 #include <map>
-#include <debug/unordered_set>
-#include <debug/unordered_map>
+#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 #include <cstdint>
 #include <string>
@@ -27,26 +27,27 @@ struct ditem_cmp {
 	}
 };
 typedef vector<int_t> term;
-struct lit { term t; bool neg; };
-struct term_hash { long long operator()(const term& t) const; };
-typedef unordered_set<term, term_hash> delta;
-typedef set<term>::const_iterator iter;
-typedef map<pair<int_t, size_t>, set<term>> stage;
+struct lit { int_t* t; bool neg; };
+struct term_hash { long long operator()(const int_t* t) const; };
+struct same_term { long long operator()(const int_t* x, const int_t *y) const; };
+typedef unordered_set<const int_t*, term_hash, same_term> delta;
+typedef delta::const_iterator iter;
+typedef map<pair<int_t, size_t>, unordered_set<const int_t*, term_hash, same_term>> stage;
 struct stage_hash { long long operator()(const stage& t) const; };
 
 struct rule {
 	vector<int_t> t;
-	vector<size_t> asz;
+	vector<size_t> pos;
 	vector<bool> neg;
 	set<int_t> derefs, ex;
 	size_t v1 = -1, vn = -1;
-	const lit operator[](size_t n) const;
 	void add_lit(const lit& l);
 	void add_lit(const rule& r, size_t n);
 };
+
 struct lp {
 	vector<rule> r;
-	set<term> q;
+	set<int_t*> q;
 	stage db;
 };
 
@@ -73,22 +74,20 @@ struct lp {
 #define min(x,y) ((x)<(y)?(x):(y))
 #define max(x,y) ((x)>(y)?(x):(y))
 #define env_clear(t) cterm_for_each_arg(t, x) if (*x > 0) env[*x-1] = 0
-#define termlen(r, n) ((r).t[(r).asz[n]]) // ((n==(r).asz.size()-1 ? (r).t.size() : (r).asz[n+1])-(r).asz[n])
+#define termlen(r, n) ((r).t[(r).pos[n]]) // ((n==(r).pos.size()-1 ? (r).t.size() : (r).pos[n+1])-(r).pos[n])
+#define resize(x,t,l)		((t*)((x)=(t*)realloc(x,sizeof(t)*(l))))
+#define term_append(a, x)	((int_t*)resize(a, int_t, *a))[(*a)-1] = (x)
+#define rule_clear(r) ((r).t.clear(), (r).pos.clear(), (r).neg.clear(), (r).derefs.clear(), (r).ex.clear(), ((r).v1 = (r).vn = -1))
 map<ditem, int_t, ditem_cmp> elems, rels, vars; 
 vector<ditem> delems, drels, dvars;
 int_t *env = 0;
 
 void normalize(rule &r, size_t v) {
 	r.v1 = r.vn = v;
-	crule_for_each_term(r, t)
-		cterm_for_each_arg(t, x)
-			if (*x > 0) env[*x - 1] = 0;
-	crule_for_each_term(r, t)
-		cterm_for_each_arg(t, x)
-			if (*x > 0 && !env[*x - 1]) env[*x - 1] = r.vn++;
-	rule_for_each_term(r, t)
-		term_for_each_arg(t, x)
-			if (*x > 0) *x = env[*x - 1] ;
+	crule_for_each_term(r,t) cterm_for_each_arg(t,x) if (*x>0) env[*x - 1]=0;
+	crule_for_each_term(r,t) cterm_for_each_arg(t,x) if (*x>0&&!env[*x-1]) env[*x-1]=r.vn++;
+	 rule_for_each_term(r,t)  term_for_each_arg(t,x) if (*x>0) *x=env[*x-1];
+	crule_for_each_term(r,t) cterm_for_each_arg(t,x) if (*x>0) env[*x-1]=0;
 }
 
 long long get_rnd() {
@@ -117,17 +116,21 @@ int_t var_get(const wchar_t *s, size_t n) {
 	return i.hash = get_rnd(), dvars.push_back(i), vars[i] = dvars.size();
 }
 
-long long term_hash::operator()(const term& t) const {
+long long same_term::operator()(const int_t* x, const int_t *y) const {
+	return !memcmp(x, y, sizeof(int_t)*(*x+1));
+}
+
+long long term_hash::operator()(const int_t* t) const {
 	long long h = 0;
-	h ^= drels[-t[1]-1].hash;
-	for (size_t n = 2; n < t.size(); ++n) h ^= delems[abs(t[n])-1].hash << (n+1);
+	h ^= drels[-t[1]-1].hash - 127;
+	for (size_t n = 2; n < (size_t)*t; ++n) h ^= delems[abs(t[n])-1].hash << (n+1);
 	return h;
 }
 
 long long stage_hash::operator()(const stage& t) const {
 	long long h = 0;
 	static term_hash th;
-	for (auto x : t) for (auto y : x.second) h ^= th(y);
+	for (auto x : t) for (auto y : x.second) h ^= th(&y[0]);
 	return h;
 }
 
@@ -149,30 +152,29 @@ const wchar_t* str_read(int_t *r, const wchar_t *in, bool rel) {
 	return t;
 }
 
-term term_read(const wchar_t **in) {
-	int_t x;
-	term r;
+int_t* term_read(const wchar_t **in) {
+	int_t x, *r = (int_t*)malloc(sizeof(int_t));
+	*r = 0;
 	bool neg = **in == L'~';
 	if (neg) ++*in;
-	while (**in != L')' && (*in = str_read(&x, *in, !r.size())))
-		if (!r.size() && *((*in)++) != L'(') er(oparen_expected);
-		else if (r.push_back(x); **in == L',') ++*in;
+	while (**in != L')' && (*in = str_read(&x, *in, !*r)))
+		if (!*r && *((*in)++) != L'(') er(oparen_expected);
+		else if (r=(int_t*)realloc(r, (*r+2)*sizeof(int_t)), r[++*r]=x;
+			**in == L',') ++*in;
 		else if (**in == L')') break;
-		else if (r.size() != 1) er(comma_expected);
+		else if (*r != 1) er(comma_expected);
 	for (++*in; iswspace(**in); ++*in);
 	if (neg) r[1] = -r[1];
-	r.insert(r.begin(), r.size());
 	return r;
 }
 
-rule rule_read(lp &p, const wchar_t **in) {
-	rule c;
+rule* rule_read(lp &p, const wchar_t **in) {
 	while (iswspace(**in)) ++*in;
-	if (!**in) return c;
+	if (!**in) return 0;
 	bool deref = false;
 	if (**in == L'*') deref = true;
-	term t = term_read(in);
-	if (t.empty()) return c;
+	int_t* t = term_read(in);
+	if (!*t) return free(t), nullptr;
 	if (deref) {
 		p.q.emplace(t), deref = false;
 		while (iswspace(**in)) ++*in;
@@ -180,47 +182,53 @@ rule rule_read(lp &p, const wchar_t **in) {
 		return rule_read(p, in);
 	}
 	lit l;
+	rule *c = new rule;
 	if ((l.neg = t[1] > 0)) t[1] = -t[1];
-	if (l.t = t, c.add_lit(l), **in == L'.') 
-		return p.db[get_key(t)].emplace(t), ++*in, rule_read(p, in);
+	if (l.t = t, c->add_lit(l), **in == L'.') 
+		return p.db[get_key(t)].emplace(&c->t[c->pos.size()-1]), free(t), ++*in, rule_read(p, in);
 	if (*((*in)++) != L'i' || *((*in)++) != L'f' || !iswspace(*((*in)++)))
 		er(if_expected);
 next:	deref = false;
 	while (iswspace(**in)) ++*in;
 	if (**in == L'*') deref = true;
-	if ((t = term_read(in)).empty()) return c;
+	if (!*(t = term_read(in))) return free(t), c;
 	if ((l.neg = t[1] > 0)) t[1] = -t[1];
-	if (deref) c.derefs.emplace(t[1]);
-	if (l.t = t, c.add_lit(l); **in != L'.') goto next;
+	if (deref) c->derefs.emplace(t[1]);
+	if (l.t = t, c->add_lit(l), free(t); **in != L'.') goto next;
 	++*in;
 	while (iswspace(**in)) ++*in;
 	return c;
 }
 
-wostream& operator<<(wostream& os, const term& t) {
-	rel_format(t[1], os);
-	os << L'(';
+wostream& operator<<(wostream& os, const int_t* t) {
+	wstringstream ss;
+	rel_format(t[1], ss);
+	ss << L'(';
 	cterm_for_each_arg(t, x) {
-		if (env) elem_format((*x < 0 || !env[*x-1] ? *x : env[*x-1]), os);
-		else elem_format(*x, os);
-		if (x != &t[t.size()-1]) os << L',';
+		if (env) elem_format((*x < 0 || !env[*x-1] ? *x : env[*x-1]), ss);
+		else elem_format(*x, ss);
+		wstring s = ss.str();
+		if (x != &t[*t]) ss << L',';
 	}
+	wstring s = ss.str();
+	os << s;
 	return os << L')';
 }
 
 wostream& operator<<(wostream& os, const lit& t) {
 	if (t.neg) os << L'~';
-	return os << t.t;
+	return os << &t.t[0];
 }
 
 wostream& operator<<(wostream& os, const rule& t) {
-	if (os << t[0]; t.asz.size() > 1) os << L" if ";
-	for (size_t n = 1; n < t.asz.size(); ++n) os<<t[n]<<(n==t.asz.size()-1?L" .":L", ");
+	if (os << &t.t[0]; t.pos.size() > 1) os << L" if ";
+	for (size_t n = 1; n < t.pos.size(); ++n)
+		os<<&t.t[t.pos[n]]<<(n==t.pos.size()-1?L" .":L", ");
 	return os;
 }
 
 wostream& operator<<(wostream& os, const stage& t) {
-	for (auto x : t) for (auto y : x.second) os << y << endl;
+	for (auto x : t) for (auto y : x.second) os << &y[0] << endl;
 	return os;
 }
 
@@ -243,9 +251,9 @@ next:	for (n = l = 0; n < 31; ++n)
 
 lp lp_read(const wchar_t *in) {
 	lp p;
-	for (rule r; !(r = rule_read(p, &in)).t.empty();)
+	for (rule *r; (r = rule_read(p, &in)) && !r->t.empty();)
 		//r.t.push_back(0), 
-		p.r.push_back(r), wcout << r << endl;
+		p.r.push_back(*r), wcout << *r << endl;
 	size_t v = 0, vn = 1;
 	for (const rule& r : p.r) for (const int_t& t : r.t) if (t > 0) ++v;
 	memset(env = new int_t[v], 0, v * sizeof(int_t));
@@ -254,80 +262,79 @@ lp lp_read(const wchar_t *in) {
 	return p;
 }
 
-const lit rule::operator[](size_t n) const {
-	const size_t k = termlen(*this, n)+1;
-	lit l;
-	l.neg = neg[n], l.t.reserve(k);
-	l.t.insert(l.t.end(), &t[asz[n]], &t[asz[n]+k]);
-	return l;
-}
-
 void rule::add_lit(const lit& l) {
 	neg.push_back(l.neg);
 	if (!t.size()) t.push_back(0);
-	asz.push_back(t.size()-1);
-	t.insert(t.end()-1, l.t.begin(), l.t.end());
+	pos.push_back(t.size()-1);
+	t.insert(t.end()-1, l.t, l.t + *l.t + 1);
 }
 
 void rule::add_lit(const rule& r, size_t n) {
 	size_t l = termlen(r, n)+1;
-	neg.push_back(r.neg[n]);
 	if (!t.size()) t.push_back(0);
-	asz.push_back(t.size()-1);
-	t.insert(t.end()-1, &r.t[r.asz[n]], &r.t[r.asz[n] + l]);
-	for (int_t *x = &t[t.size()-l]; x != &t[t.size()]; ++x)
-		if (*x > 0 && env[*x - 1]) *x = env[*x - 1];
+	pos.push_back(t.size()-1), neg.push_back(r.neg[n]);
+	t.insert(t.end()-1, &r.t[r.pos[n]], &r.t[r.pos[n] + l]);
+	for (int_t *x = &t[t.size() - l]; x != &t[t.size()]; ++x)
+		if (*x > 0 && env[*x - 1])
+			*x = env[*x - 1];
 }
 
-bool unify(const term& f, const term& t) {
+bool unify(const int_t* f, const int_t* t) {
+//	wcout << L"unify " << t << L" vs " << f << endl;
 	env_clear(t);
-	if (f.size() != t.size() || f[1] != t[1]) return false;
-	for (size_t n = 2; n < t.size(); ++n)
-		if (t[n] < 0) { if (t[n] != f[n]) return false; }
-		else if (!env[t[n]-1]) env[t[n]-1] = f[n];
-		else if (env[t[n]-1] != f[n]) return false;
+	size_t n = *t - 1;
+	if (*f++ != *t++ || *f++ != *t++) return false;
+	while (n--)
+		if (*t < 0) { if (*t != *f) return false; }
+		else if (!env[*t-1]) env[*t++-1] = *f++;
+		else if (env[*t-1] != *f) return false;
+//	wcout << L"success" << endl;
 	return true;
 }
 
-bool set_query(stage &s, const term& q, iter& qit, iter& eit) {
+bool set_query(stage &s, const int_t *q, iter& qit, iter& eit) {
 	if (auto it = s.find(get_key(q)); it == s.end()) return false;
 	else return qit = it->second.begin(), eit = it->second.end(), true;
 }
 
-bool query(const term& q, iter& qit, iter& eit) {
+bool query(const int_t *q, iter& qit, iter& eit) {
 	while (qit != eit) if (unify(*qit++, q)) return true;
 	return false;
 }
-
-bool Tp(stage&, const rule&, delta&, delta&);
-bool on_match(stage &s, const rule &r, size_t n, delta& add, delta& del) {
-	rule t;
-	for (size_t k = 0; k < r.asz.size(); ++k)
-		if (n != k) t.add_lit(r, k);
-	normalize(t, 1), memset(env + r.v1 - 1, 0, (r.vn - r.v1)*sizeof(int_t));
-	return	t.asz.size() != 1 ? Tp(s, t, add, del) :
-		(!t.neg[0] || !has(add,t[0].t)) && (t.neg[0] || !has(del, t[0].t))
-		&& ((t[0].neg ? del : add).emplace(t[0].t), true);
+#define dup(x) ((int_t*)memcpy(malloc(sizeof(int_t)*((*x)+1)), x, sizeof(int_t)*((*x)+1)))
+bool Tp(stage&, const rule&, rule*, delta&, delta&);
+bool on_match(stage &s, const rule &r, rule *t, size_t n, delta& add, delta& del) {
+	rule_clear(*t);
+	for (size_t k = 0; k < r.pos.size(); ++k)
+		if (n != k) t->add_lit(r, k);
+	normalize(*t, 1), memset(env + r.v1 - 1, 0, (r.vn - r.v1)*sizeof(int_t));
+	rule *tr = t + 1;
+	return	t->pos.size() != 1 ? Tp(s, *t, tr, add, del) :
+		(!t->neg[0] || !has(add, &t->t[0])) && (t->neg[0] || !has(del, &t->t[0]))
+		&& ((t->neg[0] ? del : add).emplace(dup(&t->t[0])), true);
 }
 
-bool Tp(stage &s, const rule& r, delta& add, delta& del) {
+bool Tp(stage &s, const rule& r, rule *t, delta& add, delta& del) {
 	iter qit, eit;
-	for (size_t n = 1; n < r.asz.size(); ++n)
+	for (size_t n = 1; n < r.pos.size(); ++n)
 		if (r.neg[n]) {
-		} else if (set_query(s, r[n].t, qit, eit))
-			while (query(r[n].t, qit, eit))
-				if (!on_match(s, r,n,add,del))
+		} else if (set_query(s, &r.t[r.pos[n]], qit, eit))
+			while (query(&r.t[r.pos[n]], qit, eit))
+				if (!on_match(s, r, t, n, add, del))
 					return false;
 	return true;
 }
 
 bool Tp(lp &p) {
 	delta add, del;
-	for (const rule& r : p.r) if (!Tp(p.db, r, add, del)) return false;
-	for (const term& t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
-	for (const term& t : del)
+	size_t b = 0;
+	for (const rule& r : p.r) b = max(b, r.pos.size());
+	rule *tr = new rule[b];
+	for (const rule& r : p.r) if (!Tp(p.db, r, tr, add, del)) return false;
+	for (const int_t* t : add) p.db[get_key(t)].emplace(t);//, wcout << "adding " << t << endl;
+	for (const int_t* t : del)
 		if (auto it = p.db.find(get_key(t)); it != p.db.end())
-			if (it->second.erase(t)){};// wcout << "erasing " << t << endl;
+			if (it->second.erase(t)){} // wcout << "erasing " << t << endl;
 	return true;
 }
 
