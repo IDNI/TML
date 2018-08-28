@@ -1,5 +1,6 @@
 #include <set>
 #include <map>
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 using namespace std;
@@ -19,5 +20,6 @@ dnf operator/(const dnf& d, const clause& c); // project only the occurences of 
 dnf operator%(const dnf& d, const clause& c); // the complement of the above
 clause rename(const clause& c, size_t from, size_t to, size_t offset); // rename vars
 dnf rename(const dnf& d, size_t from, size_t to, size_t offset);
+clause from_bits(const int_t* t, size_t n, size_t offset, size_t bits);
 wostream& operator<<(wostream& os, const clause& c); // io
 wostream& operator<<(wostream& os, const dnf& d);
