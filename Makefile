@@ -1,2 +1,2 @@
 all:
-	g++ pfp.cpp -W -Wall -Wpedantic -std=c++1z -g
+	g++ -std=c++17 dnf.cpp table.cpp pfp.cpp -W -Wall -Wpedantic -g

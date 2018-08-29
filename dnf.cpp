@@ -1,6 +1,5 @@
 #include "dnf.h"
 
-#define has(x,y) ((x).find(y) != (x).end())
 clause cempty;
 
 clause& operator*=(clause &c, int_t x) {
@@ -18,6 +17,7 @@ clause operator*(const clause &x, const clause& y) {
 }
 
 dnf& operator+=(dnf& d, const clause& c) { return c.empty() ? d : (d.emplace(c), d); }
+dnf& operator-=(dnf& d, const clause& c) { return d.erase(c), d; }
 
 dnf operator*(const dnf& x, const dnf& y) {
 	dnf r;

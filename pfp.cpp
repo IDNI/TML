@@ -342,7 +342,7 @@ bool pfp(lp p) {
 	return false;
 }
 
-int main() {
+int _main() {
 	setlocale(LC_ALL, "");
 	return pfp(lp_read(file_read_text(stdin).c_str()));
 }
