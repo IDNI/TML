@@ -1,4 +1,5 @@
 #include "dnf.h"
+#include "pfp.h"
 
 clause cempty;
 
@@ -88,7 +89,13 @@ wostream& operator<<(wostream& os, const dnf& d) {
 
 int main() {
 	setlocale(LC_ALL, "");
-	int_t x = 4;
+
+	vector<int_t> x = { 2, -1, 2 };
+	table t(1, 2, 1, -1);
+	t += &x[0];
+	wcout << t;
+	return 0;
+/*	int_t x = 4;
 	//wcin >> x;
 	dnf d = { { 1, -2, 3}, { 2, -3, x }};
 	dnf e = { { 3}, { x }};
@@ -98,5 +105,5 @@ int main() {
 	wcout << d << L" % { 3 } = " << d % clause{3} << endl;
 	int_t p[] = { 3, 4 };
 	wcout << L" from_bits({3,4},2,6,5) " << from_bits(p,2,6,5) << endl;
-	return 0;
+	return 0;*/
 }
