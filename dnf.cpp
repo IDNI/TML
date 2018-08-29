@@ -86,7 +86,7 @@ wostream& operator<<(wostream& os, const dnf& d) {
 	for (const clause& c : d) os << L'(' << c << L')';
 	return os;
 }
-
+/*
 int main() {
 	setlocale(LC_ALL, "");
 
@@ -95,7 +95,7 @@ int main() {
 	t += &x[0];
 	wcout << t;
 	return 0;
-/*	int_t x = 4;
+	int_t x = 4;
 	//wcin >> x;
 	dnf d = { { 1, -2, 3}, { 2, -3, x }};
 	dnf e = { { 3}, { x }};
@@ -105,5 +105,5 @@ int main() {
 	wcout << d << L" % { 3 } = " << d % clause{3} << endl;
 	int_t p[] = { 3, 4 };
 	wcout << L" from_bits({3,4},2,6,5) " << from_bits(p,2,6,5) << endl;
-	return 0;*/
-}
+	return 0;
+}*/

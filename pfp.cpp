@@ -10,6 +10,7 @@
 #include <random>
 #include <sstream>
 #include <climits>
+#include "dnf.h"
 using namespace std;
 
 typedef int32_t int_t;
@@ -342,7 +343,7 @@ bool pfp(lp p) {
 	return false;
 }
 
-int _main() {
+int main() {
 	setlocale(LC_ALL, "");
 	return pfp(lp_read(file_read_text(stdin).c_str()));
 }
