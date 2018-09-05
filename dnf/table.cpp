@@ -4,11 +4,11 @@ bool cmpterm::operator()(term x, term y) const {
 	return *x == *y ? memcmp(x, y, sizeof(int_t)**x)<0 : (*x < *y);
 }
 
-table::table(size_t ubits, size_t rbits, size_t arbits, dnf&& d, const term q, const table* t) :
-	dnf(move(d)), ubits(ubits), rbits(rbits), arbits(arbits), q(q), t(t), sel(q) {}
+table::table(size_t ubits, size_t rbits, size_t arbits, dnf&& d) :
+	dnf(move(d)), ubits(ubits), rbits(rbits), arbits(arbits) {}
 
-table::table(size_t ubits, size_t rbits, size_t arbits, const term q, const table* t) :
-	ubits(ubits), rbits(rbits), arbits(arbits), q(q), t(t), sel(q) {}
+table::table(size_t ubits, size_t rbits, size_t arbits) :
+	ubits(ubits), rbits(rbits), arbits(arbits) {}
 
 void table::get(const clause& c, size_t len, size_t rel, terms& r) const {
 	size_t z = 0, k = 0, n, from = arbits + rbits, to = from + (len<<3), i;
@@ -71,7 +71,8 @@ void table::get(terms& r) const {
 	for (const clause& c : *this) get(c, r);
 }
 
-table table::select(term q) const {
+table* table::select(term q) {
+	if (auto it = sel.find(q); it != sel.end()) return it->second;
 	set<array<int_t, 3>> e;
 	set<int_t> s;
 	for (int_t n = 0, k; n < *q; ++n)
@@ -80,15 +81,6 @@ table table::select(term q) const {
 				s.emplace(getbit(q[n+2], k) ? k+1 : (-k-1));
 		else if (n) for (k = n-1; k; --k)
 			if (q[k+2] == q[n+2]) e.emplace(array<int_t,3>{n, (int_t)ubits, k});
-	return table(ubits, rbits, arbits, eq(e, s), q, this);
+	return sel[q] = new table(ubits, rbits, arbits, eq(e, s));
 }
 
-table table::join(const table& db, const map<term, set<terms>>& p) {
-	for (auto& def : p) {
-		term h = def.first;
-		for (const terms& alt: def.second)
-			for (term b : alt) {
-				table sel = db.select(b);
-			}
-	}
-}

@@ -6,11 +6,13 @@ const clause cempty;
 clause::clause(const set<int>& s) : vector<int_t>(s.begin(), s.end()) {}
 
 bool clause::has(int_t t) const {
-	auto it = lower_bound(begin(), end(), t);
-	return it != end() && *it == t;
+	//if (t > 0) t -= offset; else t += offset;
+	auto it = equal_range(begin(), end(), t);
+	return it.first != it.second;
 }
 
 void clause::add(int_t i) {
+	if (i > 0) i -= offset; else i += offset;
 	if (empty()) push_back(i);
 	else if (has(-i)) clear(), tau = false;
 	else if (const_iterator it = lower_bound(begin(), end(), i); (it!=end() && *it!=i)
@@ -19,6 +21,7 @@ void clause::add(int_t i) {
 }
 
 void clause::del(int_t i) {
+	if (i > 0) i -= offset; else i += offset;
 	const_iterator it = lower_bound(begin(), end(), i);
 	if (it != end() && *it == i) erase(it);
 	if (empty()) tau = true;
@@ -27,9 +30,11 @@ void clause::del(int_t i) {
 int_t clause::subclause(const clause& c) const {
 	bool b = false;
 	int_t r = -1;
-	for (int_t i : c)
+	for (int_t i : c) {
+		if (i > 0) i += c.offset; else i -= c.offset;
 		if (!b && has(-i)) b = true, r = abs(i);
 		else if (!has(i)) return 0;
+	}
 	return r; 
 }
 
@@ -68,13 +73,13 @@ void dnf::add(clause&& c) {
 }
 
 clause& clause::operator*=(const clause& c) {
-	for (int_t i : c) if (add(i); empty()) break;
+	for (int_t i : c)if (add(i > 0 ? i + c.offset : (i - c.offset)); empty()) break;
 	return *this;
 }
 
 dnf clause::operator-() const {
 	dnf r;
-	for (int_t i : *this) r += clause({i});
+	for (int_t i : *this) r += clause({i > 0 ? -i-(int_t)offset : ((int_t)offset-i)});
 	return r;
 }
 
@@ -86,6 +91,13 @@ dnf dnf::operator*(const dnf& d) {
 	return r;
 }
 
+clause& clause::operator/=(const set<int_t>& v) {
+	for (auto it = begin(); it != end();)
+		if (v.find(abs(*it)) == v.end()) erase(it);
+		else ++it;
+	return *this;
+}
+
 clause clause::eq(const set<array<int_t, 3>>& e, const set<int_t>& s) const {
 	struct cmp {
 		bool operator()(const array<int_t, 3>& a, int_t i) const { return a[1]<i; }
@@ -93,6 +105,7 @@ clause clause::eq(const set<array<int_t, 3>>& e, const set<int_t>& s) const {
 	} c;
 	clause r;
 	for (int_t i : *this) {
+		if (i > 0) i += offset; else i -= offset;
 		if (s.find(i) != s.end()) continue;
 		if (s.find(-i)!= s.end()) return cempty;
 		auto er = equal_range(e.begin(), e.end(), i, c);
@@ -114,7 +127,7 @@ dnf dnf::eq(const set<array<int_t, 3>>& e, const set<int_t>& s) const {
 
 wostream& operator<<(wostream& os, const clause& c) {
 	os << L'(';
-	for (int_t i : c) os << i << L' ';
+	for (int_t i : c) os << (i > 0 ? i+c.offset : (i-c.offset)) << L' ';
 	return os << L')';
 }
 
