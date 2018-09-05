@@ -32,6 +32,7 @@ struct clause : protected vector<int_t> {
 
 struct dnf : protected vector<clause> {
 	dnf(){}
+	dnf(const dnf&& d) : vector<clause>(move(d)) {}
 	dnf(clause&& c) { add(move(c)); }
 	bool tau = false;
 
@@ -39,7 +40,7 @@ struct dnf : protected vector<clause> {
 	void add(clause&& c); 
 	dnf& operator+=(const dnf& d);
 	dnf operator*(const dnf& d);
-	dnf eq(const set<array<int_t, 3>>&) const;
+	dnf eq(const set<array<int_t, 3>>&, const set<int_t>&) const;
 
 	size_t size() const { return vector<clause>::size(); }
 	bool empty() const { return vector<clause>::empty(); }

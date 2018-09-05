@@ -89,26 +89,20 @@ clause clause::eq(const set<array<int_t, 3>>& e) const {
 		bool operator()(const array<int_t, 3>& a, int_t i) const { return a[1]<i; }
 		bool operator()(int_t i, const array<int_t, 3>& a) const { return i<a[0]; }
 	} c;
-
 	clause r;
-	bool b;
 	for (int_t i : *this) {
-		b = false;
 		auto er = equal_range(e.begin(), e.end(), i, c);
-		for (; er.first != er.second; ++er.first) {
-			auto& t = *er.first;
-			if (i >= t[0] && i < t[1]) {
+		for (; er.first != er.second; ++er.first)
+			if (auto& t = *er.first; i >= t[0] && i < t[1]) {
 				r.add(i > 0 ? i + t[3] : i - t[3]);
-				b = true;
 				break;
 			}
-		}
-		if (!b) r.add(i);
+		if (er.first != er.second) r.add(i);
 	}
 	return r;
 }
 
-dnf dnf::eq(const set<array<int_t, 3>>& e) const {
+dnf dnf::eq(const set<array<int_t, 3>>& e, const set<int_t>&) const {
 	dnf r;
 	for (const clause& c : *this) r.add(c.eq(e));
 	return r;

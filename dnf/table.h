@@ -13,6 +13,7 @@ class table : protected dnf {
 public:
 	const size_t ubits, rbits, arbits;
 	table(size_t ubits, size_t rbits, size_t arbits);
+	table(size_t ubits, size_t rbits, size_t arbits, dnf&& d);
 	void add(term);
 	void get(terms&) const;
 	table select(term) const;

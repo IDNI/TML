@@ -4,6 +4,9 @@ bool cmpterm::operator()(term x, term y) const {
 	return *x == *y ? memcmp(x, y, sizeof(int_t)**x)<0 : (*x < *y);
 }
 
+table::table(size_t ubits, size_t rbits, size_t arbits, dnf&& d) :
+	dnf(move(d)), ubits(ubits), rbits(rbits), arbits(arbits) {}
+
 table::table(size_t ubits, size_t rbits, size_t arbits) :
 	ubits(ubits), rbits(rbits), arbits(arbits) {}
 
@@ -69,13 +72,13 @@ void table::get(terms& r) const {
 }
 
 table table::select(term q) const {
-	clause c;
-	for (size_t n = 0; n < (size_t)*q; ++n)
+	set<array<int_t, 3>> e;
+	set<int_t> s;
+	for (int_t n = 0, k; n < *q; ++n)
 		if (q[n+2] < 0)
-			for (size_t k = 0; k < ubits; ++k)
-				c.add(getbit(q[n+2], k) ? k+1 : (-k-1));
-		else {
-		}
-	table r(ubits, rbits, arbits);
-	return ((dnf&)r).add(move(c)), r;
+			for (k = 0; k < (int_t)ubits; ++k)
+				s.emplace(getbit(q[n+2], k) ? k+1 : (-k-1));
+		else if (n) for (k = n-1; k; --k)
+			if (q[k+2] == q[n+2]) e.emplace(array<int_t,3>{n, (int_t)ubits, k});
+	return table(ubits, rbits, arbits, eq(e, s));
 }
