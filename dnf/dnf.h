@@ -1,6 +1,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <array>
 #include <algorithm>
 #include <cstring>
 #include <iostream>
@@ -21,7 +22,7 @@ struct clause : protected vector<int_t> {
 	pair<char, int_t> subclause2(const clause& c) const;
 	clause& operator*=(const clause& c);
 	dnf operator-() const;
-	clause eq(int_t x, int_t y) const;
+	clause eq(const set<array<int_t, 3>>&) const;
 
 	size_t size() const { return vector<int_t>::size(); }
 	bool empty() const { return vector<int_t>::empty(); }
@@ -38,7 +39,7 @@ struct dnf : protected vector<clause> {
 	void add(clause&& c); 
 	dnf& operator+=(const dnf& d);
 	dnf operator*(const dnf& d);
-	dnf eq(int_t x, int_t y);
+	dnf eq(const set<array<int_t, 3>>&) const;
 
 	size_t size() const { return vector<clause>::size(); }
 	bool empty() const { return vector<clause>::empty(); }

@@ -55,9 +55,11 @@ void dnf::add(clause&& c) {
 		else del.push_back(n);
 	if (m.empty()) { push_back(move(c)); return; }
 	sort(m.begin(), m.end(), [this, c](const elem& x, const elem& y) {
-		return ((x.second.first==1) ? at(x.first).size() : c.size()) > ((y.second.first==1) ? at(y.first).size() : c.size());
+		return ((x.second.first==1) ? at(x.first).size() :
+			c.size()) > ((y.second.first==1) ? at(y.first).size() : c.size());
 	});
-	if (m[0].second.first > 0) c = move((*this)[m[0].first]), erase(begin() + m[0].first);
+	if (m[0].second.first > 0)
+		c = move((*this)[m[0].first]), erase(begin() + m[0].first);
 	c.del(m[0].second.second), c.del(-m[0].second.second);
 	for (size_t i : del) erase(begin() + i);
 	add(move(c));
@@ -82,15 +84,33 @@ dnf dnf::operator*(const dnf& d) {
 	return r;
 }
 
-clause clause::eq(int_t x, int_t y) const {
+clause clause::eq(const set<array<int_t, 3>>& e) const {
+	struct cmp {
+		bool operator()(const array<int_t, 3>& a, int_t i) const { return a[1]<i; }
+		bool operator()(int_t i, const array<int_t, 3>& a) const { return i<a[0]; }
+	} c;
+
 	clause r;
-	for (int_t i : *this) r.add(i==x?y:i==-x?-y:i);
+	bool b;
+	for (int_t i : *this) {
+		b = false;
+		auto er = equal_range(e.begin(), e.end(), i, c);
+		for (; er.first != er.second; ++er.first) {
+			auto& t = *er.first;
+			if (i >= t[0] && i < t[1]) {
+				r.add(i > 0 ? i + t[3] : i - t[3]);
+				b = true;
+				break;
+			}
+		}
+		if (!b) r.add(i);
+	}
 	return r;
 }
 
-dnf dnf::eq(int_t x, int_t y) {
+dnf dnf::eq(const set<array<int_t, 3>>& e) const {
 	dnf r;
-	for (const clause& c : *this) r.add(c.eq(x, y));
+	for (const clause& c : *this) r.add(c.eq(e));
 	return r;
 }
 
