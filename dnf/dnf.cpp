@@ -11,8 +11,8 @@ bool clause::has(int_t t) const {
 void clause::add(int_t i) {
 	if (empty()) push_back(i);
 	else if (has(-i)) clear(), tau = false;
-	else if (const_iterator it = lower_bound(begin(), end(), i); (it != end() && *it != i)
-			 || (it = upper_bound(begin(), end(), i)) == end())
+	else if (const_iterator it = lower_bound(begin(), end(), i); (it!=end() && *it!=i)
+		|| (it = upper_bound(begin(), end(), i)) == end())
 		insert(it, i);
 }
 
