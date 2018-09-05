@@ -1,15 +1,16 @@
 #include "table.h"
 
-bool cmpterm::operator()(const int_t* x, const int_t* y) const {
+bool cmpterm::operator()(term x, term y) const {
 	return *x == *y ? memcmp(x, y, sizeof(int_t)**x)<0 : (*x < *y);
 }
 
-table:: table(size_t ubits, size_t rbits, size_t arbits) :
+table::table(size_t ubits, size_t rbits, size_t arbits) :
 	ubits(ubits), rbits(rbits), arbits(arbits) {}
 
 void table::get(const clause& c, size_t len, size_t rel, terms& r) const {
 	size_t z = 0, k = 0, n, from = arbits + rbits, to = from + (len<<3), i;
 	char *p = (char*)__builtin_alloca(to-from);
+	int_t *t;
 	for (n = from; n < to; ++n)
 		if (c.has(n+1)) p[k++] = 1;
 		else if (c.has(-n-1)) p[k++] = -1;
@@ -18,48 +19,39 @@ void table::get(const clause& c, size_t len, size_t rel, terms& r) const {
 		wcout<<L"Got more than 2^64-1=18446744073709551615 results (~2^"
 			<< z << L" results)"<<endl, exit(0);
 	for (i = 0; i < (size_t)(1 << z); ++i) {
-		int_t* t = new int_t[len];
-		*t = len;
-		t[1] = rel;
-		memset(t+2, 0, sizeof(int_t) * (len - 2));
-		k = 0;
-		for (n = from; n < to; ++n)
+		for (	*(t = new int_t[len]) = len, t[1] = rel,
+			memset(t+2, 0, sizeof(int_t) * (len - 2)),
+			n = from, k = 0; n < to; ++n)
 			if (p[n-from] == -1 || (!p[n-from] && !getbit(i, k++))) continue;
-			else setbit(t[2+(n-from)/ubits], (n-from)%ubits);
+			else setbit(t[2 + (n - from) / ubits], (n - from) % ubits);
 		if (!r.emplace(t).second) delete[] t;
 	}
 }
 
 void table::get(const clause& c, terms& r) const {
 	size_t psz = 0, nsz = 0, n, z, k, len, rel, _z, _k, prel, nrel;
-
 	for (n = 0; n < arbits; ++n)
 		if (c.has(n+1)) setbit(psz, n);
 		else if (c.has(-n-1)) setbit(nsz, n);
-
 	const size_t m = (~(psz | nsz)) & ((1 << arbits)-1);
 	for ((z = 1 << __builtin_popcount(m)), k=len=0; z--; k=len=0) {
 		for (n = 0; n < arbits; ++n)
 			if (psz & (1 << n)) setbit(len,n);
 			else if (nsz & (1 << n)) continue;
 			else setbit(len, getbit(z, k++));
-
 		for (prel = nrel = 0; n < rbits + arbits; ++n)
 			if (c.has(n+1)) setbit(prel,n-arbits);
 			else if (c.has(-n-1)) setbit(nrel,n-arbits);
-
 		const size_t _m = (~(prel | nrel)) & ((1 << rbits)-1);
-		for (_z=1<<__builtin_popcount(_m), _k=0, rel=0; _z--; _k=rel=0) {
-			for (n = 0; n < rbits; ++n)
+		for (_z=1<<__builtin_popcount(_m), _k=0, rel=0; _z--; _k=rel=0)
+			for (n = 0; n < rbits; get(c, len, rel, r), ++n)
 				if (prel & (1 << n)) setbit(rel, n);
 				else if (nrel & (1 << n)) continue;
 				else setbit(rel, getbit(_z, _k++));
-			get(c, len, rel, r);
-		}
 	}
 }
 
-void table::add(const int_t* t) {
+void table::add(term t) {
 	clause c;
 	size_t v = 0;
 	for (size_t n = 0; n < arbits; ++n)
@@ -74,4 +66,16 @@ void table::add(const int_t* t) {
 
 void table::get(terms& r) const {
 	for (const clause& c : *this) get(c, r);
+}
+
+table table::select(term q) const {
+	clause c;
+	for (size_t n = 0; n < (size_t)*q; ++n)
+		if (q[n+2] < 0)
+			for (size_t k = 0; k < ubits; ++k)
+				c.add(getbit(q[n+2], k) ? k+1 : (-k-1));
+		else {
+		}
+	table r(ubits, rbits, arbits);
+	return ((dnf&)r).add(move(c)), r;
 }
