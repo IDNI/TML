@@ -82,3 +82,6 @@ table table::select(term q) const {
 			if (q[k+2] == q[n+2]) e.emplace(array<int_t,3>{n, (int_t)ubits, k});
 	return table(ubits, rbits, arbits, eq(e, s));
 }
+
+table table::join(const set<term>& q) {
+}

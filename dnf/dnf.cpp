@@ -1,6 +1,8 @@
 #include "dnf.h"
 #include <iostream>
 
+const clause cempty;
+
 clause::clause(const set<int>& s) : vector<int_t>(s.begin(), s.end()) {}
 
 bool clause::has(int_t t) const {
@@ -84,13 +86,15 @@ dnf dnf::operator*(const dnf& d) {
 	return r;
 }
 
-clause clause::eq(const set<array<int_t, 3>>& e) const {
+clause clause::eq(const set<array<int_t, 3>>& e, const set<int_t>& s) const {
 	struct cmp {
 		bool operator()(const array<int_t, 3>& a, int_t i) const { return a[1]<i; }
 		bool operator()(int_t i, const array<int_t, 3>& a) const { return i<a[0]; }
 	} c;
 	clause r;
 	for (int_t i : *this) {
+		if (s.find(i) != s.end()) continue;
+		if (s.find(-i)!= s.end()) return cempty;
 		auto er = equal_range(e.begin(), e.end(), i, c);
 		for (; er.first != er.second; ++er.first)
 			if (auto& t = *er.first; i >= t[0] && i < t[1]) {
@@ -102,9 +106,9 @@ clause clause::eq(const set<array<int_t, 3>>& e) const {
 	return r;
 }
 
-dnf dnf::eq(const set<array<int_t, 3>>& e, const set<int_t>&) const {
+dnf dnf::eq(const set<array<int_t, 3>>& e, const set<int_t>& s) const {
 	dnf r;
-	for (const clause& c : *this) r.add(c.eq(e));
+	for (const clause& c : *this) r.add(c.eq(e, s));
 	return r;
 }
 

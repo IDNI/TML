@@ -22,7 +22,7 @@ struct clause : protected vector<int_t> {
 	pair<char, int_t> subclause2(const clause& c) const;
 	clause& operator*=(const clause& c);
 	dnf operator-() const;
-	clause eq(const set<array<int_t, 3>>&) const;
+	clause eq(const set<array<int_t, 3>>&, const set<int_t>&) const;
 
 	size_t size() const { return vector<int_t>::size(); }
 	bool empty() const { return vector<int_t>::empty(); }

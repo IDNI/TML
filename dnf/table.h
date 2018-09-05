@@ -17,4 +17,5 @@ public:
 	void add(term);
 	void get(terms&) const;
 	table select(term) const;
+	table join(const set<term>& q);
 };
