@@ -1,12 +1,12 @@
 #include <vector>
 #include <map>
 #include <array>
-#include <forward_list>
 #include <iostream>
 using namespace std;
 
 typedef int32_t int_t;
 typedef array<int_t, 3> node;
+
 class bdds {
 	vector<node> V;
 	map<node, int_t> M;
@@ -16,7 +16,7 @@ class bdds {
 	template<typename op_t> friend
 	int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, op_t op);
 public:
-	bdds() { add({0, 0, 0}), add({0, 1, 1}); }
+	bdds();
 	int_t from_bvec(const vector<bool>& v);
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t) const;
@@ -63,11 +63,13 @@ void bdds::out(wostream& os, const node& n) const {
 	}
 }
 
-int_t bdds::add_nocheck(const node& n){
-	return V.emplace_back(n), M[n]=V.size()-1;
-}
+bdds::bdds() { add_nocheck({0, 0, 0}), add_nocheck({0, 1, 1}); }
+
+int_t bdds::add_nocheck(const node& n) { return V.emplace_back(n), M[n]=V.size()-1; }
 
 int_t bdds::add(const node& n) {
+	if (!n[1] && !n[2]) return F;
+	if (n[1] == n[2]) return n[1];
 	auto it = M.find(n);
 	return it == M.end() ? add_nocheck(n) : it->second;
 }
@@ -81,7 +83,9 @@ int main() {
 	b.out(wcout, s);
 	wcout << endl;
 	//size_t d = b.bdd_or(s, t);
-	b.out(wcout, b.bdd_or(b.from_bvec({0,0}),b.from_bvec({1,1})));
+	b.out(wcout, b.bdd_or(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
+	b.out(wcout, b.bdd_and(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
+	b.out(wcout, b.bdd_and_not(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	wcout << endl;
 	return 0;
 }
