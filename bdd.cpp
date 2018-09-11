@@ -43,9 +43,18 @@ int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, op_t 
 struct op_or { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; } }; 
 struct op_and { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } }; 
 struct op_and_not { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } }; 
-int_t bdds::bdd_or(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_or()); }
-int_t bdds::bdd_and(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_and()); }
-int_t bdds::bdd_and_not(int_t x, int_t y) { return bdd_apply(*this,x,*this,y,*this, op_and_not()); }
+int_t bdds::bdd_or(int_t x, int_t y) {
+	static constexpr op_or op;
+	return bdd_apply(*this, x, *this, y, *this, op);
+}
+int_t bdds::bdd_and(int_t x, int_t y) {
+	static constexpr op_and op;
+	return bdd_apply(*this, x, *this, y, *this, op);
+}
+int_t bdds::bdd_and_not(int_t x, int_t y) {
+	static constexpr op_and_not op;
+	return bdd_apply(*this, x, *this, y, *this, op);
+}
 
 int_t bdds::from_bvec(const vector<bool>& v) {
 	int_t k = T, n = v.size() - 1;
@@ -77,11 +86,16 @@ int main() {
 	size_t s = b.from_bvec({ 0, 0, 1, 1 });
 	b.out(wcout, s);
 	wcout << endl;
-	//size_t d = b.bdd_or(s, t);
 	b.out(wcout, b.bdd_or(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	b.out(wcout, b.bdd_and(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	b.out(wcout, b.bdd_and_not(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	b.out(wcout, b.bdd_and_not(1, b.from_bvec({0,0}))); wcout << endl; // negation
+	bdds c; // demonstrate output to another bddset (this is a substitute for gc)
+	c.out(wcout, bdd_apply(b, 1, b, b.from_bvec({0,0}), c, op_and_not()));
+	wcout << endl;
+//	int_t v1,v2,v3,v4;
+//	wcin >> v1 >> v2 >> v3 >> v4;
+//	b.out(wcout, b.bdd_and_not(b.from_bvec({v1,v2}),b.from_bvec({v3,v4}))); wcout << endl;
 	wcout << endl;
 	return 0;
 }
