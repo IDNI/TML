@@ -56,11 +56,7 @@ int_t bdds::from_bvec(const vector<bool>& v) {
 void bdds::out(wostream& os, size_t n) const { out(os, V[n]); }
 void bdds::out(wostream& os, const node& n) const {
 	if (!n[0]) os << (n[1] ? L'T' : L'F');
-	else {
-		os << n[0] << L'?';
-		out(os, V[n[1]]), os << L':';
-		out(os, V[n[2]]);
-	}
+	else out(os << n[0] << L'?', V[n[1]]), out(os << L':', V[n[2]]);
 }
 
 bdds::bdds() { add_nocheck({0, 0, 0}), add_nocheck({0, 1, 1}); }
@@ -68,7 +64,6 @@ bdds::bdds() { add_nocheck({0, 0, 0}), add_nocheck({0, 1, 1}); }
 int_t bdds::add_nocheck(const node& n) { return V.emplace_back(n), M[n]=V.size()-1; }
 
 int_t bdds::add(const node& n) {
-	if (!n[1] && !n[2]) return F;
 	if (n[1] == n[2]) return n[1];
 	auto it = M.find(n);
 	return it == M.end() ? add_nocheck(n) : it->second;
@@ -86,6 +81,7 @@ int main() {
 	b.out(wcout, b.bdd_or(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	b.out(wcout, b.bdd_and(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
 	b.out(wcout, b.bdd_and_not(b.from_bvec({0,0}),b.from_bvec({1,1}))); wcout << endl;
+	b.out(wcout, b.bdd_and_not(1, b.from_bvec({0,0}))); wcout << endl; // negation
 	wcout << endl;
 	return 0;
 }
