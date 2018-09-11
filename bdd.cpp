@@ -1,5 +1,6 @@
 #include <vector>
 #include <map>
+#include <set>
 #include <array>
 #include <iostream>
 using namespace std;
@@ -14,7 +15,9 @@ class bdds {
 	int_t add(const node& n);
 	int_t add_nocheck(const node& n);
 	template<typename op_t> friend
-	int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, op_t op);
+	int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
+	template<typename op_t> friend
+	int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 public:
 	bdds();
 	int_t from_bvec(const vector<bool>& v);
@@ -22,14 +25,34 @@ public:
 	template<typename K> int_t from_vec(const vector<K>& v, size_t bits);
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t) const;
+	node getnode(size_t n) const { return V[n]; }
 	int_t bdd_or(int_t x, int_t y);
 	int_t bdd_and(int_t x, int_t y);
 	int_t bdd_and_not(int_t x, int_t y);
 };
 
+struct op_set : public set<int_t> {
+	node operator()(const bdds& b, const node& n) const {
+		return find(n[0]) == end() ? n : b.getnode(n[1]);
+	}
+}; 
+struct op_unset : public set<int_t> {
+	node operator()(const bdds& b, const node& n) const {
+		return find(n[0]) == end() ? n : b.getnode(n[2]);
+	}
+}; 
+
 template<typename op_t>
-int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, op_t op) {
-	const auto &Vx = bx.V[x], &Vy = by.V[y];
+int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op) {
+	node n = op(b, b.V[x]);
+	if (n[1] > 1) n[1] = bdd_apply(b, n[1], r, op);
+	if (n[2] > 1) n[2] = bdd_apply(b, n[2], r, op);
+	return r.add(n);
+}
+
+template<typename op_t>
+int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
+	const node &Vx = bx.V[x], &Vy = by.V[y];
 	const int_t &vx = Vx[0], &vy = Vy[0];
 	int_t v = vx, a, b, c, d;
 	if (!vx) {
@@ -120,6 +143,12 @@ int main() {
 //	b.out(wcout, b.bdd_and_not(b.from_bvec({v1,v2}),b.from_bvec({v3,v4}))); wcout << endl;
 	int_t x = b.from_vec<int>({1},3);
 	b.out(wcout, x); wcout << endl;
+	op_set o;
+	o.emplace(2);
+	b.out(wcout, bdd_apply(b, x, b, o)); wcout << endl;
+	op_unset uo;
+	uo.emplace(2);
+	b.out(wcout, bdd_apply(b, x, b, uo)); wcout << endl;
 //	int_t y = b.from_vec<int>({2,3,4},3);
 //	int_t z = b.from_vec<int>({4,5,6},3);
 //	b.out(wcout, b.bdd_or(x, b.bdd_or(y, z))); wcout << endl;
