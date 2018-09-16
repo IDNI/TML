@@ -107,7 +107,7 @@ template<typename op_t>
 int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
 	const int_t &vx = Vx[0], &vy = Vy[0];
-	int_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	int_t v = vx, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
 	else if (!vx) return op(a, b);
 	else if (!vy || vx < vy) b = d = y, v = vx;
