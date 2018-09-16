@@ -63,29 +63,39 @@ class bdds : public bdds_base {
 	int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> friend int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
-	int_t from_eq(int_t x, int_t y) {
-		return bdd_or(	bdd_and(from_bit(x, true), from_bit(y, true)),
-				bdd_and(from_bit(x, false),from_bit(y, false)));
+	size_t count(int_t x) const {
+		if (x < 2) return x;
+		node n = getnode(x);
+		size_t r = 0;
+		if (node k = getnode(n[1]);! k[0]) r += k[1];
+		else r += count(n[1]) << (k[0] - n[0] - 1);
+		if (node k = getnode(n[2]); !k[0]) r += k[1];
+		else r += count(n[2]) << (k[0] - n[0] - 1);
+		return r;
 	}
 public:
 	int_t from_bvec(const vector<bool>& v) {
 		int_t k = T, n = v.size() - 1;
 		do { k = v[n] ? add({n+1, k, F}) : add({n+1, F, k}); } while (n--);
-		return k;
-	}
+		return k; }
 	template<typename K> int_t from_vec(K* v, size_t len, size_t bits, bool discard_zero, bool negfst);
 	template<typename K> int_t from_vec(vector<K> v, size_t bits, bool discard_zero, bool negfst) {
-		return from_vec(&v[0], v.size(), bits, discard_zero, negfst);
-	} 
+		return from_vec(&v[0], v.size(), bits, discard_zero, negfst); } 
 	template<typename K> int_t from_query(const vector<const vector<K>>& v, size_t bits, size_t max_len);
 	void out(wostream& os, const node& n) const {
 		if (!n[0]) os << (n[1] ? L'T' : L'F');
-		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
-	}
+		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2])); }
 	void out(wostream& os, size_t n) const { out(os, getnode(n)); }
 	int_t bdd_or(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_and_not); }
+	size_t satcount(int_t x) const {
+		if (x < 2) return x;
+		return count(x) << (getnode(x)[0] - 1);
+	}
+	int_t from_eq(int_t x, int_t y) {
+		return bdd_or(	bdd_and(from_bit(x, true), from_bit(y, true)),
+				bdd_and(from_bit(x, false),from_bit(y, false))); }
 };
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op) {
@@ -154,7 +164,7 @@ int main() {
 //	int_t v1,v2,v3,v4;
 //	wcin >> v1 >> v2 >> v3 >> v4;
 //	b.out(wcout, b.bdd_and_not(b.from_bvec({v1,v2}),b.from_bvec({v3,v4}))); wcout << endl;
-	int_t x = b.from_vec<int>({1},3, false, false);
+	const int_t x = b.from_vec<int>({1},3, false, false);
 	b.out(wcout, x); wcout << endl;
 	op_set<false> o;
 	o.emplace(2);
@@ -162,6 +172,14 @@ int main() {
 	op_set<true> uo;
 	uo.emplace(2);
 	b.out(wcout, bdd_apply(b, x, b, uo)); wcout << endl;
+	wcout << b.satcount(x) << endl;
+	wcout << b.satcount(b.from_eq(3,4)) << endl;
+	wcout << b.satcount(b.from_eq(1,2)) << endl;
+	wcout << b.satcount(b.from_eq(1,1)) << endl;
+	wcout << b.satcount(b.from_eq(2,2)) << endl;
+	b.out(wcout, b.from_eq(1,1)), wcout << endl;
+	b.out(wcout, b.from_eq(2,2)), wcout << endl;
+	b.out(wcout, b.from_eq(3,4)), wcout << endl;
 //	int_t y = b.from_vec<int>({2,3,4},3);
 //	int_t z = b.from_vec<int>({4,5,6},3);
 //	b.out(wcout, b.bdd_or(x, b.bdd_or(y, z))); wcout << endl;
