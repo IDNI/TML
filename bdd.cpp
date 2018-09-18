@@ -46,7 +46,6 @@ template<typename X, typename Y>
 struct op_compose {
 	X x;
 	Y y;
-	op_compose(){}
 	op_compose(const X& x, const Y& y) : x(x), y(y) {}
 	node operator()(const bdds_base& b, const node& n) const { return x(b, y(b, n)); }
 }; 
@@ -58,40 +57,63 @@ struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; }
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+typedef vector<bool> bits;
+typedef vector<bits> vbits;
+vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y){
+	size_t sx = x.size(), sy = y.first.size();
+	x.reserve(sx + sy);
+	for (size_t n = 0; n < sy; ++n) x.push_back(y.first[n]);
+	sy += sx;
+	while (sy-- != sx) x[sy][y.second] = false;
+	while (sx--) x[sx][y.second] = true;
+	return x;
+}
 class bdds : public bdds_base {
 	template<typename op_t> friend
 	int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> friend int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
 	size_t count(int_t x) const {
-		if (x < 2) return x;
 		node n = getnode(x);
+		if (!n[0]) return n[1];
 		size_t r = 0;
-		if (node k = getnode(n[1]);! k[0]) r += k[1];
+		if (node k = getnode(n[1]); !k[0]) r += k[1];
 		else r += count(n[1]) << (k[0] - n[0] - 1);
 		if (node k = getnode(n[2]); !k[0]) r += k[1];
 		else r += count(n[2]) << (k[0] - n[0] - 1);
 		return r;
 	}
 public:
-	int_t from_bvec(const vector<bool>& v) {
+	int_t from_bvec(const bits& v) {
 		int_t k = T, n = v.size() - 1;
 		do { k = v[n] ? add({n+1, k, F}) : add({n+1, F, k}); } while (n--);
 		return k; }
 	template<typename K> int_t from_vec(K* v, size_t len, size_t bits, bool discard_zero, bool negfst);
 	template<typename K> int_t from_vec(vector<K> v, size_t bits, bool discard_zero, bool negfst) {
-		return from_vec(&v[0], v.size(), bits, discard_zero, negfst); } 
+		return from_vec(&v[0], v.size(), bits, discard_zero, negfst);
+	} 
 	template<typename K> int_t from_query(const vector<const vector<K>>& v, size_t bits, size_t max_len);
 	void out(wostream& os, const node& n) const {
 		if (!n[0]) os << (n[1] ? L'T' : L'F');
-		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2])); }
-	void out(wostream& os, size_t n) const { out(os, getnode(n)); }
-	int_t bdd_or(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_or); } 
-	int_t bdd_and(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_and); } 
-	int_t bdd_and_not(int_t x, int_t y) { return bdd_apply(*this, x, *this, y, *this, op_and_not); }
-	size_t satcount(int_t x) const {
-		if (x < 2) return x;
-		return count(x) << (getnode(x)[0] - 1);
+		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
+	}
+	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
+	int_t bdd_or(int_t x, int_t y)		{ return bdd_apply(*this, x, *this, y, *this, op_or); } 
+	int_t bdd_and(int_t x, int_t y)		{ return bdd_apply(*this, x, *this, y, *this, op_and); } 
+	int_t bdd_and_not(int_t x, int_t y)	{ return bdd_apply(*this, x, *this, y, *this, op_and_not); }
+	size_t satcount(int_t x) const		{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
+public: vbits& sat(int_t x, vbits& r) const {
+		node n = getnode(x);
+		node nl = getnode(n[1]), nr = getnode(n[2]);
+		vbits s1, s2;
+		if (nl[0] || nl[1]) { s1 = r; for (int_t k = n[0]-1; k != nl[0]; ++k) s1 *= { s1, k }; }
+		if (nr[0] || nr[1]) { s2 = r; for (int_t k = n[0]-1; k != nr[0]; ++k) s2 *= { s2, k }; }
+		return r = s1 *= { s2, n[0] };
+	}
+	vbits allsat(int_t x) const {
+		vbits r;
+		r.reserve(satcount(x));
+		return sat(x, r);
 	}
 	int_t from_eq(int_t x, int_t y) {
 		return bdd_or(	bdd_and(from_bit(x, true), from_bit(y, true)),
@@ -107,10 +129,10 @@ template<typename op_t>
 int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
 	const int_t &vx = Vx[0], &vy = Vy[0];
-	int_t v = vx, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	int_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
 	else if (!vx) return op(a, b);
-	else if (!vy || vx < vy) b = d = y, v = vx;
+	else if ((v = vx) < vy || !vy) b = d = y;
 	return r.add({v, bdd_apply(bx, a, by, b, r, op), bdd_apply(bx, c, by, d, r, op)});
 }
 
