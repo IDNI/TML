@@ -137,19 +137,24 @@ template<typename K> void align_arity(vector<vector<K>>& v, int_t s);
 template<typename K> pair<int_t, set<int_t>> bdds::from_rule(const vector<vector<K>>& v, const size_t bits) {
 	int_t r = T, ar = align_arity(v);
 	map<K, array<size_t, 2>> m;
-	for (size_t i = 1; i < v.size(); ++i) { // first term is head
+	set<K> hvars, ex;
+	for (K k : v[0]) if (k < 0) hvars.emplace(k);
+	for (size_t i = 1; i < v.size(); ++i) {
 		int_t k = T;
 		for (size_t j = 1; j < v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end())
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq(	(i*bits+b)*ar+j,
 								(it->second[0]*bits+b)*ar+it->second[0]));
-			else if (m[v[i][j]] = { i, j }; v[i][j] > 0) // const is positive
+			else if (m.emplace(v[i][j], { i, j }); v[i][j] > 0)
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
+			else if (hvars.find(v[i][j]) == hvars.end())
+				for (size_t b = 0; b != bits; ++b)
+					ex.emplace((i*bits+b)*ar+j);
 		r = v[i][0] > 0 ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
-	return r;
+	return { r, ex };
 }
 
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
@@ -161,13 +166,11 @@ vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
 	while (sx--) x[sx][y.second] = true;
 	return x;
 }
-#define has(x,y) ((x).find(y) != (x).end())
+
 #define er(x)	perror(x), exit(0)
-#define usage 	"Usage: <relation symbol> <src filename> <dst filename>\n"  \
-		"Will output the program after plugging src into dst.\n)"
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
-#define dot_after_q "expected '.' after query (dereferenced head).\n"
+#define dot_after_q "expected '.' after query.\n"
 #define if_expected "'if' or '.' expected\n"
 #define sep_expected "Term or ':-' or '.' expected\n"
 #define unmatched_quotes "Unmatched \"\n"
@@ -182,13 +185,20 @@ class lp {
 			return x.second == y.second ? wcsncmp(x.first, y.first, x.second) < 0 : x.second < y.second;
 		}
 	};
-	map<pair<const wchar_t*, size_t>, K, dictcmp> dict;
-	vector<const wchar_t*> strs;
+	map<pair<const wchar_t*, size_t>, K, dictcmp> syms_dict, vars_dict;
+	vector<const wchar_t*> syms;
 	vector<size_t> lens;
-	pair<const wchar_t*, size_t> dict_get(K t) { return { strs[t-1], lens[t-1] }; }
+	pair<const wchar_t*, size_t> dict_get(K t) { return { syms[t-1], lens[t-1] }; }
+	const int_t pad = 1;
+	lp() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
 	K dict_get(const wchar_t* s, size_t len) {
-		if (auto it = dict.find({s, len}) != it->end()) return it->second;
-		return strs.push_back(s), lens.push_back(len), dict[{s, len}] = strs.size();
+		if (*s == L'?') {
+			if (auto it = vars_dict.find({s, len}) != it->end()) return it->second;
+			return vars_dict[{s, len}] = -vars_dict.size();
+		}
+		if (auto it = syms_dict.find({s, len}) != it->end()) return it->second;
+		syms.push_back(s), lens.push_back(len);
+		return syms.size();
 	}
 	K str_read(const wchar_t **s) {
 		const wchar_t *t;
@@ -223,7 +233,9 @@ class lp {
 		vector<K> t;
 		vector<vector<K>> r;
 		if ((t = term_read(s)).empty()) return r;
-		if (*((*s)++) != L':' || *((*s)++) != L'-') er(":- expected");
+		while (iswspace(**s)) ++*s;
+		if (**s == L'.') return r;
+		if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
 	loop:	if ((t = term_read(s)).empty()) er("term expected");
 		while (iswspace(**s)) ++*s;
 		if (**s == L'.') return r;
