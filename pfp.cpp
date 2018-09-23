@@ -51,19 +51,30 @@ public:
 template<bool unset> struct op_set : public set<int_t> {
 	using set<int_t>::set;
 	node operator()(const bdds_base& b, const node& n) const {
-		return find(n[0])==end()?n:b.getnode(n[unset?2:1]);
+		return find(n[0]) == end() ? n : b.getnode(n[unset ? 2 : 1]);
 	}
-}; 
+};
+
+struct op_replace_t : public map<int_t, int_t> {
+	using map<int_t, int_t>::map;
+	node operator()(const bdds_base&, node n) const {
+		if (auto it = find(n[0]); it != end()) n[0] = it->second;
+		return n;
+	}
+} op_replace;
+
 template<typename X, typename Y> struct op_compose {
 	X x;
 	Y y;
 	op_compose(const X& x, const Y& y) : x(x), y(y) {}
 	node operator()(const bdds_base& b, const node& n) const { return x(b, y(b, n)); }
-}; 
-struct op_set_unset : public op_compose<op_set<false>, op_set<true>> {
-	op_set_unset(const set<int_t>& s, const set<int_t>& us) :
+};
+
+struct op_restrict : public op_compose<op_set<false>, op_set<true>> {
+	op_restrict(const set<int_t>& s, const set<int_t>& us) :
 		op_compose(op_set<false>(s.begin(), s.end()), op_set<true>(us.begin(), us.end())) {}
 };
+
 struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; } } op_or; 
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
@@ -131,21 +142,17 @@ node bdds_base::getnode(size_t n) const {
 	if (dim == 1) return V[n];
 	const size_t m = n % V.size(), ms = (n / V.size() + 1) * V.size();
 	node r = V[m];
-	if (!r[0]) {
-		if (!r[1]) return V[F];
-		return ms == V.size() * dim ? V[T] : V[root];
-	} else return r[1] += ms, r[2] += ms, r;
+	return r[0] ? r[1] += ms, r[2] += ms, r : r[1] ? ms == V.size()*dim ? V[T] : V[root] : V[F];
 }
 
 size_t bdds::count(int_t x) const {
-	node n = getnode(x);
+	node n = getnode(x), k;
 	if (!n[0]) return n[1];
 	size_t r = 0;
-	if (node k = getnode(n[1]); !k[0]) r += k[1];
+	if (k = getnode(n[1]); !k[0]) r += k[1];
 	else r += count(n[1]) << (k[0] - n[0] - 1);
-	if (node k = getnode(n[2]); !k[0]) r += k[1];
-	else r += count(n[2]) << (k[0] - n[0] - 1);
-	return r;
+	if (k = getnode(n[2]); !k[0]) return r + k[1];
+	return r + (count(n[2]) << (k[0] - n[0] - 1));
 }
 
 int_t bdds::from_bvec(const bits& v) {
@@ -165,8 +172,7 @@ vbits& bdds::sat(int_t x, vbits& r) const {
 
 vbits bdds::allsat(int_t x) const {
 	vbits r;
-	r.reserve(satcount(x));
-	return sat(x, r);
+	return r.reserve(satcount(x)), sat(x, r);
 }
 
 int_t bdds::from_eq(int_t x, int_t y) {
@@ -230,7 +236,7 @@ vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K>
-bool dict_t<K>::dictcmp::operator()(const pair<wstr, size_t>& x, const pair<wstr, size_t>& y) const {
+bool dict_t<K>::dictcmp::operator()(const pair<wstr, size_t>& x, const pair<wstr, size_t>& y) const{
 	if (x.second != y.second) return x.second < y.second;
 	return wcsncmp(x.first, y.first, x.second) < 0;
 }
