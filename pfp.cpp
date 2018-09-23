@@ -14,7 +14,9 @@ using namespace std;
 
 typedef int32_t int_t;
 typedef array<int_t, 3> node;
-
+typedef const wchar_t* wstr;
+template<typename K> using matrix = vector<vector<K>>;
+////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
 	vector<node> V;
 	map<node, int_t> M;
@@ -41,7 +43,7 @@ public:
 	}
 	void setpow(int_t _root, size_t _dim) { root = _root, dim = _dim; }
 };
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 template<bool unset>
 struct op_set : public set<int_t> {
 	using set<int_t>::set;
@@ -63,7 +65,7 @@ struct op_set_unset : public op_compose<op_set<false>, op_set<true>> {
 struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; } } op_or; 
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 typedef vector<bool> bits;
 typedef vector<bits> vbits;
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y);
@@ -88,22 +90,23 @@ public:
 		int_t k = T, n = v.size() - 1;
 		do { k = v[n] ? add({n+1, k, F}) : add({n+1, F, k}); } while (n--);
 		return k; }
-	template<typename K> pair<int_t, set<int_t>> from_rule(const vector<vector<K>>& v, const size_t bits);
+	template<typename K>
+	pair<int_t, set<int_t>> from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
 	void out(wostream& os, const node& n) const {
 		if (!n[0]) os << (n[1] ? L'T' : L'F');
 		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
 	}
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
-	int_t bdd_or(int_t x, int_t y)		{ return bdd_apply(*this, x, *this, y, *this, op_or); } 
-	int_t bdd_and(int_t x, int_t y)		{ return bdd_apply(*this, x, *this, y, *this, op_and); } 
-	int_t bdd_and_not(int_t x, int_t y)	{ return bdd_apply(*this, x, *this, y, *this, op_and_not); }
-	size_t satcount(int_t x) const		{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
+	int_t bdd_or(int_t x, int_t y)	{ return bdd_apply(*this, x, *this, y, *this, op_or); } 
+	int_t bdd_and(int_t x, int_t y)	{ return bdd_apply(*this, x, *this, y, *this, op_and); } 
+	int_t bdd_and_not(int_t x, int_t y){ return bdd_apply(*this, x, *this, y, *this, op_and_not); }
+	size_t satcount(int_t x) const	{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
 public: vbits& sat(int_t x, vbits& r) const {
 		node n = getnode(x);
 		node nl = getnode(n[1]), nr = getnode(n[2]);
 		vbits s1, s2;
-		if (nl[0] || nl[1]) { s1 = r; for (int_t k = n[0]-1; k != nl[0]; ++k) s1 *= { s1, k }; }
-		if (nr[0] || nr[1]) { s2 = r; for (int_t k = n[0]-1; k != nr[0]; ++k) s2 *= { s2, k }; }
+		if (nl[0]||nl[1]) { s1=r; for (int_t k=n[0]-1; k!=nl[0]; ++k) s1 *= { s1, k }; }
+		if (nr[0]||nr[1]) { s2=r; for (int_t k=n[0]-1; k!=nr[0]; ++k) s2 *= { s2, k }; }
 		return r = s1 *= { s2, n[0] };
 	}
 	vbits allsat(int_t x) const {
@@ -115,10 +118,10 @@ public: vbits& sat(int_t x, vbits& r) const {
 		return bdd_or(	bdd_and(from_bit(x, true), from_bit(y, true)),
 				bdd_and(from_bit(x, false),from_bit(y, false))); }
 };
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdd_apply(const bdds& b, int_t x, bdds& r, const op_t& op) {
 	node n = op(b, b.getnode(x));
-	return r.add({n[0], n[1]>1 ? bdd_apply(b,n[1],r,op) : n[1], n[2]>1 ? bdd_apply(b,n[2],r,op) : n[2]});
+	return r.add({n[0], n[1]>1?bdd_apply(b,n[1],r,op):n[1], n[2]>1?bdd_apply(b,n[2],r,op):n[2]});
 }
 
 template<typename op_t>
@@ -131,11 +134,10 @@ int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const
 	else if ((v = vx) < vy || !vy) b = d = y;
 	return r.add({v, bdd_apply(bx, a, by, b, r, op), bdd_apply(bx, c, by, d, r, op)});
 }
-
-template<typename K> void align_arity(vector<vector<K>>& v, int_t s);
-
-template<typename K> pair<int_t, set<int_t>> bdds::from_rule(const vector<vector<K>>& v, const size_t bits) {
-	int_t r = T, ar = align_arity(v);
+////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename K>
+pair<int_t, set<int_t>> bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
+	int_t r = T;
 	map<K, array<size_t, 2>> m;
 	set<K> hvars, ex;
 	for (K k : v[0]) if (k < 0) hvars.emplace(k);
@@ -144,8 +146,8 @@ template<typename K> pair<int_t, set<int_t>> bdds::from_rule(const vector<vector
 		for (size_t j = 1; j < v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end())
 				for (size_t b = 0; b != bits; ++b)
-					k = bdd_and(k,from_eq(	(i*bits+b)*ar+j,
-								(it->second[0]*bits+b)*ar+it->second[0]));
+					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
+							(it->second[0]*bits+b)*ar+it->second[0]));
 			else if (m.emplace(v[i][j], { i, j }); v[i][j] > 0)
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
@@ -166,7 +168,7 @@ vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
 	while (sx--) x[sx][y.second] = true;
 	return x;
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -179,40 +181,53 @@ vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
 #define err_dst "Unable to read dst file.\n"
 
 template<typename K>
-class lp {
+class dict_t {
 	struct dictcmp {
-		bool operator()(const pair<const wchar_t*, size_t>& x, const pair<const wchar_t*, size_t>& y) const {
-			return x.second == y.second ? wcsncmp(x.first, y.first, x.second) < 0 : x.second < y.second;
-		}
-	};
-	map<pair<const wchar_t*, size_t>, K, dictcmp> syms_dict, vars_dict;
-	vector<const wchar_t*> syms;
+		bool operator()(const pair<wstr, size_t>& x, const pair<wstr, size_t>& y) const {
+			if (x.second != y.second) x.second < y.second;
+			return wcsncmp(x.first, y.first, x.second) < 0; } };
+	map<pair<wstr, size_t>, K, dictcmp> syms_dict, vars_dict;
+	vector<wstr> syms;
 	vector<size_t> lens;
-	pair<const wchar_t*, size_t> dict_get(K t) { return { syms[t-1], lens[t-1] }; }
-	const int_t pad = 1;
-	lp() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
-	K dict_get(const wchar_t* s, size_t len) {
+public:
+	const K pad = 1;
+	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
+	K operator()(wstr s, size_t len) {
 		if (*s == L'?') {
 			if (auto it = vars_dict.find({s, len}) != it->end()) return it->second;
 			return vars_dict[{s, len}] = -vars_dict.size();
 		}
 		if (auto it = syms_dict.find({s, len}) != it->end()) return it->second;
-		syms.push_back(s), lens.push_back(len);
-		return syms.size();
+		return syms.push_back(s), lens.push_back(len), syms.size();
 	}
-	K str_read(const wchar_t **s) {
-		const wchar_t *t;
+	pair<wstr, size_t> operator()(K t) { return { syms[t-1], lens[t-1] }; }
+	size_t bits() const { return sizeof(K)<<3 - __builtin_clz(syms.size()); }
+};
+
+struct rule {
+	int_t h; // bdd root
+	set<int_t> x; // existentials
+};
+
+template<typename K>
+class lp {
+	dict_t<K> dict;
+	bdds B;
+	vector<rule> rules;
+
+	K str_read(wstr *s) {
+		wstr t;
 		while (**s && iswspace(**s)) ++*s;
 		if (!**s) return 0;
 		if (*(t = *s) == L'?') ++t;
 		while (iswalnum(*t)) ++t;
 		while (iswspace(*t)) ++t;
 		if (t == *s) return 0;
-		K r = dict_get(*s, t - *s);
+		K r = dict(*s, t - *s);
 		while (*t && iswspace(*t)) ++t;
 		return *s = t, r;
 	}
-	vector<K> term_read(const wchar_t **s) {
+	vector<K> term_read(wstr *s) {
 		vector<K> r;
 		while (iswspace(**s)) ++*s;
 		bool b = **s == L'~';
@@ -229,9 +244,9 @@ class lp {
 		} while (**s);
 		er("term_read(): unexpected parsing error");
 	}
-	vector<vector<K>> rule_read(const wchar_t **s) {
+	matrix<K> rule_read(wstr *s) {
 		vector<K> t;
-		vector<vector<K>> r;
+		matrix<K> r;
 		if ((t = term_read(s)).empty()) return r;
 		while (iswspace(**s)) ++*s;
 		if (**s == L'.') return r;
@@ -241,14 +256,21 @@ class lp {
 		if (**s == L'.') return r;
 		goto loop;
 	}
-	vector<vector<vector<K>>> prog_read(const wchar_t **s) {
-		vector<vector<vector<K>>> r;
-		vector<vector<K>> t;
-		while (!(t = rule_read(s)).empty()) r.push_back(t);
-		return r;
+	void prog_read(wstr *s) {
+		vector<matrix<K>> r;
+		matrix<K> t;
+		size_t ar = 0, l;
+		while (!(t = rule_read(s)).empty()) {
+			for (const vector<K>& x : t) ar = max(ar, x.size());
+			r.push_back(t);
+		}
+		for (matrix<K>& x : r)
+			if ((l=x.size()) < ar) x.resize(ar), fill(x.begin()+l, x.end(), dict.pad);
+		rules.resize(r.size());
+		for (size_t n = 0; n < r.size(); ++n) rules[n] = B.from_rule(r[n], dict.bits(), ar);
 	}
 };
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
 	wstringstream ss;
 	wchar_t buf[32], n, l, skip = 0;
@@ -265,7 +287,7 @@ next:	for (n = l = 0; n < 31; ++n)
 	} else if (skip) goto next;
 	return ss.str();
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
 	setlocale(LC_ALL, "");
 //	return pfp( lp_read(file_read_text(stdin).c_str()));
