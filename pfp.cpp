@@ -17,6 +17,11 @@ typedef array<int_t, 3> node;
 typedef const wchar_t* wstr;
 template<typename K> using matrix = vector<vector<K>>;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+struct rule {
+	int_t h; // bdd root
+	set<int_t> x; // existentials
+};
+////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
 	vector<node> V;
 	map<node, int_t> M;
@@ -91,7 +96,7 @@ public:
 		do { k = v[n] ? add({n+1, k, F}) : add({n+1, F, k}); } while (n--);
 		return k; }
 	template<typename K>
-	pair<int_t, set<int_t>> from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
+	rule from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
 	void out(wostream& os, const node& n) const {
 		if (!n[0]) os << (n[1] ? L'T' : L'F');
 		else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
@@ -136,7 +141,7 @@ int_t bdd_apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K>
-pair<int_t, set<int_t>> bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
+rule bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
 	int_t r = T;
 	map<K, array<size_t, 2>> m;
 	set<K> hvars, ex;
@@ -148,7 +153,7 @@ pair<int_t, set<int_t>> bdds::from_rule(const matrix<K>& v, const size_t bits, c
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
 							(it->second[0]*bits+b)*ar+it->second[0]));
-			else if (m.emplace(v[i][j], { i, j }); v[i][j] > 0)
+			else if (m.emplace(v[i][j], array<size_t, 2>{ i, j }); v[i][j] > 0)
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
 			else if (hvars.find(v[i][j]) == hvars.end())
@@ -184,7 +189,7 @@ template<typename K>
 class dict_t {
 	struct dictcmp {
 		bool operator()(const pair<wstr, size_t>& x, const pair<wstr, size_t>& y) const {
-			if (x.second != y.second) x.second < y.second;
+			if (x.second != y.second) return x.second < y.second;
 			return wcsncmp(x.first, y.first, x.second) < 0; } };
 	map<pair<wstr, size_t>, K, dictcmp> syms_dict, vars_dict;
 	vector<wstr> syms;
@@ -194,19 +199,15 @@ public:
 	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
 	K operator()(wstr s, size_t len) {
 		if (*s == L'?') {
-			if (auto it = vars_dict.find({s, len}) != it->end()) return it->second;
+			if (auto it = vars_dict.find({s, len}); it != vars_dict.end())
+				return it->second;
 			return vars_dict[{s, len}] = -vars_dict.size();
 		}
-		if (auto it = syms_dict.find({s, len}) != it->end()) return it->second;
+		if (auto it = syms_dict.find({s, len}); it != syms_dict.end()) return it->second;
 		return syms.push_back(s), lens.push_back(len), syms.size();
 	}
 	pair<wstr, size_t> operator()(K t) { return { syms[t-1], lens[t-1] }; }
-	size_t bits() const { return sizeof(K)<<3 - __builtin_clz(syms.size()); }
-};
-
-struct rule {
-	int_t h; // bdd root
-	set<int_t> x; // existentials
+	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
 };
 
 template<typename K>
@@ -256,16 +257,19 @@ class lp {
 		if (**s == L'.') return r;
 		goto loop;
 	}
-	void prog_read(wstr *s) {
+public:
+	void prog_read(wstr s) {
 		vector<matrix<K>> r;
 		matrix<K> t;
 		size_t ar = 0, l;
-		while (!(t = rule_read(s)).empty()) {
+		while (!(t = rule_read(&s)).empty()) {
 			for (const vector<K>& x : t) ar = max(ar, x.size());
 			r.push_back(t);
 		}
 		for (matrix<K>& x : r)
-			if ((l=x.size()) < ar) x.resize(ar), fill(x.begin()+l, x.end(), dict.pad);
+			for (vector<K>& y : x)
+				if ((l=y.size()) < ar)
+					y.resize(ar), fill(y.begin()+l, y.end(), dict.pad);
 		rules.resize(r.size());
 		for (size_t n = 0; n < r.size(); ++n) rules[n] = B.from_rule(r[n], dict.bits(), ar);
 	}
@@ -290,5 +294,7 @@ next:	for (n = l = 0; n < 31; ++n)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
 	setlocale(LC_ALL, "");
+	lp<int32_t> p;
+	p.prog_read(file_read_text(stdin).c_str());
 //	return pfp( lp_read(file_read_text(stdin).c_str()));
 }
