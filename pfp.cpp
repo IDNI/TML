@@ -213,7 +213,8 @@ public:
 template<typename K>
 class lp {
 	dict_t<K> dict;
-	bdds B;
+	bdds prog, _db;
+	int_t db = bdds::T;
 	vector<rule> rules;
 
 	K str_read(wstr *s) {
@@ -270,8 +271,9 @@ public:
 			for (vector<K>& y : x)
 				if ((l=y.size()) < ar)
 					y.resize(ar), fill(y.begin()+l, y.end(), dict.pad);
-		rules.resize(r.size());
-		for (size_t n = 0; n < r.size(); ++n) rules[n] = B.from_rule(r[n], dict.bits(), ar);
+		for (const matrix<K>& x : r)
+			if (x.size() == 1) db = _db.bdd_or(db, _db.from_rule(x, dict.bits(), ar).h);
+			else rules.push_back(prog.from_rule(x, dict.bits(), ar));
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
