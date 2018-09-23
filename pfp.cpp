@@ -16,6 +16,8 @@ typedef int32_t int_t;
 typedef array<int_t, 3> node;
 typedef const wchar_t* wstr;
 template<typename K> using matrix = vector<vector<K>>;
+typedef vector<bool> bits;
+typedef vector<bits> vbits;
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -55,14 +57,6 @@ template<bool unset> struct op_set : public set<int_t> {
 	}
 };
 
-struct op_replace_t : public map<int_t, int_t> {
-	using map<int_t, int_t>::map;
-	node operator()(const bdds_base&, node n) const {
-		if (auto it = find(n[0]); it != end()) n[0] = it->second;
-		return n;
-	}
-} op_replace;
-
 template<typename X, typename Y> struct op_compose {
 	X x;
 	Y y;
@@ -79,29 +73,33 @@ struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; }
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-typedef vector<bool> bits;
-typedef vector<bits> vbits;
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y);
 
 class bdds : public bdds_base {
 	template<typename op_t> static
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
-	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
+	template<typename op_t> static
+	int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
+	template<typename op_t> static
+	int_t compose(const bdds& bx,int_t x,int_t v,const bdds& by,int_t y,bdds& r,const op_t& op);
+
 	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
 	size_t count(int_t x) const;
 public:
 	int_t from_bvec(const bits& v);
-	template<typename K>
-	rule from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
-	void out(wostream& os, const node& n) const;
-	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
+	int_t from_eq(int_t x, int_t y);
+	template<typename K> rule from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
+
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
+
 	size_t satcount(int_t x) const	{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
 	vbits& sat(int_t x, vbits& r) const;
 	vbits allsat(int_t x) const;
-	int_t from_eq(int_t x, int_t y);
+
+	void out(wostream& os, const node& n) const;
+	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class dict_t {
@@ -201,6 +199,12 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename op_t>
+int_t bdds::compose(const bdds& bx, int_t x, int_t v, const bdds& by, int_t y, bdds& r, const op_t& op) {
+	return apply(r, apply(r, apply(bx, x, r, op_restrict({v},{})), by, y, r, op_and), r,
+			apply(r, apply(bx, x, r, op_restrict({},{v})), by, y, r, op_and_not), r, op_or);
+}
+
 template<typename K>
 rule bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
 	int_t r = T;
