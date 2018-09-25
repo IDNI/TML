@@ -90,7 +90,7 @@ public:
 
 	int_t from_bvec(const bits& v);
 	int_t from_eq(int_t x, int_t y);
-	template<typename K> rule from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
+	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
 
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
@@ -221,10 +221,12 @@ int_t bdds::compose(const bdds& bx, int_t x, int_t v, const bdds& by, int_t y, b
 }
 
 template<typename K>
-rule bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
+rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t r = T;
 	map<K, array<size_t, 2>> m;
 	set<K> hvars, ex;
+	bool neg = v[0][0] < 0;
+	if (neg) v[0][0] = -v[0][0];
 	for (K k : v[0]) if (k < 0) hvars.emplace(k);
 	for (size_t i = 1; i < v.size(); ++i) {
 		int_t k = T;
@@ -241,7 +243,7 @@ rule bdds::from_rule(const matrix<K>& v, const size_t bits, const size_t ar) {
 					ex.emplace((i*bits+b)*ar+j);
 		r = v[i][0] > 0 ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
-	return { v[0][0] > 0, r, ex };
+	return { neg, r, ex };
 }
 
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
@@ -338,20 +340,18 @@ pair<bdds*, int_t> operator*(pair<bdds*, int_t> x, const pair<const bdds*, int_t
 	return pair{x.first, bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_and)};
 }
 
-pair<bdds*, int_t> operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
-	return pair{x.first, bdds::apply(*x.first, x.second, *x.first, op_exists(y))};
-}
-
-pair<bdds*, int_t> operator|=(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
-	return pair{x.first, bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_or) };
+int_t operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
+	return bdds::apply(*x.first, x.second, *x.first, op_exists(y));
 }
 
 template<typename K> int_t lp<K>::step(int_t db) {
 	int_t add = bdds::F, del = bdds::F, s;
-	for (const rule& r : rules)
-		pair{ &prog, r.neg ? del : add } |= pair{ &prog, r.h } * pair{ &_db, db } / r.x;
+	for (const rule& r : rules) {
+		prog.bdd_or(r.neg ? del : add, (pair{ &prog, r.h } * pair{ &_db, db }) / r.x);
+//		(r.neg ? del : add) = prog.shift(r.neg ? del : add, vars);
+	}
 	if ((s = prog.bdd_and_not(add, del)) == bdds::F) return bdds::F;
-	return (pair{&prog, prog.bdd_and_not(bdds::T, del)} |= { &prog, s} ).second;
+	return prog.bdd_or(prog.bdd_and_not(bdds::T, del), s);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
