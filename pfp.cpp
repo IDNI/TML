@@ -76,16 +76,18 @@ struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y);
 
 class bdds : public bdds_base {
+	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
+	size_t count(int_t x) const;
+public:
 	template<typename op_t> static
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static
 	int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	template<typename op_t> static
+	int_t apply(bdds& b, int_t x, bdds& r, const op_t& op);
+	template<typename op_t> static
 	int_t compose(const bdds& bx,int_t x,int_t v,const bdds& by,int_t y,bdds& r,const op_t& op);
 
-	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
-	size_t count(int_t x) const;
-public:
 	int_t from_bvec(const bits& v);
 	int_t from_eq(int_t x, int_t y);
 	template<typename K> rule from_rule(const matrix<K>& v, const size_t bits, const size_t ar);
@@ -101,10 +103,12 @@ public:
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
-struct op_exists : public set<int_t> {
-	using set<int_t>::set;
+
+struct op_exists {
+	const set<int_t>& s;
+	op_exists(const set<int_t>& s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
-		return find(n[0]) == end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+		return s.find(n[0]) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,9 +135,11 @@ template<typename K> class lp {
 	K str_read(wstr *s);
 	vector<K> term_read(wstr *s);
 	matrix<K> rule_read(wstr *s);
-public:
-	void prog_read(wstr s);
 	int_t step(rule r, int_t db, bdds& res);
+public:
+	int_t db;
+	void prog_read(wstr s);
+	int_t step(int_t db, bdds& res);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int_t bdds_base::add(const node& n) {
@@ -190,6 +196,10 @@ void bdds::out(wostream& os, const node& n) const {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) {
+	node n = op(b, b.getnode(x));
+	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
+}
+template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) {
 	node n = op(b, b.getnode(x));
 	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
 }
@@ -327,7 +337,11 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 
 template<typename K> int_t lp<K>::step(rule r, int_t db, bdds& res) {
 	int_t s = bdds::apply(prog, r.h, _db, db, res, op_and);
-	s = bdds::apply(res, s, res, op_exists(r.x)); 
+	return s = bdds::apply(res, s, res, op_exists(r.x)); 
+}
+template<typename K> int_t lp<K>::step(int_t db, bdds& res) {
+	for (const rule& r : rules) step(r, db, res);
+	return db;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
@@ -351,5 +365,7 @@ int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
+	bdds r;
+	p.step(p.db, r);
 //	return pfp( lp_read(file_read_text(stdin).c_str()));
 }
