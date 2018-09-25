@@ -101,6 +101,12 @@ public:
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
+struct op_exists : public set<int_t> {
+	using set<int_t>::set;
+	node operator()(bdds& b, const node& n) const {
+		return find(n[0]) == end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+	}
+};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class dict_t {
 	struct dictcmp {
@@ -321,7 +327,7 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 
 template<typename K> int_t lp<K>::step(rule r, int_t db, bdds& res) {
 	int_t s = bdds::apply(prog, r.h, _db, db, res, op_and);
-	//s = res.bdd_ex(s, r.ex); 
+	s = bdds::apply(res, s, res, op_exists(r.x)); 
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
