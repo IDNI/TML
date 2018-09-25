@@ -334,20 +334,22 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	_db.setpow(db, dim);
 }
 
-int_t operator*(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
-	return bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_and);
+pair<bdds*, int_t> operator*(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
+	return pair{x.first, bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_and)};
 }
 
-int_t operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
-	return bdds::apply(*x.first, x.second, *x.first, op_exists(y));
+pair<bdds*, int_t> operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
+	return pair{x.first, bdds::apply(*x.first, x.second, *x.first, op_exists(y))};
+}
+
+pair<bdds*, int_t> operator|=(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
+	return pair{x.first, bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_or) };
 }
 
 template<typename K> int_t lp<K>::step(int_t db) {
 	int_t add = bdds::F, del = bdds::F, s;
-	for (const rule& r : rules) {
-//		s = bdds::apply(prog, pair{ &prog, r.h } * pair{ &_db, db }, prog, op_exists(r.x));
-		s = pair{&prog, pair{ &prog, r.h } * pair{ &_db, db } } / r.x;
-	}
+	for (const rule& r : rules)
+		pair{ &prog, r.neg ? del : add } |= pair{ &prog, r.h } * pair{ &_db, db } / r.x;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
