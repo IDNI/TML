@@ -135,11 +135,10 @@ template<typename K> class lp {
 	K str_read(wstr *s);
 	vector<K> term_read(wstr *s);
 	matrix<K> rule_read(wstr *s);
-	int_t step(rule r, int_t db, bdds& res);
 public:
 	int_t db;
 	void prog_read(wstr s);
-	int_t step(int_t db, bdds& res);
+	int_t step(int_t db);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int_t bdds_base::add(const node& n) {
@@ -335,13 +334,20 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	_db.setpow(db, dim);
 }
 
-template<typename K> int_t lp<K>::step(rule r, int_t db, bdds& res) {
-	int_t s = bdds::apply(prog, r.h, _db, db, res, op_and);
-	return s = bdds::apply(res, s, res, op_exists(r.x)); 
+int_t operator*(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
+	return bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_and);
 }
-template<typename K> int_t lp<K>::step(int_t db, bdds& res) {
-	for (const rule& r : rules) step(r, db, res);
-	return db;
+
+int_t operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
+	return bdds::apply(*x.first, x.second, *x.first, op_exists(y));
+}
+
+template<typename K> int_t lp<K>::step(int_t db) {
+	int_t add = bdds::F, del = bdds::F, s;
+	for (const rule& r : rules) {
+//		s = bdds::apply(prog, pair{ &prog, r.h } * pair{ &_db, db }, prog, op_exists(r.x));
+		s = pair{&prog, pair{ &prog, r.h } * pair{ &_db, db } } / r.x;
+	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
@@ -365,7 +371,6 @@ int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
-	bdds r;
-	p.step(p.db, r);
+	p.step(p.db);
 //	return pfp( lp_read(file_read_text(stdin).c_str()));
 }
