@@ -350,6 +350,8 @@ template<typename K> int_t lp<K>::step(int_t db) {
 	int_t add = bdds::F, del = bdds::F, s;
 	for (const rule& r : rules)
 		pair{ &prog, r.neg ? del : add } |= pair{ &prog, r.h } * pair{ &_db, db } / r.x;
+	if ((s = prog.bdd_and_not(add, del)) == bdds::F) return bdds::F;
+	return (pair{&prog, prog.bdd_and_not(bdds::T, del)} |= { &prog, s} ).second;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
