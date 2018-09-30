@@ -33,6 +33,7 @@ struct rule {
 	bool neg;
 	int_t h; // bdd root
 	set<int_t> x; // existentials
+	map<int_t, int_t> hvars;
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
@@ -63,12 +64,12 @@ template<typename X, typename Y> struct op_compose {
 	op_compose(const X& x, const Y& y) : x(x), y(y) {}
 	node operator()(const bdds_base& b, const node& n) const { return x(b, y(b, n)); }
 };
-
+/*
 struct op_restrict : public op_compose<op_set<false>, op_set<true>> {
 	op_restrict(const set<int_t>& s, const set<int_t>& us) :
 		op_compose(op_set<false>(s.begin(), s.end()), op_set<true>(us.begin(), us.end())) {}
 };
-
+*/
 struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; } } op_or; 
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
@@ -81,12 +82,11 @@ class bdds : public bdds_base {
 public:
 	template<typename op_t> static
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
-	template<typename op_t> static
-	int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
-	template<typename op_t> static
-	int_t apply(bdds& b, int_t x, bdds& r, const op_t& op);
-	template<typename op_t> static
-	int_t compose(const bdds& bx,int_t x,int_t v,const bdds& by,int_t y,bdds& r,const op_t& op);
+	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
+	template<typename op_t> static int_t apply(bdds& b, int_t x, bdds& r, const op_t& op);
+	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
+//	template<typename op_t> static
+//	int_t compose(const bdds& bx,int_t x,int_t v,const bdds& by,int_t y,bdds& r,const op_t& op);
 
 	int_t from_bvec(const bits& v);
 	int_t from_eq(int_t x, int_t y);
@@ -203,6 +203,14 @@ template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t&
 	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
 }
 
+int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
+	node n = b.getnode(x);
+	if (!n[0]) return x;
+	auto it = m.find(n[0]);
+	if (it == m.end()) throw 0;
+	return r.add({it->second, n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]});
+}
+
 template<typename op_t>
 int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
@@ -214,42 +222,44 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename op_t>
+/*template<typename op_t>
 int_t bdds::compose(const bdds& bx, int_t x, int_t v, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	return apply(r, apply(r, apply(bx, x, r, op_restrict({v},{})), by, y, r, op_and), r,
 			apply(r, apply(bx, x, r, op_restrict({},{v})), by, y, r, op_and_not), r, op_or);
-}
+}*/
 
-template<typename K>
-rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
+template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t r = T;
 	map<K, array<size_t, 2>> m;
 	set<K> hvars, ex;
+	map<int_t, int_t> hv;
 	bool neg = v[0][0] < 0;
 	if (neg) v[0][0] = -v[0][0];
 	for (K k : v[0]) if (k < 0) hvars.emplace(k);
-	for (size_t i = 1; i < v.size(); ++i) {
+	for (size_t i = 1; i != v.size(); ++i) {
 		int_t k = T;
-		for (size_t j = 1; j < v[i].size(); ++j)
+		for (size_t j = 1; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end())
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
-							(it->second[0]*bits+b)*ar+it->second[0]));
+							(it->second[0]*bits+b)*ar+it->second[1]));
 			else if (m.emplace(v[i][j], array<size_t, 2>{ i, j }); v[i][j] > 0)
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
-			else if (hvars.find(v[i][j]) == hvars.end())
+			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end())
 				for (size_t b = 0; b != bits; ++b)
 					ex.emplace((i*bits+b)*ar+j);
+			else for (size_t b = 0; b != bits; ++b)
+				hv.emplace();
 		r = v[i][0] > 0 ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
-	return { neg, r, ex };
+	return { neg, r, ex, hv };
 }
 
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
 	size_t sx = x.size(), sy = y.first.size();
 	x.reserve(sx + sy);
-	for (size_t n = 0; n < sy; ++n) x.push_back(y.first[n]);
+	for (size_t n = 0; n != sy; ++n) x.push_back(y.first[n]);
 	sy += sx;
 	while (sy-- != sx) x[sy][y.second] = false;
 	while (sx--) x[sx][y.second] = true;
@@ -336,19 +346,13 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	_db.setpow(db, dim);
 }
 
-pair<bdds*, int_t> operator*(pair<bdds*, int_t> x, const pair<const bdds*, int_t>& y) {
-	return pair{x.first, bdds::apply(*x.first, x.second, *y.first, y.second, *x.first, op_and)};
-}
-
-int_t operator/(pair<bdds*, int_t> x, const set<int_t>& y) {
-	return bdds::apply(*x.first, x.second, *x.first, op_exists(y));
-}
-
 template<typename K> int_t lp<K>::step(int_t db) {
 	int_t add = bdds::F, del = bdds::F, s;
 	for (const rule& r : rules) {
-		prog.bdd_or(r.neg ? del : add, (pair{ &prog, r.h } * pair{ &_db, db }) / r.x);
-//		(r.neg ? del : add) = prog.shift(r.neg ? del : add, vars);
+		int_t x = bdds::apply(prog, r.h, _db, db, prog, op_and);
+		int_t y = bdds::apply(prog, x, prog, op_exists(r.x));
+		int_t z = bdds::permute(prog, y, prog, r.hvars);
+		(r.neg ? del : add) = prog.bdd_or(r.neg ? del : add, z);
 	}
 	if ((s = prog.bdd_and_not(add, del)) == bdds::F) return bdds::F;
 	return prog.bdd_or(prog.bdd_and_not(bdds::T, del), s);
@@ -359,7 +363,7 @@ wstring file_read_text(FILE *f) {
 	wchar_t buf[32], n, l, skip = 0;
 	wint_t c;
 	*buf = 0;
-next:	for (n = l = 0; n < 31; ++n)
+next:	for (n = l = 0; n != 31; ++n)
 		if (WEOF == (c = getwc(f))) { skip = 0; break; }
 		else if (c == L'#') skip = 1;
 		else if (c == L'\r' || c == L'\n') skip = 0, buf[l++] = c;
