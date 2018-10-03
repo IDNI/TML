@@ -32,6 +32,7 @@ typedef vector<bits> vbits;
 struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
 	int_t h; // bdd root
+	size_t w; // nbodies, will determine the virtual power
 	set<int_t> x; // existentials
 	map<int_t, int_t> hvars; // how to permute body vars to head vars
 };
@@ -63,10 +64,10 @@ class bdds : public bdds_base { // holding functions only, therefore tbd: dont u
 	size_t count(int_t x) const;
 	vbits& sat(int_t x, vbits& r) const;
 public:
-	template<typename op_t> static
+	template<typename op_t> static // binary application
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
-	template<typename op_t> static int_t apply(bdds& b, int_t x, bdds& r, const op_t& op);
+	template<typename op_t> static int_t apply(bdds& b, int_t x,bdds& r, const op_t& op);//unary
 	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
@@ -162,16 +163,16 @@ void bdds::out(wostream& os, const node& n) const {
 	else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) {
+template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) { //unary
 	node n = op(b, b.getnode(x));
 	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
 }
-template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) {
+template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
 	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
 }
 
-int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
+int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) { // [overlapping] rename
 	node n = b.getnode(x);
 	if (!n[0]) return x;
 	auto it = m.find(n[0]);
@@ -179,7 +180,7 @@ int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
 	return r.add({it->second, n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]});
 }
 
-template<typename op_t>
+template<typename op_t> // binary application
 int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
 	const int_t &vx = Vx[0], &vy = Vy[0];
@@ -190,12 +191,6 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-/*template<typename op_t>
-int_t bdds::compose(const bdds& bx, int_t x, int_t v, const bdds& by, int_t y, bdds& r, const op_t& op) {
-	return apply(r, apply(r, apply(bx, x, r, op_restrict({v},{})), by, y, r, op_and), r,
-			apply(r, apply(bx, x, r, op_restrict({},{v})), by, y, r, op_and_not), r, op_or);
-}*/
-
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t r = T;
 	map<K, array<size_t, 2>> m;
@@ -299,11 +294,10 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
 	matrix<K> t;
 	int_t db = bdds::T;
-	size_t ar = 0, l, dim = 0;
+	size_t ar = 0;
 	while (!(t = rule_read(&s)).empty()) {
-		dim = max(t.size()-1, dim);
 		for (const vector<K>& x : t) ar = max(ar, x.size());
-		r.push_back(t);
+		t.w = t.size() - 1, r.push_back(t);
 	}
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
@@ -312,12 +306,12 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);
 		else rules.push_back(prog.from_rule(x, dict.bits(), ar));
-	dbs.setpow(db, dim);
 }
 
 template<typename K> void lp<K>::step() {
 	int_t add = bdds::F, del = bdds::F, s;
 	for (const rule& r : rules) { // per rule
+		dbs.setpow(db, r.w);
 		int_t x = bdds::apply(prog, r.h, dbs, db, prog, op_and); // rule/db conjunction
 		int_t y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
 		int_t z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
@@ -349,6 +343,6 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	p.step();
-//	p.printdb(wcout);
+	p.printdb(wcout);
 	return 0;
 }
