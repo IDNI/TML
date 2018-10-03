@@ -13,9 +13,9 @@
 using namespace std;
 
 typedef int32_t int_t;
-typedef array<int_t, 3> node;
+typedef array<int_t, 3> node; // [bdd] node is a triple: varid, 1-node-id, 0-node-id
 typedef const wchar_t* wstr;
-template<typename K> using matrix = vector<vector<K>>;
+template<typename K> using matrix = vector<vector<K>>; // used as a set of terms (e.g. rule)
 typedef vector<bool> bits;
 typedef vector<bits> vbits;
 #define er(x)	perror(x), exit(0)
@@ -29,82 +29,61 @@ typedef vector<bits> vbits;
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-struct rule {
+struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
 	int_t h; // bdd root
 	set<int_t> x; // existentials
-	map<int_t, int_t> hvars;
+	map<int_t, int_t> hvars; // how to permute body vars to head vars
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
-	vector<node> V;
-	map<node, int_t> M;
-	int_t root;
-	size_t dim = 1;
+	vector<node> V; // all nodes
+	map<node, int_t> M; // node to its index
+	int_t root; // used for implicit power
+	size_t dim = 1; // used for implicit power
 protected:
 	int_t add(const node& n);
 	int_t add_nocheck(const node& n) { return V.emplace_back(n), M[n]=V.size()-1; }
 	bdds_base() { add_nocheck({0, 0, 0}), add_nocheck({0, 1, 1}); }
 public:
 	static const int_t F = 0, T = 1;
-	node getnode(size_t n) const;
+	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
 	void setpow(int_t _root, size_t _dim) { root = _root, dim = _dim; }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<bool unset> struct op_set : public set<int_t> {
-	using set<int_t>::set;
-	node operator()(const bdds_base& b, const node& n) const {
-		return find(n[0]) == end() ? n : b.getnode(n[unset ? 2 : 1]);
-	}
-};
-
-template<typename X, typename Y> struct op_compose {
-	X x;
-	Y y;
-	op_compose(const X& x, const Y& y) : x(x), y(y) {}
-	node operator()(const bdds_base& b, const node& n) const { return x(b, y(b, n)); }
-};
-/*
-struct op_restrict : public op_compose<op_set<false>, op_set<true>> {
-	op_restrict(const set<int_t>& s, const set<int_t>& us) :
-		op_compose(op_set<false>(s.begin(), s.end()), op_set<true>(us.begin(), us.end())) {}
-};
-*/
+// the following to be used with bdds::apply()
 struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; } } op_or; 
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y);
+vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y); // to be used with allsat()
 
-class bdds : public bdds_base {
+class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
 	size_t count(int_t x) const;
+	vbits& sat(int_t x, vbits& r) const;
 public:
 	template<typename op_t> static
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(bdds& b, int_t x, bdds& r, const op_t& op);
 	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
-//	template<typename op_t> static
-//	int_t compose(const bdds& bx,int_t x,int_t v,const bdds& by,int_t y,bdds& r,const op_t& op);
-
-	int_t from_bvec(const bits& v);
-	int_t from_eq(int_t x, int_t y);
+	// helper constructors
+	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
-
+	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
-
+	// count/return satisfying assignments
 	size_t satcount(int_t x) const	{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
-	vbits& sat(int_t x, vbits& r) const;
 	vbits allsat(int_t x) const;
-
+	// print a bdd, using ?: syntax
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
 
-struct op_exists {
+struct op_exists { // existential quantification, to be used with apply()
 	const set<int_t>& s;
 	op_exists(const set<int_t>& s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
@@ -112,7 +91,7 @@ struct op_exists {
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename K> class dict_t {
+template<typename K> class dict_t { // handles representation of strings as unique integers
 	struct dictcmp {
 		bool operator()(const pair<wstr, size_t>& x, const pair<wstr, size_t>& y) const;
 	};
@@ -127,27 +106,28 @@ public:
 	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename K> class lp {
-	dict_t<K> dict;
-	bdds prog, _db;
-	vector<rule> rules;
+template<typename K> class lp { // [pfp] logic program
+	dict_t<K> dict; // hold its own dict so we can determine the universe size
+	bdds prog, dbs; // separate bdds for prog and db cause db is a virtual power
+	vector<rule> rules; // prog's rules
 
-	K str_read(wstr *s);
-	vector<K> term_read(wstr *s);
-	matrix<K> rule_read(wstr *s);
+	K str_read(wstr *s); // parser's helper, reads a string and returns its dict id
+	vector<K> term_read(wstr *s); // read raw term (no bdd)
+	matrix<K> rule_read(wstr *s); // read raw rule (no bdd)
 public:
-	int_t db;
+	int_t db; // db's bdd root
 	void prog_read(wstr s);
-	int_t step(int_t db);
+	void step(); // single pfp step
+	void printdb(wostream&) const;
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-int_t bdds_base::add(const node& n) {
+int_t bdds_base::add(const node& n) { // create new bdd node, standard implementation
 	if (n[1] == n[2]) return n[1];
 	auto it = M.find(n);
 	return it == M.end() ? add_nocheck(n) : it->second;
 }
 
-node bdds_base::getnode(size_t n) const {
+node bdds_base::getnode(size_t n) const { // returns a bdd node considering virtual powers
 	if (dim == 1) return V[n];
 	const size_t m = n % V.size(), ms = (n / V.size() + 1) * V.size();
 	node r = V[m];
@@ -158,18 +138,11 @@ size_t bdds::count(int_t x) const {
 	node n = getnode(x), k;
 	if (!n[0]) return n[1];
 	size_t r = 0;
-	if (k = getnode(n[1]); !k[0]) r += k[1];
-	else r += count(n[1]) << (k[0] - n[0] - 1);
-	if (k = getnode(n[2]); !k[0]) return r + k[1];
-	return r + (count(n[2]) << (k[0] - n[0] - 1));
+	if (k = getnode(n[1]); !k[0]) r += k[1]; else r += count(n[1]) << (k[0] - n[0] - 1);
+	if (k = getnode(n[2]); !k[0]) return r + k[1]; else return r + (count(n[2])<<(k[0]-n[0]-1));
 }
 
-int_t bdds::from_bvec(const bits& v) {
-	int_t k = T, n = v.size() - 1;
-	do { k = v[n] ? add({n+1, k, F}) : add({n+1, F, k}); } while (n--);
-	return k;
-}
-
+vbits bdds::allsat(int_t x) const { vbits r; return r.reserve(satcount(x)), sat(x, r); }
 vbits& bdds::sat(int_t x, vbits& r) const {
 	node n = getnode(x);
 	node nl = getnode(n[1]), nr = getnode(n[2]);
@@ -177,11 +150,6 @@ vbits& bdds::sat(int_t x, vbits& r) const {
 	if (nl[0]||nl[1]) { s1=r; for (int_t k=n[0]-1; k!=nl[0]; ++k) s1 *= { s1, k }; }
 	if (nr[0]||nr[1]) { s2=r; for (int_t k=n[0]-1; k!=nr[0]; ++k) s2 *= { s2, k }; }
 	return r = s1 *= { s2, n[0] };
-}
-
-vbits bdds::allsat(int_t x) const {
-	vbits r;
-	return r.reserve(satcount(x)), sat(x, r);
 }
 
 int_t bdds::from_eq(int_t x, int_t y) {
@@ -233,12 +201,13 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	map<K, array<size_t, 2>> m;
 	set<K> hvars, ex;
 	map<int_t, int_t> hv;
-	bool neg = v[0][0] < 0;
+	bool neg = v[0][0] < 0, bneg; // negation denoted by negative relid
 	if (neg) v[0][0] = -v[0][0];
-	for (K k : v[0]) if (k < 0) hvars.emplace(k);
-	for (size_t i = 1; i != v.size(); ++i) {
+	for (K k : v[0]) if (k < 0) hvars.emplace(k); // scan head vars
+	for (size_t i = 1; i != v.size(); ++i) { // go over bodies
 		int_t k = T;
-		for (size_t j = 1; j != v[i].size(); ++j)
+		if ((bneg = (v[i][0] < 0))) v[i][0] = -v[i][0];
+		for (size_t j = 0; j != v[i].size(); ++j) // per relid/arg
 			if (auto it = m.find(v[i][j]); it != m.end())
 				for (size_t b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
@@ -251,7 +220,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 					ex.emplace((i*bits+b)*ar+j);
 			else for (size_t b = 0; b != bits; ++b)
 				hv.emplace();
-		r = v[i][0] > 0 ? bdd_and(r, k) : bdd_and_not(r, k);
+		r = bneg ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
 	return { neg, r, ex, hv };
 }
@@ -341,21 +310,21 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 			if ((l=y.size()) < ar)
 				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad);
 	for (const matrix<K>& x : r)
-		if (x.size() == 1) db = _db.bdd_or(db, _db.from_rule(x, dict.bits(), ar).h);
+		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);
 		else rules.push_back(prog.from_rule(x, dict.bits(), ar));
-	_db.setpow(db, dim);
+	dbs.setpow(db, dim);
 }
 
-template<typename K> int_t lp<K>::step(int_t db) {
+template<typename K> void lp<K>::step() {
 	int_t add = bdds::F, del = bdds::F, s;
-	for (const rule& r : rules) {
-		int_t x = bdds::apply(prog, r.h, _db, db, prog, op_and);
-		int_t y = bdds::apply(prog, x, prog, op_exists(r.x));
-		int_t z = bdds::permute(prog, y, prog, r.hvars);
-		(r.neg ? del : add) = prog.bdd_or(r.neg ? del : add, z);
+	for (const rule& r : rules) { // per rule
+		int_t x = bdds::apply(prog, r.h, dbs, db, prog, op_and); // rule/db conjunction
+		int_t y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
+		int_t z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
+		(r.neg ? del : add) = prog.bdd_or(r.neg ? del : add, z); // disjunct with add/del
 	}
-	if ((s = prog.bdd_and_not(add, del)) == bdds::F) return bdds::F;
-	return prog.bdd_or(prog.bdd_and_not(bdds::T, del), s);
+	if ((s = prog.bdd_and_not(add, del)) == bdds::F) db = bdds::F; // detect contradiction
+	else db = prog.bdd_or(prog.bdd_and_not(bdds::T, del), s); // db = (db|add)&~del
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
@@ -379,6 +348,7 @@ int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
-	p.step(p.db);
-//	return pfp( lp_read(file_read_text(stdin).c_str()));
+	p.step();
+//	p.printdb(wcout);
+	return 0;
 }
