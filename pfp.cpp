@@ -271,7 +271,8 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	do {
 		while (iswspace(**s)) ++*s;
 		if (**s == L')') return ++*s, r;
-		if (!(t = str_read(s))) er("identifier expected");
+		if (!(t = str_read(s)))
+			er("identifier expected");
 		r.push_back(t);
 	} while (**s);
 	er("term_read(): unexpected parsing error");
@@ -283,12 +284,13 @@ template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
 	if ((t = term_read(s)).empty()) return r;
 	r.push_back(t);
 	while (iswspace(**s)) ++*s;
-	if (**s == L'.') return r;
+	if (**s == L'.') return ++*s, r;
 	while (iswspace(**s)) ++*s;
 	if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
 loop:	if ((t = term_read(s)).empty()) er("term expected");
+	r.push_back(t);
 	while (iswspace(**s)) ++*s;
-	if (**s == L'.') return r;
+	if (**s == L'.') return ++*s, r;
 	goto loop;
 }
 
