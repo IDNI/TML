@@ -192,32 +192,33 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
-	int_t r = T;
+	int_t r = T, k;
+	size_t i, j, b;
 	map<K, array<size_t, 2>> m;
-	set<K> hvars, ex;
+	set<K> ex;
+	map<K, int_t> hvars;
 	map<int_t, int_t> hv;
 	bool neg = v[0][0] < 0, bneg; // negation denoted by negative relid
 	if (neg) v[0][0] = -v[0][0];
-	for (K k : v[0]) if (k < 0) hvars.emplace(k); // scan head vars
-	for (size_t i = 1; i != v.size(); ++i) { // go over bodies
-		int_t k = T;
-		if ((bneg = (v[i][0] < 0))) v[i][0] = -v[i][0];
-		for (size_t j = 0; j != v[i].size(); ++j) // per relid/arg
-			if (auto it = m.find(v[i][j]); it != m.end())
-				for (size_t b = 0; b != bits; ++b)
+	for (i = 0; i != v[0].size(); ++i) if (v[0][i] < 0) hvars.emplace(i, v[0][i]); // head vars
+	for (i = 1; i != v.size(); ++i) { // go over bodies
+		if (k = T; (bneg = (v[i][0] < 0))) v[i][0] = -v[i][0];
+		for (j = 0; j != v[i].size(); ++j) // per relid/arg
+			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
+				for (b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
 							(it->second[0]*bits+b)*ar+it->second[1]));
-			else if (m.emplace(v[i][j], array<size_t, 2>{ i, j }); v[i][j] > 0)
-				for (size_t b = 0; b != bits; ++b)
+			else if (m.emplace(v[i][j], array<size_t, 2>{ i, j }); v[i][j] > 0) // sym
+				for (b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
-			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end())
-				for (size_t b = 0; b != bits; ++b)
-					ex.emplace((i*bits+b)*ar+j);
-			else for (size_t b = 0; b != bits; ++b)
-				hv.emplace();
+			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
+				for (b = 0; b != bits; ++b)
+					ex.emplace((i*bits+b)*ar+j); // is an "existential"
+			else for (b = 0; b != bits; ++b)
+				hv.emplace((i*bits+b)*ar+j, b * ar + jt->second);
 		r = bneg ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
-	return { neg, r, ex, hv };
+	return { neg, r, v.size()-1, ex, hv };
 }
 
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
@@ -292,20 +293,18 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
-	matrix<K> t;
 	int_t db = bdds::T;
-	size_t ar = 0;
-	while (!(t = rule_read(&s)).empty()) {
-		for (const vector<K>& x : t) ar = max(ar, x.size());
-		t.w = t.size() - 1, r.push_back(t);
-	}
+	size_t ar = 0, l;
+	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
+		for (const vector<K>& x : t) // we really support a single rel arity
+			ar = max(ar, x.size()); // so we'll pad everything
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar)
-				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad);
+				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	for (const matrix<K>& x : r)
-		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);
-		else rules.push_back(prog.from_rule(x, dict.bits(), ar));
+		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);// fact
+		else rules.push_back(prog.from_rule(x, dict.bits(), ar)); // rule
 }
 
 template<typename K> void lp<K>::step() {
@@ -343,6 +342,6 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	p.step();
-	p.printdb(wcout);
+	//p.printdb(wcout);
 	return 0;
 }
