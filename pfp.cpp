@@ -196,8 +196,8 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	size_t i, j, b;
 	map<K, array<size_t, 2>> m;
 	set<K> ex;
-	map<K, int_t> hvars;
-	map<int_t, int_t> hv;
+	map<K, int_t> hvars; // argwise
+	map<int_t, int_t> hv;// bitwise
 	bool neg = v[0][0] < 0, bneg; // negation denoted by negative relid
 	if (neg) v[0][0] = -v[0][0];
 	for (i = 0; i != v[0].size(); ++i) if (v[0][i] < 0) hvars.emplace(i, v[0][i]); // head vars
@@ -214,8 +214,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
 				for (b = 0; b != bits; ++b)
 					ex.emplace((i*bits+b)*ar+j); // is an "existential"
-			else for (b = 0; b != bits; ++b)
-				hv.emplace((i*bits+b)*ar+j, b * ar + jt->second);
+			else for (b=0; b != bits; ++b) hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
 		r = bneg ? bdd_and(r, k) : bdd_and_not(r, k);
 	}
 	return { neg, r, v.size()-1, ex, hv };
@@ -241,7 +240,7 @@ template<typename K> K dict_t<K>::operator()(wstr s, size_t len) {
 	if (*s == L'?') {
 		if (auto it = vars_dict.find({s, len}); it != vars_dict.end())
 			return it->second;
-		return vars_dict[{s, len}] = -vars_dict.size();
+		return vars_dict[{s, len}] = -vars_dict.size()-1;
 	}
 	if (auto it = syms_dict.find({s, len}); it != syms_dict.end()) return it->second;
 	return syms.push_back(s), lens.push_back(len), syms.size();
@@ -253,7 +252,7 @@ template<typename K> K lp<K>::str_read(wstr *s) {
 	if (!**s) return 0;
 	if (*(t = *s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
-	while (iswspace(*t)) ++t;
+	//while (iswspace(*t)) ++t;
 	if (t == *s) return 0;
 	K r = dict(*s, t - *s);
 	while (*t && iswspace(*t)) ++t;
@@ -271,7 +270,7 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	if (*((*s)++) != L'(') er(oparen_expected);
 	do {
 		while (iswspace(**s)) ++*s;
-		if (**s == L')') return r;
+		if (**s == L')') return ++*s, r;
 		if (!(t = str_read(s))) er("identifier expected");
 		r.push_back(t);
 	} while (**s);
@@ -284,6 +283,7 @@ template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
 	if ((t = term_read(s)).empty()) return r;
 	while (iswspace(**s)) ++*s;
 	if (**s == L'.') return r;
+	while (iswspace(**s)) ++*s;
 	if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
 loop:	if ((t = term_read(s)).empty()) er("term expected");
 	while (iswspace(**s)) ++*s;
