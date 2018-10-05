@@ -192,6 +192,7 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
+	if (v.size() == 1) v.insert(v.begin(), {0});
 	int_t r = T, k;
 	size_t i, j, b;
 	map<K, array<size_t, 2>> m;
@@ -252,7 +253,6 @@ template<typename K> K lp<K>::str_read(wstr *s) {
 	if (!**s) return 0;
 	if (*(t = *s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
-	//while (iswspace(*t)) ++t;
 	if (t == *s) return 0;
 	K r = dict(*s, t - *s);
 	while (*t && iswspace(*t)) ++t;
@@ -265,7 +265,7 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	bool b = **s == L'~';
 	if (b) ++*s;
 	K rel = str_read(s), t;
-	r.push_back(b ? rel : -rel);
+	r.push_back(b ? -rel : rel);
 	if (!rel) return {};
 	if (*((*s)++) != L'(') er(oparen_expected);
 	do {
@@ -281,6 +281,7 @@ template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
 	vector<K> t;
 	matrix<K> r;
 	if ((t = term_read(s)).empty()) return r;
+	r.push_back(t);
 	while (iswspace(**s)) ++*s;
 	if (**s == L'.') return r;
 	while (iswspace(**s)) ++*s;
@@ -293,7 +294,7 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
-	int_t db = bdds::T;
+	int_t db = bdds::F;
 	size_t ar = 0, l;
 	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
 		for (const vector<K>& x : t) // we really support a single rel arity
@@ -305,6 +306,8 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);// fact
 		else rules.push_back(prog.from_rule(x, dict.bits(), ar)); // rule
+	dbs.out(wcout << L"db:"<<endl, db);
+	for (rule rl : rules) dbs.out(wcout, rl.h), wcout << endl;
 }
 
 template<typename K> void lp<K>::step() {
