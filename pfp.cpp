@@ -60,7 +60,7 @@ struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?
 vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y); // to be used with allsat()
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
-	int_t from_bit(int_t x, bool v) { return add(v ? node{x, T, F} : node{x, F, T}); }
+	int_t from_bit(int_t x, bool v) { return add(v ? node{x+1, T, F} : node{x+1, F, T}); }
 	size_t count(int_t x) const;
 	vbits& sat(int_t x, vbits& r) const;
 public:
@@ -192,17 +192,17 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
-	if (v.size() == 1) v.insert(v.begin(), {0});
 	int_t r = T, k;
 	size_t i, j, b;
 	map<K, array<size_t, 2>> m;
 	set<K> ex;
 	map<K, int_t> hvars; // argwise
 	map<int_t, int_t> hv;// bitwise
-	bool neg = v[0][0] < 0, bneg; // negation denoted by negative relid
-	if (neg) v[0][0] = -v[0][0];
-	for (i = 0; i != v[0].size(); ++i) if (v[0][i] < 0) hvars.emplace(i, v[0][i]); // head vars
-	for (i = 1; i != v.size(); ++i) { // go over bodies
+	vector<K>& head = v[v.size()-1];
+	bool neg = head[0] < 0, bneg; // negation denoted by negative relid. head is last
+	if (neg) head[0] = -head[0];
+	for (i = 0; i != head.size(); ++i) if (head[i] < 0) hvars.emplace(i, head[i]); // head vars
+	for (i = 0; i != (v.size()-1 ? v.size() - 1 : 1); ++i) { // go over bodies
 		if (k = T; (bneg = (v[i][0] < 0))) v[i][0] = -v[i][0];
 		for (j = 0; j != v[i].size(); ++j) // per relid/arg
 			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
@@ -288,7 +288,7 @@ template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
 	while (iswspace(**s)) ++*s;
 	if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
 loop:	if ((t = term_read(s)).empty()) er("term expected");
-	r.push_back(t);
+	r.insert(r.end()-1, t); // make sure head is last
 	while (iswspace(**s)) ++*s;
 	if (**s == L'.') return ++*s, r;
 	goto loop;
