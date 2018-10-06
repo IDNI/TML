@@ -216,7 +216,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 				for (b = 0; b != bits; ++b)
 					ex.emplace((i*bits+b)*ar+j); // is an "existential"
 			else for (b=0; b != bits; ++b) hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
-		r = bneg ? bdd_and(r, k) : bdd_and_not(r, k);
+		r = bneg ? bdd_and_not(r, k) : bdd_and(r, k);
 	}
 	return { neg, r, v.size()-1, ex, hv };
 }
@@ -306,10 +306,13 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 			if ((l=y.size()) < ar)
 				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	for (const matrix<K>& x : r)
-		if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);// fact
-		else rules.push_back(prog.from_rule(x, dict.bits(), ar)); // rule
-	dbs.out(wcout << L"db:"<<endl, db);
-	for (rule rl : rules) dbs.out(wcout, rl.h), wcout << endl;
+	 	if (x.size() == 1) {
+			db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);// fact
+			dbs.out(wcout << endl << L"db: ", db);
+		} else {
+			rules.push_back(prog.from_rule(x, dict.bits(), ar)); // rule
+			prog.out(wcout << endl, rules.back().h);
+		}
 }
 
 template<typename K> void lp<K>::step() {
@@ -346,7 +349,7 @@ int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
-	p.step();
+	//p.step();
 	//p.printdb(wcout);
 	return 0;
 }
