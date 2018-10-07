@@ -146,21 +146,30 @@ size_t bdds::count(int_t x) const {
 	node n = getnode(x), k;
 	if (!n[0]) return n[1];
 	size_t r = 0;
-	if (k = getnode(n[1]); !k[0])
-		r += k[1];
-	else
-		r += count(n[1]) << (k[0] - n[0] - 1);
-	if (k = getnode(n[2]); !k[0])
-		return r + k[1];
-	else
-		return r + (count(n[2])<<(k[0]-n[0]-1));
+//	if (k = getnode(n[1]); !k[0]) r += k[1];
+//	else r += count(n[1]) << (k[0] - n[0] - 1);
+//	if (k = getnode(n[2]); !k[0]) return r + k[1];
+//	else return r + (count(n[2])<<(k[0]-n[0]-1));
+	k = getnode(n[1]);
+	r += count(n[1]) << (k[0] - n[0] - 1);
+	k = getnode(n[2]);
+	return r + (count(n[2])<<(k[0]-n[0]-1));
 }
-
+wostream& operator<<(wostream& os, const bools& x) {
+	for (auto y : x) os << (y ? '1' : '0');
+	return os;
+}
+wostream& operator<<(wostream& os, const vbools& x) {
+	for (auto y : x) os << y << endl;
+	return os;
+}
 vbools bdds::allsat(int_t x) const {
 	vbools r;
 	size_t n = satcount(x);
 	r.reserve(n);
-	return sat(x, r);
+	sat(x, r);
+	wcout <<"allsat: " << r << endl;
+	return r;
 }
 vbools& bdds::sat(int_t x, vbools& r) const {
 	node n = getnode(x);
@@ -170,12 +179,12 @@ vbools& bdds::sat(int_t x, vbools& r) const {
 		s1 = r;
 		for (int_t k=n[0]-1; k!=nl[0]; ++k)
 			s1 *= { s1, k };
-	} else if (nl[1]) s1 *= { {{true}}, 1 };  
+	} else if (nl[1]) s1.push_back({true});///for (bools& b : s1) b.push_back(true);// *= { {{true}}, 1 };  
 	if (nr[0]) {//||nr[1]) { // if the right node is not a leaf, or, is "true"
 		s2 = r;
 		for (int_t k=n[0]-1; k!=nr[0]; ++k)
 			s2 *= { s2, k };
-	} else if (nr[1]) s2 *= { {{false}}, 1 };
+	} else if (nr[1]) s2.push_back({false});//for (bools &b : s2) b.push_back(false);// *= { {{false}}, 1 };
 	return r = s1 *= { s2, n[0] };
 }
 
@@ -259,6 +268,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			else for (b=0; b != bits; ++b) hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
 		r = bneg ? bdd_and_not(r, k) : bdd_and(r, k);
 	}
+	wcout << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
+	for (auto x : v) { for (auto y : x) wcout << y << ' '; wcout << endl; }
+	out(wcout, r);
 	return { neg, r, v.size()-1, ex, hv };
 }
 
@@ -393,6 +405,6 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	//p.step();
-	p.printdb(wcout);
+	p.printdb(wcout<<endl);
 	return 0;
 }
