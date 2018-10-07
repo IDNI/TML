@@ -16,8 +16,8 @@ typedef int32_t int_t;
 typedef array<int_t, 3> node; // [bdd] node is a triple: varid, 1-node-id, 0-node-id
 typedef const wchar_t* wstr;
 template<typename K> using matrix = vector<vector<K>>; // used as a set of terms (e.g. rule)
-typedef vector<bool> bits;
-typedef vector<bits> vbits;
+typedef vector<bool> bools;
+typedef vector<bools> vbools;
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -57,12 +57,12 @@ struct op_or_t { int_t operator()(int_t x, int_t y) const { return (x||y)?1:0; }
 struct op_and_t { int_t operator()(int_t x, int_t y) const { return (x&&y)?1:0; } } op_and; 
 struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?1:0; } } op_and_not;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y); // to be used with allsat()
+vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be used with allsat()
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	int_t from_bit(int_t x, bool v) { return add(v ? node{x+1, T, F} : node{x+1, F, T}); }
 	size_t count(int_t x) const;
-	vbits& sat(int_t x, vbits& r) const;
+	vbools& sat(int_t x, vbools& r) const;
 public:
 	template<typename op_t> static // binary application
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
@@ -72,13 +72,14 @@ public:
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
+	template<typename K> matrix<K> from_bits(int_t x, const size_t bits, const size_t ar);
 	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
 	// count/return satisfying assignments
 	size_t satcount(int_t x) const	{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
-	vbits allsat(int_t x) const;
+	vbools allsat(int_t x) const;
 	// print a bdd, using ?: syntax
 	void out(wostream& os, const node& n) const;
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
@@ -115,11 +116,17 @@ template<typename K> class lp { // [pfp] logic program
 	K str_read(wstr *s); // parser's helper, reads a string and returns its dict id
 	vector<K> term_read(wstr *s); // read raw term (no bdd)
 	matrix<K> rule_read(wstr *s); // read raw rule (no bdd)
+	size_t bits, ar;
 public:
 	int_t db; // db's bdd root
 	void prog_read(wstr s);
 	void step(); // single pfp step
-	void printdb(wostream&) const;
+	void printdb(wostream& os) {
+		for (const vector<K>& v : dbs.from_bits<K>(db, bits, ar)) {
+			for (const K& k : v) os << k << L' ';
+			os << endl;
+		}
+	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int_t bdds_base::add(const node& n) { // create new bdd node, standard implementation
@@ -139,15 +146,26 @@ size_t bdds::count(int_t x) const {
 	node n = getnode(x), k;
 	if (!n[0]) return n[1];
 	size_t r = 0;
-	if (k = getnode(n[1]); !k[0]) r += k[1]; else r += count(n[1]) << (k[0] - n[0] - 1);
-	if (k = getnode(n[2]); !k[0]) return r + k[1]; else return r + (count(n[2])<<(k[0]-n[0]-1));
+	if (k = getnode(n[1]); !k[0])
+		r += k[1];
+	else
+		r += count(n[1]) << (k[0] - n[0] - 1);
+	if (k = getnode(n[2]); !k[0])
+		return r + k[1];
+	else
+		return r + (count(n[2])<<(k[0]-n[0]-1));
 }
 
-vbits bdds::allsat(int_t x) const { vbits r; return r.reserve(satcount(x)), sat(x, r); }
-vbits& bdds::sat(int_t x, vbits& r) const {
+vbools bdds::allsat(int_t x) const {
+	vbools r;
+	size_t n = satcount(x);
+	r.reserve(n);
+	return sat(x, r);
+}
+vbools& bdds::sat(int_t x, vbools& r) const {
 	node n = getnode(x);
 	node nl = getnode(n[1]), nr = getnode(n[2]);
-	vbits s1, s2;
+	vbools s1, s2;
 	if (nl[0]||nl[1]) { s1=r; for (int_t k=n[0]-1; k!=nl[0]; ++k) s1 *= { s1, k }; }
 	if (nr[0]||nr[1]) { s2=r; for (int_t k=n[0]-1; k!=nr[0]; ++k) s2 *= { s2, k }; }
 	return r = s1 *= { s2, n[0] };
@@ -191,6 +209,21 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename K> vector<K> from_bits(const bools& x, const size_t bits, const size_t ar) {
+	vector<K> r;
+	r.resize(ar);
+	fill(r.begin(), r.end(), 0);
+	for (size_t n = 0; n < x.size(); ++n) if (x[n]) r[n / ar] |= 1<<(n % ar);
+	return r;
+}
+template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
+	vbools s = allsat(x);
+	matrix<K> r;
+	r.resize(s.size());
+	size_t n = 0;
+	for (const bools& b : s) r[n++] = ::from_bits<K>(b, bits, ar);
+	return r;
+}
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t r = T, k;
 	size_t i, j, b;
@@ -221,7 +254,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	return { neg, r, v.size()-1, ex, hv };
 }
 
-vbits& operator*=(vbits& x, const pair<const vbits&, size_t>& y) {
+vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y) {
 	size_t sx = x.size(), sy = y.first.size();
 	x.reserve(sx + sy);
 	for (size_t n = 0; n != sy; ++n) x.push_back(y.first[n]);
@@ -297,7 +330,8 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
 	int_t db = bdds::F;
-	size_t ar = 0, l;
+	size_t l;
+	ar = 0;
 	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
 		for (const vector<K>& x : t) // we really support a single rel arity
 			ar = max(ar, x.size()); // so we'll pad everything
@@ -305,12 +339,13 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar)
 				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad); // the padding
+	bits = dict.bits();
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1) {
-			db = dbs.bdd_or(db, dbs.from_rule(x, dict.bits(), ar).h);// fact
+			db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
 			dbs.out(wcout << endl << L"db: ", db);
 		} else {
-			rules.push_back(prog.from_rule(x, dict.bits(), ar)); // rule
+			rules.push_back(prog.from_rule(x, bits, ar)); // rule
 			prog.out(wcout << endl, rules.back().h);
 		}
 }
@@ -350,6 +385,6 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	//p.step();
-	//p.printdb(wcout);
+	p.printdb(wcout);
 	return 0;
 }
