@@ -166,8 +166,16 @@ vbools& bdds::sat(int_t x, vbools& r) const {
 	node n = getnode(x);
 	node nl = getnode(n[1]), nr = getnode(n[2]);
 	vbools s1, s2;
-	if (nl[0]||nl[1]) { s1=r; for (int_t k=n[0]-1; k!=nl[0]; ++k) s1 *= { s1, k }; }
-	if (nr[0]||nr[1]) { s2=r; for (int_t k=n[0]-1; k!=nr[0]; ++k) s2 *= { s2, k }; }
+	if (nl[0]) {// || nl[1]) { // if the left node is not a leaf, or, is "true"
+		s1 = r;
+		for (int_t k=n[0]-1; k!=nl[0]; ++k)
+			s1 *= { s1, k };
+	} else if (nl[1]) s1 *= { {{true}}, 1 };  
+	if (nr[0]) {//||nr[1]) { // if the right node is not a leaf, or, is "true"
+		s2 = r;
+		for (int_t k=n[0]-1; k!=nr[0]; ++k)
+			s2 *= { s2, k };
+	} else if (nr[1]) s2 *= { {{false}}, 1 };
 	return r = s1 *= { s2, n[0] };
 }
 
