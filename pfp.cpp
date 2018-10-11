@@ -78,10 +78,9 @@ public:
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
 	// count/return satisfying assignments
-	size_t satcount(int_t x) const	{ return x < 2 ? x : (count(x) << (getnode(x)[0] - 1)); }
+	size_t satcount(int_t x) const;
 	vbools allsat(int_t x) const;
-	// print a bdd, using ?: syntax
-	void out(wostream& os, const node& n) const;
+	void out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
 
@@ -151,9 +150,10 @@ size_t bdds::count(int_t x) const {
 //	if (k = getnode(n[2]); !k[0]) return r + k[1];
 //	else return r + (count(n[2])<<(k[0]-n[0]-1));
 	k = getnode(n[1]);
-	r += count(n[1]) << (k[0] - n[0] - 1);
+	r += count(n[1]) << (n[0] - k[0] - 1);
 	k = getnode(n[2]);
-	return r + (count(n[2])<<(k[0]-n[0]-1));
+	r += (count(n[2])<< (n[0] - k[0] - 1));
+	return r;
 }
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y : x) os << (y ? '1' : '0');
@@ -162,6 +162,10 @@ wostream& operator<<(wostream& os, const bools& x) {
 wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y : x) os << y << endl;
 	return os;
+}
+size_t bdds::satcount(int_t x) const {
+	if (x < 2) return x;
+	return (count(x) << (getnode(x)[0] - 1));
 }
 vbools bdds::allsat(int_t x) const {
 	vbools r;
@@ -204,7 +208,7 @@ template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const
 }
 template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
-	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
+	return r.add({{n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]}});
 }
 
 int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) { // [overlapping] rename
@@ -349,7 +353,7 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
-	int_t db = bdds::F;
+	db = bdds::F;
 	size_t l;
 	ar = 0;
 	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
@@ -404,7 +408,8 @@ int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
-	//p.step();
-	//p.printdb(wcout<<endl);
+	p.printdb(wcout<<endl);
+	p.step();
+	p.printdb(wcout<<endl);
 	return 0;
 }
