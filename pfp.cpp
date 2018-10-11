@@ -142,7 +142,6 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 }
 
 size_t bdds::count(int_t x, size_t nvars) const {
-	out(wcout <<"count for: ", x);
 	node n = getnode(x), k;
 	size_t r = 0;
 	if (!n[0]) r = n[1];
@@ -156,7 +155,6 @@ size_t bdds::count(int_t x, size_t nvars) const {
 		k = getnode(n[2]);
 		r += count(n[2], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
 	}
-	wcout << " is " << r << endl;
 	return r;
 }
 wostream& operator<<(wostream& os, const bools& x) {
@@ -168,7 +166,6 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	return os;
 }
 size_t bdds::satcount(int_t x, size_t nvars) const {
-	out(wcout <<"satcount for: ", x); wcout << endl;
 	if (x < 2) return x;
 	return (count(x, nvars) << (getnode(x)[0] - 1));
 }
@@ -260,7 +257,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	vector<K>& head = v[v.size()-1];
 	bool neg = head[0] < 0, bneg; // negation denoted by negative relid. head is last
 	if (neg) head[0] = -head[0];
-	for (i = 0; i != head.size(); ++i) if (head[i] < 0) hvars.emplace(i, head[i]); // head vars
+	for (i = 0; i != head.size(); ++i) if (head[i] < 0) hvars.emplace(head[i], i); // head vars
 	for (i = 0; i != (v.size()-1 ? v.size() - 1 : 1); ++i) { // go over bodies
 		if (k = T; (bneg = (v[i][0] < 0))) v[i][0] = -v[i][0];
 		for (j = 0; j != v[i].size(); ++j) // per relid/arg
@@ -274,7 +271,8 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
 				for (b = 0; b != bits; ++b)
 					ex.emplace((i*bits+b)*ar+j); // is an "existential"
-			else for (b=0; b != bits; ++b) hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
+			else for (b=0; b != bits; ++b)
+				hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
 		r = bneg ? bdd_and_not(r, k) : bdd_and(r, k);
 	}
 	wcout << endl << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
