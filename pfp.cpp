@@ -45,7 +45,7 @@ class bdds_base {
 protected:
 	int_t add(const node& n);
 	int_t add_nocheck(const node& n) { return V.emplace_back(n), M[n]=V.size()-1; }
-	bdds_base() { add_nocheck({0, 0, 0}), add_nocheck({0, 1, 1}); }
+	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
 public:
 	static const int_t F = 0, T = 1;
 	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
@@ -60,7 +60,7 @@ struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?
 vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be used with allsat()
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
-	int_t from_bit(int_t x, bool v) { return add(v ? node{x+1, T, F} : node{x+1, F, T}); }
+	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
 	size_t count(int_t x) const;
 	vbools& sat(int_t x, vbools& r) const;
 public:
@@ -212,7 +212,7 @@ int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) { // 
 	if (!n[0]) return x;
 	auto it = m.find(n[0]);
 	if (it == m.end()) throw 0;
-	return r.add({it->second, n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]});
+	return r.add({{it->second, n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]}});
 }
 
 template<typename op_t> // binary application
@@ -223,10 +223,10 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
 	else if (!vx) return op(a, b);
 	else if ((v = vx) < vy || !vy) b = d = y;
-	return r.add({v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
+	return r.add({{v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)}});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename K> vector<K> from_bits(const bools& x, const size_t bits, const size_t ar) {
+template<typename K> vector<K> from_bits(const bools& x, const size_t /*bits*/, const size_t ar) {
 	vector<K> r;
 	r.resize(ar);
 	fill(r.begin(), r.end(), 0);
@@ -259,7 +259,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 				for (b = 0; b != bits; ++b)
 					k = bdd_and(k,from_eq((i*bits+b)*ar+j,
 							(it->second[0]*bits+b)*ar+it->second[1]));
-			else if (m.emplace(v[i][j], array<size_t, 2>{ i, j }); v[i][j] > 0) // sym
+			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] > 0) // sym
 				for (b = 0; b != bits; ++b)
 					k = bdd_and(k, from_bit((i*bits+b)*ar+j, v[i][j]&(1<<b)));
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
@@ -268,9 +268,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			else for (b=0; b != bits; ++b) hv.emplace((i*bits+b)*ar+j, b*ar+jt->second);
 		r = bneg ? bdd_and_not(r, k) : bdd_and(r, k);
 	}
-	wcout << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
+	wcout << endl << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
 	for (auto x : v) { for (auto y : x) wcout << y << ' '; wcout << endl; }
-	out(wcout, r);
+	out(wcout, r); wcout << endl;
 	return { neg, r, v.size()-1, ex, hv };
 }
 
@@ -297,7 +297,7 @@ template<typename K> K dict_t<K>::operator()(wstr s, size_t len) {
 		return vars_dict[{s, len}] = -vars_dict.size()-1;
 	}
 	if (auto it = syms_dict.find({s, len}); it != syms_dict.end()) return it->second;
-	return syms.push_back(s), lens.push_back(len), syms.size();
+	return syms.push_back(s), lens.push_back(len), syms_dict[{s, len}] = syms.size();
 }
 
 template<typename K> K lp<K>::str_read(wstr *s) {
@@ -405,6 +405,6 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	//p.step();
-	p.printdb(wcout<<endl);
+	//p.printdb(wcout<<endl);
 	return 0;
 }
