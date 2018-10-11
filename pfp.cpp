@@ -61,7 +61,7 @@ vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be us
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
-	size_t count(int_t x) const;
+	size_t count(int_t x, size_t nvars) const;
 	vbools& sat(int_t x, vbools& r) const;
 public:
 	template<typename op_t> static // binary application
@@ -78,8 +78,8 @@ public:
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
 	// count/return satisfying assignments
-	size_t satcount(int_t x) const;
-	vbools allsat(int_t x) const;
+	size_t satcount(int_t x, size_t nvars) const;
+	vbools allsat(int_t x, size_t nvars) const;
 	void out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
 	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
 };
@@ -141,18 +141,22 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 	return r[0] ? r[1] += ms, r[2] += ms, r : r[1] ? ms == V.size()*dim ? V[T] : V[root] : V[F];
 }
 
-size_t bdds::count(int_t x) const {
+size_t bdds::count(int_t x, size_t nvars) const {
+	out(wcout <<"count for: ", x);
 	node n = getnode(x), k;
-	if (!n[0]) return n[1];
 	size_t r = 0;
+	if (!n[0]) r = n[1];
 //	if (k = getnode(n[1]); !k[0]) r += k[1];
 //	else r += count(n[1]) << (k[0] - n[0] - 1);
 //	if (k = getnode(n[2]); !k[0]) return r + k[1];
 //	else return r + (count(n[2])<<(k[0]-n[0]-1));
-	k = getnode(n[1]);
-	r += count(n[1]) << (n[0] - k[0] - 1);
-	k = getnode(n[2]);
-	r += (count(n[2])<< (n[0] - k[0] - 1));
+	else {
+		k = getnode(n[1]);
+		r += count(n[1], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
+		k = getnode(n[2]);
+		r += count(n[2], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
+	}
+	wcout << " is " << r << endl;
 	return r;
 }
 wostream& operator<<(wostream& os, const bools& x) {
@@ -163,16 +167,17 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y : x) os << y << endl;
 	return os;
 }
-size_t bdds::satcount(int_t x) const {
+size_t bdds::satcount(int_t x, size_t nvars) const {
+	out(wcout <<"satcount for: ", x); wcout << endl;
 	if (x < 2) return x;
-	return (count(x) << (getnode(x)[0] - 1));
+	return (count(x, nvars) << (getnode(x)[0] - 1));
 }
-vbools bdds::allsat(int_t x) const {
+vbools bdds::allsat(int_t x, size_t nvars) const {
 	vbools r;
-	size_t n = satcount(x);
+	size_t n = satcount(x, nvars);
 	r.reserve(n);
 	sat(x, r);
-	wcout <<"allsat: " << r << endl;
+	out(wcout <<"allsat for ", x); wcout << " : " << r << endl;
 	return r;
 }
 vbools& bdds::sat(int_t x, vbools& r) const {
@@ -238,7 +243,7 @@ template<typename K> vector<K> from_bits(const bools& x, const size_t /*bits*/, 
 	return r;
 }
 template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
-	vbools s = allsat(x);
+	vbools s = allsat(x, bits * ar);
 	matrix<K> r;
 	r.resize(s.size());
 	size_t n = 0;
