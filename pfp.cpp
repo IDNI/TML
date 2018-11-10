@@ -183,7 +183,7 @@ vbools bdds::allsat(int_t x, size_t nvars) const {
 		wcout << endl;
 		for (int_t y : x) wcout << y << ' ';
 	}
-	wcout << endl;
+	wcout << endl << endl;
 	return r;
 }
 
@@ -321,10 +321,11 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	K rel = str_read(s), t;
 	r.push_back(b ? -rel : rel);
 	if (!rel) return {};
-	if (*((*s)++) != L'(') er(oparen_expected);
+	//if (*((*s)++) != L'(') er(oparen_expected);
 	do {
 		while (iswspace(**s)) ++*s;
-		if (**s == L')') return ++*s, r;
+		if (**s == L',') return ++*s, r;
+		if (**s == L'.' || **s == L':') return r;
 		if (!(t = str_read(s)))
 			er("identifier expected");
 		r.push_back(t);
