@@ -63,6 +63,7 @@ class bdds : public bdds_base { // holding functions only, therefore tbd: dont u
 	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
 	size_t count(int_t x, size_t nvars) const;
 	vbools& sat(int_t x, vbools& r) const;
+	void sat(int_t v, node n, bools& p, vbools& r) const;
 public:
 	template<typename op_t> static // binary application
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
@@ -80,8 +81,8 @@ public:
 	// count/return satisfying assignments
 	size_t satcount(int_t x, size_t nvars) const;
 	vbools allsat(int_t x, size_t nvars) const;
-	void out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
-	void out(wostream& os, size_t n) const	{ out(os, getnode(n)); }
+	wostream& out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
+	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
 };
 
 struct op_exists { // existential quantification, to be used with apply()
@@ -144,18 +145,11 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 size_t bdds::count(int_t x, size_t nvars) const {
 	node n = getnode(x), k;
 	size_t r = 0;
-	if (!n[0]) r = n[1];
-//	if (k = getnode(n[1]); !k[0]) r += k[1];
-//	else r += count(n[1]) << (k[0] - n[0] - 1);
-//	if (k = getnode(n[2]); !k[0]) return r + k[1];
-//	else return r + (count(n[2])<<(k[0]-n[0]-1));
-	else {
-		k = getnode(n[1]);
-		r += count(n[1], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
-		k = getnode(n[2]);
-		r += count(n[2], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
-	}
-	return r;
+	if (!n[0]) return n[1];
+	k = getnode(n[1]);
+	r += count(n[1], nvars) * (1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
+	k = getnode(n[2]);
+	return r+count(n[2], nvars)*(1 << (((k[0] ? k[0] : nvars+1) - n[0]) - 1));
 }
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y : x) os << (y ? '1' : '0');
@@ -169,29 +163,28 @@ size_t bdds::satcount(int_t x, size_t nvars) const {
 	if (x < 2) return x;
 	return (count(x, nvars) << (getnode(x)[0] - 1));
 }
+
+void bdds::sat(int_t v, node n, bools& p, vbools& r) const {
+	if (v < n[0]) p[v-1] = true, sat(v+1, n, p, r), p[v-1] = false, sat(v+1, n, p, r);
+	else if (n[0]) p[v-1] = true, sat(v+1, getnode(n[1]), p, r), p[v-1] = false, sat(v+1, getnode(n[2]), p, r);
+	else if (n[1]) r.push_back(p);
+}
+
 vbools bdds::allsat(int_t x, size_t nvars) const {
+	bools p;
+	p.resize(nvars);
 	vbools r;
 	size_t n = satcount(x, nvars);
 	r.reserve(n);
-	sat(x, r);
-	out(wcout <<"allsat for ", x); wcout << " : " << r << endl;
+	node t = getnode(x);
+	sat(1, t, p, r);
+	out(wcout <<"allsat for ", x);
+	for (auto& x : r) {
+		wcout << endl;
+		for (int_t y : x) wcout << y << ' ';
+	}
+	wcout << endl;
 	return r;
-}
-vbools& bdds::sat(int_t x, vbools& r) const {
-	node n = getnode(x);
-	node nl = getnode(n[1]), nr = getnode(n[2]);
-	vbools s1, s2;
-	if (nl[0]) {// || nl[1]) { // if the left node is not a leaf, or, is "true"
-		s1 = r;
-		for (int_t k=n[0]-1; k!=nl[0]; ++k)
-			s1 *= { s1, k };
-	} else if (nl[1]) s1.push_back({true});///for (bools& b : s1) b.push_back(true);// *= { {{true}}, 1 };  
-	if (nr[0]) {//||nr[1]) { // if the right node is not a leaf, or, is "true"
-		s2 = r;
-		for (int_t k=n[0]-1; k!=nr[0]; ++k)
-			s2 *= { s2, k };
-	} else if (nr[1]) s2.push_back({false});//for (bools &b : s2) b.push_back(false);// *= { {{false}}, 1 };
-	return r = s1 *= { s2, n[0] };
 }
 
 int_t bdds::from_eq(int_t x, int_t y) {
@@ -199,15 +192,16 @@ int_t bdds::from_eq(int_t x, int_t y) {
 			bdd_and(from_bit(x, false),from_bit(y, false)));
 }
 
-void bdds::out(wostream& os, const node& n) const {
-	if (!n[0]) os << (n[1] ? L'T' : L'F');
-	else out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
+wostream& bdds::out(wostream& os, const node& n) const {
+	if (!n[0]) return os << (n[1] ? L'T' : L'F');
+	else return out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) { //unary
 	node n = op(b, b.getnode(x));
 	return r.add({n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]});
 }
+
 template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
 	return r.add({{n[0], n[1]>1?apply(b,n[1],r,op):n[1], n[2]>1?apply(b,n[2],r,op):n[2]}});
@@ -232,7 +226,7 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({{v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)}});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename K> vector<K> from_bits(const bools& x, const size_t /*bits*/, const size_t ar) {
+template<typename K> vector<K> from_bits(const bools& x, const size_t ar) {
 	vector<K> r;
 	r.resize(ar);
 	fill(r.begin(), r.end(), 0);
@@ -244,7 +238,7 @@ template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const
 	matrix<K> r;
 	r.resize(s.size());
 	size_t n = 0;
-	for (const bools& b : s) r[n++] = ::from_bits<K>(b, bits, ar);
+	for (const bools& b : s) r[n++] = ::from_bits<K>(b, ar);
 	return r;
 }
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
@@ -282,9 +276,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 }
 
 vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y) {
-	size_t sx = x.size(), sy = y.first.size();
+	int_t sx = x.size(), sy = y.first.size();
 	x.reserve(sx + sy);
-	for (size_t n = 0; n != sy; ++n) x.push_back(y.first[n]);
+	for (int_t n = 0; n != sy; ++n) x.push_back(y.first[n]);
 	sy += sx;
 	while (sy-- != sx) x[sy][y.second] = false;
 	while (sx--) x[sx][y.second] = true;
@@ -370,10 +364,10 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1) {
 			db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
-			dbs.out(wcout << endl << L"db: ", db);
+//			dbs.out(wcout << endl << L"db: ", db);
 		} else {
 			rules.push_back(prog.from_rule(x, bits, ar)); // rule
-			prog.out(wcout << endl, rules.back().h);
+//			prog.out(wcout << endl, rules.back().h);
 		}
 }
 
@@ -409,10 +403,11 @@ next:	for (n = l = 0; n != 31; ++n)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
 	setlocale(LC_ALL, "");
+	bdds b;
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	p.printdb(wcout<<endl);
-	p.step();
-	p.printdb(wcout<<endl);
+//	p.step();
+//	p.printdb(wcout<<endl);
 	return 0;
 }
