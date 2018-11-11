@@ -227,16 +227,13 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> vector<K> from_bits(const bools& x, const size_t ar) {
-	vector<K> r;
-	r.resize(ar);
-	fill(r.begin(), r.end(), 0);
-	for (size_t n = 0; n < x.size(); ++n) if (x[n]) r[n / ar] |= 1<<(n % ar);
+	vector<K> r(ar, 0);
+	for (size_t n = 0; n < x.size(); ++n) if (x[n]) r[n % ar] |= 1<<(n / ar);
 	return r;
 }
 template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
 	vbools s = allsat(x, bits * ar);
-	matrix<K> r;
-	r.resize(s.size());
+	matrix<K> r(s.size());
 	size_t n = 0;
 	for (const bools& b : s) r[n++] = ::from_bits<K>(b, ar);
 	return r;
@@ -271,7 +268,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	}
 	wcout << endl << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
 	for (auto x : v) { for (auto y : x) wcout << y << ' '; wcout << endl; }
-	out(wcout, r); wcout << endl;
+	out(wcout, r) << endl << "from_bits: ";
+	auto fb = from_bits<K>(r, bits, ar);
+	for (auto x : fb) { for (auto y : x) wcout << y << ' '; wcout << endl; }
 	return { neg, r, v.size()-1, ex, hv };
 }
 
@@ -326,8 +325,7 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 		while (iswspace(**s)) ++*s;
 		if (**s == L',') return ++*s, r;
 		if (**s == L'.' || **s == L':') return r;
-		if (!(t = str_read(s)))
-			er("identifier expected");
+		if (!(t = str_read(s))) er("identifier expected");
 		r.push_back(t);
 	} while (**s);
 	er("term_read(): unexpected parsing error");
@@ -365,10 +363,10 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1) {
 			db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
-//			dbs.out(wcout << endl << L"db: ", db);
+			dbs.out(wcout << endl << L"db: ", db);
 		} else {
 			rules.push_back(prog.from_rule(x, bits, ar)); // rule
-//			prog.out(wcout << endl, rules.back().h);
+			prog.out(wcout << endl, rules.back().h);
 		}
 }
 
