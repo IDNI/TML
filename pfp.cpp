@@ -121,6 +121,7 @@ public:
 	int_t db; // db's bdd root
 	void prog_read(wstr s);
 	void step(); // single pfp step
+	bool pfp();
 	void printdb(wostream& os) {
 		for (const vector<K>& v : dbs.from_bits<K>(db, bits, ar)) {
 			for (const K& k : v) os << k << L' ';
@@ -268,9 +269,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	}
 	wcout << endl << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
 	for (auto x : v) { for (auto y : x) wcout << y << ' '; wcout << endl; }
-	out(wcout, r) << endl << "from_bits: ";
-	auto fb = from_bits<K>(r, bits, ar);
-	for (auto x : fb) { for (auto y : x) wcout << y << ' '; wcout << endl; }
+//	out(wcout, r) << endl << "from_bits: ";
+//	auto fb = from_bits<K>(r, bits, ar);
+//	for (auto x : fb) { for (auto y : x) wcout << y << ' '; wcout << endl; }
 	return { neg, r, v.size()-1, ex, hv };
 }
 
@@ -382,6 +383,15 @@ template<typename K> void lp<K>::step() {
 	if ((s = prog.bdd_and_not(add, del)) == bdds::F) db = bdds::F; // detect contradiction
 	else db = prog.bdd_or(prog.bdd_and_not(bdds::T, del), s); // db = (db|add)&~del
 }
+
+template<typename K> bool lp<K>::pfp() {
+	int_t d;
+	for (set<int_t> s;;) {
+		s.emplace(d = db);
+		step();
+		if (s.find(db) != s.end()) return d == db;
+	}
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
 	wstringstream ss;
@@ -406,6 +416,8 @@ int main() {
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	p.printdb(wcout<<endl);
+	if (p.pfp()) p.printdb(wcout<<endl);
+	else wcout << "unsat" << endl;
 //	p.step();
 //	p.printdb(wcout<<endl);
 	return 0;
