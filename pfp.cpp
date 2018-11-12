@@ -212,7 +212,9 @@ int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) { // 
 	node n = b.getnode(x);
 	if (!n[0]) return x;
 	auto it = m.find(n[0]);
-	if (it == m.end()) throw 0;
+	if (it == m.end())
+	return r.add({{n[0], n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]}});
+	       //	throw 0;
 	return r.add({{it->second, n[1]>1?permute(b,n[1],r,m):n[1], n[2]>1?permute(b,n[2],r,m):n[2]}});
 }
 
@@ -372,23 +374,27 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 }
 
 template<typename K> void lp<K>::step() {
-	int_t add = bdds::F, del = bdds::F, s;
+	int_t add = bdds::F, del = bdds::F, s, x, y, z;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w);
-		int_t x = bdds::apply(prog, r.h, dbs, db, prog, op_and); // rule/db conjunction
-		int_t y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		int_t z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
+		x = bdds::apply(prog, r.h, dbs, db, prog, op_and); // rule/db conjunction
+		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
+		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
 		(r.neg ? del : add) = prog.bdd_or(r.neg ? del : add, z); // disjunct with add/del
 	}
+	dbs.out(wcout<<endl<<"db: ", db)<<endl;
+	dbs.out(wcout<<"add: ", add)<<endl;
+	dbs.out(wcout<<"del: ", del)<<endl;
 	if ((s = prog.bdd_and_not(add, del)) == bdds::F) db = bdds::F; // detect contradiction
 	else db = prog.bdd_or(prog.bdd_and_not(bdds::T, del), s); // db = (db|add)&~del
 }
 
 template<typename K> bool lp<K>::pfp() {
-	int_t d;
+	int_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
 		step();
+		printdb(wcout<<"step: " << ++t << endl);
 		if (s.find(db) != s.end()) return d == db;
 	}
 }
@@ -415,10 +421,6 @@ int main() {
 	bdds b;
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
-	p.printdb(wcout<<endl);
-	if (p.pfp()) p.printdb(wcout<<endl);
-	else wcout << "unsat" << endl;
-//	p.step();
-//	p.printdb(wcout<<endl);
+	if (!p.pfp()) wcout << "unsat" << endl;
 	return 0;
 }
