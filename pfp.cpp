@@ -158,19 +158,19 @@ size_t bdds::count(int_t x, size_t nvars) const {
 	k = getnode(n[1]);
 	r += count(n[1], nvars) * (1 << (((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
 	k = getnode(n[2]);
-	return r+count(n[2], nvars)*(1 << (((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
+	return r+count(n[2], nvars)*(1<<(((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
 }
 
-size_t bdds::satcount(int_t x, size_t nvars) const {
-	if (x < 2) return x;
-	return (count(x, nvars) << (getnode(x)[0] - 1));
-}
+size_t bdds::satcount(int_t x,size_t nvars)const{return x<2?x:(count(x, nvars)<<(getnode(x)[0]-1));}
 
 void bdds::sat(int_t v, node n, bools& p, vbools& r) const {
-	if (v > n[0]) p[v] = true, sat(v - 1, n, p, r), p[v] = false, sat(v - 1, n, p, r);
-//	else if (v > n[0]) throw 0;
-	else if (n[0]) p[v] = true, sat(v - 1, getnode(n[1]), p, r), p[v] = false, sat(v - 1, getnode(n[2]), p, r);
-	else if (n[1]) r.push_back(p);
+	if (v > n[0])
+		p[v-1] = true, sat(v - 1, n, p, r), p[v-1] = false, sat(v - 1, n, p, r);
+	else if (leaf(n)) {
+		if (trueleaf(n))
+			r.push_back(p);
+	} else
+		p[v-1] = true, sat(v - 1, getnode(n[1]), p, r), p[v-1] = false, sat(v - 1, getnode(n[2]), p, r);
 }
 
 vbools bdds::allsat(int_t x, size_t nvars) const {
@@ -180,7 +180,7 @@ vbools bdds::allsat(int_t x, size_t nvars) const {
 	size_t n = satcount(x, nvars);
 	r.reserve(n);
 	node t = getnode(x);
-	sat(nvars - 1, t, p, r);
+	sat(nvars, t, p, r);
 	out(wcout<<"satcount: " << n <<" allsat for ", x);
 	for (auto& x : r) {
 		wcout << endl;
@@ -414,9 +414,8 @@ next:	for (n = l = 0; n != 31; ++n)
 int main() {
 	setlocale(LC_ALL, "");
 	bdds b;
-	b.allsat(b.bdd_and(	bdds_base::T
-				//b.from_bit(1, true)
-				, b.from_bit(0, false)), 4);
+	b.allsat(b.from_bit(0, true), 4);
+	b.allsat(b.from_bit(0, false), 4);
 	return 0;
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
