@@ -1,7 +1,7 @@
 a a.
 b b.
 #a 2.
-b ?x :- a ?x.
+#b ?x :- a ?x.
 #e 1 2.
 #e 2 3.
 #t ?x ?y :- e ?x ?y.

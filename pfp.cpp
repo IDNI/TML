@@ -64,8 +64,8 @@ vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be us
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	size_t count(int_t x, size_t nvars) const;
-	vbools& sat(int_t x, vbools& r) const;
-	void sat(int_t v, node n, bools& p, vbools& r) const;
+	//vbools& sat(int_t x, vbools& r) const;
+	void sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const;
 public:
 	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
 	template<typename op_t> static // binary application
@@ -163,14 +163,11 @@ size_t bdds::count(int_t x, size_t nvars) const {
 
 size_t bdds::satcount(int_t x,size_t nvars)const{return x<2?x:(count(x, nvars)<<(getnode(x)[0]-1));}
 
-void bdds::sat(int_t v, node n, bools& p, vbools& r) const {
-	if (v > n[0])
-		p[v-1] = true, sat(v - 1, n, p, r), p[v-1] = false, sat(v - 1, n, p, r);
-	else if (leaf(n)) {
-		if (trueleaf(n))
-			r.push_back(p);
-	} else
-		p[v-1] = true, sat(v - 1, getnode(n[1]), p, r), p[v-1] = false, sat(v - 1, getnode(n[2]), p, r);
+void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
+	if (leaf(n) && !trueleaf(n)) return;
+	if (v < n[0]) p[v-1] = true, sat(v + 1, nvars, n, p, r), p[v-1] = false, sat(v + 1, nvars, n, p, r);
+	else if (v == nvars+1) r.push_back(p);
+	else p[v-1] = true, sat(v + 1, nvars, getnode(n[1]), p, r), p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, r);
 }
 
 vbools bdds::allsat(int_t x, size_t nvars) const {
@@ -180,7 +177,7 @@ vbools bdds::allsat(int_t x, size_t nvars) const {
 	size_t n = satcount(x, nvars);
 	r.reserve(n);
 	node t = getnode(x);
-	sat(nvars, t, p, r);
+	sat(1, nvars, t, p, r);
 	out(wcout<<"satcount: " << n <<" allsat for ", x);
 	for (auto& x : r) {
 		wcout << endl;
@@ -388,8 +385,8 @@ template<typename K> bool lp<K>::pfp() {
 	int_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		step();
 		printdb(wcout<<"step: " << ++t << endl);
+		step();
 		if (s.find(db) != s.end()) return d == db;
 	}
 }
@@ -414,9 +411,8 @@ next:	for (n = l = 0; n != 31; ++n)
 int main() {
 	setlocale(LC_ALL, "");
 	bdds b;
-	b.allsat(b.from_bit(0, true), 4);
-	b.allsat(b.from_bit(0, false), 4);
-	return 0;
+	b.allsat(b.bdd_and(b.from_bit(0, true), b.from_bit(1,false)), 4);
+	//b.allsat(b.from_bit(0, false), 4);
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
