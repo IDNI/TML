@@ -43,8 +43,12 @@ class bdds_base {
 	int_t root; // used for implicit power
 	size_t dim = 1; // used for implicit power
 protected:
-	int_t add(const node& n);
-	int_t add_nocheck(const node& n) { return V.emplace_back(n), M[n]=V.size()-1; }
+	int_t add_nocheck(const node& n) {
+		V.emplace_back(n);
+		int_t r = (M[n]=V.size()-1);
+		//out(wcout<<"add: ", r) << endl;
+		return r;
+	}
 	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
 public:
 	static const int_t F = 0, T = 1;
@@ -53,6 +57,9 @@ public:
 	static bool leaf(int_t x) { return x == T || x == F; }
 	static bool leaf(const node& x) { return !x[0]; }
 	static bool trueleaf(const node& x) { return leaf(x) && x[1]; }
+	wostream& out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
+	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
+	int_t add(const node& n);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // the following to be used with bdds::apply()
@@ -84,8 +91,8 @@ public:
 	// count/return satisfying assignments
 	size_t satcount(int_t x, size_t nvars) const;
 	vbools allsat(int_t x, size_t nvars) const;
-	wostream& out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
-	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
+	using bdds_base::add;
+	using bdds_base::out;
 	template<typename K> wostream& out(wostream& os, int_t db, size_t bits, size_t ar) {
 		for (auto v : from_bits<K>(db, bits, ar)) {
 			for (auto k : v) os << k << L' ';
@@ -192,7 +199,7 @@ int_t bdds::from_eq(int_t x, int_t y) {
 			bdd_and(from_bit(x, false),from_bit(y, false)));
 }
 
-wostream& bdds::out(wostream& os, const node& n) const {
+wostream& bdds_base::out(wostream& os, const node& n) const {
 	if (leaf(n)) return os << (trueleaf(n) ? L'T' : L'F');
 	else return out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
 }
@@ -220,9 +227,10 @@ template<typename op_t> // binary application
 int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
 	const int_t &vx = Vx[0], &vy = Vy[0];
+	//by.out(bx.out(wcout << "x: ", x) << endl << "y: ", y) << endl << endl;
 	int_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) return op(a, b);
+	else if (!vx) return /*(wcout<<"op"<<endl),*/ op(a, b);
 	else if ((v = vx) < vy || !vy) b = d = y;
 	return r.add({{v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)}});
 }
@@ -366,13 +374,16 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w);
-		x = bdds::apply(prog, r.h, dbs, db, prog, op_and); // rule/db conjunction
-		dbs.out<K>(wcout<<"x: ", x, bits, ar)<<endl;
+//		dbs.out<K>(wcout<<"db: ", db, bits, ar)<<endl;
+//		prog.out<K>(wcout<<endl<<"rule: ", r.h, bits, ar)<<endl;
+		x = bdds::apply(dbs, db, prog, r.h, prog, op_and); // rule/db conjunction
+//		prog.out(wcout<<"x: ", x)<<endl;
+//		prog.out<K>(wcout<<"x: ", x, bits, ar)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		dbs.out<K>(wcout<<"y: ", y, bits, ar)<<endl;
+//		prog.out<K>(wcout<<"y: ", y, bits, ar)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
-		dbs.out<K>(wcout<<"z: ", z, bits, ar)<<endl;
-		(r.neg ? del : add) = prog.bdd_or(r.neg ? del : add, z); // disjunct with add/del
+//		prog.out<K>(wcout<<"z: ", z, bits, ar)<<endl;
+		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or); // disjunct with add/del
 	}
 	dbs.out(wcout<<"db: ", db)<<endl;
 	dbs.out(wcout<<"add: ", add)<<endl;
@@ -410,9 +421,18 @@ next:	for (n = l = 0; n != 31; ++n)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
 	setlocale(LC_ALL, "");
-	bdds b;
-	b.allsat(b.bdd_and(b.from_bit(0, true), b.from_bit(1,false)), 4);
-	//b.allsat(b.from_bit(0, false), 4);
+//	bdds b, c;
+//	int_t x = b.add({1, 0, b.add({3, 1, 0})});
+//	int_t y = c.add({1, 0, c.add({2, c.add({3, c.add({4, 1, 0}), 0}), 0})});
+	//int_t y = b.add({1, 0, b.add({2, b.add({3, b.add({4, 1, 0}), 0}), 0})});
+//	b.out(wcout, x)<<endl;
+//	wcout<<"1?F:3?T:F"<<endl;
+//	c.out(wcout, y)<<endl;
+//	wcout<<"1?F:2?3?4?T:F:F:F"<<endl;
+//	c.out(wcout, bdds::apply(c, y, b, x, c, op_and))<<endl;
+	//c.out<unsigned>(wcout, bdds::apply(b, x, c, y, c, op_and), 4, 1)<<endl;
+//	c.allsat(bdds::apply(b, b.from_bit(0, true), c, c.from_bit(1, false), c, op_and), 4);
+	//return 0;
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
