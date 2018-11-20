@@ -93,13 +93,6 @@ public:
 	vbools allsat(int_t x, size_t nvars) const;
 	using bdds_base::add;
 	using bdds_base::out;
-	template<typename K> wostream& out(wostream& os, int_t db, size_t bits, size_t ar) {
-		for (auto v : from_bits<K>(db, bits, ar)) {
-			for (auto k : v) os << k << L' ';
-			os << endl;
-		}
-		return os;
-	}
 };
 
 struct op_exists { // existential quantification, to be used with apply()
@@ -121,9 +114,14 @@ public:
 	const K pad = 1;
 	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
 	K operator()(wstr s, size_t len);
-	pair<wstr, size_t> operator()(K t) { return { syms[t-1], lens[t-1] }; }
+	pair<wstr, size_t> operator()(K t) const { return { syms[t-1], lens[t-1] }; }
 	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
 };
+wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
+	for (size_t n = 0; n < p.second; ++n) os << p.first[n];
+	return os;
+}
+template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const class dict_t<K>& d);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class lp { // [pfp] logic program
 	dict_t<K> dict; // hold its own dict so we can determine the universe size
@@ -139,11 +137,19 @@ public:
 	void prog_read(wstr s);
 	void step(); // single pfp step
 	bool pfp();
-	void printdb(wostream& os) { dbs.out<K>(os, db, bits, ar); }
+	void printdb(wostream& os) { out<K>(os, dbs, db, bits, ar, dict); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) { for (auto y:x) os << (y?'1':'0');return os; }
 wostream& operator<<(wostream& os, const vbools& x) { for (auto y:x) os << y << endl; return os; }
+
+template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const dict_t<K>& d) {
+	for (auto v : b.from_bits<K>(db, bits, ar)) {
+		for (auto k : v) os << d(k) << L' ';
+		os << endl;
+	}
+	return os;
+}
 
 int_t bdds_base::add(const node& n) { // create new bdd node, standard implementation
 	if (n[1] == n[2]) return n[1];
@@ -371,14 +377,14 @@ template<typename K> void lp<K>::step() {
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w);
 //		dbs.out<K>(wcout<<"db: ", db, bits, ar)<<endl;
-		prog.out<K>(wcout<<endl<<"rule: ", r.h, bits, ar)<<endl;
+		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
 		x = bdds::apply(dbs, db, prog, r.h, prog, op_and); // rule/db conjunction
 //		prog.out(wcout<<"x: ", x)<<endl;
-		prog.out<K>(wcout<<"x: ", x, bits, ar)<<endl;
+		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		prog.out<K>(wcout<<"y: ", y, bits, ar)<<endl;
+		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars, r.eq); // reorder the remaining vars
-		prog.out<K>(wcout<<"z: ", z, bits, ar)<<endl;
+		out<K>(wcout<<"z: ", prog, z, bits, ar, dict)<<endl;
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
 	}
 	dbs.out(wcout<<"db: ", db)<<endl;
