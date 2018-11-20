@@ -277,16 +277,12 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
 			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] > 0) // sym
-				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b)));
+				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
+								v[i][j]&(1<<b)));
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
 				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
 			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
-//	wcout << endl << "from_rule() with bits="<<bits<<" ar="<<ar<<" for ";
-//	for (auto x : v) { for (auto y : x) wcout << y << ' '; wcout << endl; }
-//	out(wcout, r) << endl << "from_bits: ";
-//	auto fb = from_bits<K>(r, bits, ar);
-//	for (auto x : fb) { for (auto y : x) wcout << y << ' '; wcout << endl; }
-	return r;//{ neg, r, v.size()-1, ex, hv };
+	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K>
@@ -358,7 +354,7 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	ar = 0;
 	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
 		for (const vector<K>& x : t) // we really support a single rel arity
-			ar = max(ar, x.size()); // so we'll pad everything
+			ar = max(ar, x.size()-1); // so we'll pad everything
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar)
@@ -422,18 +418,6 @@ next:	for (n = l = 0; n != 31; ++n)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
 	setlocale(LC_ALL, "");
-//	bdds b, c;
-//	int_t x = b.add({1, 0, b.add({3, 1, 0})});
-//	int_t y = c.add({1, 0, c.add({2, c.add({3, c.add({4, 1, 0}), 0}), 0})});
-	//int_t y = b.add({1, 0, b.add({2, b.add({3, b.add({4, 1, 0}), 0}), 0})});
-//	b.out(wcout, x)<<endl;
-//	wcout<<"1?F:3?T:F"<<endl;
-//	c.out(wcout, y)<<endl;
-//	wcout<<"1?F:2?3?4?T:F:F:F"<<endl;
-//	c.out(wcout, bdds::apply(c, y, b, x, c, op_and))<<endl;
-	//c.out<unsigned>(wcout, bdds::apply(b, x, c, y, c, op_and), 4, 1)<<endl;
-//	c.allsat(bdds::apply(b, b.from_bit(0, true), c, c.from_bit(1, false), c, op_and), 4);
-	//return 0;
 	lp<int32_t> p;
 	p.prog_read(file_read_text(stdin).c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
