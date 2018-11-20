@@ -172,9 +172,9 @@ size_t bdds::satcount(int_t x,size_t nvars)const{return x<2?x:(count(x, nvars)<<
 
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
-	if (v < n[0]) p[v-1] = true, sat(v + 1, nvars, n, p, r), p[v-1] = false, sat(v + 1, nvars, n, p, r);
+	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
 	else if (v == nvars+1) r.push_back(p);
-	else p[v-1] = true, sat(v + 1, nvars, getnode(n[1]), p, r), p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, r);
+	else p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
 }
 
 vbools bdds::allsat(int_t x, size_t nvars) const {
@@ -254,9 +254,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	int_t k;
 	size_t i, j, b;
 	map<K, array<size_t, 2>> m;
-	set<K> ex;
-	map<K, int_t> hvars; // argwise
-	map<int_t, int_t> hv;// bitwise
+	map<K, int_t> hvars;
 	vector<K>& head = v[v.size()-1];
 	bool bneg;
 	rule r;
@@ -268,9 +266,10 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		if (head[i] < 0) hvars.emplace(head[i], i); // head vars
 		else for (b = 0; b != bits; ++b) // head consts
 			r.eq.emplace(b*ar+i, head[i]&(1<<b));
+	if (v.size() == 1)
+		for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second));
 	#define BIT(term,arg) (term*bits+b)*ar+arg
-	for (	i = 0; i != (v.size()-1 ? v.size() - 1 : 1);
-		++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
+	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (	k = T, bneg = (v[i][0] < 0), v[i].erase(v[i].begin()), j = 0;
 			j != v[i].size(); ++j) // per relid/arg
 			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
