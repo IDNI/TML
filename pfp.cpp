@@ -321,16 +321,15 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	vector<K> r;
 	K t;
 	while (iswspace(**s)) ++*s;
+	if (!**s) return r;
 	bool b = **s == L'~';
-	if (b) ++*s, r.push_back(1); else r.push_back(-1);
-//	K rel = str_read(s), t;
-//	r.push_back(b ? -rel : rel);
-//	if (!rel) return {};
+	if (b) ++*s, r.push_back(-1); else r.push_back(1);
 	do {
 		while (iswspace(**s)) ++*s;
 		if (**s == L',') return ++*s, r;
 		if (**s == L'.' || **s == L':') return r;
-		if (!(t = str_read(s))) er("identifier expected");
+		if (!(t = str_read(s)))
+			er("identifier expected");
 		r.push_back(t);
 	} while (**s);
 	er("term_read(): unexpected parsing error");
@@ -382,7 +381,7 @@ template<typename K> void lp<K>::step() {
 		prog.out<K>(wcout<<"x: ", x, bits, ar)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
 		prog.out<K>(wcout<<"y: ", y, bits, ar)<<endl;
-		z = bdds::permute(prog, y, prog, r.hvars, {}); // reorder the remaining vars
+		z = bdds::permute(prog, y, prog, r.hvars, r.eq); // reorder the remaining vars
 		prog.out<K>(wcout<<"z: ", z, bits, ar)<<endl;
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or); // disjunct with add/del
 	}
