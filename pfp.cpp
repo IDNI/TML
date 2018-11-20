@@ -168,7 +168,9 @@ size_t bdds::count(int_t x, size_t nvars) const {
 	return r+count(n[2], nvars)*(1<<(((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
 }
 
-size_t bdds::satcount(int_t x,size_t nvars)const{return x<2?x:(count(x, nvars)<<(getnode(x)[0]-1));}
+size_t bdds::satcount(int_t x,size_t nvars) const {
+	return x<2?x?(1<<nvars):0:(count(x, nvars)<<(getnode(x)[0]-1));
+}
 
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
@@ -266,12 +268,10 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		if (head[i] < 0) hvars.emplace(head[i], i); // head vars
 		else for (b = 0; b != bits; ++b) // head consts
 			r.eq.emplace(b*ar+i, head[i]&(1<<b));
-	if (v.size() == 1)
-		for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second));
 	#define BIT(term,arg) (term*bits+b)*ar+arg
+	if (v.size() == 1) for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second));
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
-		for (	k = T, bneg = (v[i][0] < 0), v[i].erase(v[i].begin()), j = 0;
-			j != v[i].size(); ++j) // per relid/arg
+		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
@@ -281,6 +281,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
 				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
 			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
+	#undef BIT
 	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,7 +379,7 @@ template<typename K> void lp<K>::step() {
 		prog.out<K>(wcout<<"y: ", y, bits, ar)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars, r.eq); // reorder the remaining vars
 		prog.out<K>(wcout<<"z: ", z, bits, ar)<<endl;
-		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or); // disjunct with add/del
+		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
 	}
 	dbs.out(wcout<<"db: ", db)<<endl;
 	dbs.out(wcout<<"add: ", add)<<endl;
