@@ -116,12 +116,14 @@ public:
 	K operator()(wstr s, size_t len);
 	pair<wstr, size_t> operator()(K t) const { return { syms[t-1], lens[t-1] }; }
 	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
+	size_t nsyms() const { return syms.size(); }
 };
 wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 	for (size_t n = 0; n < p.second; ++n) os << p.first[n];
 	return os;
 }
-template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const class dict_t<K>& d);
+template<typename K>
+wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const class dict_t<K>& d);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class lp { // [pfp] logic program
 	dict_t<K> dict; // hold its own dict so we can determine the universe size
@@ -142,10 +144,11 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) { for (auto y:x) os << (y?'1':'0');return os; }
 wostream& operator<<(wostream& os, const vbools& x) { for (auto y:x) os << y << endl; return os; }
-
 template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const dict_t<K>& d) {
 	for (auto v : b.from_bits<K>(db, bits, ar)) {
-		for (auto k : v) os << d(k) << L' ';
+		for (auto k : v)
+			if (k && k < (int_t)d.nsyms()) os << d(k) << L' ';
+			else os << L'[' << k << L"] ";
 		os << endl;
 	}
 	return os;
@@ -425,7 +428,8 @@ next:	for (n = l = 0; n != 31; ++n)
 int main() {
 	setlocale(LC_ALL, "");
 	lp<int32_t> p;
-	p.prog_read(file_read_text(stdin).c_str());
+	wstring s = file_read_text(stdin); // got to stay in memory
+	p.prog_read(s.c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
 	return 0;
 }
