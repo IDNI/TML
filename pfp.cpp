@@ -264,7 +264,6 @@ template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t k;
 	size_t i, j, b;
-	map<K, array<size_t, 2>> m;
 	map<K, int_t> hvars;
 	vector<K>& head = v[v.size()-1];
 	bool bneg;
@@ -278,19 +277,28 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(b*ar+i, head[i]&(1<<b)));
 		//	r.eq.emplace(b*ar+i, head[i]&(1<<b)); // sym
 	#define BIT(term,arg) (term*bits+b)*ar+arg
+	map<K, array<size_t, 2>> m;
 	if (v.size()==1) r.h = r.hsym; // for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second)); //fact
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
-		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
-			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
+		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j) {
+			auto it = m.find(v[i][j]);
+			if (it != m.end()) { // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
-			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] >= 0) // sym
+				continue;
+			}
+			m.emplace(v[i][j], array<size_t, 2>{ {i, j} });
+			if (v[i][j] >= 0) { // sym
 				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
 								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j));
-			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
+				continue;
+			}
+			auto jt = hvars.find(v[i][j]);
+			if (jt == hvars.end()) //non-head var
 				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
 			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), //jt->first&(1<<b));//
 				b*ar+jt->second);
+		}
 	#undef BIT
 	out(wcout<<"from_rule: ", r.h)<<endl;
 	return r;
@@ -304,12 +312,11 @@ bool dict_t<K>::dictcmp::operator()(const pair<wstr, size_t>& x, const pair<wstr
 
 template<typename K> K dict_t<K>::operator()(wstr s, size_t len) {
 	if (*s == L'?') {
-		if (auto it = vars_dict.find({s, len}); it != vars_dict.end())
-			return it->second;
-		return vars_dict[{s, len}] = -vars_dict.size();
+		auto it = vars_dict.find({s, len});
+		return it != vars_dict.end() ? it->second : (vars_dict[{s, len}]=-vars_dict.size());
 	}
-	if (auto it = syms_dict.find({s, len}); it != syms_dict.end()) return it->second;
-	return syms.push_back(s), lens.push_back(len), syms_dict[{s, len}] = syms.size()-1;
+	auto it = syms_dict.find({s, len});
+	return it==syms_dict.end()?syms.push_back(s),lens.push_back(len),syms_dict[{s,len}]=syms.size()-1:it->second;
 }
 
 template<typename K> K lp<K>::str_read(wstr *s) {
