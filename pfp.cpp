@@ -10,6 +10,7 @@
 #include <random>
 #include <sstream>
 #include <climits>
+#include <stdexcept>
 using namespace std;
 
 typedef int32_t int_t;
@@ -31,11 +32,10 @@ typedef vector<bools> vbools;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
-	int_t h; // bdd root
+	int_t h, hsym; // bdd root and head syms
 	size_t w; // nbodies, will determine the virtual power
 	set<int_t> x; // existentials
 	map<int_t, int_t> hvars; // how to permute body vars to head vars
-	map<int_t, bool> eq; // head consts
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
@@ -79,7 +79,7 @@ public:
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(bdds& b, int_t x,bdds& r, const op_t& op);//unary
-	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&, const map<int_t, bool>&);
+	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
@@ -111,10 +111,10 @@ template<typename K> class dict_t { // handles representation of strings as uniq
 	vector<wstr> syms;
 	vector<size_t> lens;
 public:
-	const K pad = 1;
+	const K pad = 0;
 	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
 	K operator()(wstr s, size_t len);
-	pair<wstr, size_t> operator()(K t) const { return { syms[t-1], lens[t-1] }; }
+	pair<wstr, size_t> operator()(K t) const { return { syms[t], lens[t] }; }
 	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
 	size_t nsyms() const { return syms.size(); }
 };
@@ -147,7 +147,7 @@ wostream& operator<<(wostream& os, const vbools& x) { for (auto y:x) os << y << 
 template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits, size_t ar, const dict_t<K>& d) {
 	for (auto v : b.from_bits<K>(db, bits, ar)) {
 		for (auto k : v)
-			if (k && k < (int_t)d.nsyms()) os << d(k) << L' ';
+			if (k < (int_t)d.nsyms()) os << d(k) << L' ';
 			else os << L'[' << k << L"] ";
 		os << endl;
 	}
@@ -225,17 +225,17 @@ template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t&
 	return r.add({{n[0], leaf(n[1])?n[1]:apply(b,n[1],r,op), leaf(n[2])?n[2]:apply(b,n[2],r,op)}});
 }
 // [overlapping] rename
-int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m, const map<int_t, bool>& s) {
+int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
 	node n = b.getnode(x);
 	if (leaf(n)) return x;
 	auto it = m.find(n[0]);
 	if (it != m.end())
-		return 	r.add({{it->second, leaf(n[1])?n[1]:permute(b,n[1],r,m,s),
-			leaf(n[2])?n[2]:permute(b,n[2],r,m,s)}});
-	else if (auto jt = s.find(n[0]); jt == s.end())
-		return r.add({{n[0], permute(b,n[1],r,m,s), permute(b,n[2],r,m,s)}});
-	else if (jt->second) return permute(b,n[1],r,m,s);
-	else return permute(b,n[2],r,m,s);
+		return 	r.add({{it->second, leaf(n[1])?n[1]:permute(b,n[1],r,m),
+			leaf(n[2])?n[2]:permute(b,n[2],r,m)}});
+//	else if (auto jt = s.find(n[0]); jt == s.end())
+		return r.add({{n[0], permute(b,n[1],r,m), permute(b,n[2],r,m)}});
+//	else if (jt->second) return permute(b,n[1],r,m,s);
+//	else return permute(b,n[2],r,m,s);
 }
 
 template<typename op_t> // binary application
@@ -269,28 +269,30 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	vector<K>& head = v[v.size()-1];
 	bool bneg;
 	rule r;
-	r.h = T;
+	r.h = r.hsym = T;
 	r.neg = head[0] < 0;
 	head.erase(head.begin());
 	r.w = v.size() - 1;
 	for (i = 0; i != head.size(); ++i)
-		if (head[i] < 0) hvars.emplace(head[i], i); // head vars
-		else for (b = 0; b != bits; ++b) // head consts
-			r.eq.emplace(b*ar+i, head[i]&(1<<b));
+		if (head[i] < 0) hvars.emplace(head[i], i); // var
+		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(b*ar+i, head[i]&(1<<b)));
+		//	r.eq.emplace(b*ar+i, head[i]&(1<<b)); // sym
 	#define BIT(term,arg) (term*bits+b)*ar+arg
-	if (v.size() == 1) for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second));
+	if (v.size()==1) r.h = r.hsym; // for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second)); //fact
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
-			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] > 0) // sym
+			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] >= 0) // sym
 				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
-								v[i][j]&(1<<b)));
+								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j));
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
 				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
-			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
+			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), //jt->first&(1<<b));//
+				b*ar+jt->second);
 	#undef BIT
+	out(wcout<<"from_rule: ", r.h)<<endl;
 	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,19 +306,19 @@ template<typename K> K dict_t<K>::operator()(wstr s, size_t len) {
 	if (*s == L'?') {
 		if (auto it = vars_dict.find({s, len}); it != vars_dict.end())
 			return it->second;
-		return vars_dict[{s, len}] = -vars_dict.size()-1;
+		return vars_dict[{s, len}] = -vars_dict.size();
 	}
 	if (auto it = syms_dict.find({s, len}); it != syms_dict.end()) return it->second;
-	return syms.push_back(s), lens.push_back(len), syms_dict[{s, len}] = syms.size();
+	return syms.push_back(s), lens.push_back(len), syms_dict[{s, len}] = syms.size()-1;
 }
 
 template<typename K> K lp<K>::str_read(wstr *s) {
 	wstr t;
 	while (**s && iswspace(**s)) ++*s;
-	if (!**s) return 0;
+	if (!**s) throw runtime_error("identifier expected");
 	if (*(t = *s) == L'?') ++t;
 	while (iswalnum(*t)) ++t;
-	if (t == *s) return 0;
+	if (t == *s) throw runtime_error("identifier expected");
 	K r = dict(*s, t - *s);
 	while (*t && iswspace(*t)) ++t;
 	return *s = t, r;
@@ -324,7 +326,6 @@ template<typename K> K lp<K>::str_read(wstr *s) {
 
 template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	vector<K> r;
-	K t;
 	while (iswspace(**s)) ++*s;
 	if (!**s) return r;
 	bool b = **s == L'~';
@@ -333,9 +334,7 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 		while (iswspace(**s)) ++*s;
 		if (**s == L',') return ++*s, r;
 		if (**s == L'.' || **s == L':') return r;
-		if (!(t = str_read(s)))
-			er("identifier expected");
-		r.push_back(t);
+		r.push_back(str_read(s));
 	} while (**s);
 	er("term_read(): unexpected parsing error");
 }
@@ -386,8 +385,11 @@ template<typename K> void lp<K>::step() {
 		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
 		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
-		z = bdds::permute(prog, y, prog, r.hvars, r.eq); // reorder the remaining vars
+		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
 		out<K>(wcout<<"z: ", prog, z, bits, ar, dict)<<endl;
+		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
+		z = prog.bdd_and(z, r.hsym);
+		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
 	}
 	dbs.out(wcout<<"db: ", db)<<endl;
