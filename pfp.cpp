@@ -1,22 +1,32 @@
 #include <set>
 #include <map>
-#include <unordered_set>
-#include <unordered_map>
 #include <vector>
-#include <cstdint>
+//#include <cstdint>
 #include <string>
 #include <cstring>
 #include <iostream>
-#include <random>
+//#include <random>
 #include <sstream>
 #include <climits>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 using namespace std;
 
-typedef int32_t int_t;
-typedef array<int_t, 3> node; // [bdd] node is a triple: varid, 1-node-id, 0-node-id
+//typedef int32_t int_t;
+typedef long int_t;
+//typedef array<int_t, 3> node; // [bdd] node is a triple: varid, 1-node-id, 0-node-id
+struct node {
+	int_t var, hi, lo;
+	bool operator<(const node& n) const {
+		if (var != n.var) return var < n.var;
+		if (hi != n.hi) return hi < n.hi;
+		if (lo != n.lo) return lo < n.lo;
+		return false;
+	}
+};
 typedef const wchar_t* wstr;
-template<typename K> using matrix = vector<vector<K>>; // used as a set of terms (e.g. rule)
+//template<typename K> using matrix = vector<vector<K> >; // used as a set of terms (e.g. rule)
 typedef vector<bool> bools;
 typedef vector<bools> vbools;
 #define er(x)	perror(x), exit(0)
@@ -45,18 +55,18 @@ class bdds_base {
 	size_t dim = 1; // used for implicit power
 protected:
 	int_t add_nocheck(const node& n) {
-		V.emplace_back(n);
+		V.push_back(n);
 		int_t r = (M[n]=V.size()-1);
 		return r;
 	}
-	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
+	bdds_base() { add_nocheck((node){0, 0, 0}), add_nocheck((node){0, 1, 1}); }
 public:
 	static const int_t F = 0, T = 1;
 	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
 	void setpow(int_t _root, size_t _dim) { root = _root, dim = _dim; }
 	static bool leaf(int_t x) { return x == T || x == F; }
-	static bool leaf(const node& x) { return !x[0]; }
-	static bool trueleaf(const node& x) { return leaf(x) && x[1]; }
+	static bool leaf(const node& x) { return !x.var; }
+	static bool trueleaf(const node& x) { return leaf(x) && x.hi; }
 	wostream& out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
 	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
 	int_t add(const node& n);
@@ -74,7 +84,7 @@ class bdds : public bdds_base { // holding functions only, therefore tbd: dont u
 	//vbools& sat(int_t x, vbools& r) const;
 	void sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const;
 public:
-	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
+	int_t from_bit(int_t x, bool v) { return add(v ? (node){x+1, T, F} : (node){x+1, F, T}); }
 	template<typename op_t> static // binary application
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
@@ -82,8 +92,8 @@ public:
 	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
-	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
-	template<typename K> matrix<K> from_bits(int_t x, const size_t bits, const size_t ar);
+	template<typename K> rule from_rule(vector<vector<K> > v, const size_t bits, const size_t ar);
+	template<typename K> vector<vector<K> > from_bits(int_t x, const size_t bits, const size_t ar);
 	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
@@ -99,7 +109,7 @@ struct op_exists { // existential quantification, to be used with apply()
 	const set<int_t>& s;
 	op_exists(const set<int_t>& s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
-		return s.find(n[0]) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+		return s.find(n.var) == s.end() ? n : b.getnode(b.bdd_or(n.hi, n.lo));
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,9 +122,9 @@ template<typename K> class dict_t { // handles representation of strings as uniq
 	vector<size_t> lens;
 public:
 	const K pad = 0;
-	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad; }
+	dict_t() { syms.push_back(0), lens.push_back(0), syms_dict[make_pair<wstr, size_t>(0, 0)] = pad; }
 	K operator()(wstr s, size_t len);
-	pair<wstr, size_t> operator()(K t) const { return { syms[t], lens[t] }; }
+	pair<wstr, size_t> operator()(K t) const { return make_pair(syms[t], lens[t]); }
 	size_t bits() const { return (sizeof(K)<<3) - __builtin_clz(syms.size()); }
 	size_t nsyms() const { return syms.size(); }
 };
@@ -132,7 +142,7 @@ template<typename K> class lp { // [pfp] logic program
 
 	K str_read(wstr *s); // parser's helper, reads a string and returns its dict id
 	vector<K> term_read(wstr *s); // read raw term (no bdd)
-	matrix<K> rule_read(wstr *s); // read raw rule (no bdd)
+	vector<vector<K> > rule_read(wstr *s); // read raw rule (no bdd)
 	size_t bits, ar;
 public:
 	int_t db; // db's bdd root
@@ -155,7 +165,7 @@ template<typename K> wostream& out(wostream& os, bdds& b, int_t db, size_t bits,
 }
 
 int_t bdds_base::add(const node& n) { // create new bdd node, standard implementation
-	if (n[1] == n[2]) return n[1];
+	if (n.hi == n.lo) return n.hi;
 	auto it = M.find(n);
 	return it == M.end() ? add_nocheck(n) : it->second;
 }
@@ -164,28 +174,28 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 	if (dim == 1) return V[n];
 	const size_t m = n % V.size(), ms = (n / V.size() + 1) * V.size();
 	node r = V[m];
-	return r[0] ? r[1] += ms, r[2] += ms, r : r[1] ? ms == V.size()*dim ? V[T] : V[root] : V[F];
+	return r.var ? r.hi += ms, r.lo += ms, r : r.hi ? ms == V.size()*dim ? V[T] : V[root] : V[F];
 }
 
 size_t bdds::count(int_t x, size_t nvars) const {
 	node n = getnode(x), k;
 	size_t r = 0;
 	if (leaf(n)) return trueleaf(n) ? 1 : 0;
-	k = getnode(n[1]);
-	r += count(n[1], nvars) * (1 << (((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
-	k = getnode(n[2]);
-	return r+count(n[2], nvars)*(1<<(((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
+	k = getnode(n.hi);
+	r += count(n.hi, nvars) * (1 << (((leaf(k) ? nvars+1 : k.var) - n.var) - 1));
+	k = getnode(n.lo);
+	return r+count(n.lo, nvars)*(1<<(((leaf(k) ? nvars+1 : k.var) - n.var) - 1));
 }
 
 size_t bdds::satcount(int_t x,size_t nvars) const {
-	return x<2?x?(1<<nvars):0:(count(x, nvars)<<(getnode(x)[0]-1));
+	return x<2?x?(1<<nvars):0:(count(x, nvars)<<(getnode(x).var-1));
 }
 
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
-	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
+	if (v<n.var) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
 	else if (v == nvars+1) r.push_back(p);
-	else p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
+	else p[v-1]=true, sat(v+1,nvars,getnode(n.hi),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n.lo),p,r);
 }
 
 vbools bdds::allsat(int_t x, size_t nvars) const {
@@ -212,41 +222,41 @@ int_t bdds::from_eq(int_t x, int_t y) {
 
 wostream& bdds_base::out(wostream& os, const node& n) const {
 	if (leaf(n)) return os << (trueleaf(n) ? L'T' : L'F');
-	else return out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
+	else return out(os << n.var << L'?', getnode(n.hi)), out(os << L':', getnode(n.lo));
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) { //unary
 	node n = op(b, b.getnode(x));
-	return r.add({n[0], leaf(n[1])?n[1]:apply(b,n[1],r,op), leaf(n[2])?n[2]:apply(b,n[2],r,op)});
+	return r.add((node){n.var, leaf(n.hi)?n.hi:apply(b,n.hi,r,op), leaf(n.lo)?n.lo:apply(b,n.lo,r,op)});
 }
 
 template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
-	return r.add({{n[0], leaf(n[1])?n[1]:apply(b,n[1],r,op), leaf(n[2])?n[2]:apply(b,n[2],r,op)}});
+	return r.add((node){n.var, leaf(n.hi)?n.hi:apply(b,n.hi,r,op), leaf(n.lo)?n.lo:apply(b,n.lo,r,op)});
 }
 // [overlapping] rename
 int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
 	node n = b.getnode(x);
 	if (leaf(n)) return x;
-	auto it = m.find(n[0]);
+	auto it = m.find(n.var);
 	if (it != m.end())
-		return 	r.add({{it->second, leaf(n[1])?n[1]:permute(b,n[1],r,m),
-			leaf(n[2])?n[2]:permute(b,n[2],r,m)}});
-//	else if (auto jt = s.find(n[0]); jt == s.end())
-		return r.add({{n[0], permute(b,n[1],r,m), permute(b,n[2],r,m)}});
-//	else if (jt->second) return permute(b,n[1],r,m,s);
-//	else return permute(b,n[2],r,m,s);
+		return 	r.add((node){it->second, leaf(n.hi)?n.hi:permute(b,n.hi,r,m),
+			leaf(n.lo)?n.lo:permute(b,n.lo,r,m)});
+//	else if (auto jt = s.find(n.var); jt == s.end())
+		return r.add((node){n.var, permute(b,n.hi,r,m), permute(b,n.lo,r,m)});
+//	else if (jt->second) return permute(b,n.hi,r,m,s);
+//	else return permute(b,n.lo,r,m,s);
 }
 
 template<typename op_t> // binary application
 int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op) {
 	const node &Vx = bx.getnode(x), &Vy = by.getnode(y);
-	const int_t &vx = Vx[0], &vy = Vy[0];
-	int_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	const int_t &vx = Vx.var, &vy = Vy.var;
+	int_t v, a = Vx.hi, b = Vy.hi, c = Vx.lo, d = Vy.lo;
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
 	else if (!vx) return op(a, b);
 	else if ((v = vx) < vy || !vy) b = d = y;
-	return r.add({{v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)}});
+	return r.add((node){v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> vector<K> from_bits(const bools& x, const size_t ar) {
@@ -254,14 +264,14 @@ template<typename K> vector<K> from_bits(const bools& x, const size_t ar) {
 	for (size_t n = 0; n < x.size(); ++n) if (x[n]) r[n % ar] |= 1<<(n / ar);
 	return r;
 }
-template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
+template<typename K> vector<vector<K> > bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
 	vbools s = allsat(x, bits * ar);
-	matrix<K> r(s.size());
+	vector<vector<K> > r(s.size());
 	size_t n = 0;
 	for (const bools& b : s) r[n++] = ::from_bits<K>(b, ar);
 	return r;
 }
-template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
+template<typename K> rule bdds::from_rule(vector<vector<K> > v, const size_t bits, const size_t ar) {
 	int_t k;
 	size_t i, j, b;
 	map<K, int_t> hvars;
@@ -273,31 +283,35 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	head.erase(head.begin());
 	r.w = v.size() - 1;
 	for (i = 0; i != head.size(); ++i)
-		if (head[i] < 0) hvars.emplace(head[i], i); // var
+		if (head[i] < 0) hvars[head[i]] = i; // var
 		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(b*ar+i, head[i]&(1<<b)));
 		//	r.eq.emplace(b*ar+i, head[i]&(1<<b)); // sym
 	#define BIT(term,arg) (term*bits+b)*ar+arg
-	map<K, array<size_t, 2>> m;
+	//map<K, array<size_t, 2>> m;
+	//map<K, pair<const size_t, const size_t> > m;
+	struct sz2 { size_t x, y; sz2() {} sz2(size_t x, size_t y) : x(x), y(y) {} };
+	map<K, sz2 > m;
 	if (v.size()==1) r.h = r.hsym; // for (auto x : r.eq) r.h = bdd_and(r.h, from_bit(x.first, x.second)); //fact
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j) {
 			auto it = m.find(v[i][j]);
 			if (it != m.end()) { // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
-								BIT(it->second[0], it->second[1])));
+								BIT(it->second.x, it->second.y)));
 				continue;
 			}
-			m.emplace(v[i][j], array<size_t, 2>{ {i, j} });
+			// auto p = make_pair<const size_t, const size_t>(i,j);
+			m[v[i][j]] = sz2(i, j);
 			if (v[i][j] >= 0) { // sym
 				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
-								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j));
+								v[i][j]&(1<<b))), r.x.insert(BIT(i,j));
 				continue;
 			}
 			auto jt = hvars.find(v[i][j]);
 			if (jt == hvars.end()) //non-head var
-				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
-			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), //jt->first&(1<<b));//
-				b*ar+jt->second);
+				for (b=0; b!=bits; ++b)	r.x.insert(BIT(i,j));
+			else	for (b=0; b!=bits; ++b)	r.hvars.insert(make_pair(BIT(i,j), //jt->first&(1<<b));//
+				b*ar+jt->second));
 		}
 	#undef BIT
 	out(wcout<<"from_rule: ", r.h)<<endl;
@@ -312,11 +326,11 @@ bool dict_t<K>::dictcmp::operator()(const pair<wstr, size_t>& x, const pair<wstr
 
 template<typename K> K dict_t<K>::operator()(wstr s, size_t len) {
 	if (*s == L'?') {
-		auto it = vars_dict.find({s, len});
-		return it != vars_dict.end() ? it->second : (vars_dict[{s, len}]=-vars_dict.size());
+		auto it = vars_dict.find(make_pair(s, len));
+		return it != vars_dict.end() ? it->second : (vars_dict[make_pair(s, len)]=-vars_dict.size());
 	}
-	auto it = syms_dict.find({s, len});
-	return it==syms_dict.end()?syms.push_back(s),lens.push_back(len),syms_dict[{s,len}]=syms.size()-1:it->second;
+	auto it = syms_dict.find(make_pair(s, len));
+	return it==syms_dict.end()?syms.push_back(s),lens.push_back(len),syms_dict[make_pair(s,len)]=syms.size()-1:it->second;
 }
 
 template<typename K> K lp<K>::str_read(wstr *s) {
@@ -346,9 +360,9 @@ template<typename K> vector<K> lp<K>::term_read(wstr *s) {
 	er("term_read(): unexpected parsing error");
 }
 
-template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
+template<typename K> vector<vector<K> > lp<K>::rule_read(wstr *s) {
 	vector<K> t;
-	matrix<K> r;
+	vector<vector<K> > r;
 	if ((t = term_read(s)).empty()) return r;
 	r.push_back(t);
 	while (iswspace(**s)) ++*s;
@@ -363,19 +377,19 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 }
 
 template<typename K> void lp<K>::prog_read(wstr s) {
-	vector<matrix<K>> r;
+	vector<vector<vector<K> > > r;
 	db = bdds::F;
 	size_t l;
 	ar = 0;
-	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
+	for (vector<vector<K> > t; !(t = rule_read(&s)).empty(); r.push_back(t))
 		for (const vector<K>& x : t) // we really support a single rel arity
 			ar = max(ar, x.size()-1); // so we'll pad everything
-	for (matrix<K>& x : r)
+	for (vector<vector<K> >& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar)
 				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	bits = dict.bits();
-	for (const matrix<K>& x : r)
+	for (const vector<vector<K> >& x : r)
 	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
 		else rules.push_back(prog.from_rule(x, bits, ar)); // rule
 }
@@ -410,7 +424,7 @@ template<typename K> void lp<K>::step() {
 template<typename K> bool lp<K>::pfp() {
 	int_t d, t = 0;
 	for (set<int_t> s;;) {
-		s.emplace(d = db);
+		s.insert(d = db);
 		printdb(wcout<<"step: " << ++t << endl);
 		step();
 		if (s.find(db) != s.end()) return d == db;
