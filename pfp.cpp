@@ -292,12 +292,17 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 					k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b))),
 					r.x.emplace(BIT(i,j));
 			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) { //non-head var
-				for (b=0, notpad = F; b!=bits; ++b)
+				for (b=0, notpad = T; b!=bits; ++b)
 					r.x.emplace(BIT(i,j)),
-						notpad = bdd_or(notpad, from_bit(BIT(i, j), true));
-				r.h = bdd_and(r.h, notpad);
+					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
+				r.h = bdd_and_not(r.h, notpad);
 			}
-			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
+			else {
+				for (b=0, notpad = T; b!=bits; ++b)
+					r.hvars.emplace(BIT(i,j), b*ar+jt->second),
+					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
+				r.h = bdd_and_not(r.h, notpad);
+			}
 	#undef BIT
 	//out(wcout<<"from_rule: ", r.h)<<endl;
 	return r;
@@ -387,17 +392,17 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w);
-		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
+//		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
 		x = bdds::apply(dbs, db, prog, r.h, prog, op_and); // rule/db conjunction
-		prog.out(wcout<<"x: ", x)<<endl;
-		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
+//		prog.out(wcout<<"x: ", x)<<endl;
+//		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
-		out<K>(wcout<<"z: ", prog, z, bits, ar, dict)<<endl;
-		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"z: ", prog, z, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
 		z = prog.bdd_and(z, r.hsym);
-		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
 	}
 //	dbs.out(wcout<<"db: ", db)<<endl;
