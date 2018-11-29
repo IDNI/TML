@@ -100,7 +100,7 @@ struct op_exists { // existential quantification, to be used with apply()
 	const set<int_t>& s;
 	op_exists(const set<int_t>& s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
-		return s.find(n[0]) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+		return s.find(n[0]+1) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,8 +237,8 @@ int_t bdds::ite(int_t v, int_t t, int_t e) {
 int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
 	node n = b.getnode(x);
 	if (leaf(n)) return x;
-	auto it = m.find(n[0]);
-	return r.ite(it==m.end() ? n[0] : it->second, permute(b,n[1],r,m), permute(b,n[2],r,m));
+	auto it = m.find(n[0]-1);
+	return r.ite(it==m.end() ? n[0]-1 : it->second, permute(b,n[1],r,m), permute(b,n[2],r,m));
 }
 
 template<typename op_t> // binary application
@@ -292,13 +292,13 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			m.emplace(v[i][j], array<size_t, 2>{ {i, j} });
 			if (v[i][j] >= 0) { // sym
 				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
-								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j)+1);
+								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j));
 				continue;
 			}
 			auto jt = hvars.find(v[i][j]);
 			if (jt == hvars.end()) //non-head var
-				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j)+1);
-			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j)+1, b*ar+jt->second+1);
+				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
+			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
 		}
 	#undef BIT
 	out(wcout<<"from_rule: ", r.h)<<endl;
