@@ -266,7 +266,7 @@ template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const
 	return r;
 }
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
-	int_t k;
+	int_t k, notpad;
 	size_t i, j, b;
 	map<K, int_t> hvars;
 	vector<K>& head = v[v.size()-1];
@@ -283,26 +283,23 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) r.h = r.hsym;
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
-		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j) {
-			auto it = m.find(v[i][j]);
-			if (it != m.end()) { // if seen
+		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
+			if (auto it = m.find(v[i][j]); it != m.end()) // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
-				continue;
+			else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] >= 0) // sym
+				for (b=0; b!=bits; ++b)
+					k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b))),
+					r.x.emplace(BIT(i,j));
+			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) { //non-head var
+				for (b=0, notpad = F; b!=bits; ++b)
+					r.x.emplace(BIT(i,j)),
+						notpad = bdd_or(notpad, from_bit(BIT(i, j), true));
+				r.h = bdd_and(r.h, notpad);
 			}
-			m.emplace(v[i][j], array<size_t, 2>{ {i, j} });
-			if (v[i][j] >= 0) { // sym
-				for (b=0; b!=bits; ++b)	k = bdd_and(k, from_bit(BIT(i,j),
-								v[i][j]&(1<<b))), r.x.emplace(BIT(i,j));
-				continue;
-			}
-			auto jt = hvars.find(v[i][j]);
-			if (jt == hvars.end()) //non-head var
-				for (b=0; b!=bits; ++b)	r.x.emplace(BIT(i,j));
 			else	for (b=0; b!=bits; ++b)	r.hvars.emplace(BIT(i,j), b*ar+jt->second);
-		}
 	#undef BIT
-	out(wcout<<"from_rule: ", r.h)<<endl;
+	//out(wcout<<"from_rule: ", r.h)<<endl;
 	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -377,8 +374,8 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 			ar = max(ar, x.size()-1); // so we'll pad everything
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
-			if ((l=y.size()) < ar)
-				y.resize(ar), fill(y.begin()+l, y.end(), dict.pad); // the padding
+			if ((l=y.size()) < ar+1)
+				y.resize(ar+1), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	bits = dict.bits();
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
@@ -390,10 +387,9 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w);
-//		dbs.out<K>(wcout<<"db: ", db, bits, ar)<<endl;
 		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
 		x = bdds::apply(dbs, db, prog, r.h, prog, op_and); // rule/db conjunction
-//		prog.out(wcout<<"x: ", x)<<endl;
+		prog.out(wcout<<"x: ", x)<<endl;
 		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
 		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
@@ -404,21 +400,21 @@ template<typename K> void lp<K>::step() {
 		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
 	}
-	dbs.out(wcout<<"db: ", db)<<endl;
-	dbs.out(wcout<<"add: ", add)<<endl;
-	dbs.out(wcout<<"del: ", del)<<endl;
+//	dbs.out(wcout<<"db: ", db)<<endl;
+//	dbs.out(wcout<<"add: ", add)<<endl;
+//	dbs.out(wcout<<"del: ", del)<<endl;
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F) db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);// db = (db|add)&~del = db&~del | add&~del
-	dbs.out(wcout<<"db: ", db)<<endl;
+//	dbs.out(wcout<<"db: ", db)<<endl;
 }
 
 template<typename K> bool lp<K>::pfp() {
 	int_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		printdb(wcout<<"before step: " << ++t << endl);
+		printdb(wcout<<"step: " << ++t << endl);
 		step();
-		printdb(wcout<<"after step: " << t << endl);
+		//printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return d == db;
 	}
 }
