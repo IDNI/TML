@@ -100,7 +100,8 @@ struct op_exists { // existential quantification, to be used with apply()
 	const set<int_t>& s;
 	op_exists(const set<int_t>& s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
-		return s.find(n[0]+1) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+		if (!n[0]) return n;
+		return s.find(n[0]-1) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +169,7 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 	node r = V[m];
 	return r[0] ? r[1] += ms, r[2] += ms, r : r[1] ? ms == V.size()*dim ? V[T] : V[root] : V[F];
 }
-
+/*
 size_t bdds::count(int_t x, size_t nvars) const {
 	node n = getnode(x), k;
 	size_t r = 0;
@@ -184,7 +185,7 @@ size_t bdds::count(int_t x, size_t nvars) const {
 size_t bdds::satcount(int_t x,size_t nvars) const {
 	return x<2?x?(1<<nvars):0:(count(x, nvars)<<(getnode(x)[0]-1));
 }
-
+*/
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
 	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
@@ -200,12 +201,12 @@ vbools bdds::allsat(int_t x, size_t nvars) const {
 	//r.reserve(n);
 	node t = getnode(x);
 	sat(1, nvars, t, p, r);
-	out(wcout/*<<"satcount: " << n*/ <<" allsat for ", x);
-	for (auto& x : r) {
-		wcout << endl;
-		for (int_t y : x) wcout << y << ' ';
-	}
-	wcout << endl << endl;
+	//out(wcout/*<<"satcount: " << n*/ <<" allsat for ", x);
+	//for (auto& x : r) {
+	//	wcout << endl;
+	//	for (int_t y : x) wcout << y << ' ';
+	//}
+	//wcout << endl << endl;
 	return r;
 }
 
@@ -415,8 +416,9 @@ template<typename K> bool lp<K>::pfp() {
 	int_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		printdb(wcout<<"step: " << ++t << endl);
+		printdb(wcout<<"before step: " << ++t << endl);
 		step();
+		printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return d == db;
 	}
 }
