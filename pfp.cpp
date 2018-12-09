@@ -1,3 +1,10 @@
+// LICENSE
+// This software is free for use and redistribution while including this license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission.  This license may be modified over time by the Author.
 #include <set>
 #include <map>
 #include <unordered_set>
@@ -53,10 +60,11 @@ protected:
 public:
 	static const int_t F = 0, T = 1;
 	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
-	void setpow(int_t _root, size_t _dim) { root = _root, dim = _dim; }
+	int_t setpow(int_t _root, size_t _dim) { root=_root, dim=_dim; return root+V.size()*(dim-1);}
 	static bool leaf(int_t x) { return x == T || x == F; }
 	static bool leaf(const node& x) { return !x[0]; }
 	static bool trueleaf(const node& x) { return leaf(x) && x[1]; }
+	static bool trueleaf(const int_t& x) { return x == T; }
 	wostream& out(wostream& os, const node& n) const; // print a bdd, using ?: syntax
 	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
 	int_t add(const node& n);
@@ -70,8 +78,6 @@ struct op_and_not_t { int_t operator()(int_t x, int_t y) const { return (x&&!y)?
 vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be used with allsat()
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
-	size_t count(int_t x, size_t nvars) const;
-	//vbools& sat(int_t x, vbools& r) const;
 	void sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const;
 public:
 	int_t from_bit(int_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
@@ -89,8 +95,6 @@ public:
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
 	int_t bdd_and_not(int_t x, int_t y){ return apply(*this, x, *this, y, *this, op_and_not); }
-	// count/return satisfying assignments
-	size_t satcount(int_t x, size_t nvars) const;
 	vbools allsat(int_t x, size_t nvars) const;
 	using bdds_base::add;
 	using bdds_base::out;
@@ -164,28 +168,16 @@ int_t bdds_base::add(const node& n) { // create new bdd node, standard implement
 }
 
 node bdds_base::getnode(size_t n) const { // returns a bdd node considering virtual powers
-	if (dim == 1) return V[n];
-	const size_t m = n % V.size(), ms = (n / V.size() + 1) * V.size();
+	if (dim == 1 || n < V.size()) return V[n];
+	const size_t m = n % V.size(), d = n / V.size();
 	node r = V[m];
-	return r[0] ? r[1] += ms, r[2] += ms, r : r[1] ? ms == V.size()*dim ? V[T] : V[root] : V[F];
-}
-/*
-size_t bdds::count(int_t x, size_t nvars) const {
-	node n = getnode(x), k;
-	size_t r = 0;
-	if (leaf(n)) return trueleaf(n) ? 1 : 0;
-	k = getnode(n[1]);
-	//r += count(n[1], nvars) * (1 << (((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
-	r += count(n[1], nvars) * (1 << (((leaf(k) ? nvars+1-n[0] : (n[0] - k[0]))) - 1));
-	k = getnode(n[2]);
-	//return r+count(n[2], nvars)*(1<<(((leaf(k) ? nvars+1 : k[0]) - n[0]) - 1));
-	return r+count(n[2], nvars)*(1<<(((leaf(k) ? nvars+1-n[0] : (n[0]-k[0]))) - 1));
+	if (trueleaf(r[1])) r[1] = root + V.size() * (d - 1);
+	else if (!leaf(r[1])) r[1] += V.size() * d;
+	if (trueleaf(r[2])) r[2] = root + V.size() * (d - 1);
+	else if (!leaf(r[2])) r[2] += V.size() * d;
+	return r;
 }
 
-size_t bdds::satcount(int_t x,size_t nvars) const {
-	return x<2?x?(1<<nvars):0:(count(x, nvars)<<(getnode(x)[0]-1));
-}
-*/
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
 	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
@@ -197,17 +189,7 @@ vbools bdds::allsat(int_t x, size_t nvars) const {
 	bools p;
 	p.resize(nvars);
 	vbools r;
-	//size_t n = satcount(x, nvars);
-	//r.reserve(n);
-	node t = getnode(x);
-	sat(1, nvars, t, p, r);
-	//out(wcout/*<<"satcount: " << n*/ <<" allsat for ", x);
-	//for (auto& x : r) {
-	//	wcout << endl;
-	//	for (int_t y : x) wcout << y << ' ';
-	//}
-	//wcout << endl << endl;
-	return r;
+	return sat(1, nvars, getnode(x), p, r), r;
 }
 
 int_t bdds::from_eq(int_t x, int_t y) {
@@ -276,10 +258,10 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	r.neg = head[0] < 0;
 	head.erase(head.begin());
 	r.w = v.size() - 1;
+	#define BIT(term,arg) (term*bits+b)*ar+arg
 	for (i = 0; i != head.size(); ++i)
 		if (head[i] < 0) hvars.emplace(head[i], i); // var
-		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(b*ar+i, head[i]&(1<<b)));
-	#define BIT(term,arg) (term*bits+b)*ar+arg
+		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(BIT(0, i), head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) r.h = r.hsym;
 	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
@@ -291,17 +273,14 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 				for (b=0; b!=bits; ++b)
 					k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b))),
 					r.x.emplace(BIT(i,j));
-			else if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) { //non-head var
-				for (b=0, notpad = T; b!=bits; ++b)
-					r.x.emplace(BIT(i,j)),
-					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
-				r.h = bdd_and_not(r.h, notpad);
-			}
 			else {
 				for (b=0, notpad = T; b!=bits; ++b)
-					r.hvars.emplace(BIT(i,j), b*ar+jt->second),
 					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
 				r.h = bdd_and_not(r.h, notpad);
+				if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
+					for (b=0; b!=bits; ++b) r.x.emplace(BIT(i,j));
+				else for (b=0; b!=bits; ++b)
+					r.hvars.emplace(BIT(i,j), BIT(0, jt->second));
 			}
 	#undef BIT
 	//out(wcout<<"from_rule: ", r.h)<<endl;
@@ -391,9 +370,9 @@ template<typename K> void lp<K>::step() {
 	int_t add = bdds::F, del = bdds::F, s, x, y, z;
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
-		dbs.setpow(db, r.w);
+		int_t root = dbs.setpow(db, r.w);
 //		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
-		x = bdds::apply(dbs, db, prog, r.h, prog, op_and); // rule/db conjunction
+		x = bdds::apply(dbs, root, prog, r.h, prog, op_and); // rule/db conjunction
 //		prog.out(wcout<<"x: ", x)<<endl;
 //		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
