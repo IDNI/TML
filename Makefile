@@ -1,2 +1,2 @@
 all:
-	g++ -std=c++1z pfp.cpp -W -Wall -Wpedantic -g -opfp
+	g++-7 -std=c++17 pfp.cpp -W -Wall -Wpedantic -g -opfp

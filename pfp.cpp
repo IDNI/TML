@@ -18,6 +18,7 @@
 #include <sstream>
 #include <climits>
 #include <stdexcept>
+#include <cassert>
 using namespace std;
 
 typedef int32_t int_t;
@@ -49,8 +50,8 @@ class bdds_base {
 	vector<node> V; // all nodes
 	map<node, int_t> M; // node to its index
 	int_t root; // used for implicit power
-	size_t dim = 1; // used for implicit power
 protected:
+	size_t dim = 1; // used for implicit power
 	int_t add_nocheck(const node& n) {
 		V.emplace_back(n);
 		int_t r = (M[n]=V.size()-1);
@@ -90,7 +91,7 @@ public:
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
-	template<typename K> matrix<K> from_bits(int_t x, const size_t bits, const size_t ar);
+	template<typename K> matrix<K> from_bits(int_t x, size_t bits, size_t ar);
 	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_or); } 
 	int_t bdd_and(int_t x, int_t y)	{ return apply(*this, x, *this, y, *this, op_and); } 
@@ -180,6 +181,7 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
+	//assert(v <= nvars+1);
 	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
 	else if (v == nvars+1) r.push_back(p);
 	else p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
@@ -235,16 +237,19 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 	return r.add({{v, apply(bx, a, by, b, r, op), apply(bx, c, by, d, r, op)}});
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename K> vector<K> from_bits(const bools& x, const size_t ar) {
-	vector<K> r(ar, 0);
-	for (size_t n = 0; n < x.size(); ++n) if (x[n]) r[n % ar] |= 1<<(n / ar);
-	return r;
-}
-template<typename K> matrix<K> bdds::from_bits(int_t x, const size_t bits, const size_t ar) {
+template<typename K> matrix<K> bdds::from_bits(int_t x, size_t bits, size_t ar) {
 	vbools s = allsat(x, bits * ar);
 	matrix<K> r(s.size());
+	for (vector<K>& v : r) v = vector<K>(dim * ar, 0);
 	size_t n = 0;
-	for (const bools& b : s) r[n++] = ::from_bits<K>(b, ar);
+	for (const bools& b : s) {
+		assert(b.size() == bits * ar * dim);
+		for (size_t i = 0, j; i != bits * ar * dim; ++i)
+			if (b[i])
+				j = i - (i % ar),
+				r[n][ar*((j/ar)/bits)+i%ar] |= 1 << ((j/ar)%bits);
+		++n;
+	}
 	return r;
 }
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
@@ -258,6 +263,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	r.neg = head[0] < 0;
 	head.erase(head.begin());
 	r.w = v.size() - 1;
+	// (t*s+b)r+a < (Ts+B)r+A
+	// ((t-T)*s+b-B)r+a-A < 0
+	// (t-T)*s+b < B+(A-a)/r
 	#define BIT(term,arg) (term*bits+b)*ar+arg
 	for (i = 0; i != head.size(); ++i)
 		if (head[i] < 0) hvars.emplace(head[i], i); // var
@@ -374,14 +382,14 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		int_t root = dbs.setpow(db, r.w);
-		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
+		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits*r.w, ar, dict)<<endl;
 		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply(dbs, root, prog, r.h, prog, op_and); // rule/db conjunction
 		prog.out(wcout<<"x: ", x)<<endl;
-		out<K>(wcout<<"x: ", prog, x, bits, ar, dict)<<endl;
+		out<K>(wcout<<"x: ", prog, x, bits*r.w, ar, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		out<K>(wcout<<"y: ", prog, y, bits, ar, dict)<<endl;
+		out<K>(wcout<<"y: ", prog, y, bits*r.w, ar, dict)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
-		out<K>(wcout<<"z: ", prog, z, bits, ar, dict)<<endl;
+		out<K>(wcout<<"z: ", prog, z, bits*r.w, ar, dict)<<endl;
 		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
 		z = prog.bdd_and(z, r.hsym);
 		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
@@ -393,6 +401,7 @@ template<typename K> void lp<K>::step() {
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F) db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);// db = (db|add)&~del = db&~del | add&~del
 	dbs.out(wcout<<"db: ", db)<<endl;
+	dbs.setpow(db, 1);
 }
 
 template<typename K> bool lp<K>::pfp() {
