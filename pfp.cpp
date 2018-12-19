@@ -51,7 +51,7 @@ class bdds_base {
 	map<node, int_t> M; // node to its index
 	int_t root; // used for implicit power
 protected:
-	size_t dim = 1; // used for implicit power
+	size_t dim = 1, nvars; // used for implicit power
 	int_t add_nocheck(const node& n) {
 		V.emplace_back(n);
 		int_t r = (M[n]=V.size()-1);
@@ -61,13 +61,13 @@ protected:
 public:
 	static const int_t F = 0, T = 1;
 	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
-	int_t setpow(int_t _root, size_t _dim) { root=_root, dim=_dim; return leaf(root)?root:(root+V.size()*(dim-1));}
+	int_t setpow(int_t _root, size_t _dim, size_t _nvars) { root=_root, dim=_dim, nvars=_nvars; return root;}
 	static bool leaf(int_t x) { return x == T || x == F; }
 	static bool leaf(const node& x) { return !x[0]; }
 	static bool trueleaf(const node& x) { return leaf(x) && x[1]; }
 	static bool trueleaf(const int_t& x) { return x == T; }
 	wostream& out(wostream& os, const node& n) const; // print a bdd using ?: syntax
-	wostream& out(wostream& os, size_t n) const	{ return out(os, getnode(n)); }
+	wostream& out(wostream& os, size_t n) const	{ return out(os<< L'['<<n<<L']' , getnode(n)); }
 	int_t add(const node& n);
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,19 +169,20 @@ int_t bdds_base::add(const node& n) { // create new bdd node, standard implement
 }
 
 node bdds_base::getnode(size_t n) const { // returns a bdd node considering virtual powers
-	if (dim == 1 || n < V.size()) return V[n];
+	if (dim == 1/* || n < V.size()*/) return V[n];
 	const size_t m = n % V.size(), d = n / V.size();
 	node r = V[m];
-	if (trueleaf(r[1])) r[1] = root + V.size() * (d - 1);
+	if (r[0]) r[0] += nvars * d;
+	if (trueleaf(r[1])) { if (d<dim-1) r[1] = root + V.size() * (d+1); }
 	else if (!leaf(r[1])) r[1] += V.size() * d;
-	if (trueleaf(r[2])) r[2] = root + V.size() * (d - 1);
+	if (trueleaf(r[2])) { if (d<dim-1) r[2] = root + V.size() * (d+1); }
 	else if (!leaf(r[2])) r[2] += V.size() * d;
 	return r;
 }
 
 void bdds::sat(int_t v, int_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
-	//assert(v <= nvars+1);
+	assert(v <= nvars+1);
 	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
 	else if (v == nvars+1) r.push_back(p);
 	else p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
@@ -201,7 +202,7 @@ int_t bdds::from_eq(int_t x, int_t y) {
 
 wostream& bdds_base::out(wostream& os, const node& n) const {
 	if (leaf(n)) return os << (trueleaf(n) ? L'T' : L'F');
-	else return out(os << n[0] << L'?', getnode(n[1])), out(os << L':', getnode(n[2]));
+	else return out(os << n[0] << L'?', n[1]), out(os << L':', n[2]);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) { //unary
@@ -238,7 +239,7 @@ int_t bdds::apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, con
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> matrix<K> bdds::from_bits(int_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar);
+	vbools s = allsat(x, bits * ar * dim);
 	matrix<K> r(s.size());
 	for (vector<K>& v : r) v = vector<K>(dim * ar, 0);
 	size_t n = 0;
@@ -263,9 +264,6 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	r.neg = head[0] < 0;
 	head.erase(head.begin());
 	r.w = v.size() - 1;
-	// (t*s+b)r+a < (Ts+B)r+A
-	// ((t-T)*s+b-B)r+a-A < 0
-	// (t-T)*s+b < B+(A-a)/r
 	#define BIT(term,arg) (term*bits+b)*ar+arg
 	for (i = 0; i != head.size(); ++i)
 		if (head[i] < 0) hvars.emplace(head[i], i); // var
@@ -294,7 +292,6 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 			}
 	#undef BIT
 	r.h = bdd_and_not(r.h, npad);
-	//out(wcout<<"from_rule: ", r.h)<<endl;
 	return r;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -381,27 +378,33 @@ template<typename K> void lp<K>::step() {
 	int_t add = bdds::F, del = bdds::F, s, x, y, z;
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
-		int_t root = dbs.setpow(db, r.w);
-		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits*r.w, ar, dict)<<endl;
+		dbs.setpow(db, 1, ar * bits);
+//		dbs.out(wcout<<"db before: ", db)<<endl;
+//		out<K>(wcout<<"db before: ", dbs, db, bits, ar, dict)<<endl;
+		int_t root = dbs.setpow(db, r.w, ar * bits);
+//		dbs.out(wcout<<"db before (pow): ", root)<<endl;
+//		out<K>(wcout<<"db before (pow): ", dbs, root, bits, ar, dict)<<endl;
+//		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
 		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply(dbs, root, prog, r.h, prog, op_and); // rule/db conjunction
-		prog.out(wcout<<"x: ", x)<<endl;
-		out<K>(wcout<<"x: ", prog, x, bits*r.w, ar, dict)<<endl;
+//		prog.out(wcout<<"x: ", x)<<endl;
+//		out<K>(wcout<<"x: ", prog, x, bits, ar*r.w, dict)<<endl;
 		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
-		out<K>(wcout<<"y: ", prog, y, bits*r.w, ar, dict)<<endl;
+//		out<K>(wcout<<"y: ", prog, y, bits, ar*r.w, dict)<<endl;
 		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
-		out<K>(wcout<<"z: ", prog, z, bits*r.w, ar, dict)<<endl;
-		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"z: ", prog, z, bits, ar*r.w, dict)<<endl;
+//		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
 		z = prog.bdd_and(z, r.hsym);
-		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, dict)<<endl;
+//		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar*r.w, dict)<<endl;
+		dbs.setpow(db, 1, ar * bits);
 		(r.neg ? del : add) = bdds::apply(dbs, r.neg ? del : add, prog, z, dbs, op_or);
+//		dbs.out(wcout<<"db: ", db)<<endl;
+//		out<K>(wcout<<"db: ", dbs, db, bits, ar, dict)<<endl;
 	}
-	dbs.out(wcout<<"db: ", db)<<endl;
-	dbs.out(wcout<<"add: ", add)<<endl;
-	dbs.out(wcout<<"del: ", del)<<endl;
+//	dbs.out(wcout<<"add: ", add)<<endl;
+//	dbs.out(wcout<<"del: ", del)<<endl;
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F) db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);// db = (db|add)&~del = db&~del | add&~del
-	dbs.out(wcout<<"db: ", db)<<endl;
-	dbs.setpow(db, 1);
+//	dbs.out(wcout<<"db: ", db)<<endl;
 }
 
 template<typename K> bool lp<K>::pfp() {
