@@ -38,6 +38,21 @@ typedef vector<bools> vbools;
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+template <class T> // boost's
+inline void hash_combine(std::size_t& s, const T& v) {
+	std::hash<T> h;
+	s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
+}
+template<> struct std::hash<node> {
+	std::hash<int_t> hh;
+	size_t operator()(const node& n) const {
+		std::size_t res = 0;
+		hash_combine(res, n[0]);
+		hash_combine(res, n[1]);
+		hash_combine(res, n[2]);
+		return res;		
+	}
+};
 struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
 	int_t h, hsym; // bdd root and head syms
@@ -48,13 +63,14 @@ struct rule { // a [P-DATALOG] rule in bdd form with additional information
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
 	vector<node> V; // all nodes
-	map<node, int_t> M; // node to its index
+	unordered_map<node, int_t> M; // node to its index
 	int_t root; // used for implicit power
 protected:
 	size_t dim = 1, nvars; // used for implicit power
 	int_t add_nocheck(const node& n) {
 		V.emplace_back(n);
-		int_t r = (M[n]=V.size()-1);
+		int_t r;
+		M.emplace(n, r = V.size()-1);
 		return r;
 	}
 	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
@@ -92,7 +108,7 @@ public:
 	static int_t permute(bdds& b, int_t x, bdds& r, const int_t*, int_t sz);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
-	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar, const size_t maxvars);
+	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
 	template<typename K> matrix<K> from_bits(int_t x, size_t bits, size_t ar);
 	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply_or(*this, x, *this, y, *this); } 
@@ -282,7 +298,7 @@ template<typename K> matrix<K> bdds::from_bits(int_t x, size_t bits, size_t ar) 
 	}
 	return r;
 }
-template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar, const size_t maxvars) {
+template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
 	int_t k, notpad, npad = F;
 	size_t i, j, b;
 	map<K, int_t> hvars;
@@ -299,9 +315,10 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(BIT(0, i), head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) return r.h = r.hsym, r;
-	r.hvars = new int_t[maxvars];
-	r.x = new bool[maxvars];
-	for (i = 0; i < maxvars; ++i) r.x[i] = false, r.hvars[i] = i;
+	const size_t vars = ((r.w+1)*bits+1)*(ar+2);
+	r.hvars = new int_t[vars];
+	r.x = new bool[vars];
+	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
 	for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end()) { // if seen
@@ -392,22 +409,19 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
 	db = bdds::F;
-	size_t l, w = 0;
+	size_t l;
 	ar = 0;
-	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t)) {
+	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
 		for (const vector<K>& x : t) // we really support a single rel arity
 			ar = max(ar, x.size()-1); // so we'll pad everything
-		w = max(w, t.size());
-	}
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar+1)
 				y.resize(ar+1), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	bits = dict.bits();
-	size_t vars = (ar+2) * (w+1) * (bits+1);
 	for (const matrix<K>& x : r)
-	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar, vars).h);// fact
-		else rules.push_back(prog.from_rule(x, bits, ar, vars)); // rule
+	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
+		else rules.push_back(prog.from_rule(x, bits, ar)); // rule
 }
 
 template<typename K> void lp<K>::step() {
@@ -415,32 +429,16 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, 1, ar * bits);
-//		dbs.out(wcout<<"db before: ", db)<<endl;
-//		out<K>(wcout<<"db before: ", dbs, db, bits, ar, dict)<<endl;
 		int_t root = dbs.setpow(db, r.w, ar * bits);
-//		dbs.out(wcout<<"db before (pow): ", root)<<endl;
-//		out<K>(wcout<<"db before (pow): ", dbs, root, bits, ar, dict)<<endl;
-//		out<K>(wcout<<endl<<"rule: ", prog, r.h, bits, ar, dict)<<endl;
 		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply_and(dbs, root, prog, r.h, prog); // rule/db conjunction
-//		prog.out(wcout<<"x: ", x)<<endl;
-//		out<K>(wcout<<"x: ", prog, x, bits, ar*r.w, dict)<<endl;
-		y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+1))); // remove nonhead variables
-//		out<K>(wcout<<"y: ", prog, y, bits, ar*r.w, dict)<<endl;
-		z = bdds::permute(prog, y, prog, r.hvars, ((r.w+1)*bits+1)*(ar+1)); // reorder the remaining vars
-//		out<K>(wcout<<"z: ", prog, z, bits, ar*r.w, dict)<<endl;
-//		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
+		y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
+		z = bdds::permute(prog, y, prog, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
 		z = prog.bdd_and(z, r.hsym);
-//		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar*r.w, dict)<<endl;
 		dbs.setpow(db, 1, ar * bits);
 		(r.neg ? del : add) = bdds::apply_or(dbs, r.neg ? del : add, prog, z, dbs);
-//		dbs.out(wcout<<"db: ", db)<<endl;
-//		out<K>(wcout<<"db: ", dbs, db, bits, ar, dict)<<endl;
 	}
-//	dbs.out(wcout<<"add: ", add)<<endl;
-//	dbs.out(wcout<<"del: ", del)<<endl;
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F) db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);// db = (db|add)&~del = db&~del | add&~del
-//	dbs.out(wcout<<"db: ", db)<<endl;
 }
 
 template<typename K> bool lp<K>::pfp() {
