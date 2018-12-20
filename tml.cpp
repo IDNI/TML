@@ -42,8 +42,8 @@ struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
 	int_t h, hsym; // bdd root and head syms
 	size_t w; // nbodies, will determine the virtual power
-	set<int_t> x; // existentials
-	map<int_t, int_t> hvars; // how to permute body vars to head vars
+	bool *x; // existentials
+	int_t *hvars; // how to permute body vars to head vars
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
@@ -53,6 +53,9 @@ class bdds_base {
 protected:
 	size_t dim = 1, nvars; // used for implicit power
 	int_t add_nocheck(const node& n) {
+		assert(n[0] >= 0);
+		assert(n[1] >= 0);
+		assert(n[2] >= 0);
 		V.emplace_back(n);
 		int_t r = (M[n]=V.size()-1);
 		return r;
@@ -69,6 +72,7 @@ public:
 	wostream& out(wostream& os, const node& n) const; // print a bdd using ?: syntax
 	wostream& out(wostream& os, size_t n) const	{ return out(os<< L'['<<n<<L']' , getnode(n)); }
 	int_t add(const node& n);
+	size_t size() const { return V.size(); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // the following to be used with bdds::apply()
@@ -87,7 +91,7 @@ public:
 	int_t apply(const bdds& bx, int_t x, const bdds& by, int_t y, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(const bdds& b, int_t x, bdds& r, const op_t& op);
 	template<typename op_t> static int_t apply(bdds& b, int_t x,bdds& r, const op_t& op);//unary
-	static int_t permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>&);
+	static int_t permute(bdds& b, int_t x, bdds& r, const int_t*);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
@@ -102,11 +106,10 @@ public:
 };
 
 struct op_exists { // existential quantification, to be used with apply()
-	const set<int_t>& s;
-	op_exists(const set<int_t>& s) : s(s) { }
+	const bool* s;
+	op_exists(const bool* s) : s(s) { }
 	node operator()(bdds& b, const node& n) const {
-		if (!n[0]) return n;
-		return s.find(n[0]-1) == s.end() ? n : b.getnode(b.bdd_or(n[1], n[2]));
+		return n[0] ? s[n[0]-1] ? b.getnode(b.bdd_or(n[1], n[2])) : n : n;
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -177,6 +180,9 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 	else if (!leaf(r[1])) r[1] += V.size() * d;
 	if (trueleaf(r[2])) { if (d<dim-1) r[2] = root + V.size() * (d+1); }
 	else if (!leaf(r[2])) r[2] += V.size() * d;
+	assert(r[0] >= 0);
+	assert(r[1] >= 0);
+	assert(r[2] >= 0);
 	return r;
 }
 
@@ -207,11 +213,17 @@ wostream& bdds_base::out(wostream& os, const node& n) const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> int_t bdds::apply(const bdds& b, int_t x, bdds& r, const op_t& op) { //unary
 	node n = op(b, b.getnode(x));
+	assert(n[0] >= 0);
+	assert(n[1] >= 0);
+	assert(n[2] >= 0);
 	return r.add({n[0], leaf(n[1])?n[1]:apply(b,n[1],r,op), leaf(n[2])?n[2]:apply(b,n[2],r,op)});
 }
 
 template<typename op_t> int_t bdds::apply(bdds& b, int_t x, bdds& r, const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
+	assert(n[0] >= 0);
+	assert(n[1] >= 0);
+	assert(n[2] >= 0);
 	return r.add({{n[0], leaf(n[1])?n[1]:apply(b,n[1],r,op), leaf(n[2])?n[2]:apply(b,n[2],r,op)}});
 }
 
@@ -220,11 +232,9 @@ int_t bdds::ite(int_t v, int_t t, int_t e) {
 }
 
 // [overlapping] rename
-int_t bdds::permute(bdds& b, int_t x, bdds& r, const map<int_t, int_t>& m) {
+int_t bdds::permute(bdds& b, int_t x, bdds& r, const int_t* m) {
 	node n = b.getnode(x);
-	if (leaf(n)) return x;
-	auto it = m.find(n[0]-1);
-	return r.ite(it==m.end() ? n[0]-1 : it->second, permute(b,n[1],r,m), permute(b,n[2],r,m));
+	return leaf(n) ? x : r.ite(m[n[0]-1], permute(b,n[1],r,m), permute(b,n[2],r,m));
 }
 
 template<typename op_t> // binary application
@@ -269,26 +279,31 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		if (head[i] < 0) hvars.emplace(head[i], i); // var
 		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(BIT(0, i), head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
-	if (v.size()==1) r.h = r.hsym;
-	else for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
+	if (v.size()==1) return r.h = r.hsym, r;
+	const size_t vars = (r.w + 1) * (bits + 1) * (ar + 2);
+	r.hvars = new int_t[vars];
+	r.x = new bool[vars];
+	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
+	for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end()) { // if seen
 				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
 								BIT(it->second[0], it->second[1])));
 				if (hvars.find(v[i][j]) != hvars.end()) // existential out if headvar
-					for (b=0; b!=bits; ++b) r.x.emplace(BIT(i,j));
+					for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
 			} else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] >= 0) // sym
 				for (b=0; b!=bits; ++b)
 					k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b))),
-					r.x.emplace(BIT(i,j));
+					r.x[BIT(i,j)] = true;
 			else {
 				for (b=0, notpad = T; b!=bits; ++b)
 					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
 				npad = bdd_or(npad, notpad);
 				if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
-					for (b=0; b!=bits; ++b) r.x.emplace(BIT(i,j));
+					for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
 				else for (b=0; b!=bits; ++b)
-					r.hvars.emplace(BIT(i,j), BIT(0, jt->second));
+					if (BIT(i,j) != BIT(0, jt->second))
+						r.hvars[BIT(i,j)] = BIT(0, jt->second);
 			}
 	#undef BIT
 	r.h = bdd_and_not(r.h, npad);
@@ -411,10 +426,10 @@ template<typename K> bool lp<K>::pfp() {
 	int_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		printdb(wcout<<"step: " << ++t << endl);
+		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<dbs.size()<<" + "<<prog.size()<<endl);
 		step();
 		//printdb(wcout<<"after step: " << t << endl);
-		if (s.find(db) != s.end()) return d == db;
+		if (s.find(db) != s.end()) return printdb(wcout), d == db;
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
