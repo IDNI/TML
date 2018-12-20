@@ -89,10 +89,10 @@ public:
 	static int_t apply_or(const bdds& b, int_t x, bdds& r);
 	template<typename op_t> static int_t apply(bdds& b, int_t x,bdds& r, const op_t& op);//unary
 	template<typename op_t> static int_t apply(const bdds& b, int_t x,bdds& r, const op_t& op);//unary
-	static int_t permute(bdds& b, int_t x, bdds& r, const int_t*);
+	static int_t permute(bdds& b, int_t x, bdds& r, const int_t*, int_t sz);
 	// helper constructors
 	int_t from_eq(int_t x, int_t y); // a bdd saying "x=y"
-	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
+	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar, const size_t maxvars);
 	template<typename K> matrix<K> from_bits(int_t x, size_t bits, size_t ar);
 	// helper apply() variations
 	int_t bdd_or(int_t x, int_t y)	{ return apply_or(*this, x, *this, y, *this); } 
@@ -105,9 +105,10 @@ public:
 
 struct op_exists { // existential quantification, to be used with apply()
 	const bool* s;
-	op_exists(const bool* s) : s(s) { }
+	int_t sz;
+	op_exists(const bool* s, int_t sz) : s(s), sz(sz) { }
 	node operator()(bdds& b, const node& n) const {
-		return n[0] ? s[n[0]-1] ? b.getnode(b.bdd_or(n[1], n[2])) : n : n;
+		return n[0] && n[0] <= sz && s[n[0]-1] ? b.getnode(b.bdd_or(n[1], n[2])) : n;
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,9 +222,9 @@ int_t bdds::ite(int_t v, int_t t, int_t e) {
 }
 
 // [overlapping] rename
-int_t bdds::permute(bdds& b, int_t x, bdds& r, const int_t* m) {
+int_t bdds::permute(bdds& b, int_t x, bdds& r, const int_t* m, int_t sz) {
 	node n = b.getnode(x);
-	return leaf(n) ? x : r.ite(m[n[0]-1], permute(b,n[1],r,m), permute(b,n[2],r,m));
+	return leaf(n) ? x : r.ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1), permute(b,n[1],r,m,sz), permute(b,n[2],r,m,sz));
 }
 int_t bdds::copy(const bdds& b, int_t x) {
 	if (leaf(x)) return x;
@@ -281,7 +282,7 @@ template<typename K> matrix<K> bdds::from_bits(int_t x, size_t bits, size_t ar) 
 	}
 	return r;
 }
-template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
+template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar, const size_t maxvars) {
 	int_t k, notpad, npad = F;
 	size_t i, j, b;
 	map<K, int_t> hvars;
@@ -298,10 +299,9 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 		else for (b = 0; b != bits; ++b) r.hsym = bdd_and(r.hsym, from_bit(BIT(0, i), head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) return r.h = r.hsym, r;
-	const size_t vars = (r.w + 1) * (bits + 1) * (ar + 2);
-	r.hvars = new int_t[vars];
-	r.x = new bool[vars];
-	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
+	r.hvars = new int_t[maxvars];
+	r.x = new bool[maxvars];
+	for (i = 0; i < maxvars; ++i) r.x[i] = false, r.hvars[i] = i;
 	for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
 		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
 			if (auto it = m.find(v[i][j]); it != m.end()) { // if seen
@@ -392,19 +392,22 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 template<typename K> void lp<K>::prog_read(wstr s) {
 	vector<matrix<K>> r;
 	db = bdds::F;
-	size_t l;
+	size_t l, w = 0;
 	ar = 0;
-	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
+	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t)) {
 		for (const vector<K>& x : t) // we really support a single rel arity
 			ar = max(ar, x.size()-1); // so we'll pad everything
+		w = max(w, t.size());
+	}
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar+1)
 				y.resize(ar+1), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	bits = dict.bits();
+	size_t vars = (ar+2) * (w+1) * (bits+1);
 	for (const matrix<K>& x : r)
-	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
-		else rules.push_back(prog.from_rule(x, bits, ar)); // rule
+	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar, vars).h);// fact
+		else rules.push_back(prog.from_rule(x, bits, ar, vars)); // rule
 }
 
 template<typename K> void lp<K>::step() {
@@ -421,9 +424,9 @@ template<typename K> void lp<K>::step() {
 		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply_and(dbs, root, prog, r.h, prog); // rule/db conjunction
 //		prog.out(wcout<<"x: ", x)<<endl;
 //		out<K>(wcout<<"x: ", prog, x, bits, ar*r.w, dict)<<endl;
-		y = bdds::apply(prog, x, prog, op_exists(r.x)); // remove nonhead variables
+		y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+1))); // remove nonhead variables
 //		out<K>(wcout<<"y: ", prog, y, bits, ar*r.w, dict)<<endl;
-		z = bdds::permute(prog, y, prog, r.hvars); // reorder the remaining vars
+		z = bdds::permute(prog, y, prog, r.hvars, ((r.w+1)*bits+1)*(ar+1)); // reorder the remaining vars
 //		out<K>(wcout<<"z: ", prog, z, bits, ar*r.w, dict)<<endl;
 //		out<K>(wcout<<"hsym: ", prog, r.hsym, bits, ar, dict)<<endl;
 		z = prog.bdd_and(z, r.hsym);
