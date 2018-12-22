@@ -58,6 +58,20 @@ template<> struct std::hash<memo> {
 		return res;		
 	}
 };
+template<> struct std::hash<pair<const bdds*, size_t>> {
+	size_t operator()(const pair<const bdds*, size_t>& m) const {
+		size_t res = 0;
+		hash_combine(res, m.first), hash_combine(res, m.second);
+		return res;		
+	}
+};
+template<> struct std::hash<pair<size_t, const int_t*>> {
+	size_t operator()(const pair<size_t, const int_t*>& m) const {
+		size_t res = 0;
+		hash_combine(res, m.first), hash_combine(res, m.second);
+		return res;		
+	}
+};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 struct rule { // a [P-DATALOG] rule in bdd form with additional information
 	bool neg;
@@ -81,7 +95,7 @@ protected:
 	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
 public:
 	size_t root = 0, maxbdd; // used for implicit power
-	static const int_t F = 0, T = 1;
+	static const int_t F, T;
 	node getnode(size_t n) const; // node from id. equivalent to V[n] unless virtual pow is used
 	int_t setpow(int_t _root, size_t _dim, size_t _nvars, size_t maxw) {
 		root=_root, dim=_dim, nvars=_nvars, maxbdd = (int_t)1 << ((sizeof(int_t)<<3)/maxw);
@@ -96,12 +110,16 @@ public:
 	int_t add(const node& n);
 	size_t size() const { return V.size(); }
 };
+const int_t bdds_base::F = 0;
+const int_t bdds_base::T = 1;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be used with allsat()
 
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const;
-	unordered_map<memo, int_t> memo_and, memo_and_not, memo_or;
+	unordered_map<memo, size_t> memo_and, memo_and_not, memo_or;
+	unordered_map<pair<const bdds*, size_t>, size_t> memo_copy;
+	unordered_map<pair<size_t, const int_t*>, size_t> memo_permute;
 public:
 	size_t from_bit(size_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
 	size_t ite(size_t v, size_t t, size_t e);
@@ -111,7 +129,7 @@ public:
 	static size_t apply_or(bdds& src, size_t x, bdds& dst, size_t y);
 	template<typename op_t> static size_t apply(bdds& b, size_t x, bdds& r, const op_t& op);//unary
 	template<typename op_t> static size_t apply(const bdds& b, size_t x,bdds& r, const op_t& op);//unary
-	static size_t permute(bdds& b, size_t x, bdds& r, const int_t*, size_t sz);
+	size_t permute(size_t x, const int_t*, size_t sz);
 	// helper constructors
 	size_t from_eq(size_t x, size_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
@@ -207,7 +225,7 @@ node bdds_base::getnode(size_t n) const { // returns a bdd node considering virt
 
 void bdds::sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
-	assert(v <= nvars+1);
+	//assert(v <= nvars+1);
 	if (v<n[0]) p[v-1] = true, sat(v+1, nvars, n, p, r), p[v-1]=false, sat(v+1, nvars, n, p, r);
 	else if (v == nvars+1) r.push_back(p);
 	else p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r), p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
@@ -245,14 +263,22 @@ size_t bdds::ite(size_t v, size_t t, size_t e) {
 }
 
 // [overlapping] rename
-size_t bdds::permute(bdds& b, size_t x, bdds& r, const int_t* m, size_t sz) {
-	node n = b.getnode(x);
-	return leaf(n) ? x : r.ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1), permute(b,n[1],r,m,sz), permute(b,n[2],r,m,sz));
+size_t bdds::permute(size_t x, const int_t* m, size_t sz) {
+	auto t = make_pair(x, m);
+	auto it = memo_permute.find(t);
+	if (it != memo_permute.end()) return it->second;
+	node n = getnode(x);
+	size_t res = leaf(n) ? x : ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1), permute(n[1],m,sz), permute(n[2],m,sz));
+	return memo_permute.emplace(t, res), res;
 }
 size_t bdds::copy(const bdds& b, size_t x) {
 	if (leaf(x)) return x;
+	auto t = make_pair(&b, x);
+	auto it = memo_copy.find(t);
+	if (it != memo_copy.end()) return it->second;
 	node n = b.getnode(x);
-	return add({n[0], copy(b, n[1]), copy(b, n[2])});
+	size_t res = add({n[0], copy(b, n[1]), copy(b, n[2])});
+	return memo_copy.emplace(t, res), res;
 }
 size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 	const auto t = make_tuple(&dst, x, y);
@@ -449,7 +475,7 @@ template<typename K> void lp<K>::step() {
 		int_t root = dbs.setpow(db, r.w, ar * bits, maxw);
 		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply_and(dbs, root, prog, r.h); // rule/db conjunction
 		y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
-		z = bdds::permute(prog, y, prog, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
+		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
 		z = prog.bdd_and(z, r.hsym);
 		dbs.setpow(db, 1, ar * bits, maxw);
 		(r.neg ? del : add) = bdds::apply_or(prog, z, dbs, r.neg ? del : add);

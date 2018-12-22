@@ -1,2 +1,2 @@
 all:
-	 g++-7 -std=c++17 tml.cpp -W -Wall -Wpedantic -g -O3 -otml
+	 g++-8 -std=c++17 tml.cpp -W -Wall -Wpedantic -O3 -flto -otml
