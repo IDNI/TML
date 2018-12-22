@@ -29,6 +29,7 @@ typedef vector<bool> bools;
 typedef vector<bools> vbools;
 class bdds;
 typedef tuple<const bdds*, int_t, int_t> memo;
+typedef tuple<const bdds*, const bool*, int_t, int_t> exmemo;
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -44,6 +45,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
+template<> struct std::hash<exmemo> { size_t operator()(const exmemo& m) const; };
 template<> struct std::hash<pair<const bdds*, size_t>> {
 	size_t operator()(const pair<const bdds*, size_t>& m) const;
 };
@@ -96,6 +98,7 @@ vbools& operator*=(vbools& x, const pair<const vbools&, size_t>& y); // to be us
 class bdds : public bdds_base { // holding functions only, therefore tbd: dont use it as an object
 	void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const;
 	unordered_map<memo, size_t> memo_and, memo_and_not, memo_or;
+	unordered_map<exmemo, size_t> memo_and_ex;
 	unordered_map<pair<const bdds*, size_t>, size_t> memo_copy;
 	unordered_map<pair<size_t, const int_t*>, size_t> memo_permute;
 public:
@@ -105,6 +108,7 @@ public:
 	static size_t apply_and(bdds& src, size_t x, bdds& dst, size_t y);
 	static size_t apply_and_not(bdds& src, size_t x, bdds& dst, size_t y);
 	static size_t apply_or(bdds& src, size_t x, bdds& dst, size_t y);
+	static size_t apply_and_ex(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, size_t sz);
 	template<typename op_t> static size_t apply(bdds& b, size_t x, bdds& r, const op_t& op);//unary
 	template<typename op_t> static size_t apply(const bdds& b, size_t x,bdds& r, const op_t& op);//unary
 	size_t permute(size_t x, const int_t*, size_t sz);
@@ -117,7 +121,7 @@ public:
 	size_t bdd_and(size_t x, size_t y)	{ return apply_and(*this, x, *this, y); } 
 	size_t bdd_and_not(size_t x, size_t y){ return apply_and_not(*this, x, *this, y); }
 	vbools allsat(size_t x, size_t nvars) const;
-	void memos_clear() { memo_and.clear(), memo_and_not.clear();}//, memo_or.clear(); }
+	void memos_clear() { memo_and.clear(), memo_and_not.clear(), memo_or.clear(), memo_and_ex.clear(); }
 	using bdds_base::add;
 	using bdds_base::out;
 };
@@ -264,7 +268,7 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 	if (it != src.memo_and.end()) return it->second;
 	int_t res;
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) return src.memo_and.emplace(t, res = !trueleaf(Vx) ? F : &src == &dst ? y : dst.copy(dst, y)), res;
+	if (leaf(Vx)) return src.memo_and.emplace(t, res = trueleaf(Vx) ? y : F), res;
        	const node &Vy = dst.getnode(y);
 	if (leaf(Vy)) return src.memo_and.emplace(t, res = !trueleaf(Vy) ? F : &src == &dst ? x : dst.copy(src, x)), res;
 	const size_t &vx = Vx[0], &vy = Vy[0];
@@ -273,6 +277,25 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 	else if (!vx) return src.memo_and.emplace(t, res = (a&&b)?T:F), res;
 	else if ((v = vx) < vy || !vy) b = d = y;
 	return src.memo_and.emplace(t, res = dst.add({{v, apply_and(src, a, dst, b), apply_and(src, c, dst, d)}})), res;
+}
+size_t bdds::apply_and_ex(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, size_t sz) {
+	const auto t = make_tuple(&dst, s, x, y);
+	auto it = src.memo_and_ex.find(t);
+	if (it != src.memo_and_ex.end()) return it->second;
+	int_t res;
+	const node &Vx = src.getnode(x);
+	if (leaf(Vx)) return src.memo_and_ex.emplace(t, res = trueleaf(Vx) ? apply(dst, y, dst, op_exists(s, sz)) : F), res;
+       	const node &Vy = dst.getnode(y);
+	if (leaf(Vy))
+		return src.memo_and_ex.emplace(t, res = !trueleaf(Vy) ? F : &src == &dst ? apply(dst, x, dst, op_exists(s, sz)) : apply(dst, dst.copy(src, x), dst, op_exists(s, sz))), res;
+	const size_t &vx = Vx[0], &vy = Vy[0];
+	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
+	else if (!vx) return src.memo_and_ex.emplace(t, res = (a&&b)?T:F), res;
+	else if ((v = vx) < vy || !vy) b = d = y;
+	if (v <= sz && s[v-1])
+		return src.memo_and_ex.emplace(t, res = dst.bdd_or(apply_and_ex(src, a, dst, b, s, sz), apply_and_ex(src, c, dst, d, s, sz))), res;
+	return src.memo_and_ex.emplace(t, res = dst.add({{v, apply_and_ex(src, a, dst, b, s, sz), apply_and_ex(src, c, dst, d, s, sz)}})), res;
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 	const auto t = make_tuple(&dst, x, y);
@@ -296,7 +319,7 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 	if (it != src.memo_or.end()) return it->second;
 	int_t res;
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) return src.memo_or.emplace(t, res = trueleaf(Vx) ? T : &src == &dst ? y : dst.copy(dst, y)), res;
+	if (leaf(Vx)) return src.memo_or.emplace(t, res = trueleaf(Vx) ? T : y), res;
        	const node &Vy = dst.getnode(y);
 	if (leaf(Vy)) return src.memo_or.emplace(t, res = trueleaf(Vy) ? T : &src == &dst ? x : dst.copy(src, x)), res;
 	const size_t &vx = Vx[0], &vy = Vy[0];
@@ -451,8 +474,10 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	for (const rule& r : rules) { // per rule
 		int_t root = dbs.setpow(db, r.w, ar * bits, maxw);
-		x = bdds::leaf(db) ? bdds::trueleaf(db) ? r.h : bdds_base::F : bdds::apply_and(dbs, root, prog, r.h); // rule/db conjunction
-		y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
+		if (bdds::leaf(db)) {
+			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
+			y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
+		} else  y = bdds::apply_and_ex(dbs, root, prog, r.h, r.x, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
 		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
 		z = prog.bdd_and(z, r.hsym);
 		dbs.setpow(db, 1, ar * bits, maxw);
@@ -492,6 +517,9 @@ next:	for (n = l = 0; n != 31; ++n)
 }
 size_t std::hash<memo>::operator()(const memo& m) const {
 	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m);
+}
+size_t std::hash<exmemo>::operator()(const exmemo& m) const {
+	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m) + (size_t)get<3>(m);
 }
 size_t std::hash<pair<const bdds*, size_t>>::operator()(const pair<const bdds*, size_t>& m) const {
 	return (size_t)m.first + m.second;
