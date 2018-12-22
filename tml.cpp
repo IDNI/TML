@@ -40,37 +40,15 @@ typedef tuple<const bdds*, int_t, int_t> memo;
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-template <class T> inline void hash_combine(std::size_t& s, const T& v) { // boost's
-	static hash<T> h;
-	s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
-}
 template<> struct std::hash<node> {
-	size_t operator()(const node& n) const {
-		size_t res = 0;
-		hash_combine(res, n[0]), hash_combine(res, n[1]), hash_combine(res, n[2]);
-		return res;		
-	}
+	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
-template<> struct std::hash<memo> {
-	size_t operator()(const memo& m) const {
-		size_t res = 0;
-		hash_combine(res,get<0>(m)),hash_combine(res,get<1>(m)),hash_combine(res,get<2>(m));
-		return res;		
-	}
-};
+template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
 template<> struct std::hash<pair<const bdds*, size_t>> {
-	size_t operator()(const pair<const bdds*, size_t>& m) const {
-		size_t res = 0;
-		hash_combine(res, m.first), hash_combine(res, m.second);
-		return res;		
-	}
+	size_t operator()(const pair<const bdds*, size_t>& m) const;
 };
 template<> struct std::hash<pair<size_t, const int_t*>> {
-	size_t operator()(const pair<size_t, const int_t*>& m) const {
-		size_t res = 0;
-		hash_combine(res, m.first), hash_combine(res, m.second);
-		return res;		
-	}
+	size_t operator()(const pair<size_t, const int_t*>& m) const { return m.first + (size_t)m.second; }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 struct rule { // a [P-DATALOG] rule in bdd form with additional information
@@ -511,6 +489,12 @@ next:	for (n = l = 0; n != 31; ++n)
 		goto next;
 	} else if (skip) goto next;
 	return ss.str();
+}
+size_t std::hash<memo>::operator()(const memo& m) const {
+	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m);
+}
+size_t std::hash<pair<const bdds*, size_t>>::operator()(const pair<const bdds*, size_t>& m) const {
+	return (size_t)m.first + m.second;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main() {
