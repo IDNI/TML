@@ -120,7 +120,7 @@ public:
 	static size_t apply_and(bdds& src, size_t x, bdds& dst, size_t y);
 	static size_t apply_and_not(bdds& src, size_t x, bdds& dst, size_t y);
 	static size_t apply_or(bdds& src, size_t x, bdds& dst, size_t y);
-	static size_t apply_and_ex(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, size_t sz);
+	static size_t apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, const size_t* p, size_t sz);
 	template<typename op_t> static size_t apply(bdds& b, size_t x, bdds& r, const op_t& op);//unary
 	template<typename op_t> static size_t apply(const bdds& b, size_t x,bdds& r, const op_t& op);//unary
 	size_t permute(size_t x, const size_t*, size_t sz);
@@ -133,7 +133,7 @@ public:
 	size_t bdd_and(size_t x, size_t y)	{ return apply_and(*this, x, *this, y); } 
 	size_t bdd_and_not(size_t x, size_t y){ return apply_and_not(*this, x, *this, y); }
 	vbools allsat(size_t x, size_t nvars) const;
-	void memos_clear() {/* memo_and.clear(), memo_and_not.clear(), memo_or.clear(),*/ memo_and_ex.clear(); }
+	void memos_clear() { /*memo_and.clear(), memo_and_not.clear(), memo_or.clear(), memo_copy.clear(), memo_permute.clear(),*/ memo_and_ex.clear(); }
 	using bdds_base::add;
 	using bdds_base::out;
 };
@@ -274,24 +274,36 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 	else if ((v = vx) < vy || !vy) b = d = y;
 	return src.memo_and.emplace(t, res = dst.add({{v, apply_and(src, a, dst, b), apply_and(src, c, dst, d)}})), res;
 }
-size_t bdds::apply_and_ex(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, size_t sz) {
+size_t bdds::apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y, const bool* s, const size_t* p, size_t sz) {
 	const auto t = make_tuple(&dst, s, x, y);
 	auto it = src.memo_and_ex.find(t);
 	if (it != src.memo_and_ex.end()) return it->second;
 	size_t res;
-	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) return src.memo_and_ex.emplace(t, res = trueleaf(Vx) ? apply(dst, y, dst, op_exists(s, sz)) : F), res;
-       	const node &Vy = dst.getnode(y);
-	if (leaf(Vy))
-		return src.memo_and_ex.emplace(t, res = !trueleaf(Vy) ? F : &src == &dst ? apply(dst, x, dst, op_exists(s, sz)) : apply(dst, dst.copy(src, x), dst, op_exists(s, sz))), res;
+	const node Vx = src.getnode(x);
+       	const node Vy = dst.getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	if (leaf(Vx)) {
+		res = trueleaf(Vx) ? apply(dst, y, dst, op_exists(s, sz)) : F;
+		goto ret;
+	}
+	if (leaf(Vy)) {
+		res = !trueleaf(Vy) ? F : &src == &dst ? apply(dst, x, dst, op_exists(s, sz)) : apply(dst, dst.copy(src, x), dst, op_exists(s, sz));
+		goto ret;
+	}
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) return src.memo_and_ex.emplace(t, res = (a&&b)?T:F), res;
+	else if (!vx) {
+		res = (a&&b)?T:F;
+		goto ret;
+	}
 	else if ((v = vx) < vy || !vy) b = d = y;
-	if (v <= sz && s[v-1])
-		return src.memo_and_ex.emplace(t, res = dst.bdd_or(apply_and_ex(src, a, dst, b, s, sz), apply_and_ex(src, c, dst, d, s, sz))), res;
-	return src.memo_and_ex.emplace(t, res = dst.add({{v, apply_and_ex(src, a, dst, b, s, sz), apply_and_ex(src, c, dst, d, s, sz)}})), res;
+	if (v <= sz && s[v-1]) {
+		res = dst.bdd_or(apply_and_ex_perm(src, a, dst, b, s, p, sz), apply_and_ex_perm(src, c, dst, d, s, p, sz));
+		goto ret;
+	}
+	res = dst.add({{v, apply_and_ex_perm(src, a, dst, b, s, p, sz), apply_and_ex_perm(src, c, dst, d, s, p, sz)}});
+ret:
+	return src.memo_and_ex.emplace(t, res = dst.permute(res, p, sz)), res;
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 	const auto t = make_tuple(&dst, x, y);
@@ -472,8 +484,8 @@ template<typename K> void lp<K>::step() {
 		if (bdds::leaf(db)) {
 			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
 			y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
-		} else  y = bdds::apply_and_ex(dbs, root, prog, r.h, r.x, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
-		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
+			z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
+		} else  z = bdds::apply_and_ex_perm(dbs, root, prog, r.h, r.x, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
 		z = prog.bdd_and(z, r.hsym);
 		dbs.setpow(db, 1, ar * bits, maxw);
 		(r.neg ? del : add) = bdds::apply_or(prog, z, dbs, r.neg ? del : add);
@@ -481,6 +493,7 @@ template<typename K> void lp<K>::step() {
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F) db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);// db = (db|add)&~del = db&~del | add&~del
 	dbs.memos_clear();
+	prog.memos_clear();
 }
 
 template<typename K> bool lp<K>::pfp() {
