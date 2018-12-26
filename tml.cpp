@@ -65,17 +65,18 @@ class bdds_base {
 	vector<node> V; // all nodes
 	unordered_map<node, size_t> M; // node to its index
 protected:
-	size_t dim = 1, nvars; // used for implicit power
+	size_t dim = 1; // used for implicit power
+	const size_t nvars;
 	size_t add_nocheck(const node& n) {
 		size_t r;
 		return M.emplace(n, r = V.size()), V.emplace_back(n), r;
 	}
-	bdds_base() { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
+	bdds_base(size_t nvars) : nvars(nvars) { add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}}); }
 public:
 	size_t root = 0, maxbdd; // used for implicit power
 	static const size_t F, T;
-	size_t setpow(size_t _root, size_t _dim, size_t _nvars, size_t maxw) {
-		root=_root, dim=_dim, nvars=_nvars, maxbdd = (size_t)1 << ((sizeof(int_t)<<3)/maxw);
+	size_t setpow(size_t _root, size_t _dim, size_t maxw) {
+		root = _root, dim = _dim, maxbdd = (size_t)1 << ((sizeof(int_t)<<3)/maxw);
 		return root;
 	}
 	size_t add(const node& n) { // create new bdd node, standard implementation
@@ -114,6 +115,7 @@ class bdds : public bdds_base { // holding functions only, therefore tbd: dont u
 	unordered_map<pair<const bdds*, size_t>, size_t> memo_copy;
 	unordered_map<pair<size_t, const size_t*>, size_t> memo_permute;
 public:
+	bdds(size_t nvars) : bdds_base(nvars) {}
 	size_t from_bit(size_t x, bool v) { return add(v ? node{{x+1, T, F}} : node{{x+1, F, T}}); }
 	size_t ite(size_t v, size_t t, size_t e);
 	size_t copy(const bdds& b, size_t x);
@@ -171,7 +173,7 @@ wostream& out(wostream& os, bdds& b, size_t db, size_t bits, size_t ar, const cl
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class lp { // [pfp] logic program
 	dict_t<K> dict; // hold its own dict so we can determine the universe size
-	bdds prog, dbs; // separate bdds for prog and db cause db is a virtual power
+	bdds *pprog, *pdbs; // separate bdds for prog and db cause db is a virtual power
 	vector<rule> rules; // prog's rules
 
 	K str_read(wstr *s); // parser's helper, reads a string and returns its dict id
@@ -183,7 +185,7 @@ public:
 	void prog_read(wstr s);
 	void step(); // single pfp step
 	bool pfp();
-	void printdb(wostream& os) { out<K>(os, dbs, db, bits, ar, dict); }
+	void printdb(wostream& os) { out<K>(os, *pdbs, db, bits, ar, dict); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) { for (auto y:x) os << (y?'1':'0');return os; }
@@ -470,24 +472,26 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 			if ((l=y.size()) < ar+1)
 				y.resize(ar+1), fill(y.begin()+l, y.end(), dict.pad); // the padding
 	bits = dict.bits();
+	pdbs = new bdds(ar * bits), pprog = new bdds(maxw * ar * bits);
 	for (const matrix<K>& x : r)
-	 	if (x.size() == 1) db = dbs.bdd_or(db, dbs.from_rule(x, bits, ar).h);// fact
-		else rules.push_back(prog.from_rule(x, bits, ar)); // rule
+	 	if (x.size() == 1) db = pdbs->bdd_or(db, pdbs->from_rule(x, bits, ar).h);// fact
+		else rules.push_back(pprog->from_rule(x, bits, ar)); // rule
 	for (const rule& x : rules) maxw = max(maxw, x.w);
 }
 
 template<typename K> void lp<K>::step() {
 	size_t add = bdds::F, del = bdds::F, s, x, y, z;
 	wcout << endl;
+	bdds &dbs = *pdbs, &prog = *pprog;
 	for (const rule& r : rules) { // per rule
-		int_t root = dbs.setpow(db, r.w, ar * bits, maxw);
+		int_t root = dbs.setpow(db, r.w, maxw);
 		if (bdds::leaf(db)) {
 			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
 			y = bdds::apply(prog, x, prog, op_exists(r.x, ((r.w+1)*bits+1)*(ar+2))); // remove nonhead variables
 			z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder the remaining vars
 		} else  z = bdds::apply_and_ex_perm(dbs, root, prog, r.h, r.x, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
 		z = prog.bdd_and(z, r.hsym);
-		dbs.setpow(db, 1, ar * bits, maxw);
+		dbs.setpow(db, 1, maxw);
 		(r.neg ? del : add) = bdds::apply_or(prog, z, dbs, r.neg ? del : add);
 	}
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F) db = bdds::F; // detect contradiction
@@ -500,7 +504,7 @@ template<typename K> bool lp<K>::pfp() {
 	size_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<dbs.size()<<" + "<<prog.size()<<endl);
+		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<" + "<<pprog->size()<<endl);
 		step();
 		//printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return printdb(wcout), d == db;
