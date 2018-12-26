@@ -235,6 +235,8 @@ template<typename op_t> size_t bdds::apply(bdds& b, size_t x, bdds& r, const op_
 }
 
 size_t bdds::ite(size_t v, size_t t, size_t e) {
+	node x = getnode(t), y = getnode(e);
+	if ((leaf(x) || v < x[0]) && (leaf(y) || v < y[0])) return add({{v+1,t,e}});
 	return bdd_or(bdd_and(from_bit(v, true), t), bdd_and(from_bit(v, false), e));
 }
 
