@@ -129,6 +129,8 @@ public:
 	// helper constructors
 	size_t from_eq(size_t x, size_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
+	template<typename K>
+	void from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar, const map<K, int_t>&, map<K, array<size_t, 2>>&, rule &r, size_t npad);
 	template<typename K> matrix<K> from_bits(size_t x, size_t bits, size_t ar);
 	// helper apply() variations
 	size_t bdd_or(size_t x, size_t y)	{ return apply_or(*this, x, *this, y); } 
@@ -354,14 +356,37 @@ template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar)
 	}
 	return r;
 }
+template<typename K>
+void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar, const map<K, int_t>& hvars, map<K, array<size_t, 2>>& m, rule &r, size_t npad) {
+	size_t notpad, b;
+	#define BIT(term,arg) (term*bits+b)*ar+arg
+	if (auto it = m.find(vij); it != m.end()) { // if seen
+		for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
+						BIT(it->second[0], it->second[1])));
+		if (hvars.find(vij) != hvars.end()) // existential out if headvar
+			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
+	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }); vij >= 0) // sym
+		for (b=0; b!=bits; ++b)
+			k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))),
+			r.x[BIT(i,j)] = true;
+	else {
+		for (b=0, notpad = T; b!=bits; ++b)
+			notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
+		npad = bdd_or(npad, notpad);
+		if (auto jt = hvars.find(vij); jt == hvars.end()) //non-head var
+			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
+		else for (b=0; b!=bits; ++b)
+			if (BIT(i,j) != BIT(0, jt->second))
+				r.hvars[BIT(i,j)] = BIT(0, jt->second);
+	}
+}
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
-	size_t i, j, b, k, notpad, npad = F;
+	size_t i, j, b, k, npad = F;
 	map<K, int_t> hvars;
 	vector<K>& head = v[v.size() - 1];
 	bool bneg;
 	rule r;
 	r.h = r.hsym = T, r.neg = head[0] < 0, r.w = v.size() - 1, head.erase(head.begin());
-	#define BIT(term,arg) (term*bits+b)*ar+arg
 	for (i = 0; i != head.size(); ++i)
 		if (head[i] < 0) hvars.emplace(head[i], i); // var
 		else for (b = 0; b != bits; ++b)
@@ -373,27 +398,8 @@ template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const 
 	r.x = new bool[vars];
 	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
 	for (i = 0; i != v.size()-1; ++i, r.h = bneg ? bdd_and_not(r.h, k) : bdd_and(r.h, k))
-		for (k=T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
-			if (auto it = m.find(v[i][j]); it != m.end()) { // if seen
-				for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
-								BIT(it->second[0], it->second[1])));
-				if (hvars.find(v[i][j]) != hvars.end()) // existential out if headvar
-					for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
-			} else if (m.emplace(v[i][j], array<size_t, 2>{ {i, j} }); v[i][j] >= 0) // sym
-				for (b=0; b!=bits; ++b)
-					k = bdd_and(k, from_bit(BIT(i,j), v[i][j]&(1<<b))),
-					r.x[BIT(i,j)] = true;
-			else {
-				for (b=0, notpad = T; b!=bits; ++b)
-					notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
-				npad = bdd_or(npad, notpad);
-				if (auto jt = hvars.find(v[i][j]); jt == hvars.end()) //non-head var
-					for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
-				else for (b=0; b!=bits; ++b)
-					if (BIT(i,j) != BIT(0, jt->second))
-						r.hvars[BIT(i,j)] = BIT(0, jt->second);
-			}
-	#undef BIT
+		for (k = T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0; j != v[i].size(); ++j)
+			from_arg(i, j, k, v[i][j], bits, ar, hvars, m, r, npad);
 	r.h = bdd_and_not(r.h, npad);
 	return r;
 }
