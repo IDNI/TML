@@ -132,7 +132,7 @@ public:
 	template<typename K>
 	void from_arg(	size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar,
 			const map<K, int_t>&, map<K, array<size_t, 2>>&, rule &r, size_t &npad);
-	template<typename K> matrix<K> from_bits(size_t x, size_t bits, size_t ar);
+	template<typename K> matrix<K> from_bits(size_t x, size_t bits, size_t ar, size_t w);
 	// helper apply() variations
 	size_t bdd_or(size_t x, size_t y)	{ return apply_or(*this, x, *this, y); } 
 	size_t bdd_and(size_t x, size_t y)	{ return apply_and(*this, x, *this, y); } 
@@ -172,7 +172,7 @@ wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 	return os;
 }
 template<typename K>
-wostream& out(wostream& os, bdds& b, size_t db, size_t bits, size_t ar, const class dict_t<K>& d);
+wostream& out(wostream& os, bdds& b, size_t db, size_t bits, size_t ar, size_t w, const class dict_t<K>& d);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename K> class lp { // [pfp] logic program
 	dict_t<K> dict; // hold its own dict so we can determine the universe size
@@ -188,13 +188,13 @@ public:
 	void prog_read(wstr s);
 	void step(); // single pfp step
 	bool pfp();
-	void printdb(wostream& os) { out<K>(os, *pdbs, db, bits, ar, dict); }
+	void printdb(wostream& os) { out<K>(os, *pdbs, db, bits, ar, 1, dict); }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) { for (auto y:x) os << (y?'1':'0');return os; }
 wostream& operator<<(wostream& os, const vbools& x) { for (auto y:x) os << y << endl; return os; }
-template<typename K> wostream& out(wostream& os, bdds& b, size_t db, size_t bits, size_t ar, const dict_t<K>& d) {
-	for (auto v : b.from_bits<K>(db, bits, ar)) {
+template<typename K> wostream& out(wostream& os, bdds& b, size_t db, size_t bits, size_t ar, size_t w, const dict_t<K>& d) {
+	for (auto v : b.from_bits<K>(db, bits, ar, w)) {
 		for (auto k : v)
 			if (!k) os << L"* ";
 			else if ((size_t)k < (size_t)d.nsyms()) os << d(k) << L' ';
@@ -344,16 +344,17 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #define BIT(term,arg) ((term*bits+b)*ar+arg)
-template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar * dim);
+template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar, size_t w) {
+	vbools s = allsat(x, bits * ar * w);
 	matrix<K> r(s.size());
-	for (vector<K>& v : r) v = vector<K>(dim * ar, 0);
-	size_t n = 0, i, b;
+	for (vector<K>& v : r) v = vector<K>(w * ar, 0);
+	size_t n = 0, i, b, j;
 	for (const bools& x : s) {
-		for (i = 0; i != ar * dim; ++i)
-			for (b = 0; b != bits; ++b)
-				if (x[BIT(0, i)])
-					r[n][i] |= 1 << b;
+		for (j = 0; j != w; ++j)
+			for (i = 0; i != ar; ++i)
+				for (b = 0; b != bits; ++b)
+					if (x[BIT(j, i)])
+						r[n][j * ar + i] |= 1 << b;
 		++n;
 	}
 	return r;
@@ -479,8 +480,8 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	 	if (x.size() == 1) db = pdbs->bdd_or(db, pdbs->from_rule(x, bits, ar).h);// fact
 		else {
 			rules.push_back(pprog->from_rule(x, bits, ar)); // rule
-			out<K>(wcout<<"from_rule: ", *pprog, rules.back().h, bits, ar * rules.back().w, dict) << endl;
-			out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits, ar, dict) << endl;
+			out<K>(wcout<<"from_rule: ", *pprog, rules.back().h, bits, ar, rules.back().w, dict) << endl;
+			out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits, ar, 1, dict) << endl;
 		}
 	for (const rule& x : rules) maxw = max(maxw, x.w);
 }
