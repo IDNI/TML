@@ -130,7 +130,8 @@ public:
 	size_t from_eq(size_t x, size_t y); // a bdd saying "x=y"
 	template<typename K> rule from_rule(matrix<K> v, const size_t bits, const size_t ar);
 	template<typename K>
-	void from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar, const map<K, int_t>&, map<K, array<size_t, 2>>&, rule &r, size_t npad);
+	void from_arg(	size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar,
+			const map<K, int_t>&, map<K, array<size_t, 2>>&, rule &r, size_t &npad);
 	template<typename K> matrix<K> from_bits(size_t x, size_t bits, size_t ar);
 	// helper apply() variations
 	size_t bdd_or(size_t x, size_t y)	{ return apply_or(*this, x, *this, y); } 
@@ -342,42 +343,37 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 	return src.memo_or.emplace(t, res = dst.add({{v, apply_or(src, a, dst, b), apply_or(src, c, dst, d)}})), res;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+#define BIT(term,arg) ((term*bits+b)*ar+arg)
 template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar) {
 	vbools s = allsat(x, bits * ar * dim);
 	matrix<K> r(s.size());
 	for (vector<K>& v : r) v = vector<K>(dim * ar, 0);
-	size_t n = 0;
-	for (const bools& b : s) {
-		for (size_t i = 0, j; i != bits * ar * dim; ++i)
-			if (b[i])
-				j = i - (i % ar),
-				r[n][ar*((j/ar)/bits)+i%ar] |= 1 << ((j/ar)%bits);
+	size_t n = 0, i, b;
+	for (const bools& x : s) {
+		for (i = 0; i != ar * dim; ++i)
+			for (b = 0; b != bits; ++b)
+				if (x[BIT(0, i)])
+					r[n][i] |= 1 << b;
 		++n;
 	}
 	return r;
 }
 template<typename K>
-void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar, const map<K, int_t>& hvars, map<K, array<size_t, 2>>& m, rule &r, size_t npad) {
+void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar,
+	const map<K, int_t>& hvars, map<K, array<size_t, 2>>& m, rule &r, size_t &npad) {
 	size_t notpad, b;
-	#define BIT(term,arg) (term*bits+b)*ar+arg
 	if (auto it = m.find(vij); it != m.end()) { // if seen
-		for (b=0; b!=bits; ++b)	k = bdd_and(k,from_eq(BIT(i,j),
-						BIT(it->second[0], it->second[1])));
+		for (b=0; b!=bits; ++b)	k = bdd_and(k, from_eq(BIT(i,j), BIT(it->second[0], it->second[1])));
 		if (hvars.find(vij) != hvars.end()) // existential out if headvar
 			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
 	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }); vij >= 0) // sym
-		for (b=0; b!=bits; ++b)
-			k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))),
-			r.x[BIT(i,j)] = true;
+		for (b=0; b!=bits; ++b) k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))), r.x[BIT(i,j)] = true;
 	else {
-		for (b=0, notpad = T; b!=bits; ++b)
-			notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
+		for (b=0, notpad = T; b!=bits; ++b) notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
 		npad = bdd_or(npad, notpad);
 		if (auto jt = hvars.find(vij); jt == hvars.end()) //non-head var
 			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
-		else for (b=0; b!=bits; ++b)
-			if (BIT(i,j) != BIT(0, jt->second))
-				r.hvars[BIT(i,j)] = BIT(0, jt->second);
+		else for (b=0; b!=bits; ++b) if (BIT(i,j) != BIT(0, jt->second)) r.hvars[BIT(i,j)] = BIT(0, jt->second);
 	}
 }
 template<typename K> rule bdds::from_rule(matrix<K> v, const size_t bits, const size_t ar) {
@@ -481,7 +477,11 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	pdbs = new bdds(ar * bits), pprog = new bdds(maxw * ar * bits);
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1) db = pdbs->bdd_or(db, pdbs->from_rule(x, bits, ar).h);// fact
-		else rules.push_back(pprog->from_rule(x, bits, ar)); // rule
+		else {
+			rules.push_back(pprog->from_rule(x, bits, ar)); // rule
+			out<K>(wcout<<"from_rule: ", *pprog, rules.back().h, bits, ar * rules.back().w, dict) << endl;
+			out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits, ar, dict) << endl;
+		}
 	for (const rule& x : rules) maxw = max(maxw, x.w);
 }
 
