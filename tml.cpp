@@ -87,8 +87,8 @@ public:
 	}
 	size_t add(const node& n) {//create new bdd node,standard implementation
 		if (n[1] == n[2]) return n[1];
-		if (auto it = M.find(n); it != M.end()) return it->second;
-		return add_nocheck(n);
+		auto it = M.find(n);
+		return it == M.end() ? add_nocheck(n) : it->second;
 	}
 	node getnode(size_t n) const { // considering virtual powers
 		if (dim == 1) return V[n];
@@ -206,9 +206,11 @@ public:
 };
 ////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) {
-	for (auto y:x) os << (y?'1':'0');return os; }
+	for (auto y:x) os << (y?'1':'0');
+	return os; }
 wostream& operator<<(wostream& os, const vbools& x) {
-	for (auto y:x) os << y << endl; return os; }
+	for (auto y:x) os << y << endl;
+	return os; }
 
 template<typename K> wostream& out(wostream& os, bdds& b, size_t db, size_t bits,
 	       			size_t ar, size_t w, const dict_t<K>& d) {
@@ -402,13 +404,14 @@ void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar
 	const map<K, int_t>& hvars, map<K, array<size_t, 2>>& m, rule &r,
 	size_t &npad) {
 	size_t notpad, b;
-	if (auto it = m.find(vij); it != m.end()) { // if seen
+	auto it = m.find(vij);
+	if (it != m.end()) { // if seen
 		for (b=0; b!=bits; ++b)
 			k = bdd_and(k, from_eq(BIT(i,j),
 					BIT(it->second[0], it->second[1])));
 		if (hvars.find(vij) != hvars.end()) // existential out if headvar
 			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
-	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }); vij >= 0) // sym
+	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }), vij >= 0) // sym
 		for (b=0; b!=bits; ++b)
 			k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))),
 			r.x[BIT(i,j)] = true;
@@ -416,7 +419,8 @@ void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar
 		for (b=0, notpad = T; b!=bits; ++b)
 			notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
 		npad = bdd_or(npad, notpad);
-		if (auto jt = hvars.find(vij); jt == hvars.end()) //non-head var
+		auto jt = hvars.find(vij);
+		if (jt == hvars.end()) //non-head var
 			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
 		else for (b=0; b!=bits; ++b) if (BIT(i,j) != BIT(0, jt->second))
 			r.hvars[BIT(i,j)] = BIT(0, jt->second);
@@ -542,13 +546,13 @@ template<typename K> void lp<K>::step() {
 	wcout << endl;
 	bdds &dbs = *pdbs, &prog = *pprog;
 	for (const rule& r : rules) { // per rule
-		int_t root = dbs.setpow(db, r.w, maxw);
+		dbs.setpow(db, r.w, maxw);
 		out<K>(wcout<<"db: ", *pdbs, db, bits, ar, r.w, dict) << endl;
 		if (bdds::leaf(db)) {
 			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
 			y = bdds::apply(prog, x, prog, // remove nonhead variables
 				op_exists(r.x, ((r.w+1)*bits+1)*(ar+2)));
-		} else  y = bdds::apply_and_ex_perm(dbs, root, prog, r.h, r.x,
+		} else  y = bdds::apply_and_ex_perm(dbs, db, prog, r.h, r.x,
 			r.hvars, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
 		out<K>(wcout<<"y: ", prog, y, bits, ar, r.w, dict) << endl;
 		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder
@@ -620,4 +624,4 @@ int main() {
 	p.prog_read(s.c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
 	return 0;
-}
+}////////////////////
