@@ -45,6 +45,13 @@ typedef tuple<const bdds*, const bool*, size_t, size_t> exmemo;
 #define err_inrel "Unable to read the input relation symbol.\n"
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"
+#define RED     "\x1b[31m"
+#define GREEN   "\x1b[32m"
+#define YELLOW  "\x1b[33m"
+#define BLUE    "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN    "\x1b[36m"
+#define COLOR_RESET   "\x1b[0m"
 ////////////////////////////////////////////////////////////////////////////////
 template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
@@ -86,6 +93,7 @@ public:
 		root=_root,dim=_dim,maxbdd=(size_t)1<<((sizeof(int_t)<<3)/maxw);
 	}
 	size_t add(const node& n) {//create new bdd node,standard implementation
+		assert(n[0] <= nvars * dim);
 		if (n[1] == n[2]) return n[1];
 		auto it = M.find(n);
 		return it == M.end() ? add_nocheck(n) : it->second;
@@ -107,7 +115,7 @@ public:
 	static bool trueleaf(const size_t& x) { return x == T; }
 	wostream& out(wostream& os, const node& n) const;//print using ?: syntax
 	wostream& out(wostream& os, size_t n) const {
-		return out(os<< L'['<<n<<L']' , getnode(n)); }
+		return out(os<<RED<< L'['<<n<<L']'<<COLOR_RESET , getnode(n)); }
 	size_t size() const { return V.size(); }
 };
 const size_t bdds_base::F = 0;
@@ -249,7 +257,7 @@ size_t bdds::from_eq(size_t x, size_t y) {
 
 wostream& bdds_base::out(wostream& os, const node& n) const {
 	if (leaf(n)) return os << (trueleaf(n) ? L'T' : L'F');
-	else return out(os << n[0] << L'?', n[1]), out(os << L':', n[2]);
+	else return out(os << GREEN<<n[0]<<COLOR_RESET << L'?', n[1]), out(os << L':', n[2]);
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> size_t bdds::apply(const bdds& b, size_t x, bdds& r,
@@ -409,8 +417,8 @@ void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar
 		for (b=0; b!=bits; ++b)
 			k = bdd_and(k, from_eq(BIT(i,j),
 					BIT(it->second[0], it->second[1])));
-		if (hvars.find(vij) != hvars.end()) // existential out if headvar
-			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
+//		if (hvars.find(vij) != hvars.end()) // existential out if headvar
+		for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true; // existential out anyway
 	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }), vij >= 0) // sym
 		for (b=0; b!=bits; ++b)
 			k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))),
@@ -440,8 +448,7 @@ template<typename K> rule bdds::from_rule(matrix<K> v, size_t bits, size_t ar) {
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) return r.h = r.hsym, r;
 	const size_t vars = ((r.w+1)*bits+1)*(ar+2);
-	r.hvars = new size_t[vars];
-	r.x = new bool[vars];
+	r.hvars = new size_t[vars], r.x = new bool[vars];
 	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
 	for (i=0;i!=v.size()-1;++i,r.h=bneg?bdd_and_not(r.h, k):bdd_and(r.h, k))
 		for (k = T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
@@ -518,9 +525,11 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	db = bdds::F;
 	size_t l;
 	ar = maxw = 0;
-	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t))
+	for (matrix<K> t; !(t = rule_read(&s)).empty(); r.push_back(t)) {
 		for (const vector<K>& x : t) // we support a single rel arity
 			ar = max(ar, x.size()-1); // so we'll pad everything
+		maxw = max(maxw, t.size() - 1);
+	}
 	for (matrix<K>& x : r)
 		for (vector<K>& y : x)
 			if ((l=y.size()) < ar+1)
@@ -533,12 +542,11 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 			db=pdbs->bdd_or(db,pdbs->from_rule(x, bits, ar).h);//fact
 		else {
 			rules.push_back(pprog->from_rule(x, bits, ar)); // rule
-			out<K>(wcout<<"from_rule: ", *pprog, rules.back().h,
-					bits, ar, rules.back().w, dict) << endl;
-			out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits,
-					ar, 1, dict) << endl;
+			//out<K>(wcout<<"from_rule: ", *pprog, rules.back().h,
+			//		bits, ar, rules.back().w, dict) << endl;
+			//out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits,
+			//		ar, 1, dict) << endl;
 		}
-	for (const rule& x : rules) maxw = max(maxw, x.w);
 }
 
 template<typename K> void lp<K>::step() {
@@ -547,35 +555,40 @@ template<typename K> void lp<K>::step() {
 	bdds &dbs = *pdbs, &prog = *pprog;
 	for (const rule& r : rules) { // per rule
 		dbs.setpow(db, r.w, maxw);
-		out<K>(wcout<<"db: ", *pdbs, db, bits, ar, r.w, dict) << endl;
+		//out<K>(wcout<<"db: ", *pdbs, db, bits, ar, r.w, dict) << endl;
 		if (bdds::leaf(db)) {
 			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
 			y = bdds::apply(prog, x, prog, // remove nonhead variables
 				op_exists(r.x, ((r.w+1)*bits+1)*(ar+2)));
 		} else  y = bdds::apply_and_ex_perm(dbs, db, prog, r.h, r.x,
 			r.hvars, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
-		out<K>(wcout<<"y: ", prog, y, bits, ar, r.w, dict) << endl;
+//		out<K>(wcout<<"y: ", prog, y, bits, ar, r.w, dict) << endl;
 		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder
-		out<K>(wcout<<"z: ", prog, z, bits, ar, r.w, dict) << endl;
+//		out<K>(wcout<<"z: ", prog, z, bits, ar, r.w, dict) << endl;
 		z = prog.bdd_and(z, r.hsym);
-		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, r.w, dict) << endl;
+//		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, r.w, dict) << endl;
 		dbs.setpow(db, 1, maxw);
-		out<K>(wcout<<"db: ", *pdbs, db, bits, ar, 1, dict) << endl;
+//		out<K>(wcout<<"db: ", *pdbs, db, bits, ar, 1, dict) << endl;
+//		dbs.out(wcout<<"add: ", add) << endl;
+//		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
+//		prog.out(wcout<<"toadd: ", z) << endl;
+//		out<K>(wcout<<"toadd: ", prog, z, bits, ar, r.w, dict) << endl;
+//		out<K>(wcout<<"invtoadd: ", prog, prog.bdd_and_not(bdds_base::T, z), bits, ar, r.w, dict) << endl;
 		(r.neg?del:add) = bdds::apply_or(prog, z, dbs, r.neg?del:add);
+//		dbs.out(wcout<<"add: ", add) << endl;
+//		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
 	}
-		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F)
 		db = bdds::F; // detect contradiction
 	else {
-		out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
-		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
-		db = dbs.bdd_and_not(db, del);
-		out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
-		db = dbs.bdd_or(db, s);// db = (db|add)&~del = db&~del | add&~del
-		out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
+		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
+		//out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
+		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
+		// db = (db|add)&~del = db&~del | add&~del
+		db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);
+		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
 	}
-	dbs.memos_clear();
-	prog.memos_clear();
+	dbs.memos_clear(), prog.memos_clear();
 }
 
 template<typename K> bool lp<K>::pfp() {
@@ -624,4 +637,4 @@ int main() {
 	p.prog_read(s.c_str());
 	if (!p.pfp()) wcout << "unsat" << endl;
 	return 0;
-}////////////////////
+}
