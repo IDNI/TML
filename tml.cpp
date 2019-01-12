@@ -65,14 +65,6 @@ template<> struct std::hash<pair<size_t, const size_t*>> {
 	size_t operator()(const pair<size_t, const size_t*>& m) const { return m.first + (size_t)m.second; }
 };
 ////////////////////////////////////////////////////////////////////////////////
-struct rule { // a [P-DATALOG] rule in bdd form with additional information
-	bool neg;
-	size_t h, hsym; // bdd root and head syms
-	size_t w; // nbodies, will determine the virtual power
-	bool *x; // existentials
-	size_t *hvars; // how to permute body vars to head vars
-};
-////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
 	vector<node> V; // all nodes
 	unordered_map<node, size_t> M; // node to its index
@@ -93,7 +85,7 @@ public:
 		root=_root,dim=_dim,maxbdd=(size_t)1<<((sizeof(int_t)<<3)/maxw);
 	}
 	size_t add(const node& n) {//create new bdd node,standard implementation
-		assert(n[0] <= nvars * dim);
+		assert(n[0] <= nvars);
 		if (n[1] == n[2]) return n[1];
 		auto it = M.find(n);
 		return it == M.end() ? add_nocheck(n) : it->second;
@@ -145,10 +137,6 @@ public:
 	size_t permute(size_t x, const size_t*, size_t sz);
 	// helper constructors
 	size_t from_eq(size_t x, size_t y); // a bdd saying "x=y"
-	template<typename K> rule from_rule(matrix<K> v, size_t bits, size_t ar);
-	template<typename K> void from_arg(size_t i, size_t j, size_t &k, K vij,
-			size_t bits, size_t ar, const map<K, int_t>&,
-			map<K, array<size_t, 2>>&, rule &r, size_t &npad);
 	template<typename K> matrix<K> from_bits(size_t x, size_t bits,
 			size_t ar, size_t w);
 	// helper apply() variations
@@ -163,7 +151,23 @@ public:
 	using bdds_base::add;
 	using bdds_base::out;
 };
-
+////////////////////////////////////////////////////////////////////////////////
+struct rule { // a [P-DATALOG] rule in bdd form with additional information
+	bool neg;
+	rule(){}
+	template<typename K> rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar);
+	template<typename K> void from_arg(bdds& bdd, size_t i, size_t j, size_t &k,
+			K vij, size_t bits, size_t ar,
+			const map<K, int_t>&, map<K, array<size_t, 2>>&,
+			size_t &npad);
+	//struct {
+		size_t h, hsym; // bdd root and head syms
+		size_t w; // nbodies, will determine the virtual power
+		bool *x; // existentials
+		size_t *hvars; // how to permute body vars to head vars
+	//} poss, negs; // positive and negative body items
+};
+////////////////////////////////////////////////////////////////////////////////
 struct op_exists { // existential quantification, to be used with apply()
 	const bool* s;
 	size_t sz;
@@ -407,55 +411,51 @@ template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar,
 	}
 	return r;
 }
-template<typename K>
-void bdds::from_arg(size_t i, size_t j, size_t &k, K vij, size_t bits, size_t ar,
-	const map<K, int_t>& hvars, map<K, array<size_t, 2>>& m, rule &r,
-	size_t &npad) {
+template<typename K> void rule::from_arg(bdds& bdd, size_t i, size_t j, size_t &k,
+	K vij, size_t bits, size_t ar, const map<K, int_t>& _hvars,
+	map<K, array<size_t, 2>>& m, size_t &npad) {
 	size_t notpad, b;
 	auto it = m.find(vij);
-	if (it != m.end()) { // if seen
+	if (it != m.end()) // if seen
 		for (b=0; b!=bits; ++b)
-			k = bdd_and(k, from_eq(BIT(i,j),
-					BIT(it->second[0], it->second[1])));
-//		if (hvars.find(vij) != hvars.end()) // existential out if headvar
-		for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true; // existential out anyway
-	} else if (m.emplace(vij, array<size_t, 2>{ {i, j} }), vij >= 0) // sym
+			k = bdd.bdd_and(k, bdd.from_eq(BIT(i,j),
+					BIT(it->second[0], it->second[1]))),
+			x[BIT(i,j)] = true; // existential out
+	else if (m.emplace(vij, array<size_t, 2>{ {i, j} }), vij >= 0) // sym
 		for (b=0; b!=bits; ++b)
-			k = bdd_and(k, from_bit(BIT(i,j), vij&(1<<b))),
-			r.x[BIT(i,j)] = true;
+			k = bdd.bdd_and(k, bdd.from_bit(BIT(i,j), vij&(1<<b))),
+			x[BIT(i,j)] = true;
 	else {
-		for (b=0, notpad = T; b!=bits; ++b)
-			notpad = bdd_and(notpad, from_bit(BIT(i, j), false));
-		npad = bdd_or(npad, notpad);
-		auto jt = hvars.find(vij);
-		if (jt == hvars.end()) //non-head var
-			for (b=0; b!=bits; ++b) r.x[BIT(i,j)] = true;
+		for (b=0, notpad = bdds::T; b!=bits; ++b)
+			notpad = bdd.bdd_and(notpad, bdd.from_bit(BIT(i, j), false));
+		npad = bdd.bdd_or(npad, notpad);
+		auto jt = _hvars.find(vij); // whether head var
+		if (jt == _hvars.end()) for(b=0; b!=bits; ++b)x[BIT(i,j)]=true;
 		else for (b=0; b!=bits; ++b) if (BIT(i,j) != BIT(0, jt->second))
-			r.hvars[BIT(i,j)] = BIT(0, jt->second);
+			hvars[BIT(i,j)] = BIT(0, jt->second);
 	}
 }
-template<typename K> rule bdds::from_rule(matrix<K> v, size_t bits, size_t ar) {
-	size_t i, j, b, k, npad = F;
-	map<K, int_t> hvars;
+template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) {
+	size_t i, j, b, k, npad = bdds::F;
+	map<K, int_t> _hvars;
 	vector<K>& head = v[v.size() - 1];
 	bool bneg;
-	rule r;
-	r.h=r.hsym=T, r.neg=head[0]<0, r.w=v.size()-1, head.erase(head.begin());
+	h=hsym=bdds::T, neg=head[0]<0, w=v.size()-1, head.erase(head.begin());
 	for (i = 0; i != head.size(); ++i)
-		if (head[i] < 0) hvars.emplace(head[i], i); // var
+		if (head[i] < 0) _hvars.emplace(head[i], i); // var
 		else for (b = 0; b != bits; ++b)
-			r.hsym=bdd_and(r.hsym,from_bit(BIT(0, i),head[i]&(1<<b)));
+			hsym=bdd.bdd_and(hsym,bdd.from_bit(BIT(0, i),head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
-	if (v.size()==1) return r.h = r.hsym, r;
-	const size_t vars = ((r.w+1)*bits+1)*(ar+2);
-	r.hvars = new size_t[vars], r.x = new bool[vars];
-	for (i = 0; i < vars; ++i) r.x[i] = false, r.hvars[i] = i;
-	for (i=0;i!=v.size()-1;++i,r.h=bneg?bdd_and_not(r.h, k):bdd_and(r.h, k))
-		for (k = T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
+	if (v.size()==1) { h = hsym; return; }
+	const size_t vars = ((w+1)*bits+1)*(ar+2);
+	hvars = new size_t[vars], x = new bool[vars];
+	for (i = 0; i < vars; ++i) x[i] = false, hvars[i] = i;
+	for (i=0;i!=v.size()-1;
+		++i,h=bdd.bdd_and(k,bneg?bdd.bdd_and_not(h, k):bdd.bdd_and(h, k)))
+		for (k=bdds::T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
 			j != v[i].size(); ++j)
-			from_arg(i, j, k, v[i][j], bits, ar, hvars, m, r, npad);
-	r.h = bdd_and_not(r.h, npad);
-	return r;
+			from_arg(bdd, i, j, k, v[i][j], bits, ar, _hvars, m, npad);
+	h = bdd.bdd_and_not(h, npad);
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename K> bool dict_t<K>::dictcmp::operator()(
@@ -539,9 +539,9 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	pdbs = new bdds(ar * bits), pprog = new bdds(maxw * ar * bits);
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1)
-			db=pdbs->bdd_or(db,pdbs->from_rule(x, bits, ar).h);//fact
+			db=pdbs->bdd_or(db,rule(*pdbs, x, bits, ar).h);//fact
 		else {
-			rules.push_back(pprog->from_rule(x, bits, ar)); // rule
+			rules.push_back(rule(*pprog, x, bits, ar)); // rule
 			//out<K>(wcout<<"from_rule: ", *pprog, rules.back().h,
 			//		bits, ar, rules.back().w, dict) << endl;
 			//out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits,
@@ -595,7 +595,7 @@ template<typename K> bool lp<K>::pfp() {
 	size_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		printdb(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
+		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
 				" + "<<pprog->size()<<endl);
 		step();
 		//printdb(wcout<<"after step: " << t << endl);
