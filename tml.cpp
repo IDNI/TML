@@ -503,7 +503,6 @@ template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) 
 	negs.hvars = new size_t[nvars], negs.x = new bool[nvars];
 	for (i = 0; i < pvars; ++i) poss.x[i] = false, poss.hvars[i] = i;
 	for (i = 0; i < nvars; ++i) negs.x[i] = false, negs.hvars[i] = i;
-	hasnegs = false;
 	for (i=0;i!=v.size()-1;
 		++i,(bneg?negs:poss).h=
 		bdd.bdd_and(k,bneg?bdd.bdd_and_not((bneg?negs:poss).h, k):
