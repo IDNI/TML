@@ -570,12 +570,12 @@ template<typename K> matrix<K> lp<K>::rule_read(wstr *s) {
 	r.push_back(t);
 	while (iswspace(**s)) ++*s;
 	if (**s == L'.') return ++*s, r;
-	while (iswspace(**s)) ++*s;
 	if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
 loop:	if ((t = term_read(s)).empty()) er("term expected");
 	r.insert(r.end()-1, t); // make sure head is last
 	while (iswspace(**s)) ++*s;
 	if (**s == L'.') return ++*s, r;
+	if (**s == L':') er("',' expected");
 	goto loop;
 }
 
