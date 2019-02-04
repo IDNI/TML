@@ -204,10 +204,6 @@ struct rule { // a P-DATALOG rule in bdd form
 		size_t w; // nbodies, will determine the virtual power
 		bool *x; // existentials
 		size_t *hvars; // how to permute body vars to head vars
-//		template<typename K> void from_arg(bdds& bdd, size_t i, size_t j, size_t &k,
-//				K vij, size_t bits, size_t ar,
-//				const map<K, int_t>&, map<K, array<size_t, 2>>&,
-//				size_t &npad) {
 #define BIT(term,arg) ((term*bits+b)*ar+arg)
 		template<typename K> void from_arg(bdds& bdd, size_t i, size_t j, size_t &k,
 			K vij, size_t bits, size_t ar, const map<K, int_t>& _hvars,
@@ -456,31 +452,6 @@ template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar,
 	}
 	return r;
 }
-/*
-template<typename K> void rule::from_arg(bdds& bdd, size_t i, size_t j, size_t &k,
-	K vij, size_t bits, size_t ar, const map<K, int_t>& _hvars,
-	map<K, array<size_t, 2>>& m, size_t &npad) {
-	size_t notpad, b;
-	auto it = m.find(vij);
-	if (it != m.end()) // if seen
-		for (b=0; b!=bits; ++b)
-			k = bdd.bdd_and(k, bdd.from_eq(BIT(i,j),
-					BIT(it->second[0], it->second[1]))),
-			x[BIT(i,j)] = true; // existential out
-	else if (m.emplace(vij, array<size_t, 2>{ {i, j} }), vij >= 0) // sym
-		for (b=0; b!=bits; ++b)
-			k = bdd.bdd_and(k, bdd.from_bit(BIT(i,j), vij&(1<<b))),
-			x[BIT(i,j)] = true;
-	else {
-		for (b=0, notpad = bdds::T; b!=bits; ++b)
-			notpad = bdd.bdd_and(notpad, bdd.from_bit(BIT(i, j), false));
-		npad = bdd.bdd_or(npad, notpad);
-		auto jt = _hvars.find(vij); // whether head var
-		if (jt == _hvars.end()) for(b=0; b!=bits; ++b)x[BIT(i,j)]=true;
-		else for (b=0; b!=bits; ++b) if (BIT(i,j) != BIT(0, jt->second))
-			hvars[BIT(i,j)] = BIT(0, jt->second);
-	}
-}*/
 template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) {
 	size_t i, j, b, k, npad = bdds::F;
 	map<K, int_t> _hvars;
@@ -494,6 +465,7 @@ template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) 
 			hsym=bdd.bdd_and(hsym,bdd.from_bit(BIT(0, i),head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) { poss.h = hsym; return; }
+	hasnegs = false;
 	for (i=0; i != v.size() - 1; ++i)
 		if (v[i][0] < 0) hasnegs = true, ++negs.w;
 		else ++poss.w;
@@ -506,14 +478,11 @@ template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) 
 	for (i=0;i!=v.size()-1;
 		++i,(bneg?negs:poss).h=
 		bdd.bdd_and(k,bneg?bdd.bdd_and_not((bneg?negs:poss).h, k):
-		bdd.bdd_and((bneg?negs:poss).h, k))) {
+		bdd.bdd_and((bneg?negs:poss).h, k)))
 		for (k=bdds::T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
 			j != v[i].size(); ++j)
-			//++(bneg?negs:poss).w,
 			(bneg?negs:poss).from_arg(
 				bdd,i,j,k,v[i][j],bits,ar,_hvars,m,npad);
-		hasnegs |= bneg;
-	}
 	(bneg?negs:poss).h = bdd.bdd_and_not((bneg?negs:poss).h, npad);
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -612,43 +581,11 @@ template<typename K> void lp<K>::step() {
 	size_t add = bdds::F, del = bdds::F, s;//, x, y, z;
 	wcout << endl;
 	bdds &dbs = *pdbs, &prog = *pprog;
-	for (const rule* r : rules) { // per rule
-//		dbs.setpow(db, r.w, maxw);
-		//out<K>(wcout<<"db: ", *pdbs, db, bits, ar, r.w, dict) << endl;
-//		if (bdds::leaf(db)) {
-//			x = bdds::trueleaf(db) ? r.h : bdds_base::F;
-//			y = bdds::apply(prog, x, prog, // remove nonhead variables
-//				op_exists(r.x, ((r.w+1)*bits+1)*(ar+2)));
-//		} else  y = bdds::apply_and_ex_perm(dbs, db, prog, r.h, r.x,
-//			r.hvars, ((r.w+1)*bits+1)*(ar+2)); // rule/db conjunction
-//		out<K>(wcout<<"y: ", prog, y, bits, ar, r.w, dict) << endl;
-//		z = prog.permute(y, r.hvars, ((r.w+1)*bits+1)*(ar+2)); // reorder
-//		out<K>(wcout<<"z: ", prog, z, bits, ar, r.w, dict) << endl;
-//		z = prog.bdd_and(z, r.hsym);
-//		out<K>(wcout<<"z&hsym: ", prog, z, bits, ar, r.w, dict) << endl;
-//		dbs.setpow(db, 1, maxw);
-//		out<K>(wcout<<"db: ", *pdbs, db, bits, ar, 1, dict) << endl;
-//		dbs.out(wcout<<"add: ", add) << endl;
-//		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
-//		prog.out(wcout<<"toadd: ", z) << endl;
-//		out<K>(wcout<<"toadd: ", prog, z, bits, ar, r.w, dict) << endl;
-//		out<K>(wcout<<"invtoadd: ", prog, prog.bdd_and_not(bdds_base::T, z), bits, ar, r.w, dict) << endl;
-//		(r.neg?del:add) = bdds::apply_or(prog, z, dbs, r.neg?del:add);
-		//(r->neg?del:add) = pdbs->bdd_or(r->get_heads(*this), r->neg?del:add);
+	for (const rule* r : rules)
 		(r->neg?del:add) = bdds::apply_or(prog, r->get_heads(*this), dbs, r->neg?del:add);
-//		dbs.out(wcout<<"add: ", add) << endl;
-//		out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
-	}
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F)
 		db = bdds::F; // detect contradiction
-	else {
-		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
-		//out<K>(wcout<<"add: ", dbs, add, bits, ar, 1, dict) << endl;
-		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
-		// db = (db|add)&~del = db&~del | add&~del
-		db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);
-		//out<K>(wcout<<"db: ", dbs, db, bits, ar, 1, dict) << endl;
-	}
+	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);
 	dbs.memos_clear(), prog.memos_clear();
 }
 
