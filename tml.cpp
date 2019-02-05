@@ -170,16 +170,16 @@ public:
 };
 ////////////////////////////////////////////////////////////////////////////////
 template<typename K> class lp { // [pfp] logic program
-	dict_t<K> dict;//hold its own dict so we can determine the universe size
-
 	K str_read(wstr *s); // parse a string and returns its dict id
 	vector<K> term_read(wstr *s); // read raw term (no bdd)
 	matrix<K> rule_read(wstr *s); // read raw rule (no bdd)
+	bool hasnegs;
 public:
+	dict_t<K> dict;//hold its own dict so we can determine the universe size
 	vector<struct rule*> rules;
 	size_t bits, ar, maxw;
 	bdds *pprog, *pdbs; // separate for prog and db as db has virtual power
-	size_t db; // db's bdd root
+	size_t db, ndb; // db's bdd root (and its negation's)
 	void prog_read(wstr s);
 	void step(); // single pfp step
 	bool pfp();
@@ -193,9 +193,11 @@ struct op_exists { // existential quantification, to be used with apply()
 		return n[0]&&n[0]<=sz&&s[n[0]-1]?b.getnode(b.bdd_or(n[1],n[2])):n;
 	}
 };
+template<typename K> wostream& out(wostream& os, bdds& b, size_t db, size_t bits,
+	       			size_t ar, size_t w, const class dict_t<K>& d);
 ////////////////////////////////////////////////////////////////////////////////
 struct rule { // a P-DATALOG rule in bdd form
-	bool neg, hasnegs;
+	bool neg, hasnegs, hasposs;
 	rule(){}
 	template<typename K> rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar);
 	size_t hsym;
@@ -229,26 +231,32 @@ struct rule { // a P-DATALOG rule in bdd form
 					hvars[BIT(i,j)] = BIT(0, jt->second);
 			}
 		}
-		template<typename K> size_t get_heads(lp<K>& p, const size_t hsym) const {
-			//for (const rule* r : p.rules) { // per rule
-				p.pdbs->setpow(p.db, w, p.maxw);
-				size_t x, y, z;
-				if (bdds::leaf(p.db)) {
-					x = bdds::trueleaf(p.db) ? h : bdds_base::F;
-					y = bdds::apply(*p.pprog, x, *p.pprog, // remove nonhead variables
-						op_exists(this->x, ((w+1)*p.bits+1)*(p.ar+2)));
-				} else  y = bdds::apply_and_ex_perm(*p.pdbs, p.db, *p.pprog, h, this->x,
-					hvars, ((w+1)*p.bits+1)*(p.ar+2)); // rule/db conjunction
-				z = p.pprog->permute(y, hvars, ((w+1)*p.bits+1)*(p.ar+2)); // reorder
-				z = p.pprog->bdd_and(z, hsym);
-				p.pdbs->setpow(p.db, 1, p.maxw);
-				return z;
-			//}
+		template<typename K>
+		size_t get_heads(lp<K>& p, size_t hsym, size_t db) const {
+			p.pdbs->setpow(p.db, w, p.maxw);
+			size_t y, z, n = ((w+1)*p.bits+1)*(p.ar+2);
+			if (bdds::leaf(p.db))
+				y = bdds::apply(*p.pprog,
+					bdds::trueleaf(p.db) ? h : bdds_base::F,
+					*p.pprog, op_exists(this->x, n));
+			else y = bdds::apply_and_ex_perm(*p.pdbs, db,
+					*p.pprog, h, this->x, hvars, n);
+			out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
+			out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+			z = p.pprog->permute(y, hvars, n);
+			z = p.pprog->bdd_and(z, hsym);
+			p.pdbs->setpow(p.db, 1, p.maxw);
+			out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+			return z;
 		}
 	} poss, negs; // positive and negative body items
 	template<typename K> size_t get_heads(lp<K>& p) const {
-		if (hasnegs) return p.pdbs->bdd_and(poss.get_heads(p, hsym), negs.get_heads(p, hsym));
-		return poss.get_heads(p, hsym);
+		if (hasnegs && hasposs)
+			return p.pdbs->bdd_and(poss.get_heads(p, hsym, p.db),
+					negs.get_heads(p, hsym, p.ndb));
+		if (hasposs) return poss.get_heads(p, hsym, p.db);
+		if (hasnegs) return negs.get_heads(p, hsym, p.ndb);
+		return bdds_base::T;
 	}
 };
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,8 +264,6 @@ wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 	for (size_t n = 0; n < p.second; ++n) os << p.first[n];
 	return os;
 }
-template<typename K> wostream& out(wostream& os, bdds& b, size_t db, size_t bits,
-	       			size_t ar, size_t w, const class dict_t<K>& d);
 ////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y:x) os << (y?'1':'0');
@@ -465,20 +471,19 @@ template<typename K> rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar) 
 			hsym=bdd.bdd_and(hsym,bdd.from_bit(BIT(0, i),head[i]&(1<<b)));
 	map<K, array<size_t, 2>> m;
 	if (v.size()==1) { poss.h = hsym; return; }
-	hasnegs = false;
+	hasposs = hasnegs = false;
 	for (i=0; i != v.size() - 1; ++i)
 		if (v[i][0] < 0) hasnegs = true, ++negs.w;
-		else ++poss.w;
+		else hasposs = true, ++poss.w;
 	const size_t pvars = ((poss.w+1)*bits+1)*(ar+2);
 	const size_t nvars = ((negs.w+1)*bits+1)*(ar+2);
 	poss.hvars = new size_t[pvars], poss.x = new bool[pvars],
 	negs.hvars = new size_t[nvars], negs.x = new bool[nvars];
 	for (i = 0; i < pvars; ++i) poss.x[i] = false, poss.hvars[i] = i;
 	for (i = 0; i < nvars; ++i) negs.x[i] = false, negs.hvars[i] = i;
-	for (i=0;i!=v.size()-1;
-		++i,(bneg?negs:poss).h=
-		bdd.bdd_and(k,bneg?bdd.bdd_and_not((bneg?negs:poss).h, k):
-		bdd.bdd_and((bneg?negs:poss).h, k)))
+	for (i = 0; i != v.size() - 1; ++i,
+		bneg ? negs.h=bdd.bdd_and_not(negs.h, k) :
+		(poss.h=bdd.bdd_and(poss.h, k)))
 		for (k=bdds::T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
 			j != v[i].size(); ++j)
 			(bneg?negs:poss).from_arg(
@@ -549,6 +554,7 @@ loop:	if ((t = term_read(s)).empty()) er("term expected");
 }
 
 template<typename K> void lp<K>::prog_read(wstr s) {
+	hasnegs = false;
 	vector<matrix<K>> r;
 	db = bdds::F;
 	size_t l;
@@ -568,17 +574,14 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1)
 			db=pdbs->bdd_or(db,rule(*pdbs, x, bits, ar).poss.h);//fact
-		else {
-			rules.emplace_back(new rule(*pprog, x, bits, ar)); // rule
-			//out<K>(wcout<<"from_rule: ", *pprog, rules.back().h,
-			//		bits, ar, rules.back().w, dict) << endl;
-			//out<K>(wcout<<"hsym: ", *pprog, rules.back().hsym, bits,
-			//		ar, 1, dict) << endl;
-		}
+		else
+			rules.emplace_back(new rule(*pprog, x, bits, ar)), // rule
+			hasnegs |= rules.back()->hasnegs;
 }
 
 template<typename K> void lp<K>::step() {
 	size_t add = bdds::F, del = bdds::F, s;//, x, y, z;
+	if (hasnegs) ndb = pdbs->bdd_and_not(bdds::T, db);
 	wcout << endl;
 	bdds &dbs = *pdbs, &prog = *pprog;
 	for (const rule* r : rules)
