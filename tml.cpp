@@ -244,9 +244,11 @@ struct rule { // a P-DATALOG rule in bdd form
 					*p.pprog, op_exists(this->x, n));
 			else y = bdds::apply_and_ex_perm(*p.pdbs, db,
 					*p.pprog, h, this->x, hvars, n);
-			//out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
-			//out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+			out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
+			out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+			out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
 			z = p.pprog->permute(y, hvars, n);
+			out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 			z = p.pprog->bdd_and(z, hsym);
 			p.pdbs->setpow(p.db, 1, p.maxw);
 			out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
@@ -473,8 +475,8 @@ rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 		if (head[i] < 0) { // var
 			_hvars.emplace(head[i], i);
 			rng = bdds::F;
-			for (j=1, elem=bdds::T; j != dsz; ++j) {// enforce range
-				for (b = 0; b != bits; ++b)
+			for (j = 1; j != dsz; ++j) {// enforce range
+				for (b = 0, elem = bdds::T; b != bits; ++b)
 					elem = bdd.bdd_and(elem, bdd.from_bit(
 							BIT(0, i), j&(1<<b)));
 				rng = bdd.bdd_or(rng, elem);
@@ -588,10 +590,10 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	for (const matrix<K>& x : r)
 	 	if (x.size() == 1)
 			db = pdbs->bdd_or(db, //fact
-				rule(*pdbs,x,bits,ar,dict.nsyms()+1).poss.h);
+				rule(*pdbs,x,bits,ar,dict.nsyms()).poss.h);
 		else
 			rules.emplace_back(new rule(
-				*pprog, x, bits, ar, dict.nsyms()+1)), // rule
+				*pprog, x, bits, ar, dict.nsyms())), // rule
 			hasnegs |= rules.back()->hasnegs;
 }
 
