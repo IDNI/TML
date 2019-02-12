@@ -258,7 +258,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	} poss, negs; // positive and negative body items
 	template<typename K> size_t get_heads(lp<K>& p) const {
 		if (hasnegs && hasposs)
-			return p.pdbs->bdd_and(poss.get_heads(p, hsym, p.db),
+			return p.pprog->bdd_and(poss.get_heads(p, hsym, p.db),
 					negs.get_heads(p, hsym, p.ndb));
 		if (hasposs) return poss.get_heads(p, hsym, p.db);
 		if (hasnegs) return negs.get_heads(p, hsym, p.ndb);
@@ -498,14 +498,18 @@ rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 	negs.hvars = new size_t[nvars], negs.x = new bool[nvars];
 	for (i = 0; i != pvars; ++i) poss.x[i] = false, poss.hvars[i] = i;
 	for (i = 0; i != nvars; ++i) negs.x[i] = false, negs.hvars[i] = i;
+	size_t pp = 0, pn = 0;
 	for (i = 0; i != v.size() - 1; ++i,
-		bneg ? negs.h=bdd.bdd_and/*_not*/(negs.h, k) :
-		(poss.h=bdd.bdd_and(poss.h, k)))
+		bneg ? negs.h=bdd.bdd_and(negs.h, k) :
+		(poss.h=bdd.bdd_and(poss.h, k))) {
 		for (k=bdds::T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
 			j != v[i].size(); ++j)
 			(bneg?negs:poss).from_arg(
-				bdd,i,j,k,v[i][j],bits,ar,_hvars,m,npad);
-	(bneg?negs:poss).h = bdd.bdd_and_not((bneg?negs:poss).h, npad);
+				bdd,bneg?pn:pp
+				,j,k,v[i][j],bits,ar,_hvars,m,npad);
+		++(bneg?pn:pp);
+		(bneg?negs:poss).h = bdd.bdd_and_not((bneg?negs:poss).h, npad);
+	}
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename K> bool dict_t<K>::dictcmp::operator()(
@@ -613,7 +617,7 @@ template<typename K> void lp<K>::step() {
 }
 
 template<typename K> bool lp<K>::pfp() {
-	size_t d, t = 0;
+	size_t d;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
 //		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
