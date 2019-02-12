@@ -616,8 +616,8 @@ template<typename K> bool lp<K>::pfp() {
 	size_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
+//		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
+//				" + "<<pprog->size()<<endl);
 		step();
 		//printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return printdb(wcout), d == db;
