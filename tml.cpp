@@ -236,22 +236,23 @@ struct rule { // a P-DATALOG rule in bdd form
 		}
 		template<typename K>
 		size_t get_heads(lp<K>& p, size_t hsym, size_t db) const {
-			p.pdbs->setpow(p.db, w, p.maxw);
+			p.pdbs->setpow(db, w, p.maxw);
 			size_t y, z, n = ((w+1)*p.bits+1)*(p.ar+2);
-			if (bdds::leaf(p.db))
+			if (bdds::leaf(db))
 				y = bdds::apply(*p.pprog,
-					bdds::trueleaf(p.db) ? h : bdds_base::F,
+					bdds::trueleaf(db) ? h : bdds_base::F,
 					*p.pprog, op_exists(this->x, n));
 			else y = bdds::apply_and_ex_perm(*p.pdbs, db,
 					*p.pprog, h, this->x, hvars, n);
-			out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
-			out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
-			out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
+			//out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
+			//out<K>(wcout << L"ndb: " << endl, *p.pdbs, p.ndb, p.bits, p.ar, w, p.dict)<<endl;
+			//out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+			//out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
 			z = p.pprog->permute(y, hvars, n);
-			out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+			//out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 			z = p.pprog->bdd_and(z, hsym);
-			p.pdbs->setpow(p.db, 1, p.maxw);
-			out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+			p.pdbs->setpow(db, 1, p.maxw);
+			//out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 			return z;
 		}
 	} poss, negs; // positive and negative body items
@@ -498,7 +499,7 @@ rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 	for (i = 0; i != pvars; ++i) poss.x[i] = false, poss.hvars[i] = i;
 	for (i = 0; i != nvars; ++i) negs.x[i] = false, negs.hvars[i] = i;
 	for (i = 0; i != v.size() - 1; ++i,
-		bneg ? negs.h=bdd.bdd_and_not(negs.h, k) :
+		bneg ? negs.h=bdd.bdd_and/*_not*/(negs.h, k) :
 		(poss.h=bdd.bdd_and(poss.h, k)))
 		for (k=bdds::T, bneg = (v[i][0]<0), v[i].erase(v[i].begin()), j=0;
 			j != v[i].size(); ++j)
