@@ -1,10 +1,10 @@
-g++ tcgen.cpp
-./a.out $1 > $1
+g++ tcgen.cpp # compile a program that outputs a tml program calculating transitive closure over a circular graph with $1 vertices
+./a.out $1 > $1 # output the tml program into a file
 cd ..
-g++ -std=c++1y tml.cpp -W -Wall -Wpedantic -otml -O3 -flto
+g++ -std=c++1y tml.cpp -W -Wall -Wpedantic -otml -O3 -flto # compile tml with optimization flags
 cd -
-time ../tml < $1 | sort > r
-g++ tcres.cpp
-./a.out $1 | sort > t
-rm a.out
-diff -w r t
+time ../tml < $1 | sort > r # run tml, sort the output and save it into file "r"
+g++ tcres.cpp # compile a program that prints the desired result
+./a.out $1 | sort > t # run it and output into file "t"
+rm a.out # cleanup
+diff -w r t # diff files "r" and "t"
