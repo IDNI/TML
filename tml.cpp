@@ -25,7 +25,7 @@
 #include <stdexcept>
 #include <cassert>
 using namespace std;
-
+#define MEMO
 typedef int64_t int_t;
 typedef array<size_t, 3> node; //bdd node is a triple: varid,1-node-id,0-node-id
 typedef const wchar_t* wstr;
@@ -52,10 +52,16 @@ typedef tuple<const bdds*, const bool*, size_t, size_t> exmemo;
 #define MAGENTA "\x1b[35m"
 #define CYAN    "\x1b[36m"
 #define COLOR_RESET   "\x1b[0m"
+#ifdef MEMO
+#define apply_ret(r, m) return m.emplace(t, res = (r)), res
+#else
+#define apply_ret(r, m) return r
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
+#ifdef MEMO
 template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
 template<> struct std::hash<exmemo> { size_t operator()(const exmemo& m)const;};
 template<> struct std::hash<pair<const bdds*, size_t>> {
@@ -65,12 +71,12 @@ template<> struct std::hash<pair<size_t, const size_t*>> {
 	size_t operator()(const pair<size_t, const size_t*>& m) const {
 		return m.first + (size_t)m.second; }
 };
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 class bdds_base {
 	vector<node> V; // all nodes
 	unordered_map<node, size_t> M; // node to its index
 	static node flip(node n) {
-		if (leaf(n)) return trueleaf(n) ? node{0,0,0} : node{0,1,1};
 		if (leaf(n[1])) n[1] = trueleaf(n[1]) ? F : T;
 		if (leaf(n[2])) n[2] = trueleaf(n[2]) ? F : T;
 		return n;
@@ -101,11 +107,11 @@ public:
 		if (pdim == 1 && !ndim) return V[n];
 		if (!pdim && ndim == 1) return leaf(n) ? V[n] : flip(V[n]);
 		const size_t m = n % maxbdd, d = n / maxbdd;
-		node r = d < pdim ? V[m] : leaf(m) ? V[m] : flip(V[m]);
+		node r = d < pdim || leaf(m) ? V[m] : flip(V[m]);
 		if (r[0]) r[0] += nvars * d;
-		if (trueleaf(r[1])) { if (d<pdim+ndim-1) r[1] = root+maxbdd*(d+1); }
+		if (trueleaf(r[1])) { if (d<pdim+ndim-1)r[1]=root+maxbdd*(d+1);}
 		else if (!leaf(r[1])) r[1] += maxbdd * d;
-		if (trueleaf(r[2])) { if (d<pdim+ndim-1) r[2] = root+maxbdd*(d+1); }
+		if (trueleaf(r[2])) { if (d<pdim+ndim-1)r[2]=root+maxbdd*(d+1);}
 		else if (!leaf(r[2])) r[2] += maxbdd * d;
 		return r;
 	}
@@ -122,10 +128,12 @@ const size_t bdds_base::F = 0, bdds_base::T = 1;
 ////////////////////////////////////////////////////////////////////////////////
 class bdds : public bdds_base {
 	void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const;
+#ifdef MEMO
 	unordered_map<memo, size_t> memo_and, memo_and_not, memo_or;
 	unordered_map<exmemo, size_t> memo_and_ex;
 	unordered_map<pair<const bdds*, size_t>, size_t> memo_copy;
 	unordered_map<pair<size_t, const size_t*>, size_t> memo_permute;
+#endif
 public:
 	bdds(size_t nvars) : bdds_base(nvars) {}
 	size_t from_bit(size_t x, bool v) {
@@ -153,8 +161,11 @@ public:
 		return apply_and_not(*this, x, *this, y); }
 	vbools allsat(size_t x, size_t nvars) const;
 	void memos_clear() {
+#ifdef MEMO		
 		memo_and.clear(), memo_and_not.clear(), memo_or.clear(),
-		memo_copy.clear(), memo_permute.clear(), memo_and_ex.clear(); }
+		memo_copy.clear(), memo_permute.clear(), memo_and_ex.clear();
+#endif		
+	}
 	using bdds_base::add;
 	using bdds_base::out;
 };
@@ -196,7 +207,8 @@ struct op_exists { // existential quantification, to be used with apply()
 	size_t sz;
 	op_exists(const bool* s, size_t sz) : s(s), sz(sz) { }
 	node operator()(bdds& b, const node& n) const {
-		return n[0]&&n[0]<=sz&&s[n[0]-1]?b.getnode(b.bdd_or(n[1],n[2])):n;
+		return	n[0] && n[0] <= sz && s[n[0]-1] ?
+			b.getnode(b.bdd_or(n[1], n[2])) : n;
 	}
 };
 template<typename K> wostream& out(wostream& os, bdds& b, size_t db,size_t bits,
@@ -251,14 +263,15 @@ struct rule { // a P-DATALOG rule in bdd form
 				*p.pprog, op_exists(this->x, n));
 		else	y = bdds::apply_and_ex_perm(*p.pdbs, p.db,
 				*p.pprog, h, this->x, hvars, n);
-		//out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
-		//out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
-		//out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"y: " << endl, *p.pprog, y, p.bits, p.ar, w, p.dict)<<endl;
 		z = p.pprog->permute(y, hvars, n);
-		//out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 		z = p.pprog->bdd_and(z, hsym);
 		p.pdbs->setpow(p.db, 1, 0, p.maxw);
-		//out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+		out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 		return z;
 	}
 };
@@ -313,76 +326,80 @@ size_t bdds::from_eq(size_t x, size_t y) {
 
 wostream& bdds_base::out(wostream& os, const node& n) const {
 	return	leaf(n) ? os << (trueleaf(n) ? L'T' : L'F') :
-		(out(os<<GREEN<<n[0]<<COLOR_RESET<<L'?',getnode(n[1])),
-		out(os<<L':',getnode(n[2])));
+		(out(os << GREEN << n[0] << COLOR_RESET << L'?', getnode(n[1])),
+		out(os << L':', getnode(n[2])));
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> size_t bdds::apply(const bdds& b, size_t x, bdds& r,
 		const op_t& op) { //unary
 	node n = op(b, b.getnode(x));
-	return r.add({n[0],	leaf(n[1]) ? n[1] : apply(b,n[1],r,op),
-				leaf(n[2]) ? n[2] : apply(b,n[2],r,op)});
+	return r.add({n[0],	leaf(n[1]) ? n[1] : apply(b, n[1], r, op),
+				leaf(n[2]) ? n[2] : apply(b, n[2], r, op)});
 }
-
 template<typename op_t> size_t bdds::apply(bdds& b, size_t x, bdds& r,
 		const op_t& op) { // nonconst
 	node n = op(b, b.getnode(x));
-	return r.add({{n[0],	leaf(n[1]) ? n[1] : apply(b,n[1],r,op),
-				leaf(n[2]) ? n[2] : apply(b,n[2],r,op)}});
+	return r.add({{n[0],	leaf(n[1]) ? n[1] : apply(b, n[1], r, op),
+				leaf(n[2]) ? n[2] : apply(b, n[2], r, op)}});
 }
-
 size_t bdds::ite(size_t v, size_t t, size_t e) {
 	node x = getnode(t), y = getnode(e);
 	if ((leaf(x)||v<x[0]) && (leaf(y)||v<y[0])) return add({{v+1,t,e}});
 	return bdd_or(	bdd_and(from_bit(v, true), t),
 			bdd_and(from_bit(v, false), e));
 }
-
-// [overlapping] rename
-size_t bdds::permute(size_t x, const size_t* m, size_t sz) {
+size_t bdds::permute(size_t x, const size_t* m, size_t sz) {//overlapping rename
+#ifdef MEMO	
 	auto t = make_pair(x, m);
 	auto it = memo_permute.find(t);
 	if (it != memo_permute.end()) return it->second;
+	size_t res;
+#endif	
 	node n = getnode(x);
-	size_t res = leaf(n) ? x : ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1),
-				permute(n[1],m,sz), permute(n[2],m,sz));
-	return memo_permute.emplace(t, res), res;
+	apply_ret(leaf(n) ? x : ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1),
+				permute(n[1],m,sz), permute(n[2],m,sz)),
+			memo_permute);
 }
 size_t bdds::copy(const bdds& b, size_t x) {
 	if (leaf(x)) return x;
+#ifdef MEMO	
 	auto t = make_pair(&b, x);
 	auto it = memo_copy.find(t);
 	if (it != memo_copy.end()) return it->second;
+	size_t res;
+#endif	
 	node n = b.getnode(x);
-	size_t res = add({n[0], copy(b, n[1]), copy(b, n[2])});
-	return memo_copy.emplace(t, res), res;
+	apply_ret(add({n[0], copy(b, n[1]), copy(b, n[2])}), memo_copy);
 }
 size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
+#ifdef MEMO	
 	const auto t = make_tuple(&dst, x, y);
 	auto it = src.memo_and.find(t);
 	if (it != src.memo_and.end()) return it->second;
 	size_t res;
+#endif	
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) return src.memo_and.emplace(t,res=trueleaf(Vx)?y:F), res;
+	if (leaf(Vx)) apply_ret(trueleaf(Vx)?y:F, src.memo_and);
        	const node &Vy = dst.getnode(y);
-	if (leaf(Vy)) return src.memo_and.emplace(t,res = !trueleaf(Vy) ? F :
-				&src == &dst ? x : dst.copy(src, x)), res;
+	if (leaf(Vy)) apply_ret(!trueleaf(Vy) ? F :
+				&src==&dst?x:dst.copy(src, x), src.memo_and);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) return src.memo_and.emplace(t, res = (a&&b)?T:F), res;
+	else if (!vx) apply_ret((a&&b)?T:F, src.memo_and);
 	else if ((v = vx) < vy || !vy) b = d = y;
-	return	src.memo_and.emplace(t, res = dst.add({{v,
-		apply_and(src, a, dst, b), apply_and(src, c, dst, d)}})), res;
+	apply_ret(dst.add({{v, apply_and(src, a, dst, b),
+		apply_and(src, c, dst, d)}}), src.memo_and);
 }
 size_t bdds::apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y,
 				const bool* s, const size_t* p, size_t sz) {
-//	const auto t = make_tuple(&dst, s, x, y);
-//	auto it = src.memo_and_ex.find(t);
-//	if (it != src.memo_and_ex.end()) return it->second;
+#ifdef MEMO
+	const auto t = make_tuple(&dst, s, x, y);
+	auto it = src.memo_and_ex.find(t);
+	if (it != src.memo_and_ex.end()) return it->second;
+#endif	
 	size_t res;
-	const node Vx = src.getnode(x);
-       	const node Vy = dst.getnode(y);
+	const node Vx = src.getnode(x), Vy = dst.getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if (leaf(Vx)) {
@@ -405,47 +422,47 @@ size_t bdds::apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y,
 	}
 	res = dst.add({{v, apply_and_ex_perm(src, a, dst, b, s, p, sz),
 			apply_and_ex_perm(src, c, dst, d, s, p, sz)}});
-ret:
-	return //src.memo_and_ex.emplace(t, res /*= dst.permute(res, p, sz)*/),
-	       res;
+ret:	apply_ret(res, src.memo_and_ex);
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
+#ifdef MEMO
 	const auto t = make_tuple(&dst, x, y);
 	auto it = src.memo_and_not.find(t);
 	if (it != src.memo_and_not.end()) return it->second;
 	size_t res;
+#endif	
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx) && !trueleaf(Vx)) return src.memo_and_not.emplace(t, F), F;
+	if (leaf(Vx) && !trueleaf(Vx)) apply_ret(F, src.memo_and_not);
        	const node &Vy = src.getnode(y);
-	if (leaf(Vy)) return src.memo_and_not.emplace(t, res = trueleaf(Vy) ? F :
-				&src == &dst ? x : dst.copy(src, x)), res;
+	if (leaf(Vy)) apply_ret(trueleaf(Vy) ? F: &src == &dst ? x :
+			dst.copy(src, x), src.memo_and_not);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) return src.memo_and_not.emplace(t, res = (a&&!b)?T:F), res;
+	else if (!vx) apply_ret((a&&!b)?T:F, src.memo_and_not);
 	else if ((v = vx) < vy || !vy) b = d = y;
-	return src.memo_and_not.emplace(t, res = dst.add({{v,
-			apply_and_not(src, a, dst, b),
-			apply_and_not(src, c, dst, d)}})), res;
+	apply_ret(dst.add({{v, apply_and_not(src, a, dst, b),
+		apply_and_not(src, c, dst, d)}}), src.memo_and_not);
 }
 size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
+#ifdef MEMO	
 	const auto t = make_tuple(&dst, x, y);
 	auto it = src.memo_or.find(t);
 	if (it != src.memo_or.end()) return it->second;
 	size_t res;
+#endif	
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) return src.memo_or.emplace(t, res = trueleaf(Vx) ? T : y),res;
+	if (leaf(Vx)) apply_ret(trueleaf(Vx)?T:y, src.memo_or);
        	const node &Vy = dst.getnode(y);
-	if (leaf(Vy)) return src.memo_or.emplace(t, res = trueleaf(Vy) ? T :
-			&src == &dst ? x : dst.copy(src, x)), res;
+	if (leaf(Vy)) apply_ret(trueleaf(Vy) ? T : &src == &dst ? x :
+			dst.copy(src, x), src.memo_or);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) return src.memo_or.emplace(t, res = (a||b)?T:F), res;
+	else if (!vx) apply_ret((a||b)?T:F, src.memo_or);
 	else if ((v = vx) < vy || !vy) b = d = y;
-	return src.memo_or.emplace(t, res = dst.add({{v,
-			apply_or(src, a, dst, b),
-			apply_or(src, c, dst, d)}})), res;
+	apply_ret(dst.add({{v, apply_or(src, a, dst, b),
+		apply_or(src, c, dst, d)}}), src.memo_or);
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename K>
@@ -487,8 +504,8 @@ rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 	map<K, array<size_t, 2>> m;
 	if (v.size() == 1) { h = hsym; return; }
 	matrix<K> t;
-	for (i=0; i != v.size() - 1; ++i) if (v[i][0] > 0) ++npos, t.push_back(v[i]);
-	for (i=0; i != v.size() - 1; ++i) if (v[i][0] < 0) ++nneg, t.push_back(v[i]);
+	for (i=0; i!=v.size()-1; ++i) if (v[i][0]>0) ++npos, t.push_back(v[i]);
+	for (i=0; i!=v.size()-1; ++i) if (v[i][0]<0) ++nneg, t.push_back(v[i]);
 	t.push_back(v.back());
 	v = move(t);
 	const size_t vars = ((npos+nneg+1)*bits+1)*(ar+2);
@@ -589,8 +606,7 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 }
 
 template<typename K> void lp<K>::step() {
-	size_t add = bdds::F, del = bdds::F, s;//, x, y, z;
-	wcout << endl;
+	size_t add = bdds::F, del = bdds::F, s;
 	bdds &dbs = *pdbs, &prog = *pprog;
 	for (const rule* r : rules) {
 		(r->neg?del:add) = bdds::apply_or(prog, r->get_heads(*this),
@@ -606,29 +622,7 @@ template<typename K> bool lp<K>::pfp() {
 	size_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-/*		pdbs->setpow(db, 1, 0, 1);
-		pdbs->out(wcout<<"gn 10"<<endl, db)<<endl;
-		printdb(wcout<<"10: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		pdbs->setpow(db, 2, 0, 2);
-		printdb(wcout<<"20: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		pdbs->setpow(db, 0, 1, 1);
-		pdbs->out(wcout << "gn 01"<<endl, db)<<endl;
-		printdb(wcout<<"01: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		pdbs->setpow(db, 0, 2, 2);
-		printdb(wcout<<"02: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		pdbs->setpow(db, 1, 1, 2);
-		printdb(wcout<<"11: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		pdbs->setpow(db, 1, 2, 3);
-		printdb(wcout<<"12: "<<++t<<" nodes: "<<pdbs->size()<<
-				" + "<<pprog->size()<<endl);
-		exit(0);*/
 		step();
-		//printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return printdb(wcout), d == db;
 	}
 }
@@ -649,6 +643,7 @@ next:	for (n = l = 0; n != 31; ++n)
 	} else if (skip) goto next;
 	return ss.str();
 }
+#ifdef MEMO
 size_t std::hash<memo>::operator()(const memo& m) const {
 	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m);
 }
@@ -660,6 +655,7 @@ size_t std::hash<pair<const bdds*, size_t>>::operator()(
 		const pair<const bdds*, size_t>& m) const {
 	return (size_t)m.first + m.second;
 }
+#endif
 template<typename K> void lp<K>::printdb(wostream& os) {
 	out<K>(os, *pdbs, db, bits, ar, pdbs->pdim + pdbs->ndim, dict);
 }
