@@ -85,8 +85,7 @@ protected:
 		add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}});
 	}
 public:
-	size_t pdim = 1, ndim = 0; // used for implicit power
-	size_t root = 0, maxbdd; // used for implicit power
+	size_t pdim = 1, ndim = 0, root = 0, maxbdd; // used for implicit power
 	static const size_t F, T;
 	void setpow(size_t _root, size_t _pdim, size_t _ndim, size_t maxw) {
 		root = _root, pdim = _pdim, ndim = _ndim,
@@ -102,7 +101,7 @@ public:
 		if (pdim == 1 && !ndim) return V[n];
 		if (!pdim && ndim == 1) return leaf(n) ? V[n] : flip(V[n]);
 		const size_t m = n % maxbdd, d = n / maxbdd;
-		node r = d < pdim ? V[m] : flip(V[m]);
+		node r = d < pdim ? V[m] : leaf(m) ? V[m] : flip(V[m]);
 		if (r[0]) r[0] += nvars * d;
 		if (trueleaf(r[1])) { if (d<pdim+ndim-1) r[1] = root+maxbdd*(d+1); }
 		else if (!leaf(r[1])) r[1] += maxbdd * d;
@@ -119,8 +118,7 @@ public:
 		return out(os<<RED<<L'['<<n<<L']'<<COLOR_RESET, getnode(n)); }
 	size_t size() const { return V.size(); }
 };
-const size_t bdds_base::F = 0;
-const size_t bdds_base::T = 1;
+const size_t bdds_base::F = 0, bdds_base::T = 1;
 ////////////////////////////////////////////////////////////////////////////////
 class bdds : public bdds_base {
 	void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const;
@@ -379,9 +377,9 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 size_t bdds::apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y,
 				const bool* s, const size_t* p, size_t sz) {
-	const auto t = make_tuple(&dst, s, x, y);
-	auto it = src.memo_and_ex.find(t);
-	if (it != src.memo_and_ex.end()) return it->second;
+//	const auto t = make_tuple(&dst, s, x, y);
+//	auto it = src.memo_and_ex.find(t);
+//	if (it != src.memo_and_ex.end()) return it->second;
 	size_t res;
 	const node Vx = src.getnode(x);
        	const node Vy = dst.getnode(y);
@@ -408,7 +406,8 @@ size_t bdds::apply_and_ex_perm(bdds& src, size_t x, bdds& dst, size_t y,
 	res = dst.add({{v, apply_and_ex_perm(src, a, dst, b, s, p, sz),
 			apply_and_ex_perm(src, c, dst, d, s, p, sz)}});
 ret:
-	return src.memo_and_ex.emplace(t, res /*= dst.permute(res, p, sz)*/), res;
+	return //src.memo_and_ex.emplace(t, res /*= dst.permute(res, p, sz)*/),
+	       res;
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 	const auto t = make_tuple(&dst, x, y);
@@ -593,13 +592,14 @@ template<typename K> void lp<K>::step() {
 	size_t add = bdds::F, del = bdds::F, s;//, x, y, z;
 	wcout << endl;
 	bdds &dbs = *pdbs, &prog = *pprog;
-	for (const rule* r : rules)
+	for (const rule* r : rules) {
 		(r->neg?del:add) = bdds::apply_or(prog, r->get_heads(*this),
 				dbs, r->neg?del:add);
+		dbs.memos_clear(), prog.memos_clear();
+	}
 	if ((s = dbs.bdd_and_not(add, del)) == bdds::F && add != bdds::F)
 		db = bdds::F; // detect contradiction
 	else db = dbs.bdd_or(dbs.bdd_and_not(db, del), s);
-	dbs.memos_clear(), prog.memos_clear();
 }
 
 template<typename K> bool lp<K>::pfp() {
