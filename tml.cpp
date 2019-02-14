@@ -72,11 +72,10 @@ class bdds_base {
 	static node flip(node n) {
 		if (leaf(n)) return trueleaf(n) ? node{0,0,0} : node{0,1,1};
 		if (leaf(n[1])) n[1] = trueleaf(n[1]) ? F : T;
-		if (leaf(n[2])) n[2] = trueleaf(n[1]) ? F : T;
+		if (leaf(n[2])) n[2] = trueleaf(n[2]) ? F : T;
 		return n;
 	}
 protected:
-	size_t pdim = 1, ndim = 0; // used for implicit power
 	const size_t nvars;
 	size_t add_nocheck(const node& n) {
 		size_t r;
@@ -86,11 +85,12 @@ protected:
 		add_nocheck({{0, 0, 0}}), add_nocheck({{0, 1, 1}});
 	}
 public:
+	size_t pdim = 1, ndim = 0; // used for implicit power
 	size_t root = 0, maxbdd; // used for implicit power
 	static const size_t F, T;
 	void setpow(size_t _root, size_t _pdim, size_t _ndim, size_t maxw) {
-		root = _root, pdim=_pdim, ndim = _ndim,
-		maxbdd=(size_t)1<<((sizeof(int_t)<<3)/maxw);
+		root = _root, pdim = _pdim, ndim = _ndim,
+		maxbdd = (size_t)1 << ((sizeof(int_t) << 3) / maxw);
 	}
 	size_t add(const node& n) {//create new bdd node,standard implementation
 		assert(n[0] <= nvars);
@@ -100,10 +100,9 @@ public:
 	}
 	node getnode(size_t n) const { // considering virtual powers
 		if (pdim == 1 && !ndim) return V[n];
-		if (!pdim && ndim == 1) return flip(V[n]);
+		if (!pdim && ndim == 1) return leaf(n) ? V[n] : flip(V[n]);
 		const size_t m = n % maxbdd, d = n / maxbdd;
-		node r = V[m];
-		if (d+1>pdim) r = flip(r);
+		node r = d < pdim ? V[m] : flip(V[m]);
 		if (r[0]) r[0] += nvars * d;
 		if (trueleaf(r[1])) { if (d<pdim+ndim-1) r[1] = root+maxbdd*(d+1); }
 		else if (!leaf(r[1])) r[1] += maxbdd * d;
@@ -117,7 +116,7 @@ public:
 	static bool trueleaf(const size_t& x) { return x == T; }
 	wostream& out(wostream& os, const node& n) const;//print using ?: syntax
 	wostream& out(wostream& os, size_t n) const {
-		return out(os<<RED<< L'['<<n<<L']'<<COLOR_RESET , getnode(n)); }
+		return out(os<<RED<<L'['<<n<<L']'<<COLOR_RESET, getnode(n)); }
 	size_t size() const { return V.size(); }
 };
 const size_t bdds_base::F = 0;
@@ -244,8 +243,7 @@ struct rule { // a P-DATALOG rule in bdd form
 					hvars[BIT(i,j)] = BIT(0, jt->second);
 		}
 	}
-	template<typename K>
-	size_t get_heads(lp<K>& p) const {
+	template<typename K> size_t get_heads(lp<K>& p) const {
 		p.pdbs->setpow(p.db, npos, nneg, p.maxw);
 		const size_t w = npos + nneg;
 		size_t y, z, n = ((w+1)*p.bits+1)*(p.ar+2);
@@ -253,7 +251,7 @@ struct rule { // a P-DATALOG rule in bdd form
 			y = bdds::apply(*p.pprog,
 				bdds::trueleaf(p.db) ? h : bdds_base::F,
 				*p.pprog, op_exists(this->x, n));
-		else y = bdds::apply_and_ex_perm(*p.pdbs, p.db,
+		else	y = bdds::apply_and_ex_perm(*p.pdbs, p.db,
 				*p.pprog, h, this->x, hvars, n);
 		//out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
 		//out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
@@ -294,12 +292,13 @@ template<typename K> wostream& out(wostream& os, bdds& b, size_t db,size_t bits,
 void bdds::sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const {
 	if (leaf(n) && !trueleaf(n)) return;
 	assert(v <= nvars+1);
-	if (v<n[0])
-		p[v-1]=true,
-		sat(v+1,nvars,n,p,r), p[v-1]=false, sat(v+1,nvars,n,p,r);
-	else if (v == nvars+1) r.push_back(p);
-	else	p[v-1]=true, sat(v+1,nvars,getnode(n[1]),p,r),
-		p[v-1]=false, sat(v+1,nvars,getnode(n[2]),p,r);
+	if (v < n[0])
+		p[v-1] = true,  sat(v + 1, nvars, n, p, r),
+		p[v-1] = false, sat(v + 1, nvars, n, p, r);
+	else if (v != nvars+1)
+		p[v-1] = true,  sat(v + 1, nvars, getnode(n[1]), p, r),
+		p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, r);
+	else	r.push_back(p);
 }
 
 vbools bdds::allsat(size_t x, size_t nvars) const {
@@ -315,8 +314,9 @@ size_t bdds::from_eq(size_t x, size_t y) {
 }
 
 wostream& bdds_base::out(wostream& os, const node& n) const {
-	if (leaf(n)) return os << (trueleaf(n) ? L'T' : L'F');
-	else return out(os << GREEN<<n[0]<<COLOR_RESET << L'?', n[1]), out(os << L':', n[2]);
+	return	leaf(n) ? os << (trueleaf(n) ? L'T' : L'F') :
+		(out(os<<GREEN<<n[0]<<COLOR_RESET<<L'?',getnode(n[1])),
+		out(os<<L':',getnode(n[2])));
 }
 ////////////////////////////////////////////////////////////////////////////////
 template<typename op_t> size_t bdds::apply(const bdds& b, size_t x, bdds& r,
@@ -449,8 +449,8 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 			apply_or(src, c, dst, d)}})), res;
 }
 ////////////////////////////////////////////////////////////////////////////////
-template<typename K> matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar,
-		size_t w) {
+template<typename K>
+matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar, size_t w) {
 	vbools s = allsat(x, bits * ar * w);
 	matrix<K> r(s.size());
 	for (vector<K>& v : r) v = vector<K>(w * ar, 0);
@@ -603,11 +603,30 @@ template<typename K> void lp<K>::step() {
 }
 
 template<typename K> bool lp<K>::pfp() {
-	size_t d;
+	size_t d, t = 0;
 	for (set<int_t> s;;) {
 		s.emplace(d = db);
-//		/*printdb*/(wcout<<"step: "<<++t<<" nodes: "<<pdbs->size()<<
-//				" + "<<pprog->size()<<endl);
+/*		pdbs->setpow(db, 1, 0, 1);
+		pdbs->out(wcout<<"gn 10"<<endl, db)<<endl;
+		printdb(wcout<<"10: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		pdbs->setpow(db, 2, 0, 2);
+		printdb(wcout<<"20: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		pdbs->setpow(db, 0, 1, 1);
+		pdbs->out(wcout << "gn 01"<<endl, db)<<endl;
+		printdb(wcout<<"01: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		pdbs->setpow(db, 0, 2, 2);
+		printdb(wcout<<"02: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		pdbs->setpow(db, 1, 1, 2);
+		printdb(wcout<<"11: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		pdbs->setpow(db, 1, 2, 3);
+		printdb(wcout<<"12: "<<++t<<" nodes: "<<pdbs->size()<<
+				" + "<<pprog->size()<<endl);
+		exit(0);*/
 		step();
 		//printdb(wcout<<"after step: " << t << endl);
 		if (s.find(db) != s.end()) return printdb(wcout), d == db;
@@ -642,7 +661,7 @@ size_t std::hash<pair<const bdds*, size_t>>::operator()(
 	return (size_t)m.first + m.second;
 }
 template<typename K> void lp<K>::printdb(wostream& os) {
-	out<K>(os, *pdbs, db, bits, ar, 1, dict);
+	out<K>(os, *pdbs, db, bits, ar, pdbs->pdim + pdbs->ndim, dict);
 }
 ////////////////////////////////////////////////////////////////////////////////
 int main() {
