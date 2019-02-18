@@ -33,8 +33,10 @@ template<typename K> using matrix = vector<vector<K>>;// set of relational terms
 typedef vector<bool> bools;
 typedef vector<bools> vbools;
 class bdds;
+#ifdef MEMO
 typedef tuple<const bdds*, size_t, size_t> memo;
 typedef tuple<const bdds*, const bool*, size_t, size_t> exmemo;
+#endif
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -183,7 +185,9 @@ public:
 	dict_t() { syms.push_back(0),lens.push_back(0),syms_dict[{0, 0}]=pad; }
 	K operator()(wstr s, size_t len);
 	pair<wstr, size_t> operator()(K t) const { return { syms[t],lens[t] }; }
-	size_t bits() const { return (sizeof(K)<<3)-__builtin_clz(syms.size());}
+	size_t bits() const {
+		return 	(sizeof(unsigned long long)<<3) -
+			__builtin_clzll((unsigned long long)(syms.size()-1));}
 	size_t nsyms() const { return syms.size(); }
 };
 ////////////////////////////////////////////////////////////////////////////////
@@ -261,17 +265,21 @@ struct rule { // a P-DATALOG rule in bdd form
 			y = bdds::apply(*p.pprog,
 				bdds::trueleaf(p.db) ? h : bdds_base::F,
 				*p.pprog, op_exists(this->x, n));
-		else	y = bdds::apply_and_ex_perm(*p.pdbs, p.db,
+		else
+			y = bdds::apply_and_ex_perm(*p.pdbs, p.db,
 				*p.pprog, h, this->x, hvars, n);
-		out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
-		out<K>(wcout << L"with: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
-		out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
-		out<K>(wcout << L"y: " << endl, *p.pprog, y, p.bits, p.ar, w, p.dict)<<endl;
+//		out<K>(wcout << L"db: " << endl, *p.pdbs, p.db, p.bits, p.ar, w, p.dict)<<endl;
+//		out<K>(wcout << L"h: " << endl, *p.pprog, h, p.bits, p.ar, w, p.dict)<<endl;
+//		out<K>(wcout << L"hsym: " << endl, *p.pprog, hsym, p.bits, p.ar, w, p.dict)<<endl;
+//		wcout << "existentials: " << endl;
+//		for (size_t i = 0; i < n; ++i) if (this->x[i]) wcout << i << ' ';
+//		wcout << endl;
+//		out<K>(wcout << L"y=ex(y): " << endl, *p.pprog, y, p.bits, p.ar, w, p.dict)<<endl;
 		z = p.pprog->permute(y, hvars, n);
-		out<K>(wcout << L"sel: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+//		out<K>(wcout << L"perm(y): " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 		z = p.pprog->bdd_and(z, hsym);
 		p.pdbs->setpow(p.db, 1, 0, p.maxw);
-		out<K>(wcout << L"heads: " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
+//		out<K>(wcout << L"heads (z&hsym): " << endl, *p.pprog, z, p.bits, p.ar, w, p.dict)<<endl;
 		return z;
 	}
 };
@@ -357,8 +365,7 @@ size_t bdds::permute(size_t x, const size_t* m, size_t sz) {//overlapping rename
 #endif	
 	node n = getnode(x);
 	apply_ret(leaf(n) ? x : ite(n[0] <= sz ? m[n[0]-1] : (n[0]-1),
-				permute(n[1],m,sz), permute(n[2],m,sz)),
-			memo_permute);
+			permute(n[1],m,sz), permute(n[2],m,sz)), memo_permute);
 }
 size_t bdds::copy(const bdds& b, size_t x) {
 	if (leaf(x)) return x;
@@ -452,14 +459,14 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 	size_t res;
 #endif	
 	const node &Vx = src.getnode(x);
-	if (leaf(Vx)) apply_ret(trueleaf(Vx)?T:y, src.memo_or);
+	if (leaf(Vx)) apply_ret(trueleaf(Vx) ? T : y, src.memo_or);
        	const node &Vy = dst.getnode(y);
 	if (leaf(Vy)) apply_ret(trueleaf(Vy) ? T : &src == &dst ? x :
 			dst.copy(src, x), src.memo_or);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret((a||b)?T:F, src.memo_or);
+	else if (!vx) apply_ret(a||b ? T : F, src.memo_or);
 	else if ((v = vx) < vy || !vy) b = d = y;
 	apply_ret(dst.add({{v, apply_or(src, a, dst, b),
 		apply_or(src, c, dst, d)}}), src.memo_or);
