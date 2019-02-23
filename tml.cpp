@@ -35,8 +35,7 @@ typedef vector<bool> bools;
 typedef vector<bools> vbools;
 class bdds;
 #ifdef MEMO
-typedef tuple<const bdds*, size_t, size_t> memo;
-typedef tuple<const bdds*, const bool*, size_t, size_t> exmemo;
+typedef tuple<const bdds*, size_t, size_t, size_t, size_t, size_t, size_t> memo;
 #endif
 #ifdef TRACE
 #define D(x) x
@@ -71,13 +70,8 @@ template<> struct std::hash<node> {
 };
 #ifdef MEMO
 template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
-template<> struct std::hash<exmemo> { size_t operator()(const exmemo& m)const;};
-template<> struct std::hash<pair<const bdds*, size_t>> {
-	size_t operator()(const pair<const bdds*, size_t>& m) const;
-};
-template<> struct std::hash<pair<size_t, const size_t*>> {
-	size_t operator()(const pair<size_t, const size_t*>& m) const {
-		return m.first + (size_t)m.second; }
+template<> struct std::hash<pair<memo, size_t>> {
+	size_t operator()(const pair<memo, size_t>& m) const;
 };
 #endif
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +134,7 @@ class bdds : public bdds_base {
 	void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) const;
 #ifdef MEMO
 	unordered_map<memo, size_t> memo_and, memo_and_not, memo_or;
-	unordered_map<pair<const bdds*, size_t>, size_t> memo_copy;
+	unordered_map<pair<memo, size_t>, size_t> memo_copy;
 #endif
 public:
 	bdds(size_t nvars) : bdds_base(nvars) {}
@@ -161,7 +155,6 @@ public:
 	size_t bdd_and(size_t x, size_t y){ return apply_and(*this,x,*this,y); } 
 	size_t bdd_and_not(size_t x, size_t y) {
 		return apply_and_not(*this, x, *this, y); }
-	size_t deltail(size_t x, size_t h);
 	size_t delhead(size_t x, size_t h);
 	vbools allsat(size_t x, size_t nvars) const;
 	void memos_clear() {
@@ -284,7 +277,7 @@ size_t bdds::ite(size_t v, size_t t, size_t e) {
 size_t bdds::copy(const bdds& b, size_t x) {
 	if (leaf(x)) return x;
 #ifdef MEMO	
-	auto t = make_pair(&b, x);
+	auto t = make_pair(make_tuple(&b, pdim, ndim, offset, b.pdim, b.ndim, b.offset), x);
 	auto it = memo_copy.find(t);
 	if (it != memo_copy.end()) return it->second;
 	size_t res;
@@ -294,7 +287,8 @@ size_t bdds::copy(const bdds& b, size_t x) {
 }
 size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO	
-	const auto t = make_tuple(&dst, x, y);
+	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
+			dst.offset);
 	auto it = src.memo_and.find(t);
 	if (it != src.memo_and.end()) return it->second;
 	size_t res;
@@ -314,7 +308,8 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO
-	const auto t = make_tuple(&dst, x, y);
+	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
+			dst.offset);
 	auto it = src.memo_and_not.find(t);
 	if (it != src.memo_and_not.end()) return it->second;
 	size_t res;
@@ -334,7 +329,8 @@ size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO	
-	const auto t = make_tuple(&dst, x, y);
+	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
+			dst.offset);
 	auto it = src.memo_or.find(t);
 	if (it != src.memo_or.end()) return it->second;
 	size_t res;
@@ -352,16 +348,10 @@ size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 	apply_ret(dst.add({{v, apply_or(src, a, dst, b),
 		apply_or(src, c, dst, d)}}), src.memo_or);
 }
-size_t bdds::deltail(size_t x, size_t h) {
-	if (leaf(x)) return x;
-	node n = getnode(x);
-	if (n[0]<=h) return add({{n[0], deltail(n[1], h), deltail(n[2], h)}});
-	return n[1] == F && n[2] == F ? F : T;
-}
 size_t bdds::delhead(size_t x, size_t h) {
 	if (leaf(x)) return x;
 	node n = getnode(x);
-	if (n[0] > h) return x;//add({{n[0], delhead(n[1], h), delhead(n[2], h)}});
+	if (n[0] > h) return x;
 	return bdd_or(delhead(n[1], h), delhead(n[2], h));
 }
 #define BIT(term,arg) ((term*bits+b)*ar+arg)
@@ -563,15 +553,14 @@ next:	for (n = l = 0; n != 31; ++n)
 }
 #ifdef MEMO
 size_t std::hash<memo>::operator()(const memo& m) const {
-	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m);
+	return 	(size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m)
+		+ (size_t)get<3>(m) + (size_t)get<4>(m) + (size_t)get<5>(m)
+		+ (size_t)get<6>(m);
 }
-size_t std::hash<exmemo>::operator()(const exmemo& m) const {
-	return (size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m) +
-		(size_t)get<3>(m);
-}
-size_t std::hash<pair<const bdds*, size_t>>::operator()(
-		const pair<const bdds*, size_t>& m) const {
-	return (size_t)m.first + m.second;
+size_t std::hash<pair<memo, size_t>>::operator()(
+		const pair<memo, size_t>& m) const {
+	static std::hash<memo> hm;
+	return hm(m.first) + m.second;
 }
 #endif
 template<typename K> void lp<K>::printdb(wostream& os) {
