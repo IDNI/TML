@@ -158,12 +158,6 @@ public:
 		return apply_and_not(*this, x, *this, y); }
 	size_t delhead(size_t x, size_t h);
 	vbools allsat(size_t x, size_t nvars) const;
-	void memos_clear() {
-#ifdef MEMO		
-		memo_and.clear(), memo_and_not.clear(), memo_or.clear(),
-		memo_copy.clear(); 
-#endif		
-	}
 	using bdds_base::add;
 	using bdds_base::out;
 };
@@ -211,7 +205,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	template<typename K>
 	rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz);
 	size_t h = bdds::T, hsym = bdds::T, npos, nneg;//, hbits;
-	template<typename K> size_t get_heads(lp<K>& p) const;
+	template<typename K> size_t step(lp<K>& p) const;
 };
 ////////////////////////////////////////////////////////////////////////////////
 wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
@@ -356,7 +350,7 @@ size_t bdds::delhead(size_t x, size_t h) {
 	if (n[0] > h) return x;
 	return bdd_or(delhead(n[1], h), delhead(n[2], h));
 }
-#define BIT(term,arg) ((term*bits+b)*ar+arg)
+#define BIT(term,arg) (term*ar+arg)*bits+b //((term*bits+b)*ar+arg)
 template<typename K>
 matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar, size_t w) {
 	vbools s = allsat(x, bits * ar * w);
@@ -385,23 +379,22 @@ template<typename K> void from_term(bdds& bdd, size_t i, size_t s, size_t bits,
 		size_t ar, vector<K> v, size_t &V, size_t &S,
 		map<K, array<size_t, 2>>& m){
 	auto it = m.end();
-	size_t j, b;
-	for (v.erase(v.begin()), j = 0; j != v.size(); ++j)
+	size_t j = 0, b = bits;
+	for (v.erase(v.begin()); j != v.size(); ++j, b = bits)
 		if (v[j] < 0) {
 			V = bdd.bdd_and(V, get_range(bdd, i, j, s, bits, ar));
 			if ((it = m.find(v[j])) == m.end())
 				m.emplace(v[j], array<size_t, 2>{{i, j}});
-			else for (b = 0; b != bits; ++b)
+			else while (b--)
 				V = bdd.bdd_and(V, bdd.from_eq(BIT(i,j),
 					BIT(it->second[0], it->second[1])));
-		} else for (b = 0; b != bits; ++b)
+		} else while (b--)
 			S = bdd.bdd_and(S, bdd.from_bit(BIT(i,j), v[j]&(1<<b)));
 }
 template<typename K>
 rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 	size_t i;
-	neg = v[0][0] < 0, //hbits = bits * (v[0].size() - 1),
-	npos = nneg = 0;
+	neg = v[0][0] < 0, npos = nneg = 0;
 	map<K, array<size_t, 2>> m;
 	matrix<K> t;
 	for (i=1; i != v.size(); ++i) if (v[i][0]>0) ++npos, t.push_back(v[i]);
@@ -411,7 +404,7 @@ rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 		from_term(bdd, i, dsz, bits, ar, v[i], hsym, h, m);
 	if (v.size() == 1) h = bdd.bdd_and(h, hsym);
 }
-template<typename K> size_t rule::get_heads(lp<K>& p) const {
+template<typename K> size_t rule::step(lp<K>& p) const {
 	D(out<K>(wcout<<L"db: "<<endl, *p.dbs,p.db,p.bits,p.ar,1,p.dict)<<endl);
 	p.dbs->setpow(p.db, npos, nneg, p.maxw, 0);//hbits);
 	size_t x, y, z;
@@ -517,11 +510,10 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 template<typename K> void lp<K>::step() {
 	size_t add = bdds::F, del = bdds::F, s, x;
 	for (const rule* r : rules) {
-		x = r->get_heads(*this);
+		x = r->step(*this);
 		prog->setpow(x, 1, 0, 1, -(r->npos + r->nneg) * bits * ar);
-		(r->neg?del:add) = bdds::apply_or(*prog, x, *dbs, r->neg?del:add);
+		(r->neg?del:add) = bdds::apply_or(*prog,x,*dbs,r->neg?del:add);
 		prog->setpow(x, 1, 0, 1, 0);
-//		dbs->memos_clear(), prog->memos_clear();
 	}
 	if ((s = dbs->bdd_and_not(add, del)) == bdds::F && add != bdds::F)
 		db = bdds::F; // detect contradiction
