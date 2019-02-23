@@ -35,7 +35,8 @@ typedef vector<bool> bools;
 typedef vector<bools> vbools;
 class bdds;
 #ifdef MEMO
-typedef tuple<const bdds*, size_t, size_t, size_t, size_t, size_t, size_t> memo;
+typedef tuple<const bdds*, size_t, size_t, size_t, size_t, size_t, size_t,
+	size_t, size_t> memo;
 #endif
 #ifdef TRACE
 #define D(x) x
@@ -277,7 +278,8 @@ size_t bdds::ite(size_t v, size_t t, size_t e) {
 size_t bdds::copy(const bdds& b, size_t x) {
 	if (leaf(x)) return x;
 #ifdef MEMO	
-	auto t = make_pair(make_tuple(&b, pdim, ndim, offset, b.pdim, b.ndim, b.offset), x);
+	auto t = make_pair(make_tuple(&b, pdim, ndim, root, offset, b.root,
+				b.pdim, b.ndim, b.offset), x);
 	auto it = memo_copy.find(t);
 	if (it != memo_copy.end()) return it->second;
 	size_t res;
@@ -287,8 +289,8 @@ size_t bdds::copy(const bdds& b, size_t x) {
 }
 size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO	
-	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
-			dst.offset);
+	const auto t = make_tuple(&dst, x, y, src.root, src.pdim, src.ndim,
+			src.offset, dst.root, dst.offset);
 	auto it = src.memo_and.find(t);
 	if (it != src.memo_and.end()) return it->second;
 	size_t res;
@@ -308,8 +310,8 @@ size_t bdds::apply_and(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO
-	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
-			dst.offset);
+	const auto t = make_tuple(&dst, x, y, src.root, src.pdim, src.ndim,
+			src.offset, dst.root, dst.offset);
 	auto it = src.memo_and_not.find(t);
 	if (it != src.memo_and_not.end()) return it->second;
 	size_t res;
@@ -329,8 +331,8 @@ size_t bdds::apply_and_not(bdds& src, size_t x, bdds& dst, size_t y) {
 }
 size_t bdds::apply_or(bdds& src, size_t x, bdds& dst, size_t y) {
 #ifdef MEMO	
-	const auto t = make_tuple(&dst, x, y, src.pdim, src.ndim, src.offset,
-			dst.offset);
+	const auto t = make_tuple(&dst, x, y, src.root, src.pdim, src.ndim,
+			src.offset, dst.root, dst.offset);
 	auto it = src.memo_or.find(t);
 	if (it != src.memo_or.end()) return it->second;
 	size_t res;
@@ -519,7 +521,7 @@ template<typename K> void lp<K>::step() {
 		prog->setpow(x, 1, 0, 1, -(r->npos + r->nneg) * bits * ar);
 		(r->neg?del:add) = bdds::apply_or(*prog, x, *dbs, r->neg?del:add);
 		prog->setpow(x, 1, 0, 1, 0);
-		dbs->memos_clear(), prog->memos_clear();
+//		dbs->memos_clear(), prog->memos_clear();
 	}
 	if ((s = dbs->bdd_and_not(add, del)) == bdds::F && add != bdds::F)
 		db = bdds::F; // detect contradiction
@@ -555,7 +557,7 @@ next:	for (n = l = 0; n != 31; ++n)
 size_t std::hash<memo>::operator()(const memo& m) const {
 	return 	(size_t)get<0>(m) + (size_t)get<1>(m) + (size_t)get<2>(m)
 		+ (size_t)get<3>(m) + (size_t)get<4>(m) + (size_t)get<5>(m)
-		+ (size_t)get<6>(m);
+		+ (size_t)get<6>(m) + (size_t)get<7>(m) + (size_t)get<8>(m);
 }
 size_t std::hash<pair<memo, size_t>>::operator()(
 		const pair<memo, size_t>& m) const {
