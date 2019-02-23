@@ -100,9 +100,10 @@ protected:
 	}
 	inline node shift(node n) const { return leaf(n)?n:(n[0]+=offset,n); }
 public:
-	size_t pdim, ndim, root, maxbdd, offset; // for implicit power
+	size_t pdim, ndim, root, maxbdd; // for implicit power
+	int64_t offset;
 	static const size_t F, T;
-	void setpow(size_t r, size_t p, size_t n, size_t maxw, size_t _offset) {
+	void setpow(size_t r, size_t p, size_t n, size_t maxw, int64_t _offset) {
 		root = r, pdim = p, ndim = n, offset = _offset,
 		maxbdd = (size_t)1 << ((sizeof(int_t) << 3) / maxw);
 	}
@@ -118,9 +119,9 @@ public:
 		const size_t m = n % maxbdd, d = n / maxbdd;
 		node r = d < pdim || leaf(m) ? V[m] : flip(V[m]);
 		if (r[0]) r[0] += nvars * d;
-		if (trueleaf(r[1])) { if (d<pdim+ndim-1)r[1]=root+maxbdd*(d+1);}
+		if (trueleaf(r[1])) {if (d<pdim+ndim-1) r[1]=root+maxbdd*(d+1);}
 		else if (!leaf(r[1])) r[1] += maxbdd * d;
-		if (trueleaf(r[2])) { if (d<pdim+ndim-1)r[2]=root+maxbdd*(d+1);}
+		if (trueleaf(r[2])) {if (d<pdim+ndim-1) r[2]=root+maxbdd*(d+1);}
 		else if (!leaf(r[2])) r[2] += maxbdd * d;
 		return shift(r);
 	}
@@ -153,14 +154,15 @@ public:
 	size_t permute(size_t x, const size_t*, size_t sz);
 	// helper constructors
 	size_t from_eq(size_t x, size_t y); // a bdd saying "x=y"
-	template<typename K> matrix<K> from_bits(size_t x, size_t bits,
-			size_t ar, size_t w);
+	template<typename K>
+	matrix<K> from_bits(size_t x, size_t bits, size_t ar, size_t w);
 	// helper apply() variations
 	size_t bdd_or(size_t x, size_t y) { return apply_or(*this,x,*this,y); } 
 	size_t bdd_and(size_t x, size_t y){ return apply_and(*this,x,*this,y); } 
 	size_t bdd_and_not(size_t x, size_t y) {
 		return apply_and_not(*this, x, *this, y); }
 	size_t deltail(size_t x, size_t h);
+	size_t delhead(size_t x, size_t h);
 	vbools allsat(size_t x, size_t nvars) const;
 	void memos_clear() {
 #ifdef MEMO		
@@ -214,7 +216,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	rule(){}
 	template<typename K>
 	rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz);
-	size_t h = bdds::T, hsym = bdds::T, npos, nneg, hbits;
+	size_t h = bdds::T, hsym = bdds::T, npos, nneg;//, hbits;
 	template<typename K> size_t get_heads(lp<K>& p) const;
 };
 ////////////////////////////////////////////////////////////////////////////////
@@ -356,6 +358,12 @@ size_t bdds::deltail(size_t x, size_t h) {
 	if (n[0]<=h) return add({{n[0], deltail(n[1], h), deltail(n[2], h)}});
 	return n[1] == F && n[2] == F ? F : T;
 }
+size_t bdds::delhead(size_t x, size_t h) {
+	if (leaf(x)) return x;
+	node n = getnode(x);
+	if (n[0] > h) return x;//add({{n[0], delhead(n[1], h), delhead(n[2], h)}});
+	return bdd_or(delhead(n[1], h), delhead(n[2], h));
+}
 #define BIT(term,arg) ((term*bits+b)*ar+arg)
 template<typename K>
 matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar, size_t w) {
@@ -375,10 +383,10 @@ matrix<K> bdds::from_bits(size_t x, size_t bits, size_t ar, size_t w) {
 }
 ////////////////////////////////////////////////////////////////////////////////
 size_t get_range(bdds& bdd,size_t i,size_t j,size_t s,size_t bits,size_t ar) {
-	size_t rng = bdds::F, elem, b, k = 1;
+	size_t rng = bdds::F, b, elem, k = 1;
 	for (; k != s; ++k, rng = bdd.bdd_or(rng, elem))
 		for (b = 0, elem = bdds::T; b != bits; ++b)
-			elem=bdd.bdd_and(elem,bdd.from_bit(BIT(i, j),k&(1<<b)));
+			elem=bdd.bdd_and(elem,bdd.from_bit(BIT(i,j),k&(1<<b)));
 	return rng;
 }
 template<typename K> void from_term(bdds& bdd, size_t i, size_t s, size_t bits,
@@ -400,28 +408,30 @@ template<typename K> void from_term(bdds& bdd, size_t i, size_t s, size_t bits,
 template<typename K>
 rule::rule(bdds& bdd, matrix<K> v, size_t bits, size_t ar, size_t dsz) {
 	size_t i;
-	neg = v[0][0] < 0, hbits = bits*(v[0].size()-1), npos=nneg=0;
+	neg = v[0][0] < 0, //hbits = bits * (v[0].size() - 1),
+	npos = nneg = 0;
 	map<K, array<size_t, 2>> m;
 	matrix<K> t;
-	t.push_back(v[0]);
 	for (i=1; i != v.size(); ++i) if (v[i][0]>0) ++npos, t.push_back(v[i]);
 	for (i=1; i != v.size(); ++i) if (v[i][0]<0) ++nneg, t.push_back(v[i]);
+	t.push_back(v[0]);
 	for (v = move(t), i = 0; i != v.size(); ++i)
-		from_term(bdd, i, dsz, bits, ar, v[i], hsym, i?h:hsym, m);
+		from_term(bdd, i, dsz, bits, ar, v[i], hsym, h, m);
 	if (v.size() == 1) h = bdd.bdd_and(h, hsym);
 }
 template<typename K> size_t rule::get_heads(lp<K>& p) const {
 	D(out<K>(wcout<<L"db: "<<endl, *p.dbs,p.db,p.bits,p.ar,1,p.dict)<<endl);
-	p.dbs->setpow(p.db, npos, nneg, p.maxw, hbits);
-	size_t x, y, z, w = npos + nneg + 1;
+	p.dbs->setpow(p.db, npos, nneg, p.maxw, 0);//hbits);
+	size_t x, y, z;
+       	D(size_t w = npos + nneg + 1);
 	D(out<K>(wcout<<L"db: "<<endl, *p.dbs,p.db,p.bits,p.ar,w,p.dict)<<endl);
 	D(out<K>(wcout<<L"h: "<<endl, *p.prog,h,p.bits,p.ar,w,p.dict)<<endl);
 	x = bdds::apply_and(*p.dbs, p.db, *p.prog, h);
 	D(out<K>(wcout<<L"x: "<<endl, *p.prog,x,p.bits,p.ar,w,p.dict)<<endl);
 	y = p.prog->bdd_and(x, hsym);
 	D(out<K>(wcout<<L"y: "<<endl, *p.prog,y,p.bits,p.ar,w,p.dict)<<endl);
-	D(out<K>(wcout<<L"hsym: "<<endl, *p.prog,hsym,p.bits,p.ar,w,p.dict)<<endl);
-	z = p.prog->deltail(y, hbits);
+	D(out<K>(wcout<<L"hsym: "<<endl,*p.prog,hsym,p.bits,p.ar,w,p.dict)<<endl);
+	z = p.prog->delhead(y, (npos + nneg) * p.bits * p.ar);
 	D(out<K>(wcout<<L"z: "<<endl, *p.prog,z,p.bits,p.ar,w,p.dict)<<endl);
 	p.dbs->setpow(p.db, 1, 0, p.maxw, 0);
 	return z;
@@ -510,15 +520,15 @@ template<typename K> void lp<K>::prog_read(wstr s) {
 	 	if (x.size() == 1)
 			db=dbs->bdd_or(db,rule(*dbs,x,bits,ar,dict.nsyms()).h);
 		else rules.emplace_back(new rule(*prog,x,bits,ar,dict.nsyms()));
-	//	out<K>(wcout<<L"h: "<<endl,*prog,rules.back()->h,bits,ar,
-	//	rules.back()->npos+rules.back()->nneg+1,dict)<<endl;
 }
 
 template<typename K> void lp<K>::step() {
-	size_t add = bdds::F, del = bdds::F, s;
+	size_t add = bdds::F, del = bdds::F, s, x;
 	for (const rule* r : rules) {
-		(r->neg?del:add) = bdds::apply_or(*prog, r->get_heads(*this),
-				*dbs, r->neg?del:add);
+		x = r->get_heads(*this);
+		prog->setpow(x, 1, 0, 1, -(r->npos + r->nneg) * bits * ar);
+		(r->neg?del:add) = bdds::apply_or(*prog, x, *dbs, r->neg?del:add);
+		prog->setpow(x, 1, 0, 1, 0);
 		dbs->memos_clear(), prog->memos_clear();
 	}
 	if ((s = dbs->bdd_and_not(add, del)) == bdds::F && add != bdds::F)
