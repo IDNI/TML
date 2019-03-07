@@ -66,7 +66,8 @@ struct dictcmp {
 			wcsncmp(x.first, y.first, x.second) < 0;
 	}
 };
-vector<node> V; // bdd all nodes
+
+vector<node> &V = *new vector<node>; // all bdd nodes
 unordered_map<node, size_t> M; // node to its index
 map<pair<wstr, size_t>, int_t, dictcmp> syms_dict, vars_dict;
 vector<wstr> syms;
@@ -348,9 +349,11 @@ size_t bdd_permute(size_t x, const size_t* m) {//overlapping rename
 	if (it != memo_permute.end()) return it->second;
 	size_t res;
 #endif	
-	const node &n = getnode(x);
-	apply_ret(leaf(n) ? x : ite(m[n[0]-1],
-		bdd_permute(n[1], m), bdd_permute(n[2], m)), memo_permute);
+	const node n = getnode(x);
+	if (leaf(n)) apply_ret(x, memo_permute);
+	size_t v = m[n[0]-1];
+	res = ite(v, bdd_permute(n[1], m), bdd_permute(n[2], m));
+	apply_ret(res, memo_permute);
 }
 
 size_t from_eq(size_t x, size_t y) {
@@ -481,19 +484,24 @@ void lp::prog_read(wstr s) {
 rule::rule(matrix v, size_t bits) {
 	matrix t; // put negs after poss and count them
 	t.push_back(v[0]);
-	size_t i, j, b, ar = v[0].size() - 1, k = ar;
+	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
 	for (i=1; i!=v.size(); ++i) if (v[i][0]>0) ++npos, t.push_back(v[i]);
 	for (i=1; i!=v.size(); ++i) if (v[i][0]<0) ++nneg, t.push_back(v[i]);
 	v = move(t);
 	neg = v[0][0] < 0;
-	for (term& x : v) x.erase(x.begin());
+	set<int_t> vars;
+	for (term& x : v) {
+		x.erase(x.begin());
+		for (int_t& y : x) if (y < 0) vars.emplace(y);
+	}
+	nvars = vars.size();
 	map<int_t, size_t> m;
 	auto it = m.end();
 	for (i = 1; i != v.size(); ++i) { // init, sel, ex and local eq
 		body d;
 		d.ex = (bool*)memset(new bool[bits*ar],0,sizeof(bool)*bits*ar),
-		d.perm = new size_t[ar * bits];
-		for (b = 0; b != ar * bits; ++b) d.perm[b] = b;
+		d.perm = new size_t[(ar + nvars) * bits];
+		for (b = 0; b != (ar + nvars) * bits; ++b) d.perm[b] = b;
 		for (j = 0; j != ar; ++j)
 			if (v[i][j] >= 0)
 				d.sel = bdd_and(d.sel,
@@ -540,7 +548,7 @@ size_t rule::step(size_t db, size_t bits, size_t ar) const {
 		if (F == (sels[n] = bdd_and_not_ex(bd[n].sel, db, bd[n].ex)))
 			return F;
 	for (n = 0; n != bd.size(); ++n)
-		if (F == (vars=bdd_and(vars, bdd_permute(sels[n],bd[n].perm))))
+		if (F == (vars=bdd_and(vars, bdd_permute(sels[n], bd[n].perm))))
 			return F;
 	return bdd_deltail(bdd_and(hsym, vars), bits * ar);
 }
