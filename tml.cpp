@@ -311,8 +311,8 @@ size_t bdd_and_not_ex(size_t x, size_t y, const bool* s) {
 	const node &Vx = getnode(x), &Vy = getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if (leaf(Vx)) {
-		res = trueleaf(Vx) ? bdd_ex(y, s) : F;
+	if (leaf(Vx) && !trueleaf(Vx)) {
+		res = F;
 		goto ret;
 	}
 	if (leaf(Vy)) {
