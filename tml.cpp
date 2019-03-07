@@ -501,10 +501,10 @@ rule::rule(matrix v, size_t bits) {
 			else if ((it = m.find(v[i][j])) != m.end())
 				for (b = 0; b != bits; ++b)
 					d.ex[b+j*bits] = true,
-					d.sel=bdd_and(d.sel, from_eq(b+j*bits,
+					d.sel = bdd_and(d.sel, from_eq(b+j*bits,
 						b+it->second*bits));
-			else 	m.emplace(v[i][j], j),
-				d.sel = from_range(nsyms(), bits, j * bits);
+			else 	m.emplace(v[i][j], j), d.sel = bdd_and(d.sel,
+					from_range(nsyms(), bits, j * bits));
 		//out(wcout<<"d.sel"<<endl, d.sel, bits, ar)<<endl;
 		m.clear(), bd.push_back(d);
 	}
