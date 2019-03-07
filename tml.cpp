@@ -122,7 +122,7 @@ wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y:x){ os << (y?1:0); } return os; }
 wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y:x) { os << y << endl; } return os; }
-wostream& out(wostream& os, size_t db,size_t bits, size_t ar) {
+wostream& out(wostream& os, size_t db, size_t bits, size_t ar) {
 	set<wstring> s;
 	for (auto v : from_bits(db, bits, ar)) {
 		wstringstream ss;
@@ -504,7 +504,8 @@ rule::rule(matrix v, size_t bits) {
 					d.sel=bdd_and(d.sel, from_eq(b+j*bits,
 						b+it->second*bits));
 			else 	m.emplace(v[i][j], j),
-				d.sel = from_range(nsyms()-1, bits, j * bits);
+				d.sel = from_range(nsyms(), bits, j * bits);
+		//out(wcout<<"d.sel"<<endl, d.sel, bits, ar)<<endl;
 		m.clear(), bd.push_back(d);
 	}
 	for (j = 0; j != ar; ++j) // hsym
@@ -513,6 +514,7 @@ rule::rule(matrix v, size_t bits) {
 		else if (m.end() == (it=m.find(v[0][j]))) m.emplace(v[0][j], j);
 		else for (b = 0; b != bits; ++b)
 			hsym=bdd_and(hsym,from_eq(b+j*bits, b+it->second*bits));
+	//out(wcout<<"hsym"<<endl, hsym, bits, ar)<<endl;
 	for (i = 0; i != v.size() - 1; ++i) // var permutations
 		for (j = 0; j != ar; ++j)
 			if (v[i+1][j] < 0) {
@@ -526,9 +528,14 @@ rule::rule(matrix v, size_t bits) {
 
 size_t rule::step(size_t db, size_t bits, size_t ar) const {
 	size_t n = 0, vars = T;
+//	out(wcout<<"db:"<<endl, db, bits, ar);
 	for (; n != npos; ++n)
 		if (F == (sels[n] = bdd_and_ex(bd[n].sel, db, bd[n].ex)))
 			return F;
+//		else {
+//			out(wcout<<"db.sel"<<n<<endl, bd[n].sel, bits, ar)<<endl;
+//			out(wcout<<"sel"<<n<<endl, sels[n], bits, ar)<<endl;
+//		}
 	for (; n != nneg+npos; ++n)
 		if (F == (sels[n] = bdd_and_not_ex(bd[n].sel, db, bd[n].ex)))
 			return F;
@@ -536,7 +543,6 @@ size_t rule::step(size_t db, size_t bits, size_t ar) const {
 		if (F == (vars=bdd_and(vars, bdd_permute(sels[n],bd[n].perm))))
 			return F;
 	return bdd_deltail(bdd_and(hsym, vars), bits * ar);
-//	out(wcout << L"x: "<<endl, *p.pprog, x, p.bits, p.ar, w, p.dict)<<endl;
 }
 
 void lp::step() {
