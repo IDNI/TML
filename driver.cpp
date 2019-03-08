@@ -82,10 +82,10 @@ public:
 
 wostream& driver::printdb(wostream& os) {
 	set<wstring> s;
-	for (auto v : p.getdb()) {
+	for (auto v : getdb()) {
 		wstringstream ss;
 		for (auto k : v)
-			if (!k) ss << L"* ";
+			if (k == pad) ss << L"* ";
 			else if((size_t)k<(size_t)nsyms())ss<<dict_get(k)<<L' ';
 			else ss << L'[' << k << L"] ";
 		s.emplace(ss.str());
@@ -93,6 +93,7 @@ wostream& driver::printdb(wostream& os) {
 	for (auto& x : s) os << x << endl;
 	return os;
 }
+
 int_t driver::str_read(wstr *s) {
 	wstr t;
 	while (**s && iswspace(**s)) ++*s;

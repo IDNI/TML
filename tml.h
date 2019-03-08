@@ -27,12 +27,11 @@ class lp { // [pfp] logic program
 	std::forward_list<matrix> rawrules;
 	std::vector<class rule*> rules;
 	void step(); // single pfp step
-public:
 	size_t bits, ar = 0, maxw = 0;
 	size_t db = F; // db's bdd root
-	bool pfp();
-	void printdb(std::wostream& os);
+public:
 	void rule_add(const matrix& t);
 	void compile(size_t bits, size_t nsyms);
+	bool pfp();
 	matrix getdb();
 };
