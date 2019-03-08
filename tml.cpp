@@ -25,7 +25,7 @@
 #include <stdexcept>
 #include <cassert>
 using namespace std;
-#define MEMO
+//#define MEMO
 #define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
@@ -389,8 +389,7 @@ size_t bdd_permute(size_t x, const size_t* m) {//overlapping rename
 	const node n = getnode(x);
 	if (leaf(n)) apply_ret(x, memo_permute);
 	size_t v = m[n[0]-1];
-	res = ite(v, bdd_permute(n[1], m), bdd_permute(n[2], m));
-	apply_ret(res, memo_permute);
+	apply_ret(ite(v, bdd_permute(n[1], m), bdd_permute(n[2], m)), memo_permute);
 }
 
 size_t from_eq(size_t x, size_t y) {
