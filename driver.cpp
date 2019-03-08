@@ -1,3 +1,15 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include "tml.h"
 #include <map>
 #include <set>
@@ -174,7 +186,7 @@ void driver::prog_read(wstr s) {
 }
 
 int main() {
-	setlocale(LC_ALL, ""), bdd_init(), dict_init();
+	setlocale(LC_ALL, ""), tml_init(), dict_init();
 //	test_range();
 	driver p;
 	wstring s = file_read_text(stdin); // got to stay in memory
