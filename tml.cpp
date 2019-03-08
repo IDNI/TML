@@ -14,8 +14,6 @@
 #include <map>
 #include <unordered_set>
 #include <unordered_map>
-#include <vector>
-#include <cstdint>
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -24,18 +22,9 @@
 #include <climits>
 #include <stdexcept>
 #include <cassert>
+#include "tml.h"
 using namespace std;
 //#define MEMO
-#define er(x)	perror(x), exit(0)
-#define oparen_expected "'(' expected\n"
-#define comma_expected "',' or ')' expected\n"
-#define dot_after_q "expected '.' after query.\n"
-#define if_expected "'if' or '.' expected\n"
-#define sep_expected "Term or ':-' or '.' expected\n"
-#define unmatched_quotes "Unmatched \"\n"
-#define err_inrel "Unable to read the input relation symbol.\n"
-#define err_src "Unable to read src file.\n"
-#define err_dst "Unable to read dst file.\n"
 #define RED     "\x1b[31m"
 #define GREEN   "\x1b[32m"
 #define YELLOW  "\x1b[33m"
@@ -49,31 +38,13 @@ using namespace std;
 #define apply_ret(r, m) return r
 #endif
 
-typedef int64_t int_t;
 typedef array<size_t, 3> node; //bdd node is a triple: varid,1-node-id,0-node-id
-typedef const wchar_t* wstr;
-typedef vector<int_t> term;
-typedef vector<term> matrix;// set of relational terms
-typedef vector<bool> bools;
-typedef vector<bools> vbools;
 template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
-};
-struct dictcmp {
-	bool operator()(const pair<wstr, size_t>& x,
-			const pair<wstr, size_t>& y) const {
-		return	x.second != y.second ? x.second < y.second :
-			wcsncmp(x.first, y.first, x.second) < 0;
-	}
 };
 
 vector<node> &V = *new vector<node>; // all bdd nodes
 unordered_map<node, size_t> M; // node to its index
-map<pair<wstr, size_t>, int_t, dictcmp> syms_dict, vars_dict;
-vector<wstr> syms;
-vector<size_t> lens;
-const int_t pad = 0;
-const size_t F = 0, T = 1;
 
 #ifdef MEMO
 typedef array<size_t, 2> memo;
@@ -112,9 +83,6 @@ bool trueleaf(const node& x)	{ return leaf(x) && x[1]; }
 bool trueleaf(const size_t& x)	{ return x == T; }
 size_t from_bit(size_t x ,bool v) {
 	return bdd_add(v ? node{{x+1,T,F}} : node{{x+1,F,T}}); }
-void dict_init() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}]=pad;}
-pair<wstr, size_t> dict_get(int_t t) { return { syms[t],lens[t] }; }
-size_t nsyms() { return syms.size(); }
 
 matrix from_bits(size_t x, size_t bits, size_t ar);
 wostream& out(wostream& os, const node& n) { //print using ?: syntax
@@ -122,25 +90,10 @@ wostream& out(wostream& os, const node& n) { //print using ?: syntax
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
 }
 wostream& out(wostream& os,size_t n){return out(os<<L'['<<n<<L']',getnode(n));}
-wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
-	for (size_t n = 0; n != p.second; ++n) { os << p.first[n]; } return os;}
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y:x){ os << (y?1:0); } return os; }
 wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y:x) { os << y << endl; } return os; }
-wostream& out(wostream& os, size_t db, size_t bits, size_t ar) {
-	set<wstring> s;
-	for (auto v : from_bits(db, bits, ar)) {
-		wstringstream ss;
-		for (auto k : v)
-			if (!k) ss << L"* ";
-			else if((size_t)k<(size_t)nsyms())ss<<dict_get(k)<<L' ';
-			else ss << L'[' << k << L"] ";
-		s.emplace(ss.str());
-	}
-	for (auto& x : s) os << x << endl;
-	return os;
-}
 
 void memos_clear() {
 #ifdef MEMO		
@@ -149,23 +102,6 @@ void memos_clear() {
 #endif		
 }
 
-int_t dict_get(wstr s, size_t len) {
-	if (*s == L'?') {
-		auto it = vars_dict.find({s, len});
-		if (it != vars_dict.end()) return it->second;
-		int_t r = -vars_dict.size() - 1;
-		return vars_dict[{s, len}] = r;
-	}
-	auto it = syms_dict.find({s, len});
-	if (it != syms_dict.end()) return it->second;
-	return	syms.push_back(s), lens.push_back(len), syms_dict[{s,len}] =
-		syms.size() - 1;
-}
-
-#define msb(x) ((sizeof(unsigned long long)<<3) - \
-	__builtin_clzll((unsigned long long)(x)))
-size_t dict_bits() { return msb(nsyms()-1); }
-////////////////////////////////////////////////////////////////////////////////
 struct rule { // a P-DATALOG rule in bdd form
 	struct body {
 		size_t sel = T, *perm = 0;
@@ -183,23 +119,9 @@ struct rule { // a P-DATALOG rule in bdd form
 	rule() {}
 	rule(rule&& r) : neg(r.neg), hsym(r.hsym), npos(r.npos), nneg(r.nneg),
 		sels(r.sels) { r.sels = 0; }
-	rule(matrix v, size_t bits);
+	rule(matrix v, size_t bits, size_t dsz);
 	size_t step(size_t db, size_t bits, size_t ar) const;
 	~rule() { if (sels) delete sels; }
-};
-
-class lp { // [pfp] logic program
-	int_t str_read(wstr *s); // parse a string and returns its dict id
-	term term_read(wstr *s); // read raw term (no bdd)
-	matrix rule_read(wstr *s); // read raw rule (no bdd)
-public:
-	vector<rule*> rules;
-	size_t bits, ar, maxw;
-	size_t db; // db's bdd root
-	void prog_read(wstr s);
-	void step(); // single pfp step
-	bool pfp();
-	void printdb(wostream& os);
 };
 ////////////////////////////////////////////////////////////////////////////////
 void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) {
@@ -446,84 +368,31 @@ void test_range() {
 	exit(0);
 }
 */
-matrix from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar);
-	matrix r(s.size());
-	for (term& v : r) v = term(ar, 0);
-	size_t n = s.size(), i, b;
-	while (n--)
-		for (i = 0; i != ar; ++i)
-			for (b = 0; b != bits; ++b)
-				if (s[n][i * bits + b])
-					r[n][i] |= 1 << (bits - b - 1);
-	return r;
-}
 ////////////////////////////////////////////////////////////////////////////////
-int_t lp::str_read(wstr *s) {
-	wstr t;
-	while (**s && iswspace(**s)) ++*s;
-	if (!**s) throw runtime_error("identifier expected");
-	if (*(t = *s) == L'?') ++t;
-	while (iswalnum(*t)) ++t;
-	if (t == *s) throw runtime_error("identifier expected");
-	int_t r = dict_get(*s, t - *s);
-	while (*t && iswspace(*t)) ++t;
-	return *s = t, r;
+void lp::rule_add(const matrix& t) {
+	rawrules.push_front(t);
+	for (const term& x : t) // we support a single rel arity
+		ar = max(ar, x.size()-1); // so we'll pad everything
+	maxw = max(maxw, t.size() - 1);
 }
 
-term lp::term_read(wstr *s) {
-	term r;
-	while (iswspace(**s)) ++*s;
-	if (!**s) return r;
-	bool b = **s == L'~';
-	if (b) ++*s, r.push_back(-1); else r.push_back(1);
-	do {
-		while (iswspace(**s)) ++*s;
-		if (**s == L',') return ++*s, r;
-		if (**s == L'.' || **s == L':') return r;
-		r.push_back(str_read(s));
-	} while (**s);
-	er("term_read(): unexpected parsing error");
-}
-
-matrix lp::rule_read(wstr *s) {
-	term t;
-	matrix r;
-	if ((t = term_read(s)).empty()) return r;
-	r.push_back(t);
-	while (iswspace(**s)) ++*s;
-	if (**s == L'.') return ++*s, r;
-	if (*((*s)++) != L':' || *((*s)++) != L'-') er(sep_expected);
-loop:	if ((t = term_read(s)).empty()) er("term expected");
-	r.push_back(t);
-	while (iswspace(**s)) ++*s;
-	if (**s == L'.') return ++*s, r;
-	if (**s == L':') er("',' expected");
-	goto loop;
-}
-
-void lp::prog_read(wstr s) {
-	vector<matrix> r;
-	db = F;
+void lp::compile(size_t _bits, size_t dsz) {
 	size_t l;
-	ar = maxw = 0;
-	for (matrix t; !(t = rule_read(&s)).empty(); r.push_back(t)) {
-		for (const term& x : t) // we support a single rel arity
-			ar = max(ar, x.size()-1); // so we'll pad everything
-		maxw = max(maxw, t.size() - 1);
-	}
-	for (matrix& x : r)
+	bits = _bits;
+	for (matrix& x : rawrules)
 		for (term& y : x)
 			if ((l=y.size()) < ar+1)
 				y.resize(ar+1),
 				fill(y.begin() + l, y.end(), pad);//the padding
-	bits = dict_bits();
-	for (const matrix& x : r)
-	 	if (x.size() == 1) db = bdd_or(db, rule(x, bits).hsym);//fact
-		else rules.emplace_back(new rule(x, bits));
+	for (const matrix& x : rawrules)
+	 	if (x.size() == 1) db = bdd_or(db, rule(x,bits,dsz).hsym);//fact
+		else rules.emplace_back(new rule(x, bits, dsz));
+	rawrules.clear();
 }
 
-rule::rule(matrix v, size_t bits) {
+vbools lp::allsat(size_t x) { return ::allsat(x, bits * ar); }
+
+rule::rule(matrix v, size_t bits, size_t dsz) {
 	matrix t; // put negs after poss and count them
 	t.push_back(v[0]);
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
@@ -555,7 +424,7 @@ rule::rule(matrix v, size_t bits) {
 					d.sel = bdd_and(d.sel, from_eq(b+j*bits,
 						b+it->second*bits));
 			else 	m.emplace(v[i][j], j), d.sel = bdd_and(d.sel,
-					from_range(nsyms(), bits, j * bits));
+					from_range(dsz, bits, j * bits));
 		//out(wcout<<"d.sel"<<endl, d.sel, bits, ar)<<endl;
 		m.clear(), bd.push_back(move(d));
 	}
@@ -620,7 +489,7 @@ bool lp::pfp() {
 	size_t d;
 	for (set<int_t> s;;)
 		if (s.emplace(d = db), step(), s.find(db) != s.end())
-			return printdb(wcout), d == db;
+			return d == db;
 }
 ////////////////////////////////////////////////////////////////////////////////
 wstring file_read_text(FILE *f) {
@@ -652,14 +521,3 @@ size_t std::hash<exmemo>::operator()(const exmemo& m) const {
 	return (size_t)m.first + (size_t)m.second;
 }
 #endif
-void lp::printdb(wostream& os) { out(os, db, bits, ar); }
-////////////////////////////////////////////////////////////////////////////////
-int main() {
-	setlocale(LC_ALL, ""), bdd_init(), dict_init();
-//	test_range();
-	lp p;
-	wstring s = file_read_text(stdin); // got to stay in memory
-	p.prog_read(s.c_str());
-	if (!p.pfp()) wcout << "unsat" << endl;
-	return 0;
-}
