@@ -34,5 +34,5 @@ public:
 	void printdb(std::wostream& os);
 	void rule_add(const matrix& t);
 	void compile(size_t bits, size_t nsyms);
-	vbools allsat(size_t x);
+	matrix getdb();
 };

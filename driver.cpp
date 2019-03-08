@@ -72,31 +72,17 @@ class driver {
 	int_t str_read(wstr *s); // parse a string and returns its dict id
 	term term_read(wstr *s); // read raw term (no bdd)
 	matrix rule_read(wstr *s); // read raw rule (no bdd)
-	matrix from_bits(size_t x, size_t bits, size_t ar);
 	lp p;
 public:
 	void prog_read(wstr s);
 	bool pfp() { bool r = p.pfp(); return printdb(wcout), r; }
-	void printdb(wostream& os) { out(os, p.db, p.bits, p.ar); }
-	wostream& out(wostream& os, size_t db, size_t bits, size_t ar);
+	matrix getdb() { return p.getdb(); }
+	wostream& printdb(wostream& os);
 };
 
-matrix driver::from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = p.allsat(x);
-	matrix r(s.size());
-	for (term& v : r) v = term(ar, 0);
-	size_t n = s.size(), i, b;
-	while (n--)
-		for (i = 0; i != ar; ++i)
-			for (b = 0; b != bits; ++b)
-				if (s[n][i * bits + b])
-					r[n][i] |= 1 << (bits - b - 1);
-	return r;
-}
-
-wostream& driver::out(wostream& os, size_t db, size_t bits, size_t ar) {
+wostream& driver::printdb(wostream& os) {
 	set<wstring> s;
-	for (auto v : from_bits(db, bits, ar)) {
+	for (auto v : p.getdb()) {
 		wstringstream ss;
 		for (auto k : v)
 			if (!k) ss << L"* ";
@@ -183,6 +169,23 @@ void driver::prog_read(wstr s) {
 	}*/
 	for (matrix t; !(t = rule_read(&s)).empty(); p.rule_add(t));
 	p.compile(dict_bits(), nsyms());
+}
+
+wstring file_read_text(FILE *f) {
+	wstringstream ss;
+	wchar_t buf[32], n, l, skip = 0;
+	wint_t c;
+	*buf = 0;
+next:	for (n = l = 0; n != 31; ++n)
+		if (WEOF == (c = getwc(f))) { skip = 0; break; }
+		else if (c == L'#') skip = 1;
+		else if (c == L'\r' || c == L'\n') skip = 0, buf[l++] = c;
+		else if (!skip) buf[l++] = c;
+	if (n) {
+		buf[l] = 0, ss << buf;
+		goto next;
+	} else if (skip) goto next;
+	return ss.str();
 }
 
 int main() {

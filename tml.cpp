@@ -123,8 +123,6 @@ void lp::compile(size_t _bits, size_t dsz) {
 	rawrules.clear();
 }
 
-vbools lp::allsat(size_t x) { return ::allsat(x, bits * ar); }
-
 rule::rule(matrix v, size_t bits, size_t dsz) {
 	matrix t; // put negs after poss and count them
 	t.push_back(v[0]);
@@ -224,23 +222,24 @@ bool lp::pfp() {
 		if (s.emplace(d = db), step(), s.find(db) != s.end())
 			return d == db;
 }
-////////////////////////////////////////////////////////////////////////////////
-wstring file_read_text(FILE *f) {
-	wstringstream ss;
-	wchar_t buf[32], n, l, skip = 0;
-	wint_t c;
-	*buf = 0;
-next:	for (n = l = 0; n != 31; ++n)
-		if (WEOF == (c = getwc(f))) { skip = 0; break; }
-		else if (c == L'#') skip = 1;
-		else if (c == L'\r' || c == L'\n') skip = 0, buf[l++] = c;
-		else if (!skip) buf[l++] = c;
-	if (n) {
-		buf[l] = 0, ss << buf;
-		goto next;
-	} else if (skip) goto next;
-	return ss.str();
+
+matrix lp::getdb() {
+	return from_bits(db, bits, ar);
 }
+
+matrix from_bits(size_t x, size_t bits, size_t ar) {
+	vbools s = allsat(x, bits * ar);
+	matrix r(s.size());
+	for (term& v : r) v = term(ar, 0);
+	size_t n = s.size(), i, b;
+	while (n--)
+		for (i = 0; i != ar; ++i)
+			for (b = 0; b != bits; ++b)
+				if (s[n][i * bits + b])
+					r[n][i] |= 1 << (bits - b - 1);
+	return r;
+}
+////////////////////////////////////////////////////////////////////////////////
 #ifdef MEMO
 size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
 size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {
