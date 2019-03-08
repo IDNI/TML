@@ -15,6 +15,7 @@
 #include <set>
 #include <string>
 #include <sstream>
+#include <forward_list>
 using namespace std;
 
 #define er(x)	perror(x), exit(0)
@@ -72,11 +73,11 @@ class driver {
 	int_t str_read(wstr *s); // parse a string and returns its dict id
 	term term_read(wstr *s); // read raw term (no bdd)
 	matrix rule_read(wstr *s); // read raw rule (no bdd)
-	lp p;
+	lp *p = 0;
 public:
 	void prog_read(wstr s);
-	bool pfp() { bool r = p.pfp(); return printdb(wcout), r; }
-	matrix getdb() { return p.getdb(); }
+	bool pfp() { bool r = p->pfp(); return printdb(wcout), r; }
+	matrix getdb() { return p->getdb(); }
 	wostream& printdb(wostream& os);
 };
 
@@ -168,8 +169,20 @@ void driver::prog_read(wstr s) {
 			dot = false;
 		}
 	}*/
-	for (matrix t; !(t = rule_read(&s)).empty(); p.rule_add(t));
-	p.compile(dict_bits(), nsyms());
+	size_t ar = 0, l;
+	forward_list<matrix> rawrules;
+	for (matrix t; !(t = rule_read(&s)).empty(); rawrules.push_front(t))
+		for (term& x : t)
+			ar = max(ar, x.size() - 1);
+	p = new lp(dict_bits(), ar, nsyms());
+	while (!rawrules.empty()) {
+		matrix t = rawrules.front();
+		rawrules.pop_front();
+		for (term& x : t)
+			if ((l = x.size()) < ar+1) x.resize(ar+1),
+					fill(x.begin() + l, x.end(), pad);
+		p->rule_add(t);
+	}
 }
 
 wstring file_read_text(FILE *f) {

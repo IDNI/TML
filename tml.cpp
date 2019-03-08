@@ -102,25 +102,9 @@ void test_range() {
 }
 */
 ////////////////////////////////////////////////////////////////////////////////
-void lp::rule_add(const matrix& t) {
-	rawrules.push_front(t);
-	for (const term& x : t) // we support a single rel arity
-		ar = max(ar, x.size()-1); // so we'll pad everything
-	maxw = max(maxw, t.size() - 1);
-}
-
-void lp::compile(size_t _bits, size_t dsz) {
-	size_t l;
-	bits = _bits;
-	for (matrix& x : rawrules)
-		for (term& y : x)
-			if ((l=y.size()) < ar+1)
-				y.resize(ar+1),
-				fill(y.begin() + l, y.end(), pad);//the padding
-	for (const matrix& x : rawrules)
-	 	if (x.size() == 1) db = bdd_or(db, rule(x,bits,dsz).hsym);//fact
-		else rules.emplace_back(new rule(x, bits, dsz));
-	rawrules.clear();
+void lp::rule_add(const matrix& x) {
+ 	if (x.size() == 1) db = bdd_or(db, rule(x, bits, dsz).hsym);//fact
+	else rules.emplace_back(new rule(x, bits, dsz));
 }
 
 rule::rule(matrix v, size_t bits, size_t dsz) {

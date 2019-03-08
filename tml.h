@@ -12,7 +12,6 @@
 // modified over time by the Author.
 #include <cstdint>
 #include <vector>
-#include <forward_list>
 #include <iostream>
 #include "bdd.h"
 
@@ -24,14 +23,15 @@ void tml_init();
 	__builtin_clzll((unsigned long long)(x)))
 
 class lp { // [pfp] logic program
-	std::forward_list<matrix> rawrules;
 	std::vector<class rule*> rules;
 	void step(); // single pfp step
-	size_t bits, ar = 0, maxw = 0;
+	const size_t bits, ar, dsz;
 	size_t db = F; // db's bdd root
 public:
+	lp(size_t maxbits, size_t arity, size_t dsz) :
+		bits(maxbits), ar(arity), dsz(dsz) {}
 	void rule_add(const matrix& t);
-	void compile(size_t bits, size_t nsyms);
+	void compile(size_t nsyms);
 	bool pfp();
 	matrix getdb();
 };
