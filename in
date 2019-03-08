@@ -8,4 +8,4 @@ t ?x ?y :- e ?x ?y, notdone.
 t ?x ?z :- t ?x ?y, e ?y ?z, notdone.
 ~t ?x ?y :- e ?x ?y, done.
 done :- notdone.
-~notdone :- done.
+~notdone :- notdone.

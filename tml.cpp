@@ -1,4 +1,4 @@
-// LICENSE
+
 // This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
@@ -363,14 +363,14 @@ size_t bdd_and_not_ex(size_t x, size_t y, const bool* s) {
 	const node &Vx = getnode(x), &Vy = getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if (leaf(Vx) && !trueleaf(Vx)) {
+	/*if (leaf(Vx) && !trueleaf(Vx)) {
 		res = F;
 		goto ret;
 	}
 	if (leaf(Vy)) {
 		res = trueleaf(Vy) ? F : bdd_ex(x, s);
 		goto ret;
-	}
+	}*/
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
 	else if (!vx) { res = (a && !b)?T:F; goto ret; }
 	else if ((v = vx) < vy || !vy) b = d = y;
@@ -392,10 +392,10 @@ size_t bdd_permute(size_t x, const size_t* m) {//overlapping rename
 	if (it != memo_permute.end()) return it->second;
 	size_t res;
 #endif	
+	if (leaf(x)) return x;
 	const node n = getnode(x);
-	if (leaf(n)) apply_ret(x, memo_permute);
-	size_t v = m[n[0]-1];
-	apply_ret(ite(v, bdd_permute(n[1], m), bdd_permute(n[2], m)), memo_permute);
+	apply_ret(ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2], m)),
+		memo_permute);
 }
 
 size_t from_eq(size_t x, size_t y) {
@@ -545,10 +545,11 @@ rule::rule(matrix v, size_t bits) {
 		d.perm = new size_t[(ar + nvars) * bits];
 		for (b = 0; b != (ar + nvars) * bits; ++b) d.perm[b] = b;
 		for (j = 0; j != ar; ++j)
-			if (v[i][j] >= 0)
+			if (v[i][j] >= 0) {
 				d.sel = bdd_and(d.sel,
 					from_int(v[i][j], bits, j * bits));
-			else if ((it = m.find(v[i][j])) != m.end())
+				for (b = 0; b != bits; ++b) d.ex[b+j*bits]=true;
+			} else if ((it = m.find(v[i][j])) != m.end())
 				for (b = 0; b != bits; ++b)
 					d.ex[b+j*bits] = true,
 					d.sel = bdd_and(d.sel, from_eq(b+j*bits,
@@ -577,7 +578,7 @@ rule::rule(matrix v, size_t bits) {
 }
 
 size_t rule::step(size_t db, size_t bits, size_t ar) const {
-	size_t n = 0, vars = T;
+	size_t n = 0, vars = T, p;
 //	out(wcout<<"db:"<<endl, db, bits, ar);
 	for (; n != npos; ++n)
 		if (F == (sels[n] = bdd_and_ex(bd[n].sel, db, bd[n].ex)))
@@ -589,9 +590,18 @@ size_t rule::step(size_t db, size_t bits, size_t ar) const {
 	for (; n != nneg+npos; ++n)
 		if (F == (sels[n] = bdd_and_not_ex(bd[n].sel, db, bd[n].ex)))
 			return F;
-	for (n = 0; n != bd.size(); ++n)
-		if (F == (vars=bdd_and(vars, bdd_permute(sels[n], bd[n].perm))))
+//		else {
+//			out(wcout<<"db.sel"<<n<<endl, bd[n].sel, bits, ar)<<endl;
+//			out(wcout<<"sel"<<n<<endl, sels[n], bits, ar)<<endl;
+//		}
+	for (n = 0; n != bd.size(); ++n) {
+		p = bdd_permute(sels[n], bd[n].perm);
+//		out(wcout<<"p"<<n<<endl, p, bits, ar)<<endl;
+//		out(wcout<<"vars"<<n<<endl, p, bits, ar)<<endl;
+		if (F == (vars=bdd_and(vars, p)))
 			return F;
+//		out(wcout<<"vars"<<n<<endl, vars, bits, ar)<<endl;
+	}
 	return bdd_and_deltail(hsym, vars, bits * ar);
 }
 
