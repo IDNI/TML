@@ -170,16 +170,22 @@ struct rule { // a P-DATALOG rule in bdd form
 	struct body {
 		size_t sel = T, *perm = 0;
 		bool *ex = 0;
-//		~body() { if (perm) delete[] perm; if (ex) delete[] ex; }
+		body() {}
+		body(body&& b) : sel(b.sel), perm(b.perm), ex(b.ex) {
+			b.perm = 0, b.ex = 0;
+		}
+		~body() { if (perm) delete[] perm; if (ex) delete[] ex; }
 	};
 	bool neg = false;
 	size_t hsym = T, npos = 0, nneg = 0, *sels = 0;
 	vector<body> bd;
 
 	rule() {}
+	rule(rule&& r) : neg(r.neg), hsym(r.hsym), npos(r.npos), nneg(r.nneg),
+		sels(r.sels) { r.sels = 0; }
 	rule(matrix v, size_t bits);
 	size_t step(size_t db, size_t bits, size_t ar) const;
-//	~rule() { if (sels) delete sels; }
+	~rule() { if (sels) delete sels; }
 };
 
 class lp { // [pfp] logic program
@@ -550,7 +556,7 @@ rule::rule(matrix v, size_t bits) {
 			else 	m.emplace(v[i][j], j), d.sel = bdd_and(d.sel,
 					from_range(nsyms(), bits, j * bits));
 		//out(wcout<<"d.sel"<<endl, d.sel, bits, ar)<<endl;
-		m.clear(), bd.push_back(d);
+		m.clear(), bd.push_back(move(d));
 	}
 	for (j = 0; j != ar; ++j) // hsym
 		if (v[0][j] >= 0)
@@ -567,7 +573,7 @@ rule::rule(matrix v, size_t bits) {
 				for (b = 0; b != bits; ++b)
 					bd[i].perm[b+j*bits]=b+it->second*bits;
 			}
-	sels = new size_t[v.size() - 1];
+	if (v.size() > 1) sels = new size_t[v.size() - 1];
 }
 
 size_t rule::step(size_t db, size_t bits, size_t ar) const {
