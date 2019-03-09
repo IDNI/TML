@@ -41,90 +41,60 @@ wostream& operator<<(wostream& os, const vbools& x) {
 struct rule { // a P-DATALOG rule in bdd form
 	struct body {
 		size_t sel = T, *perm = 0;
-		bool *ex = 0;
-		body() {}
-		body(body&&b):sel(b.sel),perm(b.perm),ex(b.ex){b.perm=0,b.ex=0;}
+		bool *ex = 0, neg;
+		body(bool neg) : neg(neg) {}
+		body(body&&b) : 
+			sel(b.sel), perm(b.perm), ex(b.ex), neg(b.neg)
+				{ b.perm = 0, b.ex = 0;}
 		~body() { if (perm) delete[] perm; if (ex) delete[] ex; }
+
+		size_t varbdd(size_t db) const {
+			return bdd_permute((neg ? bdd_and_not_ex : bdd_and_ex)
+				(sel, db, ex), perm);
+		}
 	};
 	bool neg = false;
-	size_t hsym = T, npos = 0, nneg = 0, *sels = 0;
+	size_t hsym = T, *sels = 0;
 	vector<body> bd;
 
 	rule() {}
-	rule(rule&& r) : neg(r.neg), hsym(r.hsym), npos(r.npos), nneg(r.nneg),
-		sels(r.sels) { r.sels = 0; }
+	rule(rule&& r) : neg(r.neg), hsym(r.hsym) { r.sels = 0; }
 	rule(matrix v, size_t bits, size_t dsz);
 	size_t fwd(size_t db, size_t bits, size_t ar) const;
 	~rule() { if (sels) delete sels; }
 };
-////////////////////////////////////////////////////////////////////////////////
+
 size_t from_int(size_t x, size_t bits, size_t offset) {
 	size_t r = T, b = bits--;
 	while (b--) r = bdd_and(r, from_bit(bits - b + offset, x&(1<<b)));
 	return r;
 }
-/*
-size_t from_leq(size_t max, size_t bits, size_t offset) {
-	size_t r = T, t = msb(max);
-	for (size_t b = 0; b != bits; ++b) {
-		if (max&(1<<(bits-b-1))) r = ite(b + offset, r, T);
-		else r = ite(b + offset, F, r);
-//		wcout << allsat(r, bits) << endl << 't'<<endl;
-	}
-	return r;
-}
-*/
+
 size_t from_range(size_t max, size_t bits, size_t offset) {
 	size_t x = F;
 	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
 	return x;
-/*	, n = 0;
-	size_t t = msb(max);
-	for (n = 0; n != bits; ++n) x = bdd_or(x, from_bit(offset + n, 1));
-	wcout << allsat(x, bits) << endl;
-	for (n = 0; n != bits-msb(max); ++n) x = bdd_and(x, from_bit(offset + n, 0));
-	wcout << allsat(x, bits) << endl;
-	size_t l = from_leq(max, bits, offset);
-	wcout << allsat(l, bits) << endl;
-	return bdd_and(l, x);*/
 }
-/*
-void test_range() {
-	size_t x = 9, y = 5, z = 11, o = 0; // 1101 = 13, 1011 = 11
-	size_t m = from_range(y, 5, o);
-//	wcout << allsat(from_range(1, 3, 0), 3) << endl;
-//	wcout << allsat(from_int(y, 6, o), 6) << endl << y << endl;
-//	wcout << allsat(from_int(x, 6, o), 6) << endl << x << endl;
-	wcout << allsat(m, 5);
-//	assert(y<<o == bdd_and(from_int(y, 6, o), m));
-//	assert(F == bdd_and(from_int(z, 6, o), m));
-	exit(0);
-}
-*/
-////////////////////////////////////////////////////////////////////////////////
+
 void lp::rule_add(const matrix& x) {
  	if (x.size() == 1) db = bdd_or(db, rule(x, bits, dsz).hsym);//fact
 	else rules.emplace_back(new rule(x, bits, dsz));
 }
 
 rule::rule(matrix v, size_t bits, size_t dsz) {
-	matrix t; // put negs after poss and count them
-	t.push_back(v[0]);
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
-	for (i=1; i!=v.size(); ++i) if (v[i][0]>0) ++npos, t.push_back(v[i]);
-	for (i=1; i!=v.size(); ++i) if (v[i][0]<0) ++nneg, t.push_back(v[i]);
-	v = move(t);
 	neg = v[0][0] < 0;
+	v[0].erase(v[0].begin());
 	set<int_t> vars;
-	for (term& x : v) {
-		x.erase(x.begin());
-		for (int_t& y : x) if (y < 0) vars.emplace(y);
-	}
+	for (term& x : v) 
+		for (i = 1; i != x.size(); ++i) 
+			if (x[i] < 0) vars.emplace(x[i]);
 	nvars = vars.size();
 	map<int_t, size_t> m;
 	auto it = m.end();
 	for (i = 1; i != v.size(); ++i) { // init, sel, ex and local eq
-		body d;
+		body d(v[i][0] < 0);
+		v[i].erase(v[i].begin());
 		d.ex = (bool*)memset(new bool[bits*ar],0,sizeof(bool)*bits*ar),
 		d.perm = new size_t[(ar + nvars) * bits];
 		for (b = 0; b != (ar + nvars) * bits; ++b) d.perm[b] = b;
@@ -140,7 +110,6 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 						b+it->second*bits));
 			else 	m.emplace(v[i][j], j), d.sel = bdd_and(d.sel,
 					from_range(dsz, bits, j * bits));
-		//out(wcout<<"d.sel"<<endl, d.sel, bits, ar)<<endl;
 		m.clear(), bd.push_back(move(d));
 	}
 	for (j = 0; j != ar; ++j) // hsym
@@ -149,7 +118,6 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 		else if (m.end() == (it=m.find(v[0][j]))) m.emplace(v[0][j], j);
 		else for (b = 0; b != bits; ++b)
 			hsym=bdd_and(hsym,from_eq(b+j*bits, b+it->second*bits));
-	//out(wcout<<"hsym"<<endl, hsym, bits, ar)<<endl;
 	for (i = 0; i != v.size() - 1; ++i) // var permutations
 		for (j = 0; j != ar; ++j)
 			if (v[i+1][j] < 0) {
@@ -162,15 +130,9 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar) const {
-	size_t n = 0, vars = T;
-	for (; n != npos; ++n)
-		if (F == (vars = bdd_and(vars, bdd_permute(bdd_and_ex(
-			bd[n].sel, db, bd[n].ex), bd[n].perm))))
-			return F;
-	for (; n != bd.size(); ++n)
-		if (F == (vars = bdd_and(vars, bdd_permute(bdd_and_not_ex(
-			bd[n].sel, db, bd[n].ex), bd[n].perm))))
-			return F;
+	size_t vars = T;
+	for (const body& b : bd)
+		if (F == (vars = bdd_and(vars, b.varbdd(db)))) return F;
 	return bdd_and_deltail(hsym, vars, bits * ar);
 }
 
@@ -205,17 +167,3 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 					r[n][i] |= 1 << (bits - b - 1);
 	return r;
 }
-////////////////////////////////////////////////////////////////////////////////
-#ifdef MEMO
-size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
-size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {
-	static std::hash<memo> h;
-	return (size_t)m.first + h(m.second);
-}
-size_t std::hash<permemo>::operator()(const permemo& m) const {
-	return (size_t)m.first + (size_t)m.second;
-}
-size_t std::hash<exmemo>::operator()(const exmemo& m) const {
-	return (size_t)m.first + (size_t)m.second;
-}
-#endif

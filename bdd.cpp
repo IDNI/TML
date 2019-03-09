@@ -277,3 +277,16 @@ void memos_clear() {
 #endif		
 }
 
+#ifdef MEMO
+size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
+size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {
+	static std::hash<memo> h;
+	return (size_t)m.first + h(m.second);
+}
+size_t std::hash<permemo>::operator()(const permemo& m) const {
+	return (size_t)m.first + (size_t)m.second;
+}
+size_t std::hash<exmemo>::operator()(const exmemo& m) const {
+	return (size_t)m.first + (size_t)m.second;
+}
+#endif
