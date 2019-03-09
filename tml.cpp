@@ -54,7 +54,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	rule(rule&& r) : neg(r.neg), hsym(r.hsym), npos(r.npos), nneg(r.nneg),
 		sels(r.sels) { r.sels = 0; }
 	rule(matrix v, size_t bits, size_t dsz);
-	size_t step(size_t db, size_t bits, size_t ar) const;
+	size_t fwd(size_t db, size_t bits, size_t ar) const;
 	~rule() { if (sels) delete sels; }
 };
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,40 +161,23 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 	if (v.size() > 1) sels = new size_t[v.size() - 1];
 }
 
-size_t rule::step(size_t db, size_t bits, size_t ar) const {
-	size_t n = 0, vars = T, p;
-//	out(wcout<<"db:"<<endl, db, bits, ar);
+size_t rule::fwd(size_t db, size_t bits, size_t ar) const {
+	size_t n = 0, vars = T;
 	for (; n != npos; ++n)
-		if (F == (sels[n] = bdd_and_ex(bd[n].sel, db, bd[n].ex)))
+		if (F == (vars = bdd_and(vars, bdd_permute(bdd_and_ex(
+			bd[n].sel, db, bd[n].ex), bd[n].perm))))
 			return F;
-//		else {
-//			out(wcout<<"db.sel"<<n<<endl, bd[n].sel, bits, ar)<<endl;
-//			out(wcout<<"sel"<<n<<endl, sels[n], bits, ar)<<endl;
-//		}
-	for (; n != nneg+npos; ++n)
-		if (F == (sels[n] = bdd_and_not_ex(bd[n].sel, db, bd[n].ex)))
+	for (; n != bd.size(); ++n)
+		if (F == (vars = bdd_and(vars, bdd_permute(bdd_and_not_ex(
+			bd[n].sel, db, bd[n].ex), bd[n].perm))))
 			return F;
-//		else {
-//			out(wcout<<"db.sel"<<n<<endl, bd[n].sel, bits, ar)<<endl;
-//			out(wcout<<"sel"<<n<<endl, sels[n], bits, ar)<<endl;
-//		}
-	for (n = 0; n != bd.size(); ++n) {
-		p = bdd_permute(sels[n], bd[n].perm);
-//		out(wcout<<"p"<<n<<endl, p, bits, ar)<<endl;
-//		out(wcout<<"vars"<<n<<endl, p, bits, ar)<<endl;
-		if (F == (vars=bdd_and(vars, p)))
-			return F;
-//		out(wcout<<"vars"<<n<<endl, vars, bits, ar)<<endl;
-	}
 	return bdd_and_deltail(hsym, vars, bits * ar);
 }
 
-void lp::step() {
+void lp::fwd() {
 	size_t add = F, del = F, s;
-	for (const rule* r : rules) {
-		(r->neg?del:add) = bdd_or(r->step(db, bits, ar),r->neg?del:add);
-//		memos_clear();
-	}
+	for (const rule* r : rules)
+		(r->neg?del:add) = bdd_or(r->fwd(db, bits, ar),r->neg?del:add);
 	if ((s = bdd_and_not(add, del)) == F && add != F)
 		db = F; // detect contradiction
 	else db = bdd_or(bdd_and_not(db, del), s);
@@ -202,14 +185,13 @@ void lp::step() {
 
 bool lp::pfp() {
 	size_t d;
+	vector<int_t> v;
 	for (set<int_t> s;;)
-		if (s.emplace(d = db), step(), s.find(db) != s.end())
+		if (s.emplace(d = db), fwd(), s.find(db) != s.end())
 			return d == db;
 }
 
-matrix lp::getdb() {
-	return from_bits(db, bits, ar);
-}
+matrix lp::getdb() { return from_bits(db, bits, ar); }
 
 matrix from_bits(size_t x, size_t bits, size_t ar) {
 	vbools s = allsat(x, bits * ar);

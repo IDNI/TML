@@ -16,22 +16,17 @@
 #include "bdd.h"
 
 const int_t pad = 0;
-
 void tml_init();
-
-#define msb(x) ((sizeof(unsigned long long)<<3) - \
-	__builtin_clzll((unsigned long long)(x)))
 
 class lp { // [pfp] logic program
 	std::vector<class rule*> rules;
-	void step(); // single pfp step
+	void fwd(); // single pfp step
 	const size_t bits, ar, dsz;
 	size_t db = F; // db's bdd root
 public:
 	lp(size_t maxbits, size_t arity, size_t dsz) :
 		bits(maxbits), ar(arity), dsz(dsz) {}
 	void rule_add(const matrix& t);
-	void compile(size_t nsyms);
 	bool pfp();
 	matrix getdb();
 };

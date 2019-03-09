@@ -10,12 +10,12 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "tml.h"
 #include <map>
 #include <set>
 #include <string>
 #include <sstream>
 #include <forward_list>
+#include "tml.h"
 using namespace std;
 
 #define er(x)	perror(x), exit(0)
@@ -30,6 +30,8 @@ using namespace std;
 #define err_dst "Unable to read dst file.\n"
 #define err_quotes "expected \"."
 #define err_dots "two consecutive dots, or dot in beginning of document."
+#define msb(x) ((sizeof(unsigned long long)<<3) - \
+	__builtin_clzll((unsigned long long)(x)))
 
 typedef wchar_t* wstr;
 struct dictcmp {
