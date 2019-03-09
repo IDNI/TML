@@ -81,6 +81,7 @@ vbools allsat(size_t x, size_t nvars) {
 }
 
 size_t bdd_or(size_t x, size_t y) {
+	if (x == y) return x;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_or.find(t);
@@ -116,6 +117,7 @@ size_t bdd_ex(size_t x, const bool* b) {
 }
 
 size_t bdd_and(size_t x, size_t y) {
+	if (x == y) return x;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_and.find(t);
@@ -150,6 +152,7 @@ size_t bdd_deltail(size_t x, size_t h) {
 }    
 
 size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
+	if (x == y) return bdd_deltail(x, h);
 #ifdef MEMO
 	adtmemo t = {{x, y, h}};
 	auto it = memo_adt.find(t);
@@ -170,6 +173,7 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 }
 
 size_t bdd_and_ex(size_t x, size_t y, const bool* s) {
+	if (x == y) return bdd_ex(x, s);
 #ifdef MEMO
 	apexmemo t = {s, {{x, y}}};
 	auto it = memo_and_ex.find(t);
@@ -196,6 +200,7 @@ ret:	apply_ret(res, memo_and_ex);
 }
 
 size_t bdd_and_not(size_t x, size_t y) {
+	if (x == y) return F;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_and_not.find(t);
@@ -215,6 +220,7 @@ size_t bdd_and_not(size_t x, size_t y) {
 }
 
 size_t bdd_and_not_ex(size_t x, size_t y, const bool* s) {
+	if (x == y) return F;
 #ifdef MEMO
 	apexmemo t = {s, {{x, y}}};
 	auto it = memo_and_not_ex.find(t);
