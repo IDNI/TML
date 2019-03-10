@@ -14,13 +14,17 @@
 
 using namespace std;
 
+template<> struct std::hash<node> {
+	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
+};
+
 //#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
-typedef pair<const bool*, size_t> exmemo;
-typedef pair<const bool*, memo> apexmemo;
-typedef pair<const size_t*, size_t> permemo;
+typedef pair<bools, size_t> exmemo;
+typedef pair<bools, memo> apexmemo;
+typedef pair<vector<size_t>, size_t> permemo;
 template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
 template<> struct std::hash<exmemo> { size_t operator()(const exmemo&m)const;};
 template<>struct std::hash<apexmemo>{size_t operator()(const apexmemo&m)const;};
@@ -34,10 +38,6 @@ unordered_map<permemo, size_t> memo_permute;
 #else
 #define apply_ret(r, m) return r
 #endif
-
-template<> struct std::hash<node> {
-	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
-};
 
 vector<node> V; // all bdd nodes
 unordered_map<node, size_t> M; // node to its index
@@ -184,7 +184,7 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 	apply_ret(bdd_deltail(bdd_add({{v, bdd_and_deltail(a, b, h),
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
-
+/*
 size_t bdd_and_ex(size_t x, size_t y, const bools& s) {
 	if (x == y) return bdd_ex(x, s);
 #ifdef MEMO
@@ -238,7 +238,7 @@ size_t bdd_and_not_ex(size_t x, size_t y, const bools& s) {
 	else res = bdd_add({{v, bdd_and_not_ex(a,b,s), bdd_and_not_ex(c,d,s)}});
 ret:	apply_ret(res, memo_and_not_ex);
 }
-
+*/
 size_t bdd_ite(size_t v, size_t t, size_t e) {
 	const node &x = getnode(t), &y = getnode(e);
 	if ((nleaf(x)||v<x[0])&&(nleaf(y)||v<y[0])) return bdd_add({{v+1,t,e}});
@@ -273,13 +273,17 @@ void memos_clear() {
 #ifdef MEMO
 size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
 size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {
-	static std::hash<memo> h;
-	return (size_t)m.first + h(m.second);
-}
-size_t std::hash<permemo>::operator()(const permemo& m) const {
-	return (size_t)m.first + (size_t)m.second;
+	static std::hash<bools> h1;
+	static std::hash<memo> h2;
+	return h1(m.first) + h2(m.second);
 }
 size_t std::hash<exmemo>::operator()(const exmemo& m) const {
-	return (size_t)m.first + (size_t)m.second;
+	static std::hash<bools> h;
+	return h(m.first) + (size_t)m.second;
+}
+size_t std::hash<permemo>::operator()(const permemo& m) const {
+	size_t h = m.second;
+	for (auto x : m.first) h += x;
+	return h;
 }
 #endif

@@ -208,7 +208,7 @@ bool driver::pfp() {
 		if (s.emplace(d = p->db), p->fwd(), s.find(p->db) != s.end()) {
 			if (d == p->db) return printdb(wcout), true;
 			else return false;
-		} else printdb(wcout)<<endl;
+		} //else printdb(wcout)<<endl;
 }
 
 int main() {
