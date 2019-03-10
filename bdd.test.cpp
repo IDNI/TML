@@ -123,7 +123,7 @@ wostream& operator<<(wostream& os, const tt& t) {
 	return os;
 }
 
-void test_add_many() {
+void test_and_many() {
 	for (size_t k = 0; k < 50; ++k) {
 		tt *t = new tt[5];
 		for (size_t i = 0; i < 5; ++i) t[i] = rndtt(8).ex(i);
@@ -132,7 +132,7 @@ void test_add_many() {
 		if (!leaf(r)) {
 			vector<size_t> v;
 			for (size_t i = 0; i < 5; ++i) v.push_back(t[i].bdd());
-			assert(r == bdd_and_many(v, 0, v.size()));
+			assert(r == bdd_and_many(v));
 		}
 		delete[] t;
 	}
@@ -141,7 +141,7 @@ void test_add_many() {
 int main() {
 	bdd_init();
 	srand(time(0));
-	test_add_many();
+	test_and_many();
 	tt xt(3);
 	xt.addrow({false, true, true});
 	xt.addrow({true, true, false});

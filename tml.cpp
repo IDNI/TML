@@ -150,13 +150,20 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) const {
+	if (bd.size() == 1)
+		return bdd_deltail(bdd_and(hsym, bd[0].varbdd(db, s)), bits*ar);
+	if (bd.size() == 2)
+		return bdd_deltail(bdd_and(hsym, bdd_and(bd[0].varbdd(db, s),
+			bd[1].varbdd(db, s))), bits*ar);
 	size_t vars = T;
-	for (const body& b : bd)
-		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
-	vars = bdd_and(hsym, vars);
-	vars = bdd_deltail(vars, bits * ar);
+	vector<size_t> v;
+	for (const body& b : bd) {
+		if (F == (vars = b.varbdd(db, s))) return F;
+		v.push_back(vars);
+	}
+	v.push_back(hsym);
+	vars = bdd_deltail(bdd_and_many(v), bits * ar);
 	return vars;
-	return bdd_deltail(bdd_and(hsym, vars), bits * ar);
 }
 
 void lp::fwd() {

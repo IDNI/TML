@@ -190,40 +190,35 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many(vector<size_t> v, size_t from, size_t to) {
-	if (1 == (to - from))
-		return v[from];
+size_t bdd_and_many(vector<size_t> v) {
+	size_t from = 0;
+	if (1 == (v.size() - from)) return v[from];
 	while (leaf(v[from]))
-		if (!trueleaf(v[from]))
-			return F;
-		else if (1 == (to - ++from))
-			return v[from];
-	size_t m = getnode(v[from])[0], i, f, t;
+		if (!trueleaf(v[from])) return F;
+		else if (1 == (v.size() - ++from)) return v[from];
+	size_t m = getnode(v[from])[0], i, t = v[from];
 	node n;
-	vector<size_t> vs;
-	vs.resize(to-from);
-	for (i = from; i != to; ++i) vs[i-from] = getnode(v[i])[0];
-	bool b = false;
-	for (i = from + 1; i != to; ++i) {
+	bool b = false, eq = true;
+	for (i = from + 1; i != v.size(); ++i) {
 		if (leaf(v[i])) {
-			if (!trueleaf(v[i]))
-				return F;
+			if (!trueleaf(v[i])) return F;
 			continue;
 		}
-		n = getnode(v[i]), b |= n[0] != m;
+		n = getnode(v[i]), b |= n[0] != m, eq &= t == v[i];
 		if (n[0] < m) m = n[0];
 	}
-	f = v.size();
-	for (i = from; i != to; ++i)
+	if (eq) return t;
+	vector<size_t> v1, v2;
+	v1.reserve(v.size() - from), v2.reserve(v.size() - from);
+	for (i = from; i != v.size(); ++i)
 		if (!b || getnode(v[i])[0] == m)
-			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
-		else v.push_back(v[i]);
-	t = v.size();
-	for (i = from; i != to; ++i)
+			v1.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
+		else v1.push_back(v[i]);
+	for (i = from; i != v.size(); ++i)
 		if (!b || getnode(v[i])[0] == m)
-			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[2]);
-		else v.push_back(v[i]);
-	return bdd_add({{m, bdd_and_many(v,f,t), bdd_and_many(v,t,v.size())}});
+			v2.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[2]);
+		else v2.push_back(v[i]);
+	return bdd_add({{ m, bdd_and_many(v1), bdd_and_many(v2) }});
 }
 /*
 size_t bdd_and_ex(size_t x, size_t y, const bools& s) {
