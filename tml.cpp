@@ -29,7 +29,7 @@ void tml_init() { bdd_init(); }
 
 matrix from_bits(size_t x, size_t bits, size_t ar);
 wostream& out(wostream& os, const node& n) { //print using ?: syntax
-	return	leaf(n) ? os << (trueleaf(n) ? L'T' : L'F') :
+	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
 }
 wostream& out(wostream& os,size_t n){return out(os<<L'['<<n<<L']',getnode(n));}
@@ -38,19 +38,26 @@ wostream& operator<<(wostream& os, const bools& x) {
 wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y:x) { os << y << endl; } return os; }
 
+struct vbcmp {
+	bool operator()(const vector<bool>* x, const vector<bool>* y) const {
+		return *x < *y;
+	}
+};
+
 struct rule { // a P-DATALOG rule in bdd form
 	struct body {
-		size_t sel = T, *perm = 0;
-		bool *ex = 0, neg;
+		size_t sel = T;
+		const bool neg;
+		bools ex; 
+		vector<size_t> perm;
 		body(bool neg) : neg(neg) {}
-		body(body&&b) : 
-			sel(b.sel), perm(b.perm), ex(b.ex), neg(b.neg)
-				{ b.perm = 0, b.ex = 0;}
-		~body() { if (perm) delete[] perm; if (ex) delete[] ex; }
-
-		size_t varbdd(size_t db) const {
-			return bdd_permute((neg ? bdd_and_not_ex : bdd_and_ex)
-				(sel, db, ex), perm);
+		size_t varbdd(size_t db, lp::step& p) const {
+			auto it = (neg ? p.neg : p.pos).find({sel, ex});
+			if (it != (neg?p.neg:p.pos).end())
+				return bdd_permute(it->second, perm);
+			size_t r = (neg?bdd_and_not_ex:bdd_and_ex)(sel, db, ex);
+			(neg ? p.neg : p.pos).emplace(make_pair(sel,ex), r);
+			return bdd_permute(r, perm);
 		}
 	};
 	bool neg = false;
@@ -60,7 +67,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	rule() {}
 	rule(rule&& r) : neg(r.neg), hsym(r.hsym) { r.sels = 0; }
 	rule(matrix v, size_t bits, size_t dsz);
-	size_t fwd(size_t db, size_t bits, size_t ar) const;
+	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s) const;
 	~rule() { if (sels) delete sels; }
 };
 
@@ -94,9 +101,9 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 	auto it = m.end();
 	for (i = 1; i != v.size(); ++i) { // init, sel, ex and local eq
 		body d(v[i][0] < 0);
-		v[i].erase(v[i].begin());
-		d.ex = (bool*)memset(new bool[bits*ar],0,sizeof(bool)*bits*ar),
-		d.perm = new size_t[(ar + nvars) * bits];
+		v[i].erase(v[i].begin()),
+		d.ex = bools(bits * ar, false);
+		d.perm.resize((ar + nvars) * bits);
 		for (b = 0; b != (ar + nvars) * bits; ++b) d.perm[b] = b;
 		for (j = 0; j != ar; ++j)
 			if (v[i][j] >= 0) {
@@ -129,17 +136,18 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 	if (v.size() > 1) sels = new size_t[v.size() - 1];
 }
 
-size_t rule::fwd(size_t db, size_t bits, size_t ar) const {
+size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) const {
 	size_t vars = T;
 	for (const body& b : bd)
-		if (F == (vars = bdd_and(vars, b.varbdd(db)))) return F;
+		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
 	return bdd_and_deltail(hsym, vars, bits * ar);
 }
 
 void lp::fwd() {
 	size_t add = F, del = F, s;
+	p.pos.clear(), p.neg.clear();
 	for (const rule* r : rules)
-		(r->neg?del:add) = bdd_or(r->fwd(db, bits, ar),r->neg?del:add);
+		(r->neg?del:add)=bdd_or(r->fwd(db, bits, ar, p),r->neg?del:add);
 	if ((s = bdd_and_not(add, del)) == F && add != F)
 		db = F; // detect contradiction
 	else db = bdd_or(bdd_and_not(db, del), s);
@@ -166,4 +174,11 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 				if (s[n][i * bits + b])
 					r[n][i] |= 1 << (bits - b - 1);
 	return r;
+}
+
+size_t std::hash<std::pair<size_t, bools>>::operator()(
+	const std::pair<size_t, bools>& m) const {
+	std::hash<size_t> h1;
+	std::hash<bools> h2;
+	return h1(m.first) + h2(m.second);
 }

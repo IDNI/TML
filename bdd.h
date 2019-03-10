@@ -18,24 +18,27 @@
 //bdd node is a triple: varid,1-node-id,0-node-id
 typedef std::array<size_t, 3> node;
 const size_t F = 0, T = 1;
+extern std::vector<node> V;
 
 void bdd_init();
 size_t bdd_add(const node& n); //create new bdd node,standard implementation
 std::vector<std::vector<bool>> allsat(size_t x, size_t nvars);
 size_t from_bit(size_t x ,bool v);
 size_t bdd_or(size_t x, size_t y);
-size_t bdd_ex(size_t x, const bool* b);
+size_t bdd_ex(size_t x, const bools&);
 size_t bdd_and(size_t x, size_t y);
 size_t bdd_deltail(size_t x, size_t h);
 size_t bdd_and_deltail(size_t x, size_t y, size_t h);
-size_t bdd_and_ex(size_t x, size_t y, const bool* s);
+size_t bdd_and_ex(size_t x, size_t y, const bools&);
 size_t bdd_and_not(size_t x, size_t y);
-size_t bdd_and_not_ex(size_t x, size_t y, const bool* s);
+size_t bdd_and_not_ex(size_t x, size_t y, const bools&);
 size_t bdd_ite(size_t v, size_t t, size_t e);
-size_t bdd_permute(size_t x, const size_t* m); //overlapping rename
+size_t bdd_permute(size_t x, const std::vector<size_t>&); //overlapping rename
 size_t from_eq(size_t x, size_t y);
-const node& getnode(size_t n);
-bool leaf(size_t x);
-bool leaf(const node& x);
-bool trueleaf(const node& x);
-bool trueleaf(const size_t& x);
+
+#define getnode(x) V[x]
+#define leaf(x) (((x) == T) || ((x) == F))
+#define nleaf(x) (!(x)[0])
+#define trueleaf(x) ((x) == T)
+#define ntrueleaf(x) (nleaf(x) && (x)[1])
+#define from_bit(x, v) bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}})

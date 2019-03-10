@@ -18,7 +18,14 @@
 const int_t pad = 0;
 void tml_init();
 
+template<> struct std::hash<std::pair<size_t, bools>> {
+	size_t operator()(const std::pair<size_t, bools>& m) const; };
+
 class lp { // [pfp] logic program
+	friend class rule;
+	struct step {
+		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
+	} p;
 	std::vector<class rule*> rules;
 	void fwd(); // single pfp step
 	const size_t bits, ar, dsz;
