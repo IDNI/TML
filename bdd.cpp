@@ -101,7 +101,7 @@ size_t bdd_ex(size_t x, const bools& b) {
 	if (it != memo_ex.end()) return it->second;
 	size_t res;
 #endif	
-	if (b[n[0]-1]) {
+	while (b[n[0]-1]) {
 		x = bdd_or(n[1], n[2]);
 		if (leaf(x)) apply_ret(x, memo_ex);
 		n = getnode(x);
