@@ -22,12 +22,15 @@
 #include <climits>
 #include <stdexcept>
 #include <cassert>
+#ifdef DEBUG
+#include "driver.h"
+#else
 #include "tml.h"
+#endif
 using namespace std;
 
 void tml_init() { bdd_init(); }
 
-matrix from_bits(size_t x, size_t bits, size_t ar);
 wostream& out(wostream& os, const node& n) { //print using ?: syntax
 	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
@@ -44,6 +47,10 @@ struct vbcmp {
 	}
 };
 
+#ifdef DEBUG
+std::wostream& printbdd(std::wostream& os, size_t t);
+#endif
+
 struct rule { // a P-DATALOG rule in bdd form
 	struct body {
 		size_t sel = T;
@@ -55,9 +62,15 @@ struct rule { // a P-DATALOG rule in bdd form
 			auto it = (neg ? p.neg : p.pos).find({sel, ex});
 			if (it != (neg?p.neg:p.pos).end())
 				return bdd_permute(it->second, perm);
-			size_t r = (neg?bdd_and_not_ex:bdd_and_ex)(sel, db, ex);
+			size_t r = (neg?bdd_and_not:bdd_and)(sel, db);
+			DBG(printbdd(wcout<<"sel"<<endl, sel)<<endl;)
+			DBG(printbdd(wcout<<"bdd_and"<<endl, r)<<endl;)
+			r = bdd_ex(r, ex);
+			DBG(printbdd(wcout<<"bdd_ex"<<endl, r)<<endl);
 			(neg ? p.neg : p.pos).emplace(make_pair(sel,ex), r);
-			return bdd_permute(r, perm);
+			r = bdd_permute(r, perm);
+			DBG(printbdd(wcout<<"bdd_perm"<<endl, r)<<endl);
+			return r;
 		}
 	};
 	bool neg = false;
@@ -140,7 +153,10 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) const {
 	size_t vars = T;
 	for (const body& b : bd)
 		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
-	return bdd_and_deltail(hsym, vars, bits * ar);
+	vars = bdd_and(hsym, vars);
+	vars = bdd_deltail(vars, bits * ar);
+	return vars;
+	return bdd_deltail(bdd_and(hsym, vars), bits * ar);
 }
 
 void lp::fwd() {
@@ -152,16 +168,6 @@ void lp::fwd() {
 		db = F; // detect contradiction
 	else db = bdd_or(bdd_and_not(db, del), s);
 }
-
-bool lp::pfp() {
-	size_t d;
-	vector<int_t> v;
-	for (set<int_t> s;;)
-		if (s.emplace(d = db), fwd(), s.find(db) != s.end())
-			return d == db;
-}
-
-matrix lp::getdb() { return from_bits(db, bits, ar); }
 
 matrix from_bits(size_t x, size_t bits, size_t ar) {
 	vbools s = allsat(x, bits * ar);
@@ -175,6 +181,9 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 					r[n][i] |= 1 << (bits - b - 1);
 	return r;
 }
+
+matrix lp::getdb() const { return getbdd(db); }
+matrix lp::getbdd(size_t t) const { return from_bits(t, bits, ar); }
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(
 	const std::pair<size_t, bools>& m) const {

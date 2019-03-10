@@ -38,7 +38,7 @@ size_t from_eq(size_t x, size_t y);
 
 #define getnode(x) V[x]
 #define leaf(x) (((x) == T) || ((x) == F))
-#define nleaf(x) (!(x)[0])
+#define nleaf(x) (!((x)[0]))
 #define trueleaf(x) ((x) == T)
 #define ntrueleaf(x) (nleaf(x) && (x)[1])
 #define from_bit(x, v) bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}})

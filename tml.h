@@ -22,18 +22,17 @@ template<> struct std::hash<std::pair<size_t, bools>> {
 	size_t operator()(const std::pair<size_t, bools>& m) const; };
 
 class lp { // [pfp] logic program
-	friend class rule;
+	friend struct rule;
 	struct step {
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
 	} p;
-	std::vector<class rule*> rules;
-	void fwd(); // single pfp step
+	std::vector<struct rule*> rules;
 	const size_t bits, ar, dsz;
-	size_t db = F; // db's bdd root
 public:
-	lp(size_t maxbits, size_t arity, size_t dsz) :
-		bits(maxbits), ar(arity), dsz(dsz) {}
+	size_t db = F; // db's bdd root
+	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
 	void rule_add(const matrix& t);
-	bool pfp();
-	matrix getdb();
+	void fwd(); // single pfp step
+	matrix getbdd(size_t t) const;
+	matrix getdb() const;
 };

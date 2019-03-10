@@ -15,7 +15,7 @@
 #include <string>
 #include <sstream>
 #include <forward_list>
-#include "tml.h"
+#include "driver.h"
 using namespace std;
 
 #define er(x)	perror(x), exit(0)
@@ -33,7 +33,6 @@ using namespace std;
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 
-typedef wchar_t* wstr;
 struct dictcmp {
 	bool operator()(const pair<wstr, size_t>& x,
 			const pair<wstr, size_t>& y) const {
@@ -56,6 +55,16 @@ wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 	return os;
 }
 
+#ifdef DEBUG
+driver* drv;
+driver::driver() { drv = this; }
+#endif
+
+wostream& driver::printbdd(wostream& os, size_t t) const {
+	return printbdd(os, p->getbdd(t));
+}
+wostream& driver::printdb(wostream& os) const {return printbdd(os, p->getdb());}
+
 int_t dict_get(wstr s, size_t len) {
 	if (*s == L'?') {
 		auto it = vars_dict.find({s, len});
@@ -71,21 +80,9 @@ int_t dict_get(wstr s, size_t len) {
 
 size_t dict_bits() { return msb(nsyms()-1); }
 
-class driver {
-	int_t str_read(wstr *s); // parse a string and returns its dict id
-	term term_read(wstr *s); // read raw term (no bdd)
-	matrix rule_read(wstr *s); // read raw rule (no bdd)
-	lp *p = 0;
-public:
-	void prog_read(wstr s);
-	bool pfp() { bool r = p->pfp(); return printdb(wcout), r; }
-	matrix getdb() { return p->getdb(); }
-	wostream& printdb(wostream& os);
-};
-
-wostream& driver::printdb(wostream& os) {
+wostream& driver::printbdd(wostream& os, const matrix& t) const {
 	set<wstring> s;
-	for (auto v : getdb()) {
+	for (auto v : t) {
 		wstringstream ss;
 		for (auto k : v)
 			if (k == pad) ss << L"* ";
@@ -202,6 +199,16 @@ next:	for (n = l = 0; n != 31; ++n)
 		goto next;
 	} else if (skip) goto next;
 	return ss.str();
+}
+
+bool driver::pfp() {
+	size_t d;
+	vector<int_t> v;
+	for (set<int_t> s;;)
+		if (s.emplace(d = p->db), p->fwd(), s.find(p->db) != s.end()) {
+			if (d == p->db) return printdb(wcout), true;
+			else return false;
+		} else printdb(wcout)<<endl;
 }
 
 int main() {

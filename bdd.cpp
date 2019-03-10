@@ -47,13 +47,13 @@ size_t bdd_add_nocheck(const node& n) {
 	return M.emplace(n, r = V.size()), V.emplace_back(n), r;
 }
 
+void bdd_init() { bdd_add_nocheck({{0, 0, 0}}), bdd_add_nocheck({{0, 1, 1}}); }
+
 size_t bdd_add(const node& n) {//create new bdd node,standard implementation
 	if (n[1] == n[2]) return n[1];
 	auto it = M.find(n);
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
-
-void bdd_init() { bdd_add_nocheck({{0, 0, 0}}), bdd_add_nocheck({{0, 1, 1}}); }
 
 void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) {
 	if (nleaf(n) && !ntrueleaf(n)) return;
@@ -93,8 +93,8 @@ size_t bdd_or(size_t x, size_t y) {
 }
 
 size_t bdd_ex(size_t x, const bools& b) {
+	if (leaf(x)) return x;
 	node n = getnode(x);
-	if (nleaf(n)) return x;
 #ifdef MEMO
 	exmemo t = {b, x};
 	auto it = memo_ex.find(t);
@@ -102,7 +102,8 @@ size_t bdd_ex(size_t x, const bools& b) {
 	size_t res;
 #endif	
 	if (b[n[0]-1]) {
-		if (leaf(x = bdd_or(n[1], n[2]))) apply_ret(x, memo_ex);
+		x = bdd_or(n[1], n[2]);
+		if (leaf(x)) apply_ret(x, memo_ex);
 		n = getnode(x);
 	}
 	apply_ret(bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}}), memo_ex);
@@ -126,6 +127,26 @@ size_t bdd_and(size_t x, size_t y) {
 	else if (!vx) apply_ret((a&&b)?T:F, memo_and);
 	else if ((v = vx) < vy || !vy) b = d = y;
 	apply_ret(bdd_add({{v, bdd_and(a, b), bdd_and(c, d)}}), memo_and);
+}
+
+size_t bdd_and_not(size_t x, size_t y) {
+	if (x == y) return F;
+#ifdef MEMO
+	memo t = {{x, y}};
+	auto it = memo_and_not.find(t);
+	if (it != memo_and_not.end()) return it->second;
+	size_t res;
+#endif	
+	const node &Vx = getnode(x);
+	if (nleaf(Vx) && !ntrueleaf(Vx)) apply_ret(F, memo_and_not);
+       	const node &Vy = getnode(y);
+	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? F : x, memo_and_not);
+	const size_t &vx = Vx[0], &vy = Vy[0];
+	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
+	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
+	else if (!vx) apply_ret((a&&!b)?T:F, memo_and_not);
+	else if ((v = vx) < vy || !vy) b = d = y;
+	apply_ret(bdd_add({{v,bdd_and_not(a,b),bdd_and_not(c,d)}}),memo_and_not);
 }
 
 size_t bdd_deltail(size_t x, size_t h) {
@@ -189,26 +210,6 @@ size_t bdd_and_ex(size_t x, size_t y, const bools& s) {
 	if (s[v-1]) res = bdd_or(bdd_and_ex(a, b, s), bdd_and_ex(c, d, s));
 	else res = bdd_add({{v, bdd_and_ex(a, b, s), bdd_and_ex(c, d, s)}});
 ret:	apply_ret(res, memo_and_ex);
-}
-
-size_t bdd_and_not(size_t x, size_t y) {
-	if (x == y) return F;
-#ifdef MEMO
-	memo t = {{x, y}};
-	auto it = memo_and_not.find(t);
-	if (it != memo_and_not.end()) return it->second;
-	size_t res;
-#endif	
-	const node &Vx = getnode(x);
-	if (nleaf(Vx) && !ntrueleaf(Vx)) apply_ret(F, memo_and_not);
-       	const node &Vy = getnode(y);
-	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? F : x, memo_and_not);
-	const size_t &vx = Vx[0], &vy = Vy[0];
-	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret((a&&!b)?T:F, memo_and_not);
-	else if ((v = vx) < vy || !vy) b = d = y;
-	apply_ret(bdd_add({{v,bdd_and_not(a,b),bdd_and_not(c,d)}}),memo_and_not);
 }
 
 size_t bdd_and_not_ex(size_t x, size_t y, const bools& s) {
