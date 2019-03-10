@@ -36,3 +36,6 @@ public:
 	matrix getbdd(size_t t) const;
 	matrix getdb() const;
 };
+
+std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
+std::wostream& out(std::wostream& os, size_t n);

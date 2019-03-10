@@ -6,6 +6,11 @@
 
 using namespace std;
 
+wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
+	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
+		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
+}
+wostream& out(wostream& os,size_t n){return out(os<<L'['<<n<<L']',getnode(n));}
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y:x) os << (y?1:0);
 	return os;
@@ -33,11 +38,11 @@ struct tt { // truth table
 		if (full) {
 			table.emplace(bools(bits, false));
 			addall(0);
-			assert(table.size() == (1 << bits));
+			assert(table.size() == (size_t)(1 << bits));
 		}
 	}
 
-	size_t addrow(const bools& b) { table.emplace(b); }
+	void addrow(const bools& b) { table.emplace(b); }
 	tt operator&(const tt& x) const {
 		tt r(bits);
 		for (auto& y : table)
@@ -90,13 +95,17 @@ struct tt { // truth table
 		vbools s = allsat(r, bits);
 		set<bools> sb;
 		for (auto& x : s) sb.emplace(x);
-		assert(sb == table);
+		if (sb != table) {
+			wcout << "expected"<<endl;
+			for (auto& x : table) wcout << x << endl;
+			wcout << "got"<<endl<<allsat(r, bits);
+			assert(sb == table);
+		}
 		return r;
 	}
 };
 
 bools brnd(size_t bits) {
-	size_t x = 31;
 	bools r(bits);
 	while (bits--) r[bits] = random() & 1;
 	return r;
@@ -114,9 +123,25 @@ wostream& operator<<(wostream& os, const tt& t) {
 	return os;
 }
 
+void test_add_many() {
+	for (size_t k = 0; k < 50; ++k) {
+		tt *t = new tt[5];
+		for (size_t i = 0; i < 5; ++i) t[i] = rndtt(8).ex(i);
+		size_t r = T;
+		for (size_t i = 0; i < 5; ++i) r = bdd_and(r, t[i].bdd());
+		if (!leaf(r)) {
+			vector<size_t> v;
+			for (size_t i = 0; i < 5; ++i) v.push_back(t[i].bdd());
+			assert(r == bdd_and_many(v, 0, v.size()));
+		}
+		delete[] t;
+	}
+}
+
 int main() {
 	bdd_init();
 	srand(time(0));
+	test_add_many();
 	tt xt(3);
 	xt.addrow({false, true, true});
 	xt.addrow({true, true, false});
@@ -133,7 +158,7 @@ int main() {
 			e[0] = t[0].ex(0);
 			for (size_t j = 1; j < k; ++j) e[j] = e[j-1].ex(j);
 			assert(!t[0].table.size() 
-				|| e[k-1].table.size() == (1 << k));
+				|| e[k-1].table.size() == (size_t)(1 << k));
 			delete[] e;
 			t[0].ex(brnd(k));
 			t[1].ex(brnd(k));

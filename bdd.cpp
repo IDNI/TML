@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "bdd.h"
+#include <cassert>
 
 using namespace std;
 
@@ -49,8 +50,12 @@ size_t bdd_add_nocheck(const node& n) {
 
 void bdd_init() { bdd_add_nocheck({{0, 0, 0}}), bdd_add_nocheck({{0, 1, 1}}); }
 
-size_t bdd_add(const node& n) {//create new bdd node,standard implementation
+size_t bdd_add(const node& n) { // create new bdd node,standard implementation
 	if (n[1] == n[2]) return n[1];
+#ifdef DEBUG	
+	if (!leaf(n[1])) assert(n[0] < getnode(n[1])[0]);
+	if (!leaf(n[2])) assert(n[0] < getnode(n[2])[0]);
+#endif	
 	auto it = M.find(n);
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
@@ -183,6 +188,42 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 	else if ((v = vx) < vy || !vy) b = d = y;
 	apply_ret(bdd_deltail(bdd_add({{v, bdd_and_deltail(a, b, h),
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
+}
+
+size_t bdd_and_many(vector<size_t> v, size_t from, size_t to) {
+	if (1 == (to - from))
+		return v[from];
+	while (leaf(v[from]))
+		if (!trueleaf(v[from]))
+			return F;
+		else if (1 == (to - ++from))
+			return v[from];
+	size_t m = getnode(v[from])[0], i, f, t;
+	node n;
+	vector<size_t> vs;
+	vs.resize(to-from);
+	for (i = from; i != to; ++i) vs[i-from] = getnode(v[i])[0];
+	bool b = false;
+	for (i = from + 1; i != to; ++i) {
+		if (leaf(v[i])) {
+			if (!trueleaf(v[i]))
+				return F;
+			continue;
+		}
+		n = getnode(v[i]), b |= n[0] != m;
+		if (n[0] < m) m = n[0];
+	}
+	f = v.size();
+	for (i = from; i != to; ++i)
+		if (!b || getnode(v[i])[0] == m)
+			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
+		else v.push_back(v[i]);
+	t = v.size();
+	for (i = from; i != to; ++i)
+		if (!b || getnode(v[i])[0] == m)
+			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[2]);
+		else v.push_back(v[i]);
+	return bdd_add({{m, bdd_and_many(v,f,t), bdd_and_many(v,t,v.size())}});
 }
 /*
 size_t bdd_and_ex(size_t x, size_t y, const bools& s) {

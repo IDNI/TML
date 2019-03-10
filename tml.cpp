@@ -31,7 +31,7 @@ using namespace std;
 
 void tml_init() { bdd_init(); }
 
-wostream& out(wostream& os, const node& n) { //print using ?: syntax
+wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
 	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
 }
