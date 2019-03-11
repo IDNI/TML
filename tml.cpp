@@ -115,8 +115,7 @@ rule::rule(matrix v, size_t bits, size_t dsz) {
 	for (i = 1; i != v.size(); ++i) { // init, sel, ex and local eq
 		body d(v[i][0] < 0);
 		v[i].erase(v[i].begin()),
-		d.ex = bools(bits * ar, false);
-		d.perm.resize((ar + nvars) * bits);
+		d.ex.resize(bits*ar, false), d.perm.resize((ar+nvars)*bits);
 		for (b = 0; b != (ar + nvars) * bits; ++b) d.perm[b] = b;
 		for (j = 0; j != ar; ++j)
 			if (v[i][j] >= 0) {

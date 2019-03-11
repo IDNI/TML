@@ -181,6 +181,7 @@ lp* driver::prog_read(wstr *s) {
 			rules.push_front(t);
 			break;
 		} 
+		if (**s == L'{') er("unexpected '{'");
 	}
 	lp *p = new lp(dict_bits(), ar, nsyms());
 	while (!rules.empty()) {
@@ -228,10 +229,8 @@ bool driver::pfp(lp *p) {
 	size_t d;
 	for (set<int_t> s;;) {
 		s.emplace(d = p->db), p->fwd();
-		if (s.find(p->db) != s.end()) {
-			if (d == p->db) return printdb(wcout), true;
-			else return false;
-		}// else printdb(wcout)<<endl;
+		if (s.find(p->db) != s.end()) return d == p->db;
+		// else printdb(wcout)<<endl;
 	}
 }
 
@@ -241,12 +240,11 @@ bool driver::pfp() {
 		progs[n]->db = progs[n-1]->db;
 		if (!pfp(progs[n])) return false;
 	}
-	return true;
+	return printdb(wcout), true;
 }
 
 int main() {
 	setlocale(LC_ALL, ""), tml_init(), dict_init();
-//	test_range();
 	driver d;
 	wstring s = file_read_text(stdin); // got to stay in memory
 	wstr str = wcsdup(s.c_str());
