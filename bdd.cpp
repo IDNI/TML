@@ -190,7 +190,7 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many(vector<size_t> v) {
+size_t bdd_and_many(const vector<size_t>& v) {
 	size_t from = 0;
 	if (1 == (v.size() - from)) return v[from];
 	while (leaf(v[from]))

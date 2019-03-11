@@ -162,8 +162,7 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) const {
 		v.push_back(vars);
 	}
 	v.push_back(hsym);
-	vars = bdd_deltail(bdd_and_many(v), bits * ar);
-	return vars;
+	return bdd_deltail(bdd_and_many(v), bits * ar);
 }
 
 void lp::fwd() {
