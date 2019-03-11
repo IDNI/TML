@@ -10,3 +10,4 @@ typedef std::vector<bools> vbools;
 #else
 #define DBG(x)
 #endif
+#define er(x)	perror(x), exit(0)

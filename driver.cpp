@@ -13,12 +13,12 @@
 #include <map>
 #include <set>
 #include <string>
+#include <cstring>
 #include <sstream>
 #include <forward_list>
 #include "driver.h"
 using namespace std;
 
-#define er(x)	perror(x), exit(0)
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
 #define dot_after_q "expected '.' after query.\n"
@@ -60,11 +60,14 @@ driver* drv;
 driver::driver() { drv = this; }
 #endif
 
+wostream& driver::printbdd(wostream& os, const lp& p, size_t t) const {
+	return printbdd(os, p.getbdd(t));
+}
 wostream& driver::printbdd(wostream& os, size_t t) const {
 	return printbdd(os, progs.back()->getbdd(t));
 }
-wostream& driver::printdb(wostream& os) const {
-	return printbdd(os, progs.back()->getdb());
+wostream& driver::printdb(wostream& os, lp *q) const {
+	return printbdd(os, q->getdb());
 }
 
 int_t dict_get(wstr s, size_t len) {
@@ -157,7 +160,7 @@ void directive_read(wstr s) {
 	while (ss != s) *(ss++) = L' ';
 }
 */
-lp* driver::prog_read(wstr *s) {
+lp* driver::prog_read(wstr *s, bool proof) {
 	/*bool dot = true;
 	for (wstr ss = s; *ss; ++ss) {
 		if (iswspace(*ss)) continue;
@@ -170,37 +173,49 @@ lp* driver::prog_read(wstr *s) {
 			dot = false;
 		}
 	}*/
-	size_t ar = 0, l;
-	forward_list<matrix> rules;
-	for (matrix t; !(t = rule_read(s)).empty(); rules.push_front(t)) {
-		for (term& x : t)
-			ar = max(ar, x.size() - 1);
+	set<matrix> rules;
+	for (matrix t; !(t = rule_read(s)).empty(); rules.emplace(t)) {
 		while (iswspace(**s)) ++*s;
 		if (**s == L'}') {
 			if (!mult) er("unexpected '}'");
-			rules.push_front(t);
+			rules.emplace(t);
 			break;
 		} 
 		if (**s == L'{') er("unexpected '{'");
 	}
+	return prog_create(move(rules), proof);
+}
+
+lp* driver::prog_create(set<matrix> rules, bool proof) {
+	size_t ar = 0, l;
+	for (const matrix& t : rules)
+		for (const term& x : t)
+			ar = max(ar, x.size() - 1);
 	lp *p = new lp(dict_bits(), ar, nsyms());
 	while (!rules.empty()) {
-		matrix t = rules.front();
-		rules.pop_front();
+		matrix t = *rules.begin();
+		rules.erase(rules.begin());
 		for (term& x : t)
 			if ((l = x.size()) < ar+1) x.resize(ar+1),
-					fill(x.begin() + l, x.end(), pad);
-		p->rule_add(t);
+				fill(x.begin() + l, x.end(), pad);
+		p->rule_add(t, proof ? &proofs.back() : 0);
 	}
 	return p;
 }
 
-void driver::progs_read(wstr s) {
+void driver::progs_read(wstr s, bool proof) {
 	while (iswspace(*s)) ++s;
-	if (!(mult = *s == L'{')) { progs.push_back(prog_read(&s)); return; }
+	if (!(mult = *s == L'{')) {
+		if (proof) proofs.emplace_back();
+		progs.push_back(prog_read(&s, proof));
+		return;
+	}
 	while (*s) {
 		while (iswspace(*s)) ++s;
-		if (*s == L'{') progs.push_back(prog_read(&++s));
+		if (*s == L'{') {
+			if (proof) proofs.emplace_back();
+			progs.push_back(prog_read(&++s, proof));
+		}
 		while (iswspace(*s)) ++s;
 		if (*s != L'}') er("expected '}'");
 		else ++s;
@@ -225,31 +240,48 @@ next:	for (n = l = 0; n != 31; ++n)
 	return ss.str();
 }
 
-bool driver::pfp(lp *p) {
-	size_t d;
+bool driver::pfp(lp *p, set<matrix>* proof) {
+	set<size_t> pr;
+	size_t d, add, del, t;
 	for (set<int_t> s;;) {
-		s.emplace(d = p->db), p->fwd();
-		if (s.find(p->db) != s.end()) return d == p->db;
-		// else printdb(wcout)<<endl;
+		add = del = F;
+		s.emplace(d = p->db), p->fwd(add, del, proof ? &pr : 0);
+		if ((t = bdd_and_not(add, del)) == F && add != F)
+			p->db = F; // detect contradiction
+		else p->db = bdd_or(bdd_and_not(p->db, del), t);
+		if (s.find(p->db) != s.end()) {
+			if (d != p->db) return false;
+			break;
+		}
 	}
+	if (!proof) return true;
+	lp *q = prog_create(move(*proof), false);
+	q->db = F;
+	for (size_t x : pr) q->db = bdd_or(q->db, x);
+	d = q->db;
+	add = del = F;
+	q->fwd(add, del, 0);
+	printbdd(wcout, *q, add);
+	return true;
 }
 
-bool driver::pfp() {
-	pfp(progs[0]);
+bool driver::pfp(bool pr) {
+	pfp(progs[0], pr ? &proofs[0] : 0);
 	for (size_t n = 1; n != progs.size(); ++n) {
 		progs[n]->db = progs[n-1]->db;
-		if (!pfp(progs[n])) return false;
+		if (!pfp(progs[n], pr ? &proofs[n] : 0)) return false;
 	}
-	return printdb(wcout), true;
+	return printdb(wcout, progs.back()), true;
 }
 
-int main() {
+int main(int argc, char** argv) {
 	setlocale(LC_ALL, ""), tml_init(), dict_init();
+	bool proof = argc == 2 && !strcmp(argv[1], "-p");
 	driver d;
 	wstring s = file_read_text(stdin); // got to stay in memory
 	wstr str = wcsdup(s.c_str());
 	s.clear();
-	d.progs_read(str);
-	if (!d.pfp()) wcout << "unsat" << endl;
+	d.progs_read(str, proof);
+	if (!d.pfp(proof)) wcout << "unsat" << endl;
 	return 0;
 }

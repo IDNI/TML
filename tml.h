@@ -31,8 +31,8 @@ class lp { // [pfp] logic program
 public:
 	size_t db = F; // db's bdd root
 	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
-	void rule_add(const matrix& t);
-	void fwd(); // single pfp step
+	void rule_add(const matrix& t, std::set<matrix>* proof = 0);
+	void fwd(size_t &add, size_t &del, std::set<size_t>* p = 0);
 	matrix getbdd(size_t t) const;
 	matrix getdb() const;
 };
