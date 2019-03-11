@@ -21,8 +21,9 @@ using namespace std;
 
 #define oparen_expected "'(' expected\n"
 #define comma_expected "',' or ')' expected\n"
-#define dot_after_q "expected '.' after query.\n"
-#define if_expected "'if' or '.' expected\n"
+//#define dot_after_q "expected '.' after query.\n"
+//#define if_expected "'if' or '.' expected\n"
+#define dot_expected "'.' expected."
 #define sep_expected "Term or ':-' or '.' expected\n"
 #define unmatched_quotes "Unmatched \"\n"
 #define err_inrel "Unable to read the input relation symbol.\n"
@@ -30,25 +31,9 @@ using namespace std;
 #define err_dst "Unable to read dst file.\n"
 #define err_quotes "expected \"."
 #define err_dots "two consecutive dots, or dot in beginning of document."
-#define msb(x) ((sizeof(unsigned long long)<<3) - \
-	__builtin_clzll((unsigned long long)(x)))
 
-struct dictcmp {
-	bool operator()(const pair<wstr, size_t>& x,
-			const pair<wstr, size_t>& y) const {
-		return	x.second != y.second ? x.second < y.second :
-			wcsncmp(x.first, y.first, x.second) < 0;
-	}
-};
-
-map<pair<wstr, size_t>, int_t, dictcmp> syms_dict, vars_dict;
-vector<wstr> syms;
-vector<size_t> lens;
 wstring file_read_text(FILE *f);
-
-void dict_init() { syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}]=pad;}
-pair<wstr, size_t> dict_get(int_t t) { return { syms[t],lens[t] }; }
-size_t nsyms() { return syms.size(); }
+wstring file_read_text(wstring fname);
 
 wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 	for (size_t n = 0; n != p.second; ++n) os << p.first[n];
@@ -57,8 +42,11 @@ wostream& operator<<(wostream& os, const pair<wstr, size_t>& p) {
 
 #ifdef DEBUG
 driver* drv;
-driver::driver() { drv = this; }
 #endif
+driver::driver() {
+	syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}]=pad;
+	DBG(drv = this;)
+}
 
 wostream& driver::printbdd(wostream& os, const lp& p, size_t t) const {
 	return printbdd(os, p.getbdd(t));
@@ -70,7 +58,16 @@ wostream& driver::printdb(wostream& os, lp *q) const {
 	return printbdd(os, q->getdb());
 }
 
-int_t dict_get(wstr s, size_t len) {
+pair<wstr, size_t> driver::dict_get(int_t t) const {
+	static wchar_t str_nums[20];
+	if (t < (int_t)syms.size()) return { syms[t], lens[t] };
+	assert(t < (int_t)(syms.size() + nums));
+	wstring s = to_wstring(t - syms.size());
+	wcscpy(str_nums, s.c_str());
+	return { str_nums, wcslen(str_nums) };
+}
+
+int_t driver::dict_get(wstr s, size_t len) {
 	if (*s == L'?') {
 		auto it = vars_dict.find({s, len});
 		if (it != vars_dict.end()) return it->second;
@@ -79,11 +76,10 @@ int_t dict_get(wstr s, size_t len) {
 	}
 	auto it = syms_dict.find({s, len});
 	if (it != syms_dict.end()) return it->second;
+	assert(!nums);
 	return	syms.push_back(s), lens.push_back(len), syms_dict[{s,len}] =
 		syms.size() - 1;
 }
-
-size_t dict_bits() { return msb(nsyms()-1); }
 
 wostream& driver::printbdd(wostream& os, const matrix& t) const {
 	set<wstring> s;
@@ -141,38 +137,36 @@ loop:	if ((t = term_read(s)).empty()) er("term expected.");
 	if (**s == L':') er("unexpected ':'.");
 	goto loop;
 }
-/*
-void directive_read(wstr s) {
-	wstr ss = s;
-	if(wcsncmp(++s, L"load", 4) && iswspace(*(s += 4))) {
-		while (iswspace(*s)) ++s;
-		if (*s == L'"') {
-			wstring fname, txt;
-			while (*++s != L'"')
-				if (!*s) er(err_quotes);
-				else fname += *s;
-			FILE* f = fopen((const char*)fname.c_str(),"r");
-			txt = file_read_text(f);
-			fclose(f);
-			const char* ctxt = (const char*)txt.c_str();
-		}
+
+set<matrix> driver::prog_read(wstr *s, map<int_t, wstring>& strs) {
+	for (; **s; ++*s) {
+		if (iswspace(**s)) continue;
+		if (**s != L'@') break;
+		int_t rel = str_read(&++*s);
+		if (iswspace(**s)) ++*s;
+		if (**s == L'"') {
+			bool escape = false;
+			wstring str;
+			for (++*s; **s; ++*s) {
+				if ((escape = **s == L'\''))
+					str += *++*s;
+				else if (**s == L'"') { ++*s; break; }
+				else str += **s;
+			}
+			if (iswspace(**s)) ++*s;
+			if (**s != L'.') er(dot_expected);
+			++*s;
+			strs.emplace(rel, move(str));
+		} else if (**s == L'<') {
+			wstring str;
+			while (**s && *++*s != L'>') str += **s;
+			if (*((*s)++) != L'>') er("'>' expected.");
+			if (iswspace(**s)) ++*s;
+			if (**s != L'.') er(dot_expected);
+			++*s;
+			strs.emplace(rel, file_read_text(move(str)));
+		} else er("expected string in \"\" or filename in <>");
 	}
-	while (ss != s) *(ss++) = L' ';
-}
-*/
-lp* driver::prog_read(wstr *s, bool proof) {
-	/*bool dot = true;
-	for (wstr ss = s; *ss; ++ss) {
-		if (iswspace(*ss)) continue;
-		if (*ss == L'.') {
-			if (dot) er(err_dots);
-			dot = true;
-		}
-		if (dot) {
-			if (*ss == L'@') directive_read(ss);
-			dot = false;
-		}
-	}*/
 	set<matrix> rules;
 	for (matrix t; !(t = rule_read(s)).empty(); rules.emplace(t)) {
 		while (iswspace(**s)) ++*s;
@@ -183,7 +177,7 @@ lp* driver::prog_read(wstr *s, bool proof) {
 		} 
 		if (**s == L'{') er("unexpected '{'");
 	}
-	return prog_create(move(rules), proof);
+	return rules;
 }
 
 lp* driver::prog_create(set<matrix> rules, bool proof) {
@@ -204,23 +198,42 @@ lp* driver::prog_create(set<matrix> rules, bool proof) {
 }
 
 void driver::progs_read(wstr s, bool proof) {
+//	return prog_create(move(rules), proof);
+	vector<map<int_t, wstring>> strs;
+	vector<set<matrix>> raw;
 	while (iswspace(*s)) ++s;
 	if (!(mult = *s == L'{')) {
 		if (proof) proofs.emplace_back();
-		progs.push_back(prog_read(&s, proof));
-		return;
+		strs.emplace_back();
+		//progs.push_back(prog_read(&s, proof, strs.back()));
+		raw.push_back(prog_read(&s, strs.back()));
+		goto strs;
 	}
 	while (*s) {
 		while (iswspace(*s)) ++s;
 		if (*s == L'{') {
 			if (proof) proofs.emplace_back();
-			progs.push_back(prog_read(&++s, proof));
+			strs.emplace_back();
+			//progs.push_back(prog_read(&++s, proof, strs.back()));
+			raw.push_back(prog_read(&++s, strs.back()));
 		}
 		while (iswspace(*s)) ++s;
 		if (*s != L'}') er("expected '}'");
 		else ++s;
 		while (iswspace(*s)) ++s;
 	}
+strs:	for (size_t i = 0; i != strs.size(); ++i) {
+		if (strs[i].empty()) continue;
+		nums = max(nums, (size_t)256);
+		for (auto x : strs[i]) nums = max(nums, x.second.size());
+		for (auto x : strs[i])
+			for (int_t n = 0; n != (int_t)x.second.size(); ++n)
+				raw[i].emplace(matrix{{ 1, x.first,
+					n+(int_t)syms.size(),
+					x.second[n]+(int_t)syms.size(),
+					n+(int_t)syms.size()+1 }});
+	}
+	for (auto x : raw) progs.push_back(prog_create(move(x), proof));
 }
 
 wstring file_read_text(FILE *f) {
@@ -238,6 +251,13 @@ next:	for (n = l = 0; n != 31; ++n)
 		goto next;
 	} else if (skip) goto next;
 	return ss.str();
+}
+
+wstring file_read_text(wstring fname) {
+	FILE *f = fopen((const char*)fname.c_str(), "r");
+	wstring r = file_read_text(f);
+	fclose(f);
+	return r;
 }
 
 bool driver::pfp(lp *p, set<matrix>* proof) {
@@ -274,7 +294,7 @@ bool driver::pfp(bool pr) {
 }
 
 int main(int argc, char** argv) {
-	setlocale(LC_ALL, ""), tml_init(), dict_init();
+	setlocale(LC_ALL, ""), tml_init();
 	bool proof = argc == 2 && !strcmp(argv[1], "-p");
 	driver d;
 	wstring s = file_read_text(stdin); // got to stay in memory

@@ -1,3 +1,4 @@
+#include <cassert>
 typedef int64_t int_t;
 typedef wchar_t* wstr;
 typedef std::vector<int_t> term;
@@ -11,3 +12,5 @@ typedef std::vector<bools> vbools;
 #define DBG(x)
 #endif
 #define er(x)	perror(x), exit(0)
+#define msb(x) ((sizeof(unsigned long long)<<3) - \
+	__builtin_clzll((unsigned long long)(x)))
