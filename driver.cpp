@@ -256,12 +256,11 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	}
 	if (!proof) return true;
 	lp *q = prog_create(move(*proof), false);
-	q->db = F;
+	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
-	d = q->db;
-	add = del = F;
 	q->fwd(add, del, 0);
 	printbdd(wcout, *q, add);
+	delete q;
 	return true;
 }
 
@@ -283,5 +282,6 @@ int main(int argc, char** argv) {
 	s.clear();
 	d.progs_read(str, proof);
 	if (!d.pfp(proof)) wcout << "unsat" << endl;
+	free(str);
 	return 0;
 }

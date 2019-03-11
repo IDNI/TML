@@ -35,6 +35,7 @@ public:
 	void fwd(size_t &add, size_t &del, std::set<size_t>* p = 0);
 	matrix getbdd(size_t t) const;
 	matrix getdb() const;
+	~lp();
 };
 
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax

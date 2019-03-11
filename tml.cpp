@@ -52,7 +52,6 @@ wostream& operator<<(wostream& os, const matrix& m) {
 	return os;
 }
 
-
 struct vbcmp {
 	bool operator()(const vector<bool>* x, const vector<bool>* y) const {
 		return *x < *y;
@@ -222,6 +221,7 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 
 matrix lp::getdb() const { return getbdd(db); }
 matrix lp::getbdd(size_t t) const { return from_bits(t, bits, ar); }
+lp::~lp() { for (rule* r : rules) delete r; }
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(
 	const std::pair<size_t, bools>& m) const {
