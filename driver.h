@@ -12,6 +12,7 @@ class driver {
 	std::map<std::pair<wstr, size_t>, int_t, dictcmp> syms_dict, vars_dict;
 	std::vector<wstr> syms;
 	std::vector<size_t> lens;
+	std::vector<std::map<int_t, std::wstring>> strs;
 	std::pair<wstr, size_t> dict_get(int_t t) const;
 	int_t dict_get(wstr s, size_t len);
 	size_t nums = 0;
@@ -30,10 +31,11 @@ public:
 	lp* prog_create(std::set<matrix> m, bool proof);
 	bool pfp(lp *p, std::set<matrix>* proof);
 	bool pfp(bool proof);
-	std::wostream& printbdd(std::wostream& os, const lp& p, size_t t) const;
-	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
+	std::wostream& printbdd(std::wostream& os, size_t prog, size_t t) const;
+	std::wostream& printbdd(std::wostream& os, const matrix& t,
+		size_t prog) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
-	std::wostream& printdb(std::wostream& os, lp *q) const;
+	std::wostream& printdb(std::wostream& os, size_t prog) const;
 	~driver() { for (lp* p : progs) delete p; }
 };
 

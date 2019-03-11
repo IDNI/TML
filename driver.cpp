@@ -48,14 +48,14 @@ driver::driver() {
 	DBG(drv = this;)
 }
 
-wostream& driver::printbdd(wostream& os, const lp& p, size_t t) const {
-	return printbdd(os, p.getbdd(t));
+wostream& driver::printbdd(wostream& os, size_t prog, size_t t) const {
+	return printbdd(os, progs[prog]->getbdd(t), prog);
 }
 wostream& driver::printbdd(wostream& os, size_t t) const {
-	return printbdd(os, progs.back()->getbdd(t));
+	return printbdd(os, progs.back()->getbdd(t), progs.size()-1);
 }
-wostream& driver::printdb(wostream& os, lp *q) const {
-	return printbdd(os, q->getdb());
+wostream& driver::printdb(wostream& os, size_t prog) const {
+	return printbdd(os, prog, progs[prog]->db);
 }
 
 pair<wstr, size_t> driver::dict_get(int_t t) const {
@@ -68,6 +68,7 @@ pair<wstr, size_t> driver::dict_get(int_t t) const {
 }
 
 int_t driver::dict_get(wstr s, size_t len) {
+	if (iswdigit(*s)) er("symbol name cannot begin with a digit");
 	if (*s == L'?') {
 		auto it = vars_dict.find({s, len});
 		if (it != vars_dict.end()) return it->second;
@@ -81,14 +82,20 @@ int_t driver::dict_get(wstr s, size_t len) {
 		syms.size() - 1;
 }
 
-wostream& driver::printbdd(wostream& os, const matrix& t) const {
+wostream& driver::printbdd(wostream& os, const matrix& t, size_t prog) const {
 	set<wstring> s;
 	for (auto v : t) {
 		wstringstream ss;
-		for (auto k : v)
-			if (k == pad) ss << L"* ";
-			else if((size_t)k<(size_t)nsyms())ss<<dict_get(k)<<L' ';
-			else ss << L'[' << k << L"] ";
+		auto it = strs[prog].find(v[0]);
+		if (it == strs[prog].end()) {
+			for (auto k : v)
+				if (k == pad) ss << L"* ";
+				else if ((size_t)k<(size_t)nsyms())
+					ss<<dict_get(k)<<L' ';
+				else ss << L'[' << k << L"] ";
+		} else
+			ss << dict_get(v[0]) << ' ' << v[1] - syms.size()
+			<< " '" << (wchar_t)v[2] << "' " << v[3] - syms.size();
 		s.emplace(ss.str());
 	}
 	for (auto& x : s) os << x << endl;
@@ -198,14 +205,11 @@ lp* driver::prog_create(set<matrix> rules, bool proof) {
 }
 
 void driver::progs_read(wstr s, bool proof) {
-//	return prog_create(move(rules), proof);
-	vector<map<int_t, wstring>> strs;
 	vector<set<matrix>> raw;
 	while (iswspace(*s)) ++s;
 	if (!(mult = *s == L'{')) {
 		if (proof) proofs.emplace_back();
 		strs.emplace_back();
-		//progs.push_back(prog_read(&s, proof, strs.back()));
 		raw.push_back(prog_read(&s, strs.back()));
 		goto strs;
 	}
@@ -279,18 +283,20 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
 	q->fwd(add, del, 0);
-	printbdd(wcout, *q, add);
+	progs.push_back(q);
+	printbdd(wcout, progs.size()-1, add);
 	delete q;
 	return true;
 }
 
 bool driver::pfp(bool pr) {
+	size_t sz = progs.size();
 	pfp(progs[0], pr ? &proofs[0] : 0);
-	for (size_t n = 1; n != progs.size(); ++n) {
+	for (size_t n = 1; n != sz; ++n) {
 		progs[n]->db = progs[n-1]->db;
 		if (!pfp(progs[n], pr ? &proofs[n] : 0)) return false;
 	}
-	return printdb(wcout, progs.back()), true;
+	return printdb(wcout, progs.size()-1), true;
 }
 
 int main(int argc, char** argv) {
