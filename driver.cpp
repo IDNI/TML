@@ -23,14 +23,15 @@ using namespace std;
 #define comma_expected "',' or ')' expected\n"
 //#define dot_after_q "expected '.' after query.\n"
 //#define if_expected "'if' or '.' expected\n"
-#define dot_expected "'.' expected."
-#define sep_expected "Term or ':-' or '.' expected\n"
+#define dot_expected "'.' expected.\n"
+#define sep_expected "Term or ':-' or '.' expected.\n"
 #define unmatched_quotes "Unmatched \"\n"
 #define err_inrel "Unable to read the input relation symbol.\n"
 #define err_src "Unable to read src file.\n"
 #define err_dst "Unable to read dst file.\n"
-#define err_quotes "expected \"."
-#define err_dots "two consecutive dots, or dot in beginning of document."
+#define err_quotes "expected \".\n"
+#define err_dots "two consecutive dots, or dot in beginning of document.\n"
+#define err_quote "' should come before and after a single character only.\n";
 
 wstring file_read_text(FILE *f);
 wstring file_read_text(wstring fname);
@@ -219,7 +220,6 @@ void driver::progs_read(wstr s, bool proof) {
 		if (*s == L'{') {
 			if (proof) proofs.emplace_back();
 			strs.emplace_back();
-			//progs.push_back(prog_read(&++s, proof, strs.back()));
 			raw.push_back(prog_read(&++s, strs.back()));
 		}
 		while (iswspace(*s)) ++s;

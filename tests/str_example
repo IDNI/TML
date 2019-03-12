@@ -1,4 +1,5 @@
 @in "abcd".
+e a 'a' 1.
 e v1 v2.
 e v2 v1.
 e ?x ?y :- e ?x ?z, e ?z ?y.

@@ -1,11 +1,9 @@
 {
-	@in "abcd".
-#	@inf <a.b>.
-	e 1 2.
-	e 2 3.
-	e 3 4.
-	e 4 5.
-	e 5 1.
+	e v1 v2.
+	e v2 v3.
+	e v3 v4.
+	e v4 v5.
+	e v5 v1.
 	e ?x ?y :- e ?x ?z, e ?z ?y.
 }
 {

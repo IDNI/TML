@@ -23,7 +23,7 @@ class driver {
 	matrix rule_read(wstr *s); // read raw rule (no bdd)
 	std::vector<lp*> progs;
 	std::vector<std::set<matrix>> proofs;
-	bool mult;
+	bool mult = false;
 public:
 	driver();
 	std::set<matrix> prog_read(wstr *s, std::map<int_t, std::wstring>&strs);
