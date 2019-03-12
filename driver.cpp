@@ -95,7 +95,8 @@ wostream& driver::printbdd(wostream& os, const matrix& t, size_t prog) const {
 				else ss << L'[' << k << L"] ";
 		} else
 			ss << dict_get(v[0]) << ' ' << v[1] - syms.size()
-			<< " '" << (wchar_t)v[2] << "' " << v[3] - syms.size();
+			<< " '" << (wchar_t)(v[2] - syms.size())
+			<< "' " << v[3] - syms.size();
 		s.emplace(ss.str());
 	}
 	for (auto& x : s) os << x << endl;

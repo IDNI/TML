@@ -173,7 +173,6 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	for (auto x : m) if (x.second >= ar) prf[1].push_back(x.first);
 	for (i = 0; i < bd.size(); ++i) veccat(prf[0], v[i+1]);
 	proof->emplace(prf);
-//	wcout <<"r:"<<endl << v << endl <<"p:"<<endl<< prf << endl;
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s, set<size_t>* p)
