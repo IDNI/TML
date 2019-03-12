@@ -211,10 +211,12 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 	for (term& v : r) v = term(ar, 0);
 	size_t n = s.size(), i, b;
 	while (n--)
-		for (i = 0; i != ar; ++i)
+		for (i = 0; i != ar; ++i) {
 			for (b = 0; b != bits; ++b)
 				if (s[n][i * bits + b])
 					r[n][i] |= 1 << (bits - b - 1);
+			if (r[n][i] == pad) break;
+		}
 	return r;
 }
 

@@ -13,18 +13,29 @@
 #include <string>
 #include <cstring>
 #include <sstream>
-#include <iostream>
 #include <vector>
 #include "input.h"
 using namespace std;
 
-wstring file_read_text(FILE *f);
-wstring file_read_text(wstring fname);
-
-wostream& operator<<(wostream& os, const lexeme& l) {
-	for (cws s = l[0]; s != l[1]; ++s) os << *s;
-	return os;
-}
+#define dot_expected "'.' expected.\n"
+#define sep_expected "Term or ':-' or '.' expected.\n"
+#define unmatched_quotes "Unmatched \"\n"
+#define err_inrel "Unable to read the input relation symbol.\n"
+#define err_src "Unable to read src file.\n"
+#define err_dst "Unable to read dst file.\n"
+#define err_quotes "expected \".\n"
+#define err_dots "two consecutive dots, or dot in beginning of document.\n"
+#define err_quote "' should come before and after a single character only.\n"
+#define err_fname "malformed filename.\n"
+#define err_directive_arg "invalid directive argument.\n"
+#define err_escape "invalid escaped character\n"
+#define err_int "malformed int.\n"
+#define err_lex "lexer error (please report as a bug).\n"
+#define err_parse "parser error (please report as a bug).\n"
+#define err_chr "unexpected character.\n"
+#define err_body "rules' body expected.\n"
+#define err_term_or_dot "term or dot expected.\n"
+#define err_close_curly "'}' expected.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -49,7 +60,7 @@ lexeme lex(pcws s) {
 		if (*++*s == L'-') return ++*s, lexeme{ *s-2, *s };
 		else er(err_chr);
 	}
-	if (wcschr(L".,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (**s == L'?' || **s == L'-') ++*s;
 	while (iswalnum(**s)) ++*s;
 	return { t, *s };
@@ -64,23 +75,15 @@ lexemes prog_lex(cws s) {
 	return r;
 }
 
-struct directive {
-	lexeme rel, arg;
-	bool fname;
-	bool parse(const lexemes& l, size_t& pos) {
-		if (*l[pos][0] != '@') return false;
-		rel = l[++pos];
-		if (*l[pos++][0] == L'<') fname = true;
-		else if (*l[pos][0] == L'"') fname = false;
-		else er(err_directive_arg);
-		arg = l[pos++];
-		if (*l[pos++][0] != '.') er(dot_expected);
-		return true;
-	}
-};
-
-wostream& operator<<(wostream& os, const directive& d) {
-	return os << d.rel << ' ' << d.arg;
+bool directive::parse(const lexemes& l, size_t& pos) {
+	if (*l[pos][0] != '@') return false;
+	rel = l[++pos];
+	if (*l[pos++][0] == L'<') fname = true;
+	else if (*l[pos][0] == L'"') fname = false;
+	else er(err_directive_arg);
+	arg = l[pos++];
+	if (*l[pos++][0] != '.') er(dot_expected);
+	return true;
 }
 
 int_t get_int_t(cws from, cws to) {
@@ -94,66 +97,92 @@ int_t get_int_t(cws from, cws to) {
 	return neg ? -r : r;
 }
 
-struct elem {
-	enum etype { SYM, NUM, CHR, VAR } type;
-	int_t num;
-	lexeme e;
-	bool parse(const lexemes& l, size_t& pos) {
-		if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0]))
-			return false;
-		e = l[pos];
-		if (*l[pos][0] == L'\'') {
-			if (l[pos][1]-l[pos][0] != 3 || *(l[pos][1]-1)!=L'\'')
-				er(err_quote);
-			type = CHR;
-			e = { l[pos][0] + 1, l[pos][1]-1 };
-		} //else if (l[pos][1] - l[pos][0] != 1) er(err_lex);
-		else if (*l[pos][0] == L'?') type = VAR;
-		else if (iswalpha(*l[pos][0])) type = SYM;
-		else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
-		return ++pos, true;
+bool elem::parse(const lexemes& l, size_t& pos) {
+	if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0]))
+		return false;
+	e = l[pos];
+	if (*l[pos][0] == L'\'') {
+		if (l[pos][1]-l[pos][0] != 3 || *(l[pos][1]-1)!=L'\'')
+			er(err_quote);
+		type = CHR;
+		e = { l[pos][0] + 1, l[pos][1]-1 };
+	} //else if (l[pos][1] - l[pos][0] != 1) er(err_lex);
+	else if (*l[pos][0] == L'?') type = VAR;
+	else if (iswalpha(*l[pos][0])) type = SYM;
+	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
+	return ++pos, true;
+}
+
+bool raw_term::parse(const lexemes& l, size_t& pos) {
+	if ((neg = *l[pos][0] == L'~')) ++pos;
+	while (!wcschr(L".:,", *l[pos][0])) {
+		elem m;
+		if (!m.parse(l, pos)) return false;
+		e.push_back(m);
 	}
-};
+	return true;
+}
+
+bool raw_rule::parse(const lexemes& l, size_t& pos) {
+	if (!h.parse(l, pos)) return false;
+	if (*l[pos][0] == '.') return ++pos, true;
+	if (*l[pos++][0] != ':') er(err_chr);
+	raw_term t;
+	while (t.parse(l, pos)) {
+		b.push_back(t);
+		if (*l[pos][0] == '.') return ++pos, true;
+		if (*l[pos][0] != ',') er(err_term_or_dot);
+		++pos, t.e.clear();
+	}
+	er(err_body);
+}
+
+bool raw_prog::parse(const lexemes& l, size_t& pos) {
+	while (pos < l.size() && *l[pos][0] != L'}') {
+		directive x;
+		raw_rule y;
+		if (x.parse(l, pos)) d.push_back(x);
+		else if (y.parse(l, pos)) r.push_back(y);
+		else return false;
+	}
+	return true;
+}
+
+bool raw_progs::parse(const lexemes& l, size_t& pos) {
+	if (*l[pos][0] != L'{') {
+		raw_prog x;
+		if (!x.parse(l, pos)) return false;
+		return p.push_back(x), true;
+	}
+	do {
+		++pos;
+		raw_prog x;
+		if (!x.parse(l, pos)) return false;
+		p.push_back(x);
+		if (*l[pos++][0] != L'}') er(err_close_curly);
+	} while (pos < l.size());
+	return true;
+}
+
+wostream& operator<<(wostream& os, const lexeme& l) {
+	for (cws s = l[0]; s != l[1]; ++s) os << *s;
+	return os;
+}
+
+wostream& operator<<(wostream& os, const directive& d) {
+	return os << d.rel << ' ' << d.arg;
+}
 
 wostream& operator<<(wostream& os, const elem& e) {
 	if (e.type == elem::CHR) return os << '\'' << *e.e[0] << '\'';
 	return e.type == elem::NUM ? os << e.num : (os << e.e);
 }
 
-struct raw_term {
-	vector<elem> e;
-	bool parse(const lexemes& l, size_t& pos) {
-		while (!wcschr(L".:,", *l[pos][0])) {
-			elem m;
-			if (!m.parse(l, pos)) return false;
-			e.push_back(m);
-		}
-		return true;
-	}
-};
-
 wostream& operator<<(wostream& os, const raw_term& t) {
+	if (t.neg) os << L'~';
 	for (auto x : t.e) os << x << L' ';
 	return os;
 }
-
-struct raw_rule {
-	raw_term h;
-	vector<raw_term> b;
-	bool parse(const lexemes& l, size_t& pos) {
-		if (!h.parse(l, pos)) return false;
-		if (*l[pos][0] == '.') return ++pos, true;
-		if (*l[pos++][0] != ':') er(err_chr);
-		raw_term t;
-		while (t.parse(l, pos)) {
-			b.push_back(t);
-			if (*l[pos][0] == '.') return ++pos, true;
-			if (*l[pos][0] != ',') er(err_term_or_dot);
-			++pos;
-		}
-		er(err_body);
-	}
-};
 
 wostream& operator<<(wostream& os, const raw_rule& r) {
 	os << r.h << L" :- ";
@@ -161,32 +190,55 @@ wostream& operator<<(wostream& os, const raw_rule& r) {
 	return os << L'.';
 }
 
-struct raw_prog {
-	vector<directive> d;
-	vector<raw_rule> r;
-	bool parse(const lexemes& l, size_t& pos) {
-		while (pos < l.size()) {
-			directive x;
-			raw_rule y;
-			if (x.parse(l, pos)) d.push_back(x);
-			else if (y.parse(l, pos)) r.push_back(y);
-			else return false;
-		}
-		if (pos < l.size()) er(err_parse);
-		return true;
-	}
-};
-
 wostream& operator<<(wostream& os, const raw_prog& p) {
 	for (auto x : p.d) os << x << endl;
 	for (auto x : p.r) os << x << endl;
 	return os;
 }
 
+wostream& operator<<(wostream& os, const raw_progs& p) {
+	if (p.p.size() == 1) os << p.p[0];
+	else for (auto x : p.p) os << L'{' << endl << x << L'}' << endl;
+	return os;
+}
+
+raw_progs::raw_progs(FILE* f) {
+	wstring s = file_read_text(f);
+	size_t pos = 0;
+	parse(prog_lex(s.c_str()), pos);
+}
+
+off_t fsize(const char *fname) {
+	struct stat s;
+	return stat(fname, &s) ? 0 : s.st_size;
+}
+
+wstring file_read_text(FILE *f) {
+	wstringstream ss;
+	wchar_t buf[32], n, l, skip = 0;
+	wint_t c;
+	*buf = 0;
+next:	for (n = l = 0; n != 31; ++n)
+		if (WEOF == (c = getwc(f))) { skip = 0; break; }
+		else if (c == L'#') skip = 1;
+		else if (c == L'\r' || c == L'\n') skip = 0, buf[l++] = c;
+		else if (!skip) buf[l++] = c;
+	if (n) {
+		buf[l] = 0, ss << buf;
+		goto next;
+	} else if (skip) goto next;
+	return ss.str();
+}
+
+wstring file_read_text(wstring fname) {
+	FILE *f = fopen((const char*)fname.c_str(), "r");
+	wstring r = file_read_text(f);
+	fclose(f);
+	return r;
+}
+
 void parser_test() {
 	setlocale(LC_ALL, "");
-	wstring s = file_read_text(stdin);
-	size_t pos = 0;
-	raw_prog p;
-	wcout << p.parse(prog_lex(s.c_str()), pos) << endl << p << endl;
+	wcout<<raw_progs(stdin);
+	exit(0);
 }

@@ -1,4 +1,5 @@
 @in "abcd".
+@inf <dcba.txt>.
 e a 'a' 1.
 e v1 v2.
 e v2 v1.

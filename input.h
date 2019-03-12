@@ -1,28 +1,64 @@
 #include "defs.h"
 #include <vector>
 #include <array>
-
-#define dot_expected "'.' expected.\n"
-#define sep_expected "Term or ':-' or '.' expected.\n"
-#define unmatched_quotes "Unmatched \"\n"
-#define err_inrel "Unable to read the input relation symbol.\n"
-#define err_src "Unable to read src file.\n"
-#define err_dst "Unable to read dst file.\n"
-#define err_quotes "expected \".\n"
-#define err_dots "two consecutive dots, or dot in beginning of document.\n"
-#define err_quote "' should come before and after a single character only.\n"
-#define err_fname "malformed filename.\n"
-#define err_directive_arg "invalid directive argument.\n"
-#define err_escape "invalid escaped character\n"
-#define err_int "malformed int.\n"
-#define err_lex "lexer error (please report as a bug).\n"
-#define err_parse "parser error (please report as a bug).\n"
-#define err_chr "unexpected character.\n"
-#define err_body "rules' body expected.\n"
-#define err_term_or_dot "term or dot expected.\n"
+#include <iostream>
+#include <sys/stat.h>
 
 typedef const wchar_t* cws;
 typedef cws* pcws;
 
 typedef std::array<cws, 2> lexeme;
 typedef std::vector<lexeme> lexemes;
+
+struct directive {
+	lexeme rel, arg;
+	bool fname;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+
+struct elem {
+	enum etype { SYM, NUM, CHR, VAR } type;
+	int_t num;
+	lexeme e;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+
+struct raw_term {
+	bool neg;
+	std::vector<elem> e;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+
+struct raw_rule {
+	raw_term h;
+	std::vector<raw_term> b;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+struct raw_prog {
+	std::vector<directive> d;
+	std::vector<raw_rule> r;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+struct raw_progs {
+	std::vector<raw_prog> p;
+	raw_progs(FILE*);
+	bool parse(const lexemes& l, size_t& pos);
+};
+
+std::wostream& operator<<(std::wostream& os, const directive& d);
+std::wostream& operator<<(std::wostream& os, const elem& e);
+std::wostream& operator<<(std::wostream& os, const raw_term& t);
+std::wostream& operator<<(std::wostream& os, const raw_rule& r);
+std::wostream& operator<<(std::wostream& os, const raw_prog& p);
+std::wostream& operator<<(std::wostream& os, const lexeme& l);
+lexeme lex(pcws s);
+lexemes prog_lex(cws s);
+std::wstring file_read_text(FILE *f);
+std::wstring file_read_text(std::wstring fname);
+off_t fsize(const char *fname);
+void parser_test();
