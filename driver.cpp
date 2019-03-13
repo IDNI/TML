@@ -89,7 +89,7 @@ term driver::get_term(const raw_term& r) {
 		if (e.type == elem::NUM) t.push_back(e.num);
 		else if (e.type == elem::CHR) t.push_back(*e.e[0]);
 		else t.push_back(dict_get(e.e));
-	return term_pad(t), t;
+	return t;
 }
 
 matrix driver::get_rule(const raw_rule& r) {
@@ -99,13 +99,18 @@ matrix driver::get_rule(const raw_rule& r) {
 	return m;
 }
 
-void driver::term_pad(term& t) {
+void driver::term_pad(term& t, size_t ar) {
 	size_t l;
 	if ((l=t.size())<ar+1) t.resize(ar+1), fill(t.begin()+l, t.end(), pad);
 }
 
-void driver::rule_pad(matrix& t) { for (term& x : t) term_pad(x); }
-matrix driver::rule_pad(const matrix& t) { matrix r; rule_pad(r=t); return r; }
+void driver::rule_pad(matrix& t, size_t ar) { for (term& x:t) term_pad(x, ar); }
+
+matrix driver::rule_pad(const matrix& t, size_t ar) {
+	matrix r;
+	rule_pad(r = t, ar);
+	return r;
+}
 
 driver::driver(FILE *f, bool proof) {
 	syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad;
@@ -133,46 +138,36 @@ driver::driver(FILE *f, bool proof) {
 		}
 		set<matrix> s;
 		for (auto x : rp.p[n].r) {
-			ar = max(ar, x.h.e.size());
 			for (auto e:x.h.e) if (e.type==elem::SYM) dict_get(e.e);
-			for (auto y : x.b) {
-				ar = max(ar, y.e.size());
+			for (auto y : x.b)
 				for (auto e:y.e)
 					if (e.type==elem::SYM) dict_get(e.e);
-			}
 		}
 	}
-	++ar;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
-		progs.emplace_back(new lp(dict_bits(), ar, nsyms())),
+		set<matrix> m;
 		proofs.emplace_back();
-		for (auto x : strs[n])
-			for (int_t n = 0; n != (int_t)x.second.size(); ++n)
-				progs.back()->rule_add(rule_pad({{ 1, x.first,
-					n+(int_t)syms.size(),
-					x.second[n]+(int_t)syms.size(),
-					n+(int_t)syms.size()+1 }}));
-		for (auto x : rp.p[n].r)
-			progs.back()->rule_add(get_rule(x),
-				proof ? &proofs.back() : 0);
+		for (auto x : rp.p[n].r) m.insert(get_rule(x));
+		prog_add(move(m), strs[n], proof ? &proofs.back() : 0);
 	}
 }
 
-lp* driver::prog_create(set<matrix> rules, bool proof) {
-	size_t ar = 0, l;
-	for (const matrix& t : rules)
-		for (const term& x : t)
-			ar = max(ar, x.size() - 1);
-	lp *p = new lp(dict_bits(), ar, nsyms());
-	while (!rules.empty()) {
-		matrix t = *rules.begin();
-		rules.erase(rules.begin());
-		for (term& x : t)
-			if ((l = x.size()) < ar+1) x.resize(ar+1),
-				fill(x.begin() + l, x.end(), pad);
-		p->rule_add(t, proof ? &proofs.back() : 0);
+void driver::prog_add(set<matrix> m, const map<int_t, wstring>& s,
+	set<matrix>* proof) {
+	size_t ar = 0;
+	for (const matrix& x : m) for (const term& y : x) ar=max(ar,y.size()-1);
+	progs.emplace_back(new lp(dict_bits(), ar, nsyms()));
+	for (auto x : s)
+		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
+			progs.back()->rule_add(rule_pad({{ 1, x.first,
+				n+(int_t)syms.size(),
+				x.second[n]+(int_t)syms.size(),
+				n+(int_t)syms.size()+1 }}, ar), proof);
+	while (!m.empty()) {
+		matrix x = move(*m.begin());
+		m.erase(m.begin());
+		progs.back()->rule_add(rule_pad(move(x), ar), proof);
 	}
-	return p;
 }
 
 bool driver::pfp(lp *p, set<matrix>* proof) {
@@ -190,11 +185,12 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 		}
 	}
 	if (!proof) return true;
-	lp *q = prog_create(move(*proof), false);
+	strs.emplace_back();
+	prog_add(move(*proof), strs.back(), 0);
+	lp *q = progs.back();
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
 	q->fwd(add, del, 0);
-	progs.push_back(q), strs.emplace_back();
 	printbdd(wcout, progs.size()-1, add);
 	delete q;
 	return true;
@@ -207,7 +203,7 @@ bool driver::pfp(bool pr) {
 		progs[n]->db = progs[n-1]->db;
 		if (!pfp(progs[n], pr ? &proofs[n] : 0)) return false;
 	}
-	return printdb(wcout, progs.size()-1), true;
+	return printdb(wcout, sz - 1), true;
 }
 
 int main(int argc, char** argv) {

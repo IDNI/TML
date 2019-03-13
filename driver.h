@@ -21,18 +21,18 @@ class driver {
 	size_t dict_bits() const { return msb(nsyms()-1); }
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
-	void term_pad(term& t);
-	void rule_pad(matrix& t);
-	matrix rule_pad(const matrix& t);
+	void term_pad(term& t, size_t ar);
+	void rule_pad(matrix& t, size_t ar);
+	matrix rule_pad(const matrix& t, size_t ar);
 	std::vector<lp*> progs;
 	std::vector<std::set<matrix>> proofs;
 	bool mult = false;
 	int_t nums = 0;
-	size_t ar = 0;
 public:
 	driver(FILE *f, bool proof);
 	void progs_read(wstr s, bool proof);
-	lp* prog_create(std::set<matrix> m, bool proof);
+	void prog_add(std::set<matrix> m,
+		const std::map<int_t,std::wstring>& s, std::set<matrix>* proof);
 	bool pfp(lp *p, std::set<matrix>* proof);
 	bool pfp(bool proof);
 	std::wostream& printbdd(std::wostream& os, size_t prog, size_t t) const;

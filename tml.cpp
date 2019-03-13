@@ -168,8 +168,8 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
 	matrix prf;
-	prf.resize(2), prf[0].push_back(1),
-	prf[1].push_back(1), veccat(prf[0], v[0]), veccat(prf[1], v[0]);
+	prf.resize(2), prf[0].push_back(1), prf[1].push_back(1),
+	veccat(prf[0], v[0]), veccat(prf[1], v[0]);
 	for (auto x : m) if (x.second >= ar) prf[1].push_back(x.first);
 	for (i = 0; i < bd.size(); ++i) veccat(prf[0], v[i+1]);
 	proof->emplace(prf);
