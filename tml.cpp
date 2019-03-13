@@ -171,7 +171,10 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	prf.resize(2), prf[0].push_back(1), prf[1].push_back(1),
 	veccat(prf[0], v[0]), veccat(prf[1], v[0]);
 	for (auto x : m) if (x.second >= ar) prf[1].push_back(x.first);
-	for (i = 0; i < bd.size(); ++i) veccat(prf[0], v[i+1]);
+	for (i = 0; i != bd.size(); ++i) veccat(prf[0], v[i+1]);
+	for (i = 0; i != prf.size(); ++i)
+		for (j = 0; j != prf[i].size(); ++j)
+			if (!prf[i][j]) prf[i].erase(prf[i].begin() + j--);
 	proof->emplace(prf);
 }
 

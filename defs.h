@@ -5,6 +5,7 @@ typedef std::vector<int_t> term;
 typedef std::vector<term> matrix;// set of relational terms
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+std::wostream& operator<<(std::wostream& os, const matrix& m);
 //#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x

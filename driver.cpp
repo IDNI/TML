@@ -144,7 +144,7 @@ driver::driver(FILE *f, bool proof) {
 			for (auto e:x.h.e) if (e.type==elem::SYM) dict_get(e.e);
 			for (auto y : x.b) {
 				ar = max(ar, y.e.size());
-				for (auto e:y.e)
+				for (auto e : y.e)
 					if (e.type==elem::SYM) dict_get(e.e);
 			}
 		}
@@ -163,8 +163,8 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
-				n+(int_t)syms.size(),
-				x.second[n]+(int_t)syms.size(),
+				n + (int_t)syms.size(),
+				x.second[n] + (int_t)syms.size(),
 				n+(int_t)syms.size()+1 }}, ar), proof);
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
@@ -191,7 +191,8 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	strs.emplace_back();
 	size_t ar = 0;
 	for (const matrix& x : *proof)
-		for (const term& y : x) ar = max(ar,y.size()-1);
+		for (const term& y : x) ar = max(ar, y.size() - 1);
+	//for (const matrix& x : *proof) wcout << x << endl;
 	prog_add(move(*proof), ar, strs.back(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
