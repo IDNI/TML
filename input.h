@@ -16,7 +16,6 @@ struct directive {
 	bool parse(const lexemes& l, size_t& pos);
 };
 
-
 struct elem {
 	enum etype { SYM, NUM, CHR, VAR } type;
 	int_t num;

@@ -36,6 +36,7 @@ using namespace std;
 #define err_body "rules' body expected.\n"
 #define err_term_or_dot "term or dot expected.\n"
 #define err_close_curly "'}' expected.\n"
+#define err_fnf "file not found.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -46,11 +47,11 @@ lexeme lex(pcws s) {
 			if (!**s) er(unmatched_quotes);
 			else if (**s == L'\'' && !wcschr(L"\\\"", *++*s))
 				er(err_escape);
-		return { t, ++*s };
+		return { t, (*s)++ };
 	}
 	if (**s == L'<') {
 		while (*++*s != L'>') if (!**s) er(err_fname);
-		return { t, ++*s };
+		return { t, (*s)++ };
 	}
 	if (**s == L'\'') {
 		if (*(*s + 2) != L'\'') er(err_quote);
@@ -213,8 +214,10 @@ next:	for (n = l = 0; n != 31; ++n)
 	return ss.str();
 }
 
-wstring file_read_text(wstring fname) {
-	FILE *f = fopen((const char*)fname.c_str(), "r");
+wstring file_read_text(wstring wfname) {
+	string fname(wfname.begin(), wfname.end());
+	FILE *f = fopen(fname.c_str(), "r");
+	if (!f) er(err_fnf);
 	wstring r = file_read_text(f);
 	fclose(f);
 	return r;

@@ -40,7 +40,7 @@ wostream& driver::printdb(wostream& os, size_t prog) const {
 
 pair<cws, size_t> driver::dict_get(int_t t) const {
 	static wchar_t str_nums[20];
-	if (t >= nums) return { syms[t], lens[t] };
+	if (t >= nums) return { syms[t - nums], lens[t - nums] };
 	wcscpy(str_nums, to_wstring(t).c_str());
 	return { str_nums, wcslen(str_nums) };
 }
@@ -118,9 +118,9 @@ driver::driver(FILE *f, bool proof) {
 			wstring str;
 			nums = max(nums, (int_t)256);
 			if (d.fname) {
-				wstring fname(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
-				nums = max(nums,
-				(int_t)fsize((const char*)fname.c_str()));
+				wstring wfname(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
+				string fname(wfname.begin(), wfname.end());
+				nums = max(nums, (int_t)fsize(fname.c_str()));
 			} else nums = max(nums, d.arg[1]-d.arg[0]);
 		}
 	}
@@ -212,7 +212,7 @@ bool driver::pfp(bool pr) {
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, ""), tml_init();
-	parser_test();
+	//parser_test();
 	bool proof = argc == 2 && !strcmp(argv[1], "-p");
 	driver d(stdin, proof);
 	if (!d.pfp(proof)) wcout << "unsat" << endl;
