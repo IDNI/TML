@@ -31,7 +31,7 @@ class driver {
 public:
 	driver(FILE *f, bool proof);
 	void progs_read(wstr s, bool proof);
-	void prog_add(std::set<matrix> m,
+	void prog_add(std::set<matrix> m, size_t ar,
 		const std::map<int_t,std::wstring>& s, std::set<matrix>* proof);
 	bool pfp(lp *p, std::set<matrix>* proof);
 	bool pfp(bool proof);

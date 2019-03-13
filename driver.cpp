@@ -129,8 +129,10 @@ driver::driver(FILE *f, bool proof) {
 			} else nums = max(nums, d.arg[1]-d.arg[0]);
 		}
 	}
+	size_t ar = 0;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
+			ar = max(ar, (size_t)4);
 			const directive& d = rp.p[n].d[k];
 			wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
 			strs[n].emplace(dict_get(d.rel), d.fname ?
@@ -138,24 +140,25 @@ driver::driver(FILE *f, bool proof) {
 		}
 		set<matrix> s;
 		for (auto x : rp.p[n].r) {
+			ar = max(ar, x.h.e.size());
 			for (auto e:x.h.e) if (e.type==elem::SYM) dict_get(e.e);
-			for (auto y : x.b)
+			for (auto y : x.b) {
+				ar = max(ar, y.e.size());
 				for (auto e:y.e)
 					if (e.type==elem::SYM) dict_get(e.e);
+			}
 		}
 	}
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		set<matrix> m;
 		proofs.emplace_back();
 		for (auto x : rp.p[n].r) m.insert(get_rule(x));
-		prog_add(move(m), strs[n], proof ? &proofs.back() : 0);
+		prog_add(move(m), ar, strs[n], proof ? &proofs.back() : 0);
 	}
 }
 
-void driver::prog_add(set<matrix> m, const map<int_t, wstring>& s,
+void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	set<matrix>* proof) {
-	size_t ar = 0;
-	for (const matrix& x : m) for (const term& y : x) ar=max(ar,y.size()-1);
 	progs.emplace_back(new lp(dict_bits(), ar, nsyms()));
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
@@ -186,7 +189,10 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	}
 	if (!proof) return true;
 	strs.emplace_back();
-	prog_add(move(*proof), strs.back(), 0);
+	size_t ar = 0;
+	for (const matrix& x : *proof)
+		for (const term& y : x) ar = max(ar,y.size()-1);
+	prog_add(move(*proof), ar, strs.back(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
