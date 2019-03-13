@@ -1,3 +1,4 @@
+#grammar: S -> SS|b
 @str "bb".
 ?a S ?b :- ?a S ?c, ?c S ?b.
 ?a S ?b :- str ?a 'b' ?b.
