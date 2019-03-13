@@ -72,10 +72,8 @@ wostream& driver::printbdd(wostream& os, const matrix& t, size_t prog) const {
 				else if ((size_t)k<(size_t)nsyms())
 					ss<<dict_get(k)<<L' ';
 				else ss << L'[' << k << L"] ";
-		} else
-			ss << dict_get(v[0]) << ' ' << v[1] - syms.size()
-			<< " '" << (wchar_t)(v[2] - syms.size())
-			<< "' " << v[3] - syms.size();
+		} else	ss << dict_get(v[0]) << ' ' << v[1]
+			<< " '" << (wchar_t)v[2] << "' " << v[3];
 		s.emplace(ss.str());
 	}
 	for (auto& x : s) os << x << endl;
@@ -134,7 +132,7 @@ driver::driver(FILE *f, bool proof) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
 			ar = max(ar, (size_t)4);
 			const directive& d = rp.p[n].d[k];
-			wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
+			wstring str(d.arg[0] + 1, d.arg[1] - d.arg[0] - 1);
 			strs[n].emplace(dict_get(d.rel), d.fname ?
 				file_read_text(str) : str);
 		}
@@ -163,9 +161,9 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
-				n + (int_t)syms.size(),
+				n + 1/*(int_t)syms.size()*/,
 				x.second[n] + (int_t)syms.size(),
-				n+(int_t)syms.size()+1 }}, ar), proof);
+				n+2/*(int_t)syms.size()+1*/ }}, ar), proof);
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
 		m.erase(m.begin());
@@ -177,15 +175,12 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	set<size_t> pr;
 	size_t d, add, del, t;
 	for (set<int_t> s;;) {
-		add = del = F;
-		s.emplace(d = p->db), p->fwd(add, del, proof ? &pr : 0);
+		add=del=F, s.emplace(d = p->db), p->fwd(add, del, proof?&pr:0);
 		if ((t = bdd_and_not(add, del)) == F && add != F)
 			p->db = F; // detect contradiction
 		else p->db = bdd_or(bdd_and_not(p->db, del), t);
-		if (s.find(p->db) != s.end()) {
-			if (d != p->db) return false;
-			break;
-		}
+		if (d == p->db) break;
+		if (s.find(p->db) != s.end()) return false;
 	}
 	if (!proof) return true;
 	strs.emplace_back();
