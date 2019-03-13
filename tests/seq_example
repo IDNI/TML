@@ -1,11 +1,11 @@
-{
+#{
 	e v1 v2.
 	e v2 v3.
 	e v3 v4.
 	e v4 v5.
 	e v5 v1.
 	e ?x ?y :- e ?x ?z, e ?z ?y.
-}
-{
-	~e ?x ?x :- e ?x ?x.
-}
+#}
+#{
+#	~e ?x ?x :- e ?x ?x.
+#}

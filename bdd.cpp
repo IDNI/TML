@@ -60,21 +60,21 @@ size_t bdd_add(const node& n) { // create new bdd node,standard implementation
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
 
-void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) {
+void sat(size_t v, size_t nvars, node n, bools& p, vbools& r, size_t mod) {
 	if (nleaf(n) && !ntrueleaf(n)) return;
 	if (v < n[0])
-		p[v-1] = true,  sat(v + 1, nvars, n, p, r),
-		p[v-1] = false, sat(v + 1, nvars, n, p, r);
+		p[v-1] = true,  sat(v + 1, nvars, n, p, r, mod),
+		p[v-1] = false, sat(v + 1, nvars, n, p, r, mod);
 	else if (v != nvars+1)
-		p[v-1] = true,  sat(v + 1, nvars, getnode(n[1]), p, r),
-		p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, r);
+		p[v-1] = true,  sat(v + 1, nvars, getnode(n[1]), p, r, mod),
+		p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, r, mod);
 	else	r.push_back(p);
 }
 
-vbools allsat(size_t x, size_t nvars) {
+vbools allsat(size_t x, size_t nvars, size_t mod) {
 	bools p(nvars);
 	vbools r;
-	return sat(1, nvars, getnode(x), p, r), r;
+	return sat(1, nvars, getnode(x), p, r, mod), r;
 }
 
 size_t bdd_or(size_t x, size_t y) {

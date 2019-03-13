@@ -47,7 +47,6 @@ struct raw_prog {
 struct raw_progs {
 	std::vector<raw_prog> p;
 	raw_progs(FILE*);
-	bool parse(const lexemes& l, size_t& pos);
 };
 
 std::wostream& operator<<(std::wostream& os, const directive& d);

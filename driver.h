@@ -21,6 +21,9 @@ class driver {
 	size_t dict_bits() const { return msb(nsyms()-1); }
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
+	void term_pad(term& t);
+	void rule_pad(matrix& t);
+	matrix rule_pad(const matrix& t);
 	std::vector<lp*> progs;
 	std::vector<std::set<matrix>> proofs;
 	bool mult = false;
@@ -37,7 +40,7 @@ public:
 		size_t prog) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
 	std::wostream& printdb(std::wostream& os, size_t prog) const;
-	~driver() { for (lp* p : progs) delete p; }
+	~driver() {}// for (lp* p : progs) delete p; }
 };
 
 #ifdef DEBUG

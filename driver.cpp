@@ -55,7 +55,6 @@ int_t driver::dict_get(cws s, size_t len) {
 	}
 	auto it = syms_dict.find({s, len});
 	if (it != syms_dict.end()) return it->second;
-	assert(!nums);
 	return	syms.push_back(s), lens.push_back(len), syms_dict[{s,len}] =
 		syms.size() - 1 + nums;
 }
@@ -90,7 +89,7 @@ term driver::get_term(const raw_term& r) {
 		if (e.type == elem::NUM) t.push_back(e.num);
 		else if (e.type == elem::CHR) t.push_back(*e.e[0]);
 		else t.push_back(dict_get(e.e));
-	return t.push_back(pad), t;
+	return term_pad(t), t;
 }
 
 matrix driver::get_rule(const raw_rule& r) {
@@ -99,6 +98,14 @@ matrix driver::get_rule(const raw_rule& r) {
 	for (auto x : r.b) m.push_back(get_term(x));
 	return m;
 }
+
+void driver::term_pad(term& t) {
+	size_t l;
+	if ((l=t.size())<ar+1) t.resize(ar+1), fill(t.begin()+l, t.end(), pad);
+}
+
+void driver::rule_pad(matrix& t) { for (term& x : t) term_pad(x); }
+matrix driver::rule_pad(const matrix& t) { matrix r; rule_pad(r=t); return r; }
 
 driver::driver(FILE *f, bool proof) {
 	syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad;
@@ -141,10 +148,10 @@ driver::driver(FILE *f, bool proof) {
 		proofs.emplace_back();
 		for (auto x : strs[n])
 			for (int_t n = 0; n != (int_t)x.second.size(); ++n)
-				progs.back()->rule_add(matrix{{ 1, x.first,
+				progs.back()->rule_add(rule_pad({{ 1, x.first,
 					n+(int_t)syms.size(),
 					x.second[n]+(int_t)syms.size(),
-					n+(int_t)syms.size()+1, pad }});
+					n+(int_t)syms.size()+1 }}));
 		for (auto x : rp.p[n].r)
 			progs.back()->rule_add(get_rule(x),
 				proof ? &proofs.back() : 0);
@@ -187,7 +194,7 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
 	q->fwd(add, del, 0);
-	progs.push_back(q);
+	progs.push_back(q), strs.emplace_back();
 	printbdd(wcout, progs.size()-1, add);
 	delete q;
 	return true;
@@ -205,7 +212,7 @@ bool driver::pfp(bool pr) {
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, ""), tml_init();
-	//parser_test();
+	parser_test();
 	bool proof = argc == 2 && !strcmp(argv[1], "-p");
 	driver d(stdin, proof);
 	if (!d.pfp(proof)) wcout << "unsat" << endl;

@@ -69,20 +69,16 @@ lexeme lex(pcws s) {
 lexemes prog_lex(cws s) {
 	lexeme l;
 	lexemes r;
-	do {
-		if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l);
-	} while (*s);
+	do { if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l); } while (*s);
 	return r;
 }
 
 bool directive::parse(const lexemes& l, size_t& pos) {
 	if (*l[pos][0] != '@') return false;
-	rel = l[++pos];
-	if (*l[pos++][0] == L'<') fname = true;
+	if (rel = l[++pos], *l[++pos][0] == L'<') fname = true;
 	else if (*l[pos][0] == L'"') fname = false;
 	else er(err_directive_arg);
-	arg = l[pos++];
-	if (*l[pos++][0] != '.') er(dot_expected);
+	if (arg = l[pos++], *l[pos++][0] != '.') er(dot_expected);
 	return true;
 }
 
@@ -98,16 +94,11 @@ int_t get_int_t(cws from, cws to) {
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
-	if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0]))
-		return false;
-	e = l[pos];
-	if (*l[pos][0] == L'\'') {
-		if (l[pos][1]-l[pos][0] != 3 || *(l[pos][1]-1)!=L'\'')
-			er(err_quote);
-		type = CHR;
-		e = { l[pos][0] + 1, l[pos][1]-1 };
-	} //else if (l[pos][1] - l[pos][0] != 1) er(err_lex);
-	else if (*l[pos][0] == L'?') type = VAR;
+	if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0])) return false;
+	if (e = l[pos], *l[pos][0] == L'\'') {
+		if (l[pos][1]-l[pos][0]!=3||*(l[pos][1]-1)!=L'\'')er(err_quote);
+		type = CHR, e = { l[pos][0] + 1, l[pos][1]-1 };
+	} else if (*l[pos][0] == L'?') type = VAR;
 	else if (iswalpha(*l[pos][0])) type = SYM;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, true;
@@ -129,8 +120,7 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	if (*l[pos++][0] != ':') er(err_chr);
 	raw_term t;
 	while (t.parse(l, pos)) {
-		b.push_back(t);
-		if (*l[pos][0] == '.') return ++pos, true;
+		if (b.push_back(t), *l[pos][0] == '.') return ++pos, true;
 		if (*l[pos][0] != ',') er(err_term_or_dot);
 		++pos, t.e.clear();
 	}
@@ -148,20 +138,19 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 	return true;
 }
 
-bool raw_progs::parse(const lexemes& l, size_t& pos) {
+raw_progs::raw_progs(FILE* f) {
+	wstring s = file_read_text(f);
+	size_t pos = 0;
+	lexemes l = prog_lex(wcsdup(s.c_str()));
 	if (*l[pos][0] != L'{') {
 		raw_prog x;
-		if (!x.parse(l, pos)) return false;
-		return p.push_back(x), true;
-	}
-	do {
-		++pos;
-		raw_prog x;
-		if (!x.parse(l, pos)) return false;
+		if (!x.parse(l, pos)) er(err_parse);
 		p.push_back(x);
-		if (*l[pos++][0] != L'}') er(err_close_curly);
+	} else do {
+		raw_prog x;
+		if (++pos, !x.parse(l, pos)) er(err_parse);
+		if (p.push_back(x), *l[pos++][0] != L'}') er(err_close_curly);
 	} while (pos < l.size());
-	return true;
 }
 
 wostream& operator<<(wostream& os, const lexeme& l) {
@@ -200,12 +189,6 @@ wostream& operator<<(wostream& os, const raw_progs& p) {
 	if (p.p.size() == 1) os << p.p[0];
 	else for (auto x : p.p) os << L'{' << endl << x << L'}' << endl;
 	return os;
-}
-
-raw_progs::raw_progs(FILE* f) {
-	wstring s = file_read_text(f);
-	size_t pos = 0;
-	parse(prog_lex(s.c_str()), pos);
 }
 
 off_t fsize(const char *fname) {
