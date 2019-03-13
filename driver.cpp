@@ -41,7 +41,7 @@ wostream& driver::printdb(wostream& os, size_t prog) const {
 pair<cws, size_t> driver::dict_get(int_t t) const {
 	static wchar_t str_nums[20];
 	if (t >= nums) return { syms[t - nums], lens[t - nums] };
-	wcscpy(str_nums, to_wstring(t).c_str());
+	wcscpy(str_nums, to_wstring(t-1).c_str());
 	return { str_nums, wcslen(str_nums) };
 }
 
@@ -72,8 +72,8 @@ wostream& driver::printbdd(wostream& os, const matrix& t, size_t prog) const {
 				else if ((size_t)k<(size_t)nsyms())
 					ss<<dict_get(k)<<L' ';
 				else ss << L'[' << k << L"] ";
-		} else	ss << dict_get(v[0]) << ' ' << v[1]
-			<< " '" << (wchar_t)v[2] << "' " << v[3];
+		} else	ss << dict_get(v[0]) << ' ' << v[1] - 1 <<
+			" '" << (wchar_t)v[2] << "' " << v[3] - 1;
 		s.emplace(ss.str());
 	}
 	for (auto& x : s) os << x << endl;
@@ -162,7 +162,7 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
 				n + 1/*(int_t)syms.size()*/,
-				x.second[n] + (int_t)syms.size(),
+				x.second[n],// + (int_t)syms.size(),
 				n+2/*(int_t)syms.size()+1*/ }}, ar), proof);
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
