@@ -55,7 +55,7 @@ int_t driver::dict_get(cws s, size_t len) {
 	auto it = syms_dict.find({s, len});
 	if (it != syms_dict.end()) return it->second;
 	return	syms.push_back(s), lens.push_back(len), syms_dict[{s,len}] =
-		syms.size() - 1 + nums;
+		syms.size() + nums - 1;
 }
 
 int_t driver::dict_get(const lexeme& l) { return dict_get(l[0], l[1]-l[0]); }
@@ -66,7 +66,7 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 		wstringstream ss;
 		for (auto k : v)
 			if (k == pad) ss << L"* ";
-			else if((size_t)k<(size_t)nsyms())ss<<dict_get(k)<<L' ';
+			else if((size_t)k < nsyms())ss<<dict_get(k)<<L' ';
 			else ss << L'[' << k << L"] ";
 		s.emplace(ss.str());
 	}
@@ -120,7 +120,7 @@ driver::driver(FILE *f, bool proof) {
 		}
 	}
 	static wstr spad;
-	pad = dict_get(spad, 0);
+	pad = dict_get(spad, 0), syms.push_back(0), lens.push_back(0);
 	size_t ar = 0;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
@@ -179,7 +179,7 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	size_t ar = 0;
 	for (const matrix& x : *proof)
 		for (const term& y : x) ar = max(ar, y.size() - 1);
-	//for (const matrix& x : *proof) wcout << x << endl;
+	for (const matrix& x : *proof) wcout << x << endl;
 	prog_add(move(*proof), ar, strs.back(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
