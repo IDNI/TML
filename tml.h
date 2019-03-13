@@ -15,7 +15,6 @@
 #include <iostream>
 #include "bdd.h"
 
-const int_t pad = 0;
 void tml_init();
 
 template<> struct std::hash<std::pair<size_t, bools>> {
@@ -40,3 +39,4 @@ public:
 
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
 std::wostream& out(std::wostream& os, size_t n);
+extern int_t pad;

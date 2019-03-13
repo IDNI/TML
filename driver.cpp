@@ -28,24 +28,23 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	return os;
 }
 
-wostream& driver::printbdd(wostream& os, size_t prog, size_t t) const {
-	return printbdd(os, progs[prog]->getbdd(t), prog);
-}
 wostream& driver::printbdd(wostream& os, size_t t) const {
-	return printbdd(os, progs.back()->getbdd(t), progs.size()-1);
+	return printbdd(os, progs.back()->getbdd(t));
 }
 wostream& driver::printdb(wostream& os, size_t prog) const {
-	return printbdd(os, prog, progs[prog]->db);
+	return printbdd(os, progs[prog]->db);
 }
 
 pair<cws, size_t> driver::dict_get(int_t t) const {
-	static wchar_t str_nums[20];
+	static wchar_t str_nums[20], str_chr[] = L"'a'";
 	if (t >= nums) return { syms[t - nums], lens[t - nums] };
-	wcscpy(str_nums, to_wstring(t-1).c_str());
+	if (t < 256) { str_chr[1] = t; return { str_chr, (size_t)3 }; }
+	wcscpy(str_nums, to_wstring(t-256).c_str());
 	return { str_nums, wcslen(str_nums) };
 }
 
 int_t driver::dict_get(cws s, size_t len) {
+	if (!s) return pad;
 	if (iswdigit(*s)) er("symbol name cannot begin with a digit");
 	if (*s == L'?') {
 		auto it = vars_dict.find({s, len});
@@ -61,19 +60,14 @@ int_t driver::dict_get(cws s, size_t len) {
 
 int_t driver::dict_get(const lexeme& l) { return dict_get(l[0], l[1]-l[0]); }
 
-wostream& driver::printbdd(wostream& os, const matrix& t, size_t prog) const {
+wostream& driver::printbdd(wostream& os, const matrix& t) const {
 	set<wstring> s;
 	for (auto v : t) {
 		wstringstream ss;
-		auto it = strs[prog].find(v[0]);
-		if (it == strs[prog].end()) {
-			for (auto k : v)
-				if (k == pad) ss << L"* ";
-				else if ((size_t)k<(size_t)nsyms())
-					ss<<dict_get(k)<<L' ';
-				else ss << L'[' << k << L"] ";
-		} else	ss << dict_get(v[0]) << ' ' << v[1] - 1 <<
-			" '" << (wchar_t)v[2] << "' " << v[3] - 1;
+		for (auto k : v)
+			if (k == pad) ss << L"* ";
+			else if((size_t)k<(size_t)nsyms())ss<<dict_get(k)<<L' ';
+			else ss << L'[' << k << L"] ";
 		s.emplace(ss.str());
 	}
 	for (auto& x : s) os << x << endl;
@@ -111,7 +105,6 @@ matrix driver::rule_pad(const matrix& t, size_t ar) {
 }
 
 driver::driver(FILE *f, bool proof) {
-	syms.push_back(0), lens.push_back(0), syms_dict[{0, 0}] = pad;
 	DBG(drv = this;)
 	const raw_progs rp(f);
 	for (size_t n = 0; n != rp.p.size(); ++n) {
@@ -119,14 +112,15 @@ driver::driver(FILE *f, bool proof) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
 			const directive& d = rp.p[n].d[k];
 			wstring str;
-			nums = max(nums, (int_t)256);
 			if (d.fname) {
 				wstring wfname(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
 				string fname(wfname.begin(), wfname.end());
-				nums = max(nums, (int_t)fsize(fname.c_str()));
-			} else nums = max(nums, d.arg[1]-d.arg[0]);
+				nums=max(nums, 256+(int_t)fsize(fname.c_str()));
+			} else nums = max(nums, 256+d.arg[1]-d.arg[0]);
 		}
 	}
+	static wstr spad;
+	pad = dict_get(spad, 0);
 	size_t ar = 0;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
@@ -161,9 +155,7 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
-				n + 1/*(int_t)syms.size()*/,
-				x.second[n],// + (int_t)syms.size(),
-				n+2/*(int_t)syms.size()+1*/ }}, ar), proof);
+				n + 256, x.second[n], n + 257 }}, ar), proof);
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
 		m.erase(m.begin());
@@ -193,7 +185,7 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
 	q->fwd(add, del, 0);
-	printbdd(wcout, progs.size()-1, add);
+	printbdd(wcout, add);
 	delete q;
 	return true;
 }

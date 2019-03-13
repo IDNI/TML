@@ -35,9 +35,7 @@ public:
 		const std::map<int_t,std::wstring>& s, std::set<matrix>* proof);
 	bool pfp(lp *p, std::set<matrix>* proof);
 	bool pfp(bool proof);
-	std::wostream& printbdd(std::wostream& os, size_t prog, size_t t) const;
-	std::wostream& printbdd(std::wostream& os, const matrix& t,
-		size_t prog) const;
+	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
 	std::wostream& printdb(std::wostream& os, size_t prog) const;
 	~driver() {}// for (lp* p : progs) delete p; }

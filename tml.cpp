@@ -33,6 +33,7 @@ using namespace std;
 			"with negation or deletion."
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 #define veccat(x, y) (x).insert((x).end(), (y).begin(), (y).end())
+int_t pad = 0;
 void tml_init() { bdd_init(); }
 
 wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
