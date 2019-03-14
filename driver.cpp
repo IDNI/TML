@@ -179,15 +179,12 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	size_t ar = 0;
 	for (const matrix& x : *proof)
 		for (const term& y : x) ar = max(ar, y.size() - 1);
-	for (const matrix& x : *proof) wcout << x << endl;
 	prog_add(move(*proof), ar, strs.back(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
-	q->fwd(add, del, 0);
-	printbdd(wcout, add);
-	delete q;
-	return true;
+	return 	q->fwd(add, del, 0), printbdd(wcout, add), delete q,
+		progs.erase(progs.end()-1), true;
 }
 
 bool driver::pfp(bool pr) {
