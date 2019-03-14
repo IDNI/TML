@@ -294,11 +294,6 @@ size_t bdd_permute(size_t x, const vector<size_t>& m) {//overlapping rename
 		memo_permute);
 }
 
-size_t from_eq(size_t x, size_t y) {
-	return bdd_or(	bdd_and(from_bit(x, true), from_bit(y, true)),
-			bdd_and(from_bit(x, false),from_bit(y, false)));
-}
-
 void memos_clear() {
 #ifdef MEMO		
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear(),

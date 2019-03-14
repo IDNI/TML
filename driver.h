@@ -18,7 +18,7 @@ class driver {
 	int_t dict_get(cws s, size_t len);
 	int_t dict_get(const lexeme& l);
 	size_t nsyms() const { return syms.size() + nums; }
-	size_t dict_bits() const { return msb(nsyms()-1); }
+	size_t dict_bits() const { return msb(nsyms()); }
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
 	void term_pad(term& t, size_t ar);

@@ -42,4 +42,6 @@ size_t from_eq(size_t x, size_t y);
 #define nleaf(x) (!((x)[0]))
 #define trueleaf(x) ((x) == T)
 #define ntrueleaf(x) (nleaf(x) && (x)[1])
-#define from_bit(x, v) bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}})
+#define from_bit(x, v) (bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}}))
+#define from_eq(x, y) ((x) < (y) ? bdd_add({{x+1,from_bit(y,1),from_bit(y,0)}})\
+			: bdd_add({{y+1, from_bit(x,1), from_bit(x,0)}}))

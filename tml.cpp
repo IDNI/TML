@@ -68,7 +68,7 @@ struct rule { // a P-DATALOG rule in bdd form
 		size_t sel = T;
 		const bool neg;
 		bools ex;
-		vector<size_t> perm;
+		vector<size_t> perm, eqs;
 		body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars);
 		void from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 			map<int_t, size_t>& m);
@@ -76,9 +76,12 @@ struct rule { // a P-DATALOG rule in bdd form
 			auto it = (neg ? p.neg : p.pos).find({sel, ex});
 			if (it != (neg?p.neg:p.pos).end())
 				return bdd_permute(it->second, perm);
-			size_t r = (neg?bdd_and_not:bdd_and)(sel, db);
+			size_t r = T;
+			r = (neg?bdd_and_not:bdd_and)(sel, db);
+			for (size_t n = eqs.size(); n;)
+				if (F == (r=bdd_and(r, eqs[--n]))) return false;
 			r = bdd_ex(r, ex);
-			(neg ? p.neg : p.pos).emplace(make_pair(sel,ex), r);
+			(neg ? p.neg : p.pos).emplace(make_pair(r,ex), r);
 			r = bdd_permute(r, perm);
 			//DBG(printbdd(wcout, r);)
 			return r;
@@ -87,6 +90,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	bool neg = false;
 	size_t hsym = T;
 	vector<body> bd;
+	vector<size_t> eqs;
 
 	rule() {}
 	rule(rule&& r) : neg(r.neg), hsym(r.hsym) {}
@@ -101,11 +105,11 @@ size_t from_int(size_t x, size_t bits, size_t offset) {
 	while (b--) r = bdd_and(r, from_bit(bits - b + offset, x&(1<<b)));
 	return r;
 }
-
+/*
 void from_eq(size_t src, size_t dst, size_t len, size_t &r) {
 	while (len--) r = bdd_and(r, from_eq(src + len, dst + len));
 }
-
+*/
 void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 	size_t x = F;
 	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
@@ -129,7 +133,8 @@ rule::body::body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars)
 	: neg(t[0] < 0) {
 	map<int_t, size_t> m;
 	size_t b, j;
-	t.erase(t.begin()),ex.resize(bits*ar,false),perm.resize((ar+nvars)*bits);
+	t.erase(t.begin()), 
+	ex.resize(bits*ar,false), perm.resize((ar+nvars)*bits);
 	for (b = 0; b != (ar + nvars) * bits; ++b) perm[b] = b;
 	for (j = 0; j != ar; ++j) from_arg(t[j], j, bits, dsz, m);
 }
@@ -137,13 +142,20 @@ rule::body::body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars)
 void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 	map<int_t, size_t>& m) {
 	auto it = m.end();
+	vector<array<size_t, 2>> eq;
 	if (vij >= 0) // sym
 		vecfill(ex, j * bits, (j+1) * bits, true),
 		from_int_and(vij, bits, j * bits, sel);
-	else if ((it = m.find(vij)) != m.end()) //seen var
-		vecfill(ex, j * bits, (j+1) * bits, true),
-		from_eq(j * bits, it->second * bits, bits, sel);
-	else	m.emplace(vij, j), from_range(dsz, bits, j * bits, sel);
+	else if ((it = m.find(vij)) != m.end()) { //seen var
+		vecfill(ex, j * bits, (j+1) * bits, true);
+		for (size_t b = 0; b != bits; ++b)
+			eq.emplace_back(array<size_t, 2>
+				{j*bits+b, it->second*bits+b});
+	} else	m.emplace(vij, j), from_range(dsz, bits, j * bits, sel);
+	for (size_t j = 0; j != eq.size(); ++j) {
+		if (!(j % 8)) eqs.push_back(T);
+		eqs.back() = bdd_and(eqs.back(), from_eq(eq[j][0], eq[j][1]));
+	}
 }
 
 rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
@@ -152,11 +164,19 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	for (i = 1; i != v.size(); ++i) // init, sel, ex and local eq
 		bd.emplace_back(v[i], ar, bits, dsz, nvars);
 	map<int_t, size_t> m;
+	vector<array<size_t, 2>> heq;
 	auto it = m.end();
 	for (j = 0; j != ar; ++j) // hsym
 		if (v[0][j] >= 0) from_int_and(v[0][j], bits, j * bits, hsym);
 		else if (m.end() == (it=m.find(v[0][j]))) m.emplace(v[0][j], j);
-		else from_eq(j * bits, it->second*bits, bits, hsym);
+		else for (b = 0; b!=bits; ++b)
+			heq.emplace_back(array<size_t, 2>
+				{j * bits + b, it->second * bits + b});
+//			from_eq(j * bits, it->second*bits, bits, heq);
+	for (j = 0; j != heq.size(); ++j) {
+		if (!(j % 8)) eqs.push_back(T);
+		eqs.back() = bdd_and(eqs.back(), from_eq(heq[j][0], heq[j][1]));
+	}
 	for (i = 0; i != v.size() - 1; ++i) // var permutations
 		for (j = 0; j != ar; ++j)
 			if (v[i+1][j] < 0) {
@@ -181,24 +201,33 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s, set<size_t>* p)
 	const {
-	size_t vars;
-	vector<size_t> v;
+	size_t vars = T;
+/*	vector<size_t> v;
 	if (bd.size() == 1) {
-		if (F==(vars=bdd_and(hsym, bd[0].varbdd(db, s)))) return false;
+		if (F == (vars = bd[0].varbdd(db, s))) return false;
+		for (size_t n = eqs.size(); n; ++n)
+			if (F == (vars = bdd_and(vars, eqs[n]))) return false;
+		vars = bdd_and(vars, hsym);
 		goto ret;
 	}
 	if (bd.size() == 2) {
-		if (F == (vars = bdd_and(hsym, bdd_and(bd[0].varbdd(db, s),
-			bd[1].varbdd(db, s))))) return false;
+		if (F == (vars = bdd_and(bd[0].varbdd(db, s),
+			bd[1].varbdd(db, s)))) return false;
+		for (size_t n = eqs.size(); n; ++n)
+			if (F == (vars = bdd_and(vars, eqs[n]))) return false;
+		vars = bdd_and(vars, hsym);
 		goto ret;
-	}
+	}*/
 	for (const body& b : bd) {
-		if (F == (vars = b.varbdd(db, s))) return F;
-		v.push_back(vars);
+		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
+//		v.push_back(vars);
 	}
-	v.push_back(hsym);
-	if (F == (vars = bdd_and_many(v))) return false;
-ret:	if (p) p->emplace(vars);
+	for (size_t n = eqs.size(); n;)
+		if (F == (vars = bdd_and(vars, eqs[--n]))) return false;
+	vars = bdd_and(vars, hsym);
+//	v.push_back(hsym);
+//	if (F == (vars = bdd_and_many(v))) return false;
+/*ret:*/if (p) p->emplace(vars);
 	//DBG(printbdd(wcout, vars);)
 	return bdd_deltail(vars, bits * ar);
 }
