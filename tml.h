@@ -34,6 +34,7 @@ public:
 	void fwd(size_t &add, size_t &del, std::set<size_t>* p = 0);
 	matrix getbdd(size_t t) const;
 	matrix getdb() const;
+	size_t varslen() const;
 	~lp();
 };
 

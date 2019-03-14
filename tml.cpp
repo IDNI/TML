@@ -88,7 +88,7 @@ struct rule { // a P-DATALOG rule in bdd form
 		}
 	};
 	bool neg = false;
-	size_t hsym = T;
+	size_t hsym = T, varbddlen = 0;
 	vector<body> bd;
 	vector<size_t> eqs;
 
@@ -196,6 +196,7 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	for (i = 0; i != prf.size(); ++i)
 		for (j = 0; j != prf[i].size(); ++j)
 			if (!prf[i][j]) prf[i].erase(prf[i].begin() + j--);
+	varbddlen = max(varbddlen, max(prf[0].size(), prf[1].size())-1);
 	proof->emplace(prf);
 }
 
@@ -250,6 +251,12 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 					r[n][i] |= 1 << (bits - b - 1);
 			if (r[n][i] == pad) break;
 		}
+	return r;
+}
+
+size_t lp::varslen() const {
+	size_t r = 0;
+	for (const rule* x : rules) r = max(r, x->varbddlen);
 	return r;
 }
 

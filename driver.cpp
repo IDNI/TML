@@ -169,17 +169,14 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 	for (set<int_t> s;;) {
 		add=del=F, s.emplace(d = p->db), p->fwd(add, del, proof?&pr:0);
 		if ((t = bdd_and_not(add, del)) == F && add != F)
-			p->db = F; // detect contradiction
+			return false; // detect contradiction
 		else p->db = bdd_or(bdd_and_not(p->db, del), t);
 		if (d == p->db) break;
 		if (s.find(p->db) != s.end()) return false;
 	}
 	if (!proof) return true;
-	strs.emplace_back();
-	size_t ar = 0;
-	for (const matrix& x : *proof)
-		for (const term& y : x) ar = max(ar, y.size() - 1);
-	prog_add(move(*proof), ar, strs.back(), 0);
+	size_t ar = p->varslen();
+	prog_add(move(*proof), ar, map<int_t, wstring>(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
 	for (size_t x : pr) q->db = bdd_or(q->db, x);
