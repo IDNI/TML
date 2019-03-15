@@ -294,6 +294,40 @@ size_t bdd_permute(size_t x, const vector<size_t>& m) {//overlapping rename
 		memo_permute);
 }
 
+size_t count(size_t x, size_t nvars) {
+	node n = getnode(x), k;
+	size_t r = 0;
+	if (nleaf(n)) return ntrueleaf(n) ? 1 : 0;
+	k = getnode(n[1]);
+	r += count(n[1], nvars)*(1<<(((nleaf(k)?nvars+1-n[0]:(k[0]-n[0])))-1));
+	k = getnode(n[2]);
+	r += count(n[2], nvars)*(1<<(((nleaf(k)?nvars+1-n[0]:(k[0]-n[0])))-1));
+	return r;
+}
+
+size_t bdd_count(size_t x, size_t nvars) {
+	return x<2?x?(1<<(nvars)):0:(count(x, nvars)<<(getnode(x)[0]-1));
+}
+
+bool bdd_onesat(size_t x, size_t nvars, bools& r) {
+	if (leaf(x)) return trueleaf(x);
+	node n = getnode(x);
+	return	leaf(n[2]) && !trueleaf(n[2])
+		? r[n[0]-1] = true,  bdd_onesat(n[1], nvars, r)
+		:(r[n[0]-1] = false, bdd_onesat(n[2], nvars, r));
+}
+
+size_t from_int(size_t x, size_t bits, size_t offset) {
+	size_t r = T, b = bits--;
+	while (b--) r = bdd_and(r, from_bit(bits - b + offset, x&(1<<b)));
+	return r;
+}
+
+size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits) {
+	for (size_t n = ar1; n != ar2; ++n) from_int_and(pad, bits, n*bits, x);
+	return x;
+}
+
 void memos_clear() {
 #ifdef MEMO		
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear(),

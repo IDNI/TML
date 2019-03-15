@@ -1,4 +1,4 @@
-#include "tml.h"
+#include "lp.h"
 #include "input.h"
 
 struct dictcmp {
@@ -37,11 +37,19 @@ public:
 	bool pfp(bool proof);
 	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
+	std::wostream& printbdd(std::wostream& os, size_t t, size_t bits,
+		size_t ar) const;
+	std::wostream& printbdd_one(std::wostream& os, size_t t) const;
+	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
+		size_t ar) const;
 	std::wostream& printdb(std::wostream& os, size_t prog) const;
 	~driver() {}// for (lp* p : progs) delete p; }
 };
 
 #ifdef DEBUG
 extern driver* drv;
-std::wostream& printbdd(std::wostream& os,size_t t){return drv->printbdd(os,t);}
+std::wostream& printbdd(std::wostream& os,size_t t);
+std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, size_t ar);
+std::wostream& printbdd_one(std::wostream& os,size_t t);
+std::wostream& printbdd_one(std::wostream& os,size_t t, size_t bits, size_t ar);
 #endif

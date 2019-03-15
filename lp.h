@@ -26,15 +26,19 @@ class lp { // [pfp] logic program
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
 	} p;
 	std::vector<struct rule*> rules;
-	const size_t bits, ar, dsz;
 public:
+	const size_t bits, ar, dsz;
 	size_t db = F; // db's bdd root
 	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
 	void rule_add(const matrix& t, std::set<matrix>* proof = 0);
-	void fwd(size_t &add, size_t &del, std::set<size_t>* p = 0);
+	void fwd(size_t &add, size_t &del, std::set<size_t>* pf);
 	matrix getbdd(size_t t) const;
+	matrix getbdd_one(size_t t) const;
 	matrix getdb() const;
-	size_t varslen() const;
+	matrix getbdd(size_t t, size_t b, size_t a) const;
+	matrix getbdd_one(size_t t, size_t b, size_t a) const;
+	size_t proof_arity() const;
+	size_t get_varbdd() const;
 	~lp();
 };
 

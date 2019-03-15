@@ -21,6 +21,14 @@ using namespace std;
 
 #ifdef DEBUG
 driver* drv;
+wostream& printbdd(wostream& os,size_t t) { return drv->printbdd(os,t); }
+wostream& printbdd_one(wostream& os,size_t t) { return drv->printbdd_one(os,t);}
+wostream& printbdd(wostream& os, size_t t, size_t bits, size_t ar) {
+	return drv->printbdd(os, t, bits, ar);
+}
+wostream& printbdd_one(wostream& os, size_t t, size_t bits, size_t ar) {
+	return drv->printbdd_one(os, t, bits, ar);
+}
 #endif
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
@@ -28,8 +36,22 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	return os;
 }
 
+wostream& driver::printbdd(wostream& os, size_t t, size_t bits, size_t ar)const{
+	return printbdd(os, progs.back()->getbdd(t, bits, ar));
+}
+
+wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits,
+	size_t ar) const {
+	return printbdd(os, progs.back()->getbdd_one(t, bits, ar));
+}
+
 wostream& driver::printbdd(wostream& os, size_t t) const {
 	return printbdd(os, progs.back()->getbdd(t));
+}
+wostream& driver::printbdd_one(wostream& os, size_t t) const {
+	os << "one of " << bdd_count(t, progs.back()->bits*progs.back()->ar)
+		<< " results: ";
+	return printbdd(os, progs.back()->getbdd_one(t));
 }
 wostream& driver::printdb(wostream& os, size_t prog) const {
 	return printbdd(os, progs[prog]->db);
@@ -149,6 +171,7 @@ driver::driver(FILE *f, bool proof) {
 	}
 }
 
+#define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	set<matrix>* proof) {
 	progs.emplace_back(new lp(dict_bits(), ar, nsyms()));
@@ -164,10 +187,10 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 }
 
 bool driver::pfp(lp *p, set<matrix>* proof) {
-	set<size_t> pr;
 	size_t d, add, del, t;
+	set<size_t> pf;
 	for (set<int_t> s;;) {
-		add=del=F, s.emplace(d = p->db), p->fwd(add, del, proof?&pr:0);
+		add=del=F, s.emplace(d = p->db), p->fwd(add, del, proof?&pf:0);
 		if ((t = bdd_and_not(add, del)) == F && add != F)
 			return false; // detect contradiction
 		else p->db = bdd_or(bdd_and_not(p->db, del), t);
@@ -175,11 +198,17 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 		if (s.find(p->db) != s.end()) return false;
 	}
 	if (!proof) return true;
-	size_t ar = p->varslen();
+	size_t ar = p->proof_arity();
+	DBG(for (matrix x : *proof) wcout << x << endl;)
 	prog_add(move(*proof), ar, map<int_t, wstring>(), 0);
 	lp *q = progs.back();
 	q->db = add = del = F;
-	for (size_t x : pr) q->db = bdd_or(q->db, x);
+	q->db = p->get_varbdd();
+//	for (size_t x : pf)
+//		q->db=bdd_or(q->db,bdd_pad(x,p->varslen(),ar,pad,q->bits));
+	DBG(printbdd(wcout<<"q->db "<<endl, q->db)<<endl;)
+//	return 	pfp(q, 0), printbdd(wcout, q->db), delete q,
+//		progs.erase(progs.end()-1), true;
 	return 	q->fwd(add, del, 0), printbdd(wcout, add), delete q,
 		progs.erase(progs.end()-1), true;
 }

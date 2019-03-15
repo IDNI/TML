@@ -22,10 +22,11 @@
 #include <climits>
 #include <stdexcept>
 #include <cassert>
+#include "defs.h"
 #ifdef DEBUG
 #include "driver.h"
 #else
-#include "tml.h"
+#include "lp.h"
 #endif
 using namespace std;
 
@@ -47,8 +48,8 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y:x) { os << y << endl; } return os; }
 wostream& operator<<(wostream& os, const matrix& m) {
 	for (const term& t : m) {
-		for (auto x : t) wcout << x << ',';
-		wcout << endl;
+		for (auto x : t) os << x << ',';
+		os << endl;
 	}
 	return os;
 }
@@ -72,44 +73,22 @@ struct rule { // a P-DATALOG rule in bdd form
 		body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars);
 		void from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 			map<int_t, size_t>& m);
-		size_t varbdd(size_t db, lp::step& p) const {
-			auto it = (neg ? p.neg : p.pos).find({sel, ex});
-			if (it != (neg?p.neg:p.pos).end())
-				return bdd_permute(it->second, perm);
-			size_t r = T;
-			r = (neg?bdd_and_not:bdd_and)(sel, db);
-			for (size_t n = eqs.size(); n;)
-				if (F == (r=bdd_and(r, eqs[--n]))) return false;
-			r = bdd_ex(r, ex);
-			(neg ? p.neg : p.pos).emplace(make_pair(r,ex), r);
-			r = bdd_permute(r, perm);
-			//DBG(printbdd(wcout, r);)
-			return r;
-		}
+		size_t varbdd(size_t db, lp::step& p) const;
 	};
 	bool neg = false;
-	size_t hsym = T, varbddlen = 0;
+	size_t hsym = T, proof_arity = 0, vars_arity;
 	vector<body> bd;
 	vector<size_t> eqs;
+	set<size_t> p;
 
 	rule() {}
-	rule(rule&& r) : neg(r.neg), hsym(r.hsym) {}
-	rule(matrix v, size_t bits, size_t dsz, set<matrix>* proof = 0);
-	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s,
-		set<size_t>* p) const;
+//	rule(rule&& r) : neg(r.neg), hsym(r.hsym) {}
+	rule(matrix v, size_t bits, size_t dsz, set<matrix>* proof);
+	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s, 
+		set<size_t>* proof);
+	size_t get_varbdd(size_t bits, size_t ar) const;
 };
 
-#define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
-size_t from_int(size_t x, size_t bits, size_t offset) {
-	size_t r = T, b = bits--;
-	while (b--) r = bdd_and(r, from_bit(bits - b + offset, x&(1<<b)));
-	return r;
-}
-/*
-void from_eq(size_t src, size_t dst, size_t len, size_t &r) {
-	while (len--) r = bdd_and(r, from_eq(src + len, dst + len));
-}
-*/
 void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 	size_t x = F;
 	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
@@ -117,7 +96,7 @@ void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 }
 
 void lp::rule_add(const matrix& x, set<matrix>* proof) {
- 	if (x.size() == 1) db = bdd_or(db, rule(x, bits, dsz).hsym);//fact
+ 	if (x.size() == 1) db = bdd_or(db, rule(x, bits, dsz, 0).hsym);//fact
 	else rules.emplace_back(new rule(x, bits, dsz, proof));
 }
 
@@ -130,7 +109,7 @@ size_t varcount(const matrix& v) { // bodies only
 }
 
 rule::body::body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars)
-	: neg(t[0] < 0) {
+	: neg(t[0] < 0) { // init, sel, ex and local eq
 	map<int_t, size_t> m;
 	size_t b, j;
 	t.erase(t.begin()), 
@@ -152,19 +131,33 @@ void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 			eq.emplace_back(array<size_t, 2>
 				{j*bits+b, it->second*bits+b});
 	} else	m.emplace(vij, j), from_range(dsz, bits, j * bits, sel);
-	for (size_t j = 0; j != eq.size(); ++j) {
-		if (!(j % 8)) eqs.push_back(T);
-		eqs.back() = bdd_and(eqs.back(), from_eq(eq[j][0], eq[j][1]));
+	for (size_t i = 0; i != eq.size(); ++i) {
+		if (!(i % 8)) eqs.push_back(T);
+		eqs.back() = bdd_and(eqs.back(), from_eq(eq[i][0], eq[i][1]));
 	}
+}
+
+size_t rule::body::varbdd(size_t db, lp::step& p) const {
+	auto it = (neg ? p.neg : p.pos).find({sel, ex});
+	if (it != (neg?p.neg:p.pos).end()) return bdd_permute(it->second, perm);
+	size_t r = (neg?bdd_and_not:bdd_and)(sel, db), n = eqs.size();
+	while (n) if (F == (r = bdd_and(r, eqs[--n]))) return false;
+//	DBG(printbdd(wcout <<"r: " << endl, r)<<endl;)
+	r = bdd_ex(r, ex);
+	(neg ? p.neg : p.pos).emplace(make_pair(r, ex), r);
+	return r = bdd_permute(r, perm);
 }
 
 rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
 	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
-	for (i = 1; i != v.size(); ++i) // init, sel, ex and local eq
+//	for (int_t x : v[0]) if (x == pad) break; else ++hlen, ++k;
+//	while (k != v[0].size() && v[0][k++] != pad) ++hlen;//, ++k;
+//	if (k && v[0][k-1] == pad) --k;//, --hlen;
+	for (i = 1; i != v.size(); ++i)
 		bd.emplace_back(v[i], ar, bits, dsz, nvars);
-	map<int_t, size_t> m;
 	vector<array<size_t, 2>> heq;
+	map<int_t, size_t> m;
 	auto it = m.end();
 	for (j = 0; j != ar; ++j) // hsym
 		if (v[0][j] >= 0) from_int_and(v[0][j], bits, j * bits, hsym);
@@ -172,7 +165,6 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 		else for (b = 0; b!=bits; ++b)
 			heq.emplace_back(array<size_t, 2>
 				{j * bits + b, it->second * bits + b});
-//			from_eq(j * bits, it->second*bits, bits, heq);
 	for (j = 0; j != heq.size(); ++j) {
 		if (!(j % 8)) eqs.push_back(T);
 		eqs.back() = bdd_and(eqs.back(), from_eq(heq[j][0], heq[j][1]));
@@ -185,7 +177,9 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 				for (b = 0; b != bits; ++b)
 					bd[i].perm[b+j*bits]=b+it->second*bits;
 			}
-	if (!proof) return;
+	vars_arity = k;
+	DBG(wcout << v << endl;)
+	if (!proof || v.size() == 1) return;
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
 	matrix prf;
@@ -193,16 +187,17 @@ rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	veccat(prf[0], v[0]), veccat(prf[1], v[0]);
 	for (auto x : m) if (x.second >= ar) prf[1].push_back(x.first);
 	for (i = 0; i != bd.size(); ++i) veccat(prf[0], v[i+1]);
+	for (j = 0; j != prf[0].size(); ++j)
+		if (prf[0][j] == pad) prf[0].erase(prf[0].begin()+j--);
 	for (i = 0; i != prf.size(); ++i)
-		for (j = 0; j != prf[i].size(); ++j)
-			if (!prf[i][j]) prf[i].erase(prf[i].begin() + j--);
-	varbddlen = max(varbddlen, max(prf[0].size(), prf[1].size())-1);
+		proof_arity = max(proof_arity, prf[i].size() - 1);
+	DBG(wcout << prf << endl;)
 	proof->emplace(prf);
 }
 
-size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s, set<size_t>* p)
-	const {
-	size_t vars = T;
+size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s,
+	set<size_t>* proof) {
+	size_t vars = T, n;
 /*	vector<size_t> v;
 	if (bd.size() == 1) {
 		if (F == (vars = bd[0].varbdd(db, s))) return false;
@@ -223,20 +218,39 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s, set<size_t>* p)
 		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
 //		v.push_back(vars);
 	}
-	for (size_t n = eqs.size(); n;)
-		if (F == (vars = bdd_and(vars, eqs[--n]))) return false;
+	for (n=eqs.size(); n;) if (F==(vars=bdd_and(vars, eqs[--n]))) return F;
 	vars = bdd_and(vars, hsym);
 //	v.push_back(hsym);
 //	if (F == (vars = bdd_and_many(v))) return false;
-/*ret:*/if (p) p->emplace(vars);
-	//DBG(printbdd(wcout, vars);)
+/*ret:*/if (proof) p.emplace(vars);
+//	wcout<<"vars solutions#: " << bdd_count(vars, vars_arity * bits) << endl;
+	DBG(printbdd_one(wcout<<"one: ", vars, bits, vars_arity);)
+/*	wcout<<"vars solutions#: " << bdd_count(bdd_deltail(vars, bits * ar),
+		ar * bits) << endl;
+	DBG(printbdd(wcout, bdd_deltail(vars, bits * ar));)*/
 	return bdd_deltail(vars, bits * ar);
 }
 
-void lp::fwd(size_t &add, size_t &del, set<size_t>* pr) {
+void lp::fwd(size_t &add, size_t &del, set<size_t>* pf) {
 	p.pos.clear(), p.neg.clear();
+	for (rule* r : rules)
+		(r->neg?del:add)=bdd_or(r->fwd(db,bits,ar,p,pf),r->neg?del:add);
+}
+
+size_t rule::get_varbdd(size_t bits, size_t ar) const {
+	size_t x = T, y = F, n;
+	for (size_t z : p) y = bdd_or(y, z);
+	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, y);)
+	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
+	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
+	return bdd_and(x, y);
+}
+
+size_t lp::get_varbdd() const {
+	size_t t = F;
 	for (const rule* r : rules)
-		(r->neg?del:add)=bdd_or(r->fwd(db,bits,ar,p,pr),r->neg?del:add);
+		t = bdd_or(r->get_varbdd(bits, proof_arity()), t);
+	return t;
 }
 
 matrix from_bits(size_t x, size_t bits, size_t ar) {
@@ -249,19 +263,37 @@ matrix from_bits(size_t x, size_t bits, size_t ar) {
 			for (b = 0; b != bits; ++b)
 				if (s[n][i * bits + b])
 					r[n][i] |= 1 << (bits - b - 1);
-			if (r[n][i] == pad) break;
+//			if (r[n][i] == pad) break;
 		}
 	return r;
 }
 
-size_t lp::varslen() const {
+term one_from_bits(size_t x, size_t bits, size_t ar) {
+	bools s(bits * ar, true);
+	if (!bdd_onesat(x, bits * ar, s)) return term();
+	term r(ar, 0);
+	for (size_t i = 0; i != ar; ++i) {
+		for (size_t b = 0; b != bits; ++b)
+			if (s[i * bits + b])
+				r[i] |= 1 << (bits - b - 1);
+//		if (r[i] == pad) break;
+	}
+	return r;
+}
+
+size_t lp::proof_arity() const {
 	size_t r = 0;
-	for (const rule* x : rules) r = max(r, x->varbddlen);
+	for (const rule* x : rules) r = max(r, x->proof_arity);
 	return r;
 }
 
 matrix lp::getdb() const { return getbdd(db); }
-matrix lp::getbdd(size_t t) const { return from_bits(t, bits, ar); }
+matrix lp::getbdd(size_t t) const { return getbdd(t, bits, ar); }
+matrix lp::getbdd_one(size_t t) const { return getbdd_one(t, bits, ar); }
+matrix lp::getbdd(size_t t, size_t b, size_t a) const{return from_bits(t,b,a);}
+matrix lp::getbdd_one(size_t t, size_t b, size_t a) const {
+	return {one_from_bits(t,b,a)};
+}
 lp::~lp() { for (rule* r : rules) delete r; }
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(

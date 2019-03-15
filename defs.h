@@ -1,3 +1,5 @@
+#ifndef __DEFS_H__
+#define __DEFS_H__
 #include <cassert>
 typedef int64_t int_t;
 typedef wchar_t* wstr;
@@ -15,3 +17,4 @@ std::wostream& operator<<(std::wostream& os, const matrix& m);
 #define er(x)	perror(x), exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
+#endif
