@@ -186,9 +186,10 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	}
 }
 
-bool driver::pfp(lp *p, set<matrix>* proof) {
+bool driver::pfp(lp *p, set<matrix>* proof, size_t *padd) {
 	size_t d, add, del, t;
 	set<size_t> pf;
+//	wcout << V.size() << endl;
 	for (set<int_t> s;;) {
 		add=del=F, s.emplace(d = p->db), p->fwd(add, del, proof?&pf:0);
 		if ((t = bdd_and_not(add, del)) == F && add != F)
@@ -197,30 +198,35 @@ bool driver::pfp(lp *p, set<matrix>* proof) {
 		if (d == p->db) break;
 		if (s.find(p->db) != s.end()) return false;
 	}
+//	wcout << V.size() << endl;
 	if (!proof) return true;
 	size_t ar = p->proof_arity();
 	DBG(for (matrix x : *proof) wcout << x << endl;)
 	prog_add(move(*proof), ar, map<int_t, wstring>(), 0);
 	lp *q = progs.back();
-	q->db = add = del = F;
+	q->db = *padd = del = F;
 	q->db = p->get_varbdd();
 //	for (size_t x : pf)
 //		q->db=bdd_or(q->db,bdd_pad(x,p->varslen(),ar,pad,q->bits));
-	DBG(printbdd(wcout<<"q->db "<<endl, q->db)<<endl;)
+//	DBG(printbdd(wcout<<"q->db "<<endl, q->db)<<endl;)
 //	return 	pfp(q, 0), printbdd(wcout, q->db), delete q,
 //		progs.erase(progs.end()-1), true;
-	return 	q->fwd(add, del, 0), printbdd(wcout, add), delete q,
-		progs.erase(progs.end()-1), true;
+//	wcout << V.size() << endl;
+	return 	q->fwd(*padd, del, 0),delete q,progs.erase(progs.end()-1), true;
+//	(wcout << V.size() << endl), true;
 }
 
 bool driver::pfp(bool pr) {
-	size_t sz = progs.size();
-	pfp(progs[0], pr ? &proofs[0] : 0);
+	size_t sz = progs.size(), add;
+	pfp(progs[0], pr ? &proofs[0] : 0, &add);
 	for (size_t n = 1; n != sz; ++n) {
 		progs[n]->db = progs[n-1]->db;
-		if (!pfp(progs[n], pr ? &proofs[n] : 0)) return false;
+		if (!pfp(progs[n], pr ? &proofs[n] : 0, &add)) return false;
 	}
-	return printdb(wcout, sz - 1), true;
+	printdb(wcout, sz - 1);
+	if (pr) printbdd(wcout<<"proof:"<<endl, add,
+		progs.back()->bits, progs.back()->proof_arity());
+	return true;
 }
 
 int main(int argc, char** argv) {

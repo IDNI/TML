@@ -33,7 +33,7 @@ public:
 	void progs_read(wstr s, bool proof);
 	void prog_add(std::set<matrix> m, size_t ar,
 		const std::map<int_t,std::wstring>& s, std::set<matrix>* proof);
-	bool pfp(lp *p, std::set<matrix>* proof);
+	bool pfp(lp *p, std::set<matrix>* proof, size_t *padd);
 	bool pfp(bool proof);
 	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
