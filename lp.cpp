@@ -151,9 +151,6 @@ size_t rule::body::varbdd(size_t db, lp::step& p) const {
 rule::rule(matrix v, size_t bits, size_t dsz, set<matrix> *proof) {
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
 	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
-//	for (int_t x : v[0]) if (x == pad) break; else ++hlen, ++k;
-//	while (k != v[0].size() && v[0][k++] != pad) ++hlen;//, ++k;
-//	if (k && v[0][k-1] == pad) --k;//, --hlen;
 	for (i = 1; i != v.size(); ++i)
 		bd.emplace_back(v[i], ar, bits, dsz, nvars);
 	vector<array<size_t, 2>> heq;

@@ -1,3 +1,4 @@
+#include <map>
 #include "lp.h"
 #include "input.h"
 
@@ -34,13 +35,16 @@ class driver {
 	int_t nums = 0;
 	template<typename V, typename X> std::set<matrix>
 	from_func(V f, std::wstring name, X from, X to);
-public:
-	driver(FILE *f, bool proof);
 	void progs_read(wstr s, bool proof);
 	void prog_add(std::set<matrix> m, size_t ar,
 		const std::map<int_t,std::wstring>& s, std::set<matrix>* proof);
 	bool pfp(lp *p, std::set<matrix>* proof, size_t *padd);
-	bool pfp(bool proof);
+	driver(const raw_progs& rp, bool proof);
+public:
+	driver(FILE *f, bool proof);
+	driver(std::wstring, bool proof);
+	bool pfp(matrix* proof);
+
 	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t, size_t bits,

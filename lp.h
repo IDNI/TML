@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <vector>
 #include <iostream>
+#include <set>
 #include "bdd.h"
 
 void tml_init();

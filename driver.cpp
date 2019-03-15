@@ -143,9 +143,11 @@ matrix driver::rule_pad(const matrix& t, size_t ar) {
 	return r;
 }
 
-driver::driver(FILE *f, bool proof) {
+driver::driver(FILE *f, bool proof) : driver(raw_progs(f), proof) {}
+driver::driver(wstring s, bool proof) : driver(raw_progs(s), proof) {}
+
+driver::driver(const raw_progs& rp, bool proof) {
 	DBG(drv = this;)
-	const raw_progs rp(f);
 	bool txt = false;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		strs.emplace_back();
@@ -156,8 +158,8 @@ driver::driver(FILE *f, bool proof) {
 			if (d.fname) {
 				wstring wfname(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
 				string fname(wfname.begin(), wfname.end());
-				nums=max(nums, 256+(int_t)fsize(fname.c_str()));
-			} else nums = max(nums, 256+d.arg[1]-d.arg[0]);
+				nums=max(nums,256+(int_t)fsize(fname.c_str()));
+			} else nums = max(nums,256+d.arg[1]-d.arg[0]);
 		}
 	}
 	static wstr spad;
@@ -179,6 +181,8 @@ driver::driver(FILE *f, bool proof) {
 			ar = max(ar, (size_t)4);
 			const directive& d = rp.p[n].d[k];
 			wstring str(d.arg[0] + 1, d.arg[1] - d.arg[0] - 1);
+			for (size_t i = 0; i != str.size(); ++i)
+				if (str[i] == L'\\') str.erase(str.begin()+i);
 			strs[n].emplace(dict_get(d.rel), d.fname ?
 				file_read_text(str) : str);
 		}
@@ -209,7 +213,7 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
-				n + 256, x.second[n], n + 257 }}, ar), proof);
+				x.second[n], n + 256, n + 257 }}, ar), proof);
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
 		m.erase(m.begin());
@@ -245,20 +249,23 @@ bool driver::pfp(lp *p, set<matrix>* proof, size_t *padd) {
 //	(wcout << V.size() << endl), true;
 }
 
-bool driver::pfp(bool pr) {
+bool driver::pfp(matrix* pr) {
 	size_t sz = progs.size(), add;
 	pfp(progs[0], pr ? &proofs[0] : 0, &add);
 	for (size_t n = 1; n != sz; ++n) {
 		progs[n]->db = progs[n-1]->db;
 		if (!pfp(progs[n], pr ? &proofs[n] : 0, &add)) return false;
 	}
-	// uncomment the following two lines in order to see builtins
+	// comment the following two lines in order to see builtins
 	// in the program's output
-//	for (size_t x : builtin_symbdds[sz-1])
-//		progs[sz - 1]->db = bdd_and_not(progs[sz - 1]->db, x);
+	for (size_t x : builtin_symbdds[sz-1])
+		progs[sz - 1]->db = bdd_and_not(progs[sz - 1]->db, x);
 	printdb(wcout, sz - 1);
-	if (pr) printbdd(wcout<<"proof:"<<endl, add,
-		progs.back()->bits, progs.back()->proof_arity());
+	if (pr)
+		*pr = progs.back()->getbdd(
+			add, progs.back()->bits, progs.back()->proof_arity());
+//	if (pr) printbdd(wcout<<"proof:"<<endl, add,
+//		progs.back()->bits, progs.back()->proof_arity());
 	return true;
 }
 
@@ -267,6 +274,8 @@ int main(int argc, char** argv) {
 	//parser_test();
 	bool proof = argc == 2 && !strcmp(argv[1], "-p");
 	driver d(stdin, proof);
-	if (!d.pfp(proof)) wcout << "unsat" << endl;
+	matrix p;
+	if (!d.pfp(proof ? &p : 0)) wcout << "unsat" << endl;
+	if (proof) d.printbdd(wcout<<"proof:"<<endl, {p});
 	return 0;
 }

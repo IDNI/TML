@@ -45,7 +45,7 @@ lexeme lex(pcws s) {
 	if (**s == L'"') {
 		while (*++*s != L'"')
 			if (!**s) er(unmatched_quotes);
-			else if (**s == L'\'' && !wcschr(L"\\\"", *++*s))
+			else if (**s == L'\\' && !wcschr(L"\\\"", *++*s))
 				er(err_escape);
 		return { t, (*s)++ };
 	}
@@ -139,8 +139,9 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 	return true;
 }
 
-raw_progs::raw_progs(FILE* f) {
-	wstring s = file_read_text(f);
+raw_progs::raw_progs(FILE* f) : raw_progs(file_read_text(f)) {}
+
+raw_progs::raw_progs(const std::wstring& s) {
 	size_t pos = 0;
 	lexemes l = prog_lex(wcsdup(s.c_str()));
 	if (*l[pos][0] != L'{') {

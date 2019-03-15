@@ -46,6 +46,7 @@ struct raw_prog {
 struct raw_progs {
 	std::vector<raw_prog> p;
 	raw_progs(FILE*);
+	raw_progs(const std::wstring& s);
 };
 
 std::wostream& operator<<(std::wostream& os, const directive& d);
