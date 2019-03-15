@@ -32,8 +32,8 @@ class driver {
 	std::vector<std::set<matrix>> proofs;
 	bool mult = false;
 	int_t nums = 0;
-	template<typename V> std::set<matrix>
-	from_func(V f, std::wstring name, size_t from, size_t to);
+	template<typename V, typename X> std::set<matrix>
+	from_func(V f, std::wstring name, X from, X to);
 public:
 	driver(FILE *f, bool proof);
 	void progs_read(wstr s, bool proof);

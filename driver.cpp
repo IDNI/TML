@@ -59,8 +59,8 @@ wostream& driver::printdb(wostream& os, size_t prog) const {
 	return printbdd(os, progs[prog]->db);
 }
 
-template<typename V>
-set<matrix> driver::from_func(V f, wstring name, size_t from, size_t to) {
+template<typename V, typename X>
+set<matrix> driver::from_func(V f, wstring name, X from, X to) {
 	set<matrix> r;
 	int_t rel = dict_get(name);
 	builtin_rels.emplace(rel);
