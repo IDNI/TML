@@ -15,8 +15,12 @@ class driver {
 	std::vector<size_t> lens;
 	std::vector<std::map<int_t, std::wstring>> strs;
 	std::pair<cws, size_t> dict_get(int_t t) const;
+	std::set<wstr> strs_extra;
+	std::vector<std::set<size_t>> builtin_symbdds;
+	std::set<size_t> builtin_rels;
 	int_t dict_get(cws s, size_t len);
 	int_t dict_get(const lexeme& l);
+	int_t dict_get(const std::wstring& s);
 	size_t nsyms() const { return syms.size() + nums; }
 	size_t dict_bits() const { return msb(nsyms()); }
 	term get_term(const raw_term&);
@@ -28,6 +32,8 @@ class driver {
 	std::vector<std::set<matrix>> proofs;
 	bool mult = false;
 	int_t nums = 0;
+	template<typename V> std::set<matrix>
+	from_func(V f, std::wstring name, size_t from, size_t to);
 public:
 	driver(FILE *f, bool proof);
 	void progs_read(wstr s, bool proof);
@@ -43,7 +49,7 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
 		size_t ar) const;
 	std::wostream& printdb(std::wostream& os, size_t prog) const;
-	~driver() {}// for (lp* p : progs) delete p; }
+	~driver() {for (lp* p:progs) delete p; for (wstr w:strs_extra) free(w);}
 };
 
 #ifdef DEBUG

@@ -253,6 +253,10 @@ size_t lp::get_varbdd() const {
 	return t;
 }
 
+size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
+	return from_int(sym, bits, bits * pos);
+}
+
 matrix from_bits(size_t x, size_t bits, size_t ar) {
 	vbools s = allsat(x, bits * ar, bits);
 	matrix r(s.size());

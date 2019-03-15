@@ -37,6 +37,7 @@ public:
 	matrix getdb() const;
 	matrix getbdd(size_t t, size_t b, size_t a) const;
 	matrix getbdd_one(size_t t, size_t b, size_t a) const;
+	size_t get_sym_bdd(size_t sym, size_t pos) const;
 	size_t proof_arity() const;
 	size_t get_varbdd() const;
 	~lp();

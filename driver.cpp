@@ -16,6 +16,8 @@
 #include <cstring>
 #include <sstream>
 #include <forward_list>
+#include <functional>
+#include <cctype>
 #include "driver.h"
 using namespace std;
 
@@ -57,6 +59,15 @@ wostream& driver::printdb(wostream& os, size_t prog) const {
 	return printbdd(os, progs[prog]->db);
 }
 
+template<typename V>
+set<matrix> driver::from_func(V f, wstring name, size_t from, size_t to) {
+	set<matrix> r;
+	int_t rel = dict_get(name);
+	builtin_rels.emplace(rel);
+	for (; from != to; ++from) if (f(from)) r.insert({{ 1, rel, from }});
+	return r;
+}
+
 pair<cws, size_t> driver::dict_get(int_t t) const {
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
 	if (t >= nums) return { syms[t - nums], lens[t - nums] };
@@ -81,6 +92,12 @@ int_t driver::dict_get(cws s, size_t len) {
 }
 
 int_t driver::dict_get(const lexeme& l) { return dict_get(l[0], l[1]-l[0]); }
+
+int_t driver::dict_get(const wstring& s) {
+	wstr w = wcsdup(s.c_str());
+	strs_extra.emplace(w);
+	return dict_get(w, s.size());
+}
 
 wostream& driver::printbdd(wostream& os, const matrix& t) const {
 	set<wstring> s;
@@ -129,10 +146,12 @@ matrix driver::rule_pad(const matrix& t, size_t ar) {
 driver::driver(FILE *f, bool proof) {
 	DBG(drv = this;)
 	const raw_progs rp(f);
+	bool txt = false;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		strs.emplace_back();
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
 			const directive& d = rp.p[n].d[k];
+			txt = true;
 			wstring str;
 			if (d.fname) {
 				wstring wfname(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
@@ -143,6 +162,17 @@ driver::driver(FILE *f, bool proof) {
 	}
 	static wstr spad;
 	pad = dict_get(spad, 0), syms.push_back(0), lens.push_back(0);
+	set<matrix> rtxt;
+	if (txt) {
+		set<matrix> m;
+#define add_char_builtin(f, n) m = from_func<function<int(int)>> \
+			(f, n, 0, 255), rtxt.insert(m.begin(), m.end())
+		add_char_builtin(::isspace, L"space");
+		add_char_builtin(::isalnum, L"alnum");
+		add_char_builtin(::isalpha, L"alpha");
+		add_char_builtin(::isdigit, L"digit");
+#undef add_char_builtin
+	}
 	size_t ar = 0;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		for (size_t k = 0; k != rp.p[n].d.size(); ++k) {
@@ -165,6 +195,7 @@ driver::driver(FILE *f, bool proof) {
 	}
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		set<matrix> m;
+		m.insert(rtxt.begin(), rtxt.end());
 		proofs.emplace_back();
 		for (auto x : rp.p[n].r) m.insert(get_rule(x));
 		prog_add(move(m), ar, strs[n], proof ? &proofs.back() : 0);
@@ -184,6 +215,10 @@ void driver::prog_add(set<matrix> m, size_t ar, const map<int_t, wstring>& s,
 		m.erase(m.begin());
 		progs.back()->rule_add(rule_pad(move(x), ar), proof);
 	}
+	builtin_symbdds.emplace_back();
+	if (s.empty()) return;
+	for (size_t x : builtin_rels)
+		builtin_symbdds.back().insert(progs.back()->get_sym_bdd(x, 0));
 }
 
 bool driver::pfp(lp *p, set<matrix>* proof, size_t *padd) {
@@ -204,13 +239,7 @@ bool driver::pfp(lp *p, set<matrix>* proof, size_t *padd) {
 	DBG(for (matrix x : *proof) wcout << x << endl;)
 	prog_add(move(*proof), ar, map<int_t, wstring>(), 0);
 	lp *q = progs.back();
-	q->db = *padd = del = F;
-	q->db = p->get_varbdd();
-//	for (size_t x : pf)
-//		q->db=bdd_or(q->db,bdd_pad(x,p->varslen(),ar,pad,q->bits));
-//	DBG(printbdd(wcout<<"q->db "<<endl, q->db)<<endl;)
-//	return 	pfp(q, 0), printbdd(wcout, q->db), delete q,
-//		progs.erase(progs.end()-1), true;
+	*padd = del = F, q->db = p->get_varbdd();
 //	wcout << V.size() << endl;
 	return 	q->fwd(*padd, del, 0),delete q,progs.erase(progs.end()-1), true;
 //	(wcout << V.size() << endl), true;
@@ -223,6 +252,10 @@ bool driver::pfp(bool pr) {
 		progs[n]->db = progs[n-1]->db;
 		if (!pfp(progs[n], pr ? &proofs[n] : 0, &add)) return false;
 	}
+	// uncomment the following two lines in order to see builtins
+	// in the program's output
+//	for (size_t x : builtin_symbdds[sz-1])
+//		progs[sz - 1]->db = bdd_and_not(progs[sz - 1]->db, x);
 	printdb(wcout, sz - 1);
 	if (pr) printbdd(wcout<<"proof:"<<endl, add,
 		progs.back()->bits, progs.back()->proof_arity());
