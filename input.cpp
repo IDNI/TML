@@ -61,8 +61,9 @@ lexeme lex(pcws s) {
 		if (*++*s == L'-') return ++*s, lexeme{ *s-2, *s };
 		else er(err_chr);
 	}
-	if (wcschr(L"~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
-	if (**s == L'?' || **s == L'-') ++*s;
+	if (**s == L'!' && *(*s + 1) == L'!') return *s+=2, lexeme{ *s-2, *s };
+	if (wcschr(L"!~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"?-", **s)) ++*s;
 	while (iswalnum(**s)) ++*s;
 	return { t, *s };
 }
@@ -116,6 +117,9 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
+	if ((goal = *l[pos][0] == L'!'))
+		if ((pgoal = *l[++pos][0] == L'!'))
+			++pos;
 	if (!h.parse(l, pos)) return false;
 	if (*l[pos][0] == '.') return ++pos, true;
 	if (*l[pos++][0] != ':') er(err_chr);

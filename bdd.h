@@ -10,6 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __BDD_H__
+#define __BDD_H__
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -40,6 +42,7 @@ bool bdd_onesat(size_t x, size_t nvars, bools& r);
 size_t from_eq(size_t x, size_t y);
 size_t from_int(size_t x, size_t bits, size_t offset);
 size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
+void from_range(size_t max, size_t bits, size_t offset, size_t &r);
 
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define getnode(x) V[x]
@@ -50,3 +53,4 @@ size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
 #define from_bit(x, v) (bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}}))
 #define from_eq(x, y) ((x) < (y) ? bdd_add({{x+1,from_bit(y,1),from_bit(y,0)}})\
 			: bdd_add({{y+1, from_bit(x,1), from_bit(x,0)}}))
+#endif

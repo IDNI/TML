@@ -10,6 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __LP_H__
+#define __LP_H__
 #include <cstdint>
 #include <vector>
 #include <iostream>
@@ -27,23 +29,33 @@ class lp { // [pfp] logic program
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
 	} p;
 	std::vector<struct rule*> rules;
+	matrices goals, pgoals;
+	matrix lens;
 public:
 	const size_t bits, ar, dsz;
 	size_t db = F; // db's bdd root
+
 	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
-	void rule_add(const matrix& t, std::set<matrix>* proof = 0);
-	void fwd(size_t &add, size_t &del, std::set<size_t>* pf);
+	void rule_add(const matrix& t);
+	void goal_add(const matrix& t);
+	void pgoal_add(const matrix& t);
+	void fwd(size_t &add, size_t &del);
+	matrices get_proof_rules() const;
+
+	matrix lenmap() const { return lens; }
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
 	matrix getdb() const;
 	matrix getbdd(size_t t, size_t b, size_t a) const;
 	matrix getbdd_one(size_t t, size_t b, size_t a) const;
 	size_t get_sym_bdd(size_t sym, size_t pos) const;
-	size_t proof_arity() const;
+//	size_t proof_arity() const;
 	size_t get_varbdd() const;
+	size_t maxw() const;
 	~lp();
 };
 
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
 std::wostream& out(std::wostream& os, size_t n);
-extern int_t pad;
+const int_t pad = 0;
+#endif

@@ -328,6 +328,12 @@ size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits) {
 	return x;
 }
 
+void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
+	size_t x = F;
+	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
+	r = bdd_and(r, x);
+}
+
 void memos_clear() {
 #ifdef MEMO		
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear(),

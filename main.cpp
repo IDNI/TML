@@ -10,27 +10,14 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __DEFS_H__
-#define __DEFS_H__
-#include <cassert>
-#include <vector>
-#include <set>
-#include <iostream>
-typedef int64_t int_t;
-typedef wchar_t* wstr;
-typedef std::vector<int_t> term;
-typedef std::vector<term> matrix;// set of relational terms
-typedef std::vector<bool> bools;
-typedef std::vector<bools> vbools;
-typedef std::set<matrix> matrices;
-std::wostream& operator<<(std::wostream& os, const matrix& m);
-//#define DEBUG
-#ifdef DEBUG
-#define DBG(x) x
-#else
-#define DBG(x)
-#endif
-#define er(x)	perror(x), exit(0)
-#define msb(x) ((sizeof(unsigned long long)<<3) - \
-	__builtin_clzll((unsigned long long)(x)))
-#endif
+#include <cstring>
+#include "driver.h"
+using namespace std;
+
+int main() {
+	setlocale(LC_ALL, ""), tml_init();
+	//parser_test();
+	driver d(stdin);
+	if (!d.pfp()) wcout << "unsat" << endl;
+	return 0;
+}
