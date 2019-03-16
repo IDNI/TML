@@ -61,10 +61,12 @@ void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 
 size_t rule::body::varbdd(size_t db, lp::step& p) const {
 	auto it = (neg ? p.neg : p.pos).find({sel, ex});
+	DBG(printbdd(wcout <<"sel: " << endl, sel)<<endl;)
 	if (it != (neg?p.neg:p.pos).end()) return bdd_permute(it->second, perm);
-	size_t r = (neg?bdd_and_not:bdd_and)(sel, db), n = eqs.size();
+	size_t r = (neg?bdd_and_not:bdd_and)(sel, db);
+	if (r == F) return false;
+	size_t n = eqs.size();
 	while (n) if (F == (r = bdd_and(r, eqs[--n]))) return false;
-//	DBG(printbdd(wcout <<"r: " << endl, r)<<endl;)
 	r = bdd_ex(r, ex);
 	(neg ? p.neg : p.pos).emplace(make_pair(r, ex), r);
 	return r = bdd_permute(r, perm);

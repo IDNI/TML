@@ -28,7 +28,7 @@ term driver::get_term(const raw_term& r) {
 	t.push_back(r.neg ? -1 : 1);
 	for (const elem& e : r.e)
 		if (e.type == elem::NUM) t.push_back(e.num);
-		else if (e.type == elem::CHR) t.push_back(*e.e[0]);
+		else if (e.type == elem::CHR) t.push_back(*e.e[0]+1);
 		else t.push_back(dict_get(e.e));
 	return t;
 }
@@ -76,11 +76,10 @@ driver::driver(wstring s) : driver(raw_progs(s)) {}
 size_t get_nums(const raw_prog& p) {
 	size_t nums = 0;
 	for (size_t k = 0; k != p.d.size(); ++k)
-		if (!p.d[k].fname)
-			max(nums,(size_t)(256+p.d[k].arg[1]-p.d[k].arg[0]));
-		else nums = max(nums, (size_t)(256 +
-			(int_t)fsize(ws2s(wstring(p.d[k].arg[0]+1,
-				p.d[k].arg[1]-p.d[k].arg[0]-1)).c_str())));
+		nums = max(nums, !p.d[k].fname
+			? (size_t)(256+p.d[k].arg[1]-p.d[k].arg[0])
+			: (size_t)(256+(int_t)fsize(ws2s(wstring(p.d[k].arg[0]+1
+				,p.d[k].arg[1]-p.d[k].arg[0]-1)).c_str())));
 	return nums;
 }
 
@@ -127,7 +126,7 @@ void driver::prog_add(matrices m, matrices g, matrices pg, size_t ar) {
 	for (auto x : strs[progs.size()-1])
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			progs.back()->rule_add(rule_pad({{ 1, x.first,
-				x.second[n], n + 256, n + 257 }}, ar));
+				x.second[n]+1, n + 257, n + 258 }}, ar));
 	while (!m.empty()) {
 		matrix x = move(*m.begin());
 		m.erase(m.begin()),progs.back()->rule_add(rule_pad(move(x),ar));
