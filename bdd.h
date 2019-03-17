@@ -42,6 +42,7 @@ bool bdd_onesat(size_t x, size_t nvars, bools& r);
 size_t from_eq(size_t x, size_t y);
 size_t from_int(size_t x, size_t bits, size_t offset);
 size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
+size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars);
 void from_range(size_t max, size_t bits, size_t offset, size_t &r);
 
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))

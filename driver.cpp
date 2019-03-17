@@ -206,10 +206,17 @@ bool driver::pfp(lp *p) {
 
 bool driver::pfp() {
 	size_t sz = progs.size();
-	DBG(printdb(wcout<<L"db:"<<endl, sz - 1) << endl;)
+	DBG(printdb(wcout<<L"db:"<<endl, 0) << endl;)
 	pfp(progs[0]);
 	for (size_t n = 1; n != sz; ++n) {
-		progs[n]->db = progs[n-1]->db;
+		size_t db = progs[n-1]->db;
+		if (progs[n-1]->bits != progs[n]->bits)
+			progs[n]->db = bdd_rebit(db, progs[n-1]->bits,
+				progs[n]->bits,progs[n-1]->bits*progs[n-1]->ar);
+		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
+		progs[n]->db = bdd_pad(progs[n]->db, progs[n-1]->ar,
+			progs[n]->ar, pad, progs[n]->bits);
+		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
 		if (!pfp(progs[n])) return false;
 	}
 	// comment the following two lines in order to see builtins
@@ -241,7 +248,7 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 
 #ifdef DEBUG
 driver* drv;
-wostream& printbdd(wostream& os,size_t t) { return drv->printbdd(os,t); }
+//wostream& printbdd(wostream& os,size_t t) { return drv->printbdd(os,t); }
 wostream& printbdd_one(wostream& os,size_t t) { return drv->printbdd_one(os,t);}
 wostream& printbdd(wostream& os, size_t t, size_t bits, size_t ar) {
 	return drv->printbdd(os, t, bits, ar);
@@ -265,14 +272,14 @@ wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits,
 	return printbdd(os, progs.back()->getbdd_one(t, bits, ar));
 }
 
-wostream& driver::printbdd(wostream& os, size_t t) const {
-	return printbdd(os, progs.back()->getbdd(t));
-}
+//wostream& driver::printbdd(wostream& os, size_t t) const {
+//	return printbdd(os, progs.back()->getbdd(t));
+//}
 wostream& driver::printbdd_one(wostream& os, size_t t) const {
 	os << "one of " << bdd_count(t, progs.back()->bits*progs.back()->ar)
 		<< " results: ";
 	return printbdd(os, progs.back()->getbdd_one(t));
 }
 wostream& driver::printdb(wostream& os, size_t prog) const {
-	return printbdd(os, progs[prog]->db);
+	return printbdd(os, progs[prog]->getbdd(progs[prog]->db));
 }

@@ -43,14 +43,19 @@ unordered_map<permemo, size_t> memo_permute;
 vector<node> V; // all bdd nodes
 unordered_map<node, size_t> M; // node to its index
 
+wostream& operator<<(wostream& os, const node& n) {
+	return os<<n[0]<<' '<<n[1]<<' '<<n[2];
+}
+
 size_t bdd_add_nocheck(const node& n) {
 	size_t r;
 	return M.emplace(n, r = V.size()), V.emplace_back(n), r;
 }
 
 void bdd_init() { bdd_add_nocheck({{0, 0, 0}}), bdd_add_nocheck({{0, 1, 1}}); }
-
+//bool print = false;
 size_t bdd_add(const node& n) { // create new bdd node,standard implementation
+//	if (print) wcout << n << endl;
 	if (n[1] == n[2]) return n[1];
 #ifdef DEBUG	
 	if (!leaf(n[1])) assert(n[0] < getnode(n[1])[0]);
@@ -326,6 +331,17 @@ size_t from_int(size_t x, size_t bits, size_t offset) {
 size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits) {
 	for (size_t n = ar1; n != ar2; ++n) from_int_and(pad, bits, n*bits, x);
 	return x;
+}
+
+size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
+	size_t t = T, n, k;
+	vector<size_t> v(nvars);
+	for (n = 0; n != nvars; ++n) {
+		v[n] = (n % prev) + curr - prev + curr * (n / prev);
+		for (k = 0; k != curr - prev; ++k)
+			t = bdd_and(t, from_bit((n / prev) * curr + k, 0));
+	}
+	return bdd_and(t, bdd_permute(x, v));
 }
 
 void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
