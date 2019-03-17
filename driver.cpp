@@ -211,10 +211,10 @@ bool driver::pfp() {
 	for (size_t n = 1; n != sz; ++n) {
 		size_t db = progs[n-1]->db;
 		if (progs[n-1]->bits != progs[n]->bits)
-			progs[n]->db = bdd_rebit(db, progs[n-1]->bits,
+			db = bdd_rebit(db, progs[n-1]->bits,
 				progs[n]->bits,progs[n-1]->bits*progs[n-1]->ar);
 		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
-		progs[n]->db = bdd_pad(progs[n]->db, progs[n-1]->ar,
+		progs[n]->db = bdd_pad(db, progs[n-1]->ar,
 			progs[n]->ar, pad, progs[n]->bits);
 		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
 		if (!pfp(progs[n])) return false;
