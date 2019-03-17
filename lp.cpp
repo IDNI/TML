@@ -30,12 +30,62 @@
 #endif
 using namespace std;
 
+#define err_goalsym "goal symbol not appearing in program.\n"
+#define err_goalarity "goal arity larger than the program's.\n"
+
 void tml_init() { bdd_init(); }
 wostream& operator<<(wostream& os, const bools& x);
 wostream& operator<<(wostream& os, const vbools& x);
 wostream& operator<<(wostream& os, const matrix& m);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
+lp::lp(matrices r, matrices g, matrices pg, lp *prev) 
+	: goals(move(g)), pgoals(move(pg)), prev(prev) {
+	if (prev) ar = prev->ar, dsz = prev->dsz;
+	else ar = dsz = 0;
+	for (const matrix& m : r)
+		for (const term& t : m) {
+			ar = max(ar, t.size() - 1);
+			for (int_t i : t)
+				if (i > 0) dsz = max(dsz, (size_t)i);
+		}
+	for (const matrix& m : goals)
+		for (const term& t : m)
+			if (t.size()-1 > ar) er(err_goalarity);
+			else for (int_t i:t)
+				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
+	for (const matrix& m : pgoals)
+		for (const term& t : m)
+			if (t.size()-1 > ar) er(err_goalarity);
+			else for (int_t i:t)
+				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
+	rules_pad(r), rules_pad(goals), rules_pad(pgoals), bits = msb(dsz);
+	for (const matrix& m : r)
+ 		if (m.size() == 1)
+			db=bdd_or(db, rule(m, bits, dsz,matrices()).hsym);//fact
+		else rules.emplace_back(new rule(m, bits, dsz, pgoals));
+}
+
+void lp::term_pad(term& t) {
+	size_t l;
+	if ((l=t.size())<ar+1) t.resize(ar+1), fill(t.begin()+l, t.end(), pad);
+}
+
+void lp::rule_pad(matrix& t) { for (term& x : t) term_pad(x); }
+
+matrix lp::rule_pad(const matrix& t) {
+	matrix r;
+	rule_pad(r = t);
+	return r;
+}
+
+void lp::rules_pad(matrices& t) {
+	matrices r = move(t);
+	t.clear();
+	for (const matrix& x : r) t.emplace(rule_pad(x));
+}
+
+/*
 void lp::rule_add(const matrix& x) {
  	if (x.size() == 1)
 		db = bdd_or(db, rule(x, bits, dsz, matrices()).hsym);//fact
@@ -55,11 +105,30 @@ void lp::pgoal_add(const matrix& t) {
 	if (t.size() != 1) er("goals cannot have body");
 	pgoals.emplace(t);
 }
-
+*/
 void lp::fwd(size_t &add, size_t &del) {
-	p.pos.clear(), p.neg.clear();
+	cache.pos.clear(), cache.neg.clear();
 	for (rule* r : rules)
-		(r->neg?del:add)=bdd_or(r->fwd(db,bits,ar,p),r->neg?del:add);
+		(r->neg ?del : add) =
+			bdd_or(r->fwd(db,bits,ar,cache),r->neg?del:add);
+}
+
+bool lp::pfp() {
+	if (prev) {
+		if (!prev->pfp()) return false;
+		db = prev->db;
+	}
+	size_t d, add, del, t;
+	set<size_t> pf;
+//	wcout << V.size() << endl;
+	for (set<int_t> s;;) {
+		add =del = F, s.emplace(d = db), fwd(add, del);
+		if ((t = bdd_and_not(add, del)) == F && add != F)
+			return false; // detect contradiction
+		else db = bdd_or(bdd_and_not(db, del), t);
+		if (d == db) return true;
+		if (s.find(db) != s.end()) return false;
+	}
 }
 /*
 size_t lp::get_varbdd() const {
@@ -126,7 +195,7 @@ matrix lp::getbdd(size_t t, size_t b, size_t a) const{return from_bits(t,b,a);}
 matrix lp::getbdd_one(size_t t, size_t b, size_t a) const {
 	return {one_from_bits(t,b,a)};
 }
-lp::~lp() { for (rule* r : rules) delete r; }
+lp::~lp() { for (rule* r : rules) delete r; if (prev) delete prev; }
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(
 	const std::pair<size_t, bools>& m) const {

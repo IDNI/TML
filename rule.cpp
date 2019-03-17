@@ -75,6 +75,7 @@ ret:	(neg ? p.neg : p.pos).emplace(make_pair(r, ex), r);
 rule::rule(matrix v, size_t bits, size_t dsz, const matrices& /*pgoals*/) {
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
 	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
+	wcout << v << endl;
 	for (i = 1; i != v.size(); ++i)
 		bd.emplace_back(v[i], ar, bits, dsz, nvars);
 	vector<array<size_t, 2>> heq;

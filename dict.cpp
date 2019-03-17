@@ -48,3 +48,8 @@ int_t driver::dict_get(const wstring& s) {
 	return	syms.push_back(w), lens.push_back(s.size()),
 		syms_dict[{w, s.size()}] = syms.size() + nums - 1;
 }
+
+int_t driver::dict_get() {
+	static size_t last = 1;
+	return dict_get(wstring(L"%") + to_wstring(last));
+}

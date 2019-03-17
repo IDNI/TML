@@ -61,7 +61,6 @@ lexeme lex(pcws s) {
 		if (*++*s == L'-') return ++*s, lexeme{ *s-2, *s };
 		else er(err_chr);
 	}
-	if (**s == L'!' && *(*s + 1) == L'!') return *s+=2, lexeme{ *s-2, *s };
 	if (wcschr(L"!~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	while (iswalnum(**s)) ++*s;

@@ -27,22 +27,29 @@ class lp { // [pfp] logic program
 	friend struct rule;
 	struct step {
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
-	} p;
+	} cache;
 	std::vector<struct rule*> rules;
 	matrices goals, pgoals;
-	matrix lens;
+	void term_pad(term& t);
+	void rule_pad(matrix& t);
+	matrix rule_pad(const matrix& t);
+	void rules_pad(matrices& t);
+	lp *prev;
+//	matrix lens;
 public:
-	const size_t bits, ar, dsz;
+	size_t bits, ar, dsz;
 	size_t db = F; // db's bdd root
 
-	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
-	void rule_add(const matrix& t);
-	void goal_add(const matrix& t);
-	void pgoal_add(const matrix& t);
+	lp(matrices r, matrices g, matrices pg, lp *prev = 0);
+//	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
+//	void rule_add(const matrix& t);
+//	void goal_add(const matrix& t);
+//	void pgoal_add(const matrix& t);
 	void fwd(size_t &add, size_t &del);
+	bool pfp();
 	matrices get_proof_rules() const;
 
-	matrix lenmap() const { return lens; }
+//	matrix lenmap() const { return lens; }
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
 	matrix getdb() const;

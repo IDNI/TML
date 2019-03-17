@@ -334,6 +334,7 @@ size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits) {
 }
 
 size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
+	assert(prev < curr);
 	size_t t = T, n, k;
 	vector<size_t> v(nvars);
 	for (n = 0; n != nvars; ++n) {

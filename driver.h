@@ -28,13 +28,13 @@ class driver {
 	int_t dict_get(cws s, size_t len);
 	int_t dict_get(const lexeme& l);
 	int_t dict_get(const std::wstring& s);
+	int_t dict_get();
 	size_t nsyms() const { return syms.size() + nums; }
-	size_t dict_bits() const { return msb(nsyms()); }
-
-	std::vector<std::map<int_t, std::wstring>> strs;
+//	size_t dict_bits() const { return msb(nsyms()); }
+	typedef std::map<int_t, std::wstring> strs_t;
+//	std::vector<std::map<int_t, std::wstring>> strs;
 	std::set<wstr> strs_extra;
-	std::vector<std::set<size_t>> builtin_symbdds;
-	std::set<size_t> builtin_rels;
+	std::set<size_t> builtin_rels, builtin_symbdds;
 
 	matrices get_char_builtins();
 	term get_term(const raw_term&);
@@ -43,16 +43,15 @@ class driver {
 	void rule_pad(matrix& t, size_t ar);
 	matrix rule_pad(const matrix& t, size_t ar);
 
-	std::vector<lp*> progs;
+	lp* prog = 0;
 	bool mult = false;
 	int_t nums = 0;
 
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
-	void directives_load(const raw_prog& p, size_t n);
-	void calc_lens(const raw_prog& rp, size_t& ar);
-	void prog_init(const raw_prog& rp, size_t ar, const matrices& rtxt);
-	void prog_add(matrices m, matrices g, matrices pg, size_t ar);
+	strs_t directives_load(const raw_prog& p);
+//	void calc_lens(const raw_prog& rp, size_t& ar);
+	void prog_init(const raw_prog& rp, const matrices& rtxt, const strs_t&);
 	void progs_read(wstr s);
 	bool pfp(lp *p);
 	driver(const raw_progs& rp);
@@ -68,8 +67,8 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t) const;
 	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
 		size_t ar) const;
-	std::wostream& printdb(std::wostream& os, size_t prog) const;
-	~driver() {for (lp* p:progs) delete p; for (wstr w:strs_extra) free(w);}
+	std::wostream& printdb(std::wostream& os, lp*) const;
+	~driver() { if (prog) delete prog; for (wstr w:strs_extra) free(w);}
 };
 
 #ifdef DEBUG
