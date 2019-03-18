@@ -124,9 +124,6 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 		t[0].push_back(-1), t[0].push_back(0), veccat(t[0], v[i]),
 		t[1].push_back(1), t[1].push_back(0), veccat(t[1], v[i]),
 		proof3.emplace(move(t));
-		// last 3 lines to replace with deletion of all beginning with *
-		// the 3 lines before are wrong as it deletes unreachable
-		// terms instead of concated rules.
 
 //	for (j = 0; j != prf[0].size(); ++j)
 //		if (prf[0][j] == pad) prf[0].erase(prf[0].begin()+j--);
@@ -164,7 +161,7 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
 //	if (F == (vars = bdd_and_many(v))) return false;
 /*ret:*/if (!proof2.empty()) p.emplace(vars);
 //	wcout<<"vars solutions#: " << bdd_count(vars, vars_arity * bits) << endl;
-	DBG(printbdd_one(wcout<<"one: ", vars, bits, vars_arity);)
+//	DBG(printbdd_one(wcout<<"one: ", vars, bits, vars_arity);)
 /*	wcout<<"vars solutions#: " << bdd_count(bdd_deltail(vars, bits * ar),
 		ar * bits) << endl;
 	DBG(printbdd(wcout, bdd_deltail(vars, bits * ar));)*/
@@ -174,8 +171,8 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
 size_t rule::get_varbdd(size_t bits, size_t ar) const {
 	size_t x = T, y = F, n;
 	for (size_t z : p) y = bdd_or(y, z);
-	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, y);)
+//	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, y);)
 	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
-	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
+//	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
 	return bdd_and(x, y);
 }

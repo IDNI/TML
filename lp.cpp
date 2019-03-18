@@ -36,7 +36,6 @@ using namespace std;
 void tml_init() { bdd_init(); }
 wostream& operator<<(wostream& os, const bools& x);
 wostream& operator<<(wostream& os, const vbools& x);
-wostream& operator<<(wostream& os, const matrix& m);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
 size_t fact(term v, size_t bits) {
@@ -69,6 +68,7 @@ lp::lp(matrices r, matrix g, matrices pg, lp *prev)
 			if (t.size()-1 > ar) er(err_goalarity);
 			else for (int_t i:t)
 				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
+	if (!prev || dsz != prev->dsz) ++dsz;
 	rules_pad(r), rule_pad(g), rules_pad(pgoals), bits = msb(dsz);
 	for (const matrix& m : r)
  		if (m.size() == 1) db = bdd_or(db, fact(m[0], bits));
@@ -81,7 +81,7 @@ lp::lp(matrices r, matrix g, matrices pg, lp *prev)
 }
 
 size_t lp::prove() const {
-	size_t add, del;
+	size_t del;
 	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
 	proof1->db = get_varbdd(proof1->ar);
 	proof1->fwd(proof2->db, del);
@@ -137,24 +137,28 @@ void lp::fwd(size_t &add, size_t &del) {
 			bdd_or(r->fwd(db,bits,ar,cache),r->neg?del:add);
 }
 
+size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
+	return bdd_pad(bdd_rebit(x, pbits, bits, ar*bits), par, ar, pad, bits);
+}
+
 bool lp::pfp() {
 	if (prev) {
 		if (!prev->pfp()) return false;
-		db = prev->db;
+		db = bdd_or(db, align(prev->db, prev->ar, prev->bits, ar,bits));
 	}
 	size_t d, add, del, t;
 	set<size_t> pf;
 //	wcout << V.size() << endl;
 	for (set<int_t> s;;) {
-		add =del = F, s.emplace(d = db), fwd(add, del);
+		add = del = F, s.emplace(d = db), fwd(add, del);
 		if ((t = bdd_and_not(add, del)) == F && add != F)
 			return false; // detect contradiction
 		else db = bdd_or(bdd_and_not(db, del), t);
 		if (d == db) break;
 		if (s.find(db) != s.end()) return false;
 	}
-	db = prove();
-	return true;
+	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
+	return db = prove(), true;
 }
 
 size_t lp::get_varbdd(size_t par) const {
@@ -202,12 +206,8 @@ size_t lp::maxw() const {
 }
 
 matrix lp::getdb() const { return getbdd(db); }
-matrix lp::getbdd(size_t t) const { return getbdd(t, bits, ar); }
-matrix lp::getbdd_one(size_t t) const { return getbdd_one(t, bits, ar); }
-matrix lp::getbdd(size_t t, size_t b, size_t a) const{return from_bits(t,b,a);}
-matrix lp::getbdd_one(size_t t, size_t b, size_t a) const {
-	return {one_from_bits(t,b,a)};
-}
+matrix lp::getbdd(size_t t) const { return from_bits(t,bits,ar); }
+matrix lp::getbdd_one(size_t t) const { return {one_from_bits(t,bits,ar)}; }
 lp::~lp() {
 	for (rule* r : rules) delete r;
 	if (prev) delete prev;
@@ -236,8 +236,12 @@ wostream& operator<<(wostream& os, const vbools& x) {
 }
 wostream& operator<<(wostream& os, const matrix& m) {
 	for (const term& t : m) {
-		for (auto x : t) os << x << ',';
-		os << endl;
+		for (auto x : t) os << x << ' ';
+		os << ',';
 	}
+	return os;
+}
+wostream& operator<<(wostream& os, const matrices& m) {
+	for (const matrix& x : m) os << x << endl;
 	return os;
 }

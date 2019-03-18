@@ -24,6 +24,7 @@ typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef std::set<matrix> matrices;
 std::wostream& operator<<(std::wostream& os, const matrix& m);
+std::wostream& operator<<(std::wostream& os, const matrices& m);
 //#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x

@@ -21,6 +21,10 @@
 #include "driver.h"
 using namespace std;
 
+#define err_null_in_head \
+	"'null' not allowed to appear in the head of positive rules.\n"
+
+int_t null;
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
 term driver::get_term(const raw_term& r) {
@@ -36,6 +40,9 @@ term driver::get_term(const raw_term& r) {
 matrix driver::get_rule(const raw_rule& r) {
 	matrix m;
 	m.push_back(get_term(r.h));
+	if (m[0][0] > 0)
+		for (size_t i = 1; i < m[0].size(); ++i)
+			if (m[0][i] == null) er(err_null_in_head);
 	for (auto x : r.b) m.push_back(get_term(x));
 	return m;
 }
@@ -91,19 +98,7 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 	}
 	return r;
 }
-/*
-void driver::calc_lens(const raw_prog& p, size_t& ar) {
-	for (auto x : p.r) {
-		ar = max(ar, x.h.e.size());
-		for (auto e : x.h.e) if (e.type==elem::SYM) dict_get(e.e);
-		for (auto y : x.b) {
-			ar = max(ar, y.e.size());
-			for (auto e : y.e)
-				if (e.type==elem::SYM) dict_get(e.e);
-		}
-	}
-}
-*/
+
 void driver::prog_init(const raw_prog& p, const matrices& rtxt,const strs_t& s){
 	matrices m, pg;
 	matrix g;
@@ -128,6 +123,7 @@ driver::driver(const raw_progs& rp) {
 	size_t ntxt = 0;
 	matrices rtxt;
 	syms.push_back(0), lens.push_back(0);
+	null = dict_get(L"null");
 	for (size_t n = 0; n != rp.p.size(); ++n)
 		if ((txt = (nums=max((size_t)nums, get_nums(rp.p[n])))))
 			ntxt = min(ntxt, n);
@@ -136,85 +132,12 @@ driver::driver(const raw_progs& rp) {
 		prog_init(rp.p[n], n >= ntxt ? rtxt : matrices(),
 			directives_load(rp.p[n]));
 }
-/*
-bool driver::pfp(lp *p) {
-	size_t d, add, del, t;
-	set<size_t> pf;
-//	wcout << V.size() << endl;
-	for (set<int_t> s;;) {
-		add=del=F, s.emplace(d = p->db), p->fwd(add, del);
-		if ((t = bdd_and_not(add, del)) == F && add != F)
-			return false; // detect contradiction
-		else p->db = bdd_or(bdd_and_not(p->db, del), t);
-		if (d == p->db) break;
-		if (s.find(p->db) != s.end()) return false;
-	}
-	return true;
-//	if (!proof) return true;
-*	prog_add(move(*proof), {}, p->proof_arity(), map<int_t, wstring>(), 0);
-	lp *q = progs.back();
-	*padd = del = F, q->db = p->get_varbdd();
-	q->fwd(*padd, del, 0), delete q, progs.erase(progs.end()-1);
-
-	prog_add(move(*proof), {}, p->proof_arity(), map<int_t, wstring>(), 0);
-	q = progs.back();
-	q->db = *padd;
-	matrices s = p->goals;
-	int_t g = dict_get(L"goal");
-	for (size_t n = 0; n != p->maxw(); ++n)
-		for (size_t i = 1; i != p->rules[i].bd.size(); ++i) {
-			matrix m = {{1},{1},{1}};
-			for (int_t k = 1; k <= p->ar; ++k)
-				m[0].push_back(i*p->ar-k);
-			m[0].push_back(g);
-			for (int_t k = 1; k <= p->ar; ++k)
-				m[1].push_back(-k);
-			m[1].push_back(g);
-			for (int_t k = 1; k <= p->proof_arity(); ++k)
-				m[2].push_back(-k);
-			wcout << m << endl;
-			s.emplace(move(m));
-		}
-	pfp(q, 0, &add);
-	delete q, progs.erase(progs.end()-1);
-	matrix m = {{-1},{-1},{1}};
-	for (int_t k = 1; k <= p->proof_arity(); ++k)
-		m[0].push_back(-k), m[2].push_back(-k);
-	m[0].push_back(g), m[1].push_back(g);
-	for (int_t k = 1; k <= p->ar; ++k) m[1].push_back(-k);
-	q->fwd(add, del, 0);
-	*padd = del;
-	return 	delete q, progs.erase(progs.end()-1), true;
-}*/
 
 bool driver::pfp() {
 	if (!prog->pfp()) return false;
-	return printdb(wcout, prog), true;
-/*	size_t sz = progs.size();
-	DBG(printdb(wcout<<L"db:"<<endl, 0) << endl;)
-	pfp(progs[0]);
-	for (size_t n = 1; n != sz; ++n) {
-		size_t db = progs[n-1]->db;
-		if (progs[n-1]->bits != progs[n]->bits)
-			db = bdd_rebit(db, progs[n-1]->bits,
-				progs[n]->bits,progs[n-1]->bits*progs[n-1]->ar);
-		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
-		progs[n]->db = bdd_pad(db, progs[n-1]->ar,
-			progs[n]->ar, pad, progs[n]->bits);
-		DBG(printdb(wcout<<L"db:"<<endl, n) << endl;)
-		if (!pfp(progs[n])) return false;
-	}
-	// comment the following two lines in order to see builtins
-	// in the program's output
-	for (size_t x : builtin_symbdds[sz-1])
-		progs[sz - 1]->db = bdd_and_not(progs[sz - 1]->db, x);
-	printdb(wcout, sz - 1);
-//	if (pr)
-//		*pr = progs.back()->getbdd(
-//			add, progs.back()->bits, progs.back()->proof_arity());
-//	if (pr) printbdd(wcout<<"proof:"<<endl, add,
-//		progs.back()->bits, progs.back()->proof_arity());
-	return true;*/
+	size_t db = prog->db;
+	for (size_t x : builtin_symbdds) db = bdd_and_not(db, x);
+	return printbdd(wcout, prog->getbdd(db)), true;
 }
 
 wostream& driver::printbdd(wostream& os, const matrix& t) const {
@@ -233,13 +156,10 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 
 #ifdef DEBUG
 driver* drv;
-//wostream& printbdd(wostream& os,size_t t) { return drv->printbdd(os,t); }
-wostream& printbdd_one(wostream& os,size_t t) { return drv->printbdd_one(os,t);}
-wostream& printbdd(wostream& os, size_t t, size_t bits, size_t ar) {
-	return drv->printbdd(os, t, bits, ar);
-}
-wostream& printbdd_one(wostream& os, size_t t, size_t bits, size_t ar) {
-	return drv->printbdd_one(os, t, bits, ar);
+wostream& printdb(wostream& os, lp* p) { return drv->printdb(os, p); }
+wostream& printbdd(wostream& os, lp* p, size_t t){return drv->printbdd(os,p,t);}
+wostream& printbdd_one(wostream& os, lp* p, size_t t) {
+	return drv->printbdd_one(os, p, t);
 }
 #endif
 
@@ -248,23 +168,12 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	return os;
 }
 
-wostream& driver::printbdd(wostream& os, size_t t, size_t bits, size_t ar)const{
-	return printbdd(os, prog->getbdd(t, bits, ar));
+wostream& driver::printbdd(wostream& os, lp *p, size_t t) const {
+	return printbdd(os, p->getbdd(t));
 }
 
-wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits,
-	size_t ar) const {
-	return printbdd(os, prog->getbdd_one(t, bits, ar));
+wostream& driver::printbdd_one(wostream& os, lp *p, size_t t) const {
+	os << "one of " << bdd_count(t, p->bits * p->ar) << " results: ";
+	return printbdd(os, p->getbdd_one(t));
 }
-
-//wostream& driver::printbdd(wostream& os, size_t t) const {
-//	return printbdd(os, progs.back()->getbdd(t));
-//}
-wostream& driver::printbdd_one(wostream& os, size_t t) const {
-	os << "one of " << bdd_count(t, prog->bits * prog->ar)
-		<< " results: ";
-	return printbdd(os, prog->getbdd_one(t));
-}
-wostream& driver::printdb(wostream& os, lp* p) const {
-	return printbdd(os, p->getbdd(p->db));
-}
+wostream& driver::printdb(wostream& os, lp*p)const{return printbdd(os,p,p->db);}
