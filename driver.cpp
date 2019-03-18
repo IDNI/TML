@@ -104,16 +104,23 @@ void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 	for (const production& p : g) {
 		if (p.p.size() < 2) er("empty production.\n");
 		matrix t;
+		if (p.p.size() == 2 && p.p[1].type == elem::SYM &&
+			null == dict_get(p.p[1].e)) {
+			m.insert({{1, dict_get(p.p[0].e), -1, -1}});
+			continue;
+		}
 		t.push_back({1, dict_get(p.p[0].e), -1, -(int_t)p.p.size()});
-		int_t v = -1;
+		int_t v = -1, x;
 		for (size_t n = 1; n < p.p.size(); ++n, --v)
-			if (p.p[n].type == elem::SYM)
+			if (p.p[n].type == elem::SYM) {
+				if (null == (x = dict_get(p.p[n].e)))
+					er("null can appear only by itself on the rhs.\n");
 				t.push_back({1, dict_get(p.p[n].e), v, v-1});
+			}
 			else if (p.p[n].type == elem::CHR) {
 				if(!n)er("grammar lhs cannot be a terminal.\n");
 				t.push_back({1, rel, *p.p[n].e[0]+1, v, v-1});
-			} else
-				er("unexpected grammar node.\n");
+			} else er("unexpected grammar node.\n");
 		m.emplace(move(t));
 	}
 	wcout << m << endl;
