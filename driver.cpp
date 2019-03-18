@@ -111,9 +111,12 @@ void driver::prog_init(const raw_prog& p, const strs_t& s){
 			assert(x.b.empty()), g.push_back(get_term(x.h));
 		else if (x.pgoal) assert(x.b.empty()),pg.push_back(get_term(x.h));
 		else m.insert(get_rule(x));
-	for (auto x : s)
-		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
+	for (auto x : s) {
+		for (int_t n = 0; n != (int_t)x.second.size()-1; ++n)
 			m.insert({{1,x.first,x.second[n]+1,n+257,n+258}});
+		m.insert({{1,x.first,x.second[x.second.size()-1]+1,
+			(int_t)x.second.size()+256,null}});
+	}
 	prog = new lp(move(m), move(g), move(pg), prog);
 	if (!s.empty())
 		for (size_t x : builtin_rels) // to suppress builtins on output

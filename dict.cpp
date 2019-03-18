@@ -17,7 +17,7 @@ pair<cws, size_t> driver::dict_get(int_t t) const {
 	assert(t);
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
 	if (t > nums) return { syms[t - nums], lens[t - nums] };
-	if (t < 256) { str_chr[1] = t; return { str_chr, (size_t)3 }; }
+	if (t < 256) { str_chr[1] = --t; return { str_chr, (size_t)3 }; }
 	wcscpy(str_nums, to_wstring(t-256).c_str());
 	return { str_nums, wcslen(str_nums) };
 }
