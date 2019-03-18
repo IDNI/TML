@@ -38,6 +38,7 @@ using namespace std;
 #define err_term_or_dot "term or dot expected.\n"
 #define err_close_curly "'}' expected.\n"
 #define err_fnf "file not found.\n"
+#define err_rule_dir_prod_expected "rule or production or directive expected.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -125,7 +126,6 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	if (*l[pos][0] == '.') return ++pos, true;
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-') return pos=curr, false;
 	++pos;
-	//er(err_chr);
 	raw_term t;
 	while (t.parse(l, pos)) {
 		if (b.push_back(t), *l[pos][0] == '.') return ++pos, true;
@@ -169,7 +169,7 @@ raw_progs::raw_progs(const std::wstring& s) {
 	lexemes l = prog_lex(wcsdup(s.c_str()));
 	if (*l[pos][0] != L'{') {
 		raw_prog x;
-		if (!x.parse(l, pos)) er(err_parse);
+		if (!x.parse(l, pos)) er(err_rule_dir_prod_expected);
 		p.push_back(x);
 	} else do {
 		raw_prog x;

@@ -144,20 +144,22 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
 		vars = bdd_and(vars, hsym);
 		goto ret;
 	}*/
-	for (const body& b : bd) {
+	vector<size_t> v(bd.size() + eqs.size() + 1);
+	size_t i = 0;
+	for (const body& b : bd)
+		if (F == (vars = b.varbdd(db, s))) return F;
+		else v[i++] = vars;
+	for (size_t n : eqs) v[i++] = n;
+	v[i] = hsym;
+	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
+	if (!proof2.empty()) p.emplace(vars);
+	return bdd_deltail(vars, bits * ar);
+
+	for (const body& b : bd)
 		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
-//		v.push_back(vars);
-	}
 	for (n=eqs.size(); n;) if (F==(vars=bdd_and(vars, eqs[--n]))) return F;
 	vars = bdd_and(vars, hsym);
-//	v.push_back(hsym);
-//	if (F == (vars = bdd_and_many(v))) return false;
-/*ret:*/if (!proof2.empty()) p.emplace(vars);
-//	wcout<<"vars solutions#: " << bdd_count(vars, vars_arity * bits) << endl;
-//	DBG(printbdd_one(wcout<<"one: ", vars, bits, vars_arity);)
-/*	wcout<<"vars solutions#: " << bdd_count(bdd_deltail(vars, bits * ar),
-		ar * bits) << endl;
-	DBG(printbdd(wcout, bdd_deltail(vars, bits * ar));)*/
+	if (!proof2.empty()) p.emplace(vars);
 	return bdd_deltail(vars, bits * ar);
 }
 

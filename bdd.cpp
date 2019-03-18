@@ -10,8 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "bdd.h"
+#include <map>
 #include <cassert>
+#include "bdd.h"
 
 using namespace std;
 
@@ -195,16 +196,15 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many(const vector<size_t>& v) {
-	size_t from = 0;
-	if (1 == (v.size() - from)) return v[from];
+size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
+	if (1 == (to - from)) return v[from];
 	while (leaf(v[from]))
 		if (!trueleaf(v[from])) return F;
-		else if (1 == (v.size() - ++from)) return v[from];
-	size_t m = getnode(v[from])[0], i, t = v[from];
+		else if (1 == (to - ++from)) return v[from];
+	size_t m = getnode(v[from])[0], i, t = v[from], sz = v.size(), t1, t2;
 	node n;
 	bool b = false, eq = true;
-	for (i = from + 1; i != v.size(); ++i) {
+	for (i = from + 1; i != to; ++i) {
 		if (leaf(v[i])) {
 			if (!trueleaf(v[i])) return F;
 			continue;
@@ -213,17 +213,19 @@ size_t bdd_and_many(const vector<size_t>& v) {
 		if (n[0] < m) m = n[0];
 	}
 	if (eq) return t;
-	vector<size_t> v1, v2;
-	v1.reserve(v.size() - from), v2.reserve(v.size() - from);
-	for (i = from; i != v.size(); ++i)
+//	vector<size_t> v1, v2;
+//	v1.reserve(v.size() - from), v2.reserve(v.size() - from);
+	for (i = from; i != to; ++i)
 		if (!b || getnode(v[i])[0] == m)
-			v1.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
-		else v1.push_back(v[i]);
-	for (i = from; i != v.size(); ++i)
+			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
+		else v.push_back(v[i]);
+	t1 = v.size();
+	for (i = from; i != to; ++i)
 		if (!b || getnode(v[i])[0] == m)
-			v2.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[2]);
-		else v2.push_back(v[i]);
-	return bdd_add({{ m, bdd_and_many(v1), bdd_and_many(v2) }});
+			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[2]);
+		else v.push_back(v[i]);
+	t2 = v.size();
+	return bdd_add({{m, bdd_and_many(v, sz, t1), bdd_and_many(v, t1, t2)}});
 }
 /*
 size_t bdd_and_ex(size_t x, size_t y, const bools& s) {
@@ -347,8 +349,12 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 }
 
 void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
+	static map<array<size_t, 3>, size_t> m;
+	auto it = m.find({max, bits, offset});
+	if (it != m.end()) { r = bdd_and(it->second, r); return; }
 	size_t x = F;
 	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
+	m[{max, bits, offset}] = x;
 	r = bdd_and(r, x);
 }
 
