@@ -143,8 +143,9 @@ bool lp::pfp() {
 		if (s.find(db) != s.end()) return false;
 	}
 //	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
-	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
-	return db = prove(), ar = proof2->ar, bits = proof2->bits, true;
+	if (proof1) return db=prove(), ar=proof2->ar, bits = proof2->bits, true;
+	if (gbdd != F) db = bdd_and(gbdd, db);
+	return true;
 }
 
 size_t lp::prove() const {
@@ -159,7 +160,8 @@ size_t lp::prove() const {
 	assert(del == F);
 	assert(proof2->pfp());
 	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
-	return bdd_and_not(proof2->db, get_sym_bdd(null, 0));
+	if (gbdd == F) return bdd_and_not(proof2->db, get_sym_bdd(null, 0));
+	return bdd_and(gbdd, bdd_and_not(proof2->db, get_sym_bdd(null, 0)));
 }
 
 size_t lp::get_varbdd(size_t par) const {
