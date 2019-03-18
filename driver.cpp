@@ -31,7 +31,7 @@ term driver::get_term(const raw_term& r) {
 	term t;
 	t.push_back(r.neg ? -1 : 1);
 	for (const elem& e : r.e)
-		if (e.type == elem::NUM) t.push_back(e.num);
+		if (e.type == elem::NUM) t.push_back(e.num+256);
 		else if (e.type == elem::CHR) t.push_back(*e.e[0]+1);
 		else t.push_back(dict_get(e.e));
 	return t;
@@ -78,11 +78,11 @@ size_t get_nums(const raw_prog& p) {
 	for (const raw_rule& r : p.r) {
 		for (const elem& e : r.h.e)
 			if (e.type == elem::NUM)
-				nums = max(nums, e.num);
+				nums = max(nums, e.num+256);
 		for (const raw_term& t : r.b)
 			for (const elem& e : t.e)
 				if (e.type == elem::NUM)
-					nums = max(nums, e.num);
+					nums = max(nums, e.num+256);
 	}
 	return nums;
 }
@@ -99,10 +99,13 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 	return r;
 }
 
-void driver::prog_init(const raw_prog& p, const matrices& rtxt,const strs_t& s){
+void driver::prog_init(const raw_prog& p, const strs_t& s){
 	matrices m;
 	matrix g, pg;
-	m.insert(rtxt.begin(), rtxt.end());
+	if (!p.d.empty()) {
+		matrices rtxt = get_char_builtins();
+		m.insert(rtxt.begin(), rtxt.end());
+	}
 	for (const raw_rule& x : p.r)
 		if (x.goal && !x.pgoal)
 			assert(x.b.empty()), g.push_back(get_term(x.h));
@@ -119,18 +122,11 @@ void driver::prog_init(const raw_prog& p, const matrices& rtxt,const strs_t& s){
 
 driver::driver(const raw_progs& rp) {
 	DBG(drv = this;)
-	bool txt;
-	size_t ntxt = 0;
-	matrices rtxt;
 	syms.push_back(0), lens.push_back(0);
-	null = dict_get(L"null");
 	for (size_t n = 0; n != rp.p.size(); ++n)
-		if ((txt = (nums=max((size_t)nums, get_nums(rp.p[n])))))
-			ntxt = min(ntxt, n);
-	if (txt) rtxt = get_char_builtins();
-	for (size_t n = 0; n != rp.p.size(); ++n)
-		prog_init(rp.p[n], n >= ntxt ? rtxt : matrices(),
-			directives_load(rp.p[n]));
+		nums = max((size_t)nums, get_nums(rp.p[n])),
+		null = dict_get(L"null"),
+		prog_init(rp.p[n], directives_load(rp.p[n]));
 }
 
 bool driver::pfp() {

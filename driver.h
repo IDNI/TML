@@ -32,7 +32,6 @@ class driver {
 	size_t nsyms() const { return syms.size() + nums; }
 //	size_t dict_bits() const { return msb(nsyms()); }
 	typedef std::map<int_t, std::wstring> strs_t;
-//	std::vector<std::map<int_t, std::wstring>> strs;
 	std::set<wstr> strs_extra;
 	std::set<size_t> builtin_rels, builtin_symbdds;
 
@@ -50,8 +49,7 @@ class driver {
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
 	strs_t directives_load(const raw_prog& p);
-//	void calc_lens(const raw_prog& rp, size_t& ar);
-	void prog_init(const raw_prog& rp, const matrices& rtxt, const strs_t&);
+	void prog_init(const raw_prog& rp, const strs_t&);
 	void progs_read(wstr s);
 	bool pfp(lp *p);
 	driver(const raw_progs& rp);
