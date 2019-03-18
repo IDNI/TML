@@ -99,9 +99,32 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 	return r;
 }
 
+void driver::grammar_to_rules(const vector<production>& g, matrices& m,
+	int_t rel) {
+	for (const production& p : g) {
+		if (p.p.size() < 2) er("empty production.\n");
+		matrix t;
+		t.push_back({1, dict_get(p.p[0].e), -1, -(int_t)p.p.size()});
+		int_t v = -1;
+		for (size_t n = 1; n < p.p.size(); ++n, --v)
+			if (p.p[n].type == elem::SYM)
+				t.push_back({1, dict_get(p.p[n].e), v, v-1});
+			else if (p.p[n].type == elem::CHR) {
+				if(!n)er("grammar lhs cannot be a terminal.\n");
+				t.push_back({1, rel, *p.p[n].e[0]+1, v, v-1});
+			} else
+				er("unexpected grammar node.\n");
+		m.emplace(move(t));
+	}
+	wcout << m << endl;
+}
+
 void driver::prog_init(const raw_prog& p, const strs_t& s){
 	matrices m;
 	matrix g, pg;
+	if (p.g.size() && s.size() > 1)
+		er("only one string allowed given grammar.\n");
+	grammar_to_rules(p.g, m, s.begin()->first);
 	if (!p.d.empty()) {
 		matrices rtxt = get_char_builtins();
 		m.insert(rtxt.begin(), rtxt.end());

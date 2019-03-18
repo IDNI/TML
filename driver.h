@@ -49,6 +49,8 @@ class driver {
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
 	strs_t directives_load(const raw_prog& p);
+	void grammar_to_rules(const std::vector<production>& g, matrices& m,
+		int_t rel);
 	void prog_init(const raw_prog& rp, const strs_t&);
 	void progs_read(wstr s);
 	bool pfp(lp *p);

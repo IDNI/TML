@@ -41,6 +41,11 @@ struct raw_term {
 	bool parse(const lexemes& l, size_t& pos);
 };
 
+struct production {
+	std::vector<elem> p;
+	bool parse(const lexemes& l, size_t& pos);
+};
+
 struct raw_rule {
 	raw_term h;
 	std::vector<raw_term> b;
@@ -50,6 +55,7 @@ struct raw_rule {
 
 struct raw_prog {
 	std::vector<directive> d;
+	std::vector<production> g;
 	std::vector<raw_rule> r;
 	bool parse(const lexemes& l, size_t& pos);
 };

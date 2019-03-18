@@ -33,7 +33,8 @@ using namespace std;
 #define err_lex "lexer error (please report as a bug).\n"
 #define err_parse "parser error (please report as a bug).\n"
 #define err_chr "unexpected character.\n"
-#define err_body "rules' body expected.\n"
+#define err_body "rule's body expected.\n"
+#define err_prod "production's body expected.\n"
 #define err_term_or_dot "term or dot expected.\n"
 #define err_close_curly "'}' expected.\n"
 #define err_fnf "file not found.\n"
@@ -58,7 +59,7 @@ lexeme lex(pcws s) {
 		return { t, ++++++*s };
 	}
 	if (**s == L':') {
-		if (*++*s == L'-') return ++*s, lexeme{ *s-2, *s };
+		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else er(err_chr);
 	}
 	if (wcschr(L"!~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
@@ -116,12 +117,14 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
 	if ((goal = *l[pos][0] == L'!'))
 		if ((pgoal = *l[++pos][0] == L'!'))
 			++pos;
-	if (!h.parse(l, pos)) return false;
+	if (!h.parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos++][0] != ':') er(err_chr);
+	if (*l[pos++][0] != ':' || l[pos][0][1] != L'-') return pos=curr, false;
+	//er(err_chr);
 	raw_term t;
 	while (t.parse(l, pos)) {
 		if (b.push_back(t), *l[pos][0] == '.') return ++pos, true;
@@ -131,12 +134,28 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	er(err_body);
 }
 
+bool production::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
+	elem e;
+	e.parse(l, pos);
+	if (*l[pos][0] != ':' || l[pos][0][1] != L'=') return pos = curr, false;
+	for (++pos, p.push_back(e);;) {
+		elem e;
+		if (*l[pos][0] == '.') return ++pos, true;
+		if (!e.parse(l, pos)) return false;
+		p.push_back(e);
+	}
+	er(err_prod);
+}
+
 bool raw_prog::parse(const lexemes& l, size_t& pos) {
 	while (pos < l.size() && *l[pos][0] != L'}') {
 		directive x;
 		raw_rule y;
+		production p;
 		if (x.parse(l, pos)) d.push_back(x);
 		else if (y.parse(l, pos)) r.push_back(y);
+		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
 	return true;
