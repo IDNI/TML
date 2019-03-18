@@ -38,6 +38,9 @@ rule::body::body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars)
 	t.erase(t.begin()), 
 	ex.resize(bits*ar,false), perm.resize((ar+nvars)*bits);
 	for (b = 0; b != (ar + nvars) * bits; ++b) perm[b] = b;
+	for (j = 0; j != ar; ++j)
+		if (t[j] >= 0)
+			from_int_and(t[j], bits, j * bits, sel);
 	for (j = 0; j != ar; ++j) from_arg(t[j], j, bits, dsz, m);
 }
 
@@ -46,8 +49,8 @@ void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 	auto it = m.end();
 	vector<array<size_t, 2>> eq;
 	if (vij >= 0) // sym
-		vecfill(ex, j * bits, (j+1) * bits, true),
-		from_int_and(vij, bits, j * bits, sel);
+		vecfill(ex, j * bits, (j+1) * bits, true);
+//		from_int_and(vij, bits, j * bits, sel);
 	else if ((it = m.find(vij)) != m.end()) { //seen var
 		vecfill(ex, j * bits, (j+1) * bits, true);
 		for (size_t b = 0; b != bits; ++b)

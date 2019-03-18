@@ -21,6 +21,7 @@
 #include "driver.h"
 using namespace std;
 
+#define err_null "'null' can appear only by itself on the rhs.\n"
 #define err_null_in_head \
 	"'null' not allowed to appear in the head of positive rules.\n"
 
@@ -106,15 +107,17 @@ void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 		matrix t;
 		if (p.p.size() == 2 && p.p[1].type == elem::SYM &&
 			null == dict_get(p.p[1].e)) {
-			m.insert({{1, dict_get(p.p[0].e), -1, -1}});
+			m.insert({{1, dict_get(p.p[0].e), -1, -1},
+				{1, rel, -2, -1, -3}});
+			m.insert({{1, dict_get(p.p[0].e), -1, -1},
+				{1, rel, -2, -3, -1}});
 			continue;
 		}
 		t.push_back({1, dict_get(p.p[0].e), -1, -(int_t)p.p.size()});
 		int_t v = -1, x;
 		for (size_t n = 1; n < p.p.size(); ++n, --v)
 			if (p.p[n].type == elem::SYM) {
-				if (null == (x = dict_get(p.p[n].e)))
-					er("null can appear only by itself on the rhs.\n");
+				if (null==(x=dict_get(p.p[n].e))) er(err_null);
 				t.push_back({1, dict_get(p.p[n].e), v, v-1});
 			}
 			else if (p.p[n].type == elem::CHR) {
@@ -123,7 +126,7 @@ void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 			} else er("unexpected grammar node.\n");
 		m.emplace(move(t));
 	}
-	wcout << m << endl;
+//	wcout << m << endl;
 }
 
 void driver::prog_init(const raw_prog& p, const strs_t& s){
