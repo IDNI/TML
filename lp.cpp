@@ -59,6 +59,7 @@ lp::lp(matrices r, matrix g, matrix pg, lp *prev) : pgoals(move(pg)),prev(prev){
 			ar = max(ar, t.size() - 1);
 			for (int_t i : t) if (i > 0) dsz = max(dsz, (size_t)i);
 		}
+	dsz = max(prev?prev->dsz:dsz+1, dsz+1);
 	for (const term& t : g)
 		if (t.size()-1 > ar) er(err_goalarity);
 		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
@@ -66,7 +67,6 @@ lp::lp(matrices r, matrix g, matrix pg, lp *prev) : pgoals(move(pg)),prev(prev){
 		if (t.size()-1 > ar) er(err_goalarity);
 		else for (int_t i : t)
 			if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
-	dsz = max(prev?prev->dsz:dsz+1, dsz+1);
 	rules_pad(r), rule_pad(g), rule_pad(pgoals), bits = msb(dsz);
 	for (const matrix& m : r)
  		if (m.size() == 1) db = bdd_or(db, fact(m[0], bits));
@@ -117,8 +117,8 @@ void lp::fwd(size_t &add, size_t &del) {
 	for (rule* r : rules)
 		(r->neg ?del : add) =
 			bdd_or(r->fwd(db,bits,ar,cache),r->neg?del:add);
-	DBG(printbdd(wcout<<"add:"<<endl,this,add););
-	DBG(printbdd(wcout<<"del:"<<endl,this,del););
+//	DBG(printbdd(wcout<<"add:"<<endl,this,add););
+//	DBG(printbdd(wcout<<"del:"<<endl,this,del););
 }
 
 size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
@@ -126,7 +126,7 @@ size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
 }
 
 bool lp::pfp() {
-	DBG(wcout<<"next prog"<<endl;)
+//	DBG(wcout<<"next prog"<<endl;)
 	if (prev) {
 		if (!prev->pfp()) return false;
 		db = bdd_or(db, align(prev->db, prev->ar, prev->bits, ar,bits));
@@ -142,19 +142,23 @@ bool lp::pfp() {
 		if (d == db) break;
 		if (s.find(db) != s.end()) return false;
 	}
-	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
-	return db = prove(), true;
+//	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
+	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
+	return db = prove(), ar = proof2->ar, bits = proof2->bits, true;
 }
 
 size_t lp::prove() const {
-	size_t del;
-	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
+	size_t add, del;
 	proof1->db = get_varbdd(proof1->ar);
-	proof1->fwd(proof2->db = F, del = F);
+	DBG(printbdd(wcout<<"p1db before:"<<endl,proof1,proof1->db)<<endl;);
+	proof1->fwd(add = F, del = F);
+	proof2->db = bdd_or(proof2->db, add);
+//	DBG(printbdd(wcout<<"add:"<<endl,proof1,proof1->db)<<endl;);
+	DBG(printbdd(wcout<<"p2db before:"<<endl,proof2,proof2->db)<<endl;);
 	proof2->prev = 0;
-	DBG(printbdd(wcout<<"del in prove:"<<endl,this,del)<<endl;);
 	assert(del == F);
 	assert(proof2->pfp());
+	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
 	return bdd_and_not(proof2->db, get_sym_bdd(null, 0));
 }
 
