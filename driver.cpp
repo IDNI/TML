@@ -100,14 +100,14 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 }
 
 void driver::prog_init(const raw_prog& p, const matrices& rtxt,const strs_t& s){
-	matrices m, pg;
-	matrix g;
+	matrices m;
+	matrix g, pg;
 	m.insert(rtxt.begin(), rtxt.end());
 	for (const raw_rule& x : p.r)
-		if (x.goal && !x.pgoal) {
-			assert(x.b.empty());
-			g.push_back(get_term(x.h));
-		} else (x.pgoal ? pg : m).insert(get_rule(x));
+		if (x.goal && !x.pgoal)
+			assert(x.b.empty()), g.push_back(get_term(x.h));
+		else if (x.pgoal) assert(x.b.empty()),pg.push_back(get_term(x.h));
+		else m.insert(get_rule(x));
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			m.insert({{1,x.first,x.second[n]+1,n+257,n+258}});
@@ -156,9 +156,11 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 
 #ifdef DEBUG
 driver* drv;
-wostream& printdb(wostream& os, lp* p) { return drv->printdb(os, p); }
-wostream& printbdd(wostream& os, lp* p, size_t t){return drv->printbdd(os,p,t);}
-wostream& printbdd_one(wostream& os, lp* p, size_t t) {
+wostream& printdb(wostream& os, const lp* p) { return drv->printdb(os, p); }
+wostream& printbdd(wostream& os, const lp* p, size_t t){
+	return drv->printbdd(os,p,t);
+}
+wostream& printbdd_one(wostream& os, const lp* p, size_t t) {
 	return drv->printbdd_one(os, p, t);
 }
 #endif
@@ -168,12 +170,14 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	return os;
 }
 
-wostream& driver::printbdd(wostream& os, lp *p, size_t t) const {
+wostream& driver::printbdd(wostream& os, const lp *p, size_t t) const {
 	return printbdd(os, p->getbdd(t));
 }
 
-wostream& driver::printbdd_one(wostream& os, lp *p, size_t t) const {
+wostream& driver::printbdd_one(wostream& os, const lp *p, size_t t) const {
 	os << "one of " << bdd_count(t, p->bits * p->ar) << " results: ";
 	return printbdd(os, p->getbdd_one(t));
 }
-wostream& driver::printdb(wostream& os, lp*p)const{return printbdd(os,p,p->db);}
+wostream& driver::printdb(wostream& os, const lp *p)const{
+	return printbdd(os,p,p->db);
+}

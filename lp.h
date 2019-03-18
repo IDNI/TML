@@ -29,29 +29,26 @@ class lp { // [pfp] logic program
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
 	} cache;
 	std::vector<struct rule*> rules;
-	matrices pgoals;
+	matrix pgoals;
 	void term_pad(term& t);
 	void rule_pad(matrix& t);
 	matrix rule_pad(const matrix& t);
 	void rules_pad(matrices& t);
 	matrices get_proof1() const;
 	matrices get_proof2() const;
-	matrices get_proof3() const;
 	size_t prove() const;
-	lp *prev, *proof1 = 0, *proof2 = 0, *proof3 = 0;
+	lp *prev, *proof1 = 0, *proof2 = 0;
 	size_t gbdd = F;
 public:
 	size_t bits, ar, dsz, db = F;
 
-	lp(matrices r, matrix g, matrices pg, lp *prev = 0);
+	lp(matrices r, matrix g, matrix pg, lp *prev = 0);
 	void fwd(size_t &add, size_t &del);
 	bool pfp();
 
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
 	matrix getdb() const;
-//	matrix getbdd(size_t t, size_t b, size_t a) const;
-//	matrix getbdd_one(size_t t, size_t b, size_t a) const;
 	size_t get_sym_bdd(size_t sym, size_t pos) const;
 	size_t get_varbdd(size_t ar) const;
 	size_t maxw() const;
@@ -61,4 +58,5 @@ public:
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
 std::wostream& out(std::wostream& os, size_t n);
 const int_t pad = 0;
+extern int_t null;
 #endif

@@ -61,16 +61,16 @@ public:
 	bool pfp();
 
 	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
-	std::wostream& printbdd(std::wostream& os, lp *p, size_t t) const;
-	std::wostream& printbdd_one(std::wostream& os, lp *p, size_t t) const;
-	std::wostream& printdb(std::wostream& os, lp*) const;
+	std::wostream& printbdd(std::wostream& os, const lp *p, size_t t) const;
+	std::wostream& printbdd_one(std::wostream& os, const lp *p, size_t t)
+		const;
+	std::wostream& printdb(std::wostream& os, const lp*) const;
 	~driver() { if (prog) delete prog; for (wstr w:strs_extra) free(w);}
 };
 
-extern int_t null;
 #ifdef DEBUG
 extern driver* drv;
-std::wostream& printdb(std::wostream& os, lp*);
-std::wostream& printbdd(std::wostream& os, lp*, size_t t);
-std::wostream& printbdd_one(std::wostream& os, lp*, size_t t);
+std::wostream& printdb(std::wostream& os, const lp*);
+std::wostream& printbdd(std::wostream& os, const lp*, size_t t);
+std::wostream& printbdd_one(std::wostream& os, const lp*, size_t t);
 #endif

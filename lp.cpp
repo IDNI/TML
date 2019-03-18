@@ -50,47 +50,31 @@ size_t fact(term v, size_t bits) {
 	return v[0] < 0 ? bdd_and_not(T, r) : r;
 }
 
-lp::lp(matrices r, matrix g, matrices pg, lp *prev) 
-	: pgoals(move(pg)), prev(prev) {
-	if (prev) ar = prev->ar, dsz = prev->dsz;
-	else ar = dsz = 0;
+lp::lp(matrices r, matrix g, matrix pg, lp *prev) : pgoals(move(pg)),prev(prev){
+	dsz = 0;
+	if (prev) ar = prev->ar;
+	else ar = 0;
 	for (const matrix& m : r)
 		for (const term& t : m) {
 			ar = max(ar, t.size() - 1);
-			for (int_t i : t)
-				if (i > 0) dsz = max(dsz, (size_t)i);
+			for (int_t i : t) if (i > 0) dsz = max(dsz, (size_t)i);
 		}
 	for (const term& t : g)
 		if (t.size()-1 > ar) er(err_goalarity);
 		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
-	for (const matrix& m : pgoals)
-		for (const term& t : m)
-			if (t.size()-1 > ar) er(err_goalarity);
-			else for (int_t i:t)
-				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
-	if (!prev || dsz != prev->dsz) ++dsz;
-	rules_pad(r), rule_pad(g), rules_pad(pgoals), bits = msb(dsz);
+	for (const term& t : pgoals)
+		if (t.size()-1 > ar) er(err_goalarity);
+		else for (int_t i : t)
+			if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
+	dsz = max(prev?prev->dsz:dsz+1, dsz+1);
+	rules_pad(r), rule_pad(g), rule_pad(pgoals), bits = msb(dsz);
 	for (const matrix& m : r)
  		if (m.size() == 1) db = bdd_or(db, fact(m[0], bits));
 		else rules.emplace_back(new rule(m, bits, dsz,!pgoals.empty()));
 	if (!pgoals.empty())
-		proof1 = new lp(get_proof1(), matrix(), matrices()),
-		proof2 = new lp(get_proof2(), matrix(), matrices()),
-		proof3 = new lp(get_proof3(), matrix(), matrices());
+		proof1 = new lp(move(get_proof1()), matrix(), matrix(), this),
+		proof2 = new lp(move(get_proof2()), matrix(), matrix(), proof1);
 	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits));
-}
-
-size_t lp::prove() const {
-	size_t del;
-	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
-	proof1->db = get_varbdd(proof1->ar);
-	proof1->fwd(proof2->db, del);
-	assert(del == F);
-	assert(proof2->pfp());
-	proof3->db = proof2->db;
-	assert(proof3->pfp());
-	return bdd_or(bdd_pad(bdd_and(gbdd, db), ar, proof3->ar, pad, bits),
-		proof3->db);
 }
 
 matrices lp::get_proof1() const {
@@ -101,13 +85,11 @@ matrices lp::get_proof1() const {
 
 matrices lp::get_proof2() const {
 	matrices p;
+	matrix m;
 	for (const rule* r : rules) p.insert(r->proof2.begin(),r->proof2.end());
-	return p;
-}
-
-matrices lp::get_proof3() const {
-	matrices p;
-	for (const rule* r : rules) p.insert(r->proof3.begin(),r->proof3.end());
+	for (const term& t : pgoals)
+		m.resize(1), m[0] = t, m[0].insert(m[0].begin()+1, null),
+		p.insert(move(m));
 	return p;
 }
 
@@ -135,6 +117,8 @@ void lp::fwd(size_t &add, size_t &del) {
 	for (rule* r : rules)
 		(r->neg ?del : add) =
 			bdd_or(r->fwd(db,bits,ar,cache),r->neg?del:add);
+	DBG(printbdd(wcout<<"add:"<<endl,this,add););
+	DBG(printbdd(wcout<<"del:"<<endl,this,del););
 }
 
 size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
@@ -142,6 +126,7 @@ size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
 }
 
 bool lp::pfp() {
+	DBG(wcout<<"next prog"<<endl;)
 	if (prev) {
 		if (!prev->pfp()) return false;
 		db = bdd_or(db, align(prev->db, prev->ar, prev->bits, ar,bits));
@@ -159,6 +144,18 @@ bool lp::pfp() {
 	}
 	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
 	return db = prove(), true;
+}
+
+size_t lp::prove() const {
+	size_t del;
+	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
+	proof1->db = get_varbdd(proof1->ar);
+	proof1->fwd(proof2->db = F, del = F);
+	proof2->prev = 0;
+	DBG(printbdd(wcout<<"del in prove:"<<endl,this,del)<<endl;);
+	assert(del == F);
+	assert(proof2->pfp());
+	return bdd_and_not(proof2->db, get_sym_bdd(null, 0));
 }
 
 size_t lp::get_varbdd(size_t par) const {
@@ -209,9 +206,9 @@ matrix lp::getdb() const { return getbdd(db); }
 matrix lp::getbdd(size_t t) const { return from_bits(t,bits,ar); }
 matrix lp::getbdd_one(size_t t) const { return {one_from_bits(t,bits,ar)}; }
 lp::~lp() {
-	for (rule* r : rules) delete r;
-	if (prev) delete prev;
-	if (proof1) delete proof1, delete proof2, delete proof3;
+//	for (rule* r : rules) delete r;
+//	if (prev) delete prev;
+//	if (proof1) delete proof1, delete proof2;
 }
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(

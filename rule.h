@@ -31,7 +31,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	std::vector<size_t> eqs;
 	std::set<size_t> p;
 	matrix proof1;
-	matrices proof2, proof3;
+	matrices proof2;
 
 	rule() {}
 	rule(matrix v, size_t bits, size_t dsz, bool proof);
