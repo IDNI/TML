@@ -123,7 +123,8 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 			++pos;
 	if (!h.parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos++][0] != ':' || l[pos][0][1] != L'-') return pos=curr, false;
+	if (*l[pos][0] != ':' || l[pos][0][1] != L'-') return pos=curr, false;
+	++pos;
 	//er(err_chr);
 	raw_term t;
 	while (t.parse(l, pos)) {
