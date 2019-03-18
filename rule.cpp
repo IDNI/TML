@@ -72,10 +72,10 @@ ret:	(neg ? p.neg : p.pos).emplace(make_pair(r, ex), r);
 	return r == F ? F : bdd_permute(r, perm);
 }
 
-rule::rule(matrix v, size_t bits, size_t dsz, const matrices& /*pgoals*/) {
+rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
+	assert(v.size() > 1);
 	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
-	wcout << v << endl;
 	for (i = 1; i != v.size(); ++i)
 		bd.emplace_back(v[i], ar, bits, dsz, nvars);
 	vector<array<size_t, 2>> heq;
@@ -100,20 +100,40 @@ rule::rule(matrix v, size_t bits, size_t dsz, const matrices& /*pgoals*/) {
 					bd[i].perm[b+j*bits]=b+it->second*bits;
 			}
 	vars_arity = k;
-	DBG(wcout << v << endl;)
-/*	if (!prf || v.size() == 1) return;
+
+	if (!proof) return;
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
-	proof.resize(2), proof[0].push_back(1), proof[1].push_back(1),
-	veccat(proof[0], v[0]), veccat(proof[1], v[0]);
-	for (auto x : m) if (x.second >= ar) proof[1].push_back(x.first);
-	for (i = 0; i != bd.size(); ++i) veccat(proof[0], v[i+1]);*/
+
+	proof1[0].push_back(1), veccat(proof1[0], v[0]), 
+	proof1[1].push_back(1), veccat(proof1[1], v[0]);
+	for (auto x : m) if (x.second >= ar) proof1[1].push_back(x.first);
+	for (i = 0; i != bd.size(); ++i) veccat(proof1[0], v[i+1]);
+	matrix t;
+	for (i = 0; i != bd.size(); ++i)
+		t.resize(3),
+		t[0].push_back(1), t[0].push_back(0), veccat(t[0], v[i+1]),
+		t[1].push_back(1), veccat(t[1], proof1[0]),
+		t[2].push_back(1), t[2].push_back(0), veccat(t[2], v[0]), 
+		proof2.emplace(move(t));
+	for (i = 0; i != v.size(); ++i)
+		t.resize(2),
+		t[0].push_back(-1), veccat(t[0], v[i]),
+		t[1].push_back(-1), t[1].push_back(0), veccat(t[1], v[i]), 
+		proof3.emplace(move(t)), t.resize(2),
+		t[0].push_back(-1), t[0].push_back(0), veccat(t[0], v[i]),
+		t[1].push_back(1), t[1].push_back(0), veccat(t[1], v[i]),
+		proof3.emplace(move(t));
+		// last 3 lines to replace with deletion of all beginning with *
+		// the 3 lines before are wrong as it deletes unreachable
+		// terms instead of concated rules.
+
 //	for (j = 0; j != prf[0].size(); ++j)
 //		if (prf[0][j] == pad) prf[0].erase(prf[0].begin()+j--);
 //	for (i = 0; i != prf.size(); ++i)
 //		proof_arity = max(proof_arity, prf[i].size() - 1);
 //	proof_arity = v.size() * ar;
-	DBG(wcout << proof << endl;)
+//	DBG(wcout << proof << endl;)
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
@@ -142,7 +162,7 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
 	vars = bdd_and(vars, hsym);
 //	v.push_back(hsym);
 //	if (F == (vars = bdd_and_many(v))) return false;
-/*ret:*/if (!proof.empty()) p.emplace(vars);
+/*ret:*/if (!proof2.empty()) p.emplace(vars);
 //	wcout<<"vars solutions#: " << bdd_count(vars, vars_arity * bits) << endl;
 	DBG(printbdd_one(wcout<<"one: ", vars, bits, vars_arity);)
 /*	wcout<<"vars solutions#: " << bdd_count(bdd_deltail(vars, bits * ar),

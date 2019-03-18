@@ -44,7 +44,7 @@ struct raw_term {
 struct raw_rule {
 	raw_term h;
 	std::vector<raw_term> b;
-	bool goal, pgoal;
+	bool goal, pgoal = false;
 	bool parse(const lexemes& l, size_t& pos);
 };
 

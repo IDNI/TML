@@ -30,10 +30,11 @@ struct rule { // a P-DATALOG rule in bdd form
 	std::vector<body> bd;
 	std::vector<size_t> eqs;
 	std::set<size_t> p;
-	matrix proof;
+	matrix proof1;
+	matrices proof2, proof3;
 
 	rule() {}
-	rule(matrix v, size_t bits, size_t dsz, const matrices& pgoals);
+	rule(matrix v, size_t bits, size_t dsz, bool proof);
 	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s);
 	size_t get_varbdd(size_t bits, size_t ar) const;
 };

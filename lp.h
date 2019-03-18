@@ -29,35 +29,31 @@ class lp { // [pfp] logic program
 		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
 	} cache;
 	std::vector<struct rule*> rules;
-	matrices goals, pgoals;
+	matrices pgoals;
 	void term_pad(term& t);
 	void rule_pad(matrix& t);
 	matrix rule_pad(const matrix& t);
 	void rules_pad(matrices& t);
-	lp *prev;
-//	matrix lens;
+	matrices get_proof1() const;
+	matrices get_proof2() const;
+	matrices get_proof3() const;
+	size_t prove() const;
+	lp *prev, *proof1 = 0, *proof2 = 0, *proof3 = 0;
+	size_t gbdd = F;
 public:
-	size_t bits, ar, dsz;
-	size_t db = F; // db's bdd root
+	size_t bits, ar, dsz, db = F;
 
-	lp(matrices r, matrices g, matrices pg, lp *prev = 0);
-//	lp(size_t maxbits,size_t ar,size_t dsz):bits(maxbits),ar(ar),dsz(dsz) {}
-//	void rule_add(const matrix& t);
-//	void goal_add(const matrix& t);
-//	void pgoal_add(const matrix& t);
+	lp(matrices r, matrix g, matrices pg, lp *prev = 0);
 	void fwd(size_t &add, size_t &del);
 	bool pfp();
-	matrices get_proof_rules() const;
 
-//	matrix lenmap() const { return lens; }
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
 	matrix getdb() const;
 	matrix getbdd(size_t t, size_t b, size_t a) const;
 	matrix getbdd_one(size_t t, size_t b, size_t a) const;
 	size_t get_sym_bdd(size_t sym, size_t pos) const;
-//	size_t proof_arity() const;
-	size_t get_varbdd() const;
+	size_t get_varbdd(size_t ar) const;
 	size_t maxw() const;
 	~lp();
 };

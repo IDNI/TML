@@ -105,10 +105,14 @@ void driver::calc_lens(const raw_prog& p, size_t& ar) {
 }
 */
 void driver::prog_init(const raw_prog& p, const matrices& rtxt,const strs_t& s){
-	matrices m, g, pg;
+	matrices m, pg;
+	matrix g;
 	m.insert(rtxt.begin(), rtxt.end());
 	for (const raw_rule& x : p.r)
-		(x.goal ? x.pgoal ? pg : g : m).insert(get_rule(x));
+		if (x.goal && !x.pgoal) {
+			assert(x.b.empty());
+			g.push_back(get_term(x.h));
+		} else (x.pgoal ? pg : m).insert(get_rule(x));
 	for (auto x : s)
 		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			m.insert({{1,x.first,x.second[n]+1,n+257,n+258}});

@@ -39,8 +39,20 @@ wostream& operator<<(wostream& os, const vbools& x);
 wostream& operator<<(wostream& os, const matrix& m);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
-lp::lp(matrices r, matrices g, matrices pg, lp *prev) 
-	: goals(move(g)), pgoals(move(pg)), prev(prev) {
+size_t fact(term v, size_t bits) {
+	size_t r = T;
+	map<int_t, size_t> m;
+	auto it = m.end();
+	for (size_t j = 0; j != v.size() - 1; ++j)
+		if (v[j+1] >= 0) from_int_and(v[j+1], bits, j * bits, r);
+		else if (m.end() == (it = m.find(v[j+1]))) m.emplace(v[j+1],j);
+		else for (size_t b = 0; b!=bits; ++b)
+			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
+	return v[0] < 0 ? bdd_and_not(T, r) : r;
+}
+
+lp::lp(matrices r, matrix g, matrices pg, lp *prev) 
+	: pgoals(move(pg)), prev(prev) {
 	if (prev) ar = prev->ar, dsz = prev->dsz;
 	else ar = dsz = 0;
 	for (const matrix& m : r)
@@ -49,21 +61,54 @@ lp::lp(matrices r, matrices g, matrices pg, lp *prev)
 			for (int_t i : t)
 				if (i > 0) dsz = max(dsz, (size_t)i);
 		}
-	for (const matrix& m : goals)
-		for (const term& t : m)
-			if (t.size()-1 > ar) er(err_goalarity);
-			else for (int_t i:t)
-				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
+	for (const term& t : g)
+		if (t.size()-1 > ar) er(err_goalarity);
+		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
 	for (const matrix& m : pgoals)
 		for (const term& t : m)
 			if (t.size()-1 > ar) er(err_goalarity);
 			else for (int_t i:t)
 				if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
-	rules_pad(r), rules_pad(goals), rules_pad(pgoals), bits = msb(dsz);
+	rules_pad(r), rule_pad(g), rules_pad(pgoals), bits = msb(dsz);
 	for (const matrix& m : r)
- 		if (m.size() == 1)
-			db=bdd_or(db, rule(m, bits, dsz,matrices()).hsym);//fact
-		else rules.emplace_back(new rule(m, bits, dsz, pgoals));
+ 		if (m.size() == 1) db = bdd_or(db, fact(m[0], bits));
+		else rules.emplace_back(new rule(m, bits, dsz,!pgoals.empty()));
+	if (!pgoals.empty())
+		proof1 = new lp(get_proof1(), matrix(), matrices()),
+		proof2 = new lp(get_proof2(), matrix(), matrices()),
+		proof3 = new lp(get_proof3(), matrix(), matrices());
+	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits));
+}
+
+size_t lp::prove() const {
+	size_t add, del;
+	if (!proof1) return gbdd == F ? db : bdd_and(gbdd, db);
+	proof1->db = get_varbdd(proof1->ar);
+	proof1->fwd(proof2->db, del);
+	assert(del == F);
+	assert(proof2->pfp());
+	proof3->db = proof2->db;
+	assert(proof3->pfp());
+	return bdd_or(bdd_pad(bdd_and(gbdd, db), ar, proof3->ar, pad, bits),
+		proof3->db);
+}
+
+matrices lp::get_proof1() const {
+	matrices p;
+	for (const rule* r : rules) p.emplace(r->proof1);
+	return p;
+}
+
+matrices lp::get_proof2() const {
+	matrices p;
+	for (const rule* r : rules) p.insert(r->proof2.begin(),r->proof2.end());
+	return p;
+}
+
+matrices lp::get_proof3() const {
+	matrices p;
+	for (const rule* r : rules) p.insert(r->proof3.begin(),r->proof3.end());
+	return p;
 }
 
 void lp::term_pad(term& t) {
@@ -85,27 +130,6 @@ void lp::rules_pad(matrices& t) {
 	for (const matrix& x : r) t.emplace(rule_pad(x));
 }
 
-/*
-void lp::rule_add(const matrix& x) {
- 	if (x.size() == 1)
-		db = bdd_or(db, rule(x, bits, dsz, matrices()).hsym);//fact
-	else rules.emplace_back(new rule(x, bits, dsz, pgoals));
-	lens.emplace_back();
-	for (const term& t : x) lens.back().push_back(t.size() - 1);
-}
-
-void lp::goal_add(const matrix& t) {
-	if (!rules.empty()) er("cannot add goals after rules");
-	if (t.size() != 1) er("goals cannot have body");
-	goals.emplace(t);
-}
-
-void lp::pgoal_add(const matrix& t) {
-	if (!rules.empty()) er("cannot add goals after rules");
-	if (t.size() != 1) er("goals cannot have body");
-	pgoals.emplace(t);
-}
-*/
 void lp::fwd(size_t &add, size_t &del) {
 	cache.pos.clear(), cache.neg.clear();
 	for (rule* r : rules)
@@ -126,18 +150,19 @@ bool lp::pfp() {
 		if ((t = bdd_and_not(add, del)) == F && add != F)
 			return false; // detect contradiction
 		else db = bdd_or(bdd_and_not(db, del), t);
-		if (d == db) return true;
+		if (d == db) break;
 		if (s.find(db) != s.end()) return false;
 	}
+	db = prove();
+	return true;
 }
-/*
-size_t lp::get_varbdd() const {
+
+size_t lp::get_varbdd(size_t par) const {
 	size_t t = F;
-	for (const rule* r : rules)
-		t = bdd_or(r->get_varbdd(bits, proof_arity()), t);
+	for (const rule* r : rules) t = bdd_or(r->get_varbdd(bits, par), t);
 	return t;
 }
-*/
+
 size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
 	return from_int(sym, bits, bits * pos);
 }
@@ -169,22 +194,10 @@ term one_from_bits(size_t x, size_t bits, size_t ar) {
 	}
 	return r;
 }
-/*
-size_t lp::proof_arity() const {
-	size_t r = 0;
-	for (const rule* x : rules) r = max(r, x->proof_arity);
-	return r;
-}
-*/
+
 size_t lp::maxw() const {
 	size_t r = 0;
 	for (const rule* x : rules) r = max(r, x->bd.size());
-	return r;
-}
-
-matrices lp::get_proof_rules() const {
-	matrices r;
-	for (auto x : rules) r.emplace(x->proof);
 	return r;
 }
 
@@ -195,7 +208,11 @@ matrix lp::getbdd(size_t t, size_t b, size_t a) const{return from_bits(t,b,a);}
 matrix lp::getbdd_one(size_t t, size_t b, size_t a) const {
 	return {one_from_bits(t,b,a)};
 }
-lp::~lp() { for (rule* r : rules) delete r; if (prev) delete prev; }
+lp::~lp() {
+	for (rule* r : rules) delete r;
+	if (prev) delete prev;
+	if (proof1) delete proof1, delete proof2, delete proof3;
+}
 
 size_t std::hash<std::pair<size_t, bools>>::operator()(
 	const std::pair<size_t, bools>& m) const {
