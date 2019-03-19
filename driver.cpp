@@ -161,15 +161,26 @@ driver::driver(const raw_progs& rp) {
 		nums = max((size_t)nums, get_nums(rp.p[n])),
 		null = dict_get(L"null"),
 		prog_init(rp.p[n], directives_load(rp.p[n]));
+//		wcout << "v:"<<endl<<v<<endl,
+//		exit(0);
 }
 
 bool driver::pfp() {
 	if (!prog->pfp()) return false;
 	size_t db = prog->db;
 	for (size_t x : builtin_symbdds) db = bdd_and_not(db, x);
+/*	matrices p1 = prog->get_proof1(), p2 = prog->get_proof2(), t1, t2;
+	for (matrix m : p1) { for (term& t:m) t.erase(t.begin());t1.insert(m); }
+	for (matrix m : p2) { for (term& t:m) t.erase(t.begin());t2.insert(m); }
+	printbdd(wcout << "p1:"<<endl,t1)<<endl,
+	printbdd(wcout << "p2:"<<endl,t2)<<endl;*/
 	return printbdd(wcout, prog->getbdd(db)), true;
 }
 
+wostream& driver::printbdd(wostream& os, const matrices& t) const {
+	for (auto m : t) printbdd(os, m) << endl;
+	return os;
+}
 wostream& driver::printbdd(wostream& os, const matrix& t) const {
 	set<wstring> s;
 	for (auto v : t) {
@@ -178,8 +189,10 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 			if (k == pad) ss << L"* ";
 			else if((size_t)k < nsyms())ss<<dict_get(k)<<L' ';
 			else ss << L'[' << k << L"] ";
+//		os << ss.str() << ',';
 		s.emplace(ss.str());
 	}
+//	os<<endl;
 	for (auto& x : s) os << x << endl;
 	return os;
 }

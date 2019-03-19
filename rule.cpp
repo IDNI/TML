@@ -109,12 +109,13 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
 
+	// null rule :- varbdd
 	proof1.resize(2), proof1[0].push_back(1), proof1[0].push_back(null), 
 	veccat(proof1[0], v[0]), proof1[1].push_back(1), veccat(proof1[1],v[0]);
 	for (auto x : m) if (x.second >= ar) proof1[1].push_back(x.first);
 	for (i = 0; i != bd.size(); ++i) veccat(proof1[0], v[i+1]);
 	replace(proof1[0].begin(), proof1[0].end(), pad, null);
-	matrix t;
+	matrix t; // null body :- null rule, null head
 	for (i = 0; i != bd.size(); ++i, proof2.emplace(move(t)))
 		t.resize(3), t[0].push_back(1), t[0].push_back(null),
 		veccat(t[0], v[i+1]), t[1] = proof1[0], t[2].push_back(1),

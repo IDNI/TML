@@ -20,7 +20,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-//#define MEMO
+#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
@@ -198,6 +198,7 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 
 size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 	if (1 == (to - from)) return v[from];
+	if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
 	while (leaf(v[from]))
 		if (!trueleaf(v[from])) return F;
 		else if (1 == (to - ++from)) return v[from];
@@ -213,8 +214,6 @@ size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 		if (n[0] < m) m = n[0];
 	}
 	if (eq) return t;
-//	vector<size_t> v1, v2;
-//	v1.reserve(v.size() - from), v2.reserve(v.size() - from);
 	for (i = from; i != to; ++i)
 		if (!b || getnode(v[i])[0] == m)
 			v.push_back(leaf(v[i]) ? v[i] : getnode(v[i])[1]);
