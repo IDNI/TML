@@ -3,6 +3,7 @@
 @str "()".
 S := null.
 S := '(' S ')' S.
-#! S ?x null.
+#! S ?x ?y.
+#! str ?x ?y ?z.
 !! S 1 null.
 # should output "S 1 null" if str is a string of balanced parenthesis

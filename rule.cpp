@@ -118,49 +118,32 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	for (const body& b : bd) if (b.neg) er(err_proof);
 
 	term vars, prule, bprule, x, y;
+	set<size_t> vs;
+	for (int_t t : v[0]) if (t < 0) vs.insert(t);
 	cat(cat(vars, 1), v[0]), cat(cat(prule, 1), openp), cat(bprule, 1);
-	for (auto x : m) if (x.second >= ar) cat(vars, x.first);
+	//for (auto x : m) if (x.second >= ar) cat(vars, x.first);
+	for (i = 1; i != v.size(); ++i)
+		for (int_t t : v[i])
+			if (t < 0 && vs.find(t) == vs.end())
+				vs.insert(t), cat(vars, t);
 	//for (term& t : v) while (t[t.size()-1] == pad) t.erase(t.end()-1);
 	for (i = 0; i != v.size(); ++i) cat(prule, v[i]);
 	cat(prule, closep), cat(bprule, v[0]), cat(bprule, openp);
 	for (i = 1; i != v.size(); ++i) cat(bprule, v[i]);
 	cat(bprule, closep);
 
-	//wcout<<"v: "<<v<<endl<<"vars: "<<vars<<endl<<"prule: "<<prule<<endl
-	//	<<"bprule: "<<bprule<<endl;
-
 	proof1 = {{prule},{vars}};
-	matrix r = { bprule, prule };
+	matrix r = { bprule, prule, cat(cat(cat(y={1}, openp), v[0]), closep) };
 	for (i = 1; i != v.size(); ++i)
 		proof2.insert({
 			cat(cat(cat(x={1}, openp), v[i]), closep),
-			prule, cat(cat(cat(y={1}, openp), v[0]), closep)}),
+			prule, r[2]}),
+//			cat(cat(cat(y={1}, openp), v[0]), closep)}),
 		r.push_back(cat(cat(cat(x={1}, openp), v[i]), closep));
 	proof2.insert(move(r));
-
-/*	// (rule) :- varbdd
-	proof1.resize(2), proof1[0].push_back(1), proof1[0].push_back(openp), 
-	veccat(proof1[0], v[0]), proof1[1].push_back(1), veccat(proof1[1],v[0]),
-	proof1[0].push_back(closep);
-	for (auto x : m) if (x.second >= ar) proof1[1].push_back(x.first);
-	for (i = 0; i != bd.size(); ++i)
-		proof1[0].push_back(openp), veccat(proof1[0], v[i+1]),
-		proof1[0].push_back(closep);
-	replace(proof1[0].begin(), proof1[0].end(), pad, null);
-	matrix t; // (body) :- (rule), (head)
-	for (i = 0; i != bd.size(); ++i, proof2.emplace(move(t)))
-		t.resize(3), t[0].push_back(1), t[0].push_back(openp),
-		veccat(t[0], v[i+1]), t[0].push_back(closep),
-		t[1] = proof1[0], t[2].push_back(1),
-		t[2].push_back(openp), veccat(t[2], v[0]),
-		t[2].push_back(closep);
-	// rule :- (rule), (b1), (b2), ...
-	t.resize(v.size() + 2), t[0].push_back(1), t[1] = proof1[0],
-	t[0].insert(t[0].end(), proof1[0].begin()+2, proof1[0].end() - 1);
-	for (i = 0; i != v.size(); ++i)
-		t[i+2].push_back(1), t[i+2].push_back(openp),
-		veccat(t[i+2],v[i]), t[i+2].push_back(closep);
-	proof2.emplace(move(t));*/
+/*	wcout << v << endl << vars << endl << endl;
+	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
+	drv->printbdd(wcout, proof2), exit(0);*/
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {

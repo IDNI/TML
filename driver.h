@@ -42,9 +42,9 @@ class driver {
 	void rule_pad(matrix& t, size_t ar);
 	matrix rule_pad(const matrix& t, size_t ar);
 
-	lp* prog = 0;
 	bool mult = false;
 	int_t nums = 0;
+	lp* prog = 0;
 
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);

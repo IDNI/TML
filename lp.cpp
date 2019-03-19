@@ -162,7 +162,8 @@ size_t lp::prove() const {
 	assert(proof2->pfp());
 //	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
 	if (gbdd == F) return bdd_and_not(proof2->db, get_sym_bdd(openp, 0));
-	return bdd_and(gbdd, bdd_and_not(proof2->db, get_sym_bdd(openp, 0)));
+	return bdd_or(align(bdd_and(gbdd, db), ar, bits, proof2->ar,
+		proof2->bits), bdd_and_not(proof2->db, get_sym_bdd(openp, 0)));
 }
 
 size_t lp::get_varbdd(size_t par) const {
