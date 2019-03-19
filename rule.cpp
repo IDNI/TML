@@ -48,15 +48,15 @@ void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 	map<int_t, size_t>& m) {
 	auto it = m.end();
 	vector<array<size_t, 2>> eq;
+	set<int_t> exclude = { pad, openp, closep };
 	if (vij >= 0) // sym
 		vecfill(ex, j * bits, (j+1) * bits, true);
-//		from_int_and(vij, bits, j * bits, sel);
 	else if ((it = m.find(vij)) != m.end()) { //seen var
 		vecfill(ex, j * bits, (j+1) * bits, true);
 		for (size_t b = 0; b != bits; ++b)
 			eq.emplace_back(array<size_t, 2>
 				{j*bits+b, it->second*bits+b});
-	} else	m.emplace(vij, j), from_range(dsz, bits, j * bits, sel);
+	} else	m.emplace(vij, j), from_range(dsz, bits, j*bits, exclude, sel);
 	for (size_t i = 0; i != eq.size(); ++i) {
 		if (!(i % 8)) eqs.push_back(T);
 		eqs.back() = bdd_and(eqs.back(), from_eq(eq[i][0], eq[i][1]));

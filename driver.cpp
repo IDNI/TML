@@ -25,7 +25,7 @@ using namespace std;
 #define err_null_in_head \
 	"'null' not allowed to appear in the head of positive rules.\n"
 
-int_t null;
+int_t null, openp, closep;
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
 term driver::get_term(const raw_term& r) {
@@ -34,17 +34,18 @@ term driver::get_term(const raw_term& r) {
 	for (const elem& e : r.e)
 		if (e.type == elem::NUM) t.push_back(e.num+256);
 		else if (e.type == elem::CHR) t.push_back(*e.e[0]+1);
+		else if (e.type == elem::OPENP) t.push_back(openp);
+		else if (e.type == elem::CLOSEP) t.push_back(closep);
 		else t.push_back(dict_get(e.e));
 	return t;
 }
 
 matrix driver::get_rule(const raw_rule& r) {
 	matrix m;
-	m.push_back(get_term(r.h));
+	for (auto x : r.b) m.push_back(get_term(x));
 	if (m[0][0] > 0)
 		for (size_t i = 1; i < m[0].size(); ++i)
 			if (m[0][i] == null) er(err_null_in_head);
-	for (auto x : r.b) m.push_back(get_term(x));
 	return m;
 }
 
@@ -76,15 +77,11 @@ size_t get_nums(const raw_prog& p) {
 			? (int_t)(256+p.d[k].arg[1]-p.d[k].arg[0])
 			: (int_t)(256+(int_t)fsize(ws2s(wstring(p.d[k].arg[0]+1
 				,p.d[k].arg[1]-p.d[k].arg[0]-1)).c_str())));
-	for (const raw_rule& r : p.r) {
-		for (const elem& e : r.h.e)
-			if (e.type == elem::NUM)
-				nums = max(nums, e.num+256);
+	for (const raw_rule& r : p.r)
 		for (const raw_term& t : r.b)
 			for (const elem& e : t.e)
 				if (e.type == elem::NUM)
 					nums = max(nums, e.num+256);
-	}
 	return nums;
 }
 
@@ -139,8 +136,9 @@ void driver::prog_init(const raw_prog& p, const strs_t& s){
 	}
 	for (const raw_rule& x : p.r)
 		if (x.goal && !x.pgoal)
-			assert(x.b.empty()), g.push_back(get_term(x.h));
-		else if (x.pgoal) assert(x.b.empty()),pg.push_back(get_term(x.h));
+			assert(x.b.size() == 1), g.push_back(get_term(x.b[0]));
+		else if (x.pgoal)
+			assert(x.b.size() == 1), pg.push_back(get_term(x.b[0]));
 		else m.insert(get_rule(x));
 	for (auto x : s) {
 		for (int_t n = 0; n != (int_t)x.second.size()-1; ++n)
@@ -159,6 +157,7 @@ driver::driver(const raw_progs& rp) {
 	syms.push_back(0), lens.push_back(0);
 	for (size_t n = 0; n != rp.p.size(); ++n)
 		nums = max((size_t)nums, get_nums(rp.p[n])),
+		openp = dict_get(L"("), closep = dict_get(L")"),
 		null = dict_get(L"null"),
 		prog_init(rp.p[n], directives_load(rp.p[n]));
 //		wcout << "v:"<<endl<<v<<endl,

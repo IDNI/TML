@@ -58,5 +58,5 @@ public:
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
 std::wostream& out(std::wostream& os, size_t n);
 const int_t pad = 0;
-extern int_t null;
+extern int_t null, openp, closep;
 #endif

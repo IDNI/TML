@@ -39,6 +39,7 @@ using namespace std;
 #define err_close_curly "'}' expected.\n"
 #define err_fnf "file not found.\n"
 #define err_rule_dir_prod_expected "rule or production or directive expected.\n"
+#define err_paren "unbalanced parenthesis.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -63,7 +64,7 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else er(err_chr);
 	}
-	if (wcschr(L"!~.,{}@", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,(){}@", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	while (iswalnum(**s)) ++*s;
 	return { t, *s };
@@ -97,6 +98,8 @@ int_t get_int_t(cws from, cws to) {
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
+	if (L'(' == *l[pos][0]) return e = l[pos++], type = OPENP, true;
+	if (L')' == *l[pos][0]) return e = l[pos++], type = CLOSEP, true;
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		if (l[pos][1]-l[pos][0]!=3||*(l[pos][1]-1)!=L'\'')er(err_quote);
@@ -109,11 +112,13 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 
 bool raw_term::parse(const lexemes& l, size_t& pos) {
 	if ((neg = *l[pos][0] == L'~')) ++pos;
-	while (!wcschr(L".:,", *l[pos][0])) {
-		elem m;
-		if (!m.parse(l, pos)) return false;
-		e.push_back(m);
-	}
+	while (!wcschr(L".:,", *l[pos][0]))
+		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
+	size_t dep = 0;
+	for (const elem& t : e)
+		if (t.type == elem::OPENP) ++dep;
+		else if (t.type == elem::CLOSEP && !dep--) er(err_paren);
+	if (dep) er(err_paren);
 	return true;
 }
 
@@ -122,9 +127,10 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	if ((goal = *l[pos][0] == L'!'))
 		if ((pgoal = *l[++pos][0] == L'!'))
 			++pos;
-	if (!h.parse(l, pos)) return pos = curr, false;
+	b.resize(1);
+	if (!b[0].parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos][0] != ':' || l[pos][0][1] != L'-') return pos=curr, false;
+	if (*l[pos][0] != ':' || l[pos][0][1] != L'-') return pos = curr, false;
 	++pos;
 	raw_term t;
 	while (t.parse(l, pos)) {
@@ -189,6 +195,7 @@ wostream& operator<<(wostream& os, const directive& d) {
 
 wostream& operator<<(wostream& os, const elem& e) {
 	if (e.type == elem::CHR) return os << '\'' << *e.e[0] << '\'';
+	if (e.type == elem::OPENP || e.type == elem::CLOSEP) return os<<*e.e[0];
 	return e.type == elem::NUM ? os << e.num : (os << e.e);
 }
 
@@ -199,8 +206,8 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 }
 
 wostream& operator<<(wostream& os, const raw_rule& r) {
-	os << r.h << L" :- ";
-	for (auto x : r.b) os << x << L',';
+	os << r.b[0] << L" :- ";
+	for (size_t n = 1; n < r.b.size(); ++n) os << r.b[n] << L',';
 	return os << L'.';
 }
 

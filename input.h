@@ -29,7 +29,7 @@ struct directive {
 };
 
 struct elem {
-	enum etype { SYM, NUM, CHR, VAR } type;
+	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP } type;
 	int_t num;
 	lexeme e;
 	bool parse(const lexemes& l, size_t& pos);
@@ -47,7 +47,6 @@ struct production {
 };
 
 struct raw_rule {
-	raw_term h;
 	std::vector<raw_term> b;
 	bool goal, pgoal = false;
 	bool parse(const lexemes& l, size_t& pos);

@@ -347,13 +347,12 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	return bdd_and(t, bdd_permute(x, v));
 }
 
-void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
-	static map<array<size_t, 3>, size_t> m;
-	auto it = m.find({max, bits, offset});
-	if (it != m.end()) { r = bdd_and(it->second, r); return; }
+void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
+	size_t &r) {
 	size_t x = F;
-	for (size_t n = 1; n < max; ++n) x = bdd_or(x,from_int(n,bits,offset));
-	m[{max, bits, offset}] = x;
+	for (size_t n = 0; n < max; ++n)
+		if (ex.find(n) == ex.end())
+			x = bdd_or(x, from_int(n, bits, offset));
 	r = bdd_and(r, x);
 }
 
