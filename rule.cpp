@@ -109,21 +109,28 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
 
-	// null rule :- varbdd
-	proof1.resize(2), proof1[0].push_back(1), proof1[0].push_back(null), 
-	veccat(proof1[0], v[0]), proof1[1].push_back(1), veccat(proof1[1],v[0]);
+	// (rule) :- varbdd
+	proof1.resize(2), proof1[0].push_back(1), proof1[0].push_back(openp), 
+	veccat(proof1[0], v[0]), proof1[1].push_back(1), veccat(proof1[1],v[0]),
+	proof1[0].push_back(closep);
 	for (auto x : m) if (x.second >= ar) proof1[1].push_back(x.first);
-	for (i = 0; i != bd.size(); ++i) veccat(proof1[0], v[i+1]);
+	for (i = 0; i != bd.size(); ++i)
+		proof1[0].push_back(openp), veccat(proof1[0], v[i+1]),
+		proof1[0].push_back(closep);
 	replace(proof1[0].begin(), proof1[0].end(), pad, null);
-	matrix t; // null body :- null rule, null head
+	matrix t; // (body) :- (rule), (head)
 	for (i = 0; i != bd.size(); ++i, proof2.emplace(move(t)))
-		t.resize(3), t[0].push_back(1), t[0].push_back(null),
-		veccat(t[0], v[i+1]), t[1] = proof1[0], t[2].push_back(1),
-		t[2].push_back(null), veccat(t[2], v[0]);
+		t.resize(3), t[0].push_back(1), t[0].push_back(openp),
+		veccat(t[0], v[i+1]), t[0].push_back(closep),
+		t[1] = proof1[0], t[2].push_back(1),
+		t[2].push_back(openp), veccat(t[2], v[0]),
+		t[2].push_back(closep);
+	// rule :- (rule), (term), (term), ...
 	t.resize(v.size() + 2), t[0].push_back(1), t[1] = proof1[0],
-	t[0].insert(t[0].end(), proof1[0].begin()+2, proof1[0].end());
+	t[0].insert(t[0].end(), proof1[0].begin()+2, proof1[0].end() - 1);
 	for (i = 0; i != v.size(); ++i)
-		t[i+2].push_back(1), t[i+2].push_back(null),veccat(t[i+2],v[i]);
+		t[i+2].push_back(1), t[i+2].push_back(openp),
+		veccat(t[i+2],v[i]), t[i+2].push_back(closep);
 	proof2.emplace(move(t));
 }
 
