@@ -23,6 +23,7 @@ typedef std::vector<term> matrix;// set of relational terms
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef std::set<matrix> matrices;
+std::wostream& operator<<(std::wostream& os, const term& t);
 std::wostream& operator<<(std::wostream& os, const matrix& m);
 std::wostream& operator<<(std::wostream& os, const matrices& m);
 //#define DEBUG

@@ -19,9 +19,17 @@ using namespace std;
 
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
-#define veccat(x, y) (x).insert((x).end(), (y).begin(), (y).end())
+#define symcat(x, y) ((x).push_back(y), (x))
 #define err_proof	"proof extraction yet unsupported for programs "\
 			"with negation or deletion."
+
+template<typename T, typename V>
+V& cat(V& v, const T& t) { return v.push_back(t), v; }
+
+template<typename V>
+V& cat(V& v, const V& t, size_t off = 0, size_t loff = 0, size_t roff = 0) {
+	return v.insert(v.end()-off, t.begin()+loff, t.end()-roff), v;
+}
 
 size_t varcount(const matrix& v) { // bodies only
 	set<int_t> vars;
@@ -109,7 +117,28 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	if (neg) er(err_proof);
 	for (const body& b : bd) if (b.neg) er(err_proof);
 
-	// (rule) :- varbdd
+	term vars, prule, bprule, x, y;
+	cat(cat(vars, 1), v[0]), cat(cat(prule, 1), openp), cat(bprule, 1);
+	for (auto x : m) if (x.second >= ar) cat(vars, x.first);
+	//for (term& t : v) while (t[t.size()-1] == pad) t.erase(t.end()-1);
+	for (i = 0; i != v.size(); ++i) cat(prule, v[i]);
+	cat(prule, closep), cat(bprule, v[0]), cat(bprule, openp);
+	for (i = 1; i != v.size(); ++i) cat(bprule, v[i]);
+	cat(bprule, closep);
+
+	//wcout<<"v: "<<v<<endl<<"vars: "<<vars<<endl<<"prule: "<<prule<<endl
+	//	<<"bprule: "<<bprule<<endl;
+
+	proof1 = {{prule},{vars}};
+	matrix r = { bprule, prule };
+	for (i = 1; i != v.size(); ++i)
+		proof2.insert({
+			cat(cat(cat(x={1}, openp), v[i]), closep),
+			prule, cat(cat(cat(y={1}, openp), v[0]), closep)}),
+		r.push_back(cat(cat(cat(x={1}, openp), v[i]), closep));
+	proof2.insert(move(r));
+
+/*	// (rule) :- varbdd
 	proof1.resize(2), proof1[0].push_back(1), proof1[0].push_back(openp), 
 	veccat(proof1[0], v[0]), proof1[1].push_back(1), veccat(proof1[1],v[0]),
 	proof1[0].push_back(closep);
@@ -125,17 +154,17 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 		t[1] = proof1[0], t[2].push_back(1),
 		t[2].push_back(openp), veccat(t[2], v[0]),
 		t[2].push_back(closep);
-	// rule :- (rule), (term), (term), ...
+	// rule :- (rule), (b1), (b2), ...
 	t.resize(v.size() + 2), t[0].push_back(1), t[1] = proof1[0],
 	t[0].insert(t[0].end(), proof1[0].begin()+2, proof1[0].end() - 1);
 	for (i = 0; i != v.size(); ++i)
 		t[i+2].push_back(1), t[i+2].push_back(openp),
 		veccat(t[i+2],v[i]), t[i+2].push_back(closep);
-	proof2.emplace(move(t));
+	proof2.emplace(move(t));*/
 }
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
-	size_t vars = T, n;
+	size_t vars = T;
 /*	vector<size_t> v;
 	if (bd.size() == 1) {
 		if (F == (vars = bd[0].varbdd(db, s))) return false;
@@ -163,12 +192,12 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step& s) {
 	if (!proof2.empty()) p.emplace(vars);
 	return bdd_deltail(vars, bits * ar);
 
-	for (const body& b : bd)
+/*	for (const body& b : bd)
 		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
 	for (n=eqs.size(); n;) if (F==(vars=bdd_and(vars, eqs[--n]))) return F;
 	vars = bdd_and(vars, hsym);
 	if (!proof2.empty()) p.emplace(vars);
-	return bdd_deltail(vars, bits * ar);
+	return bdd_deltail(vars, bits * ar);*/
 }
 
 size_t rule::get_varbdd(size_t bits, size_t ar) const {

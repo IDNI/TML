@@ -88,8 +88,9 @@ matrices lp::get_proof2() const {
 	matrix m;
 	for (const rule* r : rules) p.insert(r->proof2.begin(),r->proof2.end());
 	for (const term& t : pgoals)
-		m.resize(1), m[0] = t, m[0].insert(m[0].begin()+1, null),
-		p.insert(move(m));
+		m.resize(1), m[0] = { 1, openp },
+		m[0].insert(m[0].begin()+2, t.begin()+1, t.end()), 
+		m[0].push_back(closep), p.insert(move(m));
 	return p;
 }
 
@@ -151,17 +152,17 @@ bool lp::pfp() {
 size_t lp::prove() const {
 	size_t add, del;
 	proof1->db = get_varbdd(proof1->ar);
-	DBG(printbdd(wcout<<"p1db before:"<<endl,proof1,proof1->db)<<endl;);
+//	DBG(printbdd(wcout<<"p1db before:"<<endl,proof1,proof1->db)<<endl;);
 	proof1->fwd(add = F, del = F);
 	proof2->db = bdd_or(proof2->db, add);
 //	DBG(printbdd(wcout<<"add:"<<endl,proof1,proof1->db)<<endl;);
-	DBG(printbdd(wcout<<"p2db before:"<<endl,proof2,proof2->db)<<endl;);
+//	DBG(printbdd(wcout<<"p2db before:"<<endl,proof2,proof2->db)<<endl;);
 	proof2->prev = 0;
 	assert(del == F);
 	assert(proof2->pfp());
-	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
-	if (gbdd == F) return bdd_and_not(proof2->db, get_sym_bdd(null, 0));
-	return bdd_and(gbdd, bdd_and_not(proof2->db, get_sym_bdd(null, 0)));
+//	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
+	if (gbdd == F) return bdd_and_not(proof2->db, get_sym_bdd(openp, 0));
+	return bdd_and(gbdd, bdd_and_not(proof2->db, get_sym_bdd(openp, 0)));
 }
 
 size_t lp::get_varbdd(size_t par) const {
@@ -237,11 +238,12 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	for (auto y:x) os << y << endl;
 	return os;
 }
+wostream& operator<<(wostream& os, const term& t) {
+	for (auto x : t) os << x << ' ';
+	return os;
+}
 wostream& operator<<(wostream& os, const matrix& m) {
-	for (const term& t : m) {
-		for (auto x : t) os << x << ' ';
-		os << ',';
-	}
+	for (const term& t : m) os << t << ',';
 	return os;
 }
 wostream& operator<<(wostream& os, const matrices& m) {
