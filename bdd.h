@@ -1,4 +1,3 @@
-// LICENSE
 // This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
@@ -24,7 +23,7 @@ extern std::vector<node> V;
 
 void bdd_init();
 size_t bdd_add(const node& n); //create new bdd node,standard implementation
-std::vector<std::vector<bool>> allsat(size_t x, size_t nv, size_t mod);
+std::vector<std::vector<bool>> allsat(size_t x, size_t nv);
 size_t from_bit(size_t x ,bool v);
 size_t bdd_or(size_t x, size_t y);
 size_t bdd_ex(size_t x, const bools&);

@@ -14,7 +14,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
-#include "bdd.h"
+#include "query.h"
 
 using namespace std;
 
@@ -87,11 +87,11 @@ struct tt { // truth table
 		tt r = *this;
 		for (size_t n = 0; n < bits; ++n) if (b[n]) r = r.ex(n);
 		if (r.bdd() != bdd_ex(bdd(), b)) {
-			wcout	<< "existential quantification of" <<endl
+/*			wcout	<< "existential quantification of" <<endl
 				<< *this << endl << "with" << endl << b
 				<< endl << "wrongly returned" << endl
 				<< allsat(bdd_ex(bdd(), b), bits) << endl
-				<< "instead of" << endl << r << endl;
+				<< "instead of" << endl << r << endl;*/
 			assert(r.bdd() == bdd_ex(bdd(), b));
 		}
 		return r;
@@ -123,9 +123,9 @@ bools brnd(size_t bits) {
 	return r;
 }
 
-tt rndtt(size_t bits) {
+tt rndtt(size_t bits, size_t sz = 0) {
 	tt r(bits);
-	size_t sz = random() % (1 << bits);
+	if (!sz) sz = random() % (1 << bits);
 	while (sz--) r.addrow(brnd(bits));
 	return r;
 }
@@ -144,14 +144,33 @@ void test_and_many() {
 		if (!leaf(r)) {
 			vector<size_t> v;
 			for (size_t i = 0; i < 5; ++i) v.push_back(t[i].bdd());
-			assert(r == bdd_and_many(v));
+			assert(r == bdd_and_many(v, 0, v.size()));
 		}
 		delete[] t;
 	}
 }
 
+void test_eq_ex() {
+	for(size_t k=0; k!=10;++k) {
+		wcout << k << endl;
+		size_t bits = 4, ar = 6;
+		tt t = rndtt(bits * ar, 100);
+	//	wcout << t << endl;
+		size_t x = t.bdd(), y = x;
+		for (size_t n = 0; n < bits; ++n)
+			y = bdd_and(y, from_eq(n, bits*3+n)),
+			y = bdd_and(y, from_eq(n + bits, bits*5+n));
+		bools b(bits * ar, 0);
+		for (size_t n = 0; n < bits; ++n)
+			b[bits*3+n]=b[bits*5+n]=true;
+		y=bdd_ex(y,b);	
+		assert(bdd_eq_ex(x, bits, ar, { 0, 0, 0, 1, 0, 2 }).res == y);
+	}
+}
+
 int main() {
 	bdd_init();
+	test_eq_ex();
 	srand(time(0));
 	test_and_many();
 	tt xt(3);

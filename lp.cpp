@@ -177,7 +177,7 @@ size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
 }
 
 matrix from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar, bits);
+	vbools s = allsat(x, bits * ar);
 	matrix r(s.size());
 	for (term& v : r) v = term(ar, 0);
 	size_t n = s.size(), i, b;
