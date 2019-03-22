@@ -13,16 +13,21 @@
 #include "rule.h"
 using namespace std;
 
-size_t query_ref(size_t x, term t, size_t bits, vector<size_t> perm) {
+size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 	size_t y = fact(t, bits), ar = t.size()-1, r;
 	wcout << "x:"<<endl << from_bits(x, bits, ar);
 	wcout << "y:"<<endl << from_bits(y, bits, ar);
 	bools ex(ar*bits, 0);
-	set<int_t> s;
+	map<int_t, size_t> m;
 
 	for (size_t i = 1; i < t.size(); ++i)
-		if (t[i] < 0 && s.find(t[i]) == s.end()) s.insert(t[i]);
+		if (t[i] < 0 && m.find(t[i]) == m.end()) m[t[i]]=i-1;
 		else for (size_t b = 0; b < bits; ++b) ex[(i-1)*bits+b] = true;
+	
+	for (size_t n = 0; n < bits*ar; ++n)
+		if (t[n/bits+1] < 0)
+			perm.push_back((ar-1-m[t[n/bits+1]])*bits+n%bits);
+		else perm.push_back(n);
 
 	r = bdd_and(x, y);
 	wcout << "and:" << endl << from_bits(r, bits, ar);
@@ -43,11 +48,12 @@ void test_query() {
 	ar = m[0].size()-1;
 	for (term t : m) x = bdd_or(x, fact(t, bits));
 	vector<size_t> perm;
-	for (size_t n = 0; n < bits*ar; ++n) perm.push_back(n);
+	size_t f = query_ref(x,  { 1, 2, -1, -2 }, bits, perm);
 	query q(bits, { 1, 2, -1, -2 }, perm);
 	r = q(x);
+	wcout << "f:"<<endl << from_bits(f, bits, ar);
 	wcout << "q:"<<endl << from_bits(r, bits, ar);
-	assert(r == query_ref(x,  { 1, 2, -1, -2 }, bits, perm));
+	assert(r == f);
 //	assert(q(x) = bdd_or(term(m[1],bits), term(m[2],bits),ex)
 /*	for(size_t k=0; k!=100;++k) {
 		wcout << k << endl;
