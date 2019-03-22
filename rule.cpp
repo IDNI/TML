@@ -23,12 +23,25 @@ using namespace std;
 #define err_proof	"proof extraction yet unsupported for programs "\
 			"with negation or deletion."
 
+int_t null, openp, closep;
 template<typename T, typename V>
 V& cat(V& v, const T& t) { return v.push_back(t), v; }
 
 template<typename V>
 V& cat(V& v, const V& t, size_t off = 0, size_t loff = 0, size_t roff = 0) {
 	return v.insert(v.end()-off, t.begin()+loff, t.end()-roff), v;
+}
+
+size_t fact(term v, size_t bits) {
+	size_t r = T;
+	map<int_t, size_t> m;
+	auto it = m.end();
+	for (size_t j = 0; j != v.size() - 1; ++j)
+		if (v[j+1] >= 0) from_int_and(v[j+1], bits, j * bits, r);
+		else if (m.end() == (it = m.find(v[j+1]))) m.emplace(v[j+1],j);
+		else for (size_t b = 0; b!=bits; ++b)
+			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
+	return v[0] < 0 ? bdd_and_not(T, r) : r;
 }
 
 size_t varcount(const matrix& v) { // bodies only
@@ -188,4 +201,11 @@ size_t rule::get_varbdd(size_t bits, size_t ar) const {
 	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
 //	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
 	return bdd_and(x, y);
+}
+
+size_t std::hash<std::pair<size_t, bools>>::operator()(
+	const std::pair<size_t, bools>& m) const {
+	std::hash<size_t> h1;
+	std::hash<bools> h2;
+	return h1(m.first) + h2(m.second);
 }

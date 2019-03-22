@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include <map>
 #include "defs.h"
+#include "query.h"
 #include "lp.h"
 
 struct rule { // a P-DATALOG rule in bdd form
@@ -26,9 +27,11 @@ struct rule { // a P-DATALOG rule in bdd form
 		size_t varbdd(size_t db, lp::step& p) const;
 	};
 	bool neg = false;
-	size_t hsym = T, vars_arity; //proof_arity = 0
+	size_t hsym = T, vars_arity;
 	std::vector<body> bd;
 	std::vector<size_t> eqs;
+//	std::vector<query> q;
+//	extents e;
 	std::set<size_t> p;
 	matrix proof1;
 	matrices proof2;
@@ -38,3 +41,5 @@ struct rule { // a P-DATALOG rule in bdd form
 	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s);
 	size_t get_varbdd(size_t bits, size_t ar) const;
 };
+
+size_t fact(term v, size_t bits);

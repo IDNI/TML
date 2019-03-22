@@ -25,7 +25,6 @@ using namespace std;
 #define err_null_in_head \
 	"'null' not allowed to appear in the head of positive rules.\n"
 
-int_t null, openp, closep;
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
 term driver::get_term(const raw_term& r) {

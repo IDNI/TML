@@ -38,18 +38,6 @@ wostream& operator<<(wostream& os, const bools& x);
 wostream& operator<<(wostream& os, const vbools& x);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
-size_t fact(term v, size_t bits) {
-	size_t r = T;
-	map<int_t, size_t> m;
-	auto it = m.end();
-	for (size_t j = 0; j != v.size() - 1; ++j)
-		if (v[j+1] >= 0) from_int_and(v[j+1], bits, j * bits, r);
-		else if (m.end() == (it = m.find(v[j+1]))) m.emplace(v[j+1],j);
-		else for (size_t b = 0; b!=bits; ++b)
-			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
-	return v[0] < 0 ? bdd_and_not(T, r) : r;
-}
-
 lp::lp(matrices r, matrix g, matrix pg, lp *prev) : pgoals(move(pg)),prev(prev){
 	dsz = 0;
 	if (prev) ar = prev->ar;
@@ -176,34 +164,6 @@ size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
 	return from_int(sym, bits, bits * pos);
 }
 
-matrix from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar);
-	matrix r(s.size());
-	for (term& v : r) v = term(ar, 0);
-	size_t n = s.size(), i, b;
-	while (n--)
-		for (i = 0; i != ar; ++i) {
-			for (b = 0; b != bits; ++b)
-				if (s[n][i * bits + b])
-					r[n][i] |= 1 << (bits - b - 1);
-//			if (r[n][i] == pad) break;
-		}
-	return r;
-}
-
-term one_from_bits(size_t x, size_t bits, size_t ar) {
-	bools s(bits * ar, true);
-	if (!bdd_onesat(x, bits * ar, s)) return term();
-	term r(ar, 0);
-	for (size_t i = 0; i != ar; ++i) {
-		for (size_t b = 0; b != bits; ++b)
-			if (s[i * bits + b])
-				r[i] |= 1 << (bits - b - 1);
-//		if (r[i] == pad) break;
-	}
-	return r;
-}
-
 size_t lp::maxw() const {
 	size_t r = 0;
 	for (const rule* x : rules) r = max(r, x->bd.size());
@@ -217,13 +177,6 @@ lp::~lp() {
 //	for (rule* r : rules) delete r;
 //	if (prev) delete prev;
 //	if (proof1) delete proof1, delete proof2;
-}
-
-size_t std::hash<std::pair<size_t, bools>>::operator()(
-	const std::pair<size_t, bools>& m) const {
-	std::hash<size_t> h1;
-	std::hash<bools> h2;
-	return h1(m.first) + h2(m.second);
 }
 
 wostream& out(wostream& os,size_t n){ return out(os<<L'['<<n<<L']',getnode(n)); }

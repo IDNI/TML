@@ -44,6 +44,8 @@ size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
 size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t pnvars);
 void from_range(size_t max, size_t bits, size_t offset, std::set<int_t> ex,
 	size_t &r);
+matrix from_bits(size_t x, size_t bits, size_t ar);
+term one_from_bits(size_t x, size_t bits, size_t ar);
 
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define getnode(x) V[x]
