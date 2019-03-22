@@ -151,10 +151,10 @@ void test_and_many() {
 }
 
 void test_eq_ex() {
-	for(size_t k=0; k!=10;++k) {
+	for(size_t k=0; k!=100;++k) {
 		wcout << k << endl;
-		size_t bits = 4, ar = 6;
-		tt t = rndtt(bits * ar, 100);
+		size_t bits = 3, ar = 10;
+		tt t = rndtt(bits * ar, 1000);
 	//	wcout << t << endl;
 		size_t x = t.bdd(), y = x;
 		for (size_t n = 0; n < bits; ++n)
@@ -162,9 +162,9 @@ void test_eq_ex() {
 			y = bdd_and(y, from_eq(n + bits, bits*5+n));
 		bools b(bits * ar, 0);
 		for (size_t n = 0; n < bits; ++n)
-			b[bits*3+n]=b[bits*5+n]=true;
-		y=bdd_ex(y,b);	
-		assert(bdd_eq_ex(x, bits, ar, { 0, 0, 0, 1, 0, 2 }).res == y);
+			b[bits*2+n]=b[bits*3+n]=b[bits*5+n]=true;
+		y=bdd_ex(bdd_and(y,from_int(3,bits,2*bits)),b);
+		assert(query(x, bits, ar, { 0, 0, 3, -1, 0, -2 }).res == y);
 	}
 }
 

@@ -57,8 +57,7 @@ void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 	auto it = m.end();
 	vector<array<size_t, 2>> eq;
 	set<int_t> exclude = { pad, openp, closep };
-	if (vij >= 0) // sym
-		vecfill(ex, j * bits, (j+1) * bits, true);
+	if (vij >= 0) vecfill(ex, j * bits, (j+1) * bits, true);
 	else if ((it = m.find(vij)) != m.end()) { //seen var
 		vecfill(ex, j * bits, (j+1) * bits, true);
 		for (size_t b = 0; b != bits; ++b)
@@ -88,8 +87,7 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
 	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
 	assert(v.size() > 1);
 	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
-	for (i = 1; i != v.size(); ++i)
-		bd.emplace_back(v[i], ar, bits, dsz, nvars);
+	for (i=1; i!=v.size(); ++i) bd.emplace_back(v[i], ar, bits, dsz, nvars);
 	vector<array<size_t, 2>> heq;
 	map<int_t, size_t> m;
 	auto it = m.end();
