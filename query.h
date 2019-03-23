@@ -15,29 +15,27 @@
 class query {
 	const bool neg;
 	const size_t bits, nvars;
-	const std::vector<int_t> e;
-	std::vector<size_t> perm;
-	const std::set<size_t> s;
+	const term e;
+	const sizes perm, domain;
 	std::vector<char> path;
-	std::set<size_t> get_s() const;
-	static std::vector<int_t> from_term(const term& t);
+	sizes getdom() const;
+	static term from_term(const term& t);
 public:
-	query(size_t bits, const term& t, const std::vector<size_t>& perm);
+	query(size_t bits, const term& t, const sizes& perm);
 	size_t operator()(size_t x, size_t v = 0);
 };
 
 class extents {
 	const size_t bits, nvars, tail;
 	const int_t glt, ggt;
-	const std::vector<int_t> excl, lt, gt;
-	const std::set<size_t> s;
+	const term excl, lt, gt;
+	const sizes succ, pred, domain;
 	bools path;
-	std::set<size_t> get_s() const;
+	sizes getdom() const;
 	int_t get_int(size_t pos) const;
 public:
-	// excl must be sorted
-	extents(size_t bits, size_t ar, size_t tail, int_t glt, int_t ggt,
-		const std::vector<int_t>& excl, const std::vector<int_t>& lt,
-		const std::vector<int_t>& gt);
+	extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
+		int_t glt, int_t ggt, const term& excl, const term& lt,
+		const term& gt, const sizes& succ, const sizes& pred);
 	size_t operator()(size_t x, size_t v = 0);
 };

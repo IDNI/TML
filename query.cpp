@@ -15,9 +15,12 @@
 #include <algorithm>
 using namespace std;
 
-query::query(size_t bits, const term& t, const std::vector<size_t>& perm) 
+template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+#define has(x, y) binary_search(x.begin(), x.end(), y)
+
+query::query(size_t bits, const term& t, const sizes& perm) 
 	: neg(t[0]<0), bits(bits), nvars((t.size()-1)*bits) , e(from_term(t))
-	, perm(perm), s(get_s()), path(nvars, 0) {}
+	, perm(perm), domain(getdom()), path(nvars, 0) {}
 
 vector<int_t> query::from_term(const term& t) {
 	vector<int_t> r(t.size()-1);
@@ -38,10 +41,10 @@ node flip(node n) {
 }
 
 size_t query::operator()(size_t x, size_t v) {
-	if (leaf(x) && v == nvars) return x;
+	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = neg ? flip(getnode(x)) : getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (s.find(v/bits+1) == s.end())
+	if (!binary_search(domain.begin(), domain.end(), v/bits+1))
 		return bdd_ite(perm[v], (*this)(n[1],v+1), (*this)(n[2],v+1));
 	if (e[v/bits] > 0)
 		return (*this)(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
@@ -51,47 +54,46 @@ size_t query::operator()(size_t x, size_t v) {
 		bdd_ite(perm[v], x, (*this)(n[2], v+1));
 }
 
-set<size_t> query::get_s() const {
-	set<size_t> r;
-	for (size_t n=0; n!=e.size();++n)
-		if (e[n]) r.insert(n+1), r.insert(abs(e[n]));
-	return r;
+sizes query::getdom() const {
+	sizes r;
+	for (size_t n = 0; n != e.size(); ++n)
+		if (e[n]) r.push_back(n+1), r.push_back(abs(e[n]));
+	return sort(r);
 }
 
-extents::extents(size_t bits, size_t ar, size_t tail, int_t glt, int_t ggt,
-	const std::vector<int_t>& excl, const std::vector<int_t>& lt,
-	const std::vector<int_t>& gt)
-	: bits(bits), nvars(ar*bits), tail(tail), glt(glt), ggt(ggt)
-	, excl(excl), lt(lt), gt(gt), path(nvars, 0) {}
+extents::extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
+	int_t glt, int_t ggt, const term& excl, const term& lt, const term& gt,
+	const sizes& succ, const sizes& pred) : bits(bits), nvars(ar*bits)
+	, tail(tail), glt(glt), ggt(ggt), excl(sort(excl)), lt(lt), gt(gt)
+	, succ(succ), pred(pred) , domain(sort(domain)), path(nvars, 0) {}
 
 int_t extents::get_int(size_t v) const {
-	int_t r = 0, pos = v / bits, n = pos * bits;
-	v %= bits;
-	for (;n!=(int_t)((pos+1)*bits-v);++n) if (path[n]==1) r |= 1<<(n%bits);
+	int_t r = 0, pos = (v-1) / bits, n = pos * bits;
+	for (;n!=(int_t)((pos+1)*bits);++n)
+		if (path[n]==1) r |= 1<<(bits-1-n%bits);
 	return r;
 }
 
 size_t extents::operator()(size_t x, size_t v) {
-	if (leaf(x) && v == nvars) return x;
+	if (leaf(x) && (!trueleaf(x) || v == nvars+1)) return x;
 	node n = getnode(x);
-//	if (!leaf(x) && n[0] <= tail)
-//		return bdd_add({{n[0], (*this)(n[1], n[0]-1),
-//			(*this)(n[2], n[0]-1)}});
+	int_t i;
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (s.find(v/bits+1) == s.end())
+	if (!has(domain, v/bits))
 		return ++v, bdd_add({{v, (*this)(n[1], v), (*this)(n[2], v)}});
-	int_t i = get_int(v);
+	if (v < bits || ((v) % bits)) goto cont;
+	i = get_int(v);
 	if (	(glt && i >= glt) ||
 		(ggt && i <= ggt) ||
-		(!(v % bits) && (
-			binary_search(excl.begin(), excl.end(), i) ||
-			(lt[v/bits] < 0 && get_int(-lt[v/bits]*bits) <= i) ||
-			(lt[v/bits] > 0 && lt[v/bits] <= i) ||
-			(gt[v/bits] < 0 && get_int(-gt[v/bits]*bits) >= i) ||
-			(gt[v/bits] > 0 && gt[v/bits] >= i)
-		)))
+		has(excl, i) ||
+		(gt[v/bits-1] < 0 && i <= get_int(bits*-gt[v/bits-1])) ||
+		(gt[v/bits-1] > 0 && i <= gt[v/bits-1]) ||
+		(lt[v/bits-1] < 0 && i >= get_int(bits*-lt[v/bits-1])) ||
+		(lt[v/bits-1] > 0 && i >= lt[v/bits-1]) ||
+		(succ[v/bits-1] && i != 1+get_int(bits*succ[v/bits-1])) ||
+		(pred[v/bits-1] && i+1 != get_int(bits*pred[v/bits-1])))
 		return F;
-	size_t y;
+cont:	size_t y;
 	path[v]=true, x=(*this)(n[1], v+1), path[v++]=false, y=(*this)(n[2], v);
 	return v > tail ? x == F && y == F ? F : T : bdd_add({{v, x, y}});
 }

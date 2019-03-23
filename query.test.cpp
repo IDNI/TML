@@ -39,21 +39,33 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 }
 
 void test_query() {
-	size_t bits = 3, x = F, ar, r;
+	size_t bits = 3, x = F, ar, r, f;
 	matrix m;
-	m.push_back({ 1, 1, 2, 3});
+	//m.push_back({ 1, 1, 2, 3});
 	m.push_back({ 1, 2, 3, 4});
 	m.push_back({ 1, 2, 2, 3});
 	m.push_back({ 1, 3, 2, 3});
 	ar = m[0].size()-1;
 	for (term t : m) x = bdd_or(x, fact(t, bits));
 	vector<size_t> perm;
-	size_t f = query_ref(x,  { 1, 2, -1, -2 }, bits, perm);
+	f = query_ref(x,  { 1, 2, -1, -2 }, bits, perm);
 	query q(bits, { 1, 2, -1, -2 }, perm);
 	r = q(x);
 	wcout << "f:"<<endl << from_bits(f, bits, ar);
 	wcout << "q:"<<endl << from_bits(r, bits, ar);
 	assert(r == f);
+	perm.clear();
+	f = query_ref(x,  { 1, -1, -1, -2 }, bits, perm);
+	query q1(bits, { 1, -1, -1, -2 }, perm);
+	r = q(x);
+	assert(q1(x) == f);
+	m.push_back({ 1, 5, 3, 2});
+	for (term t : m) x = bdd_or(x, fact(t, bits));
+	extents e(bits, ar, bits*(ar-0), {0,1,2,3}, 6, 0, {0,0,0}, 
+		{0,0,0}, {0,0,-2}, {0,0,0}, {0,1,0});
+	wcout << "x:"<<endl << from_bits(x, bits, ar)<<endl;
+	wcout << "e:"<<endl << from_bits(e(x), bits, ar)<<endl;
+	exit(0);
 //	assert(q(x) = bdd_or(term(m[1],bits), term(m[2],bits),ex)
 /*	for(size_t k=0; k!=100;++k) {
 		wcout << k << endl;
