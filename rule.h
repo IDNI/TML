@@ -10,13 +10,12 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include <map>
 #include "defs.h"
 #include "query.h"
 #include "lp.h"
 
 struct rule { // a P-DATALOG rule in bdd form
-	struct body {
+/*	struct body {
 		size_t sel = T;
 		const bool neg;
 		bools ex;
@@ -25,18 +24,20 @@ struct rule { // a P-DATALOG rule in bdd form
 		void from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
 			std::map<int_t, size_t>& m);
 		size_t varbdd(size_t db, lp::step& p) const;
-	};
-	bool neg = false;
-	size_t hsym = T, vars_arity;
-	std::vector<body> bd;
-	std::vector<size_t> eqs;
-//	std::vector<query> q;
-//	extents e;
+	};*/
+	const bool neg;
+	size_t vars_arity;
+	std::unordered_map<int_t, size_t> get_varmap(const matrix& v);
+	std::unordered_map<int_t, size_t> varmap;
+	std::vector<query> q;
+	bdd_and_eq ae;
+	extents ext;
 	std::set<size_t> p;
 	matrix proof1;
 	matrices proof2;
+	extents get_extents(const matrix& v, size_t bits, size_t dsz);
 
-	rule() {}
+//	rule() {}
 	rule(matrix v, size_t bits, size_t dsz, bool proof);
 	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s);
 	size_t get_varbdd(size_t bits, size_t ar) const;

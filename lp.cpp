@@ -39,6 +39,7 @@ wostream& operator<<(wostream& os, const vbools& x);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
 lp::lp(matrices r, matrix g, matrix pg, lp *prev) : pgoals(move(pg)),prev(prev){
+	//wcout<<r<<endl;
 	dsz = 0;
 	if (prev) ar = prev->ar;
 	else ar = 0;
@@ -163,13 +164,13 @@ size_t lp::get_varbdd(size_t par) const {
 size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
 	return from_int(sym, bits, bits * pos);
 }
-
+/*
 size_t lp::maxw() const {
 	size_t r = 0;
 	for (const rule* x : rules) r = max(r, x->bd.size());
 	return r;
 }
-
+*/
 matrix lp::getdb() const { return getbdd(db); }
 matrix lp::getbdd(size_t t) const { return from_bits(t,bits,ar); }
 matrix lp::getbdd_one(size_t t) const { return {one_from_bits(t,bits,ar)}; }

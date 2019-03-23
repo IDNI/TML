@@ -200,6 +200,9 @@ wostream& printbdd(wostream& os, const lp* p, size_t t){
 wostream& printbdd_one(wostream& os, const lp* p, size_t t) {
 	return drv->printbdd_one(os, p, t);
 }
+wostream& printbdd(wostream& os, size_t t, size_t bits, size_t ar) {
+	return drv->printbdd(os, from_bits(t,bits,ar));
+}
 #endif
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {

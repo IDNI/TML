@@ -1,8 +1,8 @@
-CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -O3 -flto
-#CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -ggdb3
+#CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -O3 -flto
+CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -ggdb3
 CXX = g++
-OBJ = input.o driver.o lp.o bdd.o rule.o dict.o main.o
-SRC = input.cpp input.h defs.h driver.cpp driver.h lp.cpp lp.h bdd.cpp bdd.h rule.cpp rule.h main.cpp dict.cpp
+OBJ = input.o driver.o lp.o bdd.o rule.o dict.o main.o query.o
+SRC = input.cpp input.h defs.h driver.cpp driver.h lp.cpp lp.h bdd.cpp bdd.h rule.cpp rule.h main.cpp dict.cpp query.h query.cpp
 all: $(OBJ)
 	$(CXX) $(CXXFLAGS) $(OBJ) -otml
 
@@ -18,6 +18,8 @@ dict.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c dict.cpp -o dict.o
 rule.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c rule.cpp -o rule.o
+query.o: $(SRC)
+	$(CXX) $(CXXFLAGS) -c query.cpp -o query.o
 main.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 

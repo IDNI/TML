@@ -44,7 +44,6 @@ class driver {
 
 	bool mult = false;
 	int_t nums = 0;
-	lp* prog = 0;
 
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
@@ -56,6 +55,7 @@ class driver {
 	bool pfp(lp *p);
 	driver(const raw_progs& rp);
 public:
+	lp* prog = 0;
 	driver(FILE *f);
 	driver(std::wstring);
 	bool pfp();
@@ -74,4 +74,5 @@ extern driver* drv;
 std::wostream& printdb(std::wostream& os, const lp*);
 std::wostream& printbdd(std::wostream& os, const lp*, size_t t);
 std::wostream& printbdd_one(std::wostream& os, const lp*, size_t t);
+std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, size_t ar);
 #endif

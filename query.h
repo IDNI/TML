@@ -19,9 +19,19 @@ class query {
 	const sizes perm, domain;
 	std::vector<char> path;
 	sizes getdom() const;
-	static term from_term(const term& t);
 public:
 	query(size_t bits, const term& t, const sizes& perm);
+	size_t operator()(size_t x, size_t v = 0);
+};
+
+class bdd_and_eq {
+	const size_t bits, nvars;
+	const term e;
+	const sizes domain;
+	std::vector<char> path;
+	sizes getdom() const;
+public:
+	bdd_and_eq(size_t bits, const term& t);
 	size_t operator()(size_t x, size_t v = 0);
 };
 

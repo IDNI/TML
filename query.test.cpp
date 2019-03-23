@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "rule.h"
+#include <map>
 using namespace std;
 
 size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {

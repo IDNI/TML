@@ -18,20 +18,20 @@ using namespace std;
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 #define has(x, y) binary_search(x.begin(), x.end(), y)
 
-query::query(size_t bits, const term& t, const sizes& perm) 
-	: neg(t[0]<0), bits(bits), nvars((t.size()-1)*bits) , e(from_term(t))
-	, perm(perm), domain(getdom()), path(nvars, 0) {}
-
-vector<int_t> query::from_term(const term& t) {
+vector<int_t> from_term(const term& t) {
 	vector<int_t> r(t.size()-1);
 	map<int_t, int_t> m;
 	auto it = m.end();
 	for (int_t n = 1; n != (int_t)t.size(); ++n)
 		if (t[n] >= 0) r[n-1] = t[n]+1;
-		else if (m.end() == (it = m.find(t[n]))) m[t[n]] = -n;
+		else if (m.end() == (it = m.find(t[n]))) m[t[n]] = -n-1;
 		else r[n-1] = it->second;
 	return r;
 }
+
+query::query(size_t bits, const term& t, const sizes& perm) 
+	: neg(t[0]<0), bits(bits), nvars((t.size()-1)*bits), e(from_term(t))
+	, perm(perm), domain(getdom()), path(nvars, 0) {}
 
 node flip(node n) {
 	if (nleaf(n)) return n;
@@ -44,7 +44,7 @@ size_t query::operator()(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = neg ? flip(getnode(x)) : getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (!binary_search(domain.begin(), domain.end(), v/bits+1))
+	if (!has(domain, v/bits+1))
 		return bdd_ite(perm[v], (*this)(n[1],v+1), (*this)(n[2],v+1));
 	if (e[v/bits] > 0)
 		return (*this)(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
@@ -59,6 +59,35 @@ sizes query::getdom() const {
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n]) r.push_back(n+1), r.push_back(abs(e[n]));
 	return sort(r);
+}
+
+bdd_and_eq::bdd_and_eq(size_t bits, const term& t)
+	: bits(bits), nvars((t.size()-1)*bits), e(from_term(t))
+	, domain(getdom()), path(nvars, 0) {}
+
+sizes bdd_and_eq::getdom() const {
+	sizes r;
+	for (size_t n = 0; n != e.size(); ++n)
+		if (e[n]) r.push_back(n+1), r.push_back(abs(e[n]));
+	return sort(r);
+}
+
+size_t bdd_and_eq::operator()(size_t x, size_t v) {
+	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
+	node n = getnode(x);
+	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
+	if (!has(domain, v/bits+1))
+		return ++v, bdd_add({{v, (*this)(n[1], v), (*this)(n[2], v)}});
+	if (e[v/bits] > 0)
+		return	(e[v / bits] - 1) & (1 << (bits - v % bits - 1))
+			? bdd_add({{v+1, (*this)(n[1], v+1), F}})
+			: bdd_add({{v+1, F, (*this)(n[2], v+1)}});
+	if (e[v/bits] < 0)
+		return	path[(-e[v / bits] - 1) * bits + v % bits] == 1
+			? bdd_add({{v+1, (*this)(n[1], v+1), F}})
+			: bdd_add({{v+1, F, (*this)(n[2], v+1)}});
+	return	path[v] = 1, x = (*this)(n[1], v+1), path[v++] = -1,
+		bdd_add({{v, x, (*this)(n[2], v)}});
 }
 
 extents::extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
@@ -79,7 +108,8 @@ size_t extents::operator()(size_t x, size_t v) {
 	node n = getnode(x);
 	int_t i;
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (!has(domain, v/bits))
+	assert(v <= nvars);
+	if (!has(domain, v/bits+1))
 		return ++v, bdd_add({{v, (*this)(n[1], v), (*this)(n[2], v)}});
 	if (v < bits || ((v) % bits)) goto cont;
 	i = get_int(v);
