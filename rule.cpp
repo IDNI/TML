@@ -98,7 +98,7 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
 	if (!proof) return;
 	for (i = 0; i != v.size(); ++i)
 		if (v[i][0] < 0) er(err_proof);
-		else v[i].erase(v[i].begin());
+		else if (i) v[i].erase(v[i].begin());
 
 	term vars, prule, bprule, x, y;
 	set<size_t> vs;
@@ -131,22 +131,6 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
 
 size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step&) {
 	size_t vars = T;
-/*	sizes v;
-	if (bd.size() == 1) {
-		if (F == (vars = bd[0].varbdd(db, s))) return false;
-		for (size_t n = eqs.size(); n; ++n)
-			if (F == (vars = bdd_and(vars, eqs[n]))) return false;
-		vars = bdd_and(vars, hsym);
-		goto ret;
-	}
-	if (bd.size() == 2) {
-		if (F == (vars = bdd_and(bd[0].varbdd(db, s),
-			bd[1].varbdd(db, s)))) return false;
-		for (size_t n = eqs.size(); n; ++n)
-			if (F == (vars = bdd_and(vars, eqs[n]))) return false;
-		vars = bdd_and(vars, hsym);
-		goto ret;
-	}*/
 	sizes v(q.size());
 	size_t i = 0;
 	for (query& x : q)
@@ -154,20 +138,13 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step&) {
 		DBG(else printbdd(wcout<<"q"<<i-1<<endl,v[i-1],bits,vars_arity)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 	DBG(printbdd(wcout<<"q:"<<endl, vars,bits,vars_arity)<<endl;)
-	//vars = ext(vars);
+	vars = ext(vars);
 	DBG(printbdd(wcout<<"e:"<<endl, vars,bits,vars_arity)<<endl;)
-	vars = ae(bdd_deltail(vars, bits*ar));
-	//vars = ae(vars, bits*ar);
+	//vars = ae(bdd_deltail(vars, bits*ar));
+	vars = ae(vars);
 	DBG(printbdd(wcout<<"ae:"<<endl, drv->prog, vars)<<endl;)
 	if (!proof2.empty()) p.emplace(vars);
-	return vars;//bdd_deltail(vars, bits * ar);
-
-/*	for (const body& b : bd)
-		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;
-	for (n=eqs.size(); n;) if (F==(vars=bdd_and(vars, eqs[--n]))) return F;
-	vars = bdd_and(vars, hsym);
-	if (!proof2.empty()) p.emplace(vars);
-	return bdd_deltail(vars, bits * ar);*/
+	return vars;
 }
 
 size_t rule::get_varbdd(size_t bits, size_t ar) const {

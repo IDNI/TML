@@ -126,9 +126,10 @@ size_t extents::compute(size_t x, size_t v) {
 	node n = getnode(x);
 	int_t i;
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	assert(v <= nvars);
+	DBG(assert(v <= nvars);)
 	if (!has(domain, v/bits+1))
-		return ++v, bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
+		return ++v, n[1] == n[2] ? compute(n[1], v) :
+			bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
 	if (v < bits || ((v) % bits)) goto cont;
 	i = get_int(v);
 	if (	(glt && i >= glt) ||

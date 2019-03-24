@@ -208,7 +208,7 @@ size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 		else if (1 == (--to - from)) return v[from];
 		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
 	size_t m = getnode(v[from])[0], i, t = v[from], sz = v.size(), t1, t2;
-	bool b = false, eq = true, ret1 = false, ret2 = false;
+	bool b = false, eq = true, ret1 = false;
 	node n;
 	for (i = from + 1; i != to; ++i)
 		if (!leaf(v[i])) {
@@ -226,67 +226,12 @@ size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 		if (leaf(v[i])) continue;
 		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[2])) v.push_back(getnode(v[i])[2]);
-		else if (!trueleaf(getnode(v[i])[2])) { ret2 = true; break; }
+		else if (!trueleaf(getnode(v[i])[2])) return bdd_and_many(v, sz, t1);
 	t2 = v.size();
 	if (ret1) return bdd_and_many(v, t1, t2);
-	if (ret2) return bdd_and_many(v, sz, t1);
 	return bdd_add({{m, bdd_and_many(v, sz, t1), bdd_and_many(v, t1, t2)}});
 }
-/*
-size_t bdd_and_ex(size_t x, size_t y, const bools& s) {
-	if (x == y) return bdd_ex(x, s);
-#ifdef MEMO
-	apexmemo t = {s, {{x, y}}};
-	auto it = memo_and_ex.find(t);
-	if (it != memo_and_ex.end()) return it->second;
-#endif	
-	size_t res;
-	const node &Vx = getnode(x), &Vy = getnode(y);
-	const size_t &vx = Vx[0], &vy = Vy[0];
-	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if (nleaf(Vx)) {
-		res = ntrueleaf(Vx) ? bdd_ex(y, s) : F;
-		goto ret;
-	}
-	if (nleaf(Vy)) {
-		res = ntrueleaf(Vy) ? bdd_ex(x, s) : F;
-		goto ret;
-	}
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) { res = (a&&b)?T:F; goto ret; }
-	else if ((v = vx) < vy || !vy) b = d = y;
-	if (s[v-1]) res = bdd_or(bdd_and_ex(a, b, s), bdd_and_ex(c, d, s));
-	else res = bdd_add({{v, bdd_and_ex(a, b, s), bdd_and_ex(c, d, s)}});
-ret:	apply_ret(res, memo_and_ex);
-}
 
-size_t bdd_and_not_ex(size_t x, size_t y, const bools& s) {
-	if (x == y) return F;
-#ifdef MEMO
-	apexmemo t = {s, {{x, y}}};
-	auto it = memo_and_not_ex.find(t);
-	if (it != memo_and_not_ex.end()) return it->second;
-#endif	
-	size_t res;
-	const node &Vx = getnode(x), &Vy = getnode(y);
-	const size_t &vx = Vx[0], &vy = Vy[0];
-	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if (nleaf(Vx) && !ntrueleaf(Vx)) {
-		res = F;
-		goto ret;
-	}
-	if (nleaf(Vy)) {
-		res = ntrueleaf(Vy) ? F : bdd_ex(x, s);
-		goto ret;
-	}
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) { res = (a && !b)?T:F; goto ret; }
-	else if ((v = vx) < vy || !vy) b = d = y;
-	if (s[v-1]) res = bdd_or(bdd_and_not_ex(a,b,s), bdd_and_not_ex(c,d,s));
-	else res = bdd_add({{v, bdd_and_not_ex(a,b,s), bdd_and_not_ex(c,d,s)}});
-ret:	apply_ret(res, memo_and_not_ex);
-}
-*/
 size_t bdd_ite(size_t v, size_t t, size_t e) {
 	const node &x = getnode(t), &y = getnode(e);
 	if ((nleaf(x)||v<x[0])&&(nleaf(y)||v<y[0])) return bdd_add({{v+1,t,e}});

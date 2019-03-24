@@ -1,5 +1,5 @@
-CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -O3 -flto
-#CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -ggdb3
+#CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -O3 -flto
+CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -ggdb3
 CXX = g++
 OBJ = input.o driver.o lp.o bdd.o rule.o dict.o main.o query.o
 SRC = input.cpp input.h defs.h driver.cpp driver.h lp.cpp lp.h bdd.cpp bdd.h rule.cpp rule.h main.cpp dict.cpp query.h query.cpp
