@@ -51,111 +51,6 @@ size_t varcount(const matrix& v) { // bodies only
 			if (x[i] < 0) vars.emplace(x[i]);
 	return vars.size();
 }
-/*
-rule::body::body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars)
-	: neg(t[0] < 0) { // init, sel, ex and local eq
-	map<int_t, size_t> m;
-	size_t b, j;
-	t.erase(t.begin()), 
-	ex.resize(bits*ar,false), perm.resize((ar+nvars)*bits);
-	for (b = 0; b != (ar + nvars) * bits; ++b) perm[b] = b;
-	for (j = 0; j != ar; ++j)
-		if (t[j] >= 0)
-			from_int_and(t[j], bits, j * bits, sel);
-	for (j = 0; j != ar; ++j) from_arg(t[j], j, bits, dsz, m);
-}
-
-void rule::body::from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
-	map<int_t, size_t>& m) {
-	auto it = m.end();
-	vector<array<size_t, 2>> eq;
-	set<int_t> exclude = { pad, openp, closep };
-	if (vij >= 0) vecfill(ex, j * bits, (j+1) * bits, true);
-	else if ((it = m.find(vij)) != m.end()) { //seen var
-		vecfill(ex, j * bits, (j+1) * bits, true);
-		for (size_t b = 0; b != bits; ++b)
-			eq.emplace_back(array<size_t, 2>
-				{j*bits+b, it->second*bits+b});
-	} else	m.emplace(vij, j), from_range(dsz, bits, j*bits, exclude, sel);
-	for (size_t i = 0; i != eq.size(); ++i) {
-		if (!(i % 8)) eqs.push_back(T);
-		eqs.back() = bdd_and(eqs.back(), from_eq(eq[i][0], eq[i][1]));
-	}
-}
-
-size_t rule::body::varbdd(size_t db, lp::step& p) const {
-	auto it = (neg ? p.neg : p.pos).find({sel, ex});
-	//DBG(printbdd(wcout <<"sel: " << endl, sel)<<endl;)
-	if (it != (neg?p.neg:p.pos).end()) return bdd_permute(it->second, perm);
-	size_t r = (neg?bdd_and_not:bdd_and)(sel, db), n;
-	if (r == F) goto ret;
-	n = eqs.size();
-	while (n) if (F == (r = bdd_and(r, eqs[--n]))) goto ret;
-	r = bdd_ex(r, ex);
-ret:	(neg ? p.neg : p.pos).emplace(make_pair(r, ex), r);
-	return r == F ? F : bdd_permute(r, perm);
-}
-
-rule::rule(matrix v, size_t bits, size_t dsz, bool proof) {
-	size_t i, j, b, ar = v[0].size() - 1, k = ar, nvars;
-	assert(v.size() > 1);
-	neg = v[0][0] < 0, v[0].erase(v[0].begin()), nvars = varcount(v);
-	for (i=1; i!=v.size(); ++i) bd.emplace_back(v[i], ar, bits, dsz, nvars);
-	vector<array<size_t, 2>> heq;
-	map<int_t, size_t> m;
-	auto it = m.end();
-	for (j = 0; j != ar; ++j) // hsym
-		if (v[0][j] >= 0) from_int_and(v[0][j], bits, j * bits, hsym);
-		else if (m.end() == (it=m.find(v[0][j]))) m.emplace(v[0][j], j);
-		else for (b = 0; b!=bits; ++b)
-			heq.emplace_back(array<size_t, 2>
-				{j * bits + b, it->second * bits + b});
-	for (j = 0; j != heq.size(); ++j) {
-		if (!(j % 8)) eqs.push_back(T);
-		eqs.back() = bdd_and(eqs.back(), from_eq(heq[j][0], heq[j][1]));
-	}
-	for (i = 0; i != v.size() - 1; ++i) // var permutations
-		for (j = 0; j != ar; ++j)
-			if (v[i+1][j] < 0) {
-				if ((it = m.find(v[i+1][j])) == m.end())
-					it = m.emplace(v[i+1][j], k++).first;
-				for (b = 0; b != bits; ++b)
-					bd[i].perm[b+j*bits]=b+it->second*bits;
-			}
-	vars_arity = k;
-
-	if (!proof) return;
-	if (neg) er(err_proof);
-	for (const body& b : bd) if (b.neg) er(err_proof);
-
-	term vars, prule, bprule, x, y;
-	set<size_t> vs;
-	for (int_t t : v[0]) if (t < 0) vs.insert(t);
-	cat(cat(vars, 1), v[0]), cat(cat(prule, 1), openp), cat(bprule, 1);
-	//for (auto x : m) if (x.second >= ar) cat(vars, x.first);
-	for (i = 1; i != v.size(); ++i)
-		for (int_t t : v[i])
-			if (t < 0 && vs.find(t) == vs.end())
-				vs.insert(t), cat(vars, t);
-	//for (term& t : v) while (t[t.size()-1] == pad) t.erase(t.end()-1);
-	for (i = 0; i != v.size(); ++i) cat(prule, v[i]);
-	cat(prule, closep), cat(bprule, v[0]), cat(bprule, openp);
-	for (i = 1; i != v.size(); ++i) cat(bprule, v[i]);
-	cat(bprule, closep);
-
-	proof1 = {{prule},{vars}};
-	matrix r = { bprule, prule, cat(cat(cat(y={1}, openp), v[0]), closep) };
-	for (i = 1; i != v.size(); ++i)
-		proof2.insert({
-			cat(cat(cat(x={1}, openp), v[i]), closep),
-			prule, r[2]}),
-//			cat(cat(cat(y={1}, openp), v[0]), closep)}),
-		r.push_back(cat(cat(cat(x={1}, openp), v[i]), closep));
-	proof2.insert(move(r));
-//	wcout << v << endl << vars << endl << endl;
-//	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
-//	drv->printbdd(wcout, proof2), exit(0);
-}*/
 
 unordered_map<int_t, size_t> rule::get_varmap(const matrix& v) {
 	unordered_map<int_t, size_t> m;
@@ -259,9 +154,10 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step&) {
 		DBG(else printbdd(wcout<<"q"<<i-1<<endl,v[i-1],bits,vars_arity)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 	DBG(printbdd(wcout<<"q:"<<endl, vars,bits,vars_arity)<<endl;)
-	vars = ext(vars);
+	//vars = ext(vars);
 	DBG(printbdd(wcout<<"e:"<<endl, vars,bits,vars_arity)<<endl;)
 	vars = ae(bdd_deltail(vars, bits*ar));
+	//vars = ae(vars, bits*ar);
 	DBG(printbdd(wcout<<"ae:"<<endl, drv->prog, vars)<<endl;)
 	if (!proof2.empty()) p.emplace(vars);
 	return vars;//bdd_deltail(vars, bits * ar);
