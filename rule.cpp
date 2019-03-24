@@ -261,10 +261,10 @@ size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step&) {
 	DBG(printbdd(wcout<<"q:"<<endl, vars,bits,vars_arity)<<endl;)
 	vars = ext(vars);
 	DBG(printbdd(wcout<<"e:"<<endl, vars,bits,vars_arity)<<endl;)
-	vars = ae(vars);
+	vars = ae(bdd_deltail(vars, bits*ar));
 	DBG(printbdd(wcout<<"ae:"<<endl, drv->prog, vars)<<endl;)
 	if (!proof2.empty()) p.emplace(vars);
-	return bdd_deltail(vars, bits * ar);
+	return vars;//bdd_deltail(vars, bits * ar);
 
 /*	for (const body& b : bd)
 		if (F == (vars = bdd_and(vars, b.varbdd(db, s)))) return F;

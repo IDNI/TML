@@ -40,18 +40,24 @@ node flip(node n) {
 	return n;
 }
 
-size_t query::operator()(size_t x, size_t v) {
+size_t query::operator()(size_t x) {
+	auto it = memo.find(x);
+	if (it == memo.end()) return memo[x] = compute(x, 0);
+	return it->second;
+}
+
+size_t query::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = neg ? flip(getnode(x)) : getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))
-		return bdd_ite(perm[v], (*this)(n[1],v+1), (*this)(n[2],v+1));
+		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));
 	if (e[v/bits] > 0)
-		return (*this)(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
+		return compute(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
 	if (e[v/bits] < 0)
-		return (*this)(n[path[(-e[v/bits]-1)*bits+v%bits]==1?1:2],v+1);
-	return	path[v] = 1, x = (*this)(n[1], v+1), path[v] = -1,
-		bdd_ite(perm[v], x, (*this)(n[2], v+1));
+		return compute(n[path[(-e[v/bits]-1)*bits+v%bits]==1?1:2],v+1);
+	return	path[v] = 1, x = compute(n[1], v+1), path[v] = -1,
+		bdd_ite(perm[v], x, compute(n[2], v+1));
 }
 
 sizes query::getdom() const {
@@ -72,22 +78,28 @@ sizes bdd_and_eq::getdom() const {
 	return sort(r);
 }
 
-size_t bdd_and_eq::operator()(size_t x, size_t v) {
+size_t bdd_and_eq::operator()(size_t x) {
+	auto it = memo.find(x);
+	if (it == memo.end()) return memo[x] = compute(x, 0);
+	return it->second;
+}
+
+size_t bdd_and_eq::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))
-		return ++v, bdd_add({{v, (*this)(n[1], v), (*this)(n[2], v)}});
+		return ++v, bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
 	if (e[v/bits] > 0)
 		return	(e[v / bits] - 1) & (1 << (bits - v % bits - 1))
-			? bdd_add({{v+1, (*this)(n[1], v+1), F}})
-			: bdd_add({{v+1, F, (*this)(n[2], v+1)}});
+			? bdd_add({{v+1, compute(n[1], v+1), F}})
+			: bdd_add({{v+1, F, compute(n[2], v+1)}});
 	if (e[v/bits] < 0)
 		return	path[(-e[v / bits] - 1) * bits + v % bits] == 1
-			? bdd_add({{v+1, (*this)(n[1], v+1), F}})
-			: bdd_add({{v+1, F, (*this)(n[2], v+1)}});
-	return	path[v] = 1, x = (*this)(n[1], v+1), path[v++] = -1,
-		bdd_add({{v, x, (*this)(n[2], v)}});
+			? bdd_add({{v+1, compute(n[1], v+1), F}})
+			: bdd_add({{v+1, F, compute(n[2], v+1)}});
+	return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
+		bdd_add({{v, x, compute(n[2], v)}});
 }
 
 extents::extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
@@ -103,14 +115,20 @@ int_t extents::get_int(size_t v) const {
 	return r;
 }
 
-size_t extents::operator()(size_t x, size_t v) {
+size_t extents::operator()(size_t x) {
+	auto it = memo.find(x);
+	if (it == memo.end()) return memo[x] = compute(x, 0);
+	return it->second;
+}
+
+size_t extents::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars+1)) return x;
 	node n = getnode(x);
 	int_t i;
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	assert(v <= nvars);
 	if (!has(domain, v/bits+1))
-		return ++v, bdd_add({{v, (*this)(n[1], v), (*this)(n[2], v)}});
+		return ++v, bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
 	if (v < bits || ((v) % bits)) goto cont;
 	i = get_int(v);
 	if (	(glt && i >= glt) ||
@@ -124,6 +142,6 @@ size_t extents::operator()(size_t x, size_t v) {
 		(pred[v/bits-1] && i+1 != get_int(bits*pred[v/bits-1])))
 		return F;
 cont:	size_t y;
-	path[v]=true, x=(*this)(n[1], v+1), path[v++]=false, y=(*this)(n[2], v);
+	path[v]=true, x=compute(n[1], v+1), path[v++]=false, y=compute(n[2], v);
 	return v > tail ? x == F && y == F ? F : T : bdd_add({{v, x, y}});
 }
