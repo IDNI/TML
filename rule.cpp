@@ -129,7 +129,7 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
 //	drv->printbdd(wcout, proof2), exit(0);
 }
 
-size_t rule::fwd(size_t db, size_t /*bits*/, size_t /*ar*/) {
+size_t rule::fwd(size_t db, size_t bits, size_t ar) {
 	size_t vars = T;
 	sizes v(q.size());
 	size_t i = 0;
@@ -138,9 +138,9 @@ size_t rule::fwd(size_t db, size_t /*bits*/, size_t /*ar*/) {
 		DBG(else printbdd(wcout<<"q"<<i-1<<endl,v[i-1],bits,vars_arity)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 	DBG(printbdd(wcout<<"q:"<<endl, vars,bits,vars_arity)<<endl;)
-	vars = ext(vars);
+//	vars = ext(vars);
 	DBG(printbdd(wcout<<"e:"<<endl, vars,bits,vars_arity)<<endl;)
-	//vars = ae(bdd_deltail(vars, bits*ar));
+	vars = ae(bdd_deltail(vars, bits*ar));
 	vars = ae(vars);
 	DBG(printbdd(wcout<<"ae:"<<endl, drv->prog, vars)<<endl;)
 	if (!proof2.empty()) p.emplace(vars);

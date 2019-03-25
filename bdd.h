@@ -28,14 +28,14 @@ size_t from_bit(size_t x ,bool v);
 size_t bdd_or(size_t x, size_t y);
 size_t bdd_ex(size_t x, const bools&);
 size_t bdd_and(size_t x, size_t y);
-size_t bdd_and_many(std::vector<size_t>& v, size_t, size_t);
+size_t bdd_and_many(sizes& v, size_t, size_t);
 size_t bdd_deltail(size_t x, size_t h);
 size_t bdd_and_deltail(size_t x, size_t y, size_t h);
 //size_t bdd_and_ex(size_t x, size_t y, const bools&);
 size_t bdd_and_not(size_t x, size_t y);
 //size_t bdd_and_not_ex(size_t x, size_t y, const bools&);
 size_t bdd_ite(size_t v, size_t t, size_t e);
-size_t bdd_permute(size_t x, const std::vector<size_t>&); //overlapping rename
+size_t bdd_permute(size_t x, const sizes&); //overlapping rename
 size_t bdd_count(size_t x, size_t nvars);
 bool bdd_onesat(size_t x, size_t nvars, bools& r);
 size_t from_eq(size_t x, size_t y);

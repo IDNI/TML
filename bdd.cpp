@@ -26,7 +26,7 @@ typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
 typedef pair<bools, size_t> exmemo;
 typedef pair<bools, memo> apexmemo;
-typedef pair<vector<size_t>, size_t> permemo;
+typedef pair<sizes, size_t> permemo;
 template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
 template<> struct std::hash<exmemo> { size_t operator()(const exmemo&m)const;};
 template<>struct std::hash<apexmemo>{size_t operator()(const apexmemo&m)const;};
@@ -196,42 +196,55 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
-	if (!(to - from)) return T;
-	if (1 == (to - from)) return v[from];
-	if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
-	while (leaf(v[from]))
-		if (!trueleaf(v[from])) return F;
-		else if (1 == (to - ++from)) return v[from];
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
-	while (leaf(v[to - 1]))
-		if (!trueleaf(v[to - 1])) return F;
-		else if (1 == (--to - from)) return v[from];
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
-	size_t m = getnode(v[from])[0], i, t = v[from], sz = v.size(), t1, t2;
-	bool b = false, eq = true, ret = false;
+size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
+		size_t &m, size_t &f1, size_t &t1, size_t &t2) {
+	size_t i, t;
+	bool b, eq, flag;
 	node n;
+	if (!(to - from)) return res = T, 1;
+	if (1 == (to - from)) return res = v[from], 1;
+	if (2 == (to - from)) return res = bdd_and(v[from], v[from+1]), 1;
+	while (leaf(v[from]))
+		if (!trueleaf(v[from])) return res = F, 1;
+		else if (1 == (to - ++from)) return res = v[from], 1;
+		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]), 1;
+	while (leaf(v[to - 1]))
+		if (!trueleaf(v[to - 1])) return res = F, 1;
+		else if (1 == (--to - from)) return res = v[from], 1;
+		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]), 1;
+	m = getnode(v[from])[0], t = v[from], f1 = v.size();
+	b = false, eq = true, flag = false;
 	for (i = from + 1; i != to; ++i)
 		if (!leaf(v[i])) {
 			n = getnode(v[i]), b |= n[0] != m, eq &= t == v[i];
 			if (n[0] < m) m = n[0];
-		} else if (!trueleaf(v[i])) return F;
-	if (eq) return t;
+		} else if (!trueleaf(v[i])) return res = F, 1;
+	if (eq) return res = t, 1;
 	for (i = from; i != to; ++i)
 		if (leaf(v[i])) continue;
 		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[1])) v.push_back(getnode(v[i])[1]);
-		else if (!trueleaf(getnode(v[i])[1])) { ret = true; break; }
+		else if (!trueleaf(getnode(v[i])[1])) { flag = true; break; }
 	t1 = v.size();
 	for (i = from; i != to; ++i)
 		if (leaf(v[i])) continue;
 		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[2])) v.push_back(getnode(v[i])[2]);
-		else if (!trueleaf(getnode(v[i])[2]))
-			return ret ? F : bdd_add({{m,bdd_and_many(v,sz,t1),F}});
+		else if (!trueleaf(getnode(v[i])[2])) return flag ? res=F,1 : 2;
 	t2 = v.size();
-	if (ret) return bdd_add({{m, F, bdd_and_many(v, t1, t2)}});
-	return bdd_add({{m, bdd_and_many(v, sz, t1), bdd_and_many(v, t1, t2)}});
+	return flag ? 3 : 0;
+}
+
+size_t bdd_and_many(sizes& v, size_t from, size_t to) {
+	size_t res, m, f1, t1, t2;
+	switch (bdd_and_many_iter(v, from, to, res, m, f1, t1, t2)) {
+		case 0: return bdd_add({{m, bdd_and_many(v, f1, t1),
+				bdd_and_many(v, t1, t2)}});
+		case 1: return res;
+		case 2: return bdd_add({{m,bdd_and_many(v,f1,t1),F}});
+		case 3: return bdd_add({{m, F, bdd_and_many(v, t1, t2)}});
+		default: throw 0;
+	}
 }
 
 size_t bdd_ite(size_t v, size_t t, size_t e) {
@@ -240,7 +253,7 @@ size_t bdd_ite(size_t v, size_t t, size_t e) {
 	return bdd_or(bdd_and(from_bit(v,true),t),bdd_and(from_bit(v,false),e));
 }
 
-size_t bdd_permute(size_t x, const vector<size_t>& m) { //overlapping rename
+size_t bdd_permute(size_t x, const sizes& m) { //overlapping rename
 #ifdef MEMO
 	permemo t = {m, x};
 	auto it = memo_permute.find(t);
@@ -291,7 +304,7 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	if (prev == curr) return x;
 	assert(prev < curr);
 	size_t t = T, n, k;
-	vector<size_t> v(nvars);
+	sizes v(nvars);
 	for (n = 0; n != nvars; ++n) {
 		v[n] = (n % prev) + curr - prev + curr * (n / prev);
 		for (k = 0; k != curr - prev; ++k)
@@ -336,7 +349,6 @@ term one_from_bits(size_t x, size_t bits, size_t ar) {
 	}
 	return r;
 }
-
 
 void memos_clear() {
 #ifdef MEMO		
