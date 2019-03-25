@@ -39,7 +39,7 @@ struct rule { // a P-DATALOG rule in bdd form
 
 //	rule() {}
 	rule(matrix v, size_t bits, size_t dsz, bool proof);
-	size_t fwd(size_t db, size_t bits, size_t ar, lp::step& s);
+	size_t fwd(size_t db, size_t bits, size_t ar);
 	size_t get_varbdd(size_t bits, size_t ar) const;
 };
 

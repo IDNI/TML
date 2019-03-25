@@ -25,9 +25,6 @@ template<> struct std::hash<std::pair<size_t, bools>> {
 
 class lp { // [pfp] logic program
 	friend struct rule;
-	struct step {
-		std::unordered_map<std::pair<size_t, bools>, size_t> pos, neg;
-	} cache;
 	std::vector<struct rule*> rules;
 	matrix pgoals;
 	void term_pad(term& t);

@@ -129,7 +129,7 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
 //	drv->printbdd(wcout, proof2), exit(0);
 }
 
-size_t rule::fwd(size_t db, size_t bits, size_t ar, lp::step&) {
+size_t rule::fwd(size_t db, size_t /*bits*/, size_t /*ar*/) {
 	size_t vars = T;
 	sizes v(q.size());
 	size_t i = 0;

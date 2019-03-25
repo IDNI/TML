@@ -103,10 +103,9 @@ void lp::rules_pad(matrices& t) {
 }
 
 void lp::fwd(size_t &add, size_t &del) {
-	cache.pos.clear(), cache.neg.clear();
 	for (rule* r : rules)
 		(r->neg ?del : add) =
-			bdd_or(r->fwd(db,bits,ar,cache),r->neg?del:add);
+			bdd_or(r->fwd(db,bits,ar),r->neg?del:add);
 //	DBG(printbdd(wcout<<"add:"<<endl,this,add););
 //	DBG(printbdd(wcout<<"del:"<<endl,this,del););
 }

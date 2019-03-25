@@ -197,6 +197,7 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 }
 
 size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
+	if (!(to - from)) return T;
 	if (1 == (to - from)) return v[from];
 	if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
 	while (leaf(v[from]))
@@ -208,7 +209,7 @@ size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 		else if (1 == (--to - from)) return v[from];
 		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]);
 	size_t m = getnode(v[from])[0], i, t = v[from], sz = v.size(), t1, t2;
-	bool b = false, eq = true, ret1 = false;
+	bool b = false, eq = true, ret = false;
 	node n;
 	for (i = from + 1; i != to; ++i)
 		if (!leaf(v[i])) {
@@ -220,15 +221,16 @@ size_t bdd_and_many(vector<size_t>& v, size_t from, size_t to) {
 		if (leaf(v[i])) continue;
 		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[1])) v.push_back(getnode(v[i])[1]);
-		else if (!trueleaf(getnode(v[i])[1])) { ret1 = true; break; }
+		else if (!trueleaf(getnode(v[i])[1])) { ret = true; break; }
 	t1 = v.size();
 	for (i = from; i != to; ++i)
 		if (leaf(v[i])) continue;
 		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[2])) v.push_back(getnode(v[i])[2]);
-		else if (!trueleaf(getnode(v[i])[2])) return bdd_and_many(v, sz, t1);
+		else if (!trueleaf(getnode(v[i])[2]))
+			return ret ? F : bdd_add({{m,bdd_and_many(v,sz,t1),F}});
 	t2 = v.size();
-	if (ret1) return bdd_and_many(v, t1, t2);
+	if (ret) return bdd_add({{m, F, bdd_and_many(v, t1, t2)}});
 	return bdd_add({{m, bdd_and_many(v, sz, t1), bdd_and_many(v, t1, t2)}});
 }
 

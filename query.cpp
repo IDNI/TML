@@ -33,12 +33,8 @@ query::query(size_t bits, const term& t, const sizes& perm)
 	: neg(t[0]<0), bits(bits), nvars((t.size()-1)*bits), e(from_term(t))
 	, perm(perm), domain(getdom()), path(nvars, 0) {}
 
-node flip(node n) {
-	if (nleaf(n)) return n;
-	if (n[1] == T) n[1] = F; else if (n[1] == F) n[1] = T;
-	if (n[2] == T) n[2] = F; else if (n[2] == F) n[2] = T;
-	return n;
-}
+#define flip(n) nleaf(n) ? (n) : \
+	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
 size_t query::operator()(size_t x) {
 	auto it = memo.find(x);

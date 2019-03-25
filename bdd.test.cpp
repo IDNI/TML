@@ -146,23 +146,21 @@ wostream& operator<<(wostream& os, const tt& t) {
 }
 
 void test_and_many() {
-	for (size_t k = 0; k < 50; ++k) {
-		tt *t = new tt[5];
-		for (size_t i = 0; i < 5; ++i) t[i] = rndtt(8).ex(i);
+	for (size_t k = 0; k < 150; ++k) {
+		tt *t = new tt[10];
+		for (size_t i = 0; i < 10; ++i) t[i] = rndtt(8);//.ex(i);
 		size_t r = T;
-		for (size_t i = 0; i < 5; ++i) r = bdd_and(r, t[i].bdd());
-		if (!leaf(r)) {
-			vector<size_t> v;
-			for (size_t i = 0; i < 5; ++i) v.push_back(t[i].bdd());
-			assert(r == bdd_and_many(v, 0, v.size()));
-		}
+		for (size_t i = 0; i < 10; ++i) r = bdd_and(r, t[i].bdd());
+		vector<size_t> v;
+		for (size_t i = 0; i < 10; ++i) v.push_back(t[i].bdd());
+		assert(r == bdd_and_many(v, 0, v.size()));
 		delete[] t;
 	}
 }
 
 int main() {
 	bdd_init();
-	test_query();
+	// test_query(); need to update
 	srand(time(0));
 	test_and_many();
 	tt xt(3);
