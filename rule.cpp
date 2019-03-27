@@ -44,15 +44,7 @@ size_t fact(term v, size_t bits) {
 			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
 	return v.neg ? bdd_and_not(T, r) : r;
 }
-/*
-size_t varcount(const matrix& v) { // bodies only
-	set<int_t> vars;
-	for (const term& x : v) 
-		for (size_t i = 0; i != x.args.size(); ++i) 
-			if (x[i] < 0) vars.emplace(x[i]);
-	return vars.size();
-}
-*/
+
 void rule::get_varmap(const matrix& v) {
 	size_t k = v[0].args.size(), i, j;
 	hrel = v[0].rel, harity = v[0].arity;
@@ -158,18 +150,3 @@ size_t rule::get_varbdd(size_t /*bits*/) const {
 //	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
 	return bdd_and(x, y);
 }
-/*
-size_t std::hash<pair<size_t, bools>>::operator()(
-	const pair<size_t, bools>& m) const {
-	static std::hash<size_t> h1;
-	static std::hash<bools> h2;
-	return h1(m.first) + h2(m.second);
-}
-
-size_t std::hash<pair<int_t, ints>>::operator()(
-	const pair<int_t, ints>& m) const {
-	static std::hash<int_t> h;
-	size_t r = h(m.first);
-	for (size_t n = 0; n < m.second.size(); ++n) r += h(m.second[n])*(n+2);
-	return r;
-}*/

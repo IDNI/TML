@@ -118,41 +118,43 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 	}
 	return r;
 }
-/*
+
 void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 	int_t rel) {
-	int_t null = 0; // FIXME
+	int_t null = dict_get_rel(L"null");
 	for (const production& p : g) {
 		if (p.p.size() < 2) er("empty production.\n");
-		matrix t;
-		int_t v = -1, x = dict_get(p.p[0].e);
+		int_t x = dict_get_rel(p.p[0].e);
 		if (p.p.size() == 2 && p.p[1].type == elem::SYM &&
-			null == dict_get(p.p[1].e)) {
-			m.insert({{1, x, -1, -1}, {1, rel, -2, -1, -3}});
-			m.insert({{1, x, -1, -1}, {1, rel, -2, -3, -1}});
+			null == dict_get_rel(p.p[1].e)) {
+			m.insert({	term(false, x, {-1,-1}, {2}),
+					term(false, null, {}, {0})});
 			continue;
 		}
-		t.push_back({1, x, -1, -(int_t)p.p.size()});
+		matrix t;
+		int_t v = -1;
+		t.emplace_back(false, x, ints{-1, -(int_t)p.p.size()}, ints{2});
 		for (size_t n = 1; n < p.p.size(); ++n, --v)
 			if (p.p[n].type == elem::SYM) {
-				if (null==(x=dict_get(p.p[n].e))) er(err_null);
-				t.push_back({1, x, v, v-1});
+				if (null==(x=dict_get_rel(p.p[n].e)))
+					er(err_null);
+				t.emplace_back(false, x, ints{v, v-1}, ints{2});
 			}
 			else if (p.p[n].type == elem::CHR) {
 				if(!n)er("grammar lhs cannot be a terminal.\n");
-				t.push_back({1, rel, *p.p[n].e[0]+1, v, v-1});
+				t.emplace_back(false, rel,
+					ints{*p.p[n].e[0]+1, v, v-1}, ints{3});
 			} else er("unexpected grammar node.\n");
 		m.emplace(move(t));
 	}
-//	wcout << m << endl;
+	DBG(wcout << m << endl;)
 }
-*/
+
 void driver::prog_init(const raw_prog& p, const strs_t& s){
 	matrices m;
 	matrix g, pg;
 	if (p.g.size() && s.size() > 1)
 		er("only one string allowed given grammar.\n");
-	//grammar_to_rules(p.g, m, s.begin()->first);
 	if (!p.d.empty()) {
 		matrices rtxt = get_char_builtins();
 		m.insert(rtxt.begin(), rtxt.end());
@@ -165,13 +167,17 @@ void driver::prog_init(const raw_prog& p, const strs_t& s){
 		else m.insert(get_rule(x));
 	for (auto x : s) {
 		for (int_t n = 0; n != (int_t)x.second.size()-1; ++n)
-			m.insert({term(true, x.first,
+			m.insert({term(false, x.first,
 				{x.second[n],n+256,n+257},{3})});
-		m.insert({term(true, x.first, { x.second.back(),
+		m.insert({term(false, x.first, { x.second.back(),
 			(int_t)x.second.size()+256, (int_t)x.second.size()+256 }
 			, {3})});
 	}
+	if (p.g.size()) grammar_to_rules(p.g, m, s.begin()->first);
 	prog = new lp(move(m), move(g), move(pg), usz(), prog);
+	prog->add_fact(term(false, null, {}, {0}));
+//	DBG(printdb(wcout<<L"pos:"<<endl, prog);)
+//	DBG(printndb(wcout<<L"neg:"<<endl, prog)<<endl;)
 	if (!s.empty())
 		for (size_t x : builtin_rels) // to suppress builtins on output
 			builtin_symbdds.insert(prog->get_sym_bdd(x, 0));
@@ -277,11 +283,15 @@ wostream& driver::printbdd_one(wostream& os, size_t t, ints ar, int_t rel)const{
 
 wostream& driver::printdb(wostream& os, lp *p) const {
 	for (auto x : p->db)
-		printbdd(os,from_bits(*x.second, x.first.second,x.first.first));
+		if (builtin_rels.find(x.first.first) == builtin_rels.end())
+			printbdd(os,from_bits(*x.second,
+				x.first.second,x.first.first));
 	return os;
 }
 wostream& driver::printndb(wostream& os, lp *p) const {
 	for (auto x : p->ndb)
-		printbdd(os,from_bits(*x.second, x.first.second,x.first.first));
+		if (builtin_rels.find(x.first.first) == builtin_rels.end())
+			printbdd(os,from_bits(*x.second,
+				x.first.second,x.first.first));
 	return os;
 }

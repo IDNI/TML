@@ -21,24 +21,14 @@
 
 void tml_init();
 
-//template<> struct std::hash<std::pair<size_t, bools>> {
-//	size_t operator()(const std::pair<size_t, bools>& m) const; };
-//template<> struct std::hash<std::pair<int_t, ints>> {
-//	size_t operator()(const std::pair<int_t, ints>&) const; };
-
 class lp { // [pfp] logic program
 	friend struct rule;
 	std::vector<struct rule*> rules;
 	matrix pgoals;
-//	void term_pad(term& t);
-//	void rule_pad(matrix& t);
-//	matrix rule_pad(const matrix& t);
-//	void rules_pad(matrices& t);
 //	matrices get_proof1() const;
 //	matrices get_proof2() const;
 	bool add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
-	bool add_fact(const term& t);
 	size_t prove() const;
 	lp *prev, *proof1 = 0, *proof2 = 0;
 	size_t gbdd = F;
@@ -52,6 +42,7 @@ public:
 	void fwd(diff_t &add, diff_t &del);
 	bool pfp();
 
+	bool add_fact(const term& t);
 	size_t get_sym_bdd(size_t sym, size_t pos) const;
 	size_t get_varbdd(size_t ar) const;
 //	size_t maxw() const;

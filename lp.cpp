@@ -40,9 +40,12 @@ DBG(wostream& printbdd(wostream& os, size_t t);)
 
 bool lp::add_fact(size_t f, int_t rel, ints arity) {
 	size_t *t = db[{rel, arity}];
-	*t = bdd_or(*t, f);
-	t = ndb[{rel, arity}];
-	return F != (*t = bdd_and_not(*t, f));
+	if (!t)
+		return	*(db[{rel, arity}] = new size_t) = f, 
+			*(ndb[{rel, arity}] = new size_t) = bdd_and_not(T, f),
+			true;
+	return	*t = bdd_or(*t, f), t = ndb[{rel, arity}],
+		F != (*t = bdd_and_not(*t, f));
 }
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
@@ -95,8 +98,8 @@ lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
 			rules.emplace_back(
 				new rule(m, dbs, bits, dsz, !pgoals.empty()));
 		}
-	DBG(printdb(wcout<<L"pos:"<<endl, this));
-	DBG(printndb(wcout<<L"neg:"<<endl, this))<<endl;
+//	DBG(printdb(wcout<<L"pos:"<<endl, this);)
+//	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
 /*	if (!pgoals.empty())
 		proof1 = new lp(move(get_proof1()), matrix(), matrix(), dsz, this),
 		proof2 = new lp(move(get_proof2()), matrix(), matrix(), dsz, proof1);*/
