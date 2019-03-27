@@ -130,7 +130,7 @@ size_t rule::fwd(size_t bits) {
 	sizes v(q.size());
 	for (size_t n = 0; n < q.size(); ++n) 
 		if (F == (v[n] = q[n](*dbs[n]))) return F;
-		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
+//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 //	vars = ext(vars);

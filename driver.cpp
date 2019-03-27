@@ -39,7 +39,7 @@ term driver::get_term(const raw_term& r) {
 		if (r.e[n].type == elem::NUM)
 			t.args.push_back(r.e[n].num + chars);
 		else if (r.e[n].type == elem::CHR)
-			t.args.push_back(*r.e[n].e[0]+1);
+			t.args.push_back(*r.e[n].e[0]);
 		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
 			t.args.push_back(dict_get(r.e[n].e));
 	return t;
@@ -122,13 +122,19 @@ driver::strs_t driver::directives_load(const raw_prog& p) {
 void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 	int_t rel) {
 	int_t null = dict_get_rel(L"null");
+	builtin_rels.emplace(null);
+	m.insert({term(false, null, {}, {0})});
 	for (const production& p : g) {
 		if (p.p.size() < 2) er("empty production.\n");
 		int_t x = dict_get_rel(p.p[0].e);
 		if (p.p.size() == 2 && p.p[1].type == elem::SYM &&
 			null == dict_get_rel(p.p[1].e)) {
 			m.insert({	term(false, x, {-1,-1}, {2}),
-					term(false, null, {}, {0})});
+					//term(false, null, {}, {0})});
+					term(false, rel, {-2,-1,-3}, {3})});
+			m.insert({	term(false, x, {-1,-1}, {2}),
+					//term(false, null, {}, {0})});
+					term(false, rel, {-2,-3,-1}, {3})});
 			continue;
 		}
 		matrix t;
@@ -143,7 +149,7 @@ void driver::grammar_to_rules(const vector<production>& g, matrices& m,
 			else if (p.p[n].type == elem::CHR) {
 				if(!n)er("grammar lhs cannot be a terminal.\n");
 				t.emplace_back(false, rel,
-					ints{*p.p[n].e[0]+1, v, v-1}, ints{3});
+					ints{*p.p[n].e[0], v, v-1}, ints{3});
 			} else er("unexpected grammar node.\n");
 		m.emplace(move(t));
 	}
@@ -166,16 +172,17 @@ void driver::prog_init(const raw_prog& p, const strs_t& s){
 			assert(x.b.size() == 1), pg.push_back(get_term(x.b[0]));
 		else m.insert(get_rule(x));
 	for (auto x : s) {
-		for (int_t n = 0; n != (int_t)x.second.size()-1; ++n)
+		for (int_t n = 0; n != (int_t)x.second.size(); ++n)
 			m.insert({term(false, x.first,
 				{x.second[n],n+256,n+257},{3})});
-		m.insert({term(false, x.first, { x.second.back(),
-			(int_t)x.second.size()+256, (int_t)x.second.size()+256 }
-			, {3})});
+//		m.insert({term(false, x.first, { x.second.back(),
+//			(int_t)x.second.size()+256, (int_t)x.second.size()+256 }
+//			, {3})});
 	}
+//	wcout<<m<<endl;exit(1);
 	if (p.g.size()) grammar_to_rules(p.g, m, s.begin()->first);
 	prog = new lp(move(m), move(g), move(pg), usz(), prog);
-	prog->add_fact(term(false, null, {}, {0}));
+//	prog->add_fact(term(false, null, {}, {0}));
 //	DBG(printdb(wcout<<L"pos:"<<endl, prog);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, prog)<<endl;)
 	if (!s.empty())
@@ -262,9 +269,6 @@ wostream& printbdd(wostream& os, size_t t, ints ar, int_t rel){
 wostream& printbdd_one(wostream& os, size_t t, ints ar, int_t rel) {
 	return drv->printbdd_one(os, t, ar, rel);
 }
-//wostream& printbdd(wostream& os, size_t t, size_t bits, size_t ar) {
-//	return drv->printbdd(os, from_bits(t,bits,ar));
-//}
 #endif
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {

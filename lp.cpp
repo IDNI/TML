@@ -44,8 +44,9 @@ bool lp::add_fact(size_t f, int_t rel, ints arity) {
 		return	*(db[{rel, arity}] = new size_t) = f, 
 			*(ndb[{rel, arity}] = new size_t) = bdd_and_not(T, f),
 			true;
-	return	*t = bdd_or(*t, f), t = ndb[{rel, arity}],
-		F != (*t = bdd_and_not(*t, f));
+	*t = bdd_or(*t, f);
+	t = ndb[{rel, arity}];
+	return F != (*t = bdd_and_not(*t, f)) || f == T;
 }
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {

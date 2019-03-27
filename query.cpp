@@ -38,13 +38,13 @@ query::query(size_t bits, const term& t, const sizes& perm)
 */
 size_t query::operator()(size_t x) {
 	auto it = memo.find(x);
-	if (it == memo.end()) return memo[x] = compute(x, 0);
+	if (it == memo.end())
+		return memo[x]=domain.size()?compute(x, 0):bdd_permute(x, perm);
 	return it->second;
 }
 
 size_t query::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
-	//node n = neg ? flip(getnode(x)) : getnode(x);
 	node n = getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))
