@@ -78,12 +78,14 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar,
 		int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
+	std::wostream& printndb(std::wostream& os, lp *p) const;
 	~driver() { if (prog) delete prog; for (wstr w:strs_extra) free(w);}
 };
 
 #ifdef DEBUG
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
+std::wostream& printndb(std::wostream& os, lp *p);
 std::wostream& printbdd(std::wostream& os, size_t t, ints ar, int_t rel);
 std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar, int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,

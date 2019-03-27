@@ -13,7 +13,6 @@
 #include "bdd.h"
 
 class query {
-	const bool neg;
 	const size_t bits, nvars;
 	const ints e;
 	const sizes perm, domain;

@@ -249,6 +249,7 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 #ifdef DEBUG
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
+wostream& printndb(wostream& os, lp *p) { return drv->printndb(os, p); }
 wostream& printbdd(wostream& os, size_t t, ints ar, int_t rel){
 	return drv->printbdd(os, t, ar, rel);
 }
@@ -274,8 +275,13 @@ wostream& driver::printbdd_one(wostream& os, size_t t, ints ar, int_t rel)const{
 	return print_term(os, one_from_bits(t, ar, rel));
 }
 
-wostream& driver::printdb(wostream& os, lp *p) const{
+wostream& driver::printdb(wostream& os, lp *p) const {
 	for (auto x : p->db)
+		printbdd(os,from_bits(*x.second, x.first.second,x.first.first));
+	return os;
+}
+wostream& driver::printndb(wostream& os, lp *p) const {
+	for (auto x : p->ndb)
 		printbdd(os,from_bits(*x.second, x.first.second,x.first.first));
 	return os;
 }

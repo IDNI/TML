@@ -34,6 +34,7 @@ struct raw_term {
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
+	void clear() { e.clear(), arity.clear(); }
 };
 
 struct production {

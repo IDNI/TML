@@ -56,17 +56,16 @@ size_t varcount(const matrix& v) { // bodies only
 void rule::get_varmap(const matrix& v) {
 	size_t k = v[0].args.size(), i, j;
 	hrel = v[0].rel, harity = v[0].arity;
-	unordered_map<int_t, int_t> m;
 	for (i = 1; i != v.size(); ++i)
 		rels.push_back(v[i].rel), arities.push_back(v[i].arity);
 	for (j = 0; j != v[0].args.size(); ++j)
-		if (v[0].args[j] < 0 && m.end() == m.find(v[0].args[j]))
-			m.emplace(v[0].args[j], j);
+		if (v[0].args[j] < 0 && varmap.end()==varmap.find(v[0].args[j]))
+			varmap.emplace(v[0].args[j], j);
 	for (i = 1; i != v.size(); ++i)
 		for (j = 0; j != v[i].args.size(); ++j)
 			if (v[i].args[j] < 0)
-				if (m.find(v[i].args[j]) == m.end())
-					m.emplace(v[i].args[j], k++);
+				if (varmap.find(v[i].args[j]) == varmap.end())
+					varmap.emplace(v[i].args[j], k++);
 	vars_arity = {(int_t)k};
 }
 /*
@@ -89,15 +88,15 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/,
 	get_varmap(v);
 	//wcout<<v<<endl;
 	size_t i, j, b;
-//	v[0].erase(v[0].begin());
 	for (i = 1; i != v.size(); ++i) {
 		size_t ar = v[i].args.size();
 		sizes perm(bits * ar);
 		for (j = 0; j != bits * ar; ++j) perm[j] = j;
 		for (j = 0; j != ar; ++j)
-			if (v[i].args[j] >= 0) continue;
-			else for (b = 0; b != bits; ++b)
-				perm[b+j*bits]=b+varmap[v[i].args[j]]*bits;
+			if (v[i].args[j] < 0)
+				for (b = 0; b != bits; ++b)
+					perm[b+j*bits]=
+						b+varmap[v[i].args[j]]*bits;
 		q.emplace_back(bits, v[i], move(perm));
 	}
 

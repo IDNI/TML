@@ -38,15 +38,23 @@ wostream& operator<<(wostream& os, const bools& x);
 wostream& operator<<(wostream& os, const vbools& x);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
-bool lp::add_fact(const term& x) {
-	size_t f = fact(x, bits), *t = db[{x.rel, x.arity}];
+bool lp::add_fact(size_t f, int_t rel, ints arity) {
+	size_t *t = db[{rel, arity}];
 	*t = bdd_or(*t, f);
-	t = ndb[{x.rel, x.arity}];
-	*t = bdd_and_not(*t, f);
-	for (size_t n = 0; n < x.args.size(); ++n)
-		if (x.args[n] < 0)
-			from_range(dsz, bits, bits * n, *t);
-	return *t != F;
+	t = ndb[{rel, arity}];
+	return F != (*t = bdd_and_not(*t, f));
+}
+
+bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
+	size_t *t = ndb[{rel, arity}];
+	*t = bdd_or(*t, f);
+	t = db[{rel, arity}];
+	return F != (*t = bdd_and_not(*t, f));
+}
+
+bool lp::add_fact(const term& x) {
+	if (x.neg) return add_not_fact(fact(x, bits), x.rel, x.arity);
+	return add_fact(fact(x, bits), x.rel, x.arity);
 }
 
 lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
@@ -67,21 +75,28 @@ lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
 	rules_pad(r), rule_pad(g), rule_pad(pgoals),*/
 	bits = msb(dsz);
 	for (const matrix& m : r)
-		for (const term& t : m)
-			*(db[{t.rel, t.arity}] = new size_t) = F,
-			*(ndb[{t.rel, t.arity}] = new size_t) = T;
+		for (const term& t : m) {
+			*(db[{t.rel, t.arity}] = new size_t) = F;
+			size_t *x = ndb[{t.rel, t.arity}] = new size_t;
+			*x = T;
+			for (size_t n = 0; n < t.args.size(); ++n)
+				from_range(dsz, bits, bits * n, *x);
+		}
 	for (const matrix& m : r)
- 		if (m.size() == 1) add_fact(m[0]);
-	//*db[{m[0].rel, m[0].arity}] =
-	//		bdd_or(*db[{m[0].rel, m[0].arity}], fact(m[0], bits));
-		else {
+ 		if (m.size() == 1) {
+			if (!add_fact(m[0]))
+				(wcout << L"contradictory fact: "<<m[0]<<endl),
+				exit(0);
+		} else {
 			vector<size_t*> dbs;
 			for (size_t n = 1; n < m.size(); ++n)
 				dbs.push_back((m[n].neg?ndb:db)
 					[{m[n].rel,m[n].arity}]);
 			rules.emplace_back(
-				new rule(m, dbs, bits, dsz,!pgoals.empty()));
+				new rule(m, dbs, bits, dsz, !pgoals.empty()));
 		}
+	DBG(printdb(wcout<<L"pos:"<<endl, this));
+	DBG(printndb(wcout<<L"neg:"<<endl, this))<<endl;
 /*	if (!pgoals.empty())
 		proof1 = new lp(move(get_proof1()), matrix(), matrix(), dsz, this),
 		proof2 = new lp(move(get_proof2()), matrix(), matrix(), dsz, proof1);*/
@@ -127,8 +142,8 @@ void lp::rules_pad(matrices& t) {
 void lp::fwd(diff_t &add, diff_t &del) {
 	DBG(printdb(wcout, this));
 	for (rule* r : rules) {
-		if (add.find({r->hrel, r->harity}) == add.end())
-			add[{r->hrel, r->harity}] = del[{r->hrel, r->harity}]=F;
+//		if (add.find({r->hrel, r->harity}) == add.end())
+//			add[{r->hrel, r->harity}] = del[{r->hrel, r->harity}]=F;
 		(r->neg ? del : add)[{r->hrel, r->harity}] = bdd_or(r->fwd(bits)
 				,(r->neg?del:add)[{r->hrel, r->harity}]);
 	}
@@ -209,7 +224,7 @@ bool lp::pfp() {
 			else *(db[x.first] = new size_t) = *x.second;
 		for (auto x : prev->ndb)
 			if (ndb.find(x.first) != ndb.end())
-				*ndb[x.first] = bdd_or(*ndb[x.first], *x.second);
+				*ndb[x.first] = bdd_or(*ndb[x.first],*x.second);
 			else *(ndb[x.first] = new size_t) = *x.second;
 //		db = bdd_or(db, align(prev->db, prev->ar, prev->bits, ar,bits));
 	}
@@ -218,9 +233,15 @@ bool lp::pfp() {
 //	wcout << V.size() << endl;
 	for (set<diff_t, diffcmp> s;;) {
 		s.emplace(d = copy(db)), fwd(add, del);
-		if (!bdd_and_not(add, del, t))
-			return false; // detect contradiction
-		else bdd_or(bdd_and_not(db, del), t);
+		for (auto x : add)
+			if (!add_fact(x.second, x.first.first, x.first.second))
+				return false;
+		for (auto x : del)
+			if(!add_not_fact(x.second,x.first.first,x.first.second))
+				return false;
+//		if (!bdd_and_not(add, del, t))
+//			return false; // detect contradiction
+//		else bdd_or(bdd_and_not(db, del), t);
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}

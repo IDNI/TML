@@ -36,6 +36,8 @@ class lp { // [pfp] logic program
 //	void rules_pad(matrices& t);
 //	matrices get_proof1() const;
 //	matrices get_proof2() const;
+	bool add_fact(size_t f, int_t rel, ints arity);
+	bool add_not_fact(size_t f, int_t rel, ints arity);
 	bool add_fact(const term& t);
 	size_t prove() const;
 	lp *prev, *proof1 = 0, *proof2 = 0;

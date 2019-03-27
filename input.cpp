@@ -149,7 +149,7 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	while (t.parse(l, pos)) {
 		if (b.push_back(t), *l[pos][0] == '.') return ++pos, true;
 		if (*l[pos][0] != ',') er(err_term_or_dot);
-		++pos, t.e.clear();
+		++pos, t.clear();
 	}
 	er(err_body);
 }
