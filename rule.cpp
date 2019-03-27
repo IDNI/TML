@@ -23,7 +23,7 @@ using namespace std;
 #define err_proof	"proof extraction yet unsupported for programs "\
 			"with negation or deletion."
 
-int_t null, openp, closep;
+int_t null;
 template<typename T, typename V>
 V& cat(V& v, const T& t) { return v.push_back(t), v; }
 
@@ -33,39 +33,43 @@ V& cat(V& v, const V& t, size_t off = 0, size_t loff = 0, size_t roff = 0) {
 }
 
 size_t fact(term v, size_t bits) {
+	if (v.arity == ints{0}) return T;
 	size_t r = T;
 	unordered_map<int_t, size_t> m;
 	auto it = m.end();
-	for (size_t j = 0; j != v.size() - 1; ++j)
-		if (v[j+1] >= 0) from_int_and(v[j+1], bits, j * bits, r);
-		else if (m.end() == (it = m.find(v[j+1]))) m.emplace(v[j+1],j);
+	for (size_t j = 0; j != v.args.size(); ++j)
+		if (v.args[j] >= 0) from_int_and(v.args[j], bits, j * bits, r);
+		else if (m.end()==(it=m.find(v.args[j])))m.emplace(v.args[j],j);
 		else for (size_t b = 0; b!=bits; ++b)
 			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
-	return v[0] < 0 ? bdd_and_not(T, r) : r;
+	return v.neg ? bdd_and_not(T, r) : r;
 }
-
+/*
 size_t varcount(const matrix& v) { // bodies only
 	set<int_t> vars;
 	for (const term& x : v) 
-		for (size_t i = 1; i != x.size(); ++i) 
+		for (size_t i = 0; i != x.args.size(); ++i) 
 			if (x[i] < 0) vars.emplace(x[i]);
 	return vars.size();
 }
-
-unordered_map<int_t, size_t> rule::get_varmap(const matrix& v) {
-	unordered_map<int_t, size_t> m;
-	size_t ar = v[0].size() - 1, k = ar, i, j;
-	for (j = 0; j != ar; ++j)
-		if (v[0][j+1] < 0 && m.end() == m.find(v[0][j+1]))
-			m.emplace(v[0][j+1], j);
-	for (i = 0; i != v.size() - 1; ++i)
-		for (j = 0; j != ar; ++j)
-			if (v[i+1][j+1] < 0)
-				if (m.find(v[i+1][j+1]) == m.end())
-					m.emplace(v[i+1][j+1], k++);
-	return vars_arity = k, m;
+*/
+void rule::get_varmap(const matrix& v) {
+	size_t k = v[0].args.size(), i, j;
+	hrel = v[0].rel, harity = v[0].arity;
+	unordered_map<int_t, int_t> m;
+	for (i = 1; i != v.size(); ++i)
+		rels.push_back(v[i].rel), arities.push_back(v[i].arity);
+	for (j = 0; j != v[0].args.size(); ++j)
+		if (v[0].args[j] < 0 && m.end() == m.find(v[0].args[j]))
+			m.emplace(v[0].args[j], j);
+	for (i = 1; i != v.size(); ++i)
+		for (j = 0; j != v[i].args.size(); ++j)
+			if (v[i].args[j] < 0)
+				if (m.find(v[i].args[j]) == m.end())
+					m.emplace(v[i].args[j], k++);
+	vars_arity = {(int_t)k};
 }
-
+/*
 extents rule::get_extents(const matrix& v, size_t bits, size_t dsz) {
 	size_t ar = v[0].size()-1, l = 0;
 	term excl = {pad, openp, closep}, lt(ar, 0), gt(ar, 0);
@@ -78,31 +82,31 @@ extents rule::get_extents(const matrix& v, size_t bits, size_t dsz) {
 				lt[varmap[v[n][k+1]]] = dsz;
 	return extents(bits,vars_arity,ar*bits,dom,dsz,0,excl,lt,gt,succ,pred);
 }
-
-rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
-	neg(v[1][0] < 0), varmap(get_varmap(v)), ae(bits, v[0])
-	, ext(get_extents(v, bits, dsz)) {
+*/
+rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/,
+	bool proof) :
+	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) {//, ext(get_extents(v, bits, dsz)) {
+	get_varmap(v);
 	//wcout<<v<<endl;
-	size_t ar = v[0].size()-1, i, j, b;
-	v[0].erase(v[0].begin());
-	for (i = 0; i != v.size() - 1; ++i) {
+	size_t i, j, b;
+//	v[0].erase(v[0].begin());
+	for (i = 1; i != v.size(); ++i) {
+		size_t ar = v[i].args.size();
 		sizes perm(bits * ar);
 		for (j = 0; j != bits * ar; ++j) perm[j] = j;
 		for (j = 0; j != ar; ++j)
-			if (v[i+1][j+1] >= 0) continue;
+			if (v[i].args[j] >= 0) continue;
 			else for (b = 0; b != bits; ++b)
-				perm[b+j*bits]=b+varmap[v[i+1][j+1]]*bits;
-		q.emplace_back(bits, v[i+1], move(perm));
+				perm[b+j*bits]=b+varmap[v[i].args[j]]*bits;
+		q.emplace_back(bits, v[i], move(perm));
 	}
 
 	if (!proof) return;
-	for (i = 0; i != v.size(); ++i)
-		if (v[i][0] < 0) er(err_proof);
-		else if (i) v[i].erase(v[i].begin());
-
+	for (i = 0; i != v.size(); ++i) if (v[i].neg) er(err_proof);
+/*
 	term vars, prule, bprule, x, y;
 	set<size_t> vs;
-	for (int_t t : v[0]) if (t < 0) vs.insert(t);
+	for (int_t t : v[0].args) if (t < 0) vs.insert(t);
 	cat(cat(vars, 1), v[0]), cat(cat(prule, 1), openp), cat(bprule, 1);
 	//for (auto x : m) if (x.second >= ar) cat(vars, x.first);
 	for (i = 1; i != v.size(); ++i)
@@ -127,38 +131,46 @@ rule::rule(matrix v, size_t bits, size_t dsz, bool proof) :
 //	wcout << v << endl << vars << endl << endl;
 //	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
 //	drv->printbdd(wcout, proof2), exit(0);
+*/
 }
 
-size_t rule::fwd(size_t db, size_t bits, size_t ar) {
+size_t rule::fwd(size_t bits) {
 	size_t vars = T;
 	sizes v(q.size());
-	size_t i = 0;
-	for (query& x : q)
-		if (F == (v[i++] = x(db))) return F;
-		DBG(else printbdd(wcout<<"q"<<i-1<<endl,v[i-1],bits,vars_arity)<<endl;)
+	for (size_t n = 0; n < q.size(); ++n) 
+		if (F == (v[n] = q[n](*dbs[n]))) return F;
+		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
-	DBG(printbdd(wcout<<"q:"<<endl, vars,bits,vars_arity)<<endl;)
+	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 //	vars = ext(vars);
-	DBG(printbdd(wcout<<"e:"<<endl, vars,bits,vars_arity)<<endl;)
-	vars = ae(bdd_deltail(vars, bits*ar));
-	vars = ae(vars);
-	DBG(printbdd(wcout<<"ae:"<<endl, drv->prog, vars)<<endl;)
+	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
+	vars = ae(bdd_deltail(vars, bits*arlen(harity)));
+//	vars = ae(vars);
+	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	if (!proof2.empty()) p.emplace(vars);
 	return vars;
 }
 
-size_t rule::get_varbdd(size_t bits, size_t ar) const {
-	size_t x = T, y = F, n;
+size_t rule::get_varbdd(size_t /*bits*/) const {
+	size_t x = T, y = F;
 	for (size_t z : p) y = bdd_or(y, z);
 //	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, y);)
-	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
+//	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
 //	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
 	return bdd_and(x, y);
 }
-
-size_t std::hash<std::pair<size_t, bools>>::operator()(
-	const std::pair<size_t, bools>& m) const {
-	std::hash<size_t> h1;
-	std::hash<bools> h2;
+/*
+size_t std::hash<pair<size_t, bools>>::operator()(
+	const pair<size_t, bools>& m) const {
+	static std::hash<size_t> h1;
+	static std::hash<bools> h2;
 	return h1(m.first) + h2(m.second);
 }
+
+size_t std::hash<pair<int_t, ints>>::operator()(
+	const pair<int_t, ints>& m) const {
+	static std::hash<int_t> h;
+	size_t r = h(m.first);
+	for (size_t n = 0; n < m.second.size(); ++n) r += h(m.second[n])*(n+2);
+	return r;
+}*/

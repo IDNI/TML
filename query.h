@@ -15,7 +15,7 @@
 class query {
 	const bool neg;
 	const size_t bits, nvars;
-	const term e;
+	const ints e;
 	const sizes perm, domain;
 	std::vector<char> path;
 	sizes getdom() const;
@@ -28,7 +28,7 @@ public:
 
 class bdd_and_eq {
 	const size_t bits, nvars;
-	const term e;
+	const ints e;
 	const sizes domain;
 	std::vector<char> path;
 	sizes getdom() const;
@@ -38,7 +38,7 @@ public:
 	bdd_and_eq(size_t bits, const term& t);
 	size_t operator()(size_t x);
 };
-
+/*
 class extents {
 	const size_t bits, nvars, tail;
 	const int_t glt, ggt;
@@ -54,4 +54,4 @@ public:
 		int_t glt, int_t ggt, const term& excl, const term& lt,
 		const term& gt, const sizes& succ, const sizes& pred);
 	size_t operator()(size_t x);
-};
+};*/

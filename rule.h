@@ -15,32 +15,27 @@
 #include "lp.h"
 
 struct rule { // a P-DATALOG rule in bdd form
-/*	struct body {
-		size_t sel = T;
-		const bool neg;
-		bools ex;
-		std::vector<size_t> perm, eqs;
-		body(term &t, size_t ar, size_t bits, size_t dsz, size_t nvars);
-		void from_arg(int_t vij, size_t j, size_t bits, size_t dsz,
-			std::map<int_t, size_t>& m);
-		size_t varbdd(size_t db, lp::step& p) const;
-	};*/
 	const bool neg;
-	size_t vars_arity;
-	std::unordered_map<int_t, size_t> get_varmap(const matrix& v);
 	std::unordered_map<int_t, size_t> varmap;
 	std::vector<query> q;
+	std::vector<ints> arities;
+	ints harity, vars_arity, rels;
+	int_t hrel;
+	std::vector<size_t*> dbs;
 	bdd_and_eq ae;
-	extents ext;
+	//extents ext;
 	std::set<size_t> p;
 	matrix proof1;
 	matrices proof2;
-	extents get_extents(const matrix& v, size_t bits, size_t dsz);
+	void get_varmap(const matrix& v);
+//	extents get_extents(const matrix& v, size_t bits, size_t dsz);
 
 //	rule() {}
-	rule(matrix v, size_t bits, size_t dsz, bool proof);
-	size_t fwd(size_t db, size_t bits, size_t ar);
-	size_t get_varbdd(size_t bits, size_t ar) const;
+	rule(matrix v, const std::vector<size_t*>& dbs, size_t bits, size_t dsz,
+		bool proof);
+	size_t fwd(size_t bits);
+	size_t get_varbdd(size_t bits) const;
 };
 
 size_t fact(term v, size_t bits);
+size_t arlen(const ints& ar);

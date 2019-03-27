@@ -13,6 +13,7 @@
 #include <string>
 #include <cstring>
 #include <sstream>
+#include <fstream>
 #include <vector>
 #include "input.h"
 using namespace std;
@@ -40,6 +41,9 @@ using namespace std;
 #define err_fnf "file not found.\n"
 #define err_rule_dir_prod_expected "rule or production or directive expected.\n"
 #define err_paren "unbalanced parenthesis.\n"
+#define err_relsym_expected "expected relation name in beginning of term.\n"
+#define err_paren_expected \
+	"expected parenthesis after a nonzero arity relation symbol.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -114,10 +118,19 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	while (!wcschr(L".:,", *l[pos][0]))
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
+	if (e[0].type != elem::SYM) er(err_relsym_expected);
+	arity.push_back(0);
+	if (e.size() == 1) return true;
+	if (e[1].type != elem::OPENP) er(err_paren_expected);
+	if (e.back().type != elem::CLOSEP) er(err_paren);
 	size_t dep = 0;
-	for (const elem& t : e)
-		if (t.type == elem::OPENP) ++dep;
-		else if (t.type == elem::CLOSEP && !dep--) er(err_paren);
+	for (size_t n = 2; n < e.size()-1; ++n)
+		if (e[n].type == elem::OPENP) ++dep, arity.push_back(-1);
+		else if (e[n].type != elem::CLOSEP) {
+			if (arity.back() < 0) arity.push_back(1);
+			else ++arity.back();
+		} else if (!dep--) er(err_paren);
+		else arity.push_back(-2);
 	if (dep) er(err_paren);
 	return true;
 }
@@ -223,9 +236,19 @@ wostream& operator<<(wostream& os, const raw_progs& p) {
 	return os;
 }
 
+string ws2s(const wstring& s) { return string(s.begin(), s.end()); }
+
 off_t fsize(const char *fname) {
 	struct stat s;
 	return stat(fname, &s) ? 0 : s.st_size;
+}
+
+off_t fsize(cws s, size_t len) { return fsize(ws2s(wstring(s, len)).c_str()); }
+
+wstring file_read(wstring fname) {
+	wifstream s(ws2s(fname));
+	wstringstream ss;
+	return (ss << s.rdbuf()), ss.str();
 }
 
 wstring file_read_text(FILE *f) {

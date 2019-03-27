@@ -16,12 +16,6 @@
 #include <iostream>
 #include <sys/stat.h>
 
-typedef const wchar_t* cws;
-typedef cws* pcws;
-
-typedef std::array<cws, 2> lexeme;
-typedef std::vector<lexeme> lexemes;
-
 struct directive {
 	lexeme rel, arg;
 	bool fname;
@@ -38,6 +32,7 @@ struct elem {
 struct raw_term {
 	bool neg;
 	std::vector<elem> e;
+	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
@@ -73,7 +68,8 @@ std::wostream& operator<<(std::wostream& os, const raw_prog& p);
 std::wostream& operator<<(std::wostream& os, const lexeme& l);
 lexeme lex(pcws s);
 lexemes prog_lex(cws s);
+std::wstring file_read(std::wstring fname);
 std::wstring file_read_text(FILE *f);
 std::wstring file_read_text(std::wstring fname);
-off_t fsize(const char *fname);
+off_t fsize(cws s, size_t len);
 void parser_test();

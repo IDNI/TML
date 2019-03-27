@@ -18,19 +18,19 @@ using namespace std;
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 #define has(x, y) binary_search(x.begin(), x.end(), y)
 
-vector<int_t> from_term(const term& t) {
-	vector<int_t> r(t.size()-1);
+ints from_term(const term& t) {
+	ints r(t.args.size());
 	map<int_t, int_t> m;
 	auto it = m.end();
-	for (int_t n = 1; n != (int_t)t.size(); ++n)
-		if (t[n] >= 0) r[n-1] = t[n]+1;
-		else if (m.end() == (it = m.find(t[n]))) m[t[n]] = -n-1;
-		else r[n-1] = it->second;
+	for (int_t n = 0; n != (int_t)t.args.size(); ++n)
+		if (t.args[n] >= 0) r[n] = t.args[n]+1;
+		else if (m.end() == (it = m.find(t.args[n]))) m[t.args[n]]=-n-1;
+		else r[n] = it->second;
 	return r;
 }
 
 query::query(size_t bits, const term& t, const sizes& perm) 
-	: neg(t[0]<0), bits(bits), nvars((t.size()-1)*bits), e(from_term(t))
+	: neg(t.neg), bits(bits), nvars(t.args.size()*bits), e(from_term(t))
 	, perm(perm), domain(getdom()), path(nvars, 0) {}
 
 #define flip(n) nleaf(n) ? (n) : \
@@ -64,7 +64,7 @@ sizes query::getdom() const {
 }
 
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t)
-	: bits(bits), nvars((t.size()-1)*bits), e(from_term(t))
+	: bits(bits), nvars(t.args.size()*bits), e(from_term(t))
 	, domain(getdom()), path(nvars, 0) {}
 
 sizes bdd_and_eq::getdom() const {
@@ -97,7 +97,7 @@ size_t bdd_and_eq::compute(size_t x, size_t v) {
 	return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
 		bdd_add({{v, x, compute(n[2], v)}});
 }
-
+/*
 extents::extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
 	int_t glt, int_t ggt, const term& excl, const term& lt, const term& gt,
 	const sizes& succ, const sizes& pred) : bits(bits), nvars(ar*bits)
@@ -141,4 +141,4 @@ size_t extents::compute(size_t x, size_t v) {
 cont:	size_t y;
 	path[v]=true, x=compute(n[1], v+1), path[v++]=false, y=compute(n[2], v);
 	return v > tail ? x == F && y == F ? F : T : bdd_add({{v, x, y}});
-}
+}*/

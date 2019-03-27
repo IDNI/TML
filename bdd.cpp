@@ -236,7 +236,7 @@ size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
 }
 
 size_t bdd_and_many(sizes& v, size_t from, size_t to) {
-	size_t res, m, f1, t1, t2;
+	size_t res = F, m, f1, t1, t2;
 	switch (bdd_and_many_iter(v, from, to, res, m, f1, t1, t2)) {
 		case 0: return bdd_add({{m, bdd_and_many(v, f1, t1),
 				bdd_and_many(v, t1, t2)}});
@@ -313,42 +313,21 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	return bdd_and(t, bdd_permute(x, v));
 }
 
-void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
+void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
+	size_t x = F;
+	for (size_t n = 0; n < max; ++n)
+		x = bdd_or(x, from_int(n, bits, offset));
+	r = bdd_and(r, x);
+}
+
+/*void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
 	size_t &r) {
 	size_t x = F;
 	for (size_t n = 0; n < max; ++n)
 		if (ex.find(n) == ex.end())
 			x = bdd_or(x, from_int(n, bits, offset));
 	r = bdd_and(r, x);
-}
-
-matrix from_bits(size_t x, size_t bits, size_t ar) {
-	vbools s = allsat(x, bits * ar);
-	matrix r(s.size());
-	for (term& v : r) v = term(ar, 0);
-	size_t n = s.size(), i, b;
-	while (n--)
-		for (i = 0; i != ar; ++i) {
-			for (b = 0; b != bits; ++b)
-				if (s[n][i * bits + b])
-					r[n][i] |= 1 << (bits - b - 1);
-//			if (r[n][i] == pad) break;
-		}
-	return r;
-}
-
-term one_from_bits(size_t x, size_t bits, size_t ar) {
-	bools s(bits * ar, true);
-	if (!bdd_onesat(x, bits * ar, s)) return term();
-	term r(ar, 0);
-	for (size_t i = 0; i != ar; ++i) {
-		for (size_t b = 0; b != bits; ++b)
-			if (s[i * bits + b])
-				r[i] |= 1 << (bits - b - 1);
-//		if (r[i] == pad) break;
-	}
-	return r;
-}
+}*/
 
 void memos_clear() {
 #ifdef MEMO		

@@ -16,44 +16,47 @@
 #include <vector>
 #include <iostream>
 #include <set>
+#include <map>
 #include "bdd.h"
 
 void tml_init();
 
-template<> struct std::hash<std::pair<size_t, bools>> {
-	size_t operator()(const std::pair<size_t, bools>& m) const; };
+//template<> struct std::hash<std::pair<size_t, bools>> {
+//	size_t operator()(const std::pair<size_t, bools>& m) const; };
+//template<> struct std::hash<std::pair<int_t, ints>> {
+//	size_t operator()(const std::pair<int_t, ints>&) const; };
 
 class lp { // [pfp] logic program
 	friend struct rule;
 	std::vector<struct rule*> rules;
 	matrix pgoals;
-	void term_pad(term& t);
-	void rule_pad(matrix& t);
-	matrix rule_pad(const matrix& t);
-	void rules_pad(matrices& t);
-	matrices get_proof1() const;
-	matrices get_proof2() const;
+//	void term_pad(term& t);
+//	void rule_pad(matrix& t);
+//	matrix rule_pad(const matrix& t);
+//	void rules_pad(matrices& t);
+//	matrices get_proof1() const;
+//	matrices get_proof2() const;
+	bool add_fact(const term& t);
 	size_t prove() const;
 	lp *prev, *proof1 = 0, *proof2 = 0;
 	size_t gbdd = F;
 public:
-	size_t bits, ar, dsz, db = F;
+	size_t bits, dsz;
+	typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
+	typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
+	db_t db, ndb;
 
-	lp(matrices r, matrix g, matrix pg, lp *prev = 0);
-	void fwd(size_t &add, size_t &del);
+	lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev = 0);
+	void fwd(diff_t &add, diff_t &del);
 	bool pfp();
 
-	matrix getbdd(size_t t) const;
-	matrix getbdd_one(size_t t) const;
-	matrix getdb() const;
 	size_t get_sym_bdd(size_t sym, size_t pos) const;
 	size_t get_varbdd(size_t ar) const;
-	size_t maxw() const;
+//	size_t maxw() const;
 	~lp();
 };
 
 std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
 std::wostream& out(std::wostream& os, size_t n);
-const int_t pad = 0;
-extern int_t null, openp, closep;
+extern int_t null;
 #endif

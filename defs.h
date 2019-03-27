@@ -15,12 +15,33 @@
 #include <cassert>
 #include <vector>
 #include <set>
+#include <array>
 #include <iostream>
 typedef int64_t int_t;
 typedef wchar_t* wstr;
-typedef std::vector<int_t> term;
+typedef const wchar_t* cws;
+typedef cws* pcws;
+typedef std::array<cws, 2> lexeme;
+typedef std::vector<lexeme> lexemes;
+typedef std::vector<int_t> ints;
+struct term {
+	bool neg;
+	int_t rel;
+	ints args, arity;
+	term () {}
+	term(bool neg, int_t rel) : neg(neg), rel(rel) {}
+	term(bool neg, int_t rel, const ints& args,
+		const ints& arity) : neg(neg), rel(rel)
+		, args(args), arity(arity) {}
+	bool operator<(const term& t) const {
+		if (neg != t.neg) return neg;
+		if (rel != t.rel) return rel < t.rel;
+		if (arity != t.arity) return arity < t.arity;
+		return args < t.args;
+	}
+};
 typedef std::vector<size_t> sizes;
-typedef std::vector<term> matrix;// set of relational terms
+typedef std::vector<term> matrix;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef std::set<matrix> matrices;

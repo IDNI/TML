@@ -14,41 +14,50 @@
 using namespace std;
 
 pair<cws, size_t> driver::dict_get(int_t t) const {
-	assert(t);
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
-	if (t > nums) return { syms[t - nums], lens[t - nums] };
-	if (t < 256) { str_chr[1] = --t; return { str_chr, (size_t)3 }; }
-	wcscpy(str_nums, to_wstring(t-256).c_str());
-	return { str_nums, wcslen(str_nums) };
+	if (t < chars) { str_chr[1] = t; return { str_chr, (size_t)3 }; }
+	if ((t -= chars) < nums)
+		return wcscpy(str_nums, to_wstring(t).c_str()),
+			pair<cws, size_t>{ str_nums, wcslen(str_nums) };
+	return { syms[t - nums], lens[t - nums] };
 }
 
-int_t driver::dict_get(cws s, size_t len) {
-	if (!s) return pad;
-	if (iswdigit(*s)) er("symbol name cannot begin with a digit");
+int_t driver::dict_get(cws s, size_t len, bool rel) {
+	if (iswdigit(*s)) er("symbol name cannot begin with a digit.\n");
+	auto it = syms_dict.end();
 	if (*s == L'?') {
-		auto it = vars_dict.find({s, len});
-		if (it != vars_dict.end()) return it->second;
+		if (rel) er("relation symbol cannot be a variable.\n");
+		if ((it = vars_dict.find({s, len}))!= vars_dict.end())
+			return it->second;
 		int_t r = -vars_dict.size() - 1;
 		return vars_dict[{s, len}] = r;
 	}
-	auto it = syms_dict.find({s, len});
-	if (it != syms_dict.end()) return it->second;
+	if (rel) return	(it=rels_dict.find({s, len})) != rels_dict.end()
+			? it->second : (syms.push_back(s), lens.push_back(len),
+			rels_dict[{s,len}] = syms.size() + nums + chars - 1);
+	if ((it=syms_dict.find({s, len})) != syms_dict.end()) return it->second;
 	return	syms.push_back(s), lens.push_back(len), syms_dict[{s,len}] =
-		syms.size() + nums - 1;
+		syms.size() + nums + chars - 1;
 }
 
-int_t driver::dict_get(const lexeme& l) { return dict_get(l[0], l[1]-l[0]); }
+int_t driver::dict_get(const lexeme& l) {
+	return dict_get(l[0], l[1]-l[0], false);
+}
 
-int_t driver::dict_get(const wstring& s) {
-	auto it = syms_dict.find({s.c_str(), s.size()});
-	if (it != syms_dict.end()) return it->second;
+int_t driver::dict_get_rel(const lexeme& l) {
+	return dict_get(l[0], l[1]-l[0], true);
+}
+
+int_t driver::dict_get_rel(const wstring& s) {
+	auto it = rels_dict.find({s.c_str(), s.size()});
+	if (it != rels_dict.end()) return it->second;
 	wstr w = wcsdup(s.c_str());
 	strs_extra.emplace(w);
 	return	syms.push_back(w), lens.push_back(s.size()),
-		syms_dict[{w, s.size()}] = syms.size() + nums - 1;
+		rels_dict[{w, s.size()}] = syms.size() + nums + chars - 1;
 }
-
+/*
 int_t driver::dict_get() {
 	static size_t last = 1;
 	return dict_get(wstring(L"%") + to_wstring(last));
-}
+}*/
