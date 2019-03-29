@@ -53,7 +53,7 @@ struct raw_prog {
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
-	int_t outrel = -1;
+	int_t delrel = -1;
 	bool parse(const lexemes& l, size_t& pos);
 };
 

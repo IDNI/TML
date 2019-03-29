@@ -34,10 +34,10 @@ public:
 	void align(const db_t& d, const db_t& nd, size_t pbits, size_t bits);
 	db_t db, ndb;
 	const size_t bits, dsz;
-	const int_t outrel;
+	const int_t delrel;
 	const strs_t strs;
 
-	lp(matrices r, matrix g, int_t outrel, size_t dsz, const strs_t&,
+	lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t&,
 		lp *prev = 0);
 	void fwd(diff_t &add, diff_t &del);
 	bool pfp();

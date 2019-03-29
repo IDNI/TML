@@ -255,7 +255,7 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 		// ~W((h)(b1)...) :- ~G(h).
 		_r.r.push_back({{y.b[0], gh}, false, false});
 		// ! W(...)
-		_r.outrel = dict_get_rel(L"W");
+		_r.delrel = dict_get_rel(L"G");
 		//_r.r.push_back({{y.b[0]}, true, false});
 	}
 	return { r, _r };
@@ -290,7 +290,7 @@ void driver::prog_init(const raw_prog& p, strs_t s) {
 		else if (x.pgoal)
 			assert(x.b.size() == 1), pg.push_back(get_term(x.b[0]));
 		else m.insert(get_rule(x));
-	prog = new lp(move(m), move(g), p.outrel, usz(), s, prog);
+	prog = new lp(move(m), move(g), p.delrel, usz(), s, prog);
 }
 
 driver::driver(FILE *f) : driver(move(raw_progs(f))) {}

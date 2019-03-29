@@ -65,8 +65,8 @@ bool lp::add_fact(const term& x) {
 	return add_fact(fact(x, bits), x.rel, x.arity);
 }
 
-lp::lp(matrices r, matrix g, int_t outrel, size_t dsz, const strs_t& strs,
-	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), outrel(outrel)
+lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
+	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), delrel(delrel)
 	, strs(strs) {
 	//wcout<<r<<endl;
 /*	dsz = 0;
@@ -220,12 +220,12 @@ bool lp::pfp() {
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}
-	if (outrel != -1) {
+	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db)
-			if (x.first.first != outrel) d.insert(x.first);
+			if (x.first.first == delrel) d.insert(x.first);
 		for (auto x : ndb)
-			if (x.first.first != outrel) d.insert(x.first);
+			if (x.first.first == delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x), ndb.erase(x);
 	}
 	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
