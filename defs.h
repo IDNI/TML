@@ -50,7 +50,7 @@ typedef std::unordered_map<int_t, std::wstring> strs_t;
 std::wostream& operator<<(std::wostream& os, const term& t);
 std::wostream& operator<<(std::wostream& os, const matrix& m);
 std::wostream& operator<<(std::wostream& os, const matrices& m);
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else

@@ -236,7 +236,7 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 			gg.neg = false, append_sym_elem(gg.e, L"G"),
 			append_openp(gg.e), cat(gg.e, t.b[0].e),
 			append_closep(gg.e), gg.calc_arity(),
-			_r.r.push_back({{gg}, false, false});
+			_r.r.push_back({{gg, t.b[0]}, false, false});
 		}
 		for (size_t n = 1; n != x.b.size(); ++n) {
 			raw_rule z;
@@ -245,13 +245,14 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 			cat(z.b[0].e, x.b[n].e), append_closep(z.b[0].e),
 			z.b.push_back(gh), z.b.push_back(y.b[0]),
 			z.b[0].calc_arity(), r.r.push_back(z);
-			// ~W((h)(b1)...) :- ~G(h).
 			// ~W((h)(b1)...) :- ~G(b1).
 			y.b[0].neg = gh.neg = z.b[0].neg = true;
 			_r.r.push_back({{y.b[0], gh}, false, false}),
 			_r.r.push_back({{y.b[0], z.b[0]}, false, false}),
 			y.b[0].neg = gh.neg = false;
 		}
+		y.b[0].neg = gh.neg = true;
+		// ~W((h)(b1)...) :- ~G(h).
 		_r.r.push_back({{y.b[0], gh}, false, false});
 		// ! W(...)
 		_r.outrel = dict_get_rel(L"W");
@@ -278,10 +279,6 @@ vector<pair<raw_prog, strs_t>> driver::transform(const raw_prog& p) {
 		r.push_back({move(x[0]),{}}), r.push_back({move(x[1]),{}});
 	}
 	return r;
-//	char n = 0;
-//	if (!p.g.empty()) prog_init(r[n++], s);
-//	prog_init(r[n++], move(s));
-//	if (!pg.empty()) prog_init(r[n++], {}), prog_init(r[n], {});
 }
 
 void driver::prog_init(const raw_prog& p, strs_t s) {
