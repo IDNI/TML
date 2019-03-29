@@ -24,17 +24,12 @@ struct rule { // a P-DATALOG rule in bdd form
 	std::vector<size_t*> dbs;
 	bdd_and_eq ae;
 	//extents ext;
-	std::set<size_t> p;
-	matrix proof1;
-	matrices proof2;
 	void get_varmap(const matrix& v);
 //	extents get_extents(const matrix& v, size_t bits, size_t dsz);
 
 //	rule() {}
-	rule(matrix v, const std::vector<size_t*>& dbs, size_t bits, size_t dsz,
-		bool proof);
+	rule(matrix v, const std::vector<size_t*>& dbs, size_t bits,size_t dsz);
 	size_t fwd(size_t bits);
-	size_t get_varbdd(size_t bits) const;
 };
 
 size_t fact(term v, size_t bits);

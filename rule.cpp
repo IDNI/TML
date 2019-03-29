@@ -20,10 +20,7 @@ using namespace std;
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 #define symcat(x, y) ((x).push_back(y), (x))
-#define err_proof	"proof extraction yet unsupported for programs "\
-			"with negation or deletion."
 
-int_t null;
 template<typename T, typename V>
 V& cat(V& v, const T& t) { return v.push_back(t), v; }
 
@@ -74,8 +71,7 @@ extents rule::get_extents(const matrix& v, size_t bits, size_t dsz) {
 	return extents(bits,vars_arity,ar*bits,dom,dsz,0,excl,lt,gt,succ,pred);
 }
 */
-rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/,
-	bool proof) :
+rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/) :
 	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) {//, ext(get_extents(v, bits, dsz)) {
 	get_varmap(v);
 	//wcout<<v<<endl;
@@ -91,38 +87,9 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/,
 						b+varmap[v[i].args[j]]*bits;
 		q.emplace_back(bits, v[i], move(perm));
 	}
-
-	if (!proof) return;
-	for (i = 0; i != v.size(); ++i) if (v[i].neg) er(err_proof);
-/*
-	term vars, prule, bprule, x, y;
-	set<size_t> vs;
-	for (int_t t : v[0].args) if (t < 0) vs.insert(t);
-	cat(cat(vars, 1), v[0]), cat(cat(prule, 1), openp), cat(bprule, 1);
-	//for (auto x : m) if (x.second >= ar) cat(vars, x.first);
-	for (i = 1; i != v.size(); ++i)
-		for (int_t t : v[i])
-			if (t < 0 && vs.find(t) == vs.end())
-				vs.insert(t), cat(vars, t);
-	//for (term& t : v) while (t[t.size()-1] == pad) t.erase(t.end()-1);
-	for (i = 0; i != v.size(); ++i) cat(prule, v[i]);
-	cat(prule, closep), cat(bprule, v[0]), cat(bprule, openp);
-	for (i = 1; i != v.size(); ++i) cat(bprule, v[i]);
-	cat(bprule, closep);
-
-	proof1 = {{prule},{vars}};
-	matrix r = { bprule, prule, cat(cat(cat(y={1}, openp), v[0]), closep) };
-	for (i = 1; i != v.size(); ++i)
-		proof2.insert({
-			cat(cat(cat(x={1}, openp), v[i]), closep),
-			prule, r[2]}),
-//			cat(cat(cat(y={1}, openp), v[0]), closep)}),
-		r.push_back(cat(cat(cat(x={1}, openp), v[i]), closep));
-	proof2.insert(move(r));
 //	wcout << v << endl << vars << endl << endl;
 //	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
 //	drv->printbdd(wcout, proof2), exit(0);
-*/
 }
 
 size_t rule::fwd(size_t bits) {
@@ -132,21 +99,11 @@ size_t rule::fwd(size_t bits) {
 		if (F == (v[n] = q[n](*dbs[n]))) return F;
 //		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
-	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
+//	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 //	vars = ext(vars);
-	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
+//	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
 	vars = ae(bdd_deltail(vars, bits*arlen(harity)));
 //	vars = ae(vars);
-	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
-	if (!proof2.empty()) p.emplace(vars);
+//	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	return vars;
-}
-
-size_t rule::get_varbdd(size_t /*bits*/) const {
-	size_t x = T, y = F;
-	for (size_t z : p) y = bdd_or(y, z);
-//	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, y);)
-//	for (n = vars_arity; n != ar; ++n) from_int_and(pad, bits, n*bits, x);
-//	DBG(printbdd_one(wcout<<"rule::get_varbdd"<<endl, bdd_and(x, y));)
-	return bdd_and(x, y);
 }

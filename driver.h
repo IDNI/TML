@@ -19,6 +19,7 @@ struct dictcmp {
 			wcsncmp(x.first, y.first, x.second) < 0;
 	}
 };
+struct wstrcmp { bool operator()(cws x, cws y) const { return wcscmp(x, y)<0;}};
 
 class driver {
 	typedef std::map<std::pair<cws, size_t>, int_t, dictcmp> dictmap;
@@ -34,9 +35,8 @@ class driver {
 	size_t nsyms() const { return nums + chars + symbols + relsyms; }
 	size_t usz() const { return nums + chars + symbols; }
 //	size_t dict_bits() const { return msb(nsyms()); }
-	typedef std::map<int_t, std::wstring> strs_t;
-	std::set<wstr> strs_extra;
-	std::set<size_t> builtin_rels, builtin_symbdds;
+	std::set<cws, wstrcmp> strs_extra;
+	std::set<size_t> builtin_rels;//, builtin_symbdds;
 	matrix from_bits(size_t x, ints art, int_t rel) const;
 	term one_from_bits(size_t x, ints art, int_t rel) const;
 
@@ -44,23 +44,31 @@ class driver {
 	int_t nums = 0, chars = 0, symbols = 0, relsyms = 0;
 	size_t bits;
 
+	lexeme get_lexeme(const std::wstring& s);
+	lexeme get_var_lexeme(int_t i);
+	lexeme get_num_lexeme(int_t i);
+	lexeme get_char_lexeme(wchar_t i);
 	matrices get_char_builtins();
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
-	void get_dict_stats(const raw_progs& ps);
-	void term_pad(term& t, size_t ar);
-	void rule_pad(matrix& t, size_t ar);
-	matrix rule_pad(const matrix& t, size_t ar);
+	void get_dict_stats(const std::vector<std::pair<raw_prog, strs_t>>& v);
 
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
-	strs_t directives_load(const raw_prog& p);
+	std::wstring directive_load(const directive& d);
+	strs_t directives_load(const std::vector<directive>& p);
+	std::array<raw_prog, 2> transform_proofs(const raw_prog& p,
+			const std::vector<raw_rule>& g);
+	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
+	raw_prog transform_grammar(const directive&,
+		const std::vector<production>&, const std::wstring&);
+	std::vector<std::pair<raw_prog, strs_t>> transform(const raw_prog& p);
 	void grammar_to_rules(const std::vector<production>& g, matrices& m,
 		int_t rel);
-	void prog_init(const raw_prog& rp, const strs_t&);
+	void prog_init(const raw_prog& rp, strs_t);
 	void progs_read(wstr s);
 	bool pfp(lp *p);
-	driver(const raw_progs& rp);
+	driver(raw_progs);
 public:
 	lp* prog = 0;
 	driver(FILE *f);
@@ -79,7 +87,7 @@ public:
 		int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
 	std::wostream& printndb(std::wostream& os, lp *p) const;
-	~driver() { if (prog) delete prog; for (wstr w:strs_extra) free(w);}
+	~driver() { if (prog) delete prog; for (cws w:strs_extra)free((wstr)w);}
 };
 
 #ifdef DEBUG

@@ -34,6 +34,7 @@ struct raw_term {
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
+	void calc_arity();
 	void clear() { e.clear(), arity.clear(); }
 };
 
@@ -44,7 +45,7 @@ struct production {
 
 struct raw_rule {
 	std::vector<raw_term> b;
-	bool goal, pgoal = false;
+	bool goal = false, pgoal = false;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
@@ -52,6 +53,7 @@ struct raw_prog {
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
+	int_t outrel = -1;
 	bool parse(const lexemes& l, size_t& pos);
 };
 

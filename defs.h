@@ -15,6 +15,7 @@
 #include <cassert>
 #include <vector>
 #include <set>
+#include <unordered_map>
 #include <array>
 #include <iostream>
 typedef int64_t int_t;
@@ -45,6 +46,7 @@ typedef std::vector<term> matrix;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef std::set<matrix> matrices;
+typedef std::unordered_map<int_t, std::wstring> strs_t;
 std::wostream& operator<<(std::wostream& os, const term& t);
 std::wostream& operator<<(std::wostream& os, const matrix& m);
 std::wostream& operator<<(std::wostream& os, const matrices& m);

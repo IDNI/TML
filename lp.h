@@ -24,28 +24,25 @@ void tml_init();
 class lp { // [pfp] logic program
 	friend struct rule;
 	std::vector<struct rule*> rules;
-	matrix pgoals;
-//	matrices get_proof1() const;
-//	matrices get_proof2() const;
 	bool add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
-	size_t prove() const;
-	lp *prev, *proof1 = 0, *proof2 = 0;
+	lp *prev;
 	size_t gbdd = F;
 public:
-	size_t bits, dsz;
 	typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
 	typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
+	void align(const db_t& d, const db_t& nd, size_t pbits, size_t bits);
 	db_t db, ndb;
+	const size_t bits, dsz;
+	const int_t outrel;
+	const strs_t strs;
 
-	lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev = 0);
+	lp(matrices r, matrix g, int_t outrel, size_t dsz, const strs_t&,
+		lp *prev = 0);
 	void fwd(diff_t &add, diff_t &del);
 	bool pfp();
 
 	bool add_fact(const term& t);
-	size_t get_sym_bdd(size_t sym, size_t pos) const;
-	size_t get_varbdd(size_t ar) const;
-//	size_t maxw() const;
 	~lp();
 };
 

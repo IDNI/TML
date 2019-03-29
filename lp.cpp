@@ -46,14 +46,18 @@ bool lp::add_fact(size_t f, int_t rel, ints arity) {
 			true;
 	*t = bdd_or(*t, f);
 	t = ndb[{rel, arity}];
-	return F != (*t = bdd_and_not(*t, f)) || f == T;
+	//return F != (*t = bdd_and_not(*t, f)) || f == T;
+	*t = bdd_and_not(*t, f);
+	return true;
 }
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
 	size_t *t = ndb[{rel, arity}];
 	*t = bdd_or(*t, f);
 	t = db[{rel, arity}];
-	return F != (*t = bdd_and_not(*t, f));
+	//return F != (*t = bdd_and_not(*t, f));
+	*t = bdd_and_not(*t, f);
+	return true;
 }
 
 bool lp::add_fact(const term& x) {
@@ -61,8 +65,9 @@ bool lp::add_fact(const term& x) {
 	return add_fact(fact(x, bits), x.rel, x.arity);
 }
 
-lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
-	: pgoals(move(pg)), prev(prev), dsz(dsz) {
+lp::lp(matrices r, matrix g, int_t outrel, size_t dsz, const strs_t& strs,
+	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), outrel(outrel)
+	, strs(strs) {
 	//wcout<<r<<endl;
 /*	dsz = 0;
 	for (const matrix& m : r)
@@ -72,12 +77,7 @@ lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
 	for (const term& t : g)
 		if (t.size()-1 > ar) er(err_goalarity);
 		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
-	for (const term& t : pgoals)
-		if (t.size()-1 > ar) er(err_goalarity);
-		else for (int_t i : t)
-			if (i > 0 && i>=(int_t)dsz) er(err_goalsym);
-	rules_pad(r), rule_pad(g), rule_pad(pgoals),*/
-	bits = msb(dsz);
+	bits = msb(dsz);*/
 	for (const matrix& m : r)
 		for (const term& t : m) {
 			*(db[{t.rel, t.arity}] = new size_t) = F;
@@ -96,68 +96,39 @@ lp::lp(matrices r, matrix g, matrix pg, size_t dsz, lp *prev)
 			for (size_t n = 1; n < m.size(); ++n)
 				dbs.push_back((m[n].neg?ndb:db)
 					[{m[n].rel,m[n].arity}]);
-			rules.emplace_back(
-				new rule(m, dbs, bits, dsz, !pgoals.empty()));
+			rules.emplace_back(new rule(m, dbs, bits, dsz));
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
-/*	if (!pgoals.empty())
-		proof1 = new lp(move(get_proof1()), matrix(), matrix(), dsz, this),
-		proof2 = new lp(move(get_proof2()), matrix(), matrix(), dsz, proof1);*/
 	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits));
 }
-/*
-matrices lp::get_proof1() const {
-	matrices p;
-	for (const rule* r : rules) p.emplace(r->proof1);
-	return p;
-}
 
-matrices lp::get_proof2() const {
-	matrices p;
-	matrix m;
-	for (const rule* r : rules) p.insert(r->proof2.begin(),r->proof2.end());
-	for (const term& t : pgoals)
-		m.resize(1), m[0] = { 1, openp },
-		m[0].insert(m[0].begin()+2, t.begin()+1, t.end()), 
-		m[0].push_back(closep), p.insert(move(m));
-	return p;
-}
-
-void lp::term_pad(term& t) {
-	size_t l;
-	if ((l=t.size())<ar+1) t.resize(ar+1), fill(t.begin()+l, t.end(), pad);
-}
-
-void lp::rule_pad(matrix& t) { for (term& x : t) term_pad(x); }
-
-matrix lp::rule_pad(const matrix& t) {
-	matrix r;
-	rule_pad(r = t);
-	return r;
-}
-
-void lp::rules_pad(matrices& t) {
-	matrices r = move(t);
-	t.clear();
-	for (const matrix& x : r) t.emplace(rule_pad(x));
-}
-*/
 void lp::fwd(diff_t &add, diff_t &del) {
 	DBG(printdb(wcout, this));
-	for (rule* r : rules) {
-//		if (add.find({r->hrel, r->harity}) == add.end())
-//			add[{r->hrel, r->harity}] = del[{r->hrel, r->harity}]=F;
+	for (rule* r : rules)
 		(r->neg ? del : add)[{r->hrel, r->harity}] = bdd_or(r->fwd(bits)
 				,(r->neg?del:add)[{r->hrel, r->harity}]);
-	}
 //	DBG(printbdd(wcout<<"add:"<<endl,this,add););
 //	DBG(printbdd(wcout<<"del:"<<endl,this,del););
 }
-/*
-size_t align(size_t x, size_t par, size_t pbits, size_t ar, size_t bits) {
-	return bdd_pad(bdd_rebit(x, pbits, bits, ar*bits), par, ar, pad, bits);
-}*/
+
+void lp::align(const db_t& d, const db_t& nd, size_t pbits, size_t bits) {
+	if (bits == pbits) return;
+	for (auto x : db) {
+		auto it = d.find(x.first);
+		if (it == d.end()) continue;
+		*x.second = bdd_or(*x.second,
+				bdd_rebit(*it->second, pbits, bits,
+				arlen(x.first.second)*bits));
+	}
+	for (auto x : ndb) {
+		auto it = nd.find(x.first);
+		if (it == nd.end()) continue;
+		*x.second = bdd_or(*x.second,
+				bdd_rebit(*it->second, pbits, bits,
+				arlen(x.first.second)*bits));
+	}
+}
 
 struct diffcmp {
 	bool operator()(const lp::diff_t& x, const lp::diff_t& y) const {
@@ -230,7 +201,7 @@ bool lp::pfp() {
 			if (ndb.find(x.first) != ndb.end())
 				*ndb[x.first] = bdd_or(*ndb[x.first],*x.second);
 			else *(ndb[x.first] = new size_t) = *x.second;
-//		db = bdd_or(db, align(prev->db, prev->ar, prev->bits, ar,bits));
+		align(prev->db, prev->ndb, prev->bits, bits);
 	}
 	diff_t d, add, del, t;
 	set<size_t> pf;
@@ -249,46 +220,19 @@ bool lp::pfp() {
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}
-//	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
+	if (outrel != -1) {
+		set<pair<int_t, ints>> d;
+		for (auto x : db)
+			if (x.first.first != outrel) d.insert(x.first);
+		for (auto x : ndb)
+			if (x.first.first != outrel) d.insert(x.first);
+		for (auto x : d) db.erase(x), ndb.erase(x);
+	}
+	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
 //	if (proof1) return db=prove(), ar=proof2->ar, bits = proof2->bits, true;
 //	if (gbdd != F) db = bdd_and(gbdd, db);
 	return true;
 }
-
-size_t lp::prove() const {
-	return F;
-/*	size_t add, del;
-	proof1->db = get_varbdd(proof1->ar);
-//	DBG(printbdd(wcout<<"p1db before:"<<endl,proof1,proof1->db)<<endl;);
-	proof1->fwd(add = F, del = F);
-	proof2->db = bdd_or(proof2->db, add);
-//	DBG(printbdd(wcout<<"add:"<<endl,proof1,proof1->db)<<endl;);
-//	DBG(printbdd(wcout<<"p2db before:"<<endl,proof2,proof2->db)<<endl;);
-	proof2->prev = 0;
-	assert(del == F);
-	assert(proof2->pfp());
-//	DBG(printbdd(wcout<<"p2db after:"<<endl,proof2,proof2->db)<<endl;);
-	if (gbdd == F) return bdd_and_not(proof2->db, get_sym_bdd(openp, 0));
-	return bdd_or(align(bdd_and(gbdd, db), ar, bits, proof2->ar,
-		proof2->bits), bdd_and_not(proof2->db, get_sym_bdd(openp, 0)));*/
-}
-/*
-size_t lp::get_varbdd(size_t par) const {
-	size_t t = F;
-	for (const rule* r : rules) t = bdd_or(r->get_varbdd(bits, par), t);
-	return t;
-}
-*/
-size_t lp::get_sym_bdd(size_t sym, size_t pos) const {
-	return from_int(sym, bits, bits * pos);
-}
-/*
-size_t lp::maxw() const {
-	size_t r = 0;
-	for (const rule* x : rules) r = max(r, x->bd.size());
-	return r;
-}
-*/
 
 lp::~lp() {
 //	for (rule* r : rules) delete r;

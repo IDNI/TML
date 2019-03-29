@@ -37,12 +37,11 @@ public:
 	bdd_and_eq(size_t bits, const term& t);
 	size_t operator()(size_t x);
 };
-/*
+
 class extents {
 	const size_t bits, nvars, tail;
-	const int_t glt, ggt;
-	const term excl, lt, gt;
-	const sizes succ, pred, domain;
+	const ints lt, gt;
+	const sizes domain;
 	bools path;
 	sizes getdom() const;
 	int_t get_int(size_t pos) const;
@@ -50,7 +49,6 @@ class extents {
 	size_t compute(size_t x, size_t v);
 public:
 	extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
-		int_t glt, int_t ggt, const term& excl, const term& lt,
-		const term& gt, const sizes& succ, const sizes& pred);
+		const ints& excl, const ints& lt);
 	size_t operator()(size_t x);
-};*/
+};

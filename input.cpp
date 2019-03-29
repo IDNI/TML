@@ -54,7 +54,7 @@ lexeme lex(pcws s) {
 			if (!**s) er(unmatched_quotes);
 			else if (**s == L'\\' && !wcschr(L"\\\"", *++*s))
 				er(err_escape);
-		return { t, (*s)++ };
+		return { t, ++(*s) };
 	}
 	if (**s == L'<') {
 		while (*++*s != L'>') if (!**s) er(err_fname);
@@ -70,6 +70,7 @@ lexeme lex(pcws s) {
 	}
 	if (wcschr(L"!~.,(){}@", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
+	if (!iswalnum(**s)) er("unexpected char.\n");
 	while (iswalnum(**s)) ++*s;
 	return { t, *s };
 }
@@ -119,11 +120,16 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	while (!wcschr(L".:,", *l[pos][0]))
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 	if (e[0].type != elem::SYM) er(err_relsym_expected);
-	arity.push_back(0);
-	if (e.size() == 1) return true;
+	if (e.size() == 1) return calc_arity(), true;
 	if (e[1].type != elem::OPENP) er(err_paren_expected);
 	if (e.back().type != elem::CLOSEP) er(err_paren);
+	return calc_arity(), true;
+}
+
+void raw_term::calc_arity() {
 	size_t dep = 0;
+	arity.push_back(0);
+	if (e.size() == 1) return;
 	for (size_t n = 2; n < e.size()-1; ++n)
 		if (e[n].type == elem::OPENP) ++dep, arity.push_back(-1);
 		else if (e[n].type != elem::CLOSEP) {
@@ -132,7 +138,6 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		} else if (!dep--) er(err_paren);
 		else arity.push_back(-2);
 	if (dep) er(err_paren);
-	return true;
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
@@ -178,6 +183,9 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
+//	for (auto x : d) wcout << x.rel<<endl<<x.arg << endl;
+//	wcout<<endl;
+//	for (auto x : g) { for (auto y : x.p) wcout << y << endl; wcout<<endl;}
 	return true;
 }
 
@@ -195,6 +203,7 @@ raw_progs::raw_progs(const std::wstring& s) {
 		if (++pos, !x.parse(l, pos)) er(err_parse);
 		if (p.push_back(x), *l[pos++][0] != L'}') er(err_close_curly);
 	} while (pos < l.size());
+	//for (auto x : l) wcout << x << endl;
 }
 
 wostream& operator<<(wostream& os, const lexeme& l) {
@@ -203,7 +212,7 @@ wostream& operator<<(wostream& os, const lexeme& l) {
 }
 
 wostream& operator<<(wostream& os, const directive& d) {
-	return os << d.rel << ' ' << d.arg;
+	return os << L'@' << d.rel << L' ' << d.arg << L'.';
 }
 
 wostream& operator<<(wostream& os, const elem& e) {
@@ -212,20 +221,42 @@ wostream& operator<<(wostream& os, const elem& e) {
 	return e.type == elem::NUM ? os << e.num : (os << e.e);
 }
 
+wostream& operator<<(wostream& os, const production& p) {
+	os << p.p[0] << L" -> ";
+	for (size_t n = 1; n < p.p.size(); ++n) os << p.p[n] << L' ';
+	return os << L'.';
+}
+
 wostream& operator<<(wostream& os, const raw_term& t) {
 	if (t.neg) os << L'~';
-	for (auto x : t.e) os << x << L' ';
-	return os;
+	os << t.e[0];
+	os << L'(';
+	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
+		while (t.arity[ar] == -1) ++ar, os << L'(';
+		while (t.e[n].type == elem::OPENP) ++n;
+		for (int_t k = 0; k != t.arity[ar];)
+			if ((os << t.e[n++]), ++k != t.arity[ar]) os << L' ';
+		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
+		++ar;
+		while (ar<t.arity.size()&&t.arity[ar] == -2) ++ar, os<<L')';
+	}
+	return os << L')';
 }
 
 wostream& operator<<(wostream& os, const raw_rule& r) {
-	os << r.b[0] << L" :- ";
-	for (size_t n = 1; n < r.b.size(); ++n) os << r.b[n] << L',';
+	if (r.goal) os << L'!';
+	if (r.pgoal) os << L'!';
+	os << r.b[0];
+	if (r.b.size() == 1) return os << L'.';
+	os << L" :- ";
+	for (size_t n = 1; n < r.b.size(); ++n)
+		if ((os << r.b[n]), n != r.b.size() - 1) os << L',';
 	return os << L'.';
 }
 
 wostream& operator<<(wostream& os, const raw_prog& p) {
 	for (auto x : p.d) os << x << endl;
+	for (auto x : p.g) os << x << endl;
 	for (auto x : p.r) os << x << endl;
 	return os;
 }

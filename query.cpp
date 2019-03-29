@@ -98,12 +98,10 @@ size_t bdd_and_eq::compute(size_t x, size_t v) {
 	return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
 		bdd_add({{v, x, compute(n[2], v)}});
 }
-/*
+
 extents::extents(size_t bits, size_t ar, size_t tail, const sizes& domain,
-	int_t glt, int_t ggt, const term& excl, const term& lt, const term& gt,
-	const sizes& succ, const sizes& pred) : bits(bits), nvars(ar*bits)
-	, tail(tail), glt(glt), ggt(ggt), excl(sort(excl)), lt(lt), gt(gt)
-	, succ(succ), pred(pred) , domain(sort(domain)), path(nvars, 0) {}
+	const ints& lt, const ints& gt) : bits(bits), nvars(ar*bits)
+	, tail(tail), lt(lt), gt(gt), domain(sort(domain)), path(nvars, 0) {}
 
 int_t extents::get_int(size_t v) const {
 	int_t r = 0, pos = (v-1) / bits, n = pos * bits;
@@ -129,17 +127,12 @@ size_t extents::compute(size_t x, size_t v) {
 			bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
 	if (v < bits || ((v) % bits)) goto cont;
 	i = get_int(v);
-	if (	(glt && i >= glt) ||
-		(ggt && i <= ggt) ||
-		has(excl, i) ||
-		(gt[v/bits-1] < 0 && i <= get_int(bits*-gt[v/bits-1])) ||
+	if (	(gt[v/bits-1] < 0 && i <= get_int(bits*-gt[v/bits-1])) ||
 		(gt[v/bits-1] > 0 && i <= gt[v/bits-1]) ||
 		(lt[v/bits-1] < 0 && i >= get_int(bits*-lt[v/bits-1])) ||
-		(lt[v/bits-1] > 0 && i >= lt[v/bits-1]) ||
-		(succ[v/bits-1] && i != 1+get_int(bits*succ[v/bits-1])) ||
-		(pred[v/bits-1] && i+1 != get_int(bits*pred[v/bits-1])))
+		(lt[v/bits-1] > 0 && i >= lt[v/bits-1]))
 		return F;
 cont:	size_t y;
 	path[v]=true, x=compute(n[1], v+1), path[v++]=false, y=compute(n[2], v);
 	return v > tail ? x == F && y == F ? F : T : bdd_add({{v, x, y}});
-}*/
+}
