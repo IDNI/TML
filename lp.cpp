@@ -186,8 +186,7 @@ bool lp::pfp() {
 		for (auto x : add)
 			add_fact(x.second, x.first.first, x.first.second);
 		for (auto x : del)
-			if(!add_not_fact(x.second,x.first.first,x.first.second))
-				return false;
+			add_not_fact(x.second,x.first.first,x.first.second);
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}

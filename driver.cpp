@@ -268,10 +268,9 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 vector<pair<raw_prog, strs_t>> driver::transform(raw_prog& p) {
 	vector<pair<raw_prog, strs_t>> r;
 	vector<raw_rule> pg;
-//	wcout << L"original program:"<<endl<<p;
+	DBG(wcout << L"original program:"<<endl<<p;)
 	strs_t s = directives_load(p.d);
-	for (const raw_rule& x : p.r)
-		if (x.pgoal) pg.push_back(x);
+	for (const raw_rule& x : p.r) if (x.pgoal) pg.push_back(x);
 	if (!p.g.empty()) {
 		if (!p.d.size()) _er("grammar without input string.\n");
 		if (p.d.size()>1)_er("only one string allowed given grammar.\n");
