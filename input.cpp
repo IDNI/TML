@@ -321,7 +321,7 @@ void parse_error(std::wstring e, std::wstring s) {
 void parse_error(std::wstring e, cws s) {
 	wcerr << e << endl;
 	cws p = s;
-	while (*p != L'\n') ++p;
+	while (*p && *p != L'\n') ++p;
 	wstring t(s, p-s);
 	wcerr << L"at: " << t << endl;
 	exit(0);

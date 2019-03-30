@@ -33,5 +33,5 @@ struct rule { // a P-DATALOG rule in bdd form
 	size_t fwd(size_t bits);
 };
 
-size_t fact(term v, size_t bits);
+size_t fact(term v, size_t bits, size_t dsz);
 size_t arlen(const ints& ar);

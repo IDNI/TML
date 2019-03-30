@@ -95,22 +95,21 @@ vector<strs_t> driver::get_dict_stats(
 		for (const directive& d : p.d)
 			chars = max(chars, (int_t)256),
 			rels.insert(d.rel),
-			nums = max(nums, !d.fname
+			nums = max(nums, (!d.fname
 				? (int_t)(d.arg[1]-d.arg[0])
 				: (int_t)fsize(d.arg[0]+1,
-					(size_t)(d.arg[1]-d.arg[0]-1)));
+					(size_t)(d.arg[1]-d.arg[0]-1)))+1);
 		for (const raw_rule& r : p.r)
 			for (const raw_term& t : r.b) {
 				rels.insert(t.e[0].e);
 				for (size_t n = 1; n < t.e.size(); ++n)
 					if (t.e[n].type == elem::NUM)
-						nums = max(nums, t.e[n].num);
+						nums = max(nums, t.e[n].num+1);
 					else if (t.e[n].type == elem::SYM)
 						syms.insert(t.e[n].e);
 		}
 		for (auto y : x.second) rels.insert(y.first);
 	}
-	relsyms = rels.size(), symbols = syms.size();
 	for (const lexeme l : syms) dict_get(l);
 	for (const lexeme l : rels) dict_get_rel(l);
 	vector<strs_t> r;
@@ -120,7 +119,7 @@ vector<strs_t> driver::get_dict_stats(
 			s[dict_get_rel(y.first)] = move(y.second);
 		r.push_back(move(s));
 	}
-	bits = msb(usz());
+	relsyms = rels.size(), symbols = syms.size(), bits = msb(usz());
 	return r;
 }
 
@@ -174,6 +173,20 @@ lexeme driver::get_var_lexeme(int_t i) {
 		{elem::VAR, 0, get_var_lexeme(v2)}, \
 		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
 
+#define from_grammar_elem_builtin(r, b, v, v1, v2) \
+	array<raw_term, 2>{raw_term{ false, {\
+		{elem::SYM, 0, r}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::VAR, 0, get_var_lexeme(v)}, \
+		{elem::VAR, 0, get_var_lexeme(v1)}, \
+		{elem::VAR, 0, get_var_lexeme(v2)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}, \
+		{raw_term{false, {\
+		{elem::SYM, 0, b}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::VAR, 0, get_var_lexeme(v)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {1}}}}
+
 bool operator==(const lexeme& l, cws s) {
 	size_t n = wcslen(s);
 	return (size_t)(l[1] - l[0]) != n ? false : !wcsncmp(l[0], s, n);
@@ -199,8 +212,11 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 	}
 }
 
+#define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
+
 array<raw_prog, 2> driver::transform_grammar(
 	const directive& d, const vector<production>& g, const wstring& s) {
+	static set<wstring> b = { L"alpha", L"alnum", L"digit", L"space" };
 	raw_prog r, _r;
 	r.d.push_back(d);
 //	matrices rtxt = get_char_builtins();
@@ -215,9 +231,16 @@ array<raw_prog, 2> driver::transform_grammar(
 			_r.r.push_back({{t, t}});
 			_r.r.back().b[0].neg = true;
 		} else {
+			size_t v = p.p.size();
 			l.b.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n)
-				if (p.p[n].type == elem::CHR)
+				if (b.find(lexeme2str(p.p[n].e)) != b.end()) {
+					++v;
+					auto x=from_grammar_elem_builtin(d.rel,
+						p.p[n].e, v, n, n+1);
+					l.b.push_back(x[0]),l.b.push_back(x[1]);
+				}
+				else if (p.p[n].type == elem::CHR)
 					l.b.push_back(from_grammar_elem_nt(d.rel
 						,p.p[n],n,n+1));
 				else l.b.push_back(

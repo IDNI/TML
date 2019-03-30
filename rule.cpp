@@ -20,7 +20,7 @@ using namespace std;
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 
-size_t fact(term v, size_t bits) {
+size_t fact(term v, size_t bits, size_t dsz) {
 	if (v.arity == ints{0}) return T;
 	size_t r = T;
 	unordered_map<int_t, size_t> m;
@@ -30,7 +30,11 @@ size_t fact(term v, size_t bits) {
 		else if (m.end()==(it=m.find(v.args[j])))m.emplace(v.args[j],j);
 		else for (size_t b = 0; b!=bits; ++b)
 			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
-	return v.neg ? bdd_and_not(T, r) : r;
+	if (v.neg) r = bdd_and_not(T, r);
+	sizes domain;
+	for (auto x : m) domain.push_back(x.second);
+	return builtins<leq_const>(bits, v.args.size()*bits,
+		leq_const(domain, dsz-1, bits))(r);
 }
 
 void rule::get_varmap(const matrix& v) {
@@ -66,7 +70,7 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 			bts = new builtins<leq_const>(bits,
 				bits*arlen(vars_arity),
 //				bits*arlen(harity),
-				leq_const(domain, dsz, bits));
+				leq_const(domain, dsz-1, bits));
 		}
 	}
 	//wcout<<v<<endl;

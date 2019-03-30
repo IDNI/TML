@@ -48,8 +48,8 @@ bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
 }
 
 bool lp::add_fact(const term& x) {
-	if (x.neg) return add_not_fact(fact(x, bits), x.rel, x.arity);
-	return add_fact(fact(x, bits), x.rel, x.arity), true;
+	if (x.neg) return add_not_fact(fact(x, bits, dsz), x.rel, x.arity);
+	return add_fact(fact(x, bits, dsz), x.rel, x.arity), true;
 }
 
 lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
@@ -81,7 +81,7 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
-	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits));
+	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits, dsz));
 }
 
 void lp::fwd(diff_t &add, diff_t &del) {
