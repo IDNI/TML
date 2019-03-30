@@ -264,7 +264,7 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 vector<pair<raw_prog, strs_t>> driver::transform(const raw_prog& p) {
 	vector<pair<raw_prog, strs_t>> r;
 	vector<raw_rule> pg;
-	wcout << L"original program:"<<endl<<p;
+//	wcout << L"original program:"<<endl<<p;
 	strs_t s = directives_load(p.d);
 	for (const raw_rule& x : p.r)
 		if (x.pgoal) pg.push_back(x);

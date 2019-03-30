@@ -197,7 +197,6 @@ bool lp::pfp() {
 		for (auto x : d) db.erase(x);
 	}
 	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
-//	if (proof1) return db=prove(), ar=proof2->ar, bits = proof2->bits, true;
 //	if (gbdd != F) db = bdd_and(gbdd, db);
 	return true;
 }
