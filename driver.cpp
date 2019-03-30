@@ -80,7 +80,8 @@ struct lexcmp {
 	}
 };
 
-void driver::get_dict_stats(const vector<pair<raw_prog, strs_t>>& v) {
+vector<strs_t> driver::get_dict_stats(
+	const vector<pair<raw_prog, map<lexeme, wstring>>>& v) {
 	set<lexeme, lexcmp> rels, syms;
 	for (auto x : v) {
 		const raw_prog& p = x.first;
@@ -100,11 +101,20 @@ void driver::get_dict_stats(const vector<pair<raw_prog, strs_t>>& v) {
 					else if (t.e[n].type == elem::SYM)
 						syms.insert(t.e[n].e);
 		}
+		for (auto y : x.second) rels.insert(y.first);
 	}
 	relsyms = rels.size(), symbols = syms.size();
 	for (const lexeme l : syms) dict_get(l);
 	for (const lexeme l : rels) dict_get_rel(l);
+	vector<strs_t> r;
+	for (auto x : v) {
+		strs_t s;
+		for (auto y : x.second)
+			s[dict_get_rel(y.first)] = move(y.second);
+		r.push_back(move(s));
+	}
 	bits = msb(usz());
+	return r;
 }
 
 wstring driver::directive_load(const directive& d) {
@@ -115,10 +125,9 @@ wstring driver::directive_load(const directive& d) {
 	return str;
 }
 
-strs_t driver::directives_load(const vector<directive>& ds) {
-	strs_t r;
-	for (const directive& d : ds)
-		r.emplace(dict_get_rel(d.rel), directive_load(d));
+map<lexeme, wstring> driver::directives_load(const vector<directive>& ds) {
+	map<lexeme, wstring> r;
+	for (const directive& d : ds) r.emplace(d.rel, directive_load(d));
 	return r;
 }
 
@@ -265,11 +274,11 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 	return { r, _r };
 }
 
-vector<pair<raw_prog, strs_t>> driver::transform(raw_prog& p) {
-	vector<pair<raw_prog, strs_t>> r;
+vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog& p) {
+	vector<pair<raw_prog, map<lexeme, wstring>>> r;
 	vector<raw_rule> pg;
 	DBG(wcout << L"original program:"<<endl<<p;)
-	strs_t s = directives_load(p.d);
+	auto s = directives_load(p.d);
 	for (const raw_rule& x : p.r) if (x.pgoal) pg.push_back(x);
 	if (!p.g.empty()) {
 		if (!p.d.size()) _er("grammar without input string.\n");
@@ -305,15 +314,16 @@ driver::driver(wstring s, bool print_transformed)
 
 driver::driver(raw_progs rp, bool print_transformed) {
 	DBG(drv = this;)
-	vector<pair<raw_prog, strs_t>> v;
+	vector<pair<raw_prog, map<lexeme, wstring>>> v;
 	for (size_t n = 0; n < rp.p.size(); ++n)
 		for (auto x : transform(rp.p[n]))
 			v.push_back({move(x.first), move(x.second)});
 	if (print_transformed)
 		for (auto x : v)
 			wcout << L'{' << endl << x.first << L'}' << endl;
-	get_dict_stats(v);
-	for (auto x : v) prog_init(move(x.first), move(x.second));
+	auto y = get_dict_stats(v);
+	for (size_t n = 0; n != v.size(); ++n)
+		prog_init(move(v[n].first), move(y[n]));
 }
 
 bool driver::pfp() { return prog->pfp() ? printdb(wcout, prog), true : false; }
@@ -380,6 +390,9 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 #ifdef DEBUG
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
+wostream& printdiff(wostream& os, const lp::diff_t& d) {
+	return drv->printdiff(os, d);
+}
 wostream& printbdd(wostream& os, size_t t, ints ar, int_t rel){
 	return drv->printbdd(os, t, ar, rel);
 }
@@ -406,6 +419,14 @@ wostream& driver::printdb(wostream& os, lp *p) const {
 	for (auto x : p->db)
 		if (builtin_rels.find(x.first.first) == builtin_rels.end())
 			printbdd(os,from_bits(*x.second,
+				x.first.second,x.first.first));
+	return os;
+}
+
+wostream& driver::printdiff(wostream& os, const lp::diff_t& d) const {
+	for (auto x : d)
+		if (builtin_rels.find(x.first.first) == builtin_rels.end())
+			printbdd(os,from_bits(x.second,
 				x.first.second,x.first.first));
 	return os;
 }

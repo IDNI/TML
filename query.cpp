@@ -11,6 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "query.h"
+#ifdef DEBUG
+#include "lp.h"
+#endif
 #include <map>
 #include <algorithm>
 using namespace std;
@@ -36,6 +39,7 @@ query::query(size_t bits, const term& t, const sizes& perm, bool neg)
 	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
 size_t query::operator()(size_t x) {
+	DBG(out(wcout<<L"called with ", getnode(x)) << endl;)
 	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
 	auto it = m.find(x);
 	if (it != m.end()) return it->second;
@@ -44,9 +48,10 @@ size_t query::operator()(size_t x) {
 }
 
 size_t query::compute(size_t x, size_t v) {
-	if (leaf(x) && ((neg?trueleaf(x):!trueleaf(x)) || v == nvars)) return x;
-	//node n = neg ? flip(getnode(x)) : getnode(x);
-	node n = getnode(x);
+	//if (leaf(x) && ((neg?trueleaf(x):!trueleaf(x)) || v == nvars)) return x;
+	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
+	node n = neg&&!leaf(x) ? flip(getnode(x)) : getnode(x);
+	//node n = getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))
 		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));

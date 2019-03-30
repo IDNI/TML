@@ -51,18 +51,21 @@ class driver {
 	matrices get_char_builtins();
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
-	void get_dict_stats(const std::vector<std::pair<raw_prog, strs_t>>& v);
+	std::vector<strs_t> get_dict_stats(const std::vector<
+		std::pair<raw_prog, std::map<lexeme, std::wstring>>>& v);
 
 	template<typename V, typename X>
 	void from_func(V f, std::wstring name, X from, X to, matrices&);
 	std::wstring directive_load(const directive& d);
-	strs_t directives_load(const std::vector<directive>& p);
+	std::map<lexeme, std::wstring> directives_load(
+		const std::vector<directive>& p);
 	std::array<raw_prog, 2> transform_proofs(const raw_prog& p,
-			const std::vector<raw_rule>& g);
+		const std::vector<raw_rule>& g);
 	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
 	std::array<raw_prog, 2> transform_grammar(const directive&,
 		const std::vector<production>&, const std::wstring&);
-	std::vector<std::pair<raw_prog, strs_t>> transform(raw_prog& p);
+	std::vector<std::pair<raw_prog, std::map<lexeme, std::wstring>>>
+		transform(raw_prog& p);
 	bool print_transformed;
 	void grammar_to_rules(const std::vector<production>& g, matrices& m,
 		int_t rel);
@@ -87,6 +90,7 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar,
 		int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
+	std::wostream& printdiff(std:: wostream& os, const lp::diff_t& d) const;
 	std::wostream& printndb(std::wostream& os, lp *p) const;
 	~driver() { if (prog) delete prog; for (cws w:strs_extra)free((wstr)w);}
 };
@@ -94,7 +98,7 @@ public:
 #ifdef DEBUG
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printndb(std::wostream& os, lp *p);
+std::wostream& printdiff(std:: wostream& os, const lp::diff_t& d);
 std::wostream& printbdd(std::wostream& os, size_t t, ints ar, int_t rel);
 std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar, int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,

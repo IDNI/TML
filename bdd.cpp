@@ -313,14 +313,14 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	return bdd_and(t, bdd_permute(x, v));
 }
 
-void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
+/*void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 	size_t x = F;
 	for (size_t n = 0; n < max; ++n)
 		x = bdd_or(x, from_int(n, bits, offset));
 	r = bdd_and(r, x);
 }
 
-/*void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
+void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
 	size_t &r) {
 	size_t x = F;
 	for (size_t n = 0; n < max; ++n)

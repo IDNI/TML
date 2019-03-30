@@ -91,8 +91,9 @@ void lp::fwd(diff_t &add, diff_t &del) {
 	for (rule* r : rules)
 		(r->neg ? del : add)[{r->hrel, r->harity}] = bdd_or(r->fwd(bits)
 				,(r->neg?del:add)[{r->hrel, r->harity}]);
-//	DBG(printbdd(wcout<<"add:"<<endl,this,add););
-//	DBG(printbdd(wcout<<"del:"<<endl,this,del););
+	DBG(printdiff(wcout<<"add:"<<endl,add););
+	DBG(printdiff(wcout<<"del:"<<endl,del););
+	DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
 void lp::align(const db_t& d, size_t pbits, size_t bits) {
@@ -182,11 +183,10 @@ bool lp::pfp() {
 		s.emplace(d = copy(db)), fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
-//		else bdd_or(bdd_and_not(db, del), t);
 		for (auto x : add)
 			add_fact(x.second, x.first.first, x.first.second);
 		for (auto x : del)
-			add_not_fact(x.second,x.first.first,x.first.second);
+			add_not_fact(x.second, x.first.first, x.first.second);
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}
@@ -195,7 +195,7 @@ bool lp::pfp() {
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x);
 	}
-	DBG(printdb(wcout<<"after: "<<endl, this)<<endl;)
+	DBG(printdb(wcout<<"after prog: "<<endl, this)<<endl;)
 //	if (gbdd != F) db = bdd_and(gbdd, db);
 	return true;
 }
