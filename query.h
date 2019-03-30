@@ -73,9 +73,8 @@ template<typename func> class builtins {
 			bdd_add({{v, x, compute(n[2], v)}});
 	}
 public:
-	builtins(size_t bits, size_t nvars, func f) : bits(bits)
-		, nvars(nvars), domain(sort(f.domain))
-		, path(nvars,0), f(f) {}
+	builtins(size_t bits, size_t nvars, func f) : bits(bits), nvars(nvars)
+		, domain(sort(f.domain)), path(nvars,0), f(f) {}
 
 	size_t operator()(size_t x) {
 		auto it = memo.find(x);

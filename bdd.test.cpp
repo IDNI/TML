@@ -24,20 +24,14 @@ wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
 }
 wostream& out(wostream& os,size_t n){return out(os<<L'['<<n<<L']',getnode(n));}
-wostream& operator<<(wostream& os, const bools& x) {
-	for (auto y:x) os << (y?1:0);
-	return os;
-}
-wostream& operator<<(wostream& os, const vbools& x) {
-	for (auto y:x) { os << y << endl; } return os; }
 wostream& operator<<(wostream& os, const struct tt& t);
 
-wostream& operator<<(wostream& os, const term& t) {
+wostream& operator<<(wostream& os, const ints& t) {
 	for (auto x : t) os << x << ' ';
 	return os;
 }
-wostream& operator<<(wostream& os, const matrix& m) {
-	for (const term& t : m) os << t << endl;
+wostream& operator<<(wostream& os, const vector<ints>& m) {
+	for (const ints& t : m) os << t << endl;
 	return os;
 }
 
@@ -160,7 +154,7 @@ void test_and_many() {
 
 int main() {
 	bdd_init();
-	// test_query(); need to update
+	test_query();
 	srand(time(0));
 	test_and_many();
 	tt xt(3);

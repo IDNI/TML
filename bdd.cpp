@@ -336,6 +336,15 @@ void memos_clear() {
 #endif		
 }
 
+wostream& operator<<(wostream& os, const bools& x) {
+	for (auto y:x) os << (y?1:0);
+	return os;
+}
+wostream& operator<<(wostream& os, const vbools& x) {
+	for (auto y:x) os << y << endl;
+	return os;
+}
+
 #ifdef MEMO
 size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
 size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {

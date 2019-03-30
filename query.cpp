@@ -116,7 +116,7 @@ builtin_res leq_const::operator()(const vector<char>& path, size_t from,
 				CONTBOTH : CONTLO;
 		else if (c & (1 << (bits+from+n-(to<<1))))
 			return PASS;
-	return CONTBOTH;
+	return to - from == bits ? PASS : CONTBOTH;
 }
 
 builtin_res geq_const::operator()(const vector<char>& path, size_t from,
@@ -130,5 +130,5 @@ builtin_res geq_const::operator()(const vector<char>& path, size_t from,
 				CONTHI : CONTBOTH;
 		else if (!(c & (1 << (bits+from+n-(to<<1)))))
 			return PASS;
-	return CONTBOTH;
+	return to - from == bits ? PASS : CONTBOTH;
 }

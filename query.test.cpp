@@ -13,7 +13,7 @@
 #include "rule.h"
 #include <map>
 using namespace std;
-
+/*
 size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 	size_t y = fact(t, bits), ar = t.size()-1, r;
 	wcout << "x:"<<endl << from_bits(x, bits, ar);
@@ -38,9 +38,16 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 	wcout << "perm:"<<endl << from_bits(r, bits, ar);
 	return r;
 }
-
+*/
 void test_query() {
-	size_t bits = 3, x = F, ar, r, f;
+	size_t bits = 2, leq = 2, geq = 1;
+	builtins<leq_const> l1(bits, 2, leq_const({0}, leq, bits));
+	builtins<geq_const> g1(bits, 2, geq_const({0}, geq, bits));
+	wcout << allsat(l1(T), bits*2) << endl << endl;
+	wcout << allsat(g1(T), bits*2) << endl;
+	exit(0);
+
+/*	size_t bits = 3, x = F, ar, r, f;
 	matrix m;
 	//m.push_back({ 1, 1, 2, 3});
 	m.push_back({ 1, 2, 3, 4});
@@ -68,7 +75,7 @@ void test_query() {
 	wcout << "e:"<<endl << from_bits(e(x), bits, ar)<<endl;
 	exit(0);
 //	assert(q(x) = bdd_or(term(m[1],bits), term(m[2],bits),ex)
-/*	for(size_t k=0; k!=100;++k) {
+	for(size_t k=0; k!=100;++k) {
 		wcout << k << endl;
 		size_t bits = 3, ar = 10;
 		tt t = rndtt(bits * ar, 1000);

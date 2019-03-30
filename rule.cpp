@@ -120,3 +120,10 @@ size_t rule::fwd(size_t bits) {
 //	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	return vars;
 }
+
+size_t arlen(const ints& ar) {
+	size_t r = 0;
+	for (auto x : ar) if (x > 0) r += x;
+	return r;
+}
+

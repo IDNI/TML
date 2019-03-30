@@ -19,6 +19,7 @@
 #include <functional>
 #include <cctype>
 #include "driver.h"
+#include "rule.h"
 using namespace std;
 
 //#define err_null "'null' can appear only by itself on the rhs.\n"
@@ -28,12 +29,6 @@ using namespace std;
 			"with negation or deletion."
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
-
-size_t arlen(const ints& ar) {
-	size_t r = 0;
-	for (auto x : ar) if (x > 0) r += x;
-	return r;
-}
 
 bool operator==(const lexeme& l, const wstring& s) {
 	if ((size_t)(l[1]-l[0]) != s.size()) return false;

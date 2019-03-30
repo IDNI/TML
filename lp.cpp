@@ -34,8 +34,6 @@ using namespace std;
 #define err_goalarity "goal arity larger than the program's.\n"
 
 void tml_init() { bdd_init(); }
-wostream& operator<<(wostream& os, const bools& x);
-wostream& operator<<(wostream& os, const vbools& x);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
 void lp::add_fact(size_t f, int_t rel, ints arity) {
@@ -210,14 +208,6 @@ wostream& out(wostream& os,size_t n){ return out(os<<L'['<<n<<L']',getnode(n)); 
 wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
 	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
-}
-wostream& operator<<(wostream& os, const bools& x) {
-	for (auto y:x) os << (y?1:0);
-	return os;
-}
-wostream& operator<<(wostream& os, const vbools& x) {
-	for (auto y:x) os << y << endl;
-	return os;
 }
 wostream& operator<<(wostream& os, const term& t) {
 	os << t.rel << ' ';
