@@ -24,7 +24,7 @@ void tml_init();
 class lp { // [pfp] logic program
 	friend struct rule;
 	std::vector<struct rule*> rules;
-	bool add_fact(size_t f, int_t rel, ints arity);
+	void add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
 	lp *prev;
 	size_t gbdd = F;

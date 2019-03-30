@@ -38,20 +38,20 @@ wostream& operator<<(wostream& os, const bools& x);
 wostream& operator<<(wostream& os, const vbools& x);
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
-bool lp::add_fact(size_t f, int_t rel, ints arity) {
+void lp::add_fact(size_t f, int_t rel, ints arity) {
 	size_t *t = db[{rel, arity}];
-	if (!t) return	*(db[{rel, arity}] = new size_t) = f, true;
-	return *t = bdd_or(*t, f), true;
+	if (!t) *(db[{rel, arity}] = new size_t) = f;
+	else *t = bdd_or(*t, f);
 }
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
-	size_t *t = db[{rel, arity}];
-	return *t = bdd_and_not(*t, f), true;
+	size_t *t = db[{rel, arity}], p = *t;
+	return *t = bdd_and_not(*t, f), (p == F || *t != F);
 }
 
 bool lp::add_fact(const term& x) {
 	if (x.neg) return add_not_fact(fact(x, bits), x.rel, x.arity);
-	return add_fact(fact(x, bits), x.rel, x.arity);
+	return add_fact(fact(x, bits), x.rel, x.arity), true;
 }
 
 lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
@@ -180,15 +180,14 @@ bool lp::pfp() {
 //	wcout << V.size() << endl;
 	for (set<diff_t, diffcmp> s;;) {
 		s.emplace(d = copy(db)), fwd(add, del);
+		if (!bdd_and_not(add, del, t))
+			return false; // detect contradiction
+//		else bdd_or(bdd_and_not(db, del), t);
 		for (auto x : add)
-			if (!add_fact(x.second, x.first.first, x.first.second))
-				return false;
+			add_fact(x.second, x.first.first, x.first.second);
 		for (auto x : del)
 			if(!add_not_fact(x.second,x.first.first,x.first.second))
 				return false;
-//		if (!bdd_and_not(add, del, t))
-//			return false; // detect contradiction
-//		else bdd_or(bdd_and_not(db, del), t);
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}

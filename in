@@ -1,11 +1,5 @@
-e 1 2.
-e 2 3.
-e 3 4.
-e 4 5.
-e 5 1.
-notdone.
-t ?x ?y :- e ?x ?y, notdone.
-t ?x ?z :- t ?x ?y, e ?y ?z, notdone.
-~t ?x ?y :- e ?x ?y, done.
-done :- notdone.
-~notdone :- done.
+a(v1 v1).
+a(v1 v2).
+b(v1 v2).
+c(?x ?y) :- a(?x ?y), ~b(?x ?y).
+d(?x ?y) :- ~a(?x ?y).
