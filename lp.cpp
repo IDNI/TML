@@ -83,8 +83,8 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 			*(db[{t.rel, t.arity}] = new size_t) = F;
 			size_t *x = ndb[{t.rel, t.arity}] = new size_t;
 			*x = T;
-			for (size_t n = 0; n < t.args.size(); ++n)
-				from_range(dsz, bits, bits * n, *x);
+//			for (size_t n = 0; n < t.args.size(); ++n)
+//				from_range(dsz, bits, bits * n, *x);
 		}
 	for (const matrix& m : r)
  		if (m.size() == 1) {
@@ -222,10 +222,8 @@ bool lp::pfp() {
 	}
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
-		for (auto x : db)
-			if (x.first.first == delrel) d.insert(x.first);
-		for (auto x : ndb)
-			if (x.first.first == delrel) d.insert(x.first);
+		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
+		for (auto x : ndb) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x), ndb.erase(x);
 	}
 	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)

@@ -17,17 +17,15 @@
 struct rule { // a P-DATALOG rule in bdd form
 	const bool neg;
 	std::unordered_map<int_t, size_t> varmap;
+	builtins<leq_const> *bts = 0;
 	std::vector<query> q;
 	std::vector<ints> arities;
 	ints harity, vars_arity, rels;
 	int_t hrel;
 	std::vector<size_t*> dbs;
 	bdd_and_eq ae;
-	//extents ext;
 	void get_varmap(const matrix& v);
-//	extents get_extents(const matrix& v, size_t bits, size_t dsz);
 
-//	rule() {}
 	rule(matrix v, const std::vector<size_t*>& dbs, size_t bits,size_t dsz);
 	size_t fwd(size_t bits);
 };

@@ -19,15 +19,6 @@ using namespace std;
 
 #define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
-#define symcat(x, y) ((x).push_back(y), (x))
-
-template<typename T, typename V>
-V& cat(V& v, const T& t) { return v.push_back(t), v; }
-
-template<typename V>
-V& cat(V& v, const V& t, size_t off = 0, size_t loff = 0, size_t roff = 0) {
-	return v.insert(v.end()-off, t.begin()+loff, t.end()-roff), v;
-}
 
 size_t fact(term v, size_t bits) {
 	if (v.arity == ints{0}) return T;
@@ -57,23 +48,27 @@ void rule::get_varmap(const matrix& v) {
 					varmap.emplace(v[i].args[j], k++);
 	vars_arity = {(int_t)k};
 }
-/*
-extents rule::get_extents(const matrix& v, size_t bits, size_t dsz) {
-	size_t ar = v[0].size()-1, l = 0;
-	term excl = {pad, openp, closep}, lt(ar, 0), gt(ar, 0);
-	sizes succ(ar, 0), pred(ar, 0), dom;
-	for (auto x : varmap) dom.push_back(x.second), l = max(l, x.second);
-	dom.push_back(l + 1);
-	for (size_t n = 1; n != v.size(); ++n)
-		if (v[n][0] < 0)
-			for (size_t k = 0; k != ar; ++k)
-				lt[varmap[v[n][k+1]]] = dsz;
-	return extents(bits,vars_arity,ar*bits,dom,dsz,0,excl,lt,gt,succ,pred);
-}
-*/
-rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t /*dsz*/) :
-	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) {//, ext(get_extents(v, bits, dsz)) {
+
+rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
+	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) {
 	get_varmap(v);
+	set<int_t> vs;
+	for (auto& x : v)
+		for (int_t i : x.args)
+			if (i < 0) vs.insert(i);
+	if (!v[0].neg) {
+		for (size_t n = 1; n != v.size(); ++n)
+			if (!v[n].neg) for (int_t i : v[n].args)
+				if (i < 0) vs.erase(i);
+		if (!vs.empty()) {
+			sizes domain;
+			for (int_t i : vs) domain.push_back(varmap[i]);
+			bts = new builtins<leq_const>(bits,
+				bits*arlen(vars_arity),
+				bits*arlen(harity),
+				leq_const(domain, dsz, bits));
+		}
+	}
 	//wcout<<v<<endl;
 	size_t i, j, b;
 	for (i = 1; i != v.size(); ++i) {
@@ -102,7 +97,8 @@ size_t rule::fwd(size_t bits) {
 //	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 //	vars = ext(vars);
 //	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
-	vars = ae(bdd_deltail(vars, bits*arlen(harity)));
+	if (bts) vars = (*bts)(vars);
+	else vars = ae(bdd_deltail(vars, bits*arlen(harity)));
 //	vars = ae(vars);
 //	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	return vars;
