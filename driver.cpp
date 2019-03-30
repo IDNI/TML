@@ -110,7 +110,10 @@ vector<strs_t> driver::get_dict_stats(
 		}
 		for (auto y : x.second) rels.insert(y.first);
 	}
-	for (const lexeme l : syms) dict_get(l);
+	if (!syms.size() && !nums && !chars) {
+		wcerr<<L"warning: empty domain, adding dummy element."<<endl;
+		++nums;
+	} else for (const lexeme l : syms) dict_get(l);
 	for (const lexeme l : rels) dict_get_rel(l);
 	vector<strs_t> r;
 	for (auto x : v) {

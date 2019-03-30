@@ -48,7 +48,7 @@ bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
 }
 
 bool lp::add_fact(const term& x) {
-	if (x.neg) return add_not_fact(fact(x, bits, dsz), x.rel, x.arity);
+//	if (x.neg) return add_not_fact(fact(x, bits, dsz), x.rel, x.arity);
 	return add_fact(fact(x, bits, dsz), x.rel, x.arity), true;
 }
 

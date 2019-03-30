@@ -21,6 +21,7 @@ using namespace std;
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 
 size_t fact(term v, size_t bits, size_t dsz) {
+//	DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity == ints{0}) return T;
 	size_t r = T;
 	unordered_map<int_t, size_t> m;
@@ -28,13 +29,20 @@ size_t fact(term v, size_t bits, size_t dsz) {
 	for (size_t j = 0; j != v.args.size(); ++j)
 		if (v.args[j] >= 0) from_int_and(v.args[j], bits, j * bits, r);
 		else if (m.end()==(it=m.find(v.args[j])))m.emplace(v.args[j],j);
-		else for (size_t b = 0; b!=bits; ++b)
-			r = bdd_and(r, from_eq(j*bits+b, it->second*bits+b));
-	if (v.neg) r = bdd_and_not(T, r);
 	sizes domain;
 	for (auto x : m) domain.push_back(x.second);
-	return builtins<leq_const>(bits, v.args.size()*bits,
+	r = builtins<leq_const>(bits, v.args.size()*bits,
 		leq_const(domain, dsz-1, bits))(r);
+	for (size_t j = 0; j != v.args.size(); ++j)
+		if (v.args[j] < 0) for (size_t b = 0; b!=bits; ++b)
+			if (j != m[v.args[j]])
+				r = bdd_and(r,
+					from_eq(j*bits+b, m[v.args[j]]*bits+b));
+	if (v.neg) r = bdd_and_not(T, r);
+	DBG(printbdd(wcout<<"before range:"<<endl, r, v.arity, v.rel)<<endl;)
+	//if (domain.empty()) return dsz ? r : F;
+	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+	return r;
 }
 
 void rule::get_varmap(const matrix& v) {
