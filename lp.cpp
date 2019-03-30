@@ -40,24 +40,13 @@ DBG(wostream& printbdd(wostream& os, size_t t);)
 
 bool lp::add_fact(size_t f, int_t rel, ints arity) {
 	size_t *t = db[{rel, arity}];
-	if (!t)
-		return	*(db[{rel, arity}] = new size_t) = f, 
-			*(ndb[{rel, arity}] = new size_t) = bdd_and_not(T, f),
-			true;
-	*t = bdd_or(*t, f);
-	t = ndb[{rel, arity}];
-	//return F != (*t = bdd_and_not(*t, f)) || f == T;
-	*t = bdd_and_not(*t, f);
-	return true;
+	if (!t) return	*(db[{rel, arity}] = new size_t) = f, true;
+	return *t = bdd_or(*t, f), true;
 }
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
-	size_t *t = ndb[{rel, arity}];
-	*t = bdd_or(*t, f);
-	t = db[{rel, arity}];
-	//return F != (*t = bdd_and_not(*t, f));
-	*t = bdd_and_not(*t, f);
-	return true;
+	size_t *t = db[{rel, arity}];
+	return *t = bdd_and_not(*t, f), true;
 }
 
 bool lp::add_fact(const term& x) {
@@ -79,13 +68,8 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
 	bits = msb(dsz);*/
 	for (const matrix& m : r)
-		for (const term& t : m) {
+		for (const term& t : m)
 			*(db[{t.rel, t.arity}] = new size_t) = F;
-			size_t *x = ndb[{t.rel, t.arity}] = new size_t;
-			*x = T;
-//			for (size_t n = 0; n < t.args.size(); ++n)
-//				from_range(dsz, bits, bits * n, *x);
-		}
 	for (const matrix& m : r)
  		if (m.size() == 1) {
 			if (!add_fact(m[0]))
@@ -94,8 +78,7 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 		} else {
 			vector<size_t*> dbs;
 			for (size_t n = 1; n < m.size(); ++n)
-				dbs.push_back((m[n].neg?ndb:db)
-					[{m[n].rel,m[n].arity}]);
+				dbs.push_back(db[{m[n].rel,m[n].arity}]);
 			rules.emplace_back(new rule(m, dbs, bits, dsz));
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
@@ -112,18 +95,11 @@ void lp::fwd(diff_t &add, diff_t &del) {
 //	DBG(printbdd(wcout<<"del:"<<endl,this,del););
 }
 
-void lp::align(const db_t& d, const db_t& nd, size_t pbits, size_t bits) {
+void lp::align(const db_t& d, size_t pbits, size_t bits) {
 	if (bits == pbits) return;
 	for (auto x : db) {
 		auto it = d.find(x.first);
 		if (it == d.end()) continue;
-		*x.second = bdd_or(*x.second,
-				bdd_rebit(*it->second, pbits, bits,
-				arlen(x.first.second)*bits));
-	}
-	for (auto x : ndb) {
-		auto it = nd.find(x.first);
-		if (it == nd.end()) continue;
 		*x.second = bdd_or(*x.second,
 				bdd_rebit(*it->second, pbits, bits,
 				arlen(x.first.second)*bits));
@@ -197,11 +173,7 @@ bool lp::pfp() {
 			if (db.find(x.first) != db.end())
 				*db[x.first] = bdd_or(*db[x.first], *x.second);
 			else *(db[x.first] = new size_t) = *x.second;
-		for (auto x : prev->ndb)
-			if (ndb.find(x.first) != ndb.end())
-				*ndb[x.first] = bdd_or(*ndb[x.first],*x.second);
-			else *(ndb[x.first] = new size_t) = *x.second;
-		align(prev->db, prev->ndb, prev->bits, bits);
+		align(prev->db, prev->bits, bits);
 	}
 	diff_t d, add, del, t;
 	set<size_t> pf;
@@ -223,8 +195,7 @@ bool lp::pfp() {
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
-		for (auto x : ndb) if (x.first.first==delrel) d.insert(x.first);
-		for (auto x : d) db.erase(x), ndb.erase(x);
+		for (auto x : d) db.erase(x);
 	}
 	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
 //	if (proof1) return db=prove(), ar=proof2->ar, bits = proof2->bits, true;

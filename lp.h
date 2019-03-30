@@ -31,8 +31,8 @@ class lp { // [pfp] logic program
 public:
 	typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
 	typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
-	void align(const db_t& d, const db_t& nd, size_t pbits, size_t bits);
-	db_t db, ndb;
+	void align(const db_t& d, size_t pbits, size_t bits);
+	db_t db;
 	const size_t bits, dsz;
 	const int_t delrel;
 	const strs_t strs;
