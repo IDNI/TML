@@ -60,19 +60,20 @@ class driver {
 	std::array<raw_prog, 2> transform_proofs(const raw_prog& p,
 			const std::vector<raw_rule>& g);
 	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
-	raw_prog transform_grammar(const directive&,
+	std::array<raw_prog, 2> transform_grammar(const directive&,
 		const std::vector<production>&, const std::wstring&);
-	std::vector<std::pair<raw_prog, strs_t>> transform(const raw_prog& p);
+	std::vector<std::pair<raw_prog, strs_t>> transform(raw_prog& p);
+	bool print_transformed;
 	void grammar_to_rules(const std::vector<production>& g, matrices& m,
 		int_t rel);
 	void prog_init(const raw_prog& rp, strs_t);
 	void progs_read(wstr s);
 	bool pfp(lp *p);
-	driver(raw_progs);
+	driver(raw_progs, bool print_transformed);
 public:
 	lp* prog = 0;
-	driver(FILE *f);
-	driver(std::wstring);
+	driver(FILE *f, bool print_transformed = false);
+	driver(std::wstring, bool print_transformed = false);
 	bool pfp();
 
 	matrix getbdd(size_t t) const;

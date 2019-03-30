@@ -46,7 +46,7 @@ void lp::add_fact(size_t f, int_t rel, ints arity) {
 
 bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
 	size_t *t = db[{rel, arity}], p = *t;
-	return *t = bdd_and_not(*t, f), (p == F || *t != F);
+	return (*t = bdd_and_not(*t, f)), (p == F || *t != F);
 }
 
 bool lp::add_fact(const term& x) {
@@ -54,9 +54,9 @@ bool lp::add_fact(const term& x) {
 	return add_fact(fact(x, bits), x.rel, x.arity), true;
 }
 
-lp::lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
-	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), delrel(delrel)
-	, strs(strs) {
+lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
+	const strs_t& strs, lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz)
+	, delrel(delrel), strs(strs) {
 	//wcout<<r<<endl;
 /*	dsz = 0;
 	for (const matrix& m : r)
@@ -196,7 +196,7 @@ bool lp::pfp() {
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x);
 	}
-	DBG(drv->printdb(wcout<<"after: "<<endl, this)<<endl;)
+	DBG(printdb(wcout<<"after: "<<endl, this)<<endl;)
 //	if (gbdd != F) db = bdd_and(gbdd, db);
 	return true;
 }

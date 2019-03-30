@@ -50,13 +50,13 @@ typedef std::unordered_map<int_t, std::wstring> strs_t;
 std::wostream& operator<<(std::wostream& os, const term& t);
 std::wostream& operator<<(std::wostream& os, const matrix& m);
 std::wostream& operator<<(std::wostream& os, const matrices& m);
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else
 #define DBG(x)
 #endif
-#define er(x)	perror(x), exit(0)
+#define _er(x)	perror(x), exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #endif

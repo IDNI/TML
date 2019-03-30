@@ -28,22 +28,24 @@ ints from_term(const term& t) {
 	return r;
 }
 
-query::query(size_t bits, const term& t, const sizes& perm) 
+query::query(size_t bits, const term& t, const sizes& perm, bool neg) 
 	: bits(bits), nvars(t.args.size()*bits), e(from_term(t)), perm(perm)
-	, domain(getdom()), path(nvars, 0) {}
+	, domain(getdom()), path(nvars, 0), neg(neg) {}
 
-/*#define flip(n) nleaf(n) ? (n) : \
-	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}*/
+#define flip(n) nleaf(n) ? (n) : \
+	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
 size_t query::operator()(size_t x) {
-	auto it = memo.find(x);
-	if (it == memo.end())
-		return memo[x]=domain.size()?compute(x, 0):bdd_permute(x, perm);
-	return it->second;
+	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
+	auto it = m.find(x);
+	if (it != m.end()) return it->second;
+	return	m[x] = domain.size() ? compute(x, 0):
+		bdd_permute(neg ? bdd_and_not(T, x) : x, perm);
 }
 
 size_t query::compute(size_t x, size_t v) {
-	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
+	if (leaf(x) && ((neg?trueleaf(x):!trueleaf(x)) || v == nvars)) return x;
+	//node n = neg ? flip(getnode(x)) : getnode(x);
 	node n = getnode(x);
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))

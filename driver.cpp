@@ -108,8 +108,8 @@ void driver::get_dict_stats(const vector<pair<raw_prog, strs_t>>& v) {
 }
 
 wstring driver::directive_load(const directive& d) {
-	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
-	if (!d.fname) return file_read(str);
+	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
+	if (d.fname) return file_read(str);
 	for (size_t i = 0; i != str.size(); ++i)
 		if (str[i] == L'\\') str.erase(str.begin() + i);
 	return str;
@@ -183,18 +183,22 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 	}
 }
 
-raw_prog driver::transform_grammar(
+array<raw_prog, 2> driver::transform_grammar(
 	const directive& d, const vector<production>& g, const wstring& s) {
-	raw_prog r;
+	raw_prog r, _r;
+	r.d.push_back(d);
 //	matrices rtxt = get_char_builtins();
 //	m.insert(rtxt.begin(), rtxt.end());
 	for (const production& p : g) {
-		if (p.p.size() < 2) er("empty production.\n");
+		if (p.p.size() < 2)
+			parse_error(L"empty production.\n", p.p[0].e);
 		raw_rule l;
-		l.goal = l.pgoal = false;
-		if (p.p.size() == 2 && p.p[1].e == L"null")
-			l.b.push_back(from_grammar_elem(p.p[0], 1, 1));
-		else {
+		if (p.p.size() == 2 && p.p[1].e == L"null") {
+			raw_term t = from_grammar_elem(p.p[0], 1, 1);
+			l.b.push_back(t);
+			_r.r.push_back({{t, t}});
+			_r.r.back().b[0].neg = true;
+		} else {
 			l.b.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n)
 				if (p.p[n].type == elem::CHR)
@@ -205,7 +209,7 @@ raw_prog driver::transform_grammar(
 		}
 		r.r.push_back(l);
 	}
-	return transform_string(s, r, d.rel), r;
+	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
 
 #define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, get_lexeme(s)})
@@ -261,7 +265,7 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 	return { r, _r };
 }
 
-vector<pair<raw_prog, strs_t>> driver::transform(const raw_prog& p) {
+vector<pair<raw_prog, strs_t>> driver::transform(raw_prog& p) {
 	vector<pair<raw_prog, strs_t>> r;
 	vector<raw_rule> pg;
 //	wcout << L"original program:"<<endl<<p;
@@ -269,9 +273,11 @@ vector<pair<raw_prog, strs_t>> driver::transform(const raw_prog& p) {
 	for (const raw_rule& x : p.r)
 		if (x.pgoal) pg.push_back(x);
 	if (!p.g.empty()) {
-		if (!p.d.size()) er("grammar without input string.\n");
-		if (p.d.size()>1)er("only one string allowed given grammar.\n");
-		r.push_back({transform_grammar(p.d[0],p.g,s.begin()->second),s});
+		if (!p.d.size()) _er("grammar without input string.\n");
+		if (p.d.size()>1)_er("only one string allowed given grammar.\n");
+		auto x = transform_grammar(p.d[0],p.g,s.begin()->second);
+		r.push_back({x[0],s}), r.push_back({x[1],{}}), p.g.clear(),
+		p.d.erase(p.d.begin());
 	}
 	r.push_back({p, s});
 	if (!pg.empty()) {
@@ -293,15 +299,20 @@ void driver::prog_init(const raw_prog& p, strs_t s) {
 	prog = new lp(move(m), move(g), p.delrel, usz(), s, prog);
 }
 
-driver::driver(FILE *f) : driver(move(raw_progs(f))) {}
-driver::driver(wstring s) : driver(move(raw_progs(s))) {}
+driver::driver(FILE *f, bool print_transformed) 
+	: driver(move(raw_progs(f)), print_transformed) {}
+driver::driver(wstring s, bool print_transformed) 
+	: driver(move(raw_progs(s)), print_transformed) {}
 
-driver::driver(raw_progs rp) {
+driver::driver(raw_progs rp, bool print_transformed) {
 	DBG(drv = this;)
 	vector<pair<raw_prog, strs_t>> v;
 	for (size_t n = 0; n < rp.p.size(); ++n)
 		for (auto x : transform(rp.p[n]))
 			v.push_back({move(x.first), move(x.second)});
+	if (print_transformed)
+		for (auto x : v)
+			wcout << L'{' << endl << x.first << L'}' << endl;
 	get_dict_stats(v);
 	for (auto x : v) prog_init(move(x.first), move(x.second));
 }

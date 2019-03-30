@@ -26,8 +26,8 @@ class lp { // [pfp] logic program
 	std::vector<struct rule*> rules;
 	void add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
-	lp *prev;
 	size_t gbdd = F;
+	lp *prev;
 public:
 	typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
 	typedef std::map<std::pair<int_t, ints>, size_t> diff_t;

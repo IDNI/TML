@@ -17,7 +17,7 @@ using namespace std;
 int main() {
 	setlocale(LC_ALL, ""), tml_init();
 	//parser_test();
-	driver d(stdin);
+	driver d(stdin, true);
 	if (!d.pfp()) wcout << "unsat" << endl;
 	return 0;
 }

@@ -16,6 +16,9 @@
 #include <iostream>
 #include <sys/stat.h>
 
+#define err_digit L"symbol name cannot begin with a digit.\n"
+#define err_var_relsym L"relation symbol cannot be a variable.\n"
+
 struct directive {
 	lexeme rel, arg;
 	bool fname;
@@ -63,6 +66,10 @@ struct raw_progs {
 	raw_progs(const std::wstring& s);
 };
 
+void parse_error(std::wstring e, lexeme l);
+void parse_error(std::wstring e, cws s);
+void parse_error(std::wstring e, std::wstring s);
+void parse_error(std::wstring e, cws s, size_t len);
 std::wostream& operator<<(std::wostream& os, const directive& d);
 std::wostream& operator<<(std::wostream& os, const elem& e);
 std::wostream& operator<<(std::wostream& os, const raw_term& t);

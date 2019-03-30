@@ -23,10 +23,10 @@ pair<cws, size_t> driver::dict_get(int_t t) const {
 }
 
 int_t driver::dict_get(cws s, size_t len, bool rel) {
-	if (iswdigit(*s)) er("symbol name cannot begin with a digit.\n");
+	if (iswdigit(*s)) parse_error(err_digit, s, len);
 	auto it = syms_dict.end();
 	if (*s == L'?') {
-		if (rel) er("relation symbol cannot be a variable.\n");
+		if (rel) parse_error(err_var_relsym, s, len);
 		if ((it = vars_dict.find({s, len}))!= vars_dict.end())
 			return it->second;
 		int_t r = -vars_dict.size() - 1;

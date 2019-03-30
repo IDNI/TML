@@ -18,11 +18,12 @@ class query {
 	const ints e;
 	const sizes perm, domain;
 	std::vector<char> path;
+	const bool neg;
 	sizes getdom() const;
-	std::unordered_map<size_t, size_t> memo;
+	std::unordered_map<size_t, size_t> memo, negmemo;
 	size_t compute(size_t x, size_t v);
 public:
-	query(size_t bits, const term& t, const sizes& perm);
+	query(size_t bits, const term& t, const sizes& perm, bool neg);
 	size_t operator()(size_t x);
 };
 

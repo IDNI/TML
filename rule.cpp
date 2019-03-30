@@ -80,7 +80,7 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 				for (b = 0; b != bits; ++b)
 					perm[b+j*bits]=
 						b+varmap[v[i].args[j]]*bits;
-		q.emplace_back(bits, v[i], move(perm));
+		q.emplace_back(bits, v[i], move(perm), v[i].neg);
 	}
 //	wcout << v << endl << vars << endl << endl;
 //	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
