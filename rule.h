@@ -13,11 +13,14 @@
 #include "defs.h"
 #include "query.h"
 #include "lp.h"
+#include <functional>
 
 struct rule { // a P-DATALOG rule in bdd form
 	const bool neg;
 	std::unordered_map<int_t, size_t> varmap;
 	builtins<leq_const> *bts = 0;
+	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
+		unary_builtins;
 	std::vector<query> q;
 	std::vector<ints> arities;
 	ints harity, vars_arity, rels;

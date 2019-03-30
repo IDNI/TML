@@ -39,7 +39,7 @@ query::query(size_t bits, const term& t, const sizes& perm, bool neg)
 	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
 size_t query::operator()(size_t x) {
-	DBG(out(wcout<<L"called with ", getnode(x)) << endl;)
+//	DBG(out(wcout<<L"called with ", getnode(x)) << endl;)
 	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
 	auto it = m.find(x);
 	if (it != m.end()) return it->second;
@@ -111,11 +111,24 @@ builtin_res leq_const::operator()(const vector<char>& path, size_t from,
 		if (path[n] == 1) {
 			if (!(c & (1 << (bits+from+n-(to<<1)))))
 				return FAIL;
-		} else if (!path[n]) {
+		} else if (!path[n])
+			return	(c & (1 << (bits+from+n-(to<<1)))) ?
+				CONTBOTH : CONTLO;
+		else if (c & (1 << (bits+from+n-(to<<1))))
+			return PASS;
+	return CONTBOTH;
+}
+
+builtin_res geq_const::operator()(const vector<char>& path, size_t from,
+	size_t to) const {
+	for (size_t n = from; n != to; ++n)
+		if (path[n] == -1) {
 			if (c & (1 << (bits+from+n-(to<<1))))
-				return CONTBOTH;
-			return CONTLO;
-		} else if (c & (1 << (bits+from+n-(to<<1))))
+				return FAIL;
+		} else if (!path[n])
+			return	(c & (1 << (bits+from+n-(to<<1)))) ?
+				CONTHI : CONTBOTH;
+		else if (!(c & (1 << (bits+from+n-(to<<1)))))
 			return PASS;
 	return CONTBOTH;
 }

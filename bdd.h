@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <array>
 #include "defs.h"
+#include "term.h"
 
 //bdd node is a triple: varid,1-node-id,0-node-id
 typedef std::array<size_t, 3> node;

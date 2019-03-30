@@ -35,8 +35,18 @@ size_t arlen(const ints& ar) {
 	return r;
 }
 
+bool operator==(const lexeme& l, const wstring& s) {
+	if ((size_t)(l[1]-l[0]) != s.size()) return false;
+	return !wcsncmp(l[0], s.c_str(), l[1]-l[0]);
+}
+
 term driver::get_term(const raw_term& r) {
 	term t(r.neg, dict_get_rel(r.e[0].e), {}, r.arity);
+	if (r.e[0].e == L"space") t.b = term::SPACE;
+	else if (r.e[0].e == L"digit") t.b = term::DIGIT;
+	else if (r.e[0].e == L"alpha") t.b = term::ALPHA;
+	else if (r.e[0].e == L"alnum") t.b = term::ALNUM;
+	else t.b = term::NONE;
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (r.e[n].type == elem::NUM)
 			t.args.push_back(r.e[n].num + chars);
@@ -44,6 +54,8 @@ term driver::get_term(const raw_term& r) {
 			t.args.push_back(*r.e[n].e[0]);
 		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
 			t.args.push_back(dict_get(r.e[n].e));
+	if (t.b != term::NONE && t.arity != ints{1})
+		parse_error(L"invalid arity for unary builtin", r.e[0].e);
 	return t;
 }
 
@@ -286,7 +298,7 @@ vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog& p) {
 		auto x = transform_grammar(p.d[0],p.g,s.begin()->second);
 		r.push_back({x[0],s}), r.push_back({x[1],{}}), p.g.clear(),
 		p.d.erase(p.d.begin());
-	}
+	} else for (auto x : s) transform_string(x.second, p, x.first);
 	r.push_back({p, s});
 	if (!pg.empty()) {
 		auto x = transform_proofs(p.g.empty()?p:r[0].first, pg);

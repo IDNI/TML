@@ -65,13 +65,28 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 			for (int_t i : vs) domain.push_back(varmap[i]);
 			bts = new builtins<leq_const>(bits,
 				bits*arlen(vars_arity),
-				bits*arlen(harity),
+//				bits*arlen(harity),
 				leq_const(domain, dsz, bits));
 		}
 	}
 	//wcout<<v<<endl;
 	size_t i, j, b;
 	for (i = 1; i != v.size(); ++i) {
+		if (v[i].b != term::NONE) {
+			function<int(int)> f;
+			switch (v[i].b) {
+				case term::ALPHA: f = ::isalpha; break;
+				case term::DIGIT: f = ::isdigit; break;
+				case term::ALNUM: f = ::isalnum; break;
+				case term::SPACE: f = ::isspace; break;
+				default: throw 0;
+			}
+			unary_builtins.emplace_back(
+				builtins<unary_builtin<function<int(int)>>>(
+				bits,bits, unary_builtin<function<int(int)>>(
+				{varmap[v[i].args[0]]}, v[i].neg,f,0,256,bits)));
+			continue;
+		}
 		size_t ar = v[i].args.size();
 		sizes perm(bits * ar);
 		for (j = 0; j != bits * ar; ++j) perm[j] = j;
@@ -92,12 +107,14 @@ size_t rule::fwd(size_t bits) {
 	sizes v(q.size());
 	for (size_t n = 0; n < q.size(); ++n) 
 		if (F == (v[n] = q[n](*dbs[n]))) return F;
-		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
+//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 //	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 //	vars = ext(vars);
 //	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
-	if (bts) vars = ae((*bts)(vars));
+	for (size_t n = 0; n != unary_builtins.size(); ++n)
+		vars = unary_builtins[n](vars);
+	if (bts) vars = ae(bdd_deltail((*bts)(vars), bits*arlen(harity)));
 	else vars = ae(bdd_deltail(vars, bits*arlen(harity)));
 //	vars = ae(vars);
 //	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)

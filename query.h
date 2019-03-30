@@ -46,7 +46,7 @@ template<typename T> T sort(const T& x);
 #define del(x, y) x.erase(std::equal_range(x.begin(), x.end(), y).first)
 
 template<typename func> class builtins {
-	const size_t bits, nvars, tail;
+	const size_t bits, nvars;
 	sizes domain;
 	std::vector<char> path;
 	sizes getdom() const;
@@ -73,8 +73,8 @@ template<typename func> class builtins {
 			bdd_add({{v, x, compute(n[2], v)}});
 	}
 public:
-	builtins(size_t bits, size_t nvars, size_t tail, func f) : bits(bits)
-		, nvars(nvars), tail(tail), domain(sort(f.domain))
+	builtins(size_t bits, size_t nvars, func f) : bits(bits)
+		, nvars(nvars), domain(sort(f.domain))
 		, path(nvars,0), f(f) {}
 
 	size_t operator()(size_t x) {
@@ -92,4 +92,49 @@ struct leq_const {
 		, domain(domain) {}
 	builtin_res operator()(const std::vector<char>& path, size_t from,
 		size_t to) const;
+};
+
+struct geq_const {
+	const int_t c;
+	const size_t bits;
+	const sizes domain;
+	geq_const(const sizes& domain, int_t c, size_t bits) : c(c), bits(bits)
+		, domain(domain) {}
+	builtin_res operator()(const std::vector<char>& path, size_t from,
+		size_t to) const;
+};
+
+template<typename func> struct unary_builtin {
+	const std::set<int_t> vals;
+	const bool neg;
+	const size_t bits;
+	const sizes domain;
+	const leq_const lt;
+	const geq_const gt;
+
+	std::set<int_t> get_vals(func f, size_t from, size_t to) const {
+		std::set<int_t> r;
+		for (; from != to; ++from) if (f(from)) r.insert(from);
+		return r;
+	}
+
+	unary_builtin(const sizes& domain, bool neg, func f, size_t from,
+		size_t to, size_t bits) : vals(get_vals(f, from, to)), neg(neg)
+		, bits(bits), domain(domain), lt(domain, *vals.rbegin(), bits)
+		, gt(domain, *vals.begin(), bits) {}
+
+	builtin_res operator()(const std::vector<char>& path, size_t from,
+		size_t to) const {
+		builtin_res l = lt(path, from, to);
+		if (l == FAIL) return neg ? PASS : FAIL;
+		builtin_res g = gt(path, from, to);
+		if (g == FAIL || (l == CONTLO && g == CONTHI))
+			return neg ? PASS : FAIL;
+		if (to - from < bits) return CONTBOTH;
+		int_t v = 0;
+		for (size_t n = from; n != to; ++n)
+			v |= (1 << (bits+from+n-(to<<1)));
+		return	neg ? vals.find(v) != vals.end() ? PASS : FAIL :
+			vals.find(v) == vals.end() ? PASS : FAIL;
+	}
 };
