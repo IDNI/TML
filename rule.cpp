@@ -83,8 +83,9 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 			}
 			unary_builtins.emplace_back(
 				builtins<unary_builtin<function<int(int)>>>(
-				bits,bits, unary_builtin<function<int(int)>>(
-				{varmap[v[i].args[0]]}, v[i].neg,f,0,256,bits)));
+				bits,bits*arlen(vars_arity),
+				unary_builtin<function<int(int)>>(
+				{varmap[v[i].args[0]]},v[i].neg,f,0,256,bits)));
 			continue;
 		}
 		size_t ar = v[i].args.size();

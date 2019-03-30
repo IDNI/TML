@@ -62,11 +62,13 @@ template<typename func> class builtins {
 		if (!has(domain, v/bits))
 			return	++v, bdd_add({{v, compute(n[1], v),
 				compute(n[2], v)}});
-		switch (f(path, (v/bits)*bits, v)) {
+		switch (f(path, (v/bits)*bits, v+1)) {
 			case FAIL: return F;
-			case CONTHI:return bdd_add({{v+1,compute(n[1],v+1),F}});
-			case CONTLO:return bdd_add({{v+1,F,compute(n[2],v+1)}});
-			case PASS: del(domain, v/bits);
+			case CONTHI:path[v] = 1;
+				   return bdd_add({{v+1,compute(n[1],v+1),F}});
+			case CONTLO:path[v] = -1;
+				    return bdd_add({{v+1,F,compute(n[2],v+1)}});
+			case PASS: return T; //del(domain, v/bits);
 			default: ;
 		}
 		return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
@@ -88,7 +90,7 @@ struct leq_const {
 	const size_t bits;
 	const sizes domain;
 	leq_const(const sizes& domain, int_t c, size_t bits) : c(c), bits(bits)
-		, domain(domain) {}
+		, domain(domain) { assert(c < (1<<bits)); }
 	builtin_res operator()(const std::vector<char>& path, size_t from,
 		size_t to) const;
 };
@@ -98,7 +100,7 @@ struct geq_const {
 	const size_t bits;
 	const sizes domain;
 	geq_const(const sizes& domain, int_t c, size_t bits) : c(c), bits(bits)
-		, domain(domain) {}
+		, domain(domain) { assert(c < (1<<bits)); }
 	builtin_res operator()(const std::vector<char>& path, size_t from,
 		size_t to) const;
 };
@@ -129,10 +131,12 @@ template<typename func> struct unary_builtin {
 		builtin_res g = gt(path, from, to);
 		if (g == FAIL || (l == CONTLO && g == CONTHI))
 			return neg ? PASS : FAIL;
+		if (l == CONTLO) return CONTLO;
+		if (g == CONTHI) return CONTHI;
 		if (to - from < bits) return CONTBOTH;
 		int_t v = 0;
 		for (size_t n = from; n != to; ++n)
-			v |= (1 << (bits+from+n-(to<<1)));
+			v |= (1 << (bits-n%bits-1));
 		return	neg ? vals.find(v) != vals.end() ? PASS : FAIL :
 			vals.find(v) == vals.end() ? PASS : FAIL;
 	}

@@ -40,11 +40,11 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 }
 */
 void test_query() {
-	size_t bits = 2, leq = 2, geq = 1;
-	builtins<leq_const> l1(bits, 2, leq_const({0}, leq, bits));
-	builtins<geq_const> g1(bits, 2, geq_const({0}, geq, bits));
-	wcout << allsat(l1(T), bits*2) << endl << endl;
-	wcout << allsat(g1(T), bits*2) << endl;
+	size_t bits = 3, ar = 1, leq = 4, geq = 3;
+	builtins<leq_const> l1(bits, bits*ar, leq_const({0}, leq, bits));
+	builtins<geq_const> g1(bits, bits*ar, geq_const({0}, geq, bits));
+	wcout << allsat(l1(T), bits*ar) << endl << endl;
+	wcout << allsat(g1(T), bits*ar) << endl;
 	exit(0);
 
 /*	size_t bits = 3, x = F, ar, r, f;

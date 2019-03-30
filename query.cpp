@@ -107,28 +107,22 @@ size_t bdd_and_eq::compute(size_t x, size_t v) {
 
 builtin_res leq_const::operator()(const vector<char>& path, size_t from,
 	size_t to) const {
+	bool bit;
 	for (size_t n = from; n != to; ++n)
-		if (path[n] == 1) {
-			if (!(c & (1 << (bits+from+n-(to<<1)))))
-				return FAIL;
-		} else if (!path[n])
-			return	(c & (1 << (bits+from+n-(to<<1)))) ?
-				CONTBOTH : CONTLO;
-		else if (c & (1 << (bits+from+n-(to<<1))))
-			return PASS;
+		if ((bit = (c & (1<<(bits-n%bits-1)))), path[n] == 1) {
+			if (!bit) return FAIL;
+		} else if (!path[n]) return bit ? CONTBOTH : CONTLO;
+		else if (bit) return PASS;
 	return to - from == bits ? PASS : CONTBOTH;
 }
 
 builtin_res geq_const::operator()(const vector<char>& path, size_t from,
 	size_t to) const {
+	bool bit;
 	for (size_t n = from; n != to; ++n)
-		if (path[n] == -1) {
-			if (c & (1 << (bits+from+n-(to<<1))))
-				return FAIL;
-		} else if (!path[n])
-			return	(c & (1 << (bits+from+n-(to<<1)))) ?
-				CONTHI : CONTBOTH;
-		else if (!(c & (1 << (bits+from+n-(to<<1)))))
-			return PASS;
+		if ((bit = (c & (1<<(bits-n%bits-1)))), path[n] == -1) {
+			if (bit) return FAIL;
+		} else if (!path[n]) return bit ? CONTHI : CONTBOTH;
+		else if (!bit) return PASS;
 	return to - from == bits ? PASS : CONTBOTH;
 }
