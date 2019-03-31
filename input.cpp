@@ -124,7 +124,8 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
 	if (e.size() == 1) return calc_arity(), true;
-	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
+	if (e[1].type != elem::OPENP)
+		parse_error(err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP) parse_error(err_paren, l[pos]);
 	return calc_arity(), true;
 }

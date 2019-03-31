@@ -52,13 +52,15 @@ size_t query::operator()(size_t x) {
 size_t query::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = neg&&!leaf(x) ? flip(getnode(x)) : getnode(x);
-	if (!has(domain, v/bits+1))
+	const size_t arg = ARG(v, e.size());
+	if (!has(domain, arg+1))
 		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (e[v/bits] > 0)
-		return compute(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
-	if (e[v/bits] < 0)
-		return compute(n[path[(-e[v/bits]-1)*bits+v%bits]==1?1:2],v+1);
+	if (e[arg] > 0)
+		return compute(n[(e[arg]-1)&(1<<BIT(v,e.size(),bits))?1:2],v+1);
+	if (e[arg] < 0)
+		return compute(n[path[POS(BIT(v,e.size(),bits),
+			bits,-e[arg]-1,e.size())]==1?1:2],v+1);
 	return	path[v] = 1, x = compute(n[1], v+1), path[v] = -1,
 		bdd_ite(perm[v], x, compute(n[2], v+1));
 }
@@ -76,17 +78,20 @@ bdd_and_eq::bdd_and_eq(size_t bits, const term& t)
 size_t bdd_and_eq::operator()(size_t x) {
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
-	size_t r = x;
+	vector<size_t> v = {x};
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n] > 0) 
 			for (size_t k = 0; k != bits; ++k)
-				r = bdd_and(r, from_bit(
-					n*bits+k,(e[n]-1)&(1<<(bits-k-1))));
-		else if (e[n] < 0)
+				v.push_back(from_int(e[n]-1,bits,n,e.size()));
+	x = bdd_and_many(v, 0, v.size());
+	v = {x};
+	for (size_t n = 0; n != e.size(); ++n)
+		if (e[n] < 0)
 			for (size_t k = 0; k != bits; ++k)
-				r = bdd_and(r, from_eq(
-					n*bits+k, bits*(-e[n]-1)+k));
-	return memo[x] = r;
+				v.push_back(from_eq(POS(k, bits, n, e.size()),
+					POS(k, bits, -e[n]-1, e.size())));
+	x = bdd_and_many(v, 0, v.size());
+	return memo[x] = x;
 }
 
 builtin_res leq_const::operator()(const vector<char>& path, size_t from,

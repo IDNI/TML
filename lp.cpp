@@ -95,7 +95,7 @@ void lp::fwd(diff_t &add, diff_t &del) {
 	DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
-void lp::align(const db_t& d, size_t pbits, size_t bits) {
+/*void lp::align(const db_t& d, size_t pbits, size_t bits) {
 	if (bits == pbits) return;
 	for (auto x : db) {
 		auto it = d.find(x.first);
@@ -104,7 +104,7 @@ void lp::align(const db_t& d, size_t pbits, size_t bits) {
 				bdd_rebit(*it->second, pbits, bits,
 				arlen(x.first.second)*bits));
 	}
-}
+}*/
 
 struct diffcmp {
 	bool operator()(const lp::diff_t& x, const lp::diff_t& y) const {
@@ -173,7 +173,7 @@ bool lp::pfp() {
 			if (db.find(x.first) != db.end())
 				*db[x.first] = bdd_or(*db[x.first], *x.second);
 			else *(db[x.first] = new size_t) = *x.second;
-		align(prev->db, prev->bits, bits);
+//		align(prev->db, prev->bits, bits);
 	}
 	diff_t d, add, del, t;
 	set<size_t> pf;

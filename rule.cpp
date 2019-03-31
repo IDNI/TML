@@ -17,31 +17,35 @@
 #endif
 using namespace std;
 
-#define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 
-size_t fact(term v, size_t bits, size_t dsz) {
-//	DBG(wcout<<"add fact:"<<v<<endl;)
+size_t fact(term v, size_t bits, size_t /*dsz*/) {
+	DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity == ints{0}) return T;
 	size_t r = T;
 	unordered_map<int_t, size_t> m;
 	auto it = m.end();
 	for (size_t j = 0; j != v.args.size(); ++j)
-		if (v.args[j] >= 0) from_int_and(v.args[j], bits, j * bits, r);
+		if (v.args[j] >= 0)
+			from_int_and(v.args[j], bits, j, v.args.size(), r);
 		else if (m.end()==(it=m.find(v.args[j])))m.emplace(v.args[j],j);
 	sizes domain;
 	for (auto x : m) domain.push_back(x.second);
-	r = builtins<leq_const>(bits, v.args.size()*bits,
-		leq_const(domain, dsz-1, bits))(r);
+//	r = builtins<leq_const>(bits, v.args.size()*bits,
+//		leq_const(domain, dsz-1, bits))(r);
 	for (size_t j = 0; j != v.args.size(); ++j)
 		if (v.args[j] < 0) for (size_t b = 0; b!=bits; ++b)
 			if (j != m[v.args[j]])
 				r = bdd_and(r,
-					from_eq(j*bits+b, m[v.args[j]]*bits+b));
+					from_eq(POS(b, bits, j, v.args.size()),
+						POS(b, bits, m[v.args[j]],
+							v.args.size())));
+//						j*bits+b, m[v.args[j]]*bits+b));
 	if (v.neg) r = bdd_and_not(T, r);
-	DBG(printbdd(wcout<<"before range:"<<endl, r, v.arity, v.rel)<<endl;)
+//	DBG(printbdd(wcout<<"before range:"<<endl, r, v.arity, v.rel)<<endl;)
 	//if (domain.empty()) return dsz ? r : F;
 	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+//	exit(0);
 	return r;
 }
 
@@ -62,7 +66,7 @@ void rule::get_varmap(const matrix& v) {
 }
 
 rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
-	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) {
+	neg(v[0].neg), dbs(dbs), ae(bits, v[0]) { 
 	get_varmap(v);
 	set<int_t> vs;
 	for (auto& x : v)
@@ -77,7 +81,6 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 			for (int_t i : vs) domain.push_back(varmap[i]);
 			bts = new builtins<leq_const>(bits,
 				bits*arlen(vars_arity),
-//				bits*arlen(harity),
 				leq_const(domain, dsz-1, bits));
 		}
 	}
@@ -100,14 +103,19 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 				{varmap[v[i].args[0]]},v[i].neg,f,0,256,bits)));
 			continue;
 		}
-		size_t ar = v[i].args.size();
+		const size_t ar = v[i].args.size();
 		sizes perm(bits * ar);
 		for (j = 0; j != bits * ar; ++j) perm[j] = j;
 		for (j = 0; j != ar; ++j)
 			if (v[i].args[j] < 0)
 				for (b = 0; b != bits; ++b)
-					perm[b+j*bits]=
-						b+varmap[v[i].args[j]]*bits;
+					perm[POS(b, bits, j, ar)]=
+					POS(b,bits,varmap[v[i].args[j]],
+							arlen(vars_arity)) +
+					(varmap[v[i].args[j]] < arlen(harity)?0
+					:arlen(harity)*bits);
+//					perm[b+j*bits]=
+//						b+varmap[v[i].args[j]]*bits;
 		q.emplace_back(bits, v[i], move(perm), v[i].neg);
 	}
 	assert(q.size()==dbs.size()&&v.size()-1==q.size()+unary_builtins.size());
@@ -120,7 +128,7 @@ size_t rule::fwd(size_t bits) {
 		if (F == (v[n] = q[n](*dbs[n]))) return F;
 		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
-//	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
+	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
 	for (size_t n = 0; n != unary_builtins.size(); ++n) {
 		DBG(printbdd(wcout<<"before builtin:"<<endl, vars,vars_arity,hrel)<<endl;)
 		vars = unary_builtins[n](vars);
@@ -128,7 +136,9 @@ size_t rule::fwd(size_t bits) {
 	}
 	if (bts) vars = ae(bdd_deltail((*bts)(vars), bits*arlen(harity)));
 	else vars = ae(bdd_deltail(vars, bits*arlen(harity)));
-//	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
+//	if (bts) vars = bdd_and(head, bdd_deltail((*bts)(vars), bits*arlen(harity)));
+//	else vars = bdd_and(head, bdd_deltail(vars, bits*arlen(harity)));
+	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	return vars;
 }
 

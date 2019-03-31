@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include <map>
 #include <cassert>
+#include <cstring>
 #include "bdd.h"
 
 using namespace std;
@@ -207,11 +208,11 @@ size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
 	while (leaf(v[from]))
 		if (!trueleaf(v[from])) return res = F, 1;
 		else if (1 == (to - ++from)) return res = v[from], 1;
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]), 1;
+		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]),1;
 	while (leaf(v[to - 1]))
 		if (!trueleaf(v[to - 1])) return res = F, 1;
 		else if (1 == (--to - from)) return res = v[from], 1;
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]), 1;
+		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]),1;
 	m = getnode(v[from])[0], t = v[from], f1 = v.size();
 	b = false, eq = true, flag = false;
 	for (i = from + 1; i != to; ++i)
@@ -235,16 +236,32 @@ size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
 	return flag ? 3 : 0;
 }
 
+struct cmp {
+	size_t len;
+	cmp(size_t len) : len(len) {}
+	bool operator()(const size_t* x, const size_t* y) const {
+		return memcmp(x, y, sizeof(size_t)*len) < 0;
+	}
+};
+
 size_t bdd_and_many(sizes& v, size_t from, size_t to) {
-	size_t res = F, m, f1, t1, t2;
+	static map<sizes, size_t> memo;
+	sizes t(v.begin() + from, v.begin() + to);
+	auto it = memo.find(t);
+	if (it != memo.end()) return it->second;
+	else it = memo.emplace(t, 0).first;
+	t.clear();
+	size_t res = F, m, f1, t1, t2, h, l;
 	switch (bdd_and_many_iter(v, from, to, res, m, f1, t1, t2)) {
-		case 0: return bdd_add({{m, bdd_and_many(v, f1, t1),
-				bdd_and_many(v, t1, t2)}});
-		case 1: return res;
-		case 2: return bdd_add({{m,bdd_and_many(v,f1,t1),F}});
-		case 3: return bdd_add({{m, F, bdd_and_many(v, t1, t2)}});
+		case 0: l = bdd_and_many(v, t1, t2), v.resize(t1),
+			h = bdd_and_many(v, f1, t1), v.resize(f1);
+			break;
+		case 1: return it->second = res;
+		case 2: h = bdd_and_many(v,f1,t1), l = F, v.resize(f1); break;
+		case 3: h = F, l = bdd_and_many(v, t1, t2), v.resize(t1); break;
 		default: throw 0;
 	}
+	return it->second = bdd_add({{m, h, l}});
 }
 
 size_t bdd_ite(size_t v, size_t t, size_t e) {
@@ -289,17 +306,13 @@ bool bdd_onesat(size_t x, size_t nvars, bools& r) {
 		:(r[n[0]-1] = false, bdd_onesat(n[2], nvars, r));
 }
 
-size_t from_int(size_t x, size_t bits, size_t offset) {
-	size_t r = T, b = bits--;
-	while (b--) r = bdd_and(r, from_bit(bits - b + offset, x&(1<<b)));
+size_t from_int(size_t x, size_t bits, size_t arg, size_t args) {
+	size_t r = T, b = bits;
+	while (b--)
+		r = bdd_and(r, from_bit(POS(b, bits, arg, args), x&(1<<b)));
 	return r;
 }
-
-size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits) {
-	for (size_t n = ar1; n != ar2; ++n) from_int_and(pad, bits, n*bits, x);
-	return x;
-}
-
+/*
 size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	if (prev == curr) return x;
 	assert(prev < curr);
@@ -312,7 +325,7 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	}
 	return bdd_and(t, bdd_permute(x, v));
 }
-
+*/
 /*void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 	size_t x = F;
 	for (size_t n = 0; n < max; ++n)

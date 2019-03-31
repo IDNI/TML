@@ -40,10 +40,10 @@ size_t bdd_permute(size_t x, const sizes&); //overlapping rename
 size_t bdd_count(size_t x, size_t nvars);
 bool bdd_onesat(size_t x, size_t nvars, bools& r);
 size_t from_eq(size_t x, size_t y);
-size_t from_int(size_t x, size_t bits, size_t offset);
-size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
-size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t pnvars);
-void from_range(size_t max, size_t bits, size_t offset, size_t &r);
+size_t from_int(size_t x, size_t bits, size_t arg, size_t args);
+//size_t bdd_pad(size_t x, size_t ar1, size_t ar2, size_t pad, size_t bits);
+//size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t pnvars);
+//void from_range(size_t max, size_t bits, size_t offset, size_t &r);
 //void from_range(size_t max, size_t bits, size_t offset, std::set<int_t> ex,
 //	size_t &r);
 matrix from_bits(size_t x, size_t bits, size_t ar);
@@ -51,7 +51,7 @@ term one_from_bits(size_t x, size_t bits, size_t ar);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
 
-#define from_int_and(x, y, o, r) r = bdd_and(r, from_int(x, y, o))
+#define from_int_and(x, y, arg, args, r) r = bdd_and(r, from_int(x,y,arg,args))
 #define getnode(x) V[x]
 #define leaf(x) (((x) == T) || ((x) == F))
 #define nleaf(x) (!((x)[0]))

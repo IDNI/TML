@@ -350,13 +350,14 @@ matrix driver::from_bits(size_t x, ints art, int_t rel) const {
 	size_t ar = arlen(art);
 	vbools s = allsat(x, bits * ar);
 	matrix r(s.size());
-	for (term& v : r) v = term(false, rel, ints(ar), art);
+	for (term& v : r) v = term(false, rel, ints(ar, 0), art);
 	size_t n = s.size(), i, b;
 	while (n--)
 		for (i = 0; i != ar; ++i)
 			for (b = 0; b != bits; ++b)
-				if (s[n][i * bits + b])
-					r[n].args[i] |= 1 << (bits - b - 1);
+				//if (s[n][i * bits + b])
+				if (s[n][POS(b, bits, i, ar)])
+					r[n].args[i] |= 1 << b;//(bits - b - 1);
 	return r;
 }
 
@@ -367,7 +368,8 @@ term driver::one_from_bits(size_t x, ints art, int_t rel) const {
 	term r(1, rel, ints(ar), art);
 	for (size_t i = 0; i != ar; ++i)
 		for (size_t b = 0; b != bits; ++b)
-			if (s[i * bits + b])
+			//if (s[i * bits + b])
+			if (s[POS(b, bits, i, ar)])
 				r.args[i] |= 1 << (bits - b - 1);
 	return r;
 }

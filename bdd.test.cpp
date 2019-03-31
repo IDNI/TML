@@ -153,6 +153,11 @@ void test_and_many() {
 }
 
 int main() {
+	size_t bits = 10, args = 17;
+	for (size_t n = 0; n != bits; ++n)
+		for (size_t k = 0; k != args; ++k)
+			assert(ARG(POS(n, bits, k, args), args) == k),
+			assert(BIT(POS(n, bits, k, args), args, bits) == n);
 	bdd_init();
 	test_query();
 	srand(time(0));

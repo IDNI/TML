@@ -42,7 +42,7 @@ template<typename T> T sort(const T& x);
 #define del(x, y) x.erase(std::equal_range(x.begin(), x.end(), y).first)
 
 template<typename func> class builtins {
-	const size_t bits, nvars;
+	const size_t bits, args, nvars;
 	sizes domain;
 	std::vector<char> path;
 	sizes getdom() const;
@@ -54,11 +54,11 @@ template<typename func> class builtins {
 		if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 		node n = getnode(x);
 		assert(v<nvars);
-		if (!has(domain, v/bits))
+		if (!has(domain, ARG(v, args)/*v/bits*/))
 			return	++v, bdd_add({{v, compute(n[1], v),
 				compute(n[2], v)}});
 		if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-		switch (f(path, (v/bits)*bits, v+1)) {
+		switch (f(path, ARG(v, args)/*(v/bits)*/*bits, v+1)) {
 			case FAIL: return F;
 			case CONTHI:path[v] = 1;
 				   return bdd_add({{v+1,compute(n[1],v+1),F}});
@@ -71,8 +71,9 @@ template<typename func> class builtins {
 			bdd_add({{v, x, compute(n[2], v)}});
 	}
 public:
-	builtins(size_t bits, size_t nvars, func f) : bits(bits), nvars(nvars)
-		, domain(sort(f.domain)), path(nvars,0), f(f) {}
+	builtins(size_t bits, size_t args, func f) : bits(bits)
+		, args(args), nvars(bits*args) , domain(sort(f.domain)),
+		path(nvars,0), f(f) {}
 
 	size_t operator()(size_t x) {
 		auto it = memo.find(x);
