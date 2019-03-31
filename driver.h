@@ -59,13 +59,14 @@ class driver {
 	std::wstring directive_load(const directive& d);
 	std::map<lexeme, std::wstring> directives_load(
 		const std::vector<directive>& p);
-	std::array<raw_prog, 2> transform_proofs(const raw_prog& p,
+	std::array<raw_prog, 2> transform_proofs(
+		const std::vector<raw_prog> p,
 		const std::vector<raw_rule>& g);
 	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
 	std::array<raw_prog, 2> transform_grammar(const directive&,
 		const std::vector<production>&, const std::wstring&);
 	std::vector<std::pair<raw_prog, std::map<lexeme, std::wstring>>>
-		transform(raw_prog& p);
+		transform(raw_prog p);
 	bool print_transformed;
 	void grammar_to_rules(const std::vector<production>& g, matrices& m,
 		int_t rel);

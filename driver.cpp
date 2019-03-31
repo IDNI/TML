@@ -259,10 +259,12 @@ array<raw_prog, 2> driver::transform_grammar(
 #define append_closep(x) (x).push_back({elem::CLOSEP, 0, get_lexeme(L")")})
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
 
-array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
+array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 	const std::vector<raw_rule>& g) {
 	raw_prog r, _r;
+	for (const raw_prog p : rp) {
 	for (const raw_rule& x : p.r) {
+		assert(x.b.size());
 		if (x.b.size() == 1) continue;
 		// W((h)(b1)(b2)...):-h,b1,b2...
 		raw_rule y;
@@ -303,29 +305,22 @@ array<raw_prog, 2> driver::transform_proofs(const raw_prog& p,
 		// ! W(...)
 		_r.delrel = dict_get_rel(L"G");
 		//_r.r.push_back({{y.b[0]}, true, false});
-	}
+	}}
 	return { r, _r };
 }
 
-vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog& p) {
+vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog p) {
 	vector<pair<raw_prog, map<lexeme, wstring>>> r;
-	vector<raw_rule> pg;
-	DBG(wcout << L"original program:"<<endl<<p;)
+	//DBG(wcout << L"original program:"<<endl<<p;)
 	auto s = directives_load(p.d);
-	for (const raw_rule& x : p.r) if (x.pgoal) pg.push_back(x);
 	if (!p.g.empty()) {
 		if (!p.d.size()) _er("grammar without input string.\n");
 		if (p.d.size()>1)_er("only one string allowed given grammar.\n");
-		auto x = transform_grammar(p.d[0],p.g,s.begin()->second);
+		auto x = transform_grammar(p.d[0], p.g, s.begin()->second);
 		r.push_back({x[0],s}), r.push_back({x[1],{}}), p.g.clear(),
 		p.d.erase(p.d.begin());
 	} else for (auto x : s) transform_string(x.second, p, x.first);
-	r.push_back({p, s});
-	if (!pg.empty()) {
-		auto x = transform_proofs(p.g.empty()?p:r[0].first, pg);
-		r.push_back({move(x[0]),{}}), r.push_back({move(x[1]),{}});
-	}
-	return r;
+	return r.push_back({p, s}), r;
 }
 
 void driver::prog_init(const raw_prog& p, strs_t s) {
@@ -351,6 +346,16 @@ driver::driver(raw_progs rp, bool print_transformed) {
 	for (size_t n = 0; n < rp.p.size(); ++n)
 		for (auto x : transform(rp.p[n]))
 			v.push_back({move(x.first), move(x.second)});
+	vector<raw_rule> pg;
+	for (auto x : v)
+		for (const raw_rule& y : x.first.r)
+			if (y.pgoal) pg.push_back(y);
+	if (!pg.empty()) {
+		vector<raw_prog> y;
+		for (auto x : v) y.push_back(x.first);
+		auto x = transform_proofs(y, pg);
+		v.push_back({move(x[0]),{}}), v.push_back({move(x[1]),{}});
+	}
 	if (print_transformed)
 		for (auto x : v)
 			wcout << L'{' << endl << x.first << L'}' << endl;

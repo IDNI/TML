@@ -1,11 +1,12 @@
 # Dyck's language
-@str "((()()()((()()()))))".
+#@str "((()()()((()()()))))".
 #@str "()".
+@str "(())".
 S => null.
 S => '(' S ')' S.
 #a(1 2).
 #! S ?x ?y.
 #! str ?x ?y ?z.
 #a(?x ?y) :- b(?x).
-!! S(1 ?y).
+!! S(0 ?y).
 # should output "S 1 null" if str is a string of balanced parenthesis

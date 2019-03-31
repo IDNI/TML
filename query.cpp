@@ -21,13 +21,15 @@ using namespace std;
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 
 ints from_term(const term& t) {
-	ints r(t.args.size());
-	map<int_t, int_t> m;
-	auto it = m.end();
-	for (int_t n = 0; n != (int_t)t.args.size(); ++n)
+	ints r(t.args.size(), 0);
+	for (int_t n = 0, k; n != (int_t)t.args.size(); ++n)
 		if (t.args[n] >= 0) r[n] = t.args[n]+1;
-		else if (m.end() == (it = m.find(t.args[n]))) m[t.args[n]]=-n-1;
-		else r[n] = it->second;
+		else if ((k = n))
+			while (k--)
+				if (t.args[k] == t.args[n]) {
+					r[n] = -k-1;
+					break;
+				}
 	return r;
 }
 
@@ -71,38 +73,22 @@ sizes query::getdom() const {
 }
 
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t)
-	: bits(bits), nvars(t.args.size()*bits), e(from_term(t))
-	, domain(getdom()), path(nvars, 0) {}
-
-sizes bdd_and_eq::getdom() const {
-	sizes r;
-	for (size_t n = 0; n != e.size(); ++n)
-		if (e[n]) r.push_back(n+1), r.push_back(abs(e[n]));
-	return sort(r);
-}
+	: bits(bits), nvars(t.args.size()*bits), e(from_term(t)) {}
 
 size_t bdd_and_eq::operator()(size_t x) {
 	auto it = memo.find(x);
-	if (it == memo.end()) return memo[x] = compute(x, 0);
-	return it->second;
-}
-
-size_t bdd_and_eq::compute(size_t x, size_t v) {
-	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
-	node n = getnode(x);
-	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (!has(domain, v/bits+1))
-		return ++v, bdd_add({{v, compute(n[1], v), compute(n[2], v)}});
-	if (e[v/bits] > 0)
-		return	(e[v / bits] - 1) & (1 << (bits - v % bits - 1))
-			? bdd_add({{v+1, compute(n[1], v+1), F}})
-			: bdd_add({{v+1, F, compute(n[2], v+1)}});
-	if (e[v/bits] < 0)
-		return	path[(-e[v / bits] - 1) * bits + v % bits] == 1
-			? bdd_add({{v+1, compute(n[1], v+1), F}})
-			: bdd_add({{v+1, F, compute(n[2], v+1)}});
-	return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
-		bdd_add({{v, x, compute(n[2], v)}});
+	if (it != memo.end()) return it->second;
+	size_t r = x;
+	for (size_t n = 0; n != e.size(); ++n)
+		if (e[n] > 0) 
+			for (size_t k = 0; k != bits; ++k)
+				r = bdd_and(r,
+					from_bit(k,(e[n]-1)&(1<<(bits-k-1))));
+		else if (e[n] < 0)
+			for (size_t k = 0; k != bits; ++k)
+				r = bdd_and(r,
+					from_eq(n*bits+k, bits*(-e[n]-1)+k));
+	return memo[x] = r;
 }
 
 builtin_res leq_const::operator()(const vector<char>& path, size_t from,

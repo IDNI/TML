@@ -30,11 +30,7 @@ public:
 class bdd_and_eq {
 	const size_t bits, nvars;
 	const ints e;
-	const sizes domain;
-	std::vector<char> path;
-	sizes getdom() const;
 	std::unordered_map<size_t, size_t> memo;
-	size_t compute(size_t x, size_t v);
 public:
 	bdd_and_eq(size_t bits, const term& t);
 	size_t operator()(size_t x);
