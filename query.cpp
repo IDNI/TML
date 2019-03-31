@@ -50,13 +50,11 @@ size_t query::operator()(size_t x) {
 }
 
 size_t query::compute(size_t x, size_t v) {
-	//if (leaf(x) && ((neg?trueleaf(x):!trueleaf(x)) || v == nvars)) return x;
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 	node n = neg&&!leaf(x) ? flip(getnode(x)) : getnode(x);
-	//node n = getnode(x);
-	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (!has(domain, v/bits+1))
 		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));
+	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (e[v/bits] > 0)
 		return compute(n[(e[v/bits]-1)&(1<<(bits-v%bits-1))?1:2], v+1);
 	if (e[v/bits] < 0)
@@ -95,10 +93,11 @@ builtin_res leq_const::operator()(const vector<char>& path, size_t from,
 	size_t to) const {
 	bool bit;
 	for (size_t n = from; n != to; ++n)
-		if ((bit = (c & (1<<(bits-n%bits-1)))), path[n] == 1) {
-			if (!bit) return FAIL;
-		} else if (!path[n]) return bit ? CONTBOTH : CONTLO;
-		else if (bit) return PASS;
+		switch (bit = (c & (1<<(bits-n%bits-1))), path[n]) {
+			case 0: return bit ? CONTBOTH : CONTLO;
+			case 1: if (!bit) return FAIL; break;
+			default:if (bit) return PASS;
+		}
 	return to - from == bits ? PASS : CONTBOTH;
 }
 
@@ -106,9 +105,10 @@ builtin_res geq_const::operator()(const vector<char>& path, size_t from,
 	size_t to) const {
 	bool bit;
 	for (size_t n = from; n != to; ++n)
-		if ((bit = (c & (1<<(bits-n%bits-1)))), path[n] == -1) {
-			if (bit) return FAIL;
-		} else if (!path[n]) return bit ? CONTHI : CONTBOTH;
-		else if (!bit) return PASS;
+		switch (bit = (c & (1<<(bits-n%bits-1))), path[n]) {
+			case 0: return bit ? CONTHI : CONTBOTH;
+			case 1: if (!bit) return PASS; break;
+			default:if (bit) return FAIL;
+		}
 	return to - from == bits ? PASS : CONTBOTH;
 }

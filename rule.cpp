@@ -110,9 +110,7 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 						b+varmap[v[i].args[j]]*bits;
 		q.emplace_back(bits, v[i], move(perm), v[i].neg);
 	}
-//	wcout << v << endl << vars << endl << endl;
-//	drv->printbdd(wcout, v)<<endl, drv->printbdd(wcout, proof1)<<endl,
-//	drv->printbdd(wcout, proof2), exit(0);
+	assert(q.size()==dbs.size()&&v.size()-1==q.size()+unary_builtins.size());
 }
 
 size_t rule::fwd(size_t bits) {
@@ -120,16 +118,16 @@ size_t rule::fwd(size_t bits) {
 	sizes v(q.size());
 	for (size_t n = 0; n < q.size(); ++n) 
 		if (F == (v[n] = q[n](*dbs[n]))) return F;
-//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
+		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],vars_arity,hrel)<<endl;)
 	if (F == (vars = bdd_and_many(v, 0, v.size()))) return F;
 //	DBG(printbdd(wcout<<"q:"<<endl, vars,vars_arity,hrel)<<endl;)
-//	vars = ext(vars);
-//	DBG(printbdd(wcout<<"e:"<<endl, vars,vars_arity,hrel)<<endl;)
-	for (size_t n = 0; n != unary_builtins.size(); ++n)
+	for (size_t n = 0; n != unary_builtins.size(); ++n) {
+		DBG(printbdd(wcout<<"before builtin:"<<endl, vars,vars_arity,hrel)<<endl;)
 		vars = unary_builtins[n](vars);
+		DBG(printbdd(wcout<<"after builtin:"<<endl, vars,vars_arity,hrel)<<endl;)
+	}
 	if (bts) vars = ae(bdd_deltail((*bts)(vars), bits*arlen(harity)));
 	else vars = ae(bdd_deltail(vars, bits*arlen(harity)));
-//	vars = ae(vars);
 //	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
 	return vars;
 }

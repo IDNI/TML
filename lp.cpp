@@ -76,7 +76,8 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
 		} else {
 			vector<size_t*> dbs;
 			for (size_t n = 1; n < m.size(); ++n)
-				dbs.push_back(db[{m[n].rel,m[n].arity}]);
+				if (m[n].b == term::NONE)
+					dbs.push_back(db[{m[n].rel,m[n].arity}]);
 			rules.emplace_back(new rule(m, dbs, bits, dsz));
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)

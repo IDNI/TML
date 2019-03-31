@@ -53,11 +53,11 @@ template<typename func> class builtins {
 	size_t compute(size_t x, size_t v) {
 		if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
 		node n = getnode(x);
-		if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 		assert(v<nvars);
 		if (!has(domain, v/bits))
 			return	++v, bdd_add({{v, compute(n[1], v),
 				compute(n[2], v)}});
+		if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 		switch (f(path, (v/bits)*bits, v+1)) {
 			case FAIL: return F;
 			case CONTHI:path[v] = 1;
@@ -129,10 +129,12 @@ template<typename func> struct unary_builtin {
 			return neg ? PASS : FAIL;
 		if (l == CONTLO) return CONTLO;
 		if (g == CONTHI) return CONTHI;
-		if (to - from < bits) return CONTBOTH;
+		if (to - from <= bits) return CONTBOTH;
 		int_t v = 0;
 		for (size_t n = from; n != to; ++n)
-			v |= (1 << (bits-n%bits-1));
+			if (path[n] == 1)
+				v |= (1 << (bits-n%bits-1));
+			DBG(else assert(path[n]);)
 		return	neg ? vals.find(v) != vals.end() ? PASS : FAIL :
 			vals.find(v) == vals.end() ? PASS : FAIL;
 	}
