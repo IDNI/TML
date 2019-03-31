@@ -80,12 +80,12 @@ size_t bdd_and_eq::operator()(size_t x) {
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n] > 0) 
 			for (size_t k = 0; k != bits; ++k)
-				r = bdd_and(r,
-					from_bit(k,(e[n]-1)&(1<<(bits-k-1))));
+				r = bdd_and(r, from_bit(
+					n*bits+k,(e[n]-1)&(1<<(bits-k-1))));
 		else if (e[n] < 0)
 			for (size_t k = 0; k != bits; ++k)
-				r = bdd_and(r,
-					from_eq(n*bits+k, bits*(-e[n]-1)+k));
+				r = bdd_and(r, from_eq(
+					n*bits+k, bits*(-e[n]-1)+k));
 	return memo[x] = r;
 }
 

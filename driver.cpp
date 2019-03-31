@@ -63,23 +63,6 @@ matrix driver::get_rule(const raw_rule& r) {
 	return m;
 }
 
-template<typename V, typename X>
-void driver::from_func(V f, wstring name, X from, X to, matrices& r) {
-	int_t rel = dict_get_rel(name);
-	builtin_rels.emplace(rel);
-	for (; from != to; ++from)
-		if (f(from)) r.insert({term(false, rel, {from}, {1})});
-}
-
-matrices driver::get_char_builtins() {
-	matrices m;
-	from_func<function<int(int)>>(::isspace, L"space", 0, 255, m);
-	from_func<function<int(int)>>(::isalnum, L"alnum", 0, 255, m);
-	from_func<function<int(int)>>(::isalpha, L"alpha", 0, 255, m);
-	from_func<function<int(int)>>(::isdigit, L"digit", 0, 255, m);
-	return m;
-}
-
 struct lexcmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
@@ -222,8 +205,6 @@ array<raw_prog, 2> driver::transform_grammar(
 	static set<wstring> b = { L"alpha", L"alnum", L"digit", L"space" };
 	raw_prog r, _r;
 	r.d.push_back(d);
-//	matrices rtxt = get_char_builtins();
-//	m.insert(rtxt.begin(), rtxt.end());
 	for (const production& p : g) {
 		if (p.p.size() < 2)
 			parse_error(L"empty production.\n", p.p[0].e);
@@ -262,51 +243,50 @@ array<raw_prog, 2> driver::transform_grammar(
 array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 	const std::vector<raw_rule>& g) {
 	raw_prog r, _r;
-	for (const raw_prog p : rp) {
-	for (const raw_rule& x : p.r) {
-		assert(x.b.size());
-		if (x.b.size() == 1) continue;
-		// W((h)(b1)(b2)...):-h,b1,b2...
-		raw_rule y;
-		y.b.push_back({}), y.b[0].neg = false,
-		y.b.insert(y.b.begin() + 1, x.b.begin(), x.b.end()),
-		append_sym_elem(y.b[0].e, L"W"), append_openp(y.b[0].e);
-		for (const raw_term& t : x.b) 
-			append_openp(y.b[0].e), cat(y.b[0].e, t.e),
-			append_closep(y.b[0].e);
-		append_closep(y.b[0].e), y.b[0].calc_arity(), r.r.push_back(y);
-		// G(b1) :- G(h), W((h)(b1)...)
-		raw_term gh;
-		gh.neg = false, append_sym_elem(gh.e, L"G"), append_openp(gh.e),
-		cat(gh.e, x.b[0].e), append_closep(gh.e), gh.calc_arity();
-		for (const raw_rule& t : g) {
-			raw_term gg;
-			gg.neg = false, append_sym_elem(gg.e, L"G"),
-			append_openp(gg.e), cat(gg.e, t.b[0].e),
-			append_closep(gg.e), gg.calc_arity(),
-			_r.r.push_back({{gg, t.b[0]}, false, false});
-		}
-		for (size_t n = 1; n != x.b.size(); ++n) {
-			raw_rule z;
-			z.b.push_back({}), z.b[0].neg = false,
-			append_sym_elem(z.b[0].e, L"G"), append_openp(z.b[0].e),
-			cat(z.b[0].e, x.b[n].e), append_closep(z.b[0].e),
-			z.b.push_back(gh), z.b.push_back(y.b[0]),
-			z.b[0].calc_arity(), r.r.push_back(z);
-			// ~W((h)(b1)...) :- ~G(b1).
-			y.b[0].neg = gh.neg = z.b[0].neg = true;
-			_r.r.push_back({{y.b[0], gh}, false, false}),
-			_r.r.push_back({{y.b[0], z.b[0]}, false, false}),
-			y.b[0].neg = gh.neg = false;
-		}
-		y.b[0].neg = gh.neg = true;
-		// ~W((h)(b1)...) :- ~G(h).
-		_r.r.push_back({{y.b[0], gh}, false, false});
-		// ! W(...)
-		_r.delrel = dict_get_rel(L"G");
-		//_r.r.push_back({{y.b[0]}, true, false});
-	}}
+	for (const raw_prog p : rp)
+		for (const raw_rule& x : p.r)
+			transform_proofs(x, r, _r, g);
 	return { r, _r };
+}
+
+void driver::transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r,
+	const std::vector<raw_rule>& g) {
+	assert(x.b.size());
+	if (x.b.size() == 1) return;
+	// W((h)(b1)(b2)...):-h,b1,b2...
+	raw_rule y;
+	y.b.push_back({}), y.b[0].neg = false,
+	y.b.insert(y.b.begin() + 1, x.b.begin(), x.b.end()),
+	append_sym_elem(y.b[0].e, L"W"), append_openp(y.b[0].e);
+	for (const raw_term& t : x.b) 
+		append_openp(y.b[0].e), cat(y.b[0].e, t.e),
+		append_closep(y.b[0].e);
+	append_closep(y.b[0].e), y.b[0].calc_arity(), r.r.push_back(y);
+	// G(b1) :- G(h), W((h)(b1)...)
+	raw_term gh;
+	gh.neg = false, append_sym_elem(gh.e, L"G"), append_openp(gh.e),
+	cat(gh.e, x.b[0].e), append_closep(gh.e), gh.calc_arity();
+	for (const raw_rule& t : g) {
+		raw_term gg;
+		gg.neg = false, append_sym_elem(gg.e, L"G"),
+		append_openp(gg.e), cat(gg.e, t.b[0].e), append_closep(gg.e),
+		gg.calc_arity(), r.r.push_back({{gg, t.b[0]}, false, false});
+	}
+	raw_rule z;
+	for (size_t n = 1; n != x.b.size(); ++n)
+		z.b.push_back({}), z.b[0].neg = false,
+		append_sym_elem(z.b[0].e, L"G"), append_openp(z.b[0].e),
+		cat(z.b[0].e, x.b[n].e), append_closep(z.b[0].e),
+		z.b.push_back(gh), z.b.push_back(y.b[0]), z.b[0].calc_arity(),
+		r.r.push_back(z), y.b[0].neg = gh.neg = z.b[0].neg = true,
+		// ~W((h)(b1)...) :- ~G(b1).
+		_r.r.push_back({{y.b[0], gh}, false, false}),
+		_r.r.push_back({{y.b[0], z.b[0]}, false, false}),
+		y.b[0].neg = gh.neg = false, z.clear();
+	// ~W((h)(b1)...) :- ~G(h).
+	// ! W(...)
+	y.b[0].neg = gh.neg = true, _r.r.push_back({{y.b[0], gh}, false,false}),
+	_r.delrel = dict_get_rel(L"G");
 }
 
 vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog p) {
@@ -455,9 +435,12 @@ wostream& driver::printbdd_one(wostream& os, size_t t, ints ar, int_t rel)const{
 
 wostream& driver::printdb(wostream& os, lp *p) const {
 	for (auto x : p->db)
-		if (builtin_rels.find(x.first.first) == builtin_rels.end())
-			printbdd(os,from_bits(*x.second,
+		if (builtin_rels.find(x.first.first) == builtin_rels.end()) {
+//			for (int_t i : x.first.second) wcout << i << ' ';
+//			wcout << endl;
+			printbdd(os, from_bits(*x.second,
 				x.first.second,x.first.first));
+		}
 	return os;
 }
 

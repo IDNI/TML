@@ -50,6 +50,7 @@ struct raw_rule {
 	std::vector<raw_term> b;
 	bool goal = false, pgoal = false;
 	bool parse(const lexemes& l, size_t& pos);
+	void clear() { b.clear(), goal = pgoal = false; }
 };
 
 struct raw_prog {

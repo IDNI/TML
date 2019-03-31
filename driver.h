@@ -48,17 +48,16 @@ class driver {
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
-	matrices get_char_builtins();
 	term get_term(const raw_term&);
 	matrix get_rule(const raw_rule&);
 	std::vector<strs_t> get_dict_stats(const std::vector<
 		std::pair<raw_prog, std::map<lexeme, std::wstring>>>& v);
 
-	template<typename V, typename X>
-	void from_func(V f, std::wstring name, X from, X to, matrices&);
 	std::wstring directive_load(const directive& d);
 	std::map<lexeme, std::wstring> directives_load(
 		const std::vector<directive>& p);
+	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r,
+		const std::vector<raw_rule>& g);
 	std::array<raw_prog, 2> transform_proofs(
 		const std::vector<raw_prog> p,
 		const std::vector<raw_rule>& g);
