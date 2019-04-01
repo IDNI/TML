@@ -90,6 +90,8 @@ vector<strs_t> driver::get_dict_stats(
 						nums = max(nums, t.e[n].num+1);
 					else if (t.e[n].type == elem::SYM)
 						syms.insert(t.e[n].e);
+					else if (t.e[n].type == elem::CHR)
+						chars = max(chars, (int_t)256);
 		}
 		for (auto y : x.second) rels.insert(y.first);
 	}
@@ -212,8 +214,10 @@ array<raw_prog, 2> driver::transform_grammar(
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.b.push_back(t);
-			_r.r.push_back({{t, t}});
-			_r.r.back().b[0].neg = true;
+			elem e = {elem::VAR,0,get_var_lexeme(2)};
+			l.b.push_back(from_grammar_elem_nt(d.rel,e,1,3));
+//			_r.r.push_back({{t, t}});
+//			_r.r.back().b[0].neg = true;
 		} else {
 			size_t v = p.p.size();
 			l.b.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
