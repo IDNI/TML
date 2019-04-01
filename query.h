@@ -13,27 +13,27 @@
 #include "bdd.h"
 #include <algorithm>
 
-class query {
-	const size_t bits, nvars;
-	const ints e;
-	const sizes perm, domain;
-	std::vector<char> path;
-	const bool neg;
-	sizes getdom() const;
-	std::unordered_map<size_t, size_t> memo, negmemo;
-	size_t compute(size_t x, size_t v);
-public:
-	query(size_t bits, const term& t, const sizes& perm, bool neg);
-	size_t operator()(size_t x);
-};
-
 class bdd_and_eq {
 	const size_t bits, nvars;
 	const ints e;
+	const bool neg;
 	DBG(term _t;)
 	std::unordered_map<size_t, size_t> memo;
 public:
-	bdd_and_eq(size_t bits, const term& t);
+	bdd_and_eq(size_t bits, const term& t, bool neg);
+	size_t operator()(const size_t x);
+};
+
+class query {
+	const bools ex;
+	const sizes perm;
+	const bool neg;
+	bdd_and_eq ae;
+//	sizes getdom() const;
+	std::unordered_map<size_t, size_t> memo, negmemo;
+//	size_t compute(size_t x, size_t v);
+public:
+	query(size_t bits, const term& t, const sizes& perm, bool neg);
 	size_t operator()(size_t x);
 };
 

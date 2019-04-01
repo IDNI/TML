@@ -212,14 +212,17 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
-		size_t &m, size_t &f1, size_t &t1, size_t &t2) {
-	size_t i, t;
+size_t bdd_and_many_iter(const sizes& v, sizes& h, sizes& l, size_t &res,
+		size_t &m) {
+	size_t i, t, from = 0, to = v.size();
 	bool b, eq, flag;
 	node n;
-	if (!(to - from)) return res = T, 1;
-	if (1 == (to - from)) return res = v[from], 1;
-	if (2 == (to - from)) return res = bdd_and(v[from], v[from+1]), 1;
+	switch (v.size()) {
+		case 0: return res = T, 1;
+		case 1: return res = v[0], 1;
+		case 2: return res = bdd_and(v[0], v[1]), 1;
+		default: ;
+	}
 	while (leaf(v[from]))
 		if (!trueleaf(v[from])) return res = F, 1;
 		else if (1 == (to - ++from)) return res = v[from], 1;
@@ -228,7 +231,7 @@ size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
 		if (!trueleaf(v[to - 1])) return res = F, 1;
 		else if (1 == (--to - from)) return res = v[from], 1;
 		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]),1;
-	m = getnode(v[from])[0], t = v[from], f1 = v.size();
+	m = getnode(v[from])[0], t = v[from];
 	b = false, eq = true, flag = false;
 	for (i = from + 1; i != to; ++i)
 		if (!leaf(v[i])) {
@@ -238,42 +241,31 @@ size_t bdd_and_many_iter(sizes& v, size_t from, size_t to, size_t &res,
 	if (eq) return res = t, 1;
 	for (i = from; i != to; ++i)
 		if (leaf(v[i])) continue;
-		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
-		else if (!leaf(getnode(v[i])[1])) v.push_back(getnode(v[i])[1]);
+		else if (b && getnode(v[i])[0] != m) h.push_back(v[i]);
+		else if (!leaf(getnode(v[i])[1])) h.push_back(getnode(v[i])[1]);
 		else if (!trueleaf(getnode(v[i])[1])) { flag = true; break; }
-	t1 = v.size();
 	for (i = from; i != to; ++i)
 		if (leaf(v[i])) continue;
-		else if (b && getnode(v[i])[0] != m) v.push_back(v[i]);
-		else if (!leaf(getnode(v[i])[2])) v.push_back(getnode(v[i])[2]);
+		else if (b && getnode(v[i])[0] != m) l.push_back(v[i]);
+		else if (!leaf(getnode(v[i])[2])) l.push_back(getnode(v[i])[2]);
 		else if (!trueleaf(getnode(v[i])[2])) return flag ? res=F,1 : 2;
-	t2 = v.size();
 	return flag ? 3 : 0;
 }
 
-struct cmp {
-	size_t len;
-	cmp(size_t len) : len(len) {}
-	bool operator()(const size_t* x, const size_t* y) const {
-		return memcmp(x, y, sizeof(size_t)*len) < 0;
-	}
-};
-
-size_t bdd_and_many(sizes& v, size_t from, size_t to) {
+size_t bdd_and_many(const sizes& v) {
 	static map<sizes, size_t> memo;
-	sizes t(v.begin() + from, v.begin() + to);
-	auto it = memo.find(t);
+	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
-	else it = memo.emplace(t, 0).first;
-	t.clear();
-	size_t res = F, m, f1, t1, t2, h, l;
-	switch (bdd_and_many_iter(v, from, to, res, m, f1, t1, t2)) {
-		case 0: l = bdd_and_many(v, t1, t2), v.resize(t1),
-			h = bdd_and_many(v, f1, t1), v.resize(f1);
+	else it = memo.emplace(v, 0).first;
+	size_t res = F, m, h, l;
+	sizes vh, vl;
+	switch (bdd_and_many_iter(v, vh, vl, res, m)) {
+		case 0: l = bdd_and_many(vl), vl.clear(),
+			h = bdd_and_many(vh), vh.clear();
 			break;
 		case 1: return it->second = res;
-		case 2: h = bdd_and_many(v,f1,t1), l = F, v.resize(f1); break;
-		case 3: h = F, l = bdd_and_many(v, t1, t2), v.resize(t1); break;
+		case 2: h = bdd_and_many(vh), l = F, vh.clear(); break;
+		case 3: h = F, l = bdd_and_many(vl), vl.clear(); break;
 		default: throw 0;
 	}
 	return it->second = bdd_add({{m, h, l}});

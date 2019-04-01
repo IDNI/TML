@@ -19,13 +19,14 @@ struct rule { // a P-DATALOG rule in bdd form
 	const bool neg;
 	std::unordered_map<int_t, size_t> varmap;
 	builtins<leq_const> *bts = 0;
-	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
-		unary_builtins;
+//	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
+//		unary_builtins;
 	std::vector<query> q;
 	std::vector<ints> arities;
 	ints harity, vars_arity, rels;
 	int_t hrel;
 	std::vector<size_t*> dbs;
+//	sizes ub;
 	bdd_and_eq ae;
 	void get_varmap(const matrix& v);
 

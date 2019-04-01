@@ -145,36 +145,6 @@ lexeme driver::get_var_lexeme(int_t i) {
 	return get_lexeme(s += to_wstring(i));
 }
 
-#define from_grammar_elem(v, v1, v2) \
-	raw_term{ false, {v, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {2}}
-
-#define from_grammar_elem_nt(r, c, v1, v2) \
-	raw_term{ false, {\
-		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		c, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
-
-#define from_grammar_elem_builtin(r, b, v, v1, v2) \
-	array<raw_term, 2>{raw_term{ false, {\
-		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v)}, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}, \
-		{raw_term{false, {\
-		{elem::SYM, 0, b}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {1}}}}
-
 bool operator==(const lexeme& l, cws s) {
 	size_t n = wcslen(s);
 	return (size_t)(l[1] - l[0]) != n ? false : !wcsncmp(l[0], s, n);
@@ -187,16 +157,63 @@ bool operator==(const lexeme& l, cws s) {
 	}
 };*/
 
+#define from_grammar_elem(v, v1, v2) raw_term{ false, {v, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::VAR, 0, get_var_lexeme(v1)}, \
+		{elem::VAR, 0, get_var_lexeme(v2)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {2}}
+
+#define from_grammar_elem_nt(r, c, v1, v2) raw_term{ false, {\
+		{elem::SYM, 0, r}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		c, {elem::VAR, 0, get_var_lexeme(v1)}, \
+		{elem::VAR, 0, get_var_lexeme(v2)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
+
+/*#define from_grammar_elem_builtin(r, b, v, v1, v2) \
+	array<raw_term, 2>{raw_term{ false, {\
+		{elem::SYM, 0, r}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::VAR, 0, get_var_lexeme(v)}, \
+		{elem::VAR, 0, get_var_lexeme(v1)}, \
+		{elem::VAR, 0, get_var_lexeme(v2)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}, \
+		{raw_term{false, {\
+		{elem::SYM, 0, b}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::VAR, 0, get_var_lexeme(v)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {1}}}}*/
+
+#define from_grammar_elem_builtin(r, b, v, v1, v2) { false, {\
+		{elem::SYM, 0, r}, \
+		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::SYM, 0, get_lexeme(b)}, \
+		{elem::VAR, 0, get_var_lexeme(v1)}, \
+		{elem::VAR, 0, get_var_lexeme(v2)}, \
+		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
+
+#define from_string_lex(rel, lex, n) raw_rule{{{ false, { \
+		{elem::SYM, 0, rel}, {elem::SYM, 0, get_lexeme(lex)}, \
+		{elem::NUM, n, get_num_lexeme(n)}, \
+		{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}}}, false, false}
+
 void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
-		raw_rule l;
-		l.goal = l.pgoal = false;
-		l.b.push_back(raw_term{ false, {
+		r.r.push_back(raw_rule{
+			{{ false, {
 			{elem::SYM, 0, rel},
 			{elem::CHR, 0, get_char_lexeme(s[n])},
 			{elem::NUM, n, get_num_lexeme(n)},
-			{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}});
-		r.r.push_back(l);
+			{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}}},
+			false, false});
+		if (iswspace(s[n]))
+			r.r.push_back(from_string_lex(rel, L"space", n));
+		if (iswdigit(s[n]))
+			r.r.push_back(from_string_lex(rel, L"digit", n));
+		if (iswalpha(s[n]))
+			r.r.push_back(from_string_lex(rel, L"alpha", n));
+		if (iswalnum(s[n]))
+			r.r.push_back(from_string_lex(rel, L"alnum", n));
 	}
 }
 
@@ -204,7 +221,7 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 
 array<raw_prog, 2> driver::transform_grammar(
 	const directive& d, const vector<production>& g, const wstring& s) {
-	static set<wstring> b = { L"alpha", L"alnum", L"digit", L"space" };
+	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
 	raw_prog r, _r;
 	r.d.push_back(d);
 	for (const production& p : g) {
@@ -224,12 +241,11 @@ array<raw_prog, 2> driver::transform_grammar(
 			size_t v = p.p.size();
 			l.b.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n)
-				if (b.find(lexeme2str(p.p[n].e)) != b.end()) {
-					++v;
-					auto x=from_grammar_elem_builtin(d.rel,
-						p.p[n].e, v, n, n+1);
-					l.b.push_back(x[0]),l.b.push_back(x[1]);
-				}
+				if (b.find(lexeme2str(p.p[n].e)) != b.end())
+					++v,
+					l.b.push_back(from_grammar_elem_builtin(
+						d.rel, lexeme2str(p.p[n].e),
+						v, n,n+1));
 				else if (p.p[n].type == elem::CHR)
 					l.b.push_back(from_grammar_elem_nt(d.rel
 						,p.p[n],n,n+1));

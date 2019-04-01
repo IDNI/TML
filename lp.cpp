@@ -177,8 +177,10 @@ bool lp::pfp() {
 	}
 	diff_t d, add, del, t;
 	set<size_t> pf;
+	size_t step = 0;
 //	wcout << V.size() << endl;
 	for (set<diff_t, diffcmp> s;;) {
+		wcout << "step: " << step++ << endl;
 		s.emplace(d = copy(db)), fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
