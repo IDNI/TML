@@ -213,9 +213,13 @@ array<raw_prog, 2> driver::transform_grammar(
 		raw_rule l;
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
-			l.b.push_back(t);
 			elem e = {elem::VAR,0,get_var_lexeme(2)};
+			l.b.push_back(t);
 			l.b.push_back(from_grammar_elem_nt(d.rel,e,1,3));
+			r.r.push_back(l);
+			l.clear();
+			l.b.push_back(t);
+			l.b.push_back(from_grammar_elem_nt(d.rel,e,3,1));
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
