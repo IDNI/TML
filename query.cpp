@@ -58,9 +58,11 @@ size_t query::compute(size_t x, size_t v) {
 	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
 	if (e[arg] > 0)
 		return compute(n[(e[arg]-1)&(1<<BIT(v,e.size(),bits))?1:2],v+1);
-	if (e[arg] < 0)
-		return compute(n[path[POS(BIT(v,e.size(),bits),
-			bits,-e[arg]-1,e.size())]==1?1:2],v+1);
+	if (e[arg] < 0) {
+		bool h=path[POS(BIT(v,e.size(),bits),bits,-e[arg]-1,e.size())]==1;
+		if (h) return path[v] = 1, compute(n[1],v+1);
+		return path[v] = -1, compute(n[2],v+1);
+	}
 	return	path[v] = 1, x = compute(n[1], v+1), path[v] = -1,
 		bdd_ite(perm[v], x, compute(n[2], v+1));
 }
