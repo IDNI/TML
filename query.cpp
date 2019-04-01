@@ -96,26 +96,28 @@ size_t bdd_and_eq::operator()(size_t x) {
 	return memo[x] = x;
 }
 
-builtin_res leq_const::operator()(const vector<char>& path, size_t from,
-	size_t to) const {
+builtin_res leq_const::operator()(const vector<char>& path, size_t arg,
+	size_t v) const {
 	bool bit;
-	for (size_t n = from; n != to; ++n)
+	size_t n = POS(bits-1, bits, arg, args);
+	for (; n <= POS(0, bits, arg, args); n += args)
 		switch (bit = (c & (1<<(bits-n%bits-1))), path[n]) {
 			case 0: return bit ? CONTBOTH : CONTLO;
 			case 1: if (!bit) return FAIL; break;
 			default:if (bit) return PASS;
 		}
-	return to - from == bits ? PASS : CONTBOTH;
+	return v == args*bits ? PASS : CONTBOTH;
 }
 
-builtin_res geq_const::operator()(const vector<char>& path, size_t from,
-	size_t to) const {
+builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
+	size_t v) const {
 	bool bit;
-	for (size_t n = from; n != to; ++n)
+	size_t n = POS(bits-1, bits, arg, args);
+	for (; n <= POS(0, bits, arg+1, args); n += args)
 		switch (bit = (c & (1<<(bits-n%bits-1))), path[n]) {
 			case 0: return bit ? CONTHI : CONTBOTH;
 			case 1: if (!bit) return PASS; break;
 			default:if (bit) return FAIL;
 		}
-	return to - from == bits ? PASS : CONTBOTH;
+	return v == args*bits ? PASS : CONTBOTH;
 }

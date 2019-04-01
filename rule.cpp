@@ -19,7 +19,7 @@ using namespace std;
 
 #define vecfill(v,x,y,z) fill((v).begin() + (x), (v).begin() + (y), z)
 
-size_t fact(term v, size_t bits, size_t /*dsz*/) {
+size_t fact(term v, size_t bits, size_t dsz) {
 	DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity == ints{0}) return T;
 	size_t r = T;
@@ -31,8 +31,8 @@ size_t fact(term v, size_t bits, size_t /*dsz*/) {
 		else if (m.end()==(it=m.find(v.args[j])))m.emplace(v.args[j],j);
 	sizes domain;
 	for (auto x : m) domain.push_back(x.second);
-//	r = builtins<leq_const>(bits, v.args.size()*bits,
-//		leq_const(domain, dsz-1, bits))(r);
+	r = builtins<leq_const>(domain, bits, v.args.size(),
+		leq_const(dsz-1, bits, v.args.size()))(r);
 	for (size_t j = 0; j != v.args.size(); ++j)
 		if (v.args[j] < 0) for (size_t b = 0; b!=bits; ++b)
 			if (j != m[v.args[j]])
@@ -79,9 +79,9 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 		if (!vs.empty()) {
 			sizes domain;
 			for (int_t i : vs) domain.push_back(varmap[i]);
-			bts = new builtins<leq_const>(bits,
-				bits*arlen(vars_arity),
-				leq_const(domain, dsz-1, bits));
+			bts = new builtins<leq_const>(domain, bits,
+				arlen(vars_arity),
+				leq_const(dsz-1, bits, arlen(vars_arity)));
 		}
 	}
 	//wcout<<v<<endl;
@@ -98,9 +98,9 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 			}
 			unary_builtins.emplace_back(
 				builtins<unary_builtin<function<int(int)>>>(
-				bits,bits*arlen(vars_arity),
+				{varmap[v[i].args[0]]},bits,arlen(vars_arity),
 				unary_builtin<function<int(int)>>(
-				{varmap[v[i].args[0]]},v[i].neg,f,0,256,bits)));
+				v[i].neg,f,0,256,bits,arlen(vars_arity))));
 			continue;
 		}
 		const size_t ar = v[i].args.size();
