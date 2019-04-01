@@ -8,5 +8,5 @@ S => '(' S ')' S.
 #! S ?x ?y.
 #! str ?x ?y ?z.
 #a(?x ?y) :- b(?x).
-!! S(1 5).
+!! S(?x ?y).
 # should output "S 1 null" if str is a string of balanced parenthesis

@@ -30,6 +30,7 @@ public:
 class bdd_and_eq {
 	const size_t bits, nvars;
 	const ints e;
+	DBG(term _t;)
 	std::unordered_map<size_t, size_t> memo;
 public:
 	bdd_and_eq(size_t bits, const term& t);

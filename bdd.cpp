@@ -21,7 +21,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-//#define MEMO
+#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
@@ -159,6 +159,21 @@ size_t bdd_and_not(size_t x, size_t y) {
 	else if (!vx) apply_ret((a&&!b)?T:F, memo_and_not);
 	else if ((v = vx) < vy || !vy) b = d = y;
 	apply_ret(bdd_add({{v,bdd_and_not(a,b),bdd_and_not(c,d)}}),memo_and_not);
+}
+
+size_t bdd_deltail(size_t x, size_t args1, size_t args2, size_t bits) {
+	if (args1 == args2) return x;
+	bools ex(args1*bits, false);
+	sizes perm(args1*bits);
+	assert(args1 > args2);
+	for (size_t n = 0; n != args1*bits; ++n) perm[n] = n;
+	for (size_t n = args2; n != args1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			ex[POS(k, bits, n, args1)] = true;
+	for (size_t n = 0; n != args2; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			perm[POS(k, bits, n, args1)] = POS(k, bits, n, args2);
+	return bdd_permute(bdd_ex(x, ex), perm);
 }
 
 size_t bdd_deltail(size_t x, size_t h) {

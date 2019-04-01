@@ -73,7 +73,7 @@ sizes query::getdom() const {
 }
 
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t)
-	: bits(bits), nvars(t.args.size()*bits), e(from_term(t)) {}
+	: bits(bits), nvars(t.args.size()*bits), e(from_term(t)) {DBG(_t=t;) }
 
 size_t bdd_and_eq::operator()(size_t x) {
 	auto it = memo.find(x);

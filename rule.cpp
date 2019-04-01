@@ -111,9 +111,10 @@ rule::rule(matrix v, const vector<size_t*>& dbs, size_t bits, size_t dsz) :
 				for (b = 0; b != bits; ++b)
 					perm[POS(b, bits, j, ar)]=
 					POS(b,bits,varmap[v[i].args[j]],
-							arlen(vars_arity)) +
-					(varmap[v[i].args[j]] < arlen(harity)?0
-					:arlen(harity)*bits);
+							arlen(vars_arity));
+		//+
+		//			(varmap[v[i].args[j]] < arlen(harity)?0
+		//			:(arlen(harity)*bits));
 //					perm[b+j*bits]=
 //						b+varmap[v[i].args[j]]*bits;
 		q.emplace_back(bits, v[i], move(perm), v[i].neg);
@@ -134,11 +135,12 @@ size_t rule::fwd(size_t bits) {
 		vars = unary_builtins[n](vars);
 		DBG(printbdd(wcout<<"after builtin:"<<endl, vars,vars_arity,hrel)<<endl;)
 	}
-	if (bts) vars = ae(bdd_deltail((*bts)(vars), bits*arlen(harity)));
-	else vars = ae(bdd_deltail(vars, bits*arlen(harity)));
+	if (bts) vars = ae(bdd_deltail((*bts)(vars), arlen(vars_arity),
+		arlen(harity), bits));
+	else vars = ae(bdd_deltail(vars,arlen(vars_arity),arlen(harity),bits));
 //	if (bts) vars = bdd_and(head, bdd_deltail((*bts)(vars), bits*arlen(harity)));
 //	else vars = bdd_and(head, bdd_deltail(vars, bits*arlen(harity)));
-	DBG(printbdd(wcout<<"ae:"<<endl, vars,vars_arity,hrel)<<endl;)
+	DBG(printbdd(wcout<<"ae:"<<endl,vars,harity,hrel)<<endl;)
 	return vars;
 }
 
