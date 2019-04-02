@@ -100,7 +100,7 @@ int_t get_int_t(cws from, cws to) {
 	for (cws s = from; s != to; ++s) if (!iswdigit(*s))
 		parse_error(err_int, from);
 	wstring s(from, to - from);
-	try { r = stoll((const char*)s.c_str()); }
+	try { r = stoll(s); }
 	catch (...) { parse_error(err_int, from); }
 	return neg ? -r : r;
 }
