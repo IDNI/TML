@@ -123,7 +123,7 @@ builtin_res leq_const::operator()(const vector<char>& path, size_t arg,
 	bool bit;
 	size_t n = POS(bits-1, bits, arg, args);
 	for (; n <= POS(0, bits, arg, args); n += args)
-		switch (bit = (c & (1<<BIT(n,args,bits)/*(bits-n%bits-1)*/)), path[n]) {
+		switch (bit = (c & (1<<BIT(n,args,bits))), path[n]) {
 			case 0: return bit ? CONTBOTH : CONTLO;
 			case 1: if (!bit) return FAIL; break;
 			default:if (bit) return PASS;
@@ -136,7 +136,7 @@ builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
 	bool bit;
 	size_t n = POS(bits-1, bits, arg, args);
 	for (; n <= POS(0, bits, arg+1, args); n += args)
-		switch (bit = (c & (1<<(bits-n%bits-1))), path[n]) {
+		switch (bit = (c & (1<<BIT(n,args,bits))), path[n]) {
 			case 0: return bit ? CONTHI : CONTBOTH;
 			case 1: if (!bit) return PASS; break;
 			default:if (bit) return FAIL;

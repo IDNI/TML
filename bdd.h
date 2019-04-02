@@ -14,6 +14,7 @@
 #include <vector>
 #include <unordered_map>
 #include <array>
+#include <functional>
 #include "defs.h"
 #include "term.h"
 
@@ -25,6 +26,7 @@ extern std::vector<node> V;
 void bdd_init();
 size_t bdd_add(const node& n); //create new bdd node,standard implementation
 std::vector<std::vector<bool>> allsat(size_t x, size_t nv);
+void allsat(size_t x, size_t nvars, std::function<void(const bools&)> f);
 size_t from_bit(size_t x ,bool v);
 size_t bdd_or(size_t x, size_t y);
 size_t bdd_ex(size_t x, const bools&);

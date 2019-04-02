@@ -171,20 +171,6 @@ bool operator==(const lexeme& l, cws s) {
 		{elem::VAR, 0, get_var_lexeme(v2)}, \
 		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
 
-/*#define from_grammar_elem_builtin(r, b, v, v1, v2) \
-	array<raw_term, 2>{raw_term{ false, {\
-		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v)}, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}, \
-		{raw_term{false, {\
-		{elem::SYM, 0, b}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {1}}}}*/
-
 #define from_grammar_elem_builtin(r, b, v, v1, v2) { false, {\
 		{elem::SYM, 0, r}, \
 		{elem::OPENP, 0, get_lexeme(L"(")}, \
@@ -218,6 +204,14 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 }
 
 #define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
+#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, get_lexeme(s)})
+#define append_openp(x) (x).push_back({elem::OPENP, 0, get_lexeme(L"(")})
+#define append_closep(x) (x).push_back({elem::CLOSEP, 0, get_lexeme(L")")})
+#define cat(x, y) x.insert(x.end(), y.begin(), y.end())
+#define cat_in_brackets(x, y) \
+	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
+#define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
+#define term_close(x) append_closep((x).e), (x).calc_arity()
 
 array<raw_prog, 2> driver::transform_grammar(
 	const directive& d, const vector<production>& g, const wstring& s) {
@@ -254,18 +248,14 @@ array<raw_prog, 2> driver::transform_grammar(
 		}
 		r.r.push_back(l);
 	}
+	raw_term t;
+	append_sym_elem(t.e, L"S"), append_openp(t.e),
+	t.e.push_back({elem::NUM, 0, get_num_lexeme(0)}),
+	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
+	append_closep(t.e), r = transform_bwd(r, {t});
+	//r.delrel = dict_get_rel(L"try");
 	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
-
-#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, get_lexeme(s)})
-#define append_openp(x) (x).push_back({elem::OPENP, 0, get_lexeme(L"(")})
-#define append_closep(x) (x).push_back({elem::CLOSEP, 0, get_lexeme(L")")})
-#define cat(x, y) x.insert(x.end(), y.begin(), y.end())
-
-#define cat_in_brackets(x, y) \
-	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
-#define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
-#define term_close(x) append_closep((x).e), (x).calc_arity()
 
 void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
 	for (const raw_rule& t : g) {
@@ -285,7 +275,33 @@ array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 	return { r, _r };
 }
 
-void driver::transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r) {
+#define surround_term(x, y, z) \
+	append_sym_elem(x.e, y), cat_in_brackets(x, z), x.calc_arity()
+
+raw_prog driver::transform_bwd(const raw_prog& p,const std::vector<raw_term>&g){
+	raw_prog r;
+	for (const raw_term& t : g) { // try(goal)
+		raw_term x;
+		surround_term(x, L"try", t), r.r.push_back(raw_rule(x));
+	}
+	for (const raw_rule& x : p.r) {
+		for (const raw_term& h : x.heads()) { // h :- ..., try(h)
+			raw_rule y(h);
+			for (const raw_term& b : x.bodies()) y.add_body(b);
+			raw_term t;
+			surround_term(t, L"try", h), y.add_body(t),
+			r.r.push_back(y), y.clear(), y.add_body(t);
+			for (const raw_term& b : x.bodies()) { // try(b):-try(h)
+				raw_term w;
+				surround_term(w, L"try", b), y.add_head(w);
+			}
+			r.r.push_back(y);
+		}
+	}
+	return r;
+}
+
+void driver::transform_proofs(const raw_rule& x, raw_prog& r, raw_prog& _r) {
 	if (!x.nbodies()) return;
 	size_t n = 0;
 nxthead:const raw_term &head = x.head(n);
@@ -372,6 +388,19 @@ driver::driver(raw_progs rp, bool print_transformed) {
 }
 
 bool driver::pfp() { return prog->pfp() ? printdb(wcout, prog), true : false; }
+
+template<typename F>
+void driver::from_bits(size_t x, ints art, int_t rel, F f) const {
+	allsat(x, bits * arlen(art), [art, rel, f, this](const bools& p) {
+		const size_t ar = arlen(art);
+		term v(false, rel, ints(ar, 0), art);
+		for (size_t i = 0; i != ar; ++i)
+			for (size_t b = 0; b != bits; ++b)
+				if (p[POS(b, bits, i, ar)])
+					v.args[i] |= 1 << b;
+		f(v);
+	});
+}
 
 matrix driver::from_bits(size_t x, ints art, int_t rel) const {
 	const size_t ar = arlen(art);
@@ -466,8 +495,11 @@ wostream& driver::printdb(wostream& os, lp *p) const {
 		if (builtin_rels.find(x.first.first) == builtin_rels.end()) {
 //			for (int_t i : x.first.second) wcout << i << ' ';
 //			wcout << endl;
-			printbdd(os, from_bits(*x.second,
-				x.first.second,x.first.first));
+			from_bits(*x.second, x.first.second,x.first.first, 
+				[&os,this](const term&t){
+				print_term(os, t)<<endl;});
+//			printbdd(os, from_bits(*x.second,
+//				x.first.second,x.first.first));
 		}
 	return os;
 }

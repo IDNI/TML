@@ -44,6 +44,8 @@ class driver {
 	std::set<cws, wstrcmp> strs_extra;
 	std::set<size_t> builtin_rels;//, builtin_symbdds;
 	matrix from_bits(size_t x, ints art, int_t rel) const;
+	template<typename F>
+	void from_bits(size_t x, ints art, int_t rel, F f) const;
 	term one_from_bits(size_t x, ints art, int_t rel) const;
 
 	bool mult = false;
@@ -63,6 +65,7 @@ class driver {
 	std::wstring directive_load(const directive& d);
 	std::map<lexeme, std::wstring> directives_load(
 		const std::vector<directive>& p);
+	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
 	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
 	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r);
 	std::array<raw_prog, 2> transform_proofs(
