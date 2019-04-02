@@ -100,7 +100,7 @@ void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 			if (i < 0) (t.neg ? bnegvars : bposvars).insert(i);
 	if (bnegvars.empty()) return;
 	for (const term& t : h)
-		if (t.neg)
+		if (!t.neg)
 			for (int_t i : t.args)
 				if (i < 0) hposvars.insert(i);
 	for (int_t i : bposvars) bnegvars.erase(i);
