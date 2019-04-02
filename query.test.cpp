@@ -39,12 +39,27 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 	return r;
 }
 */
+
+void from_range(size_t max, size_t bits, size_t arg, size_t args, size_t &r) {
+	size_t x = F;
+	for (size_t n = 0; n <= max; ++n)
+		x = bdd_or(x, from_int(n, bits, arg, args));
+	r = bdd_and(r, x);
+}
+
 void test_query() {
-	size_t bits = 3, ar = 1, leq = 4, geq = 3;
-	builtins<leq_const> l1(bits, bits*ar, leq_const({0}, leq, bits));
-	builtins<geq_const> g1(bits, bits*ar, geq_const({0}, geq, bits));
-	wcout << allsat(l1(T), bits*ar) << endl << endl;
-	wcout << allsat(g1(T), bits*ar) << endl;
+	size_t bits = 3, arg = 2, args = 3;
+	for (bits = 1; bits < 10; ++bits)
+	for (size_t n = 1; n != (size_t)(1<<bits); ++n) {
+		wcout<<"max: "<<n<<" bits: "<<bits<<endl;
+		builtins<leq_const> l1({arg},bits,args,leq_const(n,bits,args));
+		size_t x = T, y = l1(T);
+		from_range(n, bits, arg, args, x);
+		auto l = allsat(y, bits*args);
+		auto r = allsat(x, bits*args);
+		wcout <<"l:"<<endl<< l << endl <<"r:"<<endl<< r << endl;
+		assert(x == y);
+	}
 	exit(0);
 
 /*	size_t bits = 3, x = F, ar, r, f;

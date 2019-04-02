@@ -118,17 +118,11 @@ size_t bdd_and_eq::operator()(const size_t x) {
 	return m[x] = bdd_and_many(v);
 }
 
-builtin_res leq_const::operator()(const vector<char>& path, size_t arg,
-	size_t v) const {
-	bool bit;
-	size_t n = POS(bits-1, bits, arg, args);
-	for (; n <= POS(0, bits, arg, args); n += args)
-		switch (bit = (c & (1<<BIT(n,args,bits))), path[n]) {
-			case 0: return bit ? CONTBOTH : CONTLO;
-			case 1: if (!bit) return FAIL; break;
-			default:if (bit) return PASS;
-		}
-	return v == args*bits ? PASS : CONTBOTH;
+builtin_res leq_const::operator()(const bools& path, size_t arg, size_t v)const{
+	return	path[v] ? (c&(1<<(BIT(v,args,bits)))) ? 
+		v == POS(0, bits, arg, args) ? PASS : CONTBOTH : FAIL :
+		(c&(1<<(BIT(v,args,bits)))) ||
+		v == POS(0, bits, arg, args)	? PASS : CONTBOTH;
 }
 
 builtin_res geq_const::operator()(const vector<char>& path, size_t arg,

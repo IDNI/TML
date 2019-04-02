@@ -29,8 +29,8 @@ size_t fact(term v, size_t bits, size_t dsz) {
 	if (!m.empty()) {
 		sizes domain;
 		for (auto x : m) domain.push_back(x.second);
-			r = builtins<leq_const>(domain, bits, v.args.size(),
-				leq_const(dsz-1, bits, v.args.size()))(r);
+		r = builtins<leq_const>(domain, bits, v.args.size(),
+			leq_const(dsz-1, bits, v.args.size()))(r);
 		for (size_t j = 0; j != v.args.size(); ++j)
 			if (v.args[j] >= 0) continue;
 			else for (size_t b = 0; b != bits; ++b)
@@ -42,7 +42,7 @@ size_t fact(term v, size_t bits, size_t dsz) {
 							v.args.size())));
 	}
 	if (v.neg) r = bdd_and_not(T, r);
-	//DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+//	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;

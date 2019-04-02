@@ -44,33 +44,33 @@ template<typename T> T sort(const T& x);
 template<typename func> class builtins {
 	const size_t bits, args, nvars;
 	sizes domain;
-	std::vector<char> path;
+	bools path;
 	sizes getdom() const;
 	int_t get_int(size_t pos) const;
 	std::unordered_map<size_t, size_t> memo;
 	func f;
 
 	size_t compute(size_t x, size_t v) {
+		if (leaf(x) && !trueleaf(x)) return F;
 		const size_t arg = ARG(v, args);
-		if (leaf(x) && (!trueleaf(x) || v == nvars))
-			return trueleaf(x) ? f(path, arg, v) == FAIL ? F : T :F;
-		node n = getnode(x);
-		assert(v<nvars);
-		if (!has(domain, arg))
-			return	++v, bdd_add({{v, compute(n[1], v),
-				compute(n[2], v)}});
-		if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
+		if (!has(domain, arg)) return compute(x, v+1);
+		size_t h, l;
+		const node n = getnode(x);
+		path[v] = true;
 		switch (f(path, arg, v)) {
-			case FAIL: return F;
-			case CONTHI:path[v] = 1;
-				   return bdd_add({{v+1,compute(n[1],v+1),F}});
-			case CONTLO:path[v] = -1;
-				    return bdd_add({{v+1,F,compute(n[2],v+1)}});
-			case PASS: return T;
-			default: ;
+			case FAIL: h = F; break;
+			case PASS: h = T; break;
+			case CONTBOTH: h = compute(n[1], v+1); break;
+			default: throw 0;
 		}
-		return	path[v] = 1, x = compute(n[1], v+1), path[v++] = -1,
-			bdd_add({{v, x, compute(n[2], v)}});
+		path[v] = false;
+		switch (f(path, arg, v)) {
+			case FAIL: l = F; break;
+			case PASS: l = T; break;
+			case CONTBOTH: l = compute(n[2], v+1); break;
+			default: throw 0;
+		}
+		return bdd_add({{v+1, h, l}});
 	}
 public:
 	builtins(const sizes& domain, size_t bits, size_t args, func f) 
@@ -89,8 +89,7 @@ struct leq_const {
 	const size_t bits, args;
 	leq_const(int_t c, size_t bits, size_t args) : c(c), bits(bits)
 		, args(args) { assert(c < (1<<bits)); }
-	builtin_res operator()(const std::vector<char>& path, size_t arg,
-		size_t var) const;
+	builtin_res operator()(const bools& path, size_t arg, size_t var) const;
 };
 
 struct geq_const {
@@ -101,7 +100,7 @@ struct geq_const {
 	builtin_res operator()(const std::vector<char>& path, size_t arg,
 		size_t var) const;
 };
-
+/*
 template<typename func> struct unary_builtin {
 	const std::set<int_t> vals;
 	const bool neg;
@@ -120,7 +119,7 @@ template<typename func> struct unary_builtin {
 		, args(args), lt(*vals.rbegin(), bits, args)
 		, gt(*vals.begin(), bits, args) {}
 
-	builtin_res operator()(const std::vector<char>& path, size_t arg,
+	builtin_res operator()(const bools& path, size_t arg,
 		size_t var) const {
 		if (ARG(var, args) != arg) return CONTBOTH;
 		builtin_res l = lt(path, arg, var);
@@ -140,4 +139,4 @@ template<typename func> struct unary_builtin {
 		return	neg ? vals.find(v) != vals.end() ? PASS : FAIL :
 			vals.find(v) == vals.end() ? PASS : FAIL;
 	}
-};
+};*/
