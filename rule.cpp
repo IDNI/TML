@@ -77,7 +77,7 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
 		hperm[n].resize(bits * (maxhlen + nvars));
 		for (size_t j = 0; j != hperm[n].size(); ++j) hperm[n][j] = j;
 		hrel[n] = h[n].rel, harity[n] = h[n].arity, neg[n] = h[n].neg;
-		ae.emplace_back(bits, h[n], neg[n]);
+		ae.emplace_back(bits, h[n], false);
 	}
 	varmap m;
 	for (size_t n = 0; n != b.size(); ++n)
@@ -118,23 +118,23 @@ sizes rule::fwd(size_t bits) {
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
-		//DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
-		//	ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
+			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
 	if (F == (vars = bdd_and_many(v))) return {};
-	//DBG(printbdd(wcout<<"q"<<endl,vars,
-	//	ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+	DBG(printbdd(wcout<<"q"<<endl,vars,
+		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
 		r[k] = bdd_permute(vars, hperm[k]);
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
 		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
-		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		//DBG(bdd_out(wcout, r[k])<<endl;)
+		DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(bdd_out(wcout, r[k])<<endl;)
 		if (bts) r[k] = (*bts)(r[k]);
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), bits);
-		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
-		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 	}
 	return r;
 }

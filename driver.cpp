@@ -305,11 +305,6 @@ nxthead:const raw_term &head = x.head(n);
 		cat(z.head(0).e, x.body(n).e), term_close(z.head(0)),
 		z.add_body(gh), z.add_body(y.head(0)), r.r.push_back(z),
 		z.clear();
-//		y.head(0).neg = gh.neg = z.head(0).neg = true,
-		// ~W((h)(b1)...) :- ~G(b1).
-//		_r.r.emplace_back(y.head(0), gh),
-//		_r.r.emplace_back(y.head(0), z.head(0)),
-//		y.head(0).neg = gh.neg = false, z.clear();
 	// ~W((h)(b1)...) :- ~G(h), ~G(b1)....
 	// ! W(...)
 	y.head(0).neg = gh.neg = true, z = raw_rule(y.head(0), gh);

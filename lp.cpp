@@ -107,8 +107,8 @@ void lp::fwd(diff_t &add, diff_t &del) {
 			t = bdd_or(x[n], t);
 		}
 	}
-	//DBG(printdiff(wcout<<"add:"<<endl,add););
-	//DBG(printdiff(wcout<<"del:"<<endl,del););
+	DBG(printdiff(wcout<<"add:"<<endl,add););
+	DBG(printdiff(wcout<<"del:"<<endl,del););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 

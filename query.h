@@ -18,7 +18,7 @@ class bdd_and_eq {
 	const ints e;
 	const bool neg;
 	DBG(term _t;)
-	std::unordered_map<size_t, size_t> memo;
+	std::unordered_map<size_t, size_t> memo, negmemo;
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
 	size_t operator()(const size_t x);

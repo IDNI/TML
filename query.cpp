@@ -98,25 +98,24 @@ bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg)
 	{DBG(_t=t;) }
 
 size_t bdd_and_eq::operator()(const size_t x) {
-	auto it = memo.find(x);
-	if (it != memo.end()) return it->second;
+	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
+	auto it = m.find(x);
+	if (it != m.end()) return it->second;
 	vector<size_t> v = {x};
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n] > 0) 
 			v.push_back(from_int(e[n]-1, bits, n, e.size()));
-//	x = bdd_and_many(v, 0, v.size());
-//	v = {x};
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n] < 0)
 			for (size_t k = 0; k != bits; ++k)
 				v.push_back(from_eq(POS(k, bits, n, e.size()),
 					POS(k, bits, -e[n]-1, e.size())));
 	if (neg) {
-		if (v.size() == 1) return memo[x] = bdd_and_not(T, v[0]);
+		if (v.size() == 1) return m[x] = bdd_and_not(T, v[0]);
 		v.push_back(bdd_and_not(v[1], v[0])),
 		v.erase(v.begin(), v.begin()+1);
 	}
-	return memo[x] = bdd_and_many(v);
+	return m[x] = bdd_and_many(v);
 }
 
 builtin_res leq_const::operator()(const vector<char>& path, size_t arg,
