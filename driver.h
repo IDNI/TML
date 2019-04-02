@@ -63,8 +63,8 @@ class driver {
 	std::wstring directive_load(const directive& d);
 	std::map<lexeme, std::wstring> directives_load(
 		const std::vector<directive>& p);
-	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r,
-		const std::vector<raw_rule>& g);
+	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
+	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r);
 	std::array<raw_prog, 2> transform_proofs(
 		const std::vector<raw_prog> p,
 		const std::vector<raw_rule>& g);

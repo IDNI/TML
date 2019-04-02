@@ -262,51 +262,52 @@ array<raw_prog, 2> driver::transform_grammar(
 #define append_closep(x) (x).push_back({elem::CLOSEP, 0, get_lexeme(L")")})
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
 
+#define cat_in_brackets(x, y) \
+	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
+#define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
+#define term_close(x) append_closep((x).e), (x).calc_arity()
+
+void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
+	for (const raw_rule& t : g) {
+		raw_term gg;
+		cat_relsym_openp(gg, L"G"), cat(gg.e, t.head(0).e),
+		term_close(gg), r.r.emplace_back(gg, t.head(0));
+	}
+}
+
 array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 	const std::vector<raw_rule>& g) {
 	raw_prog r, _r;
-	for (const raw_prog p : rp)
-		for (const raw_rule& x : p.r)
-			transform_proofs(x, r, _r, g);
+	for (const raw_prog p : rp) {
+		for (const raw_rule& x : p.r) transform_proofs(x, r, _r);
+		insert_goals(r, g);
+	}
 	return { r, _r };
 }
 
-void driver::transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r,
-	const std::vector<raw_rule>& g) {
-	if (x.nbodies() == 1) return;
-	// W((h)(b1)(b2)...):-h,b1,b2...
-	raw_rule y;
-	y.add_head({}), y.head(0).neg = false;
+void driver::transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r) {
+	if (!x.nbodies()) return;
+	raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
 	for (const raw_term& t : x.bodies()) y.add_body(t);
-	append_sym_elem(y.head(0).e, L"W"), append_openp(y.head(0).e);
-	for (const raw_term& t : x.bodies()) 
-		append_openp(y.head(0).e), cat(y.head(0).e, t.e),
-		append_closep(y.head(0).e);
-	append_closep(y.head(0).e), y.head(0).calc_arity(), r.r.push_back(y);
-	// G(b1) :- G(h), W((h)(b1)...)
+	y.add_head({}), cat_relsym_openp(y.head(0), L"W");
+	for (const raw_term& t : x.bodies()) cat_in_brackets(y.head(0), t);
+	term_close(y.head(0)), r.r.push_back(y);
+	// G(b1) :- G(h), W((h)(b1)...) FIXME: go over all heads
 	raw_term gh;
-	gh.neg = false, append_sym_elem(gh.e, L"G"), append_openp(gh.e),
-	cat(gh.e, x.head(0).e), append_closep(gh.e), gh.calc_arity();
-	for (const raw_rule& t : g) {
-		raw_term gg;
-		gg.neg = false, append_sym_elem(gg.e, L"G"),
-		append_openp(gg.e), cat(gg.e, t.head(0).e), append_closep(gg.e),
-		gg.calc_arity(), r.r.emplace_back(gg, t.head(0));
-	}
+	cat_relsym_openp(gh, L"G"), cat(gh.e, x.head(0).e), term_close(gh);
 	raw_rule z;
 	for (size_t n = 0; n != x.nbodies(); ++n)
-		z.add_head({}), z.head(0).neg = false,
-		append_sym_elem(z.head(0).e, L"G"), append_openp(z.head(0).e),
-		cat(z.head(0).e, x.body(n).e), append_closep(z.head(0).e),
-		z.add_body(gh), z.add_body(y.head(0)), z.head(0).calc_arity(),
-		r.r.push_back(z), y.head(0).neg = gh.neg = z.head(0).neg = true,
+		z.add_head({}), cat_relsym_openp(z.head(0), L"G"),
+		cat(z.head(0).e, x.body(n).e), term_close(z.head(0)),
+		z.add_body(gh), z.add_body(y.head(0)), r.r.push_back(z),
+		y.head(0).neg = gh.neg = z.head(0).neg = true,
 		// ~W((h)(b1)...) :- ~G(b1).
 		_r.r.emplace_back(y.head(0), gh),
 		_r.r.emplace_back(y.head(0), z.head(0)),
 		y.head(0).neg = gh.neg = false, z.clear();
 	// ~W((h)(b1)...) :- ~G(h).
 	// ! W(...)
-	y.head(0).neg=gh.neg=true, _r.r.emplace_back(y.head(0), gh),
+	y.head(0).neg = gh.neg = true, _r.r.emplace_back(y.head(0), gh),
 	_r.delrel = dict_get_rel(L"G");
 }
 
