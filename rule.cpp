@@ -18,7 +18,7 @@
 using namespace std;
 
 size_t fact(term v, size_t bits, size_t dsz) {
-	DBG(wcout<<"add fact:"<<v<<endl;)
+	//DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity == ints{0}) return T;
 	size_t r = T;
 	rule::varmap m;
@@ -42,7 +42,7 @@ size_t fact(term v, size_t bits, size_t dsz) {
 							v.args.size())));
 	}
 	if (v.neg) r = bdd_and_not(T, r);
-	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+	//DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;
@@ -65,7 +65,7 @@ sizes rule::get_perm(const term& b, varmap& m, size_t bits) {
 
 rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
 	size_t dsz) : dbs(dbs) {
-	DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
+	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
 	hperm.resize(h.size()), hrel.resize(h.size()), harity.resize(h.size()),
 	neg.resize(h.size()), maxhlen = 0;
 	for (const term& t : h) maxhlen = max(maxhlen, t.args.size());
@@ -118,23 +118,23 @@ sizes rule::fwd(size_t bits) {
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
-		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
-			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+		//DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
+		//	ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
 	if (F == (vars = bdd_and_many(v))) return {};
-	DBG(printbdd(wcout<<"q"<<endl,vars,
-		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+	//DBG(printbdd(wcout<<"q"<<endl,vars,
+	//	ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
 		r[k] = bdd_permute(vars, hperm[k]);
-		DBG(printbdd(wcout<<"perm:"<<endl,r[k],
-				ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
-		DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		DBG(bdd_out(wcout, r[k])<<endl;)
+		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
+		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		//DBG(bdd_out(wcout, r[k])<<endl;)
 		if (bts) r[k] = (*bts)(r[k]);
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), bits);
-		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		DBG(bdd_out(wcout, r[k])<<endl;)
+		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
-		DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 	}
 	return r;
 }

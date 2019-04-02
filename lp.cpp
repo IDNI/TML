@@ -97,7 +97,7 @@ lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz,
 }
 
 void lp::fwd(diff_t &add, diff_t &del) {
-	DBG(printdb(wcout, this));
+	//DBG(printdb(wcout, this));
 	for (rule* r : rules) {
 		const sizes x = r->fwd(bits);
 		if (x.empty()) continue;
@@ -107,9 +107,9 @@ void lp::fwd(diff_t &add, diff_t &del) {
 			t = bdd_or(x[n], t);
 		}
 	}
-	DBG(printdiff(wcout<<"add:"<<endl,add););
-	DBG(printdiff(wcout<<"del:"<<endl,del););
-	DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
+	//DBG(printdiff(wcout<<"add:"<<endl,add););
+	//DBG(printdiff(wcout<<"del:"<<endl,del););
+	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
 /*void lp::align(const db_t& d, size_t pbits, size_t bits) {

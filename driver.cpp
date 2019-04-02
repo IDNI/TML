@@ -287,28 +287,38 @@ array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 
 void driver::transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r) {
 	if (!x.nbodies()) return;
+	size_t n = 0;
+nxthead:const raw_term &head = x.head(n);
 	raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
+	y.add_body(head);
 	for (const raw_term& t : x.bodies()) y.add_body(t);
 	y.add_head({}), cat_relsym_openp(y.head(0), L"W");
+	cat_in_brackets(y.head(0), head);
 	for (const raw_term& t : x.bodies()) cat_in_brackets(y.head(0), t);
 	term_close(y.head(0)), r.r.push_back(y);
-	// G(b1) :- G(h), W((h)(b1)...) FIXME: go over all heads
+	// G(b1) :- G(h), W((h)(b1)...)
 	raw_term gh;
-	cat_relsym_openp(gh, L"G"), cat(gh.e, x.head(0).e), term_close(gh);
+	cat_relsym_openp(gh, L"G"), cat(gh.e, head.e), term_close(gh);
 	raw_rule z;
 	for (size_t n = 0; n != x.nbodies(); ++n)
 		z.add_head({}), cat_relsym_openp(z.head(0), L"G"),
 		cat(z.head(0).e, x.body(n).e), term_close(z.head(0)),
 		z.add_body(gh), z.add_body(y.head(0)), r.r.push_back(z),
-		y.head(0).neg = gh.neg = z.head(0).neg = true,
+		z.clear();
+//		y.head(0).neg = gh.neg = z.head(0).neg = true,
 		// ~W((h)(b1)...) :- ~G(b1).
-		_r.r.emplace_back(y.head(0), gh),
-		_r.r.emplace_back(y.head(0), z.head(0)),
-		y.head(0).neg = gh.neg = false, z.clear();
-	// ~W((h)(b1)...) :- ~G(h).
+//		_r.r.emplace_back(y.head(0), gh),
+//		_r.r.emplace_back(y.head(0), z.head(0)),
+//		y.head(0).neg = gh.neg = false, z.clear();
+	// ~W((h)(b1)...) :- ~G(h), ~G(b1)....
 	// ! W(...)
-	y.head(0).neg = gh.neg = true, _r.r.emplace_back(y.head(0), gh),
-	_r.delrel = dict_get_rel(L"G");
+	y.head(0).neg = gh.neg = true, z = raw_rule(y.head(0), gh);
+	for (size_t n = 0; n != x.nbodies(); ++n)
+		z.add_body({}), cat_relsym_openp(z.body(n+1), L"G"),
+		z.body(n+1).neg = true, cat(z.body(n+1).e, x.body(n).e),
+		term_close(z.body(n+1));
+	_r.r.emplace_back(z), _r.delrel = dict_get_rel(L"G");
+	if (++n < x.nheads()) goto nxthead;
 }
 
 vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog p) {
