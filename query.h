@@ -51,15 +51,16 @@ template<typename func> class builtins {
 	func f;
 
 	size_t compute(size_t x, size_t v) {
-		if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
+		const size_t arg = ARG(v, args);
+		if (leaf(x) && (!trueleaf(x) || v == nvars))
+			return trueleaf(x) ? f(path, arg, v) == FAIL ? F : T :F;
 		node n = getnode(x);
 		assert(v<nvars);
-		const size_t arg = ARG(v, args);
 		if (!has(domain, arg))
 			return	++v, bdd_add({{v, compute(n[1], v),
 				compute(n[2], v)}});
 		if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-		switch (f(path, arg, v+1)) {
+		switch (f(path, arg, v)) {
 			case FAIL: return F;
 			case CONTHI:path[v] = 1;
 				   return bdd_add({{v+1,compute(n[1],v+1),F}});
