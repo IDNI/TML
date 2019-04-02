@@ -12,11 +12,11 @@
 // modified over time by the Author.
 
 struct term {
-	enum builtins { NONE, ALPHA, DIGIT, ALNUM, SPACE };
+//	enum builtins { NONE, ALPHA, DIGIT, ALNUM, SPACE };
 	bool neg;
 	int_t rel;
 	ints args, arity;
-	builtins b;
+//	builtins b = NONE;
 	term () {}
 	term(bool neg, int_t rel) : neg(neg), rel(rel) {}
 	term(bool neg, int_t rel, const ints& args,
@@ -33,6 +33,7 @@ struct term {
 typedef std::vector<size_t> sizes;
 typedef std::vector<term> matrix;
 typedef std::set<matrix> matrices;
+typedef std::set<std::pair<matrix, matrix>> matpairs;
 std::wostream& operator<<(std::wostream& os, const term& t);
 std::wostream& operator<<(std::wostream& os, const matrix& m);
 std::wostream& operator<<(std::wostream& os, const matrices& m);

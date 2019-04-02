@@ -52,7 +52,12 @@ bool lp::add_fact(const term& x) {
 	return add_fact(fact(x, bits, dsz), x.rel, x.arity), true;
 }
 
-lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
+bool lp::add_facts(const matrix& x) {
+	for (auto y : x) if (!add_fact(y)) return false; // FIXME
+	return true;
+}
+
+lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz,
 	const strs_t& strs, lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz)
 	, delrel(delrel), strs(strs) {
 	//wcout<<r<<endl;
@@ -65,20 +70,26 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
 		if (t.size()-1 > ar) er(err_goalarity);
 		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
 	bits = msb(dsz);*/
-	for (const matrix& m : r)
-		for (const term& t : m)
+	for (const auto& m : r) {
+		for (const term& t : m.first)
 			*(db[{t.rel, t.arity}] = new size_t) = F;
-	for (const matrix& m : r)
- 		if (m.size() == 1) {
-			if (!add_fact(m[0]))
-				(wcout << L"contradictory fact: "<<m[0]<<endl),
+		for (const term& t : m.second)
+			*(db[{t.rel, t.arity}] = new size_t) = F;
+	}
+	for (const auto& m : r)
+ 		if (m.second.empty()) {
+			if (!add_facts(m.first))
+				// FIXME
+//				(wcout << L"contradictory fact: "<<m[0]<<endl),
 				exit(0);
 		} else {
 			vector<size_t*> dbs;
-			for (size_t n = 1; n < m.size(); ++n)
-				if (m[n].b == term::NONE)
-					dbs.push_back(db[{m[n].rel,m[n].arity}]);
-			rules.emplace_back(new rule(m, dbs, bits, dsz));
+			for (size_t n = 0; n < m.second.size(); ++n)
+//				if (m.second[n].b == term::NONE)
+				dbs.push_back(db[{m.second[n].rel,
+					m.second[n].arity}]);
+			rules.emplace_back(
+				new rule(m.first, m.second, dbs, bits, dsz));
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
@@ -87,9 +98,15 @@ lp::lp(matrices r, matrix g, int_t delrel, size_t dsz,
 
 void lp::fwd(diff_t &add, diff_t &del) {
 	DBG(printdb(wcout, this));
-	for (rule* r : rules)
-		(r->neg ? del : add)[{r->hrel, r->harity}] = bdd_or(r->fwd(bits)
-				,(r->neg?del:add)[{r->hrel, r->harity}]);
+	for (rule* r : rules) {
+		const sizes x = r->fwd(bits);
+		if (x.empty()) continue;
+		for (size_t n = 0; n != x.size(); ++n) {
+			size_t &t = (r->neg[n] ? del : add)
+				[{r->hrel[n], r->harity[n]}];
+			t = bdd_or(x[n], t);
+		}
+	}
 	DBG(printdiff(wcout<<"add:"<<endl,add););
 	DBG(printdiff(wcout<<"del:"<<endl,del););
 	DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
@@ -207,10 +224,12 @@ lp::~lp() {
 //	if (proof1) delete proof1, delete proof2;
 }
 
-wostream& out(wostream& os,size_t n){ return out(os<<L'['<<n<<L']',getnode(n)); }
-wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
-	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
-		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
+wostream& bdd_out(wostream& os,size_t n){
+	return bdd_out(os<<L'['<<n<<L']',getnode(n));
+}
+wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
+	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') : (bdd_out(
+		os<<n[0]<<L'?',getnode(n[1])),bdd_out(os<<L':',getnode(n[2])));
 }
 wostream& operator<<(wostream& os, const term& t) {
 	os << t.rel << ' ';

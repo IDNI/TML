@@ -113,11 +113,12 @@ size_t bdd_ex(size_t x, const bools& b) {
 	if (it != memo_ex.end()) return it->second;
 	size_t res;
 #endif	
-	while (b[n[0]-1]) {
+	while (n[0]-1 < b.size() && b[n[0]-1]) {
 		x = bdd_or(n[1], n[2]);
 		if (leaf(x)) apply_ret(x, memo_ex);
 		n = getnode(x);
 	}
+	if (n[0]-1 >= b.size()) return x;
 	apply_ret(bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}}), memo_ex);
 }
 
@@ -166,13 +167,12 @@ size_t bdd_deltail(size_t x, size_t args1, size_t args2, size_t bits) {
 	bools ex(args1*bits, false);
 	sizes perm(args1*bits);
 	assert(args1 > args2);
-	for (size_t n = 0; n != args1*bits; ++n) perm[n] = n;
-	for (size_t n = args2; n != args1; ++n)
+	size_t n;
+	for (n = 0; n != args1*bits; ++n) perm[n] = n;
+	for (n = 0; n != args1; ++n)
 		for (size_t k = 0; k != bits; ++k)
-			ex[POS(k, bits, n, args1)] = true;
-	for (size_t n = 0; n != args2; ++n)
-		for (size_t k = 0; k != bits; ++k)
-			perm[POS(k, bits, n, args1)] = POS(k, bits, n, args2);
+			if (n >= args2) ex[POS(k, bits, n, args1)] = true;
+			else perm[POS(k,bits,n,args1)] = POS(k,bits,n,args2);
 	return bdd_permute(bdd_ex(x, ex), perm);
 }
 
@@ -315,12 +315,11 @@ bool bdd_onesat(size_t x, size_t nvars, bools& r) {
 
 size_t from_int(size_t x, size_t bits, size_t arg, size_t args) {
 	size_t r = T, b = bits;
-	while (b--)
-		r = bdd_and(r, from_bit(POS(b, bits, arg, args), x&(1<<b)));
+	while (b--) r = bdd_and(r, from_bit(POS(b, bits, arg, args), x&(1<<b)));
 	return r;
 }
-/*
-size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
+
+/*size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	if (prev == curr) return x;
 	assert(prev < curr);
 	size_t t = T, n, k;
@@ -332,8 +331,8 @@ size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
 	}
 	return bdd_and(t, bdd_permute(x, v));
 }
-*/
-/*void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
+
+void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
 	size_t x = F;
 	for (size_t n = 0; n < max; ++n)
 		x = bdd_or(x, from_int(n, bits, offset));

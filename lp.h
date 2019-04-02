@@ -26,6 +26,7 @@ class lp { // [pfp] logic program
 	std::vector<struct rule*> rules;
 	void add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
+	bool add_facts(const matrix& x);
 	size_t gbdd = F;
 	lp *prev;
 public:
@@ -37,7 +38,7 @@ public:
 	const int_t delrel;
 	const strs_t strs;
 
-	lp(matrices r, matrix g, int_t delrel, size_t dsz, const strs_t&,
+	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
 		lp *prev = 0);
 	void fwd(diff_t &add, diff_t &del);
 	bool pfp();
@@ -46,7 +47,7 @@ public:
 	~lp();
 };
 
-std::wostream& out(std::wostream& os, const node& n); // print bdd in ?: syntax
-std::wostream& out(std::wostream& os, size_t n);
+std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax
+std::wostream& bdd_out(std::wostream& os, size_t n);
 extern int_t null;
 #endif

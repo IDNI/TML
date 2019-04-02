@@ -39,6 +39,6 @@ typedef std::vector<bools> vbools;
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #endif
-#define POS(bit, bits, arg, args) ((bits - (bit) - 1)*(args)+(arg))
-#define ARG(pos, args) ((pos)%(args))
-#define BIT(pos, args, bits) (bits-((pos)/(args))-1)
+#define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
+#define ARG(pos, args) ((pos) % (args))
+#define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)

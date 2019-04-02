@@ -26,8 +26,8 @@ public:
 
 class query {
 	const bools ex;
-	const sizes perm;
 	const bool neg;
+	sizes perm;
 	bdd_and_eq ae;
 //	sizes getdom() const;
 	std::unordered_map<size_t, size_t> memo, negmemo;

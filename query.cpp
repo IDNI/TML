@@ -53,7 +53,7 @@ bools get_ex(const term& t, size_t bits) {
 
 
 query::query(size_t bits, const term& t, const sizes& perm, bool neg) 
-	: ex(get_ex(t, bits)), perm(perm), neg(neg), ae(bits, t, neg) {}
+	: ex(get_ex(t, bits)), neg(neg), perm(perm), ae(bits, t, neg) {}
 
 #define flip(n) nleaf(n) ? (n) : \
 	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
@@ -103,8 +103,7 @@ size_t bdd_and_eq::operator()(const size_t x) {
 	vector<size_t> v = {x};
 	for (size_t n = 0; n != e.size(); ++n)
 		if (e[n] > 0) 
-			for (size_t k = 0; k != bits; ++k)
-				v.push_back(from_int(e[n]-1,bits,n,e.size()));
+			v.push_back(from_int(e[n]-1, bits, n, e.size()));
 //	x = bdd_and_many(v, 0, v.size());
 //	v = {x};
 	for (size_t n = 0; n != e.size(); ++n)

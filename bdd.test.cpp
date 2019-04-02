@@ -19,11 +19,13 @@
 
 using namespace std;
 
-wostream& out(wostream& os, const node& n) { //print bdd in ?: syntax
+wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
 	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') :
 		(out(os<<n[0]<<L'?',getnode(n[1])),out(os<<L':',getnode(n[2])));
 }
-wostream& out(wostream& os,size_t n){return out(os<<L'['<<n<<L']',getnode(n));}
+wostream& bdd_out(wostream& os,size_t n){
+	return bdd_out(os<<L'['<<n<<L']',getnode(n));
+}
 wostream& operator<<(wostream& os, const struct tt& t);
 
 wostream& operator<<(wostream& os, const ints& t) {

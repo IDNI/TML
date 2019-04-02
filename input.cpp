@@ -44,6 +44,7 @@ using namespace std;
 #define err_relsym_expected L"expected relation name in beginning of term.\n"
 #define err_paren_expected \
 	L"expected parenthesis after a nonzero arity relation symbol.\n"
+#define err_head L"expected dot or comma or update operator.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -149,17 +150,16 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	if ((goal = *l[pos][0] == L'!'))
 		if ((pgoal = *l[++pos][0] == L'!'))
 			++pos;
-	b.resize(1);
-	if (!b[0].parse(l, pos)) return pos = curr, false;
+head:	h.emplace_back();
+	if (!h.back().parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos][0] != ':' || l[pos][0][1] != L'-') return pos = curr, false;
+	if (*l[pos][0] == ',') { ++pos; goto head; }
+	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
+		parse_error(err_head, l[pos]);
 	++pos;
-	raw_term t;
-	while (t.parse(l, pos)) {
-		if (b.push_back(t), *l[pos][0] == '.') return ++pos, true;
-		if (*l[pos][0] != ',') parse_error(err_term_or_dot, l[pos]);
-		++pos, t.clear();
-	}
+	for (b.emplace_back(); b.back().parse(l, pos); b.emplace_back(), ++pos)
+		if (*l[pos][0] == '.') return ++pos, true;
+		else if (*l[pos][0] != ',') parse_error(err_term_or_dot,l[pos]);
 	parse_error(err_body, l[pos]);
 	return false;
 }
@@ -253,11 +253,12 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 wostream& operator<<(wostream& os, const raw_rule& r) {
 	if (r.goal) os << L'!';
 	if (r.pgoal) os << L'!';
-	os << r.b[0];
-	if (r.b.size() == 1) return os << L'.';
+	for (size_t n = 0; n < r.nheads(); ++n)
+		if ((os << r.head(n)), n != r.nheads() - 1) os << L',';
+	if (!r.nbodies()) return os << L'.';
 	os << L" :- ";
-	for (size_t n = 1; n < r.b.size(); ++n)
-		if ((os << r.b[n]), n != r.b.size() - 1) os << L',';
+	for (size_t n = 0; n < r.nbodies(); ++n)
+		if ((os << r.body(n)), n != r.nbodies() - 1) os << L',';
 	return os << L'.';
 }
 

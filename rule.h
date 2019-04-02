@@ -16,22 +16,31 @@
 #include <functional>
 
 struct rule { // a P-DATALOG rule in bdd form
-	const bool neg;
-	std::unordered_map<int_t, size_t> varmap;
+	typedef std::unordered_map<int_t, size_t> varmap;
+	bools neg;
+//	varmap bvars;
+	std::vector<varmap> hvars;
 	builtins<leq_const> *bts = 0;
 //	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
 //		unary_builtins;
 	std::vector<query> q;
-	std::vector<ints> arities;
-	ints harity, vars_arity, rels;
-	int_t hrel;
+//	std::vector<ints> arities;
+	std::vector<ints> harity;//, vars_arity;//, rels;
+	size_t maxhlen, nvars;
+//	ints vars_arity;
+	ints hrel;
 	std::vector<size_t*> dbs;
+	std::vector<sizes> hperm;
 //	sizes ub;
-	bdd_and_eq ae;
-	void get_varmap(const matrix& v);
+	std::vector<bdd_and_eq> ae;
+	sizes get_perm(const term& b, varmap&, size_t bits);
+	void get_ranges(const matrix& h, const matrix& b, size_t dsz,
+		size_t bits, const varmap&);
+	//lp::diff_t get_varbdd();
 
-	rule(matrix v, const std::vector<size_t*>& dbs, size_t bits,size_t dsz);
-	size_t fwd(size_t bits);
+	rule(matrix h, matrix b, const std::vector<size_t*>& dbs, size_t bits,
+		size_t dsz);
+	sizes fwd(size_t bits);
 };
 
 size_t fact(term v, size_t bits, size_t dsz);

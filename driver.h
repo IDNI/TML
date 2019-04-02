@@ -19,6 +19,12 @@ struct dictcmp {
 			wcsncmp(x.first, y.first, x.second) < 0;
 	}
 };
+struct lexcmp {
+	bool operator()(const lexeme& x, const lexeme& y) const {
+		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
+			: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
+	}
+};
 struct wstrcmp { bool operator()(cws x, cws y) const { return wcscmp(x, y)<0;}};
 
 class driver {
@@ -42,14 +48,15 @@ class driver {
 
 	bool mult = false;
 	int_t nums = 0, chars = 0, symbols = 0, relsyms = 0;
-	size_t bits;
 
 	lexeme get_lexeme(const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
 	term get_term(const raw_term&);
-	matrix get_rule(const raw_rule&);
+	std::pair<matrix, matrix> get_rule(const raw_rule&);
+	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& rels,
+		std::set<lexeme, lexcmp>& syms);
 	std::vector<strs_t> get_dict_stats(const std::vector<
 		std::pair<raw_prog, std::map<lexeme, std::wstring>>>& v);
 
@@ -75,6 +82,7 @@ class driver {
 	driver(raw_progs, bool print_transformed);
 public:
 	lp* prog = 0;
+	size_t bits;
 	driver(FILE *f, bool print_transformed = false);
 	driver(std::wstring, bool print_transformed = false);
 	bool pfp();
