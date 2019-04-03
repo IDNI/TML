@@ -23,8 +23,8 @@ dict.o: $(SRC)
 main.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-test: bdd.test.cpp bdd.cpp bdd.h defs.h query.h query.cpp rule.h rule.cpp query.test.h query.test.cpp
-	g++ query.cpp bdd.test.cpp query.test.cpp rule.cpp bdd.cpp -otest -g -W -Wall -Wpedantic -ggdb3
+test: bdd.test.cpp bdd.cpp bdd.h defs.h query.h query.cpp rule.h rule.cpp query.test.h query.test.cpp driver.cpp
+	g++ query.cpp bdd.test.cpp query.test.cpp rule.cpp bdd.cpp driver.cpp lp.cpp -otest -g -W -Wall -Wpedantic dict.cpp input.cpp -ggdb3
 
 .PHONY: clean
 clean:

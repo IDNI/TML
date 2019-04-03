@@ -468,7 +468,7 @@ wostream& printdiff(wostream& os, const lp::diff_t& d) {
 	return drv->printdiff(os, d);
 }
 wostream& printbdd(wostream& os, size_t t, ints ar, int_t rel) {
-	bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
+	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
 	return drv->printbdd(os, t, ar, rel);
 }
 wostream& printbdd_one(wostream& os, size_t t, ints ar, int_t rel) {
@@ -482,7 +482,8 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 }
 
 wostream& driver::printbdd(wostream& os, size_t t, ints ar, int_t rel) const {
-	return printbdd(os, from_bits(t, ar, rel));
+	from_bits(t,ar,rel,[&os,this](const term&t){print_term(os, t)<<endl;});
+	return os;
 }
 
 wostream& driver::printbdd_one(wostream& os, size_t t, ints ar, int_t rel)const{
@@ -493,13 +494,9 @@ wostream& driver::printbdd_one(wostream& os, size_t t, ints ar, int_t rel)const{
 wostream& driver::printdb(wostream& os, lp *p) const {
 	for (auto x : p->db)
 		if (builtin_rels.find(x.first.first) == builtin_rels.end()) {
-//			for (int_t i : x.first.second) wcout << i << ' ';
-//			wcout << endl;
 			from_bits(*x.second, x.first.second,x.first.first, 
 				[&os,this](const term&t){
 				print_term(os, t)<<endl;});
-//			printbdd(os, from_bits(*x.second,
-//				x.first.second,x.first.first));
 		}
 	return os;
 }

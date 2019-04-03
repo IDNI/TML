@@ -23,14 +23,17 @@ size_t fact(term v, size_t bits, size_t dsz) {
 	size_t r = T;
 	rule::varmap m;
 	for (size_t j = 0; j != v.args.size(); ++j)
-		if (v.args[j] >= 0)
-			from_int_and(v.args[j], bits, j, v.args.size(), r);
-		else if (m.end() == m.find(v.args[j])) m.emplace(v.args[j],j);
+		if (v.args[j] < 0 && m.end() == m.find(v.args[j]))
+			m.emplace(v.args[j], j);
+	//DBG(printbdd(wcout<<"ret1:"<<endl, r, v.arity, v.rel)<<endl;)
 	if (!m.empty()) {
 		sizes domain;
+//		for (size_t n = 0; n != v.args.size(); ++n)
+//			if (v.args[n] < 0) domain.push_back(n);
 		for (auto x : m) domain.push_back(x.second);
 		r = builtins<leq_const>(domain, bits, v.args.size(),
 			leq_const(dsz-1, bits, v.args.size()))(r);
+//		DBG(printbdd(wcout<<"ret2:"<<endl, r, v.arity, v.rel)<<endl;)
 		for (size_t j = 0; j != v.args.size(); ++j)
 			if (v.args[j] >= 0) continue;
 			else for (size_t b = 0; b != bits; ++b)
@@ -40,9 +43,13 @@ size_t fact(term v, size_t bits, size_t dsz) {
 						POS(b, bits, j, v.args.size()),
 						POS(b, bits, m[v.args[j]],
 							v.args.size())));
+//		DBG(printbdd(wcout<<"ret3:"<<endl, r, v.arity, v.rel)<<endl;)
 	}
+	for (size_t j = 0; j != v.args.size(); ++j)
+		if (v.args[j] >= 0)
+			from_int_and(v.args[j], bits, j, v.args.size(), r);
 	if (v.neg) r = bdd_and_not(T, r);
-//	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;
@@ -94,11 +101,14 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
 
 void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 	size_t bits, const varmap& m){
+	hleq = sizes(h.size(), F);
+	bleq = T;
 	set<int_t> bnegvars, bposvars, hposvars, del;
+	sizes domain;
 	for (const term& t : b)
 		for (int_t i : t.args)
 			if (i < 0) (t.neg ? bnegvars : bposvars).insert(i);
-	if (bnegvars.empty()) return;
+	if (bnegvars.empty()) goto hvars;
 	for (const term& t : h)
 		if (!t.neg)
 			for (int_t i : t.args)
@@ -106,11 +116,21 @@ void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 	for (int_t i : bposvars) bnegvars.erase(i);
 	for (int_t i : bnegvars) if (!has(hposvars, i)) del.insert(i);
 	for (int_t i : del) bnegvars.erase(i);
-	if (bnegvars.empty()) return;
-	sizes domain;
 	for (int_t i : bnegvars) domain.push_back(m.at(i));
-	bts = new builtins<leq_const>(domain, bits, maxhlen+nvars,
-		leq_const(dsz-1, bits, maxhlen+nvars));
+	if (!domain.empty())
+		bleq=bdd_and(bleq,builtins<leq_const>(domain,bits,maxhlen+nvars,
+			leq_const(dsz-1, bits, maxhlen+nvars))(T));
+hvars:	for (size_t n = 0; n != h.size(); ++n) {
+		domain.clear();
+		for (size_t k = 0; k != h[n].args.size(); ++k)
+			if (h[n].args[k] < 0 && !has(bnegvars, h[n].args[k]) &&
+				!has(bposvars, h[n].args[k]))
+				domain.push_back(k);
+		if (!domain.empty())
+			hleq[n] = builtins<leq_const>(domain, bits,
+				h[n].args.size(),
+				leq_const(dsz-1, bits, h[n].args.size()))(T);
+	}
 }
 
 sizes rule::fwd(size_t bits) {
@@ -123,17 +143,19 @@ sizes rule::fwd(size_t bits) {
 	if (F == (vars = bdd_and_many(v))) return {};
 	DBG(printbdd(wcout<<"q"<<endl,vars,
 		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+	vars = bdd_and(bleq, vars);
 	for (size_t k = 0; k != r.size(); ++k) {
 		r[k] = bdd_permute(vars, hperm[k]);
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
 		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
-		DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		DBG(bdd_out(wcout, r[k])<<endl;)
-		if (bts) r[k] = (*bts)(r[k]);
+		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), bits);
 		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
+		if (hleq[k] != F) r[k] = bdd_and(hleq[k], r[k]);
 		DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 	}
 	return r;

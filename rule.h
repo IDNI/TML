@@ -20,7 +20,10 @@ struct rule { // a P-DATALOG rule in bdd form
 	bools neg;
 //	varmap bvars;
 	std::vector<varmap> hvars;
-	builtins<leq_const> *bts = 0;
+	size_t bleq;
+	sizes hleq;
+//	builtins<leq_const> *bts = 0;
+//	std::vector<builtins<leq_const>*> hbts;
 //	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
 //		unary_builtins;
 	std::vector<query> q;

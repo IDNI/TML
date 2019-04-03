@@ -49,15 +49,15 @@ void from_range(size_t max, size_t bits, size_t arg, size_t args, size_t &r) {
 
 void test_query() {
 	size_t bits = 3, arg = 2, args = 3;
-	for (bits = 1; bits < 10; ++bits)
-	for (size_t n = 1; n != (size_t)(1<<bits); ++n) {
+	for (bits = 9; bits <= 10; ++bits)
+	for (size_t n = 200; n != (size_t)(1<<bits); ++n) {
 		wcout<<"max: "<<n<<" bits: "<<bits<<endl;
 		builtins<leq_const> l1({arg},bits,args,leq_const(n,bits,args));
 		size_t x = T, y = l1(T);
 		from_range(n, bits, arg, args, x);
-		auto l = allsat(y, bits*args);
-		auto r = allsat(x, bits*args);
-		wcout <<"l:"<<endl<< l << endl <<"r:"<<endl<< r << endl;
+//		auto l = allsat(y, bits*args);
+//		auto r = allsat(x, bits*args);
+//		wcout <<"l:"<<endl<< l << endl <<"r:"<<endl<< r << endl;
 		assert(x == y);
 	}
 	exit(0);
