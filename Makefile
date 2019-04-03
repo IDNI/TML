@@ -1,25 +1,31 @@
 #CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -O3 -flto
 CXXFLAGS = -W -Wall -Wpedantic -otml -std=c++1y -ggdb3
 CXX = g++
-OBJ = query.o rule.o input.o driver.o lp.o bdd.o dict.o main.o
-SRC = input.cpp input.h defs.h driver.cpp driver.h lp.cpp lp.h bdd.cpp bdd.h rule.cpp rule.h main.cpp dict.cpp query.h query.cpp term.h Makefile
+OBJ = query.o rule.o input.o driver.o lp.o bdd.o dict.o main.o output.o transform.o tree.o
+SRC = input.cpp input.h defs.h driver.cpp driver.h lp.cpp lp.h bdd.cpp bdd.h rule.cpp rule.h main.cpp dict.cpp query.h query.cpp term.h Makefile output.cpp transform.cpp tree.cpp
 all: $(OBJ)
 	$(CXX) $(CXXFLAGS) $(OBJ) -otml
 
-input.o: $(SRC)
-	$(CXX) $(CXXFLAGS) -c input.cpp -o input.o
 driver.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c driver.cpp -o driver.o
 query.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c query.cpp -o query.o
 rule.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c rule.cpp -o rule.o
+transform.o: $(SRC)
+	$(CXX) $(CXXFLAGS) -c transform.cpp -o transform.o
 lp.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c lp.cpp -o lp.o
+tree.o: $(SRC)
+	$(CXX) $(CXXFLAGS) -c tree.cpp -o tree.o
 bdd.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c bdd.cpp -o bdd.o
 dict.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c dict.cpp -o dict.o
+input.o: $(SRC)
+	$(CXX) $(CXXFLAGS) -c input.cpp -o input.o
+output.o: $(SRC)
+	$(CXX) $(CXXFLAGS) -c output.cpp -o output.o
 main.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 

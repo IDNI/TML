@@ -23,7 +23,7 @@ size_t fact(term v, size_t bits, size_t dsz) {
 	size_t r = T;
 	rule::varmap m;
 	for (size_t j = 0; j != v.args.size(); ++j)
-		if (v.args[j] < 0 && m.end() == m.find(v.args[j]))
+		if (v.args[j] < 0)
 			m.emplace(v.args[j], j);
 	//DBG(printbdd(wcout<<"ret1:"<<endl, r, v.arity, v.rel)<<endl;)
 	if (!m.empty()) {
@@ -61,8 +61,7 @@ sizes rule::get_perm(const term& b, varmap& m, size_t bits) {
 	for (size_t j = 0; j != perm.size(); ++j) perm[j] = j;
 	for (size_t k = 0; k != b.args.size(); ++k) {
 		if (b.args[k] >= 0) continue;
-		if ((it = m.find(b.args[k])) == m.end())
-			it = m.emplace(b.args[k], maxhlen + m.size()).first;
+		it = m.emplace(b.args[k], maxhlen + m.size()).first;
 		for (size_t j = 0; j != bits; ++j)
 			perm[POS(j, bits, k, b.args.size())] =
 				POS(j, bits, it->second, nvars+maxhlen);

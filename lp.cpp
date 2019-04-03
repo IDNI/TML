@@ -57,19 +57,10 @@ bool lp::add_facts(const matrix& x) {
 	return true;
 }
 
-lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz,
-	const strs_t& strs, lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz)
-	, delrel(delrel), strs(strs) {
+lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
+	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), delrel(delrel)
+	, strs(strs) {
 	//wcout<<r<<endl;
-/*	dsz = 0;
-	for (const matrix& m : r)
-		for (const term& t : m) 
-			for (int_t i : t) if (i > 0) dsz = max(dsz, (size_t)i);
-	dsz = max(prev?prev->dsz:dsz+1, dsz+1);
-	for (const term& t : g)
-		if (t.size()-1 > ar) er(err_goalarity);
-		else for (int_t i:t) if (i > 0 && i>=(int_t)dsz)er(err_goalsym);
-	bits = msb(dsz);*/
 	for (const auto& m : r) {
 		for (const term& t : m.first)
 			*(db[{t.rel, t.arity}] = new size_t) = F;
@@ -93,7 +84,12 @@ lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz,
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
-	for (const term& t : g) gbdd = bdd_or(gbdd, fact(t, bits, dsz));
+	for (const term& t : g) {
+		if (t.arity.size() > 2 && !t.arity[0] && t.arity[1] == -1)
+			trees.emplace(diff_t::key_type{t.rel, t.arity}, F);
+		DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
+		gbdd = bdd_or(gbdd, fact(t, bits, dsz));
+	}
 }
 
 void lp::fwd(diff_t &add, diff_t &del) {
@@ -112,27 +108,14 @@ void lp::fwd(diff_t &add, diff_t &del) {
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
-/*void lp::align(const db_t& d, size_t pbits, size_t bits) {
-	if (bits == pbits) return;
-	for (auto x : db) {
-		auto it = d.find(x.first);
-		if (it == d.end()) continue;
-		*x.second = bdd_or(*x.second,
-				bdd_rebit(*it->second, pbits, bits,
-				arlen(x.first.second)*bits));
-	}
-}*/
-
 struct diffcmp {
 	bool operator()(const lp::diff_t& x, const lp::diff_t& y) const {
 		if (x.size() != y.size()) return x.size() < y.size();
 		auto xt = x.begin(), yt = y.begin();
 		while (xt != x.end())
-			if (xt->first != yt->first)
-				return xt->first < yt->first;
-			else if (xt->second != yt->second)
-				return xt->second < yt->second;
-			else ++xt, ++yt;
+			if (xt->first != yt->first) return xt->first<yt->first;
+			else if (xt->second == yt->second) ++xt, ++yt;
+			else return xt->second < yt->second;
 		return false;
 	}
 };
@@ -141,6 +124,12 @@ lp::diff_t copy(const lp::db_t& x) {
 	lp::diff_t r;
 	for (auto y : x) r[y.first] = *y.second;
 	return r;
+}
+
+void copy(const lp::diff_t& src, lp::db_t& dst) {
+	for (auto x : dst) delete x.second;
+	dst.clear();
+	for (auto x : src) dst.emplace(x.first, new size_t(x.second));
 }
 
 bool bdd_and_not(const lp::diff_t& x, const lp::diff_t& y, lp::diff_t& r) {
@@ -207,6 +196,15 @@ bool lp::pfp() {
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}
+	diff_t tr;
+	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
+	for (auto x : trees) {
+		auto it = db.find(x.first);
+		if (it != db.end())
+			get_tree(x.first.first, *it->second, x.first.second, db,
+				bits, tr);
+	}
+	copy(tr, db);
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
@@ -222,25 +220,4 @@ lp::~lp() {
 //	for (rule* r : rules) delete r;
 //	if (prev) delete prev;
 //	if (proof1) delete proof1, delete proof2;
-}
-
-wostream& bdd_out(wostream& os,size_t n){
-	return bdd_out(os<<L'['<<n<<L']',getnode(n));
-}
-wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
-	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') : (bdd_out(
-		os<<n[0]<<L'?',getnode(n[1])),bdd_out(os<<L':',getnode(n[2])));
-}
-wostream& operator<<(wostream& os, const term& t) {
-	os << t.rel << ' ';
-	for (auto x : t.args) os << x << ' ';
-	return os;
-}
-wostream& operator<<(wostream& os, const matrix& m) {
-	for (const term& t : m) os << t << ',';
-	return os;
-}
-wostream& operator<<(wostream& os, const matrices& m) {
-	for (const matrix& x : m) os << x << endl;
-	return os;
 }

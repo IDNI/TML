@@ -37,6 +37,7 @@ public:
 	const size_t bits, dsz;
 	const int_t delrel;
 	const strs_t strs;
+	diff_t trees;
 
 	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
 		lp *prev = 0);
@@ -47,6 +48,9 @@ public:
 	~lp();
 };
 
+size_t arlen(const ints& ar);
+void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
+	lp::diff_t& res);
 std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, size_t n);
 extern int_t null;

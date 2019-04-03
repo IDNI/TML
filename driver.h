@@ -101,6 +101,7 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar,
 		int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
+	std::wostream& printdb(std::wostream& os, const lp::db_t& db) const;
 	std::wostream& printdiff(std:: wostream& os, const lp::diff_t& d) const;
 	std::wostream& printndb(std::wostream& os, lp *p) const;
 	~driver() { if (prog) delete prog; for (cws w:strs_extra)free((wstr)w);}

@@ -213,68 +213,6 @@ raw_progs::raw_progs(const std::wstring& s) {
 	//for (auto x : l) wcout << x << endl;
 }
 
-wostream& operator<<(wostream& os, const lexeme& l) {
-	for (cws s = l[0]; s != l[1]; ++s) os << *s;
-	return os;
-}
-
-wostream& operator<<(wostream& os, const directive& d) {
-	return os << L'@' << d.rel << L' ' << d.arg << L'.';
-}
-
-wostream& operator<<(wostream& os, const elem& e) {
-	if (e.type == elem::CHR) return os << '\'' << *e.e[0] << '\'';
-	if (e.type == elem::OPENP || e.type == elem::CLOSEP) return os<<*e.e[0];
-	return e.type == elem::NUM ? os << e.num : (os << e.e);
-}
-
-wostream& operator<<(wostream& os, const production& p) {
-	os << p.p[0] << L" -> ";
-	for (size_t n = 1; n < p.p.size(); ++n) os << p.p[n] << L' ';
-	return os << L'.';
-}
-
-wostream& operator<<(wostream& os, const raw_term& t) {
-	if (t.neg) os << L'~';
-	os << t.e[0];
-	os << L'(';
-	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
-		while (t.arity[ar] == -1) ++ar, os << L'(';
-		while (t.e[n].type == elem::OPENP) ++n;
-		for (int_t k = 0; k != t.arity[ar];)
-			if ((os << t.e[n++]), ++k != t.arity[ar]) os << L' ';
-		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
-		++ar;
-		while (ar<t.arity.size()&&t.arity[ar] == -2) ++ar, os<<L')';
-	}
-	return os << L')';
-}
-
-wostream& operator<<(wostream& os, const raw_rule& r) {
-	if (r.goal) os << L'!';
-	if (r.pgoal) os << L'!';
-	for (size_t n = 0; n < r.nheads(); ++n)
-		if ((os << r.head(n)), n != r.nheads() - 1) os << L',';
-	if (!r.nbodies()) return os << L'.';
-	os << L" :- ";
-	for (size_t n = 0; n < r.nbodies(); ++n)
-		if ((os << r.body(n)), n != r.nbodies() - 1) os << L',';
-	return os << L'.';
-}
-
-wostream& operator<<(wostream& os, const raw_prog& p) {
-	for (auto x : p.d) os << x << endl;
-	for (auto x : p.g) os << x << endl;
-	for (auto x : p.r) os << x << endl;
-	return os;
-}
-
-wostream& operator<<(wostream& os, const raw_progs& p) {
-	if (p.p.size() == 1) os << p.p[0];
-	else for (auto x : p.p) os << L'{' << endl << x << L'}' << endl;
-	return os;
-}
-
 string ws2s(const wstring& s) { return string(s.begin(), s.end()); }
 
 off_t fsize(const char *fname) {
@@ -335,10 +273,4 @@ void parse_error(std::wstring e, cws s, size_t len) {
 
 void parse_error(wstring e, lexeme l) {
 	parse_error(e, wstring(l[0], l[1]-l[0]).c_str());
-}
-
-void parser_test() {
-	setlocale(LC_ALL, "");
-	wcout<<raw_progs(stdin);
-	exit(0);
 }

@@ -12,11 +12,9 @@
 // modified over time by the Author.
 
 struct term {
-//	enum builtins { NONE, ALPHA, DIGIT, ALNUM, SPACE };
 	bool neg;
 	int_t rel;
 	ints args, arity;
-//	builtins b = NONE;
 	term () {}
 	term(bool neg, int_t rel) : neg(neg), rel(rel) {}
 	term(bool neg, int_t rel, const ints& args,

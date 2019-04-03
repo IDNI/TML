@@ -46,10 +46,6 @@ unordered_map<permemo, size_t> memo_permute;
 vector<node> V; // all bdd nodes
 unordered_map<node, size_t> M; // node to its index
 
-wostream& operator<<(wostream& os, const node& n) {
-	return os<<n[0]<<' '<<n[1]<<' '<<n[2];
-}
-
 size_t bdd_add_nocheck(const node& n) {
 	size_t r;
 	return M.emplace(n, r = V.size()), V.emplace_back(n), r;
@@ -180,13 +176,30 @@ size_t bdd_and_not(size_t x, size_t y) {
 	apply_ret(bdd_add({{v,bdd_and_not(a,b),bdd_and_not(c,d)}}),memo_and_not);
 }
 
+size_t bdd_subterm(size_t x, size_t from, size_t to, size_t args1, size_t args2,
+	size_t bits) {
+	if (args1 == to - from) return from ? F : x;
+	bools ex(args1 * bits, false);
+	sizes perm(args1 * bits);
+	size_t n;
+	for (n = 0; n != args1 * bits; ++n) perm[n] = n;
+	for (n = 0; n != args1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			if (n < from || n >= to)
+				ex[POS(k, bits, n, args1)] = true;
+			else perm[POS(k, bits, n, args1)] =
+				POS(k, bits, n - from, args2);
+	return bdd_permute(bdd_ex(x, ex), perm);
+}
+
 size_t bdd_deltail(size_t x, size_t args1, size_t args2, size_t bits) {
+	return bdd_subterm(x, 0, args2, args1, args2, bits);
 	if (args1 == args2) return x;
-	bools ex(args1*bits, false);
-	sizes perm(args1*bits);
+	bools ex(args1 * bits, false);
+	sizes perm(args1 * bits);
 	assert(args1 > args2);
 	size_t n;
-	for (n = 0; n != args1*bits; ++n) perm[n] = n;
+	for (n = 0; n != args1 * bits; ++n) perm[n] = n;
 	for (n = 0; n != args1; ++n)
 		for (size_t k = 0; k != bits; ++k)
 			if (n >= args2) ex[POS(k, bits, n, args1)] = true;
@@ -308,7 +321,7 @@ size_t bdd_and_many(sizes v) {
 	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
 	it = memo.emplace(v, 0).first;
-	size_t res = F, m, h, l;
+	size_t res = F, m = 0, h, l;
 	sizes vh, vl;
 	switch (bdd_and_many_iter(move(v), vh, vl, res, m)) {
 		case 0: l = bdd_and_many(move(vl)),
@@ -404,15 +417,6 @@ void memos_clear() {
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear(),
 	memo_permute.clear(), memo_and_ex.clear(), memo_and_not_ex.clear();
 #endif		
-}
-
-wostream& operator<<(wostream& os, const bools& x) {
-	for (auto y:x) os << (y?1:0);
-	return os;
-}
-wostream& operator<<(wostream& os, const vbools& x) {
-	for (auto y:x) os << y << endl;
-	return os;
 }
 
 #ifdef MEMO

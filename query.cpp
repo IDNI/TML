@@ -18,8 +18,6 @@
 #include <algorithm>
 using namespace std;
 
-template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
-
 ints from_term(const term& t) {
 	ints r(t.args.size(), 0);
 	for (int_t n = 0, k; n != (int_t)t.args.size(); ++n)

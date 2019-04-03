@@ -29,7 +29,7 @@ typedef std::unordered_map<int_t, std::wstring> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else
@@ -38,8 +38,9 @@ typedef std::vector<bools> vbools;
 #define _er(x)	perror(x), exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
-#endif
 #define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
 #define ARG(pos, args) ((pos) % (args))
 #define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)
 #define has(x, y) std::binary_search(x.begin(), x.end(), y)
+template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+#endif

@@ -73,8 +73,8 @@ template<typename func> class builtins {
 	}
 public:
 	builtins(const sizes& domain, size_t bits, size_t args, func f) 
-		: bits(bits), args(args), nvars(bits*args) , domain(domain),
-		path(nvars,0), f(f) {}
+		: bits(bits), args(args), nvars(bits*args)
+		, domain(sort(domain)), path(nvars,0), f(f) {}
 
 	size_t operator()(size_t x) {
 		auto it = memo.find(x);
