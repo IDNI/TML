@@ -85,10 +85,11 @@ lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
 	for (const term& t : g) {
-		if (t.arity.size() > 2 && !t.arity[0] && t.arity[1] == -1)
-			trees.emplace(diff_t::key_type{t.rel, t.arity}, F);
-		DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
-		gbdd = bdd_or(gbdd, fact(t, bits, dsz));
+		if (t.arity.size() > 2 && !t.arity[0] && t.arity[1] == -1) {
+			trees.emplace(diff_t::key_type{t.rel, t.arity}, 
+					fact(t, bits, dsz));
+			DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
+		} else gbdd = bdd_or(gbdd, fact(t, bits, dsz));
 	}
 }
 
@@ -201,8 +202,8 @@ bool lp::pfp() {
 	for (auto x : trees) {
 		auto it = db.find(x.first);
 		if (it != db.end())
-			get_tree(x.first.first, *it->second, x.first.second, db,
-				bits, tr);
+			get_tree(x.first.first, bdd_and(*it->second, x.second),
+				x.first.second, db, bits, tr);
 	}
 	copy(tr, db);
 	if (delrel != -1) {
