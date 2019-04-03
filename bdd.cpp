@@ -176,6 +176,17 @@ size_t bdd_and_not(size_t x, size_t y) {
 	apply_ret(bdd_add({{v,bdd_and_not(a,b),bdd_and_not(c,d)}}),memo_and_not);
 }
 
+size_t bdd_expand(size_t x, size_t args1, size_t args2, size_t bits) {
+	if (args1 == args2) return x;
+	sizes perm(args1 * bits);
+	size_t n;
+	for (n = 0; n != args1 * bits; ++n) perm[n] = n;
+	for (n = 0; n != args1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			perm[POS(k, bits, n, args1)] = POS(k, bits, n, args2);
+	return bdd_permute(x, perm);
+}
+
 size_t bdd_subterm(size_t x, size_t from, size_t to, size_t args1, size_t args2,
 	size_t bits) {
 	if (args1 == to - from) return from ? F : x;

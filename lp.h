@@ -49,6 +49,7 @@ public:
 };
 
 size_t arlen(const ints& ar);
+std::set<ints> prefix(const lp::db_t& db, ints ar, int_t rel);
 void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
 	lp::diff_t& res);
 std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax

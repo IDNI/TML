@@ -199,12 +199,18 @@ bool lp::pfp() {
 	}
 	diff_t tr;
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
-	for (auto x : trees) {
-		auto it = db.find(x.first);
-		if (it != db.end())
-			get_tree(x.first.first, bdd_and(*it->second, x.second),
-				x.first.second, db, bits, tr);
-	}
+	for (auto x : trees)
+		for (auto p : prefix(db, x.first.second, x.first.first)) {
+			auto it = db.find({x.first.first, p});
+			if (it != db.end()) {
+				size_t y = bdd_expand(x.second,
+					arlen(x.first.second),
+					arlen(it->first.second), bits);
+				y = bdd_and(*it->second, y);
+				get_tree(x.first.first, y, it->first.second,
+					db, bits, tr);
+			}
+		}
 	copy(tr, db);
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
