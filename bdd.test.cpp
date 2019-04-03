@@ -138,6 +138,7 @@ wostream& operator<<(wostream& os, const tt& t) {
 
 void test_and_many() {
 	for (size_t k = 0; k < 150; ++k) {
+		wcout<<k<<endl;
 		tt *t = new tt[10];
 		for (size_t i = 0; i < 10; ++i) t[i] = rndtt(8);//.ex(i);
 		size_t r = T;
@@ -156,9 +157,10 @@ int main() {
 			assert(ARG(POS(n, bits, k, args), args) == k),
 			assert(BIT(POS(n, bits, k, args), args, bits) == n);
 	bdd_init();
-	test_query();
+//	test_query();
 	srand(time(0));
 	test_and_many();
+	exit(0);
 	tt xt(3);
 	xt.addrow({false, true, true});
 	xt.addrow({true, true, false});

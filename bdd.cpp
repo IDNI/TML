@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <map>
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include "bdd.h"
@@ -21,7 +22,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-//#define MEMO
+#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
@@ -229,60 +230,93 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 		bdd_and_deltail(c, d, h)}}), h), memo_adt);
 }
 
-size_t bdd_and_many_iter(const sizes& v, sizes& h, sizes& l, size_t &res,
-		size_t &m) {
-	size_t i, t, from = 0, to = v.size();
+size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
+	size_t i, t;
 	bool b, eq, flag;
-	node n;
-	switch (v.size()) {
-		case 0: return res = T, 1;
-		case 1: return res = v[0], 1;
-		case 2: return res = bdd_and(v[0], v[1]), 1;
-		default: ;
+	if (v.empty()) return T;
+	for (size_t n = 0; n < v.size();) {
+		if (leaf(v[n])) {
+			if (!trueleaf(v[n])) return F;
+			v.erase(v.begin() + n);
+			if (v.size() == 1) return res = v[0], 1;
+			else if (v.size() == 2) return res=bdd_and(v[0],v[1]),1;
+			else if (v.empty()) return T;
+			else ++n;
+		} else ++n;
 	}
-	while (leaf(v[from]))
-		if (!trueleaf(v[from])) return res = F, 1;
-		else if (1 == (to - ++from)) return res = v[from], 1;
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]),1;
-	while (leaf(v[to - 1]))
-		if (!trueleaf(v[to - 1])) return res = F, 1;
-		else if (1 == (--to - from)) return res = v[from], 1;
-		else if (2 == (to - from)) return bdd_and(v[from], v[from+1]),1;
-	m = getnode(v[from])[0], t = v[from];
+	m = getnode(v[0])[0], t = v[0];
 	b = false, eq = true, flag = false;
-	for (i = from + 1; i != to; ++i)
+	for (i = 1; i != v.size(); ++i)
 		if (!leaf(v[i])) {
-			n = getnode(v[i]), b |= n[0] != m, eq &= t == v[i];
+			const node &n = getnode(v[i]);
+			b |= n[0] != m, eq &= t == v[i];
 			if (n[0] < m) m = n[0];
 		} else if (!trueleaf(v[i])) return res = F, 1;
 	if (eq) return res = t, 1;
-	for (i = from; i != to; ++i)
-		if (leaf(v[i])) continue;
-		else if (b && getnode(v[i])[0] != m) h.push_back(v[i]);
+	for (i = 0; i != v.size(); ++i)
+		if (b && getnode(v[i])[0] != m) h.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[1])) h.push_back(getnode(v[i])[1]);
 		else if (!trueleaf(getnode(v[i])[1])) { flag = true; break; }
-	for (i = from; i != to; ++i)
-		if (leaf(v[i])) continue;
-		else if (b && getnode(v[i])[0] != m) l.push_back(v[i]);
+	for (i = 0; i != v.size(); ++i)
+		if (b && getnode(v[i])[0] != m) l.push_back(v[i]);
 		else if (!leaf(getnode(v[i])[2])) l.push_back(getnode(v[i])[2]);
 		else if (!trueleaf(getnode(v[i])[2])) return flag ? res=F,1 : 2;
-	return flag ? 3 : 0;
+	sort(h.begin(), h.end()), sort(l.begin(), l.end());
+	if (!flag) { 
+		for (size_t n = 1; n < h.size();)
+			if (h[n] == h[n-1]) {
+				h.erase(h.begin() + n);
+				if (h.empty()) { flag = true; break; }
+				if (h.size() == 1) break;
+			} else ++n;
+	}
+	for (size_t n = 1; n < l.size();)
+		if (l[n] == l[n-1]) {
+			l.erase(l.begin() + n);
+			if (l.empty()) return flag ? 3 : 0;
+			if (l.size() == 1) break;
+		} else ++n;
+	if (flag) return 3;
+	sizes x;
+	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
+	if (x.size() > 1) {
+		size_t r = bdd_and_many(x);
+		for (size_t n = 0; n < h.size();)
+			if (has(x, h[n])) h.erase(h.begin() + n);
+			else ++n;
+		for (size_t n = 0; n < l.size();)
+			if (has(x, l[n])) l.erase(l.begin() + n);
+			else ++n;
+		h.push_back(r), l.push_back(r);
+	}
+	return 0;
 }
 
-size_t bdd_and_many(const sizes& v) {
+size_t bdd_and_many(sizes v) {
 	static map<sizes, size_t> memo;
+	auto jt = memo_and.end();
+
+	for (size_t n = 0; n < v.size(); ++n)
+		for (size_t k = 0; k < n; ++k) {
+			if ((jt=memo_and.find({v[n], v[k]})) == memo_and.end())
+				jt=memo_and.find({v[k], v[n]});
+			if (jt != memo_and.end()) {
+				v.erase(v.begin() + k), v.erase(v.begin()+n-1),
+				v.push_back(jt->second), n = k = 0; break;
+			}
+		}
 	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
-	else it = memo.emplace(v, 0).first;
+	it = memo.emplace(v, 0).first;
 	size_t res = F, m, h, l;
 	sizes vh, vl;
-	switch (bdd_and_many_iter(v, vh, vl, res, m)) {
-		case 0: l = bdd_and_many(vl), vl.clear(),
-			h = bdd_and_many(vh), vh.clear();
+	switch (bdd_and_many_iter(move(v), vh, vl, res, m)) {
+		case 0: l = bdd_and_many(move(vl)),
+			h = bdd_and_many(move(vh));
 			break;
 		case 1: return it->second = res;
-		case 2: h = bdd_and_many(vh), l = F, vh.clear(); break;
-		case 3: h = F, l = bdd_and_many(vl), vl.clear(); break;
+		case 2: h = bdd_and_many(move(vh)), l = F; break;
+		case 3: h = F, l = bdd_and_many(move(vl)); break;
 		default: throw 0;
 	}
 	return it->second = bdd_add({{m, h, l}});

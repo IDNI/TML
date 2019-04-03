@@ -39,7 +39,6 @@ public:
 
 enum builtin_res { PASS, FAIL, CONTHI, CONTLO, CONTBOTH };
 template<typename T> T sort(const T& x);
-#define has(x, y) std::binary_search(x.begin(), x.end(), y)
 
 template<typename func> class builtins {
 	const size_t bits, args, nvars;

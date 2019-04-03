@@ -49,7 +49,7 @@ size_t fact(term v, size_t bits, size_t dsz) {
 		if (v.args[j] >= 0)
 			from_int_and(v.args[j], bits, j, v.args.size(), r);
 	if (v.neg) r = bdd_and_not(T, r);
-	DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+	//DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;
@@ -101,14 +101,24 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
 
 void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 	size_t bits, const varmap& m){
-	hleq = sizes(h.size(), F);
-	bleq = T;
+	hleq = sizes(h.size(), T), bleq = T;
 	set<int_t> bnegvars, bposvars, hposvars, del;
 	sizes domain;
 	for (const term& t : b)
 		for (int_t i : t.args)
 			if (i < 0) (t.neg ? bnegvars : bposvars).insert(i);
-	if (bnegvars.empty()) goto hvars;
+	for (size_t n = 0; n != h.size(); ++n) {
+		for (size_t k = 0; k != h[n].args.size(); ++k)
+			if (h[n].args[k] < 0 && !has(bnegvars, h[n].args[k]) &&
+				!has(bposvars, h[n].args[k]))
+				domain.push_back(k);
+	//	if (domain.size())for(auto t:h)DBG(drv->print_term(wcout,t));
+		for (size_t i : domain)
+			hleq[n] = bdd_and(hleq[n],builtins<leq_const>({i},bits,
+				h[n].args.size(),
+				leq_const(dsz-1, bits, h[n].args.size()))(T));
+		domain.clear();
+	}
 	for (const term& t : h)
 		if (!t.neg)
 			for (int_t i : t.args)
@@ -120,17 +130,6 @@ void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 	if (!domain.empty())
 		bleq=bdd_and(bleq,builtins<leq_const>(domain,bits,maxhlen+nvars,
 			leq_const(dsz-1, bits, maxhlen+nvars))(T));
-hvars:	for (size_t n = 0; n != h.size(); ++n) {
-		domain.clear();
-		for (size_t k = 0; k != h[n].args.size(); ++k)
-			if (h[n].args[k] < 0 && !has(bnegvars, h[n].args[k]) &&
-				!has(bposvars, h[n].args[k]))
-				domain.push_back(k);
-		if (!domain.empty())
-			hleq[n] = builtins<leq_const>(domain, bits,
-				h[n].args.size(),
-				leq_const(dsz-1, bits, h[n].args.size()))(T);
-	}
 }
 
 sizes rule::fwd(size_t bits) {
@@ -138,25 +137,26 @@ sizes rule::fwd(size_t bits) {
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
-		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
-			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
-	if (F == (vars = bdd_and_many(v))) return {};
-	DBG(printbdd(wcout<<"q"<<endl,vars,
-		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
+//			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+	if (F == (vars = bdd_and_many(move(v)))) return {};
+//	DBG(printbdd(wcout<<"q"<<endl,vars,
+//		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
 	vars = bdd_and(bleq, vars);
 	for (size_t k = 0; k != r.size(); ++k) {
 		r[k] = bdd_permute(vars, hperm[k]);
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
 		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		DBG(bdd_out(wcout, r[k])<<endl;)
-		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+//		DBG(bdd_out(wcout, r[k])<<endl;)
+//		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), bits);
-		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+//		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
-		if (hleq[k] != F) r[k] = bdd_and(hleq[k], r[k]);
-		DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		r[k] = bdd_and(hleq[k], r[k]);
+		//DBG(printbdd(wcout<<"leq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 	}
 	return r;
 }

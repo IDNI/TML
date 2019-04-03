@@ -252,8 +252,8 @@ array<raw_prog, 2> driver::transform_grammar(
 	append_sym_elem(t.e, L"S"), append_openp(t.e),
 	t.e.push_back({elem::NUM, 0, get_num_lexeme(0)}),
 	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
-	append_closep(t.e), r = transform_bwd(r, {t});
-	//r.delrel = dict_get_rel(L"try");
+	append_closep(t.e);//, r = transform_bwd(r, {t});
+//	r.delrel = dict_get_rel(L"try");
 	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
 
@@ -268,10 +268,9 @@ void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
 array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 	const std::vector<raw_rule>& g) {
 	raw_prog r, _r;
-	for (const raw_prog p : rp) {
+	for (const raw_prog p : rp)
 		for (const raw_rule& x : p.r) transform_proofs(x, r, _r);
-		insert_goals(r, g);
-	}
+	insert_goals(r, g);
 	return { r, _r };
 }
 
@@ -383,8 +382,10 @@ driver::driver(raw_progs rp, bool print_transformed) {
 		for (auto x : v)
 			wcout << L'{' << endl << x.first << L'}' << endl;
 	auto y = get_dict_stats(v);
-	for (size_t n = 0; n != v.size(); ++n)
+	for (size_t n = 0; n != v.size(); ++n) {
+		DBG((wcout<<"nprogs: "<<n<<endl);)
 		prog_init(move(v[n].first), move(y[n]));
+	}
 }
 
 bool driver::pfp() { return prog->pfp() ? printdb(wcout, prog), true : false; }

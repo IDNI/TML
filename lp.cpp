@@ -107,8 +107,8 @@ void lp::fwd(diff_t &add, diff_t &del) {
 			t = bdd_or(x[n], t);
 		}
 	}
-	DBG(printdiff(wcout<<"add:"<<endl,add););
-	DBG(printdiff(wcout<<"del:"<<endl,del););
+	//DBG(printdiff(wcout<<"add:"<<endl,add););
+	//DBG(printdiff(wcout<<"del:"<<endl,del););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
@@ -183,7 +183,6 @@ bool operator==(const lp::db_t& x, const lp::diff_t& y) {
 }
 
 bool lp::pfp() {
-//	DBG(wcout<<"next prog"<<endl;)
 	if (prev) {
 		if (!prev->pfp()) return false;
 		for (auto x : prev->db)
@@ -213,7 +212,8 @@ bool lp::pfp() {
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x);
 	}
-	DBG(printdb(wcout<<"after prog: "<<endl, this)<<endl;)
+	DBG(static int nprog = 0;)
+	DBG(printdb(wcout<<"after prog: "<<nprog++<<endl, this)<<endl;)
 //	if (gbdd != F) db = bdd_and(gbdd, db);
 	return true;
 }

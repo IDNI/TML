@@ -42,3 +42,4 @@ typedef std::vector<bools> vbools;
 #define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
 #define ARG(pos, args) ((pos) % (args))
 #define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)
+#define has(x, y) std::binary_search(x.begin(), x.end(), y)
