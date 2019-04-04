@@ -198,6 +198,7 @@ bool lp::pfp() {
 		if (s.find(copy(db)) != s.end()) return false;
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
+	if (trees.empty()) goto ret;
 	for (auto x : trees)
 		for (auto p : prefix(db, x.first.second, x.first.first)) {
 			auto it = db.find({x.first.first, p});
@@ -211,7 +212,7 @@ bool lp::pfp() {
 			}
 		}
 	copy(trees_out, db);
-	if (delrel != -1) {
+ret:	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x);
