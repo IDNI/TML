@@ -82,12 +82,17 @@ class driver {
 	void prog_init(const raw_prog& rp, strs_t);
 	void progs_read(wstr s);
 	bool pfp(lp *p);
-	driver(raw_progs, bool print_transformed);
+	driver(int argc, char** argv, raw_progs, bool print_transformed);
+	size_t load_stdin();
+	std::wstring std_input;
+	int argc;
+	char** argv;
 public:
 	lp* prog = 0;
 	size_t bits;
-	driver(FILE *f, bool print_transformed = false);
-	driver(std::wstring, bool print_transformed = false);
+	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
+	driver(int argc, char** argv, std::wstring,
+		bool print_transformed = false);
 	bool pfp();
 
 	matrix getbdd(size_t t) const;

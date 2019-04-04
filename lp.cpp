@@ -197,7 +197,6 @@ bool lp::pfp() {
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
 	}
-	diff_t tr;
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
 	for (auto x : trees)
 		for (auto p : prefix(db, x.first.second, x.first.first)) {
@@ -208,10 +207,10 @@ bool lp::pfp() {
 					arlen(it->first.second), bits);
 				y = bdd_and(*it->second, y);
 				get_tree(x.first.first, y, it->first.second,
-					db, bits, tr);
+					db, bits, trees_out);
 			}
 		}
-	copy(tr, db);
+	copy(trees_out, db);
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);

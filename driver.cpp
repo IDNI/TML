@@ -69,18 +69,35 @@ void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& rels,
 			chars = max(chars, (int_t)256);
 }
 
+size_t driver::load_stdin() {
+	wstringstream ss;
+	std_input = ((ss << wcin.rdbuf()), ss.str());
+	return std_input.size();
+}
+
 vector<strs_t> driver::get_dict_stats(
 	const vector<pair<raw_prog, map<lexeme, wstring>>>& v) {
 	set<lexeme, lexcmp> rels, syms;
 	for (auto x : v) {
 		const raw_prog& p = x.first;
-		for (const directive& d : p.d)
+		for (const directive& d : p.d) {
 			chars = max(chars, (int_t)256),
-			rels.insert(d.rel),
-			nums = max(nums, (!d.fname
-				? (int_t)(d.arg[1]-d.arg[0])
-				: (int_t)fsize(d.arg[0]+1,
-					(size_t)(d.arg[1]-d.arg[0]-1)))+1);
+			rels.insert(d.rel);
+			switch (d.type) {
+			case directive::FNAME:
+				nums = max(nums, (int_t)fsize(d.arg[0]+1,
+				(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
+			case directive::STR: 
+				nums = max(nums,(int_t)(d.arg[1]-d.arg[0])+1);
+				break;
+			case directive::CMDLINE:
+				nums = max(nums,(int_t)(strlen(argv[d.n])+1));
+				break;
+			case directive::STDIN:
+				nums = max(nums,(int_t)(load_stdin()+1));
+			default: ;
+			}
+		}
 		for (const raw_rule& r : p.r) {
 			for (const raw_term& t : r.heads())
 				count_term(t, rels, syms);
@@ -105,9 +122,18 @@ vector<strs_t> driver::get_dict_stats(
 	return r;
 }
 
+wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
+
 wstring driver::directive_load(const directive& d) {
 	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
-	if (d.fname) return file_read(str);
+	if (d.type == directive::FNAME) return file_read(str);
+	if (d.type == directive::STDIN) return move(std_input);
+	if (d.type == directive::CMDLINE) {
+		if (argc < d.n)
+			parse_error( // FIXME
+			L"program expects more command line arguments.\n", L"");
+		return s2ws(argv[d.n]);
+	}
 	for (size_t i = 0; i != str.size(); ++i)
 		if (str[i] == L'\\') str.erase(str.begin() + i);
 	return str;
@@ -115,7 +141,9 @@ wstring driver::directive_load(const directive& d) {
 
 map<lexeme, wstring> driver::directives_load(const vector<directive>& ds) {
 	map<lexeme, wstring> r;
-	for (const directive& d : ds) r.emplace(d.rel, directive_load(d));
+	for (const directive& d : ds)
+		if (d.type != directive::YIELD)
+			r.emplace(d.rel, directive_load(d));
 	return r;
 }
 
@@ -131,12 +159,13 @@ void driver::prog_init(const raw_prog& p, strs_t s) {
 	prog = new lp(move(m), move(g), p.delrel, usz(), s, prog);
 }
 
-driver::driver(FILE *f, bool print_transformed) 
-	: driver(move(raw_progs(f)), print_transformed) {}
-driver::driver(wstring s, bool print_transformed) 
-	: driver(move(raw_progs(s)), print_transformed) {}
+driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
+	: driver(argc, argv, move(raw_progs(f)), print_transformed) {}
+driver::driver(int argc, char** argv, wstring s, bool print_transformed) 
+	: driver(argc, argv, move(raw_progs(s)), print_transformed) {}
 
-driver::driver(raw_progs rp, bool print_transformed) {
+driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
+	: argc(argc), argv(argv) {
 	DBG(drv = this;)
 	vector<pair<raw_prog, map<lexeme, wstring>>> v;
 	for (size_t n = 0; n < rp.p.size(); ++n)

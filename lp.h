@@ -37,7 +37,7 @@ public:
 	const size_t bits, dsz;
 	const int_t delrel;
 	const strs_t strs;
-	diff_t trees;
+	diff_t trees, trees_out;
 
 	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
 		lp *prev = 0);

@@ -69,7 +69,7 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else parse_error(err_chr, *s);
 	}
-	if (wcschr(L"!~.,(){}@=>", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,(){}$@=>", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s)) parse_error(err_chr, *s);
 	while (iswalnum(**s)) ++*s;
@@ -83,16 +83,6 @@ lexemes prog_lex(cws s) {
 	return r;
 }
 
-bool directive::parse(const lexemes& l, size_t& pos) {
-	if (*l[pos][0] != '@') return false;
-	if (rel = l[++pos], *l[++pos][0] == L'<') fname = true;
-	else if (*l[pos][0] == L'"') fname = false;
-	else parse_error(err_directive_arg, l[pos]);
-	if (arg = l[pos++], *l[pos++][0] != '.')
-		parse_error(dot_expected, l[pos]);
-	return true;
-}
-
 int_t get_int_t(cws from, cws to) {
 	int_t r = 0;
 	bool neg = false;
@@ -103,6 +93,20 @@ int_t get_int_t(cws from, cws to) {
 	try { r = stoll(s); }
 	catch (...) { parse_error(err_int, from); }
 	return neg ? -r : r;
+}
+
+bool directive::parse(const lexemes& l, size_t& pos) {
+	if (*l[pos][0] != '@') return false;
+	if (rel = l[++pos], *l[++pos][0] == L'<') type = FNAME;
+	else if (*l[pos][0] == L'"') type = STR;
+	else if (*l[pos][0] == L'$')
+		type = CMDLINE, ++pos, n=get_int_t(l[pos][0], l[pos][1]), ++pos;
+	else if (l[pos] == L"stdin") type = STDIN;
+	else if (t.parse(l, pos)) type = YIELD;
+	else parse_error(err_directive_arg, l[pos]);
+	if (arg = l[pos++], *l[pos++][0] != '.')
+		parse_error(dot_expected, l[pos]);
+	return true;
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {

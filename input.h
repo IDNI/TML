@@ -19,12 +19,6 @@
 #define err_digit L"symbol name cannot begin with a digit.\n"
 #define err_var_relsym L"relation symbol cannot be a variable.\n"
 
-struct directive {
-	lexeme rel, arg;
-	bool fname;
-	bool parse(const lexemes& l, size_t& pos);
-};
-
 struct elem {
 	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP } type;
 	int_t num;
@@ -39,6 +33,14 @@ struct raw_term {
 	bool parse(const lexemes& l, size_t& pos);
 	void calc_arity();
 	void clear() { e.clear(), arity.clear(); }
+};
+
+struct directive {
+	lexeme rel, arg;
+	raw_term t;
+	int_t n;
+	enum etype { STR, FNAME, CMDLINE, STDIN, YIELD } type;
+	bool parse(const lexemes& l, size_t& pos);
 };
 
 struct production {
@@ -98,4 +100,5 @@ std::wstring file_read(std::wstring fname);
 std::wstring file_read_text(FILE *f);
 std::wstring file_read_text(std::wstring fname);
 off_t fsize(cws s, size_t len);
+bool operator==(const lexeme& l, cws s);
 void parser_test();
