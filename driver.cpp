@@ -27,8 +27,15 @@ using namespace std;
 //	"'null' not allowed to appear in the head of positive rules.\n"
 #define err_proof	"proof extraction yet unsupported for programs "\
 			"with negation or deletion."
+#define err_directive_elem \
+	L"universe element in directive not appearing in program.\n"
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
+
+bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
+	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
+		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
+}
 
 bool operator==(const lexeme& l, const wstring& s) {
 	if ((size_t)(l[1]-l[0]) != s.size()) return false;
@@ -36,14 +43,16 @@ bool operator==(const lexeme& l, const wstring& s) {
 }
 
 term driver::get_term(const raw_term& r) {
-	term t(r.neg, dict_get_rel(r.e[0].e), {}, r.arity);
+	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (r.e[n].type == elem::NUM)
-			t.args.push_back(r.e[n].num + chars);
+			t.args.push_back(r.e[n].num + dict.chars);
 		else if (r.e[n].type == elem::CHR)
 			t.args.push_back(*r.e[n].e[0]);
+		else if (r.e[n].type == elem::VAR)
+			t.args.push_back(dict.get_var(r.e[n].e));
 		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
-			t.args.push_back(dict_get(r.e[n].e));
+			t.args.push_back(dict.get_sym(r.e[n].e));
 	return t;
 }
 
@@ -62,11 +71,11 @@ void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& rels,
 	rels.insert(t.e[0].e);
 	for (size_t n = 1; n < t.e.size(); ++n)
 		if (t.e[n].type == elem::NUM)
-			nums = max(nums, t.e[n].num+1);
+			dict.nums = max(dict.nums, t.e[n].num+1);
 		else if (t.e[n].type == elem::SYM)
 			syms.insert(t.e[n].e);
 		else if (t.e[n].type == elem::CHR)
-			chars = max(chars, (int_t)256);
+			dict.chars = max(dict.chars, (int_t)256);
 }
 
 size_t driver::load_stdin() {
@@ -75,50 +84,39 @@ size_t driver::load_stdin() {
 	return std_input.size();
 }
 
-vector<strs_t> driver::get_dict_stats(
-	const vector<pair<raw_prog, map<lexeme, wstring>>>& v) {
+strs_t driver::get_dict_stats(const raw_prog& p, const map<lexeme, wstring>& s){
 	set<lexeme, lexcmp> rels, syms;
-	for (auto x : v) {
-		const raw_prog& p = x.first;
-		for (const directive& d : p.d) {
-			chars = max(chars, (int_t)256),
-			rels.insert(d.rel);
-			switch (d.type) {
-			case directive::FNAME:
-				nums = max(nums, (int_t)fsize(d.arg[0]+1,
-				(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
-			case directive::STR: 
-				nums = max(nums,(int_t)(d.arg[1]-d.arg[0])+1);
-				break;
-			case directive::CMDLINE:
-				nums = max(nums,(int_t)(strlen(argv[d.n])+1));
-				break;
-			case directive::STDIN:
-				nums = max(nums,(int_t)(load_stdin()+1));
-			default: ;
-			}
+	for (const directive& d : p.d) {
+		dict.chars = max(dict.chars, (int_t)256),
+		rels.insert(d.rel);
+		switch (d.type) {
+		case directive::FNAME:
+			dict.nums = max(dict.nums, (int_t)fsize(d.arg[0]+1,
+			(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
+		case directive::STR: 
+			dict.nums = max(dict.nums,(int_t)(d.arg[1]-d.arg[0])+1);
+			break;
+		case directive::CMDLINE:
+			dict.nums = max(dict.nums,(int_t)(strlen(argv[d.n])+1));
+			break;
+		case directive::STDIN:
+			dict.nums = max(dict.nums,(int_t)(load_stdin()+1));
+		default: ;
 		}
-		for (const raw_rule& r : p.r) {
-			for (const raw_term& t : r.heads())
-				count_term(t, rels, syms);
-			for (const raw_term& t : r.bodies())
-				count_term(t, rels, syms);
-		}
-		for (auto y : x.second) rels.insert(y.first);
 	}
-	if (!syms.size() && !nums && !chars) {
+	for (const raw_rule& r : p.r) {
+		for (const raw_term& t : r.heads()) count_term(t, rels, syms);
+		for (const raw_term& t : r.bodies()) count_term(t, rels, syms);
+	}
+	for (auto y : s) rels.insert(y.first);
+	if (!dict.nsyms()) {
 		wcerr<<L"warning: empty domain, adding dummy element."<<endl;
-		++nums;
-	} else for (const lexeme l : syms) dict_get(l);
-	for (const lexeme l : rels) dict_get_rel(l);
-	vector<strs_t> r;
-	for (auto x : v) {
-		strs_t s;
-		for (auto y : x.second)
-			s[dict_get_rel(y.first)] = move(y.second);
-		r.push_back(move(s));
-	}
-	relsyms = rels.size(), symbols = syms.size(), bits = msb(usz());
+		++dict.nums;
+	} else for (const lexeme l : syms) dict.get_sym(l);
+	for (const lexeme l : rels) dict.get_rel(l);
+	strs_t r;
+	for (auto y : s) r[dict.get_rel(y.first)] = move(y.second);
+	dict.relsyms=rels.size(), dict.symbols=syms.size(),bits=msb(dict.usz());
 	return r;
 }
 
@@ -147,7 +145,7 @@ map<lexeme, wstring> driver::directives_load(const vector<directive>& ds) {
 	return r;
 }
 
-void driver::prog_init(const raw_prog& p, strs_t s) {
+lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
 	matpairs m;
 	matrix g, pg;
 	for (const raw_rule& x : p.r)
@@ -156,7 +154,15 @@ void driver::prog_init(const raw_prog& p, strs_t s) {
 		else if (x.pgoal)
 			assert(!x.nbodies()), pg.push_back(get_term(x.head(0)));
 		else m.insert(get_rule(x));
-	prog = new lp(move(m), move(g), p.delrel, usz(), s, prog);
+	map<int_t, term> yields;
+	for (const directive& d : p.d)
+		if (d.type == directive::YIELD) {
+//			size_t r = dict.get_rel(d.rel), s = syms.size();
+//			yields[r] = get_term(d.t);
+//			if (syms.size() != s)
+//				parse_error(err_directive_elem, d.t.e[0].e);
+		}
+	return new lp(move(m), move(g), p.delrel, dict.usz(), s, yields, last);
 }
 
 driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
@@ -167,6 +173,8 @@ driver::driver(int argc, char** argv, wstring s, bool print_transformed)
 driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	: argc(argc), argv(argv) {
 	DBG(drv = this;)
+	lp *prog = 0;
+	set<lp*> progs;
 	vector<pair<raw_prog, map<lexeme, wstring>>> v;
 	for (size_t n = 0; n < rp.p.size(); ++n)
 		for (auto x : transform(rp.p[n]))
@@ -184,11 +192,13 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	if (print_transformed)
 		for (auto x : v)
 			wcout << L'{' << endl << x.first << L'}' << endl;
-	auto y = get_dict_stats(v);
-	for (size_t n = 0; n != v.size(); ++n) {
-		DBG((wcout<<"nprogs: "<<n<<endl);)
-		prog_init(move(v[n].first), move(y[n]));
+	vector<pair<strs_t, size_t>> x;
+	for (auto t : v) {
+		strs_t s = get_dict_stats(t.first, t.second);
+		prog = prog_init(move(t.first), move(s), prog);
+		result &= prog->pfp({});
+		progs.insert(prog);
 	}
+	if (prog) printdb(wcout, prog);
+	for (lp* p : progs) delete p;
 }
-
-bool driver::pfp() { return prog->pfp() ? printdb(wcout, prog), true : false; }

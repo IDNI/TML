@@ -1,0 +1,39 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+#include "defs.h"
+#include <map>
+
+struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
+
+class dict_t {
+	typedef std::map<lexeme, int_t, lexcmp> dictmap;
+	dictmap syms_dict, vars_dict, rels_dict;
+	std::vector<lexeme> syms, rels;
+	std::set<lexeme, lexcmp> strs_extra;
+public:
+	int_t nums = 0, chars = 0, symbols = 0, relsyms = 0;
+	const lexeme& get_rel(int_t t) const { return rels[t]; }
+	lexeme get_sym(int_t t) const;
+	lexeme get_var(int_t t) const;
+	int_t get_var(const lexeme& l);
+	int_t get_rel(const lexeme& l);
+	int_t get_sym(const lexeme& l);
+	int_t get_rel(const std::wstring& s);
+
+	void add_nums(size_t newnums);
+	void add_chars(size_t newchars);
+	lexeme get_lexeme(const std::wstring& s);
+	size_t nsyms() const { return nums + chars + symbols + relsyms; }
+	size_t usz() const { return nums + chars + symbols; }
+	~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
+};

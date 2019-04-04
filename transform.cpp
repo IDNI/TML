@@ -1,24 +1,28 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include "driver.h"
 using namespace std;
 
-lexeme driver::get_lexeme(const wstring& s) {
-	auto it = strs_extra.find(s.c_str());
-	cws r;
-	if (it == strs_extra.end()) strs_extra.insert(r = wcsdup(s.c_str()));
-	else r = *it;
-	return { r, r + wcslen(r) };
-}
-
 lexeme driver::get_char_lexeme(wchar_t c) {
 	wstring s;
-	return get_lexeme(s += c);
+	return dict.get_lexeme(s += c);
 }
 
-lexeme driver::get_num_lexeme(int_t n) { return get_lexeme(to_wstring(n)); }
+lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
 
 lexeme driver::get_var_lexeme(int_t i) {
 	wstring s = L"?v";
-	return get_lexeme(s += to_wstring(i));
+	return dict.get_lexeme(s += to_wstring(i));
 }
 
 bool operator==(const lexeme& l, cws s) {
@@ -34,28 +38,28 @@ bool operator==(const lexeme& l, cws s) {
 };*/
 
 #define from_grammar_elem(v, v1, v2) raw_term{ false, {v, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
 		{elem::VAR, 0, get_var_lexeme(v1)}, \
 		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {2}}
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {2}}
 
 #define from_grammar_elem_nt(r, c, v1, v2) raw_term{ false, {\
 		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
+		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
 		c, {elem::VAR, 0, get_var_lexeme(v1)}, \
 		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}}
 
 #define from_grammar_elem_builtin(r, b, v, v1, v2) { false, {\
 		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, get_lexeme(L"(")}, \
-		{elem::SYM, 0, get_lexeme(b)}, \
+		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
+		{elem::SYM, 0, dict.get_lexeme(b)}, \
 		{elem::VAR, 0, get_var_lexeme(v1)}, \
 		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, get_lexeme(L")")}}, {3}}
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}}
 
 #define from_string_lex(rel, lex, n) raw_rule({ false, { \
-		{elem::SYM, 0, rel}, {elem::SYM, 0, get_lexeme(lex)}, \
+		{elem::SYM, 0, rel}, {elem::SYM, 0, dict.get_lexeme(lex)}, \
 		{elem::NUM, n, get_num_lexeme(n)}, \
 		{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}})
 
@@ -79,9 +83,9 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 }
 
 #define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
-#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, get_lexeme(s)})
-#define append_openp(x) (x).push_back({elem::OPENP, 0, get_lexeme(L"(")})
-#define append_closep(x) (x).push_back({elem::CLOSEP, 0, get_lexeme(L")")})
+#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, dict.get_lexeme(s)})
+#define append_openp(x) (x).push_back({elem::OPENP, 0, dict.get_lexeme(L"(")})
+#define append_closep(x) (x).push_back({elem::CLOSEP, 0, dict.get_lexeme(L")")})
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
 #define cat_in_brackets(x, y) \
 	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
@@ -202,7 +206,7 @@ nxthead:const raw_term &head = x.head(n);
 		z.add_body({}), cat_relsym_openp(z.body(n+1), L"G"),
 		z.body(n+1).neg = true, cat(z.body(n+1).e, x.body(n).e),
 		term_close(z.body(n+1));
-	_r.r.emplace_back(z), _r.delrel = dict_get_rel(L"G");
+	_r.r.emplace_back(z), _r.delrel = dict.get_rel(L"G");
 	if (++n < x.nheads()) goto nxthead;
 }
 

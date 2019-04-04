@@ -43,4 +43,5 @@ typedef std::vector<bools> vbools;
 #define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)
 #define has(x, y) std::binary_search(x.begin(), x.end(), y)
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+void parse_error(std::wstring e, lexeme l);
 #endif

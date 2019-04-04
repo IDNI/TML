@@ -21,37 +21,38 @@
 
 void tml_init();
 
+typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
+typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
+
 class lp { // [pfp] logic program
 	friend struct rule;
 	std::vector<struct rule*> rules;
 	void add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
 	bool add_facts(const matrix& x);
+	bool add_fact(const term& t);
+	void get_trees();
+	matrix get_yields(std::function<matrix(diff_t)> mkstr);
+	void fwd(diff_t &add, diff_t &del);
 	size_t gbdd = F;
-	lp *prev;
 public:
-	typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
-	typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
-	void align(const db_t& d, size_t pbits, size_t bits);
 	db_t db;
 	const size_t bits, dsz;
 	const int_t delrel;
 	const strs_t strs;
 	diff_t trees, trees_out;
+	std::map<int_t, term> str_yields, str_yields_out;
 
 	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
-		lp *prev = 0);
-	void fwd(diff_t &add, diff_t &del);
-	bool pfp();
-
-	bool add_fact(const term& t);
+		const std::map<int_t, term>& str_yields, lp *prev = 0);
+	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
 };
 
 size_t arlen(const ints& ar);
-std::set<ints> prefix(const lp::db_t& db, ints ar, int_t rel);
-void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
-	lp::diff_t& res);
+std::set<ints> prefix(const db_t& db, ints ar, int_t rel);
+void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
+	diff_t& res);
 std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, size_t n);
 extern int_t null;

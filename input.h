@@ -16,9 +16,6 @@
 #include <iostream>
 #include <sys/stat.h>
 
-#define err_digit L"symbol name cannot begin with a digit.\n"
-#define err_var_relsym L"relation symbol cannot be a variable.\n"
-
 struct elem {
 	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP } type;
 	int_t num;

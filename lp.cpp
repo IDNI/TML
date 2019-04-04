@@ -57,9 +57,28 @@ bool lp::add_facts(const matrix& x) {
 	return true;
 }
 
+size_t prefix_zeros(size_t x, size_t v, size_t k) {
+	if (v) return bdd_add({v+1, F, prefix_zeros(x, v-1, k)});
+	if (leaf(x)) return x;
+	const node& n = getnode(x);
+	return bdd_add({n[0]+k, prefix_zeros(n[1],0,k),prefix_zeros(n[2],0,k)});
+}
+
+size_t prefix_zeros(size_t x, size_t k) { return prefix_zeros(x, k, k); }
+
+db_t rebit(size_t pbits, size_t bits, db_t db) {
+	if (pbits == bits) return db;
+	assert(pbits < bits);
+	for (auto x : db)
+		*x.second = prefix_zeros(*x.second,
+				(bits - pbits) * arlen(x.first.second));
+	return db;
+}
+
 lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
-	lp *prev) : prev(prev), bits(msb(dsz)), dsz(dsz), delrel(delrel)
-	, strs(strs) {
+	const map<int_t, term>& str_yields, lp *prev) : bits(msb(dsz))
+	, dsz(dsz), delrel(delrel), strs(strs), str_yields(str_yields) {
+	if (prev) db = rebit(prev->bits, bits, move(prev->db));
 	//wcout<<r<<endl;
 	for (const auto& m : r) {
 		for (const term& t : m.first)
@@ -110,7 +129,7 @@ void lp::fwd(diff_t &add, diff_t &del) {
 }
 
 struct diffcmp {
-	bool operator()(const lp::diff_t& x, const lp::diff_t& y) const {
+	bool operator()(const diff_t& x, const diff_t& y) const {
 		if (x.size() != y.size()) return x.size() < y.size();
 		auto xt = x.begin(), yt = y.begin();
 		while (xt != x.end())
@@ -121,19 +140,19 @@ struct diffcmp {
 	}
 };
 
-lp::diff_t copy(const lp::db_t& x) {
-	lp::diff_t r;
+diff_t copy(const db_t& x) {
+	diff_t r;
 	for (auto y : x) r[y.first] = *y.second;
 	return r;
 }
 
-void copy(const lp::diff_t& src, lp::db_t& dst) {
+void copy(const diff_t& src, db_t& dst) {
 	for (auto x : dst) delete x.second;
 	dst.clear();
 	for (auto x : src) dst.emplace(x.first, new size_t(x.second));
 }
 
-bool bdd_and_not(const lp::diff_t& x, const lp::diff_t& y, lp::diff_t& r) {
+bool bdd_and_not(const diff_t& x, const diff_t& y, diff_t& r) {
 	for (auto t : x) {
 		auto it = y.find(t.first);
 		if (it == y.end()) continue;
@@ -144,7 +163,7 @@ bool bdd_and_not(const lp::diff_t& x, const lp::diff_t& y, lp::diff_t& r) {
 	return true;
 }
 
-lp::db_t& bdd_and_not(lp::db_t& x, const lp::diff_t& y) {
+db_t& bdd_and_not(db_t& x, const diff_t& y) {
 	for (auto t : x) {
 		auto it = y.find(t.first);
 		if (it == y.end()) continue;
@@ -153,7 +172,7 @@ lp::db_t& bdd_and_not(lp::db_t& x, const lp::diff_t& y) {
 	return x;
 }
 
-void bdd_or(lp::db_t& x, const lp::diff_t& y) {
+void bdd_or(db_t& x, const diff_t& y) {
 	for (auto t : x) {
 		auto it = y.find(t.first);
 		if (it == y.end()) continue;
@@ -161,7 +180,7 @@ void bdd_or(lp::db_t& x, const lp::diff_t& y) {
 	}
 }
 
-bool operator==(const lp::db_t& x, const lp::diff_t& y) {
+bool operator==(const db_t& x, const diff_t& y) {
 	if (x.size() != y.size()) return false;
 	auto xt = x.begin();
 	auto yt = y.begin();
@@ -172,19 +191,30 @@ bool operator==(const lp::db_t& x, const lp::diff_t& y) {
 	return true;
 }
 
-bool lp::pfp() {
-	if (prev) {
-		if (!prev->pfp()) return false;
-		for (auto x : prev->db)
-			if (db.find(x.first) != db.end())
-				*db[x.first] = bdd_or(*db[x.first], *x.second);
-			else *(db[x.first] = new size_t) = *x.second;
-//		align(prev->db, prev->bits, bits);
-	}
+void lp::get_trees() {
+	auto it = db.end();
+	for (auto x : trees)
+		for (auto p : prefix(db, x.first.second, x.first.first))
+			if ((it = db.find({x.first.first, p})) != db.end()) {
+				size_t y = bdd_expand(x.second,
+					arlen(x.first.second),
+					arlen(it->first.second), bits);
+				y = bdd_and(*it->second, y);
+				get_tree(x.first.first, y, it->first.second,
+					db, bits, trees_out);
+			}
+	if (!trees.empty()) copy(trees_out, db);
+}
+
+matrix lp::get_yields(function<matrix(diff_t)> /*mkstr*/) { return {};
+}
+
+bool lp::pfp(std::function<matrix(diff_t)> mkstr) {
 	diff_t d, add, del, t;
 	set<size_t> pf;
 	size_t step = 0;
 //	wcout << V.size() << endl;
+	DBG(printdb(wcout<<"before prog: "<<endl, this)<<endl;)
 	for (set<diff_t, diffcmp> s;;) {
 		wcout << "step: " << step++ << endl;
 		s.emplace(d = copy(db)), fwd(add, del);
@@ -198,21 +228,9 @@ bool lp::pfp() {
 		if (s.find(copy(db)) != s.end()) return false;
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
-	if (trees.empty()) goto ret;
-	for (auto x : trees)
-		for (auto p : prefix(db, x.first.second, x.first.first)) {
-			auto it = db.find({x.first.first, p});
-			if (it != db.end()) {
-				size_t y = bdd_expand(x.second,
-					arlen(x.first.second),
-					arlen(it->first.second), bits);
-				y = bdd_and(*it->second, y);
-				get_tree(x.first.first, y, it->first.second,
-					db, bits, trees_out);
-			}
-		}
-	copy(trees_out, db);
-ret:	if (delrel != -1) {
+	get_trees();
+	get_yields(mkstr);
+	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
 		for (auto x : d) db.erase(x);
@@ -223,8 +241,4 @@ ret:	if (delrel != -1) {
 	return true;
 }
 
-lp::~lp() {
-//	for (rule* r : rules) delete r;
-//	if (prev) delete prev;
-//	if (proof1) delete proof1, delete proof2;
-}
+lp::~lp() { for (rule* r : rules) delete r; }

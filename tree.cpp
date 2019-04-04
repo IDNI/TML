@@ -1,3 +1,15 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include "lp.h"
 #ifdef DEBUG
 #include "driver.h"
@@ -32,7 +44,7 @@ bool prefix(ints x, ints y) {
 	return true;
 }
 
-set<ints> prefix(const lp::db_t& db, ints ar, int_t rel) {
+set<ints> prefix(const db_t& db, ints ar, int_t rel) {
 	set<ints> r;
 	if (ar[0]) ar.insert(ar.begin(), 0);
 	auto lt = db.lower_bound({rel,{}}), ut = db.upper_bound({rel+1,{}});
@@ -45,8 +57,8 @@ set<ints> prefix(const lp::db_t& db, ints ar, int_t rel) {
 	return r;
 }
 
-void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
-	lp::diff_t& res, set<size_t>& done) {
+void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
+	diff_t& res, set<size_t>& done) {
 	if (!done.emplace(root).second) return;
 	DBG(drv->printdb(wcout << "db:" << endl, db));
 	DBG(drv->printdiff(wcout << "res:" << endl, res));
@@ -59,16 +71,16 @@ void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
 			r = bdd_subterm(root, y[n][0], y[n][1], arlen(ar),
 				arlen(z), bits);
 			DBG(drv->printbdd(wcout<<"subterm:"<<endl, r, z, rel);)
-			it = res.emplace(lp::diff_t::key_type{rel, z}, F).first,
+			it = res.emplace(diff_t::key_type{rel, z}, F).first;
 			it->second =
-				bdd_or(it->second, bdd_and(*db.at({rel,z}),r)),
+				bdd_or(it->second, bdd_and(*db.at({rel,z}),r));
 			get_tree(rel, it->second, z, db, bits, res, done);
 		}
 	}
 }
 
-void get_tree(int_t rel, size_t root, ints ar, const lp::db_t& db, size_t bits,
-	lp::diff_t& res) {
+void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
+	diff_t& res) {
 	set<size_t> done;
 	get_tree(rel, root, ar, db, bits, res, done);
 }

@@ -11,37 +11,10 @@
 #include <map>
 #include "lp.h"
 #include "input.h"
-
-struct dictcmp {
-	bool operator()(const std::pair<cws, size_t>& x,
-			const std::pair<cws, size_t>& y) const {
-		return	x.second != y.second ? x.second < y.second :
-			wcsncmp(x.first, y.first, x.second) < 0;
-	}
-};
-struct lexcmp {
-	bool operator()(const lexeme& x, const lexeme& y) const {
-		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
-			: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
-	}
-};
-struct wstrcmp { bool operator()(cws x, cws y) const { return wcscmp(x, y)<0;}};
+#include "dict.h"
 
 class driver {
-	typedef std::map<std::pair<cws, size_t>, int_t, dictcmp> dictmap;
-	dictmap syms_dict, vars_dict, rels_dict;
-	std::vector<cws> syms;
-	std::vector<size_t> lens;
-	std::pair<cws, size_t> dict_get(int_t t) const;
-	int_t dict_get(cws s, size_t len, bool rel);
-	int_t dict_get(const lexeme& l);
-	int_t dict_get_rel(const lexeme& l);
-	int_t dict_get_rel(const std::wstring& s);
-//	int_t dict_get();
-	size_t nsyms() const { return nums + chars + symbols + relsyms; }
-	size_t usz() const { return nums + chars + symbols; }
-//	size_t dict_bits() const { return msb(nsyms()); }
-	std::set<cws, wstrcmp> strs_extra;
+	dict_t dict;
 	std::set<size_t> builtin_rels;//, builtin_symbdds;
 	matrix from_bits(size_t x, ints art, int_t rel) const;
 	template<typename F>
@@ -49,9 +22,7 @@ class driver {
 	term one_from_bits(size_t x, ints art, int_t rel) const;
 
 	bool mult = false;
-	int_t nums = 0, chars = 0, symbols = 0, relsyms = 0;
 
-	lexeme get_lexeme(const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
@@ -59,8 +30,8 @@ class driver {
 	std::pair<matrix, matrix> get_rule(const raw_rule&);
 	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& rels,
 		std::set<lexeme, lexcmp>& syms);
-	std::vector<strs_t> get_dict_stats(const std::vector<
-		std::pair<raw_prog, std::map<lexeme, std::wstring>>>& v);
+	strs_t get_dict_stats(const raw_prog& p,
+		const std::map<lexeme, std::wstring>& s);
 
 	std::wstring directive_load(const directive& d);
 	std::map<lexeme, std::wstring> directives_load(
@@ -79,21 +50,20 @@ class driver {
 	bool print_transformed;
 	void grammar_to_rules(const std::vector<production>& g, matrices& m,
 		int_t rel);
-	void prog_init(const raw_prog& rp, strs_t);
+	lp* prog_init(const raw_prog& rp, strs_t, lp* last);
 	void progs_read(wstr s);
-	bool pfp(lp *p);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();
+	bool pfp();
 	std::wstring std_input;
 	int argc;
 	char** argv;
 public:
-	lp* prog = 0;
 	size_t bits;
+	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
 	driver(int argc, char** argv, std::wstring,
 		bool print_transformed = false);
-	bool pfp();
 
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
@@ -106,16 +76,14 @@ public:
 	std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar,
 		int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
-	std::wostream& printdb(std::wostream& os, const lp::db_t& db) const;
-	std::wostream& printdiff(std:: wostream& os, const lp::diff_t& d) const;
-	std::wostream& printndb(std::wostream& os, lp *p) const;
-	~driver() { if (prog) delete prog; for (cws w:strs_extra)free((wstr)w);}
+	std::wostream& printdb(std::wostream& os, const db_t& db) const;
+	std::wostream& printdiff(std:: wostream& os, const diff_t& d) const;
 };
 
 #ifdef DEBUG
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printdiff(std:: wostream& os, const lp::diff_t& d);
+std::wostream& printdiff(std:: wostream& os, const diff_t& d);
 std::wostream& printbdd(std::wostream& os, size_t t, ints ar, int_t rel);
 std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar, int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
