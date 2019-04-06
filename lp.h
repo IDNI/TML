@@ -32,7 +32,6 @@ class lp { // [pfp] logic program
 	bool add_facts(const matrix& x);
 	bool add_fact(const term& t);
 	void get_trees();
-	matrix get_yields(std::function<matrix(diff_t)> mkstr);
 	void fwd(diff_t &add, diff_t &del);
 	size_t gbdd = F;
 public:
@@ -41,10 +40,9 @@ public:
 	const int_t delrel;
 	const strs_t strs;
 	diff_t trees, trees_out;
-	std::map<int_t, term> str_yields, str_yields_out;
 
 	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
-		const std::map<int_t, term>& str_yields, lp *prev = 0);
+		lp *prev = 0);
 	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
 };

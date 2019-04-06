@@ -18,13 +18,11 @@
 #include <forward_list>
 #include <functional>
 #include <cctype>
+#include <ctime>
 #include "driver.h"
 #include "rule.h"
 using namespace std;
 
-//#define err_null "'null' can appear only by itself on the rhs.\n"
-//#define err_null_in_head 
-//	"'null' not allowed to appear in the head of positive rules.\n"
 #define err_proof	"proof extraction yet unsupported for programs "\
 			"with negation or deletion."
 #define err_directive_elem \
@@ -143,7 +141,7 @@ wstring driver::directive_load(const directive& d) {
 map<lexeme, wstring> driver::directives_load(const vector<directive>& ds) {
 	map<lexeme, wstring> r;
 	for (const directive& d : ds)
-		if (d.type != directive::YIELD)
+		if (d.type != directive::TREE)
 			r.emplace(d.rel, directive_load(d));
 	return r;
 }
@@ -157,16 +155,16 @@ lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
 		else if (x.pgoal)
 			assert(!x.nbodies()), pg.push_back(get_term(x.head(0)));
 		else m.insert(get_rule(x));
-	map<int_t, term> yields;
+	map<int_t, term> trees;
 	for (const directive& d : p.d)
-		if (d.type == directive::YIELD) {
+		if (d.type == directive::TREE) {
 //			size_t r = dict.get_rel(d.rel), s = syms.size();
 //			yields[r] = get_term(d.t);
 //			if (syms.size() != s)
 //				parse_error(err_directive_elem, d.t.e[0].e);
 		}
 	size_t usz = (dict.nsyms() + nums + chars)<<2;
-	return new lp(move(m), move(g), p.delrel, usz, s, yields, last);
+	return new lp(move(m), move(g), p.delrel, usz, s, last);
 }
 
 driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
@@ -199,8 +197,15 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	vector<pair<strs_t, size_t>> x;
 	for (auto t : v) {
 		strs_t s = get_dict_stats(t.first, t.second);
+		clock_t start, end;
+		start = clock();
 		prog = prog_init(move(t.first), move(s), prog);
+		end = clock();
+		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
+		start = clock();
 		result &= prog->pfp({});
+		end = clock();
+		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
 		progs.insert(prog);
 	}
 	if (prog) printdb(wcout, prog);

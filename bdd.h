@@ -26,7 +26,6 @@ extern std::vector<node> V;
 void bdd_init();
 size_t bdd_add(const node& n); //create new bdd node,standard implementation
 std::vector<std::vector<bool>> allsat(size_t x, size_t nv);
-void allsat(size_t x, size_t nvars, std::function<void(const bools&)> f);
 size_t from_bit(size_t x ,bool v);
 size_t bdd_or(size_t x, size_t y);
 size_t bdd_ex(size_t x, const bools&);
@@ -66,4 +65,17 @@ std::wostream& operator<<(std::wostream& os, const vbools& x);
 #define from_bit(x, v) (bdd_add((v) ? node{{(x)+1,T,F}} : node{{(x)+1,F,T}}))
 #define from_eq(x, y) ((x) < (y) ? bdd_add({{x+1,from_bit(y,1),from_bit(y,0)}})\
 			: bdd_add({{y+1, from_bit(x,1), from_bit(x,0)}}))
+
+class allsat_cb {
+public:
+	typedef std::function<void(const bools&)> callback;
+	allsat_cb(size_t x, size_t nvars, callback f)
+		: x(x), nvars(nvars), f(f), p(nvars) {}
+	void operator()() { sat(1, getnode(x)); }
+private:
+	size_t x, nvars;
+	callback f;
+	bools p;
+	void sat(size_t v, const node& n);
+};
 #endif

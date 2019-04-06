@@ -76,8 +76,7 @@ db_t rebit(size_t pbits, size_t bits, db_t db) {
 }
 
 lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
-	const map<int_t, term>& str_yields, lp *prev) : bits(msb(dsz))
-	, dsz(dsz), delrel(delrel), strs(strs), str_yields(str_yields) {
+	lp *prev) : bits(msb(dsz)) , dsz(dsz), delrel(delrel), strs(strs) {
 	if (prev) db = rebit(prev->bits, bits, move(prev->db));
 	//wcout<<r<<endl;
 	for (const auto& m : r) {
@@ -206,10 +205,7 @@ void lp::get_trees() {
 	if (!trees.empty()) copy(trees_out, db);
 }
 
-matrix lp::get_yields(function<matrix(diff_t)> /*mkstr*/) { return {};
-}
-
-bool lp::pfp(std::function<matrix(diff_t)> mkstr) {
+bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
 	diff_t d, add, del, t;
 	set<size_t> pf;
 	size_t step = 0;
@@ -229,7 +225,6 @@ bool lp::pfp(std::function<matrix(diff_t)> mkstr) {
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
 	get_trees();
-	get_yields(mkstr);
 	if (delrel != -1) {
 		set<pair<int_t, ints>> d;
 		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);

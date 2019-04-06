@@ -102,7 +102,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	else if (*l[pos][0] == L'$')
 		type = CMDLINE, ++pos, n=get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == L"stdin") type = STDIN;
-	else if (t.parse(l, pos)) type = YIELD;
+	else if (t.parse(l, pos)) type = TREE;
 	else parse_error(err_directive_arg, l[pos]);
 	if (arg = l[pos++], *l[pos++][0] != '.')
 		parse_error(dot_expected, l[pos]);

@@ -55,7 +55,7 @@ wostream& operator<<(wostream& os, const matrices& m) {
 
 template<typename F>
 void driver::from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const {
-	allsat(x, bits * arlen(art), [art, rel, bits, f, this](const bools& p) {
+	allsat_cb(x, bits * arlen(art), [art, rel, bits,f,this](const bools& p){
 		const size_t ar = arlen(art);
 		term v(false, rel, ints(ar, 0), art);
 		for (size_t i = 0; i != ar; ++i)
@@ -63,7 +63,7 @@ void driver::from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const {
 				if (p[POS(b, bits, i, ar)])
 					v.arg(i) |= 1 << b;
 		f(v);
-	});
+	})();
 }
 
 matrix driver::from_bits(size_t x, size_t bits, ints art, int_t rel) const {
@@ -165,7 +165,7 @@ wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 		if (builtin_rels.find(x.first.first) == builtin_rels.end()) {
 			from_bits(*x.second,bits,x.first.second,x.first.first, 
 				[&os,this](const term&t){
-				print_term(os, t)<<endl;});
+				print_term(os, t)<<endl; });
 		}
 	return os;
 }

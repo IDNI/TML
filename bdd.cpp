@@ -64,21 +64,15 @@ size_t bdd_add(const node& n) { // create new bdd node,standard implementation
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
 
-template<typename F>
-void sat(size_t v, size_t nvars, node n, bools& p, F f) {
+void allsat_cb::sat(size_t v, const node& n) {
 	if (nleaf(n) && !ntrueleaf(n)) return;
 	if (v < n[0])
-		p[v-1] = true,  sat(v + 1, nvars, n, p, f),
-		p[v-1] = false, sat(v + 1, nvars, n, p, f);
+		p[v-1] = true,  sat(v + 1, n),
+		p[v-1] = false, sat(v + 1, n);
 	else if (v != nvars+1)
-		p[v-1] = true,  sat(v + 1, nvars, getnode(n[1]), p, f),
-		p[v-1] = false, sat(v + 1, nvars, getnode(n[2]), p, f);
+		p[v-1] = true,  sat(v + 1, getnode(n[1])),
+		p[v-1] = false, sat(v + 1, getnode(n[2]));
 	else	f(p);
-}
-
-void allsat(size_t x, size_t nvars, function<void(const bools&)> f) {
-	bools p(nvars);
-	sat(1, nvars, getnode(x), p, f);
 }
 
 void sat(size_t v, size_t nvars, node n, bools& p, vbools& r) {

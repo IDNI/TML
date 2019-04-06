@@ -36,7 +36,7 @@ struct directive {
 	lexeme rel, arg;
 	raw_term t;
 	int_t n;
-	enum etype { STR, FNAME, CMDLINE, STDIN, YIELD } type;
+	enum etype { STR, FNAME, CMDLINE, STDIN, TREE } type;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
