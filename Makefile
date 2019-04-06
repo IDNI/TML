@@ -29,8 +29,8 @@ output.o: $(SRC)
 main.o: $(SRC)
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-test: bdd.test.cpp bdd.cpp bdd.h defs.h query.h query.cpp rule.h rule.cpp query.test.h query.test.cpp driver.cpp
-	g++ query.cpp bdd.test.cpp query.test.cpp rule.cpp bdd.cpp driver.cpp lp.cpp -otest -g -W -Wall -Wpedantic dict.cpp input.cpp -ggdb3
+test: bdd.test.cpp bdd.cpp bdd.h defs.h query.h query.cpp rule.h rule.cpp query.test.h query.test.cpp driver.cpp output.cpp
+	g++ transform.cpp query.cpp output.cpp bdd.test.cpp query.test.cpp rule.cpp bdd.cpp driver.cpp lp.cpp -otest -g -W -Wall -Wpedantic tree.cpp dict.cpp input.cpp -ggdb3
 
 dimacs: dimacs.cpp bdd.h bdd.cpp defs.h
 	g++ dimacs.cpp bdd.cpp -O3 -flto

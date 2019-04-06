@@ -34,6 +34,7 @@ ostream& operator<<(ostream& os, const vbools& x) {
 }
 
 int main() {
+	bdd_init();
 	vector<vector<int>> p;
 	for (string line; getline(cin, line);)
 		if (line = trim(line), line[0] == 'c') continue;
@@ -52,14 +53,18 @@ int main() {
 	}
 	vector<size_t> v;
 	int nvars = 0;
+	size_t r = T;
 	for (auto x : p) {
 		size_t t = F;
 		for (int i : x) {
 			nvars = max(nvars, abs(i));
-			t = bdd_or(t, from_bit(abs(i), i>0));
+			t = bdd_or(t, from_bit(abs(i)-1, i>0));
 		}
+//		r = bdd_and(r, t);
 		v.push_back(t);
 	}
+//	if (r == F) cout << "unsat" << endl;
+//	else cout << "sat" << endl;
 	if (bdd_and_many(v) == F) cout << "unsat" << endl;
 	else cout << "sat" << endl;
 	return 0;
