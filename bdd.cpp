@@ -64,14 +64,16 @@ size_t bdd_add(const node& n) { // create new bdd node,standard implementation
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
 
-void allsat_cb::sat(size_t v, const node& n) {
-	if (nleaf(n) && !ntrueleaf(n)) return;
-	if (v < n[0])
-		p[v-1] = true,  sat(v + 1, n),
-		p[v-1] = false, sat(v + 1, n);
+void allsat_cb::sat(size_t x) {
+	if (leaf(x) && !trueleaf(x)) return;
+	if (v < getnode(x)[0])
+		++v,
+		p[v-2] = true,  sat(x),
+		p[v-2] = false, sat(x), --v;
 	else if (v != nvars+1)
-		p[v-1] = true,  sat(v + 1, getnode(n[1])),
-		p[v-1] = false, sat(v + 1, getnode(n[2]));
+		++v,
+		p[v-2] = true,  sat(getnode(x)[1]),
+		p[v-2] = false, sat(getnode(x)[2]), --v;
 	else	f(p);
 }
 

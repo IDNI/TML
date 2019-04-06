@@ -69,13 +69,13 @@ std::wostream& operator<<(std::wostream& os, const vbools& x);
 class allsat_cb {
 public:
 	typedef std::function<void(const bools&)> callback;
-	allsat_cb(size_t x, size_t nvars, callback f)
-		: x(x), nvars(nvars), f(f), p(nvars) {}
-	void operator()() { sat(1, getnode(x)); }
+	allsat_cb(size_t r, size_t nvars, callback f)
+		: r(r), nvars(nvars), f(f), p(nvars) {}
+	void operator()() { sat(r); }
 private:
-	size_t x, nvars;
+	size_t r, nvars, v = 1;
 	callback f;
 	bools p;
-	void sat(size_t v, const node& n);
+	void sat(size_t x);
 };
 #endif
