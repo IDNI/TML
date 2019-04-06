@@ -137,15 +137,25 @@ wostream& operator<<(wostream& os, const tt& t) {
 }
 
 void test_and_many() {
-	for (size_t k = 0; k < 150; ++k) {
+	size_t bits = 3, tts = 3;
+	for (size_t k = 0; k < 15000; ++k) {
 		wcout<<k<<endl;
-		tt *t = new tt[10];
-		for (size_t i = 0; i < 10; ++i) t[i] = rndtt(8).ex(i);
+		tt *t = new tt[tts];
+		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
 		size_t r = T;
-		for (size_t i = 0; i < 10; ++i) r = bdd_and(r, t[i].bdd());
+		for (size_t i = 0; i < tts; ++i) r = bdd_and(r, t[i].bdd());
+		tt rr = t[0];
+		for (size_t i = 1; i < tts; ++i) rr = rr & t[i];
 		vector<size_t> v;
-		for (size_t i = 0; i < 10; ++i) v.push_back(t[i].bdd());
-		assert(r == bdd_and_many(v));
+		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
+		if (r != bdd_and_many(v)) {
+			wcout<<endl;
+			for (size_t i = 0; i < tts; ++i) wcout<<t[i]<<endl;
+			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_and_many(v),bits)<<endl<<endl<<allsat(r,bits)<<endl;
+			assert(r == bdd_and_many(v));
+		}
+		assert(r == rr.bdd());
+		if (r != F) wcout << "sat" << endl;
 		delete[] t;
 	}
 }
@@ -160,7 +170,7 @@ int main() {
 //	test_query();
 	srand(time(0));
 	test_and_many();
-	exit(0);
+//	exit(0);
 	tt xt(3);
 	xt.addrow({false, true, true});
 	xt.addrow({true, true, false});

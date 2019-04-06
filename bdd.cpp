@@ -22,7 +22,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-#define MEMO
+//#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef array<size_t, 3> adtmemo;
@@ -300,14 +300,14 @@ size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 	sizes x;
 	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
 	if (x.size() > 1) {
-		size_t r = bdd_and_many(x);
-		if (r == F) return res = F, 1;
 		for (size_t n = 0; n < h.size();)
 			if (has(x, h[n])) h.erase(h.begin() + n);
 			else ++n;
 		for (size_t n = 0; n < l.size();)
 			if (has(x, l[n])) l.erase(l.begin() + n);
 			else ++n;
+		size_t r = bdd_and_many(move(x));
+		if (r == F) return res = F, 1;
 		h.push_back(r), l.push_back(r);
 	}
 	return 0;
@@ -315,8 +315,8 @@ size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 
 size_t bdd_and_many(sizes v) {
 	static map<sizes, size_t> memo;
+#ifdef MEMO	
 	auto jt = memo_and.end();
-
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
 			if ((jt=memo_and.find({v[n], v[k]})) == memo_and.end())
@@ -326,6 +326,7 @@ size_t bdd_and_many(sizes v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
+#endif	
 	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
 	it = memo.emplace(v, 0).first;
