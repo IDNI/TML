@@ -32,6 +32,9 @@ main.o: $(SRC)
 test: bdd.test.cpp bdd.cpp bdd.h defs.h query.h query.cpp rule.h rule.cpp query.test.h query.test.cpp driver.cpp
 	g++ query.cpp bdd.test.cpp query.test.cpp rule.cpp bdd.cpp driver.cpp lp.cpp -otest -g -W -Wall -Wpedantic dict.cpp input.cpp -ggdb3
 
+dimacs: dimacs.cpp bdd.h bdd.cpp defs.h
+	g++ dimacs.cpp bdd.cpp -O3 -flto
+
 .PHONY: clean
 clean:
 	rm tml *.o

@@ -52,14 +52,11 @@ size_t bdd_add_nocheck(const node& n) {
 }
 
 void bdd_init() { bdd_add_nocheck({{0, 0, 0}}), bdd_add_nocheck({{0, 1, 1}}); }
-//bool print = false;
+
 size_t bdd_add(const node& n) { // create new bdd node,standard implementation
-//	if (print) wcout << n << endl;
 	if (n[1] == n[2]) return n[1];
-#ifdef DEBUG	
-	if (!leaf(n[1])) assert(n[0] < getnode(n[1])[0]);
-	if (!leaf(n[2])) assert(n[0] < getnode(n[2])[0]);
-#endif	
+	DBG(if (!leaf(n[1])) assert(n[0] < getnode(n[1])[0]);)
+	DBG(if (!leaf(n[2])) assert(n[0] < getnode(n[2])[0]);)
 	auto it = M.find(n);
 	return it == M.end() ? bdd_add_nocheck(n) : it->second;
 }
@@ -67,12 +64,9 @@ size_t bdd_add(const node& n) { // create new bdd node,standard implementation
 void allsat_cb::sat(size_t x) {
 	if (leaf(x) && !trueleaf(x)) return;
 	if (v < getnode(x)[0])
-		++v,
-		p[v-2] = true,  sat(x),
-		p[v-2] = false, sat(x), --v;
+		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
 	else if (v != nvars+1)
-		++v,
-		p[v-2] = true,  sat(getnode(x)[1]),
+		p[++v-2] = true, sat(getnode(x)[1]),
 		p[v-2] = false, sat(getnode(x)[2]), --v;
 	else	f(p);
 }
@@ -96,6 +90,9 @@ vbools allsat(size_t x, size_t nvars) {
 
 size_t bdd_or(size_t x, size_t y) {
 	if (x == y) return x;
+	if (x == F) return y;
+	if (y == F) return x;
+	if (x == T || y == T) return T;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_or.find(t);
@@ -103,9 +100,9 @@ size_t bdd_or(size_t x, size_t y) {
 	size_t res;
 #endif	
 	const node &Vx = getnode(x);
-	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx) ? T : y, memo_or);
+//	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx) ? T : y, memo_or);
        	const node &Vy = getnode(y);
-	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? T : x, memo_or);
+//	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? T : x, memo_or);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
@@ -134,6 +131,9 @@ size_t bdd_ex(size_t x, const bools& b) {
 
 size_t bdd_and(size_t x, size_t y) {
 	if (x == y) return x;
+	if (x == F || y == F) return F;
+	if (x == T) return y;
+	if (y == T) return x;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_and.find(t);
@@ -141,9 +141,9 @@ size_t bdd_and(size_t x, size_t y) {
 	size_t res;
 #endif	
 	const node &Vx = getnode(x);
-	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?y:F, memo_and);
+//	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?y:F, memo_and);
        	const node &Vy = getnode(y);
-	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy) ? F : x, memo_and);
+//	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy) ? F : x, memo_and);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
