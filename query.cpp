@@ -19,12 +19,12 @@
 using namespace std;
 
 ints from_term(const term& t) {
-	ints r(t.args.size(), 0);
-	for (int_t n = 0, k; n != (int_t)t.args.size(); ++n)
-		if (t.args[n] >= 0) r[n] = t.args[n]+1;
+	ints r(t.nargs(), 0);
+	for (int_t n = 0, k; n != (int_t)t.nargs(); ++n)
+		if (t.arg(n) >= 0) r[n] = t.args()[n]+1;
 		else if ((k = n))
 			while (k--)
-				if (t.args[k] == t.args[n]) {
+				if (t.arg(k) == t.arg(n)) {
 					r[n] = -k-1;
 					break;
 				}
@@ -32,13 +32,13 @@ ints from_term(const term& t) {
 }
 
 bools get_ex(const term& t, size_t bits) {
-	bools ex(t.args.size()*bits, false);
-	ints r(t.args.size(), 0);
-	for (int_t n = 0, k; n != (int_t)t.args.size(); ++n)
-		if (t.args[n] >= 0) r[n] = t.args[n]+1;
+	bools ex(t.nargs()*bits, false);
+	ints r(t.nargs(), 0);
+	for (int_t n = 0, k; n != (int_t)t.nargs(); ++n)
+		if (t.arg(n) >= 0) r[n] = t.arg(n)+1;
 		else if ((k = n))
 			while (k--)
-				if (t.args[k] == t.args[n]) {
+				if (t.arg(k) == t.arg(n)) {
 					r[n] = -k-1;
 					break;
 				}
@@ -92,7 +92,7 @@ size_t query::operator()(size_t x) {
 }*/
 
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg)
-	: bits(bits), nvars(t.args.size()*bits), e(from_term(t)), neg(neg)
+	: bits(bits), nvars(t.nargs()*bits), e(from_term(t)), neg(neg)
 	{DBG(_t=t;) }
 
 size_t bdd_and_eq::operator()(const size_t x) {

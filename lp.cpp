@@ -49,7 +49,7 @@ bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
 
 bool lp::add_fact(const term& x) {
 //	if (x.neg) return add_not_fact(fact(x, bits, dsz), x.rel, x.arity);
-	return add_fact(fact(x, bits, dsz), x.rel, x.arity), true;
+	return add_fact(fact(x, bits, dsz), x.rel(), x.arity()), true;
 }
 
 bool lp::add_facts(const matrix& x) {
@@ -58,9 +58,9 @@ bool lp::add_facts(const matrix& x) {
 }
 
 size_t prefix_zeros(size_t x, size_t v, size_t k) {
-	if (v) return bdd_add({v+1, F, prefix_zeros(x, v-1, k)});
+	if (v) return bdd_add({k-v+1, F, prefix_zeros(x, v-1, k)});
 	if (leaf(x)) return x;
-	const node& n = getnode(x);
+	const node n = getnode(x);
 	return bdd_add({n[0]+k, prefix_zeros(n[1],0,k),prefix_zeros(n[2],0,k)});
 }
 
@@ -82,9 +82,9 @@ lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 	//wcout<<r<<endl;
 	for (const auto& m : r) {
 		for (const term& t : m.first)
-			*(db[{t.rel, t.arity}] = new size_t) = F;
+			*(db[{t.rel(), t.arity()}] = new size_t) = F;
 		for (const term& t : m.second)
-			*(db[{t.rel, t.arity}] = new size_t) = F;
+			*(db[{t.rel(), t.arity()}] = new size_t) = F;
 	}
 	for (const auto& m : r)
  		if (m.second.empty()) {
@@ -96,16 +96,16 @@ lp::lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t& strs,
 			vector<size_t*> dbs;
 			for (size_t n = 0; n < m.second.size(); ++n)
 //				if (m.second[n].b == term::NONE)
-				dbs.push_back(db[{m.second[n].rel,
-					m.second[n].arity}]);
+				dbs.push_back(db[{m.second[n].rel(),
+					m.second[n].arity()}]);
 			rules.emplace_back(
 				new rule(m.first, m.second, dbs, bits, dsz));
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
 	for (const term& t : g) {
-		if (t.arity.size() > 2 && !t.arity[0] && t.arity[1] == -1) {
-			trees.emplace(diff_t::key_type{t.rel, t.arity}, 
+		if (t.arity().size()>2 && !t.arity()[0] && t.arity()[1] == -1) {
+			trees.emplace(diff_t::key_type{t.rel(), t.arity()}, 
 					fact(t, bits, dsz));
 			DBG(drv->printdiff(wcout<<"trees:"<<endl, trees);)
 		} else gbdd = bdd_or(gbdd, fact(t, bits, dsz));

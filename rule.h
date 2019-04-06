@@ -46,4 +46,4 @@ struct rule { // a P-DATALOG rule in bdd form
 	sizes fwd(size_t bits);
 };
 
-size_t fact(term v, size_t bits, size_t dsz);
+size_t fact(const term& v, size_t bits, size_t dsz);

@@ -21,19 +21,19 @@ class dict_t {
 	std::vector<lexeme> syms, rels;
 	std::set<lexeme, lexcmp> strs_extra;
 public:
-	int_t nums = 0, chars = 0, symbols = 0, relsyms = 0;
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	lexeme get_sym(int_t t) const;
 	lexeme get_var(int_t t) const;
 	int_t get_var(const lexeme& l);
 	int_t get_rel(const lexeme& l);
 	int_t get_sym(const lexeme& l);
-	int_t get_rel(const std::wstring& s);
 
-	void add_nums(size_t newnums);
-	void add_chars(size_t newchars);
 	lexeme get_lexeme(const std::wstring& s);
-	size_t nsyms() const { return nums + chars + symbols + relsyms; }
-	size_t usz() const { return nums + chars + symbols; }
+	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
+	size_t nsyms() const { return syms.size(); }
+//	size_t usz() const { return nums + nchars() + symbols(); }
+//	size_t nchars() const { return chars; }
+//	size_t symbols() const { return syms.size(); }
+//	size_t relsyms() const { return rels.size(); }
 	~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
 };

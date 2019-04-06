@@ -11,20 +11,32 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-struct term {
-	bool neg;
-	int_t rel;
-	ints args, arity;
+class term {
+	bool _neg;
+	int_t _rel;
+	ints _args, _arity;
+public:
 	term () {}
-	term(bool neg, int_t rel) : neg(neg), rel(rel) {}
+	term(bool neg, int_t rel) : _neg(neg), _rel(rel) {}
 	term(bool neg, int_t rel, const ints& args,
-		const ints& arity) : neg(neg), rel(rel)
-		, args(args), arity(arity) {}
+		const ints& arity) : _neg(neg), _rel(rel)
+		, _args(args), _arity(arity) {}
+	bool neg() const { return _neg; }
+	int_t rel() const { return _rel; }
+	const ints& args() const { return _args; }
+	const ints& arity() const { return _arity; }
+	int_t& arg(size_t n) { return _args[n]; }
+	const int_t& arg(size_t n) const { return _args[n]; }
+	void setrel(int_t r) { _rel = r; }
+	void setneg(bool b) { _neg = b; }
+	void add_arg(int_t x) { _args.push_back(x); }
+	void set_arity(const ints& a) { _arity = a; }
+	size_t nargs() const { return _args.size(); }
 	bool operator<(const term& t) const {
-		if (neg != t.neg) return neg;
-		if (rel != t.rel) return rel < t.rel;
-		if (arity != t.arity) return arity < t.arity;
-		return args < t.args;
+		if (_neg != t._neg) return _neg;
+		if (_rel != t._rel) return _rel < t._rel;
+		if (_arity != t._arity) return _arity < t._arity;
+		return _args < t._args;
 	}
 };
 

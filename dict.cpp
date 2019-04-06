@@ -18,11 +18,10 @@ using namespace std;
 
 lexeme dict_t::get_sym(int_t t) const {
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
-	if (t < chars) { str_chr[1] = t; return { str_chr, str_chr + 3 }; }
-	if ((t -= chars) < nums)
-		return wcscpy(str_nums, to_wstring(t).c_str()),
+	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
+	if (t & 3) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),
 			lexeme{ str_nums, str_nums + wcslen(str_nums) };
-	return syms[t - nums];
+	return syms[(t>>2)-1];
 }
 
 int_t dict_t::get_var(const lexeme& l) {
@@ -44,25 +43,7 @@ int_t dict_t::get_rel(const lexeme& l) {
 int_t dict_t::get_sym(const lexeme& l) {
 	auto it = syms_dict.find(l);
 	if (it != syms_dict.end()) return it->second;
-	syms.push_back(l);
-	return syms_dict[l] = syms.size() + nums + chars - 1;
-}
-
-/*int_t dict_t::get(const lexeme& l, bool rel) {
-	if (iswdigit(*s)) parse_error(err_digit, s, len);
-	if (*s == L'?') return get_var(s, len);
-	if (rel) return get_rel(s, len);
-	return get_sym(s, len);
-}*/
-
-int_t dict_t::get_rel(const wstring& s) {
-	return get_rel(get_lexeme(s));
-/*	auto it = rels_dict.find({s.c_str(), s.size()});
-	if (it != rels_dict.end()) return it->second;
-	wstr w = wcsdup(s.c_str());
-	lexeme l(w, w + s.size());
-	strs_extra.insert(l);
-	return rels.push_back(l), rels_dict[l] = rels.size() - 1;*/
+	return syms.push_back(l), syms_dict[l] = syms.size()<<2;
 }
 
 lexeme dict_t::get_lexeme(const wstring& s) {
@@ -73,14 +54,4 @@ lexeme dict_t::get_lexeme(const wstring& s) {
 	lexeme l = {r, r + s.size()};
 	strs_extra.insert(l);
 	return l;
-}
-
-void dict_t::add_chars(size_t newchars) {
-	chars += newchars;
-	for (auto& x : syms_dict) x.second += newchars;
-}
-
-void dict_t::add_nums(size_t newnums) {
-	nums += newnums;
-	for (auto& x : syms_dict) x.second += newnums;
 }

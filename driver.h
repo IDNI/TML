@@ -16,12 +16,13 @@
 class driver {
 	dict_t dict;
 	std::set<size_t> builtin_rels;//, builtin_symbdds;
-	matrix from_bits(size_t x, ints art, int_t rel) const;
+	matrix from_bits(size_t x, size_t bits, ints art, int_t rel) const;
 	template<typename F>
-	void from_bits(size_t x, ints art, int_t rel, F f) const;
-	term one_from_bits(size_t x, ints art, int_t rel) const;
+	void from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const;
+	term one_from_bits(size_t x, size_t bits, ints art, int_t rel) const;
 
-	bool mult = false;
+	int_t nums = 0, chars = 0, syms = 0;
+//	bool mult = false;
 
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
@@ -59,7 +60,7 @@ class driver {
 	int argc;
 	char** argv;
 public:
-	size_t bits;
+//	size_t bits;
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
 	driver(int argc, char** argv, std::wstring,
@@ -71,21 +72,25 @@ public:
 	std::wostream& print_term(std::wostream& os, const term& t) const;
 	std::wostream& printbdd(std::wostream& os, const matrix& t) const;
 	std::wostream& printbdd(std::wostream& os, const matrices& t) const;
-	std::wostream& printbdd(std::wostream& os, size_t t, ints ar, int_t rel)
-		const;
-	std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar,
-		int_t rel) const;
+	std::wostream& printbdd(std::wostream& os, size_t t, size_t bits,
+		ints ar, int_t rel) const;
+	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
+		ints ar, int_t rel) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
-	std::wostream& printdb(std::wostream& os, const db_t& db) const;
-	std::wostream& printdiff(std:: wostream& os, const diff_t& d) const;
+	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
+		const;
+	std::wostream& printdiff(std:: wostream& os, const diff_t& d,
+		size_t bits) const;
 };
 
 #ifdef DEBUG
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printdiff(std:: wostream& os, const diff_t& d);
-std::wostream& printbdd(std::wostream& os, size_t t, ints ar, int_t rel);
-std::wostream& printbdd_one(std::wostream& os, size_t t, ints ar, int_t rel);
+std::wostream& printdiff(std:: wostream& os, const diff_t& d, size_t bits);
+std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
+	int_t rel);
+std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits, ints ar,
+	int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
