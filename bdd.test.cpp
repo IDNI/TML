@@ -137,6 +137,55 @@ wostream& operator<<(wostream& os, const tt& t) {
 }
 
 void test_and_many() {
+/*
+000
+001
+011
+100
+101
+111
+
+001
+011
+100
+101
+110
+111
+
+010
+011
+100
+101 */
+	size_t v1[] = {
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 0))),
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 1))),
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 1)))};
+/*	size_t v2[] = {
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 1))),
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 0))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 1)))};*/
+	size_t v3[] = {
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 0))),
+		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
+		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1)))};
+	size_t x = F, y = F, z = F;
+	for (size_t n = 0; n != 6; ++n) x=bdd_or(x, v1[n]);//, y=bdd_or(y, v2[n]);
+	for (size_t n = 0; n != 4; ++n) z=bdd_or(z, v3[n]);
+	bdd_out(wcout<<"x: ", x)<<endl;
+	bdd_out(wcout<<"z: ", z)<<endl;
+	//assert(bdd_and(bdd_and(x, y), z) != bdd_and_many({x,y,z}));
+	size_t a1 = bdd_and(x, z);
+	bdd_out(wcout<<"x&z: ", a1)<<endl;
+	size_t a2 = bdd_and_many({x,x,z});
+	bdd_out(wcout<<"and many x&z: ", a2)<<endl;
+	assert(a1 == a2);
 	size_t bits = 3, tts = 3;
 	for (size_t k = 0; k < 15000; ++k) {
 		wcout<<k<<endl;

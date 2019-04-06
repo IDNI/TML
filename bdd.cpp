@@ -99,9 +99,9 @@ size_t bdd_or(size_t x, size_t y) {
 	if (it != memo_or.end()) return it->second;
 	size_t res;
 #endif	
-	const node &Vx = getnode(x);
+	const node Vx = getnode(x);
 //	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx) ? T : y, memo_or);
-       	const node &Vy = getnode(y);
+       	const node Vy = getnode(y);
 //	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? T : x, memo_or);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
@@ -140,9 +140,9 @@ size_t bdd_and(size_t x, size_t y) {
 	if (it != memo_and.end()) return it->second;
 	size_t res;
 #endif	
-	const node &Vx = getnode(x);
+	const node Vx = getnode(x);
 //	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?y:F, memo_and);
-       	const node &Vy = getnode(y);
+       	const node Vy = getnode(y);
 //	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy) ? F : x, memo_and);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
@@ -160,9 +160,9 @@ size_t bdd_and_not(size_t x, size_t y) {
 	if (it != memo_and_not.end()) return it->second;
 	size_t res;
 #endif	
-	const node &Vx = getnode(x);
+	const node Vx = getnode(x);
 	if (nleaf(Vx) && !ntrueleaf(Vx)) apply_ret(F, memo_and_not);
-       	const node &Vy = getnode(y);
+       	const node Vy = getnode(y);
 	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? F : x, memo_and_not);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
@@ -237,9 +237,9 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 	if (it != memo_adt.end()) return it->second;
 	size_t res;
 #endif	
-	const node &Vx = getnode(x);
+	const node Vx = getnode(x);
 	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?bdd_deltail(y, h):F, memo_adt);
-       	const node &Vy = getnode(y);
+       	const node Vy = getnode(y);
 	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy)?F:bdd_deltail(x, h),memo_adt);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
@@ -253,14 +253,15 @@ size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
 size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 	size_t i, t;
 	bool b, eq, flag;
-	if (v.empty()) return T;
+	sizes x;
+	if (v.empty()) return res = T, 1;
 	for (size_t n = 0; n < v.size();) {
 		if (leaf(v[n])) {
-			if (!trueleaf(v[n])) return F;
+			if (!trueleaf(v[n])) return res = F, 1;
 			v.erase(v.begin() + n);
 			if (v.size() == 1) return res = v[0], 1;
 			else if (v.size() == 2) return res=bdd_and(v[0],v[1]),1;
-			else if (v.empty()) return T;
+			else if (v.empty()) return res = T, 1;
 			else ++n;
 		} else ++n;
 	}
@@ -268,7 +269,7 @@ size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 	b = false, eq = true, flag = false;
 	for (i = 1; i != v.size(); ++i)
 		if (!leaf(v[i])) {
-			const node &n = getnode(v[i]);
+			node n = getnode(v[i]);
 			b |= n[0] != m, eq &= t == v[i];
 			if (n[0] < m) m = n[0];
 		} else if (!trueleaf(v[i])) return res = F, 1;
@@ -297,7 +298,6 @@ size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 			if (l.size() == 1) break;
 		} else ++n;
 	if (flag) return 3;
-	sizes x;
 	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
 	if (x.size() > 1) {
 		for (size_t n = 0; n < h.size();)
@@ -327,25 +327,27 @@ size_t bdd_and_many(sizes v) {
 			}
 		}
 #endif	
-	auto it = memo.find(v);
-	if (it != memo.end()) return it->second;
-	it = memo.emplace(v, 0).first;
+//	auto it = memo.find(v);
+//	if (it != memo.end()) return it->second;
+//	it = memo.emplace(v, 0).first;
 	size_t res = F, m = 0, h, l;
 	sizes vh, vl;
 	switch (bdd_and_many_iter(move(v), vh, vl, res, m)) {
 		case 0: l = bdd_and_many(move(vl)),
 			h = bdd_and_many(move(vh));
 			break;
-		case 1: return it->second = res;
+		//case 1: return it->second = res;
+		case 1: return res;
 		case 2: h = bdd_and_many(move(vh)), l = F; break;
 		case 3: h = F, l = bdd_and_many(move(vl)); break;
 		default: throw 0;
 	}
-	return it->second = bdd_add({{m, h, l}});
+	//return it->second = bdd_add({{m, h, l}});
+	return bdd_add({{m, h, l}});
 }
 
 size_t bdd_ite(size_t v, size_t t, size_t e) {
-	const node &x = getnode(t), &y = getnode(e);
+	const node x = getnode(t), y = getnode(e);
 	if ((nleaf(x)||v<x[0])&&(nleaf(y)||v<y[0])) return bdd_add({{v+1,t,e}});
 	return bdd_or(bdd_and(from_bit(v,true),t),bdd_and(from_bit(v,false),e));
 }
