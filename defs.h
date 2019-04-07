@@ -29,7 +29,6 @@ typedef std::unordered_map<int_t, std::wstring> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 
-#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else
