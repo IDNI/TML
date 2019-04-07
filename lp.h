@@ -18,6 +18,7 @@
 #include <set>
 #include <map>
 #include "bdd.h"
+#include "query.h"
 
 void tml_init();
 
@@ -36,12 +37,12 @@ class lp { // [pfp] logic program
 	size_t gbdd = F;
 public:
 	db_t db;
-	const size_t bits, dsz;
 	const int_t delrel;
 	const strs_t strs;
+	range rng;
 	diff_t trees, trees_out;
 
-	lp(matpairs r, matrix g, int_t delrel, size_t dsz, const strs_t&,
+	lp(matpairs r, matrix g, int_t delrel, const strs_t&, range rng,
 		lp *prev = 0);
 	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
@@ -51,7 +52,5 @@ size_t arlen(const ints& ar);
 std::set<ints> prefix(const db_t& db, ints ar, int_t rel);
 void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
 	diff_t& res);
-std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax
-std::wostream& bdd_out(std::wostream& os, size_t n);
 extern int_t null;
 #endif

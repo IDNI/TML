@@ -19,7 +19,7 @@ using namespace std;
 lexeme dict_t::get_sym(int_t t) const {
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
 	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
-	if (t & 3) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),
+	if (t & 2) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),
 			lexeme{ str_nums, str_nums + wcslen(str_nums) };
 	return syms[(t>>2)-1];
 }

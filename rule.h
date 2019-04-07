@@ -11,39 +11,28 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "defs.h"
-#include "query.h"
 #include "lp.h"
 #include <functional>
 
 struct rule { // a P-DATALOG rule in bdd form
 	typedef std::unordered_map<int_t, size_t> varmap;
 	bools neg;
-//	varmap bvars;
 	std::vector<varmap> hvars;
 	size_t bleq;
 	sizes hleq;
-//	builtins<leq_const> *bts = 0;
-//	std::vector<builtins<leq_const>*> hbts;
-//	std::vector<builtins<unary_builtin<std::function<int(int)>>>>
-//		unary_builtins;
 	std::vector<query> q;
-//	std::vector<ints> arities;
-	std::vector<ints> harity;//, vars_arity;//, rels;
+	std::vector<ints> harity;
 	size_t maxhlen, nvars;
-//	ints vars_arity;
 	ints hrel;
 	std::vector<size_t*> dbs;
 	std::vector<sizes> hperm;
-//	sizes ub;
 	std::vector<bdd_and_eq> ae;
-	sizes get_perm(const term& b, varmap&, size_t bits);
-	void get_ranges(const matrix& h, const matrix& b, size_t dsz,
-		size_t bits, const varmap&);
-	//lp::diff_t get_varbdd();
+	range rng;
+	sizes get_perm(const term& b, varmap&);
+	void get_ranges(const matrix& h, const matrix& b, const varmap&);
 
-	rule(matrix h, matrix b, const std::vector<size_t*>& dbs, size_t bits,
-		size_t dsz);
-	sizes fwd(size_t bits);
+	rule(matrix h, matrix b, const std::vector<size_t*>& dbs, range& rng);
+	sizes fwd();
 };
 
-size_t fact(const term& v, size_t bits, size_t dsz);
+size_t fact(const term& v, range&);

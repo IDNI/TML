@@ -22,19 +22,16 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-//#define MEMO
+#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
-typedef array<size_t, 3> adtmemo;
 typedef pair<bools, size_t> exmemo;
 typedef pair<bools, memo> apexmemo;
 typedef pair<sizes, size_t> permemo;
-template<> struct std::hash<memo> { size_t operator()(const memo& m) const; };
 template<> struct std::hash<exmemo> { size_t operator()(const exmemo&m)const;};
 template<>struct std::hash<apexmemo>{size_t operator()(const apexmemo&m)const;};
 template<> struct std::hash<permemo>{ size_t operator()(const permemo&m)const;};
-unordered_map<memo, size_t> memo_and, memo_and_not, memo_or, memo_dt;
-unordered_map<adtmemo, size_t> memo_adt;
+unordered_map<memo, size_t, array_hash<size_t, 2>> memo_and, memo_and_not, memo_or, memo_dt;
 unordered_map<exmemo, size_t> memo_ex;
 unordered_map<apexmemo, size_t> memo_and_ex, memo_and_not_ex;
 unordered_map<permemo, size_t> memo_permute;
@@ -86,6 +83,17 @@ vbools allsat(size_t x, size_t nvars) {
 	bools p(nvars);
 	vbools r;
 	return sat(1, nvars, getnode(x), p, r), r;
+}
+
+vbools allsat(size_t x, size_t bits, size_t args) {
+	vbools v = allsat(x, bits * args), s;
+	for (bools b : v) {
+		s.emplace_back(bits*args);
+		for (size_t n = 0; n != bits; ++n)
+			for (size_t k = 0; k != args; ++k)
+				s.back()[k*bits+n] = b[POS(n,bits,k,args)];
+	}
+	return s;
 }
 
 size_t bdd_or(size_t x, size_t y) {
@@ -201,17 +209,6 @@ size_t bdd_subterm(size_t x, size_t from, size_t to, size_t args1, size_t args2,
 
 size_t bdd_deltail(size_t x, size_t args1, size_t args2, size_t bits) {
 	return bdd_subterm(x, 0, args2, args1, args2, bits);
-	if (args1 == args2) return x;
-	bools ex(args1 * bits, false);
-	sizes perm(args1 * bits);
-	assert(args1 > args2);
-	size_t n;
-	for (n = 0; n != args1 * bits; ++n) perm[n] = n;
-	for (n = 0; n != args1; ++n)
-		for (size_t k = 0; k != bits; ++k)
-			if (n >= args2) ex[POS(k, bits, n, args1)] = true;
-			else perm[POS(k,bits,n,args1)] = POS(k,bits,n,args2);
-	return bdd_permute(bdd_ex(x, ex), perm);
 }
 
 size_t bdd_deltail(size_t x, size_t h) {
@@ -229,42 +226,18 @@ size_t bdd_deltail(size_t x, size_t h) {
 	apply_ret(n[1] == F && n[2] == F ? F : T, memo_dt);
 }    
 
-size_t bdd_and_deltail(size_t x, size_t y, size_t h) {
-	if (x == y) return bdd_deltail(x, h);
-#ifdef MEMO
-	adtmemo t = {{x, y, h}};
-	auto it = memo_adt.find(t);
-	if (it != memo_adt.end()) return it->second;
-	size_t res;
-#endif	
-	const node Vx = getnode(x);
-	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?bdd_deltail(y, h):F, memo_adt);
-       	const node Vy = getnode(y);
-	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy)?F:bdd_deltail(x, h),memo_adt);
-	const size_t &vx = Vx[0], &vy = Vy[0];
-	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret((a&&b)?T:F, memo_adt);
-	else if ((v = vx) < vy || !vy) b = d = y;
-	apply_ret(bdd_deltail(bdd_add({{v, bdd_and_deltail(a, b, h),
-		bdd_and_deltail(c, d, h)}}), h), memo_adt);
-}
-
 size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 	size_t i, t;
 	bool b, eq, flag;
 	sizes x;
 	if (v.empty()) return res = T, 1;
-	for (size_t n = 0; n < v.size();) {
-		if (leaf(v[n])) {
-			if (!trueleaf(v[n])) return res = F, 1;
-			v.erase(v.begin() + n);
-			if (v.size() == 1) return res = v[0], 1;
-			else if (v.size() == 2) return res=bdd_and(v[0],v[1]),1;
-			else if (v.empty()) return res = T, 1;
-			else ++n;
-		} else ++n;
-	}
+	for (size_t n = 0; n < v.size();)
+		if (!leaf(v[n])) ++n;
+		else if (!trueleaf(v[n])) return res = F, 1;
+		else if (v.erase(v.begin()+n), v.size()==1) return res=v[0], 1;
+		else if (v.size() == 2) return res=bdd_and(v[0],v[1]),1;
+		else if (v.empty()) return res = T, 1;
+		else ++n;
 	m = getnode(v[0])[0], t = v[0];
 	b = false, eq = true, flag = false;
 	for (i = 1; i != v.size(); ++i)
@@ -327,23 +300,21 @@ size_t bdd_and_many(sizes v) {
 			}
 		}
 #endif	
-//	auto it = memo.find(v);
-//	if (it != memo.end()) return it->second;
-//	it = memo.emplace(v, 0).first;
+	auto it = memo.find(v);
+	if (it != memo.end()) return it->second;
+	it = memo.emplace(v, 0).first;
 	size_t res = F, m = 0, h, l;
 	sizes vh, vl;
 	switch (bdd_and_many_iter(move(v), vh, vl, res, m)) {
 		case 0: l = bdd_and_many(move(vl)),
 			h = bdd_and_many(move(vh));
 			break;
-		//case 1: return it->second = res;
-		case 1: return res;
+		case 1: return it->second = res;
 		case 2: h = bdd_and_many(move(vh)), l = F; break;
 		case 3: h = F, l = bdd_and_many(move(vl)); break;
 		default: throw 0;
 	}
-	//return it->second = bdd_add({{m, h, l}});
-	return bdd_add({{m, h, l}});
+	return it->second = bdd_add({{m, h, l}});
 }
 
 size_t bdd_ite(size_t v, size_t t, size_t e) {
@@ -431,10 +402,9 @@ void memos_clear() {
 }
 
 #ifdef MEMO
-size_t std::hash<memo>::operator()(const memo& m) const { return m[0] + m[1]; }
 size_t std::hash<apexmemo>::operator()(const apexmemo& m) const {
 	static std::hash<bools> h1;
-	static std::hash<memo> h2;
+	static array_hash<size_t, 2> h2;
 	return h1(m.first) + h2(m.second);
 }
 size_t std::hash<exmemo>::operator()(const exmemo& m) const {

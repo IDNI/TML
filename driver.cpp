@@ -163,8 +163,8 @@ lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
 //			if (syms.size() != s)
 //				parse_error(err_directive_elem, d.t.e[0].e);
 		}
-	size_t usz = (dict.nsyms() + nums + chars)<<2;
-	return new lp(move(m), move(g), p.delrel, usz, s, last);
+	return new lp(move(m), move(g), p.delrel, s,
+			range(dict.nsyms(), nums, chars), last);
 }
 
 driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 

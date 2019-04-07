@@ -13,6 +13,8 @@
 #include "bdd.h"
 #include <sstream>
 #include <cmath>
+#include <map>
+#include <set>
 using namespace std;
 
 string trim(string s) {
@@ -33,25 +35,11 @@ ostream& operator<<(ostream& os, const vbools& x) {
 	return os;
 }
 
-size_t reduce_many(sizes v) {
-	if (v.size() == 1) return v[0];
-	sizes t((v.size()>>1)+1, 1);
-	size_t r, k = 0, n;
-	for (n = 0; n < v.size(); n += 2) {
-		r = bdd_and(v[n], v[n+1]);
-		if (r == F) return F;
-		t[k++] = r;
-	}
-	if (n != v.size()) t[k] = v.back();
-	return reduce_many(move(t));
-}
-
 int main() {
 	bdd_init();
 	vector<vector<int>> p;
 	for (string line; getline(cin, line);)
-		if (line = trim(line), line[0] == 'c') continue;
-		else if (line[0] == 'p') continue;
+		if (line = trim(line), line[0]=='c' || line[0]=='p') continue;
 		else {
 			stringstream ss;
 			ss << line;
@@ -61,23 +49,12 @@ int main() {
 			p.push_back(v);
 		}
 //	for (auto x : p) { for (int i : x) cout << i << ' '; cout <<0<< endl; }
-	vector<size_t> v;
-	int nvars = 0;
-	size_t r = T, n = 0;
-	for (auto x : p) {
+	vector<size_t> v(p.size());
+	for (size_t n = 0; n != p.size(); ++n) { 
 		size_t t = F;
-		for (int i : x) {
-			nvars = max(nvars, abs(i));
-			t = bdd_or(t, from_bit(abs(i)-1, i>0));
-		}
-//		r = bdd_and(r, t);
-//		cout << n++ << endl;
-		v.push_back(t);
+		for (int i : p[n]) t = bdd_or(t, from_bit((size_t)abs(i)-1, i>0));
+		v[n] = t;
 	}
-//	if (r == F) cout << "unsat" << endl;
-//	else cout << "sat" << endl;
-//	if (reduce_many(v) == F) cout << "unsat" << endl;
-//	else cout << "sat" << endl;
 	if (bdd_and_many(v) == F) cout << "unsat" << endl;
 	else cout << "sat" << endl;
 	return 0;

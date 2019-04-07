@@ -60,8 +60,8 @@ set<ints> prefix(const db_t& db, ints ar, int_t rel) {
 void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
 	diff_t& res, set<size_t>& done) {
 	if (!done.emplace(root).second) return;
-	DBG(drv->printdb(wcout << "db:" << endl, db));
-	DBG(drv->printdiff(wcout << "res:" << endl, res));
+	DBG(drv->printdb(wcout << "db:" << endl, db, bits));
+	DBG(drv->printdiff(wcout << "res:" << endl, res, bits));
 	auto x = subarities(ar);
 	auto y = subterms(ar);
 	assert(x.size() == y.size());
@@ -70,7 +70,7 @@ void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
 		for (const ints& z : prefix(db, x[n], rel)) {
 			r = bdd_subterm(root, y[n][0], y[n][1], arlen(ar),
 				arlen(z), bits);
-			DBG(drv->printbdd(wcout<<"subterm:"<<endl, r, z, rel);)
+			DBG(drv->printbdd(wcout<<"subterm:"<<endl,r,bits,z,rel);)
 			it = res.emplace(diff_t::key_type{rel, z}, F).first;
 			it->second =
 				bdd_or(it->second, bdd_and(*db.at({rel,z}),r));

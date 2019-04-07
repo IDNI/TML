@@ -105,7 +105,7 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 		for (int_t k = 0; k != t.arity()[ar]; ++k) {
 			if (t.arg(n) < 0) throw 0;//os<<dict.get_var(t.args[n]);
 			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
-			else if (t.arg(n) & 3) os << (int_t)(t.arg(n)>>2);
+			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
 			else if ((size_t)(t.arg(n)>>2)-1 < dict.nsyms())
 				os << dict.get_sym(t.arg(n));
 			else os << L'[' << (t.arg(n)>>2) << L']';
@@ -131,15 +131,15 @@ wostream& driver::printbdd(wostream& os, const matrix& t) const {
 #ifdef DEBUG
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
-wostream& printdiff(wostream& os, const diff_t& d) {
-	return drv->printdiff(os, d);
+wostream& printdiff(wostream& os, const diff_t& d, size_t bits) {
+	return drv->printdiff(os, d, bits);
 }
-wostream& printbdd(wostream& os, size_t t, ints ar, int_t rel) {
+wostream& printbdd(wostream& os, size_t t, size_t bits, ints ar, int_t rel) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
-	return drv->printbdd(os, t, ar, rel);
+	return drv->printbdd(os, t, bits, ar, rel);
 }
-wostream& printbdd_one(wostream& os, size_t t, ints ar, int_t rel) {
-	return drv->printbdd_one(os, t, ar, rel);
+wostream& printbdd_one(wostream& os, size_t t, size_t bits, ints ar, int_t rel){
+	return drv->printbdd_one(os, t, bits, ar, rel);
 }
 #endif
 
@@ -157,7 +157,7 @@ wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits, ints ar,
 }
 
 wostream& driver::printdb(wostream& os, lp *p) const {
-	return printdb(os, p->db, p->bits);
+	return printdb(os, p->db, p->rng.bits);
 }
 
 wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {

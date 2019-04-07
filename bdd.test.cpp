@@ -175,7 +175,7 @@ void test_and_many() {
 		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
 		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
 		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1)))};
-	size_t x = F, y = F, z = F;
+	size_t x = F, z = F;
 	for (size_t n = 0; n != 6; ++n) x=bdd_or(x, v1[n]);//, y=bdd_or(y, v2[n]);
 	for (size_t n = 0; n != 4; ++n) z=bdd_or(z, v3[n]);
 	bdd_out(wcout<<"x: ", x)<<endl;
@@ -200,7 +200,8 @@ void test_and_many() {
 		if (r != bdd_and_many(v)) {
 			wcout<<endl;
 			for (size_t i = 0; i < tts; ++i) wcout<<t[i]<<endl;
-			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_and_many(v),bits)<<endl<<endl<<allsat(r,bits)<<endl;
+			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_and_many(v),bits)
+				<<endl<<endl<<allsat(r,bits)<<endl;
 			assert(r == bdd_and_many(v));
 		}
 		assert(r == rr.bdd());
@@ -216,7 +217,7 @@ int main() {
 			assert(ARG(POS(n, bits, k, args), args) == k),
 			assert(BIT(POS(n, bits, k, args), args, bits) == n);
 	bdd_init();
-//	test_query();
+	test_query();
 	srand(time(0));
 	test_and_many();
 //	exit(0);

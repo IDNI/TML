@@ -17,7 +17,7 @@
 #endif
 using namespace std;
 
-size_t fact(const term& v, size_t bits, size_t dsz) {
+size_t fact(const term& v, range& rng) {
 	//DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity() == ints{0}) return T;
 	size_t r = T;
@@ -26,50 +26,49 @@ size_t fact(const term& v, size_t bits, size_t dsz) {
 		if (v.arg(j) < 0) m.emplace(v.arg(j), j);
 	//DBG(printbdd(wcout<<"ret1:"<<endl, r, v.arity, v.rel)<<endl;)
 	if (!m.empty()) {
-		sizes domain;
-//		for (size_t n = 0; n != v.args.size(); ++n)
-//			if (v.args[n] < 0) domain.push_back(n);
-		for (auto x : m) domain.push_back(x.second);
-		r = builtins<leq_const>(domain, bits, v.nargs(),
-			leq_const(dsz-1, bits, v.nargs()))(r);
 //		DBG(printbdd(wcout<<"ret2:"<<endl, r, v.arity, v.rel)<<endl;)
 		for (size_t j = 0; j != v.nargs(); ++j)
-			if (v.arg(j) >= 0) continue;
-			else for (size_t b = 0; b != bits; ++b)
-				if (j != m[v.arg(j)])
-					r = bdd_and(r,
-						from_eq(
-						POS(b, bits, j, v.nargs()),
-						POS(b, bits, m[v.arg(j)],
-							v.nargs())));
+			if (v.arg(j) >= 0 || j == m[v.arg(j)]) continue;
+			else for (size_t b = 0; b != rng.bits; ++b)
+				r = bdd_and(r, from_eq(
+					POS(b,rng.bits,j,v.nargs()),
+					POS(b,rng.bits,m[v.arg(j)],v.nargs())));
 //		DBG(printbdd(wcout<<"ret3:"<<endl, r, v.arity, v.rel)<<endl;)
 	}
 	for (size_t j = 0; j != v.nargs(); ++j)
 		if (v.arg(j) >= 0)
-			from_int_and(v.arg(j), bits, j, v.nargs(), r);
+			from_int_and(v.arg(j), rng.bits, j, v.nargs(), r);
 	if (v.neg()) r = bdd_and_not(T, r);
-	//DBG(printbdd(wcout<<"ret:"<<endl, r, v.arity, v.rel)<<endl;)
+	if (!m.empty()) {
+		sizes domain;
+		for (auto x : m) domain.push_back(x.second);
+		r = bdd_and(r, rng(domain, v.nargs()));
+		DBG(bdd_out(wcout, r)<<endl;)
+	}
+	DBG(printbdd(wcout<<"ret:"<<endl, r, rng.bits, v.arity(), v.rel())<<endl;)
+	DBG(bdd_out(wcout, r)<<endl;)
+	DBG(wcout<<allsat(r, rng.bits*v.nargs())<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;
 }
 
-sizes rule::get_perm(const term& b, varmap& m, size_t bits) {
-	sizes perm(bits * b.nargs());
+sizes rule::get_perm(const term& b, varmap& m) {
+	sizes perm(rng.bits * b.nargs());
 	auto it = m.end();
 	for (size_t j = 0; j != perm.size(); ++j) perm[j] = j;
 	for (size_t k = 0; k != b.nargs(); ++k) {
 		if (b.arg(k) >= 0) continue;
 		it = m.emplace(b.arg(k), maxhlen + m.size()).first;
-		for (size_t j = 0; j != bits; ++j)
-			perm[POS(j, bits, k, b.nargs())] =
-				POS(j, bits, it->second, nvars+maxhlen);
+		for (size_t j = 0; j != rng.bits; ++j)
+			perm[POS(j, rng.bits, k, b.nargs())] =
+				POS(j, rng.bits, it->second, nvars+maxhlen);
 	}
 	return perm;
 }
 
-rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
-	size_t dsz) : dbs(dbs) {
+rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, range& rng) :
+	dbs(dbs), rng(rng) {
 	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
 	hperm.resize(h.size()), hrel.resize(h.size()), harity.resize(h.size()),
 	neg.resize(h.size()), maxhlen = 0;
@@ -79,27 +78,27 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, size_t bits,
 	for (const term& t : h) for (int_t i : t.args()) if (i<0) vs.insert(i);
 	nvars = vs.size(), vs.clear();
 	for (size_t n = 0; n != h.size(); ++n) {
-		hperm[n].resize(bits * (maxhlen + nvars));
+		hperm[n].resize(rng.bits * (maxhlen + nvars));
 		for (size_t j = 0; j != hperm[n].size(); ++j) hperm[n][j] = j;
 		hrel[n] = h[n].rel(), harity[n] = h[n].arity(),
 		neg[n] = h[n].neg();
-		ae.emplace_back(bits, h[n], false);
+		ae.emplace_back(rng.bits, h[n], false);
 	}
 	varmap m;
 	for (size_t n = 0; n != b.size(); ++n)
-		q.emplace_back(bits, b[n], get_perm(b[n], m, bits), b[n].neg());
+		q.emplace_back(
+			rng.bits, b[n], get_perm(b[n], m),b[n].neg());
 	for (size_t n = 0; n != h.size(); ++n)
 		for (size_t k = 0; k != h[n].nargs(); ++k)
 			if (h[n].arg(k) < 0)
-				for (size_t j = 0; j != bits; ++j)
-					hperm[n][POS(j, bits, m[h[n].arg(k)],
-						nvars+maxhlen)] = POS(j, bits,
+				for (size_t j = 0; j != rng.bits; ++j)
+					hperm[n][POS(j, rng.bits,m[h[n].arg(k)],
+						nvars+maxhlen)]=POS(j, rng.bits,
 						k, nvars+maxhlen);
-	get_ranges(h, b, dsz, bits, m);
+	get_ranges(h, b, m);
 }
 
-void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
-	size_t bits, const varmap& m){
+void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
 	hleq = sizes(h.size(), T), bleq = T;
 	set<int_t> bnegvars, bposvars, hposvars, del;
 	sizes domain;
@@ -111,11 +110,12 @@ void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 			if (h[n].arg(k) < 0 && !has(bnegvars, h[n].arg(k)) &&
 				!has(bposvars, h[n].arg(k)))
 				domain.push_back(k);
+		hleq[n] = rng(domain, h[n].nargs());
 	//	if (domain.size())for(auto t:h)DBG(drv->print_term(wcout,t));
-		for (size_t i : domain)
-			hleq[n] = bdd_and(hleq[n],builtins<leq_const>({i},bits,
-				h[n].nargs(),
-				leq_const(dsz-1, bits, h[n].nargs()))(T));
+//		for (size_t i : domain)
+//			hleq[n] = bdd_and(hleq[n],builtins<leq_const>({i},bits,
+//				h[n].nargs(),
+//				leq_const(dsz-1, bits, h[n].nargs()))(T));
 		domain.clear();
 	}
 	for (const term& t : h)
@@ -126,12 +126,13 @@ void rule::get_ranges(const matrix& h, const matrix& b, size_t dsz,
 	for (int_t i : bnegvars) if (!has(hposvars, i)) del.insert(i);
 	for (int_t i : del) bnegvars.erase(i);
 	for (int_t i : bnegvars) domain.push_back(m.at(i));
-	if (!domain.empty())
-		bleq=bdd_and(bleq,builtins<leq_const>(domain,bits,maxhlen+nvars,
-			leq_const(dsz-1, bits, maxhlen+nvars))(T));
+	bleq = rng(domain, maxhlen + nvars);
+//	if (!domain.empty())
+//		bleq=bdd_and(bleq,builtins<leq_const>(domain,bits,maxhlen+nvars,
+//			leq_const(dsz-1, bits, maxhlen+nvars))(T));
 }
 
-sizes rule::fwd(size_t bits) {
+sizes rule::fwd() {
 	sizes r(hrel.size()), v(q.size());
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
@@ -149,7 +150,7 @@ sizes rule::fwd(size_t bits) {
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 //		DBG(bdd_out(wcout, r[k])<<endl;)
 //		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), bits);
+		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), rng.bits);
 //		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);

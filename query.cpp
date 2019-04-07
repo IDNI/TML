@@ -113,17 +113,10 @@ size_t bdd_and_eq::operator()(const size_t x) {
 		v.push_back(bdd_and_not(v[1], v[0])),
 		v.erase(v.begin(), v.begin()+1);
 	}
-	return m[x] = bdd_and_many(v);
+	return m[x] = bdd_and_many(move(v));
 }
 
-builtin_res leq_const::operator()(const bools& path, size_t arg, size_t v)const{
-	return	path[v] ? (c&(1<<(BIT(v,args,bits)))) ? 
-		v == POS(0, bits, arg, args) ? PASS : CONTBOTH : FAIL :
-		(c&(1<<(BIT(v,args,bits)))) ||
-		v == POS(0, bits, arg, args)	? PASS : CONTBOTH;
-}
-
-builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
+/*builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
 	size_t v) const {
 	bool bit;
 	size_t n = POS(bits-1, bits, arg, args);
@@ -134,4 +127,6 @@ builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
 			default:if (bit) return FAIL;
 		}
 	return v == args*bits ? PASS : CONTBOTH;
-}
+}*/
+
+unordered_map<array<int_t, 5>, size_t, array_hash<int_t, 5>> range::memo;
