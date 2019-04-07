@@ -19,7 +19,7 @@ using namespace std;
 vector<array<size_t, 2>> subterms(const ints& ar) {
 	assert(ar.size() && ar[0] == 0);
 	vector<array<size_t, 2>> r;
-	for (size_t n = 1, from, last = 0, dep = 0; n != ar.size(); ++n) {
+	for (size_t n = 1, from = 0, last = 0, dep = 0; n != ar.size(); ++n) {
 		if (ar[n] == -1) { if (!dep++) from = 0; }
 		else if (ar[n] != -2) from += ar[n];
 		else if (!--dep) r.push_back({last, last + from}), last = from;

@@ -122,36 +122,7 @@ struct range {
 		for (size_t x : domain) v.push_back((*this)(x, nargs));
 		return bdd_and_many(v);
 	}
-	size_t get_leq(size_t arg, size_t nargs, int_t c) const {
-		size_t r = builtins<leq_const>(arg, bits, nargs,
-				leq_const(c, bits, nargs))(T);
-	//	DBG(wcout<<"get_leq c="<<c<<" arg="<<arg<<" args="<<nargs
-	//		<<endl<<allsat(r,bits,nargs)<<endl;)
-	//	DBG(bdd_out(wcout, r)<<endl);
-		return r;
-	}
-	size_t get2(size_t arg, size_t args, bool b1, bool b2) const {
-		return bdd_and(	from_bit(POS(0,bits,arg,args), b1),
-				from_bit(POS(1,bits,arg,args), b2));
-	}
-	size_t get_leq2(size_t arg, size_t nargs,int_t c,bool b1,bool b2) const{
-		if (!c) return bdd_and_not(T, get2(arg,nargs, b1, b2));
-		return bdd_and(	get2(arg, nargs, b1, b2),
-				get_leq(arg, nargs, ((c-1)<<2)|3));
-	}
-	size_t operator()(size_t arg, size_t nargs) {
-		auto it = memo.find({syms,nums,chars,(int_t)nargs,(int_t)arg});
-		if (it != memo.end()) return it->second;
-		size_t r;
-		DBG(using namespace std;)
-		r = bdd_and_many({
-				get_leq2(arg, nargs, chars, true, false),
-				get_leq2(arg, nargs, nums, false, true),
-				get_leq2(arg, nargs, syms, false, false)});
-	//	DBG(wcout<<"r:"<<endl<<allsat(r, bits,nargs)<<endl;)
-	//	DBG(bdd_out(wcout<<endl, r)<<endl);
-		return memo[{syms,nums,chars,(int_t)nargs,(int_t)arg}] = r;
-	}
+	size_t operator()(size_t arg, size_t nargs);
 };
 
 /*

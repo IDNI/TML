@@ -124,9 +124,11 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 }
 
 bool raw_term::parse(const lexemes& l, size_t& pos) {
+	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	while (!wcschr(L".:,", *l[pos][0]))
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
+		else if (pos == l.size()) parse_error(L"unexpected end of file", s[0]);
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
 	if (e.size() == 1) return calc_arity(), true;
 	if (e[1].type != elem::OPENP)

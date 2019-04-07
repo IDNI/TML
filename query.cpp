@@ -49,7 +49,6 @@ bools get_ex(const term& t, size_t bits) {
 	return ex;
 }
 
-
 query::query(size_t bits, const term& t, const sizes& perm, bool neg) 
 	: ex(get_ex(t, bits)), neg(neg), perm(perm), ae(bits, t, neg) {}
 
@@ -129,4 +128,27 @@ size_t bdd_and_eq::operator()(const size_t x) {
 	return v == args*bits ? PASS : CONTBOTH;
 }*/
 
+#define get_leq(c) builtins<leq_const>(arg,bits,args,leq_const(c,bits,args))(T)
+#define get2(b1, b2) bdd_and(from_bit(POS(0,bits,arg,args), b1),\
+			from_bit(POS(1,bits,arg,args), b2))
+#define ischar get2(true, false)
+#define isnum get2(false, true)
+#define issym get2(false, false)
+#define chars_clause bdd_impl(ischar, get_leq(((chars-1)<<2)|3))
+#define nums_clause bdd_impl(isnum, get_leq(((nums-1)<<2)|3))
+#define syms_clause bdd_impl(issym, get_leq(((syms-1)<<2)|3))
+#define notchar bdd_and_not(T, ischar)
+#define notnum bdd_and_not(T, isnum)
+#define notsym bdd_and_not(T, issym)
+
+size_t range::operator()(size_t arg, size_t args) {
+	auto it = memo.find({syms,nums,chars,(int_t)args,(int_t)arg});
+	if (it != memo.end()) return it->second;
+	size_t r = bdd_and_many({
+		bdd_or(bdd_or(ischar, isnum), issym),
+		chars ? chars_clause : notchar,
+		nums ? nums_clause : notnum,
+		syms ? syms_clause : notsym});
+	return memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
+}
 unordered_map<array<int_t, 5>, size_t, array_hash<int_t, 5>> range::memo;

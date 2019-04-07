@@ -21,7 +21,7 @@ lexeme dict_t::get_sym(int_t t) const {
 	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
 	if (t & 2) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),
 			lexeme{ str_nums, str_nums + wcslen(str_nums) };
-	return syms[(t>>2)-1];
+	return syms[t>>2];
 }
 
 int_t dict_t::get_var(const lexeme& l) {
@@ -43,7 +43,7 @@ int_t dict_t::get_rel(const lexeme& l) {
 int_t dict_t::get_sym(const lexeme& l) {
 	auto it = syms_dict.find(l);
 	if (it != syms_dict.end()) return it->second;
-	return syms.push_back(l), syms_dict[l] = syms.size()<<2;
+	return syms.push_back(l), syms_dict[l] = (syms.size()-1)<<2;
 }
 
 lexeme dict_t::get_lexeme(const wstring& s) {

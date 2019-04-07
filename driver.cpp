@@ -71,12 +71,9 @@ void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& rels,
 	set<lexeme, lexcmp>& syms) {
 	rels.insert(t.e[0].e);
 	for (size_t n = 1; n < t.e.size(); ++n)
-		if (t.e[n].type == elem::NUM)
-			nums = max(nums, t.e[n].num+1);
-		else if (t.e[n].type == elem::SYM)
-			syms.insert(t.e[n].e);
-		else if (t.e[n].type == elem::CHR)
-			chars = max(chars, (int_t)256);
+		if (t.e[n].type == elem::NUM) nums = max(nums, t.e[n].num+1);
+		else if (t.e[n].type == elem::SYM) syms.insert(t.e[n].e);
+		else if (t.e[n].type == elem::CHR) chars=max(chars, (int_t)256);
 }
 
 size_t driver::load_stdin() {

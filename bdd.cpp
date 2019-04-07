@@ -97,9 +97,8 @@ vbools allsat(size_t x, size_t bits, size_t args) {
 }
 
 size_t bdd_or(size_t x, size_t y) {
-	if (x == y) return x;
+	if (x == y || y == F) return x;
 	if (x == F) return y;
-	if (y == F) return x;
 	if (x == T || y == T) return T;
 #ifdef MEMO
 	memo t = {{x, y}};
@@ -107,10 +106,7 @@ size_t bdd_or(size_t x, size_t y) {
 	if (it != memo_or.end()) return it->second;
 	size_t res;
 #endif	
-	const node Vx = getnode(x);
-//	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx) ? T : y, memo_or);
-       	const node Vy = getnode(y);
-//	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? T : x, memo_or);
+	const node Vx = getnode(x), Vy = getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
@@ -138,20 +134,16 @@ size_t bdd_ex(size_t x, const bools& b) {
 }
 
 size_t bdd_and(size_t x, size_t y) {
-	if (x == y) return x;
-	if (x == F || y == F) return F;
+	if (x == y || y == T) return x;
 	if (x == T) return y;
-	if (y == T) return x;
+	if (x == F || y == F) return F;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_and.find(t);
 	if (it != memo_and.end()) return it->second;
 	size_t res;
 #endif	
-	const node Vx = getnode(x);
-//	if (nleaf(Vx)) apply_ret(ntrueleaf(Vx)?y:F, memo_and);
-       	const node Vy = getnode(y);
-//	if (nleaf(Vy)) apply_ret(!ntrueleaf(Vy) ? F : x, memo_and);
+	const node Vx = getnode(x), Vy = getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
@@ -161,17 +153,14 @@ size_t bdd_and(size_t x, size_t y) {
 }
 
 size_t bdd_and_not(size_t x, size_t y) {
-	if (x == y) return F;
+	if (x == y || x == F || y == T) return F;
 #ifdef MEMO
 	memo t = {{x, y}};
 	auto it = memo_and_not.find(t);
 	if (it != memo_and_not.end()) return it->second;
 	size_t res;
 #endif	
-	const node Vx = getnode(x);
-	if (nleaf(Vx) && !ntrueleaf(Vx)) apply_ret(F, memo_and_not);
-       	const node Vy = getnode(y);
-	if (nleaf(Vy)) apply_ret(ntrueleaf(Vy) ? F : x, memo_and_not);
+	const node Vx = getnode(x), Vy = getnode(y);
 	const size_t &vx = Vx[0], &vy = Vy[0];
 	size_t v, a = Vx[1], b = Vy[1], c = Vx[2], d = Vy[2];
 	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
@@ -324,13 +313,13 @@ size_t bdd_ite(size_t v, size_t t, size_t e) {
 }
 
 size_t bdd_permute(size_t x, const sizes& m) { //overlapping rename
+	if (leaf(x)) return x;
 #ifdef MEMO
 	permemo t = {m, x};
 	auto it = memo_permute.find(t);
 	if (it != memo_permute.end()) return it->second;
 	size_t res;
 #endif	
-	if (leaf(x)) return x;
 	const node n = getnode(x);
 	apply_ret(bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m)),
 		memo_permute);

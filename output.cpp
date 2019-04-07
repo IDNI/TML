@@ -92,8 +92,8 @@ term driver::one_from_bits(size_t x, size_t bits, ints art, int_t rel) const {
 	return r;
 }
 
-wostream& driver::printbdd(wostream& os, const matrices& t) const {
-	for (auto m : t) printbdd(os, m) << endl;
+wostream& driver::printmats(wostream& os, const matrices& t) const {
+	for (auto m : t) printmat(os, m) << endl;
 	return os;
 }
 
@@ -106,7 +106,7 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 			if (t.arg(n) < 0) throw 0;//os<<dict.get_var(t.args[n]);
 			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
 			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
-			else if ((size_t)(t.arg(n)>>2)-1 < dict.nsyms())
+			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
 				os << dict.get_sym(t.arg(n));
 			else os << L'[' << (t.arg(n)>>2) << L']';
 			if (++n != t.nargs()) os << L' ';
@@ -117,7 +117,7 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 	return os << L')';
 }
 
-wostream& driver::printbdd(wostream& os, const matrix& t) const {
+wostream& driver::printmat(wostream& os, const matrix& t) const {
 	set<wstring> s;
 	for (auto v : t) {
 		wstringstream ss;
@@ -173,7 +173,7 @@ wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 wostream& driver::printdiff(wostream& os, const diff_t& d, size_t bits) const {
 	for (auto x : d)
 		if (builtin_rels.find(x.first.first) == builtin_rels.end())
-			printbdd(os,from_bits(x.second,bits,
+			printmat(os,from_bits(x.second,bits,
 				x.first.second,x.first.first));
 	return os;
 }

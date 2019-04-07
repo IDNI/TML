@@ -45,9 +45,9 @@ size_t fact(const term& v, range& rng) {
 		r = bdd_and(r, rng(domain, v.nargs()));
 		DBG(bdd_out(wcout, r)<<endl;)
 	}
-	DBG(printbdd(wcout<<"ret:"<<endl, r, rng.bits, v.arity(), v.rel())<<endl;)
-	DBG(bdd_out(wcout, r)<<endl;)
-	DBG(wcout<<allsat(r, rng.bits*v.nargs())<<endl;)
+//	DBG(printbdd(wcout<<"ret:"<<endl, r, rng.bits, v.arity(), v.rel())<<endl;)
+//	DBG(bdd_out(wcout, r)<<endl;)
+//	DBG(wcout<<allsat(r, rng.bits*v.nargs())<<endl;)
 //	DBG(printbdd(wcout<<"dt:"<<endl, bdd_deltail(r, v.args.size(),
 //		v.args.size()-2, bits), ints{v.args.size()-2}, v.rel)<<endl;)
 	return r;
@@ -137,12 +137,12 @@ sizes rule::fwd() {
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
-//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],
-//			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
+//		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],rng.bits,
+//			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
+	v.push_back(bleq);
 	if (F == (vars = bdd_and_many(move(v)))) return {};
-//	DBG(printbdd(wcout<<"q"<<endl,vars,
-//		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl;)
-	vars = bdd_and(bleq, vars);
+//	DBG(printbdd(wcout<<"q:"<<endl,vars,rng.bits,
+//		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
 		r[k] = bdd_permute(vars, hperm[k]);
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
@@ -151,12 +151,12 @@ sizes rule::fwd() {
 //		DBG(bdd_out(wcout, r[k])<<endl;)
 //		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), rng.bits);
-//		DBG(printbdd(wcout<<"dt:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
-		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(printbdd(wcout<<"ae:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		r[k] = bdd_and(hleq[k], r[k]);
-		//DBG(printbdd(wcout<<"leq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
+		DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 	}
 	return r;
 }
