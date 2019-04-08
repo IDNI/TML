@@ -312,7 +312,12 @@ Filtering is done by:
 
     ! e(1 ?x).
 
-which will leave on the database only the results that match the term `e(1 ?x).
+which will leave on the database only the results that match the term `e(1 ?x).`
+Tree extraction is done by supplying the root (which may possibly contain
+variables) after `!!`:
+
+    !! T((?x ?y)).
+
 Proof extraction is done by:
 
     !! relname e(1 ?x).
