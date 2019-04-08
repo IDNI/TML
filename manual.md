@@ -90,9 +90,12 @@ with a digit), or a nonzero integer, or a character. Additionally a term may
 contain variables, prefixed with `?`. A fact that contain variables,
 like `b(?x)`, is interpreted where ?x goes over the whole universe. So the
 program
+
     a(1).
     b(?x).
+
 is equivalent to
+
     a(1).
     b(0).
     b(1).
@@ -100,34 +103,44 @@ is equivalent to
 ## Rules
 
 Rules are terms separated by commas and one update operator `:-`. For example:
+
     e(?x ?y) :- e(?x ?z), e(?z ?y).
+
 what is left to the update operator (which may be several terms separated by
 commas) is called the `head` of the rule, while the rhs is called the `body`
 of the rule. This latter example therefore instructs to add to the next-step
 database all facts of the form e(?x ?y) such that e(?x ?z) and e(?x, ?y) appear
 in the current-step database, for some value of ?z. So for example the following
 program
+
     e(1 2).
     e(2 1).
     e(?x ?y) :- e(?x ?z), e(?z ?y).
+
 will result with:
+
     e(1 2).
     e(2 1).
     e(1 1).
     e(2 2).
+
 Note that the order of facts and rules does not matter. Also note that all
 facts and rules must end with a dot.
 
 ## Negation and Deletion
 
 Bodies may be negated using the negation symbol `~`, for example:
+
     e(?x ?y) :- e(?x ?z), e(?z ?y), ~e(?x ?x).
+
 The variable ?x will bind to all values such that e(?x ?x) does not appear in
 the current-step database.
 
 Heads may also contain the negation symbol, in which case it is interpreted
 as deletion. For example the rule:
+
     ~e(?x ?x) :- e(?x ?x).
+
 Will make the next-step database to not include all terms of the form e(?x ?x)
 included on the current step database.
 
@@ -142,6 +155,7 @@ universe.
 
 It is possible to sequence programs one after the other using curly brackets.
 For example the program
+
     {
       e(1 2).
       e(2 3).
@@ -151,13 +165,16 @@ For example the program
     {
       ~e(?x ?x) :- e(?x ?x).
     }
+
 will result with
+
     e(1 2).
     e(1 3).
     e(2 1).
     e(2 3).
     e(3 1).
     e(3 2).
+
 More generally, the output of one program is considered the input of the other.
 It is possible to filter the output before passing it to the next program as in
 the section "Queries".
@@ -169,21 +186,29 @@ Nested programs are yet unsupported.
 Terms of certain form are interpreted as trees. This does not affect the rules
 at all, but only as means of intputing and outputing facts. Trees are expressed
 by constructing a directed graph of terms. For example the following term
+
     b((a(1 2)) (a(2 2)) (c(2 3)))
+
 indicates two edges in a graph named `b`, where a vertex labelled `a(1 2)` has
 two [ordered] outgoing edges, one to the term `a(2 2)` and one to the term
 `c(2 3)`. Terms as labels of vertices need not be proper terms in the sense
 that we could also have
+
     b((a 1 2) (a 2 2) (c 2 3))
+
 Either way, `a` and `c` are interpreted as universe elements rather relation
 symbols. In general having a relation symbols and then parenthesized sequences
 of elements is interpreted as denoting ordered outgoing edges.
 
 We can construct trees in the normal way using rules. For example, a proof
 tree of a program consisting of the rule
+
     e(?x ?y) :- e(?x ?z), e(?y ?z).
+
 may be constructed by adding the rule
+
     proof((e(?x ?y)) (e(?x ?z)) (e(?y ?z))).
+
 We can then extract the proof tree by querying, as in the section "Queries".
 However as in that section there's a shortcut syntax for extracting proofs.
 
@@ -193,18 +218,24 @@ contain loops. They are avoided during the traversal by simply skipping
 previously visited nodes.
 
 Terms that appear in double parenthesis, like `a 2 2` in:
+
     b((a 1 2) ((a 2 2)) (c 2 3))
+
 will be omitted when converting a tree to a string, as in the next section.
 
 # Strings
 
 It is possible to input strings to the database. The line
-    @mystr "abc".
+
+    \@mystr "abc".
+
 will add the following fact to the database:
+
     mystr(((0))('a')((1))).
     mystr(((1))('b')((2))).
     mystr(((2))('c')((3))).
-More generally, `@relname "str"` will use the relation symbol relname to declare
+
+More generally, `\@relname "str"` will use the relation symbol relname to declare
 a tree where each string position has first successor to the character on that
 position, and a second successor to the next position. Observe that the
 positions appear in double parenthesis. This is because of the following:
@@ -213,40 +244,60 @@ It is possible to construct a string by specifying a root of a tree. The backend
 will then traverse the tree depth-first left-first (Pre-Order) and stringify its
 content. It will omit from the output string nodes that appear in double
 parenthesis. For example the program
-    @str T((1 2)).
+
+    \@str T((1 2)).
     T((1 2) (2 3) (a b)).
     T((a b) (c d)).
     T((2 3) (4 5)).
+
 will result in having the relation symbol `str` represent the string:
+
     "122345abcd"
+
 while if we had:
-    @str T((1 2)).
+
+    \@str T((1 2)).
     T((1 2) ((2 3)) (a b)).
     T((a b) ((c d))).
     T(((2 3)) (4 5)).
+
 the string `str` would be:
+
     "1245ab"
+    
 This relation `str` is then transferred to the next sequenced program, or
 emitted as the output of the program if no sequenced program is present.
 
 Note that the double-parenthesis omission is denoted on the successor nodes.
 
 Now we can see why strings create trees with double parenthesis: the following
-    @str1 "abc".
-    @str2 str1(((0))).
+
+    \@str1 "abc".
+    \@str2 str1(((0))).
+
 will result with `str2="abc"`.
 
 It is also possible to output a string to `stdout` by using it as a relation
 symbol:
-    @stdout str1(((0))).
+
+    \@stdout str1(((0))).
+
 or arbitrary tree:
-    @stdout T((1 2)).
+
+    \@stdout T((1 2)).
+
 In addition a string can refer to command line arguments:
-    @str $1.
+
+    \@str $1.
+
 or to be taken from `stdin`:
-    @str stdin.
+
+    \@str stdin.
+
 or from a file:
-    @str <filename>.
+
+    \@str <filename>.
+
 Finally it is possible to refer to the length of the string by the symbol
 `len:str`.
 
@@ -258,36 +309,50 @@ namely deleting everything unrelated to them. Their result is then outputed
 or passed to the next sequenced program.
 
 Filtering is done by:
+
     ! e(1 ?x).
+
 which will leave on the database only the results that match the term `e(1 ?x).
 Proof extraction is done by:
+
     !! relname e(1 ?x).
+
 which will construct a forest with relation symbol `relname` that proves all
 results that match `e(1 ?x)`, in a fashion that described above: if we have a
 rule
+
     e(?x ?y) :- e(?x ?z), e(?y ?z).
     !! P e(1 ?x).
+
 then the proof tree will have the form
+
     P((e(?x ?y)) (e(?x ?z)) (e(?y ?z))).
 
 # Grammars
 
 It is possible to supply a context free grammar as a syntactic shortcut for
 definite clause grammars. For example Dyck's language may be written as:
+
     S => null.
     S => '(' S ')' S.
+
 and will be converted to the rules:
+
     S(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
     S(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
     S(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), S(?v2 ?v3),
         str(((?v3)) (')') ((?v4))), S(?v4 ?v5).
+
 where `str` is some string defined in the program. An additional line is
 required for specifying the start symbol and on which string the grammar should
 run:
-    @str "(()())".
+
+    \@str "(()())".
     S <= str.
+
 Extracting the parse forest can be done by extracting a proof of the start
 symbol:
+
     !! parseForest S(0, len:str).
 
 # Philosophy
