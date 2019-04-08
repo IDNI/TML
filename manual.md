@@ -227,7 +227,7 @@ will be omitted when converting a tree to a string, as in the next section.
 
 It is possible to input strings to the database. The line
 
-    \@mystr "abc".
+    @mystr "abc".
 
 will add the following fact to the database:
 
@@ -235,7 +235,7 @@ will add the following fact to the database:
     mystr(((1))('b')((2))).
     mystr(((2))('c')((3))).
 
-More generally, `\@relname "str"` will use the relation symbol relname to declare
+More generally, `@relname "str"` will use the relation symbol relname to declare
 a tree where each string position has first successor to the character on that
 position, and a second successor to the next position. Observe that the
 positions appear in double parenthesis. This is because of the following:
@@ -245,7 +245,7 @@ will then traverse the tree depth-first left-first (Pre-Order) and stringify its
 content. It will omit from the output string nodes that appear in double
 parenthesis. For example the program
 
-    \@str T((1 2)).
+    @str T((1 2)).
     T((1 2) (2 3) (a b)).
     T((a b) (c d)).
     T((2 3) (4 5)).
@@ -256,7 +256,7 @@ will result in having the relation symbol `str` represent the string:
 
 while if we had:
 
-    \@str T((1 2)).
+    @str T((1 2)).
     T((1 2) ((2 3)) (a b)).
     T((a b) ((c d))).
     T(((2 3)) (4 5)).
@@ -272,31 +272,31 @@ Note that the double-parenthesis omission is denoted on the successor nodes.
 
 Now we can see why strings create trees with double parenthesis: the following
 
-    \@str1 "abc".
-    \@str2 str1(((0))).
+    @str1 "abc".
+    @str2 str1(((0))).
 
 will result with `str2="abc"`.
 
 It is also possible to output a string to `stdout` by using it as a relation
 symbol:
 
-    \@stdout str1(((0))).
+    @stdout str1(((0))).
 
 or arbitrary tree:
 
-    \@stdout T((1 2)).
+    @stdout T((1 2)).
 
 In addition a string can refer to command line arguments:
 
-    \@str $1.
+    @str $1.
 
 or to be taken from `stdin`:
 
-    \@str stdin.
+    @str stdin.
 
 or from a file:
 
-    \@str <filename>.
+    @str <filename>.
 
 Finally it is possible to refer to the length of the string by the symbol
 `len:str`.
@@ -347,7 +347,7 @@ where `str` is some string defined in the program. An additional line is
 required for specifying the start symbol and on which string the grammar should
 run:
 
-    \@str "(()())".
+    @str "(()())".
     S <= str.
 
 Extracting the parse forest can be done by extracting a proof of the start
