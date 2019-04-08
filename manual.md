@@ -28,6 +28,7 @@ specifically:
   * Testing
 * Queries need a rewrite.
 * String from trees.
+* Strings are encoded in a different style than described here.
 * Support binary input files and UTF-8 charset.
 * Grammars support only one input string for now, with default start symbol S.
 * Parsing error messages and bugs.
@@ -184,8 +185,9 @@ Nested programs are yet unsupported.
 # Trees
 
 Terms of certain form are interpreted as trees. This does not affect the rules
-at all, but only as means of intputing and outputing facts. Trees are expressed
-by constructing a directed graph of terms. For example the following term
+at all, but only as means of inputting and outputting facts, as below. Trees are
+expressed by constructing a directed graph of terms. For example the following
+term
 
     b((a(1 2)) (a(2 2)) (c(2 3)))
 
@@ -207,7 +209,7 @@ tree of a program consisting of the rule
 
 may be constructed by adding the rule
 
-    proof((e(?x ?y)) (e(?x ?z)) (e(?y ?z))).
+    proof((e(?x ?y)) (e(?x ?z)) (e(?y ?z))) :- e(?x ?y), e(?x ?z), e(?y ?z).
 
 We can then extract the proof tree by querying, as in the section "Queries".
 However as in that section there's a shortcut syntax for extracting proofs.
