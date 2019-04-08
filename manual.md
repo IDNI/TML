@@ -73,12 +73,14 @@ previous section.
 ## Facts
 
 Facts take the form of
+
     a(b c).
     a(b(c)).
     a(1 2 3).
     rel('t' 1 2).
     b(?x).
     r.
+
 Each term begins with a relation symbol (which is not considered as part of the
 universe). It is then possibly followed by parenthesis (or any balanced sequence
 of them) containing symbols. A term like `b(b)` is understood as containing two
