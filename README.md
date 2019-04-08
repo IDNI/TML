@@ -1,363 +1,376 @@
-For now this repository contains an ongoing work on TML (Tau Meta-Language), a
-Partial Evaluator (Futamura's style) to PFP (Partial Fixed Points, those logics
-that capture PSPACE over finite ordered structures). Nothing here is ready yet.
-
-Materials about PFP and Datalog can be found in any Finite Model Theory (or
-Descriptive Complexity Theory) book. PFP was originally introduced by Abiteboul
-and Vianu (1989).
-
-Can find us on ##idni @freenode
-
-# TML Tutorial (Unfinished Draft)
-
-We introduce TML (Tau Meta-Language). The language is quite similar to flavors
-of Datalog with negation. It is intended to define other languages (hence Meta-
-Langauage) in a logical fashion. Our explanation comes in a top-down manner:
-Globally speaking, a TML program is a loop. We first describe the higher level
-behavior of the loop and then turn to describe what happens in every iteration
-together with actual input and output of TML programs. This tutorial attempts to
-assume no math background and attempts to be self-contained.
-
-## Recursion
-
-Maybe the most major aspect in TML is recursion. In general, recursion is made
-of an iteration with a stopping condition, however on TML we don't have an
-arbitrary stopping condition as usual in programming languages. A TML program
-defines what happens within a single iteration, while evaluator then iterates
-the program until one of the two happens:
-
-1. Two consecutive iterations returned the same result, means that the state of
-the computation hasn't changed. This is called a Fixed-Point, and indeed TML is
-a fixed-point logic language. If this happens, then this result is considered as
-the final result.
-
-2. Or, two nonconsecutive iterations returned the same result, in which case we
-consider the program ending with status "fail", or "no result" (this is not same
-as "empty result").
-
-There are only those two possibilities because the state space is finite, as we
-shall see. In both cases we actually detect a loop, we just consider it as fail
-if the loop has length greater than one, and accept the result otherwise. Those
-conditions characterize TML's fixed-point operator as what known as PFP (or
-Partial Fixed Point).
-
-*Remark: In Finite Model Theory (resp. Descriptive Complexity) it
-has been shown that PFP logic over finite ordered structures captures precisely
-all problems solvable in PSPACE.*
-
-## Models
-
-Every iteration is a map from a relational structure to itself, under the same
-vocabulary. A __relational structure__ (or a relational model, or just a
-"__model__" here sometimes) is a set of *relations*, while we think of relations
-as tables. As in a table, each row is a tuple, and all rows have same number of
-cells. If a relation is a table, then the width of every row, is what we call
-the Arity of the relation, as in binary (width 2), monadic (width 1), ternary,
-k-ary (width k) etc. Last, every table has a name, still two relations with the
-same name but with different arity are treated as if they had a different name.
-A relation over a set S is therefore a subset of a power of S (wrt Cartesian
-product).
-
-So the following is a just fine relational structure:
-
-	uncle(jim, joe)
-	uncle(joe, jill)
-	begins_with_j(joe)
-	begins_with_j(jim)
-	begins_with_j(jill)
-
-which defines two relations, one binary called "uncle" and one unary called
-"begins_with_j". To make things even more clearer, let's write down the matching
-tables:
-
-		|Table A: uncle	|Table B: begins_with_j	|
-		|	 arity=2|	 arity=2	|
-	        ----------------------------------------|
-	Row 1:	|jim	|joe	|Row 1:	|joe		|
-	Row 2:	|joe	|jill	|Row 2:	|jim		|
-				|Row 3:	|jill		|
-
-The vocabulary of this structure is contains uncle, begins_with_j, joe, jim, and
-jill. But of course it contains more information than just the vocabulary: it
-contains information about how the terms relate to each other. We could have
-many different tables and models using the same vocabulary. And this is what
-each iteration in a TML (or PFP) program is doing: it takes a model and returns
-a model with the same vocabulary. In other words, it edits the tables, just
-keeping the words that are allowed to appear in the rows and in the table names.
-It keeps iterating until one of the two stopping conditions above reaches, so a
-"pass" run will determine a set of tables such that if we iterate the program
-again, we'll get the same tables untouched.
-
-*Remark: we numbered the tables' rows just for conveinece, but in TML and in math
-in general, a relation is an unordered set of tuples. So tables are considered
-totally identical if all they differ at is the order of rows. This is not true
-at all when it comes to the columns, where the order matters. Also note that our
-table's columns don't have names. Indeed by that we differ from common relational
-databases where columns typically have names. Here they are identified by their
-order only.*
-
-Each iteration is written as update conditions, of the form "if the current
-state satisfies ... then update the state to be ...". By "state" (or sometimes
-"stage") we refer to the relational structure evolving with each iteration.
-
-*This "update-based" presentation of PFP/Datalog semantics is taken from [2].*
-
-## Example: Transitive Closure
-
-We will now demonstrate the above in a more detailed example. The canonical
-example in texts dealing with fixed-point logics is the Transitive Closure (TC)
-operator. Take a piece of paper, draw some points, then draw arrows between
-the points, and that'd be a directed graph (__digraph__). The points are called
-vertices and the arrows are called edges. Note that arrows are directed: an
-arrow from vertex 1 to vertex 2 isn't the same as from vertex 2 from vertex 1.
-If they'd be considered the same, we'd call it an undirected graph.
-
-*Remark: All directred graphs are all binary relations and vice versa. In other
-words, every digraph can be written as a table with two columns, and every such
-table represents a digraph.*
-
-The __transitive closure__ of a digraph is simply another digraph representing
-paths in the original graph. In other words, B=TC(A) if and only if every two
-path-connected vertices in A are edge connected in B. Take the example graph G
-with vertices numbered 1,2,3,4:
-
-	1→2
-	↑↘↓
-	4←3
-
-Or explicitly, denoting the edge relation by E, we have five tuples:
-
-	E(1,2)
-	E(2,3)
-	E(3,4)
-	E(4,1)
-	E(1,3)
-
-The transitive closure of the graph contains the following tuples in addition
-to the above five:
-
-	TC(1,2) // the original edges
-	TC(2,3)
-	TC(3,4)
-	TC(4,1)
-	TC(1,3)
-
-	TC(1,4) // the new edges
-	TC(2,1)
-	TC(2,4)
-	TC(3,1)
-	TC(3,2)
-	TC(4,2)
-	TC(4,3)
-
-On our case, the transitive closure forms a clique graph. The following TML
-TML defines the transitive closure of a binary relation E:
-
-	E(?x,?y)	  -> TC(?x,?y)
-	TC(?x,?y) E(?y,?z)-> TC(?x,?z)
-
-The arrow sign means to update the relational structure as we mentioned above
-and will demonstrate later on. The question mark in front of x,y,z denotes that
-they are [first-order] variables. This program is equivalent to the logical
-formula:
-	
-	∀x,y,z E(x,y)->TC(x,y) & [TC(x,y)&E(y,z)->TC(x,z)]
-
-taken under the partial fixed point semantics as mentioned and will be detailed
-more. Observe that this formula has all its first-order variables bound, but all
-its second-order (relational) variables (TC,E) free. What bounds them is the
-fixed point operator, namely they are meant to be calculated iteratively as
-above. The formula is evaluated to "true" once the relations (or tables) are not
-changed if we apply the program again.  In pseudocode we could write a single
-iteration of our TC program as:
-
-	for (x : vertices)
-		for (y : vertices)
-			for (z : vertices) {
-				if (E(x,y)) set TC(x,y):=1;
-				if (TC(x,y) && E(y,z)) set TC(x,z):=1;
-			}
-
-and the iteration is repeated as long as either the "set" operations don't
-change anything (a "pass" case), or when we repeat to a previous state and
-therefore will loop if will continue the same way (a "fail" case).
-
-*Remark: Note that the definition of TC is recursive, as it depends on TC as
-well.  Further, on our example graph we have a cycle, so without any care, the
-recursion will never halt. We will demonstrate how PFP termination conditions
-avoid infinite loops.*
-
-## Negation
-
-Our example contains no negation, or more precisely, it is made of Horn clauses
-only. It demonstrates LFP or IFP being weaker logics than PFP. We now add
-negation to our example. Suppose we're interested only on the new edges created
-by the transitive closure process, namely we remove from the relation TC all
-edges from the original graph E. We denote this relation by S. In addition we
-explicitly remove from S the edge 1->4. So S is given by:
-
-	S(2,1)
-	S(2,4)
-	S(3,1)
-	S(3,2)
-	S(4,2)
-	S(4,3)
-
-and our program becomes:
-
-	E(?x,?y)	 	-> TC(?x,?y)
-	TC(?x,?y) E(?y,?z)	-> TC(?x,?z)
-	TC(?x,?y) !E(?x,?y)	-> S(?x,?y)
-	S(1,4)			-> !S(1,4)
-
-Note the negation operator '!' in the third and fourth line. The fourth line
-further looks like a contradiction, but a close look shows it has a well-defined
-meaning: if on some iteration `S(1,4)` is set, then we unset it. Note that on our
-case, `S(1,4)` is concluded only in an iteration where the third line yields
-it (as `TC(1,4) & !E(1,4)`). Then iteration after the fourth line can be
-activated, and `S(1,4)` is unset. Our program therefore doesn't contain a
-contradiction, nevertheless it fails because it has no fixed point, as it keeps
-adding and removing S(1,4) with every iteration, which is a loop of length 2. If
-we had contradicting updates at the same iteration, then the relation must be
-empty which in turn means going back to a previous nonconsecutive state
-(precisely the first step), therefore is evaluated also as "fail". Removing the
-fourth line completely gives an example of a program with both fixed point and
-negation. This is however still a weak case of negation called Stratified
-Negation. PFP further negations that allowed to appear everywhere including
-recursive statements.
-
-## Bits and Bytes
-
-A bitstring is a monadic relation where the universe is the string's positions.
-If we have a string of N bits, our monadic relation will be the set of the
-universe elements corresponding to the location of the bits that are set to one.
-So for the bitstring 01000110 we'll have a monadic relation, call it M, having:
-
-	M(2)
-	M(6)
-	M(7)
-
-A bytestring is a binary relation where the first argument is the string's
-position as in bitstrings, and the second argument represent the value of that
-byte, from -127 to 128. The built-in predicates +-\*\<=/ on those elements
-(chars and positions) will behave as usual and will overflow. A byte will
-overflow at 8 bits and length will overflow at 64 bits. A relation may be
-initialized from a string:
-
-	S"hello world"
-
-represents the set of literals:
-
-	S(1, 'h') 	// we use 'h' as a shorthand to h's ASCII code
-	S(2, 'e')
-	...
-	succ(1, 2) 	// builtin successor relation, using it can determine
-	...		// the first, last, and next character. note that we
-			// don't need it per string but just once globally
-
-## Input and Output
-
-What a TML program really defines is a set of second-order variables, aka
-relations aka tables. On our TC example we had two relations, E and TC. We
-considered E as input and TC as output, but we could have take the same program
-and consider them the other way around. A TML program doesn't come with
-prescribed input and output relation names, but they come afterwards. But in
-order to continue from here we need to get a little deeper into the our fixed-
-point mechanism.
-
-When we ran the TC example we assumed that the table E has some information in
-it but the table TC begins empty and being filled during the execution of the
-program. Indeed, the fixed-point operator in PFP is defined to begin with the
-empty set. And this points to some asymmetry between input and output: it
-amounts to the initial state of the tables being "filled" for inputs and empty
-for outputs, and from there the program runs as usual. We therefore need TML's
-evaluator to be able to initialize relation before running the program, and to
-mark which relations are desired as output. Note that this is in contrast to
-most logic or database languges in which the output may be more flexible than
-whole tables.
-
-*Remark: A TML program has a fixed number of relation symbols which are the ones
-mentioned explicitly in the program, as the language deliberately offers no means
-to dynamically create new relations. Therefore per program one can define a fixed
-number of input and output relations.*
-
-## Partial Evaluation (PE)
-
-Partial evaluation is about a program that takes several inputs, and we're
-concerned with updating the program given part (but not all) of the inputs. In
-other words, consider a TML program involving 3 tables, where we're interested
-in two of them being input and the third being output. Further we'd like to
-specify only the first input, and generate a *reduct* (or *residue*) program
-that'd take one input relation but will perform the same computation as the
-original function over the two inputs.
-
-The canonical example of a program that takes two inputs at the scope of PE is
-an interpreter, and is very relevant to TML being a meta-language. An
-interpreter takes two parameters, a program and its input, and evaluates the
-program wrt the input. Partially-evaluating the interpreter wrt a given program
-yields a compiled program, and that'd be the first Futamura projection.
-
-We support partial evaluation of whole relations only, means that one cannot
-supply an input table row by row but the whole table at once. Similarly, partial
-evaluation wrt a string cannot be done char by char but given the whole string.
-
-The PFP iteration number can be treated inside the program, by defining:
-
-	round(x) succ(x,y)	-> round(y)
-	round(x)		-> !round(x)
-
-We can then use this in order to perform partial evaluation. Suppose we'd like
-to partially evaluate the TC program wrt a graph with a single edge E(1,2). As
-we showed, this is equivalent to beginning the fixed point iteration with an
-initialized relation.  So we invoke as much rules as we can and we explicitly
-exclude the non-specialized original parts:
-
-	# the iteration number rules
-	round(x) succ(x,y)	-> round(y)
-	round(x)		-> !round(x)
-	# the evaluated part
-	round(0)		-> E(1,2)
-	# we keep evaluating as long as we can
-	round(1)		-> TC(1,2)
-	round(1) TC(x,1) E(1,2) -> TC(x,2)
-	# the unevaluated part. includes an explicit exclusion of the first
-	# rounds because we assume that the input relation E is fully given, so
-	# these rules may never be invoked again even with new input.
-	# otherwise they shouldv'e left untouched.
-	!round(0) !round(1) E(x,y)		-> TC(x,y)
-	!round(0) !round(1) TC(x,y) E(y,z)	-> TC(x,z)
-
-## Formal Syntax
-
-The set of all TML programs can be defined by the following context-free grammar
-(in fact a regular grammar):
-
-	program		:= clause+ .
-	clause		:= [literal ws]* [->] [literal ws]*.
-	literal		:= snd([fst[,fst]*]) | fst snd fst | snd'"'identifier'"'
-	fst		:= [?]identifier
-	snd		:= [!]identifier // can be '=' and '!='
-	wchar 		:= <any UTF-8 char>
-	ws		:= <whitespace>
-	identifier	:= wchar-{ '-', '>', '!', '(', ')', ',', '.', '"', ws }
-
-A model (as input or output of TML programs) is specified using the syntax:
-
-	model		:= clause+ .
-	clause		:= [equality|inequality ws]* [->] [literal ws]*.
-	literal		:= snd([fst[,fst]*]) | fst snd fst | snd'"'identifier'"'
-	fst		:= identifier // ground only
-	snd		:= [!]identifier | '"'identifier'"'
-
-*(TODO: quoted strings and single chars)*
-
-Note that TML supports both triple notation "subject predicate object" for
-binary predicates as well as and list notation "predicate(subject, object)".
-However the latter offers unbounded arity.
-
-## References
-
-[1] "Finite Model Theory" by Ebbinghaus and Flum.
-[2] "Finite Model Theory and Its Applications" by Gradel et al.
-[3] "Partial Evaluation of Computation Process – An Approach to a Compiler-
-    Compiler" by Futamura.
+# Introduction
+
+TML (Tau Meta-Language) is a variant of Datalog. It is intended to serve as
+a translator between formal languages (and more uses, see under the Philosophy
+section). The main difference between TML and common Datalog implementations is
+that TML works under the Partial Fixed-Point (PFP) semantics, unlike common
+implementations that follow the Well-Founded Semantics (WFS) or stratified
+Datalog. By that TML (like with WFS) imposes no syntactic restrictions on
+negation, however unlike WFS or stratified Datalog it is PSPACE complete rather
+than P complete.  TML's implementation heavily relies on BDDs (Binary Decision
+Diagrams) in its internals. This gives it extraordinary performance in time and
+space terms, and allowing negation to be feasible even over large universes. In
+fact negated bodies, as below, do not consume more time or space than positive
+bodies by any means, thanks to the BDD mechanism.
+
+## Not Implemented Yet
+Not everything on this document is implemented though implementation is ongoing
+and everything is expected to be implemented in a matter of weeks. Besides there
+is no release yet as tests and final finishes have not been done yet.
+
+Specifically:
+* Proof extraction needs a rewrite.
+* Proof extraction for programs that contain negation.
+* Tree extraction is not fully working and is a very preliminary implementation,
+specifically:
+  * Cycle detection
+  * Node omission
+  * Testing
+* Queries need a rewrite.
+* String from trees.
+* Strings are encoded in a different style than described here.
+* Symbol for length of strings.
+* Support binary input files and UTF-8 charset.
+* Grammars support only one input string for now, with default start symbol S.
+* Parsing error messages and bugs.
+* Comprehensive tests of everything.
+
+# Universe
+
+The size of the universe (or domain of discourse) of a TML program is:
+* The number of distinct non-relation symbols in the program, plus
+* The maximum nonnegative integer that appears in the program (where the length
+of input strings counts as appearing in the program), plus
+* 256 if at least one character symbol is used in the program (or at least one
+string appears in the program).
+
+# Fixed Points
+
+TML follows the PFP semantics in the following sense. On each step, all rules
+are executed once and only once, causing a set of insertions and deletions of
+terms. If the same term is inserted and deleted at the same step, the program
+halts and evaluates to `unsat`. Otherwise it continues to the next step
+performing again a single evaluation of every rule. This process must eventually
+halt in either of the following forms:
+
+1. The database obtained from the current step is equal to the database resulted
+from the previous step. This is a Fixed-Point. When this happens, the resulted
+database is considered as the final result.
+
+2. Or, the database obtained in one step equals to the database state in some
+previous, not immediate predecessor, state. In this case the program will loop
+forever if we wouldn't detect it and halt the program, and is therefore
+evaluated to `unsat`, as no fixed point exists.
+
+Note that only one of the two options can happen because the arity and the
+universe size are fixed. Ultimately, for universe size n and maximum arity k,
+they will occur in no more than 2^n^k steps.
+
+# Facts and Rules
+
+A TML program consists of initial terms (facts) and rules that instruct the
+interpreter which terms to derive or delete at each step, as described in the
+previous section.
+
+## Facts
+
+Facts take the form of
+
+    a(b c).
+    a(b(c)).
+    a(1 2 3).
+    rel('t' 1 2).
+    b(?x).
+    r.
+
+Each term begins with a relation symbol (which is not considered as part of the
+universe). It is then possibly followed by parenthesis (or any balanced sequence
+of them) containing symbols. A term like `b(b)` is understood as containing two
+different symbols, one `b` stands for a relation symbol, and the second one for
+a universe element. Symbols may either be alphanumeric literals (not beginning
+with a digit), or a nonzero integer, or a character. Additionally a term may
+contain variables, prefixed with `?`. A fact that contain variables,
+like `b(?x)`, is interpreted where ?x goes over the whole universe. So the
+program
+
+    a(1).
+    b(?x).
+
+is equivalent to
+
+    a(1).
+    b(0).
+    b(1).
+
+## Rules
+
+Rules are terms separated by commas and one update operator `:-`. For example:
+
+    e(?x ?y) :- e(?x ?z), e(?z ?y).
+
+what is left to the update operator (which may be several terms separated by
+commas) is called the `head` of the rule, while the rhs is called the `body`
+of the rule. This latter example therefore instructs to add to the next-step
+database all facts of the form e(?x ?y) such that e(?x ?z) and e(?x, ?y) appear
+in the current-step database, for some value of ?z. So for example the following
+program
+
+    e(1 2).
+    e(2 1).
+    e(?x ?y) :- e(?x ?z), e(?z ?y).
+
+will result with:
+
+    e(1 2).
+    e(2 1).
+    e(1 1).
+    e(2 2).
+
+Note that the order of facts and rules does not matter. Also note that all
+facts and rules must end with a dot.
+
+## Negation and Deletion
+
+Bodies may be negated using the negation symbol `~`, for example:
+
+    e(?x ?y) :- e(?x ?z), e(?z ?y), ~e(?x ?x).
+
+The variable ?x will bind to all values such that e(?x ?x) does not appear in
+the current-step database.
+
+Heads may also contain the negation symbol, in which case it is interpreted
+as deletion. For example the rule:
+
+    ~e(?x ?x) :- e(?x ?x).
+
+Will make the next-step database to not include all terms of the form e(?x ?x)
+included on the current step database.
+
+For performance reasons it is advised to better not have variables appearing
+in negated bodies that do not occur in any positive head (in the same rule),
+or variables that appear in positive heads and do not appear in bodies (also in
+the same rule). However this is only a performance advice. TML should work
+correctly either way, where variables (implicitly) range over the whole
+universe.
+
+## Sequencing
+
+It is possible to sequence programs one after the other using curly brackets.
+For example the program
+
+    {
+      e(1 2).
+      e(2 3).
+      e(3 1).
+      e(?x ?y) :- e(?x ?z), e(?z ?y).
+    }
+    {
+      ~e(?x ?x) :- e(?x ?x).
+    }
+
+will result with
+
+    e(1 2).
+    e(1 3).
+    e(2 1).
+    e(2 3).
+    e(3 1).
+    e(3 2).
+
+More generally, the output of one program is considered the input of the other.
+It is possible to filter the output before passing it to the next program as in
+the section "Queries".
+
+Nested programs are unsupported as they make no difference from flat sequences.
+
+# Trees
+
+Terms of certain form are interpreted as trees. This does not affect the rules
+at all, but only as means of inputting and outputting facts, as below. Trees are
+expressed by constructing a directed graph of terms. For example the following
+term
+
+    b((a(1 2)) (a(2 2)) (c(2 3)))
+
+indicates two edges in a graph named `b`, where a vertex labelled `a(1 2)` has
+two [ordered] outgoing edges, one to the term `a(2 2)` and one to the term
+`c(2 3)`. Terms as labels of vertices need not be proper terms in the sense
+that we could also have
+
+    b((a 1 2) (a 2 2) (c 2 3))
+
+Either way, `a` and `c` are interpreted as universe elements rather relation
+symbols. In general having a relation symbols and then parenthesized sequences
+of elements is interpreted as denoting ordered outgoing edges.
+
+We can construct trees in the normal way using rules. For example, a proof
+tree of a program consisting of the rule
+
+    e(?x ?y) :- e(?x ?z), e(?y ?z).
+
+may be constructed by adding the rule
+
+    proof((e(?x ?y)) (e(?x ?z)) (e(?y ?z))) :- e(?x ?y), e(?x ?z), e(?y ?z).
+
+We can then extract the proof tree by querying, as in the section "Queries".
+However as in that section there's a shortcut syntax for extracting proofs.
+
+Note that as we indeed construct a directed graph rather a tree, it is
+interpreted as a packed representation of a forest. Further this graph may
+contain loops. They are avoided during the traversal by simply skipping
+previously visited nodes.
+
+Terms that appear in double parenthesis, like `a 2 2` in:
+
+    b((a 1 2) ((a 2 2)) (c 2 3))
+
+will be omitted when converting a tree to a string, as in the next section.
+
+# Strings
+
+It is possible to input strings to the database. The line
+
+    @mystr "abc".
+
+will add the following fact to the database:
+
+    mystr(((0))('a')((1))).
+    mystr(((1))('b')((2))).
+    mystr(((2))('c')((3))).
+
+More generally, `@relname "str"` will use the relation symbol relname to declare
+a tree where each string position has first successor to the character on that
+position, and a second successor to the next position. Observe that the
+positions appear in double parenthesis. This is because of the following:
+
+It is possible to construct a string by specifying a root of a tree. The backend
+will then traverse the tree depth-first left-first (Pre-Order) and stringify its
+content. It will omit from the output string nodes that appear in double
+parenthesis. For example the program
+
+    @str T((1 2)).
+    T((1 2) (2 3) (a b)).
+    T((a b) (c d)).
+    T((2 3) (4 5)).
+
+will result in having the relation symbol `str` represent the string:
+
+    "122345abcd"
+
+while if we had:
+
+    @str T((1 2)).
+    T((1 2) ((2 3)) (a b)).
+    T((a b) ((c d))).
+    T(((2 3)) (4 5)).
+
+the string `str` would be:
+
+    "1245ab"
+    
+This relation `str` is then transferred to the next sequenced program, or
+emitted as the output of the program if no sequenced program is present.
+
+Note that the double-parenthesis omission is denoted on the successor nodes.
+
+Now we can see why strings create trees with double parenthesis: the following
+
+    @str1 "abc".
+    @str2 str1(((0))).
+
+will result with `str2="abc"`.
+
+It is also possible to output a string to `stdout` by using it as a relation
+symbol:
+
+    @stdout str1(((0))).
+
+or arbitrary tree:
+
+    @stdout T((1 2)).
+
+In addition a string can refer to command line arguments:
+
+    @str $1.
+
+or to be taken from `stdin`:
+
+    @str stdin.
+
+or from a file:
+
+    @str <filename>.
+
+Finally it is possible to refer to the length of the string by the symbol
+`len:str`.
+
+# Queries
+
+TML features three kinds of queries: filtering, proving, and tree extraction.
+Filtering and tree extraction replace the resulted database with their result,
+namely deleting everything unrelated to them. Their result is then outputed
+or passed to the next sequenced program.
+
+Filtering is done by:
+
+    ! e(1 ?x).
+
+which will leave on the database only the results that match the term `e(1 ?x).`
+Tree extraction is done by supplying the root (which may possibly contain
+variables) after `!!`:
+
+    !! T((?x ?y)).
+
+Proof extraction is done by:
+
+    !! relname e(1 ?x).
+
+which will construct a forest with relation symbol `relname` that proves all
+results that match `e(1 ?x)`, in a fashion that described above: if we have a
+rule
+
+    e(?x ?y) :- e(?x ?z), e(?y ?z).
+    !! P e(1 ?x).
+
+then the proof tree will have the form
+
+    P((e(?x ?y)) (e(?x ?z)) (e(?y ?z))).
+
+# Grammars
+
+It is possible to supply a context free grammar as a syntactic shortcut for
+definite clause grammars. For example Dyck's language may be written as:
+
+    S => null.
+    S => '(' S ')' S.
+
+and will be converted to the rules:
+
+    S(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
+    S(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
+    S(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), S(?v2 ?v3),
+        str(((?v3)) (')') ((?v4))), S(?v4 ?v5).
+
+where `str` is some string defined in the program. An additional line is
+required for specifying the start symbol and on which string the grammar should
+run:
+
+    @str "(()())".
+    S <= str.
+
+Extracting the parse forest can be done by extracting a proof of the start
+symbol:
+
+    !! parseForest S(0, len:str).
+
+# Philosophy
+
+TBD
+
+# Future Work
+
+TBD
+
+# Further Examples
+
+TBD
