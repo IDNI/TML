@@ -21,12 +21,8 @@
 #include <ctime>
 #include "driver.h"
 #include "rule.h"
+#include "err.h"
 using namespace std;
-
-#define err_proof	"proof extraction yet unsupported for programs "\
-			"with negation or deletion."
-#define err_directive_elem \
-	L"universe element in directive not appearing in program.\n"
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
@@ -120,27 +116,22 @@ strs_t driver::get_dict_stats(const raw_prog& p, const map<lexeme, wstring>& s){
 
 wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
 
-wstring driver::directive_load(const directive& d) {
-	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
-	if (d.type == directive::FNAME) return file_read(str);
-	if (d.type == directive::STDIN) return move(std_input);
-	if (d.type == directive::CMDLINE) {
-		if (argc < d.n)
-			parse_error( // FIXME
-			L"program expects more command line arguments.\n", L"");
-		return s2ws(argv[d.n]);
-	}
+void unquote(wstring& str) {
 	for (size_t i = 0; i != str.size(); ++i)
 		if (str[i] == L'\\') str.erase(str.begin() + i);
-	return str;
 }
 
-map<lexeme, wstring> driver::directives_load(const vector<directive>& ds) {
-	map<lexeme, wstring> r;
-	for (const directive& d : ds)
-		if (d.type != directive::TREE)
-			r.emplace(d.rel, directive_load(d));
-	return r;
+wstring driver::directive_load(const directive& d) {
+	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
+	switch (d.type) {
+		case directive::FNAME: return file_read(str);
+		case directive::STDIN: return move(std_input);
+		case directive::CMDLINE:
+			if (d.n < argc) return s2ws(argv[d.n]);
+			parse_error(err_num_cmdline, L""); break; // FIXME
+		default: return unquote(str), str;
+	}
+	throw 0; // unreachable
 }
 
 lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
@@ -176,18 +167,9 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	set<lp*> progs;
 	vector<pair<raw_prog, map<lexeme, wstring>>> v;
 	for (size_t n = 0; n < rp.p.size(); ++n)
-		for (auto x : transform(rp.p[n]))
+		for (auto x : transform(move(rp.p[n])))
 			v.push_back({move(x.first), move(x.second)});
 	vector<raw_rule> pg;
-	for (auto x : v)
-		for (const raw_rule& y : x.first.r)
-			if (y.pgoal) pg.push_back(y);
-	if (!pg.empty()) {
-		vector<raw_prog> y;
-		for (auto x : v) y.push_back(x.first);
-		auto x = transform_proofs(y, pg);
-		v.push_back({move(x[0]),{}}), v.push_back({move(x[1]),{}});
-	}
 	if (print_transformed)
 		for (auto x : v)
 			wcout << L'{' << endl << x.first << L'}' << endl;

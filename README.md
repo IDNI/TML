@@ -31,7 +31,6 @@ specifically:
 * Strings are encoded in a different style than described here.
 * Symbol for length of strings.
 * Support binary input files and UTF-8 charset.
-* Grammars support only one input string for now, with default start symbol S.
 * Parsing error messages and bugs.
 * Comprehensive tests of everything.
 
@@ -351,17 +350,24 @@ and will be converted to the rules:
     S(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), S(?v2 ?v3),
         str(((?v3)) (')') ((?v4))), S(?v4 ?v5).
 
-where `str` is some string defined in the program. An additional line is
-required for specifying the start symbol and on which string the grammar should
-run:
-
-    @str "(()())".
-    S <= str.
+where `str` is some string defined in the program. Grammars are allowed in
+programs that contain only one string. If multiple strings require parsing it
+is possible to define them in sequenced programs.
 
 Extracting the parse forest can be done by extracting a proof of the start
 symbol:
 
     !! parseForest S(0, len:str).
+
+which also defines the start symbol.
+
+The grammar supports fow now the builtins `alpha`, `alnum`, `digit`, and
+`space`. For example a sequence of one or more whitespaces can be defined by
+the productions
+
+    ws => space ws1.
+    ws1 => space ws1.
+    ws1 => null.
 
 # Philosophy
 

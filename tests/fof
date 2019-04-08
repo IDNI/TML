@@ -1,0 +1,33 @@
+@str "p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).".
+
+S => pred ws ':' '=' ws form ws dot.
+dot => '.'.
+pred => chars ws '(' ws args ws ')' ws.
+identifier => chars.
+identifier => var.
+args => null.
+args => identifier ws args.
+var => '?' chars.
+chars => alpha chars1.
+chars1=> alnum chars1.
+chars1=> null.
+ws => null.
+ws => space ws.
+form => ws prefix ws var ws '(' ws form ws ')' ws.
+form => ws '(' ws form ws ')' ws 'a''n''d' ws '(' ws form ws ')' ws.
+form => ws '(' ws form ws ')' ws 'o''r' ws '(' ws form ws ')' ws.
+form => ws 'n''o''t' '(' ws form ws ')' ws.
+form => ws pred ws 'a''n''d' ws '(' ws form ws ')' ws.
+form => ws pred ws 'o''r' ws '(' ws form ws ')' ws.
+form => ws 'n''o''t' '(' ws form ws ')' ws.
+form => ws pred ws 'a''n''d' ws pred ws.
+form => ws pred ws 'o''r' ws pred ws.
+form => ws 'n''o''t' pred ws.
+form => ws '(' ws form ws ')' ws 'a''n''d' ws pred ws.
+form => ws '(' ws form ws ')' ws 'o''r' ws pred ws.
+form => pred.
+#form => null.
+prefix => 'f''o''r''a''l''l'.
+prefix => 'e''x''i''s''t''s'.
+prefix => 'u''n''i''q''u''e'.
+#!! S(0 ?x).

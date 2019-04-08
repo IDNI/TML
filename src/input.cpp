@@ -16,35 +16,8 @@
 #include <fstream>
 #include <vector>
 #include "input.h"
+#include "err.h"
 using namespace std;
-
-#define dot_expected L"'.' expected.\n"
-#define sep_expected L"Term or ':-' or '.' expected.\n"
-#define unmatched_quotes L"Unmatched \"\n"
-#define err_inrel L"Unable to read the input relation symbol.\n"
-#define err_src L"Unable to read src file.\n"
-#define err_dst L"Unable to read dst file.\n"
-#define err_quotes L"expected \".\n"
-#define err_dots L"two consecutive dots, or dot in beginning of document.\n"
-#define err_quote L"' should come before and after a single character only.\n"
-#define err_fname L"malformed filename.\n"
-#define err_directive_arg L"invalid directive argument.\n"
-#define err_escape L"invalid escaped character\n"
-#define err_int L"malformed int.\n"
-#define err_lex L"lexer error (please report as a bug).\n"
-#define err_parse L"parser error (please report as a bug).\n"
-#define err_chr L"unexpected character.\n"
-#define err_body L"rule's body expected.\n"
-#define err_prod L"production's body expected.\n"
-#define err_term_or_dot L"term or dot expected.\n"
-#define err_close_curly L"'}' expected.\n"
-#define err_fnf L"file not found.\n"
-#define err_rule_dir_prod_expected L"rule or production or directive expected.\n"
-#define err_paren L"unbalanced parenthesis.\n"
-#define err_relsym_expected L"expected relation name in beginning of term.\n"
-#define err_paren_expected \
-	L"expected parenthesis after a nonzero arity relation symbol.\n"
-#define err_head L"expected dot or comma or update operator.\n"
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -69,7 +42,7 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else parse_error(err_chr, *s);
 	}
-	if (wcschr(L"!~.,(){}$@=>", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,(){}$@=<>", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s)) parse_error(err_chr, *s);
 	while (iswalnum(**s)) ++*s;
@@ -100,12 +73,12 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	if (rel = l[++pos], *l[++pos][0] == L'<') type = FNAME;
 	else if (*l[pos][0] == L'"') type = STR;
 	else if (*l[pos][0] == L'$')
-		type = CMDLINE, ++pos, n=get_int_t(l[pos][0], l[pos][1]), ++pos;
+		type=CMDLINE, ++pos, n = get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == L"stdin") type = STDIN;
+	else if (l[pos] == L"stdout") type = STDOUT;
 	else if (t.parse(l, pos)) type = TREE;
 	else parse_error(err_directive_arg, l[pos]);
-	if (arg = l[pos++], *l[pos++][0] != '.')
-		parse_error(dot_expected, l[pos]);
+	if (arg=l[pos++], *l[pos++][0]!='.') parse_error(dot_expected, l[pos]);
 	return true;
 }
 
@@ -131,8 +104,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		else if (pos == l.size()) parse_error(L"unexpected end of file", s[0]);
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
 	if (e.size() == 1) return calc_arity(), true;
-	if (e[1].type != elem::OPENP)
-		parse_error(err_paren_expected, l[pos]);
+	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP) parse_error(err_paren, l[pos]);
 	return calc_arity(), true;
 }
@@ -173,15 +145,23 @@ head:	h.emplace_back();
 bool production::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	elem e;
-	e.parse(l, pos);
-	if (*l[pos++][0] != '=' || l[pos][0][0] != L'>') return pos = curr, false;
-	for (++pos, p.push_back(e);;) {
+	if (!e.parse(l, pos) || l.size() <= pos+1) goto fail;
+/*	if (*l[pos++][0] == L'<') {
+		if (l[pos++][0][0] != L'=') goto fail;
+		start = true;
+		if (!t.parse(l, pos)) parse_error(err_start_sym, l[pos]);
+		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+		return true;
+	}*/
+	if (*l[pos++][0] != '=' || l[pos++][0][0] != L'>') goto fail;
+	for (p.push_back(e);;) {
 		elem e;
 		if (*l[pos][0] == '.') return ++pos, true;
-		if (!e.parse(l, pos)) return false;
+		if (!e.parse(l, pos)) goto fail;
 		p.push_back(e);
 	}
 	parse_error(err_prod, l[pos]);
+fail:	return pos = curr, false;	
 }
 
 bool raw_prog::parse(const lexemes& l, size_t& pos) {
@@ -194,9 +174,6 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
-//	for (auto x : d) wcout << x.rel<<endl<<x.arg << endl;
-//	wcout<<endl;
-//	for (auto x : g) { for (auto y : x.p) wcout << y << endl; wcout<<endl;}
 	return true;
 }
 
@@ -216,16 +193,36 @@ raw_progs::raw_progs(const std::wstring& s) {
 		if (p.push_back(x), *l[pos++][0] != L'}')
 			parse_error(err_close_curly, l[pos]);
 	} while (pos < l.size());
-	//for (auto x : l) wcout << x << endl;
 }
 
-string ws2s(const wstring& s) { return string(s.begin(), s.end()); }
+bool operator==(const lexeme& x, const lexeme& y) {
+	return x[1]-x[0] == y[1]-y[0] && !wcsncmp(x[0],y[0],x[1]-x[0]);
+}
+
+bool operator==(const elem& x, const elem& y) {
+	return x.type == y.type && x.num == y.num && x.e == y.e;
+}
+
+bool operator<(const elem& x, const elem& y) {
+	if (x.type != y.type) return x.type < y.type;
+	if (x.num != y.num) return x.num < y.num;
+	static lexcmp c;
+	return c(x.e, y.e);
+}
+
+bool operator<(const raw_term& x, const raw_term& y) {
+	if (x.neg != y.neg) return x.neg < y.neg;
+	if (x.e != y.e) return x.e < y.e;
+	if (x.arity != y.arity) return x.arity < y.arity;
+	return false;
+}
 
 off_t fsize(const char *fname) {
 	struct stat s;
 	return stat(fname, &s) ? 0 : s.st_size;
 }
 
+string ws2s(const wstring& s) { return string(s.begin(), s.end()); }
 off_t fsize(cws s, size_t len) { return fsize(ws2s(wstring(s, len)).c_str()); }
 
 wstring file_read(wstring fname) {
@@ -260,9 +257,7 @@ wstring file_read_text(wstring wfname) {
 	return r;
 }
 
-void parse_error(std::wstring e, std::wstring s) {
-	parse_error(e, s.c_str());
-}
+void parse_error(std::wstring e, std::wstring s) { parse_error(e, s.c_str()); }
 
 void parse_error(std::wstring e, cws s) {
 	wcerr << e << endl;

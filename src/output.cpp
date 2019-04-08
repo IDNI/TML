@@ -4,19 +4,6 @@
 #include <sstream>
 using namespace std;
 
-wostream& operator<<(wostream& os, const node& n) {
-	return os<<n[0]<<' '<<n[1]<<' '<<n[2];
-}
-
-wostream& bdd_out(wostream& os,size_t n){
-	return bdd_out(os<<L'['<<n<<L']',getnode(n));
-}
-
-wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
-	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') : (bdd_out(
-		os<<n[0]<<L'?',getnode(n[1])),bdd_out(os<<L':',getnode(n[2])));
-}
-
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	for (size_t n = 0; n != p.second; ++n) os << p.first[n];
 	return os;
@@ -25,6 +12,20 @@ wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 wostream& operator<<(wostream& os, const lexeme& l) {
 	for (cws s = l[0]; s != l[1]; ++s) os << *s;
 	return os;
+}
+
+#ifdef DEBUG
+wostream& operator<<(wostream& os, const node& n) {
+	return os << n[0] << L' ' << n[1] << L' '<<n[2];
+}
+
+wostream& bdd_out(wostream& os, size_t n){
+	return bdd_out(os<<L'['<<n<<L']',getnode(n));
+}
+
+wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
+	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') : (bdd_out(
+		os<<n[0]<<L'?',getnode(n[1])),bdd_out(os<<L':',getnode(n[2])));
 }
 
 wostream& operator<<(wostream& os, const bools& x) {
@@ -52,6 +53,7 @@ wostream& operator<<(wostream& os, const matrices& m) {
 	for (const matrix& x : m) os << x << endl;
 	return os;
 }
+#endif
 
 template<typename F>
 void driver::from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const {
@@ -66,6 +68,7 @@ void driver::from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const {
 	})();
 }
 
+#ifdef DEBUG
 matrix driver::from_bits(size_t x, size_t bits, ints art, int_t rel) const {
 	const size_t ar = arlen(art);
 	const vbools s = allsat(x, bits * ar);
@@ -96,6 +99,7 @@ wostream& driver::printmats(wostream& os, const matrices& t) const {
 	for (auto m : t) printmat(os, m) << endl;
 	return os;
 }
+#endif
 
 wostream& driver::print_term(wostream& os, const term& t) const {
 	if (t.neg()) os << L'~';
@@ -117,6 +121,7 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 	return os << L')';
 }
 
+#ifdef DEBUG
 wostream& driver::printmat(wostream& os, const matrix& t) const {
 	set<wstring> s;
 	for (auto v : t) {
@@ -128,20 +133,21 @@ wostream& driver::printmat(wostream& os, const matrix& t) const {
 	return os;
 }
 
-#ifdef DEBUG
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
+
 wostream& printdiff(wostream& os, const diff_t& d, size_t bits) {
 	return drv->printdiff(os, d, bits);
 }
+
 wostream& printbdd(wostream& os, size_t t, size_t bits, ints ar, int_t rel) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
 	return drv->printbdd(os, t, bits, ar, rel);
 }
+
 wostream& printbdd_one(wostream& os, size_t t, size_t bits, ints ar, int_t rel){
 	return drv->printbdd_one(os, t, bits, ar, rel);
 }
-#endif
 
 wostream& driver::printbdd(wostream& os, size_t t, size_t bits, ints ar,
 	int_t rel) const {
@@ -155,6 +161,7 @@ wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits, ints ar,
 	os << "one of " << bdd_count(t, bits * arlen(ar)) << " results: ";
 	return print_term(os, one_from_bits(t, bits, ar, rel));
 }
+#endif
 
 wostream& driver::printdb(wostream& os, lp *p) const {
 	return printdb(os, p->db, p->rng.bits);

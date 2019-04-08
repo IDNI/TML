@@ -17,7 +17,7 @@ using namespace std;
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	tml_init();
-	driver d(argc, argv, stdin, false);
+	driver d(argc, argv, stdin, true);
 	if (!d.result) wcout << "unsat" << endl;
 	return 0;
 }

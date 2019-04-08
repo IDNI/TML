@@ -3,7 +3,7 @@ project(tau)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_VERBOSE_MAKEFILE true)
-include_directories(.)
+add_subdirectory(src)
 
 add_executable(tml
         bdd.cpp

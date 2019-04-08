@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "driver.h"
+#include "err.h"
 using namespace std;
 
 lexeme driver::get_char_lexeme(wchar_t c) {
@@ -37,26 +38,47 @@ bool operator==(const lexeme& l, cws s) {
 	}
 };*/
 
-#define from_grammar_elem(v, v1, v2) raw_term{ false, {v, \
-		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {2}}
+raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
+	return { false, {v,
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::VAR, 0, get_var_lexeme(v1)},
+		{elem::VAR, 0, get_var_lexeme(v2)},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {2}};
+}
 
-#define from_grammar_elem_nt(r, c, v1, v2) raw_term{ false, {\
-		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
-		c, {elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}}
+raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
+	int_t v1, int_t v2) {
+	raw_term t{ false, {
+		{elem::SYM, 0, r},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::VAR, 0, get_var_lexeme(v1)},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		c,
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::VAR, 0, get_var_lexeme(v2)},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}
+	}, {}};
+	return t.calc_arity(), t;
+}
 
-#define from_grammar_elem_builtin(r, b, v, v1, v2) { false, {\
-		{elem::SYM, 0, r}, \
-		{elem::OPENP, 0, dict.get_lexeme(L"(")}, \
-		{elem::SYM, 0, dict.get_lexeme(b)}, \
-		{elem::VAR, 0, get_var_lexeme(v1)}, \
-		{elem::VAR, 0, get_var_lexeme(v2)}, \
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}}
+raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
+	int_t v){
+	return { false, {
+		{elem::SYM, 0, r},
+		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		{elem::SYM, 0, dict.get_lexeme(b)},
+		{elem::VAR, 0, get_var_lexeme(v)},
+		{elem::VAR, 0, get_var_lexeme(v+1)},
+		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}};
+}
 
 #define from_string_lex(rel, lex, n) raw_rule({ false, { \
 		{elem::SYM, 0, rel}, {elem::SYM, 0, dict.get_lexeme(lex)}, \
@@ -68,9 +90,22 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 		r.r.push_back(raw_rule(raw_term{
 			false, {
 			{elem::SYM, 0, rel},
-			{elem::CHR, 0, get_char_lexeme(s[n])},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
 			{elem::NUM, n, get_num_lexeme(n)},
-			{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}}));
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
+			{elem::CHR, 0, get_char_lexeme(s[n])},
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
+			{elem::OPENP, 0, dict.get_lexeme(L"(")},
+			{elem::NUM, n+1, get_num_lexeme(n+1)},
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
+			{elem::CLOSEP, 0, dict.get_lexeme(L")")}},{}}));
+		r.r.back().head(0).calc_arity();
 		if (iswspace(s[n]))
 			r.r.push_back(from_string_lex(rel, L"space", n));
 		if (iswdigit(s[n]))
@@ -93,18 +128,17 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 #define term_close(x) append_closep((x).e), (x).calc_arity()
 
 array<raw_prog, 2> driver::transform_grammar(
-	const directive& d, const vector<production>& g, const wstring& s) {
+	directive d, vector<production> g, const wstring& s) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
 	raw_prog r, _r;
-	r.d.push_back(d);
+	r.d.push_back(move(d));
 	for (const production& p : g) {
-		if (p.p.size() < 2)
-			parse_error(L"empty production.\n", p.p[0].e);
+		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
 		raw_rule l;
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
-			elem e = {elem::VAR,0,get_var_lexeme(2)};
 			l.add_head(t);
+			elem e = {elem::VAR,0,get_var_lexeme(2)};
 			l.add_body(from_grammar_elem_nt(d.rel,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
 			l.add_body(from_grammar_elem_nt(d.rel,e,3,1));
@@ -117,8 +151,7 @@ array<raw_prog, 2> driver::transform_grammar(
 				if (b.find(lexeme2str(p.p[n].e)) != b.end())
 					++v,
 					l.add_body(from_grammar_elem_builtin(
-						d.rel, lexeme2str(p.p[n].e),
-						v, n,n+1));
+						d.rel, lexeme2str(p.p[n].e),n));
 				else if (p.p[n].type == elem::CHR)
 					l.add_body(from_grammar_elem_nt(d.rel
 						,p.p[n],n,n+1));
@@ -127,11 +160,11 @@ array<raw_prog, 2> driver::transform_grammar(
 		}
 		r.r.push_back(l);
 	}
-	raw_term t;
-	append_sym_elem(t.e, L"S"), append_openp(t.e),
-	t.e.push_back({elem::NUM, 0, get_num_lexeme(0)}),
-	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
-	append_closep(t.e);//, r = transform_bwd(r, {t});
+//	raw_term t;
+//	append_sym_elem(t.e, L"S"), append_openp(t.e),
+//	t.e.push_back({elem::NUM, 0, get_num_lexeme(0)}),
+//	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
+//	append_closep(t.e), r = transform_bwd(r, {t});
 //	r.delrel = dict_get_rel(L"try");
 	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
@@ -212,14 +245,28 @@ nxthead:const raw_term &head = x.head(n);
 
 vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog p) {
 	vector<pair<raw_prog, map<lexeme, wstring>>> r;
+	map<lexeme, wstring> s;
+	set<raw_term> trees, out;
+	for (const directive& d : p.d)
+		if (d.type == directive::STDOUT) out.insert(d.t);
+		else if (d.type == directive::TREE) trees.insert(d.t);
+		else s.emplace(d.rel, directive_load(d));
 	//DBG(wcout << L"original program:"<<endl<<p;)
-	auto s = directives_load(p.d);
 	if (!p.g.empty()) {
-		if (!p.d.size()) _er("grammar without input string.\n");
-		if (p.d.size()>1)_er("only one string allowed given grammar.\n");
-		auto x = transform_grammar(p.d[0], p.g, s.begin()->second);
+		if (p.d.size() > 1) er(err_one_input);
+		auto x = transform_grammar(p.d.size()?move(p.d[0]):directive(),
+			move(p.g), s.begin()->second);
 		r.push_back({x[0],s}), r.push_back({x[1],{}}), p.g.clear(),
 		p.d.erase(p.d.begin());
 	} else for (auto x : s) transform_string(x.second, p, x.first);
+/*	for (auto x : v)
+		for (const raw_rule& y : x.first.r)
+			if (y.pgoal) pg.push_back(y);
+	if (!pg.empty()) {
+		vector<raw_prog> y;
+		for (auto x : v) y.push_back(x.first);
+		auto x = transform_proofs(y, pg);
+		v.push_back({move(x[0]),{}}), v.push_back({move(x[1]),{}});
+	}*/
 	return r.push_back({p, s}), r;
 }

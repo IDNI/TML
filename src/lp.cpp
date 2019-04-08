@@ -30,9 +30,6 @@
 #endif
 using namespace std;
 
-#define err_goalsym "goal symbol not appearing in program.\n"
-#define err_goalarity "goal arity larger than the program's.\n"
-
 void tml_init() { bdd_init(); }
 DBG(wostream& printbdd(wostream& os, size_t t);)
 

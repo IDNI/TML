@@ -34,7 +34,7 @@ typedef std::vector<bools> vbools;
 #else
 #define DBG(x)
 #endif
-#define _er(x)	perror(x), exit(0)
+#define er(x)	perror((const char*)x), exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
@@ -43,4 +43,5 @@ typedef std::vector<bools> vbools;
 #define has(x, y) std::binary_search(x.begin(), x.end(), y)
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
+struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
 #endif

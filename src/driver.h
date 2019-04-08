@@ -1,3 +1,5 @@
+// LICENSE
+// This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
 // 2. used for a product which includes or associated with a blockchain or other
@@ -35,8 +37,6 @@ class driver {
 		const std::map<lexeme, std::wstring>& s);
 
 	std::wstring directive_load(const directive& d);
-	std::map<lexeme, std::wstring> directives_load(
-		const std::vector<directive>& p);
 	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
 	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
 	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r);
@@ -44,13 +44,16 @@ class driver {
 		const std::vector<raw_prog> p,
 		const std::vector<raw_rule>& g);
 	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
-	std::array<raw_prog, 2> transform_grammar(const directive&,
-		const std::vector<production>&, const std::wstring&);
+	std::array<raw_prog, 2> transform_grammar(directive,
+		std::vector<production>, const std::wstring&);
 	std::vector<std::pair<raw_prog, std::map<lexeme, std::wstring>>>
 		transform(raw_prog p);
 	bool print_transformed;
-	void grammar_to_rules(const std::vector<production>& g, matrices& m,
-		int_t rel);
+	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
+	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
+		int_t v1, int_t v2);
+	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
+		int_t v);
 	lp* prog_init(const raw_prog& rp, strs_t, lp* last);
 	void progs_read(wstr s);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);

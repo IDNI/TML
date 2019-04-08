@@ -18,7 +18,7 @@
 
 struct elem {
 	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP } type;
-	int_t num;
+	int_t num = 0;
 	lexeme e;
 	bool parse(const lexemes& l, size_t& pos);
 };
@@ -36,11 +36,13 @@ struct directive {
 	lexeme rel, arg;
 	raw_term t;
 	int_t n;
-	enum etype { STR, FNAME, CMDLINE, STDIN, TREE } type;
+	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE } type;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
 struct production {
+	bool start = false;
+	raw_term t;
 	std::vector<elem> p;
 	bool parse(const lexemes& l, size_t& pos);
 };
@@ -98,4 +100,7 @@ std::wstring file_read_text(FILE *f);
 std::wstring file_read_text(std::wstring fname);
 off_t fsize(cws s, size_t len);
 bool operator==(const lexeme& l, cws s);
+bool operator<(const raw_term& x, const raw_term& y);
+bool operator<(const elem& x, const elem& y);
+bool operator==(const elem& x, const elem& y);
 void parser_test();

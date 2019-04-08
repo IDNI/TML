@@ -13,8 +13,6 @@
 #include "defs.h"
 #include <map>
 
-struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
-
 class dict_t {
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
 	dictmap syms_dict, vars_dict, rels_dict;

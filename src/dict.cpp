@@ -11,10 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "dict.h"
+#include "err.h"
 using namespace std;
-
-#define err_digit L"symbol name cannot begin with a digit.\n"
-#define err_var_relsym L"relation symbol cannot be a variable.\n"
 
 lexeme dict_t::get_sym(int_t t) const {
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
