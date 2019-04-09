@@ -63,9 +63,7 @@ pair<matrix, matrix> driver::get_rule(const raw_rule& r) {
 	return { h, b };
 }
 
-void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& rels,
-	set<lexeme, lexcmp>& syms) {
-	rels.insert(t.e[0].e);
+void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& syms) {
 	for (size_t n = 1; n < t.e.size(); ++n)
 		if (t.e[n].type == elem::NUM) nums = max(nums, t.e[n].num+1);
 		else if (t.e[n].type == elem::SYM) syms.insert(t.e[n].e);
@@ -78,11 +76,10 @@ size_t driver::load_stdin() {
 	return std_input.size();
 }
 
-strs_t driver::get_dict_stats(const raw_prog& p, const map<lexeme, wstring>& s){
-	set<lexeme, lexcmp> rels, syms;
+void driver::get_dict_stats(const raw_prog& p) {
+	set<lexeme, lexcmp> /*rels,*/syms;
 	for (const directive& d : p.d) {
-		chars = max(chars, (int_t)256),
-		rels.insert(d.rel);
+		chars = max(chars, (int_t)256);
 		switch (d.type) {
 		case directive::FNAME:
 			nums = max(nums, (int_t)fsize(d.arg[0]+1,
@@ -99,19 +96,14 @@ strs_t driver::get_dict_stats(const raw_prog& p, const map<lexeme, wstring>& s){
 		}
 	}
 	for (const raw_rule& r : p.r) {
-		for (const raw_term& t : r.heads()) count_term(t, rels, syms);
-		for (const raw_term& t : r.bodies()) count_term(t, rels, syms);
+		for (const raw_term& t : r.heads()) count_term(t, syms);
+		for (const raw_term& t : r.bodies()) count_term(t, syms);
 	}
 	for (const lexeme l : syms) dict.get_sym(l);
-	for (const lexeme l : rels) dict.get_rel(l);
-	for (auto y : s) rels.insert(y.first);
-	if (!dict.nsyms() && !nums && !chars) {
-		wcerr<<L"warning: empty domain, adding dummy element."<<endl;
-		nums = 1;
-	}
-	strs_t r;
-	for (auto y : s) r[dict.get_rel(y.first)] = move(y.second);
-	return r;
+//	for (const lexeme l : rels) dict.get_rel(l);
+//	for (auto y : s) rels.insert(y.first);
+	if (!(dict.nsyms()+nums+chars))nums=1,wcerr<<warning_empty_domain<<endl;
+//	return r;
 }
 
 wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
@@ -134,7 +126,7 @@ wstring driver::directive_load(const directive& d) {
 	throw 0; // unreachable
 }
 
-lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
+lp* driver::prog_init(const raw_prog& p, prog_data& pd, lp* last) {
 	matpairs m;
 	matrix g, pg;
 	for (const raw_rule& x : p.r)
@@ -151,7 +143,7 @@ lp* driver::prog_init(const raw_prog& p, strs_t s, lp* last) {
 //			if (syms.size() != s)
 //				parse_error(err_directive_elem, d.t.e[0].e);
 		}
-	return new lp(move(m), move(g), p.delrel, s,
+	return new lp(move(m), move(g), pd.strs,
 			range(dict.nsyms(), nums, chars), last);
 }
 
@@ -164,29 +156,34 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	: argc(argc), argv(argv) {
 	DBG(drv = this;)
 	lp *prog = 0;
-	set<lp*> progs;
-	vector<pair<raw_prog, map<lexeme, wstring>>> v;
-	for (size_t n = 0; n < rp.p.size(); ++n)
-		for (auto x : transform(move(rp.p[n])))
-			v.push_back({move(x.first), move(x.second)});
-	vector<raw_rule> pg;
-	if (print_transformed)
-		for (auto x : v)
-			wcout << L'{' << endl << x.first << L'}' << endl;
-	vector<pair<strs_t, size_t>> x;
-	for (auto t : v) {
-		strs_t s = get_dict_stats(t.first, t.second);
+	for (raw_prog& p : rp.p) {
+		prog_data pd;
+		for (const directive& d : p.d)
+			if (d.type == directive::STDOUT) pd.out.push_back(d.t);
+			else if (d.type == directive::TREE) {
+				if (pd.strtree.find(dict.get_rel(d.t.e[0].e))
+						!= pd.strtree.end())
+					parse_error(err_str_defined, d.t.e[0].e);
+				pd.strtree[dict.get_rel(d.t.e[0].e)] = d.t;
+			} else pd.strs.emplace(dict.get_rel(d.rel),
+				directive_load(d));
+		//DBG(wcout << L"original program:"<<endl<<p;)
+		if (p.g.empty())
+			for (auto x : pd.strs)
+				transform_string(x.second, p, x.first);
+		else if (p.d.size() > 1) er(err_one_input);
+		else transform_grammar(p, pd);
+		if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
+		get_dict_stats(p);
 		clock_t start, end;
 		start = clock();
-		prog = prog_init(move(t.first), move(s), prog);
+		prog = prog_init(move(p), pd, prog);
 		end = clock();
 		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
 		start = clock();
 		result &= prog->pfp({});
 		end = clock();
 		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
-		progs.insert(prog);
 	}
-	if (prog) printdb(wcout, prog);
-	for (lp* p : progs) delete p;
+	if (prog) { printdb(wcout, prog); delete prog; }
 }

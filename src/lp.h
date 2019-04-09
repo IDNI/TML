@@ -27,6 +27,7 @@ typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
 
 class lp { // [pfp] logic program
 	friend struct rule;
+	DBG(friend class driver;)
 	std::vector<struct rule*> rules;
 	void add_fact(size_t f, int_t rel, ints arity);
 	bool add_not_fact(size_t f, int_t rel, ints arity);
@@ -34,16 +35,12 @@ class lp { // [pfp] logic program
 	bool add_fact(const term& t);
 	void get_trees();
 	void fwd(diff_t &add, diff_t &del);
-	size_t gbdd = F;
+	const strs_t strs;
+	diff_t trees, trees_out;
 public:
 	db_t db;
-	const int_t delrel;
-	const strs_t strs;
 	range rng;
-	diff_t trees, trees_out;
-
-	lp(matpairs r, matrix g, int_t delrel, const strs_t&, range rng,
-		lp *prev = 0);
+	lp(matpairs r, matrix g, const strs_t&, range rng, lp *prev = 0);
 	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
 };

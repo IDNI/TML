@@ -31,30 +31,32 @@ class driver {
 	lexeme get_char_lexeme(wchar_t i);
 	term get_term(const raw_term&);
 	std::pair<matrix, matrix> get_rule(const raw_rule&);
-	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& rels,
-		std::set<lexeme, lexcmp>& syms);
-	strs_t get_dict_stats(const raw_prog& p,
-		const std::map<lexeme, std::wstring>& s);
+	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& syms);
+	void get_dict_stats(const raw_prog& p);
+
+	struct prog_data {
+		strs_t strs;
+		std::unordered_map<int_t, raw_term> strtree;
+		std::vector<raw_term> out;
+	};
 
 	std::wstring directive_load(const directive& d);
 	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
-	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
-	void transform_proofs(const raw_rule& x, raw_prog &r, raw_prog &_r);
-	std::array<raw_prog, 2> transform_proofs(
-		const std::vector<raw_prog> p,
-		const std::vector<raw_rule>& g);
-	void transform_string(const std::wstring&, raw_prog&, const lexeme&);
-	std::array<raw_prog, 2> transform_grammar(directive,
-		std::vector<production>, const std::wstring&);
-	std::vector<std::pair<raw_prog, std::map<lexeme, std::wstring>>>
-		transform(raw_prog p);
+//	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
+	void transform_proofs(const raw_rule& x, raw_prog& r,const lexeme& rel);
+//	std::array<raw_prog, 2> transform_proofs(
+//		const std::vector<raw_prog> p,
+//		const std::vector<raw_rule>& g);
+	void transform_string(const std::wstring&, raw_prog&, int_t);
+	void transform_grammar(raw_prog& r, prog_data& pd);
+	void transform(raw_prog& p, prog_data& pd);
 	bool print_transformed;
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
-	lp* prog_init(const raw_prog& rp, strs_t, lp* last);
+	lp* prog_init(const raw_prog& p, prog_data& pd, lp* last);
 	void progs_read(wstr s);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();

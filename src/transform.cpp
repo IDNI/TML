@@ -85,11 +85,11 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 		{elem::NUM, n, get_num_lexeme(n)}, \
 		{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}})
 
-void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
+void driver::transform_string(const wstring& s, raw_prog& r, int_t rel){
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
 		r.r.push_back(raw_rule(raw_term{
 			false, {
-			{elem::SYM, 0, rel},
+			{elem::SYM, 0, dict.get_rel(rel)},
 			{elem::OPENP, 0, dict.get_lexeme(L"(")},
 			{elem::OPENP, 0, dict.get_lexeme(L"(")},
 			{elem::OPENP, 0, dict.get_lexeme(L"(")},
@@ -107,18 +107,22 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 			{elem::CLOSEP, 0, dict.get_lexeme(L")")}},{}}));
 		r.r.back().head(0).calc_arity();
 		if (iswspace(s[n]))
-			r.r.push_back(from_string_lex(rel, L"space", n));
+			r.r.push_back(from_string_lex(
+					dict.get_rel(rel), L"space", n));
 		if (iswdigit(s[n]))
-			r.r.push_back(from_string_lex(rel, L"digit", n));
+			r.r.push_back(from_string_lex(
+					dict.get_rel(rel), L"digit", n));
 		if (iswalpha(s[n]))
-			r.r.push_back(from_string_lex(rel, L"alpha", n));
+			r.r.push_back(from_string_lex(
+					dict.get_rel(rel), L"alpha", n));
 		if (iswalnum(s[n]))
-			r.r.push_back(from_string_lex(rel, L"alnum", n));
+			r.r.push_back(from_string_lex(
+					dict.get_rel(rel), L"alnum", n));
 	}
 }
 
 #define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
-#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, dict.get_lexeme(s)})
+#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, s})
 #define append_openp(x) (x).push_back({elem::OPENP, 0, dict.get_lexeme(L"(")})
 #define append_closep(x) (x).push_back({elem::CLOSEP, 0, dict.get_lexeme(L")")})
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
@@ -127,21 +131,20 @@ void driver::transform_string(const wstring& s, raw_prog& r, const lexeme& rel){
 #define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
 #define term_close(x) append_closep((x).e), (x).calc_arity()
 
-array<raw_prog, 2> driver::transform_grammar(
-	directive d, vector<production> g, const wstring& s) {
+void driver::transform_grammar(raw_prog& r, prog_data& pd) {
+//	directive d, vector<production> g, const wstring& s) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
-	raw_prog r, _r;
-	r.d.push_back(move(d));
-	for (const production& p : g) {
+	transform_string(pd.strs.begin()->second, r, pd.strs.begin()->first);
+	for (const production& p : r.g) {
 		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
 		raw_rule l;
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = {elem::VAR,0,get_var_lexeme(2)};
-			l.add_body(from_grammar_elem_nt(d.rel,e,1,3));
+			l.add_body(from_grammar_elem_nt(r.d[0].rel,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(d.rel,e,3,1));
+			l.add_body(from_grammar_elem_nt(r.d[0].rel,e,3,1));
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
@@ -151,10 +154,11 @@ array<raw_prog, 2> driver::transform_grammar(
 				if (b.find(lexeme2str(p.p[n].e)) != b.end())
 					++v,
 					l.add_body(from_grammar_elem_builtin(
-						d.rel, lexeme2str(p.p[n].e),n));
+						r.d[0].rel,
+						lexeme2str(p.p[n].e),n));
 				else if (p.p[n].type == elem::CHR)
-					l.add_body(from_grammar_elem_nt(d.rel
-						,p.p[n],n,n+1));
+					l.add_body(from_grammar_elem_nt(
+						r.d[0].rel, p.p[n], n, n+1));
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
 		}
@@ -166,10 +170,10 @@ array<raw_prog, 2> driver::transform_grammar(
 //	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
 //	append_closep(t.e), r = transform_bwd(r, {t});
 //	r.delrel = dict_get_rel(L"try");
-	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
+//	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
 
-void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
+/*void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
 	for (const raw_rule& t : g) {
 		raw_term gg;
 		cat_relsym_openp(gg, L"G"), cat(gg.e, t.head(0).e),
@@ -184,7 +188,7 @@ array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
 		for (const raw_rule& x : p.r) transform_proofs(x, r, _r);
 	insert_goals(r, g);
 	return { r, _r };
-}
+}*/
 
 #define surround_term(x, y, z) \
 	append_sym_elem(x.e, y), cat_in_brackets(x, z), x.calc_arity()
@@ -212,61 +216,19 @@ raw_prog driver::transform_bwd(const raw_prog& p,const std::vector<raw_term>&g){
 	return r;
 }
 
-void driver::transform_proofs(const raw_rule& x, raw_prog& r, raw_prog& _r) {
+void driver::transform_proofs(const raw_rule& x, raw_prog& r,const lexeme& rel){
 	if (!x.nbodies()) return;
 	size_t n = 0;
 nxthead:const raw_term &head = x.head(n);
 	raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
 	y.add_body(head);
 	for (const raw_term& t : x.bodies()) y.add_body(t);
-	y.add_head({}), cat_relsym_openp(y.head(0), L"W");
+	y.add_head({}), cat_relsym_openp(y.head(0), rel);
 	cat_in_brackets(y.head(0), head);
 	for (const raw_term& t : x.bodies()) cat_in_brackets(y.head(0), t);
 	term_close(y.head(0)), r.r.push_back(y);
-	// G(b1) :- G(h), W((h)(b1)...)
 	raw_term gh;
 	cat_relsym_openp(gh, L"G"), cat(gh.e, head.e), term_close(gh);
-	raw_rule z;
-	for (size_t n = 0; n != x.nbodies(); ++n)
-		z.add_head({}), cat_relsym_openp(z.head(0), L"G"),
-		cat(z.head(0).e, x.body(n).e), term_close(z.head(0)),
-		z.add_body(gh), z.add_body(y.head(0)), r.r.push_back(z),
-		z.clear();
-	// ~W((h)(b1)...) :- ~G(h), ~G(b1)....
-	// ! W(...)
-	y.head(0).neg = gh.neg = true, z = raw_rule(y.head(0), gh);
-	for (size_t n = 0; n != x.nbodies(); ++n)
-		z.add_body({}), cat_relsym_openp(z.body(n+1), L"G"),
-		z.body(n+1).neg = true, cat(z.body(n+1).e, x.body(n).e),
-		term_close(z.body(n+1));
-	_r.r.emplace_back(z), _r.delrel = dict.get_rel(L"G");
+	r.r.push_back(gh);
 	if (++n < x.nheads()) goto nxthead;
-}
-
-vector<pair<raw_prog, map<lexeme, wstring>>> driver::transform(raw_prog p) {
-	vector<pair<raw_prog, map<lexeme, wstring>>> r;
-	map<lexeme, wstring> s;
-	set<raw_term> trees, out;
-	for (const directive& d : p.d)
-		if (d.type == directive::STDOUT) out.insert(d.t);
-		else if (d.type == directive::TREE) trees.insert(d.t);
-		else s.emplace(d.rel, directive_load(d));
-	//DBG(wcout << L"original program:"<<endl<<p;)
-	if (!p.g.empty()) {
-		if (p.d.size() > 1) er(err_one_input);
-		auto x = transform_grammar(p.d.size()?move(p.d[0]):directive(),
-			move(p.g), s.begin()->second);
-		r.push_back({x[0],s}), r.push_back({x[1],{}}), p.g.clear(),
-		p.d.erase(p.d.begin());
-	} else for (auto x : s) transform_string(x.second, p, x.first);
-/*	for (auto x : v)
-		for (const raw_rule& y : x.first.r)
-			if (y.pgoal) pg.push_back(y);
-	if (!pg.empty()) {
-		vector<raw_prog> y;
-		for (auto x : v) y.push_back(x.first);
-		auto x = transform_proofs(y, pg);
-		v.push_back({move(x[0]),{}}), v.push_back({move(x[1]),{}});
-	}*/
-	return r.push_back({p, s}), r;
 }

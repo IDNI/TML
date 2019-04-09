@@ -34,3 +34,5 @@ const wchar_t err_goalsym[] = L"goal symbol not appearing in program.";
 const wchar_t err_goalarity[] = L"goal arity larger than the program's.";
 const wchar_t err_num_cmdline[] = L"program expects more command line arguments.";
 const wchar_t err_one_input[] = L"only one input string allowed given grammar.";
+const wchar_t err_str_defined[] = L"string already defined.";
+const wchar_t warning_empty_domain[] = L"warning: empty domain, adding dummy element.";
