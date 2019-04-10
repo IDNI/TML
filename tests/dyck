@@ -4,6 +4,7 @@
 @string str "(()())".
 S => null.
 S => '(' S ')' S.
+@trace W.
 #a(1 2).
 #! S ?x ?y.
 #! str ?x ?y ?z.

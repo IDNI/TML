@@ -359,35 +359,6 @@ size_t from_int(size_t x, size_t bits, size_t arg, size_t args) {
 	return r;
 }
 
-/*size_t bdd_rebit(size_t x, size_t prev, size_t curr, size_t nvars) {
-	if (prev == curr) return x;
-	assert(prev < curr);
-	size_t t = T, n, k;
-	sizes v(nvars);
-	for (n = 0; n != nvars; ++n) {
-		v[n] = (n % prev) + curr - prev + curr * (n / prev);
-		for (k = 0; k != curr - prev; ++k)
-			t = bdd_and(t, from_bit((n / prev) * curr + k, 0));
-	}
-	return bdd_and(t, bdd_permute(x, v));
-}
-
-void from_range(size_t max, size_t bits, size_t offset, size_t &r) {
-	size_t x = F;
-	for (size_t n = 0; n < max; ++n)
-		x = bdd_or(x, from_int(n, bits, offset));
-	r = bdd_and(r, x);
-}
-
-void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
-	size_t &r) {
-	size_t x = F;
-	for (size_t n = 0; n < max; ++n)
-		if (ex.find(n) == ex.end())
-			x = bdd_or(x, from_int(n, bits, offset));
-	r = bdd_and(r, x);
-}*/
-
 #define print_memo_size(x) wcout << #x << ": " << x.size() << endl
 
 void print_memos_len() {

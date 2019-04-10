@@ -145,7 +145,7 @@ lp* driver::prog_run(raw_prog& p, lp* last) {
 		} else pd.strs.emplace(dict.get_rel(d.rel.e),directive_load(d));
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	for (auto x : pd.strs) transform_string(x.second, p, x.first);
-	if (!p.g.empty() && p.d.size() > 1) er(err_one_input);
+	if (!p.g.empty() && pd.strs.size() > 1) er(err_one_input);
 	else transform_grammar(p);
 	if (trace) transform_proofs(p, prel);
 	if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;

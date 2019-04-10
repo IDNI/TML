@@ -34,7 +34,7 @@ typedef std::vector<bools> vbools;
 #else
 #define DBG(x)
 #endif
-#define er(x)	perror((const char*)x), exit(0)
+#define er(x)	wcerr<<x<<endl, exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))

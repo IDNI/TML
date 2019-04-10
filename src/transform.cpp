@@ -186,9 +186,12 @@ void driver::transform_proofs(raw_prog& r, const lexeme& rel) {
 		if (!x.nbodies()) continue;
 		size_t n = 0;
 nexthead:	const raw_term &head = x.head(n);
+		if (head.neg) parse_error(err_proof, head.e[0].e);
 		raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
 		y.add_body(head);
-		for (const raw_term& t : x.bodies()) y.add_body(t);
+		for (const raw_term& t : x.bodies())
+			if (t.neg) parse_error(err_proof, t.e[0].e);
+			else y.add_body(t);
 		y.add_head({}), cat_relsym_openp(y.head(0), rel);
 		cat_in_brackets(y.head(0), head);
 		for (const raw_term& t:x.bodies()) cat_in_brackets(y.head(0),t);

@@ -151,12 +151,12 @@ sizes rule::fwd() {
 //		DBG(bdd_out(wcout, r[k])<<endl;)
 //		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), rng.bits);
-		DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
-		DBG(printbdd(wcout<<"ae:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		r[k] = bdd_and(hleq[k], r[k]);
-		DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
+		//DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 	}
 	return r;
 }

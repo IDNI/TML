@@ -387,6 +387,7 @@ TBD
 * Support finitary arithmetic.
 * Backward chaining and focused goal resolution.
 * More grammar and string builtins.
+* BDD level garbage collection.
 * Improved syntax.
 * TBD
 
