@@ -1,4 +1,4 @@
-@str "p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).".
+@string str "p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).".
 
 S => pred ws ':' '=' ws form ws dot.
 dot => '.'.

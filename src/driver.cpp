@@ -126,25 +126,54 @@ wstring driver::directive_load(const directive& d) {
 	throw 0; // unreachable
 }
 
-lp* driver::prog_init(const raw_prog& p, prog_data& pd, lp* last) {
-	matpairs m;
-	matrix g, pg;
-	for (const raw_rule& x : p.r)
-		if (x.goal && !x.pgoal) // FIXME
-			assert(!x.nbodies()), g.push_back(get_term(x.head(0)));
-		else if (x.pgoal)
-			assert(!x.nbodies()), pg.push_back(get_term(x.head(0)));
-		else m.insert(get_rule(x));
-	map<int_t, term> trees;
+#define measure_time(x) \
+	start = clock(); \
+	x; \
+	end = clock(); \
+	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
+
+lp* driver::prog_run(raw_prog& p, lp* last) {
+	prog_data pd;
+	bool trace = false;
+	lexeme prel;
 	for (const directive& d : p.d)
-		if (d.type == directive::TREE) {
-//			size_t r = dict.get_rel(d.rel), s = syms.size();
-//			yields[r] = get_term(d.t);
-//			if (syms.size() != s)
-//				parse_error(err_directive_elem, d.t.e[0].e);
+		if (d.type == directive::TRACE) trace = true, prel = d.rel.e;
+		else if (d.type == directive::STDOUT)
+			pd.out.push_back(get_term(d.t));
+		else if (d.type == directive::TREE) {
+			if (pd.strtree.find(dict.get_rel(d.t.e[0].e))
+					!= pd.strtree.end())
+				parse_error(err_str_defined, d.t.e[0].e);
+			pd.strtree[dict.get_rel(d.t.e[0].e)] = get_term(d.t);
+		} else pd.strs.emplace(dict.get_rel(d.rel.e),directive_load(d));
+	//DBG(wcout << L"original program:"<<endl<<p;)
+	for (auto x : pd.strs) transform_string(x.second, p, x.first);
+	if (!p.g.empty() && p.d.size() > 1) er(err_one_input);
+	else transform_grammar(p);
+	if (trace) transform_proofs(p, prel);
+	if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
+	get_dict_stats(p);
+	clock_t start, end;
+	for (const raw_rule& x : p.r)
+		switch (x.type) {
+		case raw_rule::NONE: pd.r.insert(get_rule(x)); break;
+		case raw_rule::GOAL: pd.goals.push_back(get_term(x.head(0)));
+				     break;
+		case raw_rule::TREE: pd.tgoals.push_back(get_term(x.head(0)));
+				     break;
+		default: assert(0);
 		}
-	return new lp(move(m), move(g), pd.strs,
-			range(dict.nsyms(), nums, chars), last);
+	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
+	measure_time(result &= prog->pfp({}));
+	return prog;
+}
+
+driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
+	: argc(argc), argv(argv), print_transformed(print_transformed) {
+	DBG(drv = this;)
+	lp *prog = 0;
+	for (raw_prog& p : rp.p) prog = prog_run(p, prog);
+	if (prog) { printdb(wcout, prog); delete prog; }
 }
 
 driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
@@ -152,38 +181,3 @@ driver::driver(int argc, char** argv, FILE *f, bool print_transformed)
 driver::driver(int argc, char** argv, wstring s, bool print_transformed) 
 	: driver(argc, argv, move(raw_progs(s)), print_transformed) {}
 
-driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
-	: argc(argc), argv(argv) {
-	DBG(drv = this;)
-	lp *prog = 0;
-	for (raw_prog& p : rp.p) {
-		prog_data pd;
-		for (const directive& d : p.d)
-			if (d.type == directive::STDOUT) pd.out.push_back(d.t);
-			else if (d.type == directive::TREE) {
-				if (pd.strtree.find(dict.get_rel(d.t.e[0].e))
-						!= pd.strtree.end())
-					parse_error(err_str_defined, d.t.e[0].e);
-				pd.strtree[dict.get_rel(d.t.e[0].e)] = d.t;
-			} else pd.strs.emplace(dict.get_rel(d.rel),
-				directive_load(d));
-		//DBG(wcout << L"original program:"<<endl<<p;)
-		if (p.g.empty())
-			for (auto x : pd.strs)
-				transform_string(x.second, p, x.first);
-		else if (p.d.size() > 1) er(err_one_input);
-		else transform_grammar(p, pd);
-		if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
-		get_dict_stats(p);
-		clock_t start, end;
-		start = clock();
-		prog = prog_init(move(p), pd, prog);
-		end = clock();
-		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
-		start = clock();
-		result &= prog->pfp({});
-		end = clock();
-		wcerr << double(end - start) / CLOCKS_PER_SEC << endl;
-	}
-	if (prog) { printdb(wcout, prog); delete prog; }
-}

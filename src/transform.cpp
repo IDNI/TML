@@ -85,7 +85,7 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 		{elem::NUM, n, get_num_lexeme(n)}, \
 		{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}})
 
-void driver::transform_string(const wstring& s, raw_prog& r, int_t rel){
+void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
 		r.r.push_back(raw_rule(raw_term{
 			false, {
@@ -131,10 +131,9 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel){
 #define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
 #define term_close(x) append_closep((x).e), (x).calc_arity()
 
-void driver::transform_grammar(raw_prog& r, prog_data& pd) {
+void driver::transform_grammar(raw_prog& r) {
 //	directive d, vector<production> g, const wstring& s) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
-	transform_string(pd.strs.begin()->second, r, pd.strs.begin()->first);
 	for (const production& p : r.g) {
 		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
 		raw_rule l;
@@ -142,9 +141,9 @@ void driver::transform_grammar(raw_prog& r, prog_data& pd) {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = {elem::VAR,0,get_var_lexeme(2)};
-			l.add_body(from_grammar_elem_nt(r.d[0].rel,e,1,3));
+			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(r.d[0].rel,e,3,1));
+			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
@@ -154,11 +153,11 @@ void driver::transform_grammar(raw_prog& r, prog_data& pd) {
 				if (b.find(lexeme2str(p.p[n].e)) != b.end())
 					++v,
 					l.add_body(from_grammar_elem_builtin(
-						r.d[0].rel,
+						r.d[0].rel.e,
 						lexeme2str(p.p[n].e),n));
 				else if (p.p[n].type == elem::CHR)
 					l.add_body(from_grammar_elem_nt(
-						r.d[0].rel, p.p[n], n, n+1));
+						r.d[0].rel.e, p.p[n], n, n+1));
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
 		}
@@ -179,16 +178,25 @@ void driver::transform_grammar(raw_prog& r, prog_data& pd) {
 		cat_relsym_openp(gg, L"G"), cat(gg.e, t.head(0).e),
 		term_close(gg), r.r.emplace_back(gg, t.head(0));
 	}
-}
-
-array<raw_prog, 2> driver::transform_proofs(const vector<raw_prog> rp,
-	const std::vector<raw_rule>& g) {
-	raw_prog r, _r;
-	for (const raw_prog p : rp)
-		for (const raw_rule& x : p.r) transform_proofs(x, r, _r);
-	insert_goals(r, g);
-	return { r, _r };
 }*/
+
+void driver::transform_proofs(raw_prog& r, const lexeme& rel) {
+	set<raw_rule> s;
+	for (auto x : r.r) {
+		if (!x.nbodies()) continue;
+		size_t n = 0;
+nexthead:	const raw_term &head = x.head(n);
+		raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
+		y.add_body(head);
+		for (const raw_term& t : x.bodies()) y.add_body(t);
+		y.add_head({}), cat_relsym_openp(y.head(0), rel);
+		cat_in_brackets(y.head(0), head);
+		for (const raw_term& t:x.bodies()) cat_in_brackets(y.head(0),t);
+		term_close(y.head(0)), s.insert(y);
+		if (++n < x.nheads()) goto nexthead;
+	}
+	for (auto x : s) r.r.push_back(x);
+}
 
 #define surround_term(x, y, z) \
 	append_sym_elem(x.e, y), cat_in_brackets(x, z), x.calc_arity()
@@ -214,21 +222,4 @@ raw_prog driver::transform_bwd(const raw_prog& p,const std::vector<raw_term>&g){
 		}
 	}
 	return r;
-}
-
-void driver::transform_proofs(const raw_rule& x, raw_prog& r,const lexeme& rel){
-	if (!x.nbodies()) return;
-	size_t n = 0;
-nxthead:const raw_term &head = x.head(n);
-	raw_rule y; // W((h)(b1)(b2)...):-h,b1,b2...
-	y.add_body(head);
-	for (const raw_term& t : x.bodies()) y.add_body(t);
-	y.add_head({}), cat_relsym_openp(y.head(0), rel);
-	cat_in_brackets(y.head(0), head);
-	for (const raw_term& t : x.bodies()) cat_in_brackets(y.head(0), t);
-	term_close(y.head(0)), r.r.push_back(y);
-	raw_term gh;
-	cat_relsym_openp(gh, L"G"), cat(gh.e, head.e), term_close(gh);
-	r.r.push_back(gh);
-	if (++n < x.nheads()) goto nxthead;
 }

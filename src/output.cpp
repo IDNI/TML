@@ -186,7 +186,11 @@ wostream& driver::printdiff(wostream& os, const diff_t& d, size_t bits) const {
 }
 
 wostream& operator<<(wostream& os, const directive& d) {
-	return os << L'@' << d.rel << L' ' << d.arg << L'.';
+	os << L'@';
+	if (d.type == directive::TRACE) return os << L"trace." << endl;
+	if (d.type == directive::STDOUT) os << L"stdout ";
+	else os << L"string ";
+	return os << d.rel << L' ' << d.arg << L'.';
 }
 
 wostream& operator<<(wostream& os, const elem& e) {
@@ -218,8 +222,11 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 }
 
 wostream& operator<<(wostream& os, const raw_rule& r) {
-	if (r.goal) os << L'!';
-	if (r.pgoal) os << L'!';
+	switch (r.type) {
+		case raw_rule::GOAL: os << L'!'; break;
+		case raw_rule::TREE: os << L"!!"; break;
+		default: ;
+	}
 	for (size_t n = 0; n < r.nheads(); ++n)
 		if ((os << r.head(n)), n != r.nheads() - 1) os << L',';
 	if (!r.nbodies()) return os << L'.';

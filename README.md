@@ -32,6 +32,7 @@ specifically:
 * Symbol for length of strings.
 * Support binary input files and UTF-8 charset.
 * Parsing error messages and bugs.
+* First order formulas.
 * Comprehensive tests of everything.
 
 # Universe
@@ -369,13 +370,23 @@ the productions
     ws1 => space ws1.
     ws1 => null.
 
+# First Order Formulas
+
+It is possible to supply a first order formula which is then transformed into
+a TML program. TBD
+
 # Philosophy
 
 TBD
 
 # Future Work
 
-TBD
+* Support !=, <, >.
+* Support finitary arithmetic.
+* Backward chaining and focused goal resolution.
+* More grammar and string builtins.
+* Improved syntax.
+* TBD
 
 # Further Examples
 

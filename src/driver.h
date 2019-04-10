@@ -34,38 +34,27 @@ class driver {
 	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& syms);
 	void get_dict_stats(const raw_prog& p);
 
-	struct prog_data {
-		strs_t strs;
-		std::unordered_map<int_t, raw_term> strtree;
-		std::vector<raw_term> out;
-	};
-
 	std::wstring directive_load(const directive& d);
 	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
-//	void insert_goals(raw_prog& r, const std::vector<raw_rule>& g);
-	void transform_proofs(const raw_rule& x, raw_prog& r,const lexeme& rel);
-//	std::array<raw_prog, 2> transform_proofs(
-//		const std::vector<raw_prog> p,
-//		const std::vector<raw_rule>& g);
+	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
-	void transform_grammar(raw_prog& r, prog_data& pd);
-	void transform(raw_prog& p, prog_data& pd);
-	bool print_transformed;
+	void transform_grammar(raw_prog& r);
+//	void transform(raw_prog& p, prog_data& pd);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
-	lp* prog_init(const raw_prog& p, prog_data& pd, lp* last);
 	void progs_read(wstr s);
+	lp* prog_run(raw_prog& p, lp* last);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();
 	bool pfp();
 	std::wstring std_input;
 	int argc;
 	char** argv;
+	bool print_transformed;
 public:
-//	size_t bits;
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
 	driver(int argc, char** argv, std::wstring,

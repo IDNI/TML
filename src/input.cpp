@@ -44,8 +44,8 @@ lexeme lex(pcws s) {
 	}
 	if (wcschr(L"!~.,(){}$@=<>", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
-	if (!iswalnum(**s)) parse_error(err_chr, *s);
-	while (iswalnum(**s)) ++*s;
+	if (!iswalnum(**s) && **s != L'_') parse_error(err_chr, *s);
+	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
 	return { t, *s };
 }
 
@@ -70,12 +70,27 @@ int_t get_int_t(cws from, cws to) {
 
 bool directive::parse(const lexemes& l, size_t& pos) {
 	if (*l[pos][0] != '@') return false;
-	if (rel = l[++pos], *l[++pos][0] == L'<') type = FNAME;
+	if (l[++pos] == L"trace") {
+		type = TRACE;
+		if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
+			parse_error(err_trace_rel, l[pos]);
+		if (*l[(++pos)++][0] != '.') parse_error(dot_expected, l[pos]);
+		return true;
+	}
+	if (l[pos] == L"stdout") {
+		type = STDOUT;
+		if (!t.parse(l, ++pos)) parse_error(err_stdout, l[pos]);
+		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+		return true;
+	}
+	if (!(l[pos] == L"string")) parse_error(err_directive, l[pos]);
+	if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
+		parse_error(err_rel_expected, l[pos]);
+	if (*l[pos][0] == L'<') type = FNAME;
 	else if (*l[pos][0] == L'"') type = STR;
 	else if (*l[pos][0] == L'$')
 		type=CMDLINE, ++pos, n = get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == L"stdin") type = STDIN;
-	else if (l[pos] == L"stdout") type = STDOUT;
 	else if (t.parse(l, pos)) type = TREE;
 	else parse_error(err_directive_arg, l[pos]);
 	if (arg=l[pos++], *l[pos++][0]!='.') parse_error(dot_expected, l[pos]);
@@ -102,6 +117,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	while (!wcschr(L".:,", *l[pos][0]))
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size()) parse_error(L"unexpected end of file", s[0]);
+	if (e.empty()) return false;
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
 	if (e.size() == 1) return calc_arity(), true;
 	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
@@ -125,9 +141,10 @@ void raw_term::calc_arity() {
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
-	if ((goal = *l[pos][0] == L'!'))
-		if ((pgoal = *l[++pos][0] == L'!'))
-			++pos;
+	if (*l[pos][0] == L'!') {
+		if (*l[++pos][0] == L'!') ++pos, type = TREE;
+		else type = GOAL;
+	}
 head:	h.emplace_back();
 	if (!h.back().parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
@@ -214,6 +231,22 @@ bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
+	return false;
+}
+
+bool operator==(const raw_term& x, const raw_term& y) {
+	return x.neg == y.neg && x.e == y.e && x.arity == y.arity;
+}
+
+bool operator<(const raw_rule& x, const raw_rule& y) {
+	if (x.heads().size() != y.heads().size())
+		return x.heads().size() < y.heads().size();
+	if (x.bodies().size() != y.bodies().size())
+		return x.bodies().size() < y.bodies().size();
+	for (size_t n = 0; n != x.heads().size(); ++n)
+		if (!(x.head(n) == y.head(n))) return x.head(n) < y.head(n);
+	for (size_t n = 0; n != x.bodies().size(); ++n)
+		if (!(x.body(n) == y.body(n))) return x.body(n) < y.body(n);
 	return false;
 }
 

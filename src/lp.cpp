@@ -72,14 +72,20 @@ db_t rebit(size_t pbits, size_t bits, db_t db) {
 	return db;
 }
 
-lp::lp(matpairs r, matrix g, const strs_t& strs, range rng, lp *prev) 
-	: strs(strs), rng(rng) {
+void bdd_or(diff_t& x, const term& t, range& rng) {
+	const auto k = make_pair(t.rel(), t.arity());
+	auto it = x.find(k);
+	if (it == x.end()) it = x.emplace(k, F).first;
+	it->second = bdd_or(it->second, fact(t, rng));
+}
+
+lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 	if (prev) {
 		db = rebit(prev->rng.bits, rng.bits, move(prev->db));
 		delete prev;
 	}
 	//wcout<<r<<endl;
-	for (const auto& m : r) {
+	for (const auto& m : pd.r) {
 		for (const term& t : m.first)
 			if (db.find({t.rel(), t.arity()}) == db.end())
 				*(db[{t.rel(), t.arity()}] = new size_t) = F;
@@ -87,7 +93,7 @@ lp::lp(matpairs r, matrix g, const strs_t& strs, range rng, lp *prev)
 			if (db.find({t.rel(), t.arity()}) == db.end())
 				*(db[{t.rel(), t.arity()}] = new size_t) = F;
 	}
-	for (const auto& m : r)
+	for (const auto& m : pd.r)
  		if (m.second.empty()) {
 			if (!add_facts(m.first))
 				// FIXME
@@ -103,15 +109,9 @@ lp::lp(matpairs r, matrix g, const strs_t& strs, range rng, lp *prev)
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
-	for (const term& t : g) {
-		if (t.arity().size()>2 && !t.arity()[0] && t.arity()[1] == -1) {
-			trees.emplace(diff_t::key_type{t.rel(), t.arity()}, 
-					fact(t, rng));
-			DBG(drv->printdiff(wcout<<"trees:"<<endl, trees,
-						rng.bits);)
-		}// else gbdd = bdd_or(gbdd, fact(t, rng));
-	}
-//	for (auto x : trees) g.erase(x.first);
+	for (const term& t : pd.goals) bdd_or(gbdd, t, rng);
+	for (const term& t : pd.tgoals)
+		trees.emplace(diff_t::key_type{t.rel(), t.arity()}, fact(t, rng));
 }
 
 void lp::fwd(diff_t &add, diff_t &del) {
@@ -210,11 +210,11 @@ void lp::get_trees() {
 bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
 	diff_t d, add, del, t;
 	set<size_t> pf;
-	size_t step = 0;
+	DBG(size_t step = 0;)
 //	wcout << V.size() << endl;
 	DBG(printdb(wcout<<"before prog: "<<endl, this)<<endl;)
 	for (set<diff_t, diffcmp> s;;) {
-		wcout << "step: " << step++ << endl;
+		DBG(wcout << "step: " << step++ << endl;)
 		s.emplace(d = copy(db)), fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
@@ -227,14 +227,14 @@ bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();
-/*	if (delrel != -1) {
-		set<pair<int_t, ints>> d;
-		for (auto x : db) if (x.first.first==delrel) d.insert(x.first);
-		for (auto x : d) db.erase(x);
-	}*/
 	DBG(static int nprog = 0;)
 	DBG(printdb(wcout<<"after prog: "<<nprog++<<endl, this)<<endl;)
-//	if (gbdd != F) db = bdd_and(gbdd, db);
+	for (auto x : gbdd) {
+		auto it = db.find(x.first);
+		if (it == db.end()) continue;
+		delete it->second;
+		db.erase(it);
+	}
 	return true;
 }
 

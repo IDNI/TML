@@ -1,7 +1,7 @@
 # Dyck's language
 #@str "((()()()((()()()))))".
 #@str "()".
-@str "(()())".
+@string str "(()())".
 S => null.
 S => '(' S ')' S.
 #a(1 2).

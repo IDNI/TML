@@ -33,10 +33,11 @@ struct raw_term {
 };
 
 struct directive {
-	lexeme rel, arg;
+	elem rel;
+	lexeme arg;
 	raw_term t;
 	int_t n;
-	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE } type;
+	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE } type;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
@@ -61,9 +62,10 @@ public:
 	size_t nheads() const { return h.size(); }
 	size_t nbodies() const { return b.size(); }
 
-	bool goal = false, pgoal = false;
+	enum etype { NONE, GOAL, TREE };
+	etype type = NONE;
 	bool parse(const lexemes& l, size_t& pos);
-	void clear() { h.clear(), b.clear(), goal = pgoal = false; }
+	void clear() { h.clear(), b.clear(), type = NONE; }
 	raw_rule(){}
 	raw_rule(const raw_term& t) : h({t}) {}
 	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({b}) {}
@@ -101,6 +103,7 @@ std::wstring file_read_text(std::wstring fname);
 off_t fsize(cws s, size_t len);
 bool operator==(const lexeme& l, cws s);
 bool operator<(const raw_term& x, const raw_term& y);
+bool operator<(const raw_rule& x, const raw_rule& y);
 bool operator<(const elem& x, const elem& y);
 bool operator==(const elem& x, const elem& y);
 void parser_test();

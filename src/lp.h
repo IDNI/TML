@@ -25,6 +25,14 @@ void tml_init();
 typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
 typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
 
+struct prog_data {
+	strs_t strs;
+	std::unordered_map<int_t, term> strtree;
+	std::vector<term> out;
+	matpairs r;
+	matrix goals, tgoals;
+};
+
 class lp { // [pfp] logic program
 	friend struct rule;
 	DBG(friend class driver;)
@@ -36,11 +44,12 @@ class lp { // [pfp] logic program
 	void get_trees();
 	void fwd(diff_t &add, diff_t &del);
 	const strs_t strs;
-	diff_t trees, trees_out;
+	diff_t trees, trees_out, gbdd;
 public:
-	db_t db;
+	prog_data pd;
 	range rng;
-	lp(matpairs r, matrix g, const strs_t&, range rng, lp *prev = 0);
+	db_t db;
+	lp(prog_data, range rng, lp *prev = 0);
 	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
 };
