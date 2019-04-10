@@ -24,7 +24,7 @@ template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
 
-#define MEMO
+//#define MEMO
 #ifdef MEMO
 typedef array<size_t, 2> memo;
 typedef pair<bools, size_t> exmemo;
@@ -392,12 +392,14 @@ void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
 
 void print_memos_len() {
 	wcout<<"memos: "<<memos<<endl;
+#ifdef MEMO
 	print_memo_size(memo_and);
 	print_memo_size(memo_and_not);
 	print_memo_size(memo_or);
 	print_memo_size(memo_ex);
 	print_memo_size(memo_dt);
 	print_memo_size(memo_permute);
+#endif
 	wcout<<"bdds: " << V.size() << endl;
 }
 
