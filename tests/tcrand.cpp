@@ -7,16 +7,24 @@
 #include <array>
 using namespace std;
 
+#define measure_time(x) start = clock(); x; end = clock(); \
+	cout << double(end - start) / CLOCKS_PER_SEC << endl
+
+size_t size(const map<int, set<int>>& m) {
+	size_t r = 0;
+	for (auto x : m) r += x.second.size();
+	return r;
+}
+
 void tc(map<int, set<int>>& m) {
-	size_t sz = m.size();
+loop:	size_t sz = size(m);
 	set<array<int, 2>> s;
 	for (auto x : m)
 		for (int y : x.second)
 			for (int z : m[y])
 				s.insert({x.first, z});
 	for (auto x : s) m[x[0]].insert(x[1]);
-	s.clear();
-	if (sz != m.size()) tc(m);
+	if (sz != size(m)) goto loop;
 }
 
 int main(int argc, char** argv) {
@@ -33,7 +41,8 @@ int main(int argc, char** argv) {
 		for (auto y : x.second)
 			in << "e(" << x.first << ' ' << y << ")." << endl;
 	in << "e(?x ?y) :- e(?x ?z), e(?z ?y)."<<endl;
-	tc(m);
+	clock_t start, end;
+	measure_time(tc(m));
 	for (auto x : m)
 		for (auto y : x.second)
 			out << "e(" << x.first << ' ' << y << ")." << endl;
