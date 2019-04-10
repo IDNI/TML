@@ -53,6 +53,7 @@ std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
 std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, size_t n);
+void memos_clear();
 
 #define from_int_and(x, y, arg, args, r) r = bdd_and(r, from_int(x,y,arg,args))
 #define getnode(x) V[x]

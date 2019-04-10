@@ -79,7 +79,7 @@ public:
 
 	size_t operator()(size_t x) {
 		auto it = memo.find(x);
-		if (it == memo.end()) return memo[x] = compute(x, 0);
+		if (it == memo.end()) return ++memos, memo[x] = compute(x, 0);
 		return it->second;
 	}
 };
@@ -120,7 +120,7 @@ struct range {
 	size_t operator()(const sizes& domain, size_t nargs) {
 		sizes v;
 		for (size_t x : domain) v.push_back((*this)(x, nargs));
-		return bdd_and_many(v);
+		return bdd_and_many(move(v));
 	}
 	size_t operator()(size_t arg, size_t nargs);
 };

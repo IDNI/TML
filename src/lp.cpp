@@ -224,6 +224,7 @@ bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
 			add_not_fact(x.second, x.first.first, x.first.second);
 		if (db == d) break;
 		if (s.find(copy(db)) != s.end()) return false;
+		if (memos > 1e+4) memos_clear();
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();

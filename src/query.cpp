@@ -60,7 +60,7 @@ size_t query::operator()(size_t x) {
 	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
 	auto it = m.find(x);
 	if (it != m.end()) return it->second;
-	return m[x] = bdd_permute(bdd_ex(ae(x), ex), perm);
+	return ++memos, m[x] = bdd_permute(bdd_ex(ae(x), ex), perm);
 	//return m[x] = domain.size() ? compute(x, 0):
 	//	bdd_permute(neg ? bdd_and_not(T, x) : x, perm);
 }
@@ -112,7 +112,7 @@ size_t bdd_and_eq::operator()(const size_t x) {
 		v.push_back(bdd_and_not(v[1], v[0])),
 		v.erase(v.begin(), v.begin()+1);
 	}
-	return m[x] = bdd_and_many(move(v));
+	return ++memos, m[x] = bdd_and_many(move(v));
 }
 
 /*builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
@@ -149,6 +149,6 @@ size_t range::operator()(size_t arg, size_t args) {
 		chars ? chars_clause : notchar,
 		nums ? nums_clause : notnum,
 		syms ? syms_clause : notsym});
-	return memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
+	return ++memos, memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }
 unordered_map<array<int_t, 5>, size_t, array_hash<int_t, 5>> range::memo;

@@ -14,10 +14,13 @@
 #include "driver.h"
 using namespace std;
 
+void print_memos_len();
+
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	tml_init();
 	driver d(argc, argv, stdin, DBG(true?true:)false);
 	if (!d.result) wcout << "unsat" << endl;
+	print_memos_len();
 	return 0;
 }

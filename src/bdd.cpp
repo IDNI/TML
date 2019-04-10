@@ -18,6 +18,8 @@
 
 using namespace std;
 
+size_t memos = 0;
+
 template<> struct std::hash<node> {
 	size_t operator()(const node& n) const { return n[0] + n[1] + n[2]; }
 };
@@ -35,7 +37,7 @@ unordered_map<memo, size_t, array_hash<size_t, 2>> memo_and, memo_and_not, memo_
 unordered_map<exmemo, size_t> memo_ex;
 unordered_map<apexmemo, size_t> memo_and_ex, memo_and_not_ex;
 unordered_map<permemo, size_t> memo_permute;
-#define apply_ret(r, m) return m.emplace(t, res = (r)), res
+#define apply_ret(r, m) return memos++, m.emplace(t, res = (r)), res
 #else
 #define apply_ret(r, m) return r
 #endif
@@ -119,18 +121,19 @@ size_t bdd_ex(size_t x, const bools& b) {
 	if (leaf(x)) return x;
 	node n = getnode(x);
 #ifdef MEMO
-	exmemo t = {b, x};
+/*	exmemo t = {b, x};
 	auto it = memo_ex.find(t);
 	if (it != memo_ex.end()) return it->second;
-	size_t res;
+	size_t res;*/
 #endif	
 	while (n[0]-1 < b.size() && b[n[0]-1]) {
 		x = bdd_or(n[1], n[2]);
-		if (leaf(x)) apply_ret(x, memo_ex);
+		if (leaf(x)) return x; //apply_ret(x, memo_ex);
 		n = getnode(x);
 	}
 	if (n[0]-1 >= b.size()) return x;
-	apply_ret(bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}}), memo_ex);
+	return bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}});
+//	apply_ret(bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}}), memo_ex);
 }
 
 size_t bdd_and(size_t x, size_t y) {
@@ -292,6 +295,7 @@ size_t bdd_and_many(sizes v) {
 	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
 	it = memo.emplace(v, 0).first;
+	++memos;
 	size_t res = F, m = 0, h, l;
 	sizes vh, vl;
 	switch (bdd_and_many_iter(move(v), vh, vl, res, m)) {
@@ -315,14 +319,15 @@ size_t bdd_ite(size_t v, size_t t, size_t e) {
 size_t bdd_permute(size_t x, const sizes& m) { //overlapping rename
 	if (leaf(x)) return x;
 #ifdef MEMO
-	permemo t = {m, x};
+/*	permemo t = {m, x};
 	auto it = memo_permute.find(t);
 	if (it != memo_permute.end()) return it->second;
-	size_t res;
+	size_t res;*/
 #endif	
 	const node n = getnode(x);
-	apply_ret(bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m)),
-		memo_permute);
+	return bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m));
+//	apply_ret(bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m)),
+//		memo_permute);
 }
 
 size_t count(size_t x, size_t nvars) {
@@ -383,10 +388,24 @@ void from_range(size_t max, size_t bits, size_t offset, set<int_t> ex,
 	r = bdd_and(r, x);
 }*/
 
+#define print_memo_size(x) wcout << #x << ": " << x.size() << endl
+
+void print_memos_len() {
+	wcout<<"memos: "<<memos<<endl;
+	print_memo_size(memo_and);
+	print_memo_size(memo_and_not);
+	print_memo_size(memo_or);
+	print_memo_size(memo_ex);
+	print_memo_size(memo_dt);
+	print_memo_size(memo_permute);
+	wcout<<"bdds: " << V.size() << endl;
+}
+
 void memos_clear() {
-#ifdef MEMO		
+#ifdef MEMO
+	memos = 0;
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear(),
-	memo_permute.clear(), memo_and_ex.clear(), memo_and_not_ex.clear();
+	memo_permute.clear(), memo_ex.clear();
 #endif		
 }
 
