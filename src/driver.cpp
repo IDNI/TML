@@ -126,10 +126,7 @@ wstring driver::directive_load(const directive& d) {
 	throw 0; // unreachable
 }
 
-#define measure_time(x) \
-	start = clock(); \
-	x; \
-	end = clock(); \
+#define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
 lp* driver::prog_run(raw_prog& p, lp* last) {

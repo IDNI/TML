@@ -230,7 +230,7 @@ will be omitted when converting a tree to a string, as in the next section.
 
 It is possible to input strings to the database. The line
 
-    @mystr "abc".
+    @string mystr "abc".
 
 will add the following fact to the database:
 
@@ -238,17 +238,18 @@ will add the following fact to the database:
     mystr(((1))('b')((2))).
     mystr(((2))('c')((3))).
 
-More generally, `@relname "str"` will use the relation symbol relname to declare
-a tree where each string position has first successor to the character on that
-position, and a second successor to the next position. Observe that the
-positions appear in double parenthesis. This is because of the following:
+More generally, `@string relname "str"` will use the relation symbol relname
+to declare a tree where each string position has first successor to the
+character on that position, and a second successor to the next position.
+Observe that the positions appear in double parenthesis. This is because of the
+following:
 
 It is possible to construct a string by specifying a root of a tree. The backend
 will then traverse the tree depth-first left-first (Pre-Order) and stringify its
 content. It will omit from the output string nodes that appear in double
 parenthesis. For example the program
 
-    @str T((1 2)).
+    @string str T((1 2)).
     T((1 2) (2 3) (a b)).
     T((a b) (c d)).
     T((2 3) (4 5)).
@@ -259,7 +260,7 @@ will result in having the relation symbol `str` represent the string:
 
 while if we had:
 
-    @str T((1 2)).
+    @string str T((1 2)).
     T((1 2) ((2 3)) (a b)).
     T((a b) ((c d))).
     T(((2 3)) (4 5)).
@@ -275,8 +276,8 @@ Note that the double-parenthesis omission is denoted on the successor nodes.
 
 Now we can see why strings create trees with double parenthesis: the following
 
-    @str1 "abc".
-    @str2 str1(((0))).
+    @string str1 "abc".
+    @string str2 str1(((0))).
 
 will result with `str2="abc"`.
 
@@ -291,15 +292,15 @@ or arbitrary tree:
 
 In addition a string can refer to command line arguments:
 
-    @str $1.
+    @string str $1.
 
 or to be taken from `stdin`:
 
-    @str stdin.
+    @string str stdin.
 
 or from a file:
 
-    @str <filename>.
+    @string str <filename>.
 
 Finally it is possible to refer to the length of the string by the symbol
 `len:str`.
@@ -321,18 +322,19 @@ variables) after `!!`:
 
     !! T((?x ?y)).
 
-Proof extraction is done by:
+Proof extraction is done by adding a single directive specifying a relation
+name:
 
-    !! relname e(1 ?x).
+    @trace relname.
 
-which will construct a forest with relation symbol `relname` that proves all
-results that match `e(1 ?x)`, in a fashion that described above: if we have a
-rule
+which will construct a forest with relation symbol `relname` that contains
+all possible witnesses to all derived facts, in a fashion that was described
+above: if we have a rule
 
     e(?x ?y) :- e(?x ?z), e(?y ?z).
-    !! P e(1 ?x).
+    @trace P.
 
-then the proof tree will have the form
+then the trace tree will have the form
 
     P((e(?x ?y)) (e(?x ?z)) (e(?y ?z))).
 

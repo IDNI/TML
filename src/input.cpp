@@ -74,7 +74,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		type = TRACE;
 		if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 			parse_error(err_trace_rel, l[pos]);
-		if (*l[(++pos)++][0] != '.') parse_error(dot_expected, l[pos]);
+		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
 		return true;
 	}
 	if (l[pos] == L"stdout") {
