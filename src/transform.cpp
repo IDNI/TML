@@ -134,6 +134,21 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 void driver::transform_grammar(raw_prog& r) {
 //	directive d, vector<production> g, const wstring& s) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
+	for (size_t k = 0; k != r.g.size();) {
+		size_t n = 0;
+		while (n<r.g[k].p.size() && r.g[k].p[n].type != elem::ALT) ++n;
+		if (n == r.g[k].p.size()) {
+			++k;
+			continue;
+		}
+		production q;
+		q.p = vector<elem>(r.g[k].p.begin(), r.g[k].p.begin() + n);
+		r.g.push_back(q);
+		q.p = vector<elem>(r.g[k].p.begin()+n+1, r.g[k].p.end());
+		q.p.insert(q.p.begin(), r.g[k].p[0]);
+		r.g.erase(r.g.begin() + k);
+		r.g.push_back(q);
+	}
 	for (const production& p : r.g) {
 		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
 		raw_rule l;

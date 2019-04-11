@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 
 struct elem {
-	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP } type;
+	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT } type;
 	int_t num = 0;
 	lexeme e;
 	bool parse(const lexemes& l, size_t& pos);
@@ -42,8 +42,8 @@ struct directive {
 };
 
 struct production {
-	bool start = false;
-	raw_term t;
+//	bool start = false;
+//	raw_term t;
 	std::vector<elem> p;
 	bool parse(const lexemes& l, size_t& pos);
 };

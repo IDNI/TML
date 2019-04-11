@@ -61,8 +61,7 @@ void lp::get_trees(const diff_t& in, diff_t& out) {
 
 void lp::get_trees() {
 	get_trees(trees, trees_out);
-	for (auto x : strtrees)
-		get_trees(x.second, strtrees_out[x.first]);
+	for (auto x : strtrees) get_trees(x.second, strtrees_out[x.first]);
 	auto it = db.end();
 	for (auto x : trees_out) {
 		if ((it = db.find(x.first)) == db.end())

@@ -2,8 +2,8 @@
 #@str "((()()()((()()()))))".
 #@str "()".
 @string str "(()())".
-S => null.
-S => '(' S ')' S.
+#S => null.
+S => '(' S ')' S | null.
 @trace W.
 #a(1 2).
 #! S ?x ?y.
