@@ -12,9 +12,10 @@
 // modified over time by the Author.
 #ifndef __QUERY_H__
 #define __QUERY_H__
-#include "bdd.h"
 #include <algorithm>
 #include <numeric>
+#include "bdd.h"
+#include "term.h"
 
 class bdd_and_eq {
 	const size_t bits, nvars;

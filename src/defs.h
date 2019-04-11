@@ -28,6 +28,7 @@ typedef std::vector<int_t> ints;
 typedef std::unordered_map<int_t, std::wstring> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+typedef std::vector<size_t> sizes;
 
 #ifdef DEBUG
 #define DBG(x) x
@@ -40,7 +41,8 @@ typedef std::vector<bools> vbools;
 #define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
 #define ARG(pos, args) ((pos) % (args))
 #define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)
-#define has(x, y) std::binary_search(x.begin(), x.end(), y)
+#define has(x, y) ((x).find(y) != (x).end())
+#define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };

@@ -1,4 +1,3 @@
-// LICENSE
 // This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
@@ -129,28 +128,24 @@ wstring driver::directive_load(const directive& d) {
 #define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
-lp* driver::prog_run(raw_prog& p, lp* last) {
-	prog_data pd;
-	bool trace = false;
-	lexeme prel;
+void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
+	int_t rel;
 	for (const directive& d : p.d)
-		if (d.type == directive::TRACE) trace = true, prel = d.rel.e;
-		else if (d.type == directive::STDOUT)
-			pd.out.push_back(get_term(d.t));
-		else if (d.type == directive::TREE) {
-			if (pd.strtree.find(dict.get_rel(d.t.e[0].e))
-					!= pd.strtree.end())
+		switch (d.type) {
+		case directive::TRACE: trel = d.rel.e; break;
+		case directive::STDOUT: pd.out.push_back(get_term(d.t)); break;
+		case directive::TREE:
+			rel = dict.get_rel(d.t.e[0].e);
+			if (has(pd.strtrees, rel) || has(pd.strs, rel))
 				parse_error(err_str_defined, d.t.e[0].e);
-			pd.strtree[dict.get_rel(d.t.e[0].e)] = get_term(d.t);
-		} else pd.strs.emplace(dict.get_rel(d.rel.e),directive_load(d));
-	//DBG(wcout << L"original program:"<<endl<<p;)
-	for (auto x : pd.strs) transform_string(x.second, p, x.first);
-	if (!p.g.empty() && pd.strs.size() > 1) er(err_one_input);
-	else transform_grammar(p);
-	if (trace) transform_proofs(p, prel);
-	if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
-	get_dict_stats(p);
-	clock_t start, end;
+			else pd.strtrees.emplace(rel, get_term(d.t));
+			break;
+		default: pd.strs.emplace(dict.get_rel(d.rel.e),
+				directive_load(d));
+		}
+}
+
+void driver::add_rules(raw_prog& p, prog_data& pd) {
 	for (const raw_rule& x : p.r)
 		switch (x.type) {
 		case raw_rule::NONE: pd.r.insert(get_rule(x)); break;
@@ -160,8 +155,34 @@ lp* driver::prog_run(raw_prog& p, lp* last) {
 				     break;
 		default: assert(0);
 		}
+}
+
+void driver::transform(raw_prog& p, prog_data& pd, const strs_t& strtrees) {
+	lexeme trel = { 0, 0 };
+	directives_load(p, pd, trel);
+	for (auto x : pd.strs) transform_string(x.second, p, x.first);
+	for (auto x : strtrees) transform_string(x.second, p, x.first);
+	if (!p.g.empty() && pd.strs.size() > 1) er(err_one_input);
+	else transform_grammar(p);
+	if (trel[0]) transform_proofs(p, trel);
+}
+
+//wstring driver::tree2str(
+
+lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
+	//DBG(wcout << L"original program:"<<endl<<p;)
+	prog_data pd;
+	transform(p, pd, strtrees);
+	if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
+	strtrees.clear(), get_dict_stats(p), add_rules(p, pd);
 	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
+	clock_t start, end;
 	measure_time(result &= prog->pfp({}));
+	for (auto x : pd.strtrees) {
+//		auto it = db.find({x.first, });
+//		if (it == end()) continue;
+//		strtrees.emplace(x.first, tree2str(it->second));
+	}
 	return prog;
 }
 
@@ -169,7 +190,8 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	: argc(argc), argv(argv), print_transformed(print_transformed) {
 	DBG(drv = this;)
 	lp *prog = 0;
-	for (raw_prog& p : rp.p) prog = prog_run(p, prog);
+	strs_t strtrees;
+	for (raw_prog& p : rp.p) prog = prog_run(p, prog, strtrees);
 	if (prog) { printdb(wcout, prog); delete prog; }
 }
 

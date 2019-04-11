@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstring>
 #include "bdd.h"
+#include "term.h"
 
 using namespace std;
 
@@ -266,10 +267,10 @@ size_t bdd_and_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
 	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
 	if (x.size() > 1) {
 		for (size_t n = 0; n < h.size();)
-			if (has(x, h[n])) h.erase(h.begin() + n);
+			if (hasb(x, h[n])) h.erase(h.begin() + n);
 			else ++n;
 		for (size_t n = 0; n < l.size();)
-			if (has(x, l[n])) l.erase(l.begin() + n);
+			if (hasb(x, l[n])) l.erase(l.begin() + n);
 			else ++n;
 		size_t r = bdd_and_many(move(x));
 		if (r == F) return res = F, 1;

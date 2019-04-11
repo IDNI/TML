@@ -150,11 +150,10 @@ void driver::transform_grammar(raw_prog& r) {
 			size_t v = p.p.size();
 			l.add_head(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n)
-				if (b.find(lexeme2str(p.p[n].e)) != b.end())
-					++v,
+				if (has(b, lexeme2str(p.p[n].e)))
 					l.add_body(from_grammar_elem_builtin(
 						r.d[0].rel.e,
-						lexeme2str(p.p[n].e),n));
+						lexeme2str(p.p[n].e),n)), ++v;
 				else if (p.p[n].type == elem::CHR)
 					l.add_body(from_grammar_elem_nt(
 						r.d[0].rel.e, p.p[n], n, n+1));

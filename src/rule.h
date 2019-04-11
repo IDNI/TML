@@ -21,9 +21,8 @@ struct rule { // a P-DATALOG rule in bdd form
 	size_t bleq;
 	sizes hleq;
 	std::vector<query> q;
-	std::vector<ints> harity;
+	std::vector<prefix> hpref;
 	size_t maxhlen, nvars;
-	ints hrel;
 	std::vector<size_t*> dbs;
 	std::vector<sizes> hperm;
 	std::vector<bdd_and_eq> ae;

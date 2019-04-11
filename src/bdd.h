@@ -17,7 +17,6 @@
 #include <functional>
 #include <numeric>
 #include "defs.h"
-#include "term.h"
 
 //bdd node is a triple: varid,1-node-id,0-node-id
 typedef std::array<size_t, 3> node;
@@ -47,8 +46,8 @@ size_t bdd_count(size_t x, size_t nvars);
 bool bdd_onesat(size_t x, size_t nvars, bools& r);
 size_t from_eq(size_t x, size_t y);
 size_t from_int(size_t x, size_t bits, size_t arg, size_t args);
-matrix from_bits(size_t x, size_t bits, size_t ar);
-term one_from_bits(size_t x, size_t bits, size_t ar);
+//matrix from_bits(size_t x, size_t bits, size_t ar);
+//struct term one_from_bits(size_t x, size_t bits, size_t ar);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
 std::wostream& bdd_out(std::wostream& os, const node& n);// print bdd in ?: syntax

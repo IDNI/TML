@@ -19,15 +19,16 @@
 #include <map>
 #include "bdd.h"
 #include "query.h"
+#include "term.h"
 
 void tml_init();
 
-typedef std::map<std::pair<int_t, ints>, size_t*> db_t;
-typedef std::map<std::pair<int_t, ints>, size_t> diff_t;
+typedef std::map<prefix, size_t*> db_t;
+typedef std::map<prefix, size_t> diff_t;
 
 struct prog_data {
 	strs_t strs;
-	std::unordered_map<int_t, term> strtree;
+	std::unordered_map<int_t, term> strtrees;
 	std::vector<term> out;
 	matpairs r;
 	matrix goals, tgoals;
@@ -37,26 +38,23 @@ class lp { // [pfp] logic program
 	friend struct rule;
 	DBG(friend class driver;)
 	std::vector<struct rule*> rules;
-	void add_fact(size_t f, int_t rel, ints arity);
-	bool add_not_fact(size_t f, int_t rel, ints arity);
+	void add_fact(size_t f, const prefix& p);
+	bool add_not_fact(size_t f, const prefix& p);
 	bool add_facts(const matrix& x);
 	bool add_fact(const term& t);
 	void get_trees();
 	void fwd(diff_t &add, diff_t &del);
 	const strs_t strs;
-	diff_t trees, trees_out, gbdd;
+	diff_t trees, gbdd;
 public:
 	prog_data pd;
 	range rng;
 	db_t db;
+	diff_t trees_out;
 	lp(prog_data, range rng, lp *prev = 0);
 	bool pfp(std::function<matrix(diff_t)> mkstr);
 	~lp();
 };
 
-size_t arlen(const ints& ar);
-std::set<ints> prefix(const db_t& db, ints ar, int_t rel);
-void get_tree(int_t rel, size_t root, ints ar, const db_t& db, size_t bits,
-	diff_t& res);
 extern int_t null;
 #endif

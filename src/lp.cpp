@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <cassert>
 #include "rule.h"
+#include "term.h"
 #ifdef DEBUG
 #include "driver.h"
 #else
@@ -33,20 +34,20 @@ using namespace std;
 void tml_init() { bdd_init(); }
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
-void lp::add_fact(size_t f, int_t rel, ints arity) {
-	size_t *t = db[{rel, arity}];
-	if (!t) *(db[{rel, arity}] = new size_t) = f;
+void lp::add_fact(size_t f, const prefix& p) {
+	size_t *t = db[p];
+	if (!t) *(db[p] = new size_t) = f;
 	else *t = bdd_or(*t, f);
 }
 
-bool lp::add_not_fact(size_t f, int_t rel, ints arity) {
-	size_t *t = db[{rel, arity}], p = *t;
-	return (*t = bdd_and_not(*t, f)), (p == F || *t != F);
+bool lp::add_not_fact(size_t f, const prefix& p) {
+	size_t *t = db[p], x = *t;
+	return (*t = bdd_and_not(*t, f)), (x == F || *t != F);
 }
 
 bool lp::add_fact(const term& x) {
 //	if (x.neg) return add_not_fact(fact(x, bits, dsz), x.rel, x.arity);
-	return add_fact(fact(x, rng), x.rel(), x.arity()), true;
+	return add_fact(fact(x, rng), x.pref()), true;
 }
 
 bool lp::add_facts(const matrix& x) {
@@ -67,15 +68,13 @@ db_t rebit(size_t pbits, size_t bits, db_t db) {
 	if (pbits == bits) return db;
 	assert(pbits < bits);
 	for (auto x : db)
-		*x.second = prefix_zeros(*x.second,
-				(bits - pbits) * arlen(x.first.second));
+		*x.second = prefix_zeros(*x.second, (bits-pbits)*x.first.len());
 	return db;
 }
 
 void bdd_or(diff_t& x, const term& t, range& rng) {
-	const auto k = make_pair(t.rel(), t.arity());
-	auto it = x.find(k);
-	if (it == x.end()) it = x.emplace(k, F).first;
+	auto it = x.find(t.pref());
+	if (it == x.end()) it = x.emplace(t.pref(), F).first;
 	it->second = bdd_or(it->second, fact(t, rng));
 }
 
@@ -111,7 +110,7 @@ lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
 	for (const term& t : pd.goals) bdd_or(gbdd, t, rng);
 	for (const term& t : pd.tgoals)
-		trees.emplace(diff_t::key_type{t.rel(), t.arity()}, fact(t, rng));
+		trees.emplace(diff_t::key_type{t.rel(),t.arity()}, fact(t,rng));
 }
 
 void lp::fwd(diff_t &add, diff_t &del) {
@@ -120,8 +119,7 @@ void lp::fwd(diff_t &add, diff_t &del) {
 		const sizes x = r->fwd();
 		if (x.empty()) continue;
 		for (size_t n = 0; n != x.size(); ++n) {
-			size_t &t = (r->neg[n] ? del : add)
-				[{r->hrel[n], r->harity[n]}];
+			size_t &t = (r->neg[n] ? del : add)[r->hpref[n]];
 			t = bdd_or(x[n], t);
 		}
 	}
@@ -155,31 +153,24 @@ void copy(const diff_t& src, db_t& dst) {
 }
 
 bool bdd_and_not(const diff_t& x, const diff_t& y, diff_t& r) {
-	for (auto t : x) {
-		auto it = y.find(t.first);
-		if (it == y.end()) continue;
-		if (t.second && F == (r[t.first] 
+	for (auto t : x)
+		if (has(y, t.first) && t.second && F == (r[t.first] 
 				= bdd_and_not(t.second, y.at(t.first))))
 			return false;
-	}
 	return true;
 }
 
 db_t& bdd_and_not(db_t& x, const diff_t& y) {
-	for (auto t : x) {
-		auto it = y.find(t.first);
-		if (it == y.end()) continue;
-		*t.second = bdd_and_not(*t.second, y.at(t.first));
-	}
+	for (auto t : x)
+		if (has(y, t.first))
+			*t.second = bdd_and_not(*t.second, y.at(t.first));
 	return x;
 }
 
 void bdd_or(db_t& x, const diff_t& y) {
-	for (auto t : x) {
-		auto it = y.find(t.first);
-		if (it == y.end()) continue;
-		*t.second = bdd_or(*t.second, y.at(t.first));
-	}
+	for (auto t : x)
+		if (has(y, t.first))
+			*t.second = bdd_or(*t.second, y.at(t.first));
 }
 
 bool operator==(const db_t& x, const diff_t& y) {
@@ -190,21 +181,6 @@ bool operator==(const db_t& x, const diff_t& y) {
 		if (xt->first==yt->first && *xt->second==yt->second) ++xt, ++yt;
 		else return false;
 	return true;
-}
-
-void lp::get_trees() {
-	auto it = db.end();
-	for (auto x : trees)
-		for (auto p : prefix(db, x.first.second, x.first.first))
-			if ((it = db.find({x.first.first, p})) != db.end()) {
-				size_t y = bdd_expand(x.second,
-					arlen(x.first.second),
-					arlen(it->first.second), rng.bits);
-				y = bdd_and(*it->second, y);
-				get_tree(x.first.first, y, it->first.second,
-					db, rng.bits, trees_out);
-			}
-	for (auto x : trees) *db[x.first] = x.second;
 }
 
 bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
@@ -218,24 +194,22 @@ bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
 		s.emplace(d = copy(db)), fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
-		for (auto x : add)
-			add_fact(x.second, x.first.first, x.first.second);
-		for (auto x : del)
-			add_not_fact(x.second, x.first.first, x.first.second);
+		for (auto x : add) add_fact(x.second, x.first);
+		for (auto x : del) add_not_fact(x.second, x.first);
 		if (db == d) break;
-		if (s.find(copy(db)) != s.end()) return false;
+		if (has(s, copy(db))) return false;
 		if (memos > 1e+4) memos_clear();
 	}
 	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();
 	DBG(static int nprog = 0;)
 	DBG(printdb(wcout<<"after prog: "<<nprog++<<endl, this)<<endl;)
-	for (auto x : gbdd) {
-		auto it = db.find(x.first);
-		if (it == db.end()) continue;
-		delete it->second;
-		db.erase(it);
-	}
+	auto it = db.end();
+	for (auto x : gbdd)
+		if ((it = db.find(x.first)) != db.end()) {
+			delete it->second;
+			db.erase(it);
+		}
 	return true;
 }
 

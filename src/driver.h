@@ -17,11 +17,11 @@
 
 class driver {
 	dict_t dict;
-	std::set<size_t> builtin_rels;//, builtin_symbdds;
-	matrix from_bits(size_t x, size_t bits, ints art, int_t rel) const;
+	std::set<int_t> builtin_rels;//, builtin_symbdds;
+	matrix from_bits(size_t x, size_t bits, const prefix& p) const;
 	template<typename F>
-	void from_bits(size_t x, size_t bits, ints art, int_t rel, F f) const;
-	term one_from_bits(size_t x, size_t bits, ints art, int_t rel) const;
+	void from_bits(size_t x, size_t bits, const prefix& p, F f) const;
+	term one_from_bits(size_t x, size_t bits, const prefix& p) const;
 
 	int_t nums = 0, chars = 0, syms = 0;
 //	bool mult = false;
@@ -35,6 +35,9 @@ class driver {
 	void get_dict_stats(const raw_prog& p);
 
 	std::wstring directive_load(const directive& d);
+	void directives_load(raw_prog& p, prog_data& pd, lexeme& trel);
+	void add_rules(raw_prog& p, prog_data& pd);
+	void transform(raw_prog& p, prog_data& pd, const strs_t& strtrees);
 	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
@@ -46,7 +49,7 @@ class driver {
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
 	void progs_read(wstr s);
-	lp* prog_run(raw_prog& p, lp* last);
+	lp* prog_run(raw_prog& p, lp* last, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();
 	bool pfp();

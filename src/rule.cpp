@@ -70,8 +70,8 @@ sizes rule::get_perm(const term& b, varmap& m) {
 rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, range& rng) :
 	dbs(dbs), rng(rng) {
 	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
-	hperm.resize(h.size()), hrel.resize(h.size()), harity.resize(h.size()),
-	neg.resize(h.size()), maxhlen = 0;
+	hperm.resize(h.size()), hpref.resize(h.size()), neg.resize(h.size()),
+	maxhlen = 0;
 	for (const term& t : h) maxhlen = max(maxhlen, t.nargs());
 	set<int_t> vs;
 	for (const term& t : b) for (int_t i : t.args()) if (i<0) vs.insert(i);
@@ -80,8 +80,7 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, range& rng) :
 	for (size_t n = 0; n != h.size(); ++n) {
 		hperm[n].resize(rng.bits * (maxhlen + nvars));
 		for (size_t j = 0; j != hperm[n].size(); ++j) hperm[n][j] = j;
-		hrel[n] = h[n].rel(), harity[n] = h[n].arity(),
-		neg[n] = h[n].neg();
+		hpref[n] = h[n].pref(), neg[n] = h[n].neg();
 		ae.emplace_back(rng.bits, h[n], false);
 	}
 	varmap m;
@@ -133,7 +132,7 @@ void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
 }
 
 sizes rule::fwd() {
-	sizes r(hrel.size()), v(q.size());
+	sizes r(hpref.size()), v(q.size());
 	size_t vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
@@ -150,7 +149,7 @@ sizes rule::fwd() {
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 //		DBG(bdd_out(wcout, r[k])<<endl;)
 //		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		r[k] = bdd_deltail(r[k], maxhlen+nvars, arlen(harity[k]), rng.bits);
+		r[k]=bdd_deltail(r[k], maxhlen+nvars, hpref[k].len(), rng.bits);
 		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
@@ -158,11 +157,5 @@ sizes rule::fwd() {
 		r[k] = bdd_and(hleq[k], r[k]);
 		//DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 	}
-	return r;
-}
-
-size_t arlen(const ints& ar) {
-	size_t r = 0;
-	for (auto x : ar) if (x > 0) r += x;
 	return r;
 }
