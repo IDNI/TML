@@ -42,9 +42,8 @@ class lp { // [pfp] logic program
 	bool add_not_fact(size_t f, const prefix& p);
 	bool add_facts(const matrix& x);
 	bool add_fact(const term& t);
-	std::set<prefix> tree_prefix(const prefix& p) const;
-	void get_tree(const prefix& p, size_t root, std::set<size_t>& done);
-	void get_tree(const prefix& p, size_t root);
+	std::set<db_t::const_iterator> tree_prefix(const prefix& p) const;
+	void get_tree(const prefix& p, size_t root, set<size_t>& done);
 	void get_trees();
 	void fwd(diff_t &add, diff_t &del);
 	const strs_t strs;

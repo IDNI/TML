@@ -16,19 +16,25 @@
 #endif
 using namespace std;
 
-bool ar_prefix(const ints& x, ints y) {
+bool operator<(const db_t::const_iterator& x, const db_t::const_iterator& y) {
+	return	x->first != y->first ? x->first < y->first :
+		x->second != y->second ? x->second < y->second : false;
+}
+
+bool ar_prefix(ints x, ints y) {
+	if (!x[0]) x.erase(x.begin());
 	if (!y[0]) y.erase(y.begin());
 	if (y.size() < x.size()) return false;
 	for (size_t n = 0; n < x.size(); ++n) if (x[n] != y[n]) return false;
 	return true;
 }
 
-set<prefix> lp::tree_prefix(const prefix& p) const {
-	set<prefix> r;
+set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
+	set<db_t::const_iterator> r;
 	auto lt = db.lower_bound({p.rel,{}}), ut = db.upper_bound({p.rel+1,{}});
 	while (lt != ut) {
 		if (lt->first.rel != p.rel) return r;
-		if (ar_prefix(p.ar, lt->first.ar)) r.insert(lt->first);
+		if (ar_prefix(p.ar, lt->first.ar)) r.insert(lt);
 		++lt;
 	}
 	return r;
@@ -36,30 +42,26 @@ set<prefix> lp::tree_prefix(const prefix& p) const {
 
 void lp::get_tree(const prefix& p, size_t root, set<size_t>& done) {
 	if (!done.emplace(root).second) return;
-	const vector<ints> x = p.subarities();
-	const vector<array<size_t, 2>> y = p.subterms();
-	const size_t len = p.len();
-	DBG(assert(x.size() == y.size());)
-	for (size_t n = 0; n != x.size(); ++n)
-		for (const prefix& z : tree_prefix({ p.rel, x[n] }))
-			get_tree(z, bdd_or(trees_out.emplace(z,F).first->second,
-					bdd_and(*db.at(z), bdd_subterm(root,
-					y[n][0], y[n][1], len, z.len(),rng.bits)
-					)), done);
-}
-
-void lp::get_tree(const prefix& p, size_t root) {
-	set<size_t> done;
-	get_tree(p, root, done);
+	diff_t::iterator it;
+	for (const pair<ints, array<size_t, 2>>& x : p.subterms())
+		for (const db_t::const_iterator& y:tree_prefix({p.rel,x.first}))
+			it = trees_out.emplace(y->first,F).first,
+			get_tree(y->first, it->second = bdd_or(it->second,
+				bdd_and(*y->second, bdd_subterm(root,
+				x.second[0], x.second[1], p.len(),
+				y->first.len(), rng.bits))), done);
 }
 
 void lp::get_trees() {
+	set<size_t> done;
 	for (auto x : trees)
-		for (auto p : tree_prefix(x.first))
-			get_tree(p, bdd_and(*db.at(p), bdd_expand(
-				x.second, x.first.len(), p.len(), rng.bits)));
+		for (const db_t::const_iterator& it : tree_prefix(x.first))
+			get_tree(it->first, bdd_and(*it->second, bdd_expand(
+				x.second, x.first.len(), it->first.len(),
+				rng.bits)), done), done.clear();
+	db.clear();
 	auto it = db.end();
-	for (auto x : trees) {
+	for (auto x : trees_out) {
 		if ((it = db.find(x.first)) == db.end())
 			it = db.emplace(x.first, new size_t).first;
 		*it->second = x.second;

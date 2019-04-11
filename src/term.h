@@ -26,23 +26,20 @@ struct prefix {
 		return r;
 	}
 
-	std::vector<std::array<size_t, 2>> subterms() const {
+	std::vector<std::pair<ints, std::array<size_t, 2>>> subterms() const {
 		assert(ar.size() && ar[0] == 0);
-		std::vector<std::array<size_t, 2>> r;
+		std::vector<std::pair<ints, std::array<size_t, 2>>> r;
 		for (size_t n=1, from=0, last=0, dep=0; n != ar.size(); ++n) {
 			if (ar[n] == -1) { if (!dep++) from = 0; }
 			else if (ar[n] != -2) from += ar[n];
-			else if (!--dep)r.push_back({last,last+from}),last=from;
+			else if (!--dep)
+				r.push_back({{}, {last,last+from}}), last=from;
 		}
-		return r;
-	}
-
-	std::vector<ints> subarities() const {
-		std::vector<ints> r;
+		size_t k = 0;
 		ints x = {0};
 		for (size_t n = ar[0]==0 ? 1 : 0, dep = 0; n != ar.size(); ++n)
 			if (x.push_back(ar[n]), ar[n] == -1) dep++;
-			else if (ar[n] == -2 && !--dep) r.push_back(x), x = {0};
+			else if (ar[n] == -2 && !--dep) r[k++].first = x, x={0};
 		return r;
 	}
 
