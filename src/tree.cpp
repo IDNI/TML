@@ -76,8 +76,8 @@ void lp::get_trees() {
 
 set<set<term>::const_iterator> tree_prefix(const term& t, const set<term>& s) {
 	set<set<term>::const_iterator> r;
-	for (auto it = s.lower_bound(t); it != s.end() && it->root() == t; ++it)
-		r.insert(it);
+	for (auto it = s.lower_bound(t); it != s.end(); ++it)
+		if (it->root() == t) r.insert(it); // FIXME
 	return r;
 }
 
@@ -85,17 +85,20 @@ void driver::get_trees(wostream& os, const term& root, const set<term>& s,
 	set<term>& done) {
 	if (!done.emplace(root).second) return;
 	print_term(os, root);
-	for (auto x : root.subterms())
-		for (auto y : tree_prefix(x, s))
-			get_trees(os, *y, s, done);
+	for (auto x : tree_prefix(root, s))
+		for (auto y : x->subterms())
+			get_trees(os, y, s, done);
 }
 
 void driver::get_trees(const set<term>& roots, const diff_t& t, size_t bits) {
 	set<term> m, done;
-	for (auto x : t)
+	for (auto x : t) {
+	//	DBG(printbdd(wcout<<"t: "<<endl, x.second, bits,x.first)<<endl;)
 		from_bits(x.second, bits, x.first, [&m](const term& t) {
 				m.insert(t); });
+	}
 	wstringstream ss;
+	//for (auto x : m) print_term(wcout << "m: ", x) << endl;
 	for (const term& x : roots) get_trees(ss, x, m, done);
 	wcout << L"get_trees: " << ss.str() << endl;
 }

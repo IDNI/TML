@@ -100,16 +100,15 @@ public:
 	}
 
 	term root() const {
-		size_t n, dep = 1;
 		int_t k = 0;
-		DBG(assert(p.ar[1] == -1);)
 		ints ar = {0, -1};
-		for (n = 2; dep; ++n)
+		DBG(assert(p.ar[1] == -1);)
+		for (size_t n = 2, dep = 1; dep; ++n)
 			if (p.ar[n] == -1) ++dep, ar.push_back(-1);
 			else if (p.ar[n] == -2) --dep, ar.push_back(-2);
 			else k += p.ar[n], ar.push_back(p.ar[n]);
 		term r(false, p.rel,
-				ints(_args.begin(), _args.begin() + k), ar);
+			ints(_args.begin(), _args.begin() + k), ar);
 		return r;
 	}
 
