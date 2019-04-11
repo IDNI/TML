@@ -50,7 +50,7 @@ class driver {
 		int_t v);
 	void get_trees(std::wostream& os, const term& root,
 		const std::map<term, std::vector<term>>&, std::set<term>& done);
-	void get_trees(const std::set<term>& roots,const diff_t& t,size_t bits);
+	std::wstring get_trees(const term& roots,const diff_t& t,size_t bits);
 	void progs_read(wstr s);
 	lp* prog_run(raw_prog& p, lp* last, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);

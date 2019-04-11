@@ -12,9 +12,7 @@
 // modified over time by the Author.
 #include <sstream>
 #include "lp.h"
-#ifdef DEBUG
 #include "driver.h"
-#endif
 using namespace std;
 
 bool operator<(const db_t::const_iterator& x, const db_t::const_iterator& y) {
@@ -87,7 +85,7 @@ void driver::get_trees(wostream& os, const term& root,
 	for (auto x : it->second) get_trees(os, x, m, done);
 }
 
-void driver::get_trees(const set<term>& roots, const diff_t& t, size_t bits) {
+wstring driver::get_trees(const term& root, const diff_t& t, size_t bits) {
 	set<term> s, done;
 	map<term, vector<term>> m;
 	for (auto x : t)
@@ -99,6 +97,6 @@ void driver::get_trees(const set<term>& roots, const diff_t& t, size_t bits) {
 	}
 
 	wstringstream ss;
-	for (const term& x : roots) get_trees(ss, x, m, done);
-	wcout << L"get_trees: " << ss.str() << endl;
+	return get_trees(ss, root, m, done), ss.str();
+//	wcout << L"get_trees: " << ss.str() << endl;
 }

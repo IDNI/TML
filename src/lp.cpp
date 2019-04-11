@@ -185,7 +185,7 @@ bool operator==(const db_t& x, const diff_t& y) {
 	return true;
 }
 
-bool lp::pfp(std::function<matrix(diff_t)> /*mkstr*/) {
+bool lp::pfp() {
 	diff_t d, add, del, t;
 	set<size_t> pf;
 	DBG(size_t step = 0;)

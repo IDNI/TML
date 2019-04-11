@@ -178,14 +178,10 @@ lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
 	strtrees.clear(), get_dict_stats(p), add_rules(p, pd);
 	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
-	measure_time(result &= prog->pfp({}));
+	measure_time(result &= prog->pfp());
 	for (auto x : prog->strtrees_out)
-//		for (auto y : x.second)
-			get_trees({prog->pd.strtrees.begin()->second}, x.second, prog->rng.bits);
-//		auto it = db.find({x.first, });
-//		if (it == end()) continue;
-//		strtrees.emplace(x.first, tree2str(it->second));
-//
+		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
+					x.second, prog->rng.bits));
 	return prog;
 }
 

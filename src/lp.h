@@ -58,7 +58,7 @@ public:
 	diff_t trees_out;
 	std::map<int_t, diff_t> strtrees_out;
 	lp(prog_data, range rng, lp *prev = 0);
-	bool pfp(std::function<matrix(diff_t)> mkstr);
+	bool pfp();
 	~lp();
 };
 
