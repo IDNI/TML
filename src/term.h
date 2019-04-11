@@ -84,27 +84,33 @@ public:
 	void add_arg(int_t x) { _args.push_back(x); }
 	void set_arity(const ints& a) { p.ar = a; }
 	size_t nargs() const { return _args.size(); }
+
 	std::vector<term> subterms() const {
 		std::vector<std::pair<ints, std::array<size_t, 2>>> x =
 			p.subterms();
+//		for (auto y : x)
+//			y.first.insert(y.first.begin()+1,-1),
+//			y.first.insert(y.first.end(), -2);
 		std::vector<term> r(x.size());
 		for (size_t n = 0; n != x.size(); ++n)
 			r[n] = term(false, { p.rel, x[n].first }),
-			r[n]._args = ints(p.ar.begin() + x[n].second[0],
-					p.ar.begin() + x[n].second[1]);
+			r[n]._args = ints(_args.begin() + x[n].second[0],
+					_args.begin() + x[n].second[1]);
 		return r;
 	}
 
 	term root() const {
-		int_t from = 0, to, dep = 1;
-		while (_args[from] != -1) ++from;
-		to = from;
-		do {
-			if (_args[from] == -1) ++dep;
-			else if (_args[to] == -2) --dep;
-		} while (dep);
-		return	term(false, p.rel, ints(_args.begin() + from,
-			_args.end() + to), ints{to-from});
+		size_t n, dep = 1;
+		int_t k = 0;
+		DBG(assert(p.ar[1] == -1);)
+		ints ar = {0, -1};
+		for (n = 2; dep; ++n)
+			if (p.ar[n] == -1) ++dep, ar.push_back(-1);
+			else if (p.ar[n] == -2) --dep, ar.push_back(-2);
+			else k += p.ar[n], ar.push_back(p.ar[n]);
+		term r(false, p.rel,
+				ints(_args.begin(), _args.begin() + k), ar);
+		return r;
 	}
 
 	bool operator<(const term& t) const {

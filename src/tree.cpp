@@ -40,25 +40,31 @@ set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
 	return r;
 }
 
-void lp::get_tree(const prefix& p, size_t root, set<size_t>& done) {
+void lp::get_tree(const prefix& p, size_t root, diff_t& out, set<size_t>& done){
 	if (!done.emplace(root).second) return;
 	diff_t::iterator it;
 	for (const pair<ints, array<size_t, 2>>& x : p.subterms())
 		for (const db_t::const_iterator& y:tree_prefix({p.rel,x.first}))
-			it = trees_out.emplace(y->first,F).first,
+			it = out.emplace(y->first,F).first,
 			get_tree(y->first, it->second = bdd_or(it->second,
 				bdd_and(*y->second, bdd_subterm(root,
 				x.second[0], x.second[1], p.len(),
-				y->first.len(), rng.bits))), done);
+				y->first.len(), rng.bits))), out, done);
 }
 
-void lp::get_trees() {
+void lp::get_trees(const diff_t& in, diff_t& out) {
 	set<size_t> done;
-	for (auto x : trees)
+	for (auto x : in)
 		for (const db_t::const_iterator& it : tree_prefix(x.first))
 			get_tree(it->first, bdd_and(*it->second, bdd_expand(
 				x.second, x.first.len(), it->first.len(),
-				rng.bits)), done), done.clear();
+				rng.bits)), out, done), done.clear();
+}
+
+void lp::get_trees() {
+	get_trees(trees, trees_out);
+	for (auto x : strtrees)
+		get_trees(x.second, strtrees_out[x.first]);
 	db.clear();
 	auto it = db.end();
 	for (auto x : trees_out) {
@@ -70,7 +76,8 @@ void lp::get_trees() {
 
 set<set<term>::const_iterator> tree_prefix(const term& t, const set<term>& s) {
 	set<set<term>::const_iterator> r;
-	for (auto it = s.lower_bound(t); it->root() == t; ++it) r.insert(it);
+	for (auto it = s.lower_bound(t); it != s.end() && it->root() == t; ++it)
+		r.insert(it);
 	return r;
 }
 

@@ -108,6 +108,8 @@ lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 		}
 //	DBG(printdb(wcout<<L"pos:"<<endl, this);)
 //	DBG(printndb(wcout<<L"neg:"<<endl, this)<<endl;)
+	for (auto x : pd.strtrees)
+		strtrees[x.first][x.second.pref()] = fact(x.second, rng);
 	for (const term& t : pd.goals) bdd_or(gbdd, t, rng);
 	for (const term& t : pd.tgoals)
 		trees.emplace(diff_t::key_type{t.rel(),t.arity()}, fact(t,rng));
