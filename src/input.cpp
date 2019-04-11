@@ -136,7 +136,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 
 void raw_term::calc_arity() {
 	size_t dep = 0;
-	arity.push_back(0);
+	arity = {0};
 	if (e.size() == 1) return;
 	for (size_t n = 2; n < e.size()-1; ++n)
 		if (e[n].type == elem::OPENP) ++dep, arity.push_back(-1);

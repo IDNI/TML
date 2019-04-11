@@ -40,3 +40,4 @@ const wchar_t err_trace_rel[] = L"Trace directive has to be followed by a relati
 const wchar_t err_directive[] = L"Directives can be @string or @stdout or @trace.";
 const wchar_t err_stdout[] = L"Expected term after @stdout.";
 const wchar_t err_rel_expected[] = L"Expected relation symbol.";
+const wchar_t err_len[] = L"Taking the length of an unknown string.";

@@ -39,7 +39,23 @@ bool operator==(const lexeme& l, const wstring& s) {
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)
 
-term driver::get_term(const raw_term& r) {
+term driver::get_term(raw_term r, const strs_t& s) {
+	for (size_t n = 1; n < r.e.size(); ++n)
+		if (r.e[n].e == L"len" && n+3 < r.e.size() &&
+			r.e[n+1].type == elem::OPENP &&
+			r.e[n+2].type == elem::SYM &&
+			r.e[n+3].type == elem::CLOSEP) {
+			auto it = s.find(dict.get_rel(r.e[n+2].e));
+			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
+			wcout << r << endl;
+			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
+			r.calc_arity();
+			wcout << r << endl;
+			r.e.insert(r.e.begin()+n,
+				{elem::NUM, (int_t)it->second.size(), {0,0}}),
+			r.calc_arity();
+			wcout << r << endl;
+		}
 	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (r.e[n].type == elem::NUM)
@@ -53,10 +69,10 @@ term driver::get_term(const raw_term& r) {
 	return t;
 }
 
-pair<matrix, matrix> driver::get_rule(const raw_rule& r) {
+pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
 	matrix h, b;
-	for (auto x : r.heads()) h.push_back(get_term(x));
-	for (auto x : r.bodies()) b.push_back(get_term(x));
+	for (auto x : r.heads()) h.push_back(get_term(x, s));
+	for (auto x : r.bodies()) b.push_back(get_term(x, s));
 //	if (m[0][0] > 0)
 //		for (size_t i = 1; i < m[0].size(); ++i)
 //			if (m[0][i] == null) er(err_null_in_head);
@@ -134,12 +150,13 @@ void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
 	for (const directive& d : p.d)
 		switch (d.type) {
 		case directive::TRACE: trel = d.rel.e; break;
-		case directive::STDOUT: pd.out.push_back(get_term(d.t)); break;
+		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
+					break;
 		case directive::TREE:
 			rel = dict.get_rel(d.t.e[0].e);
 			if (has(pd.strtrees, rel) || has(pd.strs, rel))
 				parse_error(err_str_defined, d.t.e[0].e);
-			else pd.strtrees.emplace(rel, get_term(d.t));
+			else pd.strtrees.emplace(rel, get_term(d.t,pd.strs));
 			break;
 		default: pd.strs.emplace(dict.get_rel(d.rel.e),
 				directive_load(d));
@@ -149,11 +166,11 @@ void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
 void driver::add_rules(raw_prog& p, prog_data& pd) {
 	for (const raw_rule& x : p.r)
 		switch (x.type) {
-		case raw_rule::NONE: pd.r.insert(get_rule(x)); break;
-		case raw_rule::GOAL: pd.goals.push_back(get_term(x.head(0)));
-				     break;
-		case raw_rule::TREE: pd.tgoals.push_back(get_term(x.head(0)));
-				     break;
+		case raw_rule::NONE: pd.r.insert(get_rule(x,pd.strs)); break;
+		case raw_rule::GOAL: pd.goals.push_back(get_term(
+					x.head(0),pd.strs)); break;
+		case raw_rule::TREE: pd.tgoals.push_back(get_term(
+					x.head(0),pd.strs)); break;
 		default: assert(0);
 		}
 }
@@ -167,8 +184,6 @@ void driver::transform(raw_prog& p, prog_data& pd, const strs_t& strtrees) {
 	else transform_grammar(p);
 	if (trel[0]) transform_proofs(p, trel);
 }
-
-//wstring driver::tree2str(
 
 lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)

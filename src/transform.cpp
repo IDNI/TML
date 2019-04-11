@@ -132,7 +132,6 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 #define term_close(x) append_closep((x).e), (x).calc_arity()
 
 void driver::transform_grammar(raw_prog& r) {
-//	directive d, vector<production> g, const wstring& s) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
 	for (size_t k = 0; k != r.g.size();) {
 		size_t n = 0;

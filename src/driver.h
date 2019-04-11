@@ -29,8 +29,8 @@ class driver {
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
-	term get_term(const raw_term&);
-	std::pair<matrix, matrix> get_rule(const raw_rule&);
+	term get_term(raw_term r, const strs_t& s);
+	std::pair<matrix, matrix> get_rule(const raw_rule&, const strs_t& s);
 	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& syms);
 	void get_dict_stats(const raw_prog& p);
 
