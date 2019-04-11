@@ -163,7 +163,7 @@ void driver::transform(raw_prog& p, prog_data& pd, const strs_t& strtrees) {
 	directives_load(p, pd, trel);
 	for (auto x : pd.strs) transform_string(x.second, p, x.first);
 	for (auto x : strtrees) transform_string(x.second, p, x.first);
-	if (!p.g.empty() && pd.strs.size() > 1) er(err_one_input);
+	if (!p.g.empty() && pd.strs.size() != 1) er(err_one_input);
 	else transform_grammar(p);
 	if (trel[0]) transform_proofs(p, trel);
 }

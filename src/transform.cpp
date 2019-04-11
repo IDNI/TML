@@ -137,17 +137,23 @@ void driver::transform_grammar(raw_prog& r) {
 	for (size_t k = 0; k != r.g.size();) {
 		size_t n = 0;
 		while (n<r.g[k].p.size() && r.g[k].p[n].type != elem::ALT) ++n;
-		if (n == r.g[k].p.size()) {
-			++k;
-			continue;
-		}
-		production q;
-		q.p = vector<elem>(r.g[k].p.begin(), r.g[k].p.begin() + n);
-		r.g.push_back(q);
-		q.p = vector<elem>(r.g[k].p.begin()+n+1, r.g[k].p.end());
-		q.p.insert(q.p.begin(), r.g[k].p[0]);
+		if (n == r.g[k].p.size()) { ++k; continue; }
+		r.g.push_back(
+			{vector<elem>(r.g[k].p.begin(), r.g[k].p.begin() + n)});
+		r.g.push_back(
+			{vector<elem>(r.g[k].p.begin()+n+1, r.g[k].p.end())});
+		r.g.back().p.insert(r.g.back().p.begin(), r.g[k].p[0]);
 		r.g.erase(r.g.begin() + k);
-		r.g.push_back(q);
+	}
+	for (production& p : r.g) {
+		for (size_t n = 0; n < p.p.size(); ++n)
+			if (p.p[n].type == elem::STR) {
+				lexeme l = p.p[n].e;
+				p.p.erase(p.p.begin() + n);
+				for (cws s = l[0]+1; s != l[1]-1; ++s)
+					p.p.insert(p.p.begin()+n++,{elem::CHR,0,
+						get_char_lexeme(*s)});
+			}
 	}
 	for (const production& p : r.g) {
 		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);

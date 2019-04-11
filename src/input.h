@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 
 struct elem {
-	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT } type;
+	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR } type;
 	int_t num = 0;
 	lexeme e;
 	bool parse(const lexemes& l, size_t& pos);

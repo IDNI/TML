@@ -109,12 +109,13 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++], type = ALT, true;
 	if (L'(' == *l[pos][0]) return e = l[pos++], type = OPENP, true;
 	if (L')' == *l[pos][0]) return e = l[pos++], type = CLOSEP, true;
-	if (!iswalnum(*l[pos][0]) && !wcschr(L"'-?", *l[pos][0])) return false;
+	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'')
 		type = CHR,
 		e = { l[pos][0] + (*(l[pos][0]+1)==L'\\' ? 2 : 1), l[pos][1]-1};
 	else if (*l[pos][0] == L'?') type = VAR;
 	else if (iswalpha(*l[pos][0])) type = SYM;
+	else if (*l[pos][0] == L'"') type = STR;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, true;
 }
