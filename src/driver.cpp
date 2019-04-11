@@ -1,3 +1,4 @@
+// LICENSE
 // This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
@@ -178,11 +179,12 @@ lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
 	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
 	measure_time(result &= prog->pfp({}));
-	for (auto x : pd.strtrees) {
+	for (auto x : pd.strtrees)
+		get_trees({x.second}, prog->trees_out, prog->rng.bits);
 //		auto it = db.find({x.first, });
 //		if (it == end()) continue;
 //		strtrees.emplace(x.first, tree2str(it->second));
-	}
+//
 	return prog;
 }
 

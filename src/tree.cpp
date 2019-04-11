@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <sstream>
 #include "lp.h"
 #ifdef DEBUG
 #include "driver.h"
@@ -21,6 +22,9 @@ bool operator<(const db_t::const_iterator& x, const db_t::const_iterator& y) {
 		x->second != y->second ? x->second < y->second : false;
 }
 
+bool operator<(const set<term>::const_iterator& x,
+	const set<term>::const_iterator& y) { return *x < *y; }
+
 bool ar_prefix(ints x, ints y) {
 	if (!x[0]) x.erase(x.begin());
 	if (!y[0]) y.erase(y.begin());
@@ -31,12 +35,8 @@ bool ar_prefix(ints x, ints y) {
 
 set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
 	set<db_t::const_iterator> r;
-	auto lt = db.lower_bound({p.rel,{}}), ut = db.upper_bound({p.rel+1,{}});
-	while (lt != ut) {
-		if (lt->first.rel != p.rel) return r;
-		if (ar_prefix(p.ar, lt->first.ar)) r.insert(lt);
-		++lt;
-	}
+	for (auto it = db.lower_bound({p.rel,{}}); it->first.rel == p.rel; ++it)
+		if (ar_prefix(p.ar, it->first.ar)) r.insert(it);
 	return r;
 }
 
@@ -66,4 +66,29 @@ void lp::get_trees() {
 			it = db.emplace(x.first, new size_t).first;
 		*it->second = x.second;
 	}
+}
+
+set<set<term>::const_iterator> tree_prefix(const term& t, const set<term>& s) {
+	set<set<term>::const_iterator> r;
+	for (auto it = s.lower_bound(t); it->root() == t; ++it) r.insert(it);
+	return r;
+}
+
+void driver::get_trees(wostream& os, const term& root, const set<term>& s,
+	set<term>& done) {
+	if (!done.emplace(root).second) return;
+	print_term(os, root);
+	for (auto x : root.subterms())
+		for (auto y : tree_prefix(x, s))
+			get_trees(os, *y, s, done);
+}
+
+void driver::get_trees(const set<term>& roots, const diff_t& t, size_t bits) {
+	set<term> m, done;
+	for (auto x : t)
+		from_bits(x.second, bits, x.first, [&m](const term& t) {
+				m.insert(t); });
+	wstringstream ss;
+	for (const term& x : roots) get_trees(ss, x, m, done);
+	wcout << L"get_trees: " << ss.str() << endl;
 }

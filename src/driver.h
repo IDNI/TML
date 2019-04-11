@@ -19,8 +19,8 @@ class driver {
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 	matrix from_bits(size_t x, size_t bits, const prefix& p) const;
-	template<typename F>
-	void from_bits(size_t x, size_t bits, const prefix& p, F f) const;
+	void from_bits(size_t x, size_t bits, const prefix& p,
+		std::function<void(const term&)> f) const;
 	term one_from_bits(size_t x, size_t bits, const prefix& p) const;
 
 	int_t nums = 0, chars = 0, syms = 0;
@@ -48,6 +48,9 @@ class driver {
 		int_t v1, int_t v2);
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
+	void get_trees(std::wostream& os, const term& root,
+		const std::set<term>& s, std::set<term>& done);
+	void get_trees(const std::set<term>& roots,const diff_t& t,size_t bits);
 	void progs_read(wstr s);
 	lp* prog_run(raw_prog& p, lp* last, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);

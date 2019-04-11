@@ -69,6 +69,7 @@ public:
 	term(bool neg, int_t rel) : _neg(neg), p(rel, {}) {}
 	term(bool neg, int_t rel, const ints& args, const ints& arity)
 		: _neg(neg), _args(args), p(rel, arity) {}
+	term(bool neg, const prefix& p) : _neg(neg), p(p) {}
 	term(bool neg, const ints& args, const prefix& p)
 		: _neg(neg), _args(args), p(p) {}
 	bool neg() const { return _neg; }
@@ -83,8 +84,35 @@ public:
 	void add_arg(int_t x) { _args.push_back(x); }
 	void set_arity(const ints& a) { p.ar = a; }
 	size_t nargs() const { return _args.size(); }
+	std::vector<term> subterms() const {
+		std::vector<std::pair<ints, std::array<size_t, 2>>> x =
+			p.subterms();
+		std::vector<term> r(x.size());
+		for (size_t n = 0; n != x.size(); ++n)
+			r[n] = term(false, { p.rel, x[n].first }),
+			r[n]._args = ints(p.ar.begin() + x[n].second[0],
+					p.ar.begin() + x[n].second[1]);
+		return r;
+	}
+
+	term root() const {
+		int_t from = 0, to, dep = 1;
+		while (_args[from] != -1) ++from;
+		to = from;
+		do {
+			if (_args[from] == -1) ++dep;
+			else if (_args[to] == -2) --dep;
+		} while (dep);
+		return	term(false, p.rel, ints(_args.begin() + from,
+			_args.end() + to), ints{to-from});
+	}
+
 	bool operator<(const term& t) const {
 		return _neg==t._neg ? p==t.p ? _args < t._args : p < t.p : _neg;
+	}
+
+	bool operator==(const term& t) const {
+		return _neg == t._neg && p == t.p && _args == t._args;
 	}
 };
 
