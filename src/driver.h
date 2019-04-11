@@ -49,7 +49,7 @@ class driver {
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
 	void get_trees(std::wostream& os, const term& root,
-		const std::set<term>& s, std::set<term>& done);
+		const std::map<term, std::vector<term>>&, std::set<term>& done);
 	void get_trees(const std::set<term>& roots,const diff_t& t,size_t bits);
 	void progs_read(wstr s);
 	lp* prog_run(raw_prog& p, lp* last, strs_t& strtrees);

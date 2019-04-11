@@ -88,9 +88,6 @@ public:
 	std::vector<term> subterms() const {
 		std::vector<std::pair<ints, std::array<size_t, 2>>> x =
 			p.subterms();
-//		for (auto y : x)
-//			y.first.insert(y.first.begin()+1,-1),
-//			y.first.insert(y.first.end(), -2);
 		std::vector<term> r(x.size());
 		for (size_t n = 0; n != x.size(); ++n)
 			r[n] = term(false, { p.rel, x[n].first }),
@@ -113,7 +110,8 @@ public:
 	}
 
 	bool operator<(const term& t) const {
-		return _neg==t._neg ? p==t.p ? _args < t._args : p < t.p : _neg;
+		return	_neg == t._neg ? _args == t._args ? p < t.p 
+			: _args < t._args : _neg;
 	}
 
 	bool operator==(const term& t) const {
