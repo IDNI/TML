@@ -72,6 +72,8 @@ public:
 	term(bool neg, int_t rel) : _neg(neg), p(rel, {}) {}
 	term(bool neg, int_t rel, const ints& args, const ints& arity)
 		: _neg(neg), _args(args), p(rel, arity) {}
+	term(bool neg, const ints& args, const prefix& p)
+		: _neg(neg), _args(args), p(p) {}
 	bool neg() const { return _neg; }
 	int_t rel() const { return p.rel; }
 	const ints& args() const { return _args; }

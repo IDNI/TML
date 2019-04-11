@@ -70,9 +70,9 @@ public:
 	std::wostream& printmat(std::wostream& os, const matrix& t) const;
 	std::wostream& printmats(std::wostream& os, const matrices& t) const;
 	std::wostream& printbdd(std::wostream& os, size_t t, size_t bits,
-		ints ar, int_t rel) const;
+		const prefix&) const;
 	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
-		ints ar, int_t rel) const;
+		const prefix&) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
 	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
 		const;

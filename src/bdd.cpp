@@ -175,6 +175,7 @@ size_t bdd_and_not(size_t x, size_t y) {
 
 size_t bdd_expand(size_t x, size_t args1, size_t args2, size_t bits) {
 	if (args1 == args2) return x;
+	DBG(assert(args1 < args2);)
 	sizes perm(args1 * bits);
 	size_t n;
 	for (n = 0; n != args1 * bits; ++n) perm[n] = n;

@@ -76,7 +76,7 @@ matrix driver::from_bits(size_t x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	const vbools s = allsat(x, bits * ar);
 	matrix r(s.size());
-	for (term& v : r) v = term(false, rel, ints(ar, 0), art);
+	for (term& v : r) v = term(false, ints(ar, 0), p);
 	size_t n = s.size(), i, b;
 	while (n--)
 		for (i = 0; i != ar; ++i)
@@ -90,7 +90,7 @@ term driver::one_from_bits(size_t x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	bools s(bits * ar, true);
 	if (!bdd_onesat(x, bits * ar, s)) return term();
-	term r(false, rel, ints(ar), art);
+	term r(false, ints(ar, 0), p);
 	for (size_t i = 0; i != ar; ++i)
 		for (size_t b = 0; b != bits; ++b)
 			if (s[POS(b, bits, i, ar)])
@@ -143,26 +143,26 @@ wostream& printdiff(wostream& os, const diff_t& d, size_t bits) {
 	return drv->printdiff(os, d, bits);
 }
 
-wostream& printbdd(wostream& os, size_t t, size_t bits, ints ar, int_t rel) {
+wostream& printbdd(wostream& os, size_t t, size_t bits, const prefix& p) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
-	return drv->printbdd(os, t, bits, ar, rel);
+	return drv->printbdd(os, t, bits, p);
 }
 
-wostream& printbdd_one(wostream& os, size_t t, size_t bits, ints ar, int_t rel){
-	return drv->printbdd_one(os, t, bits, ar, rel);
+wostream& printbdd_one(wostream& os, size_t t, size_t bits, const prefix& p) {
+	return drv->printbdd_one(os, t, bits, p);
 }
 
-wostream& driver::printbdd(wostream& os, size_t t, size_t bits, ints ar,
-	int_t rel) const {
-	from_bits(t,bits,ar,rel,[&os,this](const term&t){
+wostream& driver::printbdd(wostream& os, size_t t, size_t bits, const prefix&p)
+	const {
+	from_bits(t,bits,p,[&os,this](const term&t){
 			print_term(os, t)<<endl;});
 	return os;
 }
 
-wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits, ints ar,
-	int_t rel)const{
+wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits, 
+	const prefix& p) const {
 //	os << "one of " << bdd_count(t, bits * arlen(ar)) << " results: ";
-	return print_term(os, one_from_bits(t, bits, ar, rel));
+	return print_term(os, one_from_bits(t, bits, p));
 }
 #endif
 
