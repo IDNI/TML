@@ -39,6 +39,7 @@ set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
 }
 
 void lp::get_tree(const prefix& p, size_t root, diff_t& out, set<size_t>& done){
+	if (leaf(root) && !trueleaf(root)) return;
 	if (!done.emplace(root).second) return;
 	diff_t::iterator it;
 	for (const pair<ints, array<size_t, 2>>& x : p.subterms())

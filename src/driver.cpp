@@ -46,15 +46,11 @@ term driver::get_term(raw_term r, const strs_t& s) {
 			r.e[n+2].type == elem::SYM &&
 			r.e[n+3].type == elem::CLOSEP) {
 			auto it = s.find(dict.get_rel(r.e[n+2].e));
-			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
-			wcout << r << endl;
+			int_t len = it == s.end() ? 0 : it->second.size();
+//			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
+			r.e.insert(r.e.begin()+n, {elem::NUM, len, {0,0}}),
 			r.calc_arity();
-			wcout << r << endl;
-			r.e.insert(r.e.begin()+n,
-				{elem::NUM, (int_t)it->second.size(), {0,0}}),
-			r.calc_arity();
-			wcout << r << endl;
 		}
 	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
 	for (size_t n = 1; n < r.e.size(); ++n)

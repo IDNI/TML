@@ -83,7 +83,6 @@ void driver::from_bits(size_t x, size_t bits, const prefix& r,
 	})();
 }
 
-#ifdef DEBUG
 matrix driver::from_bits(size_t x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	const vbools s = allsat(x, bits * ar);
@@ -98,6 +97,7 @@ matrix driver::from_bits(size_t x, size_t bits, const prefix& p) const {
 	return r;
 }
 
+#ifdef DEBUG
 term driver::one_from_bits(size_t x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	bools s(bits * ar, true);
@@ -136,7 +136,6 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 	return os << L").";
 }
 
-#ifdef DEBUG
 wostream& driver::printmat(wostream& os, const matrix& t) const {
 	set<wstring> s;
 	for (auto v : t) {
@@ -148,6 +147,7 @@ wostream& driver::printmat(wostream& os, const matrix& t) const {
 	return os;
 }
 
+#ifdef DEBUG
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
 

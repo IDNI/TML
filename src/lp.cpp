@@ -188,11 +188,12 @@ bool operator==(const db_t& x, const diff_t& y) {
 bool lp::pfp() {
 	diff_t d, add, del, t;
 	set<size_t> pf;
-	DBG(size_t step = 0;)
+	size_t step = 0;
 //	wcout << V.size() << endl;
 	DBG(printdb(wcout<<"before prog: "<<endl, this)<<endl;)
 	for (set<diff_t, diffcmp> s;;) {
-		DBG(wcout << "step: " << step++ << endl;)
+		//DBG()
+		wcout << "step: " << step++ << endl;
 		s.emplace(d = copy(db)), fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction

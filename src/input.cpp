@@ -216,24 +216,13 @@ raw_progs::raw_progs(const std::wstring& s) {
 	} else do {
 		raw_prog x;
 		if (++pos, !x.parse(l, pos)) parse_error(err_parse, l[pos]);
-		if (p.push_back(x), *l[pos++][0] != L'}')
+		if (p.push_back(x), pos == l.size() || *l[pos++][0] != L'}')
 			parse_error(err_close_curly, l[pos]);
 	} while (pos < l.size());
 }
 
 bool operator==(const lexeme& x, const lexeme& y) {
 	return x[1]-x[0] == y[1]-y[0] && !wcsncmp(x[0],y[0],x[1]-x[0]);
-}
-
-bool operator==(const elem& x, const elem& y) {
-	return x.type == y.type && x.num == y.num && x.e == y.e;
-}
-
-bool operator<(const elem& x, const elem& y) {
-	if (x.type != y.type) return x.type < y.type;
-	if (x.num != y.num) return x.num < y.num;
-	static lexcmp c;
-	return c(x.e, y.e);
 }
 
 bool operator<(const raw_term& x, const raw_term& y) {

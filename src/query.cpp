@@ -49,18 +49,24 @@ bools get_ex(const term& t, size_t bits) {
 	return ex;
 }
 
-query::query(size_t bits, const term& t, const sizes& perm, bool neg) 
-	: ex(get_ex(t, bits)), neg(neg), perm(perm), ae(bits, t, neg) {}
+query::query(size_t bits, const term& t, const sizes& perm, bool neg) :
+	ex(get_ex(t, bits)), neg(neg), perm(perm), ae(bits, t, neg) {
+/*		auto it = memos.find(k);
+		if (it != memos.end()) m = it->second;
+		m = memos[k] = new unordered_map<size_t, size_t>;*/
+	}
 
 #define flip(n) nleaf(n) ? (n) : \
 	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
 size_t query::operator()(size_t x) {
 //	DBG(out(wcout<<L"called with ", getnode(x)) << endl;)
-	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
-	auto it = m.find(x);
-	if (it != m.end()) return it->second;
-	return ++memos, m[x] = bdd_permute(bdd_ex(ae(x), ex), perm);
+	return bdd_permute(bdd_ex(ae(x),ex), perm);
+/*	x = ae(x);
+	auto it = m->find(x);
+	if (it != m->end()) return it->second;
+	return ++::memos, m->emplace(
+		x, bdd_permute(bdd_ex(ae(x),k.ex), k.perm)).first->second;*/
 	//return m[x] = domain.size() ? compute(x, 0):
 	//	bdd_permute(neg ? bdd_and_not(T, x) : x, perm);
 }
@@ -90,29 +96,33 @@ size_t query::operator()(size_t x) {
 	return sort(r);
 }*/
 
-bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg)
-	: bits(bits), nvars(t.nargs()*bits), e(from_term(t)), neg(neg)
-	{DBG(_t=t;) }
+bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg) :
+	k(bits, t.nargs()*bits, from_term(t), neg) {
+		DBG(_t=t;)
+		auto it = memos.find(k);
+		if (it != memos.end()) m = it->second;
+		m = memos[k] = new unordered_map<size_t, size_t>;
+	}
 
 size_t bdd_and_eq::operator()(const size_t x) {
-	unordered_map<size_t, size_t> &m = neg ? negmemo : memo;
-	auto it = m.find(x);
-	if (it != m.end()) return it->second;
+	auto it = m->find(x);
+	if (it != m->end()) return it->second;
 	vector<size_t> v = {x};
-	for (size_t n = 0; n != e.size(); ++n)
-		if (e[n] > 0) 
-			v.push_back(from_int(e[n]-1, bits, n, e.size()));
-	for (size_t n = 0; n != e.size(); ++n)
-		if (e[n] < 0)
-			for (size_t k = 0; k != bits; ++k)
-				v.push_back(from_eq(POS(k, bits, n, e.size()),
-					POS(k, bits, -e[n]-1, e.size())));
-	if (neg) {
-		if (v.size() == 1) return m[x] = bdd_and_not(T, v[0]);
+	for (size_t n = 0; n != k.e.size(); ++n)
+		if (k.e[n] > 0) 
+			v.push_back(from_int(k.e[n]-1, k.bits, n, k.e.size()));
+	for (size_t n = 0; n != k.e.size(); ++n)
+		if (k.e[n] < 0)
+			for (size_t i = 0; i != k.bits; ++i)
+				v.push_back(from_eq(POS(i, k.bits,n,k.e.size()),
+					POS(i, k.bits, -k.e[n]-1, k.e.size())));
+	if (k.neg) {
+		if (v.size() == 1)
+			return m->emplace(x,bdd_and_not(T, v[0])).first->second;
 		v.push_back(bdd_and_not(v[1], v[0])),
 		v.erase(v.begin(), v.begin()+1);
 	}
-	return ++memos, m[x] = bdd_and_many(move(v));
+	return ++::memos, m->emplace(x, bdd_and_many(move(v))).first->second;
 }
 
 /*builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
@@ -152,3 +162,5 @@ size_t range::operator()(size_t arg, size_t args) {
 	return ++memos, memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }
 unordered_map<array<int_t, 5>, size_t, array_hash<int_t, 5>> range::memo;
+map<bdd_and_eq::key, unordered_map<size_t, size_t>*> bdd_and_eq::memos;
+//map<query::key, unordered_map<size_t, size_t>*> query::memos;

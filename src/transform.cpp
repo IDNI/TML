@@ -131,9 +131,41 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 #define cat_relsym_openp(x, r) append_sym_elem((x).e, r), append_openp((x).e)
 #define term_close(x) append_closep((x).e), (x).calc_arity()
 
+void elim_nullables(set<production>& s) {
+	set<elem> nullables;
+loop1:	size_t sz = nullables.size();
+	for (const production& p : s) {
+		bool null = true;
+		if (p.p.size() != 2 || !(p.p[1].e == L"null"))
+			for (size_t n = 1; null && n != p.p.size(); ++n)
+				null &= has(nullables, p.p[n]);
+		if (null) nullables.insert(p.p[0]);
+	}
+	if (sz != nullables.size()) goto loop1;
+	set<production> t;
+	for (auto p : s)
+		if (p.p.size() == 2 && p.p[1].e == L"null")
+			t.insert(p);
+	for (auto x : t) s.erase(x);
+	t.clear();
+loop2:	sz = s.size();
+	for (auto p : s)
+		for (size_t n = 1; n != p.p.size(); ++n)
+			if (has(nullables, p.p[n])) {
+				production q = p;
+				q.p.erase(q.p.begin() + n),
+				t.insert(q);
+//					r.g.push_back(q);
+			}
+	for (auto x : t) s.insert(x);
+	t.clear();
+	if (sz != s.size()) goto loop2;
+}
+
 void driver::transform_grammar(raw_prog& r) {
 	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
 	for (size_t k = 0; k != r.g.size();) {
+		if (r.g[k].p.size()<2)parse_error(err_empty_prod,r.g[k].p[0].e);
 		size_t n = 0;
 		while (n<r.g[k].p.size() && r.g[k].p[n].type != elem::ALT) ++n;
 		if (n == r.g[k].p.size()) { ++k; continue; }
@@ -154,19 +186,35 @@ void driver::transform_grammar(raw_prog& r) {
 						get_char_lexeme(*s)});
 			}
 	}
+	set<production> s;
+	for (auto x : r.g) s.insert(x);
+	elim_nullables(s), r.g.clear(), r.g.reserve(s.size());
+	for (auto x : s) r.g.push_back(x);
+	s.clear();
+	raw_rule l;
+/*	raw_term m;
+	m = from_grammar_elem({elem::SYM,0,dict.get_lexeme(L"null")},1,1);
+	l.add_head(m);
+	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
+				{elem::VAR,0,get_var_lexeme(2)},1,3));
+	r.r.push_back(l), l.clear(), l.add_head(m);
+	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
+				{elem::VAR,0,get_var_lexeme(2)},3,1));
+	r.r.push_back(l);*/
 	for (const production& p : r.g) {
-		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
-		raw_rule l;
+		if (p.p.size() < 2) continue;
+		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
-			raw_term t = from_grammar_elem(p.p[0], 1, 1);
+/*			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = {elem::VAR,0,get_var_lexeme(2)};
 			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));
+			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));*/
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
+//			wcout << p << endl;
 			size_t v = p.p.size();
 			l.add_head(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n)

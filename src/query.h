@@ -14,15 +14,27 @@
 #define __QUERY_H__
 #include <algorithm>
 #include <numeric>
+#include <map>
 #include "bdd.h"
 #include "term.h"
 
 class bdd_and_eq {
-	const size_t bits, nvars;
-	const ints e;
-	const bool neg;
 	DBG(term _t;)
-	std::unordered_map<size_t, size_t> memo, negmemo;
+	struct key {
+		const size_t bits, nvars;
+		const ints e;
+		const bool neg;
+		bool operator<(const key& k) const {
+			if (nvars != k.nvars) return nvars < k.nvars;
+			if (e.size() != k.e.size()) return e.size()<k.e.size();
+			if (neg != k.neg) return neg;
+			return e != k.e ? e < k.e : false;
+		}
+		key(size_t bits, size_t nvars, const ints& e, bool neg) :
+			bits(bits), nvars(nvars), e(e), neg(neg) {}
+	} k;
+	static std::map<key, std::unordered_map<size_t, size_t>*> memos;
+	std::unordered_map<size_t, size_t>* m;
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
 	size_t operator()(const size_t x);
@@ -31,10 +43,21 @@ public:
 class query {
 	const bools ex;
 	const bool neg;
-	sizes perm;
+	const sizes perm;
+/*	struct key {
+		bool operator<(const key& k) const {
+			if (neg != k.neg) return neg;
+			if (ex.size()!=k.ex.size())return ex.size()<k.ex.size();
+			if (ex != k.ex) return ex < k.ex;
+			return perm != k.perm ? perm < k.perm : false;
+		}
+		key(const bools& ex, bool neg, const sizes& perm) :
+			ex(ex), neg(neg), perm(perm) {}
+	} k;*/
 	bdd_and_eq ae;
 //	sizes getdom() const;
-	std::unordered_map<size_t, size_t> memo, negmemo;
+//	static std::map<key, std::unordered_map<size_t, size_t>*> memos;
+//	std::unordered_map<size_t, size_t>* m;
 //	size_t compute(size_t x, size_t v);
 public:
 	query(size_t bits, const term& t, const sizes& perm, bool neg);

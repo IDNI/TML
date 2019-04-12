@@ -118,23 +118,37 @@ size_t bdd_or(size_t x, size_t y) {
 	apply_ret(bdd_add({{v, bdd_or(a, b), bdd_or(c, d)}}), memo_or);
 }
 
-size_t bdd_ex(size_t x, const bools& b) {
+size_t bdd_ex(size_t x, const bools& b, unordered_map<size_t, size_t>* memo) {
 	if (leaf(x)) return x;
+	auto it = memo->find(x);
+	if (it != memo->end()) return it->second;
 	node n = getnode(x);
 #ifdef MEMO
 /*	exmemo t = {b, x};
 	auto it = memo_ex.find(t);
 	if (it != memo_ex.end()) return it->second;
 	size_t res;*/
-#endif	
+#endif
+	size_t r;
 	while (n[0]-1 < b.size() && b[n[0]-1]) {
-		x = bdd_or(n[1], n[2]);
-		if (leaf(x)) return x; //apply_ret(x, memo_ex);
-		n = getnode(x);
+		r = bdd_or(n[1], n[2]);
+		if (leaf(r)) return memo->emplace(x, r), r;
+		n = getnode(x = r);
 	}
 	if (n[0]-1 >= b.size()) return x;
-	return bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}});
+	++memos;
+	return memo->emplace(x, bdd_add({{n[0], bdd_ex(n[1], b, memo),
+				bdd_ex(n[2], b, memo)}})).first->second;
 //	apply_ret(bdd_add({{n[0], bdd_ex(n[1], b), bdd_ex(n[2], b)}}), memo_ex);
+}
+
+size_t bdd_ex(size_t x, const bools& b) {
+	if (leaf(x)) return x;
+	static map<bools, unordered_map<size_t, size_t>*> memos;
+	auto it = memos.find(b);
+	if (it == memos.end())
+		it = memos.emplace(b, new unordered_map<size_t, size_t>).first;
+	return bdd_ex(x, b, it->second);
 }
 
 size_t bdd_and(size_t x, size_t y) {
@@ -318,8 +332,10 @@ size_t bdd_ite(size_t v, size_t t, size_t e) {
 	return bdd_or(bdd_and(from_bit(v,true),t),bdd_and(from_bit(v,false),e));
 }
 
-size_t bdd_permute(size_t x, const sizes& m) { //overlapping rename
+size_t bdd_permute(size_t x, const sizes& m, unordered_map<size_t,size_t>*memo){
 	if (leaf(x)) return x;
+	auto it = memo->find(x);
+	if (it != memo->end()) return it->second;
 #ifdef MEMO
 /*	permemo t = {m, x};
 	auto it = memo_permute.find(t);
@@ -327,9 +343,23 @@ size_t bdd_permute(size_t x, const sizes& m) { //overlapping rename
 	size_t res;*/
 #endif	
 	const node n = getnode(x);
-	return bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m));
+	size_t h = bdd_permute(n[1], m, memo);
+	size_t l = bdd_permute(n[2], m, memo);
+	size_t r = bdd_ite(m[n[0]-1], h, l);
+	memo->emplace(x, r);
+	++memos;
+	return r;
 //	apply_ret(bdd_ite(m[n[0]-1], bdd_permute(n[1], m), bdd_permute(n[2],m)),
 //		memo_permute);
+}
+
+size_t bdd_permute(size_t x, const sizes& m) {
+	if (leaf(x)) return x;
+	static map<sizes, unordered_map<size_t, size_t>*> memos;
+	auto it = memos.find(m);
+	if (it == memos.end())
+		it = memos.emplace(m, new unordered_map<size_t, size_t>).first;
+	return bdd_permute(x, m, it->second);
 }
 
 size_t count(size_t x, size_t nvars) {

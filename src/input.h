@@ -16,11 +16,24 @@
 #include <iostream>
 #include <sys/stat.h>
 
+bool operator==(const lexeme& x, const lexeme& y);
+
 struct elem {
 	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR } type;
 	int_t num = 0;
 	lexeme e;
 	bool parse(const lexemes& l, size_t& pos);
+	bool operator<(const elem& t) const {
+		if (type != t.type) return type < t.type;
+		if (type == NUM) return num < t.num;
+		if (e[1]-e[0] != t.e[1]-t.e[0]) return e[1]-e[0]<t.e[1]-t.e[0];
+		return wcsncmp(e[0], t.e[0], e[1]-e[0]) < 0;
+	}
+	bool operator==(const elem& t) const {
+		if (type != t.type) return false;
+		if (type == NUM) return num == t.num;
+		return e == t.e;
+	}
 };
 
 struct raw_term {
@@ -46,6 +59,7 @@ struct production {
 //	raw_term t;
 	std::vector<elem> p;
 	bool parse(const lexemes& l, size_t& pos);
+	bool operator<(const production& t) const { return p < t.p; }
 };
 
 class raw_rule {
@@ -95,6 +109,7 @@ std::wostream& operator<<(std::wostream& os, const raw_term& t);
 std::wostream& operator<<(std::wostream& os, const raw_rule& r);
 std::wostream& operator<<(std::wostream& os, const raw_prog& p);
 std::wostream& operator<<(std::wostream& os, const lexeme& l);
+std::wostream& operator<<(std::wostream& os, const production& p);
 lexeme lex(pcws s);
 lexemes prog_lex(cws s);
 std::wstring file_read(std::wstring fname);
@@ -104,6 +119,4 @@ off_t fsize(cws s, size_t len);
 bool operator==(const lexeme& l, cws s);
 bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
-bool operator<(const elem& x, const elem& y);
-bool operator==(const elem& x, const elem& y);
 void parser_test();
