@@ -38,10 +38,10 @@ class driver {
 	void directives_load(raw_prog& p, prog_data& pd, lexeme& trel);
 	void add_rules(raw_prog& p, prog_data& pd);
 	void transform(raw_prog& p, prog_data& pd, const strs_t& strtrees);
-	raw_prog transform_bwd(const raw_prog& p,const std::vector<raw_term>&g);
+	void transform_bwd(raw_prog& p,const std::vector<raw_term>& g);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
-	void transform_grammar(raw_prog& r);
+	void transform_grammar(raw_prog& r, size_t len);
 //	void transform(raw_prog& p, prog_data& pd);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
@@ -94,3 +94,4 @@ std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits, ints ar,
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
+std::wstring _unquote(std::wstring str);

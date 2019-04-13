@@ -364,9 +364,9 @@ symbol:
 
 which also defines the start symbol.
 
-The grammar supports fow now the builtins `alpha`, `alnum`, `digit`, and
-`space`. For example a sequence of one or more whitespaces can be defined by
-the productions
+The grammar supports fow now the builtins `alpha`, `alnum`, `digit`, `printable`
+, and `space`. For example a sequence of one or more whitespaces can be defined
+by the productions
 
     ws => space ws1.
     ws1 => space ws1.

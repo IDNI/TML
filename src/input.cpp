@@ -28,7 +28,7 @@ lexeme lex(pcws s) {
 			if (!**s) parse_error(unmatched_quotes, *s);
 			else if (**s == L'\\' && !wcschr(L"\\\"", *++*s))
 				parse_error(err_escape, *s);
-		return { t, ++(*s) };
+		return { t, (*s)++ };
 	}
 	if (**s == L'<') {
 		while (*++*s != L'>') if (!**s) parse_error(err_fname, *s);

@@ -125,7 +125,7 @@ void lp::fwd(diff_t &add, diff_t &del) {
 			t = bdd_or(x[n], t);
 		}
 	}
-	//DBG(printdiff(wcout<<"add:"<<endl,add););
+	DBG(printdiff(wcout<<"add:"<<endl,add,rng.bits););
 	//DBG(printdiff(wcout<<"del:"<<endl,del););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
@@ -190,7 +190,7 @@ bool lp::pfp() {
 	set<size_t> pf;
 	size_t step = 0;
 //	wcout << V.size() << endl;
-	DBG(printdb(wcout<<"before prog: "<<endl, this)<<endl;)
+//	DBG(printdb(wcout<<"before prog: "<<endl, this)<<endl;)
 	for (set<diff_t, diffcmp> s;;) {
 		//DBG()
 		wcout << "step: " << step++ << endl;
@@ -203,10 +203,10 @@ bool lp::pfp() {
 		if (has(s, copy(db))) return false;
 		if (memos > 1e+4) memos_clear();
 	}
-	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
+//	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();
-	DBG(static int nprog = 0;)
-	DBG(printdb(wcout<<"after prog: "<<nprog++<<endl, this)<<endl;)
+//	DBG(static int nprog = 0;)
+//	DBG(printdb(wcout<<"after prog: "<<nprog++<<endl, this)<<endl;)
 	auto it = db.end();
 	for (auto x : gbdd)
 		if ((it = db.find(x.first)) != db.end()) {

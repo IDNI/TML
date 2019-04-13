@@ -36,6 +36,13 @@ bool operator==(const lexeme& l, const wstring& s) {
 	return !wcsncmp(l[0], s.c_str(), l[1]-l[0]);
 }
 
+void unquote(wstring& str) {
+	for (size_t i = 0; i != str.size(); ++i)
+		if (str[i] == L'\\') str.erase(str.begin() + i);
+}
+
+wstring _unquote(wstring str) { unquote(str); return str; }
+
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)
 
@@ -60,6 +67,9 @@ term driver::get_term(raw_term r, const strs_t& s) {
 			t.add_arg(mkchr(*r.e[n].e[0]));
 		else if (r.e[n].type == elem::VAR)
 			t.add_arg(dict.get_var(r.e[n].e));
+		else if (r.e[n].type == elem::STR)
+			t.add_arg(dict.get_sym(dict.get_lexeme(
+				_unquote(lexeme2str(r.e[n].e)))));
 		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
 			t.add_arg(dict.get_sym(r.e[n].e));
 	return t;
@@ -120,13 +130,8 @@ void driver::get_dict_stats(const raw_prog& p) {
 
 wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
 
-void unquote(wstring& str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == L'\\') str.erase(str.begin() + i);
-}
-
 wstring driver::directive_load(const directive& d) {
-	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
+	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
 	switch (d.type) {
 		case directive::FNAME: return file_read(str);
 		case directive::STDIN: return move(std_input);
@@ -176,8 +181,10 @@ void driver::transform(raw_prog& p, prog_data& pd, const strs_t& strtrees) {
 	directives_load(p, pd, trel);
 	for (auto x : pd.strs) transform_string(x.second, p, x.first);
 	for (auto x : strtrees) transform_string(x.second, p, x.first);
-	if (!p.g.empty() && pd.strs.size() != 1) er(err_one_input);
-	else transform_grammar(p);
+	if (!p.g.empty()) {
+		if (pd.strs.size() != 1) er(err_one_input);
+		else transform_grammar(p, pd.strs.begin()->second.size());
+	}
 	if (trel[0]) transform_proofs(p, trel);
 }
 
@@ -193,6 +200,10 @@ lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
 	for (auto x : prog->strtrees_out)
 		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 					x.second, prog->rng.bits));
+	int_t tr = dict.get_rel(L"try");
+	set<prefix> sp;
+	for (auto x : prog->db) if (x.first.rel == tr) sp.insert(x.first);
+	for (auto x : sp) prog->db.erase(x);
 	return prog;
 }
 

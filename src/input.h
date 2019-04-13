@@ -120,3 +120,4 @@ bool operator==(const lexeme& l, cws s);
 bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
+#define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])

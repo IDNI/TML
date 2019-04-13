@@ -118,10 +118,12 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 		if (iswalnum(s[n]))
 			r.r.push_back(from_string_lex(
 					dict.get_rel(rel), L"alnum", n));
+		if (iswprint(s[n]))
+			r.r.push_back(from_string_lex(
+					dict.get_rel(rel), L"printable", n));
 	}
 }
 
-#define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
 #define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, s})
 #define append_openp(x) (x).push_back({elem::OPENP, 0, dict.get_lexeme(L"(")})
 #define append_closep(x) (x).push_back({elem::CLOSEP, 0, dict.get_lexeme(L")")})
@@ -162,8 +164,13 @@ loop2:	sz = s.size();
 	if (sz != s.size()) goto loop2;
 }
 
-void driver::transform_grammar(raw_prog& r) {
-	static const set<wstring> b = { L"alpha", L"alnum", L"digit", L"space"};
+//#define BWD_GRAMMAR
+//#define ELIM_NULLS
+
+void driver::transform_grammar(raw_prog& r, size_t len) {
+	if (r.g.empty()) return;
+	static const set<wstring> b =
+		{ L"alpha", L"alnum", L"digit", L"space", L"printable"};
 	for (size_t k = 0; k != r.g.size();) {
 		if (r.g[k].p.size()<2)parse_error(err_empty_prod,r.g[k].p[0].e);
 		size_t n = 0;
@@ -181,19 +188,24 @@ void driver::transform_grammar(raw_prog& r) {
 			if (p.p[n].type == elem::STR) {
 				lexeme l = p.p[n].e;
 				p.p.erase(p.p.begin() + n);
-				for (cws s = l[0]+1; s != l[1]-1; ++s)
-					p.p.insert(p.p.begin()+n++,{elem::CHR,0,
-						get_char_lexeme(*s)});
+				bool esc = false;
+				for (cws s = l[0]+1; s != l[1]; ++s)
+					if (*s == L'\\' && !esc) esc=true;
+					else p.p.insert(p.p.begin()+n++,
+						{elem::CHR,0,
+						get_char_lexeme(*s)}),esc=false;
 			}
 	}
+#ifdef ELIM_NULLS
 	set<production> s;
 	for (auto x : r.g) s.insert(x);
 	elim_nullables(s), r.g.clear(), r.g.reserve(s.size());
 	for (auto x : s) r.g.push_back(x);
 	s.clear();
+#endif
 	raw_rule l;
 /*	raw_term m;
-	m = from_grammar_elem({elem::SYM,0,dict.get_lexeme(L"null")},1,1);
+	m = fro_grammar_elem({elem::SYM,0,dict.get_lexeme(L"null")},1,1);
 	l.add_head(m);
 	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
 				{elem::VAR,0,get_var_lexeme(2)},1,3));
@@ -201,40 +213,46 @@ void driver::transform_grammar(raw_prog& r) {
 	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
 				{elem::VAR,0,get_var_lexeme(2)},3,1));
 	r.r.push_back(l);*/
-	for (const production& p : r.g) {
+	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
-/*			raw_term t = from_grammar_elem(p.p[0], 1, 1);
+#ifndef ELIM_NULLS			
+			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = {elem::VAR,0,get_var_lexeme(2)};
 			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));*/
+			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));
+#endif			
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
 //			wcout << p << endl;
 			size_t v = p.p.size();
 			l.add_head(from_grammar_elem(p.p[0], 1, p.p.size()));
-			for (size_t n = 1; n < p.p.size(); ++n)
-				if (has(b, lexeme2str(p.p[n].e)))
+			for (size_t n = 1; n < p.p.size(); ++n) {
+				wstring str = lexeme2str(p.p[n].e);
+				if (has(b, str))
 					l.add_body(from_grammar_elem_builtin(
-						r.d[0].rel.e,
-						lexeme2str(p.p[n].e),n)), ++v;
+						r.d[0].rel.e, str,n)), ++v;
 				else if (p.p[n].type == elem::CHR)
 					l.add_body(from_grammar_elem_nt(
 						r.d[0].rel.e, p.p[n], n, n+1));
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
+			}
 		}
 		r.r.push_back(l);
 	}
-//	raw_term t;
-//	append_sym_elem(t.e, L"S"), append_openp(t.e),
-//	t.e.push_back({elem::NUM, 0, get_num_lexeme(0)}),
-//	t.e.push_back({elem::VAR, 0, get_var_lexeme(1)}),
-//	append_closep(t.e), r = transform_bwd(r, {t});
+	raw_term t;
+	append_sym_elem(t.e, dict.get_lexeme(L"S")), append_openp(t.e),
+	t.e.push_back({elem::NUM, 0, 0}),
+	t.e.push_back({elem::NUM, (int_t)len, 0}),
+	append_closep(t.e), t.calc_arity();
+#ifdef BWD_GRAMMAR
+	transform_bwd(r, {t});
+#endif	
 //	r.delrel = dict_get_rel(L"try");
 //	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
@@ -271,25 +289,28 @@ nexthead:	const raw_term &head = x.head(n);
 #define surround_term(x, y, z) \
 	append_sym_elem(x.e, y), cat_in_brackets(x, z), x.calc_arity()
 
-raw_prog driver::transform_bwd(const raw_prog& p,const std::vector<raw_term>&g){
-	raw_prog r;
+void driver::transform_bwd(raw_prog& p,const std::vector<raw_term>&g){
+	lexeme tr = dict.get_lexeme(L"try");
+	set<raw_rule> s;
 	for (const raw_term& t : g) { // try(goal)
 		raw_term x;
-		surround_term(x, L"try", t), r.r.push_back(raw_rule(x));
+		surround_term(x, tr, t), s.insert(raw_rule(x));
 	}
 	for (const raw_rule& x : p.r) {
-		for (const raw_term& h : x.heads()) { // h :- ..., try(h)
-			raw_rule y(h);
-			for (const raw_term& b : x.bodies()) y.add_body(b);
+		if (!x.nbodies()) s.insert(x);
+		else for (const raw_term& h : x.heads()) { // h :- ..., try(h)
 			raw_term t;
-			surround_term(t, L"try", h), y.add_body(t),
-			r.r.push_back(y), y.clear(), y.add_body(t);
+			surround_term(t, tr, h);
+			raw_rule y(h, t);
+			for (const raw_term& b : x.bodies()) y.add_body(b);
+			s.insert(y), y.clear(), y.add_body(t);
 			for (const raw_term& b : x.bodies()) { // try(b):-try(h)
 				raw_term w;
-				surround_term(w, L"try", b), y.add_head(w);
+				surround_term(w, tr, b), y.add_head(w);
 			}
-			r.r.push_back(y);
+			s.insert(y);
 		}
 	}
-	return r;
+	p.r.clear();
+	for (auto x : s) p.r.push_back(x);
 }

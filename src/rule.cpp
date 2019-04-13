@@ -43,7 +43,7 @@ size_t fact(const term& v, range& rng) {
 		sizes domain;
 		for (auto x : m) domain.push_back(x.second);
 		r = bdd_and(r, rng(domain, v.nargs()));
-		DBG(bdd_out(wcout, r)<<endl;)
+//		DBG(bdd_out(wcout, r)<<endl;)
 	}
 //	DBG(printbdd(wcout<<"ret:"<<endl, r, rng.bits, v.arity(), v.rel())<<endl;)
 //	DBG(bdd_out(wcout, r)<<endl;)
