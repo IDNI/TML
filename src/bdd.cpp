@@ -326,6 +326,98 @@ size_t bdd_and_many(sizes v) {
 	return it->second = bdd_add({{m, h, l}});
 }
 
+size_t bdd_or_many_iter(sizes v, sizes& h, sizes& l, size_t &res, size_t &m) {
+	size_t i, t;
+	bool b, eq, flag;
+	sizes x;
+	if (v.empty()) return res = F, 1;
+	for (size_t n = 0; n < v.size();)
+		if (!leaf(v[n])) ++n;
+		else if (trueleaf(v[n])) return res = T, 1;
+		else if (v.erase(v.begin()+n), v.size()==1) return res=v[0], 1;
+		else if (v.size() == 2) return res=bdd_or(v[0],v[1]),1;
+		else if (v.empty()) return res = F, 1;
+		else ++n;
+	m = getnode(v[0])[0], t = v[0];
+	b = false, eq = true, flag = false;
+	for (i = 1; i != v.size(); ++i)
+		if (!leaf(v[i])) {
+			node n = getnode(v[i]);
+			b |= n[0] != m, eq &= t == v[i];
+			if (n[0] < m) m = n[0];
+		} else if (trueleaf(v[i])) return res = T, 1;
+	if (eq) return res = t, 1;
+	for (i = 0; i != v.size(); ++i)
+		if (b && getnode(v[i])[0] != m) h.push_back(v[i]);
+		else if (!leaf(getnode(v[i])[1])) h.push_back(getnode(v[i])[1]);
+		else if (trueleaf(getnode(v[i])[1])) { flag = true; break; }
+	for (i = 0; i != v.size(); ++i)
+		if (b && getnode(v[i])[0] != m) l.push_back(v[i]);
+		else if (!leaf(getnode(v[i])[2])) l.push_back(getnode(v[i])[2]);
+		else if (trueleaf(getnode(v[i])[2])) return flag ? res=T,1 : 2;
+	sort(h.begin(), h.end()), sort(l.begin(), l.end());
+	if (!flag) { 
+		for (size_t n = 1; n < h.size();)
+			if (h[n] == h[n-1]) {
+				h.erase(h.begin() + n);
+//				if (h.empty()) { flag = true; break; }
+				if (h.size() == 1) break;
+			} else ++n;
+	}
+	for (size_t n = 1; n < l.size();)
+		if (l[n] == l[n-1]) {
+			l.erase(l.begin() + n);
+//			if (l.empty()) return flag ? 3 : 0;
+			if (l.size() == 1) break;
+		} else ++n;
+	if (flag) return 3;
+	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
+	if (x.size() > 1) {
+		for (size_t n = 0; n < h.size();)
+			if (hasb(x, h[n])) h.erase(h.begin() + n);
+			else ++n;
+		for (size_t n = 0; n < l.size();)
+			if (hasb(x, l[n])) l.erase(l.begin() + n);
+			else ++n;
+		size_t r = bdd_or_many(move(x));
+		if (r == T) return res = T, 1;
+		h.push_back(r), l.push_back(r);
+	}
+	return 0;
+}
+
+size_t bdd_or_many(sizes v) {
+	static map<sizes, size_t> memo;
+#ifdef MEMO	
+	auto jt = memo_or.end();
+	for (size_t n = 0; n < v.size(); ++n)
+		for (size_t k = 0; k < n; ++k) {
+			if ((jt=memo_or.find({v[n], v[k]})) == memo_or.end())
+				jt=memo_or.find({v[k], v[n]});
+			if (jt != memo_or.end()) {
+				v.erase(v.begin() + k), v.erase(v.begin()+n-1),
+				v.push_back(jt->second), n = k = 0; break;
+			}
+		}
+#endif	
+	auto it = memo.find(v);
+	if (it != memo.end()) return it->second;
+	it = memo.emplace(v, 0).first;
+	++memos;
+	size_t res = F, m = 0, h, l;
+	sizes vh, vl;
+	switch (bdd_or_many_iter(move(v), vh, vl, res, m)) {
+		case 0: l = bdd_or_many(move(vl)),
+			h = bdd_or_many(move(vh));
+			break;
+		case 1: return it->second = res;
+		case 2: h = bdd_or_many(move(vh)), l = T; break;
+		case 3: h = T, l = bdd_or_many(move(vl)); break;
+		default: throw 0;
+	}
+	return it->second = bdd_add({{m, h, l}});
+}
+
 size_t bdd_ite(size_t v, size_t t, size_t e) {
 	const node x = getnode(t), y = getnode(e);
 	if ((nleaf(x)||v<x[0])&&(nleaf(y)||v<y[0])) return bdd_add({{v+1,t,e}});

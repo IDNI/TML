@@ -137,57 +137,8 @@ wostream& operator<<(wostream& os, const tt& t) {
 }
 
 void test_and_many() {
-/*
-000
-001
-011
-100
-101
-111
-
-001
-011
-100
-101
-110
-111
-
-010
-011
-100
-101 */
-	size_t v1[] = {
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 0))),
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 1))),
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 1)))};
-/*	size_t v2[] = {
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 0), from_bit(2, 1))),
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 0))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 1), from_bit(2, 1)))};*/
-	size_t v3[] = {
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 0))),
-		bdd_and(from_bit(0, 0), bdd_and(from_bit(1, 1), from_bit(2, 1))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 0))),
-		bdd_and(from_bit(0, 1), bdd_and(from_bit(1, 0), from_bit(2, 1)))};
-	size_t x = F, z = F;
-	for (size_t n = 0; n != 6; ++n) x=bdd_or(x, v1[n]);//, y=bdd_or(y, v2[n]);
-	for (size_t n = 0; n != 4; ++n) z=bdd_or(z, v3[n]);
-	bdd_out(wcout<<"x: ", x)<<endl;
-	bdd_out(wcout<<"z: ", z)<<endl;
-	//assert(bdd_and(bdd_and(x, y), z) != bdd_and_many({x,y,z}));
-	size_t a1 = bdd_and(x, z);
-	bdd_out(wcout<<"x&z: ", a1)<<endl;
-	size_t a2 = bdd_and_many({x,x,z});
-	bdd_out(wcout<<"and many x&z: ", a2)<<endl;
-	assert(a1 == a2);
 	size_t bits = 3, tts = 3;
-	for (size_t k = 0; k < 15000; ++k) {
+	for (size_t k = 0; k < 1500; ++k) {
 		wcout<<k<<endl;
 		tt *t = new tt[tts];
 		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
@@ -210,6 +161,31 @@ void test_and_many() {
 	}
 }
 
+void test_or_many() {
+	size_t bits = 3, tts = 3;
+	for (size_t k = 0; k < 1500; ++k) {
+		wcout<<k<<endl;
+		tt *t = new tt[tts];
+		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
+		size_t r = F;
+		for (size_t i = 0; i < tts; ++i) r = bdd_or(r, t[i].bdd());
+		tt rr = t[0];
+		for (size_t i = 1; i < tts; ++i) rr = rr | t[i];
+		vector<size_t> v;
+		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
+		if (r != bdd_or_many(v)) {
+			wcout<<endl;
+			for (size_t i = 0; i < tts; ++i) wcout<<t[i]<<endl;
+			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_or_many(v),bits)
+				<<endl<<endl<<allsat(r,bits)<<endl;
+			assert(r == bdd_or_many(v));
+		}
+		assert(r == rr.bdd());
+		if (r != T) wcout << "tau" << endl;
+		delete[] t;
+	}
+}
+
 int main() {
 	size_t bits = 10, args = 17;
 	for (size_t n = 0; n != bits; ++n)
@@ -217,9 +193,10 @@ int main() {
 			assert(ARG(POS(n, bits, k, args), args) == k),
 			assert(BIT(POS(n, bits, k, args), args, bits) == n);
 	bdd_init();
-	test_query();
+//	test_query();
 	srand(time(0));
 	test_and_many();
+	test_or_many();
 //	exit(0);
 	tt xt(3);
 	xt.addrow({false, true, true});

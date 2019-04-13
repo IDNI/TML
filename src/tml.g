@@ -44,7 +44,8 @@ sym => chars.
 relname => sym.
 chars => alpha chars1 | '_' chars1.
 chars1=> alnum chars1 | '_' chars1 | null.
-ws => space ws | null.
+ws => space ws | '#' printable_chars eol | null.
+eol => '\r' | '\n' | ''.
 form => ws prefix ws var ws '(' ws form ws ')' ws |
 	ws '(' ws form ws ')' ws "and" ws '(' ws form ws ')' ws |
 	ws '(' ws form ws ')' ws "or" ws '(' ws form ws ')' ws |

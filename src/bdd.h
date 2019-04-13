@@ -33,6 +33,7 @@ size_t bdd_ex(size_t x, const bools&);
 size_t bdd_and(size_t x, size_t y);
 #define bdd_impl(x, y) bdd_or(y, bdd_and_not(T, x))
 size_t bdd_and_many(sizes v);
+size_t bdd_or_many(sizes v);
 size_t bdd_expand(size_t x, size_t args1, size_t args2, size_t bits);
 size_t bdd_subterm(size_t x, size_t from, size_t to, size_t args1, size_t args2,
 	size_t bits);
