@@ -117,14 +117,23 @@ lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 
 void lp::fwd(diff_t &add, diff_t &del) {
 	//DBG(printdb(wcout, this));
+	map<prefix, vector<size_t>> a, d;
 	for (rule* r : rules) {
 		const sizes x = r->fwd();
 		if (x.empty()) continue;
-		for (size_t n = 0; n != x.size(); ++n) {
+		for (size_t n = 0; n != x.size(); ++n)
+			(r->neg[n] ? d : a)[r->hpref[n]].push_back(x[n]);
+/*		for (size_t n = 0; n != x.size(); ++n) {
 			size_t &t = (r->neg[n] ? del : add)[r->hpref[n]];
 			t = bdd_or(x[n], t);
-		}
+		}*/
 	}
+	for (auto x : a)
+		x.second.push_back(add[x.first]),
+		add[x.first] = bdd_or_many(x.second);
+	for (auto x : d)
+		x.second.push_back(del[x.first]),
+		del[x.first] = bdd_or_many(x.second);
 	//DBG(printdiff(wcout<<"add:"<<endl,add,rng.bits););
 	//DBG(printdiff(wcout<<"del:"<<endl,del););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
