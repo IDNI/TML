@@ -123,8 +123,13 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 		while (t.arity()[ar] == -1) ++ar, os << L'(';
 		for (int_t k = 0; k != t.arity()[ar]; ++k) {
 			if (t.arg(n) < 0) throw 0;//os<<dict.get_var(t.args[n]);
-			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
-			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
+			else if (t.arg(n) & 1) {
+				wchar_t c = t.arg(n)>>2;
+				if (c == L'\r') os << "'\\r'";
+				else if (c == L'\n') os << "'\\n'";
+				else if (c == L'\t') os << "'\\t'";
+				else os << c;
+			} else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
 			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
 				os << dict.get_sym(t.arg(n));
 			else os << L'[' << (t.arg(n)>>2) << L']';

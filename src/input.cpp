@@ -36,7 +36,7 @@ lexeme lex(pcws s) {
 	}
 	if (**s == L'\'') {
 		if (*(*s + 1) == L'\\') {
-			if (*(*s + 2) != L'\'' || *(*s + 3) != L'\'')
+			if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')||*(*s+3)!=L'\'')
 				parse_error(err_escape, *s);
 			return { t, ++++++++*s };
 		}
