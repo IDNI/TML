@@ -18,10 +18,10 @@
 class driver {
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
-	matrix from_bits(size_t x, size_t bits, const prefix& p) const;
-	void from_bits(size_t x, size_t bits, const prefix& p,
+	matrix from_bits(spbdd x, size_t bits, const prefix& p) const;
+	void from_bits(spbdd x, size_t bits, const prefix& p,
 		std::function<void(const term&)> f) const;
-	term one_from_bits(size_t x, size_t bits, const prefix& p) const;
+	term one_from_bits(spbdd x, size_t bits, const prefix& p) const;
 
 	int_t nums = 0, chars = 0, syms = 0;
 //	bool mult = false;
@@ -72,9 +72,9 @@ public:
 	std::wostream& print_term(std::wostream& os, const term& t) const;
 	std::wostream& printmat(std::wostream& os, const matrix& t) const;
 	std::wostream& printmats(std::wostream& os, const matrices& t) const;
-	std::wostream& printbdd(std::wostream& os, size_t t, size_t bits,
+	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 		const prefix&) const;
-	std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits,
+	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
 		const prefix&) const;
 	std::wostream& printdb(std::wostream& os, lp *p) const;
 	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
@@ -87,9 +87,9 @@ public:
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
 std::wostream& printdiff(std:: wostream& os, const diff_t& d, size_t bits);
-std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
+std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits, ints ar,
 	int_t rel);
-std::wostream& printbdd_one(std::wostream& os, size_t t, size_t bits, ints ar,
+std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits, ints ar,
 	int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
 //	int_t rel);

@@ -57,11 +57,11 @@ query::query(size_t bits, const term& t, const sizes& perm, bool neg) :
 	}
 
 #define flip(n) nleaf(n) ? (n) : \
-	node{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
+	bdd{{ n[0], n[1]==T?F:n[1]==F?T:n[1], n[2]==T?F:n[2]==F?T:n[2] }}
 
-size_t query::operator()(size_t x) {
-//	DBG(out(wcout<<L"called with ", getnode(x)) << endl;)
-	return bdd_permute(bdd_ex(ae(x),ex), perm);
+spbdd query::operator()(spbdd x) {
+//	DBG(out(wcout<<L"called with ", getbdd(x)) << endl;)
+	return (ae(x) / ex) ^ perm;
 /*	x = ae(x);
 	auto it = m->find(x);
 	if (it != m->end()) return it->second;
@@ -73,7 +73,7 @@ size_t query::operator()(size_t x) {
 
 /*size_t query::compute(size_t x, size_t v) {
 	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
-	node n = neg&&!leaf(x) ? flip(getnode(x)) : getnode(x);
+	bdd n = neg&&!leaf(x) ? flip(getbdd(x)) : getbdd(x);
 	const size_t arg = ARG(v, e.size());
 	if (!has(domain, arg+1))
 		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));
@@ -101,13 +101,13 @@ bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg) :
 		DBG(_t=t;)
 		auto it = memos.find(k);
 		if (it != memos.end()) m = it->second;
-		m = memos[k] = new unordered_map<size_t, size_t>;
+		m = memos[k] = new unordered_map<spbdd, spbdd>;
 	}
 
-size_t bdd_and_eq::operator()(const size_t x) {
+spbdd bdd_and_eq::operator()(const spbdd x) {
 	auto it = m->find(x);
 	if (it != m->end()) return it->second;
-	vector<size_t> v = {x};
+	bdds v = {x};
 	for (size_t n = 0; n != k.e.size(); ++n)
 		if (k.e[n] > 0) 
 			v.push_back(from_int(k.e[n]-1, k.bits, n, k.e.size()));
@@ -118,8 +118,8 @@ size_t bdd_and_eq::operator()(const size_t x) {
 					POS(i, k.bits, -k.e[n]-1, k.e.size())));
 	if (k.neg) {
 		if (v.size() == 1)
-			return m->emplace(x,bdd_and_not(T, v[0])).first->second;
-		v.push_back(bdd_and_not(v[1], v[0])),
+			return m->emplace(x,T%v[0]).first->second;
+		v.push_back(v[1]%v[0]),
 		v.erase(v.begin(), v.begin()+1);
 	}
 	return ++::memos, m->emplace(x, bdd_and_many(move(v))).first->second;
@@ -139,7 +139,7 @@ size_t bdd_and_eq::operator()(const size_t x) {
 }*/
 
 #define get_leq(c) builtins<leq_const>(arg,bits,args,leq_const(c,bits,args))(T)
-#define get2(b1, b2) bdd_and(from_bit(POS(0,bits,arg,args), b1),\
+#define get2(b1, b2) (from_bit(POS(0,bits,arg,args), b1) && \
 			from_bit(POS(1,bits,arg,args), b2))
 #define ischar get2(true, false)
 #define isnum get2(false, true)
@@ -147,20 +147,20 @@ size_t bdd_and_eq::operator()(const size_t x) {
 #define chars_clause bdd_impl(ischar, get_leq(((chars-1)<<2)|3))
 #define nums_clause bdd_impl(isnum, get_leq(((nums-1)<<2)|3))
 #define syms_clause bdd_impl(issym, get_leq(((syms-1)<<2)|3))
-#define notchar bdd_and_not(T, ischar)
-#define notnum bdd_and_not(T, isnum)
-#define notsym bdd_and_not(T, issym)
+#define notchar (T%ischar)
+#define notnum (T%isnum)
+#define notsym (T%issym)
 
-size_t range::operator()(size_t arg, size_t args) {
+spbdd range::operator()(size_t arg, size_t args) {
 	auto it = memo.find({syms,nums,chars,(int_t)args,(int_t)arg});
 	if (it != memo.end()) return it->second;
-	size_t r = bdd_and_many({
-		bdd_or(bdd_or(ischar, isnum), issym),
+	spbdd r = bdd_and_many({
+		ischar || isnum || issym,
 		chars ? chars_clause : notchar,
 		nums ? nums_clause : notnum,
 		syms ? syms_clause : notsym});
 	return ++memos, memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }
-unordered_map<array<int_t, 5>, size_t, array_hash<int_t, 5>> range::memo;
-map<bdd_and_eq::key, unordered_map<size_t, size_t>*> bdd_and_eq::memos;
+unordered_map<array<int_t, 5>, spbdd, array_hash<int_t, 5>> range::memo;
+map<bdd_and_eq::key, unordered_map<spbdd, spbdd>*> bdd_and_eq::memos;
 //map<query::key, unordered_map<size_t, size_t>*> query::memos;

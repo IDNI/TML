@@ -38,26 +38,26 @@ set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
 	return r;
 }
 
-void lp::get_tree(const prefix& p, size_t root, diff_t& out, set<size_t>& done){
-	if (leaf(root) && !trueleaf(root)) return;
+void lp::get_tree(const prefix& p, spbdd root, diff_t& out, set<spbdd>& done){
+	if (root->leaf() && !root->trueleaf()) return;
 	if (!done.emplace(root).second) return;
 	diff_t::iterator it;
 	for (const pair<ints, array<size_t, 2>>& x : p.subterms())
 		for (const db_t::const_iterator& y:tree_prefix({p.rel,x.first}))
 			it = out.emplace(y->first,F).first,
-			get_tree(y->first, it->second = bdd_or(it->second,
-				bdd_and(*y->second, bdd_subterm(root,
+			get_tree(y->first, it->second = it->second || (
+				*y->second && bdd_subterm(root,
 				x.second[0], x.second[1], p.len(),
-				y->first.len(), rng.bits))), out, done);
+				y->first.len(), rng.bits)), out, done);
 }
 
 void lp::get_trees(const diff_t& in, diff_t& out) {
-	set<size_t> done;
+	set<spbdd> done;
 	for (auto x : in)
 		for (const db_t::const_iterator& it : tree_prefix(x.first))
-			get_tree(it->first, bdd_and(*it->second, bdd_expand(
+			get_tree(it->first, *it->second && bdd_expand(
 				x.second, x.first.len(), it->first.len(),
-				rng.bits)), out, done), done.clear();
+				rng.bits), out, done), done.clear();
 }
 
 void lp::get_trees() {
@@ -66,7 +66,7 @@ void lp::get_trees() {
 	auto it = db.end();
 	for (auto x : trees_out) {
 		if ((it = db.find(x.first)) == db.end())
-			it = db.emplace(x.first, new size_t).first;
+			it = db.emplace(x.first, new spbdd).first;
 		*it->second = x.second;
 	}
 }

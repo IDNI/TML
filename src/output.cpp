@@ -27,17 +27,17 @@ wostream& operator<<(wostream& os, const lexeme& l) {
 }
 
 #ifdef DEBUG
-wostream& operator<<(wostream& os, const node& n) {
-	return os << n[0] << L' ' << n[1] << L' '<<n[2];
+wostream& operator<<(wostream& os, const bdd& n) {
+	return os << n.v() << L' ' << n.h() << L' ' << n.l();
 }
 
-wostream& bdd_out(wostream& os, size_t n){
-	return bdd_out(os<<L'['<<n<<L']',getnode(n));
+wostream& bdd_out(wostream& os, spbdd n) {
+	return bdd_out(os<<L'['<<n<<L']', *n);
 }
 
-wostream& bdd_out(wostream& os, const node& n) { //print bdd in ?: syntax
-	return	nleaf(n) ? os << (ntrueleaf(n) ? L'T' : L'F') : (bdd_out(
-		os<<n[0]<<L'?',getnode(n[1])),bdd_out(os<<L':',getnode(n[2])));
+wostream& bdd_out(wostream& os, const bdd& n) { //print bdd in ?: syntax
+	return	n.leaf() ? os << (n.trueleaf() ? L'T' : L'F') : (bdd_out(
+		os<<n.v()<<L'?',n.h()),bdd_out(os<<L':',n.l()));
 }
 
 wostream& operator<<(wostream& os, const bools& x) {
@@ -70,7 +70,7 @@ wostream& operator<<(wostream& os, const matrices& m) {
 }
 #endif
 
-void driver::from_bits(size_t x, size_t bits, const prefix& r,
+void driver::from_bits(spbdd x, size_t bits, const prefix& r,
 	std::function<void(const term&)> f) const {
 	allsat_cb(x, bits * r.len(), [r, bits, f, this](const bools& p){
 		const size_t ar = r.len();
@@ -83,7 +83,7 @@ void driver::from_bits(size_t x, size_t bits, const prefix& r,
 	})();
 }
 
-matrix driver::from_bits(size_t x, size_t bits, const prefix& p) const {
+matrix driver::from_bits(spbdd x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	const vbools s = allsat(x, bits * ar);
 	matrix r(s.size());
@@ -98,7 +98,7 @@ matrix driver::from_bits(size_t x, size_t bits, const prefix& p) const {
 }
 
 #ifdef DEBUG
-term driver::one_from_bits(size_t x, size_t bits, const prefix& p) const {
+term driver::one_from_bits(spbdd x, size_t bits, const prefix& p) const {
 	const size_t ar = p.len();
 	bools s(bits * ar, true);
 	if (!bdd_onesat(x, bits * ar, s)) return term();
@@ -160,23 +160,23 @@ wostream& printdiff(wostream& os, const diff_t& d, size_t bits) {
 	return drv->printdiff(os, d, bits);
 }
 
-wostream& printbdd(wostream& os, size_t t, size_t bits, const prefix& p) {
+wostream& printbdd(wostream& os, spbdd t, size_t bits, const prefix& p) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
 	return drv->printbdd(os, t, bits, p);
 }
 
-wostream& printbdd_one(wostream& os, size_t t, size_t bits, const prefix& p) {
+wostream& printbdd_one(wostream& os, spbdd t, size_t bits, const prefix& p) {
 	return drv->printbdd_one(os, t, bits, p);
 }
 
-wostream& driver::printbdd(wostream& os, size_t t, size_t bits, const prefix&p)
+wostream& driver::printbdd(wostream& os, spbdd t, size_t bits, const prefix&p)
 	const {
 	from_bits(t,bits,p,[&os,this](const term&t){
 			print_term(os, t)<<endl;});
 	return os;
 }
 
-wostream& driver::printbdd_one(wostream& os, size_t t, size_t bits, 
+wostream& driver::printbdd_one(wostream& os, spbdd t, size_t bits, 
 	const prefix& p) const {
 //	os << "one of " << bdd_count(t, bits * arlen(ar)) << " results: ";
 	return print_term(os, one_from_bits(t, bits, p));

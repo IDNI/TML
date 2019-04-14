@@ -97,10 +97,10 @@ struct tt { // truth table
 		}
 		return r;
 	}
-	size_t bdd() const {
-		size_t r = F;
+	spnode bdd() const {
+		spnode r = F;
 		for (auto& x : table) {
-			size_t y = T;
+			spnode y = T;
 			for (size_t n = 0; n < bits; ++n)
 				y = bdd_and(y, from_bit(n, x.at(n)));
 			r = bdd_or(r, y);
@@ -142,11 +142,11 @@ void test_and_many() {
 		wcout<<k<<endl;
 		tt *t = new tt[tts];
 		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
-		size_t r = T;
+		spnode r = T;
 		for (size_t i = 0; i < tts; ++i) r = bdd_and(r, t[i].bdd());
 		tt rr = t[0];
 		for (size_t i = 1; i < tts; ++i) rr = rr & t[i];
-		vector<size_t> v;
+		nodes v;
 		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
 		if (r != bdd_and_many(v)) {
 			wcout<<endl;
@@ -167,11 +167,11 @@ void test_or_many() {
 		wcout<<k<<endl;
 		tt *t = new tt[tts];
 		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
-		size_t r = F;
+		spnode r = F;
 		for (size_t i = 0; i < tts; ++i) r = bdd_or(r, t[i].bdd());
 		tt rr = t[0];
 		for (size_t i = 1; i < tts; ++i) rr = rr | t[i];
-		vector<size_t> v;
+		nodes v;
 		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
 		if (r != bdd_or_many(v)) {
 			wcout<<endl;
@@ -193,7 +193,7 @@ int main() {
 			assert(ARG(POS(n, bits, k, args), args) == k),
 			assert(BIT(POS(n, bits, k, args), args, bits) == n);
 	bdd_init();
-//	test_query();
+	test_query();
 	srand(time(0));
 	test_and_many();
 	test_or_many();

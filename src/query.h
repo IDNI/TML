@@ -33,11 +33,12 @@ class bdd_and_eq {
 		key(size_t bits, size_t nvars, const ints& e, bool neg) :
 			bits(bits), nvars(nvars), e(e), neg(neg) {}
 	} k;
-	static std::map<key, std::unordered_map<size_t, size_t>*> memos;
-	std::unordered_map<size_t, size_t>* m;
+	static std::map<key, std::unordered_map<spbdd, spbdd>*> memos;
+	std::unordered_map<spbdd, spbdd>* m;
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
-	size_t operator()(const size_t x);
+	spbdd operator()(spbdd x);
+	static void memo_clear() { ::memos -= memos.size(); memos.clear(); }
 };
 
 class query {
@@ -61,7 +62,7 @@ class query {
 //	size_t compute(size_t x, size_t v);
 public:
 	query(size_t bits, const term& t, const sizes& perm, bool neg);
-	size_t operator()(size_t x);
+	spbdd operator()(spbdd x);
 };
 
 enum builtin_res { PASS, FAIL, CONTHI, CONTLO, CONTBOTH };
@@ -72,40 +73,40 @@ template<typename func> class builtins {
 	bools path;
 	sizes getdom() const;
 	int_t get_int(size_t pos) const;
-	std::unordered_map<size_t, size_t> memo;
+	std::unordered_map<spbdd, spbdd> memo;
 	func f;
 
-	size_t compute(size_t x, size_t v) {
-		if (leaf(x) && !trueleaf(x)) return F;
+	spbdd compute(spbdd x, size_t v) {
+		if (x->leaf() && !x->trueleaf()) return F;
 		if (ARG(v, args) != arg) return compute(x, v+1);
-		size_t h, l;
-		const node n = getnode(x);
+		spbdd h, l;
 		path[v] = true;
 		switch (f(path, arg, v)) {
 			case FAIL: h = F; break;
 			case PASS: h = T; break;
-			case CONTBOTH: h = compute(n[1], v+1); break;
+			case CONTBOTH: h = compute(x->h(), v+1); break;
 			default: throw 0;
 		}
 		path[v] = false;
 		switch (f(path, arg, v)) {
 			case FAIL: l = F; break;
 			case PASS: l = T; break;
-			case CONTBOTH: l = compute(n[2], v+1); break;
+			case CONTBOTH: l = compute(x->l(), v+1); break;
 			default: throw 0;
 		}
-		return bdd_add({{v+1, h, l}});
+		return bdd::add(v+1, h, l);
 	}
 public:
 	builtins(size_t arg, size_t bits, size_t args, func f) 
 		: arg(arg), bits(bits), args(args), nvars(bits*args)
 		, path(nvars,0), f(f) {}
 
-	size_t operator()(size_t x) {
+	spbdd operator()(spbdd x) {
 		auto it = memo.find(x);
 		if (it == memo.end()) return ++memos, memo[x] = compute(x, 0);
 		return it->second;
 	}
+//	static void memo_clear() { memo.clear(); }
 };
 
 struct leq_const {
@@ -135,18 +136,19 @@ DBG(using namespace std;)
 struct range {
 	const int_t syms, nums, chars;
 	const size_t bits;
-	static std::unordered_map<std::array<int_t, 5>, size_t,
+	static std::unordered_map<std::array<int_t, 5>, spbdd,
 		array_hash<int_t, 5>> memo;
 
 	range(int_t syms, int_t nums, int_t chars)
 	: syms(syms), nums(nums), chars(chars), bits(msb(syms+nums+chars)+2) {}
 
-	size_t operator()(const sizes& domain, size_t nargs) {
-		sizes v;
+	spbdd operator()(const sizes& domain, size_t nargs) {
+		bdds v;
 		for (size_t x : domain) v.push_back((*this)(x, nargs));
 		return bdd_and_many(move(v));
 	}
-	size_t operator()(size_t arg, size_t nargs);
+	spbdd operator()(size_t arg, size_t nargs);
+	static void memo_clear() { ::memos -= memo.size(); memo.clear(); }
 };
 
 /*

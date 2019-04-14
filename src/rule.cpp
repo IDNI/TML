@@ -17,10 +17,10 @@
 #endif
 using namespace std;
 
-size_t fact(const term& v, range& rng) {
+spbdd fact(const term& v, range& rng) {
 	//DBG(wcout<<"add fact:"<<v<<endl;)
 	if (v.arity() == ints{0}) return T;
-	size_t r = T;
+	spbdd r = T;
 	rule::varmap m;
 	for (size_t j = 0; j != v.nargs(); ++j)
 		if (v.arg(j) < 0) m.emplace(v.arg(j), j);
@@ -30,19 +30,19 @@ size_t fact(const term& v, range& rng) {
 		for (size_t j = 0; j != v.nargs(); ++j)
 			if (v.arg(j) >= 0 || j == m[v.arg(j)]) continue;
 			else for (size_t b = 0; b != rng.bits; ++b)
-				r = bdd_and(r, from_eq(
+				r = r && from_eq(
 					POS(b,rng.bits,j,v.nargs()),
-					POS(b,rng.bits,m[v.arg(j)],v.nargs())));
+					POS(b,rng.bits,m[v.arg(j)],v.nargs()));
 //		DBG(printbdd(wcout<<"ret3:"<<endl, r, v.arity, v.rel)<<endl;)
 	}
 	for (size_t j = 0; j != v.nargs(); ++j)
 		if (v.arg(j) >= 0)
 			from_int_and(v.arg(j), rng.bits, j, v.nargs(), r);
-	if (v.neg()) r = bdd_and_not(T, r);
+	if (v.neg()) r = T % r;
 	if (!m.empty()) {
 		sizes domain;
 		for (auto x : m) domain.push_back(x.second);
-		r = bdd_and(r, rng(domain, v.nargs()));
+		r = r && rng(domain, v.nargs());
 //		DBG(bdd_out(wcout, r)<<endl;)
 	}
 //	DBG(printbdd(wcout<<"ret:"<<endl, r, rng.bits, v.arity(), v.rel())<<endl;)
@@ -67,7 +67,7 @@ sizes rule::get_perm(const term& b, varmap& m) {
 	return perm;
 }
 
-rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, range& rng) :
+rule::rule(matrix h, matrix b, const vector<spbdd*>& dbs, range& rng) :
 	dbs(dbs), rng(rng) {
 	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
 	hperm.resize(h.size()), hpref.resize(h.size()), neg.resize(h.size()),
@@ -98,7 +98,7 @@ rule::rule(matrix h, matrix b, const vector<size_t*>& dbs, range& rng) :
 }
 
 void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
-	hleq = sizes(h.size(), T), bleq = T;
+	hleq = bdds(h.size(), T), bleq = T;
 	set<int_t> bnegvars, bposvars, hposvars, del;
 	sizes domain;
 	for (const term& t : b)
@@ -131,9 +131,9 @@ void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
 //			leq_const(dsz-1, bits, maxhlen+nvars))(T));
 }
 
-sizes rule::fwd() {
-	sizes r(hpref.size()), v(q.size());
-	size_t vars;
+bdds rule::fwd() {
+	bdds r(hpref.size()), v(q.size());
+	spbdd vars;
 	for (size_t n = 0; n < q.size(); ++n)
 		if (F == (v[n] = q[n](*dbs[n]))) return {};
 //		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],rng.bits,
@@ -143,7 +143,7 @@ sizes rule::fwd() {
 //	DBG(printbdd(wcout<<"q:"<<endl,vars,rng.bits,
 //		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
-		r[k] = bdd_permute(vars, hperm[k]);
+		r[k] = vars ^ hperm[k];
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
 		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
@@ -154,7 +154,7 @@ sizes rule::fwd() {
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);
 		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
-		r[k] = bdd_and(hleq[k], r[k]);
+		r[k] = hleq[k] && r[k];
 		//DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 	}
 	return r;

@@ -23,8 +23,8 @@
 
 void tml_init();
 
-typedef std::map<prefix, size_t*> db_t;
-typedef std::map<prefix, size_t> diff_t;
+typedef std::map<prefix, spbdd*> db_t;
+typedef std::map<prefix, spbdd> diff_t;
 
 struct prog_data {
 	strs_t strs;
@@ -38,13 +38,13 @@ class lp { // [pfp] logic program
 	friend struct rule;
 	DBG(friend class driver;)
 	std::vector<struct rule*> rules;
-	void add_fact(size_t f, const prefix& p);
-	bool add_not_fact(size_t f, const prefix& p);
+	void add_fact(spbdd f, const prefix& p);
+	bool add_not_fact(spbdd f, const prefix& p);
 	bool add_facts(const matrix& x);
 	bool add_fact(const term& t);
 	std::set<db_t::const_iterator> tree_prefix(const prefix& p) const;
-	void get_tree(const prefix& p, size_t root, diff_t& out,
-		std::set<size_t>& done);
+	void get_tree(const prefix& p, spbdd root, diff_t& out,
+		std::set<spbdd>& done);
 	void get_trees(const diff_t& in, diff_t& out);
 	void get_trees();
 	void fwd(diff_t &add, diff_t &del);

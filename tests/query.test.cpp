@@ -40,8 +40,8 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 }
 */
 
-void from_range(size_t max, size_t bits, size_t arg, size_t args, size_t &r) {
-	size_t x = F;
+void from_range(size_t max, size_t bits, size_t arg, size_t args, spnode r) {
+	spnode x = F;
 	for (size_t n = 0; n <= max; ++n)
 		x = bdd_or(x, from_int(n, bits, arg, args));
 	r = bdd_and(r, x);
@@ -54,9 +54,11 @@ void test_query() {
 			wcout<<"max: "<<n<<" bits: "<<bits<<endl;
 			builtins<leq_const> l1({arg1},bits,args,leq_const(n,bits,args));
 			builtins<leq_const> l2({arg2},bits,args,leq_const(n,bits,args));
-			size_t x = T, y = bdd_and(l1(T),l2(T));
+			spnode x = T, y = bdd_and(l1(T),l2(T));
 			from_range(n, bits, arg1, args, x);
 			from_range(n, bits, arg2, args, x);
+			wcout<<"x:"<<endl<<allsat(x,bits*args)
+				<<"y:"<<endl<<allsat(y,bits*args)<<endl;
 			assert(x == y);
 		}
 

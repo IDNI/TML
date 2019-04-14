@@ -18,20 +18,20 @@ struct rule { // a P-DATALOG rule in bdd form
 	typedef std::unordered_map<int_t, size_t> varmap;
 	bools neg;
 	std::vector<varmap> hvars;
-	size_t bleq;
-	sizes hleq;
+	spbdd bleq;
+	bdds hleq;
 	std::vector<query> q;
 	std::vector<prefix> hpref;
 	size_t maxhlen, nvars;
-	std::vector<size_t*> dbs;
+	std::vector<spbdd*> dbs;
 	std::vector<sizes> hperm;
 	std::vector<bdd_and_eq> ae;
 	range rng;
 	sizes get_perm(const term& b, varmap&);
 	void get_ranges(const matrix& h, const matrix& b, const varmap&);
 
-	rule(matrix h, matrix b, const std::vector<size_t*>& dbs, range& rng);
-	sizes fwd();
+	rule(matrix h, matrix b, const std::vector<spbdd*>& dbs, range& rng);
+	bdds fwd();
 };
 
-size_t fact(const term& v, range&);
+spbdd fact(const term& v, range&);
