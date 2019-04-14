@@ -22,6 +22,7 @@ struct rule { // a P-DATALOG rule in bdd form
 	bdds hleq;
 	std::vector<query> q;
 	std::vector<prefix> hpref;
+	std::vector<std::pair<bools, sizes>> dt;
 	size_t maxhlen, nvars;
 	std::vector<spbdd*> dbs;
 	std::vector<sizes> hperm;

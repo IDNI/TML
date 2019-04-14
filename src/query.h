@@ -38,7 +38,7 @@ class bdd_and_eq {
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
 	spbdd operator()(spbdd x);
-	static void memo_clear() { ::memos -= memos.size(); memos.clear(); }
+	static void memo_clear() { onmemo(-memos.size()); memos.clear(); }
 };
 
 class query {
@@ -103,10 +103,10 @@ public:
 
 	spbdd operator()(spbdd x) {
 		auto it = memo.find(x);
-		if (it == memo.end()) return ++memos, memo[x] = compute(x, 0);
+		if (it == memo.end()) return onmemo(), memo[x] = compute(x, 0);
 		return it->second;
 	}
-//	static void memo_clear() { memo.clear(); }
+	void memo_clear() { onmemo(-memo.size()); memo.clear(); }
 };
 
 struct leq_const {
@@ -136,6 +136,8 @@ DBG(using namespace std;)
 struct range {
 	const int_t syms, nums, chars;
 	const size_t bits;
+	static std::map<std::pair<size_t, int_t>, builtins<leq_const>>
+		bsyms, bnums, bchars;
 	static std::unordered_map<std::array<int_t, 5>, spbdd,
 		array_hash<int_t, 5>> memo;
 
@@ -148,7 +150,12 @@ struct range {
 		return bdd_and_many(move(v));
 	}
 	spbdd operator()(size_t arg, size_t nargs);
-	static void memo_clear() { ::memos -= memo.size(); memo.clear(); }
+	static void memo_clear() {
+		onmemo(-memo.size()), memo.clear();
+		for (auto x : bsyms) x.second.memo_clear();
+		for (auto x : bnums) x.second.memo_clear();
+		for (auto x : bchars) x.second.memo_clear();
+	}
 };
 
 /*

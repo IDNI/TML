@@ -31,7 +31,7 @@
 #endif
 using namespace std;
 
-void tml_init() { bdd::bdd_init(); }
+void tml_init() { bdd::init(); }
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
 void lp::add_fact(spbdd f, const prefix& p) {
@@ -206,8 +206,8 @@ bool lp::pfp() {
 	for (set<diff_t, diffcmp> s;;) {
 		//DBG()
 		wcout << "step: " << step++ << endl;
-//		d = copy(db),
-		s.emplace(d = copy(db)),
+		d = copy(db),
+//		s.emplace(d = copy(db)),
 		fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
@@ -215,9 +215,10 @@ bool lp::pfp() {
 		for (auto x : del) add_not_fact(x.second, x.first);
 		if (db == d) break;
 		if (has(s, copy(db))) return false;
-		if (memos > 2e+6)
+		if (onmemo(0)>1e+7)
+			(wcerr<<onmemo(0)),
 			memos_clear(), bdd_and_eq::memo_clear(),
-			range::memo_clear(), wcerr << "gc" << endl;
+			range::memo_clear(), wcerr << " gc " << onmemo(0) << endl;
 	}
 //	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();

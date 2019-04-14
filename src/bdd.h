@@ -52,7 +52,7 @@ public:
 	bool operator==(const bdd& n) const {
 		return var == n.var && hi == n.hi && lo == n.lo;
 	}
-	static void bdd_init() {
+	static void init() {
 		T = bdd::ntrue(), F = bdd::nfalse();
 		bdd::M.emplace(*T, T), bdd::M.emplace(*F, F);
 	}
@@ -63,56 +63,50 @@ public:
 		return std::make_shared<bdd>(0, nullptr, nullptr);
 	}
 	static spbdd add(size_t _v, spbdd _h, spbdd _l) {
-		bddl = true;
 		if (_h == _l) return _l;
 		DBG(assert(_h&&_l);)
 		DBG(if (!_h->leaf()) assert(_v < _h->v());)
 		DBG(if (!_l->leaf()) assert(_v < _l->v());)
 		auto it = M.find(_bdd(_v,_h.get(),_l.get()));
-		if (it == M.end()) {
-			auto r = std::make_shared<bdd>(_v,_h,_l);
-			return M.emplace(_bdd(_v,_h.get(),_l.get()), std::weak_ptr<bdd>(r)), r;
-		}
-		return it->second.lock();
+		if (it != M.end()) return it->second.lock();
+		auto r = std::make_shared<bdd>(_v,_h,_l);
+		return 	M.emplace(_bdd(_v,_h.get(),_l.get()),
+			std::weak_ptr<bdd>(r)), r;
 	}
 	static size_t size() { return M.size(); }
-	static bool bddl;
-	~bdd() { M.erase(*this); }
+	static bool onexit;
+	~bdd() { if (!onexit) M.erase(*this); }
+	static void clear();
 };
 typedef std::vector<spbdd> bdds;
-//extern unordered_map<bdd, shared_ptr<bdd>> M; // bdd to its index
-//const size_t F = 0, T = 1;
-//extern std::vector<bdd> V;
 
 void bdd_init();
-//spbdd bdd_add(const bdd& n); //create new bdd bdd,standard implementation
-vbools allsat(spbdd x, size_t nv);
+vbools allsat(spbdd x, size_t nvars);
 vbools allsat(spbdd x, size_t bits, size_t args);
-//spbdd from_bit(size_t x ,bool v);
 spbdd operator||(spbdd x, spbdd y);
-spbdd operator/(spbdd x, const bools&); // existential quantificatoin
+spbdd operator/(spbdd x, const bools&); // existential quantification
 spbdd operator&&(spbdd x, spbdd y);
+spbdd operator%(spbdd x, spbdd y); // and not
+spbdd operator^(spbdd x, const sizes&); // overlapping rename (permute)
+spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m);
 #define bdd_impl(x, y) ((y) || (T%x))
 spbdd bdd_and_many(bdds v);
 spbdd bdd_or_many(bdds v);
 spbdd bdd_expand(spbdd x, size_t args1, size_t args2, size_t bits);
+std::pair<bools, sizes> bdd_subterm(size_t from, size_t to,
+	size_t args1, size_t args2, size_t bits);
+spbdd bdd_subterm(spbdd x, const bools& b, const sizes& perm, size_t from,
+	size_t to, size_t args1);
 spbdd bdd_subterm(spbdd x, size_t from, size_t to, size_t args1, size_t args2,
 	size_t bits);
-spbdd bdd_deltail(spbdd x, size_t h);
-spbdd bdd_deltail(spbdd x, size_t args1, size_t args2, size_t bits);
-spbdd bdd_and_deltail(spbdd x, size_t y, size_t h);
-spbdd operator%(spbdd x, spbdd y); // and not
+//spbdd bdd_deltail(spbdd x, size_t args1, size_t args2, size_t bits);
 spbdd bdd_ite(size_t v, spbdd t, spbdd e);
-spbdd operator^(spbdd x, const sizes&); // overlapping rename (permute)
 size_t bdd_count(size_t x, size_t nvars);
 bool bdd_onesat(spbdd x, size_t nvars, bools& r);
-//size_t from_eq(size_t x, size_t y);
 spbdd from_int(size_t x, size_t bits, size_t arg, size_t args);
-//matrix from_bits(size_t x, size_t bits, size_t ar);
-//struct term one_from_bits(size_t x, size_t bits, size_t ar);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
-std::wostream& bdd_out(std::wostream& os, const bdd& n);// print bdd in ?: syntax
+std::wostream& bdd_out(std::wostream& os, const bdd&n);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, spbdd n);
 void memos_clear();
 
@@ -137,4 +131,6 @@ template<typename X, size_t Y> struct array_hash {
 		return std::accumulate(m.begin(), m.end(), 0);
 	}
 };
+
+int_t onmemo(int_t n = 1);
 #endif

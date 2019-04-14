@@ -95,6 +95,10 @@ rule::rule(matrix h, matrix b, const vector<spbdd*>& dbs, range& rng) :
 						nvars+maxhlen)]=POS(j, rng.bits,
 						k, nvars+maxhlen);
 	get_ranges(h, b, m);
+	dt.resize(hpref.size());
+	for (size_t k = 0; k != hpref.size(); ++k)
+	dt[k] = bdd_subterm(0, hpref[k].len(), maxhlen+nvars, hpref[k].len(),
+		rng.bits);
 }
 
 void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
@@ -149,7 +153,9 @@ bdds rule::fwd() {
 		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
 //		DBG(bdd_out(wcout, r[k])<<endl;)
 //		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-		r[k]=bdd_deltail(r[k], maxhlen+nvars, hpref[k].len(), rng.bits);
+//		r[k]=bdd_deltail(r[k], maxhlen+nvars, hpref[k].len(), rng.bits);
+		r[k] = bdd_subterm(r[k], dt[k].first, dt[k].second, 0,
+			maxhlen+nvars, hpref[k].len());
 		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
 		//DBG(bdd_out(wcout, r[k])<<endl;)
 		r[k] = ae[k](r[k]);

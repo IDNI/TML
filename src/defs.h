@@ -18,6 +18,8 @@
 #include <unordered_map>
 #include <array>
 #include <iostream>
+#include <execinfo.h>
+#include <cstdio>
 typedef int64_t int_t;
 typedef wchar_t* wstr;
 typedef const wchar_t* cws;
@@ -46,5 +48,5 @@ typedef std::vector<size_t> sizes;
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
-extern size_t memos;
+void dump_stack();
 #endif
