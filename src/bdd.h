@@ -75,10 +75,16 @@ public:
 	}
 	static size_t size() { return M.size(); }
 	static bool onexit;
-	~bdd() { if (!onexit) M.erase(*this); }
+	static size_t gc;
+	~bdd() { if (!onexit) M.erase(*this); ++gc; }
 	static void clear();
 };
 typedef std::vector<spbdd> bdds;
+
+struct onexit {
+	~onexit();
+};
+extern onexit _onexit;
 
 void bdd_init();
 vbools allsat(spbdd x, size_t nvars);

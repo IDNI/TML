@@ -23,6 +23,10 @@ lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
 	cws t = *s;
+	if (**s == L'#') {
+		while (*++*s != L'\r' && **s != L'\n' && **s);
+		return lex(s);
+	}
 	if (**s == L'"') {
 		while (*++*s != L'"')
 			if (!**s) parse_error(unmatched_quotes, *s);
@@ -35,6 +39,7 @@ lexeme lex(pcws s) {
 		return { t, (*s)++ };
 	}
 	if (**s == L'\'') {
+		if (*(*s + 1) == L'\'') return { t, ++++*s };
 		if (*(*s + 1) == L'\\') {
 //			if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
 			if (!wcschr(L"\\'rnt",*(*s+2)) ||*(*s+3)!=L'\'')
@@ -111,9 +116,16 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'(' == *l[pos][0]) return e = l[pos++], type = OPENP, true;
 	if (L')' == *l[pos][0]) return e = l[pos++], type = CLOSEP, true;
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
-	if (e = l[pos], *l[pos][0] == L'\'')
-		type = CHR,
-		e = { l[pos][0] + (*(l[pos][0]+1)==L'\\' ? 2 : 1), l[pos][1]-1};
+	if (e = l[pos], *l[pos][0] == L'\'') {
+		type = CHR, e = { 0, 0 };
+		if (l[pos][0][1] == L'\'') ch = 0;
+		else if (l[pos][0][1] != L'\\') ch = l[pos][0][1];
+		else if (l[pos][0][2] == L'r') ch = L'\r';
+		else if (l[pos][0][2] == L'n') ch = L'\n';
+		else if (l[pos][0][2] == L't') ch = L'\t';
+		else if (l[pos][0][2] == L'\'') ch = L'\'';
+		else throw 0;
+	}
 	else if (*l[pos][0] == L'?') type = VAR;
 	else if (iswalpha(*l[pos][0])) type = SYM;
 	else if (*l[pos][0] == L'"') type = STR;
@@ -270,7 +282,7 @@ wstring file_read_text(FILE *f) {
 	*buf = 0;
 next:	for (n = l = 0; n != 31; ++n)
 		if (WEOF == (c = getwc(f))) { skip = 0; break; }
-		else if (c == L'#') skip = 1;
+//		else if (c == L'#') skip = 1;
 		else if (c == L'\r' || c == L'\n') skip = 0, buf[l++] = c;
 		else if (!skip) buf[l++] = c;
 	if (n) {

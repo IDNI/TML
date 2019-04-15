@@ -22,16 +22,25 @@ struct elem {
 	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR } type;
 	int_t num = 0;
 	lexeme e;
+	wchar_t ch;
+	elem() {}
+	elem(int_t num) : type(NUM), num(num) {}
+	elem(wchar_t ch) : type(CHR), ch(ch) {}
+	elem(etype type, lexeme e) : type(type), e(e) {
+		DBG(assert(type!=NUM&&type!=CHR);)
+	}
 	bool parse(const lexemes& l, size_t& pos);
 	bool operator<(const elem& t) const {
 		if (type != t.type) return type < t.type;
 		if (type == NUM) return num < t.num;
+		if (type == CHR) return ch < t.ch;
 		if (e[1]-e[0] != t.e[1]-t.e[0]) return e[1]-e[0]<t.e[1]-t.e[0];
 		return wcsncmp(e[0], t.e[0], e[1]-e[0]) < 0;
 	}
 	bool operator==(const elem& t) const {
 		if (type != t.type) return false;
 		if (type == NUM) return num == t.num;
+		if (type == CHR) return ch == t.ch;
 		return e == t.e;
 	}
 };

@@ -214,7 +214,7 @@ wostream& operator<<(wostream& os, const directive& d) {
 }
 
 wostream& operator<<(wostream& os, const elem& e) {
-	if (e.type == elem::CHR) return os << '\'' << *e.e[0] << '\'';
+	if (e.type == elem::CHR) return os << '\'' << e.ch << '\'';
 	if (e.type == elem::OPENP || e.type == elem::CLOSEP) return os<<*e.e[0];
 	return e.type == elem::NUM ? os << e.num : (os << e.e);
 }

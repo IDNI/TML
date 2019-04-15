@@ -137,6 +137,11 @@ void lp::fwd(diff_t &add, diff_t &del) {
 		else	x.second.push_back(it->second),
 			it->second = bdd_or_many(x.second);
 	}
+	if (onmemo(0)>1e+17)
+		(wcerr<<onmemo(0)),
+		memos_clear(), bdd_and_eq::memo_clear(),
+		range::memo_clear(), (wcerr << " gc " << onmemo(0) << endl),
+		onmemo(-onmemo(0));
 	//DBG(printdiff(wcout<<"add:"<<endl,add,rng.bits););
 	//DBG(printdiff(wcout<<"del:"<<endl,del););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
@@ -206,8 +211,8 @@ bool lp::pfp() {
 	for (set<diff_t, diffcmp> s;;) {
 		//DBG()
 		wcout << "step: " << step++ << endl;
-		d = copy(db),
-//		s.emplace(d = copy(db)),
+//		d = copy(db),
+		s.emplace(d = copy(db)),
 		fwd(add, del);
 		if (!bdd_and_not(add, del, t))
 			return false; // detect contradiction
@@ -215,10 +220,6 @@ bool lp::pfp() {
 		for (auto x : del) add_not_fact(x.second, x.first);
 		if (db == d) break;
 		if (has(s, copy(db))) return false;
-		if (onmemo(0)>1e+7)
-			(wcerr<<onmemo(0)),
-			memos_clear(), bdd_and_eq::memo_clear(),
-			range::memo_clear(), wcerr << " gc " << onmemo(0) << endl;
 	}
 //	DBG(drv->printdiff(wcout<<"trees:"<<endl, trees, rng.bits);)
 	get_trees();
@@ -234,3 +235,10 @@ bool lp::pfp() {
 }
 
 lp::~lp() { for (rule* r : rules) delete r; }
+
+onexit _onexit;
+
+onexit::~onexit() {
+//	memos_clear(), bdd_and_eq::memo_clear(), range::memo_clear(),
+	bdd::onexit = true;
+}

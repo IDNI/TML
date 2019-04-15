@@ -22,7 +22,5 @@ int main(int argc, char** argv) {
 	driver d(argc, argv, stdin, DBG(true?true:)false);
 	if (!d.result) wcout << "unsat" << endl;
 	print_memos_len();
-	bdd::clear();
-	bdd::onexit = true;
 	return 0;
 }

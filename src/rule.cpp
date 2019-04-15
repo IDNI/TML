@@ -67,6 +67,18 @@ sizes rule::get_perm(const term& b, varmap& m) {
 	return perm;
 }
 
+pair<bools, sizes> compose(const sizes& p1, const sizes& p2, const bools& b) {
+	pair<bools, sizes> r;
+	assert(p1.size() == p2.size());
+	assert(p1.size() == b.size());
+	r.first.resize(p2.size()),
+	r.second.resize(p2.size());
+	for (size_t n = 0; n != r.first.size(); ++n) r.second[n] = n;
+	for (size_t n = 0; n != r.first.size(); ++n)
+		r.first[n] = b[p1[n]], r.second[n] = p2[p1[n]];
+	return r;
+}
+
 rule::rule(matrix h, matrix b, const vector<spbdd*>& dbs, range& rng) :
 	dbs(dbs), rng(rng) {
 	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
@@ -96,9 +108,11 @@ rule::rule(matrix h, matrix b, const vector<spbdd*>& dbs, range& rng) :
 						k, nvars+maxhlen);
 	get_ranges(h, b, m);
 	dt.resize(hpref.size());
-	for (size_t k = 0; k != hpref.size(); ++k)
-	dt[k] = bdd_subterm(0, hpref[k].len(), maxhlen+nvars, hpref[k].len(),
-		rng.bits);
+	for (size_t k = 0; k != hpref.size(); ++k) {
+		dt[k] = bdd_subterm(0, hpref[k].len(), maxhlen+nvars,
+				hpref[k].len(), rng.bits);
+//		dt[k] = compose(hperm[k], dt[k].second, dt[k].first);
+	}
 }
 
 void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
@@ -114,11 +128,6 @@ void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
 				!has(bposvars, h[n].arg(k)))
 				domain.push_back(k);
 		hleq[n] = rng(domain, h[n].nargs());
-	//	if (domain.size())for(auto t:h)DBG(drv->print_term(wcout,t));
-//		for (size_t i : domain)
-//			hleq[n] = bdd_and(hleq[n],builtins<leq_const>({i},bits,
-//				h[n].nargs(),
-//				leq_const(dsz-1, bits, h[n].nargs()))(T));
 		domain.clear();
 	}
 	for (const term& t : h)
@@ -147,21 +156,10 @@ bdds rule::fwd() {
 //	DBG(printbdd(wcout<<"q:"<<endl,vars,rng.bits,
 //		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
-		r[k] = vars ^ hperm[k];
-		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],
-		//		ints{(int_t)(maxhlen+nvars)},hrel[k])<<endl;)
-		//DBG(printbdd(wcout<<"perm:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-//		DBG(bdd_out(wcout, r[k])<<endl;)
-//		DBG(printbdd(wcout<<"bleq:"<<endl,r[k],harity[k],hrel[k])<<endl;)
-//		r[k]=bdd_deltail(r[k], maxhlen+nvars, hpref[k].len(), rng.bits);
-		r[k] = bdd_subterm(r[k], dt[k].first, dt[k].second, 0,
+		r[k] = bdd_subterm(vars^hperm[k], dt[k].first, dt[k].second, 0,
+//		r[k] = bdd_subterm(vars, dt[k].first, dt[k].second, 0,
 			maxhlen+nvars, hpref[k].len());
-		//DBG(printbdd(wcout<<"dt:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
-		//DBG(bdd_out(wcout, r[k])<<endl;)
-		r[k] = ae[k](r[k]);
-		//DBG(printbdd(wcout<<"ae:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
-		r[k] = hleq[k] && r[k];
-		//DBG(printbdd(wcout<<"hleq:"<<endl,r[k],rng.bits,harity[k],hrel[k])<<endl;)
+		r[k] = ae[k](r[k], hleq[k]);
 	}
 	return r;
 }

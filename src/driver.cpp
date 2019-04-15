@@ -56,7 +56,7 @@ term driver::get_term(raw_term r, const strs_t& s) {
 			int_t len = it == s.end() ? 0 : it->second.size();
 //			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
-			r.e.insert(r.e.begin()+n, {elem::NUM, len, {0,0}}),
+			r.e.insert(r.e.begin()+n, elem(len)),
 			r.calc_arity();
 		}
 	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
@@ -64,7 +64,7 @@ term driver::get_term(raw_term r, const strs_t& s) {
 		if (r.e[n].type == elem::NUM)
 			t.add_arg(mknum(r.e[n].num));
 		else if (r.e[n].type == elem::CHR)
-			t.add_arg(mkchr(*r.e[n].e[0]));
+			t.add_arg(mkchr(r.e[n].ch));
 		else if (r.e[n].type == elem::VAR)
 			t.add_arg(dict.get_var(r.e[n].e));
 		else if (r.e[n].type == elem::STR)

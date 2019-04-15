@@ -62,7 +62,7 @@ query::query(size_t bits, const term& t, const sizes& perm, bool neg) :
 spbdd query::operator()(spbdd x) {
 //	DBG(out(wcout<<L"called with ", getbdd(x)) << endl;)
 	//return (ae(x) / ex) ^ perm;
-	return bdd_permute_ex(ae(x), ex, perm);
+	return bdd_permute_ex(ae(x, T), ex, perm);
 /*	x = ae(x);
 	auto it = m->find(x);
 	if (it != m->end()) return it->second;
@@ -98,17 +98,14 @@ spbdd query::operator()(spbdd x) {
 }*/
 
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg) :
-	k(bits, t.nargs()*bits, from_term(t), neg) {
+	k(bits, t.nargs()*bits, from_term(t), neg), m(memos[k]) {
 		DBG(_t=t;)
-		auto it = memos.find(k);
-		if (it != memos.end()) m = it->second;
-		m = memos[k] = new unordered_map<spbdd, spbdd>;
-	}
+}
 
-spbdd bdd_and_eq::operator()(const spbdd x) {
-	auto it = m->find(x);
-	if (it != m->end()) return it->second;
-	bdds v = {x};
+spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
+	auto it = m.find(x);
+	if (it != m.end()) return it->second;
+	bdds v = {x, y};
 	for (size_t n = 0; n != k.e.size(); ++n)
 		if (k.e[n] > 0) 
 			v.push_back(from_int(k.e[n]-1, k.bits, n, k.e.size()));
@@ -119,11 +116,11 @@ spbdd bdd_and_eq::operator()(const spbdd x) {
 					POS(i, k.bits, -k.e[n]-1, k.e.size())));
 	if (k.neg) {
 		if (v.size() == 1)
-			return onmemo(), m->emplace(x,T%v[0]).first->second;
+			return onmemo(), m.emplace(x,T%v[0]).first->second;
 		v.push_back(v[1]%v[0]),
 		v.erase(v.begin(), v.begin()+1);
 	}
-	return onmemo(), m->emplace(x, bdd_and_many(move(v))).first->second;
+	return onmemo(), m.emplace(x, bdd_and_many(move(v))).first->second;
 }
 
 /*builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
@@ -177,7 +174,7 @@ spbdd range::operator()(size_t arg, size_t args) {
 	return onmemo(), memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }
 unordered_map<array<int_t, 5>, spbdd, array_hash<int_t, 5>> range::memo;
-map<bdd_and_eq::key, unordered_map<spbdd, spbdd>*> bdd_and_eq::memos;
+map<bdd_and_eq::key, unordered_map<spbdd, spbdd>> bdd_and_eq::memos;
 map<pair<size_t, int_t>, builtins<leq_const>>
 	range::bsyms, range::bnums, range::bchars;
 //map<query::key, unordered_map<size_t, size_t>*> query::memos;

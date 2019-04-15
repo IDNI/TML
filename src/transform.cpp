@@ -40,31 +40,31 @@ bool operator==(const lexeme& l, cws s) {
 
 raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
 	return { false, {v,
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::VAR, 0, get_var_lexeme(v1)},
-		{elem::VAR, 0, get_var_lexeme(v2)},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {2}};
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::VAR, get_var_lexeme(v1)),
+		elem(elem::VAR, get_var_lexeme(v2)),
+		elem(elem::CLOSEP, dict.get_lexeme(L")"))}, {2}};
 }
 
 raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	int_t v1, int_t v2) {
 	raw_term t{ false, {
-		{elem::SYM, 0, r},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::VAR, 0, get_var_lexeme(v1)},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
+		elem(elem::SYM, r),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::VAR, get_var_lexeme(v1)),
+		elem(elem::CLOSEP, dict.get_lexeme(L")")),
+		elem(elem::CLOSEP, dict.get_lexeme(L")")),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
 		c,
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::VAR, 0, get_var_lexeme(v2)},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}
+		elem(elem::CLOSEP, dict.get_lexeme(L")")),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::VAR, get_var_lexeme(v2)),
+		elem(elem::CLOSEP, dict.get_lexeme(L")")),
+		elem(elem::CLOSEP, dict.get_lexeme(L")")),
+		elem(elem::CLOSEP, dict.get_lexeme(L")"))
 	}, {}};
 	return t.calc_arity(), t;
 }
@@ -72,39 +72,38 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 	int_t v){
 	return { false, {
-		{elem::SYM, 0, r},
-		{elem::OPENP, 0, dict.get_lexeme(L"(")},
-		{elem::SYM, 0, dict.get_lexeme(b)},
-		{elem::VAR, 0, get_var_lexeme(v)},
-		{elem::VAR, 0, get_var_lexeme(v+1)},
-		{elem::CLOSEP, 0, dict.get_lexeme(L")")}}, {3}};
+		elem(elem::SYM, r),
+		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem(elem::SYM, dict.get_lexeme(b)),
+		elem(elem::VAR, get_var_lexeme(v)),
+		elem(elem::VAR, get_var_lexeme(v+1)),
+		elem(elem::CLOSEP, dict.get_lexeme(L")"))}, {3}};
 }
 
 #define from_string_lex(rel, lex, n) raw_rule({ false, { \
-		{elem::SYM, 0, rel}, {elem::SYM, 0, dict.get_lexeme(lex)}, \
-		{elem::NUM, n, get_num_lexeme(n)}, \
-		{elem::NUM, n+1, get_num_lexeme(n+1)}},{3}})
+		elem(elem::SYM, rel), elem(elem::SYM, dict.get_lexeme(lex)), \
+		elem(n), elem(n+1)},{3}})
 
 void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
 		r.r.push_back(raw_rule(raw_term{
 			false, {
-			{elem::SYM, 0, dict.get_rel(rel)},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::NUM, n, get_num_lexeme(n)},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::CHR, 0, get_char_lexeme(s[n])},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::OPENP, 0, dict.get_lexeme(L"(")},
-			{elem::NUM, n+1, get_num_lexeme(n+1)},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")},
-			{elem::CLOSEP, 0, dict.get_lexeme(L")")}},{}}));
+			elem(elem::SYM, dict.get_rel(rel)),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(n),
+			elem(elem::CLOSEP, dict.get_lexeme(L")")),
+			elem(elem::CLOSEP, dict.get_lexeme(L")")),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(s[n]),
+			elem(elem::CLOSEP, dict.get_lexeme(L")")),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(elem::OPENP, dict.get_lexeme(L"(")),
+			elem(n+1),
+			elem(elem::CLOSEP, dict.get_lexeme(L")")),
+			elem(elem::CLOSEP, dict.get_lexeme(L")")),
+			elem(elem::CLOSEP, dict.get_lexeme(L")"))},{}}));
 		r.r.back().head(0).calc_arity();
 		if (iswspace(s[n]))
 			r.r.push_back(from_string_lex(
@@ -124,9 +123,9 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 	}
 }
 
-#define append_sym_elem(x, s) (x).push_back({elem::SYM, 0, s})
-#define append_openp(x) (x).push_back({elem::OPENP, 0, dict.get_lexeme(L"(")})
-#define append_closep(x) (x).push_back({elem::CLOSEP, 0, dict.get_lexeme(L")")})
+#define append_sym_elem(x, s) (x).push_back(elem(elem::SYM, s))
+#define append_openp(x) (x).push_back(elem(elem::OPENP, dict.get_lexeme(L"(")))
+#define append_closep(x) (x).push_back(elem(elem::CLOSEP, dict.get_lexeme(L")")))
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
 #define cat_in_brackets(x, y) \
 	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
@@ -192,8 +191,7 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 				for (cws s = l[0]+1; s != l[1]; ++s)
 					if (*s == L'\\' && !esc) esc=true;
 					else p.p.insert(p.p.begin()+n++,
-						{elem::CHR,0,
-						get_char_lexeme(*s)}),esc=false;
+						elem(*s)),esc=false;
 			}
 	}
 #ifdef ELIM_NULLS
@@ -220,7 +218,7 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 #ifndef ELIM_NULLS			
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
-			elem e = {elem::VAR,0,get_var_lexeme(2)};
+			elem e = elem(elem::VAR, get_var_lexeme(2));
 			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
 			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));
@@ -232,13 +230,15 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 			size_t v = p.p.size();
 			l.add_head(from_grammar_elem(p.p[0], 1, p.p.size()));
 			for (size_t n = 1; n < p.p.size(); ++n) {
+				if (p.p[n].type == elem::CHR) {
+					l.add_body(from_grammar_elem_nt(
+						r.d[0].rel.e, p.p[n], n, n+1));
+					continue;
+				}
 				wstring str = lexeme2str(p.p[n].e);
 				if (has(b, str))
 					l.add_body(from_grammar_elem_builtin(
 						r.d[0].rel.e, str,n)), ++v;
-				else if (p.p[n].type == elem::CHR)
-					l.add_body(from_grammar_elem_nt(
-						r.d[0].rel.e, p.p[n], n, n+1));
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
 			}
@@ -247,8 +247,8 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 	}
 	raw_term t;
 	append_sym_elem(t.e, dict.get_lexeme(L"S")), append_openp(t.e),
-	t.e.push_back({elem::NUM, 0, 0}),
-	t.e.push_back({elem::NUM, (int_t)len, 0}),
+	t.e.push_back(elem((int_t)0)),
+	t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity();
 #ifdef BWD_GRAMMAR
 	transform_bwd(r, {t});

@@ -33,12 +33,19 @@ class bdd_and_eq {
 		key(size_t bits, size_t nvars, const ints& e, bool neg) :
 			bits(bits), nvars(nvars), e(e), neg(neg) {}
 	} k;
-	static std::map<key, std::unordered_map<spbdd, spbdd>*> memos;
-	std::unordered_map<spbdd, spbdd>* m;
+	static std::map<key, std::unordered_map<spbdd, spbdd>> memos;
+	std::unordered_map<spbdd, spbdd>& m;
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
-	spbdd operator()(spbdd x);
-	static void memo_clear() { onmemo(-memos.size()); memos.clear(); }
+	spbdd operator()(spbdd x, spbdd y);
+	static void memo_clear() {
+		for (auto x : memos) {
+			onmemo(-x.second.size()); 
+			x.second.clear();
+			//delete x.second;
+		}
+//		memos.clear();
+	}
 };
 
 class query {
