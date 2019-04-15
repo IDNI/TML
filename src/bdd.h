@@ -21,6 +21,7 @@
 
 //bdd bdd is a triple: varid,1-bdd-id,0-bdd-id
 //typedef std::array<size_t, 3> bdd;
+#define leafvar(x) (!(x) || ((x) == (size_t)-1))
 #define from_bit(x, v) ((v)?bdd::add((x)+1,T,F):bdd::add((x)+1,F,T))
 #define from_eq(x, y) ((x)<(y) ? bdd::add(x+1,from_bit(y,1),from_bit(y,0))\
 			: bdd::add(y+1, from_bit(x,1), from_bit(x,0)))
@@ -32,7 +33,6 @@ extern spbdd T, F;
 struct _bdd {
 	size_t v;
 	bdd *h, *l;
-	_bdd(const bdd& n);
 	_bdd(size_t v, bdd *h, bdd *l) : v(v), h(h), l(l) {}
 	bool operator==(const _bdd& n) const;
 };
@@ -47,16 +47,18 @@ public:
 		if (var && var != (size_t)-1) assert(hi&&lo);
 	}
 	size_t v() const { return var; }
-	const spbdd h() const { return hi; }
-	const spbdd l() const { return lo; }
-	bool leaf() const { return var == 0 || var == (size_t)-1; }
+	spbdd h() { return hi; }
+	spbdd l() { return lo; }
+	bool leaf() const { return leafvar(var); } 
 	bool trueleaf() const { return var; }
 	bool operator==(const bdd& n) const {
 		return var == n.var && hi == n.hi && lo == n.lo;
 	}
 	static void init() {
-		T = bdd::ntrue(), F = bdd::nfalse();
-		bdd::M.emplace(*T, T), bdd::M.emplace(*F, F);
+		T = bdd::ntrue(), F = bdd::nfalse(),
+		T->hi = T, T->lo = T, F->hi = F, F->lo = F;
+		M.emplace(_bdd(T->var, T->hi.get(), T->lo.get()), T),
+		M.emplace(_bdd(F->var, F->hi.get(), F->lo.get()), F);
 	}
 	static spbdd ntrue() {
 		return std::make_shared<bdd>((size_t)-1, nullptr, nullptr);
@@ -78,7 +80,7 @@ public:
 	static size_t size() { return M.size(); }
 	static bool onexit;
 	static size_t gc;
-	~bdd() { if (!onexit) M.erase(*this); ++gc; }
+	~bdd() { if (onexit) return; M.erase(_bdd(var, hi.get(), lo.get())); ++gc; }
 	static void clear();
 };
 typedef std::vector<spbdd> bdds;
@@ -114,7 +116,7 @@ bool bdd_onesat(spbdd x, size_t nvars, bools& r);
 spbdd from_int(size_t x, size_t bits, size_t arg, size_t args);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
-std::wostream& bdd_out(std::wostream& os, const bdd&n);// print bdd in ?: syntax
+std::wostream& bdd_out(std::wostream& os, bdd);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, spbdd n);
 void memos_clear();
 

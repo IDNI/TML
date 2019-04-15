@@ -64,7 +64,7 @@ unordered_map<memo, spbdd> memo_and, memo_and_not, memo_or, memo_dt;
 unordered_map<_bdd, weak_ptr<bdd>> bdd::M; // bdd to its index
 bool bdd::onexit = false;
 
-_bdd::_bdd(const bdd& n) : v(n.v()), h(n.h().get()), l(n.l().get()) {}
+//_bdd::_bdd(bdd n) : v(n.v()), h(n.h().get()), l(n.l().get()) {}
 bool _bdd::operator==(const _bdd& n) const {
 	return v == n.v && h == n.h && l == n.l;
 }
@@ -130,9 +130,10 @@ spbdd operator||(spbdd x, spbdd y) {
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret(a==T||b==T ? T : F, memo_or);
-	else if ((v = vx) < vy || !vy) b = d = y;
+	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
+		a =c = x, v = vy;
+	else if (leafvar(vx)) apply_ret(a==T||b==T ? T : F, memo_or);
+	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
 	apply_ret(bdd::add(v, a || b, c || d), memo_or);
 }
 
@@ -199,9 +200,10 @@ spbdd operator&&(spbdd x, spbdd y) {
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret((a==T&&b==T)?T:F, memo_and);
-	else if ((v = vx) < vy || !vy) b = d = y;
+	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
+		a = c = x, v = vy;
+	else if (leafvar(vx)) apply_ret((a==T&&b==T)?T:F, memo_and);
+	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
 	apply_ret(bdd::add(v, a && b, c && d), memo_and);
 }
 
@@ -216,9 +218,10 @@ spbdd operator%(spbdd x, spbdd y) {
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if ((!vx && vy) || (vy && (vx > vy))) a = c = x, v = vy;
-	else if (!vx) apply_ret((a==T&&b==F)?T:F, memo_and_not);
-	else if ((v = vx) < vy || !vy) b = d = y;
+	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
+		a = c = x, v = vy;
+	else if (leafvar(vx)) apply_ret((a==T&&b==F)?T:F, memo_and_not);
+	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
 	apply_ret(bdd::add(v, a%b, c%d),memo_and_not);
 }
 

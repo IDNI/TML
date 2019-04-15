@@ -1,6 +1,6 @@
 {
-@string progs <tml.g>.
-@trace W.
+@string progs "tml.g".
+#@trace W.
 
 S => ws '{' ws prog ws '}' ws S | null.
 prog => directive prog | production prog | rule prog | fof prog | query prog | null.

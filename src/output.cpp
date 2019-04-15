@@ -27,7 +27,7 @@ wostream& operator<<(wostream& os, const lexeme& l) {
 }
 
 #ifdef DEBUG
-wostream& operator<<(wostream& os, const bdd& n) {
+wostream& operator<<(wostream& os, bdd n) {
 	return os << n.v() << L' ' << n.h() << L' ' << n.l();
 }
 
@@ -35,7 +35,7 @@ wostream& bdd_out(wostream& os, spbdd n) {
 	return bdd_out(os<<L'['<<n<<L']', *n);
 }
 
-wostream& bdd_out(wostream& os, const bdd& n) { //print bdd in ?: syntax
+wostream& bdd_out(wostream& os, bdd n) { //print bdd in ?: syntax
 	return	n.leaf() ? os << (n.trueleaf() ? L'T' : L'F') : (bdd_out(
 		os<<n.v()<<L'?',n.h()),bdd_out(os<<L':',n.l()));
 }

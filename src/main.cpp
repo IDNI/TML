@@ -19,7 +19,7 @@ void print_memos_len();
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	tml_init();
-	driver d(argc, argv, stdin, DBG(true?true:)false);
+	driver d(argc, argv, stdin, argc > 1 && !strcmp(argv[1], "-t"));
 	if (!d.result) wcout << "unsat" << endl;
 	print_memos_len();
 	bdd::onexit = true;

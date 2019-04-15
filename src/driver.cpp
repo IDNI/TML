@@ -68,9 +68,12 @@ term driver::get_term(raw_term r, const strs_t& s) {
 			t.add_arg(mkchr(r.e[n].ch));
 		else if (r.e[n].type == elem::VAR)
 			t.add_arg(dict.get_var(r.e[n].e));
-		else if (r.e[n].type == elem::STR)
+		else if (r.e[n].type == elem::STR) {
+			lexeme l = r.e[n].e;
+			++l[0], --l[1];
 			t.add_arg(dict.get_sym(dict.get_lexeme(
-				_unquote(lexeme2str(r.e[n].e)))));
+				_unquote(lexeme2str(l)))));
+		}
 		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
 			t.add_arg(dict.get_sym(r.e[n].e));
 	return t;
@@ -132,7 +135,7 @@ void driver::get_dict_stats(const raw_prog& p) {
 wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
 
 wstring driver::directive_load(const directive& d) {
-	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-1);
+	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
 	switch (d.type) {
 		case directive::FNAME: return file_read(str);
 		case directive::STDIN: return move(std_input);

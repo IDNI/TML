@@ -163,7 +163,7 @@ loop2:	sz = s.size();
 	if (sz != s.size()) goto loop2;
 }
 
-//#define BWD_GRAMMAR
+#define BWD_GRAMMAR
 //#define ELIM_NULLS
 
 void driver::transform_grammar(raw_prog& r, size_t len) {
@@ -286,31 +286,28 @@ nexthead:	const raw_term &head = x.head(n);
 	for (auto x : s) r.r.push_back(x);
 }
 
-#define surround_term(x, y, z) \
-	append_sym_elem(x.e, y), cat_in_brackets(x, z), x.calc_arity()
+raw_term prepend_arg(raw_term t, lexeme s) {
+	size_t n = 1;
+	while (t.e[n].type == elem::OPENP || t.e[n].type == elem::CLOSEP) ++n;
+	t.e.insert(t.e.begin() + n, elem(elem::SYM, s));
+	return t.calc_arity(), t;
+}
 
 void driver::transform_bwd(raw_prog& p,const std::vector<raw_term>&g){
 	lexeme tr = dict.get_lexeme(L"try");
 	set<raw_rule> s;
-	for (const raw_term& t : g) { // try(goal)
-		raw_term x;
-		surround_term(x, tr, t), s.insert(raw_rule(x));
-	}
-	for (const raw_rule& x : p.r) {
+	wcout<<"before bwd:"<<endl<<p;
+	for (raw_term t : g) s.insert(raw_rule(prepend_arg(t, tr)));
+	for (const raw_rule& x : p.r)
 		if (!x.nbodies()) s.insert(x);
-		else for (const raw_term& h : x.heads()) { // h :- ..., try(h)
-			raw_term t;
-			surround_term(t, tr, h);
-			raw_rule y(h, t);
-			for (const raw_term& b : x.bodies()) y.add_body(b);
-			s.insert(y), y.clear(), y.add_body(t);
-			for (const raw_term& b : x.bodies()) { // try(b):-try(h)
-				raw_term w;
-				surround_term(w, tr, b), y.add_head(w);
-			}
+		else for (raw_term h : x.heads()) {
+			raw_rule y(h);
+			y.add_body(prepend_arg(h, tr));
+			for (raw_term b : x.bodies())
+				y.add_body(b), y.add_head(prepend_arg(b, tr));
 			s.insert(y);
 		}
-	}
 	p.r.clear();
 	for (auto x : s) p.r.push_back(x);
+	wcout<<"after bwd:"<<endl<<p;
 }
