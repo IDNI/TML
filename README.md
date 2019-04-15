@@ -377,6 +377,11 @@ by the productions
 It is possible to supply a first order formula which is then transformed into
 a TML program. TBD
 
+# Misc
+
+Comments are either C-style /* \*/ multiline comments, or # to comment till
+the end of the line.
+
 # Philosophy
 
 TBD

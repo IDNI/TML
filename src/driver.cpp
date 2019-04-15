@@ -192,7 +192,7 @@ void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
 		else transform_grammar(rp.p[n], pd.strs.begin()->second.size());
 	}
 	if (trel[0]) transform_proofs(rp.p[n], trel);
-	wcout<<rp.p[n]<<endl;
+	//wcout<<rp.p[n]<<endl;
 	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
@@ -200,7 +200,9 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	prog_data pd;
 	transform(rp, n, pd, strtrees);
-	if (print_transformed) wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
+	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
+		for (auto p : rp.p)
+			wcout<<L'{'<<endl<<p<<L'}'<<endl;
 	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n], pd);
 	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;

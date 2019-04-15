@@ -69,10 +69,8 @@ sizes rule::get_perm(const term& b, varmap& m) {
 
 pair<bools, sizes> compose(const sizes& p1, const sizes& p2, const bools& b) {
 	pair<bools, sizes> r;
-	assert(p1.size() == p2.size());
-	assert(p1.size() == b.size());
-	r.first.resize(p2.size()),
-	r.second.resize(p2.size());
+	DBG(assert(p1.size() == p2.size() && p1.size() == b.size());)
+	r.first.resize(p2.size()), r.second.resize(p2.size());
 	for (size_t n = 0; n != r.first.size(); ++n) r.second[n] = n;
 	for (size_t n = 0; n != r.first.size(); ++n)
 		r.first[n] = b[p1[n]], r.second[n] = p2[p1[n]];
@@ -81,7 +79,6 @@ pair<bools, sizes> compose(const sizes& p1, const sizes& p2, const bools& b) {
 
 rule::rule(matrix h, matrix b, const vector<db_t::iterator>& dbs, range& rng) :
 	dbs(dbs), rng(rng) {
-	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
 	hperm.resize(h.size()), hpref.resize(h.size()), neg.resize(h.size()),
 	maxhlen = 0;
 	for (const term& t : h) maxhlen = max(maxhlen, t.nargs());
@@ -97,15 +94,15 @@ rule::rule(matrix h, matrix b, const vector<db_t::iterator>& dbs, range& rng) :
 	}
 	varmap m;
 	for (size_t n = 0; n != b.size(); ++n)
-		q.emplace_back(
-			rng.bits, b[n], get_perm(b[n], m),b[n].neg());
+		q.emplace_back(rng.bits, b[n], get_perm(b[n], m), b[n].neg());
 	for (size_t n = 0; n != h.size(); ++n)
 		for (size_t k = 0; k != h[n].nargs(); ++k)
-			if (h[n].arg(k) < 0)
-				for (size_t j = 0; j != rng.bits; ++j)
-					hperm[n][POS(j, rng.bits,m[h[n].arg(k)],
-						nvars+maxhlen)]=POS(j, rng.bits,
-						k, nvars+maxhlen);
+			if (h[n].arg(k) >= 0) continue;
+			else for (size_t j = 0; j != rng.bits; ++j)
+				hperm[n][POS(j, rng.bits, m[h[n].arg(k)],
+					nvars + maxhlen)] = POS(j, rng.bits, k,
+					//h[n].nargs());
+					nvars + maxhlen);
 	get_ranges(h, b, m);
 	dt.resize(hpref.size());
 	for (size_t k = 0; k != hpref.size(); ++k) {
@@ -147,19 +144,27 @@ void rule::get_ranges(const matrix& h, const matrix& b, const varmap& m) {
 bdds rule::fwd() {
 	bdds r(hpref.size()), v(q.size());
 	spbdd vars;
-	for (size_t n = 0; n < q.size(); ++n)
+	for (size_t n = 0; n < q.size(); ++n) {
 		if (F == (v[n] = q[n](dbs[n]->second))) return {};
+		DBG(assert_nvars(v[n], rng.bits*(maxhlen+nvars));)
+	}
 //		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],rng.bits,
 //			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
-	v.push_back(bleq);
+	if (bleq != T) v.push_back(bleq);
 	if (F == (vars = bdd_and_many(move(v)))) return {};
 //	DBG(printbdd(wcout<<"q:"<<endl,vars,rng.bits,
 //		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
+	DBG(assert_nvars(vars, rng.bits*(maxhlen+nvars));)
 	for (size_t k = 0; k != r.size(); ++k) {
 //		r[k] = bdd_subterm(vars^hperm[k], dt[k].first, dt[k].second, 0,
 		r[k] = bdd_subterm(vars, dt[k].first, dt[k].second, 0,
-			maxhlen+nvars, hpref[k].len());
+			hpref[k].len(),
+			maxhlen+nvars
+			);
+		DBG(assert_nvars(r[k], rng.bits*hpref[k].len());)
+		DBG(assert_nvars(hleq[k], rng.bits*hpref[k].len());)
 		r[k] = ae[k](r[k], hleq[k]);
+		DBG(assert_nvars(r[k], rng.bits*hpref[k].len());)
 	}
 	return r;
 }

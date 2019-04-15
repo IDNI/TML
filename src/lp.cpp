@@ -125,24 +125,25 @@ void lp::fwd(diff_t &add, diff_t &del) {
 	}
 	diff_t::iterator it;
 	for (auto x : a) {
+		DBG(for(auto y:x.second)assert_nvars(y,rng.bits*x.first.len());)
 		it = add.find(x.first);
 		if (it == add.end()) add[x.first] = bdd_or_many(x.second);
 		else	x.second.push_back(it->second),
 			it->second = bdd_or_many(x.second);
 	}
 	for (auto x : d) {
+		DBG(for(auto y:x.second)assert_nvars(y,rng.bits*x.first.len());)
 		it = del.find(x.first);
 		if (it == del.end()) del[x.first] = bdd_or_many(x.second);
 		else	x.second.push_back(it->second),
 			it->second = bdd_or_many(x.second);
 	}
 	if (onmemo(0)>1e+17)
-		(wcerr<<onmemo(0)),
-		memos_clear(), bdd_and_eq::memo_clear(),
+		(wcerr<<onmemo(0)), memos_clear(), bdd_and_eq::memo_clear(),
 		range::memo_clear(), (wcerr << " gc " << onmemo(0) << endl),
 		onmemo(-onmemo(0));
 	//DBG(printdiff(wcout<<"add:"<<endl,add,rng.bits););
-	//DBG(printdiff(wcout<<"del:"<<endl,del););
+	//DBG(printdiff(wcout<<"del:"<<endl,del,rng.bits););
 	//DBG(printdb(wcout<<"after step: "<<endl, this)<<endl;)
 }
 
@@ -237,3 +238,10 @@ onexit::~onexit() {
 //	memos_clear(), bdd_and_eq::memo_clear(), range::memo_clear(),
 	bdd::onexit = true;
 }
+
+#ifdef DEBUG
+void assert_nvars(spbdd x, size_t vars) {
+	size_t nv = bdd_nvars(x);
+	assert(nv <= vars);
+}
+#endif

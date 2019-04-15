@@ -35,6 +35,7 @@ class bdd_and_eq {
 	} k;
 	static std::map<key, std::unordered_map<spbdd, spbdd>> memos;
 	std::unordered_map<spbdd, spbdd>& m;
+	spbdd z;
 public:
 	bdd_and_eq(size_t bits, const term& t, bool neg);
 	spbdd operator()(spbdd x, spbdd y);
@@ -53,21 +54,7 @@ class query {
 	const bool neg;
 	const sizes perm;
 	DBG(term _t;)
-/*	struct key {
-		bool operator<(const key& k) const {
-			if (neg != k.neg) return neg;
-			if (ex.size()!=k.ex.size())return ex.size()<k.ex.size();
-			if (ex != k.ex) return ex < k.ex;
-			return perm != k.perm ? perm < k.perm : false;
-		}
-		key(const bools& ex, bool neg, const sizes& perm) :
-			ex(ex), neg(neg), perm(perm) {}
-	} k;*/
 	bdd_and_eq ae;
-//	sizes getdom() const;
-//	static std::map<key, std::unordered_map<size_t, size_t>*> memos;
-//	std::unordered_map<size_t, size_t>* m;
-//	size_t compute(size_t x, size_t v);
 public:
 	query(size_t bits, const term& t, const sizes& perm, bool neg);
 	spbdd operator()(spbdd x);
@@ -111,7 +98,12 @@ public:
 
 	spbdd operator()(spbdd x) {
 		auto it = memo.find(x);
-		if (it == memo.end()) return onmemo(), memo[x] = compute(x, 0);
+		if (it == memo.end()) {
+			spbdd r = compute(x, 0);
+			DBG(assert_nvars(r, bits*args);)
+			return onmemo(), memo[x] = r;
+		}
+		DBG(assert_nvars(it->second, bits*args);)
 		return it->second;
 	}
 	void memo_clear() { onmemo(-memo.size()); memo.clear(); }
@@ -130,21 +122,20 @@ struct leq_const {
 	}
 };
 
-/*struct geq_const {
-	const int_t c;
-	const size_t bits, args;
-	geq_const(int_t c, size_t bits, size_t args) : c(c), bits(bits)
-		, args(args) { assert(c < (1<<bits)); }
-	builtin_res operator()(const std::vector<char>& path, size_t arg,
-		size_t var) const;
-};*/
-
-DBG(using namespace std;)
-
 struct range {
 	const int_t syms, nums, chars;
 	const size_t bits;
-	static std::map<std::pair<size_t, int_t>, builtins<leq_const>>
+	struct key {
+		size_t arg, args;
+		int_t ext;
+		bool operator<(const key& k) const {
+			if (arg != k.arg) return arg < k.arg;
+			if (args != k.args) return args < k.args;
+			if (ext != k.ext) return ext < k.ext;
+			return false;
+		}
+	};
+	static std::map<key, builtins<leq_const>>
 		bsyms, bnums, bchars;
 	static std::unordered_map<std::array<int_t, 5>, spbdd,
 		array_hash<int_t, 5>> memo;

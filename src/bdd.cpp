@@ -29,14 +29,6 @@ size_t bdd::gc = 0;
 
 map<sizes, unordered_map<spbdd, spbdd>> memos_perm;
 map<bools, unordered_map<spbdd, spbdd>> memos_ex;
-/*template<> struct std::hash<pair<bools, sizes>> {
-	size_t operator()(const pair<bools, sizes>& m) const {
-		size_t r = 0;
-		for (size_t n = 0; n != m.first.size(); ++n)
-			r += (n+1)*(m.first[n] + m.second[n]<<1 + 1);
-		return r;
-	}
-};*/
 map<pair<sizes, bools>, unordered_map<spbdd, spbdd>> memos_perm_ex;
 map<bdds, spbdd> memo_and_many;
 map<bdds, spbdd> memo_or_many;
@@ -60,24 +52,8 @@ unordered_map<memo, spbdd> memo_and, memo_and_not, memo_or, memo_dt;
 #define apply_ret(r, m) return r
 #endif
 
-//vector<bdd> V; // all bdd bdds
-unordered_map<_bdd, weak_ptr<bdd>> bdd::M; // bdd to its index
+unordered_map<bdd::key, weak_ptr<bdd>, bdd::keyhash> bdd::M; // bdd to its ptr
 bool bdd::onexit = false;
-
-//_bdd::_bdd(bdd n) : v(n.v()), h(n.h().get()), l(n.l().get()) {}
-bool _bdd::operator==(const _bdd& n) const {
-	return v == n.v && h == n.h && l == n.l;
-}
-
-/*spbdd bdd::add_nocheck(const spbdd n) {
-	return M.emplace(*n, n).first->second;
-//	size_t r;
-//	return M.emplace(n, r = V.size()), V.emplace_back(n), r;
-}*/
-
-size_t std::hash<_bdd>::operator()(const _bdd& n) const {
-	return n.v+(size_t)n.h+(size_t)n.l;
-}
 
 void allsat_cb::sat(spbdd x) {
 	if (x->leaf() && !x->trueleaf()) return;
@@ -117,7 +93,7 @@ vbools allsat(spbdd x, size_t bits, size_t args) {
 	return s;
 }
 
-spbdd operator||(spbdd x, spbdd y) {
+spbdd operator||(const spbdd& x, const spbdd& y) {
 	if (x == y || y == F) return x;
 	if (x == F) return y;
 	if (x == T || y == T) return T;
@@ -130,10 +106,10 @@ spbdd operator||(spbdd x, spbdd y) {
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
-		a =c = x, v = vy;
+	if (!leafvar(vy) && (leafvar(vx) || vx > vy)) a = c = x, v = vy;
 	else if (leafvar(vx)) apply_ret(a==T||b==T ? T : F, memo_or);
 	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
+	DBG(assert(!leafvar(v));)
 	apply_ret(bdd::add(v, a || b, c || d), memo_or);
 }
 
@@ -147,7 +123,8 @@ spbdd bdd_ex(spbdd x, const bools& b, unordered_map<spbdd, spbdd>& memo) {
 		if (r->leaf()) return onmemo(), memo.emplace(x, r), r;
 		x = r;
 	}
-	if (x->v()-1 >= b.size()) return x;
+	//if (x->v()-1 >= b.size()) return x;
+	DBG(assert(x->v()-1 < b.size()));
 	onmemo();
 	return memo.emplace(x, bdd::add(x->v(), bdd_ex(x->h(), b, memo),
 				bdd_ex(x->l(), b, memo))).first->second;
@@ -173,12 +150,14 @@ spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m,
 	unordered_map<spbdd, spbdd>& memo) {
 	if (x->leaf()) return x;
 	spbdd t = x;
+	DBG(assert(b.size() >= x->v());)
 	for (spbdd r; x->v()-1 < b.size() && b[x->v()-1]; x = r)
 		if ((r = (x->h() || x->l()))->leaf()) return r;
+		DBG(else assert(b.size() >= r->v());)
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
 	onmemo();
-	DBG(assert(!x->leaf());)
+	DBG(assert(!x->leaf() && m.size() >= x->v());)
 	return	memo.emplace(t, bdd_ite(m[x->v()-1],
 		bdd_permute_ex(x->h(), b, m, memo),
 		bdd_permute_ex(x->l(), b, m, memo))).first->second;
@@ -506,6 +485,11 @@ spbdd from_int(size_t x, size_t bits, size_t arg, size_t args) {
 	while (b--)
 		r = r && from_bit(POS(b, bits, arg, args), x&(1<<b));
 	return r;
+}
+
+size_t bdd_nvars(spbdd x) {
+	if (x->leaf()) return 0;
+	return max(max(x->v(), bdd_nvars(x->h())), bdd_nvars(x->l()));
 }
 
 #define print_memo_size(x) wcout << #x << ": " << x.size() << endl

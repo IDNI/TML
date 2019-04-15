@@ -23,6 +23,11 @@ lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
 	cws t = *s;
+	if (!wcsncmp(*s, L"/*", 2)) {
+		while (wcsncmp(++*s, L"*/", 2))
+			if (!**s) parse_error(L"Unfinished comment", 0);
+		return ++++*s, lex(s);
+	}
 	if (**s == L'#') {
 		while (*++*s != L'\r' && **s != L'\n' && **s);
 		return lex(s);
@@ -313,8 +318,10 @@ void parse_error(std::wstring e, cws s) {
 	wcerr << e << endl;
 	cws p = s;
 	while (*p && *p != L'\n') ++p;
-	wstring t(s, p-s);
-	wcerr << L"at: " << t << endl;
+	if (s) {
+		wstring t(s, p-s);
+		wcerr << L"at: " << t << endl;
+	}
 	exit(0);
 }
 

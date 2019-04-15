@@ -73,40 +73,10 @@ spbdd query::operator()(spbdd x) {
 	//	bdd_permute(neg ? bdd_and_not(T, x) : x, perm);
 }
 
-/*size_t query::compute(size_t x, size_t v) {
-	if (leaf(x) && (!trueleaf(x) || v == nvars)) return x;
-	bdd n = neg&&!leaf(x) ? flip(getbdd(x)) : getbdd(x);
-	const size_t arg = ARG(v, e.size());
-	if (!has(domain, arg+1))
-		return bdd_ite(perm[v], compute(n[1],v+1), compute(n[2],v+1));
-	if (leaf(x) || v+1 < n[0]) n = { v+1, x, x };
-	if (e[arg] > 0)
-		return compute(n[(e[arg]-1)&(1<<BIT(v,e.size(),bits))?1:2],v+1);
-	if (e[arg] < 0) {
-		if (path[POS(BIT(v,e.size(),bits),bits,-e[arg]-1,e.size())]==1)
-			return path[v] = 1, compute(n[1],v+1);
-		return path[v] = -1, compute(n[2],v+1);
-	}
-	return	path[v] = 1, x = compute(n[1], v+1), path[v] = -1,
-		bdd_ite(perm[v], x, compute(n[2], v+1));
-}*/
-
-/*sizes query::getdom() const {
-	sizes r;
-	for (size_t n = 0; n != e.size(); ++n)
-		if (e[n]) r.push_back(n+1), r.push_back(abs(e[n]));
-	return sort(r);
-}*/
-
 bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg) :
 	k(bits, t.nargs()*bits, from_term(t), neg), m(memos[k]) {
-		DBG(_t=t;)
-}
-
-spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
-	auto it = m.find(x);
-	if (it != m.end()) return it->second;
-	bdds v = {x, y};
+	DBG(_t=t;)
+	bdds v;
 	for (size_t n = 0; n != k.e.size(); ++n)
 		if (k.e[n] > 0) 
 			v.push_back(from_int(k.e[n]-1, k.bits, n, k.e.size()));
@@ -115,13 +85,14 @@ spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
 			for (size_t i = 0; i != k.bits; ++i)
 				v.push_back(from_eq(POS(i, k.bits,n,k.e.size()),
 					POS(i, k.bits, -k.e[n]-1, k.e.size())));
-	if (k.neg) {
-		if (v.size() == 1)
-			return onmemo(), m.emplace(x,T%v[0]).first->second;
-		v.push_back(v[1]%v[0]),
-		v.erase(v.begin(), v.begin()+1);
-	}
-	return onmemo(), m.emplace(x, bdd_and_many(move(v))).first->second;
+	z = bdd_and_many(move(v));
+	DBG(assert_nvars(z, bits * t.nargs());)
+}
+
+spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
+	auto it = m.find(x);
+	if (it != m.end()) return it->second;
+	return onmemo(), m.emplace(x, bdd_and_many({x,y,z})).first->second;
 }
 
 /*builtin_res geq_const::operator()(const vector<char>& path, size_t arg,
@@ -154,28 +125,41 @@ spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
 spbdd range::operator()(size_t arg, size_t args) {
 	auto it = memo.find({syms,nums,chars,(int_t)args,(int_t)arg});
 	if (it != memo.end()) return it->second;
-	auto st = bsyms.find({arg, syms});
+	auto st = bsyms.find({arg, args, syms});
 	if (st == bsyms.end())
-		st = bsyms.emplace(pair<size_t, int_t>{arg, syms},
-			builtins<leq_const>(arg,bits,
-			args,leq_const(((syms-1)<<2)|3,bits,args))).first;
-	auto nt = bnums.find({arg, nums});
-		nt = bnums.emplace(pair<size_t, int_t>{arg, nums},
-			builtins<leq_const>(arg,bits,
-			args,leq_const(((nums-1)<<2)|3,bits,args))).first;
-	auto ct = bchars.find({arg, chars});
-		ct = bchars.emplace(pair<size_t, int_t>{arg, chars},
-			builtins<leq_const>(arg,bits,
-			args,leq_const(((chars-1)<<2)|3,bits,args))).first;
-	spbdd r = bdd_and_many({
+		st = bsyms.emplace(key{arg, args, syms},
+			builtins<leq_const>(arg,bits,args,
+			leq_const(((syms-1)<<2)|3,bits,args))).first;
+	auto nt = bnums.find({arg, args, nums});
+	if (nt == bnums.end())
+		nt = bnums.emplace(key{arg, args, nums},
+			builtins<leq_const>(arg,bits,args,
+			leq_const(((nums-1)<<2)|3,bits,args))).first;
+	auto ct = bchars.find({arg, args, chars});
+	if (ct == bchars.end())
+		ct = bchars.emplace(key{arg, args, chars},
+			builtins<leq_const>(arg,bits,args,
+			leq_const(((chars-1)<<2)|3,bits,args))).first;
+	bdds v = {
 		ischar || isnum || issym,
 		chars ? chars_clause : notchar,
 		nums ? nums_clause : notnum,
-		syms ? syms_clause : notsym});
+		syms ? syms_clause : notsym};
+	DBG(assert_nvars(ischar, bits*args);)
+	DBG(assert_nvars(isnum, bits*args);)
+	DBG(assert_nvars(issym, bits*args);)
+	DBG(assert_nvars(chars_clause, bits*args);)
+	DBG(assert_nvars(nt->second(T), bits*args);)
+	DBG(assert_nvars(nums_clause, bits*args);)
+	DBG(assert_nvars(syms_clause, bits*args);)
+	DBG(assert_nvars(notchar, bits*args);)
+	DBG(assert_nvars(notnum, bits*args);)
+	DBG(assert_nvars(notsym, bits*args);)
+	DBG(for (auto x : v) assert_nvars(x, bits*args);)
+	spbdd r = bdd_and_many(v);
 	return onmemo(), memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }
 unordered_map<array<int_t, 5>, spbdd, array_hash<int_t, 5>> range::memo;
 map<bdd_and_eq::key, unordered_map<spbdd, spbdd>> bdd_and_eq::memos;
-map<pair<size_t, int_t>, builtins<leq_const>>
-	range::bsyms, range::bnums, range::bchars;
+map<range::key, builtins<leq_const>> range::bsyms, range::bnums, range::bchars;
 //map<query::key, unordered_map<size_t, size_t>*> query::memos;

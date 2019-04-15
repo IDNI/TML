@@ -26,61 +26,59 @@
 #define from_eq(x, y) ((x)<(y) ? bdd::add(x+1,from_bit(y,1),from_bit(y,0))\
 			: bdd::add(y+1, from_bit(x,1), from_bit(x,0)))
 class bdd;
-struct _bdd;
+struct key;
 typedef std::shared_ptr<bdd> spbdd;
-template<> struct std::hash<_bdd> { size_t operator()(const _bdd& n) const; };
 extern spbdd T, F;
-struct _bdd {
-	size_t v;
-	bdd *h, *l;
-	_bdd(size_t v, bdd *h, bdd *l) : v(v), h(h), l(l) {}
-	bool operator==(const _bdd& n) const;
-};
 
 class bdd {
-	friend struct _bdd;
-	static std::unordered_map<_bdd, std::weak_ptr<bdd>> M; //bdd to its index
-	size_t var;
+	struct key {
+		const size_t v;
+		const bdd *h, *l;
+		const size_t hash;
+		key(size_t v, const bdd *h, const bdd *l) :v(v), h(h), l(l),
+			hash(v+(((size_t)h)<<13)+(((size_t)l)<<40)) {}
+		bool operator==(const key& n) const {
+			return v == n.v && h == n.h && l == n.l;
+		}
+	};
+	struct keyhash { size_t operator()(const key&k) const {return k.hash;}};
+	static std::unordered_map<key, std::weak_ptr<bdd>, keyhash> M;
+	const size_t var;
 	spbdd hi, lo;
 public:
 	bdd(size_t var, spbdd hi, spbdd lo) : var(var), hi(hi), lo(lo) {
-		if (var && var != (size_t)-1) assert(hi&&lo);
+		DBG(if (var && var != (size_t)-1) assert(hi&&lo);)
 	}
-	size_t v() const { return var; }
-	spbdd h() { return hi; }
-	spbdd l() { return lo; }
+	const size_t& v() const { return var; }
+	const spbdd& h() const { return hi; }
+	const spbdd& l() const { return lo; }
 	bool leaf() const { return leafvar(var); } 
 	bool trueleaf() const { return var; }
 	bool operator==(const bdd& n) const {
 		return var == n.var && hi == n.hi && lo == n.lo;
 	}
 	static void init() {
-		T = bdd::ntrue(), F = bdd::nfalse(),
-		T->hi = T, T->lo = T, F->hi = F, F->lo = F;
-		M.emplace(_bdd(T->var, T->hi.get(), T->lo.get()), T),
-		M.emplace(_bdd(F->var, F->hi.get(), F->lo.get()), F);
-	}
-	static spbdd ntrue() {
-		return std::make_shared<bdd>((size_t)-1, nullptr, nullptr);
-	}
-	static spbdd nfalse() {
-		return std::make_shared<bdd>(0, nullptr, nullptr);
+		T = std::make_shared<bdd>((size_t)-1, nullptr, nullptr),
+		F = std::make_shared<bdd>(0, nullptr, nullptr),
+		T->hi = T->lo = T, F->hi = F->lo = F,
+		M.emplace(key(T->var, T->hi.get(), T->lo.get()), T),
+		M.emplace(key(F->var, F->hi.get(), F->lo.get()), F);
 	}
 	static spbdd add(size_t _v, spbdd _h, spbdd _l) {
 		if (_h == _l) return _l;
 		DBG(assert(_h&&_l);)
 		DBG(if (!_h->leaf()) assert(_v < _h->v());)
 		DBG(if (!_l->leaf()) assert(_v < _l->v());)
-		auto it = M.find(_bdd(_v,_h.get(),_l.get()));
+		auto it = M.find(key(_v, _h.get(), _l.get()));
 		if (it != M.end()) return it->second.lock();
-		auto r = std::make_shared<bdd>(_v,_h,_l);
-		return 	M.emplace(_bdd(_v,_h.get(),_l.get()),
+		spbdd r = std::make_shared<bdd>(_v, _h, _l);
+		return 	M.emplace(key(_v, _h.get(), _l.get()),
 			std::weak_ptr<bdd>(r)), r;
 	}
 	static size_t size() { return M.size(); }
 	static bool onexit;
 	static size_t gc;
-	~bdd() { if (onexit) return; M.erase(_bdd(var, hi.get(), lo.get())); ++gc; }
+	~bdd() { if (onexit) return; M.erase(key(var, hi.get(), lo.get())); ++gc; }
 	static void clear();
 };
 typedef std::vector<spbdd> bdds;
@@ -93,7 +91,7 @@ extern onexit _onexit;
 void bdd_init();
 vbools allsat(spbdd x, size_t nvars);
 vbools allsat(spbdd x, size_t bits, size_t args);
-spbdd operator||(spbdd x, spbdd y);
+spbdd operator||(const spbdd& x, const spbdd& y);
 spbdd operator/(spbdd x, const bools&); // existential quantification
 spbdd operator&&(spbdd x, spbdd y);
 spbdd operator%(spbdd x, spbdd y); // and not
@@ -114,11 +112,13 @@ spbdd bdd_ite(size_t v, spbdd t, spbdd e);
 size_t bdd_count(size_t x, size_t nvars);
 bool bdd_onesat(spbdd x, size_t nvars, bools& r);
 spbdd from_int(size_t x, size_t bits, size_t arg, size_t args);
+size_t bdd_nvars(spbdd x);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
 std::wostream& bdd_out(std::wostream& os, bdd);// print bdd in ?: syntax
 std::wostream& bdd_out(std::wostream& os, spbdd n);
 void memos_clear();
+DBG(void assert_nvars(spbdd x, size_t vars);)
 
 #define from_int_and(x, y, arg, args, r) (r = (r) && from_int(x,y,arg,args))
 

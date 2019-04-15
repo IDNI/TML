@@ -5,11 +5,5 @@
 #@string str "(()())".
 S => '(' S ')' S | null.
 !S(0 len(str)).
-#a('\'').
 #@trace W.
-#a(1 2).
-#! S ?x ?y.
-#! str ?x ?y ?z.
-#a(?x ?y) :- b(?x).
 #!! S(?x ?y).
-# should output "S 1 null" if str is a string of balanced parenthesis

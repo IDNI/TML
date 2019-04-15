@@ -225,7 +225,7 @@ wostream& operator<<(wostream& os, const elem& e) {
 }
 
 wostream& operator<<(wostream& os, const production& p) {
-	os << p.p[0] << L" -> ";
+	os << p.p[0] << L" => ";
 	for (size_t n = 1; n < p.p.size(); ++n) os << p.p[n] << L' ';
 	return os << L'.';
 }

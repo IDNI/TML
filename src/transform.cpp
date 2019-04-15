@@ -296,18 +296,15 @@ nexthead:	const raw_term &head = x.head(n);
 }
 
 raw_term driver::prepend_arg(raw_term t, lexeme s) {
-	wcout<<"prepend: " << t<<endl;
 	if (t.e.size() == 1) {
 		append_openp(t.e), t.e.emplace_back(elem::SYM, s),
 		append_closep(t.e), t.calc_arity();
-		wcout<<"prepend: " << t<<endl;
 		return t;
 	}
 	size_t n = 1;
 	while (	n < t.e.size() && 
 		(t.e[n].type==elem::OPENP || t.e[n].type==elem::CLOSEP)) ++n;
 	t.e.insert(t.e.begin()+n, elem(elem::SYM, s)), t.calc_arity();
-	wcout<<"prepended: " << t<<endl;
 	return t;
 }
 
@@ -340,6 +337,5 @@ raw_prog driver::transform_bwd(raw_prog& p) {
 	for (auto x : s) p.r.push_back(x);
 	raw_prog q;
 	for (auto x : d) q.r.push_back(x);
-	wcout<<"p:"<<endl<<p<<"q:"<<endl<<q<<endl;
 	return q;
 }
