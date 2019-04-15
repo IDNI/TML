@@ -1,12 +1,12 @@
 {
-@string progs "tml.g".
-#@trace W.
+@string progs <tml.g>.
 
 S => ws '{' ws prog ws '}' ws S | null.
 prog => directive prog | production prog | rule prog | fof prog | query prog | null.
 directive =>	"@string" space ws strdir ws '.' ws |
 		"@stdout" space ws term ws '.' ws |
-		"@trace" space ws relname ws '.' ws.
+		"@trace" space ws relname ws '.' ws |
+		"@bwd" ws '.' ws.
 production => relname ws "=>" ws alt alts ws '.' ws.
 alt =>	ws terminal ws alt | ws nonterminal ws alt | null.
 alts => null | ws '|' ws alt ws alts.

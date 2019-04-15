@@ -48,24 +48,23 @@ raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
 
 raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	int_t v1, int_t v2) {
-	raw_term t{ false, {
-		elem(elem::SYM, r),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		elem(elem::VAR, get_var_lexeme(v1)),
-		elem(elem::CLOSEP, dict.get_lexeme(L")")),
-		elem(elem::CLOSEP, dict.get_lexeme(L")")),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		c,
-		elem(elem::CLOSEP, dict.get_lexeme(L")")),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
-		elem(elem::VAR, get_var_lexeme(v2)),
-		elem(elem::CLOSEP, dict.get_lexeme(L")")),
-		elem(elem::CLOSEP, dict.get_lexeme(L")")),
-		elem(elem::CLOSEP, dict.get_lexeme(L")"))
-	}, {}};
+	raw_term t;
+	t.e.emplace_back(elem::SYM, r),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem::VAR, get_var_lexeme(v1)),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(c),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem::VAR, get_var_lexeme(v2)),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
+	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")"));
 	return t.calc_arity(), t;
 }
 
@@ -216,7 +215,7 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 	r.r.push_back(l);*/
 	directive *d = 0;
 	for (directive& x : r.d)
-		if (x.type == directive::STR) {
+		if (x.type == directive::STR || x.type == directive::FNAME) {
 			d = &x;
 			break;
 		}			
