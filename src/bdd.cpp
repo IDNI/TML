@@ -174,10 +174,11 @@ spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m,
 	if (x->leaf()) return x;
 	spbdd t = x;
 	for (spbdd r; x->v()-1 < b.size() && b[x->v()-1]; x = r)
-		if ((r = x->h() || x->l())->leaf()) return r;
+		if ((r = (x->h() || x->l()))->leaf()) return r;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
 	onmemo();
+	DBG(assert(!x->leaf());)
 	return	memo.emplace(t, bdd_ite(m[x->v()-1],
 		bdd_permute_ex(x->h(), b, m, memo),
 		bdd_permute_ex(x->l(), b, m, memo))).first->second;
@@ -468,10 +469,10 @@ spbdd bdd_or_many(bdds v) {
 }
 
 spbdd bdd_ite(size_t v, spbdd t, spbdd e) {
-//	const bdd x = getbdd(t), y = getbdd(e);
-	if ((t->leaf()||v<t->v())&&(e->leaf()||v<e->v()))
+	DBG(assert(!leafvar(v+1));)
+	if ((t->leaf() || v < t->v()) && (e->leaf() || v < e->v()))
 		return bdd::add(v+1, t, e);
-	return (from_bit(v,true)&&t)||(from_bit(v,false)&&e);
+	return (from_bit(v,true) && t) || (from_bit(v,false) && e);
 }
 
 size_t count(spbdd x, size_t nvars) {

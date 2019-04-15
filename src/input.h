@@ -27,7 +27,7 @@ struct elem {
 	elem(int_t num) : type(NUM), num(num) {}
 	elem(wchar_t ch) : type(CHR), ch(ch) {}
 	elem(etype type, lexeme e) : type(type), e(e) {
-		DBG(assert(type!=NUM&&type!=CHR);)
+		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
 	bool parse(const lexemes& l, size_t& pos);
 	bool operator<(const elem& t) const {
@@ -59,7 +59,7 @@ struct directive {
 	lexeme arg;
 	raw_term t;
 	int_t n;
-	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE } type;
+	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD }type;
 	bool parse(const lexemes& l, size_t& pos);
 };
 
@@ -92,6 +92,10 @@ public:
 	raw_rule(){}
 	raw_rule(const raw_term& t) : h({t}) {}
 	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({b}) {}
+	static raw_rule getdel(const raw_term& t) {
+		raw_rule r(t, t);
+		return r.head(0).neg = true, r;
+	}
 };
 
 struct raw_prog {

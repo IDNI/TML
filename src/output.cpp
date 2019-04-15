@@ -206,6 +206,7 @@ wostream& driver::printdiff(wostream& os, const diff_t& d, size_t bits) const {
 
 wostream& operator<<(wostream& os, const directive& d) {
 	os << L'@';
+	if (d.type == directive::BWD) return os << L"bwd.";
 	if (d.type == directive::TRACE) return os << L"trace." << endl;
 	if (d.type == directive::STDOUT) os << L"stdout ";
 	else os << L"string ";

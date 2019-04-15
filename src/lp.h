@@ -32,6 +32,7 @@ struct prog_data {
 	std::vector<term> out;
 	matpairs r;
 	matrix goals, tgoals;
+	bool bwd = false;
 };
 
 class lp { // [pfp] logic program

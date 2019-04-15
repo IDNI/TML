@@ -88,6 +88,11 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
 		return true;
 	}
+	if (l[pos] == L"bwd") {
+		type = BWD;
+		if (*l[++pos][0] != '.') parse_error(dot_expected, l[pos]);
+		return ++pos, true;
+	}
 	if (l[pos] == L"stdout") {
 		type = STDOUT;
 		if (!t.parse(l, ++pos)) parse_error(err_stdout, l[pos]);

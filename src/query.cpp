@@ -51,6 +51,7 @@ bools get_ex(const term& t, size_t bits) {
 
 query::query(size_t bits, const term& t, const sizes& perm, bool neg) :
 	ex(get_ex(t, bits)), neg(neg), perm(perm), ae(bits, t, neg) {
+		DBG(_t = t;)
 /*		auto it = memos.find(k);
 		if (it != memos.end()) m = it->second;
 		m = memos[k] = new unordered_map<size_t, size_t>;*/

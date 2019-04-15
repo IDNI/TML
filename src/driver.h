@@ -37,22 +37,23 @@ class driver {
 	std::wstring directive_load(const directive& d);
 	void directives_load(raw_prog& p, prog_data& pd, lexeme& trel);
 	void add_rules(raw_prog& p, prog_data& pd);
-	void transform(raw_prog& p, prog_data& pd, const strs_t& strtrees);
-	void transform_bwd(raw_prog& p,const std::vector<raw_term>& g);
+	void transform(raw_progs& rp, size_t n, prog_data& pd,
+		const strs_t& strtrees);
+	raw_prog transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, size_t len);
-//	void transform(raw_prog& p, prog_data& pd);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
+	raw_term prepend_arg(raw_term t, lexeme s);
 	void get_trees(std::wostream& os, const term& root,
 		const std::map<term, std::vector<term>>&, std::set<term>& done);
 	std::wstring get_trees(const term& roots,const diff_t& t,size_t bits);
 	void progs_read(wstr s);
-	lp* prog_run(raw_prog& p, lp* last, strs_t& strtrees);
+	lp* prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();
 	bool pfp();

@@ -81,8 +81,11 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 }
 
 #define from_string_lex(rel, lex, n) raw_rule({ false, { \
-		elem(elem::SYM, rel), elem(elem::SYM, dict.get_lexeme(lex)), \
-		elem(n), elem(n+1)},{3}})
+		elem(elem::SYM, rel), \
+		elem(elem::OPENP, dict.get_lexeme(L"(")), \
+		elem(elem::SYM, dict.get_lexeme(lex)), \
+		elem(n), elem(n+1), \
+		elem(elem::CLOSEP, dict.get_lexeme(L")"))},{3}})
 
 void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
@@ -163,7 +166,7 @@ loop2:	sz = s.size();
 	if (sz != s.size()) goto loop2;
 }
 
-#define BWD_GRAMMAR
+//#define BWD_GRAMMAR
 //#define ELIM_NULLS
 
 void driver::transform_grammar(raw_prog& r, size_t len) {
@@ -211,6 +214,12 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
 				{elem::VAR,0,get_var_lexeme(2)},3,1));
 	r.r.push_back(l);*/
+	directive *d = 0;
+	for (directive& x : r.d)
+		if (x.type == directive::STR) {
+			d = &x;
+			break;
+		}			
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
@@ -219,9 +228,9 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = elem(elem::VAR, get_var_lexeme(2));
-			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,1,3));
+			l.add_body(from_grammar_elem_nt(d->rel.e,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(r.d[0].rel.e,e,3,1));
+			l.add_body(from_grammar_elem_nt(d->rel.e,e,3,1));
 #endif			
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
@@ -232,13 +241,13 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 			for (size_t n = 1; n < p.p.size(); ++n) {
 				if (p.p[n].type == elem::CHR) {
 					l.add_body(from_grammar_elem_nt(
-						r.d[0].rel.e, p.p[n], n, n+1));
+						d->rel.e, p.p[n], n, n+1));
 					continue;
 				}
 				wstring str = lexeme2str(p.p[n].e);
 				if (has(b, str))
 					l.add_body(from_grammar_elem_builtin(
-						r.d[0].rel.e, str,n)), ++v;
+						d->rel.e, str,n)), ++v;
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
 			}
@@ -286,28 +295,51 @@ nexthead:	const raw_term &head = x.head(n);
 	for (auto x : s) r.r.push_back(x);
 }
 
-raw_term prepend_arg(raw_term t, lexeme s) {
+raw_term driver::prepend_arg(raw_term t, lexeme s) {
+	wcout<<"prepend: " << t<<endl;
+	if (t.e.size() == 1) {
+		append_openp(t.e), t.e.emplace_back(elem::SYM, s),
+		append_closep(t.e), t.calc_arity();
+		wcout<<"prepend: " << t<<endl;
+		return t;
+	}
 	size_t n = 1;
-	while (t.e[n].type == elem::OPENP || t.e[n].type == elem::CLOSEP) ++n;
-	t.e.insert(t.e.begin() + n, elem(elem::SYM, s));
-	return t.calc_arity(), t;
+	while (	n < t.e.size() && 
+		(t.e[n].type==elem::OPENP || t.e[n].type==elem::CLOSEP)) ++n;
+	t.e.insert(t.e.begin()+n, elem(elem::SYM, s)), t.calc_arity();
+	wcout<<"prepended: " << t<<endl;
+	return t;
 }
 
-void driver::transform_bwd(raw_prog& p,const std::vector<raw_term>&g){
+raw_prog driver::transform_bwd(raw_prog& p) {
+	std::vector<raw_term> g;
+	for (const raw_rule& r : p.r)
+		if (r.type == raw_rule::GOAL)
+			g.push_back(r.head(0));
 	lexeme tr = dict.get_lexeme(L"try");
-	set<raw_rule> s;
-	wcout<<"before bwd:"<<endl<<p;
+	set<raw_rule> s, d;
 	for (raw_term t : g) s.insert(raw_rule(prepend_arg(t, tr)));
 	for (const raw_rule& x : p.r)
 		if (!x.nbodies()) s.insert(x);
 		else for (raw_term h : x.heads()) {
 			raw_rule y(h);
 			y.add_body(prepend_arg(h, tr));
+			for (raw_term b : x.bodies()) y.add_body(b);
+			s.insert(y), y.clear();
 			for (raw_term b : x.bodies())
-				y.add_body(b), y.add_head(prepend_arg(b, tr));
-			s.insert(y);
+				y.add_head(prepend_arg(b, tr));
+			y.add_body(prepend_arg(h, tr)), s.insert(y);
 		}
+	for (const raw_rule& x : p.r) {
+		for (raw_term h : x.heads())
+			d.emplace(raw_rule::getdel(prepend_arg(h, tr)));
+		for (raw_term b : x.bodies())
+			d.emplace(raw_rule::getdel(prepend_arg(b, tr)));
+	}
 	p.r.clear();
 	for (auto x : s) p.r.push_back(x);
-	wcout<<"after bwd:"<<endl<<p;
+	raw_prog q;
+	for (auto x : d) q.r.push_back(x);
+	wcout<<"p:"<<endl<<p<<"q:"<<endl<<q<<endl;
+	return q;
 }

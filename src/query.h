@@ -52,6 +52,7 @@ class query {
 	const bools ex;
 	const bool neg;
 	const sizes perm;
+	DBG(term _t;)
 /*	struct key {
 		bool operator<(const key& k) const {
 			if (neg != k.neg) return neg;

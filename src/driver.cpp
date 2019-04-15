@@ -154,6 +154,7 @@ void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
 	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
+		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
 					break;
@@ -173,31 +174,34 @@ void driver::add_rules(raw_prog& p, prog_data& pd) {
 		switch (x.type) {
 		case raw_rule::NONE: pd.r.insert(get_rule(x,pd.strs)); break;
 		case raw_rule::GOAL: pd.goals.push_back(get_term(
-					x.head(0),pd.strs)); break;
+						x.head(0),pd.strs)); break;
 		case raw_rule::TREE: pd.tgoals.push_back(get_term(
 					x.head(0),pd.strs)); break;
 		default: assert(0);
 		}
 }
 
-void driver::transform(raw_prog& p, prog_data& pd, const strs_t& strtrees) {
+void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
+	const strs_t& strtrees) {
 	lexeme trel = { 0, 0 };
-	directives_load(p, pd, trel);
-	for (auto x : pd.strs) transform_string(x.second, p, x.first);
-	for (auto x : strtrees) transform_string(x.second, p, x.first);
-	if (!p.g.empty()) {
+	directives_load(rp.p[n], pd, trel);
+	for (auto x : pd.strs) transform_string(x.second, rp.p[n], x.first);
+	for (auto x : strtrees) transform_string(x.second, rp.p[n], x.first);
+	if (!rp.p[n].g.empty()) {
 		if (pd.strs.size() != 1) er(err_one_input);
-		else transform_grammar(p, pd.strs.begin()->second.size());
+		else transform_grammar(rp.p[n], pd.strs.begin()->second.size());
 	}
-	if (trel[0]) transform_proofs(p, trel);
+	if (trel[0]) transform_proofs(rp.p[n], trel);
+	wcout<<rp.p[n]<<endl;
+	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
-lp* driver::prog_run(raw_prog& p, lp* last, strs_t& strtrees) {
+lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	prog_data pd;
-	transform(p, pd, strtrees);
-	if (print_transformed) wcout<<L'{'<<endl<<p<<L'}'<<endl;
-	strtrees.clear(), get_dict_stats(p), add_rules(p, pd);
+	transform(rp, n, pd, strtrees);
+	if (print_transformed) wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
+	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n], pd);
 	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
 	measure_time(result &= prog->pfp());
@@ -216,7 +220,8 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	DBG(drv = this;)
 	lp *prog = 0;
 	strs_t strtrees;
-	for (raw_prog& p : rp.p) prog = prog_run(p, prog, strtrees);
+	for (size_t n = 0; n != rp.p.size(); ++n)
+		prog = prog_run(rp, n, prog, strtrees);
 	if (prog) { printdb(wcout, prog); delete prog; }
 }
 

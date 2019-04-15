@@ -111,7 +111,7 @@ rule::rule(matrix h, matrix b, const vector<db_t::iterator>& dbs, range& rng) :
 	for (size_t k = 0; k != hpref.size(); ++k) {
 		dt[k] = bdd_subterm(0, hpref[k].len(), maxhlen+nvars,
 				hpref[k].len(), rng.bits);
-//		dt[k] = compose(hperm[k], dt[k].second, dt[k].first);
+		dt[k] = compose(hperm[k], dt[k].second, dt[k].first);
 	}
 }
 
@@ -156,8 +156,8 @@ bdds rule::fwd() {
 //	DBG(printbdd(wcout<<"q:"<<endl,vars,rng.bits,
 //		ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
 	for (size_t k = 0; k != r.size(); ++k) {
-		r[k] = bdd_subterm(vars^hperm[k], dt[k].first, dt[k].second, 0,
-//		r[k] = bdd_subterm(vars, dt[k].first, dt[k].second, 0,
+//		r[k] = bdd_subterm(vars^hperm[k], dt[k].first, dt[k].second, 0,
+		r[k] = bdd_subterm(vars, dt[k].first, dt[k].second, 0,
 			maxhlen+nvars, hpref[k].len());
 		r[k] = ae[k](r[k], hleq[k]);
 	}
