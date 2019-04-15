@@ -24,14 +24,15 @@ struct rule { // a P-DATALOG rule in bdd form
 	std::vector<prefix> hpref;
 	std::vector<std::pair<bools, sizes>> dt;
 	size_t maxhlen, nvars;
-	std::vector<spbdd*> dbs;
+	std::vector<db_t::iterator> dbs;
 	std::vector<sizes> hperm;
 	std::vector<bdd_and_eq> ae;
 	range rng;
 	sizes get_perm(const term& b, varmap&);
 	void get_ranges(const matrix& h, const matrix& b, const varmap&);
 
-	rule(matrix h, matrix b, const std::vector<spbdd*>& dbs, range& rng);
+	rule(matrix h, matrix b, const std::vector<db_t::iterator>& dbs,
+		range& rng);
 	bdds fwd();
 };
 

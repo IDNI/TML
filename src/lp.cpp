@@ -35,14 +35,13 @@ void tml_init() { bdd::init(); }
 DBG(wostream& printbdd(wostream& os, size_t t);)
 
 void lp::add_fact(spbdd f, const prefix& p) {
-	spbdd *t = db[p];
-	if (!t) *(db[p] = new spbdd) = f;
-	else *t = *t || f;
+	spbdd t = db[p];
+	db[p] = t ? t||f : f;
 }
 
 bool lp::add_not_fact(spbdd f, const prefix& p) {
-	spbdd *t = db[p], x = *t;
-	return (*t = *t % f), (x == F || *t != F);
+	spbdd x = db[p];
+	return (db[p] = (x ? x : T) % f), (!x || x == F || db[p] != F);
 }
 
 bool lp::add_fact(const term& x) {
@@ -68,7 +67,7 @@ db_t rebit(size_t pbits, size_t bits, db_t db) {
 	if (pbits == bits) return db;
 	assert(pbits < bits);
 	for (auto x : db)
-		*x.second = prefix_zeros(*x.second, (bits-pbits)*x.first.len());
+		x.second = prefix_zeros(x.second, (bits-pbits)*x.first.len());
 	return db;
 }
 
@@ -87,10 +86,10 @@ lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 	for (const auto& m : pd.r) {
 		for (const term& t : m.first)
 			if (db.find(t.pref()) == db.end())
-				*(db[t.pref()] = new spbdd) = F;
+				db[t.pref()] = F;
 		for (const term& t : m.second)
 			if (db.find(t.pref()) == db.end())
-				*(db[t.pref()] = new spbdd) = F;
+				db[t.pref()] = F;
 	}
 	for (const auto& m : pd.r)
  		if (m.second.empty()) {
@@ -99,10 +98,10 @@ lp::lp(prog_data pd, range rng, lp *prev) : pd(pd), rng(rng) {
 //				(wcout << L"contradictory fact: "<<m[0]<<endl),
 //			exit(0);
 		} else {
-			vector<spbdd*> dbs;
+			vector<db_t::iterator> dbs;
 			for (size_t n = 0; n < m.second.size(); ++n)
-				dbs.push_back(db[{m.second[n].rel(),
-					m.second[n].arity()}]);
+				dbs.push_back(db.find({m.second[n].rel(),
+					m.second[n].arity()}));
 			rules.emplace_back(
 				new rule(m.first, m.second, dbs, rng));
 		}
@@ -160,15 +159,10 @@ struct diffcmp {
 };
 
 diff_t copy(const db_t& x) {
+	return x;
 	diff_t r;
-	for (auto y : x) r[y.first] = *y.second;
+	for (auto y : x) r[y.first] = y.second;
 	return r;
-}
-
-void copy(const diff_t& src, db_t& dst) {
-	for (auto x : dst) delete x.second;
-	dst.clear();
-	for (auto x : src) dst.emplace(x.first, new spbdd(x.second));
 }
 
 bool bdd_and_not(const diff_t& x, const diff_t& y, diff_t& r) {
@@ -182,25 +176,26 @@ bool bdd_and_not(const diff_t& x, const diff_t& y, diff_t& r) {
 db_t& bdd_and_not(db_t& x, const diff_t& y) {
 	for (auto t : x)
 		if (has(y, t.first))
-			*t.second = *t.second % y.at(t.first);
+			t.second = t.second % y.at(t.first);
 	return x;
 }
 
 void bdd_or(db_t& x, const diff_t& y) {
 	for (auto t : x)
 		if (has(y, t.first))
-			*t.second = *t.second || y.at(t.first);
+			t.second = t.second || y.at(t.first);
 }
 
-bool operator==(const db_t& x, const diff_t& y) {
+/*bool operator==(const db_t& x, const diff_t& y) {
+	return x == y;
 	if (x.size() != y.size()) return false;
 	auto xt = x.begin();
 	auto yt = y.begin();
 	while (xt != x.end())
-		if (xt->first==yt->first && *xt->second==yt->second) ++xt, ++yt;
+		if (xt->first==yt->first && xt->second==yt->second) ++xt, ++yt;
 		else return false;
 	return true;
-}
+}*/
 
 bool lp::pfp() {
 	diff_t d, add, del, t;
@@ -228,7 +223,7 @@ bool lp::pfp() {
 	auto it = db.end();
 	for (auto x : gbdd)
 		if ((it = db.find(x.first)) != db.end()) {
-			delete it->second;
+//			delete it->second;
 			db.erase(it);
 		}
 	return true;

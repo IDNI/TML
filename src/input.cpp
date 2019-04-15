@@ -123,6 +123,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		else if (l[pos][0][2] == L'r') ch = L'\r';
 		else if (l[pos][0][2] == L'n') ch = L'\n';
 		else if (l[pos][0][2] == L't') ch = L'\t';
+		else if (l[pos][0][2] == L'\\') ch = L'\\';
 		else if (l[pos][0][2] == L'\'') ch = L'\'';
 		else throw 0;
 	}

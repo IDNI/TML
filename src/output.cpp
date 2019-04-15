@@ -190,7 +190,7 @@ wostream& driver::printdb(wostream& os, lp *p) const {
 wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 	for (auto x : db)
 		if (builtin_rels.find(x.first.rel) == builtin_rels.end()) {
-			from_bits(*x.second,bits,x.first, 
+			from_bits(x.second,bits,x.first, 
 				[&os,this](const term&t){
 				print_term(os, t)<<endl; });
 		}
@@ -214,9 +214,13 @@ wostream& operator<<(wostream& os, const directive& d) {
 }
 
 wostream& operator<<(wostream& os, const elem& e) {
-	if (e.type == elem::CHR) return os << '\'' << e.ch << '\'';
-	if (e.type == elem::OPENP || e.type == elem::CLOSEP) return os<<*e.e[0];
-	return e.type == elem::NUM ? os << e.num : (os << e.e);
+	switch (e.type) {
+		case elem::CHR: return os << '\'' << e.ch << '\'';
+		case elem::OPENP:
+		case elem::CLOSEP: return os<<*e.e[0];
+		case elem::NUM: return os << e.num;
+		default: return os << e.e;
+	}
 }
 
 wostream& operator<<(wostream& os, const production& p) {
@@ -231,12 +235,13 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 	os << L'(';
 	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
 		while (t.arity[ar] == -1) ++ar, os << L'(';
+		if (n >= t.e.size()) break;
 		while (t.e[n].type == elem::OPENP) ++n;
 		for (int_t k = 0; k != t.arity[ar];)
 			if ((os << t.e[n++]), ++k != t.arity[ar]) os << L' ';
 		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 		++ar;
-		while (ar<t.arity.size()&&t.arity[ar] == -2) ++ar, os<<L')';
+		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
 	}
 	return os << L')';
 }

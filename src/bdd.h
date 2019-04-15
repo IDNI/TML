@@ -43,7 +43,9 @@ class bdd {
 	size_t var;
 	spbdd hi, lo;
 public:
-	bdd(size_t var, spbdd hi, spbdd lo) : var(var), hi(hi), lo(lo) {}
+	bdd(size_t var, spbdd hi, spbdd lo) : var(var), hi(hi), lo(lo) {
+		if (var && var != (size_t)-1) assert(hi&&lo);
+	}
 	size_t v() const { return var; }
 	const spbdd h() const { return hi; }
 	const spbdd l() const { return lo; }

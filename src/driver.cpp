@@ -48,7 +48,8 @@ wstring _unquote(wstring str) { unquote(str); return str; }
 
 term driver::get_term(raw_term r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
-		if (r.e[n].e == L"len" && n+3 < r.e.size() &&
+		if (	r.e[n].type == elem::SYM && r.e[n].e == L"len" &&
+			n+3 < r.e.size() &&
 			r.e[n+1].type == elem::OPENP &&
 			r.e[n+2].type == elem::SYM &&
 			r.e[n+3].type == elem::CLOSEP) {

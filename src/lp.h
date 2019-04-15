@@ -23,7 +23,7 @@
 
 void tml_init();
 
-typedef std::map<prefix, spbdd*> db_t;
+typedef std::map<prefix, spbdd> db_t;
 typedef std::map<prefix, spbdd> diff_t;
 
 struct prog_data {

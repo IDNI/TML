@@ -79,7 +79,7 @@ pair<bools, sizes> compose(const sizes& p1, const sizes& p2, const bools& b) {
 	return r;
 }
 
-rule::rule(matrix h, matrix b, const vector<spbdd*>& dbs, range& rng) :
+rule::rule(matrix h, matrix b, const vector<db_t::iterator>& dbs, range& rng) :
 	dbs(dbs), rng(rng) {
 	//DBG(wcout<<"h:"<<endl<<h<<endl<<"b:"<<endl<<b<<endl;)
 	hperm.resize(h.size()), hpref.resize(h.size()), neg.resize(h.size()),
@@ -148,7 +148,7 @@ bdds rule::fwd() {
 	bdds r(hpref.size()), v(q.size());
 	spbdd vars;
 	for (size_t n = 0; n < q.size(); ++n)
-		if (F == (v[n] = q[n](*dbs[n]))) return {};
+		if (F == (v[n] = q[n](dbs[n]->second))) return {};
 //		DBG(else printbdd(wcout<<"q"<<n<<endl,v[n],rng.bits,
 //			ints{(int_t)(maxhlen+nvars)}, hrel[0])<<endl<<"---"<<endl;)
 	v.push_back(bleq);
