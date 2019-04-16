@@ -156,9 +156,6 @@ wostream& driver::printmat(wostream& os, const matrix& t) const {
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
 
-wostream& printdiff(wostream& os, const diff_t& d, size_t bits) {
-	return drv->printdiff(os, d, bits);
-}
 
 wostream& printbdd(wostream& os, spbdd t, size_t bits, const prefix& p) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
@@ -194,13 +191,6 @@ wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 				[&os,this](const term&t){
 				print_term(os, t)<<endl; });
 		}
-	return os;
-}
-
-wostream& driver::printdiff(wostream& os, const diff_t& d, size_t bits) const {
-	for (auto x : d)
-		if (builtin_rels.find(x.first.rel) == builtin_rels.end())
-			printmat(os,from_bits(x.second,bits,x.first));
 	return os;
 }
 

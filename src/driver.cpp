@@ -150,7 +150,7 @@ wstring driver::directive_load(const directive& d) {
 #define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
-void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
+void driver::directives_load(raw_prog& p, lexeme& trel) {
 	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
@@ -169,7 +169,7 @@ void driver::directives_load(raw_prog& p, prog_data& pd, lexeme& trel) {
 		}
 }
 
-void driver::add_rules(raw_prog& p, prog_data& pd) {
+void driver::add_rules(raw_prog& p) {
 	for (const raw_rule& x : p.r)
 		switch (x.type) {
 		case raw_rule::NONE: pd.r.insert(get_rule(x,pd.strs)); break;
@@ -181,15 +181,22 @@ void driver::add_rules(raw_prog& p, prog_data& pd) {
 		}
 }
 
-void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
-	const strs_t& strtrees) {
+void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 	lexeme trel = { 0, 0 };
-	directives_load(rp.p[n], pd, trel);
-	for (auto x : pd.strs) transform_string(x.second, rp.p[n], x.first);
-	for (auto x : strtrees) transform_string(x.second, rp.p[n], x.first);
+	directives_load(rp.p[n], trel);
+	for (auto x : pd.strs)
+		if (!has(transformed_strings, x.first))
+			transform_string(x.second, rp.p[n], x.first),
+			transformed_strings.insert(x.first);
+	for (auto x : strtrees)
+		if (!has(transformed_strings, x.first))
+			transform_string(x.second, rp.p[n], x.first),
+			transformed_strings.insert(x.first);
 	if (!rp.p[n].g.empty()) {
 		if (pd.strs.size() != 1) er(err_one_input);
-		else transform_grammar(rp.p[n], pd.strs.begin()->second.size());
+		else transform_grammar(rp.p[n],
+			dict.get_rel(pd.strs.begin()->first),
+			pd.strs.begin()->second.size());
 	}
 	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
@@ -197,14 +204,14 @@ void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
 }
 
 lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
+	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
-	prog_data pd;
-	transform(rp, n, pd, strtrees);
+	transform(rp, n, strtrees);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
-	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n], pd);
-	lp *prog = new lp(move(pd), range(dict.nsyms(), nums, chars), last);
+	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
+	lp *prog = new lp(pd, range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
 	measure_time(result &= prog->pfp());
 	for (auto x : prog->strtrees_out)

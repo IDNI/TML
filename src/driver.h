@@ -35,14 +35,13 @@ class driver {
 	void get_dict_stats(const raw_prog& p);
 
 	std::wstring directive_load(const directive& d);
-	void directives_load(raw_prog& p, prog_data& pd, lexeme& trel);
-	void add_rules(raw_prog& p, prog_data& pd);
-	void transform(raw_progs& rp, size_t n, prog_data& pd,
-		const strs_t& strtrees);
+	void directives_load(raw_prog& p, lexeme& trel);
+	void add_rules(raw_prog& p);
+	void transform(raw_progs& rp, size_t n,	const strs_t& strtrees);
 	raw_prog transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
-	void transform_grammar(raw_prog& r, size_t len);
+	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
@@ -51,9 +50,10 @@ class driver {
 	raw_term prepend_arg(raw_term t, lexeme s);
 	void get_trees(std::wostream& os, const term& root,
 		const std::map<term, std::vector<term>>&, std::set<term>& done);
-	std::wstring get_trees(const term& roots,const diff_t& t,size_t bits);
+	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
 	lp* prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees);
+	
 	driver(int argc, char** argv, raw_progs, bool print_transformed);
 	size_t load_stdin();
 	bool pfp();
@@ -61,6 +61,8 @@ class driver {
 	int argc;
 	char** argv;
 	bool print_transformed;
+	prog_data pd;
+	std::set<int_t> transformed_strings;
 public:
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
@@ -80,14 +82,11 @@ public:
 	std::wostream& printdb(std::wostream& os, lp *p) const;
 	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
 		const;
-	std::wostream& printdiff(std:: wostream& os, const diff_t& d,
-		size_t bits) const;
 };
 
 #ifdef DEBUG
 extern driver* drv;
 std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printdiff(std:: wostream& os, const diff_t& d, size_t bits);
 std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits, ints ar,
 	int_t rel);
 std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits, ints ar,

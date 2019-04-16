@@ -24,7 +24,6 @@
 void tml_init();
 
 typedef std::map<prefix, spbdd> db_t;
-typedef std::map<prefix, spbdd> diff_t;
 
 struct prog_data {
 	strs_t strs;
@@ -33,6 +32,10 @@ struct prog_data {
 	matpairs r;
 	matrix goals, tgoals;
 	bool bwd = false;
+	void clear() {
+		strtrees.clear(), out.clear(), r.clear(), goals.clear(),
+		tgoals.clear(), bwd = false;
+	}
 };
 
 class lp { // [pfp] logic program
@@ -44,20 +47,20 @@ class lp { // [pfp] logic program
 	bool add_facts(const matrix& x);
 	bool add_fact(const term& t);
 	std::set<db_t::const_iterator> tree_prefix(const prefix& p) const;
-	void get_tree(const prefix& p, spbdd root, diff_t& out,
+	void get_tree(const prefix& p, spbdd root, db_t& out,
 		std::set<spbdd>& done);
-	void get_trees(const diff_t& in, diff_t& out);
+	void get_trees(const db_t& in, db_t& out);
 	void get_trees();
-	void fwd(diff_t &add, diff_t &del);
+	void fwd(db_t &add, db_t &del);
 	const strs_t strs;
-	diff_t trees, gbdd;
-	std::map<int_t, diff_t> strtrees;
+	db_t trees, gbdd;
+	std::map<int_t, db_t> strtrees;
 public:
 	prog_data pd;
 	range rng;
 	db_t db;
-	diff_t trees_out;
-	std::map<int_t, diff_t> strtrees_out;
+	db_t trees_out;
+	std::map<int_t, db_t> strtrees_out;
 	lp(prog_data, range rng, lp *prev = 0);
 	bool pfp();
 	~lp();

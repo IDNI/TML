@@ -168,7 +168,7 @@ loop2:	sz = s.size();
 //#define BWD_GRAMMAR
 //#define ELIM_NULLS
 
-void driver::transform_grammar(raw_prog& r, size_t len) {
+void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	if (r.g.empty()) return;
 	static const set<wstring> b =
 		{ L"alpha", L"alnum", L"digit", L"space", L"printable"};
@@ -213,12 +213,6 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
 				{elem::VAR,0,get_var_lexeme(2)},3,1));
 	r.r.push_back(l);*/
-	directive *d = 0;
-	for (directive& x : r.d)
-		if (x.type == directive::STR || x.type == directive::FNAME) {
-			d = &x;
-			break;
-		}			
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
@@ -227,9 +221,9 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.add_head(t);
 			elem e = elem(elem::VAR, get_var_lexeme(2));
-			l.add_body(from_grammar_elem_nt(d->rel.e,e,1,3));
+			l.add_body(from_grammar_elem_nt(rel,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(d->rel.e,e,3,1));
+			l.add_body(from_grammar_elem_nt(rel,e,3,1));
 #endif			
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
@@ -240,13 +234,13 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 			for (size_t n = 1; n < p.p.size(); ++n) {
 				if (p.p[n].type == elem::CHR) {
 					l.add_body(from_grammar_elem_nt(
-						d->rel.e, p.p[n], n, n+1));
+						rel, p.p[n], n, n+1));
 					continue;
 				}
 				wstring str = lexeme2str(p.p[n].e);
 				if (has(b, str))
 					l.add_body(from_grammar_elem_builtin(
-						d->rel.e, str,n)), ++v;
+						rel, str,n)), ++v;
 				else l.add_body(
 					from_grammar_elem(p.p[n],n,n+1));
 			}

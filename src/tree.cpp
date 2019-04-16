@@ -38,10 +38,10 @@ set<db_t::const_iterator> lp::tree_prefix(const prefix& p) const {
 	return r;
 }
 
-void lp::get_tree(const prefix& p, spbdd root, diff_t& out, set<spbdd>& done){
+void lp::get_tree(const prefix& p, spbdd root, db_t& out, set<spbdd>& done){
 	if (root->leaf() && !root->trueleaf()) return;
 	if (!done.emplace(root).second) return;
-	diff_t::iterator it;
+	db_t::iterator it;
 	for (const pair<ints, array<size_t, 2>>& x : p.subterms())
 		for (const db_t::const_iterator& y:tree_prefix({p.rel,x.first}))
 			it = out.emplace(y->first,F).first,
@@ -51,7 +51,7 @@ void lp::get_tree(const prefix& p, spbdd root, diff_t& out, set<spbdd>& done){
 				y->first.len(), rng.bits)), out, done);
 }
 
-void lp::get_trees(const diff_t& in, diff_t& out) {
+void lp::get_trees(const db_t& in, db_t& out) {
 	set<spbdd> done;
 	for (auto x : in)
 		for (const db_t::const_iterator& it : tree_prefix(x.first))
@@ -84,7 +84,7 @@ void driver::get_trees(wostream& os, const term& root,
 	for (auto x : it->second) get_trees(os, x, m, done);
 }
 
-wstring driver::get_trees(const term& root, const diff_t& t, size_t bits) {
+wstring driver::get_trees(const term& root, const db_t& t, size_t bits) {
 	set<term> s, done;
 	map<term, vector<term>> m;
 	for (auto x : t)
