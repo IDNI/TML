@@ -1,67 +1,70 @@
 {
-@string progs <tml.g>.
+@string str <tml.g>.
+#"p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).  S => S | null.  ".
+#@bwd.
 
-S => ws '{' ws prog ws '}' ws S | null.
-prog => directive prog | production prog | rule prog | fof prog | query prog | null.
-directive =>	"@string" space ws strdir ws '.' ws |
-		"@stdout" space ws term ws '.' ws |
-		"@trace" space ws relname ws '.' ws |
-		"@bwd" ws '.' ws.
-production => relname ws "=>" ws alt alts ws '.' ws.
-alt =>	ws terminal ws alt | ws nonterminal ws alt | null.
-alts => null | ws '|' ws alt ws alts.
-terminal => '\'' printable '\'' | "'\\''" | string.
-nonterminal => relname.
-fact => term ws '.' ws.
-terms => ws term terms_rest.
-terms_rest => ws ',' ws term ws terms_rest | null.
-rule => ws terms ws ":-" ws terms ws '.' ws.
-strdir => relname ws fname | relname ws string | relname ws cmdline | relname ws term.
-query => '!' ws term | "!!" ws term.
-fname => '<' printable_chars '>' ws.
-string => '"' printable_chars '"' ws.
-printable_chars => printable printable_chars | null.
-cmdline => '$' digits ws.
-term => ws relname ws args.
-args => ws '(' ws args1 ws ')' ws | null.
-args1 => args_var | args_sym | args.
-args_sym => sym | sym args | sym args_sym1.
-args_sym1 => 	space ws sym |
-		space ws sym args |
-		space ws sym args_var |
-		space ws sym args_sym1 | null.
-args_var => 	var |
-		var ws args_var |
-		var ws args |
-		var args_sym1.
-
-fof => ws pred ws ":=" ws form ws '.' ws.
-pred => chars ws '(' ws args ws ')' ws.
-identifier => chars | var.
+identifier => sym | var.
 args => identifier ws args | null.
 var => '?' chars.
 sym => chars.
 relname => sym.
 chars => alpha chars1 | '_' chars1.
 chars1=> alnum chars1 | '_' chars1 | null.
-ws => space ws | '#' printable_chars eol | null.
+ws =>	space ws | ws '#' printable_chars eol ws | null.
+	#eol | ws "/*" ws printable_chars ws "*/" ws | null.
+terminal => quoted_char | string.
+quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
+		| "'\\t'" | "'\\''" | "''".
 eol => '\r' | '\n' | ''.
-form => ws prefix ws var ws '(' ws form ws ')' ws |
+nonterminal => relname.
+fname => '<' printable_chars '>' ws.
+string => '"' printable_chars '"' ws.
+printable_chars => printable printable_chars | null.
+cmdline => '$' digits ws.
+query => '!' ws term | "!!" ws term.
+
+term => relname args.
+pred => term | '~' ws term ws.
+args => ws '(' ws args1 ws ')' ws | null.
+args1 => identifier ws args1 ws | args | null.
+
+directive =>	ws "@string" space ws strdir ws '.' ws |
+		ws "@stdout" space ws term ws '.' ws |
+		ws "@trace" space ws relname ws '.' ws |
+		ws "@bwd" ws '.' ws.
+strdir => relname ws fname | relname ws string | relname ws cmdline | relname ws term.
+
+production => relname ws "=>" ws alt ws alts ws '.' ws.
+alt =>	terminal ws alt ws | nonterminal ws alt ws | null.
+alts => null | '|' ws alt ws alts ws.
+
+fact => pred '.' ws.
+preds => ws pred preds_rest.
+preds_rest => ws ',' ws pred ws preds_rest | null.
+rule => ws preds ws ":-" ws preds ws '.' ws.
+
+fof => term ws ':' '=' ws form ws '.' ws.
+form => term |
+	ws prefix ws var ws '(' ws form ws ')' ws |
 	ws '(' ws form ws ')' ws "and" ws '(' ws form ws ')' ws |
 	ws '(' ws form ws ')' ws "or" ws '(' ws form ws ')' ws |
 	ws "not" '(' ws form ws ')' ws |
-	ws pred ws "and" ws '(' ws form ws ')' ws |
-	ws pred ws "or" ws '(' ws form ws ')' ws |
+	ws term ws "and" ws '(' ws form ws ')' ws |
+	ws term ws "or" ws '(' ws form ws ')' ws |
 	ws "not" '(' ws form ws ')' ws |
-	ws pred ws "and" ws pred ws |
-	ws pred ws "or" ws pred ws |
-	ws "not" pred ws |
-	ws '(' ws form ws ')' ws "and" ws pred ws |
-	ws '(' ws form ws ')' ws "or" ws pred ws |
-	pred.
+	ws term ws "and" ws term ws |
+	ws term ws "or" ws term ws |
+	ws "not" term ws |
+	ws '(' ws form ws ')' ws "and" ws term ws |
+	ws '(' ws form ws ')' ws "or" ws term ws.
 prefix => "forall" | "exists" | "unique".
+
+prog => directive S | rule S | production S | fof S | query S | null.
+S => ws '{' ws prog ws '}' ws S | ws prog ws | null.
+
+#!! S(0 ?x).
 }
 {
-	~S(?x ?x) :- S(?x ?x).
-	~chars1(?x ?x) :- chars1(?x ?x).
+	~S(?x?x):-S(?x?x).
+	~prog(?x?x):-prog(?x?x).
 }

@@ -190,7 +190,7 @@ void driver::transform_grammar(raw_prog& r, size_t len) {
 				lexeme l = p.p[n].e;
 				p.p.erase(p.p.begin() + n);
 				bool esc = false;
-				for (cws s = l[0]+1; s != l[1]; ++s)
+				for (cws s = l[0]+1; s != l[1]-1; ++s)
 					if (*s == L'\\' && !esc) esc=true;
 					else p.p.insert(p.p.begin()+n++,
 						elem(*s)),esc=false;
