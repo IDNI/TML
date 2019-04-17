@@ -110,7 +110,7 @@ void driver::get_dict_stats(const raw_prog& p) {
 		case directive::FNAME:
 			nums = max(nums, (int_t)fsize(d.arg[0]+1,
 			(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
-		case directive::STR: 
+		case directive::STR:
 			nums = max(nums,(int_t)(d.arg[1]-d.arg[0])+1);
 			break;
 		case directive::CMDLINE:
@@ -200,6 +200,7 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	prog_data pd;
 	transform(rp, n, pd, strtrees);
+	if (xsb) print_xsb(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
@@ -217,8 +218,9 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	return prog;
 }
 
-driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
-	: argc(argc), argv(argv), print_transformed(print_transformed) {
+driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
+	bool xsb) : argc(argc), argv(argv), print_transformed(print_transformed),
+	xsb(xsb) {
 	DBG(drv = this;)
 	lp *prog = 0;
 	strs_t strtrees;
@@ -227,8 +229,8 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	if (prog) { printdb(wcout, prog); delete prog; }
 }
 
-driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
-	: driver(argc, argv, move(raw_progs(f)), print_transformed) {}
-driver::driver(int argc, char** argv, wstring s, bool print_transformed) 
-	: driver(argc, argv, move(raw_progs(s)), print_transformed) {}
-
+driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb)
+	: driver(argc, argv, move(raw_progs(f)), print_transformed, xsb) {}
+driver::driver(int argc, char** argv, wstring s, bool print_transformed,
+	bool xsb) : driver(argc, argv, move(raw_progs(s)), print_transformed, xsb)
+	{}

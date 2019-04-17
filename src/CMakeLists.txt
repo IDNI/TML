@@ -5,26 +5,27 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_VERBOSE_MAKEFILE true)
 
 add_executable(tml
-        bdd.cpp
-        bdd.h
-        defs.h
+	bdd.cpp
+	bdd.h
+	defs.h
 	dict.h
-        dict.cpp
-        driver.cpp
-        driver.h
-        input.cpp
-        input.h
-        lp.cpp
-        lp.h
-        main.cpp
-        query.cpp
-        query.h
-        rule.cpp
-        rule.h
-        term.h
+	dict.cpp
+	driver.cpp
+	driver.h
+	input.cpp
+	input.h
+	lp.cpp
+	lp.h
+	main.cpp
+	query.cpp
+	query.h
+	rule.cpp
+	rule.h
+	term.h
 	transform.cpp
 	output.cpp
-	tree.cpp)
+	tree.cpp
+	print_xsb.cpp)
 
 set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -Wpedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -ggdb3")
