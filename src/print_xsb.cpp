@@ -38,7 +38,7 @@ wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
 			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
 			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
-				os << dict.get_sym(t.arg(n));
+				output_lexeme_adjust_first(os, dict.get_sym(t.arg(n)), tolower)
 			else os << L'[' << (t.arg(n)>>2) << L']';
 			if (++n != t.nargs() && k != t.arity()[ar]-1) os << L',';
 		}
