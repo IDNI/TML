@@ -54,6 +54,7 @@ private:
 	size_t arg(size_t v, size_t args) const;
 	size_t bit(size_t v, size_t args) const;
 	void add_bit();
+	spbdd add_bit(spbdd x, ntable tab);
 	void add_tbit();
 	spbdd leq_const(int_t c, size_t arg, size_t args, size_t bit) const;
 	spbdd range(size_t arg, ntable tab);
