@@ -64,6 +64,7 @@ private:
 	void add_term(ntable tab, const ints& rows);
 	void add_raw_term(const raw_term&);
 	DBG(vbools allsat(spbdd x, ntable tab);)
+	void validate();
 public:
 	typedef std::map<item, std::set<std::set<item>>> transaction;
 	tables();

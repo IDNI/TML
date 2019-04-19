@@ -94,6 +94,7 @@ size_t tables::bit(size_t v, size_t args) const {
 }
 
 spbdd tables::add_bit(spbdd x, ntable tab) {
+	validate();
 	const size_t args = sig_len(sigs[tab]);
 	sizes perm(args * bits + tbits);
 	for (size_t n = 0; n != perm.size(); ++n) perm[n] = n;
@@ -107,6 +108,7 @@ spbdd tables::add_bit(spbdd x, ntable tab) {
 		v.push_back(bdd::from_bit(
 			pos(bits, bits + 1, n, args), false));
 	x = bdd_and_many(move(v));
+	validate();
 //	DBG(wcout<<"after and:"<<endl<<::allsat(x, max_args*(bits+1)+tbits)<<endl;)
 	return x;
 }
@@ -121,6 +123,7 @@ void tables::add_bit() {
 }
 
 void tables::add_tbit() {
+	validate();
 	range_clear_memo();
 	DBG(out(wcout<<"before add_tbit:"<<endl);)
 	sizes perm(max_args * bits + tbits);
@@ -128,10 +131,12 @@ void tables::add_tbit() {
 //	DBG(wcout<<"before add_tbit:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 	db = (db ^ perm) && bdd::from_bit(0, false), ++tbits;
 	DBG(out(wcout<<"after add_tbit:"<<endl);)
+	validate();
 //	DBG(wcout<<"after add_tbit:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 }
 
 spbdd tables::from_row(const ints& row, ntable tab, bools *ex) {
+	bdd::validate();
 	if (ex) *ex = bools(bits * row.size() + tbits, false);
 	bdds v;
 	const size_t args = row.size();
@@ -144,6 +149,7 @@ spbdd tables::from_row(const ints& row, ntable tab, bools *ex) {
 				if (ex) (*ex)[pos(b, n, args)] = true;
 			}
 		else {
+			bdd::validate();
 			auto it = vs.find(row[n]);
 			if (it == vs.end())
 				v.push_back(range(vs[row[n]] = n, tab));
@@ -154,13 +160,16 @@ spbdd tables::from_row(const ints& row, ntable tab, bools *ex) {
 			}
 		}
 	}
+	bdd::validate();
 	spbdd r = bdd_and_many(move(v));
 //	DBG(wcout<<"from_row:"<<endl<<::allsat(r, max_args*bits+tbits)<<endl;)
 	DBG(wcout<<"from_row:"<<endl<<allsat(r, tab)<<endl;)
+	bdd::validate();
 	return r;
 }
 
 ntable tables::add_table(sig_t s) {
+	validate();
 	auto it = ts.find(s);
 	if (it != ts.end()) return it->second;
 	ntable nt = sigs.size();
@@ -170,16 +179,19 @@ ntable tables::add_table(sig_t s) {
 	for (size_t b = 0; b != tbits; ++b)
 		t = t && bdd::from_bit(b,nt&(1<<(tbits-b-1)));
 //	DBG(wcout<<"table "<<nt<<" bits: "<<tbits<<endl<<::allsat(t, max_args*bits+tbits)<<endl<<endl);
+	validate();
 	return ts.emplace(s, nt), sigs.push_back(s), tbdds.push_back(t), nt;
 }
 
 void tables::add_term(ntable tab, const ints& row) {
+	validate();
 	if (tab >= (1 << tbits)) add_tbit();
 	bdds v;
 //	for (const ints& i : rows) v.push_back(from_row(i, tab));
 	DBG(wcout<<"before add:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 	//db = (bdd_or_many(v) && tbdds[tab]) || db;
 	db = (from_row(row, tab) && tbdds[tab]) || db;
+	validate();
 	DBG(wcout<<"tbdd:"<<endl<<::allsat(tbdds[tab], /*max_args*bits+*/tbits)<<endl;)
 //	DBG(wcout<<"after add:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 	DBG(wcout<<"with tab:"<<endl<<allsat(bdd_or_many((v)) && tbdds[tab], tab)<<endl;)
@@ -224,13 +236,17 @@ ntable tables::get_table(const raw_term& t) { return add_table(get_sig(t)); }
 
 void tables::out(wostream& os) {
 	DBG(wcout<<"as:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
+	validate();
 	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
-	allsat_cb(db, tbits, [&os, op, cl, this](const bools& p, spbdd x) {
+	allsat_cb(db, tbits, 0, [&os, op, cl, this](const bools& p, spbdd x) {
+		if (x->leaf() && !x->trueleaf()) return;
 		ntable tab = 0;
 		for (size_t n = 0; n != p.size(); ++n)
 			if (p[n]) tab |= 1 << (tbits - n - 1);
-		allsat_cb(x, sig_len(sigs[tab]) * bits + tbits,
-			[&os, tab, op, cl, this](const bools& p, spbdd) {
+		DBG(assert((size_t)tab < sigs.size());)
+		validate();
+		auto f = [&os, tab, op, cl, this](const bools& p, spbdd DBG(y)){
+			DBG(assert(y->leaf());)
 			const size_t args = sig_len(sigs[tab]);
 			term r = { false, sigs[tab], ints(args, 0) };
 			for (size_t n = 0; n != args; ++n)
@@ -248,8 +264,59 @@ void tables::out(wostream& os) {
 			}
 			rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
 			os<<rt<<endl;
-		})();
+		};
+		allsat_cb(x, sig_len(sigs[tab]) * bits + tbits, tbits, f)();
 	})();
+}
+
+#ifdef DEBUG
+bool _bddcmp(spbdd x, spbdd y) {
+	if (x == y) return true;
+	if (x->leaf() != y->leaf()) return false;
+	if (x->leaf()) return x->trueleaf() == y->trueleaf();
+	if (x->v() != y->v()) return false;
+	return _bddcmp(x->l(), y->l()) && _bddcmp(x->h(), y->h());
+}
+#else
+bool _bddcmp(spbdd x, spbdd y);
+#endif
+
+void tables::validate() {
+	NDBG(return;)
+	bdd::validate();
+	if (db == F) return;
+	auto bddcmp = [](spbdd x, spbdd y) {
+		bdd::validate();
+		bool b = x == y;
+		bool c = _bddcmp(x, y);
+		if (b != c) bdd::validate(x, y);
+		assert((x == y) == (_bddcmp(x, y)));
+		return x == y;
+	};
+	spbdd t = F;
+	for (size_t n = 0; n != tbdds.size(); ++n) t = t || tbdds[n];
+	if (!bddcmp(F, db%t) || !bddcmp(db, db&&t)) {
+		for (size_t n = 0; n != tbdds.size(); ++n) {
+			wcout<<"tbdd["<<n<<"]:"<<endl<<::allsat(tbdds[n], tbits)
+			<<endl<<"db:"<<endl<<
+			::allsat(db, tbits + bits*max_args+1)<<endl
+			<<"sig: " << dict.get_rel(get<0>(sigs[n])) << L' ';
+			for (int_t i : get<1>(sigs[n])) wcout << i << ' ';
+			wcout << endl;
+		}
+		wcout<<"db&&t:"<<endl<<::allsat(db&&t, tbits+max_args*bits+1);
+		spbdd y = db && t;
+		assert((db % t) == F);
+		assert((db && t) == db);
+	}
+	assert(tbdds.size() == sigs.size());
+	for (size_t n = 0; n != sigs.size(); ++n) {
+		t = db && tbdds[n];
+		spbdd x;
+		for (size_t k = 0; k != sig_len(sigs[n]); ++k)
+			x = range(k, n),
+			assert(bddcmp(x && t, t));
+	}
 }
 
 tables::tables() : dict(*new dict_t) {}
@@ -258,11 +325,11 @@ tables::~tables() { delete &dict; }
 int main() {
 	bdd::init();
 	//raw_progs rp(L"c(y).e(x).d(4).d(?z).");
-	raw_progs rp(L"a(z).c(y).e(x).d(0).");
+//	raw_progs rp(L"a(z).c(y).e(x).d(0).");
 	//raw_progs rp(L"e(x 5).c(y).d(1).d(?z).");
 	//raw_progs rp(L"d(1 ?z).");
 //	raw_progs rp(L"c(y).e(x).e(z).");
-//	raw_progs rp(L"c(y).");
+	raw_progs rp(L"c(y).");
 //	raw_progs rp(stdin);
 	tables t;
 	for (size_t n = 0; n != rp.p[0].r.size(); ++n)
