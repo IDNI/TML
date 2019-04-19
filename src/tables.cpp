@@ -19,118 +19,11 @@ using namespace std::placeholders;
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)
 
-/*class walk {
-	const tables& t;
-	size_t v = 1;
-	const size_t tbits;
-	bools p;
-public:
-	typedef function<void(spbdd, ntable)> callback;
-	callback f;
-	walk(const tables& t, callback f) :t(t),tbits(t.tbits),p(t.tbits),f(f){}
-	void operator()(spbdd x);
-};
-
-class transform {
-	const tables& t;
-	size_t v = 1, tab;
-	const size_t tbits;
-	bools p;
-public:
-	typedef function<spbdd(spbdd, ntable)> callback;
-	callback f;
-	transform(const tables& t, callback f)
-		: t(t), tbits(t.tbits), p(tbits), f(f) {}
-	spbdd operator()(spbdd x);
-};
-
-class sat {
-	tables& t;
-	size_t v, nvars;
-	bools p;
-	sig_t s;
-	typedef function<void(const raw_term&)> callback;
-	callback f;
-	walk w;
-	lexeme op, cl;
-	void cb(spbdd x, ntable tab) {
-		p.resize(t.tbits + (nvars = (sig_len(s = t.sigs[tab])*t.bits)));
-		run(x);
-	}
-	void run(spbdd x);
-public:
-	sat(tables& t, callback f) : t(t), v(t.tbits+1), p(t.tbits), f(f),
-		w(t, bind(&sat::cb, this, _1, _2)),
-		op(t.dict.get_lexeme(L"(")), cl(t.dict.get_lexeme(L")")) {}
-	void operator()(spbdd x) { w(x); }
-};*/
-
 size_t sig_len(const sig_t& s) {
 	size_t r = 0;
 	for (auto x : get<1>(s)) if (x > 0) r += x;
 	return r;
 }
-
-/*void sat::run(spbdd x) {
-	if (x->leaf() && !x->trueleaf()) return;
-	if (!x->leaf() && v < x->v())
-		p[++v-2] = true, run(x), p[v-2] = false, run(x), --v;
-	else if (v != t.tbits + nvars + 1)
-		p[++v-2] = true, run(x->h()), p[v-2] = false, run(x->l()), --v;
-	else {
-		const size_t args = nvars / t.bits;
-		term r = { false, s, ints(args, 0) };
-		for (size_t n = 0; n != args; ++n)
-			for (size_t k = 0; k != t.bits; ++k)
-				if (p[t.pos(k, n, args)])
-					get<2>(r)[n] |= 1 << (t.bits-k-1);
-		raw_term rt;
-		rt.e.resize(args+1),
-		rt.e[0] = elem(elem::SYM, t.dict.get_rel(get<0>(s)));
-		for (size_t n = 0; n != args; ++n) {
-			int_t arg = get<2>(r)[n];
-			if (arg & 1) rt.e[n+1] = elem((wchar_t)(arg>>2));
-			else if (arg & 3) rt.e[n+1] = elem((int_t)(arg>>2));
-			else rt.e[n+1]= elem(elem::SYM, t.dict.get_sym(arg));
-		}
-		rt.arity = get<1>(s), rt.insert_parens(op, cl), f(move(rt));
-	}
-}
-
-void walk::operator()(spbdd x) {
-	if (x->leaf() && !x->trueleaf()) return;
-	if (v == t.tbits + 1) {
-		ntable tab = 0;
-		for (size_t n = 0; n != p.size(); ++n)
-			if (p[n]) tab |= 1 << (t.tbits-n-1);
-		DBG(assert((size_t)tab < t.sigs.size());)
-		f(x, tab);
-	}
-	else if (!x->leaf() && v < x->v())
-		p[++v-2] = true, (*this)(x), p[v-2]=false, (*this)(x), --v;
-	else p[++v-2]=true, (*this)(x->h()), p[v-2]=false, (*this)(x->l()), --v;
-}
-
-spbdd transform::operator()(spbdd x) {
-//	DBG(wcout<<"transform var: "<<x->v()<<" v: "<<v<<endl<<::allsat(x, t.max_args*t.bits+t.tbits)<<endl;)
-	if (x->leaf() && !x->trueleaf()) return x;
-	if (v == t.tbits + 1) {
-		tab = 0;
-		for (size_t n = 0; n != p.size(); ++n) if (p[n]) tab |= 1 << n;
-		return f(x, tab);
-	}
-	spbdd h, l;
-	if (!x->leaf() && v < x->v())
-		p[++v-2] = true,h = (*this)(x),
-		p[v-2] = false,	l = (*this)(x), --v;
-	else	p[++v-2] = true,h = (*this)(x->h()),
-		p[v-2] = false,	l = (*this)(x->l()), --v;
-//	DBG(wcout<<"after transform h var: "<<h->v()<<" v: " << v<<endl<<::allsat(h, t.max_args*t.bits+t.tbits)<<endl;)
-//	DBG(wcout<<"after transform l var: "<<l->v()<<" v: " << v<<endl<<::allsat(l, t.max_args*t.bits+t.tbits)<<endl;)
-	x = bdd_ite(x->v(), h, l);
-//	DBG(wcout<<"after transform var: "<<x->v()<<" v: " << v<<endl<<::allsat(x, t.max_args*t.bits+t.tbits)<<endl;)
-	return x;
-}*/
 
 #ifdef DEBUG
 vbools tables::allsat(spbdd x, ntable tab) {
@@ -175,16 +68,6 @@ spbdd tables::range(size_t arg, ntable tab) {
 			(!syms 	? T%issym : bdd_impl(issym, 
 				leq_const(((syms-1)<<2), arg, args, bits)))});
 	DBG(wcout<<"range:"<<endl<<allsat(r, tab)<<endl<<endl;)
-//	DBG(wcout<<"range:"<<endl<<::allsat(r, tbits+max_args*bits)<<endl<<endl;)
-//	DBG(wcout<<"issym:"<<endl<<allsat(issym, tab)<<endl<<endl;)
-//	DBG(wcout<<"issym:"<<endl<<::allsat(issym, tbits+max_args*bits)<<endl<<endl;)
-//	DBG(wcout<<"isnum:"<<endl<<allsat(isnum, tab)<<endl<<endl;)
-//	DBG(wcout<<"isnum:"<<endl<<::allsat(isnum, tbits+max_args*bits)<<endl<<endl;)
-//	DBG(wcout<<"isnum&&lc:"<<endl<<allsat(isnum&&leq_const((mknum(nums-1)), arg, args, bits), tab)<<endl<<endl;)
-//	DBG(wcout<<"isnum&&lc:"<<endl<<::allsat(isnum&&leq_const((mknum(nums-1)), arg, args, bits), tbits+max_args*bits)<<endl<<endl;)
-//	DBG(wcout<<"lc:"<<endl<<allsat(leq_const((mknum(nums-1)), arg, args, bits), tab)<<endl<<endl;)
-//	DBG(wcout<<"lc:"<<endl<<::allsat(leq_const((mknum(nums-1)), arg, args, bits), tbits+max_args*bits)<<endl<<endl;)
-//	DBG(sat(*this, [this,arg,args](const raw_term& t){wcout<<t<<endl;})(tbdds[tab]&&leq_const((mknum(nums-1)), arg, args, bits));)
 	return onmemo(), r;
 }
 
@@ -345,8 +228,8 @@ void tables::out(wostream& os) {
 	allsat_cb(db, tbits, [&os, op, cl, this](const bools& p, spbdd x) {
 		ntable tab = 0;
 		for (size_t n = 0; n != p.size(); ++n)
-			if (p[n]) tab |= 1 << (tbits-n-1);
-		allsat_cb(x, sig_len(sigs[tab])*bits+tbits,
+			if (p[n]) tab |= 1 << (tbits - n - 1);
+		allsat_cb(x, sig_len(sigs[tab]) * bits + tbits,
 			[&os, tab, op, cl, this](const bools& p, spbdd) {
 			const size_t args = sig_len(sigs[tab]);
 			term r = { false, sigs[tab], ints(args, 0) };
@@ -356,19 +239,17 @@ void tables::out(wostream& os) {
 						get<2>(r)[n] |= 1 << (bits-k-1);
 			raw_term rt;
 			rt.e.resize(args+1),
-			rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(sigs[tab])));
-			for (size_t n = 0; n != args; ++n) {
-				int_t arg = get<2>(r)[n];
-				if (arg & 1) rt.e[n+1] = elem((wchar_t)(arg>>2));
-				else if (arg & 3) rt.e[n+1] = elem((int_t)(arg>>2));
-				else rt.e[n+1]= elem(elem::SYM, dict.get_sym(arg));
+			rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(sigs[tab])));
+			for (size_t n = 1; n != args + 1; ++n) {
+				int_t arg = get<2>(r)[n - 1];
+				if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+				else if (arg & 3) rt.e[n]=elem((int_t)(arg>>2));
+				else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 			}
 			rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
 			os<<rt<<endl;
-			//f(move(rt));
 		})();
 	})();
-//	sat(*this, [&os](const raw_term& t){os<<t<<endl;})(db);
 }
 
 tables::tables() : dict(*new dict_t) {}
@@ -377,7 +258,7 @@ tables::~tables() { delete &dict; }
 int main() {
 	bdd::init();
 	//raw_progs rp(L"c(y).e(x).d(4).d(?z).");
-	raw_progs rp(L"c(y).e(x).d(0).");
+	raw_progs rp(L"a(z).c(y).e(x).d(0).");
 	//raw_progs rp(L"e(x 5).c(y).d(1).d(?z).");
 	//raw_progs rp(L"d(1 ?z).");
 //	raw_progs rp(L"c(y).e(x).e(z).");

@@ -33,10 +33,6 @@ private:
 		sizes perm, limit;
 	};
 
-	friend class walk;
-	friend class sat;
-	friend class transform;
-
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2, tbits = 0; // #bits for elem, #bits for table id
 	dict_t& dict;
