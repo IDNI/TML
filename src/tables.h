@@ -64,14 +64,15 @@ private:
 	ntable add_table(sig_t s);
 	ntable get_table(const raw_term& t);
 	spbdd from_row(const ints& row, ntable tab, bools *ex = 0);
-	void add(ntable tab, const std::vector<ints>& rows);
-	void add(const raw_term&);
+	void add_terms(ntable tab, const std::vector<ints>& rows);
+	void add_term(ntable tab, const ints& rows);
+	void add_raw_term(const raw_term&);
 	DBG(vbools allsat(spbdd x, ntable tab);)
 public:
 	typedef std::map<item, std::set<std::set<item>>> transaction;
 	tables();
 	~tables();
-	void add(const std::vector<raw_term>& rows);
+	void add_raw_terms(const std::vector<raw_term>& rows);
 	void out(std::wostream&);
 };
 
