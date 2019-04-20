@@ -201,6 +201,7 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	prog_data pd;
 	transform(rp, n, pd, strtrees);
 	if (xsb) print_xsb(wcout, rp.p[n]);
+	if (souffle) print_souffle(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
@@ -219,18 +220,24 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 }
 
 driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
-	bool xsb) : argc(argc), argv(argv), print_transformed(print_transformed),
-	xsb(xsb) {
+	bool xsb, bool souffle, bool csv) : argc(argc), argv(argv),
+	print_transformed(print_transformed), xsb(xsb), souffle(souffle),
+	csv(csv) {
 	DBG(drv = this;)
 	lp *prog = 0;
 	strs_t strtrees;
 	for (size_t n = 0; n != rp.p.size(); ++n)
 		prog = prog_run(rp, n, prog, strtrees);
-	if (prog) { printdb(wcout, prog); delete prog; }
+	if (prog) {
+		if (csv) save_csv(prog);
+		printdb(wcout, prog);
+		delete prog;
+	}
 }
 
-driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb)
-	: driver(argc, argv, move(raw_progs(f)), print_transformed, xsb) {}
+driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb,
+	bool souffle, bool csv) : driver(argc, argv, move(raw_progs(f)),
+	print_transformed, xsb, souffle, csv) {}
 driver::driver(int argc, char** argv, wstring s, bool print_transformed,
-	bool xsb) : driver(argc, argv, move(raw_progs(s)), print_transformed, xsb)
-	{}
+	bool xsb, bool souffle, bool csv) : driver(argc, argv,
+	move(raw_progs(s)), print_transformed, xsb, souffle, csv) {}

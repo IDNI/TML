@@ -55,7 +55,7 @@ class driver {
 	void progs_read(wstr s);
 	lp* prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed,
-		bool xsb);
+		bool xsb, bool souffle, bool csv);
 	size_t load_stdin();
 	bool pfp();
 	std::wstring std_input;
@@ -63,12 +63,15 @@ class driver {
 	char** argv;
 	bool print_transformed;
 	bool xsb;
+	bool souffle;
+	bool csv;
 public:
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false,
-		bool xsb = false);
+		bool xsb = false, bool souffle = false, bool csv = false);
 	driver(int argc, char** argv, std::wstring,
-		bool print_transformed = false, bool xsb = false);
+	bool print_transformed = false, bool xsb = false, bool souffle = false,
+	bool csv = false);
 
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
@@ -86,7 +89,14 @@ public:
 	std::wostream& printdiff(std:: wostream& os, const diff_t& d,
 		size_t bits) const;
 	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const;
+	std::wostream& print_souffle(std::wostream& os, const raw_prog& rp)
+		const;
 	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
+	std::wostream& print_term_souffle(std::wostream& os, const term& t)
+		const;
+	std::wostream& print_term_csv(std::wostream& os, const term& t) const;
+	void save_csv(lp *p) const;
+	void save_csv(const db_t& db, size_t bits) const;
 };
 
 #ifdef DEBUG
