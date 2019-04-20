@@ -21,12 +21,12 @@ wostream& output_xsb_rule(wostream& os, const raw_rule& r);
 wostream& output_xsb_term(wostream& os, const raw_term& t);
 wostream& output_xsb_elem(wostream& os, const elem& e);
 
-#define output_lexeme_adjust_first(os, l, fn) { (os)<< (wchar_t)fn(*((l)[0])); \
-	if ((l)[1]-((l)[0]+1) > 0) (os) << lexeme{(l)[0]+1,(l)[1]}; }
+#define output_lexeme_adjust_first(os, l, fn) (os) << (wchar_t)fn(*((l)[0])) <<\
+	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
 wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 	if (t.neg()) os << L'~';
-	output_lexeme_adjust_first(os, dict.get_rel(t.rel()), tolower);
+	output_lexeme_adjust_first(os, dict.get_rel(t.rel()), towlower);
 	os << L'(';
 	int_t skip, l = 0;
 	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
@@ -38,9 +38,10 @@ wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
 			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
 			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
-				output_lexeme_adjust_first(os, dict.get_sym(t.arg(n)), tolower)
+				output_lexeme_adjust_first(os,
+					dict.get_sym(t.arg(n)), towlower);
 			else os << L'[' << (t.arg(n)>>2) << L']';
-			if (++n != t.nargs() && k != t.arity()[ar]-1) os << L',';
+			if (++n != t.nargs() && k != t.arity()[ar]-1) os <<L',';
 		}
 		++ar;
 		while (ar<t.arity().size() && t.arity()[ar] == -2) ar++,
@@ -54,10 +55,12 @@ wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 wostream& driver::print_xsb(wostream& os, const raw_prog& p) const {
 	relarities all, tabling;
 	get_relarities(p, all, tabling);
-	os << L"% start of XSB program" << endl << endl;
+	os << L"% start of XSB program" << endl;
+	os << endl;
 	os << L"% {" << endl;
 	for (auto x : p.r) output_xsb_rule(os, x) << endl;
-	os << L"% }" << endl << endl;
+	os << L"% }" << endl;
+	os << endl;
 	os << L"% enable tabling for all relations in heads"
 		<< L" to avoid inf. loops:" << endl;
 	for (auto ra : tabling) os << L":- table " << ra.first <<
@@ -73,7 +76,8 @@ wostream& driver::print_xsb(wostream& os, const raw_prog& p) const {
 		os << L"))." << endl;
 	}
 	os << endl;
-	os << L":- halt." << endl << endl;
+	os << L":- halt." << endl;
+	os << endl;
 	os << L"% end of XSB program" << endl;
 	return os;
 }
@@ -103,7 +107,8 @@ void get_relarities(const raw_prog& p, relarities& all, relarities& tabling) {
 				if (ar == 0) {
 					for (int_t a : t.arity)
 						if (a == -1) trigger++;
-						else if (a == -2 && !--trigger) ar++;
+						else if (a == -2 && !--trigger)
+							ar++;
 				}
 				rel = lexeme2str(t.e[0].e);
 				rel[0] = towlower(rel[0]);
@@ -119,11 +124,13 @@ wostream& output_xsb_rule(wostream& os, const raw_rule& r) {
 		default: ;
 	}
 	for (size_t n = 0; n < r.nheads(); ++n)
-		if (output_xsb_term(os, r.head(n)), n != r.nheads() - 1) os << L',';
+		if (output_xsb_term(os, r.head(n)), n != r.nheads() - 1)
+			os << L',';
 	if (!r.nbodies()) return os << L'.';
 	os << L" :- ";
 	for (size_t n = 0; n < r.nbodies(); ++n)
-		if (output_xsb_term(os, r.body(n)), n != r.nbodies() - 1) os << L',';
+		if (output_xsb_term(os, r.body(n)), n != r.nbodies() - 1)
+			os << L',';
 	return os << L'.';
 }
 
@@ -136,30 +143,28 @@ wostream& output_xsb_term(wostream& os, const raw_term& t) {
 		if (n >= t.e.size()) break;
 		while (t.e[n].type == elem::OPENP) ++n;
 		for (int_t k = 0; k != t.arity[ar];)
-			if (output_xsb_elem(os, t.e[n++]), ++k != t.arity[ar]) os << L", ";
+			if (output_xsb_elem(os, t.e[n++]), ++k != t.arity[ar])
+				os << L", ";
 		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 		++ar;
-		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
-		if (ar > 0 && t.arity[ar-1] == -2 && ar != t.arity.size()) os<<", ";
+		while (ar < t.arity.size() && t.arity[ar] == -2)
+			++ar, os << L')';
+		if (ar > 0 && t.arity[ar-1] == -2 && ar != t.arity.size())
+			os << ", ";
 	}
 	return os << L')';
 }
 
 wostream& output_xsb_elem(wostream& os, const elem& e) {
 	switch (e.type) {
-		case elem::CHR:
-			return os << '\'' <<
-				(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") <<
-				e.ch << '\'';
-		case elem::VAR:
-			output_lexeme_adjust_first(os,
-				(lexeme{ e.e[0]+1, e.e[1] }), towupper);
-			return os;
+		case elem::CHR: return os << '\'' <<
+			(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") <<
+			e.ch << '\'';
+		case elem::VAR: return output_lexeme_adjust_first(os,
+			(lexeme{ e.e[0]+1, e.e[1] }), towupper);
 		case elem::OPENP:
 		case elem::CLOSEP: return os << *e.e[0];
 		case elem::NUM: return os << e.num;
-		default:
-			output_lexeme_adjust_first(os, e.e, towlower);
-			return os;
+		default: return output_lexeme_adjust_first(os, e.e, towlower);
 	}
 }
