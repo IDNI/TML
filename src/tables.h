@@ -71,7 +71,7 @@ private:
 	void add_tbit();
 	spbdd leq_const(int_t c, size_t arg, size_t args, size_t bit) const;
 	spbdd range(size_t arg, ntable tab);
-	void range_clear_memo();
+	void range_clear_memo() {onmemo(-range_memo.size()),range_memo.clear();}
 
 	sig_t get_sig(const raw_term& t);
 	ntable add_table(sig_t s);

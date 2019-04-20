@@ -77,8 +77,6 @@ spbdd tables::range(size_t arg, ntable tab) {
 	return onmemo(), r;
 }
 
-void tables::range_clear_memo() {onmemo(-range_memo.size()),range_memo.clear();}
-
 spbdd tables::add_bit(spbdd x, ntable tab) {
 	validate();
 	const size_t args = siglens[tab];
@@ -113,14 +111,15 @@ void tables::add_bit() {
 void tables::add_tbit() {
 	validate();
 	range_clear_memo();
-	DBG(out(wcout<<"before add_tbit:"<<endl);)
 	sizes perm(max_args * bits + tbits);
 	for (size_t n = 0; n != perm.size(); ++n) perm[n] = n + 1;
-//	DBG(wcout<<"before add_tbit:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 	db = (db ^ perm) && bdd::from_bit(0, false), ++tbits;
-	DBG(out(wcout<<"after add_tbit:"<<endl);)
+	for (size_t k = 0; k != tbdds.size(); ++k) {
+		perm.resize(siglens[k]);
+		for (size_t n = 0; n != perm.size(); ++n) perm[n] = n + 1;
+		tbdds[k] = (tbdds[k] ^ perm) && bdd::from_bit(0, false);
+	}
 	validate();
-//	DBG(wcout<<"after add_tbit:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
 }
 
 spbdd tables::from_row(const ints& row, ntable tab, bools *ex) {
@@ -165,7 +164,7 @@ ntable tables::add_table(sig_t s) {
 	if (!sigs.size() || sigs.size() > (size_t)(1 << (tbits-1))) add_tbit();
 	spbdd t = T;
 	for (size_t b = 0; b != tbits; ++b)
-		t = t && bdd::from_bit(b,nt&(1<<(tbits-b-1)));
+		t = t && bdd::from_bit(b, nt & (1 << (tbits - b - 1)));
 //	DBG(wcout<<"table "<<nt<<" bits: "<<tbits<<endl<<::allsat(t, max_args*bits+tbits)<<endl<<endl);
 	validate();
 	ts.emplace(s, nt), sigs.push_back(s), tbdds.push_back(t),
@@ -228,23 +227,22 @@ ntable tables::get_table(const raw_term& t) { return add_table(get_sig(t)); }
 
 void tables::out(wostream& os) {
 	DBG(wcout<<"as:"<<endl<<::allsat(db, max_args*bits+tbits)<<endl;)
+	DBG(wcout<<"bits: " << bits << " tbits: " << tbits << endl;)
 	validate();
 	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
-	allsat_cb(db, tbits, 0, [&os, op, cl, this](const bools& p, spbdd x) {
-		if (x->leaf() && !x->trueleaf()) return;
-		ntable tab = 0;
-		for (size_t n = 0; n != p.size(); ++n)
-			if (p[n]) tab |= 1 << (tbits - n - 1);
-		DBG(assert((size_t)tab < sigs.size());)
-		validate();
-		auto f = [&os, tab, op, cl, this](const bools& p, spbdd DBG(y)){
+	for (ntable tab = 0; (size_t)tab != tbdds.size(); ++tab) {
+//		DBG(wcout<<"as(tab):"<<endl<<::allsat(db&&tbdds[tab],
+//			siglens[tab]*bits+tbits)<<endl;)
+		allsat_cb(db&&tbdds[tab], siglens[tab] * bits + tbits,
+			[&os, tab, op, cl, this](const bools& p, spbdd DBG(y)) {
 			DBG(assert(y->leaf());)
 			const size_t args = siglens[tab];
+//			DBG(wcout<<"p: " << p << endl;)
 			term r = { false, sigs[tab], ints(args, 0) };
 			for (size_t n = 0; n != args; ++n)
 				for (size_t k = 0; k != bits; ++k)
 					if (p[pos(k, n, args)])
-						get<2>(r)[n] |= 1 << (bits-k-1);
+						get<2>(r)[n] |= 1 << k;
 			raw_term rt;
 			rt.e.resize(args+1),
 			rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(sigs[tab])));
@@ -256,9 +254,8 @@ void tables::out(wostream& os) {
 			}
 			rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
 			os<<rt<<endl;
-		};
-		allsat_cb(x, siglens[tab] * bits + tbits, tbits, f)();
-	})();
+		})();
+	}
 }
 
 void tables::validate() {
@@ -321,14 +318,19 @@ int main() {
 //	raw_progs rp(L"a(z).c(y).e(x).d(0).");
 	//raw_progs rp(L"e(x 5).c(y).d(1).d(?z).");
 	//raw_progs rp(L"d(1 ?z).");
-	raw_progs rp(L"c(y).e(x).e(z).");
+	raw_progs rp(L"c(y).e(x).e(z).d(y).");
 //	raw_progs rp(L"c(y).e(x).");
 //	raw_progs rp(L"c(y).");
 //	raw_progs rp(stdin);
 	tables t;
+//	wcout<<endl;
 	for (size_t n = 0; n != rp.p[0].r.size(); ++n)
-		t.add_raw_terms(rp.p[0].r[n].heads()),
-		t.out(wcout<<endl);
+		t.add_raw_terms(rp.p[0].r[n].heads());
+	t.out(wcout<<endl);
+	wcout<<"input:"<<endl;
+	for (size_t n = 0; n != rp.p[0].r.size(); ++n)
+		for (size_t k = 0; k != rp.p[0].r[n].nheads(); ++k)
+			wcout<<rp.p[0].r[n].head(k)<<endl;
 	bdd::onexit = true;
 	return 0;
 }
