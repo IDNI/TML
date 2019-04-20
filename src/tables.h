@@ -39,16 +39,33 @@ private:
 
 	std::map<sig_t, ntable> ts;
 	std::vector<sig_t> sigs;
+	std::vector<size_t> siglens;
 	bdds tbdds;
 	size_t max_args = 0;
 	std::map<std::array<int_t, 7>, spbdd> range_memo;
 
 	spbdd db = F;
 
-	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args)const;
-	size_t pos(size_t bit, size_t arg, size_t args) const;
-	size_t arg(size_t v, size_t args) const;
-	size_t bit(size_t v, size_t args) const;
+	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
+		DBG(assert(bit < nbits && args <= max_args && arg < args);)
+		return (nbits - bit - 1) * args + arg + tbits;
+	}
+
+	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
+		DBG(assert(bit_from_right<bits && args<=max_args && arg<args);)
+		return (bits - bit_from_right - 1) * args + arg + tbits;
+	}
+
+	size_t arg(size_t v, size_t args) const {
+		DBG(assert(v >= tbits);)
+		return (v - tbits) % args;
+	}
+
+	size_t bit(size_t v, size_t args) const {
+		DBG(assert(v >= tbits);)
+		return bits - ((v - tbits) / args) - 1;
+	}
+
 	void add_bit();
 	spbdd add_bit(spbdd x, ntable tab);
 	void add_tbit();
@@ -72,5 +89,3 @@ public:
 	void add_raw_terms(const std::vector<raw_term>& rows);
 	void out(std::wostream&);
 };
-
-size_t sig_len(const sig_t& s);
