@@ -18,9 +18,13 @@
 #include <unordered_map>
 #include <array>
 #include <iostream>
-#include <execinfo.h>
 #include <cstdio>
+#ifdef __EMSCRIPTEN__
+typedef int32_t int_t;
+#else
+#include <execinfo.h>
 typedef int64_t int_t;
+#endif
 typedef wchar_t* wstr;
 typedef const wchar_t* cws;
 typedef cws* pcws;

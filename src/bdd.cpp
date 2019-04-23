@@ -102,7 +102,7 @@ spbdd operator||(const spbdd& x, const spbdd& y) {
 	auto it = memo_or.find(t);
 	if (it != memo_or.end()) return it->second;
 	spbdd res;
-#endif	
+#endif
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
@@ -176,7 +176,7 @@ spbdd operator&&(spbdd x, spbdd y) {
 	auto it = memo_and.find(t);
 	if (it != memo_and.end()) return it->second;
 	spbdd res;
-#endif	
+#endif
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
@@ -194,7 +194,7 @@ spbdd operator%(spbdd x, spbdd y) {
 	auto it = memo_and_not.find(t);
 	if (it != memo_and_not.end()) return it->second;
 	spbdd res;
-#endif	
+#endif
 	const size_t &vx = x->v(), &vy = y->v();
 	size_t v;
 	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
@@ -255,13 +255,13 @@ spbdd bdd_subterm(spbdd x, size_t from, size_t to, size_t args1, size_t args2,
 	auto it = memo_dt.find(t);
 	if (it != memo_dt.end()) return it->second;
 	size_t res;
-#endif	
+#endif
 	bdd n = getbdd(x);
 	if (n.v <= h)
 		apply_ret(bdd::add({{n.v, bdd_deltail(n.h,h),
 			bdd_deltail(n.l,h)}}), memo_dt);
 	apply_ret(n.h == F && n.l == F ? F : T, memo_dt);
-}    
+}
 */
 size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 	size_t i;
@@ -293,7 +293,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 		else if (!v[i]->l()->leaf()) l.push_back(v[i]->l());
 		else if (!v[i]->l()->trueleaf()) return flag ? res=F,1 : 2;
 	sort(h.begin(), h.end()), sort(l.begin(), l.end());
-	if (!flag) { 
+	if (!flag) {
 		for (size_t n = 1; n < h.size();)
 			if (h[n] == h[n-1]) {
 				h.erase(h.begin() + n);
@@ -324,7 +324,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 }
 
 spbdd bdd_and_many(bdds v) {
-#ifdef MEMO	
+#ifdef MEMO
 	auto jt = memo_and.end();
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -335,7 +335,7 @@ spbdd bdd_and_many(bdds v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
-#endif	
+#endif
 	auto it = memo_and_many.find(v);
 	if (it != memo_and_many.end()) return it->second;
 	it = memo_and_many.emplace(v, nullptr).first;
@@ -385,7 +385,7 @@ size_t bdd_or_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 		else if (!v[i]->l()->leaf()) l.push_back(v[i]->l());
 		else if (v[i]->l()->trueleaf()) return flag ? res=T,1 : 2;
 	sort(h.begin(), h.end()), sort(l.begin(), l.end());
-	if (!flag) { 
+	if (!flag) {
 		for (size_t n = 1; n < h.size();)
 			if (h[n] == h[n-1]) {
 				h.erase(h.begin() + n);
@@ -416,7 +416,7 @@ size_t bdd_or_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 }
 
 spbdd bdd_or_many(bdds v) {
-#ifdef MEMO	
+#ifdef MEMO
 	auto jt = memo_or.end();
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -427,7 +427,7 @@ spbdd bdd_or_many(bdds v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
-#endif	
+#endif
 	auto it = memo_or_many.find(v);
 	if (it != memo_or_many.end()) return it->second;
 	it = memo_or_many.emplace(v, nullptr).first;
@@ -514,9 +514,10 @@ void memos_clear() {
 #ifdef MEMO
 	onmemo(-memo_and.size() - memo_and_not.size() - memo_or.size());
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear();
-#endif		
+#endif
 }
 
+#ifndef __EMSCRIPTEN__
 void dump_stack() {
 	void *addrs[3];
 	size_t dep = backtrace(addrs, 3);
@@ -524,6 +525,7 @@ void dump_stack() {
 	for (size_t i = 1; i < dep; i++) wcerr<< strs[i]<<endl;
 	free(strs);
 }
+#endif
 
 void bdd::clear() { M.clear(); memos_clear(); init(); }
 

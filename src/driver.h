@@ -70,8 +70,10 @@ public:
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false,
 		bool xsb = false, bool souffle = false, bool csv = false);
 	driver(int argc, char** argv, std::wstring,
-	bool print_transformed = false, bool xsb = false, bool souffle = false,
-	bool csv = false);
+		bool print_transformed = false, bool xsb = false,
+		bool souffle = false, bool csv = false);
+	driver(int argc, char** argv, char *s, bool print_transformed = false,
+		bool xsb = false, bool souffle = false, bool csv = false);
 
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;

@@ -1,0 +1,9 @@
+interface tml {
+	static void init();
+};
+interface driver {
+	void driver(long argc, DOMString[] argv, DOMString source,
+		boolean print_transformed, boolean xsb, boolean souffle,
+		boolean csv);
+	readonly attribute boolean result;
+};
