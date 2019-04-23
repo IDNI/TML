@@ -19,6 +19,8 @@
 #include <functional>
 #include <cctype>
 #include <ctime>
+#include <locale>
+#include <codecvt>
 #include "driver.h"
 #include "rule.h"
 #include "err.h"
@@ -241,3 +243,8 @@ driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb,
 driver::driver(int argc, char** argv, wstring s, bool print_transformed,
 	bool xsb, bool souffle, bool csv) : driver(argc, argv,
 	move(raw_progs(s)), print_transformed, xsb, souffle, csv) {}
+std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+driver::driver(int argc, char** argv, char *s, bool print_transformed,
+	bool xsb, bool souffle, bool csv) : driver(argc, argv,
+	move(raw_progs(converter.from_bytes(string(s)))),
+	print_transformed, xsb, souffle, csv) {}
