@@ -4,7 +4,7 @@ project(tml.js)
 set(CMAKE_CXX_COMPILER em++)
 set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -Wpedantic -s EXIT_RUNTIME=1")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -DDEBUG -g4")
-set(CMAKE_CXX_FLAGS_RELEASE "-O0 -DNDEBUG -g0 --js-opts 1")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -g0")
 set(CMAKE_CXX_LINK_FLAGS "--post-js glue.js")
 
 set(CMAKE_CXX_STANDARD 14)
