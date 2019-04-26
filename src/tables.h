@@ -28,23 +28,15 @@ class tables {
 private:
 	typedef std::map<int_t, size_t> varmap;
 	struct term : public ints {
-		bool neg;//, eq;
+		bool neg;
 		ntable tab;
-//		ints &args;
-		term();//: /*eq(false), */args(*this) {}
 		term(bool neg, ntable tab, const ints& args) :
-			ints(args), neg(neg), /*eq(false),*/ tab(tab){}//, args(*this){}
-//		term(int_t t) : // table equality
-//			ints({t}), eq(true), neg(false), args(*this) {}
-//		term(bool neg, int_t x, int_t y) : // var/const equality
-//			ints({x, y}), eq(true), neg(neg), args(*this) {}
+			ints(args), neg(neg), tab(tab) {}
 		bool operator<(const term& t) const {
 			if (neg != t.neg) return neg;
 			if (tab != t.tab) return tab < t.tab;
 			return (const ints&)*this < t;
 		}
-//		int_t operator[](size_t n) const { return args[n]; }
-//		int_t& operator[](size_t n) { return args[n]; }
 		void replace(const std::map<int_t, int_t>& m);
 	};
 	struct body {
@@ -61,29 +53,29 @@ private:
 			return perm < t.perm;
 		}
 	};
-	struct alt {
-		spbdd rng;//, eq;
+	struct alt : public std::vector<body> {
+		spbdd rng;
 		size_t varslen;
-		std::set<body> b;
 		bool operator<(const alt& t) const {
-//			if (eq != t.eq) return eq < t.eq;
+			if (varslen != t.varslen) return varslen < t.varslen;
 			if (rng != t.rng) return rng < t.rng;
-			return b < t.b;
+			return (std::vector<body>)*this < (std::vector<body>)t;
 		}
 	};
-	struct rule {
+	struct rule : public std::vector<alt> {
 		bool neg;
 		ntable tab;
-		spbdd eq, rng;
+		spbdd eq;
+		size_t len;
 		std::set<alt> alts;
 		bool operator<(const rule& t) const {
 			if (neg != t.neg) return neg;
 			if (tab != t.tab) return tab < t.tab;
 			if (eq != t.eq) return eq < t.eq;
-			if (rng != t.rng) return rng < t.rng;
-			return alts < t.alts;
+			return (std::vector<alt>)*this < (std::vector<alt>)t;
 		}
 	};
+	std::vector<rule> rules;
 	alt get_alt(const std::vector<raw_term>&);
 	rule get_rule(const raw_rule&);
 
@@ -134,7 +126,7 @@ private:
 
 	sig_t get_sig(const raw_term& t);
 	ntable add_table(sig_t s);
-	ntable get_table(const raw_term& t);
+	spbdd get_table(ntable tab, spbdd x) const;
 	sizes get_perm(const term& t, const varmap& m, size_t len) const;
 	static varmap get_varmap(const term& h, const std::set<term>& b,
 		size_t &len);
@@ -143,19 +135,21 @@ private:
 	spbdd from_term(const term&, body *b = 0, std::map<int_t, size_t>*m = 0,
 		size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-	std::set<rule> get_rules(const raw_prog& p);
 	void align_vars(term& h, std::set<term>& b) const;
 	spbdd from_fact(const term& t);
 	void add_term(const term& t);
 	term from_raw_term(const raw_term&);
+	spbdd deltail(spbdd x, size_t len1, size_t len2) const;
+	spbdd body_query(const body& b) const;
+	void alt_query(const alt& a, size_t len, bdds& v) const;
 	DBG(vbools allsat(spbdd x, ntable tab);)
 	void validate();
 public:
 //	typedef std::map<item, std::set<std::set<item>>> transaction;
 	tables();
 	~tables();
+	void get_rules(const raw_prog& p);
 	void add_raw_terms(const std::vector<raw_term>& rows);
-	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
 	void add_prog(const raw_prog& p);
 	void fwd();
 	void pfp();
