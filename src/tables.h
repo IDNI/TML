@@ -136,6 +136,7 @@ private:
 		size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
 	void align_vars(term& h, std::set<term>& b) const;
+	void count_term(const raw_term& t);
 	spbdd from_fact(const term& t);
 	void add_term(const term& t);
 	term from_raw_term(const raw_term&);
@@ -145,11 +146,9 @@ private:
 	DBG(vbools allsat(spbdd x, ntable tab);)
 	void validate();
 public:
-//	typedef std::map<item, std::set<std::set<item>>> transaction;
 	tables();
 	~tables();
 	void get_rules(const raw_prog& p);
-	void add_raw_terms(const std::vector<raw_term>& rows);
 	void add_prog(const raw_prog& p);
 	void fwd();
 	void pfp();

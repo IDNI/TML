@@ -156,26 +156,16 @@ void tables::add_term(const term& t) {
 
 sig_t tables::get_sig(const raw_term&t){return{dict.get_rel(t.e[0].e),t.arity};}
 
-void tables::add_raw_terms(const vector<raw_term>& r) {
-	for (auto x : r) add_term(from_raw_term(x));
-}
-
 tables::term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	for (size_t n = 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
-			case elem::OPENP:
-			case elem::CLOSEP: break;
-			case elem::NUM:
-				nums = max(nums, r.e[n].num+1);
-				t.push_back(mknum(r.e[n].num)); break;
-			case elem::CHR:
-				chars = 256;
-				t.push_back(mkchr(r.e[n].ch)); break;
+			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
+			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
 			case elem::VAR:
 				t.push_back(dict.get_var(r.e[n].e)); break;
-			default: t.push_back(dict.get_sym(r.e[n].e));
-				 syms = max(syms, (int_t)dict.nsyms());
+			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
+			default: ;
 		}
 		/*else if (r.e[n].type == elem::STR) {
 			lexeme l = r.e[n].e;
@@ -183,7 +173,6 @@ tables::term tables::from_raw_term(const raw_term& r) {
 			t.push_back(dict.get_sym(dict.get_lexeme(
 				_unquote(lexeme2str(l)))));
 		}*/
-	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
 	return term(r.neg, add_table(get_sig(r)), t);
 }
 
@@ -373,6 +362,7 @@ void tables::get_rules(const raw_prog& p) {
 					s.emplace(from_raw_term(z));
 				align_vars(h, s), m[h].emplace(move(s));
 			}
+			if (r.b.empty()) add_term(h);
 		}
 	set<rule> rs;
 	for (auto x : m) {
@@ -406,6 +396,33 @@ void tables::get_rules(const raw_prog& p) {
 		r.len = t.size(), rs.insert(r);
 	}
 	for (const rule& r : rs) rules.push_back(r);
+}
+
+void tables::count_term(const raw_term& r) {
+	for (size_t n = 1; n < r.e.size(); ++n)
+		switch (r.e[n].type) {
+			case elem::NUM: nums = max(nums, r.e[n].num+1); break;
+			case elem::CHR: chars = 256; break;
+			case elem::SYM: syms = max(syms, (int_t)dict.nsyms());
+			default: ;
+		}
+		/*else if (r.e[n].type == elem::STR) {
+			lexeme l = r.e[n].e;
+			++l[0], --l[1];
+			t.push_back(dict.get_sym(dict.get_lexeme(
+				_unquote(lexeme2str(l)))));
+		}*/
+}
+
+void tables::add_prog(const raw_prog& p) {
+	for (const raw_rule& r : p.r) {
+		for (const raw_term& t : r.h) count_term(t);
+		for (const auto& a : r.b)
+			for (const raw_term& t : a)
+				count_term(t);
+	}
+	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
+	get_rules(p);
 }
 
 spbdd tables::get_table(ntable tab, spbdd x) const {
@@ -449,28 +466,13 @@ tables::~tables() { delete &dict; }
 
 int main() {
 	bdd::init();
-	//raw_progs rp(L"c(y).e(x).d(4).d(?z).");
-//	raw_progs rp(L"a(z).c(y).e(x).d(0).");
-	//raw_progs rp(L"e(x 5).c(y).d(1).d(?z).");
-	//raw_progs rp(L"d(1 ?z).");
 	wstring str = L"a(?y ?z) :- b(x ?x ?y ?t), c(?y ?z);t(?t ?z).c(y).e(3 6).e(x 1).d(y 1).f(?y).g(?x).";
 	wcout << str << endl;
 	raw_progs rp(str);
 	wcout << rp << endl;
-//	raw_progs rp(L"c(y).e(x).");
-//	raw_progs rp(L"c(y).");
-//	raw_progs rp(stdin);
 	tables t;
-	t.get_rules(rp.p[0]);
+	t.add_prog(rp.p[0]);
 	t.fwd();
-//	wcout<<endl;
-	for (size_t n = 0; n != rp.p[0].r.size(); ++n)
-		t.add_raw_terms(rp.p[0].r[n].h);
-	t.out(wcout<<endl);
-	wcout<<"input:"<<endl;
-	for (size_t n = 0; n != rp.p[0].r.size(); ++n)
-		for (size_t k = 0; k != rp.p[0].r[n].h.size(); ++k)
-			wcout<<rp.p[0].r[n].h[k]<<endl;
 	bdd::onexit = true;
 	return 0;
 }
