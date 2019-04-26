@@ -36,7 +36,8 @@ class bdd {
 		const bdd *h, *l;
 		const size_t hash;
 		key(size_t v, const bdd *h, const bdd *l) :v(v), h(h), l(l),
-			hash(v+(((size_t)h)<<13)+(((size_t)l)<<40)) {}
+			hash(v+(((size_t)h)<<BDD_HASH_H_SHIFT)+
+				(((size_t)l)<<BDD_HASH_L_SHIFT)) {}
 		bool operator==(const key& n) const {
 			return v == n.v && h == n.h && l == n.l;
 		}
@@ -52,7 +53,7 @@ public:
 	const size_t& v() const { return var; }
 	const spbdd& h() const { return hi; }
 	const spbdd& l() const { return lo; }
-	bool leaf() const { return leafvar(var); } 
+	bool leaf() const { return leafvar(var); }
 	bool trueleaf() const { return var; }
 	bool operator==(const bdd& n) const {
 		return var == n.var && hi == n.hi && lo == n.lo;

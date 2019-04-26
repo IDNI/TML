@@ -19,12 +19,18 @@
 #include <array>
 #include <iostream>
 #include <cstdio>
+
 #ifdef __EMSCRIPTEN__
 typedef int32_t int_t;
+#define BDD_HASH_H_SHIFT 7
+#define BDD_HASH_L_SHIFT 20
 #else
 #include <execinfo.h>
 typedef int64_t int_t;
+#define BDD_HASH_H_SHIFT 13
+#define BDD_HASH_L_SHIFT 40
 #endif
+
 typedef wchar_t* wstr;
 typedef const wchar_t* cws;
 typedef cws* pcws;
