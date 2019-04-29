@@ -27,17 +27,17 @@ wostream& operator<<(wostream& os, const lexeme& l) {
 }
 
 #ifdef DEBUG
-wostream& operator<<(wostream& os, bdd n) {
-	return os << n.v() << L' ' << n.h() << L' ' << n.l();
+wostream& bdd_out_ite(wostream& os, spbdd x, size_t dep) {
+	for (size_t n = 0; n != dep; ++n) os << '\t';
+	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F') << endl;
+	bdd_out_ite(os << "if " << x->v() << endl, x->h(), dep+1);
+	for (size_t n = 0; n != dep; ++n) os << '\t';
+	return bdd_out_ite(os << "else" << endl, x->l(), dep+1);
 }
 
-wostream& bdd_out(wostream& os, spbdd n) {
-	return bdd_out(os<<L'['<<n<<L']', *n);
-}
-
-wostream& bdd_out(wostream& os, bdd n) { //print bdd in ?: syntax
-	return	n.leaf() ? os << (n.trueleaf() ? L'T' : L'F') : (bdd_out(
-		os<<n.v()<<L'?',n.h()),bdd_out(os<<L':',n.l()));
+wostream& operator<<(wostream& os, spbdd x) {
+	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F');
+	return os << x->v() << " ? " << x->h() << " : " << x->l();
 }
 
 wostream& operator<<(wostream& os, const bools& x) {
@@ -72,7 +72,7 @@ wostream& operator<<(wostream& os, const matrices& m) {
 
 void driver::from_bits(spbdd x, size_t bits, const prefix& r,
 	std::function<void(const term&)> f) const {
-	allsat_cb(x, bits * r.len(), [r, bits, f, this](const bools& p){
+	allsat_cb(x, bits * r.len(), [r,bits,f,this](const bools& p, spbdd){
 		const size_t ar = r.len();
 		term v(false, r.rel, ints(ar, 0), r.ar);
 		for (size_t i = 0; i != ar; ++i)
@@ -244,12 +244,15 @@ wostream& operator<<(wostream& os, const raw_rule& r) {
 		case raw_rule::TREE: os << L"!!"; break;
 		default: ;
 	}
-	for (size_t n = 0; n < r.nheads(); ++n)
-		if ((os << r.head(n)), n != r.nheads() - 1) os << L',';
-	if (!r.nbodies()) return os << L'.';
+	for (size_t n = 0; n < r.h.size(); ++n)
+		if ((os << r.h[n]), n != r.h.size() - 1) os << L',';
+	if (!r.b.size()) return os << L'.';
 	os << L" :- ";
-	for (size_t n = 0; n < r.nbodies(); ++n)
-		if ((os << r.body(n)), n != r.nbodies() - 1) os << L',';
+	for (size_t n = 0; n < r.b.size(); ++n) {
+		for (size_t k = 0; k < r.b[n].size(); ++k)
+			if ((os << r.b[n][k]), k != r.b[n].size() - 1) os<<L',';
+		if (n != r.b.size() - 1) os << L';';
+	}
 	return os << L'.';
 }
 
