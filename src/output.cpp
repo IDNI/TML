@@ -207,7 +207,8 @@ wostream& operator<<(wostream& os, const directive& d) {
 
 wostream& operator<<(wostream& os, const elem& e) {
 	switch (e.type) {
-		case elem::CHR: return os << '\'' << e.ch << '\'';
+		case elem::CHR: return os << '\'' <<
+			(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") << e.ch << '\'';
 		case elem::OPENP:
 		case elem::CLOSEP: return os<<*e.e[0];
 		case elem::NUM: return os << e.num;

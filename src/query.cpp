@@ -145,17 +145,6 @@ spbdd range::operator()(size_t arg, size_t args) {
 		chars ? chars_clause : notchar,
 		nums ? nums_clause : notnum,
 		syms ? syms_clause : notsym};
-	DBG(assert_nvars(ischar, bits*args);)
-	DBG(assert_nvars(isnum, bits*args);)
-	DBG(assert_nvars(issym, bits*args);)
-	DBG(assert_nvars(chars_clause, bits*args);)
-	DBG(assert_nvars(nt->second(T), bits*args);)
-	DBG(assert_nvars(nums_clause, bits*args);)
-	DBG(assert_nvars(syms_clause, bits*args);)
-	DBG(assert_nvars(notchar, bits*args);)
-	DBG(assert_nvars(notnum, bits*args);)
-	DBG(assert_nvars(notsym, bits*args);)
-	DBG(for (auto x : v) assert_nvars(x, bits*args);)
 	spbdd r = bdd_and_many(v);
 	return onmemo(), memo[{syms,nums,chars,(int_t)args,(int_t)arg}] = r;
 }

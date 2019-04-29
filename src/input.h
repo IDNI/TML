@@ -51,6 +51,7 @@ struct raw_term {
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
 	void calc_arity();
+	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
 };
 
@@ -71,19 +72,9 @@ struct production {
 	bool operator<(const production& t) const { return p < t.p; }
 };
 
-class raw_rule {
-	std::vector<raw_term> h, b;
-public:
-	raw_term& head(size_t n) { return h[n]; }
-	raw_term& body(size_t n) { return b[n]; }
-	const raw_term& head(size_t n) const { return h[n]; }
-	const raw_term& body(size_t n) const { return b[n]; }
-	const std::vector<raw_term>& heads() const { return h; }
-	const std::vector<raw_term>& bodies() const { return b; }
-	void add_head(const raw_term& t) { h.push_back(t); }
-	void add_body(const raw_term& t) { b.push_back(t); }
-	size_t nheads() const { return h.size(); }
-	size_t nbodies() const { return b.size(); }
+struct raw_rule {
+	std::vector<raw_term> h;
+	std::vector<std::vector<raw_term>> b;
 
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
@@ -91,10 +82,10 @@ public:
 	void clear() { h.clear(), b.clear(), type = NONE; }
 	raw_rule(){}
 	raw_rule(const raw_term& t) : h({t}) {}
-	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({b}) {}
+	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
-		return r.head(0).neg = true, r;
+		return r.h[0].neg = true, r;
 	}
 };
 
@@ -121,6 +112,7 @@ std::wostream& operator<<(std::wostream& os, const elem& e);
 std::wostream& operator<<(std::wostream& os, const raw_term& t);
 std::wostream& operator<<(std::wostream& os, const raw_rule& r);
 std::wostream& operator<<(std::wostream& os, const raw_prog& p);
+std::wostream& operator<<(std::wostream& os, const raw_progs& p);
 std::wostream& operator<<(std::wostream& os, const lexeme& l);
 std::wostream& operator<<(std::wostream& os, const production& p);
 lexeme lex(pcws s);

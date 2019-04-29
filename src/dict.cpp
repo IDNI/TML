@@ -15,6 +15,7 @@
 using namespace std;
 
 lexeme dict_t::get_sym(int_t t) const {
+	DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
 	static wchar_t str_nums[20], str_chr[] = L"'a'";
 	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
 	if (t & 2) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),

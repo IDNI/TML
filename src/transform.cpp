@@ -26,11 +26,6 @@ lexeme driver::get_var_lexeme(int_t i) {
 	return dict.get_lexeme(s += to_wstring(i));
 }
 
-bool operator==(const lexeme& l, cws s) {
-	size_t n = wcslen(s);
-	return (size_t)(l[1] - l[0]) != n ? false : !wcsncmp(l[0], s, n);
-}
-
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :

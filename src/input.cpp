@@ -58,7 +58,7 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else parse_error(err_chr, *s);
 	}
-	if (wcschr(L"!~.,(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(err_chr, *s);
 	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
@@ -147,7 +147,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 bool raw_term::parse(const lexemes& l, size_t& pos) {
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
-	while (!wcschr(L".:,", *l[pos][0]))
+	while (!wcschr(L".:,;", *l[pos][0]))
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size()) parse_error(L"unexpected end of file", s[0]);
 	if (e.empty()) return false;
@@ -156,6 +156,15 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP) parse_error(err_paren, l[pos]);
 	return calc_arity(), true;
+}
+
+void raw_term::insert_parens(lexeme op, lexeme cl) {
+	elem o = elem(elem::OPENP, op), c = elem(elem::CLOSEP, cl);
+	e.insert(e.begin() + 1, o), e.push_back(c);
+	for (size_t n = 0, k = 2; n != arity.size(); ++n)
+		if (arity[n] == -1) e.insert(e.begin() + k++, o);
+		else if (arity[n] == -2) e.insert(e.begin() + k++, c);
+		else k += arity[n];
 }
 
 void raw_term::calc_arity() {
@@ -185,8 +194,11 @@ head:	h.emplace_back();
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(err_head, l[pos]);
 	++pos;
-	for (b.emplace_back(); b.back().parse(l, pos); b.emplace_back(), ++pos)
+	b.emplace_back();
+	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
+		b.back().emplace_back(), ++pos)
 		if (*l[pos][0] == '.') return ++pos, true;
+		else if (*l[pos][0] == L';') b.emplace_back();
 		else if (*l[pos][0] != ',') parse_error(err_term_or_dot,l[pos]);
 	parse_error(err_body, l[pos]);
 	return false;
@@ -261,15 +273,32 @@ bool operator==(const raw_term& x, const raw_term& y) {
 }
 
 bool operator<(const raw_rule& x, const raw_rule& y) {
-	if (x.heads().size() != y.heads().size())
+	if (x.h != y.h) return x.h < y.h;
+	if (x.b != y.b) return x.b < y.b;
+/*	if (x.h.size() != y.h.size())
 		return x.heads().size() < y.heads().size();
 	if (x.bodies().size() != y.bodies().size())
 		return x.bodies().size() < y.bodies().size();
-	for (size_t n = 0; n != x.heads().size(); ++n)
-		if (!(x.head(n) == y.head(n))) return x.head(n) < y.head(n);
+	for (size_t n = 0; n != x.h.size(); ++n)
+		if (!(x.head(n) == y.h[n])) return x.head(n) < y.head(n);
 	for (size_t n = 0; n != x.bodies().size(); ++n)
-		if (!(x.body(n) == y.body(n))) return x.body(n) < y.body(n);
+		if (!(x.body(n) == y.body(n))) return x.body(n) < y.body(n);*/
 	return false;
+}
+
+bool operator==(const lexeme& l, const wstring& s) {
+	if ((size_t)(l[1]-l[0]) != s.size()) return false;
+	return !wcsncmp(l[0], s.c_str(), l[1]-l[0]);
+}
+
+bool operator==(const lexeme& l, cws s) {
+	size_t n = wcslen(s);
+	return (size_t)(l[1] - l[0]) != n ? false : !wcsncmp(l[0], s, n);
+}
+
+bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
+	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
+		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
 }
 
 off_t fsize(const char *fname) {
