@@ -117,6 +117,7 @@ wostream& driver::printmats(wostream& os, const matrices& t) const {
 #endif
 
 wostream& driver::print_term(wostream& os, const term& t) const {
+	if (xsb) return print_term_xsb(os, t);
 	if (t.neg()) os << L'~';
 	os << dict.get_rel(t.rel()) << L'(';
 	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
@@ -128,7 +129,7 @@ wostream& driver::print_term(wostream& os, const term& t) const {
 				if (c == L'\r') os << "'\\r'";
 				else if (c == L'\n') os << "'\\n'";
 				else if (c == L'\t') os << "'\\t'";
-				else os << c;
+				else os << L'\'' << c << L'\'';
 			} else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
 			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
 				os << dict.get_sym(t.arg(n));
@@ -173,7 +174,7 @@ wostream& driver::printbdd(wostream& os, spbdd t, size_t bits, const prefix&p)
 	return os;
 }
 
-wostream& driver::printbdd_one(wostream& os, spbdd t, size_t bits, 
+wostream& driver::printbdd_one(wostream& os, spbdd t, size_t bits,
 	const prefix& p) const {
 //	os << "one of " << bdd_count(t, bits * arlen(ar)) << " results: ";
 	return print_term(os, one_from_bits(t, bits, p));
@@ -187,7 +188,7 @@ wostream& driver::printdb(wostream& os, lp *p) const {
 wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 	for (auto x : db)
 		if (builtin_rels.find(x.first.rel) == builtin_rels.end()) {
-			from_bits(x.second,bits,x.first, 
+			from_bits(x.second,bits,x.first,
 				[&os,this](const term&t){
 				print_term(os, t)<<endl; });
 		}

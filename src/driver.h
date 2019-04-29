@@ -53,8 +53,8 @@ class driver {
 	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
 	lp* prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees);
-	
-	driver(int argc, char** argv, raw_progs, bool print_transformed);
+	driver(int argc, char** argv, raw_progs, bool print_transformed,
+		bool xsb);
 	size_t load_stdin();
 	bool pfp();
 	std::wstring std_input;
@@ -63,11 +63,13 @@ class driver {
 	bool print_transformed;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
+	bool xsb;
 public:
 	bool result = true;
-	driver(int argc, char** argv, FILE *f, bool print_transformed = false);
+	driver(int argc, char** argv, FILE *f, bool print_transformed = false,
+		bool xsb = false);
 	driver(int argc, char** argv, std::wstring,
-		bool print_transformed = false);
+		bool print_transformed = false, bool xsb = false);
 
 	matrix getbdd(size_t t) const;
 	matrix getbdd_one(size_t t) const;
@@ -82,6 +84,8 @@ public:
 	std::wostream& printdb(std::wostream& os, lp *p) const;
 	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
 		const;
+	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const;
+	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
 };
 
 #ifdef DEBUG

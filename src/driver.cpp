@@ -26,16 +26,6 @@ using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
-bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
-	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
-		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
-}
-
-bool operator==(const lexeme& l, const wstring& s) {
-	if ((size_t)(l[1]-l[0]) != s.size()) return false;
-	return !wcsncmp(l[0], s.c_str(), l[1]-l[0]);
-}
-
 void unquote(wstring& str) {
 	for (size_t i = 0; i != str.size(); ++i)
 		if (str[i] == L'\\') str.erase(str.begin() + i);
@@ -110,7 +100,7 @@ void driver::get_dict_stats(const raw_prog& p) {
 		case directive::FNAME:
 			nums = max(nums, (int_t)fsize(d.arg[0]+1,
 			(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
-		case directive::STR: 
+		case directive::STR:
 			nums = max(nums,(int_t)(d.arg[1]-d.arg[0])+1);
 			break;
 		case directive::CMDLINE:
@@ -206,7 +196,9 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
-	transform(rp, n, strtrees);
+	prog_data pd;
+	transform(rp, n, pd, strtrees);
+	if (xsb) print_xsb(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
@@ -224,8 +216,9 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	return prog;
 }
 
-driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
-	: argc(argc), argv(argv), print_transformed(print_transformed) {
+driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
+	bool xsb) : argc(argc), argv(argv), print_transformed(print_transformed),
+	xsb(xsb) {
 	DBG(drv = this;)
 	lp *prog = 0;
 	strs_t strtrees;
@@ -234,8 +227,8 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed)
 	if (prog) { printdb(wcout, prog); delete prog; }
 }
 
-driver::driver(int argc, char** argv, FILE *f, bool print_transformed) 
-	: driver(argc, argv, move(raw_progs(f)), print_transformed) {}
-driver::driver(int argc, char** argv, wstring s, bool print_transformed) 
-	: driver(argc, argv, move(raw_progs(s)), print_transformed) {}
-
+driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb)
+	: driver(argc, argv, move(raw_progs(f)), print_transformed, xsb) {}
+driver::driver(int argc, char** argv, wstring s, bool print_transformed,
+	bool xsb) : driver(argc, argv, move(raw_progs(s)), print_transformed, xsb)
+	{}
