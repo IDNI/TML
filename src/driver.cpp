@@ -71,9 +71,9 @@ term driver::get_term(raw_term r, const strs_t& s) {
 	return t;
 }
 
-pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
+/*pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
 	matrix h, b;
-	for (auto x : r.heads()) h.push_back(get_term(x, s));
+	for (auto x : r.h.size()) h.push_back(get_term(x, s));
 	for (auto x : r.bodies()) b.push_back(get_term(x, s));
 //	if (m[0][0] > 0)
 //		for (size_t i = 1; i < m[0].size(); ++i)
@@ -86,7 +86,7 @@ void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& syms) {
 		if (t.e[n].type == elem::NUM) nums = max(nums, t.e[n].num+1);
 		else if (t.e[n].type == elem::SYM) syms.insert(t.e[n].e);
 		else if (t.e[n].type == elem::CHR) chars=max(chars, (int_t)256);
-}
+}*/
 
 size_t driver::load_stdin() {
 	wstringstream ss;
@@ -95,7 +95,7 @@ size_t driver::load_stdin() {
 }
 
 void driver::get_dict_stats(const raw_prog& p) {
-	set<lexeme, lexcmp> /*rels,*/syms;
+	set<lexeme, lexcmp> syms;
 	for (const directive& d : p.d) {
 		chars = max(chars, (int_t)256);
 		switch (d.type) {

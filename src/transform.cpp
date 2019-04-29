@@ -101,7 +101,7 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 			elem(elem::CLOSEP, dict.get_lexeme(L")")),
 			elem(elem::CLOSEP, dict.get_lexeme(L")")),
 			elem(elem::CLOSEP, dict.get_lexeme(L")"))},{}}));
-		r.r.back().head(0).calc_arity();
+		r.r.back().h[0].calc_arity();
 		if (iswspace(s[n]))
 			r.r.push_back(from_string_lex(
 					dict.get_rel(rel), L"space", n));
@@ -214,29 +214,31 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
 #ifndef ELIM_NULLS			
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
-			l.add_head(t);
+			l.h.push_back(t);
 			elem e = elem(elem::VAR, get_var_lexeme(2));
-			l.add_body(from_grammar_elem_nt(rel,e,1,3));
+			l.b.emplace_back();
+			l.b.back().push_back(from_grammar_elem_nt(rel,e,1,3));
 			r.r.push_back(l), l.clear(), l.add_head(t);
-			l.add_body(from_grammar_elem_nt(rel,e,3,1));
+			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
 #endif			
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
 //			wcout << p << endl;
 			size_t v = p.p.size();
-			l.add_head(from_grammar_elem(p.p[0], 1, p.p.size()));
+			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
+			l.b.emplace_back();
 			for (size_t n = 1; n < p.p.size(); ++n) {
 				if (p.p[n].type == elem::CHR) {
-					l.add_body(from_grammar_elem_nt(
+					l.b.back().push_back(from_grammar_elem_nt(
 						rel, p.p[n], n, n+1));
 					continue;
 				}
 				wstring str = lexeme2str(p.p[n].e);
 				if (has(b, str))
-					l.add_body(from_grammar_elem_builtin(
+					l.b.back().push_back(from_grammar_elem_builtin(
 						rel, str,n)), ++v;
-				else l.add_body(
+				else l.b.back().push_back(
 					from_grammar_elem(p.p[n],n,n+1));
 			}
 		}
@@ -277,8 +279,8 @@ nexthead:	const raw_term &head = x.head(n);
 		y.add_head({}), cat_relsym_openp(y.head(0), rel);
 		cat_in_brackets(y.head(0), head);
 		for (const raw_term& t:x.bodies()) cat_in_brackets(y.head(0),t);
-		term_close(y.head(0)), s.insert(y);
-		if (++n < x.nheads()) goto nexthead;
+		term_close(y.h[0])), s.insert(y);
+		if (++n < x.h.size()) goto nexthead;
 	}
 	for (auto x : s) r.r.push_back(x);
 }
@@ -300,13 +302,13 @@ raw_prog driver::transform_bwd(raw_prog& p) {
 	std::vector<raw_term> g;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::GOAL)
-			g.push_back(r.head(0));
+			g.push_back(r.h[0]);
 	lexeme tr = dict.get_lexeme(L"try");
 	set<raw_rule> s, d;
 	for (raw_term t : g) s.insert(raw_rule(prepend_arg(t, tr)));
 	for (const raw_rule& x : p.r)
-		if (!x.nbodies()) s.insert(x);
-		else for (raw_term h : x.heads()) {
+		if (!x.b.size()) s.insert(x);
+		else for (raw_term h : x.h) {
 			raw_rule y(h);
 			y.add_body(prepend_arg(h, tr));
 			for (raw_term b : x.bodies()) y.add_body(b);

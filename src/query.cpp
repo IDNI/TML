@@ -83,7 +83,8 @@ bdd_and_eq::bdd_and_eq(size_t bits, const term& t, const bool neg) :
 	for (size_t n = 0; n != k.e.size(); ++n)
 		if (k.e[n] < 0)
 			for (size_t i = 0; i != k.bits; ++i)
-				v.push_back(from_eq(POS(i, k.bits,n,k.e.size()),
+				v.push_back(bdd::from_eq(
+					POS(i, k.bits,n,k.e.size()),
 					POS(i, k.bits, -k.e[n]-1, k.e.size())));
 	z = bdd_and_many(move(v));
 	DBG(assert_nvars(z, bits * t.nargs());)
@@ -110,8 +111,8 @@ spbdd bdd_and_eq::operator()(const spbdd x, const spbdd y) {
 
 //#define get_leq(c) builtins<leq_const>(arg,bits,args,leq_const(c,bits,args))(T)
 #define get_leq(c) c->second(T)
-#define get2(b1, b2) (from_bit(POS(0,bits,arg,args), b1) && \
-			from_bit(POS(1,bits,arg,args), b2))
+#define get2(b1, b2) (bdd::from_bit(POS(0,bits,arg,args), b1) && \
+		bdd::from_bit(POS(1,bits,arg,args), b2))
 #define ischar get2(true, false)
 #define isnum get2(false, true)
 #define issym get2(false, false)

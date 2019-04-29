@@ -30,7 +30,7 @@ spbdd fact(const term& v, range& rng) {
 		for (size_t j = 0; j != v.nargs(); ++j)
 			if (v.arg(j) >= 0 || j == m[v.arg(j)]) continue;
 			else for (size_t b = 0; b != rng.bits; ++b)
-				r = r && from_eq(
+				r = r && bdd::from_eq(
 					POS(b,rng.bits,j,v.nargs()),
 					POS(b,rng.bits,m[v.arg(j)],v.nargs()));
 //		DBG(printbdd(wcout<<"ret3:"<<endl, r, v.arity, v.rel)<<endl;)
