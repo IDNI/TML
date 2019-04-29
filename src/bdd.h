@@ -172,7 +172,8 @@ public:
 	void operator()() { sat(r); }
 private:
 	spbdd r;
-	size_t nvars, v = 1;
+	const size_t nvars;
+	size_t v = 1;
 	callback f;
 	bools p;
 	void sat(spbdd x);

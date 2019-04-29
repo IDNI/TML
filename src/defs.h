@@ -42,6 +42,7 @@ typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef std::vector<size_t> sizes;
 
+//#define DEEPDEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #define NDBG(x)

@@ -57,9 +57,10 @@ bool bdd::onexit = false;
 
 void allsat_cb::sat(spbdd x) {
 	if (x->leaf() && !x->trueleaf()) return;
-	else if (!x->leaf() && v < x->v())
+	else if (!x->leaf() && v < x->v()) {
+		DBG(assert(x->v() <= nvars);)
 		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
-	else if (v != nvars + 1)
+	} else if (v != nvars + 1)
 		p[++v-2] = true, sat(x->h()),
 		p[v-2] = false, sat(x->l()), --v;
 	else f(p, x);

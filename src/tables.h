@@ -92,12 +92,12 @@ private:
 	spbdd db = F;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
-		DBG(assert(bit < nbits && args <= max_args && arg < args);)
+		DBG(assert(bit < nbits /*&& args <= max_args*/ && arg < args);)
 		return (nbits - bit - 1) * args + arg + tbits;
 	}
 
 	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
-		DBG(assert(bit_from_right<bits && args<=max_args && arg<args);)
+		DBG(assert(bit_from_right<bits/*&& args<=max_args*/&&arg<args);)
 		return (bits - bit_from_right - 1) * args + arg + tbits;
 	}
 
@@ -141,9 +141,10 @@ private:
 	term from_raw_term(const raw_term&);
 	spbdd deltail(spbdd x, size_t len1, size_t len2) const;
 	spbdd body_query(const body& b) const;
-	void alt_query(const alt& a, size_t len, bdds& v) const;
-	DBG(vbools allsat(spbdd x, ntable tab);)
+	void alt_query(const alt& a, size_t len, bdds& v) NDBG(const);
+	DBG(vbools allsat(spbdd x, size_t args);)
 	void out(std::wostream&, spbdd) const;
+	void out(std::wostream&, spbdd, ntable) const;
 	void validate();
 public:
 	tables();

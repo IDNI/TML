@@ -49,7 +49,7 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	return os;
 }
 
-wostream& operator<<(wostream& os, const term& t) {
+/*wostream& operator<<(wostream& os, const term& t) {
 	os << t.rel() << ' ';
 	for (size_t n = 0; n != t.nargs(); ++n) {
 		os << t.arg(n);
@@ -66,7 +66,7 @@ wostream& operator<<(wostream& os, const matrix& m) {
 wostream& operator<<(wostream& os, const matrices& m) {
 	for (const matrix& x : m) os << x << endl;
 	return os;
-}
+}*/
 #endif
 
 /*wostream& driver::print_term(wostream& os, const term& t) const {

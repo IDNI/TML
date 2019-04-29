@@ -33,8 +33,8 @@ void unquote(wstring& str) {
 wstring _unquote(wstring str) { unquote(str); return str; }
 
 #ifdef DEBUG
-vbools tables::allsat(spbdd x, ntable tab) {
-	const size_t args = siglens[tab];
+vbools tables::allsat(spbdd x, size_t args) {
+//	const size_t args = siglens[tab];
 	vbools v = ::allsat(x, tbits + bits * args), s;
 	for (bools b : v) {
 		s.emplace_back(bits * args);
@@ -186,30 +186,32 @@ tables::term tables::from_raw_term(const raw_term& r) {
 void tables::out(wostream& os) const { out(os, db); }
 
 void tables::out(wostream& os, spbdd x) const {
+	for (ntable tab=0; (size_t)tab != tbdds.size(); ++tab) out(os, x, tab);
+}
+
+void tables::out(wostream& os, spbdd x, ntable tab) const {
 	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
-	for (ntable tab = 0; (size_t)tab != tbdds.size(); ++tab) {
-		allsat_cb(x&&tbdds[tab], siglens[tab] * bits + tbits,
-			[&os, tab, op, cl, this](const bools& p, spbdd DBG(y)) {
-			DBG(assert(y->leaf());)
-			const size_t args = siglens[tab];
-			term r(false, tab, ints(args, 0));
-			for (size_t n = 0; n != args; ++n)
-				for (size_t k = 0; k != bits; ++k)
-					if (p[pos(k, n, args)])
-						r[n] |= 1 << k;
-			raw_term rt;
-			rt.e.resize(args+1),
-			rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(sigs[tab])));
-			for (size_t n = 1; n != args + 1; ++n) {
-				int_t arg = r[n - 1];
-				if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
-				else if (arg & 3) rt.e[n]=elem((int_t)(arg>>2));
-				else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
-			}
-			rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
-			os<<rt<<endl;
-		})();
-	}
+	allsat_cb(x&&tbdds[tab], siglens[tab] * bits + tbits,
+		[&os, tab, op, cl, this](const bools& p, spbdd DBG(y)) {
+		DBG(assert(y->leaf());)
+		const size_t args = siglens[tab];
+		term r(false, tab, ints(args, 0));
+		for (size_t n = 0; n != args; ++n)
+			for (size_t k = 0; k != bits; ++k)
+				if (p[pos(k, n, args)])
+					r[n] |= 1 << k;
+		raw_term rt;
+		rt.e.resize(args+1),
+		rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(sigs[tab])));
+		for (size_t n = 1; n != args + 1; ++n) {
+			int_t arg = r[n - 1];
+			if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+			else if (arg & 3) rt.e[n]=elem((int_t)(arg>>2));
+			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+		}
+		rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
+		os<<rt<<endl;
+	})();
 }
 
 void tables::validate() {
@@ -410,15 +412,10 @@ void tables::count_term(const raw_term& r) {
 		switch (r.e[n].type) {
 			case elem::NUM: nums = max(nums, r.e[n].num+1); break;
 			case elem::CHR: chars = 256; break;
-			case elem::SYM: syms = max(syms, (int_t)dict.nsyms());
+			case elem::SYM: dict.get_sym(r.e[n].e),
+					syms = max(syms, (int_t)dict.nsyms());
 			default: ;
 		}
-		/*else if (r.e[n].type == elem::STR) {
-			lexeme l = r.e[n].e;
-			++l[0], --l[1];
-			t.push_back(dict.get_sym(dict.get_lexeme(
-				_unquote(lexeme2str(l)))));
-		}*/
 }
 
 void tables::add_prog(const raw_prog& p) {
@@ -456,7 +453,7 @@ spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
 	sizes perm = perm_init(tbits + len1 * bits);
 	for (size_t n = 0; n != len1; ++n)
 		for (size_t k = 0; k != bits; ++k)
-			if (n >= len2) ex[POS(k, bits, n, len1)] = true;
+			if (n >= len2) ex[pos(k, n, len1)] = true;
 			else perm[pos(k, n, len1)] = pos(k, n, len2);
 	return bdd_permute_ex(x, ex, perm);
 }
@@ -467,19 +464,29 @@ spbdd tables::body_query(const body& b) const {
 			(b.q && get_table(b.tab, db)), b.ex, b.perm);
 }
 
-void tables::alt_query(const alt& a, size_t len, bdds& v) const {
+void tables::alt_query(const alt& a, size_t len, bdds& v) NDBG(const) {
 	bdds v1;
 	for (const body& b : a) v1.push_back(body_query(b));
-	v.push_back(deltail(bdd_and_many(v1), a.varslen, len));
+	spbdd x = bdd_and_many(v1);
+//	DBG(out(wcout<<"v1:"<<endl, x);)
+//	DBG(wcout<<"v1:"<<endl<<allsat(x, a.varslen);)
+	x = deltail(x, a.varslen, len);
+//	DBG(wcout<<"dt:"<<endl<<allsat(x, len);)
+//	DBG(out(wcout<<"dt:"<<endl, x, len);)
+	v.push_back(x);
 }
 
 void tables::fwd() {
 	bdds add, del;
+	validate();
 	for (const rule& r : rules) {
 		bdds v;
 		for (const alt& a : r) alt_query(a, r.len, v);
 		(r.neg ? del : add).push_back(bdd_or_many(v) && tbdds[r.tab]);
 	}
+	validate();
+//	DBG(out(wcout<<"add:"<<endl, bdd_or_many(add));)
+//	DBG(out(wcout<<"del:"<<endl, bdd_or_many(del));)
 	if (add.empty()) db = db % bdd_or_many(del);
 	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
 	else {
