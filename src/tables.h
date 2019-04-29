@@ -67,7 +67,6 @@ private:
 		ntable tab;
 		spbdd eq;
 		size_t len;
-		std::set<alt> alts;
 		bool operator<(const rule& t) const {
 			if (neg != t.neg) return neg;
 			if (tab != t.tab) return tab < t.tab;
@@ -83,7 +82,7 @@ private:
 	size_t bits = 2, tbits = 0; // #bits for elem, #bits for table id
 	dict_t& dict;
 
-	std::map<sig_t, ntable> ts;
+	std::map<sig_t, ntable> smap;
 	std::vector<sig_t> sigs;
 	std::vector<size_t> siglens;
 	bdds tbdds;
@@ -144,6 +143,7 @@ private:
 	spbdd body_query(const body& b) const;
 	void alt_query(const alt& a, size_t len, bdds& v) const;
 	DBG(vbools allsat(spbdd x, ntable tab);)
+	void out(std::wostream&, spbdd) const;
 	void validate();
 public:
 	tables();
@@ -152,5 +152,5 @@ public:
 	void add_prog(const raw_prog& p);
 	void fwd();
 	void pfp();
-	void out(std::wostream&);
+	void out(std::wostream&) const;
 };

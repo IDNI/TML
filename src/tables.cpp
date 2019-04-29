@@ -80,7 +80,6 @@ sizes perm_init(size_t n) {
 }
 
 spbdd tables::add_bit(spbdd x, ntable tab) {
-	validate();
 	const size_t args = siglens[tab];
 	sizes perm = perm_init(args * bits + tbits);
 	for (size_t n = 0; n != args; ++n)
@@ -90,7 +89,6 @@ spbdd tables::add_bit(spbdd x, ntable tab) {
 	for (size_t n = 0; n != args; ++n)
 		v.push_back(bdd::from_bit(pos(0, bits + 1, n, args), false));
 	x = bdd_and_many(move(v));
-	validate();
 	return x;
 }
 
@@ -133,9 +131,8 @@ spbdd tables::from_fact(const term& t) {
 }
 
 ntable tables::add_table(sig_t s) {
-	validate();
-	auto it = ts.find(s);
-	if (it != ts.end()) return it->second;
+	auto it = smap.find(s);
+	if (it != smap.end()) return it->second;
 	ntable nt = sigs.size();
 	size_t len = sig_len(s);
 	max_args = max(max_args, len);
@@ -143,14 +140,14 @@ ntable tables::add_table(sig_t s) {
 	spbdd t = T;
 	for (size_t b = 0; b != tbits; ++b)
 		t = t && bdd::from_bit(b, nt & (1 << (tbits - b - 1)));
-	validate();
-	ts.emplace(s, nt), sigs.push_back(s), tbdds.push_back(t),
+	smap.emplace(s, nt), sigs.push_back(s), tbdds.push_back(t),
 	siglens.push_back(len);
 	return nt;
 }
 
 void tables::add_term(const term& t) {
-	if (t.tab >= (1 << tbits)) add_tbit();
+	DBG(assert(t.tab < (1 << tbits));)
+//	if (t.tab >= (1 << tbits)) add_tbit();
 	db = (from_fact(t) && tbdds[t.tab]) || db;
 }
 
@@ -178,11 +175,12 @@ tables::term tables::from_raw_term(const raw_term& r) {
 
 //ntable tables::get_table(const raw_term& t) { return add_table(get_sig(t)); }
 
-void tables::out(wostream& os) {
-	validate();
+void tables::out(wostream& os) const { out(os, db); }
+
+void tables::out(wostream& os, spbdd x) const {
 	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
 	for (ntable tab = 0; (size_t)tab != tbdds.size(); ++tab) {
-		allsat_cb(db&&tbdds[tab], siglens[tab] * bits + tbits,
+		allsat_cb(x&&tbdds[tab], siglens[tab] * bits + tbits,
 			[&os, tab, op, cl, this](const bools& p, spbdd DBG(y)) {
 			DBG(assert(y->leaf());)
 			const size_t args = siglens[tab];
@@ -334,7 +332,8 @@ spbdd tables::get_alt_range(const term& h, const set<term>& a,
 
 tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 	body b;
-	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len), b.q = T,
+	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
+	b.q = tbdds[t.tab];
 	b.ex = bools(t.size() * bits + tbits, false);
 	for (size_t n = 0; n != tbits; ++n) b.ex[n] = true;
 	varmap m;
@@ -357,12 +356,12 @@ void tables::get_rules(const raw_prog& p) {
 	for (const raw_rule& r : p.r)
 		for (const raw_term& x : r.h) {
 			term h = from_raw_term(x);
-			for (const vector<raw_term>& y : r.b) {
+			if (r.b.empty()) add_term(h);
+			else for (const vector<raw_term>& y : r.b) {
 				for (const raw_term& z : y)
 					s.emplace(from_raw_term(z));
 				align_vars(h, s), m[h].emplace(move(s));
 			}
-			if (r.b.empty()) add_term(h);
 		}
 	set<rule> rs;
 	for (auto x : m) {
@@ -389,8 +388,8 @@ void tables::get_rules(const raw_prog& p) {
 			for (const term& t : al)
 				b.insert(get_body(t, vm, a.varslen));
 			a.rng = get_alt_range(t, al, vm, a.varslen);
-			as.insert(a);
 			for (const body& x : b) a.push_back(x);
+			as.insert(a);
 		}
 		for (const alt& x : as) r.push_back(x);
 		r.len = t.size(), rs.insert(r);
@@ -415,13 +414,27 @@ void tables::count_term(const raw_term& r) {
 }
 
 void tables::add_prog(const raw_prog& p) {
+	auto f = [this](const raw_term& t) {
+		count_term(t);
+		sig_t s = get_sig(t);
+		if (has(smap, s)) return;
+		ntable nt = sigs.size();
+		size_t len = sig_len(s);
+		max_args = max(max_args, len);
+		smap.emplace(s, nt), sigs.push_back(s), siglens.push_back(len);
+	};
 	for (const raw_rule& r : p.r) {
-		for (const raw_term& t : r.h) count_term(t);
-		for (const auto& a : r.b)
-			for (const raw_term& t : a)
-				count_term(t);
+		for (const raw_term& t : r.h) f(t);
+		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
+	do { ++tbits; } while (sigs.size() > (size_t)(1<<(tbits-1)));
+	while (nums + chars + syms >= (1 << (bits - 2))) ++bits;
+	for (ntable tab = 0; tab != (ntable)sigs.size(); ++tab) {
+		spbdd t = T;
+		for (size_t b = 0; b != tbits; ++b)
+			t = t && bdd::from_bit(b, tab & (1 << (tbits - b - 1)));
+		tbdds.push_back(t);
+	}
 	get_rules(p);
 }
 
@@ -456,8 +469,15 @@ void tables::fwd() {
 	bdds add, del;
 	for (const rule& r : rules) {
 		bdds v;
-		for (const alt& a : r.alts) alt_query(a, r.len, v);
-		(r.neg ? add : del).push_back(bdd_or_many(v) && tbdds[r.tab]);
+		for (const alt& a : r) alt_query(a, r.len, v);
+		(r.neg ? del : add).push_back(bdd_or_many(v) && tbdds[r.tab]);
+	}
+	if (add.empty()) db = db % bdd_or_many(del);
+	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
+	else {
+		spbdd a = bdd_or_many(add), d = bdd_or_many(del), s = a % d;
+		if (s == F) { wcout << "unsat" << endl; exit(0); }
+		db = (db || a) % d;
 	}
 }
 
@@ -466,13 +486,16 @@ tables::~tables() { delete &dict; }
 
 int main() {
 	bdd::init();
-	wstring str = L"a(?y ?z) :- b(x ?x ?y ?t), c(?y ?z);t(?t ?z).c(y).e(3 6).e(x 1).d(y 1).f(?y).g(?x).";
-	wcout << str << endl;
+//	wstring str = L"a(?y ?z) :- b(x ?x ?y ?t), c(?y ?z);t(?t ?z).c(y).e(3 6).e(x 1).d(y 1).f(?y).g(?x).";
+	wstring str = L"a(1). b(?x):-a(?x).";
+//	wcout << str << endl;
 	raw_progs rp(str);
 	wcout << rp << endl;
 	tables t;
 	t.add_prog(rp.p[0]);
+	t.out(wcout<<"in:"<<endl);
 	t.fwd();
+	t.out(wcout<<"out:"<<endl);
 	bdd::onexit = true;
 	return 0;
 }
