@@ -24,7 +24,7 @@ wostream& output_xsb_elem(wostream& os, const elem& e);
 #define output_lexeme_adjust_first(os, l, fn) (os) << (wchar_t)fn(*((l)[0])) <<\
 	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
-wostream& driver::print_term_xsb(wostream& os, const term& t) const {
+/*wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 	if (t.neg()) os << L'~';
 	output_lexeme_adjust_first(os, dict.get_rel(t.rel()), towlower);
 	os << L'(';
@@ -54,7 +54,7 @@ wostream& driver::print_term_xsb(wostream& os, const term& t) const {
 
 wostream& driver::print_xsb(wostream& os, const raw_prog& p) const {
 	relarities all, tabling;
-	get_relarities(p, all, tabling);
+	get_relarities(p, all, tabling); // FIXME: get_relarities
 	os << L"% start of XSB program" << endl;
 	os << endl;
 	os << L"% {" << endl;
@@ -86,7 +86,7 @@ void get_relarities(const raw_prog& p, relarities& all, relarities& tabling) {
 	wstring rel;
 	int_t ar, trigger;
 	for (auto r : p.r) {
-		for (auto t : r.heads()) {
+		for (auto t : r.h) {
 			rel = lexeme2str(t.e[0].e);
 			rel[0] = towlower(rel[0]);
 			ar = t.arity[0];
@@ -100,7 +100,7 @@ void get_relarities(const raw_prog& p, relarities& all, relarities& tabling) {
 			all.insert(ra);
 			if (r.nbodies()) tabling.insert(ra);
 		}
-		for (auto t : r.bodies())
+		for (auto t : r.bodies()) // FIXME: per alt
 			if (t.arity.size() == 1) {
 				ar = t.arity[0];
 				trigger = 0;
@@ -123,12 +123,12 @@ wostream& output_xsb_rule(wostream& os, const raw_rule& r) {
 		case raw_rule::TREE: os << L"% !!" << endl; break;
 		default: ;
 	}
-	for (size_t n = 0; n < r.nheads(); ++n)
+	for (size_t n = 0; n < r.h.size(); ++n)
 		if (output_xsb_term(os, r.head(n)), n != r.nheads() - 1)
 			os << L',';
 	if (!r.nbodies()) return os << L'.';
 	os << L" :- ";
-	for (size_t n = 0; n < r.nbodies(); ++n)
+	for (size_t n = 0; n < r.nbodies(); ++n) // FIXME: per alt
 		if (output_xsb_term(os, r.body(n)), n != r.nbodies() - 1)
 			os << L',';
 	return os << L'.';
@@ -167,4 +167,4 @@ wostream& output_xsb_elem(wostream& os, const elem& e) {
 		case elem::NUM: return os << e.num;
 		default: return output_lexeme_adjust_first(os, e.e, towlower);
 	}
-}
+}*/

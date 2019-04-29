@@ -150,7 +150,8 @@ public:
 	~tables();
 	void get_rules(const raw_prog& p);
 	void add_prog(const raw_prog& p);
+	bool run_prog(const raw_prog& p) { add_prog(p); return pfp(); }
 	void fwd();
-	void pfp();
+	bool pfp();
 	void out(std::wostream&) const;
 };

@@ -11,17 +11,22 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <map>
-#include "lp.h"
+#include "tables.h"
 #include "input.h"
 #include "dict.h"
+
+struct prog_data {
+	strs_t strs;
+//	std::unordered_map<int_t, term> strtrees;
+//	std::vector<term> out;
+//	matpairs r;
+//	matrix goals, tgoals;
+	bool bwd = false;
+};
 
 class driver {
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
-	matrix from_bits(spbdd x, size_t bits, const prefix& p) const;
-	void from_bits(spbdd x, size_t bits, const prefix& p,
-		std::function<void(const term&)> f) const;
-	term one_from_bits(spbdd x, size_t bits, const prefix& p) const;
 
 	int_t nums = 0, chars = 0, syms = 0;
 //	bool mult = false;
@@ -29,15 +34,12 @@ class driver {
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
-	term get_term(raw_term r, const strs_t& s);
-	std::pair<matrix, matrix> get_rule(const raw_rule&, const strs_t& s);
-	void count_term(const raw_term& t, std::set<lexeme, lexcmp>& syms);
-	void get_dict_stats(const raw_prog& p);
 
 	std::wstring directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
-	void add_rules(raw_prog& p);
-	void transform(raw_progs& rp, size_t n,	const strs_t& strtrees);
+	void transform(raw_progs& rp, size_t n,	prog_data& pd,
+		const strs_t& strtrees);
+	void transform_len(raw_term& r, const strs_t& s);
 	raw_prog transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const std::wstring&, raw_prog&, int_t);
@@ -48,11 +50,11 @@ class driver {
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
 	raw_term prepend_arg(raw_term t, lexeme s);
-	void get_trees(std::wostream& os, const term& root,
-		const std::map<term, std::vector<term>>&, std::set<term>& done);
-	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
+//	void get_trees(std::wostream& os, const term& root,
+//		const std::map<term, std::vector<term>>&, std::set<term>& done);
+//	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
-	lp* prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees);
+	void prog_run(raw_progs& rp, size_t n, strs_t& strtrees);
 	driver(int argc, char** argv, raw_progs, bool print_transformed,
 		bool xsb, bool souffle, bool csv);
 	size_t load_stdin();
@@ -66,6 +68,7 @@ class driver {
 	bool xsb;
 	bool souffle;
 	bool csv;
+	tables tbl;
 public:
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, bool print_transformed = false,
@@ -76,33 +79,24 @@ public:
 	driver(int argc, char** argv, char *s, bool print_transformed = false,
 		bool xsb = false, bool souffle = false, bool csv = false);
 
-	matrix getbdd(size_t t) const;
-	matrix getbdd_one(size_t t) const;
-	matrix getdb() const;
-	std::wostream& print_term(std::wostream& os, const term& t) const;
-	std::wostream& printmat(std::wostream& os, const matrix& t) const;
-	std::wostream& printmats(std::wostream& os, const matrices& t) const;
-	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
-		const prefix&) const;
-	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
-		const prefix&) const;
-	std::wostream& printdb(std::wostream& os, lp *p) const;
-	std::wostream& printdb(std::wostream& os, const db_t& db, size_t bits)
-		const;
+//	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
+//		const prefix&) const;
+//	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
+//		const prefix&) const;
 	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const;
 	std::wostream& print_souffle(std::wostream& os, const raw_prog& rp)
 		const;
-	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
-	std::wostream& print_term_souffle(std::wostream& os, const term& t)
-		const;
-	std::wostream& print_term_csv(std::wostream& os, const term& t) const;
-	void save_csv(lp *p) const;
-	void save_csv(const db_t& db, size_t bits) const;
+//	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
+//	std::wostream& print_term_souffle(std::wostream& os, const term& t)
+//		const;
+//	std::wostream& print_term_csv(std::wostream& os, const term& t) const;
+//	void save_csv(lp *p) const;
+//	void save_csv(const db_t& db, size_t bits) const;
 };
 
 #ifdef DEBUG
 extern driver* drv;
-std::wostream& printdb(std::wostream& os, lp *p);
+//std::wostream& printdb(std::wostream& os, lp *p);
 std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits, ints ar,
 	int_t rel);
 std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits, ints ar,

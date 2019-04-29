@@ -22,23 +22,15 @@
 #include <locale>
 #include <codecvt>
 #include "driver.h"
-#include "rule.h"
 #include "err.h"
 using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
-void unquote(wstring& str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == L'\\') str.erase(str.begin() + i);
-}
-
-wstring _unquote(wstring str) { unquote(str); return str; }
-
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)
 
-term driver::get_term(raw_term r, const strs_t& s) {
+void driver::transform_len(raw_term& r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (	r.e[n].type == elem::SYM && r.e[n].e == L"len" &&
 			n+3 < r.e.size() &&
@@ -52,6 +44,9 @@ term driver::get_term(raw_term r, const strs_t& s) {
 			r.e.insert(r.e.begin()+n, elem(len)),
 			r.calc_arity();
 		}
+}
+
+/*term driver::get_term(raw_term r, const strs_t& s) {
 	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (r.e[n].type == elem::NUM)
@@ -71,7 +66,7 @@ term driver::get_term(raw_term r, const strs_t& s) {
 	return t;
 }
 
-/*pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
+pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
 	matrix h, b;
 	for (auto x : r.h.size()) h.push_back(get_term(x, s));
 	for (auto x : r.bodies()) b.push_back(get_term(x, s));
@@ -94,7 +89,7 @@ size_t driver::load_stdin() {
 	return std_input.size();
 }
 
-void driver::get_dict_stats(const raw_prog& p) {
+/*void driver::get_dict_stats(const raw_prog& p) {
 	set<lexeme, lexcmp> syms;
 	for (const directive& d : p.d) {
 		chars = max(chars, (int_t)256);
@@ -122,9 +117,10 @@ void driver::get_dict_stats(const raw_prog& p) {
 //	for (auto y : s) rels.insert(y.first);
 	if (!(dict.nsyms()+nums+chars))nums=1,wcerr<<warning_empty_domain<<endl;
 //	return r;
-}
+}*/
 
 wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
+void unquote(wstring& str);
 
 wstring driver::directive_load(const directive& d) {
 	wstring str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
@@ -143,25 +139,25 @@ wstring driver::directive_load(const directive& d) {
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
 void driver::directives_load(raw_prog& p, lexeme& trel) {
-	int_t rel;
+//	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
-		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
+/*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
 					break;
 		case directive::TREE:
 			rel = dict.get_rel(d.t.e[0].e);
 			if (has(pd.strtrees, rel) || has(pd.strs, rel))
 				parse_error(err_str_defined, d.t.e[0].e);
 			else pd.strtrees.emplace(rel, get_term(d.t,pd.strs));
-			break;
+			break;*/
 		default: pd.strs.emplace(dict.get_rel(d.rel.e),
 				directive_load(d));
 		}
 }
 
-void driver::add_rules(raw_prog& p) {
+/*void driver::add_rules(raw_prog& p) {
 	for (const raw_rule& x : p.r)
 		switch (x.type) {
 		case raw_rule::NONE: pd.r.insert(get_rule(x,pd.strs)); break;
@@ -171,9 +167,10 @@ void driver::add_rules(raw_prog& p) {
 					x.head(0),pd.strs)); break;
 		default: assert(0);
 		}
-}
+}*/
 
-void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
+void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
+	const strs_t& strtrees) {
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
 	for (auto x : pd.strs)
@@ -190,23 +187,24 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 			dict.get_rel(pd.strs.begin()->first),
 			pd.strs.begin()->second.size());
 	}
-	if (trel[0]) transform_proofs(rp.p[n], trel);
+//	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
-	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
+//	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
-lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
-	pd.clear();
+void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
+//	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	prog_data pd;
 	transform(rp, n, pd, strtrees);
-	if (xsb) print_xsb(wcout, rp.p[n]);
-	if (souffle) print_souffle(wcout, rp.p[n]);
+//	if (xsb) print_xsb(wcout, rp.p[n]);
+//	if (souffle) print_souffle(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
-	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
-	lp *prog = new lp(pd, range(dict.nsyms(), nums, chars), last);
+//	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
+	tbl.run_prog(rp.p[n]);
+/*	lp *prog = new lp(pd, range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
 	measure_time(result &= prog->pfp());
 	for (auto x : prog->strtrees_out)
@@ -215,8 +213,7 @@ lp* driver::prog_run(raw_progs& rp, size_t n, lp* last, strs_t& strtrees) {
 	int_t tr = dict.get_rel(L"try");
 	set<prefix> sp;
 	for (auto x : prog->db) if (x.first.rel == tr) sp.insert(x.first);
-	for (auto x : sp) prog->db.erase(x);
-	return prog;
+	for (auto x : sp) prog->db.erase(x);*/
 }
 
 driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
@@ -224,15 +221,15 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
 	print_transformed(print_transformed), xsb(xsb), souffle(souffle),
 	csv(csv) {
 	DBG(drv = this;)
-	lp *prog = 0;
+//	lp *prog = 0;
 	strs_t strtrees;
 	for (size_t n = 0; n != rp.p.size(); ++n)
-		prog = prog_run(rp, n, prog, strtrees);
-	if (prog) {
+		prog_run(rp, n, strtrees);
+	/*if (prog) {
 		if (csv) save_csv(prog);
 		printdb(wcout, prog);
 		delete prog;
-	}
+	}*/
 }
 
 driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb,

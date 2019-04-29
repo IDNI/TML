@@ -10,7 +10,6 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "rule.h"
 #include "driver.h"
 #include <iostream>
 #include <sstream>
@@ -70,53 +69,7 @@ wostream& operator<<(wostream& os, const matrices& m) {
 }
 #endif
 
-void driver::from_bits(spbdd x, size_t bits, const prefix& r,
-	std::function<void(const term&)> f) const {
-	allsat_cb(x, bits * r.len(), [r,bits,f,this](const bools& p, spbdd){
-		const size_t ar = r.len();
-		term v(false, r.rel, ints(ar, 0), r.ar);
-		for (size_t i = 0; i != ar; ++i)
-			for (size_t b = 0; b != bits; ++b)
-				if (p[POS(b, bits, i, ar)])
-					v.arg(i) |= 1 << b;
-		f(v);
-	})();
-}
-
-matrix driver::from_bits(spbdd x, size_t bits, const prefix& p) const {
-	const size_t ar = p.len();
-	const vbools s = allsat(x, bits * ar);
-	matrix r(s.size());
-	for (term& v : r) v = term(false, ints(ar, 0), p);
-	size_t n = s.size(), i, b;
-	while (n--)
-		for (i = 0; i != ar; ++i)
-			for (b = 0; b != bits; ++b)
-				if (s[n][POS(b, bits, i, ar)])
-					r[n].arg(i) |= 1 << b;
-	return r;
-}
-
-#ifdef DEBUG
-term driver::one_from_bits(spbdd x, size_t bits, const prefix& p) const {
-	const size_t ar = p.len();
-	bools s(bits * ar, true);
-	if (!bdd_onesat(x, bits * ar, s)) return term();
-	term r(false, ints(ar, 0), p);
-	for (size_t i = 0; i != ar; ++i)
-		for (size_t b = 0; b != bits; ++b)
-			if (s[POS(b, bits, i, ar)])
-				r.arg(i) |= 1 << b;
-	return r;
-}
-
-wostream& driver::printmats(wostream& os, const matrices& t) const {
-	for (auto m : t) printmat(os, m) << endl;
-	return os;
-}
-#endif
-
-wostream& driver::print_term(wostream& os, const term& t) const {
+/*wostream& driver::print_term(wostream& os, const term& t) const {
 	if (xsb) return print_term_xsb(os, t);
 	if (t.neg()) os << L'~';
 	os << dict.get_rel(t.rel()) << L'(';
@@ -157,7 +110,6 @@ wostream& driver::printmat(wostream& os, const matrix& t) const {
 driver* drv;
 wostream& printdb(wostream& os, lp *p) { return drv->printdb(os, p); }
 
-
 wostream& printbdd(wostream& os, spbdd t, size_t bits, const prefix& p) {
 	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
 	return drv->printbdd(os, t, bits, p);
@@ -193,7 +145,7 @@ wostream& driver::printdb(wostream& os, const db_t& db, size_t bits) const {
 				print_term(os, t)<<endl; });
 		}
 	return os;
-}
+}*/
 
 wostream& operator<<(wostream& os, const directive& d) {
 	os << L'@';

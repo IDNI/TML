@@ -25,6 +25,13 @@ size_t sig_len(const sig_t& s) {
 	return r;
 }
 
+void unquote(wstring& str) {
+	for (size_t i = 0; i != str.size(); ++i)
+		if (str[i] == L'\\') str.erase(str.begin() + i);
+}
+
+wstring _unquote(wstring str) { unquote(str); return str; }
+
 #ifdef DEBUG
 vbools tables::allsat(spbdd x, ntable tab) {
 	const size_t args = siglens[tab];
@@ -155,21 +162,22 @@ sig_t tables::get_sig(const raw_term&t){return{dict.get_rel(t.e[0].e),t.arity};}
 
 tables::term tables::from_raw_term(const raw_term& r) {
 	ints t;
+	lexeme l;
 	for (size_t n = 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
 			case elem::VAR:
 				t.push_back(dict.get_var(r.e[n].e)); break;
+			case elem::STR:
+				l = r.e[n].e;
+				++l[0], --l[1];
+				t.push_back(dict.get_sym(dict.get_lexeme(
+					_unquote(lexeme2str(l)))));
+				break;
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-		/*else if (r.e[n].type == elem::STR) {
-			lexeme l = r.e[n].e;
-			++l[0], --l[1];
-			t.push_back(dict.get_sym(dict.get_lexeme(
-				_unquote(lexeme2str(l)))));
-		}*/
 	return term(r.neg, add_table(get_sig(r)), t);
 }
 
@@ -481,10 +489,19 @@ void tables::fwd() {
 	}
 }
 
+bool tables::pfp() {
+	spbdd l = db;
+	for (set<spbdd> s; fwd(), true; l = db)
+		if (l == db) return true;
+		else if (has(s, l)) return false;
+		else s.insert(l);
+	throw 0;
+}
+
 tables::tables() : dict(*new dict_t) {}
 tables::~tables() { delete &dict; }
 
-int main() {
+/*int main() {
 	bdd::init();
 //	wstring str = L"a(?y ?z) :- b(x ?x ?y ?t), c(?y ?z);t(?t ?z).c(y).e(3 6).e(x 1).d(y 1).f(?y).g(?x).";
 	wstring str = L"a(1). b(?x):-a(?x).";
@@ -498,4 +515,4 @@ int main() {
 	t.out(wcout<<"out:"<<endl);
 	bdd::onexit = true;
 	return 0;
-}
+}*/

@@ -218,7 +218,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			elem e = elem(elem::VAR, get_var_lexeme(2));
 			l.b.emplace_back();
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,1,3));
-			r.r.push_back(l), l.clear(), l.add_head(t);
+			r.r.push_back(l), l.clear(), l.h.push_back(t);
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
 #endif			
 //			_r.r.push_back({{t, t}});
@@ -262,7 +262,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		cat_relsym_openp(gg, L"G"), cat(gg.e, t.head(0).e),
 		term_close(gg), r.r.emplace_back(gg, t.head(0));
 	}
-}*/
+}
 
 void driver::transform_proofs(raw_prog& r, const lexeme& rel) {
 	set<raw_rule> s;
@@ -283,7 +283,7 @@ nexthead:	const raw_term &head = x.head(n);
 		if (++n < x.h.size()) goto nexthead;
 	}
 	for (auto x : s) r.r.push_back(x);
-}
+}*/
 
 raw_term driver::prepend_arg(raw_term t, lexeme s) {
 	if (t.e.size() == 1) {
@@ -298,7 +298,7 @@ raw_term driver::prepend_arg(raw_term t, lexeme s) {
 	return t;
 }
 
-raw_prog driver::transform_bwd(raw_prog& p) {
+/*raw_prog driver::transform_bwd(raw_prog& p) {
 	std::vector<raw_term> g;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::GOAL)
@@ -328,4 +328,4 @@ raw_prog driver::transform_bwd(raw_prog& p) {
 	raw_prog q;
 	for (auto x : d) q.r.push_back(x);
 	return q;
-}
+}*/

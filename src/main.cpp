@@ -18,7 +18,7 @@ void print_memos_len();
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
-	tml_init();
+	bdd::init();
 	bool xsb = false, souffle = false, print_transformed = false,
 		csv = false;
 	for (int i = 1; i < argc; ++i) {
