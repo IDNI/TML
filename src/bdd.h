@@ -1,3 +1,4 @@
+// LICENSE
 // This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
@@ -22,9 +23,6 @@
 //bdd bdd is a triple: varid,1-bdd-id,0-bdd-id
 //typedef std::array<size_t, 3> bdd;
 #define leafvar(x) (!(x) || ((x) == (size_t)-1))
-#define from_bit(x, v) ((v)?bdd::add((x)+1,T,F):bdd::add((x)+1,F,T))
-#define from_eq(x, y) ((x)<(y) ? bdd::add(x+1,from_bit(y,1),from_bit(y,0))\
-			: bdd::add(y+1, from_bit(x,1), from_bit(x,0)))
 class bdd;
 struct key;
 typedef std::shared_ptr<bdd> spbdd;
@@ -45,10 +43,11 @@ class bdd {
 	static std::unordered_map<key, std::weak_ptr<bdd>, keyhash> M;
 	const size_t var;
 	spbdd hi, lo;
-public:
 	bdd(size_t var, spbdd hi, spbdd lo) : var(var), hi(hi), lo(lo) {
 		DBG(if (var && var != (size_t)-1) assert(hi&&lo);)
 	}
+	friend spbdd;
+public:
 	const size_t& v() const { return var; }
 	const spbdd& h() const { return hi; }
 	const spbdd& l() const { return lo; }
@@ -58,11 +57,18 @@ public:
 		return var == n.var && hi == n.hi && lo == n.lo;
 	}
 	static void init() {
-		T = std::make_shared<bdd>((size_t)-1, nullptr, nullptr),
-		F = std::make_shared<bdd>(0, nullptr, nullptr),
+		T = spbdd(new bdd((size_t)-1, nullptr, nullptr)),
+		F = spbdd(new bdd(0, nullptr, nullptr)),
 		T->hi = T->lo = T, F->hi = F->lo = F,
 		M.emplace(key(T->var, T->hi.get(), T->lo.get()), T),
 		M.emplace(key(F->var, F->hi.get(), F->lo.get()), F);
+	}
+	static spbdd from_bit(size_t x, bool v) {
+		return v ? add(x + 1, T, F) : add(x + 1, F, T);
+	}
+	static spbdd from_eq(size_t x, size_t y) {
+		return x < y ? add(x + 1, from_bit(y, true), from_bit(y, false))
+			: add(y + 1, from_bit(x, true), from_bit(x, false));
 	}
 	static spbdd add(size_t _v, spbdd _h, spbdd _l) {
 		if (_h == _l) return _l;
@@ -71,10 +77,45 @@ public:
 		DBG(if (!_l->leaf()) assert(_v < _l->v());)
 		auto it = M.find(key(_v, _h.get(), _l.get()));
 		if (it != M.end()) return it->second.lock();
-		spbdd r = std::make_shared<bdd>(_v, _h, _l);
+		spbdd r = spbdd(new bdd(_v, _h, _l));
 		return 	M.emplace(key(_v, _h.get(), _l.get()),
 			std::weak_ptr<bdd>(r)), r;
 	}
+#ifdef DEEPDEBUG
+	static void validate(spbdd x, spbdd y) {
+		key k1(x->v(), x->h().get(), x->l().get());
+		key k2(y->v(), y->h().get(), y->l().get());
+		auto it = M.find(k1);
+		auto jt = M.find(k2);
+		assert(it->second.lock() == jt->second.lock());
+		assert(it == jt);
+	}
+	static bool _bddcmp(spbdd x, spbdd y) {
+		if (x == y) return true;
+		if (x->leaf() != y->leaf()) return false;
+		if (x->leaf()) return x->trueleaf() == y->trueleaf();
+		if (x->v() != y->v()) return false;
+		return _bddcmp(x->l(), y->l()) && _bddcmp(x->h(), y->h());
+	}
+	static void validate() {
+		auto bddcmp = [](spbdd x, spbdd y) {
+			assert((x == y) == (_bddcmp(x, y)));
+			return x == y;
+		};
+		for (auto x : M)
+			for (auto y : M)
+				if (!(x.first == y.first))
+					assert(!bddcmp(
+					x.second.lock(), y.second.lock()));
+		for (auto x : M)
+			assert(x.first.v == x.second.lock()->var),
+			assert(x.first.h == x.second.lock()->h().get()),
+			assert(x.first.l == x.second.lock()->l().get());
+	}
+#else
+	static void validate() {}
+	static bool _bddcmp(spbdd x, spbdd y) { return x == y; }
+#endif
 	static size_t size() { return M.size(); }
 	static bool onexit;
 	static size_t gc;
@@ -115,8 +156,8 @@ spbdd from_int(size_t x, size_t bits, size_t arg, size_t args);
 size_t bdd_nvars(spbdd x);
 std::wostream& operator<<(std::wostream& os, const bools& x);
 std::wostream& operator<<(std::wostream& os, const vbools& x);
-std::wostream& bdd_out(std::wostream& os, bdd);// print bdd in ?: syntax
-std::wostream& bdd_out(std::wostream& os, spbdd n);
+std::wostream& operator<<(std::wostream& os, spbdd x);
+std::wostream& bdd_out_ite(std::wostream& os, spbdd x, size_t dep = 0);
 void memos_clear();
 DBG(void assert_nvars(spbdd x, size_t vars);)
 
@@ -124,9 +165,9 @@ DBG(void assert_nvars(spbdd x, size_t vars);)
 
 class allsat_cb {
 public:
-	typedef std::function<void(const bools&)> callback;
-	allsat_cb(spbdd r, size_t nvars, callback f)
-		: r(r), nvars(nvars), f(f), p(nvars) {}
+	typedef std::function<void(const bools&, spbdd)> callback;
+	allsat_cb(spbdd r, size_t nvars, callback f) :
+		r(r), nvars(nvars), f(f), p(nvars) {}
 	void operator()() { sat(r); }
 private:
 	spbdd r;

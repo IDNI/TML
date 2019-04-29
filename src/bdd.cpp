@@ -57,29 +57,29 @@ bool bdd::onexit = false;
 
 void allsat_cb::sat(spbdd x) {
 	if (x->leaf() && !x->trueleaf()) return;
-	if (!x->leaf() && v < x->v())
+	else if (!x->leaf() && v < x->v())
 		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
-	else if (v != nvars+1)
+	else if (v != nvars + 1)
 		p[++v-2] = true, sat(x->h()),
 		p[v-2] = false, sat(x->l()), --v;
-	else	f(p);
+	else f(p, x);
 }
 
-void sat(size_t v, size_t nvars, bdd n, bools& p, vbools& r) {
-	if (n.leaf() && !n.trueleaf()) return;
-	if (!n.leaf() && v < n.v())
-		p[v-1] = true,  sat(v + 1, nvars, n, p, r),
-		p[v-1] = false, sat(v + 1, nvars, n, p, r);
+void sat(size_t v, size_t nvars, spbdd x, bools& p, vbools& r) {
+	if (x->leaf() && !x->trueleaf()) return;
+	if (!x->leaf() && v < x->v())
+		p[v-1] = true,  sat(v + 1, nvars, x, p, r),
+		p[v-1] = false, sat(v + 1, nvars, x, p, r);
 	else if (v != nvars+1)
-		p[v-1] = true,  sat(v + 1, nvars, n.leaf()?n:*n.h(), p, r),
-		p[v-1] = false, sat(v + 1, nvars, n.leaf()?n:*n.l(), p, r);
+		p[v-1] = true,  sat(v + 1, nvars, x->h(), p, r),
+		p[v-1] = false, sat(v + 1, nvars, x->l(), p, r);
 	else	r.push_back(p);
 }
 
 vbools allsat(spbdd x, size_t nvars) {
 	bools p(nvars);
 	vbools r;
-	return sat(1, nvars, *x, p, r), r;
+	return sat(1, nvars, x, p, r), r;
 }
 
 vbools allsat(spbdd x, size_t bits, size_t args) {
@@ -123,7 +123,7 @@ spbdd bdd_ex(spbdd x, const bools& b, unordered_map<spbdd, spbdd>& memo) {
 		if (r->leaf()) return onmemo(), memo.emplace(x, r), r;
 		x = r;
 	}
-	//if (x->v()-1 >= b.size()) return x;
+	if (x->v()-1 >= b.size()) return x;
 	DBG(assert(x->v()-1 < b.size()));
 	onmemo();
 	return memo.emplace(x, bdd::add(x->v(), bdd_ex(x->h(), b, memo),
@@ -264,6 +264,7 @@ spbdd bdd_subterm(spbdd x, size_t from, size_t to, size_t args1, size_t args2,
 }    
 */
 size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
+	bdd::validate();
 	size_t i;
 	spbdd t;
 	bool b, eq, flag;
@@ -308,6 +309,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 			if (l.size() == 1) break;
 		} else ++n;
 	if (flag) return 3;
+	bdd::validate();
 	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
 	if (x.size() > 1) {
 		for (size_t n = 0; n < h.size();)
@@ -320,6 +322,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 		if (r == F) return res = F, 1;
 		h.push_back(r), l.push_back(r);
 	}
+	bdd::validate();
 	return 0;
 }
 
@@ -335,7 +338,10 @@ spbdd bdd_and_many(bdds v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
-#endif	
+#endif
+	bdd::validate();
+	if (v.empty()) return T;
+	if (v.size() == 1) return v[0];
 	auto it = memo_and_many.find(v);
 	if (it != memo_and_many.end()) return it->second;
 	it = memo_and_many.emplace(v, nullptr).first;
@@ -451,7 +457,7 @@ spbdd bdd_ite(size_t v, spbdd t, spbdd e) {
 	DBG(assert(!leafvar(v+1));)
 	if ((t->leaf() || v < t->v()) && (e->leaf() || v < e->v()))
 		return bdd::add(v+1, t, e);
-	return (from_bit(v,true) && t) || (from_bit(v,false) && e);
+	return (bdd::from_bit(v,true) && t) || (bdd::from_bit(v,false) && e);
 }
 
 size_t count(spbdd x, size_t nvars) {
@@ -483,7 +489,7 @@ spbdd from_int(size_t x, size_t bits, size_t arg, size_t args) {
 	spbdd r = T;
 	size_t b = bits;
 	while (b--)
-		r = r && from_bit(POS(b, bits, arg, args), x&(1<<b));
+		r = r && bdd::from_bit(POS(b, bits, arg, args), x&(1<<b));
 	return r;
 }
 
@@ -515,14 +521,6 @@ void memos_clear() {
 	onmemo(-memo_and.size() - memo_and_not.size() - memo_or.size());
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear();
 #endif		
-}
-
-void dump_stack() {
-	void *addrs[3];
-	size_t dep = backtrace(addrs, 3);
-	char **strs = backtrace_symbols(addrs, dep);
-	for (size_t i = 1; i < dep; i++) wcerr<< strs[i]<<endl;
-	free(strs);
 }
 
 void bdd::clear() { M.clear(); memos_clear(); init(); }

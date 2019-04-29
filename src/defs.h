@@ -34,8 +34,10 @@ typedef std::vector<size_t> sizes;
 
 #ifdef DEBUG
 #define DBG(x) x
+#define NDBG(x)
 #else
 #define DBG(x)
+#define NDBG(x) x
 #endif
 #define er(x)	wcerr<<x<<endl, exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
