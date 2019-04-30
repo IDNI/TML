@@ -451,58 +451,39 @@ spbdd tables::get_table(ntable tab, spbdd x) const {
 
 spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
 	if (len1 == len2) return x;
-	DBG(wcout<<"dt before"<<endl<<allsat(x, len1);)
 	bools ex(tbits + len1 * bits, false);
 	sizes perm = perm_init(tbits + len1 * bits);
 	for (size_t n = 0; n != len1; ++n)
 		for (size_t k = 0; k != bits; ++k)
 			if (n >= len2) ex[pos(k, n, len1)] = true;
 			else perm[pos(k, n, len1)] = pos(k, n, len2);
-	x = bdd_permute_ex(x, ex, perm);
-	DBG(wcout<<"dt after"<<endl<<allsat(x, len2);)
-	return x;
+	return bdd_permute_ex(x, ex, perm);
 }
 
-DBG(size_t vlen;)
-
 spbdd tables::body_query(const body& b) const {
-	spbdd t = b.neg ? b.q % get_table(b.tab, db) :
-			(b.q && get_table(b.tab, db));
-	DBG(wcout<<"body before pmex:"<<endl<<allsat(t,(b.ex.size()-tbits)/bits);)
-	t = bdd_permute_ex(t, b.ex, b.perm);
-	DBG(wcout<<"body after pmex:"<<endl<<allsat(t, vlen);)
-	return t;
+	return bdd_permute_ex(b.neg ? b.q % get_table(b.tab, db) :
+			(b.q && get_table(b.tab, db)), b.ex, b.perm);
 }
 
 void tables::alt_query(const alt& a, size_t len, bdds& v) const {
 	bdds v1;
 	for (const body& b : a) {
-		DBG(vlen = a.varslen;)
-		spbdd x = body_query(b);
+		spbdd x = body_query(b) && a.rng;
+//		DBG(out(wcout<<"body:"<<endl, x, a.varslen);)
 		if (x == F) return;
 		v1.push_back(x);
-		DBG(wcout<<"body:"<<endl<<allsat(x, a.varslen);)
 	}
-	spbdd x = bdd_and_many(v1);
-//	DBG(out(wcout<<"v1:"<<endl, x);)
-//	DBG(wcout<<"v1:"<<endl<<allsat(x, a.varslen);)
-	x = deltail(x, a.varslen, len);
-//	DBG(wcout<<"dt:"<<endl<<allsat(x, len);)
-//	DBG(out(wcout<<"dt:"<<endl, x, len);)
-	v.push_back(x);
+	v.push_back(deltail(bdd_and_many(v1), a.varslen, len));
 }
 
 void tables::fwd() {
 	bdds add, del;
-	validate();
+//	DBG(out(wcout<<"db before:"<<endl);)
 	for (const rule& r : rules) {
 		bdds v;
 		for (const alt& a : r) alt_query(a, r.len, v);
 		(r.neg ? del : add).push_back(bdd_or_many(v) && tbdds[r.tab]);
 	}
-	validate();
-	DBG(out(wcout<<"add:"<<endl, bdd_or_many(add));)
-	DBG(out(wcout<<"del:"<<endl, bdd_or_many(del));)
 	if (add.empty()) db = db % bdd_or_many(del);
 	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
 	else {
@@ -510,7 +491,9 @@ void tables::fwd() {
 		if (s == F) { wcout << "unsat" << endl; exit(0); }
 		db = (db || a) % d;
 	}
-	DBG(out(wcout<<"db:"<<endl);wcout<<endl;)
+//	DBG(out(wcout<<"add:"<<endl, bdd_or_many(add));)
+//	DBG(out(wcout<<"del:"<<endl, bdd_or_many(del));)
+//	DBG(out(wcout<<"db after:"<<endl);)
 }
 
 bool tables::pfp() {
@@ -527,19 +510,3 @@ bool tables::pfp() {
 
 tables::tables() : dict(*new dict_t) {}
 tables::~tables() { delete &dict; }
-
-/*int main() {
-	bdd::init();
-//	wstring str = L"a(?y ?z) :- b(x ?x ?y ?t), c(?y ?z);t(?t ?z).c(y).e(3 6).e(x 1).d(y 1).f(?y).g(?x).";
-	wstring str = L"a(1). b(?x):-a(?x).";
-//	wcout << str << endl;
-	raw_progs rp(str);
-	wcout << rp << endl;
-	tables t;
-	t.add_prog(rp.p[0]);
-	t.out(wcout<<"in:"<<endl);
-	t.fwd();
-	t.out(wcout<<"out:"<<endl);
-	bdd::onexit = true;
-	return 0;
-}*/
