@@ -91,12 +91,12 @@ class tables {
 	spbdd db = F;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
-		DBG(assert(bit < nbits /*&& args <= max_args*/ && arg < args);)
+		DBG(assert(bit < nbits && arg < args);)
 		return (nbits - bit - 1) * args + arg + tbits;
 	}
 
 	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
-		DBG(assert(bit_from_right<bits/*&& args<=max_args*/&&arg<args);)
+		DBG(assert(bit_from_right < bits && arg < args);)
 		return (bits - bit_from_right - 1) * args + arg + tbits;
 	}
 
@@ -115,7 +115,7 @@ class tables {
 	}
 
 	void add_bit();
-	spbdd add_bit(spbdd x, ntable tab);
+	spbdd add_bit(spbdd x, size_t args);
 	void add_tbit();
 	spbdd leq_const(int_t c, size_t arg, size_t args, size_t bit) const;
 	void range(size_t arg, size_t args, bdds& v);

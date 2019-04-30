@@ -86,8 +86,7 @@ sizes perm_init(size_t n) {
 	return p;
 }
 
-spbdd tables::add_bit(spbdd x, ntable tab) {
-	const size_t args = siglens[tab];
+spbdd tables::add_bit(spbdd x, size_t args) {
 	sizes perm = perm_init(args * bits + tbits);
 	for (size_t n = 0; n != args; ++n)
 		for (size_t k = 0; k != bits; ++k)
@@ -95,15 +94,16 @@ spbdd tables::add_bit(spbdd x, ntable tab) {
 	bdds v = { x ^ perm };
 	for (size_t n = 0; n != args; ++n)
 		v.push_back(bdd::from_bit(pos(0, bits + 1, n, args), false));
-	x = bdd_and_many(move(v));
-	return x;
+	return bdd_and_many(move(v));
 }
 
 void tables::add_bit() {
 	range_clear_memo();
 	spbdd x = F;
-	for (size_t n=0; n!=tbdds.size(); ++n) x = x || add_bit(db&&tbdds[n],n);
-	db = x, ++bits;
+	bdds v;
+	for (size_t n = 0; n != tbdds.size(); ++n)
+		v.push_back(add_bit(db && tbdds[n], siglens[n]));
+	db = bdd_or_many(v), ++bits;
 }
 
 void tables::add_tbit() {
@@ -135,7 +135,7 @@ spbdd tables::from_fact(const term& t) {
 	return bdd_and_many(move(v));
 }
 
-ntable tables::add_table(sig_t s) {
+/*ntable tables::add_table(sig_t s) {
 	auto it = smap.find(s);
 	if (it != smap.end()) return it->second;
 	ntable nt = sigs.size();
@@ -148,7 +148,7 @@ ntable tables::add_table(sig_t s) {
 	smap.emplace(s, nt), sigs.push_back(s), tbdds.push_back(t),
 	siglens.push_back(len);
 	return nt;
-}
+}*/
 
 void tables::add_term(const term& t) {
 	DBG(assert(t.tab < (1 << tbits));)
@@ -176,7 +176,7 @@ tables::term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, add_table(get_sig(r)), t);
+	return term(r.neg, smap.at(get_sig(r)), t);//add_table(get_sig(r)), t);
 }
 
 //ntable tables::get_table(const raw_term& t) { return add_table(get_sig(t)); }
@@ -204,10 +204,10 @@ void tables::out(wostream& os, spbdd x, ntable tab) const {
 		for (size_t n = 1; n != args + 1; ++n) {
 			int_t arg = r[n - 1];
 			if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
-			else if (arg & 3) rt.e[n]=elem((int_t)(arg>>2));
+			else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 		}
-		rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
+		rt.arity = get<ints>(sigs[tab]), rt.insert_parens(op, cl),
 		os<<rt<<L'.'<<endl;
 	})();
 }
@@ -429,15 +429,19 @@ void tables::add_prog(const raw_prog& p) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	if (!tbits) add_tbit();
-	while (sigs.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
-	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
+	DBG(out(wcout<<"db before:"<<endl);)
+	while (!tbits || sigs.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
+	DBG(out(wcout<<"db after:"<<endl);)
+	int_t u = max(nums, max(chars, syms));
+	while (!u || u >= (1 << (bits - 2))) add_bit();
+	DBG(out(wcout<<"db after:"<<endl);)
 	for (ntable tab = tbdds.size(); tab != (ntable)sigs.size(); ++tab) {
 		spbdd t = T;
 		for (size_t b = 0; b != tbits; ++b)
 			t = t && bdd::from_bit(b, tab & (1 << (tbits - b - 1)));
 		tbdds.push_back(t);
 	}
+	DBG(out(wcout<<"db after:"<<endl);)
 	get_rules(p);
 }
 
