@@ -223,9 +223,10 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
 //	DBG(drv = this;)
 //	lp *prog = 0;
 	strs_t strtrees;
-	for (size_t n = 0; n != rp.p.size(); ++n)
+	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
-	tbl.out(wcout);
+		tbl.out(wcout<<endl);
+	}
 	/*if (prog) {
 		if (csv) save_csv(prog);
 		printdb(wcout, prog);

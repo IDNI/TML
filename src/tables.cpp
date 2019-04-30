@@ -104,7 +104,6 @@ void tables::add_bit() {
 	spbdd x = F;
 	for (size_t n=0; n!=tbdds.size(); ++n) x = x || add_bit(db&&tbdds[n],n);
 	db = x, ++bits;
-	validate();
 }
 
 void tables::add_tbit() {
@@ -117,7 +116,6 @@ void tables::add_tbit() {
 		for (size_t n = 0; n != perm.size(); ++n) perm[n] = n + 1;
 		tbdds[k] = (tbdds[k] ^ perm) && bdd::from_bit(0, false);
 	}
-	validate();
 }
 
 spbdd tables::from_fact(const term& t) {
@@ -210,7 +208,7 @@ void tables::out(wostream& os, spbdd x, ntable tab) const {
 			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 		}
 		rt.arity = get<1>(sigs[tab]), rt.insert_parens(op, cl),
-		os<<rt<<endl;
+		os<<rt<<L'.'<<endl;
 	})();
 }
 
@@ -432,8 +430,8 @@ void tables::add_prog(const raw_prog& p) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	do { ++tbits; } while (sigs.size() > (size_t)(1<<(tbits-1)));
-	while (nums + chars + syms >= (1 << (bits - 2))) ++bits;
+	do { add_tbit(); } while (sigs.size() > (size_t)(1<<(tbits-1)));
+	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
 	for (ntable tab = 0; tab != (ntable)sigs.size(); ++tab) {
 		spbdd t = T;
 		for (size_t b = 0; b != tbits; ++b)

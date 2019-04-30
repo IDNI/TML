@@ -188,7 +188,7 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 		++ar;
 		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
 	}
-	return os << L").";
+	return os << L')';
 }
 
 wostream& operator<<(wostream& os, const raw_rule& r) {
