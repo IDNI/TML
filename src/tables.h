@@ -134,7 +134,6 @@ class tables {
 		size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
 	void align_vars(term& h, std::set<term>& b) const;
-	void count_term(const raw_term& t);
 	spbdd from_fact(const term& t);
 	void add_term(const term& t);
 	term from_raw_term(const raw_term&);

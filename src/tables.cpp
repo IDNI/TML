@@ -378,7 +378,7 @@ void tables::get_rules(const raw_prog& p) {
 		auto it = v.end();
 		const term &t = x.first;
 		rule r;
-		r.neg = t.neg, r.tab = t.tab, r.eq = T;
+		r.neg = t.neg, r.tab = t.tab, r.eq = tbdds[r.tab];
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0)
 				for (size_t b = 0; b != bits; ++b)
@@ -405,20 +405,19 @@ void tables::get_rules(const raw_prog& p) {
 	for (const rule& r : rs) rules.push_back(r);
 }
 
-void tables::count_term(const raw_term& r) {
-	for (size_t n = 1; n < r.e.size(); ++n)
-		switch (r.e[n].type) {
-			case elem::NUM: nums = max(nums, r.e[n].num+1); break;
-			case elem::CHR: chars = 256; break;
-			case elem::SYM: dict.get_sym(r.e[n].e),
-					syms = max(syms, (int_t)dict.nsyms());
-			default: ;
-		}
-}
-
 void tables::add_prog(const raw_prog& p) {
+	rules.clear();
 	auto f = [this](const raw_term& t) {
-		count_term(t);
+		for (size_t n = 1; n < t.e.size(); ++n)
+			switch (t.e[n].type) {
+				case elem::NUM: nums = max(nums, t.e[n].num+1);
+						break;
+				case elem::CHR: chars = 256; break;
+				case elem::SYM: dict.get_sym(t.e[n].e),
+						syms = max(syms,
+							(int_t)dict.nsyms());
+				default: ;
+			}
 		sig_t s = get_sig(t);
 		if (has(smap, s)) return;
 		ntable nt = sigs.size();
@@ -430,9 +429,10 @@ void tables::add_prog(const raw_prog& p) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	do { add_tbit(); } while (sigs.size() > (size_t)(1<<(tbits-1)));
+	if (!tbits) add_tbit();
+	while (sigs.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
 	while (nums + chars + syms >= (1 << (bits - 2))) add_bit();
-	for (ntable tab = 0; tab != (ntable)sigs.size(); ++tab) {
+	for (ntable tab = tbdds.size(); tab != (ntable)sigs.size(); ++tab) {
 		spbdd t = T;
 		for (size_t b = 0; b != tbits; ++b)
 			t = t && bdd::from_bit(b, tab & (1 << (tbits - b - 1)));
@@ -480,7 +480,7 @@ void tables::fwd() {
 	for (const rule& r : rules) {
 		bdds v;
 		for (const alt& a : r) alt_query(a, r.len, v);
-		(r.neg ? del : add).push_back(bdd_or_many(v) && tbdds[r.tab]);
+		(r.neg ? del : add).push_back(bdd_or_many(v) && r.eq);
 	}
 	if (add.empty()) db = db % bdd_or_many(del);
 	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
