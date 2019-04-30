@@ -138,7 +138,7 @@ wstring driver::directive_load(const directive& d) {
 #define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
-void driver::directives_load(raw_prog& p, lexeme& trel) {
+void driver::directives_load(raw_prog& p, lexeme& trel, prog_data& pd) {
 //	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
@@ -172,7 +172,7 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
 	const strs_t& strtrees) {
 	lexeme trel = { 0, 0 };
-	directives_load(rp.p[n], trel);
+	directives_load(rp.p[n], trel, pd);
 	for (auto x : pd.strs)
 		if (!has(transformed_strings, x.first))
 			transform_string(x.second, rp.p[n], x.first),
@@ -203,30 +203,24 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
-	tbl.run_prog(rp.p[n]);
-/*	lp *prog = new lp(pd, range(dict.nsyms(), nums, chars), last);
 	clock_t start, end;
-	measure_time(result &= prog->pfp());
-	for (auto x : prog->strtrees_out)
-		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
-					x.second, prog->rng.bits));
-	int_t tr = dict.get_rel(L"try");
-	set<prefix> sp;
-	for (auto x : prog->db) if (x.first.rel == tr) sp.insert(x.first);
-	for (auto x : sp) prog->db.erase(x);*/
+	measure_time(tbl.run_prog(rp.p[n]));
+//	for (auto x : prog->strtrees_out)
+//		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
+//					x.second, prog->rng.bits));
+//	int_t tr = dict.get_rel(L"try");
 }
 
 driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
 	bool xsb, bool souffle, bool csv) : argc(argc), argv(argv),
 	print_transformed(print_transformed), xsb(xsb), souffle(souffle),
 	csv(csv) {
-//	DBG(drv = this;)
-//	lp *prog = 0;
 	strs_t strtrees;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
-		tbl.out(wcout<<endl);
+		DBG(tbl.out(wcout<<endl);)
 	}
+	NDBG(tbl.out(wcout<<endl);)
 	/*if (prog) {
 		if (csv) save_csv(prog);
 		printdb(wcout, prog);

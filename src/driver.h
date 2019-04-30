@@ -36,7 +36,7 @@ class driver {
 	lexeme get_char_lexeme(wchar_t i);
 
 	std::wstring directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
+	void directives_load(raw_prog& p, lexeme& trel, prog_data&);
 	void transform(raw_progs& rp, size_t n,	prog_data& pd,
 		const strs_t& strtrees);
 	void transform_len(raw_term& r, const strs_t& s);
@@ -63,7 +63,7 @@ class driver {
 	int argc;
 	char** argv;
 	bool print_transformed;
-	prog_data pd;
+//	prog_data pd;
 	std::set<int_t> transformed_strings;
 	bool xsb;
 	bool souffle;

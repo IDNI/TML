@@ -21,7 +21,7 @@ using namespace std::placeholders;
 
 size_t sig_len(const sig_t& s) {
 	size_t r = 0;
-	for (auto x : get<1>(s)) if (x > 0) r += x;
+	for (int_t x : get<ints>(s)) if (x > 0) r += x;
 	return r;
 }
 
@@ -154,6 +154,7 @@ void tables::add_term(const term& t) {
 	DBG(assert(t.tab < (1 << tbits));)
 //	if (t.tab >= (1 << tbits)) add_tbit();
 	db = (from_fact(t) && tbdds[t.tab]) || db;
+	DBG(assert(bdd_nvars(db&&tbdds[t.tab]) <= tbits+bits*t.size());)
 }
 
 sig_t tables::get_sig(const raw_term&t){return{dict.get_rel(t.e[0].e),t.arity};}
@@ -176,10 +177,8 @@ tables::term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, smap.at(get_sig(r)), t);//add_table(get_sig(r)), t);
+	return term(r.neg, smap.at(get_sig(r)), t);
 }
-
-//ntable tables::get_table(const raw_term& t) { return add_table(get_sig(t)); }
 
 void tables::out(wostream& os) const { out(os, db); }
 
@@ -341,8 +340,7 @@ spbdd tables::get_alt_range(const term& h, const set<term>& a,
 tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 	body b;
 	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
-	b.q = tbdds[t.tab];
-	b.ex = bools(t.size() * bits + tbits, false);
+	b.q = tbdds[t.tab], b.ex = bools(t.size() * bits + tbits, false);
 	for (size_t n = 0; n != tbits; ++n) b.ex[n] = true;
 	varmap m;
 	auto it = m.end();
@@ -355,6 +353,8 @@ tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 		else for (size_t k = 0; k != bits; ++k)
 			and_eq_(k, n, it->second, t.size(), b.q),
 			b.ex[pos(k, n, t.size())] = true;
+	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
+	DBG(assert(t.size() == siglens[t.tab]);)
 	return b;
 }
 
@@ -429,26 +429,22 @@ void tables::add_prog(const raw_prog& p) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	DBG(out(wcout<<"db before:"<<endl);)
 	while (!tbits || sigs.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
-	DBG(out(wcout<<"db after:"<<endl);)
-	int_t u = max(nums, max(chars, syms));
-	while (!u || u >= (1 << (bits - 2))) add_bit();
-	DBG(out(wcout<<"db after:"<<endl);)
+	int_t u = max((int_t)1, max(nums, max(chars, syms))-1);
+	while (u >= (1 << (bits - 2))) add_bit();
 	for (ntable tab = tbdds.size(); tab != (ntable)sigs.size(); ++tab) {
 		spbdd t = T;
 		for (size_t b = 0; b != tbits; ++b)
 			t = t && bdd::from_bit(b, tab & (1 << (tbits - b - 1)));
 		tbdds.push_back(t);
 	}
-	DBG(out(wcout<<"db after:"<<endl);)
 	get_rules(p);
 }
 
 spbdd tables::get_table(ntable tab, spbdd x) const {
 	return x && tbdds[tab];
 	return	x->leaf() || x->v() > tbits ? x :
-		get_table(tab, tab & (1 << (x->v() - 1)) ? x->h() : x->l());
+		get_table(tab, tab&(tbits-(1<<(x->v()-1))-1)?x->h():x->l());
 }
 
 spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
@@ -463,6 +459,8 @@ spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
 }
 
 spbdd tables::body_query(const body& b) const {
+	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
+	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	return bdd_permute_ex(b.neg ? b.q % get_table(b.tab, db) :
 			(b.q && get_table(b.tab, db)), b.ex, b.perm);
 }
@@ -480,7 +478,7 @@ void tables::alt_query(const alt& a, size_t len, bdds& v) const {
 
 void tables::fwd() {
 	bdds add, del;
-//	DBG(out(wcout<<"db before:"<<endl);)
+	DBG(out(wcout<<"db before:"<<endl);)
 	for (const rule& r : rules) {
 		bdds v;
 		for (const alt& a : r) alt_query(a, r.len, v);

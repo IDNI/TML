@@ -218,7 +218,8 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			elem e = elem(elem::VAR, get_var_lexeme(2));
 			l.b.emplace_back();
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,1,3));
-			r.r.push_back(l), l.clear(), l.h.push_back(t);
+			r.r.push_back(l), l.clear(), l.h.push_back(t),
+			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
 #endif			
 //			_r.r.push_back({{t, t}});

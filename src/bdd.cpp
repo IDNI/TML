@@ -165,6 +165,8 @@ spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m,
 }
 
 spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m) {
+	DBG(assert(bdd_nvars(x) <= b.size());)
+	DBG(assert(bdd_nvars(x) <= m.size());)
 	return bdd_permute_ex(x, b, m, memos_perm_ex[{m,b}]);
 }
 

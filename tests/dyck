@@ -1,9 +1,10 @@
 # Dyck's language
 #@str "((()()()((()()()))))".
-@bwd.
+#{
 @string str "()".
-#@string str "(()())".
 S => '(' S ')' S | null.
-!S(0 len(str)).
-#@trace W.
-#!! S(?x ?y).
+#!S(0 len(str)).
+#}
+#{
+#	~S(?x?x):-S(?x?x).
+#}
