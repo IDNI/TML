@@ -325,6 +325,8 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 }
 
 spbdd bdd_and_many(bdds v) {
+	if (v.empty()) return T;
+	if (v.size() == 1) return v[0];
 #ifdef MEMO
 	auto jt = memo_and.end();
 	for (size_t n = 0; n < v.size(); ++n)
@@ -338,8 +340,6 @@ spbdd bdd_and_many(bdds v) {
 		}
 #endif
 	//bdd::validate();
-	if (v.empty()) return T;
-	if (v.size() == 1) return v[0];
 	auto it = memo_and_many.find(v);
 	if (it != memo_and_many.end()) return it->second;
 	it = memo_and_many.emplace(v, nullptr).first;
@@ -420,6 +420,8 @@ size_t bdd_or_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 }
 
 spbdd bdd_or_many(bdds v) {
+	if (v.empty()) return F;
+	if (v.size() == 1) return v[0];
 #ifdef MEMO
 	auto jt = memo_or.end();
 	for (size_t n = 0; n < v.size(); ++n)

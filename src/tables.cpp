@@ -33,7 +33,7 @@ void unquote(wstring& str) {
 wstring _unquote(wstring str) { unquote(str); return str; }
 
 #ifdef DEBUG
-vbools tables::allsat(spbdd x, size_t args) {
+vbools tables::allsat(spbdd x, size_t args) const {
 //	const size_t args = siglens[tab];
 	vbools v = ::allsat(x, tbits + bits * args), s;
 	for (bools b : v) {
@@ -298,9 +298,9 @@ void tables::align_vars(term& h, set<term>& b) const {
 sizes tables::get_perm(const term& t, const varmap& m, size_t len) const {
 	sizes perm = perm_init(t.size() * bits + tbits);
 	for (size_t n = 0, b; n != t.size(); ++n)
-		if (t[n] >= 0 || m.at(t[n]) == n) continue;
-		else for (b = 0; b != bits; ++b)
-			perm[pos(b, n, t.size())] = pos(b, m.at(t[n]), len);
+		if (t[n] < 0)
+			for (b = 0; b != bits; ++b)
+				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
 	return perm;
 }
 
@@ -444,29 +444,45 @@ void tables::add_prog(const raw_prog& p) {
 }
 
 spbdd tables::get_table(ntable tab, spbdd x) const {
+	return x && tbdds[tab];
 	return	x->leaf() || x->v() > tbits ? x :
 		get_table(tab, tab & (1 << (x->v() - 1)) ? x->h() : x->l());
 }
 
 spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
+	if (len1 == len2) return x;
+	DBG(wcout<<"dt before"<<endl<<allsat(x, len1);)
 	bools ex(tbits + len1 * bits, false);
 	sizes perm = perm_init(tbits + len1 * bits);
 	for (size_t n = 0; n != len1; ++n)
 		for (size_t k = 0; k != bits; ++k)
 			if (n >= len2) ex[pos(k, n, len1)] = true;
 			else perm[pos(k, n, len1)] = pos(k, n, len2);
-	return bdd_permute_ex(x, ex, perm);
+	x = bdd_permute_ex(x, ex, perm);
+	DBG(wcout<<"dt after"<<endl<<allsat(x, len2);)
+	return x;
 }
+
+DBG(size_t vlen;)
 
 spbdd tables::body_query(const body& b) const {
-	return	bdd_permute_ex(
-		b.neg ? b.q % get_table(b.tab, db) :
-			(b.q && get_table(b.tab, db)), b.ex, b.perm);
+	spbdd t = b.neg ? b.q % get_table(b.tab, db) :
+			(b.q && get_table(b.tab, db));
+	DBG(wcout<<"body before pmex:"<<endl<<allsat(t,(b.ex.size()-tbits)/bits);)
+	t = bdd_permute_ex(t, b.ex, b.perm);
+	DBG(wcout<<"body after pmex:"<<endl<<allsat(t, vlen);)
+	return t;
 }
 
-void tables::alt_query(const alt& a, size_t len, bdds& v) NDBG(const) {
+void tables::alt_query(const alt& a, size_t len, bdds& v) const {
 	bdds v1;
-	for (const body& b : a) v1.push_back(body_query(b));
+	for (const body& b : a) {
+		DBG(vlen = a.varslen;)
+		spbdd x = body_query(b);
+		if (x == F) return;
+		v1.push_back(x);
+		DBG(wcout<<"body:"<<endl<<allsat(x, a.varslen);)
+	}
 	spbdd x = bdd_and_many(v1);
 //	DBG(out(wcout<<"v1:"<<endl, x);)
 //	DBG(wcout<<"v1:"<<endl<<allsat(x, a.varslen);)
@@ -485,8 +501,8 @@ void tables::fwd() {
 		(r.neg ? del : add).push_back(bdd_or_many(v) && tbdds[r.tab]);
 	}
 	validate();
-//	DBG(out(wcout<<"add:"<<endl, bdd_or_many(add));)
-//	DBG(out(wcout<<"del:"<<endl, bdd_or_many(del));)
+	DBG(out(wcout<<"add:"<<endl, bdd_or_many(add));)
+	DBG(out(wcout<<"del:"<<endl, bdd_or_many(del));)
 	if (add.empty()) db = db % bdd_or_many(del);
 	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
 	else {
@@ -494,14 +510,18 @@ void tables::fwd() {
 		if (s == F) { wcout << "unsat" << endl; exit(0); }
 		db = (db || a) % d;
 	}
+	DBG(out(wcout<<"db:"<<endl);wcout<<endl;)
 }
 
 bool tables::pfp() {
 	spbdd l = db;
-	for (set<spbdd> s; fwd(), true; l = db)
+	size_t step = 0;
+	for (set<spbdd> s; fwd(), true; l = db) {
+		wcout << "step: " << step++ << endl;
 		if (l == db) return true;
 		else if (has(s, l)) return false;
 		else s.insert(l);
+	}
 	throw 0;
 }
 

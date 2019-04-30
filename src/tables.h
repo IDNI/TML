@@ -25,7 +25,6 @@ class dict_t;
 typedef std::pair<rel_t, ints> sig_t;
 
 class tables {
-private:
 	typedef std::map<int_t, size_t> varmap;
 	struct term : public ints {
 		bool neg;
@@ -141,18 +140,18 @@ private:
 	term from_raw_term(const raw_term&);
 	spbdd deltail(spbdd x, size_t len1, size_t len2) const;
 	spbdd body_query(const body& b) const;
-	void alt_query(const alt& a, size_t len, bdds& v) NDBG(const);
-	DBG(vbools allsat(spbdd x, size_t args);)
+	void alt_query(const alt& a, size_t len, bdds& v) const;
+	DBG(vbools allsat(spbdd x, size_t args) const;)
 	void out(std::wostream&, spbdd) const;
 	void out(std::wostream&, spbdd, ntable) const;
+	void get_rules(const raw_prog& p);
+	void add_prog(const raw_prog& p);
+	void fwd();
 	void validate();
 public:
 	tables();
 	~tables();
-	void get_rules(const raw_prog& p);
-	void add_prog(const raw_prog& p);
 	bool run_prog(const raw_prog& p) { add_prog(p); return pfp(); }
-	void fwd();
 	bool pfp();
 	void out(std::wostream&) const;
 };
