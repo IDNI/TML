@@ -15,6 +15,8 @@
 #include "input.h"
 #include "dict.h"
 
+typedef enum pl_dialect { SWIPL, XSB } pl_dialect;
+
 struct prog_data {
 	strs_t strs;
 //	std::unordered_map<int_t, term> strtrees;
@@ -83,7 +85,12 @@ public:
 //		const prefix&) const;
 //	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
-	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const;
+	std::wostream& print_prolog(std::wostream& os, const raw_prog& p,
+		const pl_dialect dialect) const;
+	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const {
+		return print_prolog(os, rp, XSB); }
+	std::wostream& print_swipl(std::wostream& os, const raw_prog& rp) const{
+		return print_prolog(os, rp, SWIPL); }
 	std::wostream& print_souffle(std::wostream& os, const raw_prog& rp)
 		const;
 //	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
