@@ -197,7 +197,8 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	prog_data pd;
 	transform(rp, n, pd, strtrees);
-//	if (xsb) print_xsb(wcout, rp.p[n]);
+	if (xsb) print_xsb(wcout, rp.p[n]);
+	if (xsb) print_swipl(wcout, rp.p[n]);
 //	if (souffle) print_souffle(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)

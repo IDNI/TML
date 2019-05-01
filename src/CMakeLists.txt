@@ -20,7 +20,7 @@ add_executable(tml
 	tables.h
 	tables.cpp
 	#	tree.cpp
-	print_xsb.cpp)
+	print_prolog.cpp)
 
 set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -Wpedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -ggdb3")
