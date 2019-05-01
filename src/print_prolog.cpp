@@ -147,10 +147,12 @@ wostream& output_prolog_rule(wostream& os, const raw_rule& r) {
 			os << L',';
 	if (!r.b.size()) return os << L'.';
 	os << L" :- ";
-	for (auto b : r.b)
-		for (size_t n = 0; n < b.size(); ++n)
-			if (output_prolog_term(os, b[n]), n != b.size() - 1)
-				os << L',';
+	for (size_t m = 0; m < r.b.size(); ++m) {
+		for (size_t n = 0; n < r.b[m].size(); ++n)
+			if (output_prolog_term(os, r.b[m][n]),
+				n != r.b[m].size() - 1) os << L',';
+		if (m != r.b.size() - 1) os << L';';
+	}
 	return os << L'.';
 }
 
