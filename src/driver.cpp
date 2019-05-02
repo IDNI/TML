@@ -138,7 +138,7 @@ wstring driver::directive_load(const directive& d) {
 #define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 
-void driver::directives_load(raw_prog& p, lexeme& trel, prog_data& pd) {
+void driver::directives_load(raw_prog& p, lexeme& trel) {
 //	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
@@ -169,10 +169,9 @@ void driver::directives_load(raw_prog& p, lexeme& trel, prog_data& pd) {
 		}
 }*/
 
-void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
-	const strs_t& strtrees) {
+void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 	lexeme trel = { 0, 0 };
-	directives_load(rp.p[n], trel, pd);
+	directives_load(rp.p[n], trel);
 	for (auto x : pd.strs)
 		if (!has(transformed_strings, x.first))
 			transform_string(x.second, rp.p[n], x.first),
@@ -195,8 +194,7 @@ void driver::transform(raw_progs& rp, size_t n, prog_data& pd,
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
-	prog_data pd;
-	transform(rp, n, pd, strtrees);
+	transform(rp, n, strtrees);
 //	if (xsb) print_xsb(wcout, rp.p[n]);
 //	if (souffle) print_souffle(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;

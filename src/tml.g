@@ -1,27 +1,25 @@
 {
 @string str <tml.g>.
-eol => '\r' | '\n' | ''.
-printable_chars => printable printable_chars | null.
-ws =>	space ws | ws '#' printable_chars eol ws | null.
-	#eol | ws "/*" ws printable_chars ws "*/" ws | null.
-chars => alpha chars1 | '_' chars1.
-chars1=> alnum chars1 | '_' chars1 | null.
-identifier => sym | var.
-var => '?' chars.
-sym => chars.
-relname => sym.
-quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
-		| "'\\t'" | "'\\''" | "''".
-fname => '<' printable_chars '>' ws.
-string => '"' printable_chars '"' ws.
-}
-{
 #"p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).  S => S | null.  ".
 #@bwd.
 
+identifier => sym | var.
 args => identifier ws args | null.
+var => '?' chars.
+sym => chars.
+relname => sym.
+chars => alpha chars1 | '_' chars1.
+chars1=> alnum chars1 | '_' chars1 | null.
+ws =>	space ws | ws '#' printable_chars eol ws | null.
+	#eol | ws "/*" ws printable_chars ws "*/" ws | null.
 terminal => quoted_char | string.
+quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
+		| "'\\t'" | "'\\''" | "''".
+eol => '\r' | '\n' | ''.
 nonterminal => relname.
+fname => '<' printable_chars '>' ws.
+string => '"' printable_chars '"' ws.
+printable_chars => printable printable_chars | null.
 cmdline => '$' digits ws.
 query => '!' ws term | "!!" ws term.
 

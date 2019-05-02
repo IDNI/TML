@@ -43,7 +43,7 @@ class tables {
 		ntable tab;
 		bools ex;
 		sizes perm;
-		spbdd q;
+		spbdd q, last;
 		bool operator<(const body& t) const {
 			if (q != t.q) return q < t.q;
 			if (neg != t.neg) return neg;
@@ -73,6 +73,14 @@ class tables {
 			return (std::vector<alt>)*this < (std::vector<alt>)t;
 		}
 	};
+	struct table {
+		sig_t s;
+		size_t len;
+		spbdd b = F;
+		bool dirty = false;
+	};
+	std::vector<table> ts;
+	std::map<sig_t, ntable> smap;
 	std::vector<rule> rules;
 	alt get_alt(const std::vector<raw_term>&);
 	rule get_rule(const raw_rule&);
@@ -81,10 +89,6 @@ class tables {
 	size_t bits = 2, tbits = 0; // #bits for elem, #bits for table id
 	dict_t& dict;
 
-	std::map<sig_t, ntable> smap;
-	std::vector<sig_t> sigs;
-	std::vector<size_t> siglens;
-	bdds tbdds;
 	size_t max_args = 0;
 	std::map<std::array<int_t, 7>, spbdd> range_memo;
 

@@ -76,7 +76,7 @@ spbdd tables::range(size_t arg, ntable tab) {
 	auto it = range_memo.find(k);
 	if (it != range_memo.end()) return it->second;
 	bdds v;
-	return	range(arg, siglens[tab], v), onmemo(),
+	return	range(arg, ts[tab].len, v), onmemo(),
 		range_memo[k] = bdd_and_many(move(v));
 }
 
@@ -101,8 +101,8 @@ void tables::add_bit() {
 	range_clear_memo();
 	spbdd x = F;
 	bdds v;
-	for (size_t n = 0; n != tbdds.size(); ++n)
-		v.push_back(add_bit(db && tbdds[n], siglens[n]));
+	for (size_t n = 0; n != ts.size(); ++n)
+		v.push_back(add_bit(db && ts[n].b, ts[n].len));
 	db = bdd_or_many(v), ++bits;
 }
 
@@ -111,10 +111,10 @@ void tables::add_tbit() {
 	sizes perm(max_args * bits + tbits);
 	for (size_t n = 0; n != perm.size(); ++n) perm[n] = n + 1;
 	db = (db ^ perm) && bdd::from_bit(0, false), ++tbits;
-	for (size_t k = 0; k != tbdds.size(); ++k) {
-		perm.resize(siglens[k]);
+	for (size_t k = 0; k != ts.size(); ++k) {
+		perm.resize(ts[k].len);
 		for (size_t n = 0; n != perm.size(); ++n) perm[n] = n + 1;
-		tbdds[k] = (tbdds[k] ^ perm) && bdd::from_bit(0, false);
+		ts[k].b = (ts[k].b ^ perm) && bdd::from_bit(0, false);
 	}
 }
 
@@ -153,8 +153,8 @@ spbdd tables::from_fact(const term& t) {
 void tables::add_term(const term& t) {
 	DBG(assert(t.tab < (1 << tbits));)
 //	if (t.tab >= (1 << tbits)) add_tbit();
-	db = (from_fact(t) && tbdds[t.tab]) || db;
-	DBG(assert(bdd_nvars(db&&tbdds[t.tab]) <= tbits+bits*t.size());)
+	db = (from_fact(t) && ts[t.tab].b) || db;
+//	DBG(assert(bdd_nvars(db&&tbdds[t.tab]) <= tbits+bits*t.size());)
 }
 
 sig_t tables::get_sig(const raw_term&t){return{dict.get_rel(t.e[0].e),t.arity};}
@@ -183,15 +183,15 @@ tables::term tables::from_raw_term(const raw_term& r) {
 void tables::out(wostream& os) const { out(os, db); }
 
 void tables::out(wostream& os, spbdd x) const {
-	for (ntable tab=0; (size_t)tab != tbdds.size(); ++tab) out(os, x, tab);
+	for (ntable tab=0; (size_t)tab != ts.size(); ++tab) out(os, x, tab);
 }
 
 void tables::out(wostream& os, spbdd x, ntable tab) const {
 	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
-	allsat_cb(x&&tbdds[tab], siglens[tab] * bits + tbits,
+	allsat_cb(x&&ts[tab].b, ts[tab].len * bits + tbits,
 		[&os, tab, op, cl, this](const bools& p, spbdd DBG(y)) {
 		DBG(assert(y->leaf());)
-		const size_t args = siglens[tab];
+		const size_t args = ts[tab].len;
 		term r(false, tab, ints(args, 0));
 		for (size_t n = 0; n != args; ++n)
 			for (size_t k = 0; k != bits; ++k)
@@ -199,14 +199,14 @@ void tables::out(wostream& os, spbdd x, ntable tab) const {
 					r[n] |= 1 << k;
 		raw_term rt;
 		rt.e.resize(args+1),
-		rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(sigs[tab])));
+		rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(ts[tab].s)));
 		for (size_t n = 1; n != args + 1; ++n) {
 			int_t arg = r[n - 1];
 			if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
 			else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 		}
-		rt.arity = get<ints>(sigs[tab]), rt.insert_parens(op, cl),
+		rt.arity = get<ints>(ts[tab].s), rt.insert_parens(op, cl),
 		os<<rt<<L'.'<<endl;
 	})();
 }
@@ -224,10 +224,10 @@ void tables::validate() {
 		return x == y;
 	};
 	spbdd t = F;
-	for (size_t n = 0; n != tbdds.size(); ++n) t = t || tbdds[n];
+	for (size_t n = 0; n != ts.size(); ++n) t = t || ts[n].b;
 	if (!bddcmp(F, db%t) || !bddcmp(db, db&&t)) {
-		for (size_t n = 0; n != tbdds.size(); ++n) {
-			wcout<<"tbdd["<<n<<"]:"<<endl<<::allsat(tbdds[n], tbits)
+		for (size_t n = 0; n != ts.size(); ++n) {
+			wcout<<"tbdd["<<n<<"]:"<<endl<<::allsat(ts[n].b, tbits)
 			<<endl<<"db:"<<endl<<
 			::allsat(db, tbits + bits*max_args+1)<<endl
 			<<"sig: " << dict.get_rel(get<0>(sigs[n])) << L' ';
@@ -239,12 +239,11 @@ void tables::validate() {
 		assert((db % t) == F);
 		assert((db && t) == db);
 	}
-	assert(tbdds.size() == sigs.size());
-	for (size_t n = 0; n != sigs.size(); ++n) {
-		t = db && tbdds[n];
-		assert(siglens[n] == sig_len(sigs[n]));
+	for (size_t n = 0; n != ts.size(); ++n) {
+		t = db && ts[n].b;
+		assert(ts[tab].len == sig_len(ts[tab].s));
 		spbdd x;
-		for (size_t k = 0; k != siglens[n]; ++k) {
+		for (size_t k = 0; k != ts[tab].len; ++k) {
 			x = range(k, n);
 			if ((x && t) != t) {
 				wcout<<"bits: "<<bits<<" tbits: "<<tbits<<endl
@@ -340,7 +339,7 @@ spbdd tables::get_alt_range(const term& h, const set<term>& a,
 tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 	body b;
 	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
-	b.q = tbdds[t.tab], b.ex = bools(t.size() * bits + tbits, false);
+	b.q = ts[t.tab].b, b.ex = bools(t.size() * bits + tbits, false);
 	for (size_t n = 0; n != tbits; ++n) b.ex[n] = true;
 	varmap m;
 	auto it = m.end();
@@ -353,8 +352,8 @@ tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 		else for (size_t k = 0; k != bits; ++k)
 			and_eq_(k, n, it->second, t.size(), b.q),
 			b.ex[pos(k, n, t.size())] = true;
-	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
-	DBG(assert(t.size() == siglens[t.tab]);)
+//	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
+//	DBG(assert(t.size() == siglens[t.tab]);)
 	return b;
 }
 
@@ -378,7 +377,7 @@ void tables::get_rules(const raw_prog& p) {
 		auto it = v.end();
 		const term &t = x.first;
 		rule r;
-		r.neg = t.neg, r.tab = t.tab, r.eq = tbdds[r.tab];
+		r.neg = t.neg, r.tab = t.tab, r.eq = ts[r.tab].b;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0)
 				for (size_t b = 0; b != bits; ++b)
@@ -407,6 +406,7 @@ void tables::get_rules(const raw_prog& p) {
 
 void tables::add_prog(const raw_prog& p) {
 	rules.clear();
+	size_t sz = ts.size();
 	auto f = [this](const raw_term& t) {
 		for (size_t n = 1; n < t.e.size(); ++n)
 			switch (t.e[n].type) {
@@ -420,29 +420,30 @@ void tables::add_prog(const raw_prog& p) {
 			}
 		sig_t s = get_sig(t);
 		if (has(smap, s)) return;
-		ntable nt = sigs.size();
+		ntable nt = ts.size();
 		size_t len = sig_len(s);
 		max_args = max(max_args, len);
-		smap.emplace(s, nt), sigs.push_back(s), siglens.push_back(len);
+		table t;
+		t.s = s, t.len = len, ts.push_back(t), smap.emplace(s, nt);
 	};
 	for (const raw_rule& r : p.r) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
-	while (!tbits || sigs.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
+	while (!tbits || ts.size()-1 > (size_t)(1 << (tbits - 1))) add_tbit();
 	int_t u = max((int_t)1, max(nums, max(chars, syms))-1);
 	while (u >= (1 << (bits - 2))) add_bit();
-	for (ntable tab = tbdds.size(); tab != (ntable)sigs.size(); ++tab) {
+	for (ntable tab = sz; tab != (ntable)ts.size(); ++tab) {
 		spbdd t = T;
 		for (size_t b = 0; b != tbits; ++b)
 			t = t && bdd::from_bit(b, tab & (1 << (tbits - b - 1)));
-		tbdds.push_back(t);
+		ts[tab].b = t;
 	}
 	get_rules(p);
 }
 
 spbdd tables::get_table(ntable tab, spbdd x) const {
-	return x && tbdds[tab];
+	return x && ts[tab].b;
 	return	x->leaf() || x->v() > tbits ? x :
 		get_table(tab, tab&(tbits-(1<<(x->v()-1))-1)?x->h():x->l());
 }
@@ -459,21 +460,20 @@ spbdd tables::deltail(spbdd x, size_t len1, size_t len2) const {
 }
 
 spbdd tables::body_query(const body& b) const {
-	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
-	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
+//	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
+//	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	return bdd_permute_ex(b.neg ? b.q % get_table(b.tab, db) :
 			(b.q && get_table(b.tab, db)), b.ex, b.perm);
 }
 
 void tables::alt_query(const alt& a, size_t len, bdds& v) const {
-	bdds v1;
-	for (const body& b : a) {
-		spbdd x = body_query(b) && a.rng;
-//		DBG(out(wcout<<"body:"<<endl, x, a.varslen);)
-		if (x == F) return;
-		v1.push_back(x);
-	}
-	v.push_back(deltail(bdd_and_many(v1), a.varslen, len));
+	bdds v1 = { a.rng };
+	spbdd x;
+	for (const body& b : a)
+		if (F == (x = body_query(b))) return;
+		else v1.push_back(x);
+	if ((x = bdd_and_many(move(v1))) != F)
+		v.push_back(deltail(x, a.varslen, len));
 }
 
 void tables::fwd() {
@@ -482,12 +482,16 @@ void tables::fwd() {
 	for (const rule& r : rules) {
 		bdds v;
 		for (const alt& a : r) alt_query(a, r.len, v);
-		(r.neg ? del : add).push_back(bdd_or_many(v) && r.eq);
+		spbdd x = bdd_or_many(move(v)) && r.eq;
+		if (x == F) continue;
+		ts[r.tab].dirty = true;
+		(r.neg ? del : add).push_back(x);
 	}
-	if (add.empty()) db = db % bdd_or_many(del);
-	else if (del.empty()) add.push_back(db), db = bdd_or_many(add);
+	if (add.empty()) db = db % bdd_or_many(move(del));
+	else if (del.empty()) add.push_back(db), db = bdd_or_many(move(add));
 	else {
-		spbdd a = bdd_or_many(add), d = bdd_or_many(del), s = a % d;
+		spbdd a = bdd_or_many(move(add)), d = bdd_or_many(move(del)),
+		      s = a % d;
 		if (s == F) { wcout << "unsat" << endl; exit(0); }
 		db = (db || a) % d;
 	}
