@@ -13,28 +13,33 @@ string fname(std::tmpnam(0));
 ofstream out(fname.c_str());
 
 char rand_rel(size_t rmax) { return 'a' + rand()%rmax; }
-char rand_var(size_t vmax) { return 'A' + rand()%vmax; }
-char rand_sym(size_t umax) { return '0' + rand()%umax; }
+string rand_var(size_t vmax) { return to_string((int)(rand()%vmax)); }
+string rand_sym(size_t umax) { return to_string((int)(rand()%umax)); }
 
 string rand_term(size_t len, size_t amax, size_t umax, size_t vmax, size_t rmax) {
 	stringstream ss;
 	assert(len);
-	ss << rand_rel(rmax);
-	for (size_t n = 0; n != len; ++n)
-		ss << (random()&1 && vmax ? rand_var(vmax) : rand_sym(umax));
+	ss << rand_rel(rmax) << '(';
+	for (size_t n = 0; n != len; ++n) {
+		if (random()&1 && vmax) ss << '?' << rand_var(vmax) << ' ';
+		else ss << rand_sym(umax) << ' ';
+	}
+	ss << ')';
 	string s = ss.str();
 	return s;
 }
 
 void print_term(string t) {
-	out << t[0] << '(';
+	out << t;
+	return;
+/*	out << t[0] << '(';
 	if (t.size() == 1) out << ')';
 	else for (size_t n = 1; n != t.size(); ++n) {
 		if (isupper(t[n])) out << '?';
 		out << t[n];
 		if (n != t.size()-1) out << " ";
 		else out << ')';
-	}
+	}*/
 }
 
 void print_rule(vector<string> r) {
@@ -69,8 +74,8 @@ void print_query(string h) {
 int main() {
 	srand(time(0));
 	set<vector<string>> s;
-	size_t max_bodies = 5, max_arity = 2, max_universe = 10,
-	       max_vars = 3, max_rels = 3, nfacts = 5, nrules = 2;
+	size_t max_bodies = 10, max_arity = 2, max_universe = 50,
+	       max_vars = 10, max_rels = 10, nfacts = 100, nrules = 20;
 	for (size_t n = 0; n != nfacts; ++n)
 		s.insert(rand_rule(0, max_arity, max_universe, 0, max_rels));
 	for (size_t n = 0; n != nrules; ++n)

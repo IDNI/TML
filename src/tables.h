@@ -76,8 +76,9 @@ class tables {
 	struct table {
 		sig_t s;
 		size_t len;
-		spbdd b = F;
-		bool dirty = false;
+		spbdd t = F;
+		bdds add, del;
+		bool commit();
 	};
 	std::vector<table> ts;
 	std::map<sig_t, ntable> smap;
@@ -86,32 +87,28 @@ class tables {
 	rule get_rule(const raw_rule&);
 
 	int_t syms = 0, nums = 0, chars = 0;
-	size_t bits = 2, tbits = 0; // #bits for elem, #bits for table id
+	size_t bits = 2;
 	dict_t& dict;
 
 	size_t max_args = 0;
-	std::map<std::array<int_t, 7>, spbdd> range_memo;
-
-	spbdd db = F;
+	std::map<std::array<int_t, 6>, spbdd> range_memo;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
-		return (nbits - bit - 1) * args + arg + tbits;
+		return (nbits - bit - 1) * args + arg;
 	}
 
 	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
 		DBG(assert(bit_from_right < bits && arg < args);)
-		return (bits - bit_from_right - 1) * args + arg + tbits;
+		return (bits - bit_from_right - 1) * args + arg;
 	}
 
 	size_t arg(size_t v, size_t args) const {
-		DBG(assert(v >= tbits);)
-		return (v - tbits) % args;
+		return v % args;
 	}
 
 	size_t bit(size_t v, size_t args) const {
-		DBG(assert(v >= tbits);)
-		return bits - 1 - (v - tbits) / args;
+		return bits - 1 - v / args;
 	}
 
 	spbdd from_bit(size_t b, size_t arg, size_t args, int_t n) const {
@@ -120,7 +117,6 @@ class tables {
 
 	void add_bit();
 	spbdd add_bit(spbdd x, size_t args);
-	void add_tbit();
 	spbdd leq_const(int_t c, size_t arg, size_t args, size_t bit) const;
 	void range(size_t arg, size_t args, bdds& v);
 	spbdd range(size_t arg, ntable tab);
@@ -128,7 +124,6 @@ class tables {
 
 	sig_t get_sig(const raw_term& t);
 	ntable add_table(sig_t s);
-	spbdd get_table(ntable tab, spbdd x) const;
 	sizes get_perm(const term& t, const varmap& m, size_t len) const;
 	static varmap get_varmap(const term& h, const std::set<term>& b,
 		size_t &len);
@@ -145,12 +140,11 @@ class tables {
 	spbdd body_query(const body& b) const;
 	void alt_query(const alt& a, size_t len, bdds& v) const;
 	DBG(vbools allsat(spbdd x, size_t args) const;)
-	void out(std::wostream&, spbdd) const;
 	void out(std::wostream&, spbdd, ntable) const;
 	void get_rules(const raw_prog& p);
 	void add_prog(const raw_prog& p);
-	void fwd();
-	void validate();
+	bool fwd();
+	std::set<std::pair<ntable, spbdd>> get_front() const;
 public:
 	tables();
 	~tables();

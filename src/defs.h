@@ -53,9 +53,6 @@ typedef std::vector<size_t> sizes;
 #define er(x)	wcerr<<x<<endl, exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
-#define POS(bit, bits, arg, args) ((bits - (bit) - 1) * (args) + (arg))
-#define ARG(pos, args) ((pos) % (args))
-#define BIT(pos, args, bits) (bits - ((pos) / (args)) - 1)
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}

@@ -84,7 +84,7 @@ vbools allsat(spbdd x, size_t nvars) {
 	return sat(1, nvars, x, p, r), r;
 }
 
-vbools allsat(spbdd x, size_t bits, size_t args) {
+/*vbools allsat(spbdd x, size_t bits, size_t args) {
 	vbools v = allsat(x, bits * args), s;
 	for (bools b : v) {
 		s.emplace_back(bits*args);
@@ -93,7 +93,7 @@ vbools allsat(spbdd x, size_t bits, size_t args) {
 				s.back()[k*bits+n] = b[POS(n,bits,k,args)];
 	}
 	return s;
-}
+}*/
 
 spbdd bdd_or(const spbdd& x, const spbdd& y) {
 	if (x == y || y == F) return x;
@@ -196,12 +196,34 @@ spbdd operator&&(spbdd x, spbdd y) {
 	if (x == y || y == T) return x;
 	if (x == T) return y;
 	if (x == F || y == F) return F;
+//#ifdef MEMO
+	memo t = {{x, y}};
+	auto it = memo_and.find(t);
+	if (it != memo_and.end()) return it->second;
+	spbdd res;
+//#endif
+	const size_t &vx = x->v(), &vy = y->v();
+	size_t v;
+	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
+	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
+		a = c = x, v = vy;
+	else if (leafvar(vx)) apply_ret((a==T&&b==T)?T:F, memo_and);
+	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
+	return onmemo(), memo_and.emplace(t,
+		res = bdd::add(v, a && b, c && d)), res;
+//	apply_ret(bdd::add(v, a && b, c && d), memo_and);
+}
+
+/*spbdd operator&&(spbdd x, spbdd y) {
+	if (x == y || y == T) return x;
+	if (x == T) return y;
+	if (x == F || y == F) return F;
 //	return bdd_and(x, y);
 	memo t = {{x, y}};
 	auto it = memo_and.find(t);
 	if (it != memo_and.end()) return it->second;
 	return memo_and[t] = bdd_and(x, y);
-}
+}*/
 
 spbdd operator%(spbdd x, spbdd y) {
 	if (x == y || x == F || y == T) return F;
@@ -221,7 +243,7 @@ spbdd operator%(spbdd x, spbdd y) {
 	apply_ret(bdd::add(v, a%b, c%d),memo_and_not);
 }
 
-spbdd bdd_expand(spbdd x, size_t args1, size_t args2, size_t bits) {
+/*spbdd bdd_expand(spbdd x, size_t args1, size_t args2, size_t bits) {
 	if (args1 == args2) return x;
 	DBG(assert(args1 < args2);)
 	sizes perm(args1 * bits);
@@ -258,7 +280,7 @@ spbdd bdd_subterm(spbdd x, size_t from, size_t to, size_t args1, size_t args2,
 	size_t bits) {
 	auto y = bdd_subterm(from, to, args1, args2, bits);
 	return bdd_subterm(x, y.first, y.second, from, to, args1);
-}
+}*/
 
 //spbdd bdd_deltail(spbdd x, size_t args1, size_t args2, size_t bits) {
 //	return bdd_subterm(x, 0, args2, args1, args2, bits);
@@ -502,13 +524,13 @@ bool bdd_onesat(spbdd x, size_t nvars, bools& r) {
 		:(r[x->v()-1] = false, bdd_onesat(x->l(), nvars, r));
 }
 
-spbdd from_int(size_t x, size_t bits, size_t arg, size_t args) {
+/*spbdd from_int(size_t x, size_t bits, size_t arg, size_t args) {
 	spbdd r = T;
 	size_t b = bits;
 	while (b--)
 		r = r && bdd::from_bit(POS(b, bits, arg, args), x&(1<<b));
 	return r;
-}
+}*/
 
 size_t bdd_nvars(spbdd x) {
 	if (x->leaf()) return 0;
@@ -534,6 +556,7 @@ void memos_clear() {
 	memos_perm.clear(), memos_ex.clear(), memos_perm_ex.clear();
 	onmemo(-memo_and_many.size() - memo_or_many.size());
 	memo_and_many.clear(), memo_or_many.clear();
+	memo_and.clear();
 #ifdef MEMO
 	onmemo(-memo_and.size() - memo_and_not.size() - memo_or.size());
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear();
