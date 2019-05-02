@@ -281,11 +281,14 @@ void tables::align_vars(term& h, set<term>& b) const {
 	for_each12(h, b, [&vs](int_t i) { if (i < 0) vs.emplace(i); });
 	if (vs.empty()) return;
 	int_t mv = *vs.begin();
-	for_each12(h, b, [mv](int_t i) { if (i < 0) i += mv; });
+	for_each2(b, [mv](int_t& i) { if (i < 0) i += mv; });
 	vs.clear();
 	map<int_t, int_t> m;
 	for (size_t n = 0; n != h.size(); ++n)
-		if (!has(m, h[n])) m.emplace(h[n], -m.size()-1);
+		if (h[n] < 0 && !has(m, h[n])) m.emplace(h[n], -m.size()-1);
+	for (const term& t : b)
+		for (int_t i : t)
+			if (i < 0 && !has(m, i)) m.emplace(i, -m.size()-1);
 	set<term> sb;
 	for (term t : b) t.replace(m), sb.insert(t);
 	h.replace(m), b = sb;
@@ -472,6 +475,10 @@ void tables::alt_query(const alt& a, size_t len, bdds& v) const {
 	for (const body& b : a)
 		if (F == (x = body_query(b))) return;
 		else v1.push_back(x);
+//	x = T;
+//	for (auto y : v1) if (F == (x = x && y)) return;
+//	return v.push_back(deltail(x, a.varslen, len));
+//	if ((x = bdd_and_many(v1)) != F)
 	if ((x = bdd_and_many(move(v1))) != F)
 		v.push_back(deltail(x, a.varslen, len));
 }
@@ -504,7 +511,7 @@ bool tables::pfp() {
 	spbdd l = db;
 	size_t step = 0;
 	for (set<spbdd> s; fwd(), true; l = db) {
-//		wcout << "step: " << step++ << endl;
+		wcerr << "step: " << step++ << endl;
 		if (l == db) return true;
 		else if (has(s, l)) return false;
 		else s.insert(l);

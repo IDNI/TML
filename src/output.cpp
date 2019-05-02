@@ -200,11 +200,12 @@ wostream& operator<<(wostream& os, const raw_rule& r) {
 	for (size_t n = 0; n < r.h.size(); ++n)
 		if ((os << r.h[n]), n != r.h.size() - 1) os << L',';
 	if (!r.b.size()) return os << L'.';
-	os << L" :- ";
+	os << L" :- " << endl;
 	for (size_t n = 0; n < r.b.size(); ++n) {
 		for (size_t k = 0; k < r.b[n].size(); ++k)
-			if ((os << r.b[n][k]), k != r.b[n].size() - 1) os<<L',';
-		if (n != r.b.size() - 1) os << L';';
+			if ((os << '\t' << r.b[n][k]), k != r.b[n].size() - 1)
+				os << L',' << endl;
+		if (n != r.b.size() - 1) os << L';' << endl;
 	}
 	return os << L'.';
 }

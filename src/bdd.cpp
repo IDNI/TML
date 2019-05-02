@@ -113,6 +113,7 @@ spbdd operator||(const spbdd& x, const spbdd& y) {
 	if (x == y || y == F) return x;
 	if (x == F) return y;
 	if (x == T || y == T) return T;
+//	return bdd_or(x, y);
 	memo t = {{x, y}};
 	auto it = memo_or.find(t);
 	if (it != memo_or.end()) return it->second;
@@ -195,6 +196,7 @@ spbdd operator&&(spbdd x, spbdd y) {
 	if (x == y || y == T) return x;
 	if (x == T) return y;
 	if (x == F || y == F) return F;
+//	return bdd_and(x, y);
 	memo t = {{x, y}};
 	auto it = memo_and.find(t);
 	if (it != memo_and.end()) return it->second;
@@ -283,6 +285,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 	bool b, eq, flag;
 	bdds x;
 	if (v.empty()) return res = T, 1;
+	if (v.size() == 2) return res=v[0]&&v[1],1;
 	for (size_t n = 0; n < v.size();)
 		if (!v[n]->leaf()) ++n;
 		else if (!v[n]->trueleaf()) return res = F, 1;
@@ -378,6 +381,7 @@ size_t bdd_or_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 	bool b, eq, flag;
 	bdds x;
 	if (v.empty()) return res = F, 1;
+	if (v.size() == 2) return res=v[0]||v[1],1;
 	for (size_t n = 0; n < v.size();)
 		if (!v[n]->leaf()) ++n;
 		else if (v[n]->trueleaf()) return res = T, 1;

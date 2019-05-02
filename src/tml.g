@@ -1,7 +1,5 @@
 {
 @string str <tml.g>.
-#"p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).  S => S | null.  ".
-#@bwd.
 
 identifier => sym | var.
 args => identifier ws args | null.
@@ -11,7 +9,6 @@ relname => sym.
 chars => alpha chars1 | '_' chars1.
 chars1=> alnum chars1 | '_' chars1 | null.
 ws =>	space ws | ws '#' printable_chars eol ws | null.
-	#eol | ws "/*" ws printable_chars ws "*/" ws | null.
 terminal => quoted_char | string.
 quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
 		| "'\\t'" | "'\\''" | "''".
@@ -61,10 +58,10 @@ prefix => "forall" | "exists" | "unique".
 
 prog => directive S | rule S | production S | fof S | query S | null.
 S => ws '{' ws prog ws '}' ws S | ws prog ws | null.
-
-#!! S(0 ?x).
 }
 {
 	~S(?x?x):-S(?x?x).
 	~prog(?x?x):-prog(?x?x).
+	~alt(?x?x):-alt(?x?x).
+	~alts(?x?x):-alts(?x?x).
 }

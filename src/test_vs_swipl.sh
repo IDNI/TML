@@ -21,3 +21,7 @@ do
 done
 echo "diff:"
 diff -B -Z swipl.sorted tml.sorted
+echo "input:"
+cat $INPUT
+echo "tml output:"
+cat tml.sorted
