@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <algorithm>
 #include "driver.h"
 using namespace std;
 
@@ -17,56 +18,74 @@ typedef pair<wstring, int_t> relarity;
 typedef set<relarity> relarities;
 
 void get_relarities(const raw_prog& p, relarities& all, relarities& tabling);
-wostream& output_xsb_rule(wostream& os, const raw_rule& r);
-wostream& output_xsb_term(wostream& os, const raw_term& t);
-wostream& output_xsb_elem(wostream& os, const elem& e);
+wostream& output_prolog_rule(wostream& os, const raw_rule& r);
+wostream& output_prolog_term(wostream& os, const raw_term& t);
+wostream& output_prolog_elem(wostream& os, const elem& e);
 
 #define output_lexeme_adjust_first(os, l, fn) (os) << (wchar_t)fn(*((l)[0])) <<\
 	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
-/*wostream& driver::print_term_xsb(wostream& os, const term& t) const {
-	if (t.neg()) os << L'~';
-	output_lexeme_adjust_first(os, dict.get_rel(t.rel()), towlower);
+/*wostream& driver::print_term_prolog(wostream& os, const raw_term& t) const {
+	if (t.neg) os << L'~';
+	output_lexeme_adjust_first(os, t.e[0].e, towlower);
 	os << L'(';
 	int_t skip, l = 0;
-	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
+	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
 		skip = 0;
-		while (t.arity()[ar] == -1) ++ar, os <<
-			(l++ && t.arity()[ar-2] == 1 ? L"(" : (++skip, L""));
-		for (int_t k = 0; k != t.arity()[ar]; ++k) {
-			if (t.arg(n) < 0) throw 0;//os<<dict.get_var(t.args[n]);
-			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
-			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
-			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
-				output_lexeme_adjust_first(os,
-					dict.get_sym(t.arg(n)), towlower);
-			else os << L'[' << (t.arg(n)>>2) << L']';
-			if (++n != t.nargs() && k != t.arity()[ar]-1) os <<L',';
-		}
+		while (t.arity[ar] == -1) ++ar, os <<
+			(l++ && t.arity[ar-2] == 1 ? L"(" : (++skip, L""));
+		// while (t.arity[ar] == -1) ++ar, os << L'(';
+		if (n >= t.e.size()) break;
+		while (t.e[n].type == elem::OPENP) ++n;
+		for (int_t k = 0; k != t.arity[ar];)
+			if (output_lexeme_adjust_first(os, t.e[n].e, tolower),
+				++n, ++k != t.arity[ar]) os << L',';
+		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 		++ar;
-		while (ar<t.arity().size() && t.arity()[ar] == -2) ar++,
+		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar,
 			os << (--l && !skip ? L")" : (--skip, L""));
-		if (ar > 1 && t.arity()[ar-1] == -2 &&
-			ar != t.arity().size()) os<<L",";
-	}
-	return os << L")";
-}
+		// while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
+		if (ar > 1 && t.arity[ar-1] == -2 &&
+			ar != t.arity.size()) os << L",";
 
-wostream& driver::print_xsb(wostream& os, const raw_prog& p) const {
-	relarities all, tabling;
-	get_relarities(p, all, tabling); // FIXME: get_relarities
-	os << L"% start of XSB program" << endl;
+	}
+	return os << L')';
+}*/
+
+wostream& driver::print_prolog(wostream& os, const raw_prog& p,
+	const output_dialect dialect) const {
+	relarities all, tabling, diff;
+	get_relarities(p, all, tabling);
+	wstring name = dialect == SWIPL ? L"SWI Prolog" : L"XSB";
+	if (dialect == SWIPL)
+		set_difference(all.begin(), all.end(), tabling.begin(),
+			tabling.end(), inserter(diff, diff.end()));
+	os << L"% start of " << name << " program" << endl;
+	if (dialect == SWIPL) os << L":- style_check(-singleton)." << endl;
 	os << endl;
 	os << L"% {" << endl;
-	for (auto x : p.r) output_xsb_rule(os, x) << endl;
+	for (auto x : p.r) output_prolog_rule(os, x) << endl;
 	os << L"% }" << endl;
 	os << endl;
-	os << L"% enable tabling for all relations in heads"
-		<< L" to avoid inf. loops:" << endl;
+	if (dialect == SWIPL) {
+		os << L"% enable discontiguation" << endl;
+		for (auto ra : tabling) os << L":- discontiguous " << ra.first<<
+			L'/' << ra.second << L'.' << endl;
+		os << endl;
+	}
+	os << L"% enable tabling to avoid inf. loops" << endl;
 	for (auto ra : tabling) os << L":- table " << ra.first <<
 		L'/' << ra.second << L'.' << endl;
 	os << endl;
-	os << L"% find all and dump to stdout:" << endl;
+	if (dialect == SWIPL) {
+		os << L"% declare dynamic predicates" << endl;
+		for (auto ra : diff) os << L":- dynamic " << ra.first <<
+			L'/' << ra.second << L'.' << endl;
+		for (auto ra : tabling) os << L":- dynamic '" << ra.first <<
+			L" tabled'" << L'/' << ra.second << L'.' << endl;
+		os << endl;
+	}
+	os << L"% find all and dump to stdout" << endl;
 	os << L"dump_list([])." << endl;
 	os << L"dump_list([H|T]) :- writeln(H), dump_list(T)."<< endl;
 	os << L"dump(Q) :- findall(Q, Q, X), dump_list(X)." << endl;
@@ -78,7 +97,7 @@ wostream& driver::print_xsb(wostream& os, const raw_prog& p) const {
 	os << endl;
 	os << L":- halt." << endl;
 	os << endl;
-	os << L"% end of XSB program" << endl;
+	os << L"% end of "<< name << " program" << endl;
 	return os;
 }
 
@@ -98,9 +117,9 @@ void get_relarities(const raw_prog& p, relarities& all, relarities& tabling) {
 				}
 			relarity ra = { rel, ar };
 			all.insert(ra);
-			if (r.nbodies()) tabling.insert(ra);
+			if (r.b.size()) tabling.insert(ra);
 		}
-		for (auto t : r.bodies()) // FIXME: per alt
+		for (auto b : r.b) for (auto t : b)
 			if (t.arity.size() == 1) {
 				ar = t.arity[0];
 				trigger = 0;
@@ -117,33 +136,36 @@ void get_relarities(const raw_prog& p, relarities& all, relarities& tabling) {
 	}
 }
 
-wostream& output_xsb_rule(wostream& os, const raw_rule& r) {
+wostream& output_prolog_rule(wostream& os, const raw_rule& r) {
 	switch (r.type) {
 		case raw_rule::GOAL: os << L"% !" << endl; break;
 		case raw_rule::TREE: os << L"% !!" << endl; break;
 		default: ;
 	}
 	for (size_t n = 0; n < r.h.size(); ++n)
-		if (output_xsb_term(os, r.head(n)), n != r.nheads() - 1)
+		if (output_prolog_term(os, r.h[n]), n != r.h.size() - 1)
 			os << L',';
-	if (!r.nbodies()) return os << L'.';
+	if (!r.b.size()) return os << L'.';
 	os << L" :- ";
-	for (size_t n = 0; n < r.nbodies(); ++n) // FIXME: per alt
-		if (output_xsb_term(os, r.body(n)), n != r.nbodies() - 1)
-			os << L',';
+	for (size_t m = 0; m < r.b.size(); ++m) {
+		for (size_t n = 0; n < r.b[m].size(); ++n)
+			if (output_prolog_term(os, r.b[m][n]),
+				n != r.b[m].size() - 1) os << L',';
+		if (m != r.b.size() - 1) os << L';';
+	}
 	return os << L'.';
 }
 
-wostream& output_xsb_term(wostream& os, const raw_term& t) {
+wostream& output_prolog_term(wostream& os, const raw_term& t) {
 	if (t.neg) os << L'~';
-	output_xsb_elem(os, t.e[0]);
+	output_prolog_elem(os, t.e[0]);
 	os << L'(';
 	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
 		while (t.arity[ar] == -1) ++ar, os << L'(';
 		if (n >= t.e.size()) break;
 		while (t.e[n].type == elem::OPENP) ++n;
 		for (int_t k = 0; k != t.arity[ar];)
-			if (output_xsb_elem(os, t.e[n++]), ++k != t.arity[ar])
+			if (output_prolog_elem(os,t.e[n++]), ++k != t.arity[ar])
 				os << L", ";
 		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 		++ar;
@@ -155,7 +177,7 @@ wostream& output_xsb_term(wostream& os, const raw_term& t) {
 	return os << L')';
 }
 
-wostream& output_xsb_elem(wostream& os, const elem& e) {
+wostream& output_prolog_elem(wostream& os, const elem& e) {
 	switch (e.type) {
 		case elem::CHR: return os << '\'' <<
 			(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") <<
@@ -167,4 +189,4 @@ wostream& output_xsb_elem(wostream& os, const elem& e) {
 		case elem::NUM: return os << e.num;
 		default: return output_lexeme_adjust_first(os, e.e, towlower);
 	}
-}*/
+}

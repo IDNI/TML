@@ -19,17 +19,18 @@ void print_memos_len();
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	bdd::init();
-	bool xsb = false, souffle = false, print_transformed = false,
-		csv = false;
+	bool print_transformed = false;
+	output_dialect dialect = NONE;
 	for (int i = 1; i < argc; ++i) {
 		if (!strcmp(argv[i], "-t")) print_transformed = true;
-		else if (!strcmp(argv[i], "-P")) xsb = true;
-		else if (!strcmp(argv[i], "-souffle")) souffle = true;
-		else if (!strcmp(argv[i], "-csv")) csv = true;
+		else if (!strcmp(argv[i], "--xsb")) dialect = XSB;
+		else if (!strcmp(argv[i], "--swipl")) dialect = SWIPL;
+		else if (!strcmp(argv[i], "--souffle")) dialect = SOUFFLE;
+		else if (!strcmp(argv[i], "--csv")) dialect = CSV;
 	}
-	driver d(argc, argv, stdin, print_transformed, xsb, souffle, csv);
+	driver d(argc, argv, stdin, dialect, print_transformed);
 	if (!d.result) wcout << "unsat" << endl;
-	if (!xsb) print_memos_len();
+	if (dialect == NONE) print_memos_len();
 	bdd::onexit = true;
 	return 0;
 }

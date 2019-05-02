@@ -195,8 +195,9 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
-//	if (xsb) print_xsb(wcout, rp.p[n]);
-//	if (souffle) print_souffle(wcout, rp.p[n]);
+	if (dialect == XSB) print_xsb(wcout, rp.p[n]);
+	else if (dialect == SWIPL) print_swipl(wcout, rp.p[n]);
+//	else if (dialect == SOUFFLE) print_souffle(wcout, rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
@@ -209,10 +210,9 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	int_t tr = dict.get_rel(L"try");
 }
 
-driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
-	bool xsb, bool souffle, bool csv) : argc(argc), argv(argv),
-	print_transformed(print_transformed), xsb(xsb), souffle(souffle),
-	csv(csv) {
+driver::driver(int argc, char** argv, raw_progs rp, output_dialect dialect,
+	bool print_transformed) : argc(argc), argv(argv), dialect(dialect),
+	print_transformed(print_transformed) {
 	strs_t strtrees;
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
@@ -226,14 +226,15 @@ driver::driver(int argc, char** argv, raw_progs rp, bool print_transformed,
 	}*/
 }
 
-driver::driver(int argc, char** argv, FILE *f, bool print_transformed, bool xsb,
-	bool souffle, bool csv) : driver(argc, argv, move(raw_progs(f)),
-	print_transformed, xsb, souffle, csv) {}
-driver::driver(int argc, char** argv, wstring s, bool print_transformed,
-	bool xsb, bool souffle, bool csv) : driver(argc, argv,
-	move(raw_progs(s)), print_transformed, xsb, souffle, csv) {}
 std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-driver::driver(int argc, char** argv, char *s, bool print_transformed,
-	bool xsb, bool souffle, bool csv) : driver(argc, argv,
-	move(raw_progs(converter.from_bytes(string(s)))),
-	print_transformed, xsb, souffle, csv) {}
+
+driver::driver(int argc, char** argv, FILE *f, output_dialect dialect,
+	bool print_transformed) : driver(argc, argv, move(raw_progs(f)),
+	dialect, print_transformed) {}
+driver::driver(int argc, char** argv, wstring s, output_dialect dialect,
+	bool print_transformed) : driver(argc, argv, move(raw_progs(s)),
+	dialect, print_transformed) {}
+driver::driver(int argc, char** argv, char *s, output_dialect dialect,
+	bool print_transformed) : driver(argc, argv,
+	move(raw_progs(converter.from_bytes(string(s)))), dialect,
+	print_transformed) {}
