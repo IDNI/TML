@@ -21,6 +21,7 @@
 #include <ctime>
 #include <locale>
 #include <codecvt>
+#include <fstream>
 #include "driver.h"
 #include "err.h"
 using namespace std;
@@ -191,13 +192,25 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
+void driver::output_pl(const raw_prog& p) const {
+	if (dialect == NONE) return;
+	wstring s;
+	string fname(tmpnam(0));
+	wofstream os(fname.c_str());
+	switch (dialect) {
+		case XSB: print_xsb(os, p); s = L"XSB"; break;
+		case SWIPL: print_swipl(os, p); s = L"SWIPL"; break;
+//		case SOUFFLE: print_souffle(os, p); s = L"Souffle"; break;
+		default: ;
+	}
+	wcerr << "Program in " << s << " format saved to " << s2ws(fname)<<endl;
+}
+
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
-	if (dialect == XSB) print_xsb(wcout, rp.p[n]);
-	else if (dialect == SWIPL) print_swipl(wcout, rp.p[n]);
-//	else if (dialect == SOUFFLE) print_souffle(wcout, rp.p[n]);
+	output_pl(rp.p[n]);
 	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;

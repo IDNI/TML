@@ -68,6 +68,7 @@ class driver {
 	tables tbl;
 	output_dialect dialect;
 	bool print_transformed;
+	void output_pl(const raw_prog& p) const;
 public:
 	bool result = true;
 	driver(int argc, char** argv, FILE *f, output_dialect dialect,
