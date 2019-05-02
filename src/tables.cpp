@@ -325,7 +325,7 @@ spbdd tables::get_alt_range(const term& h, const set<term>& a,
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
-		for (int_t i : h) hvars.insert(i);
+		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
 		for (int_t i : hvars) range(vm.at(i), len, v);
 	}
