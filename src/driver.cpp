@@ -196,6 +196,7 @@ void driver::output_pl(const raw_prog& p) const {
 	if (dialect == NONE) return;
 	wstring s;
 	string fname(tmpnam(0));
+	fname += ".pl";
 	wofstream os(fname.c_str());
 	switch (dialect) {
 		case XSB: print_xsb(os, p); s = L"XSB"; break;
