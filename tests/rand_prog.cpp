@@ -69,8 +69,8 @@ void print_query(string h) {
 int main() {
 	srand(time(0));
 	set<vector<string>> s;
-	size_t max_bodies = 3, max_arity = 4, max_universe = 5,
-	       max_vars = 4, max_rels = 3, nfacts = 3, nrules = 3;
+	size_t max_bodies = 3, max_arity = 2, max_universe = 5,
+	       max_vars = 4, max_rels = 3, nfacts = 2, nrules = 3;
 	for (size_t n = 0; n != nfacts; ++n)
 		s.insert(rand_rule(0, max_arity, max_universe, 0, max_rels));
 	for (size_t n = 0; n != nrules; ++n)

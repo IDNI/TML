@@ -504,7 +504,7 @@ bool tables::pfp() {
 	spbdd l = db;
 	size_t step = 0;
 	for (set<spbdd> s; fwd(), true; l = db) {
-		wcout << "step: " << step++ << endl;
+//		wcout << "step: " << step++ << endl;
 		if (l == db) return true;
 		else if (has(s, l)) return false;
 		else s.insert(l);
