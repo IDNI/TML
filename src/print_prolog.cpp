@@ -179,9 +179,17 @@ wostream& output_prolog_term(wostream& os, const raw_term& t) {
 
 wostream& output_prolog_elem(wostream& os, const elem& e) {
 	switch (e.type) {
-		case elem::CHR: return os << '\'' <<
-			(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") <<
-			e.ch << '\'';
+		case elem::CHR:
+			os << '\'';
+			switch (e.ch) {
+				case L'\'':
+				case L'\\': os << L'\\' << e.ch; break;
+				case L'\r': os << L"\\r"; break;
+				case L'\n': os << L"\\n"; break;
+				case L'\t': os << L"\\t"; break;
+				default: os << e.ch;
+			}
+			return os << L'\'';
 		case elem::VAR: return output_lexeme_adjust_first(os,
 			(lexeme{ e.e[0]+1, e.e[1] }), towupper);
 		case elem::OPENP:
