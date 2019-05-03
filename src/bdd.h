@@ -20,12 +20,11 @@
 #include <memory>
 #include "defs.h"
 
-//bdd bdd is a triple: varid,1-bdd-id,0-bdd-id
-//typedef std::array<size_t, 3> bdd;
 #define leafvar(x) (!(x) || ((x) == (size_t)-1))
 class bdd;
 struct key;
 typedef std::shared_ptr<bdd> spbdd;
+typedef std::weak_ptr<bdd> wpbdd;
 extern spbdd T, F;
 
 class bdd {
@@ -49,12 +48,12 @@ class bdd {
 	}
 	friend spbdd;
 public:
-	const size_t& v() const { return var; }
-	const spbdd& h() const { return hi; }
-	const spbdd& l() const { return lo; }
-	bool leaf() const { return leafvar(var); }
-	bool trueleaf() const { return var; }
-	bool operator==(const bdd& n) const {
+	inline const size_t& v() const { return var; }
+	inline const spbdd& h() const { return hi; }
+	inline const spbdd& l() const { return lo; }
+	inline bool leaf() const { return leafvar(var); }
+	inline bool trueleaf() const { return var; }
+	inline bool operator==(const bdd& n) const {
 		return var == n.var && hi == n.hi && lo == n.lo;
 	}
 	static void init() {
@@ -71,16 +70,18 @@ public:
 		return x < y ? add(x + 1, from_bit(y, true), from_bit(y, false))
 			: add(y + 1, from_bit(x, true), from_bit(x, false));
 	}
-	static spbdd add(size_t _v, spbdd _h, spbdd _l) {
-		if (_h == _l) return _l;
-		DBG(assert(_h&&_l);)
-		DBG(if (!_h->leaf()) assert(_v < _h->v());)
-		DBG(if (!_l->leaf()) assert(_v < _l->v());)
-		auto it = M.find(key(_v, _h.get(), _l.get()));
+	static spbdd add(size_t v, spbdd h, spbdd l) {
+		if (h == l) return l;
+		DBG(assert(h&&l);)
+		DBG(if (!h->leaf()) assert(v < h->v());)
+		DBG(if (!l->leaf()) assert(v < l->v());)
+		auto it = M.find(key(v, h.get(), l.get()));
 		if (it != M.end()) return it->second.lock();
-		spbdd r = spbdd(new bdd(_v, _h, _l));
-		return 	M.emplace(key(_v, _h.get(), _l.get()),
-			std::weak_ptr<bdd>(r)), r;
+		spbdd r = spbdd(new bdd(v, h, l));
+		return M.emplace(key(v, h.get(), l.get()), wpbdd(r)), r;
+	}
+	static spbdd get(const bdd* b) {
+		return M[key(b->var, b->hi.get(), b->lo.get())].lock();
 	}
 #ifdef DEEPDEBUG
 	static void validate(spbdd x, spbdd y) {
@@ -134,11 +135,11 @@ void bdd_init();
 vbools allsat(spbdd x, size_t nvars);
 vbools allsat(spbdd x, size_t bits, size_t args);
 spbdd operator||(const spbdd& x, const spbdd& y);
-spbdd operator/(spbdd x, const bools&); // existential quantification
-spbdd operator&&(spbdd x, spbdd y);
-spbdd operator%(spbdd x, spbdd y); // and not
-spbdd operator^(spbdd x, const sizes&); // overlapping rename (permute)
-spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m);
+spbdd operator/(const spbdd& x, const bools&); // existential quantification
+spbdd operator&&(const spbdd& x, const spbdd& y);
+spbdd operator%(const spbdd& x, const spbdd& y); // and not
+spbdd operator^(const spbdd& x, const sizes&); // overlapping rename (permute)
+spbdd bdd_permute_ex(const spbdd& x, const bools& b, const sizes& m);
 #define bdd_impl(x, y) ((y) || (T%x))
 spbdd bdd_and_many(bdds v);
 spbdd bdd_or_many(bdds v);

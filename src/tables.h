@@ -43,7 +43,13 @@ class tables {
 		ntable tab;
 		bools ex;
 		sizes perm;
-		spbdd q, last;
+		spbdd q, tlast, rlast;
+		struct pbodycmp {
+			bool operator()(const body* x, const body* y) const {
+				return *x < *y;
+			}
+		};
+		static std::set<body*, pbodycmp> s;
 		bool operator<(const body& t) const {
 			if (q != t.q) return q < t.q;
 			if (neg != t.neg) return neg;
@@ -52,13 +58,15 @@ class tables {
 			return perm < t.perm;
 		}
 	};
-	struct alt : public std::vector<body> {
+	struct alt : public std::vector<body*> {
 		spbdd rng;
 		size_t varslen;
+		bdds last;
+		spbdd rlast = F;
 		bool operator<(const alt& t) const {
 			if (varslen != t.varslen) return varslen < t.varslen;
 			if (rng != t.rng) return rng < t.rng;
-			return (std::vector<body>)*this < (std::vector<body>)t;
+			return (std::vector<body*>)*this<(std::vector<body*>)t;
 		}
 	};
 	struct rule : public std::vector<alt> {
@@ -66,6 +74,8 @@ class tables {
 		ntable tab;
 		spbdd eq;
 		size_t len;
+		bdds last;
+		spbdd rlast = F;
 		bool operator<(const rule& t) const {
 			if (neg != t.neg) return neg;
 			if (tab != t.tab) return tab < t.tab;
@@ -89,6 +99,7 @@ class tables {
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
+	bool datalog;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd> range_memo;
@@ -134,11 +145,11 @@ class tables {
 	body get_body(const term& t, const varmap&, size_t len) const;
 	void align_vars(term& h, std::set<term>& b) const;
 	spbdd from_fact(const term& t);
-	void add_term(const term& t);
+	void add_term(const term& t, std::set<spbdd>& s);
 	term from_raw_term(const raw_term&);
 	spbdd deltail(spbdd x, size_t len1, size_t len2) const;
-	spbdd body_query(const body& b) const;
-	void alt_query(const alt& a, size_t len, bdds& v) const;
+	spbdd body_query(body& b);
+	void alt_query(alt& a, size_t len, bdds& v);
 	DBG(vbools allsat(spbdd x, size_t args) const;)
 	void out(std::wostream&, spbdd, ntable) const;
 	void get_rules(const raw_prog& p);

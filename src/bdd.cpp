@@ -23,6 +23,9 @@ int_t onmemo(int_t n) {
 //	dump_stack();
 	static int_t memos = 0;
 	return memos += n;
+	if (n <= 0) return memos -= n;
+	if (!((memos += n) % 1000000)) memos_clear();
+	return memos;
 }
 spbdd T, F;
 size_t bdd::gc = 0;
@@ -99,17 +102,21 @@ spbdd bdd_or(const spbdd& x, const spbdd& y) {
 	if (x == y || y == F) return x;
 	if (x == F) return y;
 	if (x == T || y == T) return T;
-	const size_t &vx = x->v(), &vy = y->v();
-	size_t v;
-	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if (!leafvar(vy) && (leafvar(vx) || vx > vy)) a = c = x, v = vy;
-	else if (leafvar(vx)) return a==T||b==T ? T : F;
-	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
-	DBG(assert(!leafvar(v));)
-	return bdd::add(v, bdd_or(a, b), bdd_or(c, d));
+	memo t = x<y?memo{x,y}:memo{y,x};
+	auto it = memo_or.find(t);
+	if (it != memo_or.end()) return it->second;
+	spbdd res;
+	if (x->v() == y->v())
+		res = bdd::add(x->v(), bdd_or(x->h(), y->h()),
+			bdd_or(x->l(), y->l()));
+	else if (x->v() < y->v())
+		res = bdd::add(x->v(), bdd_or(x->h(), y), bdd_or(x->l(), y));
+	else res = bdd::add(y->v(), bdd_or(y->h(), x), bdd_or(y->l(), x));
+	return onmemo(), memo_or.emplace(t, res), res;
 }
 
 spbdd operator||(const spbdd& x, const spbdd& y) {
+	return bdd_or(x, y);
 	if (x == y || y == F) return x;
 	if (x == F) return y;
 	if (x == T || y == T) return T;
@@ -120,27 +127,31 @@ spbdd operator||(const spbdd& x, const spbdd& y) {
 	return memo_or[t] = bdd_or(x, y);
 }
 
-spbdd bdd_ex(spbdd x, const bools& b, unordered_map<spbdd, spbdd>& memo) {
+spbdd bdd_ex(const spbdd& x, const bools& b, unordered_map<spbdd, spbdd>& memo){
 	if (x->leaf()) return x;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
 	spbdd r;
-	while (x->v()-1 < b.size() && b[x->v()-1]) {
-		r = x->h() || x->l();
-		if (r->leaf()) return onmemo(), memo.emplace(x, r), r;
-		x = r;
+	spbdd y = x;
+	while (y->v()-1 < b.size() && b[y->v()-1]) {
+		r = y->h() || y->l();
+		if (r->leaf()) return onmemo(), memo.emplace(y, r), r;
+		y = r;
 	}
-	if (x->v()-1 >= b.size()) return x;
-	DBG(assert(x->v()-1 < b.size()));
+	if (y->v()-1 >= b.size()) return y;
+	DBG(assert(y->v()-1 < b.size()));
 	onmemo();
-	return memo.emplace(x, bdd::add(x->v(), bdd_ex(x->h(), b, memo),
-				bdd_ex(x->l(), b, memo))).first->second;
+	return memo.emplace(y, bdd::add(y->v(), bdd_ex(y->h(), b, memo),
+				bdd_ex(y->l(), b, memo))).first->second;
 //	apply_ret(bdd::add({{n.v, bdd_ex(n.h, b), bdd_ex(n.l, b)}}), memo_ex);
 }
 
-spbdd operator/(spbdd x, const bools& b) { return bdd_ex(x, b, memos_ex[b]); }
+spbdd operator/(const spbdd& x, const bools& b) {
+	return bdd_ex(x, b, memos_ex[b]);
+}
 
-spbdd bdd_permute(spbdd x, const sizes& m, unordered_map<spbdd, spbdd>& memo) {
+spbdd bdd_permute(const spbdd& x, const sizes& m,
+	unordered_map<spbdd, spbdd>& memo) {
 	if (x->leaf()) return x;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
@@ -149,28 +160,29 @@ spbdd bdd_permute(spbdd x, const sizes& m, unordered_map<spbdd, spbdd>& memo) {
 		bdd_permute(x->l(), m, memo))).first->second;
 }
 
-spbdd operator^(spbdd x, const sizes& m) {
+spbdd operator^(const spbdd& x, const sizes& m) {
 	return bdd_permute(x, m, memos_perm[m]);
 }
 
-spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m, size_t last,
+spbdd bdd_permute_ex(const spbdd& x, const bools& b, const sizes& m,size_t last,
 	unordered_map<spbdd, spbdd>& memo) {
 	if (x->leaf() || x->v() > last+1) return x;
-	spbdd t = x;
-	DBG(assert(b.size() >= x->v());)
-	for (spbdd r; x->v()-1 < b.size() && b[x->v()-1]; x = r)
-		if ((r = (x->h() || x->l()))->leaf()) return r;
-		DBG(else assert(b.size() >= r->v());)
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
+	spbdd t = x, y = x;
+	DBG(assert(b.size() >= x->v());)
+	for (spbdd r; y->v()-1 < b.size() && b[y->v()-1]; y = r)
+		if ((r = (y->h() || y->l()))->leaf())
+			return onmemo(), memo.emplace(t, r), r;
+		DBG(else assert(b.size() >= r->v());)
 	onmemo();
-	DBG(assert(!x->leaf() && m.size() >= x->v());)
-	return	memo.emplace(t, bdd_ite(m[x->v()-1],
-		bdd_permute_ex(x->h(), b, m, last, memo),
-		bdd_permute_ex(x->l(), b, m, last, memo))).first->second;
+	DBG(assert(!y->leaf() && m.size() >= y->v());)
+	return	memo.emplace(t, bdd_ite(m[y->v()-1],
+		bdd_permute_ex(y->h(), b, m, last, memo),
+		bdd_permute_ex(y->l(), b, m, last, memo))).first->second;
 }
 
-spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m) {
+spbdd bdd_permute_ex(const spbdd& x, const bools& b, const sizes& m) {
 //	DBG(assert(bdd_nvars(x) <= b.size());)
 //	DBG(assert(bdd_nvars(x) <= m.size());)
 	size_t last = 0;
@@ -178,21 +190,25 @@ spbdd bdd_permute_ex(spbdd x, const bools& b, const sizes& m) {
 	return bdd_permute_ex(x, b, m, last, memos_perm_ex[{m,b}]);
 }
 
-spbdd bdd_and(spbdd x, spbdd y) {
+spbdd bdd_and(const spbdd& x, const spbdd& y) {
 	if (x == y || y == T) return x;
 	if (x == T) return y;
 	if (x == F || y == F) return F;
-	const size_t &vx = x->v(), &vy = y->v();
-	size_t v;
-	spbdd a = x->h(), b = y->h(), c = x->l(), d = y->l();
-	if ((leafvar(vx) && !leafvar(vy)) || (!leafvar(vy) && (vx > vy)))
-		a = c = x, v = vy;
-	else if (leafvar(vx)) return a==T&&b==T?T:F;
-	else if ((v = vx) < vy || leafvar(vy)) b = d = y;
-	return bdd::add(v, bdd_and(a, b), bdd_and(c, d));
+	memo t = x<y?memo{x,y}:memo{y,x};
+	auto it = memo_and.find(t);
+	if (it != memo_and.end()) return it->second;
+	spbdd res;
+	if (x->v() == y->v())
+		res = bdd::add(x->v(), bdd_and(x->h(), y->h()),
+			bdd_and(x->l(), y->l()));
+	else if (x->v() < y->v())
+		res = bdd::add(x->v(), bdd_and(x->h(), y), bdd_and(x->l(), y));
+	else res = bdd::add(y->v(), bdd_and(y->h(), x), bdd_and(y->l(), x));
+	return onmemo(), memo_and.emplace(t, res), res;
 }
 
-spbdd operator&&(spbdd x, spbdd y) {
+spbdd operator&&(const spbdd& x, const spbdd& y) {
+	return bdd_and(x, y);
 	if (x == y || y == T) return x;
 	if (x == T) return y;
 	if (x == F || y == F) return F;
@@ -225,7 +241,7 @@ spbdd operator&&(spbdd x, spbdd y) {
 	return memo_and[t] = bdd_and(x, y);
 }*/
 
-spbdd operator%(spbdd x, spbdd y) {
+spbdd operator%(const spbdd& x, const spbdd& y) {
 	if (x == y || x == F || y == T) return F;
 #ifdef MEMO
 	memo t = {{x, y}};
@@ -301,7 +317,7 @@ spbdd bdd_subterm(spbdd x, size_t from, size_t to, size_t args1, size_t args2,
 	apply_ret(n.h == F && n.l == F ? F : T, memo_dt);
 }
 */
-size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
+size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m){
 	size_t i;
 	spbdd t;
 	bool b, eq, flag;
@@ -365,7 +381,7 @@ size_t bdd_and_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 spbdd bdd_and_many(bdds v) {
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
-#ifdef MEMO
+//#ifdef MEMO
 	auto jt = memo_and.end();
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -376,7 +392,7 @@ spbdd bdd_and_many(bdds v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
-#endif
+//#endif
 	//bdd::validate();
 	auto it = memo_and_many.find(v);
 	if (it != memo_and_many.end()) return it->second;
@@ -461,7 +477,7 @@ size_t bdd_or_many_iter(bdds v, bdds& h, bdds& l, spbdd &res, size_t &m) {
 spbdd bdd_or_many(bdds v) {
 	if (v.empty()) return F;
 	if (v.size() == 1) return v[0];
-#ifdef MEMO
+//#ifdef MEMO
 	auto jt = memo_or.end();
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -472,7 +488,7 @@ spbdd bdd_or_many(bdds v) {
 				v.push_back(jt->second), n = k = 0; break;
 			}
 		}
-#endif
+//#endif
 	auto it = memo_or_many.find(v);
 	if (it != memo_or_many.end()) return it->second;
 	it = memo_or_many.emplace(v, nullptr).first;
@@ -550,13 +566,15 @@ void print_memos_len() {
 }
 
 void memos_clear() {
-	for (auto x : memos_perm) onmemo(-x.second.size());//, x.second.clear();
-	for (auto x : memos_ex) onmemo(-x.second.size());//, x.second.clear();
-	for (auto x : memos_perm_ex)onmemo(-x.second.size());//,x.second.clear();
+	wcerr<<L"memos_clear()"<<endl;
+	for (auto x : memos_perm) onmemo(-x.second.size());
+	for (auto x : memos_ex) onmemo(-x.second.size());
+	for (auto x : memos_perm_ex) onmemo(-x.second.size());
 	memos_perm.clear(), memos_ex.clear(), memos_perm_ex.clear();
-	onmemo(-memo_and_many.size() - memo_or_many.size());
-	memo_and_many.clear(), memo_or_many.clear();
-	memo_and.clear();
+	onmemo(-memo_and_many.size() - memo_or_many.size() - memo_and.size()
+		- memo_or.size());
+	memo_and_many.clear(), memo_or_many.clear(),
+	memo_and.clear(), memo_or.clear();
 #ifdef MEMO
 	onmemo(-memo_and.size() - memo_and_not.size() - memo_or.size());
 	memo_and.clear(), memo_and_not.clear(), memo_or.clear();
