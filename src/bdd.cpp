@@ -36,7 +36,9 @@ void bdd::init() {
 }
 
 int_t bdd::add(uint_t v, int_t h, int_t l) {
-	assert(v && h && l);
+	DBG(assert(v && h && l);)
+	DBG(assert(leaf(h) || v < V[abs(h)].v);)
+	DBG(assert(leaf(l) || v < V[abs(l)].v);)
 	if (h == l) return h;
 	if (l < 0) {
 		key k = { hash_tri(v, -h, -l), v, -h, -l };
@@ -110,11 +112,6 @@ int_t bdd::bdd_ite(int_t x, int_t y, int_t z) {
 		r =	add(vy, bdd_ite(x, hi(y), z), bdd_ite(x, lo(y), z));
 	else	r =	add(vz, bdd_ite(x, y, hi(z)), bdd_ite(x, y, lo(z)));
 	return C.emplace(ite_memo{x, y, z}, r), r;
-}
-
-void bdd::mark_all(int_t i) {
-	if (S.find(i = abs(i)) != S.end()) return;
-	S.insert(i), mark(hi(i)), mark(lo(i));
 }
 
 size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
@@ -215,45 +212,47 @@ int_t bdd::bdd_and_many(bdds v) {
 	return AM.emplace(v, bdd::add(m, h, l)).first->second;
 }
 
+void bdd::mark_all(int_t i) {
+	if (S.find(i = abs(i)) != S.end()) return;
+	S.insert(i), mark_all(hi(i)), mark_all(lo(i));
+}
+
 void bdd::gc() {
 	if (V.size() / S.size() < 2) return;
-	for (int_t i : S) mark_all(i);
-	unordered_set<int_t> G;
-	for (size_t n = 0; n != V.size(); ++n)
-		if (S.find(n) == S.end())
-			G.insert(n);
-	assert(!G.empty());
+	S.clear(), S.insert(0), S.insert(1);
+	for (auto x : bdd_handle::M) mark_all(x.first), assert(abs(x.first) < 2 || x.first == x.second.lock()->b);
 	vector<int_t> p(V.size(), 0);
-	for (size_t n = 0, k = 0; n != V.size(); ++n)
-		if (G.find(n) != G.end())
+	for (size_t n = 2, k = 0; n < V.size(); ++n)
+		if (!has(S, n))
 			p[V.size() - ++k] = n, V[n] = V[V.size() - k];
-	wcout << G.size() << ' ' << V.size() << endl;
-	M.clear(), V.resize(V.size() - G.size());
+	wcout << S.size() << ' ' << V.size() << endl;
+	M.clear(), V.resize(S.size());
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
-	for (size_t n = 2; n != V.size(); ++n)
+	for (size_t n = 2; n < V.size(); ++n)
 		f(V[n].h), f(V[n].l), V[n].rehash();
 	unordered_map<ite_memo, int_t> c;
 	unordered_map<bdds, int_t> am;
 	for (pair<ite_memo, int_t> x : C)
-		if (!(	has(G, abs(x.first[0])) ||
-			has(G, abs(x.first[1])) ||
-			has(G, abs(x.first[2])) ||
-			has(G, abs(x.second))))
+		if (	has(S, abs(x.first[0])) &&
+			has(S, abs(x.first[1])) &&
+			has(S, abs(x.first[2])) &&
+			has(S, abs(x.second)))
 			f(x.first[0]), f(x.first[1]), f(x.first[2]),
 			c.emplace(x.first, f(x.second));
+	C = move(c);
 	unordered_map<int_t, int_t> q;
 	map<bools, unordered_map<int_t, int_t>> mex;
-	map<uints, unordered_map<int_t, int_t>> mp;
 	for (const auto& x : memos_ex) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
+			if (has(S, abs(y.first)) && has(S, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mex.emplace(x.first, move(q));
 	}
 	memos_ex = move(mex);
+	map<uints, unordered_map<int_t, int_t>> mp;
 	for (const auto& x : memos_perm) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
+			if (has(S, abs(y.first)) && has(S, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mp.emplace(x.first, move(q));
 	}
@@ -261,7 +260,7 @@ void bdd::gc() {
 	map<pair<uints, bools>, unordered_map<int_t, int_t>> mpe;
 	for (const auto& x : memos_perm_ex) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
+			if (has(S, abs(y.first)) && has(S, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mpe.emplace(x.first, move(q));
 	}
@@ -270,25 +269,19 @@ void bdd::gc() {
 	for (pair<bdds, int_t> x : AM) {
 		b = false;
 		for (int_t& i : x.first)
-			if ((b |= has(G, abs(i)))) break;
+			if ((b |= !has(S, abs(i)))) break;
 			else f(i);
-		if (b || has(G, abs(x.second))) continue;
-		f(x.second), am.emplace(x.first, x.second);
+		if (!b&&has(S,abs(x.second))) am.emplace(x.first, f(x.second));
 	}
-	wcout << c.size() << ' ' << C.size();
-	bdd_handle::update(p, G);
-	C = move(c), AM = move(am), G.clear();
+	AM = move(am), bdd_handle::update(p);
 	for (size_t n = 0; n < V.size(); ++n) M.emplace(V[n].getkey(), n);
 	wcout << ' ' << V.size() << endl;
 }
 
-void bdd_handle::update(const vector<int_t>& p, const unordered_set<int_t>&
-		DBG(G)) {
+void bdd_handle::update(const vector<int_t>& p) {
 	std::unordered_map<int_t, std::weak_ptr<bdd_handle>> m;
-	for (pair<int_t, std::weak_ptr<bdd_handle>> x : m) {
-		DBG(assert(!has(G, x.first));)
-		f(x.first), f(x.second.lock()->b), m.emplace(x.first,x.second);
-	}
+	for (pair<int_t, std::weak_ptr<bdd_handle>> x : M)
+		f(x.first), f(x.second.lock()->b), m.emplace(x.first, x.second);
 	M = move(m);
 }
 #undef f
@@ -422,9 +415,11 @@ int_t bdd::bdd_permute_ex(int_t x, const bools& b, const uints& m, size_t last,
 }
 
 int_t bdd::bdd_permute_ex(int_t x, const bools& b, const uints& m) {
-	size_t last = 0;
-	for (size_t n = 0; n != b.size(); ++n) if (b[n] || m[n] != n) last = n;
-	return bdd_permute_ex(x, b, m, last, memos_perm_ex[{m,b}]);
+	size_t last = b.size();
+	for (size_t n = 0; n != b.size(); ++n) if (b[n] || (m[n] != n)) last=n;
+	unordered_map<int_t, int_t> mm;
+	return bdd_permute_ex(x, b, m, last, mm);
+//			memos_perm_ex[{m,b}]);
 }
 
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m) {

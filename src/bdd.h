@@ -142,17 +142,16 @@ public:
 class bdd_handle {
 	friend class bdd;
 	bdd_handle(int_t b) : b(b) { bdd::mark(b); }
-	static void update(const std::vector<int_t>&,
-		const std::unordered_set<int_t>&);
+	static void update(const std::vector<int_t>& p);
 	static std::unordered_map<int_t, std::weak_ptr<bdd_handle>> M;
 public:
 	int_t b;
-	//spbdd_handle neg() const { return get(-b); }
-	//spbdd_handle neg() { b = -b; return this; }
 	static spbdd_handle get(int_t b);
 	static spbdd_handle get(uint_t v, cr_spbdd_handle h, cr_spbdd_handle l);
 	static spbdd_handle T, F;
-	~bdd_handle() { if (abs(b) > 1) bdd::unmark(b), M.erase(b); }
+	~bdd_handle() {
+		if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
+	}
 };
 
 class allsat_cb {
