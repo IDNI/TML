@@ -205,7 +205,7 @@ bool raw_rule::parse(const lexemes& l, size_t& pos) {
 head:	h.emplace_back();
 	if (!h.back().parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') {
-		tok(HEAD); tokof(DOT, -1, pos); ++pos; tok(FACT);
+		tok(HEAD); tokof(DOT, 0, pos); ++pos; tok(FACT);
 		switch (type) {
 			case TREE: tok(TREE); break;
 			case GOAL: tok(GOAL); break;

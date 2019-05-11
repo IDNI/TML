@@ -59,17 +59,15 @@ wostream& driver::print_tokens_xml(wostream& os) const {
 	token t = *tit;
 	cws s = t.e[0], e = t.e[1];
 	for (cws c = s ; c != e; ++c, ++n) {
+		while ((t.e[0] - s) < n) t = *++tit;
 		while (!cls.empty() && cls.top() == n) os << L"</" <<
 			stk.top() << L'>', cls.pop(), stk.pop();
-		while ((t.e[0] - s) < n) t = *++tit;
 		while ((t.e[0] - s) == n) os << L'<' <<
 			token::name(t.type) << L'>',
 			stk.push(token::name(t.type)),
 			cls.push(t.e[1]-s),
 			t = *++tit;
 		os << *c;
-		while (!cls.empty() && cls.top() == n) os << L"</" <<
-			stk.top() << L'>', cls.pop(), stk.pop();
 	}
 	while (!cls.empty()) os << L"</" << stk.top() << L'>',
 		cls.pop(), stk.pop();
@@ -83,16 +81,14 @@ wostream& driver::print_tokens_html(wostream& os) const {
 	token t = *tit;
 	cws s = t.e[0], e = t.e[1];
 	for (cws c = s ; c != e; ++c, ++n) {
+		while ((t.e[0] - s) < n) t = *++tit;
 		while (!cls.empty() && cls.top() == n)
 			os << L"</span>", cls.pop();
-		while ((t.e[0] - s) < n) t = *++tit;
 		while ((t.e[0] - s) == n) os << L"<span class=\"" <<
 			token::name(t.type) << L"\">",
 			cls.push(t.e[1]-s),
 			t = *++tit;
 		os << *c;
-		while (!cls.empty() && cls.top() == n)
-			os << L"</span>", cls.pop();
 	}
 	while (!cls.empty()) os << L"</span>", cls.pop();
 	return os;
