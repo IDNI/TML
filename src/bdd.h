@@ -147,7 +147,6 @@ class bdd_handle {
 public:
 	int_t b;
 	static spbdd_handle get(int_t b);
-	static spbdd_handle get(uint_t v, cr_spbdd_handle h, cr_spbdd_handle l);
 	static spbdd_handle T, F;
 	~bdd_handle() {
 		if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);

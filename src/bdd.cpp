@@ -213,14 +213,16 @@ int_t bdd::bdd_and_many(bdds v) {
 }
 
 void bdd::mark_all(int_t i) {
-	if (S.find(i = abs(i)) != S.end()) return;
+	if (S.find(i = abs(i)) != S.end() || i < 2) return;
 	S.insert(i), mark_all(hi(i)), mark_all(lo(i));
 }
 
 void bdd::gc() {
-	if (V.size() / S.size() < 2) return;
+//	if (V.size() / S.size() < 2) return;
+	if (!S.size()) return;
 	S.clear(), S.insert(0), S.insert(1);
-	for (auto x : bdd_handle::M) mark_all(x.first), assert(abs(x.first) < 2 || x.first == x.second.lock()->b);
+	for (auto x : bdd_handle::M) mark_all(x.first);
+		//, assert(abs(x.first) < 2 || x.first == x.second.lock()->b);
 	vector<int_t> p(V.size(), 0);
 	for (size_t n = 2, k = 0; n < V.size(); ++n)
 		if (!has(S, n))
@@ -280,13 +282,16 @@ void bdd::gc() {
 
 void bdd_handle::update(const vector<int_t>& p) {
 	std::unordered_map<int_t, std::weak_ptr<bdd_handle>> m;
-	for (pair<int_t, std::weak_ptr<bdd_handle>> x : M)
-		f(x.first), f(x.second.lock()->b), m.emplace(x.first, x.second);
+	for (pair<int_t, std::weak_ptr<bdd_handle>> x : M) {
+		spbdd_handle s = x.second.lock();
+		f(s->b), m.emplace(f(x.first), x.second);
+	}
 	M = move(m);
 }
 #undef f
 
 spbdd_handle bdd_handle::get(int_t b) {
+	DBG(assert((size_t)abs(b) < bdd::V.size());)
 	auto it = M.find(b);
 	if (it != M.end()) return it->second.lock();
 	spbdd_handle h(new bdd_handle(b));
@@ -416,19 +421,17 @@ int_t bdd::bdd_permute_ex(int_t x, const bools& b, const uints& m, size_t last,
 
 int_t bdd::bdd_permute_ex(int_t x, const bools& b, const uints& m) {
 	size_t last = b.size();
-	for (size_t n = 0; n != b.size(); ++n) if (b[n] || (m[n] != n)) last=n;
-	unordered_map<int_t, int_t> mm;
-	return bdd_permute_ex(x, b, m, last, mm);
-//			memos_perm_ex[{m,b}]);
+	for (size_t n = 0; n != b.size(); ++n) if (b[n] || (m[n]!=n)) last = n;
+	return bdd_permute_ex(x, b, m, last, memos_perm_ex[{m,b}]);
 }
 
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m) {
 	return bdd_handle::get(bdd::bdd_permute_ex(x->b, b, m));
 }
 
-spbdd_handle bdd_handle::get(uint_t v, cr_spbdd_handle h, cr_spbdd_handle l) {
+/*spbdd_handle bdd_handle::get(uint_t v, cr_spbdd_handle h, cr_spbdd_handle l) {
 	return get(bdd::add(v, h->b, l->b));
-}
+}*/
 
 spbdd_handle from_bit(uint_t b, bool v) {
 	return bdd_handle::get(bdd::from_bit(b, v));
