@@ -27,7 +27,7 @@ wostream& output_prolog_elem(wostream& os, const elem& e);
 	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
 wostream& driver::print_prolog(wostream& os, const raw_prog& p,
-	const output_dialect dialect) const {
+	const dialect_t dialect) const {
 	relarities ras;
 	get_relarities(p, ras);
 	wstring name = dialect == SWIPL ? L"SWI Prolog" : L"XSB";

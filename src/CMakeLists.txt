@@ -15,12 +15,14 @@ add_executable(tml
 	input.cpp
 	input.h
 	main.cpp
-	transform.cpp
+	options.h
 	output.cpp
+	print_prolog.cpp
 	tables.h
 	tables.cpp
+	transform.cpp
 	#	tree.cpp
-	print_prolog.cpp)
+)
 
 set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -Wpedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -ggdb3")

@@ -14,8 +14,7 @@
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
-
-enum output_dialect { SWIPL, XSB, SOUFFLE, CSV, NONE };
+#include "options.h"
 
 struct prog_data {
 	strs_t strs;
@@ -56,8 +55,8 @@ class driver {
 //	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
 	void prog_run(raw_progs& rp, size_t n, strs_t& strtrees);
-	driver(int argc, char** argv, raw_progs, output_dialect dialect,
-		bool print_transformed);
+	driver(int argc, char** argv, raw_progs, options o);
+	driver(int argc, char** argv, raw_progs);
 	size_t load_stdin();
 	bool pfp();
 	std::wstring std_input;
@@ -66,24 +65,23 @@ class driver {
 	prog_data pd;
 	std::set<int_t> transformed_strings;
 	tables tbl;
-	output_dialect dialect;
-	bool print_transformed;
 	void output_pl(const raw_prog& p) const;
 public:
 	bool result = true;
-	driver(int argc, char** argv, FILE *f, output_dialect dialect,
-			bool print_transformed = false);
-	driver(int argc, char** argv, std::wstring, output_dialect dialect,
-			bool print_transformed = false);
-	driver(int argc, char** argv, char *s, output_dialect dialect,
-			bool print_transformed = false);
+	options opts;
+	driver(int argc, char** argv, FILE *f, options o);
+	driver(int argc, char** argv, std::wstring, options o);
+	driver(int argc, char** argv, char *s, options o);
+	driver(int argc, char** argv, FILE *f);
+	driver(int argc, char** argv, std::wstring);
+	driver(int argc, char** argv, char *s);
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
 //	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
 	std::wostream& print_prolog(std::wostream& os, const raw_prog& p,
-		const output_dialect dialect) const;
+		const dialect_t dialect) const;
 	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const {
 		return print_prolog(os, rp, XSB); }
 	std::wostream& print_swipl(std::wostream& os, const raw_prog& rp) const{

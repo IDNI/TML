@@ -19,17 +19,8 @@ using namespace std;
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	bdd::init();
-	bool print_transformed = false;
-	output_dialect dialect = NONE;
-	for (int i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "-t")) print_transformed = true;
-		else if (!strcmp(argv[i], "--xsb")) dialect = XSB;
-		else if (!strcmp(argv[i], "--swipl")) dialect = SWIPL;
-		else if (!strcmp(argv[i], "--souffle")) dialect = SOUFFLE;
-		else if (!strcmp(argv[i], "--csv")) dialect = CSV;
-	}
-	driver d(argc, argv, stdin, dialect, print_transformed);
+	driver d(argc, argv, stdin);
 	if (!d.result) wcout << "unsat" << endl;
-//	if (dialect == NONE) print_memos_len();
+//	print_memos_len();
 	return 0;
 }
