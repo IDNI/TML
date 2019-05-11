@@ -26,7 +26,7 @@ wostream& operator<<(wostream& os, const lexeme& l) {
 }
 
 #ifdef DEBUG
-wostream& bdd_out_ite(wostream& os, spbdd x, size_t dep) {
+/*wostream& bdd_out_ite(wostream& os, spbdd x, size_t dep) {
 	for (size_t n = 0; n != dep; ++n) os << '\t';
 	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F') << endl;
 	bdd_out_ite(os << "if " << x->v() << endl, x->h(), dep+1);
@@ -37,7 +37,7 @@ wostream& bdd_out_ite(wostream& os, spbdd x, size_t dep) {
 wostream& operator<<(wostream& os, spbdd x) {
 	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F');
 	return os << x->v() << " ? " << x->h() << " : " << x->l();
-}
+}*/
 
 wostream& operator<<(wostream& os, const bools& x) {
 	for (auto y:x) os << (y?1:0);

@@ -26,7 +26,9 @@ typedef int32_t int_t;
 #define BDD_HASH_L_SHIFT 20
 #else
 #include <execinfo.h>
-typedef int64_t int_t;
+typedef int32_t int_t;
+typedef uint32_t uint_t;
+typedef std::vector<uint_t> uints;
 #define BDD_HASH_H_SHIFT 13
 #define BDD_HASH_L_SHIFT 40
 #endif
@@ -40,7 +42,7 @@ typedef std::vector<int_t> ints;
 typedef std::unordered_map<int_t, std::wstring> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
-typedef std::vector<size_t> sizes;
+//typedef std::vector<size_t> sizes;
 
 //#define DEEPDEBUG
 #ifdef DEBUG
@@ -55,8 +57,9 @@ typedef std::vector<size_t> sizes;
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
+#define measure_time(x) start = clock(); x; end = clock(); \
+	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
-void dump_stack();
 #endif

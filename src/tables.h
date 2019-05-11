@@ -22,13 +22,14 @@ struct raw_rule;
 class tables;
 class dict_t;
 
-typedef std::pair<rel_t, ints> sig_t;
+typedef std::pair<rel_t, ints> sig;
 
 class tables {
 	typedef std::map<int_t, size_t> varmap;
 	struct term : public ints {
 		bool neg;
 		ntable tab;
+		term() {}
 		term(bool neg, ntable tab, const ints& args) :
 			ints(args), neg(neg), tab(tab) {}
 		bool operator<(const term& t) const {
@@ -39,11 +40,11 @@ class tables {
 		void replace(const std::map<int_t, int_t>& m);
 	};
 	struct body {
-		bool neg;
+		bool neg, ext = false;
 		ntable tab;
 		bools ex;
-		sizes perm;
-		spbdd q, tlast, rlast;
+		uints perm;
+		spbdd_handle q, tlast, rlast;
 		struct pbodycmp {
 			bool operator()(const body* x, const body* y) const {
 				return *x < *y;
@@ -53,16 +54,18 @@ class tables {
 		bool operator<(const body& t) const {
 			if (q != t.q) return q < t.q;
 			if (neg != t.neg) return neg;
+			if (ext != t.ext) return ext;
 			if (tab != t.tab) return tab < t.tab;
 			if (ex != t.ex) return ex < t.ex;
 			return perm < t.perm;
 		}
 	};
 	struct alt : public std::vector<body*> {
-		spbdd rng;
+		spbdd_handle rng, rlast = bdd_handle::F;
 		size_t varslen;
-		bdds last;
-		spbdd rlast = F;
+		bdd_handles last;
+		std::vector<term> t;
+		std::vector<std::pair<uints, bools>> order;
 		bool operator<(const alt& t) const {
 			if (varslen != t.varslen) return varslen < t.varslen;
 			if (rng != t.rng) return rng < t.rng;
@@ -72,10 +75,10 @@ class tables {
 	struct rule : public std::vector<alt> {
 		bool neg;
 		ntable tab;
-		spbdd eq;
+		spbdd_handle eq, rlast = bdd_handle::F;
 		size_t len;
-		bdds last;
-		spbdd rlast = F;
+		bdd_handles last;
+		term t;
 		bool operator<(const rule& t) const {
 			if (neg != t.neg) return neg;
 			if (tab != t.tab) return tab < t.tab;
@@ -84,17 +87,22 @@ class tables {
 		}
 	};
 	struct table {
-		sig_t s;
+		sig s;
 		size_t len;
-		spbdd t = F;
-		bdds add, del;
+		spbdd_handle t = bdd_handle::F;
+		bdd_handles add, del;
+		bool ext = true; // extensional
 		bool commit();
 	};
 	std::vector<table> ts;
-	std::map<sig_t, ntable> smap;
+	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	alt get_alt(const std::vector<raw_term>&);
 	rule get_rule(const raw_rule&);
+	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
+	void get_var_ex(size_t arg, size_t args, bools& b) const;
+	void get_alt_ex(alt& a, const term& h) const;
+	void merge_extensionals();
 
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
@@ -102,7 +110,7 @@ class tables {
 	bool datalog;
 
 	size_t max_args = 0;
-	std::map<std::array<int_t, 6>, spbdd> range_memo;
+	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -122,40 +130,40 @@ class tables {
 		return bits - 1 - v / args;
 	}
 
-	spbdd from_bit(size_t b, size_t arg, size_t args, int_t n) const {
-		return bdd::from_bit(pos(b, arg, args), n & (1 << b));
+	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
+		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
 
 	void add_bit();
-	spbdd add_bit(spbdd x, size_t args);
-	spbdd leq_const(int_t c, size_t arg, size_t args, size_t bit) const;
-	void range(size_t arg, size_t args, bdds& v);
-	spbdd range(size_t arg, ntable tab);
-	void range_clear_memo() {onmemo(-range_memo.size()),range_memo.clear();}
+	spbdd_handle add_bit(spbdd_handle x, size_t args);
+	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit)
+		const;
+	void range(size_t arg, size_t args, bdd_handles& v);
+	spbdd_handle range(size_t arg, ntable tab);
+	void range_clear_memo() { range_memo.clear(); }
 
-	sig_t get_sig(const raw_term& t);
-	ntable add_table(sig_t s);
-	sizes get_perm(const term& t, const varmap& m, size_t len) const;
-	static varmap get_varmap(const term& h, const std::set<term>& b,
-		size_t &len);
-	spbdd get_alt_range(const term& h, const std::set<term>& a,
+	sig get_sig(const raw_term& t);
+	ntable add_table(sig s);
+	uints get_perm(const term& t, const varmap& m, size_t len) const;
+	template<typename T>
+	static varmap get_varmap(const term& h, const T& b, size_t &len);
+	spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
 			const varmap& vm, size_t len);
-	spbdd from_term(const term&, body *b = 0, std::map<int_t, size_t>*m = 0,
-		size_t hvars = 0);
+	spbdd_handle from_term(const term&, body *b = 0,
+		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
 	void align_vars(term& h, std::set<term>& b) const;
-	spbdd from_fact(const term& t);
-	void add_term(const term& t, std::set<spbdd>& s);
+	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
-	spbdd deltail(spbdd x, size_t len1, size_t len2) const;
-	spbdd body_query(body& b);
-	void alt_query(alt& a, size_t len, bdds& v);
-	DBG(vbools allsat(spbdd x, size_t args) const;)
-	void out(std::wostream&, spbdd, ntable) const;
+	spbdd_handle deltail(spbdd_handle x, size_t len1, size_t len2) const;
+	spbdd_handle body_query(body& b);
+	void alt_query(alt& a, size_t len, bdd_handles& v);
+	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+	void out(std::wostream&, spbdd_handle, ntable) const;
 	void get_rules(const raw_prog& p);
 	void add_prog(const raw_prog& p);
 	bool fwd();
-	std::set<std::pair<ntable, spbdd>> get_front() const;
+	std::set<std::pair<ntable, spbdd_handle>> get_front() const;
 public:
 	tables();
 	~tables();
@@ -163,3 +171,5 @@ public:
 	bool pfp();
 	void out(std::wostream&) const;
 };
+
+std::wostream& operator<<(std::wostream& os, const vbools& x);

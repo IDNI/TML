@@ -14,7 +14,7 @@
 #include "driver.h"
 using namespace std;
 
-void print_memos_len();
+//void print_memos_len();
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
@@ -30,7 +30,6 @@ int main(int argc, char** argv) {
 	}
 	driver d(argc, argv, stdin, dialect, print_transformed);
 	if (!d.result) wcout << "unsat" << endl;
-	if (dialect == NONE) print_memos_len();
-	bdd::onexit = true;
+//	if (dialect == NONE) print_memos_len();
 	return 0;
 }

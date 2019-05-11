@@ -136,9 +136,6 @@ wstring driver::directive_load(const directive& d) {
 	throw 0; // unreachable
 }
 
-#define measure_time(x) start = clock(); x; end = clock(); \
-	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
-
 void driver::directives_load(raw_prog& p, lexeme& trel) {
 //	int_t rel;
 	for (const directive& d : p.d)
@@ -243,12 +240,12 @@ driver::driver(int argc, char** argv, raw_progs rp, output_dialect dialect,
 std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
 driver::driver(int argc, char** argv, FILE *f, output_dialect dialect,
-	bool print_transformed) : driver(argc, argv, move(raw_progs(f)),
+	bool print_transformed) : driver(argc, argv, raw_progs(f),
 	dialect, print_transformed) {}
 driver::driver(int argc, char** argv, wstring s, output_dialect dialect,
-	bool print_transformed) : driver(argc, argv, move(raw_progs(s)),
+	bool print_transformed) : driver(argc, argv, raw_progs(s),
 	dialect, print_transformed) {}
 driver::driver(int argc, char** argv, char *s, output_dialect dialect,
 	bool print_transformed) : driver(argc, argv,
-	move(raw_progs(converter.from_bytes(string(s)))), dialect,
+	raw_progs(converter.from_bytes(string(s))), dialect,
 	print_transformed) {}

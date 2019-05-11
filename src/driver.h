@@ -101,10 +101,10 @@ public:
 #ifdef DEBUG
 extern driver* drv;
 //std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits, ints ar,
-	int_t rel);
-std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits, ints ar,
-	int_t rel);
+std::wostream& printbdd(std::wostream& os, cr_spbdd_handle t, size_t bits,
+	ints ar, int_t rel);
+std::wostream& printbdd_one(std::wostream& os, cr_spbdd_handle t, size_t bits,
+	ints ar, int_t rel);
 //std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
