@@ -17,6 +17,7 @@
 #include <vector>
 #include "input.h"
 #include "err.h"
+#include "token.h"
 using namespace std;
 
 lexeme lex(pcws s) {
@@ -85,23 +86,27 @@ int_t get_int_t(cws from, cws to) {
 }
 
 bool directive::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
 	if (*l[pos][0] != '@') return false;
 	if (l[++pos] == L"trace") {
 		type = TRACE;
 		if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 			parse_error(err_trace_rel, l[pos]);
 		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+		tok(DIR);
 		return true;
 	}
 	if (l[pos] == L"bwd") {
 		type = BWD;
 		if (*l[++pos][0] != '.') parse_error(dot_expected, l[pos]);
+		tok(DIR);
 		return ++pos, true;
 	}
 	if (l[pos] == L"stdout") {
 		type = STDOUT;
 		if (!t.parse(l, ++pos)) parse_error(err_stdout, l[pos]);
 		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+		tok(DIR);
 		return true;
 	}
 	if (!(l[pos] == L"string")) parse_error(err_directive, l[pos]);
@@ -115,16 +120,19 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	else if (t.parse(l, pos)) {
 		type = TREE;
 		if (*l[pos++][0]!='.') parse_error(dot_expected, l[pos]);
+		tok(DIR);
 		return true;
 	} else parse_error(err_directive_arg, l[pos]);
 	if (arg=l[pos++], *l[pos++][0]!='.') parse_error(dot_expected, l[pos]);
+	tok(DIR);
 	return true;
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
-	if (L'|' == *l[pos][0]) return e = l[pos++], type = ALT, true;
-	if (L'(' == *l[pos][0]) return e = l[pos++], type = OPENP, true;
-	if (L')' == *l[pos][0]) return e = l[pos++], type = CLOSEP, true;
+	size_t curr = pos;
+	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   ttok(type),true;
+	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, ttok(type),true;
+	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,ttok(type),true;
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
@@ -141,21 +149,28 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	else if (iswalpha(*l[pos][0])) type = SYM;
 	else if (*l[pos][0] == L'"') type = STR;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
-	return ++pos, true;
+	return ++pos, ttok(type), true;
 }
 
 bool raw_term::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos, curr2;
 	lexeme s = l[pos];
-	if ((neg = *l[pos][0] == L'~')) ++pos;
-	while (!wcschr(L".:,;{}", *l[pos][0]))
+	if ((neg = *l[pos][0] == L'~')) toko(NOT, 0), ++pos;
+	curr2 = pos;
+	bool rel = false;
+	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
-		else if (pos == l.size()) parse_error(L"unexpected end of file", s[0]);
+		else if (pos == l.size())
+			parse_error(L"unexpected end of file", s[0]);
+		if (!rel) tokof(REL, -1, curr2), rel = true;
+	}
 	if (e.empty()) return false;
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
-	if (e.size() == 1) return calc_arity(), true;
+	if (e.size() == 1) return tok(TERM), (neg ? tok(NEG) : tok(POS)),
+		calc_arity(), true;
 	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP) parse_error(err_paren, l[pos]);
-	return calc_arity(), true;
+	return tok(TERM), (neg ? tok(NEG) : tok(POS)), calc_arity(), true;
 }
 
 void raw_term::insert_parens(lexeme op, lexeme cl) {
@@ -182,24 +197,42 @@ void raw_term::calc_arity() {
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos;
+	size_t curr = pos, curr2;
 	if (*l[pos][0] == L'!') {
 		if (*l[++pos][0] == L'!') ++pos, type = TREE;
 		else type = GOAL;
 	}
 head:	h.emplace_back();
 	if (!h.back().parse(l, pos)) return pos = curr, false;
-	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos][0] == ',') { ++pos; goto head; }
+	if (*l[pos][0] == '.') {
+		tok(HEAD); tokof(DOT, -1, pos); ++pos; tok(FACT);
+		switch (type) {
+			case TREE: tok(TREE); break;
+			case GOAL: tok(GOAL); break;
+			default: tok(RULE);
+		}
+		return true;
+	}
+	if (*l[pos][0] == ',') {
+		toko(AND, 0); ++pos;
+		goto head;
+	}
+	tok(HEAD);
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(err_head, l[pos]);
-	++pos;
+	tokof(DELIM, 0, pos);
+	curr2 = ++pos;
 	b.emplace_back();
 	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos)
-		if (*l[pos][0] == '.') return ++pos, true;
-		else if (*l[pos][0] == L';') b.emplace_back();
-		else if (*l[pos][0] != ',') parse_error(err_term_or_dot,l[pos]);
+		if (*l[pos][0] == '.') return tokof(DOT, 0, pos),
+			tokof(BODY, -1, curr2), ++pos, tok(RULE), true;
+		else if (*l[pos][0] == L';') {
+			tokof(OR, 0, pos);
+			b.emplace_back();
+		} else if (*l[pos][0] != ',')
+			parse_error(err_term_or_dot,l[pos]);
+		else tokof(AND, 0, pos);
 	parse_error(err_body, l[pos]);
 	return false;
 }
@@ -218,15 +251,16 @@ bool production::parse(const lexemes& l, size_t& pos) {
 	if (*l[pos++][0] != '=' || l[pos++][0][0] != L'>') goto fail;
 	for (p.push_back(e);;) {
 		elem e;
-		if (*l[pos][0] == '.') return ++pos, true;
+		if (*l[pos][0] == '.') return ++pos, tok(PROD), true;
 		if (!e.parse(l, pos)) goto fail;
 		p.push_back(e);
 	}
 	parse_error(err_prod, l[pos]);
-fail:	return pos = curr, false;	
+fail:	return pos = curr, false;
 }
 
 bool raw_prog::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;;
 	while (pos < l.size() && *l[pos][0] != L'}') {
 		directive x;
 		raw_rule y;
@@ -236,12 +270,14 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
+	tok(PROG);
 	return true;
 }
 
 raw_progs::raw_progs(FILE* f) : raw_progs(file_read_text(f)) {}
 
 raw_progs::raw_progs(const std::wstring& s) {
+	token::clear();
 	size_t pos = 0;
 	lexemes l = prog_lex(wcsdup(s.c_str()));
 	if (*l[pos][0] != L'{') {
@@ -250,11 +286,16 @@ raw_progs::raw_progs(const std::wstring& s) {
 			parse_error(err_rule_dir_prod_expected, l[pos]);
 		p.push_back(x);
 	} else do {
+		tokof(OPENC, 0, pos);
 		raw_prog x;
 		if (++pos, !x.parse(l, pos)) parse_error(err_parse, l[pos]);
 		if (p.push_back(x), pos == l.size() || *l[pos++][0] != L'}')
 			parse_error(err_close_curly, l[pos]);
+		tokof(CLOSEC, -1, pos-1);
 	} while (pos < l.size());
+	tokof(PROGS, -1, 0);
+	DBG(for (auto t : token::tokens) wcout << token::name(t.type) <<
+		L": \"" << t.e << L'"' << endl;)
 }
 
 bool operator==(const lexeme& x, const lexeme& y) {

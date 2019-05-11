@@ -20,6 +20,8 @@ add_executable(tml
 	print_prolog.cpp
 	tables.h
 	tables.cpp
+	token.h
+	token.cpp
 	transform.cpp
 	#	tree.cpp
 )

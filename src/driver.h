@@ -88,9 +88,11 @@ public:
 		return print_prolog(os, rp, SWIPL); }
 	std::wostream& print_souffle(std::wostream& os, const raw_prog& rp)
 		const;
-//	std::wostream& print_term_xsb(std::wostream& os, const term& t) const;
-//	std::wostream& print_term_souffle(std::wostream& os, const term& t)
-//		const;
+	void output_tokens() const;
+	std::wostream& print_tokens(std::wostream& os) const;
+	std::wostream& print_tokens_json(std::wostream& os) const;
+	std::wostream& print_tokens_xml(std::wostream& os) const;
+	std::wostream& print_tokens_html(std::wostream& os) const;
 //	std::wostream& print_term_csv(std::wostream& os, const term& t) const;
 //	void save_csv(lp *p) const;
 //	void save_csv(const db_t& db, size_t bits) const;
