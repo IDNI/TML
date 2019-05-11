@@ -224,10 +224,16 @@ void bdd::gc() {
 	for (auto x : bdd_handle::M) mark_all(x.first);
 		//, assert(abs(x.first) < 2 || x.first == x.second.lock()->b);
 	vector<int_t> p(V.size(), 0);
-	for (size_t n = 2, k = 0; n < V.size(); ++n)
-		if (!has(S, n))
-			p[V.size() - ++k] = n, V[n] = V[V.size() - k];
-	wcout << S.size() << ' ' << V.size() << endl;
+	vector<bdd> v1(S.size());
+	for (size_t n = 0, k = 0; n < V.size(); ++n) {
+		if (has(S, n)) p[n] = k, v1[k++] = V[n];
+//		while (!has(S, n+k) && n + k < V.size()) ++k;
+//		if (n + k < V.size()) V[n] = V[n + k];
+	//	if (!has(S, n))
+	//		p[V.size() - ++k] = n, V[n] = V[V.size() - k];
+	}
+	V = move(v1);
+//	wcout << S.size() << ' ' << V.size() << endl;
 	M.clear(), V.resize(S.size());
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V.size(); ++n)
@@ -277,7 +283,7 @@ void bdd::gc() {
 	}
 	AM = move(am), bdd_handle::update(p);
 	for (size_t n = 0; n < V.size(); ++n) M.emplace(V[n].getkey(), n);
-	wcout << ' ' << V.size() << endl;
+//	wcout << ' ' << V.size() << endl;
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
