@@ -472,6 +472,7 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 		t = bdd_and_many(move(v1)) / x.second;
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
+	bdd::gc();
 	bdd_handles v1 = { a.rng };
 	spbdd_handle x;
 	DBG(assert(!a.empty());)
@@ -500,7 +501,6 @@ bool tables::table::commit() {
 }
 
 bool tables::fwd() {
-//	bdd::gc();
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {

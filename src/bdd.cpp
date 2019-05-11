@@ -1,3 +1,15 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include <cassert>
 #include <algorithm>
 #include "bdd.h"
@@ -234,14 +246,14 @@ void bdd::gc() {
 	map<uints, unordered_map<int_t, int_t>> mp;
 	for (const auto& x : memos_ex) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, y.first) && !has(G, y.second))
+			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mex.emplace(x.first, move(q));
 	}
 	memos_ex = move(mex);
 	for (const auto& x : memos_perm) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, y.first) && !has(G, y.second))
+			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mp.emplace(x.first, move(q));
 	}
@@ -249,7 +261,7 @@ void bdd::gc() {
 	map<pair<uints, bools>, unordered_map<int_t, int_t>> mpe;
 	for (const auto& x : memos_perm_ex) {
 		for (pair<int_t, int_t> y : x.second)
-			if (!has(G, y.first) && !has(G, y.second))
+			if (!has(G, abs(y.first)) && !has(G, abs(y.second)))
 				q.emplace(f(y.first), f(y.second));
 		if (!q.empty()) mpe.emplace(x.first, move(q));
 	}
@@ -260,7 +272,7 @@ void bdd::gc() {
 		for (int_t& i : x.first)
 			if ((b |= has(G, abs(i)))) break;
 			else f(i);
-		if (b || has(G, x.second)) continue;
+		if (b || has(G, abs(x.second))) continue;
 		f(x.second), am.emplace(x.first, x.second);
 	}
 	wcout << c.size() << ' ' << C.size();
