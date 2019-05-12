@@ -198,7 +198,7 @@ const string tmp(const string ext) {
 #define tmp_os(ext) wofstream os(tmp(ext))
 
 void driver::output_pl(const raw_prog& p) const {
-	for (auto d : opts.dialect) switch (d) {
+	for (auto d : opts.dialects) switch (d) {
 		case XSB:   { tmp_os(".P");  print_xsb(os, p);   }; break;
 		case SWIPL: { tmp_os(".pl"); print_swipl(os, p); }; break;
 	//	case SOUFFLE: { tmp_os(".souffle"); print_souffle(os, p); } break;
