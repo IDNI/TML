@@ -20,6 +20,13 @@
 #include "token.h"
 using namespace std;
 
+#define ttokof(type, offset, from) token::add(type, \
+		lexeme({ l[from][0], l[pos+(offset)][1] }))
+#define tokof(type, offset, from) ttokof(token::type, offset, from)
+#define toko(type, offset) tokof(type, offset, curr)
+#define tok(type) toko(type, -1)
+#define ttok(type) ttokof((token::etype) type, -1, curr)
+
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
@@ -156,8 +163,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos, curr2;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) toko(NOT, 0), ++pos;
-	curr2 = pos;
-	bool rel = false;
+	curr2 = pos; bool rel = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
@@ -213,25 +219,17 @@ head:	h.emplace_back();
 		}
 		return true;
 	}
-	if (*l[pos][0] == ',') {
-		toko(AND, 0); ++pos;
-		goto head;
-	}
+	if (*l[pos][0] == ',') { toko(AND, 0); ++pos; goto head; }
 	tok(HEAD);
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(err_head, l[pos]);
-	tokof(DELIM, 0, pos);
-	curr2 = ++pos;
-	b.emplace_back();
+	tokof(DELIM, 0, pos); curr2 = ++pos; b.emplace_back();
 	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos)
 		if (*l[pos][0] == '.') return tokof(DOT, 0, pos),
 			tokof(BODY, -1, curr2), ++pos, tok(RULE), true;
-		else if (*l[pos][0] == L';') {
-			tokof(OR, 0, pos);
-			b.emplace_back();
-		} else if (*l[pos][0] != ',')
-			parse_error(err_term_or_dot,l[pos]);
+		else if (*l[pos][0] == L';') tokof(OR, 0, pos),b.emplace_back();
+		else if (*l[pos][0] != ',') parse_error(err_term_or_dot,l[pos]);
 		else tokof(AND, 0, pos);
 	parse_error(err_body, l[pos]);
 	return false;

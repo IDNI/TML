@@ -39,11 +39,4 @@ struct token {
 	static void clear() { tokens.clear(); }
 	static std::wstring name(etype type) { return names[type]; };
 };
-
-#define ttokof(type, offset, from) token::add(type, \
-		lexeme({ l[from][0], l[pos+(offset)][1] }))
-#define tokof(type, offset, from) ttokof(token::type, offset, from)
-#define toko(type, offset) tokof(type, offset, curr)
-#define tok(type) toko(type, -1)
-#define ttok(type) ttokof((token::etype) type, -1, curr)
 #endif
