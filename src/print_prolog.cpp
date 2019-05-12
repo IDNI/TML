@@ -26,18 +26,26 @@ wostream& output_prolog_elem(wostream& os, const elem& e);
 #define output_lexeme_adjust_first(os, l, fn) (os) << (wchar_t)fn(*((l)[0])) <<\
 	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
+wostream& driver::print_xsb(wostream& os, const raw_prog& rp) const {
+	return print_prolog(os, rp, XSB);
+}
+
+wostream& driver::print_swipl(wostream& os, const raw_prog& rp) const {
+	return print_prolog(os, rp, SWIPL);
+}
+
 wostream& driver::print_prolog(wostream& os, const raw_prog& p,
-	const dialect_t dialect) const {
+	const dialect d) const {
 	relarities ras;
 	get_relarities(p, ras);
-	wstring name = dialect == SWIPL ? L"SWI Prolog" : L"XSB";
+	wstring name = d == SWIPL ? L"SWI Prolog" : L"XSB";
 	os << L"% start of " << name << " program" << endl;
 	os << endl;
 	os << L"% enable tabling to avoid inf. loops" << endl;
 	for (auto ra : ras) os << L":- table " << ra.first <<
 		L'/' << ra.second << L'.' << endl;
 	os << endl;
-	if (dialect == SWIPL) {
+	if (d == SWIPL) {
 		os << L"% suppress singleton warnings" << endl;
 		os << L":- style_check(-singleton)." << endl;
 		os << endl;

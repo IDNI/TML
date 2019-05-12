@@ -80,22 +80,17 @@ public:
 //		const prefix&) const;
 //	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
-	std::wostream& print_prolog(std::wostream& os, const raw_prog& p,
-		const dialect_t dialect) const;
-	std::wostream& print_xsb(std::wostream& os, const raw_prog& rp) const {
-		return print_prolog(os, rp, XSB); }
-	std::wostream& print_swipl(std::wostream& os, const raw_prog& rp) const{
-		return print_prolog(os, rp, SWIPL); }
-	std::wostream& print_souffle(std::wostream& os, const raw_prog& rp)
-		const;
+	std::wostream& print_prolog(std::wostream&, const raw_prog&,
+		const dialect) const;
+	std::wostream& print_xsb(std::wostream&, const raw_prog&) const;
+	std::wostream& print_swipl(std::wostream&, const raw_prog&) const;
+	std::wostream& print_souffle(std::wostream&, const raw_prog&) const;
 	void output_tokens() const;
-	std::wostream& print_tokens(std::wostream& os) const;
-	std::wostream& print_tokens_json(std::wostream& os) const;
-	std::wostream& print_tokens_xml(std::wostream& os) const;
-	std::wostream& print_tokens_html(std::wostream& os) const;
-//	std::wostream& print_term_csv(std::wostream& os, const term& t) const;
-//	void save_csv(lp *p) const;
-//	void save_csv(const db_t& db, size_t bits) const;
+	std::wostream& print_tokens(std::wostream&) const;
+	std::wostream& print_tokens_json(std::wostream&) const;
+	std::wostream& print_tokens_xml(std::wostream&) const;
+	std::wostream& print_tokens_html(std::wostream&) const;
+	void save_csv() const;
 };
 
 #ifdef DEBUG

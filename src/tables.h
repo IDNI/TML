@@ -26,6 +26,7 @@ typedef std::pair<rel_t, ints> sig;
 
 class tables {
 	typedef std::map<int_t, size_t> varmap;
+	typedef std::function<void(const raw_term&)> rt_printer;
 	struct term : public ints {
 		bool neg;
 		ntable tab;
@@ -160,6 +161,7 @@ class tables {
 	void alt_query(alt& a, size_t len, bdd_handles& v);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void out(std::wostream&, spbdd_handle, ntable) const;
+	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_rules(const raw_prog& p);
 	void add_prog(const raw_prog& p);
 	bool fwd();
@@ -170,6 +172,7 @@ public:
 	bool run_prog(const raw_prog& p) { add_prog(p); return pfp(); }
 	bool pfp();
 	void out(std::wostream&) const;
+	void out(const rt_printer&) const;
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
