@@ -491,14 +491,14 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			return;
 		} else v1.push_back(x);
-	x = a.rng;
-	for (auto y : v1) if (bdd_handle::F == (x = x && y)) return;
-	v.push_back(a.rlast = deltail(x, a.varslen, len));
+//	x = a.rng;
+//	for (auto y : v1) if (bdd_handle::F == (x = x && y)) return;
+//	v.push_back(a.rlast = deltail(x, a.varslen, len));
 //		else v1.push_back(x);
-//	if (v1 == a.last) { v.push_back(a.rlast); return; }
-//	a.last = v1;
-//	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
-//		v.push_back(a.rlast = deltail(x, a.varslen, len));
+	if (v1 == a.last) { v.push_back(a.rlast); return; }
+	a.last = v1;
+	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
+		v.push_back(a.rlast = deltail(x, a.varslen, len));
 }
 
 bool tables::table::commit() {

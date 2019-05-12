@@ -21,21 +21,10 @@
 #include <functional>
 #include "defs.h"
 
-//#define getnode(x) bdd::V[x]
 #define hash_pair(x, y) \
 	((((size_t)(x)+(size_t)(y))*((size_t)(x)+(size_t)(y)+1)>>1)+(size_t)(y))
 #define hash_tri(x, y, z) hash_pair(hash_pair(x, y), z)
-/*#define has(x, y) ((x).find(y) != (x).end())
-#define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
-#ifdef DEBUG
-#define DBG(x) x
-#define NDBG(x)
-#else
-#define DBG(x)
-#define NDBG(x) x
-#endif
 
-typedef int32_t int_t;*/
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
