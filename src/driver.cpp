@@ -24,6 +24,7 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
+#include "token.h"
 using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
@@ -189,19 +190,35 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
+const string tmp(const string ext) {
+	string fname(tmpnam(0)); fname += ext;
+	wcerr << L"Saving " << s2ws(fname) << endl;
+	return fname;
+}
+#define tmp_os(ext) wofstream os(tmp(ext))
+
 void driver::output_pl(const raw_prog& p) const {
-	if (dialect == NONE) return;
-	wstring s;
-	string fname(tmpnam(0));
-	fname += ".pl";
-	wofstream os(fname.c_str());
-	switch (dialect) {
-		case XSB: print_xsb(os, p); s = L"XSB"; break;
-		case SWIPL: print_swipl(os, p); s = L"SWIPL"; break;
-//		case SOUFFLE: print_souffle(os, p); s = L"Souffle"; break;
+	for (auto d : opts.dialects) switch (d) {
+		case XSB:   { tmp_os(".P");  print_xsb(os, p);   }; break;
+		case SWIPL: { tmp_os(".pl"); print_swipl(os, p); }; break;
+		case SOUFFLE: { tmp_os(".souffle"); print_souffle(os, p);}break;
 		default: ;
 	}
-	wcerr << "Program in " << s << " format saved to " << s2ws(fname)<<endl;
+}
+
+void driver::output_tokens() const {
+	for (auto t : opts.token_formats) switch (t) {
+		case T_TML:
+			{ tmp_os(".tokens.tml");  print_tokens(os); } break;
+		case T_JSON:
+			{ tmp_os(".tokens.json"); print_tokens_json(os);} break;
+		case T_XML:
+			{ tmp_os(".tokens.xml");  print_tokens_xml(os); } break;
+		case T_HTML:
+			{ tmp_os(".tokens.html"); print_tokens_html(os);} break;
+		default: ;
+	}
+	token::clear();
 }
 
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
@@ -209,7 +226,7 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
 	output_pl(rp.p[n]);
-	if (print_transformed) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
+	if (opts.enabled_dialect(TRANSFORMED)) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
@@ -221,31 +238,32 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	int_t tr = dict.get_rel(L"try");
 }
 
-driver::driver(int argc, char** argv, raw_progs rp, output_dialect dialect,
-	bool print_transformed) : argc(argc), argv(argv), dialect(dialect),
-	print_transformed(print_transformed) {
+driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
+	argv(argv), opts(o) {
+	opts.parse(argc, argv);
 	strs_t strtrees;
+	output_tokens();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
 		DBG(tbl.out(wcout<<endl);)
 	}
-	NDBG(tbl.out(wcout<<endl);)
-	/*if (prog) {
-		if (csv) save_csv(prog);
-		printdb(wcout, prog);
-		delete prog;
-	}*/
+	NDBG(if (opts.enabled_format(F_TML)) tbl.out(wcout<<endl);)
+	if (opts.enabled_format(F_CSV)) save_csv();
 }
 
 std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
-driver::driver(int argc, char** argv, FILE *f, output_dialect dialect,
-	bool print_transformed) : driver(argc, argv, raw_progs(f),
-	dialect, print_transformed) {}
-driver::driver(int argc, char** argv, wstring s, output_dialect dialect,
-	bool print_transformed) : driver(argc, argv, raw_progs(s),
-	dialect, print_transformed) {}
-driver::driver(int argc, char** argv, char *s, output_dialect dialect,
-	bool print_transformed) : driver(argc, argv,
-	raw_progs(converter.from_bytes(string(s))), dialect,
-	print_transformed) {}
+driver::driver(int argc, char** argv, FILE *f, options o) :
+	driver(argc, argv, raw_progs(f), o) {}
+driver::driver(int argc, char** argv, wstring s, options o) :
+	driver(argc, argv, raw_progs(s), o) {}
+driver::driver(int argc, char** argv, char *s, options o) :
+	driver(argc, argv, raw_progs(converter.from_bytes(string(s))), o) {}
+driver::driver(int argc, char** argv, FILE *f) :
+	driver(argc, argv, f, options()) {}
+driver::driver(int argc, char** argv, wstring s) :
+	driver(argc, argv, s, options()) {}
+driver::driver(int argc, char** argv, char *s) :
+	driver(argc, argv, s, options()) {}
+driver::driver(int argc, char** argv, raw_progs rp) :
+	driver(argc, argv, rp, options()) {}

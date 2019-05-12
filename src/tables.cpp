@@ -67,9 +67,9 @@ void tables::range(size_t arg, size_t args, bdd_handles& v) {
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
 			leq_const(mkchr(chars-1), arg, args, bits))),
-		(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum, 
+		(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
 			leq_const(mknum(nums-1), arg, args, bits))),
-		(!syms 	? bdd_handle::T%issym : bdd_impl(issym, 
+		(!syms 	? bdd_handle::T%issym : bdd_impl(issym,
 			leq_const(((syms-1)<<2), arg, args, bits)))};
 	v.insert(v.end(), r.begin(), r.end());
 }
@@ -155,10 +155,21 @@ void tables::out(wostream& os) const {
 		out(os, ts[tab].t, tab);
 }
 
+void tables::out(const rt_printer& f) const {
+	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
+		out(ts[tab].t, tab, f);
+}
+
 void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
-	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
+	out(x, tab, [&os](const raw_term& rt) {
+		os << rt << L'.' << endl;
+	});
+}
+
+void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
+		lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
 	allsat_cb(x&&ts[tab].t, ts[tab].len * bits,
-		[&os, tab, op, cl, this](const bools& p, int_t DBG(y)) {
+		[tab, op, cl, &f, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		const size_t args = ts[tab].len;
 		term r(false, tab, ints(args, 0));
@@ -176,7 +187,7 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 		}
 		rt.arity = get<ints>(ts[tab].s), rt.insert_parens(op, cl),
-		os<<rt<<L'.'<<endl;
+		f(rt);
 	})();
 }
 
