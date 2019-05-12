@@ -26,6 +26,14 @@ wostream& output_prolog_elem(wostream& os, const elem& e);
 #define output_lexeme_adjust_first(os, l, fn) (os) << (wchar_t)fn(*((l)[0])) <<\
 	((l)[1]-((l)[0]+1)>0 ? lexeme{(l)[0]+1,(l)[1]} : lexeme{(l)[0], (l)[0]})
 
+wostream& driver::print_xsb(wostream& os, const raw_prog& rp) const {
+	return print_prolog(os, rp, XSB);
+}
+
+wostream& driver::print_swipl(wostream& os, const raw_prog& rp) const {
+	return print_prolog(os, rp, SWIPL);
+}
+
 wostream& driver::print_prolog(wostream& os, const raw_prog& p,
 	const dialect d) const {
 	relarities ras;

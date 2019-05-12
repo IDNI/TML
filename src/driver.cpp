@@ -247,12 +247,8 @@ driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 		prog_run(rp, n, strtrees);
 		DBG(tbl.out(wcout<<endl);)
 	}
-	NDBG(tbl.out(wcout<<endl);)
-	/*if (prog) {
-		if (csv) save_csv(prog);
-		printdb(wcout, prog);
-		delete prog;
-	}*/
+	NDBG(if (opts.enabled_format(F_TML)) tbl.out(wcout<<endl);)
+	if (opts.enabled_format(F_CSV)) save_csv();
 }
 
 std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;

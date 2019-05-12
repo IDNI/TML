@@ -16,48 +16,33 @@
 #include "driver.h"
 using namespace std;
 
-wostream& driver::print_term_csv(wostream& os, const term& t) const {
-	if (t.neg()) os << L'~';
-	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
-		while (t.arity()[ar] == -1) ++ar;
-		for (int_t k = 0; k != t.arity()[ar]; ++k) {
-			if (t.arg(n) < 0) throw 0;
-			else if (t.arg(n) & 1) os << (wchar_t)(t.arg(n)>>2);
-			else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
-			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
-				os << dict.get_sym(t.arg(n));
-			else os << L'[' << (t.arg(n)>>2) << L']';
-			if (++n != t.nargs() && k != t.arity()[ar]-1) os <<L'\t';
-		}
-		++ar;
-		while (ar<t.arity().size() && t.arity()[ar] == -2) ar++;
-		if (ar > 1 && t.arity()[ar-1] == -2 &&
-			ar != t.arity().size()) os << L'\t';
-	}
-	return os;
-}
-
-void driver::save_csv(lp *p) const {
-	save_csv(p->db, p->rng.bits);
-}
-
-void driver::save_csv(const db_t& db, size_t bits) const {
-	map<int_t, wofstream> files;
+void driver::save_csv() const {
+	map<elem, wofstream> files;
 	using convert_type = std::codecvt_utf8<wchar_t>;
 	wstring_convert<convert_type, wchar_t> converter;
-	for (auto x : db)
-		if (builtin_rels.find(x.first.rel) == builtin_rels.end()) {
-			auto it = files.find(x.first.rel);
-			if (it == files.end()) {
-				string fname = converter.to_bytes(
-					lexeme2str(dict.get_rel(x.first.rel))) +
-					".tml.csv";
-				files.emplace(x.first.rel, wofstream(fname));
-				it = files.find(x.first.rel);
-			}
-			wofstream& s = it->second;
-			from_bits(x.second,bits,x.first,
-				[&s,this](const term&t){
-				print_term_csv(s, t)<<endl; });
+	tbl.out([&files, &converter](const raw_term& t) {
+		auto it = files.find(t.e[0]);
+		if (it == files.end()) {
+			wstring wfname = lexeme2str(t.e[0].e) + L".csv";
+			wcerr << L"Saving " << wfname << endl;
+			files.emplace(t.e[0],
+				wofstream(converter.to_bytes(wfname)));
+			it = files.find(t.e[0]);
 		}
+		wofstream& os = it->second;
+		if (t.neg) os << L'~';
+		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
+			while (t.arity[ar] == -1) ++ar;
+			if (n >= t.e.size()) break;
+			while (t.e[n].type == elem::OPENP) ++n;
+			for (int_t k = 0; k != t.arity[ar];)
+				if ((os<<t.e[n++]),++k!=t.arity[ar]) os<<L'\t';
+			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
+			++ar;
+			while (ar < t.arity.size() && t.arity[ar] == -2) ++ar;
+			if (ar > 1 && t.arity[ar-1] == -2 &&
+				ar != t.arity.size()) os << L'\t';
+		}
+		os << endl;
+	});
 }
