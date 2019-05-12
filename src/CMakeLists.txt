@@ -18,6 +18,7 @@ add_executable(tml
 	options.h
 	output.cpp
 	print_prolog.cpp
+	print_souffle.cpp
 	save_csv.cpp
 	tables.h
 	tables.cpp
