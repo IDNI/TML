@@ -172,6 +172,7 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 		} else ++n;
 	if (flag) return 3;
 	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x),f);
+	sort(x.begin(), x.end());
 	if (x.size() > 1) {
 		for (size_t n = 0; n < h.size();)
 			if (hasb(x, h[n])) h.erase(h.begin() + n);
