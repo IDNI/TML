@@ -148,7 +148,7 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 		if (b && var(v[i]) != m) l.push_back(v[i]);
 		else if (!leaf(lo(v[i]))) l.push_back(lo(v[i]));
 		else if (!trueleaf(lo(v[i]))) return flag ? res = F, 1 : 2;
-	auto f = [](int_t x, int_t y) {
+	static auto f = [](int_t x, int_t y) {
 		bool s = x < y;
 		x = abs(x), y = abs(y);
 		return x < y ? true : x == y ? s : false;
@@ -171,7 +171,7 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 			if (l.size() == 1) break;
 		} else ++n;
 	if (flag) return 3;
-	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x));
+	set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x),f);
 	if (x.size() > 1) {
 		for (size_t n = 0; n < h.size();)
 			if (hasb(x, h[n])) h.erase(h.begin() + n);
