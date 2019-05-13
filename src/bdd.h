@@ -20,6 +20,7 @@
 #include <memory>
 #include <functional>
 #include "defs.h"
+#include "hmap.h"
 
 #define hash_pair(x, y) \
 	((((size_t)(x)+(size_t)(y))*((size_t)(x)+(size_t)(y)+1)>>1)+(size_t)(y))
@@ -83,10 +84,14 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 	void rehash() { hash = hash_tri(v, h, l); }
+	std::unordered_map<int_t, int_t> mp, mn;
 	typedef std::tuple<uint_t, uint_t, int_t, int_t> key;
-	static std::unordered_map<key, int_t> M;
-	static std::unordered_map<ite_memo, int_t> C;
-	static std::unordered_map<bdds, int_t> AM;
+	static hmap<key, int_t> M;
+	static hmap<ite_memo, int_t> C;
+	static hmap<bdds, int_t> AM;
+//	static std::unordered_map<key, int_t> M;
+//	static std::unordered_map<ite_memo, int_t> C;
+//	static std::unordered_map<bdds, int_t> AM;
 	static std::unordered_set<int_t> S;
 	static size_t sz;
 	static void mark_all(int_t i);
@@ -124,7 +129,7 @@ public:
 	key getkey() const { return { hash, v, h, l }; }
 	static void gc();
 	inline bool operator==(const bdd& b) const {
-		return hash == b.hash && v == b.v && h == b.h && l == b.l;
+		return v == b.v && h == b.h && l == b.l;
 	}
 	static void init();
 };
@@ -133,13 +138,14 @@ class bdd_handle {
 	friend class bdd;
 	bdd_handle(int_t b) : b(b) { bdd::mark(b); }
 	static void update(const std::vector<int_t>& p);
-	static std::unordered_map<int_t, std::weak_ptr<bdd_handle>> M;
+	//static std::unordered_map<int_t, std::weak_ptr<bdd_handle>> M;
+	static hmap<int_t, std::weak_ptr<bdd_handle>> M;
 public:
 	int_t b;
 	static spbdd_handle get(int_t b);
 	static spbdd_handle T, F;
 	~bdd_handle() {
-		if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
+		if (abs(b) > 1 && (M.del(b), !M.find(-b))) bdd::unmark(b);
 	}
 };
 
