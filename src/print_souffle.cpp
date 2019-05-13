@@ -50,14 +50,14 @@ wostream& driver::print_souffle(wostream& os, const raw_prog& p) const {
 }
 
 wstring souffle_rel_name(wstring rel, bools p) {
-	DBG(wcout << L"souffle_rel_name(" << rel << L", [ " << p << " ])" << endl;)
+//	DBG(wcout << L"souffle_rel_name(" << rel << L", [ " << p << " ])" << endl;)
 	auto it = default_type_signatures.find(rel);
 	if (it == default_type_signatures.end()) {
 		default_type_signatures[rel] = p;
 		DBG(wcout << L"\treturn " << rel << endl;)
 		return rel;
 	}
-	DBG(wcout << L"\tbools == dts["<<rel<<"]? " << (p == default_type_signatures[rel]? L'1' : L'0') << endl;)
+//	DBG(wcout << L"\tbools == dts["<<rel<<"]? " << (p == default_type_signatures[rel]? L'1' : L'0') << endl;)
 	if (p == default_type_signatures[rel]) return rel;
 	wstringstream wss;
 	wss << rel << (p.size() ? L'_' : L'0');

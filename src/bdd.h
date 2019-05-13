@@ -88,6 +88,7 @@ class bdd {
 	static std::unordered_map<ite_memo, int_t> C;
 	static std::unordered_map<bdds, int_t> AM;
 	static std::unordered_set<int_t> S;
+	static size_t sz;
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);

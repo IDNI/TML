@@ -22,6 +22,7 @@ unordered_map<ite_memo, int_t> bdd::C;
 unordered_map<bdds, int_t> bdd::AM;
 unordered_set<int_t> bdd::S;
 unordered_map<int_t, weak_ptr<bdd_handle>> bdd_handle::M;
+size_t bdd::sz = 2;
 spbdd_handle bdd_handle::T, bdd_handle::F;
 map<bools, unordered_map<int_t, int_t>> memos_ex;
 map<uints, unordered_map<int_t, int_t>> memos_perm;
@@ -44,14 +45,16 @@ int_t bdd::add(uint_t v, int_t h, int_t l) {
 		key k = { hash_tri(v, -h, -l), v, -h, -l };
 		auto it = M.find(k);
 		if (it != M.end()) return -it->second;
-		V.emplace_back(v, -h, -l), M.emplace(k, V.size() - 1);
-		return -V.size() + 1;
+		while (sz >= V.size()) V.resize(V.size() << 1);
+		V[sz] = bdd(v, -h, -l), M.emplace(move(k), sz);
+		return -sz++;
 	}
 	key k = { hash_tri(v, h, l), v, h, l };
 	auto it = M.find(k);
 	if (it != M.end()) return it->second;
-	V.emplace_back(v, h, l), M.emplace(k, V.size() - 1);
-	return V.size() - 1;
+	while (sz >= V.size()) V.resize(V.size() << 1);
+	V[sz] = bdd(v, h, l), M.emplace(move(k), sz);
+	return sz++;
 }
 
 int_t bdd::from_bit(uint_t b, bool v) {
@@ -145,7 +148,11 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 		if (b && var(v[i]) != m) l.push_back(v[i]);
 		else if (!leaf(lo(v[i]))) l.push_back(lo(v[i]));
 		else if (!trueleaf(lo(v[i]))) return flag ? res = F, 1 : 2;
-	auto f = [](int_t x, int_t y) { return abs(x) < abs(y); };
+	auto f = [](int_t x, int_t y) {
+		bool s = x < y;
+		x = abs(x), y = abs(y);
+		return x < y ? true : x == y ? s : false;
+	};
 	sort(h.begin(), h.end(), f), sort(l.begin(), l.end(), f);
 	if (!flag) {
 		for (size_t n = 1; n < h.size();)
@@ -220,18 +227,18 @@ void bdd::mark_all(int_t i) {
 }
 
 void bdd::gc() {
-	if (V.size() / S.size() < 4) return;
+	if (sz / S.size() < 4) return;
 	S.clear(), S.insert(0), S.insert(1);
 	for (auto x : bdd_handle::M) mark_all(x.first);
 	vector<int_t> p(V.size(), 0);
 	vector<bdd> v1(S.size());
-	for (size_t n = 0, k = 0; n < V.size(); ++n)
+	for (size_t n = 0, k = 0; n < sz; ++n)
 		if (has(S, n)) p[n] = k, v1[k++] = V[n];
-	wcout << S.size() << ' ' << V.size() << endl;
+	wcout << S.size() << ' ' << sz << endl;
 	V = move(v1);
-	M.clear(), V.resize(S.size());
+	M.clear(), sz = S.size();//, V.resize(S.size());
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
-	for (size_t n = 2; n < V.size(); ++n)
+	for (size_t n = 2; n < S.size(); ++n)
 		f(V[n].h), f(V[n].l), V[n].rehash();
 	unordered_map<ite_memo, int_t> c;
 	unordered_map<bdds, int_t> am;
@@ -277,7 +284,7 @@ void bdd::gc() {
 		if (!b&&has(S,abs(x.second))) am.emplace(x.first, f(x.second));
 	}
 	AM = move(am), bdd_handle::update(p);
-	for (size_t n = 0; n < V.size(); ++n) M.emplace(V[n].getkey(), n);
+	for (size_t n = 0; n < S.size(); ++n) M.emplace(V[n].getkey(), n);
 	wcout << AM.size() << ' ' << C.size() << endl;
 }
 
@@ -460,7 +467,7 @@ size_t std::hash<std::tuple<uint_t, uint_t, int_t, int_t>>::operator()(
 
 size_t std::hash<bdds>::operator()(const bdds& b) const {
 	size_t r = 0;
-	for (int_t i : b) r += i >= 0 ? bdd::V[i].hash : -bdd::V[-i].hash;
+	for (int_t i : b) r ^= i >= 0 ? bdd::V[i].hash : -bdd::V[-i].hash;
 	return r;
 }
 
