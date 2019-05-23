@@ -57,6 +57,7 @@ typedef std::vector<bools> vbools;
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
+#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define measure_time(x) start = clock(); x; end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}

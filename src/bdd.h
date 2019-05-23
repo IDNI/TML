@@ -30,14 +30,29 @@ typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
 typedef std::vector<spbdd_handle> bdd_handles;
-typedef std::array<int_t, 3> ite_memo;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 
-template<> struct std::hash<std::tuple<uint_t, int_t, int_t, int_t>> {
-	size_t operator()(const std::tuple<uint_t,int_t,int_t,int_t>& k) const;
+struct ite_memo {
+	int_t x, y, z;
+	size_t hash;
+	ite_memo(int_t x, int_t y, int_t z) :
+		x(x), y(y), z(z), hash(hash_tri(x, y, z)) {}
+	void rehash() { hash = hash_tri(x, y, z); }
+	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
-template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&m)const;};
+
+struct bdd_key {
+	uint_t hash;
+	int_t v, h, l;
+	bdd_key(){}
+	bdd_key(uint_t hash, int_t v, int_t h, int_t l) :
+		hash(hash), v(v), h(h), l(l) {}
+	bool operator==(const bdd_key& k) const {return v==k.v&&h==k.h&&l==k.l;}
+};
+
+template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
+template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
 extern int_t T, F;
@@ -83,9 +98,7 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 
-	typedef std::tuple<uint_t, int_t, int_t, int_t> key;
-
-	static std::unordered_map<key, int_t> M;
+	static std::unordered_map<bdd_key, int_t> M;
 	static std::unordered_map<ite_memo, int_t> C;
 	static std::unordered_map<bdds, int_t> AM;
 	static std::unordered_set<int_t> S;
@@ -94,11 +107,22 @@ class bdd {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
 			: V[x].v < 0 ? V[x].l : V[x].h;
 	}
+
 	inline static int_t lo(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
 			: V[x].v < 0 ? V[x].h : V[x].l;
 	}
+
 	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
+
+	inline static bdd get(int_t x) {
+		if (x > 0) {
+			const bdd &y = V[x];
+			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
+		}
+		const bdd &y = V[-x];
+		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
+	}
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
@@ -116,6 +140,7 @@ class bdd {
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
+	static bool am_simplify(bdds& v);
 	inline static int_t add(int_t v, int_t h, int_t l) {
 		DBG(assert(h && l && v > 0);)
 		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
@@ -124,31 +149,31 @@ class bdd {
 		if (h == l) return h;
 		if (h > l) std::swap(h, l), v = -v;
 		static auto it = M.end();
+		static bdd_key k;
 		if (l < 0) {
-			key k = { hash_tri(v, -h, -l), v, -h, -l };
+			k = bdd_key(hash_tri(v, -h, -l), v, -h, -l);
 			return	(it = M.find(k)) != M.end() ? -it->second :
-				(V.emplace_back(std::get<0>(k), v, -h, -l),
-				M.emplace(move(k), V.size()-1),
+				(V.emplace_back(v, -h, -l),
+				M.emplace(std::move(k), V.size()-1),
 				-V.size()+1);
 		}
-		key k = { hash_tri(v, h, l), v, h, l };
+		k = bdd_key(hash_tri(v, h, l), v, h, l);
 		return	(it = M.find(k)) != M.end() ? it->second :
-			(V.emplace_back(std::get<0>(k), v, h, l),
-			M.emplace(move(k), V.size()-1),
+			(V.emplace_back(v, h, l),
+			M.emplace(std::move(k), V.size()-1),
 			V.size()-1);
 	}
 
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
-	void rehash() { hash = hash_tri(v, h, l); }
+//	void rehash() { hash = hash_tri(v, h, l); }
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
 public:
 //	bdd() {}
-	bdd(size_t hash, int_t v, int_t h, int_t l);
-	uint_t hash;
-	key getkey() const { return { hash, v, h, l }; }
+	bdd(int_t v, int_t h, int_t l);
+//	bdd_key getkey() const { return bdd_key(hash, v, h, l); }
 	inline bool operator==(const bdd& b) const {
 		return v == b.v && h == b.h && l == b.l;
 	}
