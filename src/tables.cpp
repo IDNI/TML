@@ -46,7 +46,8 @@ vbools tables::allsat(spbdd_handle x, size_t args) const {
 }
 #endif
 
-spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit) const {
+spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
+	const {
 	if (!--bit)
 		return	(c & 1) ? bdd_handle::T :
 			::from_bit(pos(0, arg, args), false);
@@ -483,6 +484,7 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 		t = bdd_and_many(move(v1)) / x.second;
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
+//	DBG(bdd::gc();)
 	bdd_handles v1 = { a.rng };
 	spbdd_handle x;
 	DBG(assert(!a.empty());)

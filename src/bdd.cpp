@@ -15,7 +15,7 @@
 #include "bdd.h"
 using namespace std;
 
-#define MEMO
+//#define MEMO
 
 int_t T, F;
 unordered_map<bdd::key, int_t> bdd::M;
@@ -30,33 +30,11 @@ map<uints, unordered_map<int_t, int_t>> memos_perm;
 map<pair<uints, bools>, unordered_map<int_t, int_t>> memos_perm_ex;
 
 void bdd::init() {
-	S.insert(0), S.insert(1),
+	S.insert(0), S.insert(1), T = 1, F = -1,
 	V.emplace_back(hash_tri(0, 0, 0), 0, 0, 0), // dummy
-	V.back().rehash(), T = 1, F = -1,
-	V.emplace_back(hash_tri(0, 1, 1), 0, 1, 1), V.back().rehash(),
-	M.emplace(V.back().getkey(), 1),// mark(0), mark(T), mark(F),
+	V.emplace_back(hash_tri(0, 1, 1), 0, 1, 1),
+	M.emplace(V[0].getkey(), 0), M.emplace(V[1].getkey(), 1),
 	bdd_handle::T = bdd_handle::get(T), bdd_handle::F = bdd_handle::get(F);
-}
-
-int_t bdd::add(int_t v, int_t h, int_t l) {
-	DBG(assert(h && l && v > 0);)
-	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-	if (h == l) return h;
-	if (h > l) swap(h, l), v = -v;
-	if (l < 0) {
-		key k = { hash_tri(v, -h, -l), v, -h, -l };
-		auto it = M.find(k);
-		if (it != M.end()) return -it->second;
-		V.emplace_back(get<0>(k), v, -h, -l),
-		M.emplace(move(k), V.size()-1);
-		return -V.size()+1;
-	}
-	key k = { hash_tri(v, h, l), v, h, l };
-	auto it = M.find(k);
-	if (it != M.end()) return it->second;
-	V.emplace_back(get<0>(k), v, h, l), M.emplace(move(k), V.size()-1);
-	return V.size()-1;
 }
 
 int_t bdd::from_bit(uint_t b, bool v) {
@@ -238,16 +216,17 @@ void bdd::mark_all(int_t i) {
 }
 
 void bdd::gc() {
-	S.clear(), M.clear();
+	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
 	if (V.size() / S.size() < 2) return;
-	S.insert(0), S.insert(1);
+	M.clear(), S.insert(0), S.insert(1);
 	vector<int_t> p(V.size(), 0);
 	vector<bdd> v1;
 	v1.reserve(S.size());
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
-	wcout << S.size() << ' ' << V.size() << endl;
+	wcout	<< "S: " << S.size() << " V: "<< V.size() << " AM: " <<
+		AM.size() << " C: "<< C.size() << endl;
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V.size(); ++n) {
@@ -298,14 +277,18 @@ void bdd::gc() {
 		if (!b&&has(S,abs(x.second))) am.emplace(x.first, f(x.second));
 	}
 	AM = move(am), bdd_handle::update(p);
-	for (size_t n = 0; n < V.size(); ++n) M.emplace(V[n].getkey(), n);
-	wcout << AM.size() << ' ' << C.size() << endl;
+	for (size_t n = 0; n < V.size(); ++n) {
+		DBG(assert(!has(M, V[n].getkey()));)
+		M.emplace(V[n].getkey(), n);
+	}
+	wcout <<"AM: " << AM.size() << " C: "<< C.size() << endl;
+	DBG(assert(M.size() == V.size());)
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
 	std::unordered_map<int_t, std::weak_ptr<bdd_handle>> m;
 	for (pair<int_t, std::weak_ptr<bdd_handle>> x : M) {
-		if (x.second.expired()) continue;
+		DBG(assert(!x.second.expired());)
 		spbdd_handle s = x.second.lock();
 		f(s->b), m.emplace(f(x.first), x.second);
 	}

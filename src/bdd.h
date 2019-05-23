@@ -116,7 +116,28 @@ class bdd {
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
-	inline static int_t add(int_t v, int_t h, int_t l);
+	inline static int_t add(int_t v, int_t h, int_t l) {
+		DBG(assert(h && l && v > 0);)
+		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
+		DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
+		DBG(assert(M.size() == V.size());)
+		if (h == l) return h;
+		if (h > l) std::swap(h, l), v = -v;
+		static auto it = M.end();
+		if (l < 0) {
+			key k = { hash_tri(v, -h, -l), v, -h, -l };
+			return	(it = M.find(k)) != M.end() ? -it->second :
+				(V.emplace_back(std::get<0>(k), v, -h, -l),
+				M.emplace(move(k), V.size()-1),
+				-V.size()+1);
+		}
+		key k = { hash_tri(v, h, l), v, h, l };
+		return	(it = M.find(k)) != M.end() ? it->second :
+			(V.emplace_back(std::get<0>(k), v, h, l),
+			M.emplace(move(k), V.size()-1),
+			V.size()-1);
+	}
+
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
