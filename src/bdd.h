@@ -125,7 +125,7 @@ class bdd {
 	int_t h, l, v;
 public:
 //	bdd() {}
-	bdd(int_t v, int_t h, int_t l);
+	bdd(size_t hash, int_t v, int_t h, int_t l);
 	uint_t hash;
 	key getkey() const { return { hash, v, h, l }; }
 	inline bool operator==(const bdd& b) const {

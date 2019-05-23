@@ -15,6 +15,8 @@
 #include "bdd.h"
 using namespace std;
 
+#define MEMO
+
 int_t T, F;
 unordered_map<bdd::key, int_t> bdd::M;
 vector<bdd> bdd::V;
@@ -29,9 +31,9 @@ map<pair<uints, bools>, unordered_map<int_t, int_t>> memos_perm_ex;
 
 void bdd::init() {
 	S.insert(0), S.insert(1),
-	V.emplace_back(0, 0, 0), // dummy
+	V.emplace_back(hash_tri(0, 0, 0), 0, 0, 0), // dummy
 	V.back().rehash(), T = 1, F = -1,
-	V.emplace_back(0, 1, 1), V.back().rehash(),
+	V.emplace_back(hash_tri(0, 1, 1), 0, 1, 1), V.back().rehash(),
 	M.emplace(V.back().getkey(), 1),// mark(0), mark(T), mark(F),
 	bdd_handle::T = bdd_handle::get(T), bdd_handle::F = bdd_handle::get(F);
 }
@@ -46,13 +48,14 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 		key k = { hash_tri(v, -h, -l), v, -h, -l };
 		auto it = M.find(k);
 		if (it != M.end()) return -it->second;
-		V.emplace_back(v, -h, -l), M.emplace(move(k), V.size()-1);
+		V.emplace_back(get<0>(k), v, -h, -l),
+		M.emplace(move(k), V.size()-1);
 		return -V.size()+1;
 	}
 	key k = { hash_tri(v, h, l), v, h, l };
 	auto it = M.find(k);
 	if (it != M.end()) return it->second;
-	V.emplace_back(v, h, l), M.emplace(move(k), V.size()-1);
+	V.emplace_back(get<0>(k), v, h, l), M.emplace(move(k), V.size()-1);
 	return V.size()-1;
 }
 
@@ -66,15 +69,20 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	if (x == T || x == y) return y;
 	if (y == T) return x;
 	if (x == -y) return F;
+#ifdef MEMO	
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
 	if (it != C.end()) return it->second;
+#endif	
 	const uint_t vx = var(x), vy = var(y);
 	int_t r;
 	if (vx < vy) r = add(vx, bdd_and(hi(x), y), bdd_and(lo(x), y));
 	else if (vx > vy) r = add(vy, bdd_and(x, hi(y)), bdd_and(x, lo(y)));
 	else r = add(vx, bdd_and(hi(x), hi(y)), bdd_and(lo(x), lo(y)));
-	return C.emplace(m, r), r;
+#ifdef MEMO
+	C.emplace(m, r);
+#endif		
+	return r;
 }
 
 int_t bdd::bdd_ite_var(uint_t x, int_t y, int_t z) {
@@ -187,7 +195,8 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 }
 
 int_t bdd::bdd_and_many(bdds v) {
-/*	static unordered_map<ite_memo, int_t>::const_iterator jt;
+#ifdef MEMO	
+	static unordered_map<ite_memo, int_t>::const_iterator jt;
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
 			int_t x, y;
@@ -198,7 +207,8 @@ int_t bdd::bdd_and_many(bdds v) {
 				v.push_back(jt->second), n = k = 0;
 				break;
 			}
-		}*/
+		}
+#endif
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
 	if (v.size() == 2) return bdd_and(v[0], v[1]);
@@ -476,8 +486,7 @@ size_t std::hash<bdds>::operator()(const bdds& b) const {
 	return r;
 }
 
-bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
-	rehash();
+bdd::bdd(size_t hash, int_t v, int_t h, int_t l) : h(h), l(l), v(v), hash(hash){
 	DBG(assert(V.size() < 2 || (v && h && l));)
 }
 

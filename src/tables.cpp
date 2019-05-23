@@ -492,7 +492,6 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 			return;
 		} else v1.push_back(x);
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
-	bdd::gc();
 	a.last = v1;
 	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
 		v.push_back(a.rlast = deltail(x, a.varslen, len));
@@ -514,6 +513,7 @@ bool tables::table::commit() {
 }
 
 bool tables::fwd() {
+	bdd::gc();
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
