@@ -44,11 +44,11 @@ struct ite_memo {
 
 struct bdd_key {
 	uint_t hash;
-	int_t v, h, l;
+	int_t h, l;
 	bdd_key(){}
-	bdd_key(uint_t hash, int_t v, int_t h, int_t l) :
-		hash(hash), v(v), h(h), l(l) {}
-	bool operator==(const bdd_key& k) const {return v==k.v&&h==k.h&&l==k.l;}
+	bdd_key(uint_t hash, int_t h, int_t l) :
+		hash(hash), h(h), l(l) {}
+	bool operator==(const bdd_key& k) const { return h==k.h && l==k.l; }
 };
 
 template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
@@ -98,7 +98,8 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 
-	static std::unordered_map<bdd_key, int_t> M;
+	static std::vector<std::unordered_map<bdd_key, int_t>> Mp;
+	static std::vector<std::unordered_map<bdd_key, int_t>> Mn;
 	static std::unordered_map<ite_memo, int_t> C;
 	static std::unordered_map<bdds, int_t> AM;
 	static std::unordered_set<int_t> S;
@@ -145,22 +146,25 @@ class bdd {
 		DBG(assert(h && l && v > 0);)
 		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
 		DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-		DBG(assert(M.size() == V.size());)
+//		DBG(assert(M.size() == V.size());)
 		if (h == l) return h;
 		if (h > l) std::swap(h, l), v = -v;
-		static auto it = M.end();
+		static std::unordered_map<bdd_key, int_t>::const_iterator it;
 		static bdd_key k;
+		auto &mm = v < 0 ? Mn : Mp;
+		if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
+		auto &m = mm[abs(v)];
 		if (l < 0) {
-			k = bdd_key(hash_tri(v, -h, -l), v, -h, -l);
-			return	(it = M.find(k)) != M.end() ? -it->second :
+			k = bdd_key(hash_pair(-h, -l), -h, -l);
+			return	(it = m.find(k)) != m.end() ? -it->second :
 				(V.emplace_back(v, -h, -l),
-				M.emplace(std::move(k), V.size()-1),
+				m.emplace(std::move(k), V.size()-1),
 				-V.size()+1);
 		}
-		k = bdd_key(hash_tri(v, h, l), v, h, l);
-		return	(it = M.find(k)) != M.end() ? it->second :
+		k = bdd_key(hash_pair(h, l), h, l);
+		return	(it = m.find(k)) != m.end() ? it->second :
 			(V.emplace_back(v, h, l),
-			M.emplace(std::move(k), V.size()-1),
+			m.emplace(std::move(k), V.size()-1),
 			V.size()-1);
 	}
 
