@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <algorithm>
 #include "tables.h"
 #include "dict.h"
 #include "input.h"
@@ -279,9 +280,6 @@ tables::body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 		else for (size_t k = 0; k != bits; ++k)
 			and_eq_(k, n, it->second, t.size(), b.q),
 			b.ex[pos(k, n, t.size())] = true;
-
-//	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
-//	DBG(assert(t.size() == siglens[t.tab]);)
 	return b;
 }
 
@@ -303,8 +301,9 @@ void tables::get_rules(const raw_prog& p) {
 	measure_time_start();
 	bdd_handles v;
 	for (auto x : f) {
-		for (auto y : x.second) v.push_back(y);
-		ts[x.first].t = bdd_or_many(v);
+		spbdd_handle r = bdd_handle::F;
+		for (auto y : x.second) r = r || y;
+		ts[x.first].t = r;
 	}
 	measure_time_end();
 	for (table& t : ts) wcout << t.t->b << ' ';
@@ -467,14 +466,18 @@ spbdd_handle tables::deltail(spbdd_handle x, size_t len1, size_t len2) const {
 }
 
 spbdd_handle tables::body_query(body& b) {
-//	if (b.ext) return b.q;
+	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
-//	if (b.tlast == ts[b.tab].t) return b.rlast;
-//	b.tlast = ts[b.tab].t;
+	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
+	b.tlast = ts[b.tab].t;
 	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
 			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
+
+auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
+	return x->b < y->b;
+};
 
 void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 /*	spbdd_handle t = bdd_handle::T;
@@ -494,7 +497,8 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			return;
 		} else v1.push_back(x);
-//	if (v1 == a.last) { v.push_back(a.rlast); return; }
+	sort(v1.begin(), v1.end(), handle_cmp);
+	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = v1;
 	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
 		v.push_back(a.rlast = deltail(x, a.varslen, len));
@@ -516,7 +520,6 @@ bool tables::table::commit() {
 }
 
 bool tables::fwd() {
-	bdd::gc();
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
@@ -530,7 +533,6 @@ bool tables::fwd() {
 	}
 	bool b = false;
 	for (table& t : ts) b |= t.commit();
-//	if (onmemo(0) > 1e+7) memos_clear();//, wcerr<<onmemo(0)<<endl;
 	return b;
 }
 
@@ -548,7 +550,7 @@ bool tables::pfp() {
 		wcerr << "step: " << step++ << endl;
 		if (!b) return true;
 		if (!datalog && !s.emplace(get_front()).second) return false;
-//		if (step % 2) memos_clear();
+		if (!(step%3)) bdd::gc();
 	}
 	throw 0;
 }

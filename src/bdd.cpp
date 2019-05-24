@@ -232,7 +232,6 @@ int_t bdd::bdd_and_many(bdds v) {
 //	it = AM.emplace(v, 0).first;
 	if (v.size() == 2)
 		return AM.emplace(v, bdd_and(v[0], v[1])).first->second;
-//	onmemo();
 	int_t res = F, h, l;
 	size_t m = 0;
 	bdds vh, vl;
@@ -257,8 +256,7 @@ void bdd::mark_all(int_t i) {
 void bdd::gc() {
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
-	wcerr << "S: " << S.size() << " V: "<< V.size() << endl;
-	if (V.size() / S.size() < 2) return;
+	if (V.size() < S.size() << 1) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
 	vector<int_t> p(V.size(), 0);
@@ -318,6 +316,7 @@ void bdd::gc() {
 		if (!b&&has(S,abs(x.second))) am.emplace(x.first, f(x.second));
 	}
 	AM=move(am), bdd_handle::update(p), Mp.resize(pvars), Mn.resize(nvars);
+	p.clear(), S.clear();
 	for (size_t n = 0; n < V.size(); ++n)
 		if (V[n].v < 0)
 			Mn[-V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
@@ -325,7 +324,6 @@ void bdd::gc() {
 		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
 	wcerr <<"AM: " << AM.size() << " C: "<< C.size() << endl;
-	S.clear();
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
@@ -388,9 +386,9 @@ spbdd_handle bdd_and_many(const bdd_handles& v) {
 }
 
 spbdd_handle bdd_or_many(const bdd_handles& v) {
-//	int_t r = F;
-//	for (auto x : v) r = bdd::bdd_or(r, x->b);
-//	return bdd_handle::get(r);
+	int_t r = F;
+	for (auto x : v) r = bdd::bdd_or(r, x->b);
+	return bdd_handle::get(r);
 	bdds b(v.size());
 	for (size_t n = 0; n != v.size(); ++n) b[n] = -v[n]->b;
 	return bdd_handle::get(-bdd::bdd_and_many(move(b)));
