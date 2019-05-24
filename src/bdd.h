@@ -55,7 +55,7 @@ template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
-extern int_t T, F;
+const int_t T = 1, F = -1;
 
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
@@ -171,13 +171,10 @@ class bdd {
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
-//	void rehash() { hash = hash_tri(v, h, l); }
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
 public:
-//	bdd() {}
 	bdd(int_t v, int_t h, int_t l);
-//	bdd_key getkey() const { return bdd_key(hash, v, h, l); }
 	inline bool operator==(const bdd& b) const {
 		return v == b.v && h == b.h && l == b.l;
 	}

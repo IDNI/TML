@@ -58,8 +58,10 @@ typedef std::vector<bools> vbools;
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
-#define measure_time(x) start = clock(); x; end = clock(); \
+#define measure_time_start() start = clock()
+#define measure_time_end() end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
+#define measure_time(x) measure_time_start(); x; measure_time_end()
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };

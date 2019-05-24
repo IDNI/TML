@@ -300,14 +300,15 @@ void tables::get_rules(const raw_prog& p) {
 			}
 		}
 	clock_t start, end;
-	auto ff = [&f, this](){
-		for (auto x : f) {
-			bdd_handles v;
-			for (auto y : x.second) v.push_back(y);
-			ts[x.first].t = bdd_or_many(v);
-//			wcout << ::allsat(ts[x.first].t, bits * ts[x.first].len) << endl;
-		}};
-	measure_time(ff());
+	measure_time_start();
+	bdd_handles v;
+	for (auto x : f) {
+		for (auto y : x.second) v.push_back(y);
+		ts[x.first].t = bdd_or_many(v);
+	}
+	measure_time_end();
+	for (table& t : ts) wcout << t.t->b << ' ';
+	wcout<<endl;
 	f.clear();
 	set<rule> rs;
 	for (auto x : m) {
@@ -350,7 +351,7 @@ void tables::get_rules(const raw_prog& p) {
 		r.len = t.size(), rs.insert(r);
 	}
 	for (rule r : rs) rules.push_back(r);
-	if (datalog) merge_extensionals();
+//	if (datalog) merge_extensionals();
 //	for (rule& r : rules)
 //		for (alt& a : r)
 //			get_alt_ex(a, r.t);
@@ -466,11 +467,11 @@ spbdd_handle tables::deltail(spbdd_handle x, size_t len1, size_t len2) const {
 }
 
 spbdd_handle tables::body_query(body& b) {
-	if (b.ext) return b.q;
+//	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
-	if (b.tlast == ts[b.tab].t) return b.rlast;
-	b.tlast = ts[b.tab].t;
+//	if (b.tlast == ts[b.tab].t) return b.rlast;
+//	b.tlast = ts[b.tab].t;
 	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
 			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
@@ -493,7 +494,7 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			return;
 		} else v1.push_back(x);
-	if (v1 == a.last) { v.push_back(a.rlast); return; }
+//	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = v1;
 	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
 		v.push_back(a.rlast = deltail(x, a.varslen, len));
