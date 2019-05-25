@@ -46,28 +46,47 @@ int_t bdd::from_bit(uint_t b, bool v) {
 	return v ? add(b + 1, T, F) : add(b + 1, F, T);
 }
 
-int_t bdd::bdd_and(int_t x, int_t y) {
+int_t bdd::bdd_and1(int_t x, int_t y) {
 	DBG(assert(x && y);)
 	if (x == F || y == F) return F;
 	if (x == T || x == y) return y;
 	if (y == T) return x;
 	if (x == -y) return F;
-#ifdef MEMO	
+	if (x > y) swap(x, y);
+#ifdef MEMO
+	if (C.size() >= 4e+6) {
+		const bdd bx = get(x), by = get(y);
+		if (bx.v < by.v)
+			return add(bx.v, bdd_and1(bx.h, y), bdd_and1(bx.l, y));
+		else if (bx.v > by.v)
+			return add(by.v, bdd_and1(x, by.h), bdd_and1(x, by.l));
+		return add(bx.v, bdd_and1(bx.h, by.h), bdd_and1(bx.l, by.l));
+	}
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
 	if (it != C.end()) return it->second;
 #endif
 	const bdd bx = get(x), by = get(y);
 	int_t r;
-	if (bx.v < by.v) r = add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
-	else if (bx.v > by.v) r = add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
-	else r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
+	if (bx.v < by.v) r = add(bx.v, bdd_and1(bx.h, y), bdd_and1(bx.l, y));
+	else if (bx.v > by.v) r = add(by.v, bdd_and1(x, by.h), bdd_and1(x, by.l));
+	else r = add(bx.v, bdd_and1(bx.h, by.h), bdd_and1(bx.l, by.l));
 #ifdef MEMO
 	C.emplace(m, r);
 #endif		
 	return r;
 }
 
+int_t bdd::bdd_and(int_t x, int_t y) {
+//	set<int_t> sx, sy;
+//	bdd_sz(x, sx), bdd_sz(y, sy);
+//	wcerr << "bdd_and sz1: " << sx.size() << " sz2: " << sy.size() <<endl;
+//	sx.clear(), sy.clear();
+	int_t r = bdd_and1(x, y);
+//	bdd_sz(r, sx);
+//	wcerr<<"done "<<sx.size()<<endl;
+	return r;
+}
 int_t bdd::bdd_ite_var(uint_t x, int_t y, int_t z) {
 	return bdd_ite(from_bit(x, true), y, z);
 }
@@ -175,8 +194,8 @@ size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
 
 bool subset(const bdds& small, const bdds& big) {
 	if (	big.size() < small.size() ||
-		am_cmp(big[big.size()-1], small[0]) ||
-		am_cmp(small[small.size()-1], big[0]))
+		am_cmp(abs(big[big.size()-1]), abs(small[0])) ||
+		am_cmp(abs(small[small.size()-1]), abs(big[0])))
 		return false;
 	for (const int_t& t : small) if (!hasbc(big, t, am_cmp)) return false;
 	return true;
@@ -215,13 +234,12 @@ int_t bdd::bdd_and_many(bdds v) {
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
 	simps = 0;
-	bdds v1;
+	static bdds v1;
 	do {
 		v1 = v;
 		am_simplify(v);
 		if (++simps, v.size() == 1) return v[0];
 	} while (v1 != v);
-	v1.clear();
 //#ifdef DEBUG
 //#endif
 //	if (simps) wcout << "simps " << simps << endl;
@@ -256,9 +274,14 @@ void bdd::mark_all(int_t i) {
 void bdd::gc() {
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
-	if (V.size() < S.size() << 1) return;
+/*	for (auto x : AM) {
+		mark_all(x.second);
+		for (auto y : x.first) mark_all(y);
+	}*/
+//	if (V.size() < S.size() << 3) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
+//	if (S.size() >= 1e+6) { wcerr << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
 	vector<bdd> v1;
 	v1.reserve(S.size());
@@ -345,8 +368,15 @@ spbdd_handle bdd_handle::get(int_t b) {
 	return	M.emplace(b, std::weak_ptr<bdd_handle>(h)), h;
 }
 
+void bdd::bdd_sz(int_t x, set<int_t>& s) {
+	if (!s.emplace(x).second) return;
+	bdd b = get(x);
+	bdd_sz(b.h, s), bdd_sz(b.l, s);
+}
+
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::bdd_and(x->b, y->b));
+	spbdd_handle r = bdd_handle::get(bdd::bdd_and(x->b, y->b));
+	return r;
 }
 
 spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -369,15 +399,27 @@ spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z) {
 	return bdd_handle::get(bdd::bdd_ite_var(x, y->b, z->b));
 }
 
-spbdd_handle bdd_and_many(const bdd_handles& v) {
+spbdd_handle bdd_and_many(bdd_handles v) {
 /*	int_t r = T;
 	for (auto x : v) r = bdd::bdd_and(r, x->b);
 	return bdd_handle::get(r);*/
+	if (bdd::V.size() >= 4e+6) bdd::gc();
+	for (size_t n = 0; n < v.size();)
+		if (F == v[n]->b) return bdd_handle::F;
+		else if (T == v[n]->b) v.erase(v.begin() + n);
+		else ++n;
+/*	if (v.size() > 16) {
+		bdd_handles x, y;
+		spbdd_handle r;
+		for (size_t n = 0; n != v.size(); ++n)
+			(n < v.size()>>1 ? x : y).push_back(v[n]);
+		v.clear();
+		r = bdd_and_many(move(x));
+		return r && bdd_and_many(move(y));
+	}*/
 	bdds b;
 	b.reserve(v.size());
-	for (size_t n = 0; n != v.size(); ++n)
-		if (F == v[n]->b) return bdd_handle::F;
-		else if (T != v[n]->b) b.push_back(v[n]->b);
+	for (size_t n = 0; n != v.size(); ++n) b.push_back(v[n]->b);
 	sort(b.begin(), b.end(), am_cmp);
 //	DBG( wcout<<"am begin"<<endl;
 	auto r = bdd_handle::get(bdd::bdd_and_many(move(b)));

@@ -21,9 +21,11 @@
 #include <functional>
 #include "defs.h"
 
-#define hash_pair(x, y) \
+#define fpairing(x, y) \
 	((((size_t)(x)+(size_t)(y))*((size_t)(x)+(size_t)(y)+1)>>1)+(size_t)(y))
-#define hash_tri(x, y, z) hash_pair(hash_pair(x, y), z)
+#define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
+#define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
+#define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
 
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
@@ -69,7 +71,7 @@ spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
-spbdd_handle bdd_and_many(const bdd_handles& v);
+spbdd_handle bdd_and_many(bdd_handles v);
 spbdd_handle bdd_or_many(const bdd_handles& v);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
@@ -88,7 +90,7 @@ class bdd {
 		cr_spbdd_handle z);
 	friend spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y,
 		cr_spbdd_handle z);
-	friend spbdd_handle bdd_and_many(const bdd_handles& v);
+	friend spbdd_handle bdd_and_many(bdd_handles v);
 	friend spbdd_handle bdd_or_many(const bdd_handles& v);
 	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
 		const uints& m);
@@ -126,6 +128,7 @@ class bdd {
 	}
 
 	static int_t bdd_and(int_t x, int_t y);
+	static int_t bdd_and1(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
 	static int_t bdd_ite(int_t x, int_t y, int_t z);
 	static int_t bdd_ite_var(uint_t x, int_t y, int_t z);
@@ -142,6 +145,7 @@ class bdd {
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v);
+	static void bdd_sz(int_t x, std::set<int_t>& s);
 	inline static int_t add(int_t v, int_t h, int_t l) {
 		DBG(assert(h && l && v > 0);)
 		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)

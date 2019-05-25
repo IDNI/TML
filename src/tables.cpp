@@ -359,13 +359,14 @@ void tables::get_rules(const raw_prog& p) {
 //void tables::load_string(int_t ntable, const wstring& str) { }
 
 void tables::merge_extensionals() {
+	set<body*> S;
 	for (rule& r : rules)
 		for (alt& a : r) {
 			set<body*> s;
 			for (size_t n = 0; n < a.size(); ++n)
 				if (ts[a[n]->tab].ext)
-					s.insert(a[n]), a.erase(a.begin() + n),
-					a.t.erase(a.t.begin() + n);
+					s.insert(a[n]), a.erase(a.begin()+n),
+					a.t.erase(a.t.begin()+n),S.insert(a[n]);
 			if (s.size() < 2) for (body* b : s) a.push_back(b);
 			else {
 				body b;
@@ -377,6 +378,18 @@ void tables::merge_extensionals() {
 					*body::s.emplace(&(*new body=b)).first);
 			}
 		}
+	for (body* b : S) {
+		bool f = false;
+		for (const rule& r : rules) {
+			for (const alt& a : r) {
+				for (const body* x : a)
+					if (f |= x == b) break;
+				if (f) break;
+			}
+			if (f) break;
+		}
+		if (!f) S.erase(b), delete b;
+	}
 }
 
 template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -550,7 +563,6 @@ bool tables::pfp() {
 		wcerr << "step: " << step++ << endl;
 		if (!b) return true;
 		if (!datalog && !s.emplace(get_front()).second) return false;
-		if (!(step%3)) bdd::gc();
 	}
 	throw 0;
 }
