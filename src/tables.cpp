@@ -351,9 +351,12 @@ void tables::get_rules(const raw_prog& p) {
 	}
 	for (rule r : rs) rules.push_back(r);
 //	if (datalog) merge_extensionals();
-//	for (rule& r : rules)
-//		for (alt& a : r)
+	for (rule& r : rules)
+		for (alt& a : r) {
+			auto d = deltail(a.varslen, r.len);
+			a.ex = d.first, a.perm = d.second;
 //			get_alt_ex(a, r.t);
+		}
 }
 
 //void tables::load_string(int_t ntable, const wstring& str) { }
@@ -409,9 +412,9 @@ void tables::get_alt_ex(alt& a, const term& h) const {
 	varmap vm = get_varmap(h, a.t, a.varslen);
 	set<int_t> hvars;
 	set<size_t> bodies;
-	for (int_t i : h) if (i < 0) hvars.insert(i);
 	map<int_t, set<size_t>> m;
-	assert(a.size() == a.t.size());
+	for (int_t i : h) if (i < 0) hvars.insert(i);
+	DBG(assert(a.size() == a.t.size());)
 	for (size_t n = 0; n != a.size(); ++n) {
 		for (int_t i : a.t[n])
 			if (i < 0 && !has(hvars, i))
@@ -467,15 +470,14 @@ void tables::add_prog(const raw_prog& p) {
 	get_rules(p);
 }
 
-spbdd_handle tables::deltail(spbdd_handle x, size_t len1, size_t len2) const {
-	if (len1 == len2) return x;
+pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	bools ex(len1 * bits, false);
 	uints perm = perm_init(len1 * bits);
 	for (size_t n = 0; n != len1; ++n)
 		for (size_t k = 0; k != bits; ++k)
 			if (n >= len2) ex[pos(k, n, len1)] = true;
 			else perm[pos(k, n, len1)] = pos(k, n, len2);
-	return bdd_permute_ex(x, ex, perm);
+	return { ex, perm };
 }
 
 spbdd_handle tables::body_query(body& b) {
@@ -492,7 +494,7 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 	return x->b < y->b;
 };
 
-void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
+void tables::alt_query(alt& a, bdd_handles& v) {
 /*	spbdd_handle t = bdd_handle::T;
 	for (auto x : a.order) {
 		bdd_handles v1;
@@ -514,7 +516,7 @@ void tables::alt_query(alt& a, size_t len, bdd_handles& v) {
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = v1;
 	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
-		v.push_back(a.rlast = deltail(x, a.varslen, len));
+		v.push_back(a.rlast = bdd_permute_ex(x, a.ex, a.perm));
 }
 
 bool tables::table::commit() {
@@ -537,7 +539,7 @@ bool tables::fwd() {
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
 		bdd_handles v;
-		for (alt& a : r) alt_query(a, r.len, v);
+		for (alt& a : r) alt_query(a, v);
 		spbdd_handle x;
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;

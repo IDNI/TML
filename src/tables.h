@@ -67,6 +67,8 @@ class tables {
 		bdd_handles last;
 		std::vector<term> t;
 		std::vector<std::pair<uints, bools>> order;
+		bools ex;
+		uints perm;
 		bool operator<(const alt& t) const {
 			if (varslen != t.varslen) return varslen < t.varslen;
 			if (rng != t.rng) return rng < t.rng;
@@ -156,9 +158,9 @@ class tables {
 	void align_vars(term& h, std::set<term>& b) const;
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
-	spbdd_handle deltail(spbdd_handle x, size_t len1, size_t len2) const;
+	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b);
-	void alt_query(alt& a, size_t len, bdd_handles& v);
+	void alt_query(alt& a, bdd_handles& v);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;

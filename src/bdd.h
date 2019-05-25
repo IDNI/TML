@@ -128,13 +128,17 @@ class bdd {
 	}
 
 	static int_t bdd_and(int_t x, int_t y);
+	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
 	static int_t bdd_and1(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
 	static int_t bdd_ite(int_t x, int_t y, int_t z);
 	static int_t bdd_ite_var(uint_t x, int_t y, int_t z);
 	static int_t bdd_and_many(bdds v);
+	static int_t bdd_and_many_ex(bdds v, const bools& ex,
+		std::unordered_map<bdds, int_t>& memo);
 	static int_t bdd_ex(int_t x, const bools& b,
 		std::unordered_map<int_t, int_t>& memo);
+	static int_t bdd_ex(int_t x, const bools& b);
 	static int_t bdd_permute(const int_t& x, const uints& m,
 		std::unordered_map<int_t, int_t>& memo);
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m,
@@ -142,9 +146,12 @@ class bdd {
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
+	static size_t bdd_and_many_ex_iter(bdds v, bdds& h, bdds& l, int_t &res,
+		size_t &m, const bools& ex, std::unordered_map<bdds, int_t>&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
-	static bool am_simplify(bdds& v);
+	static bool am_simplify(bdds& v,
+		const std::unordered_map<bdds, int_t>&m=AM);
 	static void bdd_sz(int_t x, std::set<int_t>& s);
 	inline static int_t add(int_t v, int_t h, int_t l) {
 		DBG(assert(h && l && v > 0);)
