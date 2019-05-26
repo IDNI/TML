@@ -55,6 +55,9 @@ struct bdd_key {
 
 template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
+template<> struct std::hash<std::array<int_t, 2>>{
+	size_t operator()(const std::array<int_t, 2>&) const;
+};
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
 const int_t T = 1, F = -1;
@@ -72,6 +75,7 @@ spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
+spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 spbdd_handle bdd_or_many(const bdd_handles& v);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
@@ -91,6 +95,7 @@ class bdd {
 	friend spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y,
 		cr_spbdd_handle z);
 	friend spbdd_handle bdd_and_many(bdd_handles v);
+	friend spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 	friend spbdd_handle bdd_or_many(const bdd_handles& v);
 	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
 		const uints& m);
@@ -102,9 +107,6 @@ class bdd {
 
 	static std::vector<std::unordered_map<bdd_key, int_t>> Mp;
 	static std::vector<std::unordered_map<bdd_key, int_t>> Mn;
-	static std::unordered_map<ite_memo, int_t> C;
-	static std::unordered_map<bdds, int_t> AM;
-	static std::unordered_set<int_t> S;
 
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
@@ -129,11 +131,14 @@ class bdd {
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
+	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex,
+		std::unordered_map<std::array<int_t, 2>, int_t>& memo);
 	static int_t bdd_and1(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
 	static int_t bdd_ite(int_t x, int_t y, int_t z);
 	static int_t bdd_ite_var(uint_t x, int_t y, int_t z);
 	static int_t bdd_and_many(bdds v);
+	static int_t bdd_and_many_ex(bdds v, const bools& ex);
 	static int_t bdd_and_many_ex(bdds v, const bools& ex,
 		std::unordered_map<bdds, int_t>& memo);
 	static int_t bdd_ex(int_t x, const bools& b,
@@ -146,12 +151,11 @@ class bdd {
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
-	static size_t bdd_and_many_ex_iter(bdds v, bdds& h, bdds& l, int_t &res,
+	static size_t bdd_and_many_ex_iter(bdds&v, bdds& h, bdds& l, int_t &res,
 		size_t &m, const bools& ex, std::unordered_map<bdds, int_t>&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
-	static bool am_simplify(bdds& v,
-		const std::unordered_map<bdds, int_t>&m=AM);
+	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
 	static void bdd_sz(int_t x, std::set<int_t>& s);
 	inline static int_t add(int_t v, int_t h, int_t l) {
 		DBG(assert(h && l && v > 0);)

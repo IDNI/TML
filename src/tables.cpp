@@ -514,9 +514,12 @@ void tables::alt_query(alt& a, bdd_handles& v) {
 		} else v1.push_back(x);
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
-	a.last = v1;
-	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
-		v.push_back(a.rlast = bdd_permute_ex(x, a.ex, a.perm));
+	a.last = move(v1);
+	if ((x = bdd_and_many(a.last) / a.ex) != bdd_handle::F)
+	//if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
+		v.push_back(a.rlast = x ^ a.perm);
+//	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
+//		v.push_back(a.rlast = bdd_permute_ex(x, a.ex, a.perm));
 }
 
 bool tables::table::commit() {
