@@ -95,7 +95,7 @@ class tables {
 		spbdd_handle t = bdd_handle::F;
 		bdd_handles add, del;
 		bool ext = true; // extensional
-		bool commit();
+		bool commit(DBG(size_t));
 	};
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
@@ -159,8 +159,8 @@ class tables {
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
-	spbdd_handle body_query(body& b);
-	void alt_query(alt& a, bdd_handles& v);
+	spbdd_handle body_query(body& b, size_t);
+	void alt_query(alt& a, bdd_handles& v, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;

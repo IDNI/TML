@@ -86,6 +86,8 @@ spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
+size_t bdd_nvars(spbdd_handle x);
+size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
 
@@ -119,6 +121,7 @@ class bdd {
 		const bools&);
 	friend vbools allsat(cr_spbdd_handle x, uint_t nvars);
 	friend spbdd_handle from_bit(uint_t b, bool v);
+	friend size_t bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
@@ -179,6 +182,8 @@ class bdd {
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
 	static void bdd_sz(int_t x, std::set<int_t>& s);
+	static void bdd_nvars(int_t x, std::set<int_t>& s);
+	static size_t bdd_nvars(int_t x);
 	inline static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }

@@ -38,6 +38,8 @@ auto am_cmp = [](int_t x, int_t y) {
 	return x < y ? true : x == y ? s : false;
 };
 
+const size_t gclimit = 1e+6;
+
 void bdd::init() {
 	S.insert(0), S.insert(1), V.emplace_back(0, 0, 0), // dummy
 	V.emplace_back(0, 1, 1), Mp.resize(1),
@@ -82,7 +84,7 @@ int_t bdd::bdd_and1(int_t x, int_t y) {
 	if (y == T) return x;
 	if (x > y) swap(x, y);
 #ifdef MEMO
-	if (C.size() >= 1e+6) {
+	if (C.size() >= gclimit) {
 		const bdd bx = get(x), by = get(y);
 		if (bx.v < by.v)
 			return add(bx.v, bdd_and1(bx.h, y), bdd_and1(bx.l, y));
@@ -115,6 +117,7 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 //	wcerr<<"done "<<sx.size()<<endl;
 	return r;
 }
+
 int_t bdd::bdd_ite_var(uint_t x, int_t y, int_t z) {
 	return bdd_ite(from_bit(x, true), y, z);
 }
@@ -151,6 +154,7 @@ int_t bdd::bdd_ite(int_t x, int_t y, int_t z) {
 	else if (s == by.v)
 		r =	add(by.v, bdd_ite(x, by.h, z), bdd_ite(x, by.l, z));
 	else	r =	add(bz.v, bdd_ite(x, y, bz.h), bdd_ite(x, y, bz.l));
+	if (C.size() > gclimit) return r;
 	return C.emplace(ite_memo{x, y, z}, r), r;
 }
 
@@ -165,7 +169,7 @@ void am_sort(bdds& b) {
 		else ++n;
 }
 
-size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m) {
+size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, int_t &res, size_t &m){
 	size_t i;
 	bool flag = false;
 	m = var(v[0]);
@@ -378,7 +382,7 @@ int_t bdd::bdd_and_many_ex(bdds v, const bools& ex,
 	bdd_and_many_ex_iter(v, vh, vl, m),
 	l = bdd_and_many_ex(move(vl), ex, memo),
 	h = bdd_and_many_ex(move(vh), ex, memo);
-	if (ex[m-1]) res = bdd_or(h, l);
+	if (ex[m - 1]) res = bdd_or(h, l);
 	else res = add(m, h, l);
 	return memo.emplace(v, res).first->second;
 }
@@ -398,9 +402,9 @@ int_t bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p,
 	bdd_and_many_ex_iter(v, vh, vl, m),
 	l = bdd_and_many_ex(move(vl), ex, memo),
 	h = bdd_and_many_ex(move(vh), ex, memo);
-	if (ex[m-1]) res = bdd_or(h, l);
+	if (ex[m - 1]) res = bdd_or(h, l);
 	else res = bdd_ite_var(p[m-1], h, l);
-	return memo.emplace(v, res).first->second;
+	return memo.emplace(v, res), res;
 }
 
 int_t bdd::bdd_and_many_ex(bdds v, const bools& ex) {
@@ -412,11 +416,7 @@ int_t bdd::bdd_and_many_ex(bdds v, const bools& ex) {
 }
 
 int_t bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p) {
-	int_t r;
-	DBG(int_t t = bdd_ex(bdd_and_many(v), ex);)
-	r = bdd_and_many_ex_perm(v, ex, p, AMXP[{ex,p}]);
-	DBG(assert(r == t);)
-	return r;
+	return bdd_and_many_ex_perm(v, ex, p, AMXP[{ex,p}]);
 }
 
 void bdd::mark_all(int_t i) {
@@ -593,7 +593,7 @@ spbdd_handle bdd_and_many(bdd_handles v) {
 /*	int_t r = T;
 	for (auto x : v) r = bdd::bdd_and(r, x->b);
 	return bdd_handle::get(r);*/
-	if (V.size() >= 1e+6) bdd::gc();
+	if (V.size() >= gclimit) bdd::gc();
 /*	if (v.size() > 16) {
 		bdd_handles x, y;
 		spbdd_handle r;
@@ -614,7 +614,7 @@ spbdd_handle bdd_and_many(bdd_handles v) {
 }
 
 spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex) {
-	if (V.size() >= 1e+6) bdd::gc();
+	if (V.size() >= gclimit) bdd::gc();
 	bool t = false;
 	for (bool x : ex) t |= x;
 	if (!t) return bdd_and_many(move(v));
@@ -630,7 +630,9 @@ spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex) {
 
 spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& ex,
 	const uints& p) {
-	if (V.size() >= 1e+6) bdd::gc();
+	if (V.size() >= gclimit) bdd::gc();
+	DBG(assert(bdd_nvars(v) < ex.size());)
+	DBG(assert(bdd_nvars(v) < p.size());)
 	bool t = false;
 	for (bool x : ex) t |= x;
 	if (!t) return bdd_and_many(move(v));
@@ -715,6 +717,7 @@ int_t bdd::bdd_permute(const int_t& x, const uints& m,
 }
 
 spbdd_handle operator^(cr_spbdd_handle x, const uints& m) {
+	DBG(assert(bdd_nvars(x) < m.size());)
 	return bdd_handle::get(bdd::bdd_permute(x->b, m, memos_perm[m]));
 }
 
@@ -742,26 +745,42 @@ int_t bdd::bdd_permute_ex(int_t x, const bools& b, const uints& m) {
 }
 
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m) {
+	DBG(assert(bdd_nvars(x) < b.size());)
+	DBG(assert(bdd_nvars(x) < m.size());)
 	return bdd_handle::get(bdd::bdd_permute_ex(x->b, b, m));
 }
 
 spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b, const uints& m) {
+	DBG(assert(bdd_nvars(x) < b.size());)
+	DBG(assert(bdd_nvars(x) < m.size());)
+	DBG(assert(bdd_nvars(y) < b.size());)
+	DBG(assert(bdd_nvars(y) < m.size());)
 	return bdd_handle::get(bdd::bdd_and_ex_perm(x->b, y->b, b, m));
 }
 
 spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b) {
+	DBG(assert(bdd_nvars(x) < b.size());)
+	DBG(assert(bdd_nvars(y) < b.size());)
+//	out(wcout, x)<<endl<<endl;
+//	out(wcout, y)<<endl<<endl;
 	return bdd_handle::get(bdd::bdd_and_ex(x->b, y->b, b));
 }
 
 spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b) {
+	DBG(assert(bdd_nvars(x) < b.size());)
+	DBG(assert(bdd_nvars(y) < b.size());)
 	return bdd_handle::get(bdd::bdd_and_ex(x->b, -y->b, b));
 }
 
 spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b, const uints& m) {
+	DBG(assert(bdd_nvars(x) < b.size());)
+	DBG(assert(bdd_nvars(y) < b.size());)
+	DBG(assert(bdd_nvars(x) < m.size());)
+	DBG(assert(bdd_nvars(y) < m.size());)
 	return bdd_handle::get(bdd::bdd_and_ex_perm(x->b, -y->b, b, m));
 }
 
@@ -773,6 +792,25 @@ spbdd_handle from_eq(uint_t x, uint_t y) {
 	return bdd_ite(from_bit(x,true), from_bit(y,true), from_bit(y,false));
 }
 
+void bdd::bdd_nvars(int_t x, set<int_t>& s) {
+	if (!leaf(x)) s.insert(var(x)-1), bdd_nvars(hi(x),s),bdd_nvars(lo(x),s);
+}
+
+size_t bdd::bdd_nvars(int_t x) {
+	if (leaf(x)) return 0;
+	set<int_t> s;
+	bdd_nvars(x, s);
+	size_t r = *s.rbegin();
+	return r;
+}
+
+size_t bdd_nvars(bdd_handles x) {
+	size_t r = 0;
+	for (auto y : x) r = max(r, bdd_nvars(y));
+	return r;
+}
+
+size_t bdd_nvars(spbdd_handle x) { return bdd::bdd_nvars(x->b); }
 bool leaf(cr_spbdd_handle h) { return bdd::leaf(h->b); }
 bool trueleaf(cr_spbdd_handle h) { return bdd::trueleaf(h->b); }
 wostream& out(wostream& os, cr_spbdd_handle x) { return bdd::out(os, x->b); }
@@ -799,47 +837,6 @@ bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
 
 wostream& bdd::out(wostream& os, int_t x) {
 	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
-	if (x < 0) {
-		os << L"~(";
-		const bdd b = V[-x];
-		return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l)<<")";
-	}
-	const bdd b = V[x];
+	const bdd b = get(x);
 	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
-
-//	if (x < 0) x = -x, os << L'~';
-//	const bdd b = get(x);
-//	const bdd b = V[x];
-//	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
 }
-
-/*wostream& operator<<(wostream& os, const bools& x) {
-	for (auto y : x) os << (y ? 1 : 0);
-	return os;
-}
-
-wostream& operator<<(wostream& os, const vbools& x) {
-	for (auto y : x) os << y << endl;
-	return os;
-}
-
-spbdd_handle rand_bdd(int_t n = 5) {
-	if (!n) return bdd_ite(
-			from_bit(random()%10, random()&1),
-			from_bit(random()%10, random()&1),
-			from_bit(random()%10, random()&1));
-	return bdd_ite(rand_bdd(n-1), rand_bdd(n-1), rand_bdd(n-1));
-}
-
-void test_and_many() {
-	set<spbdd_handle> s;
-	for (size_t k = 0; k != 100; ++k) {
-		bdd_handles b;
-		for (size_t n = 0; n != 8; ++n) b.push_back(rand_bdd());
-		spbdd_handle r = bdd_handle::T;
-		for (cr_spbdd_handle i : b) r = r && i;
-		assert(r == bdd_and_many(b));
-		cout<<k<<endl;
-		if (random()&1) s.insert(r);
-	}
-}*/
