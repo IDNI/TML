@@ -15,7 +15,7 @@
 #include "bdd.h"
 using namespace std;
 
-#define MEMO
+//#define MEMO
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 vector<bdd> V;
@@ -49,7 +49,7 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
 	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
 	if (h == l) return h;
-	if (h > l) std::swap(h, l), v = -v;
+//	if (h < l) std::swap(h, l), v = -v;
 	static std::unordered_map<bdd_key, int_t>::const_iterator it;
 	static bdd_key k;
 	auto &mm = v < 0 ? Mn : Mp;
@@ -296,24 +296,37 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex,
 		v = by.v,
 		rx = bdd_and_ex(x, by.h, ex, memo),
 		ry = bdd_and_ex(x, by.l, ex, memo);
-	else	v = bx.v,
+	else
+		v = bx.v,
 		rx = bdd_and_ex(bx.h, by.h, ex, memo),
 		ry = bdd_and_ex(bx.l, by.l, ex, memo);
-	DBG(assert(v-1<ex.size());)
-	r = ex[v-1] ? bdd_or(rx, ry) : add(v, rx, ry);
+	DBG(assert((size_t)v - 1 < ex.size());)
+	r = ex[v - 1] ? bdd_or(rx, ry) : add(v, rx, ry);
+#ifdef DEBUG	
+	int_t t = bdd_ex(bdd_and(x, y), ex);
+	if (r != t) {
+		out(wcout<<"x:"<<endl, x)<<endl;
+		out(wcout<<"y:"<<endl, y)<<endl;
+		out(wcout<<"r:"<<endl, r)<<endl;
+		out(wcout<<"t:"<<endl, t)<<endl;
+		exit(0);
+		r = bdd_and_ex(x, y, ex);
+		t = bdd_ex(bdd_and(x, y), ex);
+	}
+	DBG(assert(r == t);)
+#endif
 	return memo.emplace(m, r), r;
 }
 
 int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex) {
 	int_t r = bdd_and_ex(x, y, ex, CX[ex]);
-	DBG(assert(r == bdd_ex(bdd_and(x, y), ex));)
+	DBG(int_t t = bdd_ex(bdd_and(x, y), ex);)
+	DBG(assert(r == t);)
 	return r;
 }
 
-size_t bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t &res,
-	size_t &m) {
+void bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, size_t &m) {
 	size_t i;
-	bool flag = false;
 	m = var(v[0]);
 	for (i = 1; i != v.size(); ++i) m = min(m, (size_t)var(v[i]));
 	h.reserve(v.size()), l.reserve(v.size());
@@ -321,19 +334,11 @@ size_t bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t &res,
 		if (var(v[i]) != m) h.push_back(v[i]);
 		else if (!leaf(hi(v[i]))) h.push_back(hi(v[i]));
 		else if (!trueleaf(hi(v[i]))) { h = {F}; break; }
-//		{ flag = true; break; }
-//	if (!flag)
-		am_sort(h);
 	for (i = 0; i != v.size(); ++i)
 		if (var(v[i]) != m) l.push_back(v[i]);
 		else if (!leaf(lo(v[i]))) l.push_back(lo(v[i]));
 		else if (!trueleaf(lo(v[i]))) { l = {F}; break; }
-			//return flag ? res = F, 1 : 2;
-	am_sort(l);
-//	if (!flag) { if (h.size() && h[0] == F) flag = true; }
-//	if (l.size() && l[0] == F) return flag ? 3 : (res = F, 1);
-//	if (flag) return 3;
-	return 0;
+	am_sort(h), am_sort(l);
 }
 
 int_t bdd::bdd_and_many_ex(bdds v, const bools& ex,
@@ -355,30 +360,24 @@ int_t bdd::bdd_and_many_ex(bdds v, const bools& ex,
 	if (v.empty()) return T;
 	if (v.size() == 1) return bdd_ex(v[0], ex);
 	if (v.size() == 2) return bdd_and_ex(v[0], v[1], ex);
-	for (int_t x : v) wcout << x << ' ';
-	wcout << endl;
+//	for (int_t x : v) wcout << x << ' ';
+//	wcout << endl;
 	auto it = memo.find(v);
 	if (it != memo.end()) return it->second;
 	int_t res = F, h, l;
 	size_t m = 0;
 	bdds vh, vl;
-	switch (bdd_and_many_ex_iter(v, vh, vl, res, m)) {
-		case 0: l = bdd_and_many_ex(move(vl), ex, memo),
-			h = bdd_and_many_ex(move(vh), ex, memo);
-			break;
-		case 1: return memo.emplace(v, res), res;
-		case 2: h = bdd_and_many_ex(move(vh), ex, memo), l = F; break;
-		case 3: h = F, l = bdd_and_many_ex(move(vl), ex, memo); break;
-		default: throw 0;
-	}
+	bdd_and_many_ex_iter(v, vh, vl, m),
+	l = bdd_and_many_ex(move(vl), ex, memo),
+	h = bdd_and_many_ex(move(vh), ex, memo);
 	if (ex[m-1]) res = bdd_or(h, l);
 	else res = bdd::add(m, h, l);
 	return memo.emplace(v, res).first->second;
 }
 
 int_t bdd::bdd_and_many_ex(bdds v, const bools& ex) {
-	int_t r, t;
-	DBG(t = bdd_ex(bdd_and_many(v), ex);)
+	int_t r;
+	DBG(int_t t = bdd_ex(bdd_and_many(v), ex);)
 	r = bdd_and_many_ex(v, ex, AMX[ex]);
 	DBG(assert(r == t);)
 	return r;
@@ -628,11 +627,10 @@ int_t bdd::bdd_ex(int_t x, const bools& b, unordered_map<int_t, int_t>& memo) {
 	if (leaf(x)) return x;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
-	int_t y = x;
 	DBG(assert(var(x)-1 < b.size());)
 	if (b[var(x) - 1]) return bdd_ex(bdd_or(hi(x), lo(x)), b, memo);
-	return memo.emplace(y, bdd::add(var(y), bdd_ex(hi(y), b, memo),
-				bdd_ex(lo(y), b, memo))).first->second;
+	return memo.emplace(x, bdd::add(var(x), bdd_ex(hi(x), b, memo),
+				bdd_ex(lo(x), b, memo))).first->second;
 }
 
 int_t bdd::bdd_ex(int_t x, const bools& b) {
@@ -722,9 +720,18 @@ bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
 
 wostream& bdd::out(wostream& os, int_t x) {
 	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
-	if (x < 0) x = -x, os << L'~';
-	const bdd& b = V[x];
+	if (x < 0) {
+		os << L"~(";
+		const bdd b = V[-x];
+		return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l)<<")";
+	}
+	const bdd b = V[x];
 	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
+
+//	if (x < 0) x = -x, os << L'~';
+//	const bdd b = get(x);
+//	const bdd b = V[x];
+//	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
 }
 
 /*wostream& operator<<(wostream& os, const bools& x) {

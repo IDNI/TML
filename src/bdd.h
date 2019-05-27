@@ -149,8 +149,8 @@ class bdd {
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
-	static size_t bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
-		int_t &res, size_t &m);
+	static void bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
+		size_t &m);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
