@@ -292,8 +292,8 @@ raw_progs::raw_progs(const std::wstring& s) {
 		tokof(CLOSEC, -1, pos-1);
 	} while (pos < l.size());
 	tokof(PROGS, -1, 0);
-	DBG(for (auto t : token::tokens) wcout << token::name(t.type) <<
-		L": \"" << t.e << L'"' << endl;)
+//	DBG(for (auto t : token::tokens) wcout << token::name(t.type) <<
+//		L": \"" << t.e << L'"' << endl;)
 }
 
 bool operator==(const lexeme& x, const lexeme& y) {

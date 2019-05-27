@@ -80,6 +80,7 @@ spbdd_handle bdd_or_many(const bdd_handles& v);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
+extern std::vector<class bdd> V;
 
 class bdd {
 	friend class bdd_handle;
@@ -104,9 +105,6 @@ class bdd {
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
-
-	static std::vector<std::unordered_map<bdd_key, int_t>> Mp;
-	static std::vector<std::unordered_map<bdd_key, int_t>> Mn;
 
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
@@ -151,38 +149,13 @@ class bdd {
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
-	static size_t bdd_and_many_ex_iter(bdds&v, bdds& h, bdds& l, int_t &res,
-		size_t &m, const bools& ex, std::unordered_map<bdds, int_t>&);
+	static size_t bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
+		int_t &res, size_t &m);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
 	static void bdd_sz(int_t x, std::set<int_t>& s);
-	inline static int_t add(int_t v, int_t h, int_t l) {
-		DBG(assert(h && l && v > 0);)
-		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-		DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-//		DBG(assert(M.size() == V.size());)
-		if (h == l) return h;
-		if (h > l) std::swap(h, l), v = -v;
-		static std::unordered_map<bdd_key, int_t>::const_iterator it;
-		static bdd_key k;
-		auto &mm = v < 0 ? Mn : Mp;
-		if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
-		auto &m = mm[abs(v)];
-		if (l < 0) {
-			k = bdd_key(hash_pair(-h, -l), -h, -l);
-			return	(it = m.find(k)) != m.end() ? -it->second :
-				(V.emplace_back(v, -h, -l),
-				m.emplace(std::move(k), V.size()-1),
-				-V.size()+1);
-		}
-		k = bdd_key(hash_pair(h, l), h, l);
-		return	(it = m.find(k)) != m.end() ? it->second :
-			(V.emplace_back(v, h, l),
-			m.emplace(std::move(k), V.size()-1),
-			V.size()-1);
-	}
-
+	inline static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
@@ -193,7 +166,6 @@ public:
 	inline bool operator==(const bdd& b) const {
 		return v == b.v && h == b.h && l == b.l;
 	}
-	static std::vector<bdd> V;
 	static void init();
 	static void gc();
 };

@@ -306,8 +306,8 @@ void tables::get_rules(const raw_prog& p) {
 		ts[x.first].t = r;
 	}
 	measure_time_end();
-	for (table& t : ts) wcout << t.t->b << ' ';
-	wcout<<endl;
+//	for (table& t : ts) wcout << t.t->b << ' ';
+//	wcout<<endl;
 	f.clear();
 	set<rule> rs;
 	for (auto x : m) {
@@ -515,8 +515,8 @@ void tables::alt_query(alt& a, bdd_handles& v) {
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = move(v1);
-	if ((x = bdd_and_many(a.last) / a.ex) != bdd_handle::F)
-	//if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
+	//if ((x = bdd_and_many(a.last) / a.ex) != bdd_handle::F)
+	if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
 		v.push_back(a.rlast = x ^ a.perm);
 //	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
 //		v.push_back(a.rlast = bdd_permute_ex(x, a.ex, a.perm));
