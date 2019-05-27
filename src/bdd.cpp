@@ -57,7 +57,7 @@ auto am_cmp = [](int_t x, int_t y) {
 	return x < y ? true : x == y ? s : false;
 };
 
-const size_t gclimit = 5e+6;
+const size_t gclimit = 1e+6;
 
 void bdd::init() {
 	S.insert(0), S.insert(1), V.emplace_back(0, 0, 0), // dummy
@@ -333,34 +333,43 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex,
 	return memo.emplace(m, r), r;
 }
 
-int_t bdd::bdd_and_ex_perm(int_t x, int_t y, const bools& ex, const uints& p,
-	unordered_map<array<int_t, 2>, int_t>& memo) {
-	DBG(assert(x && y);)
-	if (x == F || y == F || x == -y) return F;
-	if (x == T || x == y) return bdd_permute_ex(y, ex, p);
-	if (y == T) return bdd_permute_ex(x, ex, p);
-	if (x > y) swap(x, y);
-	array<int_t, 2> m = {x, y};
-	auto it = memo.find(m);
-	if (it != memo.end()) return it->second;
-	const bdd bx = get(x), by = get(y);
-	int_t rx, ry, v, r;
-	if (bx.v < by.v)
-		v = bx.v,
-		rx = bdd_and_ex_perm(bx.h, y, ex, p, memo),
-		ry = bdd_and_ex_perm(bx.l, y, ex, p, memo);
-	else if (bx.v > by.v)
-		v = by.v,
-		rx = bdd_and_ex_perm(x, by.h, ex, p, memo),
-		ry = bdd_and_ex_perm(x, by.l, ex, p, memo);
-	else
-		v = bx.v,
-		rx = bdd_and_ex_perm(bx.h, by.h, ex, p, memo),
-		ry = bdd_and_ex_perm(bx.l, by.l, ex, p, memo);
-	DBG(assert((size_t)v - 1 < ex.size());)
-	r = ex[v - 1] ? bdd_or(rx, ry) : bdd_ite_var(p[v-1], rx, ry);
-	return memo.emplace(m, r), r;
-}
+struct sbdd_and_ex_perm {
+	const bools& ex;
+	const uints& p;
+	unordered_map<array<int_t, 2>, int_t>& memo;
+	unordered_map<int_t, int_t>& m2;
+	int_t last;
+
+	sbdd_and_ex_perm(const bools& ex, const uints& p,
+	unordered_map<array<int_t, 2>, int_t>& memo,
+	unordered_map<int_t, int_t>& m2, int_t last) :
+		ex(ex), p(p), memo(memo), m2(m2), last(last) {}
+
+	int_t operator()(int_t x, int_t y) {
+		DBG(assert(x && y);)
+		if (x == F || y == F || x == -y) return F;
+		if (x == T || x == y)
+			return bdd::bdd_permute_ex(y, ex, p, last, m2);
+		if (y == T) return bdd::bdd_permute_ex(x, ex, p, last, m2);
+		if (x > y) swap(x, y);
+		array<int_t, 2> m = {x, y};
+		auto it = memo.find(m);
+		if (it != memo.end()) return it->second;
+		const bdd bx = bdd::get(x), by = bdd::get(y);
+		int_t rx, ry, v, r;
+		if (bx.v > last+1 && by.v > last+1)
+			return memo.emplace(m, r = bdd::bdd_and(x, y)), r;
+		if (bx.v < by.v)
+			v = bx.v, rx = (*this)(bx.h, y), ry = (*this)(bx.l, y);
+		else if (bx.v > by.v)
+			v = by.v, rx = (*this)(x, by.h), ry = (*this)(x, by.l);
+		else v = bx.v, rx = (*this)(bx.h,by.h), ry = (*this)(bx.l,by.l);
+		DBG(assert((size_t)v - 1 < ex.size());)
+		r = ex[v - 1] ? bdd::bdd_or(rx, ry) :
+			bdd::bdd_ite_var(p[v-1], rx, ry);
+		return memo.emplace(m, r), r;
+	}
+};
 
 int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex) {
 	int_t last = ex.size();
@@ -372,7 +381,10 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex) {
 }
 
 int_t bdd::bdd_and_ex_perm(int_t x, int_t y, const bools& ex, const uints& p) {
-	return bdd_and_ex_perm(x, y, ex, p, CXP[{ex,p}]);
+	size_t last = ex.size();
+	for (size_t n = 0; n != ex.size(); ++n) if (ex[n]||(p[n]!=n)) last = n;
+	return	sbdd_and_ex_perm(ex,p,CXP[{ex,p}],memos_perm_ex[{p,ex}],last)
+		(x,y);
 }
 
 void bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, size_t &m) {
@@ -432,25 +444,44 @@ struct sbdd_and_many_ex {
 	}
 };
 
-int_t bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p,
-	unordered_map<bdds, int_t>& memo) {
-	if (v.empty()) return T;
-	if (v.size() == 1) return bdd_permute_ex(v[0], ex, p);
-	if (v.size() == 2) return bdd_and_ex_perm(v[0], v[1], ex, p);
-//	for (int_t x : v) wcout << x << ' ';
-//	wcout << endl;
-	auto it = memo.find(v);
-	if (it != memo.end()) return it->second;
-	int_t res = F, h, l;
-	size_t m = 0;
-	bdds vh, vl;
-	bdd_and_many_ex_iter(v, vh, vl, m),
-	l = bdd_and_many_ex_perm(move(vl), ex, p, memo),
-	h = bdd_and_many_ex_perm(move(vh), ex, p, memo);
-	if (ex[m - 1]) res = bdd_or(h, l);
-	else res = bdd_ite_var(p[m-1], h, l);
-	return memo.emplace(v, res), res;
-}
+struct sbdd_and_many_ex_perm {
+	const bools& ex;
+	const uints& p;
+	unordered_map<bdds, int_t>& memo;
+	unordered_map<array<int_t, 2>, int_t>& m2;
+	unordered_map<int_t, int_t>& m3;
+	int_t last;
+	
+	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
+		unordered_map<bdds, int_t>& memo,
+		unordered_map<array<int_t, 2>, int_t>& m2,
+		unordered_map<int_t, int_t>& m3, int_t last) :
+		ex(ex), p(p), memo(memo), m2(m2), m3(m3), last(last) {}
+
+	int_t operator()(bdds v) {
+		if (v.empty()) return T;
+		if (v.size() == 1)
+			return bdd::bdd_permute_ex(v[0], ex, p, last, m3);
+		if (v.size() == 2)
+			return sbdd_and_ex_perm(ex, p, m2, m3, last)(v[0],v[1]);
+		auto it = memo.find(v);
+		if (it != memo.end()) return it->second;
+		int_t res = F, h, l;
+		size_t m = 0;
+		bdds vh, vl;
+		bdd::bdd_and_many_ex_iter(v, vh, vl, m);
+		if ((int_t)m > last+1)
+			res = bdd::add(m,
+				bdd::bdd_and_many(vh), bdd::bdd_and_many(vl));
+		else {
+			l = (*this)(move(vl)),
+			h = (*this)(move(vh));
+			if (ex[m - 1]) res = bdd::bdd_or(h, l);
+			else res = bdd::bdd_ite_var(p[m-1], h, l);
+		}
+		return memo.emplace(v, res), res;
+	}
+};
 
 int_t bdd::bdd_and_many_ex(bdds v, const bools& ex) {
 	int_t r;
@@ -461,7 +492,10 @@ int_t bdd::bdd_and_many_ex(bdds v, const bools& ex) {
 }
 
 int_t bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p) {
-	return bdd_and_many_ex_perm(v, ex, p, AMXP[{ex,p}]);
+	size_t last = ex.size();
+	for (size_t n = 0; n != ex.size(); ++n) if (ex[n]||(p[n]!=n)) last = n;
+	return sbdd_and_many_ex_perm(ex, p, AMXP[{ex,p}], CXP[{ex,p}],
+			memos_perm_ex[{p,ex}], last)(v);
 }
 
 void bdd::mark_all(int_t i) {

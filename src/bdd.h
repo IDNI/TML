@@ -95,6 +95,8 @@ class bdd {
 	friend class bdd_handle;
 	friend class allsat_cb;
 	friend struct sbdd_and_many_ex;
+	friend struct sbdd_and_ex_perm;
+	friend struct sbdd_and_many_ex_perm;
 	friend spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -175,12 +177,13 @@ class bdd {
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static void bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		size_t &m);
-	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
-		const uints&, std::unordered_map<std::array<int_t, 2>, int_t>&);
+/*	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
+		const uints&, std::unordered_map<std::array<int_t, 2>, int_t>&,
+		std::unordered_map<int_t, int_t>&, int_t last);*/
 	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
 		const uints&);
-	static int_t bdd_and_many_ex_perm(bdds v, const bools& ex, const uints&,
-		std::unordered_map<bdds, int_t>& memo);
+/*	static int_t bdd_and_many_ex_perm(bdds v, const bools& ex, const uints&,
+		std::unordered_map<bdds, int_t>& memo);*/
 	static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);

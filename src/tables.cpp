@@ -489,7 +489,8 @@ spbdd_handle tables::body_query(body& b, size_t DBG(len)) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	b.rlast=(b.neg?bdd_and_not_ex:bdd_and_ex)(b.q,ts[b.tab].t,b.ex)^b.perm;
+	b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
+		(b.q, ts[b.tab].t, b.ex, b.perm);
 	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
 	return b.rlast;
 //	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
@@ -524,10 +525,10 @@ void tables::alt_query(alt& a, bdd_handles& v, size_t DBG(len)) {
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = move(v1);
-	if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
-		v.push_back(a.rlast = x ^ a.perm);
-//	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != bdd_handle::F)
-//		v.push_back(a.rlast = x);
+//	if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
+//		v.push_back(a.rlast = x ^ a.perm);
+	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != bdd_handle::F)
+		v.push_back(a.rlast = x);
 	DBG(assert(bdd_nvars(a.rlast) < len*bits);)
 }
 
