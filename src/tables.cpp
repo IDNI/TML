@@ -486,8 +486,14 @@ spbdd_handle tables::body_query(body& b) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
-			(b.q && ts[b.tab].t), b.ex, b.perm);
+	if (b.neg) b.rlast = bdd_and_not_ex(b.q, ts[b.tab].t, b.ex);
+	else b.rlast = bdd_and_ex(b.q, ts[b.tab].t, b.ex);
+	return b.rlast = b.rlast ^ b.perm;
+	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
+	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
+	return b.rlast;
+//	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
+//			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
 
 auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
@@ -515,11 +521,10 @@ void tables::alt_query(alt& a, bdd_handles& v) {
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) { v.push_back(a.rlast); return; }
 	a.last = move(v1);
-	//if ((x = bdd_and_many(a.last) / a.ex) != bdd_handle::F)
 	if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
 		v.push_back(a.rlast = x ^ a.perm);
-//	if ((x = bdd_and_many(move(v1))) != bdd_handle::F)
-//		v.push_back(a.rlast = bdd_permute_ex(x, a.ex, a.perm));
+//	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != bdd_handle::F)
+//		v.push_back(a.rlast = x);
 }
 
 bool tables::table::commit() {

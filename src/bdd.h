@@ -77,6 +77,13 @@ spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
 spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 spbdd_handle bdd_or_many(const bdd_handles& v);
+spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools& b);
+spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
+spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+	const bools& b, const uints& m);
+spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+	const bools& b, const uints& m);
+spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
@@ -100,6 +107,16 @@ class bdd {
 	friend spbdd_handle bdd_or_many(const bdd_handles& v);
 	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
 		const uints& m);
+	friend spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle,
+		const bools& b, const uints& m);
+	friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x,
+		cr_spbdd_handle, const bools& b, const uints& m);
+	friend spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b,
+		const uints&);
+	friend spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
+		const bools& b);
+	friend spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
+		const bools&);
 	friend vbools allsat(cr_spbdd_handle x, uint_t nvars);
 	friend spbdd_handle from_bit(uint_t b, bool v);
 	friend bool leaf(cr_spbdd_handle h);
@@ -151,6 +168,13 @@ class bdd {
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static void bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		size_t &m);
+	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
+		const uints&, std::unordered_map<std::array<int_t, 2>, int_t>&);
+	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
+		const uints&);
+	static int_t bdd_and_many_ex_perm(bdds v, const bools& ex, const uints&,
+		std::unordered_map<bdds, int_t>& memo);
+	static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
