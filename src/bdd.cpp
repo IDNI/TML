@@ -314,7 +314,7 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex,
 	if (it != memo.end()) return it->second;
 	const bdd bx = get(x), by = get(y);
 	int_t rx, ry, v, r;
-	if (bx.v > last && by.v > last)
+	if (bx.v > last+1 && by.v > last+1)
 		return memo.emplace(m, r = bdd_and(x, y)), r;
 	if (bx.v < by.v)
 		v = bx.v,
@@ -366,7 +366,7 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex) {
 	int_t last = ex.size();
 	for (size_t n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
 	int_t r = bdd_and_ex(x, y, ex, CX[ex], memos_ex[ex], last);
-	DBG(int_t t = bdd_ex(bdd_and(x, y), ex, last);)
+	DBG(int_t t = bdd_ex(bdd_and(x, y), ex);)
 	DBG(assert(r == t);)
 	return r;
 }
@@ -419,7 +419,7 @@ struct sbdd_and_many_ex {
 		size_t m = 0;
 		bdds vh, vl;
 		bdd::bdd_and_many_ex_iter(v, vh, vl, m);
-		if (m > last)
+		if (m > last+1)
 			res = bdd::add(m,
 				bdd::bdd_and_many(vh), bdd::bdd_and_many(vl));
 		else {
@@ -737,7 +737,7 @@ void allsat_cb::sat(int_t x) {
 
 int_t bdd::bdd_ex(int_t x, const bools& b, unordered_map<int_t, int_t>& memo,
 	int_t last) {
-	if (leaf(x) || (int_t)var(x) > last) return x;
+	if (leaf(x) || (int_t)var(x) > last+1) return x;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
 	DBG(assert(var(x)-1 < b.size());)
