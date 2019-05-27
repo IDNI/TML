@@ -150,7 +150,8 @@ class bdd {
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex,
-		std::unordered_map<std::array<int_t, 2>, int_t>& memo);
+		std::unordered_map<std::array<int_t, 2>, int_t>& memo,
+		std::unordered_map<int_t, int_t>& memo2);
 	static int_t bdd_and1(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
 	static int_t bdd_ite(int_t x, int_t y, int_t z);
@@ -158,7 +159,8 @@ class bdd {
 	static int_t bdd_and_many(bdds v);
 	static int_t bdd_and_many_ex(bdds v, const bools& ex);
 	static int_t bdd_and_many_ex(bdds v, const bools& ex,
-		std::unordered_map<bdds, int_t>& memo);
+		std::unordered_map<bdds, int_t>& memo,
+		std::unordered_map<int_t, int_t>& m2);
 	static int_t bdd_ex(int_t x, const bools& b,
 		std::unordered_map<int_t, int_t>& memo);
 	static int_t bdd_ex(int_t x, const bools& b);
