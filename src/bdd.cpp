@@ -49,7 +49,7 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
 	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
 	if (h == l) return h;
-//	if (h < l) std::swap(h, l), v = -v;
+	if (abs(h) < abs(l)) std::swap(h, l), v = -v;
 	static std::unordered_map<bdd_key, int_t>::const_iterator it;
 	static bdd_key k;
 	auto &mm = v < 0 ? Mn : Mp;
