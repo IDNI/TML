@@ -94,6 +94,7 @@ extern std::vector<class bdd> V;
 class bdd {
 	friend class bdd_handle;
 	friend class allsat_cb;
+	friend struct sbdd_and_many_ex;
 	friend spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -151,7 +152,7 @@ class bdd {
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex,
 		std::unordered_map<std::array<int_t, 2>, int_t>& memo,
-		std::unordered_map<int_t, int_t>& memo2);
+		std::unordered_map<int_t, int_t>& memo2, int_t last);
 	static int_t bdd_and1(int_t x, int_t y);
 	static int_t bdd_or(int_t x, int_t y) { return -bdd_and(-x, -y); }
 	static int_t bdd_ite(int_t x, int_t y, int_t z);
@@ -160,9 +161,10 @@ class bdd {
 	static int_t bdd_and_many_ex(bdds v, const bools& ex);
 	static int_t bdd_and_many_ex(bdds v, const bools& ex,
 		std::unordered_map<bdds, int_t>& memo,
-		std::unordered_map<int_t, int_t>& m2);
+		std::unordered_map<int_t, int_t>& m2,
+		std::unordered_map<std::array<int_t, 2>, int_t>& m3);
 	static int_t bdd_ex(int_t x, const bools& b,
-		std::unordered_map<int_t, int_t>& memo);
+		std::unordered_map<int_t, int_t>& memo, int_t last);
 	static int_t bdd_ex(int_t x, const bools& b);
 	static int_t bdd_permute(const int_t& x, const uints& m,
 		std::unordered_map<int_t, int_t>& memo);
