@@ -164,7 +164,7 @@ class bdd {
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
-		size_t &m);
+		int_t &m);
 	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
 		const uints&);
 	static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
