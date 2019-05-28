@@ -24,7 +24,7 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
-#include "token.h"
+#include "ast.h"
 using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
@@ -206,19 +206,15 @@ void driver::output_pl(const raw_prog& p) const {
 	}
 }
 
-void driver::output_tokens() const {
-	for (auto t : opts.token_formats) switch (t) {
-		case T_TML:
-			{ tmp_os(".tokens.tml");  print_tokens(os); } break;
-		case T_JSON:
-			{ tmp_os(".tokens.json"); print_tokens_json(os);} break;
-		case T_XML:
-			{ tmp_os(".tokens.xml");  print_tokens_xml(os); } break;
-		case T_HTML:
-			{ tmp_os(".tokens.html"); print_tokens_html(os);} break;
+void driver::output_ast() const {
+	for (auto t : opts.ast_formats) switch (t) {
+		case AST_TML:  {tmp_os(".ast.tml");  print_ast(os); } break;
+		case AST_JSON: {tmp_os(".ast.json"); print_ast_json(os);} break;
+		case AST_XML:  {tmp_os(".ast.xml");  print_ast_xml(os); } break;
+		case AST_HTML: {tmp_os(".ast.html"); print_ast_html(os);} break;
 		default: ;
 	}
-	token::clear();
+	ast::clear();
 }
 
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
@@ -242,7 +238,7 @@ driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	argv(argv), opts(o) {
 	opts.parse(argc, argv);
 	strs_t strtrees;
-	output_tokens();
+	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
 		DBG(tbl.out(wcout<<endl);)
