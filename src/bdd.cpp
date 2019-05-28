@@ -43,6 +43,8 @@ map<pair<bools, uints>, unordered_map<array<int_t, 2>, int_t>,
 unordered_map<bdds, int_t> AM;
 map<bools, unordered_map<bdds, int_t>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, int_t>, vec2cmp<bool, uint_t>> AMXP;
+//map<pair<bools, uints>, map<bdds, int_t, veccmp<int_t>>, vec2cmp<bool, uint_t>>
+//	AMXP;
 unordered_set<int_t> S;
 unordered_map<int_t, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle bdd_handle::T, bdd_handle::F;
@@ -477,6 +479,7 @@ struct sbdd_and_many_ex_perm {
 	const bools& ex;
 	const uints& p;
 	unordered_map<bdds, int_t>& memo;
+	//map<bdds, int_t, veccmp<int_t>>& memo;
 	unordered_map<array<int_t, 2>, int_t>& m2;
 	unordered_map<int_t, int_t>& m3;
 	int_t last;
@@ -484,6 +487,7 @@ struct sbdd_and_many_ex_perm {
 	
 	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
 		unordered_map<bdds, int_t>& memo,
+		//map<bdds, int_t, veccmp<int_t>>& memo,
 		unordered_map<array<int_t, 2>, int_t>& m2,
 		unordered_map<int_t, int_t>& m3) :
 		ex(ex), p(p), memo(memo), m2(m2), m3(m3), last(0),
@@ -654,6 +658,20 @@ void bdd::gc() {
 		if (!am.empty()) amx.emplace(x.first, move(am));
 	}
 	AMX = move(amx);
+	map<pair<bools, uints>, unordered_map<bdds, int_t>,
+		vec2cmp<bool, uint_t>> amxp;
+	for (const auto& x : AMXP) {
+		for (pair<bdds, int_t> y : x.second) {
+			b = false;
+			for (int_t& i : y.first)
+				if ((b |= !has(S, abs(i)))) break;
+				else f(i);
+			if (!b && has(S, abs(y.second)))
+				am.emplace(y.first, f(y.second));
+		}
+		if (!am.empty()) amxp.emplace(x.first, move(am));
+	}
+	AMXP = move(amxp);
 	for (pair<bdds, int_t> x : AM) {
 		b = false;
 		for (int_t& i : x.first)
