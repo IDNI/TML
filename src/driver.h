@@ -91,11 +91,11 @@ public:
 	std::wostream& print_xsb(std::wostream&, const raw_prog&) const;
 	std::wostream& print_swipl(std::wostream&, const raw_prog&) const;
 	std::wostream& print_souffle(std::wostream&, const raw_prog&) const;
-	void output_tokens() const;
-	std::wostream& print_tokens(std::wostream&) const;
-	std::wostream& print_tokens_json(std::wostream&) const;
-	std::wostream& print_tokens_xml(std::wostream&) const;
-	std::wostream& print_tokens_html(std::wostream&) const;
+	void output_ast() const;
+	std::wostream& print_ast(std::wostream&) const;
+	std::wostream& print_ast_json(std::wostream&) const;
+	std::wostream& print_ast_xml(std::wostream&) const;
+	std::wostream& print_ast_html(std::wostream&) const;
 	void save_csv() const;
 };
 

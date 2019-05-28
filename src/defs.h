@@ -20,23 +20,19 @@
 #include <iostream>
 #include <cstdio>
 
-#ifdef __EMSCRIPTEN__
-typedef int32_t int_t;
-#define BDD_HASH_H_SHIFT 7
-#define BDD_HASH_L_SHIFT 20
-#else
+#ifndef __EMSCRIPTEN__
 #include <execinfo.h>
+#endif
+
 typedef int32_t int_t;
 typedef uint32_t uint_t;
 typedef std::vector<uint_t> uints;
-#define BDD_HASH_H_SHIFT 13
-#define BDD_HASH_L_SHIFT 40
-#endif
 
 typedef wchar_t* wstr;
 typedef const wchar_t* cws;
 typedef cws* pcws;
-typedef std::array<cws, 2> lexeme;
+typedef std::array<cws, 2> cws_range;
+typedef cws_range lexeme;
 typedef std::vector<lexeme> lexemes;
 typedef std::vector<int_t> ints;
 typedef std::unordered_map<int_t, std::wstring> strs_t;

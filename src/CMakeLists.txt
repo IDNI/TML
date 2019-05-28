@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_VERBOSE_MAKEFILE true)
 
 add_executable(tml
+	ast.h
+	ast.cpp
 	bdd.cpp
 	bdd.h
 	defs.h
@@ -22,8 +24,6 @@ add_executable(tml
 	save_csv.cpp
 	tables.h
 	tables.cpp
-	token.h
-	token.cpp
 	transform.cpp
 	#	tree.cpp
 )
