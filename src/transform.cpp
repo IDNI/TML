@@ -26,6 +26,45 @@ lexeme driver::get_var_lexeme(int_t i) {
 	return dict.get_lexeme(s += to_wstring(i));
 }
 
+lexeme driver::get_new_var() {
+	static size_t last = 1;
+	size_t sz = dict.nvars();
+	lexeme l;
+	for (;;)
+		if (l = get_var_lexeme(last++), dict.nvars() == sz) return l;
+		else sz = dict.nvars();
+}
+
+void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
+	for (elem& e : t.e)
+		if (e.type == elem::VAR && m.find(e) == m.end())
+			m.emplace(e, elem(elem::VAR, get_var_lexeme(v++)));
+	for (elem& e : t.e) if (e.type == elem::VAR) e = m[e];
+}
+
+raw_rule driver::refresh_vars(raw_term h, vector<vector<raw_term>> b) {
+	raw_rule r;
+	size_t v = 1;
+	map<elem, elem> m;
+	r.h.emplace_back(), refresh_vars(r.h[0] = h, v, m);
+	for (vector<raw_term> a : b) {
+		r.b.emplace_back();
+		for (raw_term t : a)
+			refresh_vars(t, v, m), r.b.back().push_back(t);
+	}
+	return r;
+}
+
+set<raw_rule> driver::refresh_vars(raw_rule& r) {
+	set<raw_rule> s;
+	for (raw_term h : r.h) {
+		raw_rule t = refresh_vars(h, r.b);
+		t.type = r.type;
+		s.insert(t);
+	}
+	return s;
+}
+
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
@@ -250,6 +289,10 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	t.e.push_back(elem((int_t)0)),
 	t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity();
+	raw_rule rr;
+	rr.type = raw_rule::GOAL;
+	rr.h.push_back(t);
+	r.r.push_back(rr);
 #ifdef BWD_GRAMMAR
 	transform_bwd(r, {t});
 #endif	
@@ -330,3 +373,107 @@ raw_term driver::prepend_arg(raw_term t, lexeme s) {
 	for (auto x : d) q.r.push_back(x);
 	return q;
 }*/
+
+elem rep(const elem& e, map<elem, elem>& m) {
+	if (e.type != elem::VAR) return e;
+	auto it = m.find(e);
+	return it == m.end() ? e : rep(it->second, m);
+}
+
+bool rep(const elem& x, const elem& y, map<elem, elem>& m) {
+	if (x == y) return true;
+	if (x.type != elem::VAR) {
+		if (y.type != elem::VAR) return false;
+		elem ry = rep(y, m);
+		if (ry.type != elem::VAR) return x == ry;
+		return m.emplace(ry, x), true;
+	} else if (y.type != elem::VAR) {
+		elem rx = rep(x, m);
+		if (rx.type != elem::VAR) return y == rx;
+		return m.emplace(rx, y), true;
+	} else {
+		elem rx = rep(x, m);
+		if (rx != x) return rep(rx, y, m);
+		elem ry = rep(y, m);
+		if (ry != y) return rep(x, ry, m);
+		if (ry < rx) return m.emplace(ry, rx), true;
+		return m.emplace(rx, ry), true;
+	}
+}
+
+bool unify(const raw_term& x, const raw_term& y, map<elem, elem>& m) {
+	if (x.e.size() != y.e.size()) return false;
+	for (size_t n = 0; n != x.e.size(); ++n)
+		if (!rep(x.e[n], y.e[n], m)) return false;
+	return true;
+}
+
+raw_term sub(const raw_term& x, map<elem, elem>& m) {
+	raw_term r;
+	for (size_t n = 0; n != x.e.size(); ++n) r.e.push_back(rep(x.e[n], m));
+	return r.calc_arity(), r;
+}
+
+bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
+	if (r.b.empty()) return res.h = r.h, true;
+	DBG(wcout << L"specializing " << r << " wrt " << t;)
+	for (const raw_term& h : r.h) {
+		map<elem, elem> m;
+		if (!unify(h, t, m)) continue;
+		res.h.push_back(sub(h, m));
+		for (const auto& a : r.b) {
+			res.b.emplace_back();
+			for (const raw_term& b : a)
+				res.b.back().push_back(sub(b, m));
+		}
+	}
+	if (res.h.size()) goto pass;
+	DBG(wcout << L" failed " << endl;)
+	return false;
+pass:	DBG(wcout << L" returned " << res << endl;)
+	return true;
+}
+
+void driver::refresh_vars(raw_prog& p) {
+	set<raw_rule> rs;
+	for (raw_rule r : p.r) {
+		auto s1 = refresh_vars(r);
+		rs.insert(s1.begin(), s1.end());
+	}
+	p.r.clear();
+	for (auto x : rs) p.r.push_back(x);
+}
+
+raw_prog driver::transform_ms(raw_prog p) { // magic sets transform
+	set<raw_term> qs;
+	set<raw_rule> s, ss;
+	refresh_vars(p);
+	for (const raw_rule& t : p.r)
+		if (t.type == raw_rule::GOAL)
+			assert(t.h.size() == 1),
+			qs.insert(refresh_vars({t.h[0]}, {}).h[0]);
+	size_t sz, v;
+	map<elem, elem> m;
+loop:	sz = qs.size();
+#ifdef DEBUG
+	wcout<<"qs:"<<endl;
+	for (auto x : qs) wcout << x << endl;
+#endif
+	for (raw_term q : qs) {
+		m.clear(), v = 1, refresh_vars(q, v, m);
+		for (const raw_rule& t : p.r) {
+			if (t.type == raw_rule::GOAL) continue;
+			raw_rule rr;
+			if (/*ss.insert(t).second && */specialize(t, q, rr)) {
+				s.emplace(rr);
+				for (auto x : rr.b) for (auto y : x) qs.insert(y);
+			}
+		}
+	}
+	if (sz != qs.size()) goto loop;
+	raw_prog r;
+	for (const raw_rule& t : s) r.r.push_back(t);
+	DBG(wcout<<"orig:"<<endl<<p;)
+	DBG(wcout<<"spec:"<<endl<<r;)
+	return r;
+}

@@ -43,8 +43,6 @@ map<pair<bools, uints>, unordered_map<array<int_t, 2>, int_t>,
 unordered_map<bdds, int_t> AM;
 map<bools, unordered_map<bdds, int_t>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, int_t>, vec2cmp<bool, uint_t>> AMXP;
-//map<pair<bools, uints>, map<bdds, int_t, veccmp<int_t>>, vec2cmp<bool, uint_t>>
-//	AMXP;
 unordered_set<int_t> S;
 unordered_map<int_t, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle bdd_handle::T, bdd_handle::F;
@@ -98,7 +96,7 @@ int_t bdd::from_bit(uint_t b, bool v) {
 	return v ? add(b + 1, T, F) : add(b + 1, F, T);
 }
 
-int_t bdd::bdd_and1(int_t x, int_t y) {
+int_t bdd::bdd_and(int_t x, int_t y) {
 	DBG(assert(x && y);)
 	if (x == F || y == F || x == -y) return F;
 	if (x == T || x == y) return y;
@@ -108,10 +106,10 @@ int_t bdd::bdd_and1(int_t x, int_t y) {
 	if (C.size() >= gclimit) {
 		const bdd bx = get(x), by = get(y);
 		if (bx.v < by.v)
-			return add(bx.v, bdd_and1(bx.h, y), bdd_and1(bx.l, y));
+			return add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
 		else if (bx.v > by.v)
-			return add(by.v, bdd_and1(x, by.h), bdd_and1(x, by.l));
-		return add(bx.v, bdd_and1(bx.h, by.h), bdd_and1(bx.l, by.l));
+			return add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
+		return add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 	}
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
@@ -119,23 +117,12 @@ int_t bdd::bdd_and1(int_t x, int_t y) {
 #endif
 	const bdd bx = get(x), by = get(y);
 	int_t r;
-	if (bx.v < by.v) r = add(bx.v, bdd_and1(bx.h, y), bdd_and1(bx.l, y));
-	else if (bx.v > by.v) r = add(by.v, bdd_and1(x, by.h), bdd_and1(x, by.l));
-	else r = add(bx.v, bdd_and1(bx.h, by.h), bdd_and1(bx.l, by.l));
+	if (bx.v < by.v) r = add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
+	else if (bx.v > by.v) r = add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
+	else r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	C.emplace(m, r);
 #endif		
-	return r;
-}
-
-int_t bdd::bdd_and(int_t x, int_t y) {
-//	set<int_t> sx, sy;
-//	bdd_sz(x, sx), bdd_sz(y, sy);
-//	wcerr << "bdd_and sz1: " << sx.size() << " sz2: " << sy.size() <<endl;
-//	sx.clear(), sy.clear();
-	int_t r = bdd_and1(x, y);
-//	bdd_sz(r, sx);
-//	wcerr<<"done "<<sx.size()<<endl;
 	return r;
 }
 
@@ -285,8 +272,6 @@ int_t bdd::bdd_and_many(bdds v) {
 	if (v.size() == 1) return v[0];
 	auto it = AM.find(v);
 	if (it != AM.end()) return it->second;
-//	for (int_t x : v) wcout << x << ' ';
-//	wcout << simps << endl;
 	if (v.size() == 2)
 		return AM.emplace(v, bdd_and(v[0], v[1])).first->second;
 	int_t res = F, h, l;
@@ -487,7 +472,6 @@ struct sbdd_and_many_ex_perm {
 	
 	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
 		unordered_map<bdds, int_t>& memo,
-		//map<bdds, int_t, veccmp<int_t>>& memo,
 		unordered_map<array<int_t, 2>, int_t>& m2,
 		unordered_map<int_t, int_t>& m3) :
 		ex(ex), p(p), memo(memo), m2(m2), m3(m3), last(0),
@@ -500,8 +484,7 @@ struct sbdd_and_many_ex_perm {
 		if (v.empty()) return T;
 		if (v.size() == 1)
 			return bdd::bdd_permute_ex(v[0], ex, p, last, m3);
-		if (v.size() == 2)
-			return saep(v[0], v[1]);
+		if (v.size() == 2) return saep(v[0], v[1]);
 		auto it = memo.find(v);
 		if (it != memo.end()) return it->second;
 		int_t res = F, h, l, m = 0;
@@ -520,14 +503,13 @@ struct sbdd_and_many_ex_perm {
 			}
 		} else {
 			switch (c) {
-			case 0: l = (*this)(move(vl)),
-				h = (*this)(move(vh));
+			case 0: l = (*this)(move(vl)), h = (*this)(move(vh));
 				if (ex[m - 1]) res = bdd::bdd_or(h, l);
-				else res = bdd::bdd_ite_var(p[m-1], h, l);
+				else res = bdd::bdd_ite_var(p[m-1],h,l);
 				break;
 			case 1: if (ex[m - 1]) res = (*this)(move(vh));
 				else res = bdd::bdd_ite_var(p[m-1],
-						(*this)(move(vh)), F);
+					(*this)(move(vh)), F);
 				break;
 			case 2: if (ex[m - 1]) res = (*this)(move(vl));
 				else res = bdd::bdd_ite_var(p[m-1], F,
@@ -563,10 +545,6 @@ void bdd::mark_all(int_t i) {
 void bdd::gc() {
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
-/*	for (auto x : AM) {
-		mark_all(x.second);
-		for (auto y : x.first) mark_all(y);
-	}*/
 //	if (V.size() < S.size() << 3) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);

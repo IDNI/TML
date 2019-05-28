@@ -29,6 +29,7 @@ public:
 	lexeme get_lexeme(const std::wstring& s);
 	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
 	size_t nsyms() const { return syms.size(); }
+	size_t nvars() const { return vars_dict.size(); }
 //	size_t usz() const { return nums + nchars() + symbols(); }
 //	size_t nchars() const { return chars; }
 //	size_t symbols() const { return syms.size(); }

@@ -43,6 +43,7 @@ struct elem {
 		if (type == CHR) return ch == t.ch;
 		return e == t.e;
 	}
+	bool operator!=(const elem& t) const { return !(*this == t); }
 };
 
 struct raw_term {

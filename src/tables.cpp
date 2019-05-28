@@ -288,7 +288,8 @@ void tables::get_rules(const raw_prog& p) {
 	set<term> s;
 	map<ntable, set<spbdd_handle>> f;
 	for (const raw_rule& r : p.r)
-		for (const raw_term& x : r.h) {
+		if (r.type != raw_rule::NONE) continue;
+		else for (const raw_term& x : r.h) {
 			term h = from_raw_term(x);
 			if (r.b.empty()) f[h.tab].insert(from_fact(h));
 			else for (const vector<raw_term>& y : r.b) {

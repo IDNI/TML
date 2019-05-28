@@ -25,6 +25,7 @@ struct options {
 	std::set<format> formats = { F_TML };
 	std::set<dialect> dialects = {};
 	std::set<token_format> token_formats = {};
+	bool ms = false;
 	options() {}
 	options(int argc, char** argv) { parse(argc, argv); }
 	void parse(int c, char** v) {
@@ -39,6 +40,7 @@ struct options {
 			else if_opt("tokens-json") token_formats.insert(T_JSON);
 			else if_opt("tokens-xml")  token_formats.insert(T_XML);
 			else if_opt("tokens-html") token_formats.insert(T_HTML);
+			else if_opt("ms")	   ms = true;
 		}
 	}
 	bool option(const std::string arg, const std::string o) const {

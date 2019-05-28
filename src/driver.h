@@ -33,12 +33,18 @@ class driver {
 //	bool mult = false;
 
 	lexeme get_var_lexeme(int_t i);
+	lexeme get_new_var();
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
+	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
+	void refresh_vars(raw_prog& p);
+	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
+	std::set<raw_rule> refresh_vars(raw_rule& r);
 
 	std::wstring directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
+	raw_prog transform_ms(raw_prog p);
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_prog transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
