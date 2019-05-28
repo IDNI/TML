@@ -304,8 +304,8 @@ void tables::get_rules(const raw_prog& p) {
 		spbdd_handle r = bdd_handle::F;
 		for (auto y : x.second) r = r || y;
 		ts[x.first].t = r;
-		DBG(assert(bdd_nvars(r) < ts[x.first].len * bits);)
-		DBG(assert(bdd_nvars(ts[x.first].t) < ts[x.first].len * bits);)
+//		DBG(assert(bdd_nvars(r) < ts[x.first].len * bits);)
+//		DBG(assert(bdd_nvars(ts[x.first].t) < ts[x.first].len * bits);)
 	}
 	measure_time_end();
 //	for (table& t : ts) wcout << t.t->b << ' ';
@@ -491,7 +491,7 @@ spbdd_handle tables::body_query(body& b, size_t DBG(len)) {
 	b.tlast = ts[b.tab].t;
 	b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
-	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
+//	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
 	return b.rlast;
 //	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
 //	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
@@ -529,7 +529,7 @@ void tables::alt_query(alt& a, bdd_handles& v, size_t DBG(len)) {
 //		v.push_back(a.rlast = x ^ a.perm);
 	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != bdd_handle::F)
 		v.push_back(a.rlast = x);
-	DBG(assert(bdd_nvars(a.rlast) < len*bits);)
+//	DBG(assert(bdd_nvars(a.rlast) < len*bits);)
 }
 
 bool tables::table::commit(DBG(size_t bits)) {
@@ -540,12 +540,12 @@ bool tables::table::commit(DBG(size_t bits)) {
 	else {
 		spbdd_handle a = bdd_or_many(move(add)),
 			     d = bdd_or_many(move(del)), s = a % d;
-		DBG(assert(bdd_nvars(a) < len*bits);)
-		DBG(assert(bdd_nvars(d) < len*bits);)
+//		DBG(assert(bdd_nvars(a) < len*bits);)
+//		DBG(assert(bdd_nvars(d) < len*bits);)
 		if (s == bdd_handle::F) { wcout << "unsat" << endl; exit(0); }
 		x = (t || a) % d;
 	}
-	DBG(assert(bdd_nvars(x) < len*bits);)
+//	DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
 
@@ -558,7 +558,7 @@ bool tables::fwd() {
 		spbdd_handle x;
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
-		DBG(assert(bdd_nvars(x) < r.len*bits);)
+//		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == bdd_handle::F) continue;
 		(r.neg ? ts[r.tab].del : ts[r.tab].add).push_back(x);
 	}

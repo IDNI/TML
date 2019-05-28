@@ -129,18 +129,6 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 
-	inline static int_t hi(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
-			: V[x].v < 0 ? V[x].l : V[x].h;
-	}
-
-	inline static int_t lo(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
-			: V[x].v < 0 ? V[x].h : V[x].l;
-	}
-
-	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
-
 	inline static bdd get(int_t x) {
 		if (x > 0) {
 			const bdd &y = V[x];
@@ -175,15 +163,10 @@ class bdd {
 	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
-	static void bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
+	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		size_t &m);
-/*	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
-		const uints&, std::unordered_map<std::array<int_t, 2>, int_t>&,
-		std::unordered_map<int_t, int_t>&, int_t last);*/
 	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
 		const uints&);
-/*	static int_t bdd_and_many_ex_perm(bdds v, const bools& ex, const uints&,
-		std::unordered_map<bdds, int_t>& memo);*/
 	static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
@@ -204,6 +187,17 @@ public:
 	}
 	static void init();
 	static void gc();
+	inline static int_t hi(int_t x) {
+		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
+			: V[x].v < 0 ? V[x].l : V[x].h;
+	}
+
+	inline static int_t lo(int_t x) {
+		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
+			: V[x].v < 0 ? V[x].h : V[x].l;
+	}
+
+	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
 };
 
 class bdd_handle {
