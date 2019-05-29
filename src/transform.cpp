@@ -382,23 +382,17 @@ elem rep(const elem& e, map<elem, elem>& m) {
 
 bool rep(const elem& x, const elem& y, map<elem, elem>& m) {
 	if (x == y) return true;
-	if (x.type != elem::VAR) {
-		if (y.type != elem::VAR) return false;
-		elem ry = rep(y, m);
-		if (ry.type != elem::VAR) return x == ry;
-		return m.emplace(ry, x), true;
-	} else if (y.type != elem::VAR) {
-		elem rx = rep(x, m);
-		if (rx.type != elem::VAR) return y == rx;
-		return m.emplace(rx, y), true;
-	} else {
-		elem rx = rep(x, m);
-		if (rx != x) return rep(rx, y, m);
-		elem ry = rep(y, m);
-		if (ry != y) return rep(x, ry, m);
-		if (ry < rx) return m.emplace(ry, rx), true;
-		return m.emplace(rx, ry), true;
-	}
+	elem rx, ry;
+	if (x.type != elem::VAR)
+		return	y.type == elem::VAR &&
+			((ry = rep(y, m)).type != elem::VAR ? x == ry :
+			(m.emplace(ry, x), true));
+	else if (y.type != elem::VAR)
+		return	(rx = rep(x, m)).type != elem::VAR ? y == rx :
+			(m.emplace(rx, y), true);
+	else return	(rx = rep(x, m)) != x ? rep(rx, y, m) :
+			(ry = rep(y, m)) != y ? rep(x, ry, m) : ry < rx ?
+			m.emplace(ry, rx), true : (m.emplace(rx, ry), true);
 }
 
 bool unify(const raw_term& x, const raw_term& y, map<elem, elem>& m) {
@@ -416,7 +410,7 @@ raw_term sub(const raw_term& x, map<elem, elem>& m) {
 
 bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 	if (r.b.empty()) return res.h = r.h, true;
-	DBG(wcout << L"specializing " << r << " wrt " << t;)
+//	DBG(wcout << L"specializing" << endl << r << "wrt" << endl << t <<endl;)
 	for (const raw_term& h : r.h) {
 		map<elem, elem> m;
 		if (!unify(h, t, m)) continue;
@@ -428,9 +422,9 @@ bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 		}
 	}
 	if (res.h.size()) goto pass;
-	DBG(wcout << L" failed " << endl;)
+//	DBG(wcout << L" failed " << endl;)
 	return false;
-pass:	DBG(wcout << L" returned " << res << endl;)
+pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }
 
@@ -444,14 +438,60 @@ void driver::refresh_vars(raw_prog& p) {
 	for (auto x : rs) p.r.push_back(x);
 }
 
-raw_prog driver::transform_ms(raw_prog p) { // magic sets transform
+set<raw_term> driver::get_queries(const raw_prog& p) {
 	set<raw_term> qs;
+	map<elem, elem> m;
+	size_t v = 1;
+	for (const raw_rule& r : p.r)
+		if (r.type == raw_rule::GOAL) {
+			assert(r.h.size() == 1);
+			raw_term t = r.h[0];
+			m.clear(), v = 1, refresh_vars(t, v, m), qs.insert(t);
+		}
+	return qs;
+}
+
+set<raw_rule> driver::transform_ms(const raw_prog& p, set<raw_term> qs) {
+	set<raw_rule> s;
+	raw_rule rr;
+	for (const raw_term& q : qs)
+		for (const raw_rule& t : p.r) {
+			rr.clear();
+			if (t.type == raw_rule::NONE && specialize(t, q, rr))
+				s.insert(move(rr));
+		}
+	return s;
+}
+
+raw_prog driver::transform_ms(raw_prog p) {
+	refresh_vars(p);
+	set<raw_term> qs = get_queries(p);
+	set<raw_rule> rs;
+	map<elem, elem> m;
+	size_t v = 1;
+	while (!qs.empty()) {
+		set<raw_rule> r = transform_ms(p, qs);
+		size_t sz = qs.size();
+		qs.clear();
+		for (raw_rule t : r)
+			for (auto x : t.b)
+				for (auto y : x)
+					m.clear(), v = 1, refresh_vars(y, v, m),
+					qs.insert(y);
+		rs.insert(r.begin(), r.end());
+		if (sz == qs.size()) break;
+	}
+	raw_prog res;
+	for (const raw_rule& t : rs) res.r.push_back(t);
+	DBG(wcout<<"orig:"<<endl<<p;)
+	DBG(wcout<<"spec:"<<endl<<res;)
+	return res;
+}
+
+/*raw_prog driver::transform_ms(raw_prog p) { // magic sets transform
 	set<raw_rule> s, ss;
 	refresh_vars(p);
-	for (const raw_rule& t : p.r)
-		if (t.type == raw_rule::GOAL)
-			assert(t.h.size() == 1),
-			qs.insert(refresh_vars({t.h[0]}, {}).h[0]);
+	set<raw_term> qs = get_queries(p);
 	size_t sz, v;
 	map<elem, elem> m;
 loop:	sz = qs.size();
@@ -464,7 +504,7 @@ loop:	sz = qs.size();
 		for (const raw_rule& t : p.r) {
 			if (t.type == raw_rule::GOAL) continue;
 			raw_rule rr;
-			if (/*ss.insert(t).second && */specialize(t, q, rr)) {
+			if (specialize(t, q, rr)) {
 				s.emplace(rr);
 				for (auto x : rr.b) for (auto y : x) qs.insert(y);
 			}
@@ -476,4 +516,4 @@ loop:	sz = qs.size();
 	DBG(wcout<<"orig:"<<endl<<p;)
 	DBG(wcout<<"spec:"<<endl<<r;)
 	return r;
-}
+}*/

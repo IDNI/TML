@@ -1,4 +1,4 @@
-{
+#{
 @string str <tml.g>.
 
 identifier => sym | var.
@@ -58,10 +58,10 @@ prefix => "forall" | "exists" | "unique".
 
 prog => directive S | rule S | production S | fof S | query S | null.
 S => ws '{' ws prog ws '}' ws S | ws prog ws | null.
-}
-{
-	~S(?x?x):-S(?x?x).
-	~prog(?x?x):-prog(?x?x).
-	~alt(?x?x):-alt(?x?x).
-	~alts(?x?x):-alts(?x?x).
-}
+#}
+#{
+#	~S(?x?x):-S(?x?x).
+#	~prog(?x?x):-prog(?x?x).
+#	~alt(?x?x):-alt(?x?x).
+#	~alts(?x?x):-alts(?x?x).
+#}

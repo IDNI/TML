@@ -40,10 +40,13 @@ class driver {
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
+	std::set<raw_term> get_queries(const raw_prog& p);
 
 	std::wstring directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
+	std::set<raw_rule> transform_ms(const raw_prog& p,
+		std::set<raw_term> qs);
 	raw_prog transform_ms(raw_prog p);
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_prog transform_bwd(raw_prog& p);

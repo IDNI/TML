@@ -225,7 +225,7 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
 	output_pl(rp.p[n]);
-	if (opts.enabled_dialect(TRANSFORMED)) //wcout<<L'{'<<endl<<rp.p[n]<<L'}'<<endl;
+	if (opts.enabled_dialect(TRANSFORMED))
 		for (auto p : rp.p)
 			wcout<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
