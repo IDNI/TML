@@ -247,7 +247,7 @@ void driver::init() {
 driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	argv(argv), opts(o) {
 	opts.parse(argc, argv);
-	DBG(wcout<<L"parsed args: "<<opts<<endl;)
+//	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
 	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
@@ -255,7 +255,7 @@ driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 		DBG(if(opts.enabled(L"o"))tbl.out(output::to(L"output")<<endl);)
 	}
 	NDBG(if (opts.enabled(L"o")) tbl.out(output::to(L"output")<<endl);)
-	if (opts.enabled(L"csv")) wcout<<L"opts.enabled(csv) = true"<<endl, save_csv();
+	if (opts.enabled(L"csv")) save_csv();
 }
 
 driver::driver(int argc, char** argv, FILE *f, options o) :
