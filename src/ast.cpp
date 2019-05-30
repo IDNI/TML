@@ -33,7 +33,7 @@ wostream& driver::print_ast(wostream& os) const {
 	cws s = 0;
 	for (auto n : ast::nodes) {
 		if (!s) s = n.r[0];
-		os << L"node(" << ast::name(n) << L' ' <<
+		os << ast::name(n) << L'(' <<
 			(n.r[0]-s) << L' ' << (n.r[1]-s) << L")." << endl;
 	}
 	return os.flush();
@@ -61,11 +61,11 @@ wostream& driver::print_ast_xml(wostream& os) const {
 	ast n = *nit;
 	cws s = n.r[0], r = n.r[1];
 	for (cws c = s; c != r; ++c, ++p) {
-		while ((n.r[0] - s) < p) n = *++nit;
+		while (nit != ast::nodes.end() && (n.r[0] - s) < p) n = *++nit;
 		while (!cls.empty() && cls.front() == p)
 			os << L"</" << stk.front() << L'>',
 			cls.pop_front(), stk.pop_front();
-		while ((n.r[0] - s) == p)
+		while (nit != ast::nodes.end() && (n.r[0] - s) == p)
 			os << L'<' << ast::name(n) << L'>',
 			stk.push_front(ast::name(n)), cls.push_front(n.r[1]-s),
 			n = *++nit;
@@ -83,11 +83,11 @@ wostream& driver::print_ast_html(wostream& os) const {
 	ast n = *nit;
 	cws s = n.r[0], r = n.r[1];
 	for (cws c = s; c != r; ++c, ++p) {
-		while ((n.r[0] - s) < p) n = *++nit;
+		while (nit != ast::nodes.end() && (n.r[0] - s) < p) n = *++nit;
 		while (!cls.empty() && cls.front() == p)
 			os<<L"</span>",
 			cls.pop_front();
-		while ((n.r[0] - s) == p)
+		while (nit != ast::nodes.end() && (n.r[0] - s) == p)
 			os<<L"<span class=\""<<ast::name(n)<<L"\">",
 			cls.push_front(n.r[1]-s),
 			n = *++nit;

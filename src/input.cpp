@@ -349,7 +349,6 @@ off_t fsize(const char *fname) {
 	return stat(fname, &s) ? 0 : s.st_size;
 }
 
-string ws2s(const wstring& s) { return string(s.begin(), s.end()); }
 off_t fsize(cws s, size_t len) { return fsize(ws2s(wstring(s, len)).c_str()); }
 
 wstring file_read(wstring fname) {

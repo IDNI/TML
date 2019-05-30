@@ -121,7 +121,14 @@ size_t driver::load_stdin() {
 //	return r;
 }*/
 
-wstring s2ws(const string& s) { return wstring(s.begin(), s.end()); } // FIXME
+wstring s2ws(const std::string& s) {
+	return std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(s);
+}
+
+string ws2s(const wstring& s) {
+	return std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(s);
+}
+
 void unquote(wstring& str);
 
 wstring driver::directive_load(const directive& d) {
@@ -185,7 +192,7 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 			dict.get_rel(pd.strs.begin()->first),
 			pd.strs.begin()->second.size());
 	}
-	if (opts.ms)
+	if (opts.enabled(L"ms"))
 		for (raw_prog& p : rp.p)
 			p = transform_ms(p);
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
@@ -193,30 +200,17 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
-const string tmp(const string ext) {
-	string fname(tmpnam(0)); fname += ext;
-	wcerr << L"Saving " << s2ws(fname) << endl;
-	return fname;
-}
-#define tmp_os(ext) wofstream os(tmp(ext))
-
 void driver::output_pl(const raw_prog& p) const {
-	for (auto d : opts.dialects) switch (d) {
-		case XSB:   { tmp_os(".P");  print_xsb(os, p);   }; break;
-		case SWIPL: { tmp_os(".pl"); print_swipl(os, p); }; break;
-		case SOUFFLE: { tmp_os(".souffle"); print_souffle(os, p);}break;
-		default: ;
-	}
+	if (opts.enabled(L"xsb"))     print_xsb    (output::to(L"xsb"),     p);
+	if (opts.enabled(L"swipl"))   print_swipl  (output::to(L"swipl"),   p);
+	if (opts.enabled(L"souffle")) print_souffle(output::to(L"souffle"), p);
 }
 
 void driver::output_ast() const {
-	for (auto t : opts.ast_formats) switch (t) {
-		case AST_TML:  {tmp_os(".ast.tml");  print_ast(os); } break;
-		case AST_JSON: {tmp_os(".ast.json"); print_ast_json(os);} break;
-		case AST_XML:  {tmp_os(".ast.xml");  print_ast_xml(os); } break;
-		case AST_HTML: {tmp_os(".ast.html"); print_ast_html(os);} break;
-		default: ;
-	}
+	if (opts.enabled(L"ast"))      print_ast     (output::to(L"ast"));
+	if (opts.enabled(L"ast-json")) print_ast_json(output::to(L"ast-json"));
+	if (opts.enabled(L"ast-xml"))  print_ast_xml (output::to(L"ast-xml"));
+	if (opts.enabled(L"ast-html")) print_ast_html(output::to(L"ast-html"));
 	ast::clear();
 }
 
@@ -225,10 +219,11 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 	//DBG(wcout << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
 	output_pl(rp.p[n]);
-	if (opts.enabled_dialect(TRANSFORMED))
+	if (opts.enabled(L"t"))
 		for (auto p : rp.p)
-			wcout<<L'{'<<endl<<p<<L'}'<<endl;
+			output::to(L"transformed")<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
+	if (opts.disabled(L"run")) return;
 	clock_t start, end;
 	measure_time(tbl.run_prog(rp.p[n]));
 //	for (auto x : prog->strtrees_out)
@@ -237,27 +232,38 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	int_t tr = dict.get_rel(L"try");
 }
 
+void driver::init() {
+	output::create(L"output",      L".out.tml");
+	output::create(L"transformed", L".trans.tml");
+	output::create(L"xsb",         L".P");
+	output::create(L"swipl",       L".pl");
+	output::create(L"souffle",     L".souffle");
+	output::create(L"ast",         L".ast.tml");
+	output::create(L"ast-json",    L".ast.json");
+	output::create(L"ast-xml",     L".ast.xml");
+	output::create(L"ast-html",    L".ast.html");
+}
+
 driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	argv(argv), opts(o) {
 	opts.parse(argc, argv);
+//	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
 	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
-		DBG(tbl.out(wcout<<endl);)
+		DBG(if(opts.enabled(L"o"))tbl.out(output::to(L"output")<<endl);)
 	}
-	NDBG(if (opts.enabled_format(F_TML)) tbl.out(wcout<<endl);)
-	if (opts.enabled_format(F_CSV)) save_csv();
+	NDBG(if (opts.enabled(L"o")) tbl.out(output::to(L"output")<<endl);)
+	if (opts.enabled(L"csv")) save_csv();
 }
-
-std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
 driver::driver(int argc, char** argv, FILE *f, options o) :
 	driver(argc, argv, raw_progs(f), o) {}
 driver::driver(int argc, char** argv, wstring s, options o) :
 	driver(argc, argv, raw_progs(s), o) {}
 driver::driver(int argc, char** argv, char *s, options o) :
-	driver(argc, argv, raw_progs(converter.from_bytes(string(s))), o) {}
+	driver(argc, argv, raw_progs(s2ws(string(s))), o) {}
 driver::driver(int argc, char** argv, FILE *f) :
 	driver(argc, argv, f, options()) {}
 driver::driver(int argc, char** argv, wstring s) :
