@@ -23,63 +23,52 @@ std::string  ws2s(const std::wstring&);
 extern std::wostream wcnull;
 
 class output {
-	static std::map<std::wstring, output*> outputs;
+	static std::map<std::wstring, output> outputs;
 	static std::wstring named; // filename w/o ext (used for @name)
 	std::wstring n = L"";      // name of the output stream
 	std::wstring e = L"";      // filename extension
 	std::wstring t = L"@null"; // target
 	std::wstring f;            // filename
 	std::wostream* s;          // output stream
-	std::wostream& os(std::wostream* wos) {
-		return s = wos, *s;
-	}
-	std::wstring tmpfile() {
-		std::wstring fn = s2ws(tmpnam(0)) + e;
-		std::wcerr << fn << L" # " << n <<std::endl;
-		return fn;
-	}
-	static output* add(output* o) { return outputs[o->name()] = o; }
-	output(std::wstring n, std::wstring e) : n(n), e(e) {
-		add(this);
-	}
+	std::wostream& os(std::wostream* wos) { return s = wos, *s; }
 public:
-	static output* create(std::wstring n, std::wstring e,
-		std::wstring t = L"") {
-		output* o = new output(n, e);
-		if (t != L"") o->target(t);
-		return o;
+	static output create(std::wstring n, std::wstring e,
+						std::wstring t = L"") {
+		auto it = outputs.emplace(n, output(n, e));
+		if (t != L"") it.first->second.target(t);
+		return it.first->second;
 	}
 	static const std::wstring& set_name(const std::wstring fn = L"") {
 		return named = fn;
 	}
-	static output* get(const std::wstring nam) {
+	static bool get(const std::wstring nam, output& o) {
 		auto it = outputs.find(nam);
-		if (it == outputs.end()) return 0;
-		return it->second;
+		if (it == outputs.end()) return false;
+		return o = it->second, true;
 	}
 	static std::wostream& to(const std::wstring nam) {
-		output *o = get(nam);
-		if (!o || !o->s) return wcnull;
-		return *o->s;
+		output o;
+		return get(nam, o) && o.s ? *o.s : wcnull;
 	}
 	static std::wstring get_target(const std::wstring nam) {
-		output *o = get(nam);
-		return o ? o->target() : L"@null";
+		output o;
+		return get(nam, o) ? o.target() : L"@null";
 	}
 	static bool is_null(const std::wstring nam) {
-		output *o = get(nam);
-		return !o || o->is_null();
+		output o;
+		return !get(nam, o) || o.is_null();
 	}
 	static std::wstring file(const std::wstring nam) {
-		output *o = get(nam);
-		return o ? o->filename() : L"";
+		output o;
+		return get(nam, o) ? o.filename() : L"";
 	}
 	static std::wstring read(std::wstring nam) {
-		output *o = get(nam);
-		return o && o->target() == L"@buffer"
-			? ((std::wstringstream*)o->s)->str() : L"";
+		output o;
+		return get(nam, o) && o.target() == L"@buffer"
+			? ((std::wstringstream*)o.s)->str() : L"";
 	}
 	output() {}
+	output(std::wstring n, std::wstring e) : n(n), e(e) {}
 	std::wstring name() const { return n; }
 	std::wstring filename() const { return f; }
 	std::wstring filename(const std::wstring fn) { return f = fn; }
@@ -91,10 +80,12 @@ public:
 		if (t==L"@stdout") return os(&std::wcout);
 		if (t==L"@stderr") return os(&std::wcerr);
 		if (t==L"@buffer") return os(new std::wstringstream());
-		if ((t==L"@name" && named==L"") ||
-			 t==L"@tmp")  filename(tmpfile());
-		else if (t==L"@name") filename(named+e);
-		else                  filename(t);
+		if (t==L"@name") {
+			if (named != L"") filename(named+e);
+			else return std::wcerr<<L"output '"<<n<<
+				"' targeting @name without name"<<std::endl,
+				os(&wcnull);
+		} else filename(t);
 		return os(new std::wofstream(ws2s(filename())));
 	}
 	bool is_null() const {
