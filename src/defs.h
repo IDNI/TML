@@ -61,4 +61,6 @@ typedef std::vector<bools> vbools;
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
+std::wstring s2ws(const std::string&);
+std::string  ws2s(const std::wstring&);
 #endif

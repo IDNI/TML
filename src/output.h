@@ -16,9 +16,7 @@
 #include <sstream>
 #include <map>
 #include <fstream>
-
-std::wstring s2ws(const std::string&);
-std::string  ws2s(const std::wstring&);
+#include "defs.h"
 
 extern std::wostream wcnull;
 
@@ -41,10 +39,17 @@ public:
 	static const std::wstring& set_name(const std::wstring fn = L"") {
 		return named = fn;
 	}
+	static bool exists(const std::wstring nam) {
+		auto it = outputs.find(nam);
+		return it != outputs.end();
+	}
 	static bool get(const std::wstring nam, output& o) {
 		auto it = outputs.find(nam);
 		if (it == outputs.end()) return false;
 		return o = it->second, true;
+	}
+	static void set(const std::wstring nam, output o) {
+		outputs.insert_or_assign(nam, o);
 	}
 	static std::wostream& to(const std::wstring nam) {
 		output o;
@@ -53,6 +58,13 @@ public:
 	static std::wstring get_target(const std::wstring nam) {
 		output o;
 		return get(nam, o) ? o.target() : L"@null";
+	}
+	static std::wostream& set_target(const std::wstring nam,
+						const std::wstring tar) {
+		output o;
+		if (!get(nam, o)) return wcnull;
+		std::wostream& os = o.target(tar);
+		return set(nam, o), os;
 	}
 	static bool is_null(const std::wstring nam) {
 		output o;

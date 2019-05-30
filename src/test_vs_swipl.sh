@@ -4,9 +4,9 @@ DIFF=""
 while [ "$DIFF" == "" ]
 do
 	INPUT=`./a.out`
+	OUTPUT="program.swipl"
 	echo $INPUT
-	./tml --swipl < $INPUT > tml.output 2> tml.fname
-	OUTPUT=`head -n 1 tml.fname | awk 'NF>1{print $NF}'`
+	./tml --swipl $OUTPUT < $INPUT > tml.output 2> tml.fname
 	echo $OUTPUT
 	timeout 5 swipl $OUTPUT > swipl.output 2> /dev/null
 	if [ $? -eq 124 ]; then

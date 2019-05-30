@@ -19,6 +19,7 @@ using namespace std;
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	bdd::init();
+	driver::init(); // setup outputs
 	driver d(argc, argv, stdin);
 	if (!d.result) wcout << "unsat" << endl;
 //	print_memos_len();

@@ -35,7 +35,7 @@ wostream& driver::print_swipl(wostream& os, const raw_prog& rp) const {
 }
 
 wostream& driver::print_prolog(wostream& os, const raw_prog& p,
-	const dialect d) const {
+	const prolog_dialect d) const {
 	relarities ras;
 	get_relarities(p, ras);
 	wstring name = d == SWIPL ? L"SWI Prolog" : L"XSB";
