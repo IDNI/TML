@@ -25,6 +25,14 @@
 #include "driver.h"
 #include "err.h"
 #include "ast.h"
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/bind.h>
+using namespace emscripten;
+#include "../js/embindings.h"
+#endif
+
 using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);

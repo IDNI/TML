@@ -83,7 +83,11 @@ struct option {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
 			case BOOL: v.set(s==L"" || s==L"true" || s==L"t" ||
 				s==L"1" || s==L"on" || s==L"enabled"); break;
-			case STRING: if (s != L"") v.set(s); break;
+			case STRING:
+				if (s == L"") {
+					if (output::exists(name()))
+						v.set(std::wstring(L"@stdout"));
+				} else v.set(s); break;
 			default: throw 0;
 		}
 		if (e) e(v);
