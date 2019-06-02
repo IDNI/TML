@@ -1,50 +1,178 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<title>tml.js emscripten test</title>
-		<meta charset="utf-8" />
-		<link rel="icon" href="data:,">
-	</head>
-	<body>
-		<script src=".//tml.js"></script>
-		<script>
-			Module['onRuntimeInitialized'] = () => {
-				const { tml: tml_js, driver } = Module;
-				const tml = tml_js.prototype;
-				tml.init();
-				const program = `
-e (v1 v2).
-e (v2 v3).
-e (v3 v4).
-e (v4 v5).
-e (v5 v6).
-e (v6 v7).
-e (v7 v8).
-e (v8 v9).
-e (v9 v10).
-e (v10 v11).
-e (v11 v12).
-e (v12 v13).
-e (v13 v14).
-e (v14 v15).
-e (v15 v16).
-e (v16 v17).
-e (v17 v18).
-e (v18 v19).
-e (v19 v20).
-e (v20 v21).
-e (v21 v22).
-e (v22 v23).
-e (v23 v24).
-e (v24 v25).
-e (v25 v1).
-t(?x ?y) :- e(?x ?y).
-t(?x ?y) :- t(?x ?z), t(?z ?y).
-`;
-				console.log(`running: '${program}'`);
-				const d = new driver(0, [], program);
-				console.log('result: ', d.result);
-			};
-		</script>
-	</body>
+<head>
+	<title>tml.js test</title>
+	<meta charset="utf-8" />
+	<link rel="icon" href="data:,">
+	<style>
+		body { font-size: 13px; }
+
+		/* using pre for stream frames */
+		pre {
+			width: 80em;
+			height: 25em;
+			overflow: auto;
+			padding: 0.3em;
+			background: black;
+			color: powderblue;
+			border: 4px solid darkolivegreen;
+		}
+
+		/* default color as a fallback for not highlighted text
+		 * which is basically a color for comments (+ nonprintable ws)
+		 */
+		#highlighted          { color: darkolivegreen; }
+
+		.open_curly,
+		.close_curly,
+		.dot,
+		.alt,
+		.and,
+		.or,
+		.delimiter,
+		.open_paren,
+		.close_paren,
+		.directive .symbol    { color: peru; }
+
+		.char,
+		.string               { color: powderblue; }
+
+		.directive,
+		.fact                 { color: cornflowerblue }
+
+		.fact .head .negative,
+		.rule .head .negative { color: crimson; }
+		.body                 { color: burlywood; }
+		.production           { color: gold; }
+		.rule .head .positive { color: greenyellow; }
+		.variable             { text-decoration: underline; }
+
+	</style>
+</head>
+
+<body>
+	<h1>tml.js example page</h1>
+	<h2>input program</h2>
+		<pre id="program">
+{
+	# Dyck's language
+	@string str "(()(()))".
+	S => '(' S ')' S | null.
+}
+{
+	# create graph represented by relation e
+	e(v1 v2).  # with nodes: v1 -> v2,
+	e(v2 v3).  # v2 -> v3
+	e(v3 v1).  # v3 -> v1
+
+	# transitive closure
+	tc(?x ?y) :- e(?x ?y).
+	tc(?x ?y) :- tc(?x ?z), tc(?z ?y).
+}
+{
+	~S(?x ?x) :- S(?x ?x).
+	~e(?x ?y) :- e(?x ?y).
+}
+</pre>
+	<h2>highlighted program (css styled --ast-html)</h2>
+	<pre id="highlighted"></pre>
+
+	<h2>--output, --o [TARGET=@stdout]</h2>
+	<pre id="output"></pre>
+
+	<h2>--transformed, --t [TARGET=@null]</h2>
+	<pre id="transformed"></pre>
+
+	<h2>--xsb [TARGET=@null]</h2>
+	<pre id="xsb"></pre>
+
+	<h2>--pl [TARGET=@null]</h2>
+	<pre id="swipl"></pre>
+
+	<h2>--souffle [TARGET=@null]</h2>
+	<pre id="souffle"></pre>
+
+	<h2>--ast, --at [TARGET=@null]</h2>
+	<pre id="ast"></pre>
+
+	<h2>--ast-json, --aj [TARGET=@null]</h2>
+	<pre id="ast-json"></pre>
+
+	<h2>--ast-xml, --ax [TARGET=@null]</h2>
+	<pre id="ast-xml"></pre>
+
+	<h2>--ast-html, --ah [TARGET=@null]</h2>
+	<pre id="ast-html"></code></pre>
+
+	<h2>TARGET</h2>
+	can be optionally path to a file or one of:
+	<ul>
+		<li>@stdout (default if argument's TARGET not provided)</li>
+		<li>@stderr</li>
+		<li>@name (use --name to specify filename w/o ext for this target)</li>
+		<li>@buffer (later can be read by output::read(stream_name))</li>
+		<li>@null</li>
+	</ul>
+	TARGET=@... means the output targets @... by default
+
+	<script src="tml.js"></script>
+<script>
+
+// read program from HTML page element with id "program"
+const program = document.getElementById("program").innerText;
+
+// names of TML output streams
+const stream_names = [
+	"output", "transformed", "xsb", "swipl", "souffle",
+	"ast", "ast-json", "ast-xml", "ast-html"
+];
+
+// create args array and add argfor each stream to buffer data
+// at the end we output.read(stream_name) buffer's data as string
+const args = [];
+stream_names.forEach(n => { args.push("--"+n); args.push("@buffer"); });
+
+console.log(`running: '${program}' with options: '${args.join(' ')}'`);
+
+tml.onRuntimeInitialized = _ => {
+	// import from tml
+	const { bdd, driver, options, output, strings } = tml;
+
+	// initialize bdd database and driver's outputs
+	bdd.init();
+	driver.init();
+
+	// push args into vector<string> arg_strings
+	const arg_strings = new strings();
+	args.forEach(arg => { arg_strings.push_back(arg); });
+
+	// create options object and update it by parsed arguments
+	const o = new options();
+	o.parse(arg_strings);
+
+	console.log('args:', o.to_string());
+
+	// create a driver and run program
+	const d = driver.create(program, o);
+
+	console.log('result: ', d.result);
+
+	// for all streams
+	for (const n of stream_names) {
+		// read data from the output buffer
+		const data = output.read(n);
+		console.log(`${n}: ${data}`);
+		// put the data into buffer's HTML element
+		document.getElementById(n).innerText = data;
+	}
+
+	// copy ast-html content into highlighted frame as HTML
+	document.getElementById('highlighted')
+		.innerHTML = document.getElementById("ast-html").innerText;
+
+	// delete created objects
+	d.delete(); o.delete(); arg_strings.delete();
+};
+</script>
+</body>
 </html>

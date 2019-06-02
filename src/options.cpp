@@ -46,7 +46,7 @@ void options::parse(int argc, char** argv) {
 
 void options::parse(strings args) {
 	wstrings wargs = {};
-	for (size_t i=0; i < wargs.size(); ++i) wargs.push_back(s2ws(args[i]));
+	for (size_t i=0; i < args.size(); ++i) wargs.push_back(s2ws(args[i]));
 	parse(wargs);
 }
 
@@ -85,6 +85,7 @@ void options::parse_option(wstring arg, wstring v) {
 	option o;
 	bool disabled = false;
 	size_t pos = 0;
+	//DBG(wcout<<L"parse_option: "<<arg<<L' '<<v<<endl;)
 	// skip hyphens
 	while (pos < arg.length() && arg[pos] == L'-' && pos < 2) ++pos;
 	wstring a = arg.substr(pos);
