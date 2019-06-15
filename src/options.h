@@ -23,7 +23,7 @@ typedef enum ast_format { AST_TML, AST_JSON, AST_XML, AST_HTML } ast_format;
 
 struct options {
 	std::set<format> formats = { F_TML };
-	bool ms = false;
+	bool sdt = false;
 	std::set<dialect> dialects = {};
 	std::set<ast_format> ast_formats = {};
 	options() {}
@@ -40,7 +40,7 @@ struct options {
 			else if_opt("ast-json")    ast_formats.insert(AST_JSON);
 			else if_opt("ast-xml")     ast_formats.insert(AST_XML);
 			else if_opt("ast-html")    ast_formats.insert(AST_HTML);
-			else if_opt("ms")	   ms = true;
+			else if_opt("sdt")	   sdt = true;
 		}
 	}
 	bool option(const std::string arg, const std::string o) const {

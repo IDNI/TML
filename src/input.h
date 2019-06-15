@@ -54,6 +54,9 @@ struct raw_term {
 	void calc_arity();
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
+	bool operator==(const raw_term& t) const {
+		return neg == t.neg && e == t.e && arity == t.arity;
+	}
 };
 
 struct directive {
@@ -73,6 +76,8 @@ struct production {
 	bool operator<(const production& t) const { return p < t.p; }
 };
 
+bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y);
+
 struct raw_rule {
 	std::vector<raw_term> h;
 	std::vector<std::vector<raw_term>> b;
@@ -88,6 +93,10 @@ struct raw_rule {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
 	}
+	bool operator==(const raw_rule& r) const {
+		return h == r.h && b == r.b;
+	}
+	bool operator!=(const raw_rule& r) const { return !(*this == r); }
 };
 
 struct raw_prog {

@@ -311,9 +311,9 @@ bool operator<(const raw_term& x, const raw_term& y) {
 	return false;
 }
 
-bool operator==(const raw_term& x, const raw_term& y) {
-	return x.neg == y.neg && x.e == y.e && x.arity == y.arity;
-}
+//bool operator==(const raw_term& x, const raw_term& y) {
+//	return x.neg == y.neg && x.e == y.e && x.arity == y.arity;
+//}
 
 bool operator<(const raw_rule& x, const raw_rule& y) {
 	if (x.h != y.h) return x.h < y.h;
@@ -342,6 +342,13 @@ bool operator==(const lexeme& l, cws s) {
 bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
 	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
 		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
+}
+
+bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y){
+	if (x.size() != y.size()) return false;
+	for (size_t n = 0; n != x.size(); ++n)
+		if (!(x[n] == y[n])) return false;
+	return true;
 }
 
 off_t fsize(const char *fname) {

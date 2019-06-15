@@ -185,9 +185,9 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
 			dict.get_rel(pd.strs.begin()->first),
 			pd.strs.begin()->second.size());
 	}
-	if (opts.ms)
+	if (opts.sdt)
 		for (raw_prog& p : rp.p)
-			p = transform_ms(p);
+			p = transform_sdt(p);
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));

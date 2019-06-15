@@ -72,33 +72,31 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 	}
 };*/
 
+#define elem_openp elem(elem::OPENP, dict.get_lexeme(L"("))
+#define elem_closep elem(elem::CLOSEP, dict.get_lexeme(L")"))
+
 raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
 	return { false, {v,
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem_openp,
 		elem(elem::VAR, get_var_lexeme(v1)),
 		elem(elem::VAR, get_var_lexeme(v2)),
-		elem(elem::CLOSEP, dict.get_lexeme(L")"))}, {2}};
+		elem_closep}, {2}};
 }
 
 raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	int_t v1, int_t v2) {
 	raw_term t;
 	t.e.emplace_back(elem::SYM, r),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem_openp), t.e.emplace_back(elem_openp),
+	t.e.emplace_back(elem_openp),
 	t.e.emplace_back(elem::VAR, get_var_lexeme(v1)),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
-	t.e.emplace_back(c),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
-	t.e.emplace_back(elem::OPENP, dict.get_lexeme(L"(")),
+	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
+	t.e.emplace_back(elem_openp), t.e.emplace_back(c),
+	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_openp),
+	t.e.emplace_back(elem_openp),
 	t.e.emplace_back(elem::VAR, get_var_lexeme(v2)),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")")),
-	t.e.emplace_back(elem::CLOSEP, dict.get_lexeme(L")"));
+	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
+	t.e.emplace_back(elem_closep);
 	return t.calc_arity(), t;
 }
 
@@ -106,40 +104,29 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 	int_t v){
 	return { false, {
 		elem(elem::SYM, r),
-		elem(elem::OPENP, dict.get_lexeme(L"(")),
+		elem_openp,
 		elem(elem::SYM, dict.get_lexeme(b)),
 		elem(elem::VAR, get_var_lexeme(v)),
 		elem(elem::VAR, get_var_lexeme(v+1)),
-		elem(elem::CLOSEP, dict.get_lexeme(L")"))}, {3}};
+		elem_closep}, {3}};
 }
 
 #define from_string_lex(rel, lex, n) raw_rule({ false, { \
 		elem(elem::SYM, rel), \
-		elem(elem::OPENP, dict.get_lexeme(L"(")), \
+		elem_openp, \
 		elem(elem::SYM, dict.get_lexeme(lex)), \
 		elem(n), elem(n+1), \
-		elem(elem::CLOSEP, dict.get_lexeme(L")"))},{3}})
+		elem_closep},{3}})
 
 void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
 		r.r.push_back(raw_rule(raw_term{
 			false, {
 			elem(elem::SYM, dict.get_rel(rel)),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(n),
-			elem(elem::CLOSEP, dict.get_lexeme(L")")),
-			elem(elem::CLOSEP, dict.get_lexeme(L")")),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(s[n]),
-			elem(elem::CLOSEP, dict.get_lexeme(L")")),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(elem::OPENP, dict.get_lexeme(L"(")),
-			elem(n+1),
-			elem(elem::CLOSEP, dict.get_lexeme(L")")),
-			elem(elem::CLOSEP, dict.get_lexeme(L")")),
-			elem(elem::CLOSEP, dict.get_lexeme(L")"))},{}}));
+			elem_openp, elem_openp, elem_openp, elem(n),
+			elem_closep, elem_closep, elem_openp, elem(s[n]),
+			elem_closep, elem_openp, elem_openp, elem(n+1),
+			elem_closep, elem_closep, elem_closep},{}}));
 		r.r.back().h[0].calc_arity();
 		if (iswspace(s[n]))
 			r.r.push_back(from_string_lex(
@@ -160,8 +147,8 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 }
 
 #define append_sym_elem(x, s) (x).push_back(elem(elem::SYM, s))
-#define append_openp(x) (x).push_back(elem(elem::OPENP, dict.get_lexeme(L"(")))
-#define append_closep(x) (x).push_back(elem(elem::CLOSEP, dict.get_lexeme(L")")))
+#define append_openp(x) (x).push_back(elem_openp)
+#define append_closep(x) (x).push_back(elem_closep)
 #define cat(x, y) x.insert(x.end(), y.begin(), y.end())
 #define cat_in_brackets(x, y) \
 	append_openp((x).e), cat((x).e, (y).e), append_closep((x).e)
@@ -428,7 +415,121 @@ pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }
 
-void driver::refresh_vars(raw_prog& p) {
+struct flat_rules : public vector<pair<raw_term, vector<raw_term>>> {
+	raw_term q;
+	map<pair<elem, ints>, set<size_t>> m;
+	flat_rules(const raw_prog& p, driver& d) {
+		for (const raw_rule& r : p.r)
+			if (r.type == raw_rule::GOAL) q = r.h[0]; // FIXME
+			else if (r.type != raw_rule::NONE) continue;
+			else for (raw_term h : r.h)
+				for (vector<raw_term> a : r.b) {
+					size_t v = 1;
+					map<elem, elem> m1;
+					d.refresh_vars(h, v, m1);
+					for (raw_term& b : a)
+						d.refresh_vars(b, v, m1);
+					m[{h.e[0],h.arity}].insert(size()),
+					emplace_back(h, a);
+				}
+	}
+};
+
+template<typename T> struct nullable {
+	const bool null;
+	const T t;
+	nullable() : null(true), t(0) {}
+	nullable(const T& t) : null(false), t(t) {}
+//	nullable<t>& operator=(const T& x) { return null=false, t=x, *this; }
+	bool operator<(const nullable<T>& x) const {
+		return null ? !x.null : x.null ? false : t < x.t;
+	}
+};
+
+// implementation of bottom-up subsumptive demand transform, section 4 from
+// "More Efficient Datalog Queries: Subsumptive Tabling Beats Magic Sets"
+// by Tekle&Liu https://www3.cs.stonybrook.edu/~tuncay/papers/TL-SIGMOD-11.pdf
+
+struct pattern {
+	elem p;
+	ints ar;
+	nullable<size_t> n, r;
+	bool g = true;
+	bools s; // true for b, false for f
+//	pattern() {}
+	pattern(const elem& p, const ints& ar, size_t n, size_t r, bool g) :
+		p(p), ar(ar), n(n), r(r), g(g) {}
+	pattern(const raw_term& h, const vector<raw_term>& b, size_t n,
+		size_t r, bool g) : p(h.e[0]), ar(h.arity), n(n), r(r), g(g) {
+		set<elem> lvars;
+		for (const elem& e : h.e)
+			if (e.type == elem::VAR) lvars.insert(e);
+		for (size_t i = 0; i != n; ++i)
+			for (size_t j = 0; j != b[i].e.size(); ++j)
+				if (b[i].e[j].type == elem::VAR)
+					lvars.insert(b[i].e[j]);
+		for (size_t k = 1; k != b[n].e.size(); ++k)
+			if (	b[n].e[k].type != elem::OPENP &&
+				b[n].e[k].type != elem::CLOSEP)
+				s.push_back(b[n].e[k].type != elem::VAR ||
+					!lvars.insert(b[n].e[k]).second);
+	}
+	pattern(const raw_term& q) : p(q.e[0]), ar(q.arity) {
+		for (size_t n = 1; n != q.e.size(); ++n)
+			if (q.e[n].type == elem::VAR) s.push_back(false);
+			else if (q.e[n].type == elem::OPENP) continue;
+			else if (q.e[n].type == elem::CLOSEP) continue;
+			else s.push_back(true);
+	}
+	static bool contains(raw_term x, vector<raw_term> y, size_t n) {
+		while (n--) if (y[n] == x) return true;
+		return false;
+	}
+	static bool subset(vector<raw_term> small, size_t ns,
+		vector<raw_term> big, size_t nb) {
+		if (ns > nb) return false;
+		while (ns--) if (!contains(small[ns], big, nb)) return false;
+		return true;
+	}
+	bool subsumes(const pattern& t, const flat_rules& f) const {
+		// *this subsumes t
+		if (!g) return false;
+		bool bb = false;
+		for (bool b : s) bb |= b;
+		if (!bb) return true;
+		for (size_t k = 0; k != s.size(); ++k)
+			if (s[k]) bb &= t.s[k];
+		if (!bb || t.n < n) return false;
+		return n.null||subset(f[r.t].second,n.t,f[t.r.t].second,t.n.t);
+	}
+};
+
+map<pair<elem, ints>, set<bools>> get_patterns(const flat_rules& f) {
+	vector<pattern> v;
+	function<void(const pattern&)> on_new_pat;
+	on_new_pat = [&f, &v, &on_new_pat](const pattern& p) {
+		v.push_back(p);
+		for (size_t rl : f.m.at({p.p, p.ar})) {
+			const vector<raw_term>& a = f[rl].second;
+			for (size_t n = 0; n != a.size(); ++n) {
+				const raw_term& b = a[n];
+				if (f.m.find({b.e[0],b.arity}) == f.m.end())
+					continue;
+				pattern pat(f[rl].first, f[rl].second,
+					n, rl, p.g && !n);
+				for (const pattern& q : v)
+					if (q.subsumes(pat, f)) return;
+				on_new_pat(pat);
+			}
+		}
+	};
+	on_new_pat(pattern(f.q));
+	map<pair<elem, ints>, set<bools>> r;
+	for (const pattern& p : v) r[{p.p, p.ar}].insert(p.s);
+	return r;
+}
+
+/*void driver::refresh_vars(raw_prog& p) {
 	set<raw_rule> rs;
 	for (raw_rule r : p.r) {
 		auto s1 = refresh_vars(r);
@@ -436,7 +537,7 @@ void driver::refresh_vars(raw_prog& p) {
 	}
 	p.r.clear();
 	for (auto x : rs) p.r.push_back(x);
-}
+}*/
 
 set<raw_term> driver::get_queries(const raw_prog& p) {
 	set<raw_term> qs;
@@ -451,11 +552,43 @@ set<raw_term> driver::get_queries(const raw_prog& p) {
 	return qs;
 }
 
-set<raw_rule> driver::transform_ms(const raw_prog& p, set<raw_term> qs) {
+lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
+	wstring s;
+	for (int_t j : i) s += to_wstring(j);
+	s += L'_';
+	for (bool x : b) s += x ? L'b' : L'f';
+	return dict.get_lexeme(wstring(L"d_") + lexeme2str(e.e) + s);
+}
+
+raw_prog driver::transform_sdt(raw_prog p) {
+	flat_rules f(p, *this);
+	map<pair<elem, ints>, set<bools>> pats = get_patterns(f);
+	raw_prog r;
+	for (const auto& x : f) {
+		if (x.second.empty()) { r.r.push_back(x.first); continue; }
+		for (const bools& b : pats.at({x.first.e[0], x.first.arity})) {
+			r.r.emplace_back(), r.r.back().h = {x.first},
+			r.r.back().b = {x.second};
+			raw_term d;
+			d.e.push_back(elem(elem::SYM, get_demand_lexeme(
+				x.first.e[0], x.first.arity, b)));
+			d.e.insert(d.e.end(), x.first.e.begin() + 1,
+				x.first.e.end());
+			d.calc_arity(),
+			r.r.back().b.back().emplace_back(move(d));
+		}
+	}
+	DBG(wcout<<"sdt transform, input:"<<endl<<p<<endl;)
+	DBG(wcout<<"sdt transform, output:"<<endl<<r<<endl;)
+	return r;
+}
+
+/*set<raw_rule> driver::transform_ms(const set<raw_rule>& p,
+	const set<raw_term>& qs) {
 	set<raw_rule> s;
 	raw_rule rr;
 	for (const raw_term& q : qs)
-		for (const raw_rule& t : p.r) {
+		for (const raw_rule& t : p) {
 			rr.clear();
 			if (t.type == raw_rule::NONE && specialize(t, q, rr))
 				s.insert(move(rr));
@@ -466,11 +599,12 @@ set<raw_rule> driver::transform_ms(const raw_prog& p, set<raw_term> qs) {
 raw_prog driver::transform_ms(raw_prog p) {
 	refresh_vars(p);
 	set<raw_term> qs = get_queries(p);
-	set<raw_rule> rs;
+	set<raw_rule> rs, pr;
+	for (const raw_rule& r : p.r) pr.insert(r);
 	map<elem, elem> m;
 	size_t v = 1;
 	while (!qs.empty()) {
-		set<raw_rule> r = transform_ms(p, qs);
+		set<raw_rule> r = transform_ms(pr, qs);
 		size_t sz = qs.size();
 		qs.clear();
 		for (raw_rule t : r)
@@ -487,7 +621,7 @@ raw_prog driver::transform_ms(raw_prog p) {
 	DBG(wcout<<"spec:"<<endl<<res;)
 	return res;
 }
-
+*/
 /*raw_prog driver::transform_ms(raw_prog p) { // magic sets transform
 	set<raw_rule> s, ss;
 	refresh_vars(p);

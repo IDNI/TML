@@ -26,6 +26,8 @@ struct prog_data {
 };
 
 class driver {
+	friend struct flat_rules;
+	friend struct pattern;
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
@@ -36,6 +38,7 @@ class driver {
 	lexeme get_new_var();
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
+	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
@@ -45,9 +48,9 @@ class driver {
 	std::wstring directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
-	std::set<raw_rule> transform_ms(const raw_prog& p,
-		std::set<raw_term> qs);
-	raw_prog transform_ms(raw_prog p);
+//	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
+//		const std::set<raw_term>& qs);
+	raw_prog transform_sdt(raw_prog p);
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_prog transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
