@@ -39,7 +39,7 @@ vector<bdd> V;
 unordered_map<ite_memo, int_t> C;
 map<bools, unordered_map<array<int_t, 2>, int_t>, veccmp<bool>> CX;
 map<pair<bools, uints>, unordered_map<array<int_t, 2>, int_t>,
-	vec2cmp<bool, uint>> CXP;
+	vec2cmp<bool, uint_t>> CXP;
 unordered_map<bdds, int_t> AM;
 map<bools, unordered_map<bdds, int_t>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, int_t>, vec2cmp<bool, uint_t>> AMXP;
@@ -122,7 +122,7 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	else r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	C.emplace(m, r);
-#endif		
+#endif
 	return r;
 }
 
@@ -247,7 +247,7 @@ bool bdd::am_simplify(bdds& v, const unordered_map<bdds, int_t>& memo) {
 }
 
 int_t bdd::bdd_and_many(bdds v) {
-#ifdef MEMO	
+#ifdef MEMO
 	static unordered_map<ite_memo, int_t>::const_iterator jt;
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -469,7 +469,7 @@ struct sbdd_and_many_ex_perm {
 	unordered_map<int_t, int_t>& m3;
 	int_t last;
 	sbdd_and_ex_perm saep;
-	
+
 	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
 		unordered_map<bdds, int_t>& memo,
 		unordered_map<array<int_t, 2>, int_t>& m2,
@@ -819,7 +819,7 @@ int_t bdd::bdd_ex(int_t x, const bools& b, unordered_map<int_t, int_t>& memo,
 }
 
 int_t bdd::bdd_ex(int_t x, const bools& b) {
-	int_t last = 0; 
+	int_t last = 0;
 	for (size_t n = 0; n != b.size(); ++n) if (b[n]) last = n;
 	return bdd_ex(x, b, memos_ex[b], last);
 }

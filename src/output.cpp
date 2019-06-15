@@ -15,6 +15,10 @@
 #include <sstream>
 using namespace std;
 
+wostream wcnull(0);
+map<std::wstring, output> output::outputs = {};
+wstring output::named = L"";
+
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	for (size_t n = 0; n != p.second; ++n) os << p.first[n];
 	return os;
@@ -221,4 +225,45 @@ wostream& operator<<(wostream& os, const raw_progs& p) {
 	if (p.p.size() == 1) os << p.p[0];
 	else for (auto x : p.p) os << L'{' << endl << x << L'}' << endl;
 	return os;
+}
+
+wostream& operator<<(wostream& os, const output& o) {
+	return os << o.target();
+}
+
+wostream& operator<<(wostream& os, const option& o) {
+	if (o.is_undefined()) return os;
+	os << L"--" << o.name() << L' ';
+	switch (o.get_type()) {
+		case option::type::INT: {
+			int i = o.get_int();
+			return os << (i < 0 ? L"--":L"") << i;
+		}
+		case option::type::BOOL:
+			return os << (o.get_bool() ?L"":L"false");
+		case option::type::STRING: {
+			wstring s = o.get_string();
+			if (s.rfind(L"-", 0) == 0) os << L"--";
+			os << L'"';
+			for (auto it = s.begin(); it < s.end(); ++it)
+				os << (*it == '\\' || *it == '"' ? L"\\" : L""),
+				os << *it;
+			return os << L'"';
+		} break;
+		default: ;
+	}
+	return os;
+}
+
+wostream& operator<<(wostream& os, const std::map<std::wstring,option>& opts) {
+	bool t = false;
+	for (auto it : opts) {
+		if (!it.second.is_undefined())
+			os << (t ? L" " : L"") << it.second, t = true;
+	}
+	return os;
+}
+
+wostream& operator<<(wostream& os, const options& o) {
+	return os << o.opts;
 }

@@ -14,7 +14,10 @@
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
+#include "output.h"
 #include "options.h"
+
+typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 
 struct prog_data {
 	strs_t strs;
@@ -81,6 +84,7 @@ class driver {
 public:
 	bool result = true;
 	options opts;
+	static void init();
 	driver(int argc, char** argv, FILE *f, options o);
 	driver(int argc, char** argv, std::wstring, options o);
 	driver(int argc, char** argv, char *s, options o);
@@ -93,7 +97,7 @@ public:
 //	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
 	std::wostream& print_prolog(std::wostream&, const raw_prog&,
-		const dialect) const;
+		const prolog_dialect) const;
 	std::wostream& print_xsb(std::wostream&, const raw_prog&) const;
 	std::wostream& print_swipl(std::wostream&, const raw_prog&) const;
 	std::wostream& print_souffle(std::wostream&, const raw_prog&) const;

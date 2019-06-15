@@ -18,6 +18,8 @@ add_executable(tml
 	input.h
 	main.cpp
 	options.h
+	options.cpp
+	output.h
 	output.cpp
 	print_prolog.cpp
 	print_souffle.cpp

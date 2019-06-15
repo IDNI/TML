@@ -484,7 +484,7 @@ pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	return { ex, perm };
 }
 
-spbdd_handle tables::body_query(body& b, size_t DBG(len)) {
+spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
@@ -505,7 +505,7 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 	return x->b < y->b;
 };
 
-void tables::alt_query(alt& a, bdd_handles& v, size_t DBG(len)) {
+void tables::alt_query(alt& a, bdd_handles& v, size_t /*DBG(len)*/) {
 /*	spbdd_handle t = bdd_handle::T;
 	for (auto x : a.order) {
 		bdd_handles v1;
@@ -533,7 +533,7 @@ void tables::alt_query(alt& a, bdd_handles& v, size_t DBG(len)) {
 //	DBG(assert(bdd_nvars(a.rlast) < len*bits);)
 }
 
-bool tables::table::commit(DBG(size_t bits)) {
+bool tables::table::commit(DBG(size_t /*bits*/)) {
 	if (add.empty() && del.empty()) return false;
 	spbdd_handle x;
 	if (add.empty()) x = t % bdd_or_many(move(del));

@@ -10,48 +10,126 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include <algorithm>
-#include <string>
-#include <set>
+#ifndef __OPTIONS_H__
+#define __OPTIONS_H__
+#include <functional>
+#include "defs.h"
+#include "output.h"
 
-typedef enum dialect { TRANSFORMED, XSB, SWIPL, SOUFFLE } dialect;
-typedef enum format { F_TML, F_CSV } format;
-typedef enum ast_format { AST_TML, AST_JSON, AST_XML, AST_HTML } ast_format;
+typedef std::vector<std::string> strings;
+typedef std::vector<std::wstring> wstrings;
 
-#define if_opt(o)       if (option(arg, (o)))
-#define if_opts(o1, o2) if (option(arg, (o1)) || option(arg, (o2)))
-
-struct options {
-	std::set<format> formats = { F_TML };
-	bool sdt = false;
-	std::set<dialect> dialects = {};
-	std::set<ast_format> ast_formats = {};
-	options() {}
-	options(int argc, char** argv) { parse(argc, argv); }
-	void parse(int c, char** v) {
-		for (int i = 1; i < c; ++i) {
-			std::string arg = std::string(v[i]);
-			if_opts("t", "transformed")dialects.insert(TRANSFORMED);
-			else if_opt("xsb")         dialects.insert(XSB);
-			else if_opt("swipl")       dialects.insert(SWIPL);
-			else if_opt("souffle")     dialects.insert(SOUFFLE);
-			else if_opt("csv")         formats.insert(F_CSV);
-			else if_opt("ast")         ast_formats.insert(AST_TML);
-			else if_opt("ast-json")    ast_formats.insert(AST_JSON);
-			else if_opt("ast-xml")     ast_formats.insert(AST_XML);
-			else if_opt("ast-html")    ast_formats.insert(AST_HTML);
-			else if_opt("sdt")	   sdt = true;
+struct option {
+	enum type { UNDEFINED, INT, BOOL, STRING };
+	struct value {
+		value()               : t(UNDEFINED)         {}
+		value(int i)          : t(INT),      v_i(i)  {}
+		value(bool b)         : t(BOOL),     v_b(b)  {}
+		value(std::wstring s) : t(STRING),   v_s(s)  {}
+		void set(int i)          { t=INT;    v_i = i; }
+		void set(bool b)         { t=BOOL;   v_b = b; }
+		void set(std::wstring s) { t=STRING; v_s = s; }
+		void null() {
+			switch (t) {
+				case INT:    v_i = 0; break;
+				case BOOL:   v_b = false; break;
+				case STRING: v_s = L""; break;
+				default: ;
+			}
 		}
+		type get_type() const { return t; }
+		int                 get_int()    const { return v_i; }
+		bool                get_bool()   const { return v_b; }
+		const std::wstring& get_string() const { return v_s; }
+		bool is_undefined() const { return t == UNDEFINED; }
+		bool is_int()       const { return t == INT; }
+		bool is_bool()      const { return t == BOOL; }
+		bool is_string()    const { return t == STRING; }
+		bool operator ==(const value& ov) const {
+			if (t != ov.get_type()) return false;
+			switch (t) {
+				case UNDEFINED: return ov.is_undefined();
+				case INT:       return v_i == ov.get_int();
+				case BOOL:      return v_b == ov.get_bool();
+				case STRING:    return v_s == ov.get_string();
+			}
+		}
+	private:
+		type         t;
+		int          v_i = 0;
+		bool         v_b = false;
+		std::wstring v_s = L"";
+	};
+	typedef std::function<void(const value&)> callback;
+	option() {}
+	option(type t, wstrings n, callback e, option::value v={})
+		: t(t), n(n), v(v), e(e) {}
+	option(type t, wstrings n, option::value v={})
+		: t(t), n(n), v(v), e(0) {}
+	const std::wstring& name() const { return n[0]; }
+	const wstrings& names() const { return n; }
+	type get_type() const { return t; }
+	value get() const { return v; }
+	int           get_int   () const { return v.get_int(); };
+	bool          get_bool  () const { return v.get_bool(); };
+	std::wstring  get_string() const { return v.get_string(); };
+	bool operator ==(const value& ov) const { return v == ov; }
+	bool operator ==(const option& o) const { return n == o.names(); }
+	bool operator  <(const option& o) const { return n < o.names(); }
+	void parse_value(std::wstring s) {
+		//DBG(std::wcout << L"option::parse_value(s=\"" << s <<
+		//	L"\") <" << (int)t << L'>' << std::endl;)
+		switch (t) {
+			case INT: if (s != L"") v.set(std::stoi(s)); break;
+			case BOOL: v.set(s==L"" || s==L"true" || s==L"t" ||
+				s==L"1" || s==L"on" || s==L"enabled"); break;
+			case STRING:
+				if (s == L"") {
+					if (output::exists(name()))
+						v.set(std::wstring(L"@stdout"));
+				} else v.set(s); break;
+			default: throw 0;
+		}
+		if (e) e(v);
 	}
-	bool option(const std::string arg, const std::string o) const {
-		return (arg == "--"+o || arg == "-"+o);
-	}
-	template<typename T>bool enabled(const std::set<T> &s, const T &o)const{
-		auto it = std::find (s.begin(), s.end(), o);
-		return (it != s.end());
-	}
-	bool enabled_dialect(const dialect d)const {return enabled(dialects,d);}
-	bool enabled_format(const format f) const  { return enabled(formats,f);}
-	bool enabled_ast_format(ast_format t) const {
-		return enabled(ast_formats, t); }
+	void disable() { v.null(); }
+	bool is_undefined() const { return v.is_undefined(); }
+private:
+	type t;
+	wstrings n; // vector of name and alternative names (shortcuts)
+	value v;
+	callback e; // callback with value as argument, fired when option parsed
 };
+
+class options {
+	friend std::wostream& operator<<(std::wostream&, const options&);
+	std::map<std::wstring, option> opts = {};
+	std::map<std::wstring, std::wstring> alts = {};
+	std::wstring try_read_value(std::wstring v);
+	void parse_option(std::wstring arg, std::wstring v = L"");
+	void setup();
+	void init_defaults();
+public:
+	options()                      { setup(); }
+	options(int argc, char** argv) { setup(); parse(argc, argv); }
+	options(strings args)          { setup(); parse(args); }
+	options(wstrings args)         { setup(); parse(args); }
+	void add(option o);
+	bool get(std::wstring name, option& o) const;
+	void set(const std::wstring name, const option o) {
+		opts.insert_or_assign(name, o);
+	}
+	void parse(int argc, char** argv);
+	void parse(strings args);
+	void parse(wstrings args);
+	bool enabled (const std::wstring arg) const;
+	bool disabled(const std::wstring arg) const { return !enabled(arg); }
+	int           get_int   (std::wstring name) const;
+	bool          get_bool  (std::wstring name) const;
+	std::wstring  get_string(std::wstring name) const;
+};
+
+std::wostream& operator<<(std::wostream&, const std::map<std::wstring,option>&);
+std::wostream& operator<<(std::wostream&, const option&);
+std::wostream& operator<<(std::wostream&, const options&);
+#endif

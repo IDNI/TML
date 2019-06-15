@@ -11,22 +11,18 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <fstream>
-#include <locale>
-#include <codecvt>
 #include "driver.h"
 using namespace std;
 
 void driver::save_csv() const {
 	map<elem, wofstream> files;
-	using convert_type = std::codecvt_utf8<wchar_t>;
-	wstring_convert<convert_type, wchar_t> converter;
-	tbl.out([&files, &converter](const raw_term& t) {
+	tbl.out([&files](const raw_term& t) {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
 			wstring wfname = lexeme2str(t.e[0].e) + L".csv";
 			wcerr << L"Saving " << wfname << endl;
 			files.emplace(t.e[0],
-				wofstream(converter.to_bytes(wfname)));
+				wofstream(ws2s(wfname)));
 			it = files.find(t.e[0]);
 		}
 		wofstream& os = it->second;
