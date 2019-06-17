@@ -27,6 +27,7 @@ typedef std::pair<rel_t, ints> sig;
 class tables {
 	typedef std::map<int_t, size_t> varmap;
 	typedef std::function<void(const raw_term&)> rt_printer;
+
 	struct term : public ints {
 		bool neg;
 		ntable tab;
@@ -136,6 +137,8 @@ class tables {
 	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
+	spbdd_handle from_sym(size_t pos, size_t args, int_t i);
+	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args);
 
 	void add_bit();
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
@@ -165,13 +168,17 @@ class tables {
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_rules(const raw_prog& p);
-	void add_prog(const raw_prog& p);
-	bool fwd();
+	ntable get_table(const sig& s);
+	void load_string(lexeme rel, const std::wstring& s);
+	void add_prog(const raw_prog& p, const strs_t& strs);
+	char fwd();
 	std::set<std::pair<ntable, spbdd_handle>> get_front() const;
+	std::map<ntable, std::set<spbdd_handle>> goals;
+	std::set<ntable> to_drop;
 public:
 	tables();
 	~tables();
-	bool run_prog(const raw_prog& p) { add_prog(p); return pfp(); }
+	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;

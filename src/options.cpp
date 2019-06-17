@@ -109,6 +109,7 @@ void options::parse_option(wstring arg, wstring v) {
 void options::setup() {
 
 	add(option(option::type::BOOL,   { L"sdt" }));
+	add(option(option::type::BOOL,   { L"bin" }));
 	add(option(option::type::BOOL,   { L"run" }));
 	add(option(option::type::BOOL,   { L"csv" }));
 	add(option(option::type::STRING, { L"name", L"n" },

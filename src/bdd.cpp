@@ -96,6 +96,17 @@ int_t bdd::from_bit(uint_t b, bool v) {
 	return v ? add(b + 1, T, F) : add(b + 1, F, T);
 }
 
+bool bdd::bdd_subsumes(int_t x, int_t y) {
+	if (x == T) return true;
+	if (x == F) return y == F;
+	if (y == T) return false;
+	if (y == F) return true;
+	const bdd bx = get(x), by = get(y);
+	if (bx.v < by.v) return bdd_subsumes(bx.h, y) && bdd_subsumes(bx.l, y);
+	if (bx.v > by.v) return bdd_subsumes(x, by.h) && bdd_subsumes(x, by.l);
+	return bdd_subsumes(bx.h, by.h) && bdd_subsumes(bx.l, by.l);
+}
+
 int_t bdd::bdd_and(int_t x, int_t y) {
 	DBG(assert(x && y);)
 	if (x == F || y == F || x == -y) return F;
@@ -710,6 +721,10 @@ spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y) {
 	return bdd_handle::get(bdd::bdd_or(-x->b, y->b));
 }
 
+bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y) {
+	return bdd::bdd_subsumes(x->b, y->b);
+}
+
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z) {
 	return bdd_handle::get(bdd::bdd_ite(x->b, y->b, z->b));
 }
@@ -765,13 +780,28 @@ spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& ex,
 	return r;
 }
 
+int_t bdd_or_reduce(bdds b) {
+	if (b.empty()) return F;
+	if (b.size() == 1) return b[0];
+	if (b.size() == 2) return bdd::bdd_or(b[0], b[1]);
+	int_t t = F;
+	if (b.size() & 1) t = b.back(), b.erase(b.begin()+b.size()-1);
+	bdds x(b.size()>>1);
+	for (size_t n = 0; n != x.size(); ++n)
+		x[n] = bdd::bdd_or(b[n<<1], b[1+(n<<1)]);
+	return bdd::bdd_or(t, bdd_or_reduce(move(x)));
+}
+
 spbdd_handle bdd_or_many(const bdd_handles& v) {
-	int_t r = F;
+	bdds b(v.size());
+	for (size_t n = 0; n != v.size(); ++n) b[n] = v[n]->b;
+	return bdd_handle::get(bdd_or_reduce(move(b)));
+/*	int_t r = F;
 	for (auto x : v) r = bdd::bdd_or(r, x->b);
 	return bdd_handle::get(r);
 	bdds b(v.size());
 	for (size_t n = 0; n != v.size(); ++n) b[n] = -v[n]->b;
-	return bdd_handle::get(-bdd::bdd_and_many(move(b)));
+	return bdd_handle::get(-bdd::bdd_and_many(move(b)));*/
 }
 
 void bdd::sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r) {

@@ -112,24 +112,48 @@ void tables::add_bit() {
 	++bits;
 }
 
+typedef tuple<size_t, size_t, size_t, int_t> skmemo;
+static map<skmemo, spbdd_handle> smemo;
+typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
+static map<ekmemo, spbdd_handle> ememo;
+
+spbdd_handle tables::from_sym(size_t pos, size_t args, int_t i) {
+	static skmemo x;
+	static map<skmemo, spbdd_handle>::const_iterator it;
+	if ((it = smemo.find(x = { i, pos, args, bits })) != smemo.end())
+		return it->second;
+	spbdd_handle r = bdd_handle::T;
+	for (size_t b = 0; b != bits; ++b) r = r && from_bit(b, pos, args, i);
+	return smemo.emplace(x, r), r;
+}
+
+spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) {
+	static ekmemo x;
+	static map<skmemo, spbdd_handle>::const_iterator it;
+	if ((it = ememo.find(x = { p1, p2, args, bits })) != ememo.end())
+		return it->second;
+	spbdd_handle r = bdd_handle::T;
+	for (size_t b = 0; b != bits; ++b)
+		r = r && ::from_eq(pos(b, p1, args), pos(b, p2, args));
+	return ememo.emplace(x, r), r;
+}
+
 spbdd_handle tables::from_fact(const term& t) {
 	spbdd_handle r = bdd_handle::T;
-	varmap vs;
+	static varmap vs;
+	vs.clear();
 	auto it = vs.end();
-	for (size_t n = 0, args = t.size(), b; n != args; ++n)
+	for (size_t n = 0, args = t.size(); n != args; ++n)
 		if (t[n] >= 0)
-			for (b = 0; b != bits; ++b)
-				r = r && from_bit(b, n, args, t[n]);
+			r = r && from_sym(n, args, t[n]);
 		else if (vs.end() == (it = vs.find(t[n]))) {
 			vs.emplace(t[n], n);
 			if (!t.neg) r = r && range(n, t.tab);
-		} else for (b = 0; b != bits; ++b)
-			r = r && ::from_eq(
-				pos(b, n, args), pos(b, it->second, args));
+		} else r = r && from_sym_eq(n, it->second, args);
 	return r;
 }
 
-sig tables::get_sig(const raw_term&t){return{dict.get_rel(t.e[0].e),t.arity};}
+sig tables::get_sig(const raw_term&t) {return{dict.get_rel(t.e[0].e),t.arity};}
 
 tables::term tables::from_raw_term(const raw_term& r) {
 	ints t;
@@ -288,7 +312,11 @@ void tables::get_rules(const raw_prog& p) {
 	set<term> s;
 	map<ntable, set<spbdd_handle>> f;
 	for (const raw_rule& r : p.r)
-		if (r.type != raw_rule::NONE) continue;
+		if (r.type == raw_rule::GOAL) {
+			assert(r.h.size() == 1 && r.b.empty());
+			term x = from_raw_term(r.h[0]);
+			goals[x.tab].insert(from_fact(x));
+		} else if (r.type != raw_rule::NONE) continue;
 		else for (const raw_term& x : r.h) {
 			term h = from_raw_term(x);
 			if (r.b.empty()) f[h.tab].insert(from_fact(h));
@@ -362,7 +390,34 @@ void tables::get_rules(const raw_prog& p) {
 		}
 }
 
-//void tables::load_string(int_t ntable, const wstring& str) { }
+void tables::load_string(lexeme r, const wstring& s) {
+	int_t rel = dict.get_rel(r);
+	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
+	const ntable t1 = get_table({rel, ar}), t2 = get_table({rel, {3}});
+	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
+		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
+		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme(L"digit")),
+		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
+	term t;
+	bdd_handles b1, b2;
+	b1.reserve(s.size()), b2.reserve(s.size());
+	t.resize(3), t.neg = false;
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		t[0] = mknum(n), t[1] = mkchr(s[n]), t[2] = mknum(n+1),
+		b1.push_back(from_fact(t)), t[1] = t[0];
+		if (iswspace(s[n])) t[0] = sspace, b2.push_back(from_fact(t));
+		if (iswdigit(s[n])) t[0] = sdigit, b2.push_back(from_fact(t));
+		if (iswalpha(s[n])) t[0] = salpha, b2.push_back(from_fact(t));
+		if (iswalnum(s[n])) t[0] = salnum, b2.push_back(from_fact(t));
+		if (iswprint(s[n])) t[0] = sprint, b2.push_back(from_fact(t));
+	}
+	clock_t start, end;
+	wcerr<<"load_string or_many: ";
+	measure_time_start();
+	ts[t1].t = bdd_or_many(move(b1)), ts[t2].t = bdd_or_many(move(b2));
+	measure_time_end();
+}
 
 void tables::merge_extensionals() {
 	set<body*> S;
@@ -444,7 +499,18 @@ void tables::get_alt_ex(alt& a, const term& h) const {
 	}
 }
 
-void tables::add_prog(const raw_prog& p) {
+ntable tables::get_table(const sig& s) {
+	auto it = smap.find(s);
+	if (it != smap.end()) return it->second;
+	ntable nt = ts.size();
+	size_t len = sig_len(s);
+	max_args = max(max_args, len);
+	table tb;
+	tb.t = bdd_handle::F;
+	return tb.s = s, tb.len = len, ts.push_back(tb), smap.emplace(s,nt), nt;
+}
+
+void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	rules.clear(), datalog = true;
 	auto f = [this](const raw_term& t) {
 		for (size_t n = 1; n < t.e.size(); ++n)
@@ -457,21 +523,23 @@ void tables::add_prog(const raw_prog& p) {
 							(int_t)dict.nsyms());
 				default: ;
 			}
-		sig s = get_sig(t);
-		if (has(smap, s)) return;
-		ntable nt = ts.size();
-		size_t len = sig_len(s);
-		max_args = max(max_args, len);
-		table tb;
-		tb.s = s, tb.len = len, ts.push_back(tb), smap.emplace(s, nt);
+		get_table(get_sig(t));
 	};
 	for (const raw_rule& r : p.r) {
 		for (const raw_term& t : r.h) f(t);
 		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
 	}
+	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
 	int_t u = max((int_t)1, max(nums, max(chars, syms))-1);
 	while (u >= (1 << (bits - 2))) add_bit();
 	get_rules(p);
+	clock_t start, end;
+	wcerr<<"load_string: ";
+	measure_time_start();
+	for (auto x : strs) load_string(x.first, x.second);
+	measure_time_end();
+	smemo.clear(), ememo.clear();
+	bdd::gc();
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -550,7 +618,7 @@ bool tables::table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
-bool tables::fwd() {
+char tables::fwd() {
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
@@ -566,6 +634,12 @@ bool tables::fwd() {
 	bool b = false;
 	for (table& t : ts) b |= t.commit(DBG(bits));
 	return b;
+/*	if (!b) return false;
+	for (auto x : goals)
+		for (auto y : x.second)
+			b &= (y && ts[x.first].t) == y;
+	if (b) return (wcout <<"found"<<endl), false;
+	return b;*/
 }
 
 set<pair<ntable, spbdd_handle>> tables::get_front() const {
@@ -577,13 +651,24 @@ set<pair<ntable, spbdd_handle>> tables::get_front() const {
 
 bool tables::pfp() {
 	size_t step = 0;
-	bool b;
+	char b;
 	for (set<set<pair<ntable, spbdd_handle>>> s; (b = fwd()), true;) {
 		wcerr << "step: " << step++ << endl;
-		if (!b) return true;
+		if (!b/* == 1 || b == 2*/) return true;
 		if (!datalog && !s.emplace(get_front()).second) return false;
 	}
 	throw 0;
+}
+
+bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
+	clock_t start, end;
+	measure_time_start();
+	add_prog(p, strs);
+	measure_time_end();
+	measure_time_start();
+	bool r = pfp();
+	measure_time_end();
+	return r;
 }
 
 tables::tables() : dict(*new dict_t) {}

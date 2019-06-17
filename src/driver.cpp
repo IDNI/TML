@@ -47,7 +47,7 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 			r.e[n+1].type == elem::OPENP &&
 			r.e[n+2].type == elem::SYM &&
 			r.e[n+3].type == elem::CLOSEP) {
-			auto it = s.find(dict.get_rel(r.e[n+2].e));
+			auto it = s.find(r.e[n+2].e);
 			int_t len = it == s.end() ? 0 : it->second.size();
 //			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
@@ -166,8 +166,7 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 				parse_error(err_str_defined, d.t.e[0].e);
 			else pd.strtrees.emplace(rel, get_term(d.t,pd.strs));
 			break;*/
-		default: pd.strs.emplace(dict.get_rel(d.rel.e),
-				directive_load(d));
+		default: pd.strs.emplace(d.rel.e, directive_load(d));
 		}
 }
 
@@ -183,26 +182,28 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		}
 }*/
 
-void driver::transform(raw_progs& rp, size_t n, const strs_t& strtrees) {
+void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
-	for (auto x : pd.strs)
-		if (!has(transformed_strings, x.first))
-			transform_string(x.second, rp.p[n], x.first),
-			transformed_strings.insert(x.first);
-	for (auto x : strtrees)
-		if (!has(transformed_strings, x.first))
-			transform_string(x.second, rp.p[n], x.first),
-			transformed_strings.insert(x.first);
+//	for (auto x : pd.strs)
+//		if (!has(transformed_strings, x.first))
+//			transform_string(x.second, rp.p[n], x.first),
+//			transformed_strings.insert(x.first);
+//	for (auto x : strtrees)
+//		if (!has(transformed_strings, x.first))
+//			transform_string(x.second, rp.p[n], x.first),
+//			transformed_strings.insert(x.first);
 	if (!rp.p[n].g.empty()) {
 		if (pd.strs.size() != 1) er(err_one_input);
-		else transform_grammar(rp.p[n],
-			dict.get_rel(pd.strs.begin()->first),
+		else transform_grammar(rp.p[n], pd.strs.begin()->first,
 			pd.strs.begin()->second.size());
 	}
 	if (opts.enabled(L"sdt"))
 		for (raw_prog& p : rp.p)
-			p = transform_sdt(p);
+			p = transform_sdt(move(p));
+	if (opts.enabled(L"bin"))
+		for (raw_prog& p : rp.p)
+			transform_bin(p);
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
@@ -233,7 +234,7 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	if (opts.disabled(L"run")) return;
 	clock_t start, end;
-	measure_time(tbl.run_prog(rp.p[n]));
+	measure_time(tbl.run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));

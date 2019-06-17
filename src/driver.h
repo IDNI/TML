@@ -39,6 +39,7 @@ class driver {
 
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
+	lexeme get_new_rel();
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
 	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
@@ -53,18 +54,23 @@ class driver {
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
-	raw_prog transform_sdt(raw_prog p);
+	raw_prog transform_sdt(const raw_prog& p);
+	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
-	raw_prog transform_bwd(raw_prog& p);
+//	raw_prog transform_bwd(raw_prog& p);
+	raw_term get_try_pred(const raw_term& x);
+	void transform_bwd(const raw_term& h, const std::vector<raw_term>& b,
+		std::set<raw_rule>& s);
+	void transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
-	void transform_string(const std::wstring&, raw_prog&, int_t);
+//	void transform_string(const std::wstring&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
 	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
 		int_t v);
-	raw_term prepend_arg(raw_term t, lexeme s);
+	raw_term prepend_arg(const raw_term& t, lexeme s);
 //	void get_trees(std::wostream& os, const term& root,
 //		const std::map<term, std::vector<term>>&, std::set<term>& done);
 //	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);

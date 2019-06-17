@@ -19,6 +19,7 @@
 #include <array>
 #include <iostream>
 #include <cstdio>
+#include <map>
 
 #ifndef __EMSCRIPTEN__
 #include <execinfo.h>
@@ -35,7 +36,8 @@ typedef std::array<cws, 2> cws_range;
 typedef cws_range lexeme;
 typedef std::vector<lexeme> lexemes;
 typedef std::vector<int_t> ints;
-typedef std::unordered_map<int_t, std::wstring> strs_t;
+struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
+typedef std::map<lexeme, std::wstring, lexcmp> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 //typedef std::vector<size_t> sizes;
@@ -58,9 +60,10 @@ typedef std::vector<bools> vbools;
 #define measure_time_end() end = clock(); \
 	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
+#define elem_openp elem(elem::OPENP, dict.get_lexeme(L"("))
+#define elem_closep elem(elem::CLOSEP, dict.get_lexeme(L")"))
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
-struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
 #endif

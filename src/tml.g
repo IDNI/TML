@@ -57,7 +57,7 @@ form => term |
 prefix => "forall" | "exists" | "unique".
 
 prog => directive S | rule S | production S | fof S | query S | null.
-S => ws '{' ws prog ws '}' ws S | ws prog ws | null.
+S => ws '{' ws prog ws '}' ws S ws | ws prog ws | null.
 #}
 #{
 #	~S(?x?x):-S(?x?x).

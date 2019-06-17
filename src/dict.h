@@ -21,7 +21,6 @@ class dict_t {
 public:
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	lexeme get_sym(int_t t) const;
-	lexeme get_var(int_t t) const;
 	int_t get_var(const lexeme& l);
 	int_t get_rel(const lexeme& l);
 	int_t get_sym(const lexeme& l);
@@ -30,9 +29,6 @@ public:
 	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
-//	size_t usz() const { return nums + nchars() + symbols(); }
-//	size_t nchars() const { return chars; }
-//	size_t symbols() const { return syms.size(); }
-//	size_t relsyms() const { return rels.size(); }
+	size_t nrels() const { return rels.size(); }
 	~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
 };

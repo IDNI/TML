@@ -72,6 +72,7 @@ spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
 spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
+bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
@@ -86,6 +87,7 @@ spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
+int_t bdd_or_reduce(bdds b);
 size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
@@ -103,6 +105,8 @@ class bdd {
 	friend spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
 	friend spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
 	friend spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend int_t bdd_or_reduce(bdds b);
 	friend spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y,
 		cr_spbdd_handle z);
 	friend spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y,
@@ -173,6 +177,7 @@ class bdd {
 	static void bdd_sz(int_t x, std::set<int_t>& s);
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
+	static bool bdd_subsumes(int_t x, int_t y);
 	inline static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }

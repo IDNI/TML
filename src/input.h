@@ -29,6 +29,7 @@ struct elem {
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
+	bool is_paren() const { return type == OPENP || type == CLOSEP; }
 	bool parse(const lexemes& l, size_t& pos);
 	bool operator<(const elem& t) const {
 		if (type != t.type) return type < t.type;
@@ -89,6 +90,9 @@ struct raw_rule {
 	raw_rule(){}
 	raw_rule(const raw_term& t) : h({t}) {}
 	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
+	raw_rule(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
+		if (!_b.empty()) b = {_b};
+	}
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
