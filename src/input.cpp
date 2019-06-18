@@ -284,6 +284,7 @@ raw_progs::raw_progs(const std::wstring& s) {
 	ast::clear();
 	size_t pos = 0;
 	lexemes l = prog_lex(wcsdup(s.c_str()));
+	if (!l.size()) return;
 	if (*l[pos][0] != L'{') {
 		raw_prog x;
 		if (!x.parse(l, pos))
