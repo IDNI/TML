@@ -77,7 +77,9 @@ lexeme lex(pcws s) {
 lexemes prog_lex(cws s) {
 	lexeme l;
 	lexemes r;
+	ast::source[0] = s;
 	do { if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l); } while (*s);
+	ast::source[1] = s;
 	return r;
 }
 

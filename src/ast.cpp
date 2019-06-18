@@ -28,11 +28,11 @@ map<ast::type, std::wstring> ast::names = {
 	{CLOSEC, L"close_curly"}, {PROG, L"program"}, {PROGS, L"programs"}
 };
 set<ast> ast::nodes;
+cws_range ast::source;
 
 wostream& driver::print_ast(wostream& os) const {
-	cws s = 0;
+	cws s = ast::source[0];
 	for (auto n : ast::nodes) {
-		if (!s) s = n.r[0];
 		os << ast::name(n) << L'(' <<
 			(n.r[0]-s) << L' ' << (n.r[1]-s) << L")." << endl;
 	}
@@ -40,14 +40,29 @@ wostream& driver::print_ast(wostream& os) const {
 }
 
 wostream& driver::print_ast_json(wostream& os) const {
-	cws s = 0;
+	map<cws, pair<long, long>> coords;
+	cws s = ast::source[0];
+	long l = 0, c = 0;
+	for ( ; s <= ast::source[1]; s++) {
+		coords[s] = {l, c};
+		if (*s == L'\n') c = 0, ++l;
+		else ++c;
+	}
 	os << L"{ \"AST\": [";
+	bool t = true;
 	for (auto n : ast::nodes) {
-		if (!s) s = n.r[0];
+		if (t) t = false;
 		else os << L",";
-		os << endl << L"\t{ \"node\": \"" << ast::name(n) <<
-			L"\", \"from\": " << (n.r[0]-s) << L", \"to\": " <<
-			(n.r[1]-s) << L" }";
+		os << endl;
+		os << L"\t{ \"node\": \"" << ast::name(n) << L"\", ";
+		os << "\"from\": { ";
+		os << "\"pos\": "    << (n.r[0]-ast::source[0]) << L", ";
+		os << "\"line\": "   << coords[n.r[0]].first    << L", ";
+		os << "\"ch\": " << coords[n.r[0]].second   << L" }, ";
+		os << "\"to\": { ";
+		os << "\"pos\": "    << (n.r[1]-ast::source[0]) << L", ";
+		os << "\"line\": "   << coords[n.r[1]].first    << L", ";
+		os << "\"ch\": " << coords[n.r[1]].second   << L" } }";
 	}
 	os << endl << L"] }" << endl;
 	return os.flush();
@@ -59,8 +74,8 @@ wostream& driver::print_ast_xml(wostream& os) const {
 	forward_list<long> cls;
 	auto nit = ast::nodes.begin();
 	ast n = *nit;
-	cws s = n.r[0], r = n.r[1];
-	for (cws c = s; c != r; ++c, ++p) {
+	cws s = ast::source[0];
+	for (cws c = s; c != ast::source[1]; ++c, ++p) {
 		while (nit != ast::nodes.end() && (n.r[0] - s) < p) n = *++nit;
 		while (!cls.empty() && cls.front() == p)
 			os << L"</" << stk.front() << L'>',
@@ -77,13 +92,13 @@ wostream& driver::print_ast_xml(wostream& os) const {
 }
 
 wostream& driver::print_ast_html(wostream& os) const {
-	long p = 0;
 	forward_list<long> cls;
 	auto nit = ast::nodes.begin();
 	ast n = *nit;
-	cws s = n.r[0], r = n.r[1];
-	for (cws c = s; c != r; ++c, ++p) {
-		while (nit != ast::nodes.end() && (n.r[0] - s) < p) n = *++nit;
+	cws s = ast::source[0];
+	long p = 0;
+	for (cws c = s; c != ast::source[1]; ++c, ++p) {
+		while (nit != ast::nodes.end() && (n.r[0]-s) < p) n = *++nit;
 		while (!cls.empty() && cls.front() == p)
 			os<<L"</span>",
 			cls.pop_front();

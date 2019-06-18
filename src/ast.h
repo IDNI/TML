@@ -24,6 +24,7 @@ struct ast {
 	cws_range r;
 	static std::map<type, std::wstring> names;
 	static std::set<ast> nodes;
+	static cws_range source;
 	static std::wstring name(ast n) { return names[n.t]; };
 	static void add(type t, cws_range r) { nodes.emplace(t, r); };
 	static void clear() { nodes.clear(); }
