@@ -398,7 +398,9 @@ pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }*/
 
-struct flat_rules : public vector<pair<raw_term, vector<raw_term>>> {
+typedef pair<raw_term, vector<raw_term>> frule;
+
+struct flat_rules : public vector<frule> {
 	raw_term q;
 	map<pair<elem, ints>, set<size_t>> m;
 	flat_rules(const raw_prog& p, driver& d) {
@@ -585,15 +587,49 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
+/*set<frule> driver::interpolate(const vector<frule>& r) {
+	struct cmp {
+		bool operator()(const raw_term& x, const raw_term& y) const {
+			if (x.e[0] != y.e[0]) return x.e[0] < y.e[0];
+			if (x.arity != y.arity) return x.arity < y.arity;
+			return false;
+		}
+	};
+	vector<raw_term, multiset<raw_term, cmp>> m(r.size());
+	for (size_t n = 0; n != r.size(); ++n)
+		for (const raw_term& t : r[n].second)
+			m[n].insert(t);
+}*/
+
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
+/*	map<multiset<pair<elem, ints>>, set<frule>> m1;
+	map<multiset<pair<elem, ints>>, frule> m2;
+	auto get_body_sigs = [&f](size_t n) {
+		const vector<raw_term>& b = f[n].second;
+		multiset<pair<elem, ints> r;
+		for (const raw_term& x : b) r.insert(x.e[0], x.arity);
+		return r;
+	};
+	for (size_t n = 0; n != f.size(); ++n)
+		if (f[n].second.size() >= 2)
+			m1[get_body_sigs(n)].insert(f[n]);
+	for (auto x : m1)
+		if (x.second.size() == 1) m2.emplace(x.first, x.second);
+		else {
+			vector<raw_term> mgu = get_mgu(x.second);
+			frule r;
+			r.b = {mgu};
+			r.h.emplace_back();
+			r.h[0].e.emplace_back(elem::SYM, get_new_rel());
+		}
+	m1.clear();*/
 	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),
 			assert(r.h[0].e.size()),
 			assert(f.back().first.e.size());
-	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	p.r.clear();
 	auto interpolate = [this](
 		const raw_term& x, const raw_term& y, set<elem> v) {

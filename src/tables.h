@@ -24,80 +24,86 @@ class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
 
+template<typename T> struct ptrcmp {
+	bool operator()(const T* x, const T* y) const { return *x < *y; }
+};
+
+struct term : public ints {
+	bool neg;
+	ntable tab;
+	term() {}
+	term(bool neg, ntable tab, const ints& args) :
+		ints(args), neg(neg), tab(tab) {}
+	bool operator<(const term& t) const {
+		if (neg != t.neg) return neg;
+		if (tab != t.tab) return tab < t.tab;
+		return (const ints&)*this < t;
+	}
+	void replace(const std::map<int_t, int_t>& m);
+};
+
+struct body {
+	bool neg, ext = false;
+	struct alt *a = 0;
+	ntable tab;
+	bools ex;
+	uints perm;
+	spbdd_handle q, tlast, rlast;
+	static std::set<body*, ptrcmp<body>> s;
+	bool operator<(const body& t) const {
+		if (q != t.q) return q < t.q;
+		if (neg != t.neg) return neg;
+		if (ext != t.ext) return ext;
+		if (tab != t.tab) return tab < t.tab;
+		if (ex != t.ex) return ex < t.ex;
+		return perm < t.perm;
+	}
+};
+
+struct alt : public std::vector<body*> {
+	spbdd_handle rng = bdd_handle::T, rlast = bdd_handle::F;
+	size_t varslen;
+	bdd_handles last;
+	std::vector<term> t;
+//	std::vector<std::pair<uints, bools>> order;
+	bools ex;
+	uints perm;
+	static std::set<alt*, ptrcmp<alt>> s;
+	bool operator<(const alt& t) const {
+		if (varslen != t.varslen) return varslen < t.varslen;
+		if (rng != t.rng) return rng < t.rng;
+		return (std::vector<body*>)*this<(std::vector<body*>)t;
+	}
+};
+
+struct rule : public std::vector<alt*> {
+	bool neg;
+	ntable tab;
+	spbdd_handle eq, rlast = bdd_handle::F;
+	size_t len;
+	bdd_handles last;
+	term t;
+	bool operator<(const rule& t) const {
+		if (neg != t.neg) return neg;
+		if (tab != t.tab) return tab < t.tab;
+		if (eq != t.eq) return eq < t.eq;
+		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
+	}
+};
+
+struct table {
+	sig s;
+	size_t len;
+	spbdd_handle t = bdd_handle::F;
+	bdd_handles add, del;
+	bool ext = true; // extensional
+	bool commit(DBG(size_t));
+};
+
 class tables {
 	typedef std::map<int_t, size_t> varmap;
 	typedef std::function<void(const raw_term&)> rt_printer;
 
-	struct term : public ints {
-		bool neg;
-		ntable tab;
-		term() {}
-		term(bool neg, ntable tab, const ints& args) :
-			ints(args), neg(neg), tab(tab) {}
-		bool operator<(const term& t) const {
-			if (neg != t.neg) return neg;
-			if (tab != t.tab) return tab < t.tab;
-			return (const ints&)*this < t;
-		}
-		void replace(const std::map<int_t, int_t>& m);
-	};
-	struct body {
-		bool neg, ext = false;
-		ntable tab;
-		bools ex;
-		uints perm;
-		spbdd_handle q, tlast, rlast;
-		struct pbodycmp {
-			bool operator()(const body* x, const body* y) const {
-				return *x < *y;
-			}
-		};
-		static std::set<body*, pbodycmp> s;
-		bool operator<(const body& t) const {
-			if (q != t.q) return q < t.q;
-			if (neg != t.neg) return neg;
-			if (ext != t.ext) return ext;
-			if (tab != t.tab) return tab < t.tab;
-			if (ex != t.ex) return ex < t.ex;
-			return perm < t.perm;
-		}
-	};
-	struct alt : public std::vector<body*> {
-		spbdd_handle rng, rlast = bdd_handle::F;
-		size_t varslen;
-		bdd_handles last;
-		std::vector<term> t;
-		std::vector<std::pair<uints, bools>> order;
-		bools ex;
-		uints perm;
-		bool operator<(const alt& t) const {
-			if (varslen != t.varslen) return varslen < t.varslen;
-			if (rng != t.rng) return rng < t.rng;
-			return (std::vector<body*>)*this<(std::vector<body*>)t;
-		}
-	};
-	struct rule : public std::vector<alt> {
-		bool neg;
-		ntable tab;
-		spbdd_handle eq, rlast = bdd_handle::F;
-		size_t len;
-		bdd_handles last;
-		term t;
-		bool operator<(const rule& t) const {
-			if (neg != t.neg) return neg;
-			if (tab != t.tab) return tab < t.tab;
-			if (eq != t.eq) return eq < t.eq;
-			return (std::vector<alt>)*this < (std::vector<alt>)t;
-		}
-	};
-	struct table {
-		sig s;
-		size_t len;
-		spbdd_handle t = bdd_handle::F;
-		bdd_handles add, del;
-		bool ext = true; // extensional
-		bool commit(DBG(size_t));
-	};
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
@@ -137,8 +143,8 @@ class tables {
 	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
-	spbdd_handle from_sym(size_t pos, size_t args, int_t i);
-	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args);
+	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
+	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args) const;
 
 	void add_bit();
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
@@ -163,11 +169,12 @@ class tables {
 	term from_raw_term(const raw_term&);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
-	void alt_query(alt& a, bdd_handles& v, size_t);
+	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_rules(const raw_prog& p);
+	void get_facts(const raw_prog& p);
 	ntable get_table(const sig& s);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);
