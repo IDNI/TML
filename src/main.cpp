@@ -11,17 +11,36 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <cstring>
+#ifdef __unix__
+#include <sys/ioctl.h>
+#endif
 #include "driver.h"
 using namespace std;
 
 //void print_memos_len();
 
+bool is_stdin_readable();
+
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	bdd::init();
-	driver::init(); // setup outputs
-	driver d(argc, argv, stdin);
-	if (!d.result) wcout << "unsat" << endl;
+	driver::init();
+	if (is_stdin_readable())
+		driver d(argc, argv, file_read_text(stdin));
+	else {
+		strings args;
+		if (argc == 1) args.push_back("--help");
+		driver d(argc, argv, L"", options(args));
+	}
 //	print_memos_len();
 	return 0;
+}
+
+bool is_stdin_readable() {
+#ifdef __unix__
+	long n = 0;
+	return ioctl(0, FIONREAD, &n) == 0 && n > 0;
+#else
+	return true;
+#endif
 }

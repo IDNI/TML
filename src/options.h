@@ -13,6 +13,7 @@
 #ifndef __OPTIONS_H__
 #define __OPTIONS_H__
 #include <functional>
+#include <iostream>
 #include "defs.h"
 #include "output.h"
 
@@ -70,6 +71,7 @@ struct option {
 	const wstrings& names() const { return n; }
 	type get_type() const { return t; }
 	value get() const { return v; }
+	bool          is_output () const { return output::exists(name()); }
 	int           get_int   () const { return v.get_int(); };
 	bool          get_bool  () const { return v.get_bool(); };
 	std::wstring  get_string() const { return v.get_string(); };
@@ -82,10 +84,11 @@ struct option {
 		switch (t) {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
 			case BOOL: v.set(s==L"" || s==L"true" || s==L"t" ||
-				s==L"1" || s==L"on" || s==L"enabled"); break;
+				s==L"1" || s==L"on" || s==L"enabled" ||
+				s==L"yes"); break;
 			case STRING:
 				if (s == L"") {
-					if (output::exists(name()))
+					if (is_output())
 						v.set(std::wstring(L"@stdout"));
 				} else v.set(s); break;
 			default: throw 0;
@@ -94,11 +97,40 @@ struct option {
 	}
 	void disable() { v.null(); }
 	bool is_undefined() const { return v.is_undefined(); }
+	option &description(std::wstring d) { return desc = d, *this; }
+	std::wostream& help(std::wostream& os) const {
+		std::wstringstream ss; ss << L"";
+		long pos = ss.tellp();
+		ss << L"\t";
+		for (size_t i = 0; i != n.size(); ++i) {
+			if (i) ss << L",";
+			ss << L"--" << n[i];
+		}
+		ss << L" [";
+		switch (t) {
+			case INT: ss << "number"; break;
+			case BOOL: ss << "bool"; break;
+			case STRING:
+				if (is_output()) ss << "output";
+				else ss << "string";
+				break;
+			default: throw 0;
+		}
+		ss << L']';
+		if (desc.size() > 0) {
+			const long indent = 28;
+			long to_write = indent-(ss.tellp()-pos);
+			if (to_write > 0) while (to_write-- > 0) ss << L' ';
+			ss << L' ' << desc;
+		}
+		return os << ss.str();
+	}
 private:
 	type t;
 	wstrings n; // vector of name and alternative names (shortcuts)
 	value v;
 	callback e; // callback with value as argument, fired when option parsed
+	std::wstring desc = L"";
 };
 
 class options {
@@ -127,6 +159,7 @@ public:
 	int           get_int   (std::wstring name) const;
 	bool          get_bool  (std::wstring name) const;
 	std::wstring  get_string(std::wstring name) const;
+	void help(std::wostream& os) const;
 };
 
 std::wostream& operator<<(std::wostream&, const std::map<std::wstring,option>&);

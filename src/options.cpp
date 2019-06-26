@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <sstream>
 #include "options.h"
 
 using namespace std;
@@ -99,42 +100,79 @@ void options::parse_option(wstring arg, wstring v) {
 	set(o.name(), o);
 }
 
-#define add_output(n) add(option(option::type::STRING, {n}, \
+#define add_bool(n,desc) add(option(option::type::BOOL, {n}).description(desc))
+#define add_output(n,desc) add(option(option::type::STRING, {n}, \
 		[](const option::value& v) { \
-			output::set_target(n,v.get_string());}))
-#define add_output_alt(n, alt) add(option(option::type::STRING, {n, alt}, \
+			output::set_target(n,v.get_string()); \
+		}).description((desc)))
+#define add_output_alt(n,alt,desc) add(option(option::type::STRING, {n, alt}, \
 		[](const option::value& v) { \
-			output::set_target(n,v.get_string());}))
+			output::set_target(n,v.get_string()); \
+		}).description((desc)))
 
 void options::setup() {
 
-	add(option(option::type::BOOL,   { L"sdt" }));
-	add(option(option::type::BOOL,   { L"bin" }));
-	add(option(option::type::BOOL,   { L"run" }));
-	add(option(option::type::BOOL,   { L"csv" }));
+	add(option(option::type::BOOL, { L"help" },
+		[this](const option::value& v) {
+			if (v.get_bool()) help(output::to(L"output"));
+		})
+		.description(L"this help"));
+	add_bool(L"sdt", L"sdt transformation");
+	add_bool(L"bin", L"bin transformation");
+	add_bool(L"run", L"run program (enabled by default)");
+	add_bool(L"csv", L"save result into CSV files");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			output::set_name(v.get_string());
-		}));
-	add_output_alt(L"output",      L"o");
-	add_output_alt(L"transformed", L"t");
-	add_output_alt(L"ast",         L"at");
-	add_output_alt(L"ast-json",    L"aj");
-	add_output_alt(L"ast-xml",     L"ax");
-	add_output_alt(L"ast-html",    L"ah");
-	add_output    (L"xsb");
-	add_output    (L"swipl");
-	add_output    (L"souffle");
+		})
+		.description(L"name used for @name output"));
+	add_output_alt(L"output", L"o",L"standard output (@stdout by default)");
+	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
+	add_output_alt(L"ast",         L"at", L"produce AST in TML format");
+	add_output_alt(L"ast-json",    L"aj", L"produce AST in JSON format");
+	add_output_alt(L"ast-xml",     L"ax", L"produce AST in XML format");
+	add_output_alt(L"ast-html",    L"ah", L"produce AST in HTML format");
+	add_output(L"xsb",     L"attempt to translate program into XSB");
+	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
+	add_output(L"souffle", L"attempt to translate program into Soufflé");
 
 	init_defaults();
 }
 
+#undef add_bool
 #undef add_output
 #undef add_output_alt
 
 void options::init_defaults() {
 	parse({
-		L"--run", L"true",
+		L"--run",
 		L"--output", L"@stdout"
 	});
+}
+
+void options::help(wostream& os) const {
+	os<<L"TML usage:"<<endl;
+	os<<L"\ttml [options] < INPUT"<<endl;
+	os<<endl;
+	os<<L"options:"<<endl;
+	os<<L"\tOptions are preceded by one or two hyphens (--run/-run)."<<endl;
+	os<<L"\tDisable option by prefixing it with disable-, no- or dont-"
+		<<endl;
+	os<<L"\t\t(--disable-run/--no-run/--dont-run)."<<endl;
+	os<<endl;
+	for (auto oit : opts) oit.second.help(os)<<endl;
+	os<<endl;
+	os<<L"bool:"<<endl;
+	os<<L"\tEnabled if 'true', 't', '1', 'yes', 'on', 'enabled' or "
+		<<"if no argument."<<endl;
+	os<<endl;
+	os<<L"output:"<<endl;
+	os<<L"\t[FILENAME | @stdout | @stderr | @name | @null | @buffer]"<<endl;
+	os<<endl;
+	os<<L"\t@null\tdisable output"<<endl;
+	os<<L"\t@stdout\tredirect to stdout"<<endl;
+	os<<L"\t@stderr\tredirect to stderr"<<endl;
+	os<<L"\t@buffer\tredirect to buffer to be read through API later"<<endl;
+	os<<L"\t@name\tredirect to a file named by --name (ext predefined)"
+		<<endl;
 }
