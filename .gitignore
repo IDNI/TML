@@ -4,6 +4,7 @@
 **/Makefile
 
 src/tml
+src/libTML.so*
 
 js/tml.js
 js/tml.wasm
