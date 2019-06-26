@@ -50,7 +50,7 @@ typedef std::vector<bools> vbools;
 #define DBG(x)
 #define NDBG(x) x
 #endif
-#define er(x)	wcerr<<x<<endl, exit(0)
+#define er(x)	output::to(L"error")<<x<<endl, exit(0)
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())
@@ -58,7 +58,7 @@ typedef std::vector<bools> vbools;
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define measure_time_start() start = clock()
 #define measure_time_end() end = clock(); \
-	wcerr << double(end - start) / CLOCKS_PER_SEC << endl
+	output::to(L"debug") << double(end - start) / CLOCKS_PER_SEC << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
 #define elem_openp elem(elem::OPENP, dict.get_lexeme(L"("))
 #define elem_closep elem(elem::CLOSEP, dict.get_lexeme(L")"))

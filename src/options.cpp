@@ -112,21 +112,33 @@ void options::parse_option(wstring arg, wstring v) {
 
 void options::setup() {
 
-	add(option(option::type::BOOL, { L"help" },
+	add(option(option::type::BOOL, { L"help", L"h", L"?" },
 		[this](const option::value& v) {
-			if (v.get_bool()) help(output::to(L"output"));
+			if (v.get_bool()) help(output::to(L"info"));
 		})
 		.description(L"this help"));
-	add_bool(L"sdt", L"sdt transformation");
-	add_bool(L"bin", L"bin transformation");
-	add_bool(L"run", L"run program (enabled by default)");
-	add_bool(L"csv", L"save result into CSV files");
+	add(option(option::type::BOOL, { L"version", L"v" },
+		[this](const option::value& v) {
+			if (v.get_bool()) output::to(L"info") << L"TML: "
+				<< GIT_DESCRIBED << endl;
+			DBG(if (v.get_bool()) output::to(L"info")
+				<< L"commit: " << GIT_COMMIT_HASH << L" ("
+				<< GIT_BRANCH << L')' <<endl;)
+		})
+		.description(L"this help"));
+	add_bool(L"sdt",     L"sdt transformation");
+	add_bool(L"bin",     L"bin transformation");
+	add_bool(L"run",     L"run program     (enabled by default)");
+	add_bool(L"csv",     L"save result into CSV files");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			output::set_name(v.get_string());
 		})
 		.description(L"name used for @name output"));
 	add_output_alt(L"output", L"o",L"standard output (@stdout by default)");
+	add_output    (L"error",       L"errors          (@stderr by default)");
+	add_output    (L"info",        L"info            (@stderr by default)");
+	add_output    (L"debug",       L"debug output");
 	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
 	add_output_alt(L"ast",         L"at", L"produce AST in TML format");
 	add_output_alt(L"ast-json",    L"aj", L"produce AST in JSON format");
@@ -146,12 +158,15 @@ void options::setup() {
 void options::init_defaults() {
 	parse({
 		L"--run",
-		L"--output", L"@stdout"
+		L"--output", L"@stdout",
+		L"--error",  L"@stderr",
+		L"--info",   L"@stderr"
 	});
+	DBG(parse(wstrings{ L"--debug", L"@stderr" });)
 }
 
 void options::help(wostream& os) const {
-	os<<L"TML usage:"<<endl;
+	os<<L"Usage:"<<endl;
 	os<<L"\ttml [options] < INPUT"<<endl;
 	os<<endl;
 	os<<L"options:"<<endl;

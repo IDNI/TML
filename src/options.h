@@ -95,7 +95,10 @@ struct option {
 		}
 		if (e) e(v);
 	}
-	void disable() { v.null(); }
+	void disable() {
+		if (STRING == get_type() && is_output()) parse_value(L"@null");
+		else v.null();
+	}
 	bool is_undefined() const { return v.is_undefined(); }
 	option &description(std::wstring d) { return desc = d, *this; }
 	std::wostream& help(std::wostream& os) const {

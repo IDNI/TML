@@ -14,6 +14,7 @@
 #include "tables.h"
 #include "dict.h"
 #include "input.h"
+#include "output.h"
 using namespace std;
 //using namespace std::placeholders;
 
@@ -416,7 +417,7 @@ void tables::load_string(lexeme r, const wstring& s) {
 		if (iswprint(s[n])) t[0] = sprint, b2.push_back(from_fact(t));
 	}
 	clock_t start, end;
-	wcerr<<"load_string or_many: ";
+	output::to(L"debug")<<"load_string or_many: ";
 	measure_time_start();
 	ts[t1].t = bdd_or_many(move(b1)), ts[t2].t = bdd_or_many(move(b2));
 	measure_time_end();
@@ -502,7 +503,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	while (u >= (1 << (bits - 2))) add_bit();
 	get_rules(p);
 	clock_t start, end;
-	wcerr<<"load_string: ";
+	output::to(L"debug")<<"load_string: ";
 	measure_time_start();
 	for (auto x : strs) load_string(x.first, x.second);
 	measure_time_end();
@@ -583,7 +584,10 @@ bool table::commit(DBG(size_t /*bits*/)) {
 			     d = bdd_or_many(move(del)), s = a % d;
 //		DBG(assert(bdd_nvars(a) < len*bits);)
 //		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == bdd_handle::F) { wcout << "unsat" << endl; exit(0); }
+		if (s == bdd_handle::F) {
+			output::to(L"output") << "unsat." << endl;
+			exit(0); //FIXME
+		}
 		x = (t || a) % d;
 	}
 //	DBG(assert(bdd_nvars(x) < len*bits);)
@@ -626,7 +630,7 @@ bool tables::pfp() {
 	size_t step = 0;
 	char b;
 	for (set<set<pair<ntable, spbdd_handle>>> s; (b = fwd()), true;) {
-		wcerr << "step: " << step++ << endl;
+		output::to(L"info") << "step: " << step++ << endl;
 		if (!b/* == 1 || b == 2*/) return true;
 		if (!datalog && !s.emplace(get_front()).second) return false;
 	}

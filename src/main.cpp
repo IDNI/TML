@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
 		driver d(argc, argv, file_read_text(stdin));
 	else {
 		strings args;
-		if (argc == 1) args.push_back("--help");
+		if (argc == 1) args = { "-v", "-h" };
 		driver d(argc, argv, L"", options(args));
 	}
 //	print_memos_len();

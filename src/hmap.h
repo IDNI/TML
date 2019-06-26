@@ -4,6 +4,7 @@
 #include <functional>
 #include <unordered_map>
 #include <iostream>
+#include "output.h"
 
 template<typename K, typename V>
 class hmap {
@@ -39,7 +40,7 @@ public:
 		if (it != b.end() && it->k == k) b.erase(it);
 	}
 	void rebuild() {
-		std::wcerr << "rebuild " << M.size() << std::endl;
+		output::to(L"error") << "rebuild " << M.size() << std::endl;
 		std::vector<std::vector<item>> v(1 << ++bits);
 		for (auto &x : M)
 			for (auto &y : x) {

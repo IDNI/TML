@@ -18,6 +18,7 @@
 #include "input.h"
 #include "err.h"
 #include "ast.h"
+#include "output.h"
 using namespace std;
 
 // AST node adding helpers
@@ -396,14 +397,14 @@ wstring file_read_text(wstring wfname) {
 void parse_error(std::wstring e, std::wstring s) { parse_error(e, s.c_str()); }
 
 void parse_error(std::wstring e, cws s) {
-	wcerr << e << endl;
+	output::to(L"error") << e << endl;
 	cws p = s;
 	while (*p && *p != L'\n') ++p;
 	if (s) {
 		wstring t(s, p-s);
-		wcerr << L"at: " << t << endl;
+		output::to(L"error") << L"at: " << t << endl;
 	}
-	exit(0);
+	exit(0); //FIXME
 }
 
 void parse_error(std::wstring e, cws s, size_t len) {

@@ -243,6 +243,9 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 
 void driver::init() {
 	output::create(L"output",      L".out.tml");
+	output::create(L"error",       L".error.log");
+	output::create(L"info",        L".info.log");
+	output::create(L"debug",       L".debug.log");
 	output::create(L"transformed", L".trans.tml");
 	output::create(L"xsb",         L".P");
 	output::create(L"swipl",       L".pl");
