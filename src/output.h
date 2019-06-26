@@ -53,7 +53,7 @@ public:
 	}
 	static std::wostream& to(const std::wstring nam) {
 		output o;
-		return get(nam, o) && o.s ? *o.s : wcnull;
+		return get(nam, o) && L"@null" != o.target() ? *o.s : wcnull;
 	}
 	static std::wstring get_target(const std::wstring nam) {
 		output o;
