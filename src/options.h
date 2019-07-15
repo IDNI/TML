@@ -122,7 +122,7 @@ struct option {
 		ss << L']';
 		if (desc.size() > 0) {
 			const long indent = 28;
-			long to_write = indent-(ss.tellp()-pos);
+			long to_write = indent-(((long)ss.tellp())-pos);
 			if (to_write > 0) while (to_write-- > 0) ss << L' ';
 			ss << L' ' << desc;
 		}

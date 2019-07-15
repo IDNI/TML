@@ -118,7 +118,7 @@ void options::setup() {
 		})
 		.description(L"this help"));
 	add(option(option::type::BOOL, { L"version", L"v" },
-		[this](const option::value& v) {
+		[](const option::value& v) {
 			if (v.get_bool()) output::to(L"info") << L"TML: "
 				<< GIT_DESCRIBED << endl;
 			DBG(if (v.get_bool()) output::to(L"info")
@@ -146,7 +146,7 @@ void options::setup() {
 	add_output_alt(L"ast-html",    L"ah", L"produce AST in HTML format");
 	add_output(L"xsb",     L"attempt to translate program into XSB");
 	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
-	add_output(L"souffle", L"attempt to translate program into Soufflé");
+	add_output(L"souffle", L"attempt to translate program into Souffle");
 
 	init_defaults();
 }

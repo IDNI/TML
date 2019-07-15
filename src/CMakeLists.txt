@@ -1,66 +1,78 @@
-cmake_minimum_required(VERSION 3.1)
-project(TML)
+cmake_minimum_required(VERSION 3.13)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_VERBOSE_MAKEFILE true)
+set(TML_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
+include(tml-common)
 
-# create shared library
-add_library(TML SHARED
-	ast.h
-	ast.cpp
-	bdd.cpp
+set(TML_HEADERS
+	TML.h
 	bdd.h
 	defs.h
 	dict.h
-	dict.cpp
-	driver.cpp
 	driver.h
-	input.cpp
 	input.h
 	options.h
-	options.cpp
 	output.h
+	tables.h
+)
+
+set(TML_SOURCES
+	ast.cpp
+	bdd.cpp
+	dict.cpp
+	driver.cpp
+	input.cpp
+	options.cpp
 	output.cpp
 	print_prolog.cpp
 	print_souffle.cpp
 	save_csv.cpp
-	tables.h
 	tables.cpp
 	transform.cpp
 )
 
-# create executable
-add_executable(tml main.cpp)
-target_link_libraries(tml TML)
+set(TML_COMPILE_OPTIONS
+	"$<$<CONFIG:DEBUG>:-O0;-ggdb3>"
+	"$<$<CONFIG:RELEASE>:-O3;-flto>"
+)
 
-# flags
-set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -Wpedantic")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -ggdb3")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto")
-set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
-if(NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE "Release")
-endif()
 
-# populate and add GIT_DESCRIBED, GIT_BRANCH and GIT_COMMIT_HASH definitions
-execute_process(
-	COMMAND git describe --tags --always
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	OUTPUT_VARIABLE GIT_DESCRIBED
-	OUTPUT_STRIP_TRAILING_WHITESPACE
+# shared library
+#################
+
+add_library(TML SHARED)
+add_library(TML::TML ALIAS TML)
+target_setup(TML)
+target_compile_options(TML     PRIVATE ${TML_COMPILE_OPTIONS})
+target_sources(TML             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_include_directories(TML PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+	$<INSTALL_INTERFACE:.>
 )
-execute_process(
-	COMMAND git rev-parse --abbrev-ref HEAD
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	OUTPUT_VARIABLE GIT_BRANCH
-	OUTPUT_STRIP_TRAILING_WHITESPACE
+set_target_properties(TML PROPERTIES
+	EXPORT_NAME TML
+	PUBLIC_HEADER ${TML_HEADERS})
+
+
+# executable
+#############
+
+add_executable(tml)
+target_setup(tml)
+target_compile_options(tml PRIVATE ${TML_COMPILE_OPTIONS})
+target_sources(tml         PRIVATE main.cpp)
+target_link_libraries(tml  TML)
+
+
+# install
+##########
+
+include(GNUInstallDirs)
+install(TARGETS tml TML
+	EXPORT TML
+	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TML
+	RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-execute_process(
-	COMMAND git log -1 --format=%h
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	OUTPUT_VARIABLE GIT_COMMIT_HASH
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-add_definitions("-DGIT_DESCRIBED=L\"${GIT_DESCRIBED}\"")
-add_definitions("-DGIT_COMMIT_HASH=L\"${GIT_COMMIT_HASH}\"")
-add_definitions("-DGIT_BRANCH=L\"${GIT_BRANCH}\"")
+export(EXPORT TML FILE ${TML_DIR}/tml-config.cmake)
+install(EXPORT TML DESTINATION ${PROJECT_BINARY_DIR})

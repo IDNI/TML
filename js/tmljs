@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const tml = require('./tml');
+const tml = require('../build-Release/tml');
 
 const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);

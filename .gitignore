@@ -1,14 +1,4 @@
-**/cmake_install.cmake
-**/CMakeFiles
-**/CMakeCache.txt
-**/Makefile
-
-src/tml
-src/libTML.so*
-
-js/tml.js
-js/tml.wasm
-js/tml.wasm.map
-js/tml.wast
+build-*
+tml-config.cmake
 
 .vscode
