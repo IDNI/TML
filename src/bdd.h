@@ -44,6 +44,46 @@ struct ite_memo {
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
 
+struct xynode {
+	int_t x, y;
+	xynode(int_t x, int_t y) : x(x), y(y) {}
+};
+
+struct bifork {
+	int_t val;
+	xynode left, right;
+	bifork(int_t v, const xynode& l, const xynode& r) : val(v), left(l), right(r) {}
+};
+
+struct addnode {
+	int_t x, y, val, left;
+	addnode(int_t x, int_t y, int_t v, int_t l) : x(x), y(y), val(v), left(l) {}
+};
+
+struct xystackitem {
+	xynode node;
+	std::vector<addnode> parents;
+	xystackitem(const xynode& node, const std::vector<addnode>& parents) :
+		node(node), parents(parents) {}
+};
+
+enum class StackState {
+	Tail, //TailCondition,
+	Left,
+	Right,
+	Add
+};
+struct xyitem {
+	xynode node;
+	StackState state;
+	//bifork fork;
+	xynode left, right;
+	//xyitem left, right;
+	int_t val, leftval, rightval, result;
+	xyitem(const xynode& node, StackState state) :
+		node(node), state(state), left(0, 0), right(0, 0) {}
+};
+
 struct bdd_key {
 	uint_t hash;
 	int_t h, l;
@@ -92,6 +132,8 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
+extern std::unordered_map<ite_memo, int_t> C;
+extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
 
 class bdd {
 	friend class bdd_handle;
@@ -142,7 +184,91 @@ class bdd {
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
+	inline static bifork getfork(const xynode& node)
+	{
+		int_t x = node.x;
+		int_t y = node.y;
+		const bdd bx = get(x), by = get(y);
+		if (bx.v < by.v) return { bx.v, {bx.h, y}, {bx.l, y} };
+		else if (bx.v > by.v) return { by.v, {x, by.h}, {x, by.l} };
+		else return { bx.v, {bx.h, by.h}, {bx.l, by.l} };
+	}
+	inline static bifork getfork(const int_t x, const int_t y)
+	{
+		const bdd bx = get(x), by = get(y);
+		if (bx.v < by.v) return { bx.v, {bx.h, y}, {bx.l, y} };
+		else if (bx.v > by.v) return { by.v, {x, by.h}, {x, by.l} };
+		else return { bx.v, {bx.h, by.h}, {bx.l, by.l} };
+	}
+
+	// pull out the exit condition in one place, it's mutable (x,y) for simplicity
+	inline static std::optional<int_t> processtail(int_t& x, int_t& y)
+	{
+		if (x == F || y == F || x == -y) return F;
+		if (x == T || x == y) return y;
+		if (y == T) return x;
+
+		if (x > y) std::swap(x, y);
+
+		ite_memo m = { x, y, F };
+		auto it = C.find(m);
+		if (it != C.end()) return it->second;
+
+		return std::nullopt;
+	}
+
+	inline static std::optional<int_t> istail(const xynode& node)
+	{
+		int_t x = node.x;
+		int_t y = node.y;
+
+		if (x == F || y == F || x == -y) return F;
+		if (x == T || x == y) return y;
+		if (y == T) return x;
+
+		if (x > y) std::swap(x, y);
+
+		ite_memo m = { x, y, F };
+		auto it = C.find(m);
+		if (it != C.end()) return it->second;
+
+		return std::nullopt;
+	}
+
+	inline static std::optional<int_t> baseexit(
+		int_t& x, int_t& y, std::vector<addnode>& parents, int_t& retval) {
+		if (auto value = processtail(x, y)) {
+			retval = *value;
+			// pop all parents in reverse order (first the immediate next, then up etc.)
+			while (!parents.empty()) {
+				auto parent = parents.back();
+				parents.pop_back();
+
+				// now we have everything to finish off the parent 'add'.
+				// this is the right time to add to 'C' (in the right order), normally
+				// it'd be done recursively (back), we're just doing it ahead of time.
+				ite_memo m = { parent.x, parent.y, F };
+				//auto it = C.find(m);
+				//if (it != C.end()) {} // shouldn't happen, assert or something
+				int_t r = add(parent.val, parent.left, retval);
+				C.emplace(m, r);
+				retval = r; // retval simulates the 'return r' and then we go up
+			}
+			// at the end retval holds the top parent's return, it's all we need
+			//retval = retval;
+			return value;
+		}
+
+		return std::nullopt;
+	}
+
+	static int_t and_flat(int_t x, int_t y);
+	static int_t and_flat(xynode&);
+	static int_t and_stack(int_t x, int_t y); // xynode& node);
+
 	static int_t bdd_and(int_t x, int_t y);
+	static int_t bdd_and_recursive(int_t x, int_t y);
+
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex,
 		std::unordered_map<std::array<int_t, 2>, int_t>& memo,
@@ -178,7 +304,33 @@ class bdd {
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
-	inline static int_t add(int_t v, int_t h, int_t l);
+
+	//inline static int_t add(int_t v, int_t h, int_t l);
+	inline static int_t add(int_t v, int_t h, int_t l) {
+		DBG(assert(h && l && v > 0);)
+			DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
+			DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
+			if (h == l) return h;
+		if (abs(h) < abs(l)) std::swap(h, l), v = -v;
+		static std::unordered_map<bdd_key, int_t>::const_iterator it;
+		static bdd_key k;
+		auto& mm = v < 0 ? Mn : Mp;
+		if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v) + 1);
+		auto& m = mm[abs(v)];
+		if (l < 0) {
+			k = bdd_key(hash_pair(-h, -l), -h, -l);
+			return	(it = m.find(k)) != m.end() ? -it->second :
+				(V.emplace_back(v, -h, -l),
+					m.emplace(std::move(k), V.size() - 1),
+					-V.size() + 1);
+		}
+		k = bdd_key(hash_pair(h, l), h, l);
+		return	(it = m.find(k)) != m.end() ? it->second :
+			(V.emplace_back(v, h, l),
+				m.emplace(std::move(k), V.size() - 1),
+				V.size() - 1);
+	}
+
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
