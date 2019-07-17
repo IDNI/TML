@@ -32,8 +32,8 @@ set(TML_SOURCES
 )
 
 set(TML_COMPILE_OPTIONS
-	"$<$<CONFIG:DEBUG>:-O0;-ggdb3>"
-	"$<$<CONFIG:RELEASE>:-O3;-flto>"
+	"$<$<CONFIG:DEBUG>:-O0;-ggdb3;-DDEBUG>"
+	"$<$<CONFIG:RELEASE>:-O3;-flto;-DNDEBUG>"
 )
 
 
