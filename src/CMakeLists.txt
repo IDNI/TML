@@ -80,6 +80,19 @@ target_sources(tml         PRIVATE main.cpp)
 target_link_libraries(tml  TMLs)
 
 
+# executable using shared library
+##################################
+
+add_executable(tml_shared)
+target_setup(tml_shared)
+target_compile_options(tml_shared PRIVATE ${TML_COMPILE_OPTIONS})
+target_sources(tml_shared         PRIVATE main.cpp)
+target_link_libraries(tml_shared  TML)
+set_target_properties(tml_shared  PROPERTIES
+	EXCLUDE_FROM_ALL 1
+	EXCLUDE_FROM_DEFAULT_BUILD 1)
+
+
 # install
 ##########
 
