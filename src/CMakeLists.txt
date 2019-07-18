@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
+set(CMAKE_VERBOSE_MAKEFILE true)
 
 set(TML_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
 list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
@@ -50,8 +51,23 @@ target_include_directories(TML PUBLIC
 	$<INSTALL_INTERFACE:.>
 )
 set_target_properties(TML PROPERTIES
+	EXCLUDE_FROM_ALL 1
+	EXCLUDE_FROM_DEFAULT_BUILD 1
 	EXPORT_NAME TML
 	PUBLIC_HEADER ${TML_HEADERS})
+
+
+# static library
+#################
+
+add_library(TMLs STATIC)
+target_setup(TMLs)
+target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
+target_link_options(TMLs        PRIVATE ${TML_COMPILE_OPTIONS})
+target_sources(TMLs             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_include_directories(TMLs PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
 
 
 # executable
@@ -61,7 +77,7 @@ add_executable(tml)
 target_setup(tml)
 target_compile_options(tml PRIVATE ${TML_COMPILE_OPTIONS})
 target_sources(tml         PRIVATE main.cpp)
-target_link_libraries(tml  TML)
+target_link_libraries(tml  TMLs)
 
 
 # install
