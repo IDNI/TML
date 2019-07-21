@@ -263,7 +263,7 @@ class bdd {
 	}
 
 	static int_t and_flat(int_t x, int_t y);
-	static int_t and_flat(xynode&);
+	static int_t and_flat(xynode& node);
 	static int_t and_stack(int_t x, int_t y); // xynode& node);
 
 	static int_t bdd_and(int_t x, int_t y);

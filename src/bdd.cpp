@@ -112,13 +112,13 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	static clock_t total = 0;
 	static int count = 0;
 	clock_t start = clock();
-	//auto retval = bdd_and_recursive(x, y);
+	auto retval = bdd_and_recursive(x, y);
 	//auto retval = and_flat(x, y);
-	auto retval = and_stack(x, y);
+	//auto retval = and_stack(x, y);
 	clock_t end = clock();
 	total += double(end - start);
-	output::to(L"debug") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
-	output::to(L"debug") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
+	output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
+	output::to(L"info") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
 	count++;
 	if (count == 10000) {
 		count = count;
@@ -237,10 +237,14 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 	stack.emplace_back(node, StackState::Tail);
 	//optional<int_t> value; // first leftval is of no importance
 	int_t value;
+	int ipop = 0;
+	//int ipush = 1;
 
-	while (!stack.empty()) {
-		xyitem& stackinfo = stack.back();
-		stack.pop_back();
+	while (ipop >= 0) { //!stack.empty()) {
+		//xyitem& stackinfo = stack.back();
+		//stack.pop_back();
+		xyitem& stackinfo = stack[ipop--];
+		// should we release them after a while? in case v size gets long, but who cares?
 
 		xynode& node = stackinfo.node;
 		StackState state = stackinfo.state;
@@ -262,23 +266,44 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 				//stackinfo.left = { fork.left, , StackState::Tail };
 				//stackinfo.right = { fork.right, , StackState::Tail };
 				stackinfo.state = StackState::Left;
-				stack.push_back(stackinfo);
-				stack.emplace_back(fork.left, StackState::Tail);
+
+				//stack.push_back(stackinfo);
+				stack[++ipop] = stackinfo;
+				const bool hasspace = int(stack.size()) - 1 > ipop;
+				if (hasspace) {
+					stack[++ipop] = { fork.left, StackState::Tail }; // set directly instead
+				}
+				else {
+					stack.emplace_back(fork.left, StackState::Tail);
+					ipop++;
+				}
 				break;
 			}
 			case StackState::Left:
 			{
 				stackinfo.leftval = value; // *value;
 				stackinfo.state = StackState::Right;
-				stack.push_back(stackinfo);
-				stack.emplace_back(stackinfo.right, StackState::Tail);
+
+				//stack.push_back(stackinfo);
+				//stack.emplace_back(stackinfo.right, StackState::Tail);
+				stack[++ipop] = stackinfo;
+				const bool hasspace = int(stack.size()) - 1 > ipop;
+				if (hasspace) {
+					stack[++ipop] = { stackinfo.right, StackState::Tail }; // set directly
+				}
+				else {
+					stack.emplace_back(stackinfo.right, StackState::Tail);
+					ipop++;
+				}
 				break;
 			}
 			case StackState::Right:
 			{
 				stackinfo.rightval = value; // *value;
 				stackinfo.state = StackState::Add;
-				stack.push_back(stackinfo);
+
+				//stack.push_back(stackinfo);
+				stack[++ipop] = stackinfo;
 				break;
 			}
 			case StackState::Add:
