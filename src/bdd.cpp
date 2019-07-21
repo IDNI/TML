@@ -112,9 +112,9 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	static clock_t total = 0;
 	static int count = 0;
 	clock_t start = clock();
-	auto retval = bdd_and_recursive(x, y);
+	//auto retval = bdd_and_recursive(x, y);
 	//auto retval = and_flat(x, y);
-	//auto retval = and_stack(x, y);
+	auto retval = and_stack(x, y);
 	clock_t end = clock();
 	total += double(end - start);
 	output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
@@ -229,16 +229,27 @@ int_t bdd::and_flat(xynode& node) {
 	return *leftval; // retval // the same
 }
 
+vector<xyitem> stack(20000);
+
 int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 	DBG(assert(x && y););
 
 	xynode node = { x, y };
-	vector<xyitem> stack = {};
-	stack.emplace_back(node, StackState::Tail);
-	//optional<int_t> value; // first leftval is of no importance
+
+	//vector<xyitem> stack = {};
+	//stack.emplace_back(node, StackState::Tail);
+	//vector<xyitem> stack(10000);
+	int ipop = -1; // 0;
+	const bool hasspace = int(stack.size()) - 1 > ipop;
+	if (hasspace) { //int(stack.size()) > 0) {
+		stack[++ipop] = { node, StackState::Tail }; // set directly instead
+	}
+	else {
+		stack.emplace_back(node, StackState::Tail);
+		ipop++;
+	}
+
 	int_t value;
-	int ipop = 0;
-	//int ipush = 1;
 
 	while (ipop >= 0) { //!stack.empty()) {
 		//xyitem& stackinfo = stack.back();
@@ -254,13 +265,27 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 		switch (state) {
 			case StackState::Tail:
 			{
-				if (auto tailval = processtail(x, y)) {
-					value = *tailval;
+				//if (auto tailval = processtail(x, y)) {
+				//	value = *tailval;
+				//	break;
+				//}
+				bool istail = node.prod < std::numeric_limits<int>::max();
+				if (istail) {
+					value = node.prod;
 					break;
 				}
+
+				if (x > y) std::swap(x, y);
+				ite_memo m = { x, y, F };
+				auto it = C.find(m);
+				if (it != C.end()) {
+					value = it->second;
+					break;
+				}
+
 				// we're not tail, get left/right nodes and dive deeper...
 				auto fork = getfork(x, y);
-				stackinfo.left = fork.left;
+				//stackinfo.left = fork.left;
 				stackinfo.right = fork.right;
 				stackinfo.val = fork.val;
 				//stackinfo.left = { fork.left, , StackState::Tail };

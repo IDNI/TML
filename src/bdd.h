@@ -35,6 +35,8 @@ typedef std::vector<spbdd_handle> bdd_handles;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 
+const int_t T = 1, F = -1;
+
 struct ite_memo {
 	int_t x, y, z;
 	size_t hash;
@@ -46,7 +48,16 @@ struct ite_memo {
 
 struct xynode {
 	int_t x, y;
-	xynode(int_t x, int_t y) : x(x), y(y) {}
+	int_t prod; // = std::numeric_limits<int>::max();
+	xynode() {} // for stack allocation
+	xynode(int_t x, int_t y) : x(x), y(y) {
+		if ((x - F) * (y - F) * (x + y) == 0)
+			prod = F;
+		else if ((x + F) * (y + F) * (x - y) == 0)
+			prod = x * y;
+		else
+			prod = std::numeric_limits<int>::max();
+	}
 };
 
 struct bifork {
@@ -76,12 +87,12 @@ enum class StackState {
 struct xyitem {
 	xynode node;
 	StackState state;
-	//bifork fork;
-	xynode left, right;
-	//xyitem left, right;
-	int_t val, leftval, rightval, result;
+	xynode right;
+	int_t val = 0, leftval = 0, rightval = 0, result = 0;
+	xyitem() {} // for stack allocation
 	xyitem(const xynode& node, StackState state) :
-		node(node), state(state), left(0, 0), right(0, 0) {}
+		node(node), state(state), right(0, 0) {
+	}
 };
 
 struct bdd_key {
@@ -100,7 +111,7 @@ template<> struct std::hash<std::array<int_t, 2>>{
 };
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
-const int_t T = 1, F = -1;
+//const int_t T = 1, F = -1;
 
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
@@ -201,6 +212,12 @@ class bdd {
 		else return { bx.v, {bx.h, by.h}, {bx.l, by.l} };
 	}
 
+	// x  y  =		x  y  =
+	// F     F		T  y  y
+	//    F  F		x  T  x
+	// x -x  F		x  x  x
+	// (x - F) * (y - F) * (x + y) == 0 => F
+	// (x + F) * (y + F) * (x - y) == 0 => x * y
 	// pull out the exit condition in one place, it's mutable (x,y) for simplicity
 	inline static std::optional<int_t> processtail(int_t& x, int_t& y)
 	{
