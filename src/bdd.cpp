@@ -265,10 +265,6 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 		switch (state) {
 			case StackState::Tail:
 			{
-				//if (auto tailval = processtail(x, y)) {
-				//	value = *tailval;
-				//	break;
-				//}
 				bool istail = node.prod < std::numeric_limits<int>::max();
 				if (istail) {
 					value = node.prod;
@@ -285,18 +281,30 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 
 				// we're not tail, get left/right nodes and dive deeper...
 				auto fork = getfork(x, y);
-				//stackinfo.left = fork.left;
-				stackinfo.right = fork.right;
-				stackinfo.val = fork.val;
-				//stackinfo.left = { fork.left, , StackState::Tail };
-				//stackinfo.right = { fork.right, , StackState::Tail };
-				stackinfo.state = StackState::Left;
 
-				//stack.push_back(stackinfo);
-				stack[++ipop] = stackinfo;
+				//stackinfo.right = fork.right;
+				//stackinfo.val = fork.val;
+				//stackinfo.state = StackState::Left;
+				//stack[++ipop] = stackinfo;
+				xyitem& item = stack[++ipop];
+				//item.node = stackinfo.node;
+				item.node.x = stackinfo.node.x;
+				item.node.y = stackinfo.node.y;
+				item.node.prod = stackinfo.node.prod;
+				//item.state = stackinfo.state;
+				item.right = fork.right;
+				item.val = fork.val;
+				item.state = StackState::Left;
+
 				const bool hasspace = int(stack.size()) - 1 > ipop;
 				if (hasspace) {
-					stack[++ipop] = { fork.left, StackState::Tail }; // set directly instead
+					//stack[++ipop] = { fork.left, StackState::Tail }; // set directly instead
+					xyitem& item = stack[++ipop];
+					//item.node = fork.left;
+					item.node.x = fork.left.x;
+					item.node.y = fork.left.y;
+					item.node.prod = fork.left.prod;
+					item.state = StackState::Tail;
 				}
 				else {
 					stack.emplace_back(fork.left, StackState::Tail);
@@ -306,15 +314,29 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 			}
 			case StackState::Left:
 			{
-				stackinfo.leftval = value; // *value;
-				stackinfo.state = StackState::Right;
+				//stackinfo.leftval = value;
+				//stackinfo.state = StackState::Right;
+				//stack[++ipop] = stackinfo;
+				xyitem& item = stack[++ipop];
+				//item.node = stackinfo.node;
+				item.node.x = stackinfo.node.x;
+				item.node.y = stackinfo.node.y;
+				item.node.prod = stackinfo.node.prod;
+				//item.state = stackinfo.state;
+				//item.right = stackinfo.right;
+				item.val = stackinfo.val;
+				item.leftval = value;
+				item.state = StackState::Right;
 
-				//stack.push_back(stackinfo);
-				//stack.emplace_back(stackinfo.right, StackState::Tail);
-				stack[++ipop] = stackinfo;
 				const bool hasspace = int(stack.size()) - 1 > ipop;
 				if (hasspace) {
-					stack[++ipop] = { stackinfo.right, StackState::Tail }; // set directly
+					//stack[++ipop] = { stackinfo.right, StackState::Tail }; // set directly
+					xyitem& item = stack[++ipop];
+					//item.node = stackinfo.right;
+					item.node.x = stackinfo.right.x;
+					item.node.y = stackinfo.right.y;
+					item.node.prod = stackinfo.right.prod;
+					item.state = StackState::Tail;
 				}
 				else {
 					stack.emplace_back(stackinfo.right, StackState::Tail);
@@ -324,23 +346,30 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 			}
 			case StackState::Right:
 			{
-				stackinfo.rightval = value; // *value;
-				stackinfo.state = StackState::Add;
-
-				//stack.push_back(stackinfo);
-				stack[++ipop] = stackinfo;
-				break;
-			}
-			case StackState::Add:
-			{
+				stackinfo.rightval = value;
 				ite_memo m = { x, y, F };
-				//auto it = C.find(m);
-				//if (it != C.end()) {} // shouldn't happen, assert or something
+				//auto it = C.find(m); if (it != C.end()) {} // assert or something
 				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
 				C.emplace(m, r);
 				value = r;
 				stackinfo.result = value; // in case we decide to do this via stack items
+
+				//stackinfo.rightval = value; // *value;
+				//stackinfo.state = StackState::Add;
+				//stack[++ipop] = stackinfo;
 				break;
+			}
+			case StackState::Add:
+			{
+				throw 0;
+				//ite_memo m = { x, y, F };
+				////auto it = C.find(m);
+				////if (it != C.end()) {} // shouldn't happen, assert or something
+				//int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
+				//C.emplace(m, r);
+				//value = r;
+				//stackinfo.result = value; // in case we decide to do this via stack items
+				//break;
 			}
 			default:
 				throw 0;
