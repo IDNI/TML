@@ -112,16 +112,15 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	static clock_t total = 0;
 	static int count = 0;
 	clock_t start = clock();
-	//auto retval = bdd_and_recursive(x, y);
+	auto retval = bdd_and_recursive(x, y);
 	//auto retval = and_flat(x, y);
-	auto retval = and_stack(x, y);
+	//auto retval = and_stack(x, y);
 	clock_t end = clock();
 	total += double(end - start);
-	output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
-	output::to(L"info") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
 	count++;
-	if (count == 10000) {
-		count = count;
+	if ((count % 100) == 0) { //count == 10000) {
+		output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
+		output::to(L"info") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
 	}
 	return retval;
 }
@@ -239,6 +238,7 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 	//vector<xyitem> stack = {};
 	//stack.emplace_back(node, StackState::Tail);
 	//vector<xyitem> stack(10000);
+	int ntries = 0;
 	int ipop = -1; // 0;
 	const bool hasspace = int(stack.size()) - 1 > ipop;
 	if (hasspace) { //int(stack.size()) > 0) {
@@ -307,6 +307,9 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 					item.state = StackState::Tail;
 				}
 				else {
+					if ((ntries++ % 100) == 0) {
+						output::to(L"info") << "stack.emplace_back: (" << x << ", " << y << ") =>: " << ntries << endl;
+					}
 					stack.emplace_back(fork.left, StackState::Tail);
 					ipop++;
 				}
@@ -339,6 +342,9 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 					item.state = StackState::Tail;
 				}
 				else {
+					if ((ntries++ % 100) == 0) {
+						output::to(L"info") << "stack.emplace_back(r): (" << x << ", " << y << ") =>: " << ntries << endl;
+					}
 					stack.emplace_back(stackinfo.right, StackState::Tail);
 					ipop++;
 				}
