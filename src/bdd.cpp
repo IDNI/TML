@@ -112,9 +112,9 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	static clock_t total = 0;
 	static int count = 0;
 	clock_t start = clock();
-	auto retval = bdd_and_recursive(x, y);
+	//auto retval = bdd_and_recursive(x, y);
 	//auto retval = and_flat(x, y);
-	//auto retval = and_stack(x, y);
+	auto retval = and_stack(x, y);
 	clock_t end = clock();
 	total += double(end - start);
 	count++;
@@ -250,6 +250,7 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 	}
 
 	int_t value;
+	constexpr int imax = std::numeric_limits<int>::max();
 
 	while (ipop >= 0) { //!stack.empty()) {
 		//xyitem& stackinfo = stack.back();
@@ -268,6 +269,7 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 				bool istail = node.prod < std::numeric_limits<int>::max();
 				if (istail) {
 					value = node.prod;
+					DBG(assert(value != imax););
 					break;
 				}
 
@@ -276,6 +278,7 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 				auto it = C.find(m);
 				if (it != C.end()) {
 					value = it->second;
+					DBG(assert(value != imax););
 					break;
 				}
 
@@ -358,6 +361,7 @@ int_t bdd::and_stack(int_t x, int_t y) { //xynode& node) {
 				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
 				C.emplace(m, r);
 				value = r;
+				DBG(assert(value != imax););
 				stackinfo.result = value; // in case we decide to do this via stack items
 
 				//stackinfo.rightval = value; // *value;

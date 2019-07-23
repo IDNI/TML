@@ -51,12 +51,23 @@ struct xynode {
 	int_t prod; // = std::numeric_limits<int>::max();
 	xynode() {} // for stack allocation
 	xynode(int_t x, int_t y) : x(x), y(y) {
-		if ((x - F) * (y - F) * (x + y) == 0)
-			prod = F;
-		else if ((x + F) * (y + F) * (x - y) == 0)
-			prod = x * y;
-		else
-			prod = std::numeric_limits<int>::max();
+		if (x == F || y == F || x == -y) prod = F;
+		else if (x == T || x == y) prod = y;
+		else if (y == T) prod = x;
+		else prod = std::numeric_limits<int>::max();
+		////if (x == F || y == F || x == -y) return F;
+		////if (x == T || x == y) return y;
+		////if (y == T) return x;
+		////if (x > y) std::swap(x, y);
+		////ite_memo m = { x, y, F };
+		////auto it = C.find(m);
+		////if (it != C.end()) return it->second;
+		//if ((x - F) * (y - F) * (x + y) == 0)
+		//	prod = F;
+		//else if ((x + F) * (y + F) * (x - y) == 0)
+		//	prod = x == y ? y : x * y; // T == 1
+		//else
+		//	prod = std::numeric_limits<int>::max();
 	}
 };
 
@@ -325,9 +336,9 @@ class bdd {
 	//inline static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t add(int_t v, int_t h, int_t l) {
 		DBG(assert(h && l && v > 0);)
-			DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-			DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-			if (h == l) return h;
+		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
+		DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
+		if (h == l) return h;
 		if (abs(h) < abs(l)) std::swap(h, l), v = -v;
 		static std::unordered_map<bdd_key, int_t>::const_iterator it;
 		static bdd_key k;
