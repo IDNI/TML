@@ -1,4 +1,4 @@
-               TML Installation instructions
+# TML Installation instructions
 
 # Requirements
 
@@ -14,7 +14,7 @@
     $ mkdir build
     $ cd build
 
-## 2. Configure the library
+## 2. Configure
 
     $ cmake ../
 
@@ -47,9 +47,13 @@
 
 ## 3. Building
 
-   To build `tml` executable and `TML` shared library run:
+   To build `tml` executable run:
 
     $ make
+
+   To build shared library run:
+
+    $ make TML
 
    If you want to speed up compilation, you may want to use multiple
    threads (e.g. 4):
@@ -57,7 +61,7 @@
 
 ## 4. Install (as user with sufficient permissions):
 
-   Install tml executable and TML shared library:
+   Install tml executable and TML shared library (run after `make TML`):
 
     $ make install
 
