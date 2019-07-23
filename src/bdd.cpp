@@ -195,14 +195,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 					break;
 				}
 
-				//if (x > y) std::swap(x, y);
-				//ite_memo m = { x, y, F };
-				//auto it = C.find(m);
-				//if (it != C.end()) {
-				//	value = it->second;
-				//	break;
-				//}
-
 				// we're not tail, get left/right nodes and dive deeper...
 				//auto fork = getfork(x, y);
 				std::array<int_t, 5> forkarr; // [5] ;
