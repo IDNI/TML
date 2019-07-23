@@ -135,42 +135,25 @@ struct xynode {
 		else if (y == T) prod = x;
 		else {
 			if (x > y) std::swap(x, y);
-			uint_t shash = hash_pair(x, y); // x + y;
-			uint_t hash = shash % 640000; // hash => 
-			int index = hash / 64; // 0..999
-			int bit = hash - index * 64; // 0..63
-			int val = (fcache[index] >> bit) & 1;
-			if (val == 1) {
+			//uint_t shash = hash_pair(x, y); // x + y;
+			//uint_t hash = shash % 640000; // hash => 
+			//int index = hash / 64; // 0..999
+			//int bit = hash - index * 64; // 0..63
+			//int val = (fcache[index] >> bit) & 1;
+			//if (val == 1) 
+			{
 				ite_memo m = { x, y, F };
 				auto it = C.find(m);
 				if (it != C.end()) prod = it->second;
 				else prod = std::numeric_limits<int>::max(); // ?
 			}
-			else prod = std::numeric_limits<int>::max();
+			//else prod = std::numeric_limits<int>::max();
 		}
 	}
 };
 
-//struct bifork {
-//	int_t val;
-//	xynode left, right;
-//	bifork(int_t v, const xynode& l, const xynode& r) : val(v), left(l), right(r) {}
-//};
-//
-//struct addnode {
-//	int_t x, y, val, left;
-//	addnode(int_t x, int_t y, int_t v, int_t l) : x(x), y(y), val(v), left(l) {}
-//};
-
-//struct xystackitem {
-//	xynode node;
-//	std::vector<addnode> parents;
-//	xystackitem(const xynode& node, const std::vector<addnode>& parents) :
-//		node(node), parents(parents) {}
-//};
-
 enum class StackState {
-	Tail, //TailCondition,
+	Tail,
 	Left,
 	Right,
 	Add
@@ -235,15 +218,6 @@ class bdd {
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
-	//inline static bifork getfork(const xynode& node)
-	//{
-	//	int_t x = node.x;
-	//	int_t y = node.y;
-	//	const bdd bx = get(x), by = get(y);
-	//	if (bx.v < by.v) return { bx.v, {bx.h, y}, {bx.l, y} };
-	//	else if (bx.v > by.v) return { by.v, {x, by.h}, {x, by.l} };
-	//	else return { bx.v, {bx.h, by.h}, {bx.l, by.l} };
-	//}
 	//inline static bifork getfork(const int_t x, const int_t y)
 	//{
 	//	const bdd bx = get(x), by = get(y);
@@ -259,21 +233,6 @@ class bdd {
 	// (x - F) * (y - F) * (x + y) == 0 => F
 	// (x + F) * (y + F) * (x - y) == 0 => x == y ? y : x * y
 	// pull out the exit condition in one place, it's mutable (x,y) for simplicity
-	//inline static std::optional<int_t> processtail(int_t& x, int_t& y)
-	//{
-	//	if (x == F || y == F || x == -y) return F;
-	//	if (x == T || x == y) return y;
-	//	if (y == T) return x;
-
-	//	if (x > y) std::swap(x, y);
-
-	//	ite_memo m = { x, y, F };
-	//	auto it = C.find(m);
-	//	if (it != C.end()) return it->second;
-
-	//	return std::nullopt;
-	//}
-
 	//inline static std::optional<int_t> istail(const xynode& node)
 	//{
 	//	int_t x = node.x;
@@ -292,36 +251,10 @@ class bdd {
 	//	return std::nullopt;
 	//}
 
-	//inline static std::optional<int_t> baseexit(
-	//	int_t& x, int_t& y, std::vector<addnode>& parents, int_t& retval) {
-	//	if (auto value = processtail(x, y)) {
-	//		retval = *value;
-	//		// pop all parents in reverse order (first the immediate next, then up etc.)
-	//		while (!parents.empty()) {
-	//			auto parent = parents.back();
-	//			parents.pop_back();
-
-	//			// now we have everything to finish off the parent 'add'.
-	//			// this is the right time to add to 'C' (in the right order), normally
-	//			// it'd be done recursively (back), we're just doing it ahead of time.
-	//			ite_memo m = { parent.x, parent.y, F };
-	//			//auto it = C.find(m);
-	//			//if (it != C.end()) {} // shouldn't happen, assert or something
-	//			int_t r = add(parent.val, parent.left, retval);
-	//			C.emplace(m, r);
-	//			retval = r; // retval simulates the 'return r' and then we go up
-	//		}
-	//		// at the end retval holds the top parent's return, it's all we need
-	//		//retval = retval;
-	//		return value;
-	//	}
-
-	//	return std::nullopt;
-	//}
 
 	//static int_t and_flat(int_t x, int_t y);
 	//static int_t and_flat(xynode& node);
-	static int_t and_stack(int_t x, int_t y); // xynode& node);
+	static int_t and_stack(const int_t x, const int_t y);
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_recursive(int_t x, int_t y);
@@ -411,6 +344,7 @@ public:
 	}
 
 	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
+	static void initopts(bool usestack = false);
 };
 
 class bdd_handle {

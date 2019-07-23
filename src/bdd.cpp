@@ -111,13 +111,20 @@ bool bdd::bdd_subsumes(int_t x, int_t y) {
 int stackdepth = 0, maxstackdepth = 0;
 clock_t total = 0;
 int countand = 0;
+bool usestack = false;
 
 int_t bdd::bdd_and(int_t x, int_t y) {
-	//clock_t start = clock();
-
-	//auto retval = bdd_and_recursive(x, y);
-	//auto retval = and_flat(x, y);
-	auto retval = and_stack(x, y);
+	if (usestack) {
+		//output::to(L"info") << "using stack: " << endl;
+		//output::to(L"error") << "using stack: () =>: " << endl;
+		//clock_t start = clock();
+		auto retval = and_stack(x, y);
+		return retval;
+		//auto retval = and_flat(x, y);
+	}
+	else {
+		return bdd_and_recursive(x, y);
+	}
 
 	//clock_t end = clock();
 	//total += double(end - start);
@@ -130,7 +137,6 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	//	output::to(L"info") << "depth(stack): (" << maxstackdepth << ") =>: " << stackdepth << endl;
 	//	maxstackdepth = stackdepth;
 	//}
-	return retval;
 }
 int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 	DBG(assert(x && y);)
@@ -172,11 +178,14 @@ int_t bdd::and_stack(int_t x, int_t y) {
 	int ntries = 0;
 	int ipop = -1;
 	int_t value;
-	//constexpr int imax = std::numeric_limits<int>::max();
 
-	xynode node = { x, y };
-	//const bool hasspace = int(stack.size()) - 1 > ipop;
-	stack[++ipop] = { node, StackState::Tail }; // set directly instead
+	//xynode node = { x, y };
+	//stack[++ipop] = { xynode(x, y), StackState::Tail }; 
+	xyitem& item = stack[++ipop];
+	item.node.x = x;
+	item.node.y = y;
+	item.node.calctail();
+	item.state = StackState::Tail;
 
 	while (ipop >= 0) { //!stack.empty()) {
 		xyitem& stackinfo = stack[ipop--];
@@ -196,7 +205,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				}
 
 				// we're not tail, get left/right nodes and dive deeper...
-				//auto fork = getfork(x, y);
 				std::array<int_t, 5> forkarr; // [5] ;
 				const bdd bx = get(x), by = get(y);
 				if (bx.v < by.v) forkarr = { bx.v, bx.h, y, bx.l, y };
@@ -215,8 +223,10 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				item.val = forkarr[0]; // fork.val;
 				item.state = StackState::Left;
 
-				const bool hasspace = int(stack.size()) - 1 > ipop;
-				if (hasspace) {
+				DBG(assert(int(stack.size()) - 1 > ipop););
+				//const bool hasspace = int(stack.size()) - 1 > ipop;
+				//if (hasspace) 
+				{
 					xyitem& item = stack[++ipop];
 					//item.node = fork.left;
 					item.node.x = forkarr[1];
@@ -224,14 +234,14 @@ int_t bdd::and_stack(int_t x, int_t y) {
 					item.node.calctail();
 					item.state = StackState::Tail;
 				}
-				else { // this shouldn't happen (increase stack size if needed)
-					if ((ntries++ % 100) == 0) {
-						output::to(L"info") << "stack.emplace_back: (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
-						output::to(L"info") << "stack.emplace_back: (" << x << ", " << y << ") =>: " << ntries << endl;
-					}
-					stack.emplace_back(xynode(forkarr[1], forkarr[2]), StackState::Tail);
-					ipop++;
-				}
+				//else { // this shouldn't happen (increase stack size if needed)
+				//	if ((ntries++ % 100) == 0) {
+				//		output::to(L"info") << "stack.emplace_back: (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
+				//		output::to(L"info") << "stack.emplace_back: (" << x << ", " << y << ") =>: " << ntries << endl;
+				//	}
+				//	stack.emplace_back(xynode(forkarr[1], forkarr[2]), StackState::Tail);
+				//	ipop++;
+				//}
 				break;
 			}
 			case StackState::Left:
@@ -245,8 +255,10 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				item.leftval = value;
 				item.state = StackState::Right;
 
-				const bool hasspace = int(stack.size()) - 1 > ipop;
-				if (hasspace) {
+				DBG(assert(int(stack.size()) - 1 > ipop););
+				//const bool hasspace = int(stack.size()) - 1 > ipop;
+				//if (hasspace) 
+				{
 					xyitem& item = stack[++ipop];
 					//item.node = stackinfo.right;
 					item.node.x = stackinfo.right.x;
@@ -254,14 +266,14 @@ int_t bdd::and_stack(int_t x, int_t y) {
 					item.node.prod = stackinfo.right.prod;
 					item.state = StackState::Tail;
 				}
-				else { // shouldn't happen (increase stack preallocated size)
-					if ((ntries++ % 100) == 0) {
-						output::to(L"info") << "stack.emplace_back(r): (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
-						output::to(L"info") << "stack.emplace_back(r): (" << x << ", " << y << ") =>: " << ntries << endl;
-					}
-					stack.emplace_back(stackinfo.right, StackState::Tail);
-					ipop++;
-				}
+				//else { // shouldn't happen (increase stack preallocated size)
+				//	if ((ntries++ % 100) == 0) {
+				//		output::to(L"info") << "stack.emplace_back(r): (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
+				//		output::to(L"info") << "stack.emplace_back(r): (" << x << ", " << y << ") =>: " << ntries << endl;
+				//	}
+				//	stack.emplace_back(stackinfo.right, StackState::Tail);
+				//	ipop++;
+				//}
 				break;
 			}
 			case StackState::Right:
@@ -271,11 +283,11 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				//auto it = C.find(m); if (it != C.end()) {} // assert or something
 				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
 				C.emplace(m, r);
-				uint_t shash = hash_pair(x, y); // x + y;
-				uint_t hash = shash % 640000; // hash => 
-				int index = hash / 64; // 0..999
-				int bit = hash - index * 64; // 0..63
-				fcache[index] |= (1u << bit);
+				//uint_t shash = hash_pair(x, y); // x + y;
+				//uint_t hash = shash % 640000; // hash => 
+				//int index = hash / 64; // 0..999
+				//int bit = hash - index * 64; // 0..63
+				//fcache[index] |= (1u << bit);
 				value = r;
 				stackinfo.result = value; // in case we decide to do this via stack items
 				break;
@@ -284,7 +296,7 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				throw 0;
 		}
 	}
-	return value; // *value;
+	return value;
 }
 
 //int_t bdd::and_flat(int_t x, int_t y) {
@@ -1215,4 +1227,11 @@ wostream& bdd::out(wostream& os, int_t x) {
 	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
 	const bdd b = get(x);
 	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
+}
+
+void bdd::initopts(bool usestackopt)
+{
+	if (usestackopt) {
+		usestack = true;
+	}
 }
