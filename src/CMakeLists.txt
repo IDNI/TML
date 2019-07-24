@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 set(CMAKE_VERBOSE_MAKEFILE true)
 
+project(tml)
+
 if(CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_CONFIGURATION_TYPES Debug Release PgoScan PgoRun)
 	set(CMAKE_CONFIGURATION_TYPES

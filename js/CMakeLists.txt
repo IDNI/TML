@@ -5,6 +5,8 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+project(tml)
+
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(tml-common)
 
