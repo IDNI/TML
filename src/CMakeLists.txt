@@ -59,6 +59,19 @@ set(TML_COMPILE_OPTIONS
 set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
 
 
+# object library
+#################
+
+add_library(TMLo OBJECT)
+target_setup(TMLo)
+target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS})
+target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
+target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_include_directories(TMLo PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
+
+
 # shared library
 #################
 
@@ -67,7 +80,7 @@ add_library(TML::TML ALIAS TML)
 target_setup(TML)
 target_compile_options(TML     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TML        PRIVATE ${TML_LINK_OPTIONS})
-target_sources(TML             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_link_libraries(TML      TMLo)
 target_include_directories(TML PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
@@ -76,7 +89,6 @@ set_target_properties(TML PROPERTIES
 	EXPORT_NAME TML
 	PUBLIC_HEADER ${TML_HEADERS}
 )
-exclude(TML)
 
 
 # static library
@@ -86,7 +98,7 @@ add_library(TMLs STATIC)
 target_setup(TMLs)
 target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLs        PRIVATE ${TML_LINK_OPTIONS})
-target_sources(TMLs             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_link_libraries(TMLs      TMLo)
 target_include_directories(TMLs PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )

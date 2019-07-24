@@ -47,13 +47,9 @@
 
 ## 3. Building
 
-   To build `tml` executable run:
+   To build `tml` executable and TML shared library run:
 
     $ make
-
-   To build shared library run:
-
-    $ make TML
 
    If you want to speed up compilation, you may want to use multiple
    threads (e.g. 4):
@@ -61,7 +57,7 @@
 
 ## 4. Install (as user with sufficient permissions):
 
-   Install tml executable and TML shared library (run after `make TML`):
+   Install tml executable and TML shared library:
 
     $ make install
 
