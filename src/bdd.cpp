@@ -155,25 +155,25 @@ int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 }
 
 //vector<xystackitem> istack(100); // (200); // 20000);
-constexpr int stack_size = 8000;
-int istack[stack_size]; // 200 stack items
+constexpr int STACK_SIZE = 8000;
+constexpr int SIZE = sizeof(xystackitem) / sizeof(int);
+int istack[STACK_SIZE]; // 200 stack items
 
 int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 	DBG(assert(x && y););
 
 	int ipop = -1;
 	int_t value;
-	int size = sizeof(xystackitem) / sizeof(int);
-	DBG(assert(size == 10););
+	DBG(assert(SIZE == 10););
 
-	xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+	xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
 	item.x = x;
 	item.y = y;
 	item.tailval = calctailval(item.x, item.y);
 	item.state = 0; // StackState::Tail;
 
 	while (ipop >= 0) { //!istack.empty()) {
-		xystackitem& stackinfo = reinterpret_cast<xystackitem&>(istack[(ipop--) * size]);
+		xystackitem& stackinfo = reinterpret_cast<xystackitem&>(istack[(ipop--) * SIZE]);
 
 		int_t& x = stackinfo.x;
 		int_t& y = stackinfo.y;
@@ -194,7 +194,7 @@ int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 			else if (bx.v > by.v) forkarr = { by.v, x, by.h, x, by.l };
 			else forkarr = { bx.v, bx.h, by.h, bx.l, by.l };
 
-			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
 			item.x = stackinfo.x;
 			item.y = stackinfo.y;
 			item.tailval = stackinfo.tailval;
@@ -204,9 +204,9 @@ int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 			item.val = forkarr[0]; // fork.val;
 			item.state = 1; // StackState::Left;
 
-			DBG(assert(int(stack_size / size) - 1 > ipop););
+			DBG(assert(int(STACK_SIZE / SIZE) - 1 > ipop););
 			{
-				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
 				item.x = forkarr[1];
 				item.y = forkarr[2];
 				item.tailval = calctailval(item.x, item.y);
@@ -221,7 +221,7 @@ int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 		}
 		case 1: //StackState::Left:
 		{
-			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
 			item.x = stackinfo.x;
 			item.y = stackinfo.y;
 			item.tailval = stackinfo.tailval;
@@ -229,9 +229,9 @@ int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 			item.leftval = value;
 			item.state = 2; // StackState::Right;
 
-			DBG(assert(int(stack_size / size) - 1 > ipop););
+			DBG(assert(int(STACK_SIZE / SIZE) - 1 > ipop););
 			{
-				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
 				item.x = stackinfo.rx;
 				item.y = stackinfo.ry;
 				item.tailval = stackinfo.rtailval;
@@ -296,11 +296,9 @@ int_t bdd::and_stack(const int_t x, const int_t y) {
 				else forkarr = { bx.v, bx.h, by.h, bx.l, by.l };
 
 				xyitem& item = stack[++ipop];
-				//item.node = stackinfo.node;
 				item.node.x = stackinfo.node.x;
 				item.node.y = stackinfo.node.y;
 				item.node.prod = stackinfo.node.prod;
-				//item.right = fork.right;
 				item.right.x = forkarr[3];
 				item.right.y = forkarr[4];
 				item.right.calctail();
@@ -310,7 +308,6 @@ int_t bdd::and_stack(const int_t x, const int_t y) {
 				DBG(assert(int(stack.size()) - 1 > ipop););
 				{
 					xyitem& item = stack[++ipop];
-					//item.node = fork.left;
 					item.node.x = forkarr[1];
 					item.node.y = forkarr[2];
 					item.node.calctail();
@@ -321,7 +318,6 @@ int_t bdd::and_stack(const int_t x, const int_t y) {
 			case StackState::Left:
 			{
 				xyitem& item = stack[++ipop];
-				//item.node = stackinfo.node;
 				item.node.x = stackinfo.node.x;
 				item.node.y = stackinfo.node.y;
 				item.node.prod = stackinfo.node.prod;
@@ -332,7 +328,6 @@ int_t bdd::and_stack(const int_t x, const int_t y) {
 				DBG(assert(int(stack.size()) - 1 > ipop););
 				{
 					xyitem& item = stack[++ipop];
-					//item.node = stackinfo.right;
 					item.node.x = stackinfo.right.x;
 					item.node.y = stackinfo.right.y;
 					item.node.prod = stackinfo.right.prod;
