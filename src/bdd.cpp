@@ -114,13 +114,21 @@ int countand = 0;
 bool usestack = false;
 
 int_t bdd::bdd_and(int_t x, int_t y) {
-	return and_stack_ints(x, y);
+	//return and_stack_ints(x, y);
 	//return bdd_and_recursive(x, y);
+	clock_t start = clock();
 	int_t retval;
 	if (usestack)
 		retval = and_stack_ints(x, y);
 	else
 		retval = bdd_and_recursive(x, y);
+	clock_t end = clock();
+	total += double(end - start);
+	countand++;
+	if (true) { //if ((countand % 100) == 0) { //countand == 10000) {
+		output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
+		output::to(L"info") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
+	}
 	return retval;
 }
 
