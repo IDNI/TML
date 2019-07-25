@@ -64,7 +64,7 @@ set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
 
 add_library(TMLo OBJECT)
 target_setup(TMLo)
-target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS})
+target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS} -fPIC)
 target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
 target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
 target_include_directories(TMLo PUBLIC
@@ -132,7 +132,7 @@ exclude(tml_shared)
 ##########
 
 include(GNUInstallDirs)
-install(TARGETS tml TML
+install(TARGETS tml TML TMLo
 	EXPORT TML
 	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TML
