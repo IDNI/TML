@@ -114,30 +114,16 @@ int countand = 0;
 bool usestack = false;
 
 int_t bdd::bdd_and(int_t x, int_t y) {
-	if (usestack) {
-		//output::to(L"info") << "using stack: " << endl;
-		//output::to(L"error") << "using stack: () =>: " << endl;
-		//clock_t start = clock();
-		auto retval = and_stack(x, y);
-		return retval;
-		//auto retval = and_flat(x, y);
-	}
-	else {
-		return bdd_and_recursive(x, y);
-	}
-
-	//clock_t end = clock();
-	//total += double(end - start);
-	//countand++;
-	//if (true) { //if ((countand % 100) == 0) { //countand == 10000) {
-	//	output::to(L"info") << "test and(node): (" << x << ", " << y << ") =>: " << retval << endl;
-	//	output::to(L"info") << "test and: " << double(end - start) << " (" << total << "), ret: " << retval << endl; // / CLOCKS_PER_SEC
-	//}
-	//if (stackdepth > maxstackdepth) {
-	//	output::to(L"info") << "depth(stack): (" << maxstackdepth << ") =>: " << stackdepth << endl;
-	//	maxstackdepth = stackdepth;
-	//}
+	return and_stack_ints(x, y);
+	//return bdd_and_recursive(x, y);
+	int_t retval;
+	if (usestack)
+		retval = and_stack_ints(x, y);
+	else
+		retval = bdd_and_recursive(x, y);
+	return retval;
 }
+
 int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 	DBG(assert(x && y);)
 	if (x == F || y == F || x == -y) return F;
@@ -168,10 +154,110 @@ int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 	return r;
 }
 
-vector<xyitem> stack(100); // (200); // 20000);
-ullong fcache[10000];
+//vector<xystackitem> istack(100); // (200); // 20000);
+constexpr int stack_size = 8000;
+int istack[stack_size]; // 200 stack items
 
-int_t bdd::and_stack(int_t x, int_t y) {
+int_t bdd::and_stack_ints(const int_t x, const int_t y) {
+	DBG(assert(x && y););
+
+	int ipop = -1;
+	int_t value;
+	int size = sizeof(xystackitem) / sizeof(int);
+	DBG(assert(size == 10););
+
+	xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+	item.x = x;
+	item.y = y;
+	item.tailval = calctailval(item.x, item.y);
+	item.state = 0; // StackState::Tail;
+
+	while (ipop >= 0) { //!istack.empty()) {
+		xystackitem& stackinfo = reinterpret_cast<xystackitem&>(istack[(ipop--) * size]);
+
+		int_t& x = stackinfo.x;
+		int_t& y = stackinfo.y;
+
+		switch (stackinfo.state) {
+		case 0: //StackState::Tail:
+		{
+			bool istail = stackinfo.tailval < std::numeric_limits<int>::max();
+			if (istail) {
+				value = stackinfo.tailval;
+				break;
+			}
+
+			// we're not tail, get left/right nodes and dive deeper...
+			std::array<int_t, 5> forkarr;
+			const bdd bx = get(x), by = get(y);
+			if (bx.v < by.v) forkarr = { bx.v, bx.h, y, bx.l, y };
+			else if (bx.v > by.v) forkarr = { by.v, x, by.h, x, by.l };
+			else forkarr = { bx.v, bx.h, by.h, bx.l, by.l };
+
+			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+			item.x = stackinfo.x;
+			item.y = stackinfo.y;
+			item.tailval = stackinfo.tailval;
+			item.rx = forkarr[3];
+			item.ry = forkarr[4];
+			item.rtailval = calctailval(item.rx, item.ry);
+			item.val = forkarr[0]; // fork.val;
+			item.state = 1; // StackState::Left;
+
+			DBG(assert(int(stack_size / size) - 1 > ipop););
+			{
+				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+				item.x = forkarr[1];
+				item.y = forkarr[2];
+				item.tailval = calctailval(item.x, item.y);
+				item.state = 0; // StackState::Tail;
+			}
+			// doesn't matter what the 'value' is, only taken into account if we're a tail
+			// (as in that case we're not pushing and the next pop expects left or right val).
+			// In this case we've pushed more nodes, so the next, our left child, doesn't care.
+			// Next will be us again expecting a real value from the left child.
+			// values are returned on tail condition, or on Right when we 'add' => value.
+			break;
+		}
+		case 1: //StackState::Left:
+		{
+			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+			item.x = stackinfo.x;
+			item.y = stackinfo.y;
+			item.tailval = stackinfo.tailval;
+			item.val = stackinfo.val;
+			item.leftval = value;
+			item.state = 2; // StackState::Right;
+
+			DBG(assert(int(stack_size / size) - 1 > ipop););
+			{
+				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * size]);
+				item.x = stackinfo.rx;
+				item.y = stackinfo.ry;
+				item.tailval = stackinfo.rtailval;
+				item.state = 0; // StackState::Tail;
+			}
+			break;
+		}
+		case 2: //StackState::Right:
+		{
+			stackinfo.rightval = value;
+			ite_memo m = { x, y, F };
+			int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
+			C.emplace(m, r);
+			value = r;
+			break;
+		}
+		default:
+			throw 0;
+		}
+	}
+	return value;
+}
+
+vector<xyitem> stack(100); // (200); // 20000);
+
+int_t bdd::and_stack(const int_t x, const int_t y) {
 	DBG(assert(x && y););
 	DBG(assert(int(stack.size() > 0)););
 
@@ -179,8 +265,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 	int ipop = -1;
 	int_t value;
 
-	//xynode node = { x, y };
-	//stack[++ipop] = { xynode(x, y), StackState::Tail }; 
 	xyitem& item = stack[++ipop];
 	item.node.x = x;
 	item.node.y = y;
@@ -224,8 +308,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				item.state = StackState::Left;
 
 				DBG(assert(int(stack.size()) - 1 > ipop););
-				//const bool hasspace = int(stack.size()) - 1 > ipop;
-				//if (hasspace) 
 				{
 					xyitem& item = stack[++ipop];
 					//item.node = fork.left;
@@ -234,14 +316,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 					item.node.calctail();
 					item.state = StackState::Tail;
 				}
-				//else { // this shouldn't happen (increase stack size if needed)
-				//	if ((ntries++ % 100) == 0) {
-				//		output::to(L"info") << "stack.emplace_back: (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
-				//		output::to(L"info") << "stack.emplace_back: (" << x << ", " << y << ") =>: " << ntries << endl;
-				//	}
-				//	stack.emplace_back(xynode(forkarr[1], forkarr[2]), StackState::Tail);
-				//	ipop++;
-				//}
 				break;
 			}
 			case StackState::Left:
@@ -256,8 +330,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 				item.state = StackState::Right;
 
 				DBG(assert(int(stack.size()) - 1 > ipop););
-				//const bool hasspace = int(stack.size()) - 1 > ipop;
-				//if (hasspace) 
 				{
 					xyitem& item = stack[++ipop];
 					//item.node = stackinfo.right;
@@ -266,30 +338,15 @@ int_t bdd::and_stack(int_t x, int_t y) {
 					item.node.prod = stackinfo.right.prod;
 					item.state = StackState::Tail;
 				}
-				//else { // shouldn't happen (increase stack preallocated size)
-				//	if ((ntries++ % 100) == 0) {
-				//		output::to(L"info") << "stack.emplace_back(r): (" << stack.size() << ", " << ipop << ") =>: " << ntries << endl;
-				//		output::to(L"info") << "stack.emplace_back(r): (" << x << ", " << y << ") =>: " << ntries << endl;
-				//	}
-				//	stack.emplace_back(stackinfo.right, StackState::Tail);
-				//	ipop++;
-				//}
 				break;
 			}
 			case StackState::Right:
 			{
 				stackinfo.rightval = value;
 				ite_memo m = { x, y, F };
-				//auto it = C.find(m); if (it != C.end()) {} // assert or something
 				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
 				C.emplace(m, r);
-				//uint_t shash = hash_pair(x, y); // x + y;
-				//uint_t hash = shash % 640000; // hash => 
-				//int index = hash / 64; // 0..999
-				//int bit = hash - index * 64; // 0..63
-				//fcache[index] |= (1u << bit);
 				value = r;
-				stackinfo.result = value; // in case we decide to do this via stack items
 				break;
 			}
 			default:
@@ -298,80 +355,6 @@ int_t bdd::and_stack(int_t x, int_t y) {
 	}
 	return value;
 }
-
-//int_t bdd::and_flat(int_t x, int_t y) {
-//	xynode node = { x, y };
-//	return and_flat(node);
-//	// we don't care about the return here, return value is in retval instead.
-//	// also we don't care about any intermediate bdd_and returns. 
-//	// 'C' is also up-to-date so we could get the value from it as well (any node).
-//}
-//
-//// how this works: left-s go first, we go from left tail up, left tail sets
-//// the first leftval for its parent. Parent then pops and forks, left is
-//// done (we have leftval just set), parent adds itself to the 'right-tail'
-//// unwind-stack, and adds the right child (& its left-s) to the left stack.
-//// we continue left stack from now newly added left tail and work our way up
-//// note: if there's only one left, leftval is set as its tail and returns.
-//// if more, leftest tail sets the first leftval, goes up, saves to unwind,
-//// goes right and as soon as we hit the right-tail stack unwinds up to the
-//// top-left node. 'retval' is set to its 'add' result, which is the new
-//// leftval for its parent.
-//int_t bdd::and_flat(xynode& node) {
-//	DBG(assert(node.x && node.y););
-//
-//	vector<addnode> parents = {};
-//	int_t retval;
-//
-//	// 'parents' holds the parent node 'add' stuff, 'node' is its right fork
-//	vector<xystackitem> leftparents = {};
-//	optional<int_t> leftval; // first leftval is of no importance
-//	leftparents.emplace_back(node, parents);
-//	auto leftnode = node;
-//	while (!istail(leftnode)) {
-//		leftnode = getfork(leftnode).left;
-//		// since these are all left nodes, parents don't apply and we reset to {}
-//		// ...unless we're the last node left (i.e. the 'node')
-//		leftparents.emplace_back(leftnode, vector<addnode>());
-//	}
-//	// first node to pop will always be a 'tail' (guaranteed by the while above)
-//	// (we also always have l/r/fork, i.e. unless the tail condition is triggered)
-//	// (if 'node' is a tail itself it'll just fall through and do one-pass here)
-//	while (!leftparents.empty()) {
-//		auto stackinfo = leftparents.back();
-//		leftparents.pop_back();
-//
-//		xynode& node = stackinfo.node;
-//		vector<addnode>& rightparents = stackinfo.parents;
-//		int_t& x = node.x;
-//		int_t& y = node.y;
-//
-//		if (auto value = baseexit(x, y, rightparents, retval)) {
-//			// retval is the real return (on tail exit), this being the top node.
-//			// when no parents retval will be set to *value (for left node)
-//			// when we have right node w/ parents, we don't care about intermediates
-//			leftval = retval; // *value;
-//			continue;
-//		}
-//
-//		// we're not tail, get left/right nodes and dive deeper...
-//		auto fork = getfork(x, y);
-//
-//		// this is for 'add' to unwind once the right-most node hits the tail.
-//		// this was essential to get a sort of tail-right-recursion to be able to
-//		// merge the right recursion (and get 2 similar while loops into one).
-//		rightparents.emplace_back(x, y, fork.val, *leftval); // leftval is always ok
-//
-//		// add right's child nodes to the stack, it'll work nicely (this is the key)
-//		leftparents.emplace_back(fork.right, rightparents);
-//		auto leftnode = fork.right;
-//		while (!istail(leftnode)) {
-//			leftnode = getfork(leftnode).left;
-//			leftparents.emplace_back(leftnode, vector<addnode>());
-//		}
-//	}
-//	return *leftval; // retval // the same
-//}
 
 int_t bdd::bdd_ite_var(uint_t x, int_t y, int_t z) {
 	if (x+1 < var(y) && x+1 < var(z)) return add(x+1, y, z);

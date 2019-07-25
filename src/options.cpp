@@ -128,6 +128,7 @@ void options::setup() {
 		.description(L"this help"));
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
+	add_bool(L"stack", L"enabled stack variant for 'and' etc.");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
 	add(option(option::type::STRING, { L"name", L"n" },

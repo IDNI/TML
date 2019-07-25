@@ -25,6 +25,7 @@
 #include "driver.h"
 #include "err.h"
 #include "ast.h"
+//#include "bdd.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -259,6 +260,17 @@ void driver::init() {
 driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	argv(argv), opts(o) {
 	opts.parse(argc, argv);
+
+	if (opts.enabled(L"stack")) {
+		output::to(L"info") << "stack defined: " << endl;
+		//output::to(L"error") << "stack defined: () =>: " << endl;
+		bdd::initopts(true);
+	}
+	else {
+		output::to(L"info") << "stack not defined: " << endl;
+		//output::to(L"error") << "stack not defined: () =>: " << endl;
+	}
+
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
 	output_ast();

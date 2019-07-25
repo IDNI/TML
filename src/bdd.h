@@ -46,10 +46,6 @@ struct ite_memo {
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
 
-//extern std::vector<class bdd> V;
-//extern std::unordered_map<ite_memo, int_t> C;
-//extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
-
 struct bdd_key {
 	uint_t hash;
 	int_t h, l;
@@ -100,8 +96,6 @@ vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
 extern std::unordered_map<ite_memo, int_t> C;
 extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
-typedef unsigned long long ullong;
-extern ullong fcache[10000];
 
 struct xynode {
 	int_t x = 0, y = 0;
@@ -109,23 +103,6 @@ struct xynode {
 	xynode() {} // for stack allocation
 	xynode(int_t x_, int_t y_) : x(x_), y(y_) {
 		calctail();
-		//if (x == F || y == F || x == -y) prod = F;
-		//else if (x == T || x == y) prod = y;
-		//else if (y == T) prod = x;
-		//else {
-		//	if (x > y) std::swap(x, y);
-		//	uint_t shash = hash_pair(x, y); // x + y;
-		//	uint_t hash = shash % 640000; // hash => 
-		//	int index = hash / 64; // 0..999
-		//	int bit = hash - index * 64; // 0..63
-		//	int val = (fcache[index] >> bit) & 1;
-		//	if (val == 1) {
-		//		ite_memo m = { x, y, F };
-		//		auto it = C.find(m);
-		//		if (it != C.end()) prod = it->second;
-		//		//else prod = std::numeric_limits<int>::max();
-		//	}
-		//}
 	}
 	//((x - F) * (y - F) * (x + y) == 0) => F;
 	//((x + F) * (y + F) * (x - y) == 0) => x == y ? y : x * y
@@ -135,19 +112,10 @@ struct xynode {
 		else if (y == T) prod = x;
 		else {
 			if (x > y) std::swap(x, y);
-			//uint_t shash = hash_pair(x, y); // x + y;
-			//uint_t hash = shash % 640000; // hash => 
-			//int index = hash / 64; // 0..999
-			//int bit = hash - index * 64; // 0..63
-			//int val = (fcache[index] >> bit) & 1;
-			//if (val == 1) 
-			{
-				ite_memo m = { x, y, F };
-				auto it = C.find(m);
-				if (it != C.end()) prod = it->second;
-				else prod = std::numeric_limits<int>::max(); // ?
-			}
-			//else prod = std::numeric_limits<int>::max();
+			ite_memo m = { x, y, F };
+			auto it = C.find(m);
+			if (it != C.end()) prod = it->second;
+			else prod = std::numeric_limits<int>::max(); // ?
 		}
 	}
 };
@@ -158,16 +126,27 @@ enum class StackState {
 	Right,
 	Add
 };
+
 struct xyitem {
 	xynode node;
 	StackState state;
 	xynode right;
-	int_t val = 0, leftval = 0, rightval = 0, result = 0;
+	int_t val = 0, leftval = 0, rightval = 0;
 	xyitem() {} // for stack allocation
 	xyitem(const xynode& node, StackState state) :
 		node(node), state(state), right() {
 	}
 };
+
+#pragma pack(push, 1)
+struct xystackitem {
+	int_t x = 0, y = 0, tailval = std::numeric_limits<int>::max();
+	int_t state;
+	int_t rx = 0, ry = 0, rtailval = std::numeric_limits<int>::max();
+	int_t val = 0, leftval = 0, rightval = 0;
+	//xystackitem() {} // for stack allocation
+};
+#pragma pack(pop)
 
 class bdd {
 	friend class bdd_handle;
@@ -218,14 +197,6 @@ class bdd {
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
-	//inline static bifork getfork(const int_t x, const int_t y)
-	//{
-	//	const bdd bx = get(x), by = get(y);
-	//	if (bx.v < by.v) return { bx.v, {bx.h, y}, {bx.l, y} };
-	//	else if (bx.v > by.v) return { by.v, {x, by.h}, {x, by.l} };
-	//	else return { bx.v, {bx.h, by.h}, {bx.l, by.l} };
-	//}
-
 	// x  y  =		x  y  =
 	// F     F		T  y  y
 	//    F  F		x  T  x
@@ -233,27 +204,18 @@ class bdd {
 	// (x - F) * (y - F) * (x + y) == 0 => F
 	// (x + F) * (y + F) * (x - y) == 0 => x == y ? y : x * y
 	// pull out the exit condition in one place, it's mutable (x,y) for simplicity
-	//inline static std::optional<int_t> istail(const xynode& node)
-	//{
-	//	int_t x = node.x;
-	//	int_t y = node.y;
+	inline static int_t calctailval(int& x, int& y) {
+		if (x == F || y == F || x == -y) return F;
+		if (x == T || x == y) return y;
+		if (y == T) return x;
+		if (x > y) std::swap(x, y);
+		ite_memo m = { x, y, F };
+		auto it = C.find(m);
+		if (it != C.end()) return it->second;
+		return std::numeric_limits<int>::max();
+	}
 
-	//	if (x == F || y == F || x == -y) return F;
-	//	if (x == T || x == y) return y;
-	//	if (y == T) return x;
-
-	//	if (x > y) std::swap(x, y);
-
-	//	ite_memo m = { x, y, F };
-	//	auto it = C.find(m);
-	//	if (it != C.end()) return it->second;
-
-	//	return std::nullopt;
-	//}
-
-
-	//static int_t and_flat(int_t x, int_t y);
-	//static int_t and_flat(xynode& node);
+	static int_t and_stack_ints(const int_t x, const int_t y);
 	static int_t and_stack(const int_t x, const int_t y);
 
 	static int_t bdd_and(int_t x, int_t y);
