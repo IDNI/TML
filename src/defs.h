@@ -40,6 +40,7 @@ struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
 typedef std::map<lexeme, std::wstring, lexcmp> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+typedef int_t ntable;
 //typedef std::vector<size_t> sizes;
 
 //#define DEEPDEBUG

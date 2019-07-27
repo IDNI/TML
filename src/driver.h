@@ -65,6 +65,7 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 //	void transform_string(const std::wstring&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
+	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);

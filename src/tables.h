@@ -13,8 +13,8 @@
 #include <map>
 #include <vector>
 #include "bdd.h"
+#include "term.h"
 
-typedef int_t ntable;
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
@@ -24,22 +24,11 @@ class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
 
+std::map<int_t, int_t> cqc(term h1, std::vector<term> b1, term h2,
+	std::vector<term> b2);
+
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
-};
-
-struct term : public ints {
-	bool neg;
-	ntable tab;
-	term() {}
-	term(bool neg, ntable tab, const ints& args) :
-		ints(args), neg(neg), tab(tab) {}
-	bool operator<(const term& t) const {
-		if (neg != t.neg) return neg;
-		if (tab != t.tab) return tab < t.tab;
-		return (const ints&)*this < t;
-	}
-	void replace(const std::map<int_t, int_t>& m);
 };
 
 struct body {
@@ -89,6 +78,12 @@ struct rule : public std::vector<alt*> {
 		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
 	}
+	bool equals_termwise(const rule& r) const {
+		if (t != r.t || size() != r.size()) return false;
+		for (size_t n = 0; n != size(); ++n)
+			if (at(n)->t != r[n]->t) return false;
+		return true;
+	}
 };
 
 struct table {
@@ -103,6 +98,7 @@ struct table {
 class tables {
 	typedef std::map<int_t, size_t> varmap;
 	typedef std::function<void(const raw_term&)> rt_printer;
+	typedef std::function<void(const term&)> cb_decompress;
 
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
@@ -117,7 +113,7 @@ class tables {
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
-	bool datalog;
+	bool datalog, optimize;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -171,6 +167,7 @@ class tables {
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+	void decompress(spbdd_handle x, ntable tab, const cb_decompress&) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_rules(const raw_prog& p);
@@ -183,7 +180,7 @@ class tables {
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
-	tables();
+	tables(bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool pfp();

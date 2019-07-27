@@ -16,7 +16,6 @@
 #include "input.h"
 #include "output.h"
 using namespace std;
-//using namespace std::placeholders;
 
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)
@@ -193,10 +192,10 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 	});
 }
 
-void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-		lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
+void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f)
+	const {
 	allsat_cb(x&&ts[tab].t, ts[tab].len * bits,
-		[tab, op, cl, &f, this](const bools& p, int_t DBG(y)) {
+		[tab, &f, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		const size_t args = ts[tab].len;
 		term r(false, tab, ints(args, 0));
@@ -204,7 +203,15 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, args)])
 					r[n] |= 1 << k;
+		f(r);
+	})();
+}
+
+void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
+	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
+	decompress(x, tab, [op, cl, tab, f, this](const term& r) {
 		raw_term rt;
+		const size_t args = ts[tab].len;
 		rt.e.resize(args+1),
 		rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(ts[tab].s)));
 		for (size_t n = 1; n != args + 1; ++n) {
@@ -215,7 +222,7 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 		}
 		rt.arity = get<ints>(ts[tab].s), rt.insert_parens(op, cl),
 		f(rt);
-	})();
+	});
 }
 
 template<typename T, typename F>
@@ -329,6 +336,25 @@ void tables::get_facts(const raw_prog& p) {
 	measure_time_end();
 }
 
+/*bool tables::cqc(const set<rule>& rs, const rule& r, size_t a, tables& tb)const{
+	int_t m = 0;
+	for (int_t i : r.t) m = max(m, i);
+	for (int_t i : r.r[a]) m = max(m, i);
+	bool bsym = false, bnum = false, bchr = false;
+
+}
+
+bool tables::cqc(const set<rule>& rs, rule& r) {
+	tables tb(false);
+	tb.bits = bits, tb.ts = ts, tb.smap = smap;
+	for (const rule& x : rs)
+		if (!x.equals_termwise(r))
+			tb.rules.push_back(x);
+	for (size_t n = 0; n < r.size();)
+		if (cqc(rs, r, n, tb)) r.erase(n);
+		else ++n;
+}*/
+
 void tables::get_rules(const raw_prog& p) {
 	get_facts(p);
 	map<term, set<set<term>>> m;
@@ -392,6 +418,14 @@ void tables::get_rules(const raw_prog& p) {
 	}
 	m.clear();
 	for (rule r : rs) rules.push_back(r);
+/*	if (!optimize) for (rule r : rs) rules.push_back(r);
+	else {
+		for (rule r : rs)
+			if (!cqc(rs, r))
+				rules.push_back(r);
+		break_shared();
+		cqc_minimize();
+	}*/
 }
 
 void tables::load_string(lexeme r, const wstring& s) {
@@ -648,7 +682,8 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	return r;
 }
 
-tables::tables() : dict(*new dict_t) {}
+tables::tables(bool optimize) : dict(*new dict_t), optimize(optimize) {}
+
 tables::~tables() {
 	delete &dict;
 	while (!body::s.empty()) {
