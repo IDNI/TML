@@ -28,3 +28,10 @@ function(target_setup target)
 	target_git_definitions(${target})
 	target_build_output(${target})
 endfunction()
+
+# exclude target from all and default
+function(exclude target)
+	set_target_properties(${target} PROPERTIES
+		EXCLUDE_FROM_ALL 1
+		EXCLUDE_FROM_DEFAULT_BUILD 1)
+endfunction()
