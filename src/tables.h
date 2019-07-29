@@ -177,6 +177,8 @@ class tables {
 	ntable get_table(const sig& s);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);
+	void add_prog(std::map<term, std::set<std::set<term>>> m,
+		const strs_t& strs, bool mknums = false);
 	char fwd();
 	std::set<std::pair<ntable, spbdd_handle>> get_front() const;
 	std::map<ntable, std::set<spbdd_handle>> goals;
@@ -185,6 +187,8 @@ public:
 	tables(bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
+	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
+		std::set<term>& r);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;

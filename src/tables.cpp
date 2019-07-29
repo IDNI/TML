@@ -173,7 +173,7 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, /*smap.at(get_sig(r))*/get_table(get_sig(r)), t);
+	return term(r.neg, get_table(get_sig(r)), t);
 }
 
 void tables::out(wostream& os) const {
@@ -513,30 +513,54 @@ ntable tables::get_table(const sig& s) {
 	return tb.s = s, tb.len = len, ts.push_back(tb), smap.emplace(s,nt), nt;
 }
 
+term to_nums(term t) {
+	for (int_t& i : t)  if (i > 0) i = mknum(i);
+	return t;
+}
+
+set<term> to_nums(const set<term>& s) {
+	set<term> ss;
+	for (const term& t : s) ss.insert(to_nums(t));
+	return ss;
+}
+
+set<set<term>> to_nums(const set<set<term>>& s) {
+	set<set<term>> ss;
+	for (const auto& x : s) ss.insert(to_nums(x));
+	return ss;
+}
+
+void to_nums(map<term, set<set<term>>>& m) {
+	map<term, set<set<term>>> mm;
+	for (auto x : m) mm[to_nums(x.first)] = move(to_nums(x.second));
+	m = move(mm);
+}
+
 void tables::add_prog(const raw_prog& p, const strs_t& strs) {
+	add_prog(move(to_terms(p)), strs);
+}
+
+bool tables::run_nums(const map<term, set<set<term>>>& m, set<term>& r) {
+	add_prog(m, {}, true);
+	if (!pfp()) return false;
+	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
+		decompress(ts[tab].t, tab, [&r](const term& t) {r.insert(t);});
+	return true;
+}
+
+void tables::add_prog(map<term, set<set<term>>> m, const strs_t& strs,
+	bool mknums) {
+	if (mknums) to_nums(m);
 	rules.clear(), datalog = true;
-	auto m = to_terms(p);
-	auto f = [this](const raw_term& t) {
-		for (size_t n = 1; n < t.e.size(); ++n)
-			switch (t.e[n].type) {
-				case elem::NUM: nums = max(nums, t.e[n].num+1);
-						break;
-				case elem::CHR: chars = 256; break;
-				case elem::SYM: dict.get_sym(t.e[n].e),
-						syms = max(syms,
-							(int_t)dict.nsyms());
-				default: ;
-			}
-//		get_table(get_sig(t));
-	};
-	for (const raw_rule& r : p.r) {
-		for (const raw_term& t : r.h) f(t);
-		for (const auto& a : r.b) for (const raw_term& t : a) f(t);
+	int_t u = 0;
+	for (auto x : strs) u = max(u, (int_t)x.second.size()+1);
+	for (auto x : m) {
+		for (int_t i : x.first) u = max(u, i);
+		for (auto y : x.second)
+			for (auto z : y)
+				for (int_t i : z) u = max(u, i);
 	}
-	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
-	int_t u = max((int_t)1, max(nums, max(chars, syms))-1);
 	while (u >= (1 << (bits - 2))) add_bit();
-	//get_rules(to_terms(p));
 	get_rules(m);
 	clock_t start, end;
 	output::to(L"debug")<<"load_string: ";
