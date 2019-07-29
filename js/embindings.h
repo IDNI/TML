@@ -1,6 +1,7 @@
 EMSCRIPTEN_BINDINGS(tml) {
 	class_<bdd>("bdd")
 		.class_function("init", &bdd::init)
+		.class_function("gc", &bdd::gc)
 		;
 	class_<driver>("driver")
 		.class_function("init", &driver::init)
