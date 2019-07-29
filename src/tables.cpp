@@ -173,7 +173,7 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, smap.at(get_sig(r)), t);
+	return term(r.neg, /*smap.at(get_sig(r))*/get_table(get_sig(r)), t);
 }
 
 void tables::out(wostream& os) const {
@@ -200,29 +200,29 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f)
 		const size_t args = ts[tab].len;
 		term r(false, tab, ints(args, 0));
 		for (size_t n = 0; n != args; ++n)
-			for (size_t k = 0; k != bits; ++k)
-				if (p[pos(k, n, args)])
+			for (size_t k = 0; k != bits; ++k) if (p[pos(k, n, args)])
 					r[n] |= 1 << k;
 		f(r);
 	})();
 }
 
+raw_term tables::to_raw_term(const term& r) const {
+	raw_term rt;
+	const size_t args = ts[r.tab].len;
+	rt.e.resize(args + 1),
+	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
+	for (size_t n = 1; n != args + 1; ++n) {
+		int_t arg = r[n - 1];
+		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
+		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+	}
+	return	rt.arity = get<ints>(ts[r.tab].s),
+	      	rt.insert_parens(dict.op, dict.cl), rt;
+}
+
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-	lexeme op(dict.get_lexeme(L"(")), cl(dict.get_lexeme(L")"));
-	decompress(x, tab, [op, cl, tab, f, this](const term& r) {
-		raw_term rt;
-		const size_t args = ts[tab].len;
-		rt.e.resize(args+1),
-		rt.e[0]=elem(elem::SYM,dict.get_rel(get<0>(ts[tab].s)));
-		for (size_t n = 1; n != args + 1; ++n) {
-			int_t arg = r[n - 1];
-			if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
-			else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
-			else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
-		}
-		rt.arity = get<ints>(ts[tab].s), rt.insert_parens(op, cl),
-		f(rt);
-	});
+	decompress(x, tab, [f, this](const term& r) { f(to_raw_term(r)); });
 }
 
 template<typename T, typename F>
@@ -312,19 +312,12 @@ body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 	return b;
 }
 
-void tables::get_facts(const raw_prog& p) {
+void tables::get_facts(const map<term, set<set<term>>>& m) {
 	map<ntable, set<spbdd_handle>> f;
-	for (const raw_rule& r : p.r)
-		if (r.type == raw_rule::GOAL) {
-			assert(r.h.size() == 1 && r.b.empty());
-			term x = from_raw_term(r.h[0]);
-			goals[x.tab].insert(from_fact(x));
-		} else if (r.type == raw_rule::NONE)
-			for (const raw_term& x : r.h)
-				if (r.b.empty()) {
-					term h = from_raw_term(x);
-					f[h.tab].insert(from_fact(h));
-				}
+	for (const auto& r : m)
+		if (r.second.empty())
+			(r.first.goal ? goals : f)[r.first.tab].insert(
+				from_fact(r.first));
 	clock_t start, end;
 	measure_time_start();
 	bdd_handles v;
@@ -355,20 +348,28 @@ bool tables::cqc(const set<rule>& rs, rule& r) {
 		else ++n;
 }*/
 
-void tables::get_rules(const raw_prog& p) {
-	get_facts(p);
+map<term, set<set<term>>> tables::to_terms(const raw_prog& p) {
 	map<term, set<set<term>>> m;
 	set<term> s;
+	term t;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
-				term h = from_raw_term(x);
+				t = from_raw_term(x);
 				for (const vector<raw_term>& y : r.b) {
 					for (const raw_term& z : y)
 						s.emplace(from_raw_term(z));
-					align_vars(h, s), m[h].emplace(move(s));
+					align_vars(t, s), m[t].emplace(move(s));
 				}
 			}
+		else for (const raw_term& x : r.h)
+			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
+			m[t] = {};
+	return m;
+}
+
+void tables::get_rules(const map<term, set<set<term>>>& m) {
+	get_facts(m);
 	set<rule> rs;
 	varmap::const_iterator it;
 	set<body*, ptrcmp<body>>::const_iterator bit;
@@ -416,7 +417,6 @@ void tables::get_rules(const raw_prog& p) {
 				r.push_back(aa), alt::s.insert(aa);
 		rs.insert(r);
 	}
-	m.clear();
 	for (rule r : rs) rules.push_back(r);
 /*	if (!optimize) for (rule r : rs) rules.push_back(r);
 	else {
@@ -515,6 +515,7 @@ ntable tables::get_table(const sig& s) {
 
 void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	rules.clear(), datalog = true;
+	auto m = to_terms(p);
 	auto f = [this](const raw_term& t) {
 		for (size_t n = 1; n < t.e.size(); ++n)
 			switch (t.e[n].type) {
@@ -526,7 +527,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 							(int_t)dict.nsyms());
 				default: ;
 			}
-		get_table(get_sig(t));
+//		get_table(get_sig(t));
 	};
 	for (const raw_rule& r : p.r) {
 		for (const raw_term& t : r.h) f(t);
@@ -535,7 +536,8 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
 	int_t u = max((int_t)1, max(nums, max(chars, syms))-1);
 	while (u >= (1 << (bits - 2))) add_bit();
-	get_rules(p);
+	//get_rules(to_terms(p));
+	get_rules(m);
 	clock_t start, end;
 	output::to(L"debug")<<"load_string: ";
 	measure_time_start();

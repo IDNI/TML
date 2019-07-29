@@ -168,10 +168,12 @@ class tables {
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&) const;
+	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
-	void get_rules(const raw_prog& p);
-	void get_facts(const raw_prog& p);
+	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
+	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
+	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
 	ntable get_table(const sig& s);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);

@@ -33,7 +33,7 @@ bool rep(int_t x, int_t y, env& m) {
 }
 
 bool unify(const term& x, const term& y, env& m) {
-	if (x.tab != y.tab) return false;
+	if (x.tab != y.tab || x.neg != y.neg) return false;
 	assert(x.size() == y.size());
 	for (size_t n = 0; n != x.size(); ++n)
 		if (!rep(x[n], y[n], m)) return false;
