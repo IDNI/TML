@@ -16,10 +16,12 @@ include(tml-common)
 
 set(TML_HEADERS
 	TML.h
+	ast.h
 	bdd.h
 	defs.h
 	dict.h
 	driver.h
+	err.h
 	input.h
 	options.h
 	output.h

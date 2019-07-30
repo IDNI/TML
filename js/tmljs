@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const tml = require('../build-Release/tml');
+const tml = require('./tml.js');
 
 const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);
-
-console.log(`running: '${program}' with options: '${args.join(' ')}'`);
 
 tml.onRuntimeInitialized = _ => {
 	// load stuff from tml
