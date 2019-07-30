@@ -23,6 +23,8 @@ class tables;
 class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
+typedef std::map<int_t, size_t> varmap;
+typedef bdd_handles level;
 
 std::map<int_t, int_t> cqc(term h1, std::vector<term> b1, term h2,
 	std::vector<term> b2);
@@ -54,9 +56,10 @@ struct alt : public std::vector<body*> {
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
-//	std::vector<std::pair<uints, bools>> order;
 	bools ex;
 	uints perm;
+	varmap vm;
+	std::map<size_t, int_t> inv;
 	static std::set<alt*, ptrcmp<alt>> s;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
@@ -68,7 +71,7 @@ struct alt : public std::vector<body*> {
 struct rule : public std::vector<alt*> {
 	bool neg;
 	ntable tab;
-	spbdd_handle eq, rlast = bdd_handle::F;
+	spbdd_handle eq, rlast = bdd_handle::F, h;
 	size_t len;
 	bdd_handles last;
 	term t;
@@ -96,7 +99,6 @@ struct table {
 };
 
 class tables {
-	typedef std::map<int_t, size_t> varmap;
 	typedef std::function<void(const raw_term&)> rt_printer;
 	typedef std::function<void(const term&)> cb_decompress;
 
@@ -167,7 +169,12 @@ class tables {
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
-	void decompress(spbdd_handle x, ntable tab, const cb_decompress&) const;
+	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
+		size_t len = 0) const;
+	std::set<term> decompress();
+	std::map<int_t, int_t> varbdd_to_subs(const alt* a, cr_spbdd_handle v)
+		const;
+	void bwd_facts(const bdd_handles& v, std::map<term, std::set<term>>& m);
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -180,7 +187,7 @@ class tables {
 	void add_prog(std::map<term, std::set<std::set<term>>> m,
 		const strs_t& strs, bool mknums = false);
 	char fwd();
-	std::set<std::pair<ntable, spbdd_handle>> get_front() const;
+	level get_front() const;
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
@@ -189,7 +196,7 @@ public:
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
 		std::set<term>& r);
-	bool pfp();
+	bool pfp(std::vector<level>* v = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 };

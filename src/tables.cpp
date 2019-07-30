@@ -138,6 +138,13 @@ spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 	return ememo.emplace(x, r), r;
 }
 
+/*spbdd_handle tables::from_ground(const term& t) {
+	spbdd_handle r = bdd_handle::T;
+	for (size_t n = 0, args = t.size(); n != args; ++n)
+		r = r && from_sym(n, args, t[n]);
+	return r;
+}*/
+
 spbdd_handle tables::from_fact(const term& t) {
 	spbdd_handle r = bdd_handle::T;
 	static varmap vs;
@@ -192,9 +199,10 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 	});
 }
 
-void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f)
-	const {
-	allsat_cb(x&&ts[tab].t, ts[tab].len * bits,
+void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
+	size_t len) const {
+	if (!len) len = ts[tab].len;
+	allsat_cb(x&&ts[tab].t, len * bits,
 		[tab, &f, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		const size_t args = ts[tab].len;
@@ -204,6 +212,13 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f)
 					r[n] |= 1 << k;
 		f(r);
 	})();
+}
+
+set<term> tables::decompress() {
+	set<term> r;
+	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
+		decompress(ts[tab].t, tab, [&r](const term& t) {r.insert(t);});
+	return r;
 }
 
 raw_term tables::to_raw_term(const term& r) const {
@@ -265,7 +280,7 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 }
 
 template<typename T>
-tables::varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
+varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 	varmap m;
 	varslen = h.size();
 	for (size_t n = 0; n != h.size(); ++n)
@@ -296,7 +311,16 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	return bdd_and_many(v);
 }
 
-body tables::get_body(const term& t,const varmap& vm,size_t len) const {
+map<size_t, int_t> varmap_inv(const varmap& vm) {
+	map<size_t, int_t> inv;
+	for (auto x : vm) {
+		assert(!has(inv, x.second));
+		inv.emplace(x.second, x.first);
+	}
+	return inv;
+}
+
+body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
 	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
 	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
@@ -395,10 +419,11 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
-			varmap vm = get_varmap(t, al, a.varslen);
+			a.vm = get_varmap(t, al, a.varslen),
+			a.inv = varmap_inv(a.vm);
 			for (const term& t : al)
-				b.insert({get_body(t, vm, a.varslen), t});
-			a.rng = get_alt_range(t, al, vm, a.varslen);
+				b.insert({get_body(t, a.vm, a.varslen), t});
+			a.rng = get_alt_range(t, al, a.vm, a.varslen);
 			for (auto x : b) {
 				a.t.push_back(x.second);
 				if ((bit=body::s.find(&x.first))!=body::s.end())
@@ -470,38 +495,6 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
-void tables::get_alt_ex(alt& a, const term& h) const {
-	varmap vm = get_varmap(h, a.t, a.varslen);
-	set<int_t> hvars;
-	set<size_t> bodies;
-	map<int_t, set<size_t>> m;
-	for (int_t i : h) if (i < 0) hvars.insert(i);
-	DBG(assert(a.size() == a.t.size());)
-	for (size_t n = 0; n != a.size(); ++n) {
-		for (int_t i : a.t[n])
-			if (i < 0 && !has(hvars, i))
-				m[i].emplace(n);
-		bodies.insert(n);
-	}
-/*	size_t sz = (size_t)-1, v = 0;
-	for (auto x : m)
-		if (x.second.size() < sz)
-			sz = x.second.size(), v = x.first;*/
-	while (!m.empty()) {
-		auto it = m.begin();
-		bools ex = bools(a.varslen * bits, false);
-		get_var_ex(vm.at(it->first), a.varslen, ex);
-		uints s;
-		for (auto x : it->second)
-			if (has(bodies, x)) s.push_back(x), bodies.erase(x);
-//		a.order.push_back({s, ex});
-		for (auto x : m)
-			if (x.first!=it->first&&subset(x.second, it->second))
-				m.erase(x.first);
-		m.erase(it);
-	}
-}
-
 ntable tables::get_table(const sig& s) {
 	auto it = smap.find(s);
 	if (it != smap.end()) return it->second;
@@ -518,9 +511,20 @@ term to_nums(term t) {
 	return t;
 }
 
+term from_nums(term t) {
+	for (int_t& i : t)  if (i > 0) i >>= 2;
+	return t;
+}
+
 set<term> to_nums(const set<term>& s) {
 	set<term> ss;
 	for (const term& t : s) ss.insert(to_nums(t));
+	return ss;
+}
+
+set<term> from_nums(const set<term>& s) {
+	set<term> ss;
+	for (const term& t : s) ss.insert(from_nums(t));
 	return ss;
 }
 
@@ -542,10 +546,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 
 bool tables::run_nums(const map<term, set<set<term>>>& m, set<term>& r) {
 	add_prog(m, {}, true);
-	if (!pfp()) return false;
-	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
-		decompress(ts[tab].t, tab, [&r](const term& t) {r.insert(t);});
-	return true;
+	return pfp() && (r = decompress(), true);
 }
 
 void tables::add_prog(map<term, set<set<term>>> m, const strs_t& strs,
@@ -679,20 +680,23 @@ char tables::fwd() {
 	return b;*/
 }
 
-set<pair<ntable, spbdd_handle>> tables::get_front() const {
-	set<pair<ntable, spbdd_handle>> r;
-	for (ntable tab = 0; tab != (ntable)ts.size(); ++tab)
-		r.insert({tab, ts[tab].t});
+level tables::get_front() const {
+	level r;
+	r.resize(ts.size());
+	for (ntable n = 0; n != (ntable)ts.size(); ++n) r[n] = ts[n].t;
 	return r;
 }
 
-bool tables::pfp() {
+bool tables::pfp(vector<level>* v) {
 	size_t step = 0;
-	char b;
-	for (set<set<pair<ntable, spbdd_handle>>> s; (b = fwd()), true;) {
+	set<level> s;
+	level l;
+	for (;;) {
 		output::to(L"info") << "step: " << step++ << endl;
-		if (!b/* == 1 || b == 2*/) return true;
-		if (!datalog && !s.emplace(get_front()).second) return false;
+		if (!fwd()) return true;
+		l = get_front();
+		if (!datalog && !s.emplace(l).second) return false;
+		if (v) v->push_back(move(l));
 	}
 	throw 0;
 }
