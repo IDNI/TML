@@ -25,23 +25,39 @@ map<int_t, int_t> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 	return r;
 }
 
-struct proof_dag {
-	struct vertex {
-		size_t step;
-		term t;
-		vertex(const term& t, size_t step) : step(step), t(t) {}
-		bool operator<(const vertex& v) const {
-			if (step != v.step) return step < v.step;
-			return t < v.t;
-		}
-	};
-	map<vertex, set<vertex>> E;
-	void add(const term& h, const vector<term>& b, size_t step) {
-		set<vertex> s;
-		for (const term& t : b) s.emplace(t, step - 1);
-		E.emplace(vertex(h, step), move(s));
-	}
-};
+void subs_to_rule(const rule& r, const alt* a, term& h, vector<term>& b,
+	const map<int, int>& e) {
+	h = r.t, b = a->t;
+	for (int_t& i : h) if (i < 0) i = e.at(i);
+	for (term& t : b) for (int_t& i : t) if (i < 0) i = e.at(i);
+}
+
+bool proof_dag::vertex::operator<(const vertex& v) const {
+	if (step != v.step) return step < v.step;
+	return t < v.t;
+}
+
+void proof_dag::add(const term& h, const vector<term>& b, size_t step) {
+	set<vertex> s;
+	for (const term& t : b) s.emplace(t, step - 1);
+	E.emplace(vertex(h, step), move(s));
+}
+
+proof_dag tables::get_proof() const {
+	size_t n = levels.size();
+	proof_dag pd;
+	map<size_t, spbdd_handle>::const_iterator it;
+	term h;
+	vector<term> b;
+	while (--n)
+		for (const rule& r : rules)
+			for (const alt* a : r)
+				if ((it=a->levels.find(n)) != a->levels.end())
+					subs_to_rule(r, a, h, b,
+						varbdd_to_subs(a, it->second)),
+					pd.add(h, b, n);
+	return pd;
+}
 
 /*void tables::bwd_facts(const vector<level>& v, proof_dag& p) {
 	size_t l = v.size();

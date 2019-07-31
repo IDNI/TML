@@ -589,10 +589,9 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
+	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
-	return b.rlast;
 //	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
 //	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
 //	return b.rlast;
@@ -624,11 +623,14 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		} else v1.push_back(x);
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) return a.rlast;// { v.push_back(a.rlast); return; }
-	a.last = move(v1);
+	if (!bproof)
+		return	a.rlast =
+			bdd_and_many_ex_perm(a.last = move(v1), a.ex, a.perm);
+	a.levels.emplace(nstep, x = bdd_and_many(v1));
 //	if ((x = bdd_and_many_ex(a.last, a.ex)) != bdd_handle::F)
 //		v.push_back(a.rlast = x ^ a.perm);
 //	bdd_handles v;
-	return a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
+	return a.rlast = bdd_permute_ex(x, a.ex, a.perm);
 //	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != bdd_handle::F)
 //		v.push_back(a.rlast = x);
 //	return x;
@@ -687,16 +689,15 @@ level tables::get_front() const {
 	return r;
 }
 
-bool tables::pfp(vector<level>* v) {
-	size_t step = 0;
+bool tables::pfp() {
 	set<level> s;
 	level l;
 	for (;;) {
-		output::to(L"info") << "step: " << step++ << endl;
+		output::to(L"info") << "step: " << nstep++ << endl;
 		if (!fwd()) return true;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
-		if (v) v->push_back(move(l));
+		if (bproof) levels.push_back(move(l));
 	}
 	throw 0;
 }
@@ -712,7 +713,8 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	return r;
 }
 
-tables::tables(bool optimize) : dict(*new dict_t), optimize(optimize) {}
+tables::tables(bool bproof, bool optimize) :
+	dict(*new dict_t), bproof(bproof), optimize(optimize) {}
 
 tables::~tables() {
 	delete &dict;

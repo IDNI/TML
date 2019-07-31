@@ -60,6 +60,7 @@ struct alt : public std::vector<body*> {
 	uints perm;
 	varmap vm;
 	std::map<size_t, int_t> inv;
+	std::map<size_t, spbdd_handle> levels;
 	static std::set<alt*, ptrcmp<alt>> s;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
@@ -98,13 +99,26 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
+struct proof_dag {
+	struct vertex {
+		size_t step;
+		term t;
+		vertex(const term& t, size_t step) : step(step), t(t) {}
+		bool operator<(const vertex& v) const;
+	};
+	std::map<vertex, std::set<vertex>> E;
+	void add(const term& h, const std::vector<term>& b, size_t step);
+};
+
 class tables {
 	typedef std::function<void(const raw_term&)> rt_printer;
 	typedef std::function<void(const term&)> cb_decompress;
 
+	size_t nstep = 0;
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
+	std::vector<level> levels;
 	alt get_alt(const std::vector<raw_term>&);
 	rule get_rule(const raw_rule&);
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
@@ -115,6 +129,7 @@ class tables {
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
+	bool bproof;
 	bool datalog, optimize;
 
 	size_t max_args = 0;
@@ -174,7 +189,7 @@ class tables {
 	std::set<term> decompress();
 	std::map<int_t, int_t> varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 		const;
-	void bwd_facts(const bdd_handles& v, std::map<term, std::set<term>>& m);
+	proof_dag get_proof() const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -191,12 +206,12 @@ class tables {
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
-	tables(bool optimize = true);
+	tables(bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
 		std::set<term>& r);
-	bool pfp(std::vector<level>* v = 0);
+	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 };
