@@ -106,7 +106,8 @@ struct proof_dag {
 		vertex(const term& t, size_t step) : step(step), t(t) {}
 		bool operator<(const vertex& v) const;
 	};
-	std::map<vertex, std::set<vertex>> E;
+	std::map<vertex, std::set<std::set<vertex>>> E;
+	std::map<size_t, std::set<vertex>> L;
 	void add(const term& h, const std::vector<term>& b, size_t step);
 };
 
@@ -190,6 +191,7 @@ class tables {
 	std::map<int_t, int_t> varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 		const;
 	proof_dag get_proof() const;
+	void print_proof(std::wostream& os, const proof_dag& pd) const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -206,7 +208,7 @@ class tables {
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
-	tables(bool bproof = false, bool optimize = true);
+	tables(bool bproof = true, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,

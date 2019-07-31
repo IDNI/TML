@@ -203,12 +203,12 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len) const {
 	if (!len) len = ts[tab].len;
 	allsat_cb(x&&ts[tab].t, len * bits,
-		[tab, &f, this](const bools& p, int_t DBG(y)) {
+		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		const size_t args = ts[tab].len;
-		term r(false, tab, ints(args, 0));
-		for (size_t n = 0; n != args; ++n)
-			for (size_t k = 0; k != bits; ++k) if (p[pos(k, n, args)])
+		term r(false, tab, ints(len, 0));
+		for (size_t n = 0; n != len; ++n)
+			for (size_t k = 0; k != bits; ++k)
+				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
 		f(r);
 	})();
@@ -694,7 +694,7 @@ bool tables::pfp() {
 	level l;
 	for (;;) {
 		output::to(L"info") << "step: " << nstep++ << endl;
-		if (!fwd()) return true;
+		if (!fwd()) return get_proof(), true;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));

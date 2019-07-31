@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "tables.h"
+#include "input.h"
 
 using namespace std;
 
@@ -40,8 +41,25 @@ bool proof_dag::vertex::operator<(const vertex& v) const {
 void proof_dag::add(const term& h, const vector<term>& b, size_t step) {
 	set<vertex> s;
 	for (const term& t : b) s.emplace(t, step - 1);
-	E.emplace(vertex(h, step), move(s));
+	vertex v = vertex(h, step);
+	E[v].insert(move(s)), L[step].insert(v);
 }
+
+void tables::print_proof(std::wostream& os, const proof_dag& pd) const {
+	for (const auto& x : pd.L) {
+		for (const proof_dag::vertex& v : x.second)
+			for (const set<proof_dag::vertex>& s : pd.E.at(v)) {
+				os << to_raw_term(v.t) << L" :- ";
+				for (const proof_dag::vertex& t : s)
+					os << to_raw_term(t.t) << ' ';
+				os << endl;
+			}
+		}
+}
+
+/*std::wostream operator<<(std::wostream& os, const proof_dag::vertex& v) {
+	return os << v.step << to_raw_term(v.t);
+}*/
 
 proof_dag tables::get_proof() const {
 	size_t n = levels.size();
@@ -49,13 +67,16 @@ proof_dag tables::get_proof() const {
 	map<size_t, spbdd_handle>::const_iterator it;
 	term h;
 	vector<term> b;
+	map<int_t, int_t> e;
 	while (--n)
 		for (const rule& r : rules)
 			for (const alt* a : r)
 				if ((it=a->levels.find(n)) != a->levels.end())
-					subs_to_rule(r, a, h, b,
-						varbdd_to_subs(a, it->second)),
-					pd.add(h, b, n);
+					if (!(e = varbdd_to_subs(a, it->second))
+						.empty())
+						subs_to_rule(r, a, h, b, e),
+						pd.add(h, b, n);
+	print_proof(wcerr, pd);
 	return pd;
 }
 
