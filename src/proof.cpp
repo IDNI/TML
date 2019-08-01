@@ -15,13 +15,15 @@
 
 using namespace std;
 
-map<int_t, int_t> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
+vector<map<int_t, int_t>> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 	const {
-	map<int_t, int_t> r;
+	vector<map<int_t, int_t>> r;
 	decompress(v, 0, [this, a, &r](const term& x) {
+		map<int_t, int_t> m;
 		for (auto z : a->inv)
-			if (!r.emplace(z.second, x[z.first]).second)
+			if (!m.emplace(z.second, x[z.first]).second)
 				throw 0;
+		r.emplace_back(move(m));
 	}, a->varslen);
 	return r;
 }
@@ -72,8 +74,8 @@ proof_dag tables::get_proof() const {
 		for (const rule& r : rules)
 			for (const alt* a : r)
 				if ((it=a->levels.find(n)) != a->levels.end())
-					if (!(e = varbdd_to_subs(a, it->second))
-						.empty())
+					for (	const map<int_t, int_t>& e :
+						varbdd_to_subs(a, it->second))
 						subs_to_rule(r, a, h, b, e),
 						pd.add(h, b, n);
 	print_proof(wcerr, pd);

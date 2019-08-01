@@ -202,7 +202,7 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len) const {
 	if (!len) len = ts[tab].len;
-	allsat_cb(x&&ts[tab].t, len * bits,
+	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		term r(false, tab, ints(len, 0));
@@ -237,7 +237,9 @@ raw_term tables::to_raw_term(const term& r) const {
 }
 
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-	decompress(x, tab, [f, this](const term& r) { f(to_raw_term(r)); });
+	decompress(x&&ts[tab].t, tab, [f, this](const term& r) {
+		f(to_raw_term(r));
+	});
 }
 
 template<typename T, typename F>
