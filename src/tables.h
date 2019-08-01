@@ -208,7 +208,7 @@ class tables {
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
-	tables(bool bproof = true, bool optimize = true);
+	tables(bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
@@ -216,6 +216,7 @@ public:
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
+	void set_bproof(bool v) { bproof = v; }
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
