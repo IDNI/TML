@@ -216,7 +216,7 @@ public:
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
-	void set_bproof(bool v) { bproof = v; }
+	void set_proof(bool v) { bproof = v; }
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);

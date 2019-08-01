@@ -261,7 +261,7 @@ driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	opts.parse(argc, argv);
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
-	if (opts.enabled(L"bproof")) tbl.set_bproof(true);
+	if (opts.enabled(L"proof")) tbl.set_proof(true);
 	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
