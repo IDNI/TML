@@ -51,9 +51,11 @@ void tables::print_proof(std::wostream& os, const proof_dag& pd) const {
 	for (const auto& x : pd.L) {
 		for (const proof_dag::vertex& v : x.second)
 			for (const set<proof_dag::vertex>& s : pd.E.at(v)) {
-				os << to_raw_term(v.t) << L" :- ";
+				os	<< L'[' << v.step << L']' <<
+					to_raw_term(v.t) << L" :- ";
 				for (const proof_dag::vertex& t : s)
-					os << to_raw_term(t.t) << ' ';
+					os	<< L'[' << t.step << L']' <<
+						to_raw_term(t.t) << ' ';
 				os << endl;
 			}
 		}
