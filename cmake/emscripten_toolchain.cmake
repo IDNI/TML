@@ -1,4 +1,5 @@
-if (NOT DEFINED EMSCRIPTEN_DIR) # FIXME (autodetect)
+set(EMSCRIPTEN_DIR $ENV{EMSDK}/fastcomp/emscripten)
+if (NOT DEFINED EMSCRIPTEN_DIR)
 	set(EMSCRIPTEN_DIR "/usr/lib/emscripten")
 endif()
 set(EMSCRIPTEN_CMAKE "${EMSCRIPTEN_DIR}/cmake/Modules/Platform/Emscripten.cmake")
