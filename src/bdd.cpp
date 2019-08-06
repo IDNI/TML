@@ -242,8 +242,8 @@ int_t bdd::and_stack_ints(const int_t x, const int_t y) {
 		case 2: //StackState::Right:
 		{
 			stackinfo.rightval = value;
-			ite_memo m = { x, y, F };
 			int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
+			ite_memo m = { x, y, F };
 			C.emplace(m, r);
 			value = r;
 			break;

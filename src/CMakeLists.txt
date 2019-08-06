@@ -31,9 +31,11 @@ set(TML_SOURCES
 	transform.cpp
 )
 
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 set(TML_COMPILE_OPTIONS
 	"$<$<CONFIG:DEBUG>:-O0;-ggdb3>"
-	"$<$<CONFIG:RELEASE>:-O3;-flto>"
+	"$<$<CONFIG:RELEASE>:-O3;-flto;-fno-threadsafe-statics>"
 )
 
 
