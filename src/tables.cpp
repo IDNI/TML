@@ -155,6 +155,9 @@ spbdd_handle tables::from_fact(const term& t) {
 }
 
 sig tables::get_sig(const raw_term&t) {return{dict.get_rel(t.e[0].e),t.arity};}
+sig tables::get_sig(const lexeme& rel, const ints& arity) {
+	return { dict.get_rel(rel), arity };
+}
 
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
@@ -482,8 +485,10 @@ ntable tables::get_table(const sig& s) {
 void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	rules.clear(), datalog = true;
 	auto f = [this](const raw_term& t) {
+		bool isneq = false;
 		for (size_t n = 1; n < t.e.size(); ++n)
 			switch (t.e[n].type) {
+				case elem::NEQ: isneq = true; break;
 				case elem::NUM: nums = max(nums, t.e[n].num+1);
 						break;
 				case elem::CHR: chars = 256; break;
@@ -492,7 +497,11 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 							(int_t)dict.nsyms());
 				default: ;
 			}
-		get_table(get_sig(t));
+		// neq: should we treat neq as a rel? what are side effects?
+		if (isneq)
+			get_table(get_sig(t.e[1].e, t.arity));
+		else
+			get_table(get_sig(t));
 	};
 	for (const raw_rule& r : p.r) {
 		for (const raw_term& t : r.h) f(t);

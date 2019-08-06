@@ -155,6 +155,8 @@ class tables {
 	void range_clear_memo() { range_memo.clear(); }
 
 	sig get_sig(const raw_term& t);
+	sig get_sig(const lexeme& rel, const ints& arity);
+
 	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	template<typename T>

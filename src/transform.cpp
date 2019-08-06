@@ -624,7 +624,8 @@ void driver::transform_bin(raw_prog& p) {
 			r.h[0].e.emplace_back(elem::SYM, get_new_rel());
 		}
 	m1.clear();*/
-	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
+	//DBG(wcout << "bin before:" << endl << f << endl;);
+	DBG(wcout << endl << f << endl;);
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),
