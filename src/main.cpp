@@ -26,11 +26,11 @@ int main(int argc, char** argv) {
 	bdd::init();
 	driver::init();
 	if (is_stdin_readable())
-		driver d(argc, argv, file_read_text(stdin));
+		driver d(file_read_text(stdin), options(argc, argv));
 	else {
 		strings args;
 		if (argc == 1) args = { "-v", "-h" };
-		driver d(argc, argv, L"", options(args));
+		driver d(L"", options(args));
 	}
 //	print_memos_len();
 	return 0;
@@ -40,7 +40,7 @@ bool is_stdin_readable() {
 #ifdef __unix__
 	long n = 0;
 	return ioctl(0, FIONREAD, &n) == 0 && n > 0;
-#else
+#else // WIN TODO
 	return true;
 #endif
 }
