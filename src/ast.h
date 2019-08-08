@@ -18,7 +18,7 @@
 struct ast {
 	// neq: is it ok to just drop NEQ in, is any order / value hardcoded anywhere?
 	enum type {
-		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, NEQ, REL, NEG, POS,
+		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, REL, NEG, POS,
 		TERM, HEAD, BODY, DOT, DELIM, NOT, AND, OR, GOAL, TREE, FACT,
 		RULE, PROD, DIR, DIRNAME, OPENC, CLOSEC, PROG, PROGS
 	} t;

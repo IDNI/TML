@@ -30,12 +30,14 @@ template<typename T> struct ptrcmp {
 
 struct term : public ints {
 	bool neg;
+	bool iseq;
 	ntable tab;
 	term() {}
-	term(bool neg, ntable tab, const ints& args) :
-		ints(args), neg(neg), tab(tab) {}
+	term(bool neg, bool eq, ntable tab, const ints& args) :
+		ints(args), neg(neg), tab(tab), iseq(eq) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
+		if (iseq != t.iseq) return iseq < t.iseq;
 		if (tab != t.tab) return tab < t.tab;
 		return (const ints&)*this < t;
 	}
@@ -43,16 +45,17 @@ struct term : public ints {
 };
 
 struct body {
-	bool neg, ext = false;
+	bool neg, iseq = false, ext = false;
 	struct alt *a = 0;
 	ntable tab;
 	bools ex;
 	uints perm;
-	spbdd_handle q, tlast, rlast;
+	spbdd_handle q, tlast, rlast, qeq;
 	static std::set<body*, ptrcmp<body>> s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
+		if (iseq != t.iseq) return iseq < t.iseq;
 		if (ext != t.ext) return ext;
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;

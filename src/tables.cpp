@@ -162,7 +162,9 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	for (size_t n = 1; n < r.e.size(); ++n)
+	// D: I'm guessing that n = 1 is not a bug, but we want to skip the first symbol?
+	// (which is always there, till now, EQ/NEQ doesn't have that structure (VAR is first)
+	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -177,7 +179,10 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, smap.at(get_sig(r)), t);
+	// neq:
+	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	return term(r.neg, r.iseq, smap.at(sg), t);
+	//return term(r.neg, r.iseq, smap.at(get_sig(r)), t);
 }
 
 void tables::out(wostream& os) const {
@@ -202,7 +207,7 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 		[tab, op, cl, &f, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		const size_t args = ts[tab].len;
-		term r(false, tab, ints(args, 0));
+		term r(false, false, tab, ints(args, 0));
 		for (size_t n = 0; n != args; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, args)])
@@ -294,8 +299,9 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 
 body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 	body b;
-	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
-	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
+	// D: // neq: body is created for each right-hand term 
+	b.neg = t.neg, b.iseq = t.iseq, b.tab = t.tab, b.perm = get_perm(t, vm, len),
+	b.q = bdd_handle::T, b.qeq = bdd_handle::T, b.ex = bools(t.size() * bits, false);
 	varmap m;
 	auto it = m.end();
 	for (size_t n = 0; n != t.size(); ++n)
@@ -305,6 +311,13 @@ body tables::get_body(const term& t,const varmap& vm,size_t len) const {
 		else if (m.end() == (it = m.find(t[n]))) m.emplace(t[n], n);
 		else	b.q = b.q && from_sym_eq(n, it->second, t.size()),
 			get_var_ex(n, t.size(), b.ex);
+	// neq: if iseq (NEQ or EQ), create a new b.qeq to compare 1' vs 3'? make any sense?
+	if (b.iseq) {
+		// 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
+		if (t.size() == 2) {
+			b.qeq = b.qeq && from_sym_eq(0, 1, t.size());
+		}
+	}
 	return b;
 }
 
@@ -367,11 +380,13 @@ void tables::get_rules(const raw_prog& p) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
+		// D: alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
 			varmap vm = get_varmap(t, al, a.varslen);
+			// D: t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al)
 				b.insert({get_body(t, vm, a.varslen), t});
 			a.rng = get_alt_range(t, al, vm, a.varslen);
@@ -485,10 +500,8 @@ ntable tables::get_table(const sig& s) {
 void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	rules.clear(), datalog = true;
 	auto f = [this](const raw_term& t) {
-		bool isneq = false;
 		for (size_t n = 1; n < t.e.size(); ++n)
 			switch (t.e[n].type) {
-				case elem::NEQ: isneq = true; break;
 				case elem::NUM: nums = max(nums, t.e[n].num+1);
 						break;
 				case elem::CHR: chars = 256; break;
@@ -498,7 +511,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 				default: ;
 			}
 		// neq: should we treat neq as a rel? what are side effects?
-		if (isneq)
+		if (t.iseq)
 			get_table(get_sig(t.e[1].e, t.arity));
 		else
 			get_table(get_sig(t));
@@ -537,8 +550,26 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
-		(b.q, ts[b.tab].t, b.ex, b.perm);
+	
+	// neq:
+	if (b.iseq && b.neg) {
+		// NEQ
+		// D: neq: not sure how to make this, dimensions are different, and what is that we
+		// need to compare here, negation is easier (unary, prev/new val), maybe this is not
+		// the right place?
+		// D: moved eq compare when term is created, b.qeq is set then
+		// D: why is this seemingly 'inverted' I have no idea? but this works
+		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
+		b.rlast = bdd_and_not_ex_perm(b.q, b.rlast, b.ex, b.perm);
+	}
+	else if (b.iseq) {
+		// EQ
+		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
+		b.rlast = bdd_and_ex_perm(b.q, b.rlast, b.ex, b.perm);
+	}
+	else
+		b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
+			(b.q, ts[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
 	return b.rlast;
 //	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
