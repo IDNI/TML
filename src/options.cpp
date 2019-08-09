@@ -53,11 +53,17 @@ void options::parse(strings sargs, bool internal) {
 
 void options::parse(wstrings wargs, bool internal) {
 	wstring v;
+	bool skip_next = false;
 	for (size_t i = 0; i < wargs.size(); ++i) {
 		if (!internal) args.push_back(wargs[i]);
-		v = (i < wargs.size()-1) ? try_read_value(wargs[i+1]) : L"";
-		parse_option(wargs[i], v);
-		if (v != L"") i++;
+		if (skip_next) skip_next = false;
+		else {
+			v = i < wargs.size() - 1
+				? try_read_value(wargs[i+1])
+				: L"";
+			parse_option(wargs[i], v);
+			skip_next = v != L"";
+		}
 	}
 }
 
