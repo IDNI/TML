@@ -20,7 +20,7 @@ tml.onRuntimeInitialized = _ => {
 
 	// create options object and parse args
 	const o = new options();
-	o.parse(arg_strings);
+	o.parse(arg_strings, false);
 
 	// console.log('args:', o.to_string());
 
