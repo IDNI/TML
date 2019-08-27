@@ -338,8 +338,8 @@ int_t bdd::and_stack(const int_t x, const int_t y) {
 			case StackState::Right:
 			{
 				stackinfo.rightval = value;
-				ite_memo m = { x, y, F };
 				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
+				ite_memo m = { x, y, F };
 				C.emplace(m, r);
 				value = r;
 				break;
@@ -1148,6 +1148,16 @@ spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 //	DBG(assert(bdd_nvars(x) < m.size());)
 //	DBG(assert(bdd_nvars(y) < m.size());)
 	return bdd_handle::get(bdd::bdd_and_ex_perm(x->b, -y->b, b, m));
+}
+
+spbdd_handle bdd_not_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
+	const bools& b) {
+	return bdd_handle::get(bdd::bdd_and_ex(-x->b, -y->b, b));
+}
+
+spbdd_handle bdd_not_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+	const bools& b, const uints& m) {
+	return bdd_handle::get(bdd::bdd_and_ex_perm(-x->b, -y->b, b, m));
 }
 
 spbdd_handle from_bit(uint_t b, bool v) {

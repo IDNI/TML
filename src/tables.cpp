@@ -180,6 +180,9 @@ term tables::from_raw_term(const raw_term& r) {
 			default: ;
 		}
 	// neq:
+	if (r.iseq) {
+		auto ieq = r.iseq;
+	}
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	return term(r.neg, r.iseq, smap.at(sg), t);
 	//return term(r.neg, r.iseq, smap.at(get_sig(r)), t);
@@ -552,31 +555,48 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	b.tlast = ts[b.tab].t;
 	
 	// neq:
-	if (b.iseq && b.neg) {
-		// NEQ
-		// D: neq: not sure how to make this, dimensions are different, and what is that we
-		// need to compare here, negation is easier (unary, prev/new val), maybe this is not
-		// the right place?
-		// D: moved eq compare when term is created, b.qeq is set then
-		// D: why is this seemingly 'inverted' I have no idea? but this works
-		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-		b.rlast = bdd_and_not_ex_perm(b.q, b.rlast, b.ex, b.perm);
+	//bdd_handle::get(bdd::bdd_and_ex_perm(b.q->b, ts[b.tab].t->b, b.ex, b.perm));
+	//sbdd_and_ex_perm(b.ex, b.perm, CXP[{b.ex, b.perm}], memos_perm_ex[{b.perm, b.ex}])
+	//	(b.q->b, ts[b.tab].t->b);
+	// NEQ
+	// D: neq: not sure how to make this, dimensions are different, and what is that we
+	// need to compare here, negation is easier (unary, prev/new val), maybe this is not
+	// the right place?
+	//auto cc = from_sym_eq(abs(b.q->b), abs(ts[b.tab].t->b), 1);
+	// D: moved eq compare when term is created, b.qeq is set then
+
+	// EQ / NEQ
+	if (b.iseq) {
+		// we can use b.q to store b.qeq, still to improve (as there's nothing else going on?)
+		if (ts[b.tab].t == bdd_handle::F)
+			b.rlast = b.qeq;
+		else {
+			// this should work
+			b.rlast = bdd_not_and_not_ex(b.qeq, ts[b.tab].t, b.ex); // , b.perm));
+			// maybe it won't work when/if ts[b.tab].t != bdd_handle::F, we need to invert 
+			//b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
+		}
+
+		if (b.neg) // NEQ
+			return (b.rlast = bdd_and_not_ex_perm(bdd_handle::T, b.rlast, b.ex, b.perm));
+		else // EQ
+			return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.rlast, b.ex, b.perm));
+
+		//if (ts[b.tab].t == bdd_handle::F)
+		//	b.rlast = b.qeq;
+		//else
+		//	b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
+		//// D: why is this seemingly 'inverted' I have no idea? but this works
+
+		//if (b.neg) // NEQ
+		//	return (b.rlast = bdd_and_not_ex_perm(b.q, b.rlast, b.ex, b.perm));
+		//else // EQ
+		//	return (b.rlast = bdd_and_ex_perm(b.q, b.rlast, b.ex, b.perm));
 	}
-	else if (b.iseq) {
-		// EQ
-		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-		b.rlast = bdd_and_ex_perm(b.q, b.rlast, b.ex, b.perm);
-	}
-	else
-		b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
-			(b.q, ts[b.tab].t, b.ex, b.perm);
-//	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
+
+	b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
+		(b.q, ts[b.tab].t, b.ex, b.perm);
 	return b.rlast;
-//	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
-//	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
-//	return b.rlast;
-//	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
-//			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
 
 auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {

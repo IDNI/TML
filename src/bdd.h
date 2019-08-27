@@ -86,6 +86,9 @@ spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b, const uints& m);
 spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b, const uints& m);
+spbdd_handle bdd_not_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
+spbdd_handle bdd_not_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+	const bools& b, const uints& m);
 spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
@@ -175,6 +178,9 @@ class bdd {
 		const bools& b, const uints& m);
 	friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x,
 		cr_spbdd_handle, const bools& b, const uints& m);
+	friend spbdd_handle bdd_not_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
+	friend spbdd_handle bdd_not_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+		const bools& b, const uints& m);
 	friend spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b,
 		const uints&);
 	friend spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
