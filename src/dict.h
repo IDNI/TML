@@ -19,6 +19,8 @@ class dict_t {
 	std::vector<lexeme> syms, rels;
 	std::set<lexeme, lexcmp> strs_extra;
 public:
+	dict_t();
+	const lexeme op, cl;
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	lexeme get_sym(int_t t) const;
 	int_t get_var(const lexeme& l);
@@ -30,5 +32,5 @@ public:
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
-	~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
+	~dict_t();
 };

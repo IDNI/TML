@@ -14,6 +14,10 @@
 #include "err.h"
 using namespace std;
 
+dict_t::dict_t() : op(get_lexeme(L"(")), cl(get_lexeme(L")")) {}
+
+dict_t::~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
+
 lexeme dict_t::get_sym(int_t t) const {
 	DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
 	static wchar_t str_nums[20], str_chr[] = L"'a'";

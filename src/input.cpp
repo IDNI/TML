@@ -132,8 +132,8 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 		parse_error(err_rel_expected, l[pos]);
 	size_t curr2 = pos;
-	if (*l[pos][0] == L'<') type = FNAME;
-	else if (*l[pos][0] == L'"') type = STR;
+	if (*l[pos][0] == L'<') type = FNAME, arg = l[pos++];
+	else if (*l[pos][0] == L'"') type = STR, arg = l[pos++];
 	else if (*l[pos][0] == L'$')
 		type=CMDLINE, ++pos, n = get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == L"stdin") type = STDIN;
@@ -143,7 +143,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		an(DIR);
 		return true;
 	} else parse_error(err_directive_arg, l[pos]);
-	if (arg=l[pos++], an_of(STR, -1, curr2), *l[pos++][0]!='.')
+	if (an_of(STR, -1, curr2), *l[pos++][0]!='.')
 		parse_error(dot_expected, l[pos]);
 	an_of(DOT, -1, pos-1);
 	an(DIR);

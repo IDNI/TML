@@ -10,37 +10,22 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include <cstring>
-#ifdef __unix__
-#include <sys/ioctl.h>
-#endif
-#include "driver.h"
-using namespace std;
+#include "defs.h"
 
-//void print_memos_len();
-
-bool is_stdin_readable();
-
-int main(int argc, char** argv) {
-	setlocale(LC_ALL, "");
-	bdd::init();
-	driver::init();
-	if (is_stdin_readable())
-		driver d(file_read_text(stdin), options(argc, argv));
-	else {
-		strings args;
-		if (argc == 1) args = { "-v", "-h" };
-		driver d(L"", options(args));
+struct term : public ints {
+	bool neg, goal = false;
+	bool iseq;
+	ntable tab;
+	term() {}
+	term(bool neg, bool eq, ntable tab, const ints& args) :
+		ints(args), neg(neg), iseq(eq), tab(tab) {}
+	bool operator<(const term& t) const {
+		if (neg != t.neg) return neg;
+		if (iseq != t.iseq) return iseq < t.iseq;
+		if (tab != t.tab) return tab < t.tab;
+		if (goal != t.goal) return goal;
+		return (const ints&)*this < t;
 	}
-//	print_memos_len();
-	return 0;
-}
+	void replace(const std::map<int_t, int_t>& m);
+};
 
-bool is_stdin_readable() {
-#ifdef __unix__
-	long n = 0;
-	return ioctl(0, FIONREAD, &n) == 0 && n > 0;
-#else // WIN TODO
-	return true;
-#endif
-}

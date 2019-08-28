@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const tml = require('../build-Release/tml');
+const tml = require('./tml.js');
 
 const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);
-
-console.log(`running: '${program}' with options: '${args.join(' ')}'`);
 
 tml.onRuntimeInitialized = _ => {
 	// load stuff from tml
@@ -22,7 +20,7 @@ tml.onRuntimeInitialized = _ => {
 
 	// create options object and parse args
 	const o = new options();
-	o.parse(arg_strings);
+	o.parse(arg_strings, false);
 
 	// console.log('args:', o.to_string());
 

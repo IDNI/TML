@@ -38,25 +38,32 @@ wstring options::get_string(wstring name) const {
 	option o; return get(name, o) ? o.get_string() : L"";
 }
 
-void options::parse(int argc, char** argv) {
+void options::parse(int c, char** v, bool internal) {
 	wstrings wargs = {};
-	for (int i = 1; i < argc; ++i)
-		wargs.push_back(s2ws(string(argv[i])));
-	parse(wargs);
+	for (int i = 0; i < c; ++i)
+		wargs.push_back(s2ws(string(v[i])));
+	parse(wargs, internal);
 }
 
-void options::parse(strings args) {
+void options::parse(strings sargs, bool internal) {
 	wstrings wargs = {};
-	for (size_t i=0; i < args.size(); ++i) wargs.push_back(s2ws(args[i]));
-	parse(wargs);
+	for (size_t i=0; i < sargs.size(); ++i) wargs.push_back(s2ws(sargs[i]));
+	parse(wargs, internal);
 }
 
-void options::parse(wstrings args) {
+void options::parse(wstrings wargs, bool internal) {
 	wstring v;
-	for (size_t i = 0; i < args.size(); ++i) {
-		v = (i < args.size()-1) ? try_read_value(args[i+1]) : L"";
-		parse_option(args[i], v);
-		if (v != L"") i++;
+	bool skip_next = false;
+	for (size_t i = 0; i < wargs.size(); ++i) {
+		if (!internal) args.push_back(wargs[i]);
+		if (skip_next) skip_next = false;
+		else {
+			v = i < wargs.size() - 1
+				? try_read_value(wargs[i+1])
+				: L"";
+			parse_option(wargs[i], v);
+			skip_next = v != L"";
+		}
 	}
 }
 
@@ -128,7 +135,7 @@ void options::setup() {
 		.description(L"this help"));
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
-	add_bool(L"stack",   L"enabled stack variant for 'and' etc.");
+	add_bool(L"proof",  L"extract proof");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
 	add(option(option::type::STRING, { L"name", L"n" },
@@ -162,8 +169,8 @@ void options::init_defaults() {
 		L"--output", L"@stdout",
 		L"--error",  L"@stderr",
 		L"--info",   L"@stderr"
-	});
-	DBG(parse(wstrings{ L"--debug", L"@stderr" });)
+	}, true);
+	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
 }
 
 void options::help(wostream& os) const {

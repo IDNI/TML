@@ -115,7 +115,7 @@
 	</ul>
 	TARGET=@... means the output targets @... by default
 
-	<script src="../build-Release/tml.js"></script>
+	<script src="tml.js"></script>
 <script>
 
 // read program from HTML page element with id "program"
@@ -148,7 +148,7 @@ tml.onRuntimeInitialized = _ => {
 
 	// create options object and update it by parsed arguments
 	const o = new options();
-	o.parse(arg_strings);
+	o.parse(arg_strings, false);
 
 	console.log('args:', o.to_string());
 

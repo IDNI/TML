@@ -25,7 +25,6 @@
 #include "driver.h"
 #include "err.h"
 #include "ast.h"
-//#include "bdd.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -145,9 +144,6 @@ wstring driver::directive_load(const directive& d) {
 	switch (d.type) {
 		case directive::FNAME: return file_read(str);
 		case directive::STDIN: return move(std_input);
-		case directive::CMDLINE:
-			if (d.n < argc) return s2ws(argv[d.n]);
-			parse_error(err_num_cmdline, L""); break; // FIXME
 		default: return unquote(str), str;
 	}
 	throw 0; // unreachable
@@ -159,6 +155,11 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		switch (d.type) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
+		case directive::CMDLINE:
+			if (d.n < opts.argc())
+				pd.strs.emplace(d.rel.e, opts.argv(d.n));
+			else parse_error(err_num_cmdline, L""); // FIXME
+			break;
 /*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
 					break;
 		case directive::TREE:
@@ -257,22 +258,18 @@ void driver::init() {
 	output::create(L"ast-html",    L".ast.html");
 }
 
-driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
-	argv(argv), opts(o) {
-	opts.parse(argc, argv);
-
-	if (opts.enabled(L"stack")) {
-		output::to(L"info") << "stack defined: " << endl;
-		//output::to(L"error") << "stack defined: () =>: " << endl;
-		bdd::initopts(true);
-	}
-	else {
-		output::to(L"info") << "stack not defined: " << endl;
-		//output::to(L"error") << "stack not defined: () =>: " << endl;
-	}
-
+driver::driver(raw_progs rp, options o) : opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
+	if (opts.enabled(L"proof")) tbl.set_proof(true);
+	//if (opts.enabled(L"stack")) {
+	//	output::to(L"info") << "stack defined: " << endl;
+	//	bdd::initopts(true);
+	//}
+	//else {
+	//	output::to(L"info") << "stack not defined: " << endl;
+	//}
+
 	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);
@@ -282,17 +279,10 @@ driver::driver(int argc, char** argv, raw_progs rp, options o) : argc(argc),
 	if (opts.enabled(L"csv")) save_csv();
 }
 
-driver::driver(int argc, char** argv, FILE *f, options o) :
-	driver(argc, argv, raw_progs(f), o) {}
-driver::driver(int argc, char** argv, wstring s, options o) :
-	driver(argc, argv, raw_progs(s), o) {}
-driver::driver(int argc, char** argv, char *s, options o) :
-	driver(argc, argv, raw_progs(s2ws(string(s))), o) {}
-driver::driver(int argc, char** argv, FILE *f) :
-	driver(argc, argv, f, options()) {}
-driver::driver(int argc, char** argv, wstring s) :
-	driver(argc, argv, s, options()) {}
-driver::driver(int argc, char** argv, char *s) :
-	driver(argc, argv, s, options()) {}
-driver::driver(int argc, char** argv, raw_progs rp) :
-	driver(argc, argv, rp, options()) {}
+driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
+driver::driver(wstring s, options o) : driver(raw_progs(s), o) {}
+driver::driver(char *s,   options o) : driver(raw_progs(s2ws(string(s))), o) {}
+driver::driver(FILE *f)              : driver(f, options()) {}
+driver::driver(wstring s)            : driver(s, options()) {}
+driver::driver(char *s)              : driver(s, options()) {}
+driver::driver(raw_progs rp)         : driver(rp, options()) {}

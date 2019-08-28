@@ -603,29 +603,8 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
-/*	map<multiset<pair<elem, ints>>, set<frule>> m1;
-	map<multiset<pair<elem, ints>>, frule> m2;
-	auto get_body_sigs = [&f](size_t n) {
-		const vector<raw_term>& b = f[n].second;
-		multiset<pair<elem, ints> r;
-		for (const raw_term& x : b) r.insert(x.e[0], x.arity);
-		return r;
-	};
-	for (size_t n = 0; n != f.size(); ++n)
-		if (f[n].second.size() >= 2)
-			m1[get_body_sigs(n)].insert(f[n]);
-	for (auto x : m1)
-		if (x.second.size() == 1) m2.emplace(x.first, x.second);
-		else {
-			vector<raw_term> mgu = get_mgu(x.second);
-			frule r;
-			r.b = {mgu};
-			r.h.emplace_back();
-			r.h[0].e.emplace_back(elem::SYM, get_new_rel());
-		}
-	m1.clear();*/
-	//DBG(wcout << "bin before:" << endl << f << endl;);
-	DBG(wcout << endl << f << endl;);
+	// DBG(wcout << endl << f << endl;);
+	// DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),
@@ -680,6 +659,49 @@ void driver::transform_bin(raw_prog& p) {
 		for (auto x : r.b)
 			assert(!x.empty());*/
 }
+
+/*raw_prog driver::reify(const raw_prog& p) {
+	set<raw_rule> s;
+	set<lexeme> rels;
+	for (const raw_rule& r : p.r) {
+		for (const raw_term& t : r.h) rels.emplace(t.e[0]);
+		for (const auto& x : r.b)
+			for (const raw_term& y : x)
+				rels.emplace(x.e[0]);
+	}
+	elem relname = elem(elem::SYM, dict.get_lexeme(L"relname"));
+	elem fact = elem(elem::SYM, dict.get_lexeme(L"fact"));
+	elem rule = elem(elem::SYM, dict.get_lexeme(L"rule"));
+	lexeme op = dict.get_lexeme(L"("), cp = dict.get_lexeme(L")");
+	raw_term t;
+	for (const lexeme& l : rels)
+		t.e = { r, elem_openp, l, elem_closep },
+		t.calc_arity(), s.emplace(t), t.clear();
+	set<sizes> lens;
+	set<frule> rls;
+	const elem op = elem_openp, cp = elem_closep;
+	auto reify_fact = [&relname, &fact, this](const raw_term& t) {
+		vector<raw_term> v;
+		v.push_back({ relname, op, t.e[0], cp });
+		for (size_t n = 1; n != t.e.size(); ++n)
+			if (t.e[n].type == VAR)
+				v.push_back({ relname, op, t.e[n], cp }),
+				v.back().neg = true;
+		raw_term r;
+		r.e = { fact, op };
+		for (size_t n = 0; n != t.e.size(); ++n)
+
+		return r.e.push_back(cp), v.push_back(r), v;
+	};
+	for (const raw_rule& r : p.r)
+		for (const raw_term& t : r.h)
+			for (const auto& x : r.b) {
+				rls.emplace(t, x);
+				raw_term th;
+				th.e = { fact, elem_openp, 
+			}
+
+}*/
 
 /*set<raw_rule> driver::transform_ms(const set<raw_rule>& p,
 	const set<raw_term>& qs) {

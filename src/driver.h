@@ -65,6 +65,7 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 //	void transform_string(const std::wstring&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
+	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
@@ -76,13 +77,11 @@ class driver {
 //	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
 	void prog_run(raw_progs& rp, size_t n, strs_t& strtrees);
-	driver(int argc, char** argv, raw_progs, options o);
-	driver(int argc, char** argv, raw_progs);
+	driver(raw_progs, options o);
+	driver(raw_progs);
 	size_t load_stdin();
 	bool pfp();
 	std::wstring std_input;
-	int argc;
-	char** argv;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
 	tables tbl;
@@ -91,12 +90,12 @@ public:
 	bool result = true;
 	options opts;
 	static void init();
-	driver(int argc, char** argv, FILE *f, options o);
-	driver(int argc, char** argv, std::wstring, options o);
-	driver(int argc, char** argv, char *s, options o);
-	driver(int argc, char** argv, FILE *f);
-	driver(int argc, char** argv, std::wstring);
-	driver(int argc, char** argv, char *s);
+	driver(FILE *f, options o);
+	driver(std::wstring, options o);
+	driver(char *s, options o);
+	driver(FILE *f);
+	driver(std::wstring);
+	driver(char *s);
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;

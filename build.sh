@@ -1,7 +1,13 @@
 #!/bin/bash
 
 BUILD_TYPE="${1:-Release}"
-BUILD_DIR="build-${BUILD_TYPE}"
+if [ "${BUILD_TYPE}" == "Debug" ]
+then
+	SUFFIX="Debug"
+else
+	SUFFIX="Release"
+fi
+BUILD_DIR="build-${SUFFIX}"
 
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"

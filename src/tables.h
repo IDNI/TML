@@ -13,8 +13,8 @@
 #include <map>
 #include <vector>
 #include "bdd.h"
+#include "term.h"
 
-typedef int_t ntable;
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
@@ -23,25 +23,14 @@ class tables;
 class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
+typedef std::map<int_t, size_t> varmap;
+typedef bdd_handles level;
+
+std::map<int_t, int_t> cqc(term h1, std::vector<term> b1, term h2,
+	std::vector<term> b2);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
-};
-
-struct term : public ints {
-	bool neg;
-	bool iseq;
-	ntable tab;
-	term() {}
-	term(bool neg, bool eq, ntable tab, const ints& args) :
-		ints(args), neg(neg), tab(tab), iseq(eq) {}
-	bool operator<(const term& t) const {
-		if (neg != t.neg) return neg;
-		if (iseq != t.iseq) return iseq < t.iseq;
-		if (tab != t.tab) return tab < t.tab;
-		return (const ints&)*this < t;
-	}
-	void replace(const std::map<int_t, int_t>& m);
 };
 
 struct body {
@@ -68,9 +57,11 @@ struct alt : public std::vector<body*> {
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
-//	std::vector<std::pair<uints, bools>> order;
 	bools ex;
 	uints perm;
+	varmap vm;
+	std::map<size_t, int_t> inv;
+	std::map<size_t, spbdd_handle> levels;
 	static std::set<alt*, ptrcmp<alt>> s;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
@@ -82,7 +73,7 @@ struct alt : public std::vector<body*> {
 struct rule : public std::vector<alt*> {
 	bool neg;
 	ntable tab;
-	spbdd_handle eq, rlast = bdd_handle::F;
+	spbdd_handle eq, rlast = bdd_handle::F, h;
 	size_t len;
 	bdd_handles last;
 	term t;
@@ -91,6 +82,12 @@ struct rule : public std::vector<alt*> {
 		if (tab != t.tab) return tab < t.tab;
 		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
+	}
+	bool equals_termwise(const rule& r) const {
+		if (t != r.t || size() != r.size()) return false;
+		for (size_t n = 0; n != size(); ++n)
+			if (at(n)->t != r[n]->t) return false;
+		return true;
 	}
 };
 
@@ -103,13 +100,27 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
-class tables {
-	typedef std::map<int_t, size_t> varmap;
-	typedef std::function<void(const raw_term&)> rt_printer;
+struct proof_dag {
+	struct vertex {
+		size_t step;
+		term t;
+		vertex(const term& t, size_t step) : step(step), t(t) {}
+		bool operator<(const vertex& v) const;
+	};
+	std::map<vertex, std::set<std::set<vertex>>> E;
+	std::map<size_t, std::set<vertex>> L;
+	void add(const term& h, const std::vector<term>& b, size_t step);
+};
 
+class tables {
+	typedef std::function<void(const raw_term&)> rt_printer;
+	typedef std::function<void(const term&)> cb_decompress;
+
+	size_t nstep = 0;
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
+	std::vector<level> levels;
 	alt get_alt(const std::vector<raw_term>&);
 	rule get_rule(const raw_rule&);
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
@@ -120,7 +131,8 @@ class tables {
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
-	bool datalog;
+	bool bproof;
+	bool datalog, optimize;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -176,24 +188,39 @@ class tables {
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
+		size_t len = 0) const;
+	std::set<term> decompress();
+	std::vector<std::map<int_t, int_t>> varbdd_to_subs(const alt* a,
+		cr_spbdd_handle v) const;
+	proof_dag get_proof() const;
+	void print_proof(std::wostream& os, const proof_dag& pd) const;
+	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
-	void get_rules(const raw_prog& p);
-	void get_facts(const raw_prog& p);
+	void get_nums(const raw_term& t);
+	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
+	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
+	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
 	ntable get_table(const sig& s);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);
+	void add_prog(std::map<term, std::set<std::set<term>>> m,
+		const strs_t& strs, bool mknums = false);
 	char fwd();
-	std::set<std::pair<ntable, spbdd_handle>> get_front() const;
+	level get_front() const;
 	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<ntable> to_drop;
 public:
-	tables();
+	tables(bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
+	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
+		std::set<term>& r);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
+	void set_proof(bool v) { bproof = v; }
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
