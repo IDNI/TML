@@ -375,6 +375,12 @@ bool tables::cqc(const set<rule>& rs, rule& r) {
 		else ++n;
 }*/
 
+void tables::get_nums(const raw_term& t) {
+	for (const elem& e : t.e)
+		if (e.type == elem::NUM)
+			nums = max(nums, e.num);
+}
+
 map<term, set<set<term>>> tables::to_terms(const raw_prog& p) {
 	map<term, set<set<term>>> m;
 	set<term> s;
@@ -382,16 +388,18 @@ map<term, set<set<term>>> tables::to_terms(const raw_prog& p) {
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
+				get_nums(x);
 				t = from_raw_term(x);
 				for (const vector<raw_term>& y : r.b) {
 					for (const raw_term& z : y)
-						s.emplace(from_raw_term(z));
+						s.emplace(from_raw_term(z)),
+						get_nums(z);
 					align_vars(t, s), m[t].emplace(move(s));
 				}
 			}
 		else for (const raw_term& x : r.h)
 			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
-			m[t] = {};
+			m[t] = {}, get_nums(x);
 	return m;
 }
 
@@ -545,6 +553,8 @@ void to_nums(map<term, set<set<term>>>& m) {
 }
 
 void tables::add_prog(const raw_prog& p, const strs_t& strs) {
+	if (!strs.empty()) chars = 256;
+	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
 	add_prog(move(to_terms(p)), strs);
 }
 
@@ -557,15 +567,8 @@ void tables::add_prog(map<term, set<set<term>>> m, const strs_t& strs,
 	bool mknums) {
 	if (mknums) to_nums(m);
 	rules.clear(), datalog = true;
-	int_t u = 0;
-	for (auto x : strs) u = max(u, (int_t)x.second.size()+1);
-	for (auto x : m) {
-		for (int_t i : x.first) u = max(u, i);
-		for (auto y : x.second)
-			for (auto z : y)
-				for (int_t i : z) u = max(u, i);
-	}
-	while (u >= (1 << (bits - 2))) add_bit();
+	syms = dict.nsyms();
+	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
 	get_rules(m);
 	clock_t start, end;
 	output::to(L"debug")<<"load_string: ";

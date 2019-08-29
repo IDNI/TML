@@ -140,6 +140,7 @@ class options {
 	friend std::wostream& operator<<(std::wostream&, const options&);
 	std::map<std::wstring, option> opts = {};
 	std::map<std::wstring, std::wstring> alts = {};
+	std::vector<std::wstring> args;
 	std::wstring try_read_value(std::wstring v);
 	void parse_option(std::wstring arg, std::wstring v = L"");
 	void setup();
@@ -149,14 +150,16 @@ public:
 	options(int argc, char** argv) { setup(); parse(argc, argv); }
 	options(strings args)          { setup(); parse(args); }
 	options(wstrings args)         { setup(); parse(args); }
+	int argc()               const { return args.size(); }
+	std::wstring argv(int n) const { if (n<argc()) return args[n]; throw 0;}
 	void add(option o);
 	bool get(std::wstring name, option& o) const;
 	void set(const std::wstring name, const option o) {
 		opts.insert_or_assign(name, o);
 	}
-	void parse(int argc, char** argv);
-	void parse(strings args);
-	void parse(wstrings args);
+	void parse(int argc, char** argv, bool internal = false);
+	void parse(strings sargs,         bool internal = false);
+	void parse(wstrings wargs,        bool internal = false);
 	bool enabled (const std::wstring arg) const;
 	bool disabled(const std::wstring arg) const { return !enabled(arg); }
 	int           get_int   (std::wstring name) const;

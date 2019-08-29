@@ -7,7 +7,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.class_function("init", &driver::init)
 		.class_function("create",
 			optional_override([](std::wstring s, options o) {
-				return new driver(0, 0, s, o);
+				return new driver(s, o);
 			}), allow_raw_pointers())
 		.property("result", &driver::result)
 		.property("opts", &driver::opts)
@@ -15,7 +15,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 	class_<options>("options")
 		.constructor<>()
 		.function("parse", select_overload
-			<void(std::vector<std::string>)> (&options::parse))
+			<void(std::vector<std::string>, bool)> (&options::parse))
 		.function("enabled", &options::enabled)
 		.function("get", &options::get)
 		.function("get_int", &options::get_int)

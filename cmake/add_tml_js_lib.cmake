@@ -15,7 +15,7 @@ function(add_tml_js_lib)
 	add_custom_command(OUTPUT ${TML_JS_FILES}
 		COMMAND ${CMAKE_COMMAND} --output-debug ${TML_DIR} -DBUILD_JSLIB=on
 			&& ${CMAKE_COMMAND} --build . -- -j4
-			&& cp ${TML_JS_BUILD_DIR}/tml.{js,wasm} ${CMAKE_CURRENT_BINARY_DIR}
+			&& cp ${TML_JS_BUILD_DIR}/tml.js ${TML_JS_BUILD_DIR}/tml.wasm ${CMAKE_CURRENT_BINARY_DIR}
 		WORKING_DIRECTORY ${TML_JS_BUILD_DIR}
 		COMMENT "added tml_js_lib target"
 		VERBATIM

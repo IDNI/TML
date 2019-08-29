@@ -187,6 +187,7 @@ class tables {
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
+	void get_nums(const raw_term& t);
 	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
 	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
 	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
