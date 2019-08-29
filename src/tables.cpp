@@ -146,6 +146,7 @@ spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 }*/
 
 spbdd_handle tables::from_fact(const term& t) {
+	// TODO: memoize
 	spbdd_handle r = bdd_handle::T;
 	static varmap vs;
 	vs.clear();
@@ -444,7 +445,8 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 				r.push_back(aa), alt::s.insert(aa);
 		rs.insert(r);
 	}
-	for (rule r : rs) rules.push_back(r);
+	for (rule r : rs)
+		ts[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
 /*	if (!optimize) for (rule r : rs) rules.push_back(r);
 	else {
 		for (rule r : rs)
@@ -693,11 +695,12 @@ level tables::get_front() const {
 
 bool tables::pfp() {
 	set<level> s;
+	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
 		output::to(L"info") << "step: " << nstep++ << endl;
 		if (!fwd()) {
-			if (bproof) get_proof();
+//			if (bproof) get_proof(true);
 			return true;
 		}
 		l = get_front();

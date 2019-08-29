@@ -10,14 +10,12 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "term.h"
+#include "tables.h"
 using namespace std;
 
 // conjunctive query containment
 // following Ullman's "Information Integration using Logical Views"
 // https://www.sciencedirect.com/science/article/pii/S0304397599002194
-
-typedef map<int_t, int_t> env;
 
 int_t rep(int_t x, const env& m) {
 	if (x >= 0) return x;
@@ -81,7 +79,7 @@ map<int_t, int_t> cqc(term h1, vector<term> b1, term h2, vector<term> b2) {
 	return derives(h1, h2, b2, b1, e) ? e : map<int_t, int_t>();
 }
 
-wostream& operator<<(wostream& os, const map<int_t, int_t>& e) {
+wostream& operator<<(wostream& os, const env& e) {
 	for (auto x : e) wcout << x.first << " = " << x.second << endl;
 	return os;
 }

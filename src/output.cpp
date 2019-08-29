@@ -267,3 +267,14 @@ wostream& operator<<(wostream& os, const std::map<std::wstring,option>& opts) {
 wostream& operator<<(wostream& os, const options& o) {
 	return os << o.opts;
 }
+
+void tables::print_env(const env& e) const {
+	for (auto x : e) {
+		int_t arg = r[n - 1];
+		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
+		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+		wcout << x.first << " = " << x.second << endl;
+	}
+	return os;
+}

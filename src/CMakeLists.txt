@@ -30,6 +30,7 @@ set(TML_HEADERS
 
 set(TML_SOURCES
 	proof.cpp
+	cqc.cpp
 	ast.cpp
 	bdd.cpp
 	dict.cpp

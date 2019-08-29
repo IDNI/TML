@@ -24,14 +24,17 @@ class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
+typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
 
-std::map<int_t, int_t> cqc(term h1, std::vector<term> b1, term h2,
-	std::vector<term> b2);
+std::wostream& operator<<(std::wostream& os, const env& e);
+env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
+
+typedef function<void(size_t, size_t, size_t, std::vector<term>)> cb_ground;
 
 struct body {
 	bool neg, ext = false;
@@ -95,20 +98,9 @@ struct table {
 	size_t len;
 	spbdd_handle t = bdd_handle::F;
 	bdd_handles add, del;
+	std::vector<size_t> r;
 	bool ext = true; // extensional
 	bool commit(DBG(size_t));
-};
-
-struct proof_dag {
-	struct vertex {
-		size_t step;
-		term t;
-		vertex(const term& t, size_t step) : step(step), t(t) {}
-		bool operator<(const vertex& v) const;
-	};
-	std::map<vertex, std::set<std::set<vertex>>> E;
-	std::map<size_t, std::set<vertex>> L;
-	void add(const term& h, const std::vector<term>& b, size_t step);
 };
 
 class tables {
@@ -188,10 +180,10 @@ class tables {
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0) const;
 	std::set<term> decompress();
-	std::vector<std::map<int_t, int_t>> varbdd_to_subs(const alt* a,
-		cr_spbdd_handle v) const;
-	proof_dag get_proof() const;
-	void print_proof(std::wostream& os, const proof_dag& pd) const;
+	std::vector<env> varbdd_to_subs(const alt* a, cr_spbdd_handle v) const;
+	void rule_get_grounds(size_t rl, size_t level, cb_ground f);
+	void term_get_grounds(const term& t, size_t level, cb_ground f);
+	void print_env(const env& e, const rule& r) const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -205,7 +197,8 @@ class tables {
 		const strs_t& strs, bool mknums = false);
 	char fwd();
 	level get_front() const;
-	std::map<ntable, std::set<spbdd_handle>> goals;
+//	std::map<ntable, std::set<spbdd_handle>> goals;
+	std::set<term> goals;
 	std::set<ntable> to_drop;
 public:
 	tables(bool bproof = false, bool optimize = true);
