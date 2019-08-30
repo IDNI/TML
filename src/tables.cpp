@@ -138,6 +138,11 @@ spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 	return ememo.emplace(x, r), r;
 }
 
+spbdd_handle tables::from_sym_not_eq(size_t p1, size_t p2, size_t args) const {
+	spbdd_handle iseq = from_sym_eq(p1, p2, args);
+	return bdd_handle::get(-iseq->b);
+}
+
 /*spbdd_handle tables::from_ground(const term& t) {
 	spbdd_handle r = bdd_handle::T;
 	for (size_t n = 0, args = t.size(); n != args; ++n)
@@ -349,11 +354,13 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 		else	b.q = b.q && from_sym_eq(n, it->second, t.size()),
 			get_var_ex(n, t.size(), b.ex);
 	// neq: if iseq (NEQ or EQ), create a new b.qeq to compare 1' vs 3'? make any sense?
-	if (b.iseq) {
-		// 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
-		if (t.size() == 2) {
-			b.qeq = b.qeq && from_sym_eq(0, 1, t.size());
-		}
+	// 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
+	if (b.iseq && t.size() == 2) {
+		if (b.neg) // NEQ
+			b.q = b.q && from_sym_not_eq(0, 1, t.size());
+		else // EQ
+			b.q = b.q && from_sym_eq(0, 1, t.size());
+		//b.qeq = b.qeq && from_sym_eq(0, 1, t.size());
 	}
 	return b;
 }
@@ -446,6 +453,7 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 		set<alt> as;
 		r.len = t.size();
 		// D: alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR
+		//spbdd_handle r_alt_eq = bdd_handle::T;
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
@@ -453,8 +461,24 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
 			// D: t redefinition, t is header, and below is a body term, then header again
-			for (const term& t : al)
+			//spbdd_handle alt_eq = bdd_handle::F;
+			//bool isfirsteq = true;
+			for (const term& t : al) {
+				// D: qeq: we should skip the eq/neq terms, as they're doing nothing
+				//if (t.iseq && t.size() == 2) {
+				//	if (isfirsteq) {
+				//		isfirsteq = false;
+				//		alt_eq = bdd_handle::T;
+				//	}
+				//	// this should do?
+				//	if (t.neg) // NEQ
+				//		alt_eq = alt_eq && from_sym_not_eq(0, 1, t.size());
+				//	else // EQ
+				//		alt_eq = alt_eq && from_sym_eq(0, 1, t.size());
+				//}
 				b.insert({get_body(t, a.vm, a.varslen), t});
+			}
+			//r_alt_eq = r_alt_eq || alt_eq;
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
 			for (auto x : b) {
 				a.t.push_back(x.second);
@@ -467,6 +491,7 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			a.ex = d.first, a.perm = d.second;
 			as.insert(a);
 		}
+		//r.eq = r.eq && r_alt_eq;
 		for (alt x : as)
 			if ((ait = alt::s.find(&x)) != alt::s.end())
 				r.push_back(*ait);
@@ -618,87 +643,43 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	b.tlast = ts[b.tab].t;
 	
 	// neq:
-	//bdd_handle::get(bdd::bdd_and_ex_perm(b.q->b, ts[b.tab].t->b, b.ex, b.perm));
 	//sbdd_and_ex_perm(b.ex, b.perm, CXP[{b.ex, b.perm}], memos_perm_ex[{b.perm, b.ex}])
 	//	(b.q->b, ts[b.tab].t->b);
-	// NEQ
-	// D: neq: not sure how to make this, dimensions are different, and what is that we
-	// need to compare here, negation is easier (unary, prev/new val), maybe this is not
-	// the right place?
-	//auto cc = from_sym_eq(abs(b.q->b), abs(ts[b.tab].t->b), 1);
-	// D: moved eq compare when term is created, b.qeq is set then
-
 	// EQ / NEQ
 	if (b.iseq) {
-		if (ts[b.tab].t == bdd_handle::F) {
-			if (b.neg) // NEQ
-				return (b.rlast = bdd_and_not_ex_perm(bdd_handle::T, b.qeq, b.ex, b.perm));
-			else // EQ
-				return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.qeq, b.ex, b.perm));
-		}
-		else {
-			// previous ts[b.tab].t seems to be inverted, that's why we're doing this not/not
-			// ...probably not ideal
-			if (b.neg) // NEQ
-				return (b.rlast = bdd_not_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm));
-			else // EQ
-				return (b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm));
-			//// this should work
-			//b.rlast = bdd_not_and_not_ex(b.qeq, ts[b.tab].t, b.ex); // , b.perm));
-			//// maybe it won't work when/if ts[b.tab].t != bdd_handle::F, we need to invert 
-			////b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-		}
+		// we can't just remove this, as 'neg' is set and will turn out all wrong below
+		//return bdd_handle::T;
 
-		// TEST2: this works
-		//// we can use b.q to store b.qeq, still to improve (as there's nothing else going on?)
-		//if (ts[b.tab].t == bdd_handle::F)
-		//	b.rlast = b.qeq;
-		//else {
-		//	// this should work
-		//	b.rlast = bdd_not_and_not_ex(b.qeq, ts[b.tab].t, b.ex); // , b.perm));
-		//	// maybe it won't work when/if ts[b.tab].t != bdd_handle::F, we need to invert 
-		//	//b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-		//}
-		//if (b.neg) // NEQ
-		//	return (b.rlast = bdd_and_not_ex_perm(bdd_handle::T, b.rlast, b.ex, b.perm));
-		//else // EQ
-		//	return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.rlast, b.ex, b.perm));
+		// - this is always TRUE: ts[b.tab].t == bdd_handle::F
+		// ts/facts don't exist for the ==/!= relation, i.e. that's always FALSE
+		// - b.q is already negated (if .neg) so no need to do it here
+		return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
+		// (we could just use bdd::bdd_permute_ex(...) but there's no overhead here & cleaner
 
 		// TEST3: this works
-		//if (ts[b.tab].t == bdd_handle::F)
-		//	b.rlast = b.qeq;
-		//else
-		//	b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-		//// D: why is this seemingly 'inverted' I have no idea? but this works
-		//if (b.neg) // NEQ
-		//	return (b.rlast = bdd_and_not_ex_perm(b.q, b.rlast, b.ex, b.perm));
-		//else // EQ
-		//	return (b.rlast = bdd_and_ex_perm(b.q, b.rlast, b.ex, b.perm));
+		//if (ts[b.tab].t == bdd_handle::F) {
+		//	if (b.neg) // NEQ
+		//		return (b.rlast = bdd_and_not_ex_perm(bdd_handle::T, b.qeq, b.ex, b.perm));
+		//	else // EQ
+		//		return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.qeq, b.ex, b.perm));
+		//}
+		//else {
+		//	// previous ts[b.tab].t seems to be inverted, that's why we're doing this not/not
+		//	// ...probably not ideal
+		//	if (b.neg) // NEQ
+		//		return (b.rlast = bdd_not_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm));
+		//	else // EQ
+		//		return (b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm));
+		//	//// this should work
+		//	//b.rlast = bdd_not_and_not_ex(b.qeq, ts[b.tab].t, b.ex); // , b.perm));
+		//	//// maybe it won't work when/if ts[b.tab].t != bdd_handle::F, we need to invert 
+		//	////b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
+		//}
 	}
 
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
 
-//	if (b.iseq && b.neg) {
-//		// D: why is this seemingly 'inverted' I have no idea? but this works
-//		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-//		b.rlast = bdd_and_not_ex_perm(b.q, b.rlast, b.ex, b.perm);
-//	}
-//	else if (b.iseq) {
-//		// EQ
-//		//b.rlast = bdd_and_ex_perm(b.q, b.qeq, b.ex, b.perm);
-//		//b.rlast = bdd_and_ex_perm(b.rlast, ts[b.tab].t, b.ex, b.perm);
-//		b.rlast = bdd_and_not_ex_perm(b.qeq, ts[b.tab].t, b.ex, b.perm);
-//		b.rlast = bdd_and_ex_perm(b.q, b.rlast, b.ex, b.perm);
-//	}
-//	else
-//		b.rlast=(b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
-//			(b.q, ts[b.tab].t, b.ex, b.perm);
-////	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
-//	return b.rlast;
-//	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
-//	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
-//	return b.rlast;
 //	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
 //			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
@@ -770,6 +751,7 @@ char tables::fwd() {
 			v[n] = alt_query(*r[n], r.len);
 		spbdd_handle x;
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
+		// D: qeq: r.eq to contain neg/eq directly and it's calced here (to skip b-s)
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
 //		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == bdd_handle::F) continue;

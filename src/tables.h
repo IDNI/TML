@@ -160,6 +160,7 @@ class tables {
 	}
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
 	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args) const;
+	spbdd_handle from_sym_not_eq(size_t p1, size_t p2, size_t args) const;
 
 	void add_bit();
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
