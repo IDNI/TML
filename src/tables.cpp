@@ -190,7 +190,7 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// neq:
+	// NEQ/EQ:
 	if (r.iseq) {
 		auto ieq = r.iseq;
 	}
@@ -201,6 +201,8 @@ term tables::from_raw_term(const raw_term& r) {
 	// can we have a fact w/ eq, e.g. 1 == "test" (or something like that), and to make sense?
 	// If that's possible we'd need to keep table, facts and change the body query to include
 	// ts[].t for eq/neq as well?
+	// D: ints t is mapping elems (VAR, consts) to specific ints and are pushed to term (base).
+	// to be used for mapping/permutations later on.
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	return term(r.neg, r.iseq, get_table(sg), t);
 }
@@ -300,6 +302,8 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 		if (t[n] < 0)
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
+	// D: (bit_from_right, arg, args) => (bits - bit_from_right - 1) * args + arg
+	// D: why is this done only for negative 't[n] < 0' (guessing as it's F path? still why?)
 	return perm;
 }
 
@@ -348,7 +352,7 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
 	// D: // neq: body is created for each right-hand term 
 	b.neg = t.neg, b.iseq = t.iseq, b.tab = t.tab, b.perm = get_perm(t, vm, len),
-	b.q = bdd_handle::T, b.qeq = bdd_handle::T, b.ex = bools(t.size() * bits, false);
+	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
 	varmap m;
 	auto it = m.end();
 	for (size_t n = 0; n != t.size(); ++n)
@@ -358,17 +362,18 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 		else if (m.end() == (it = m.find(t[n]))) m.emplace(t[n], n);
 		else	b.q = b.q && from_sym_eq(n, it->second, t.size()),
 			get_var_ex(n, t.size(), b.ex);
-
-	// D: EQ/NEQ: 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
-	// 'q' is TRUE as there's nothing else going on, is that safe? problem is what if we're
-	// compunding, having complex (n)eq-s, not just vars/consts (and is that possible?) 
-	if (b.iseq && t.size() == 2) {
-		if (b.neg) // NEQ
-			b.q = b.q && from_sym_not_eq(0, 1, t.size());
-		else // EQ
-			b.q = b.q && from_sym_eq(0, 1, t.size());
-	}
 	return b;
+
+	//// D: EQ/NEQ: 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
+	//// 'q' is TRUE as there's nothing else going on, is that safe? problem is what if we're
+	//// compunding, having complex (n)eq-s, not just vars/consts (and is that possible?) 
+	//if (b.iseq && t.size() == 2) {
+	//	if (b.neg) // NEQ
+	//		b.q = b.q && from_sym_not_eq(0, 1, t.size());
+	//	else // EQ
+	//		b.q = b.q && from_sym_eq(0, 1, t.size());
+	//}
+	//return b;
 }
 
 void tables::get_facts(const map<term, set<set<term>>>& m) {
@@ -467,11 +472,15 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			a.inv = varmap_inv(a.vm);
 			// D: t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
-				// D: EQ/NEQ: this isn't worth it really? as we're just duping what's in body 
-				//if (t.iseq && t.size() == 2) {
-				//	if (t.neg) alt_eq = alt_eq && from_sym_not_eq(0, 1, t.size());
-				//	else alt_eq = alt_eq && from_sym_eq(0, 1, t.size());
-				//}
+				// D: EQ/NEQ: alt-level EQ-s
+				// pos(b, a.vm.at(t[0]), a.varslen)
+				if (t.iseq && t.size() == 2) {
+					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
+					if (t.neg) a.eq = a.eq && from_sym_not_eq(arg0, arg1, a.varslen);
+					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
+					//if (t.neg) alt_eq = alt_eq && from_sym_not_eq(0, 1, t.size());
+					//else alt_eq = alt_eq && from_sym_eq(0, 1, t.size());
+				}
 				b.insert({get_body(t, a.vm, a.varslen), t});
 			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
@@ -687,7 +696,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
 //	DBG(bdd::gc();)
-	bdd_handles v1 = { a.rng };
+	// D: EQ/NEQ: we're adding 'eq' here and doing and_many in the end on all, should work?
+	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	DBG(assert(!a.empty());)
 	for (size_t n = 0; n != a.size(); ++n)

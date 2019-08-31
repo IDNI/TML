@@ -39,7 +39,7 @@ struct body {
 	ntable tab;
 	bools ex;
 	uints perm;
-	spbdd_handle q, tlast, rlast, qeq;
+	spbdd_handle q, tlast, rlast;
 	static std::set<body*, ptrcmp<body>> s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
@@ -53,7 +53,7 @@ struct body {
 };
 
 struct alt : public std::vector<body*> {
-	spbdd_handle rng = bdd_handle::T, rlast = bdd_handle::F;
+	spbdd_handle rng = bdd_handle::T, eq = bdd_handle::T, rlast = bdd_handle::F;
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
@@ -66,6 +66,8 @@ struct alt : public std::vector<body*> {
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
+		// D: do we need this for eq?
+		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
 };
