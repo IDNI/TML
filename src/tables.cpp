@@ -198,8 +198,8 @@ term tables::from_raw_term(const raw_term& r) {
 	// the real relations), it's simply used to distinguish it from others (as it's a rel?)
 	// and term here seems to require (and assume we have a rel/sig/table), i.e. I think we
 	// may need it down the line, though eq/neq isn't really a typical rel in TML sense, is it?
-	// can we have a fact w/ eq, e.g. 1 == "test" (or something like that), and to make sense?
-	// If that's possible we'd need to keep table, facts and change the body query to include
+	// can we have a fact w/ eq, e.g. 1 == test (or something like that), and to make sense?
+	// If that's possible we'd need to keep table, facts and change the get_rules to include
 	// ts[].t for eq/neq as well?
 	// D: ints t is mapping elems (VAR, consts) to specific ints and are pushed to term (base).
 	// to be used for mapping/permutations later on.
@@ -364,9 +364,6 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 			get_var_ex(n, t.size(), b.ex);
 	return b;
 
-	//// D: EQ/NEQ: 2 is the magic #, we no longer have 3 terms, just vars are pushed (consts?)
-	//// 'q' is TRUE as there's nothing else going on, is that safe? problem is what if we're
-	//// compunding, having complex (n)eq-s, not just vars/consts (and is that possible?) 
 	//if (b.iseq && t.size() == 2) {
 	//	if (b.neg) // NEQ
 	//		b.q = b.q && from_sym_not_eq(0, 1, t.size());
@@ -474,13 +471,18 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			for (const term& t : al) {
 				// D: EQ/NEQ: alt-level EQ-s
 				// pos(b, a.vm.at(t[0]), a.varslen)
+				// 2 is the magic #, we no longer have 3 terms, just vars/c-s are pushed
 				if (t.iseq && t.size() == 2) {
+					// in simple cases this maps to 0,1 so we're back where we were before.
+					// this needs more testing w/ more vars, complex alt-s, works for x,y,const
 					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
 					if (t.neg) a.eq = a.eq && from_sym_not_eq(arg0, arg1, a.varslen);
 					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					//if (t.neg) alt_eq = alt_eq && from_sym_not_eq(0, 1, t.size());
-					//else alt_eq = alt_eq && from_sym_eq(0, 1, t.size());
+					// what if we're compunding, having complex (n)eq-s, not just vars/consts
+					// (is that possible?) 
 				}
+				// D: can we skip body here for eq? not sure cause of the below for (x : b)
+				// if so, we can then remove eq/neq from body_query (return ::T)
 				b.insert({get_body(t, a.vm, a.varslen), t});
 			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
@@ -647,8 +649,13 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	
 	//sbdd_and_ex_perm(b.ex, b.perm, CXP[{b.ex, b.perm}], memos_perm_ex[{b.perm, b.ex}])
 	//	(b.q->b, ts[b.tab].t->b);
-	// D: EQ/NEQ
+
 	if (b.iseq) {
+		// D: EQ/NEQ: doesn't make sense permuting T, permuting returns T/F for leafs anyway.
+		// we need this (for now) as we still have this body, should we remove bodies for eq-s?
+		return (b.rlast = bdd_handle::T);
+
+		// D: EQ/NEQ: questions:
 		// - this is always TRUE: ts[b.tab].t == bdd_handle::F
 		// ts/facts don't exist for the ==/!= relation, i.e. that's always FALSE
 		// - b.q is already negated (if .neg) so no need to do it here
@@ -659,20 +666,21 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 		// (we'd need to keep neg separate from the neq neg as we'd need it for ts[] here?)
 		// and/or in case of having facts, we'd need to join the eq/neq in one eq table really?
 		// - we can't have ~(?x != ?y) at the moment, is that by design, ok?
-		return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
-		// (we could just use bdd::bdd_permute_ex(...) but there's no overhead here & cleaner
 
+		// old code, keeping it for the moment to compare, till finished w alts.
+		//return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
+		// (we could just use bdd::bdd_permute_ex(...) but there's no overhead here & cleaner
 		// in case we need ts[] / facts for eq/neq
-		if (ts[b.tab].t == bdd_handle::F)
-			return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
-		else {
-			// see above comments on neg and eq facts (if plausible)
-			return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-			//if (b.neg) // NEQ
-			//	return (b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-			//else // EQ
-			//	return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-		}
+		//if (ts[b.tab].t == bdd_handle::F)
+		//	return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
+		//else {
+		//	// see above comments on neg and eq facts (if plausible)
+		//	return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
+		//	//if (b.neg) // NEQ
+		//	//	return (b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
+		//	//else // EQ
+		//	//	return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
+		//}
 	}
 
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)

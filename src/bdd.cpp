@@ -1150,16 +1150,6 @@ spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 	return bdd_handle::get(bdd::bdd_and_ex_perm(x->b, -y->b, b, m));
 }
 
-spbdd_handle bdd_not_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b) {
-	return bdd_handle::get(bdd::bdd_and_ex(-x->b, -y->b, b));
-}
-
-spbdd_handle bdd_not_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b, const uints& m) {
-	return bdd_handle::get(bdd::bdd_and_ex_perm(-x->b, -y->b, b, m));
-}
-
 spbdd_handle from_bit(uint_t b, bool v) {
 	return bdd_handle::get(bdd::from_bit(b, v));
 }
