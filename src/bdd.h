@@ -35,8 +35,6 @@ typedef std::vector<spbdd_handle> bdd_handles;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 
-const int_t T = 1, F = -1;
-
 struct ite_memo {
 	int_t x, y, z;
 	size_t hash;
@@ -62,7 +60,7 @@ template<> struct std::hash<std::array<int_t, 2>>{
 };
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
-//const int_t T = 1, F = -1;
+const int_t T = 1, F = -1;
 
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
@@ -94,59 +92,6 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
-extern std::unordered_map<ite_memo, int_t> C;
-extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
-
-struct xynode {
-	int_t x = 0, y = 0;
-	int_t prod = std::numeric_limits<int>::max();
-	xynode() {} // for stack allocation
-	xynode(int_t x_, int_t y_) : x(x_), y(y_) {
-		calctail();
-	}
-	//((x - F) * (y - F) * (x + y) == 0) => F;
-	//((x + F) * (y + F) * (x - y) == 0) => x == y ? y : x * y
-	inline void calctail() {
-		if (x == F || y == F || x == -y) prod = F;
-		else if (x == T || x == y) prod = y;
-		else if (y == T) prod = x;
-		else {
-			if (x > y) std::swap(x, y);
-			ite_memo m = { x, y, F };
-			auto it = C.find(m);
-			if (it != C.end()) prod = it->second;
-			else prod = std::numeric_limits<int>::max(); // ?
-		}
-	}
-};
-
-enum class StackState {
-	Tail,
-	Left,
-	Right,
-	Add
-};
-
-struct xyitem {
-	xynode node;
-	StackState state;
-	xynode right;
-	int_t val = 0, leftval = 0, rightval = 0;
-	xyitem() {} // for stack allocation
-	xyitem(const xynode& node, StackState state) :
-		node(node), state(state), right() {
-	}
-};
-
-#pragma pack(push, 1)
-struct xystackitem {
-	int_t x = 0, y = 0, tailval = std::numeric_limits<int>::max();
-	int_t state;
-	int_t rx = 0, ry = 0, rtailval = std::numeric_limits<int>::max();
-	int_t val = 0, leftval = 0, rightval = 0;
-	//xystackitem() {} // for stack allocation
-};
-#pragma pack(pop)
 
 class bdd {
 	friend class bdd_handle;
@@ -197,30 +142,7 @@ class bdd {
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
-	// x  y  =		x  y  =
-	// F     F		T  y  y
-	//    F  F		x  T  x
-	// x -x  F		x  x  x
-	// (x - F) * (y - F) * (x + y) == 0 => F
-	// (x + F) * (y + F) * (x - y) == 0 => x == y ? y : x * y
-	// pull out the exit condition in one place, it's mutable (x,y) for simplicity
-	inline static int_t calctailval(int& x, int& y) {
-		if (x == F || y == F || x == -y) return F;
-		if (x == T || x == y) return y;
-		if (y == T) return x;
-		if (x > y) std::swap(x, y);
-		ite_memo m = { x, y, F };
-		auto it = C.find(m);
-		if (it != C.end()) return it->second;
-		return std::numeric_limits<int>::max();
-	}
-
-	static int_t and_stack_ints(const int_t x, const int_t y);
-	static int_t and_stack(const int_t x, const int_t y);
-
 	static int_t bdd_and(int_t x, int_t y);
-	static int_t bdd_and_recursive(int_t x, int_t y);
-
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex,
 		std::unordered_map<std::array<int_t, 2>, int_t>& memo,
@@ -256,33 +178,7 @@ class bdd {
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
-
-	//inline static int_t add(int_t v, int_t h, int_t l);
-	inline static int_t add(int_t v, int_t h, int_t l) {
-		DBG(assert(h && l && v > 0);)
-		DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-		DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-		if (h == l) return h;
-		if (abs(h) < abs(l)) std::swap(h, l), v = -v;
-		static std::unordered_map<bdd_key, int_t>::const_iterator it;
-		static bdd_key k;
-		auto& mm = v < 0 ? Mn : Mp;
-		if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v) + 1);
-		auto& m = mm[abs(v)];
-		if (l < 0) {
-			k = bdd_key(hash_pair(-h, -l), -h, -l);
-			return	(it = m.find(k)) != m.end() ? -it->second :
-				(V.emplace_back(v, -h, -l),
-					m.emplace(std::move(k), V.size() - 1),
-					-V.size() + 1);
-		}
-		k = bdd_key(hash_pair(h, l), h, l);
-		return	(it = m.find(k)) != m.end() ? it->second :
-			(V.emplace_back(v, h, l),
-				m.emplace(std::move(k), V.size() - 1),
-				V.size() - 1);
-	}
-
+	inline static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
@@ -306,7 +202,6 @@ public:
 	}
 
 	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
-	static void initopts(bool usestack = false);
 };
 
 class bdd_handle {

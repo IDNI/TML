@@ -138,11 +138,6 @@ spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 	return ememo.emplace(x, r), r;
 }
 
-spbdd_handle tables::from_sym_not_eq(size_t p1, size_t p2, size_t args) const {
-	spbdd_handle iseq = from_sym_eq(p1, p2, args);
-	return bdd_handle::get(-iseq->b);
-}
-
 /*spbdd_handle tables::from_ground(const term& t) {
 	spbdd_handle r = bdd_handle::T;
 	for (size_t n = 0, args = t.size(); n != args; ++n)
@@ -174,8 +169,7 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	// D: I'm guessing that n = 1 is not a bug, but we want to skip the first symbol?
-	// (which is always there, till now, EQ/NEQ doesn't have that structure (VAR is first)
+	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
 	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
@@ -191,19 +185,8 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// NEQ/EQ:
-	if (r.iseq) {
-		auto ieq = r.iseq;
-	}
-	// D: EQ/NEQ: we're still giving eq it's own sig/table, as even though not used (as for
-	// the real relations), it's simply used to distinguish it from others (as it's a rel?)
-	// and term here seems to require (and assume we have a rel/sig/table), i.e. I think we
-	// may need it down the line, though eq/neq isn't really a typical rel in TML sense, is it?
-	// can we have a fact w/ eq, e.g. 1 == test (or something like that), and to make sense?
-	// If that's possible we'd need to keep table, facts and change the get_rules to include
-	// ts[].t for eq/neq as well?
-	// D: ints t is mapping elems (VAR, consts) to specific ints and are pushed to term (base).
-	// to be used for mapping/permutations later on.
+	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
+	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	return term(r.neg, r.iseq, get_table(sg), t);
 }
@@ -303,8 +286,6 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 		if (t[n] < 0)
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
-	// D: (bit_from_right, arg, args) => (bits - bit_from_right - 1) * args + arg
-	// D: why is this done only for negative 't[n] < 0' (guessing as it's F path? still why?)
 	return perm;
 }
 
@@ -351,8 +332,7 @@ map<size_t, int_t> varmap_inv(const varmap& vm) {
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
-	// D: // neq: body is created for each right-hand term 
-	b.neg = t.neg, b.iseq = t.iseq, b.tab = t.tab, b.perm = get_perm(t, vm, len),
+	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
 	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
 	varmap m;
 	auto it = m.end();
@@ -364,14 +344,6 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 		else	b.q = b.q && from_sym_eq(n, it->second, t.size()),
 			get_var_ex(n, t.size(), b.ex);
 	return b;
-
-	//if (b.iseq && t.size() == 2) {
-	//	if (b.neg) // NEQ
-	//		b.q = b.q && from_sym_not_eq(0, 1, t.size());
-	//	else // EQ
-	//		b.q = b.q && from_sym_eq(0, 1, t.size());
-	//}
-	//return b;
 }
 
 void tables::get_facts(const map<term, set<set<term>>>& m) {
@@ -461,29 +433,24 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
-		// D: alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
+		// alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
-			// D: t redefinition, t is header, and below is a body term, then header again
+			// t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
-				// D: EQ/NEQ: alt-level EQ-s
-				// pos(b, a.vm.at(t[0]), a.varslen)
-				// 2 is the magic #, we no longer have 3 terms, just vars/c-s are pushed
+				// alt-level EQ/NEQ-s (2 is the magic #, just 2 vars/consts elems).
+				// needs more testing w/ more vars, complex alt-s, works for x,y,const.
 				if (t.iseq && t.size() == 2) {
-					// in simple cases this maps to 0,1 so we're back where we were before.
-					// this needs more testing w/ more vars, complex alt-s, works for x,y,const
 					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-					if (t.neg) a.eq = a.eq && from_sym_not_eq(arg0, arg1, a.varslen);
+					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
 					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					// what if we're compunding, having complex (n)eq-s, not just vars/consts
-					// (is that possible?) 
+					continue; // no body for eq-s
 				}
-				// D: can we skip body here for eq? not sure cause of the below for (x : b)
-				// if so, we can then remove eq/neq from body_query (return ::T)
+				// body is created for each right-hand term (except eq/ineq)
 				b.insert({get_body(t, a.vm, a.varslen), t});
 			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
@@ -648,43 +615,6 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	
-	//sbdd_and_ex_perm(b.ex, b.perm, CXP[{b.ex, b.perm}], memos_perm_ex[{b.perm, b.ex}])
-	//	(b.q->b, ts[b.tab].t->b);
-
-	if (b.iseq) {
-		// D: EQ/NEQ: doesn't make sense permuting T, permuting returns T/F for leafs anyway.
-		// we need this (for now) as we still have this body, should we remove bodies for eq-s?
-		return (b.rlast = bdd_handle::T);
-
-		// D: EQ/NEQ: questions:
-		// - this is always TRUE: ts[b.tab].t == bdd_handle::F
-		// ts/facts don't exist for the ==/!= relation, i.e. that's always FALSE
-		// - b.q is already negated (if .neg) so no need to do it here
-		// - ts[] doesn't really make sense for EQ (it's always F), for now we're keeping an
-		// empty slot, just in case it's needed somewhere to distinguish (as it is a rel still)
-		// - (see the comment in from_raw_term, what if we could have a fact: 1 == "test")
-		// - could we have ~(?x != ?y) or ~(?x != 1) w/ a fact 1 == "test" somewhere
-		// (we'd need to keep neg separate from the neq neg as we'd need it for ts[] here?)
-		// and/or in case of having facts, we'd need to join the eq/neq in one eq table really?
-		// - we can't have ~(?x != ?y) at the moment, is that by design, ok?
-
-		// old code, keeping it for the moment to compare, till finished w alts.
-		//return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
-		// (we could just use bdd::bdd_permute_ex(...) but there's no overhead here & cleaner
-		// in case we need ts[] / facts for eq/neq
-		//if (ts[b.tab].t == bdd_handle::F)
-		//	return (b.rlast = bdd_and_ex_perm(bdd_handle::T, b.q, b.ex, b.perm));
-		//else {
-		//	// see above comments on neg and eq facts (if plausible)
-		//	return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-		//	//if (b.neg) // NEQ
-		//	//	return (b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-		//	//else // EQ
-		//	//	return (b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm));
-		//}
-	}
-
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
@@ -709,7 +639,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
 //	DBG(bdd::gc();)
-	// D: EQ/NEQ: we're adding 'eq' here and doing and_many in the end on all, should work?
+	// we're adding eq (EQ/NEQ) here and doing and_many in the end on all.
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	DBG(assert(!a.empty());)
@@ -763,7 +693,7 @@ char tables::fwd() {
 			v[n] = alt_query(*r[n], r.len);
 		spbdd_handle x;
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
-		// D: applying the r.eq and or-ing all alt-s
+		// applying the r.eq and or-ing all alt-s
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
 //		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == bdd_handle::F) continue;

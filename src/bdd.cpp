@@ -68,30 +68,30 @@ void bdd::init() {
 	bdd_handle::T = bdd_handle::get(T), bdd_handle::F = bdd_handle::get(F);
 }
 
-//int_t bdd::add(int_t v, int_t h, int_t l) {
-//	DBG(assert(h && l && v > 0);)
-//	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-//	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
-//	if (h == l) return h;
-//	if (abs(h) < abs(l)) swap(h, l), v = -v;
-//	static std::unordered_map<bdd_key, int_t>::const_iterator it;
-//	static bdd_key k;
-//	auto &mm = v < 0 ? Mn : Mp;
-//	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
-//	auto &m = mm[abs(v)];
-//	if (l < 0) {
-//		k = bdd_key(hash_pair(-h, -l), -h, -l);
-//		return	(it = m.find(k)) != m.end() ? -it->second :
-//			(V.emplace_back(v, -h, -l),
-//			m.emplace(std::move(k), V.size()-1),
-//			-V.size()+1);
-//	}
-//	k = bdd_key(hash_pair(h, l), h, l);
-//	return	(it = m.find(k)) != m.end() ? it->second :
-//		(V.emplace_back(v, h, l),
-//		m.emplace(std::move(k), V.size()-1),
-//		V.size()-1);
-//}
+int_t bdd::add(int_t v, int_t h, int_t l) {
+	DBG(assert(h && l && v > 0);)
+	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
+	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
+	if (h == l) return h;
+	if (abs(h) < abs(l)) swap(h, l), v = -v;
+	static std::unordered_map<bdd_key, int_t>::const_iterator it;
+	static bdd_key k;
+	auto &mm = v < 0 ? Mn : Mp;
+	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
+	auto &m = mm[abs(v)];
+	if (l < 0) {
+		k = bdd_key(hash_pair(-h, -l), -h, -l);
+		return	(it = m.find(k)) != m.end() ? -it->second :
+			(V.emplace_back(v, -h, -l),
+			m.emplace(std::move(k), V.size()-1),
+			-V.size()+1);
+	}
+	k = bdd_key(hash_pair(h, l), h, l);
+	return	(it = m.find(k)) != m.end() ? it->second :
+		(V.emplace_back(v, h, l),
+		m.emplace(std::move(k), V.size()-1),
+		V.size()-1);
+}
 
 int_t bdd::from_bit(uint_t b, bool v) {
 	return v ? add(b + 1, T, F) : add(b + 1, F, T);
@@ -108,23 +108,7 @@ bool bdd::bdd_subsumes(int_t x, int_t y) {
 	return bdd_subsumes(bx.h, by.h) && bdd_subsumes(bx.l, by.l);
 }
 
-int stackdepth = 0, maxstackdepth = 0;
-clock_t total = 0;
-int countand = 0;
-bool usestack = false;
-
 int_t bdd::bdd_and(int_t x, int_t y) {
-	return and_stack_ints(x, y);
-	//return bdd_and_recursive(x, y);
-	int_t retval;
-	if (usestack)
-		retval = and_stack_ints(x, y);
-	else
-		retval = bdd_and_recursive(x, y);
-	return retval;
-}
-
-int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 	DBG(assert(x && y);)
 	if (x == F || y == F || x == -y) return F;
 	if (x == T || x == y) return y;
@@ -134,10 +118,10 @@ int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 	if (C.size() >= gclimit) {
 		const bdd bx = get(x), by = get(y);
 		if (bx.v < by.v)
-			return add(bx.v, bdd_and_recursive(bx.h, y), bdd_and_recursive(bx.l, y));
+			return add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
 		else if (bx.v > by.v)
-			return add(by.v, bdd_and_recursive(x, by.h), bdd_and_recursive(x, by.l));
-		return add(bx.v, bdd_and_recursive(bx.h, by.h), bdd_and_recursive(bx.l, by.l));
+			return add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
+		return add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 	}
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
@@ -145,210 +129,13 @@ int_t bdd::bdd_and_recursive(int_t x, int_t y) {
 #endif
 	const bdd bx = get(x), by = get(y);
 	int_t r;
-	if (bx.v < by.v) r = add(bx.v, bdd_and_recursive(bx.h, y), bdd_and_recursive(bx.l, y));
-	else if (bx.v > by.v) r = add(by.v, bdd_and_recursive(x, by.h), bdd_and_recursive(x, by.l));
-	else r = add(bx.v, bdd_and_recursive(bx.h, by.h), bdd_and_recursive(bx.l, by.l));
+	if (bx.v < by.v) r = add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
+	else if (bx.v > by.v) r = add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
+	else r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	C.emplace(m, r);
 #endif
 	return r;
-}
-
-//vector<xystackitem> istack(100); // (200); // 20000);
-constexpr int STACK_SIZE = 8000;
-constexpr int SIZE = sizeof(xystackitem) / sizeof(int);
-int istack[STACK_SIZE]; // 200 stack items
-
-int_t bdd::and_stack_ints(const int_t x, const int_t y) {
-	DBG(assert(x && y););
-
-	int ipop = -1;
-	int_t value;
-	DBG(assert(SIZE == 10););
-
-	xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
-	item.x = x;
-	item.y = y;
-	item.tailval = calctailval(item.x, item.y);
-	item.state = 0; // StackState::Tail;
-
-	while (ipop >= 0) { //!istack.empty()) {
-		xystackitem& stackinfo = reinterpret_cast<xystackitem&>(istack[(ipop--) * SIZE]);
-
-		int_t& x = stackinfo.x;
-		int_t& y = stackinfo.y;
-
-		switch (stackinfo.state) {
-		case 0: //StackState::Tail:
-		{
-			bool istail = stackinfo.tailval < std::numeric_limits<int>::max();
-			if (istail) {
-				value = stackinfo.tailval;
-				break;
-			}
-
-			// we're not tail, get left/right nodes and dive deeper...
-			std::array<int_t, 5> forkarr;
-			const bdd bx = get(x), by = get(y);
-			if (bx.v < by.v) forkarr = { bx.v, bx.h, y, bx.l, y };
-			else if (bx.v > by.v) forkarr = { by.v, x, by.h, x, by.l };
-			else forkarr = { bx.v, bx.h, by.h, bx.l, by.l };
-
-			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
-			item.x = stackinfo.x;
-			item.y = stackinfo.y;
-			item.tailval = stackinfo.tailval;
-			item.rx = forkarr[3];
-			item.ry = forkarr[4];
-			item.rtailval = calctailval(item.rx, item.ry);
-			item.val = forkarr[0]; // fork.val;
-			item.state = 1; // StackState::Left;
-
-			DBG(assert(int(STACK_SIZE / SIZE) - 1 > ipop););
-			{
-				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
-				item.x = forkarr[1];
-				item.y = forkarr[2];
-				item.tailval = calctailval(item.x, item.y);
-				item.state = 0; // StackState::Tail;
-			}
-			// doesn't matter what the 'value' is, only taken into account if we're a tail
-			// (as in that case we're not pushing and the next pop expects left or right val).
-			// In this case we've pushed more nodes, so the next, our left child, doesn't care.
-			// Next will be us again expecting a real value from the left child.
-			// values are returned on tail condition, or on Right when we 'add' => value.
-			break;
-		}
-		case 1: //StackState::Left:
-		{
-			xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
-			item.x = stackinfo.x;
-			item.y = stackinfo.y;
-			item.tailval = stackinfo.tailval;
-			item.val = stackinfo.val;
-			item.leftval = value;
-			item.state = 2; // StackState::Right;
-
-			DBG(assert(int(STACK_SIZE / SIZE) - 1 > ipop););
-			{
-				xystackitem& item = reinterpret_cast<xystackitem&>(istack[(++ipop) * SIZE]);
-				item.x = stackinfo.rx;
-				item.y = stackinfo.ry;
-				item.tailval = stackinfo.rtailval;
-				item.state = 0; // StackState::Tail;
-			}
-			break;
-		}
-		case 2: //StackState::Right:
-		{
-			stackinfo.rightval = value;
-			int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
-			ite_memo m = { x, y, F };
-			C.emplace(m, r);
-			value = r;
-			break;
-		}
-		default:
-			throw 0;
-		}
-	}
-	return value;
-}
-
-vector<xyitem> stack(100); // (200); // 20000);
-
-int_t bdd::and_stack(const int_t x, const int_t y) {
-	DBG(assert(x && y););
-	DBG(assert(int(stack.size() > 0)););
-
-	int ntries = 0;
-	int ipop = -1;
-	int_t value;
-
-	xyitem& item = stack[++ipop];
-	item.node.x = x;
-	item.node.y = y;
-	item.node.calctail();
-	item.state = StackState::Tail;
-
-	while (ipop >= 0) { //!stack.empty()) {
-		xyitem& stackinfo = stack[ipop--];
-
-		xynode& node = stackinfo.node;
-		StackState state = stackinfo.state;
-		int_t& x = node.x;
-		int_t& y = node.y;
-
-		switch (state) {
-			case StackState::Tail:
-			{
-				bool istail = node.prod < std::numeric_limits<int>::max();
-				if (istail) {
-					value = node.prod;
-					break;
-				}
-
-				// we're not tail, get left/right nodes and dive deeper...
-				std::array<int_t, 5> forkarr; // [5] ;
-				const bdd bx = get(x), by = get(y);
-				if (bx.v < by.v) forkarr = { bx.v, bx.h, y, bx.l, y };
-				else if (bx.v > by.v) forkarr = { by.v, x, by.h, x, by.l };
-				else forkarr = { bx.v, bx.h, by.h, bx.l, by.l };
-
-				xyitem& item = stack[++ipop];
-				item.node.x = stackinfo.node.x;
-				item.node.y = stackinfo.node.y;
-				item.node.prod = stackinfo.node.prod;
-				item.right.x = forkarr[3];
-				item.right.y = forkarr[4];
-				item.right.calctail();
-				item.val = forkarr[0]; // fork.val;
-				item.state = StackState::Left;
-
-				DBG(assert(int(stack.size()) - 1 > ipop););
-				{
-					xyitem& item = stack[++ipop];
-					item.node.x = forkarr[1];
-					item.node.y = forkarr[2];
-					item.node.calctail();
-					item.state = StackState::Tail;
-				}
-				break;
-			}
-			case StackState::Left:
-			{
-				xyitem& item = stack[++ipop];
-				item.node.x = stackinfo.node.x;
-				item.node.y = stackinfo.node.y;
-				item.node.prod = stackinfo.node.prod;
-				item.val = stackinfo.val;
-				item.leftval = value;
-				item.state = StackState::Right;
-
-				DBG(assert(int(stack.size()) - 1 > ipop););
-				{
-					xyitem& item = stack[++ipop];
-					item.node.x = stackinfo.right.x;
-					item.node.y = stackinfo.right.y;
-					item.node.prod = stackinfo.right.prod;
-					item.state = StackState::Tail;
-				}
-				break;
-			}
-			case StackState::Right:
-			{
-				stackinfo.rightval = value;
-				int_t r = add(stackinfo.val, stackinfo.leftval, stackinfo.rightval);
-				ite_memo m = { x, y, F };
-				C.emplace(m, r);
-				value = r;
-				break;
-			}
-			default:
-				throw 0;
-		}
-	}
-	return value;
 }
 
 int_t bdd::bdd_ite_var(uint_t x, int_t y, int_t z) {
@@ -1205,11 +992,4 @@ wostream& bdd::out(wostream& os, int_t x) {
 	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
 	const bdd b = get(x);
 	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
-}
-
-void bdd::initopts(bool usestackopt)
-{
-	if (usestackopt) {
-		usestack = true;
-	}
 }

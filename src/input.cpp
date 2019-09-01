@@ -186,28 +186,24 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos, curr2;
 	lexeme s = l[pos];
-	// neq: NOT is set here (ast) but neg may change below, what happens to ast? 
 	if ((neg = *l[pos][0] == L'~')) an_o(NOT, 0), ++pos;
-	// neq: include both EQ and NEQ here to parse, then decide how to save
 	curr2 = pos; bool rel = false, noteq = false, eq = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(L"unexpected end of file", s[0]);
-		// neq:
 		noteq = noteq || e.back().type == elem::NEQ; 
 		eq = eq || e.back().type == elem::EQ;
 		if (!rel) an_of(REL, -1, curr2), rel = true;
 	}
 	if (e.empty()) return false;
-	// neq: provide specific error messages. Also, something better to group?
+	// TODO: provide specific error messages. Also, something better to group?
 	if (noteq || eq) {
 		if (e.size() < 3) parse_error(err_term_or_dot, l[pos]);
-		// only supporting smth != smthelse (3-parts), what about parenth-s?
+		// only supporting smth != smthelse (3-parts) and negation in front (no parentheses).
 		if (e[1].type != elem::NEQ &&
 			e[1].type != elem::EQ)
 			parse_error(err_term_or_dot, l[pos]);
-		// the question is what to do w/ the ast set already, see above (maybe it should stay)
 		if (noteq) 
 			neg = !neg; // flip the negation as we have the NEQ, don't do it for EQ ofc
 		iseq = true;

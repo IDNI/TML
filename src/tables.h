@@ -37,7 +37,7 @@ template<typename T> struct ptrcmp {
 typedef std::function<void(size_t,size_t,size_t, std::vector<term>)> cb_ground;
 
 struct body {
-	bool neg, iseq = false, ext = false;
+	bool neg, ext = false;
 	struct alt *a = 0;
 	ntable tab;
 	bools ex;
@@ -47,7 +47,6 @@ struct body {
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
-		if (iseq != t.iseq) return iseq < t.iseq;
 		if (ext != t.ext) return ext;
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
@@ -69,7 +68,6 @@ struct alt : public std::vector<body*> {
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
-		// D: do we need this for eq?
 		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
@@ -166,7 +164,6 @@ class tables {
 	}
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
 	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args) const;
-	spbdd_handle from_sym_not_eq(size_t p1, size_t p2, size_t args) const;
 
 	void add_bit();
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
