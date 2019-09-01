@@ -603,8 +603,7 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
-	// DBG(wcout << endl << f << endl;);
-	// DBG(wcout<<"bin before:"<<endl<<f<<endl;)
+//	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),

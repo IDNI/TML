@@ -262,14 +262,6 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
 	strs_t strtrees;
 	if (opts.enabled(L"proof")) tbl.set_proof(true);
-	//if (opts.enabled(L"stack")) {
-	//	output::to(L"info") << "stack defined: " << endl;
-	//	bdd::initopts(true);
-	//}
-	//else {
-	//	output::to(L"info") << "stack not defined: " << endl;
-	//}
-
 	output_ast();
 	for (size_t n = 0; n != rp.p.size(); ++n) {
 		prog_run(rp, n, strtrees);

@@ -151,6 +151,7 @@ spbdd_handle tables::from_sym_not_eq(size_t p1, size_t p2, size_t args) const {
 }*/
 
 spbdd_handle tables::from_fact(const term& t) {
+	// TODO: memoize
 	spbdd_handle r = bdd_handle::T;
 	static varmap vs;
 	vs.clear();
@@ -376,9 +377,9 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 void tables::get_facts(const map<term, set<set<term>>>& m) {
 	map<ntable, set<spbdd_handle>> f;
 	for (const auto& r : m)
-		if (r.second.empty())
-			(r.first.goal ? goals : f)[r.first.tab].insert(
-				from_fact(r.first));
+		if (!r.second.empty()) continue;
+		else if (r.first.goal) goals.insert(r.first);
+		else f[r.first.tab].insert(from_fact(r.first));
 	clock_t start, end;
 	measure_time_start();
 	bdd_handles v;
@@ -504,7 +505,8 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 				r.push_back(aa), alt::s.insert(aa);
 		rs.insert(r);
 	}
-	for (rule r : rs) rules.push_back(r);
+	for (rule r : rs)
+		ts[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
 /*	if (!optimize) for (rule r : rs) rules.push_back(r);
 	else {
 		for (rule r : rs)
@@ -685,7 +687,10 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
-
+//	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
+//	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
+//	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
+//	return b.rlast;
 //	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
 //			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
@@ -784,11 +789,12 @@ level tables::get_front() const {
 
 bool tables::pfp() {
 	set<level> s;
+	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
 		output::to(L"info") << "step: " << nstep++ << endl;
 		if (!fwd()) {
-			if (bproof) get_proof();
+//			if (bproof) get_proof(true);
 			return true;
 		}
 		l = get_front();
