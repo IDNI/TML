@@ -342,9 +342,9 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 void tables::get_facts(const map<term, set<set<term>>>& m) {
 	map<ntable, set<spbdd_handle>> f;
 	for (const auto& r : m)
-		if (r.second.empty())
-			(r.first.goal ? goals : f)[r.first.tab].insert(
-				from_fact(r.first));
+		if (!r.second.empty()) continue;
+		else if (r.first.goal) goals.insert(r.first);
+		else f[r.first.tab].insert(from_fact(r.first));
 	clock_t start, end;
 	measure_time_start();
 	bdd_handles v;

@@ -34,7 +34,7 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
-typedef function<void(size_t, size_t, size_t, std::vector<term>)> cb_ground;
+typedef std::function<void(size_t,size_t,size_t, std::vector<term>)> cb_ground;
 
 struct body {
 	bool neg, ext = false;
@@ -106,6 +106,18 @@ struct table {
 class tables {
 	typedef std::function<void(const raw_term&)> rt_printer;
 	typedef std::function<void(const term&)> cb_decompress;
+
+	struct witness {
+		size_t rl, al;
+		std::vector<term> b;
+		witness(size_t rl, size_t al, const std::vector<term>& b) :
+			rl(rl), al(al), b(b) {}
+		bool operator<(const witness& t) const {
+			if (rl != t.rl) return rl < t.rl;
+			if (al != t.al) return al < t.al;
+			return b < t.b;
+		}
+	};
 
 	size_t nstep = 0;
 	std::vector<table> ts;
@@ -181,9 +193,13 @@ class tables {
 		size_t len = 0) const;
 	std::set<term> decompress();
 	std::vector<env> varbdd_to_subs(const alt* a, cr_spbdd_handle v) const;
-	void rule_get_grounds(size_t rl, size_t level, cb_ground f);
+	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
+		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
+	std::set<witness> get_witnesses(const term& t, size_t l);
+	std::set<struct proof_elem*> get_proof(const term& q, size_t l);
 	void print_env(const env& e, const rule& r) const;
+	void print_env(const env& e) const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;

@@ -268,7 +268,7 @@ wostream& operator<<(wostream& os, const options& o) {
 	return os << o.opts;
 }
 
-void tables::print_env(const env& e) const {
+/*void tables::print_env(const env& e) const {
 	for (auto x : e) {
 		int_t arg = r[n - 1];
 		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
@@ -277,4 +277,4 @@ void tables::print_env(const env& e) const {
 		wcout << x.first << " = " << x.second << endl;
 	}
 	return os;
-}
+}*/

@@ -40,25 +40,57 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
 	for (size_t n = 0; n != rules[rl].size(); ++n) {
 		const alt *a = rules[rl][n];
-		spbdd_handle t = a->levels[level] && h;
+		spbdd_handle t = a->levels.at(level) && h;
 		if (t == bdd_handle::F) continue;
 		if (level) {
 			auto it = a->levels.find(level - 1);
 			if (it != a->levels.end()) t = t % it->second;
 		}
 		for (const env& e : varbdd_to_subs(a, t))
-			f(rl, level, n, move(subs_to_rule(rules[rl], a, v, e)));
+			f(rl, level, n, move(subs_to_rule(rules[rl], a, e)));
 	}
 }
 
 void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 	spbdd_handle h = from_fact(t);
-	for (size_t r : ts[t.tab])
+	for (size_t r : ts[t.tab].r)
 		if (rules[r].neg == t.neg)
-			rule_get_grounds(t, r, level, f);
+			rule_get_grounds(h, r, level, f);
 }
 
-struct proof {
+set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
+	set<witness> r;
+	term_get_grounds(t, l, [&r](size_t rl, size_t, size_t al,
+		const vector<term>& b) { r.emplace(rl, al, b); });
+	return r;
+}
+
+struct proof_elem {
+	term t;
+	size_t rl, al, level;
+	set<vector<set<proof_elem*>>> s;
+	proof_elem(const term& t, size_t rl, size_t al, size_t level) :
+		t(t), rl(rl), al(al), level(level) {}
+};
+
+set<proof_elem*> tables::get_proof(const term& q, size_t l) {
+	set<proof_elem*> r;
+	set<witness> s;
+	size_t n;
+	vector<set<proof_elem*>> v;
+	proof_elem *p;
+	while ((s = get_witnesses(q, l)).empty()) --l;
+	for (const witness& w : s) {
+		r.insert(p = new proof_elem(q, l, w.rl, w.al));
+		if (!l) continue;
+		for (v.resize(w.b.size()), n = 0; n != v.size(); ++n)
+			v[n] = move(get_proof(w.b[n], l - 1));
+		p->s.insert(v);
+	}
+	return r;
+}
+
+/*struct proof {
 	struct node {
 		term t;
 		size_t level, rl, al;
@@ -127,4 +159,4 @@ set<proof_elem> tables::term_get_proof(const term& q, size_t level) {
 	for (auto x : m)
 		for (size_t y : ts[x.first.tab].r)
 			rule_get_grounds(y, level, f);
-}
+}*/
