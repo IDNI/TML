@@ -55,7 +55,7 @@ struct body {
 };
 
 struct alt : public std::vector<body*> {
-	spbdd_handle rng = bdd_handle::T, rlast = bdd_handle::F;
+	spbdd_handle rng = bdd_handle::T, eq = bdd_handle::T, rlast = bdd_handle::F;
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
@@ -68,6 +68,7 @@ struct alt : public std::vector<body*> {
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
+		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
 };
@@ -173,6 +174,8 @@ class tables {
 	void range_clear_memo() { range_memo.clear(); }
 
 	sig get_sig(const raw_term& t);
+	sig get_sig(const lexeme& rel, const ints& arity);
+
 	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	template<typename T>

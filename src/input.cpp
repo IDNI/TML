@@ -68,6 +68,13 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else parse_error(err_chr, *s);
 	}
+	// neq: make sure we don't turn off directives (single '!'). limits?
+	if (**s == L'!' && *(*s + 1) == L'=') {
+		return *s += 2, lexeme{ *s - 2, *s };
+	}
+	if (**s == L'=' && *(*s + 1) == L'=') {
+		return *s += 2, lexeme{ *s - 2, *s };
+	}
 	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(err_chr, *s);
@@ -148,6 +155,15 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   an_t(type),true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, an_t(type),true;
 	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,an_t(type),true;
+	// neq: should we check for any limits here?
+	if (L'!' == l[pos][0][0] &&
+		L'=' == l[pos][0][1]) {
+		return e = l[pos++], type = NEQ, an_t(type), true;
+	}
+	if (L'=' == l[pos][0][0] &&
+		L'=' == l[pos][0][1]) {
+		return e = l[pos++], type = EQ, an_t(type), true;
+	}
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
@@ -171,14 +187,28 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos, curr2;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) an_o(NOT, 0), ++pos;
-	curr2 = pos; bool rel = false;
+	curr2 = pos; bool rel = false, noteq = false, eq = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(L"unexpected end of file", s[0]);
+		noteq = noteq || e.back().type == elem::NEQ; 
+		eq = eq || e.back().type == elem::EQ;
 		if (!rel) an_of(REL, -1, curr2), rel = true;
 	}
 	if (e.empty()) return false;
+	// TODO: provide specific error messages. Also, something better to group?
+	if (noteq || eq) {
+		if (e.size() < 3) parse_error(err_term_or_dot, l[pos]);
+		// only supporting smth != smthelse (3-parts) and negation in front (no parentheses).
+		if (e[1].type != elem::NEQ &&
+			e[1].type != elem::EQ)
+			parse_error(err_term_or_dot, l[pos]);
+		if (noteq) 
+			neg = !neg; // flip the negation as we have the NEQ, don't do it for EQ ofc
+		iseq = true;
+		return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
+	}
 	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
 	if (e.size() == 1) return an(TERM), (neg ? an(NEG) : an(POS)),
 		calc_arity(), true;
@@ -310,6 +340,7 @@ bool operator==(const lexeme& x, const lexeme& y) {
 
 bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
+	if (x.iseq != y.iseq) return x.iseq < y.iseq;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;

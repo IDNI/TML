@@ -57,7 +57,7 @@ set(TML_PGO_OPTIONS
 
 set(TML_COMPILE_OPTIONS
 	"$<IF:$<CONFIG:Debug>,${TML_DEBUG_OPTIONS},${TML_RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto>"
+	"$<$<CONFIG:Release>:-flto -fno-threadsafe-statics>"
 	${TML_PGO_OPTIONS}
 )
 set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})

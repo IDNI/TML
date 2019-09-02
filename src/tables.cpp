@@ -162,11 +162,15 @@ spbdd_handle tables::from_fact(const term& t) {
 }
 
 sig tables::get_sig(const raw_term&t) {return{dict.get_rel(t.e[0].e),t.arity};}
+sig tables::get_sig(const lexeme& rel, const ints& arity) {
+	return { dict.get_rel(rel), arity };
+}
 
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	for (size_t n = 1; n < r.e.size(); ++n)
+	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
+	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -181,7 +185,10 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	return term(r.neg, get_table(get_sig(r)), t);
+	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
+	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
+	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	return term(r.neg, r.iseq, get_table(sg), t);
 }
 
 void tables::out(wostream& os) const {
@@ -206,7 +213,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, tab, ints(len, 0));
+		term r(false, false, tab, ints(len, 0));
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -426,14 +433,25 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
+		// alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
-			for (const term& t : al)
+			// t redefinition, t is header, and below is a body term, then header again
+			for (const term& t : al) {
+				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
+				if (t.iseq && t.size() == 2) {
+					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
+					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
+					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
+					continue; // no body for eq-s
+				}
+				// body is created for each right-hand term (except eq/ineq)
 				b.insert({get_body(t, a.vm, a.varslen), t});
+			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
 			for (auto x : b) {
 				a.t.push_back(x.second);
@@ -620,7 +638,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
 //	DBG(bdd::gc();)
-	bdd_handles v1 = { a.rng };
+	// we're adding eq (EQ/NEQ) here and doing and_many in the end on all.
+	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	DBG(assert(!a.empty());)
 	for (size_t n = 0; n != a.size(); ++n)
@@ -673,6 +692,7 @@ char tables::fwd() {
 			v[n] = alt_query(*r[n], r.len);
 		spbdd_handle x;
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
+		// applying the r.eq and or-ing all alt-s
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
 //		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == bdd_handle::F) continue;

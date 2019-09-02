@@ -14,12 +14,14 @@
 
 struct term : public ints {
 	bool neg, goal = false;
+	bool iseq;
 	ntable tab;
 	term() {}
-	term(bool neg, ntable tab, const ints& args) :
-		ints(args), neg(neg), tab(tab) {}
+	term(bool neg, bool eq, ntable tab, const ints& args) :
+		ints(args), neg(neg), iseq(eq), tab(tab) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
+		if (iseq != t.iseq) return iseq < t.iseq;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		return (const ints&)*this < t;
