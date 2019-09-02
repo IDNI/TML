@@ -442,8 +442,7 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			a.inv = varmap_inv(a.vm);
 			// t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
-				// alt-level EQ/NEQ-s (2 is the magic #, just 2 vars/consts elems).
-				// needs more testing w/ more vars, complex alt-s, works for x,y,const.
+				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
 				if (t.iseq && t.size() == 2) {
 					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
 					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
