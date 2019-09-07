@@ -37,7 +37,7 @@ template<typename T> struct ptrcmp {
 typedef std::function<void(size_t,size_t,size_t, std::vector<term>)> cb_ground;
 
 struct body {
-	bool neg, ext = false;
+	bool neg, iseq = false, ext = false;
 	struct alt *a = 0;
 	ntable tab;
 	bools ex;

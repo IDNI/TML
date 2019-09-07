@@ -169,8 +169,17 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
+	// EQ/NEQ: all previous terms had a SYM, so make EQ/NEQ have that same format.
+	if (r.iseq) {
+		auto iseqineq = r.iseq;
+		//if (r.neg)
+		//	t.push_back(dict.get_sym(dict.get_lexeme(L"_not_equals_")));
+		//else
+		//	t.push_back(dict.get_sym(dict.get_lexeme(L"_equals_")));
+	}
 	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
-	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
+	//for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n) {
+	for (size_t n = r.iseq ? 1 : 1; n < r.e.size(); ++n) {
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -182,12 +191,15 @@ term tables::from_raw_term(const raw_term& r) {
 				t.push_back(dict.get_sym(dict.get_lexeme(
 					_unquote(lexeme2str(l)))));
 				break;
-			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
+			case elem::SYM: 
+				t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
+	}
 	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
 	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
-	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	//sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	sig sg = r.iseq ? get_sig(r) : get_sig(r);
 	return term(r.neg, r.iseq, get_table(sg), t);
 }
 
@@ -236,9 +248,12 @@ raw_term tables::to_raw_term(const term& r) const {
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
 	for (size_t n = 1; n != args + 1; ++n) {
 		int_t arg = r[n - 1];
-		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
-		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
-		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+		if (arg & 1) 
+			rt.e[n]=elem((wchar_t)(arg>>2));
+		else if (arg & 2) 
+			rt.e[n]=elem((int_t)(arg>>2));
+		else 
+			rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 	}
 	return	rt.arity = get<ints>(ts[r.tab].s),
 	      	rt.insert_parens(dict.op, dict.cl), rt;
@@ -332,7 +347,7 @@ map<size_t, int_t> varmap_inv(const varmap& vm) {
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
-	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
+	b.neg = t.neg, b.iseq = t.iseq, b.tab = t.tab, b.perm = get_perm(t, vm, len),
 	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
 	varmap m;
 	auto it = m.end();
@@ -443,11 +458,11 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			// t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
 				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
-				if (t.iseq && t.size() == 2) {
+				if (t.iseq) { // && t.size() == 2) {
 					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
 					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
 					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					continue; // no body for eq-s
+					//continue; // no body for eq-s
 				}
 				// body is created for each right-hand term (except eq/ineq)
 				b.insert({get_body(t, a.vm, a.varslen), t});
@@ -614,6 +629,8 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
+	if (b.iseq) 
+		return (b.rlast = bdd_handle::T);
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)

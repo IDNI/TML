@@ -53,6 +53,7 @@ struct raw_term {
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
+	//bool parse_raw(const lexemes& l, size_t& pos);
 	void calc_arity();
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
