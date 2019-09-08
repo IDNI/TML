@@ -59,30 +59,35 @@ spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 			leq_const(c, arg, args, bit));
 }
 
-void tables::range(size_t arg, size_t args, bdd_handles& v) {
+void tables::range(size_t arg, size_t args, bdd_handles& v, int_t arity) {
 	spbdd_handle	ischar= ::from_bit(pos(0, arg, args), true) &&
 			::from_bit(pos(1, arg, args), false);
 	spbdd_handle	isnum = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), true);
 	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), false);
+	// ~UNIVERSE: this seems to be the problem, 'nums' is 2, and 0,1 is what mknum produces. 
+	// for ==1 it makes sense to skip the nums, otherwise include it (if pair etc.)
+	int_t fixednums = arity > 1? nums : nums - 1;
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
 			leq_const(mkchr(chars-1), arg, args, bits))),
 		(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
-			leq_const(mknum(nums-1), arg, args, bits))),
+			leq_const(mknum(fixednums), arg, args, bits))),
 		(!syms 	? bdd_handle::T%issym : bdd_impl(issym,
 			leq_const(((syms-1)<<2), arg, args, bits)))};
+		//(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
+		//	leq_const(mknum(nums-1), arg, args, bits))),
 	v.insert(v.end(), r.begin(), r.end());
 }
 
-spbdd_handle tables::range(size_t arg, ntable tab) {
+spbdd_handle tables::range(size_t arg, ntable tab, int_t arity) {
 	array<int_t, 6> k = { syms, nums, chars, (int_t)tab, (int_t)arg,
 		(int_t)bits };
 	auto it = range_memo.find(k);
 	if (it != range_memo.end()) return it->second;
 	bdd_handles v;
-	return	range(arg, ts[tab].len, v),
+	return	range(arg, ts[tab].len, v, arity),
 		range_memo[k] = bdd_and_many(move(v));
 }
 
@@ -156,7 +161,7 @@ spbdd_handle tables::from_fact(const term& t) {
 			r = r && from_sym(n, args, t[n]);
 		else if (vs.end() == (it = vs.find(t[n]))) {
 			vs.emplace(t[n], n);
-			if (!t.neg) r = r && range(n, t.tab);
+			if (!t.neg) r = r && range(n, t.tab, t.singlearity());
 		} else r = r && from_sym_eq(n, it->second, args);
 	return r;
 }
@@ -169,17 +174,12 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	// EQ/NEQ: all previous terms had a SYM, so make EQ/NEQ have that same format.
-	if (r.iseq) {
-		auto iseqineq = r.iseq;
-		//if (r.neg)
-		//	t.push_back(dict.get_sym(dict.get_lexeme(L"_not_equals_")));
-		//else
-		//	t.push_back(dict.get_sym(dict.get_lexeme(L"_equals_")));
-	}
+	//if (r.iseq) {
+	//	auto iseqineq = r.iseq;
+	//}
 	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
-	//for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n) {
-	for (size_t n = r.iseq ? 1 : 1; n < r.e.size(); ++n) {
+	//for (size_t n = r.iseq ? 1 : 1; n < r.e.size(); ++n)
+	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -191,16 +191,14 @@ term tables::from_raw_term(const raw_term& r) {
 				t.push_back(dict.get_sym(dict.get_lexeme(
 					_unquote(lexeme2str(l)))));
 				break;
-			case elem::SYM: 
-				t.push_back(dict.get_sym(r.e[n].e));
+			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	}
 	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
 	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
-	//sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
-	sig sg = r.iseq ? get_sig(r) : get_sig(r);
-	return term(r.neg, r.iseq, get_table(sg), t);
+	//sig sg = r.iseq ? get_sig(r) : get_sig(r);
+	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	return term(r.neg, r.iseq, get_table(sg), t, r.arity);
 }
 
 void tables::out(wostream& os) const {
@@ -225,7 +223,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, false, tab, ints(len, 0));
+		term r(false, false, tab, ints(len, 0), ints{0});
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -252,8 +250,18 @@ raw_term tables::to_raw_term(const term& r) const {
 			rt.e[n]=elem((wchar_t)(arg>>2));
 		else if (arg & 2) 
 			rt.e[n]=elem((int_t)(arg>>2));
-		else 
-			rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+		else { // iseq // ~UNIVERSE:
+			rt.e[n] = elem(elem::SYM, dict.get_sym(arg));
+			//if (r.iseq) {
+			//	if (r.neg)
+			//		rt.e[n] = elem(elem::NEQ, dict_t::new_lexeme(L"NEQ"));
+			//	else
+			//		rt.e[n] = elem(elem::EQ, dict_t::new_lexeme(L"NEQ"));
+			//}
+			//else {
+			//	rt.e[n] = elem(elem::EQ, dict_t::new_lexeme(L"NEQ"));
+			//}
+		}
 	}
 	return	rt.arity = get<ints>(ts[r.tab].s),
 	      	rt.insert_parens(dict.op, dict.cl), rt;
@@ -320,18 +328,32 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
 	set<int_t> pvars, nvars;
-	for (const term& t : a)
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0) (t.neg ? nvars : pvars).insert(t[n]);
+	map<int_t, int_t> nvarity;
+	for (const term& t : a) {
+		for (size_t n = 0; n != t.size(); ++n) {
+			if (t[n] < 0) {
+				//(t.neg ? nvars : pvars).insert(t[n]);
+				if (t.neg) {
+					int_t ivar = t[n];
+					nvars.insert(ivar);
+					// TODO: how to handle multiple arity? we only care if one & > 1
+					nvarity[ivar] = t.singlearity();
+				}
+				else
+					pvars.insert(t[n]);
+			}
+		}
+	}
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
 	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v);
+	// ~UNIVERSE: iseq:
+	for (int_t i : nvars) range(vm.at(i), len, v, nvarity[i]);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
-		for (int_t i : hvars) range(vm.at(i), len, v);
+		for (int_t i : hvars) range(vm.at(i), len, v, h.singlearity());
 	}
 	return bdd_and_many(v);
 }

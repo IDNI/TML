@@ -169,8 +169,8 @@ class tables {
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit)
 		const;
-	void range(size_t arg, size_t args, bdd_handles& v);
-	spbdd_handle range(size_t arg, ntable tab);
+	void range(size_t arg, size_t args, bdd_handles& v, int_t arity);
+	spbdd_handle range(size_t arg, ntable tab, int_t arity);
 	void range_clear_memo() { range_memo.clear(); }
 
 	sig get_sig(const raw_term& t);

@@ -184,6 +184,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	return ++pos, an_t(type), true;
 }
 
+// EQ/NEQ: all previous terms had a SYM, so make EQ/NEQ have that same format.
 //bool raw_term::parse_ex(const lexemes& l, size_t& pos) {
 //	bool success = parse_raw(l, pos);
 //	if (success && iseq) {
@@ -251,6 +252,10 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity() {
 	size_t dep = 0;
 	arity = {0};
+	if (iseq) {
+		arity = { 2 };
+		return;
+	}
 	if (e.size() == 1) return;
 	for (size_t n = 2; n < e.size()-1; ++n)
 		if (e[n].type == elem::OPENP) ++dep, arity.push_back(-1);
