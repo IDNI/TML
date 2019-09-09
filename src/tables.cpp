@@ -68,7 +68,7 @@ void tables::range(size_t arg, size_t args, bdd_handles& v, int_t arity) {
 			::from_bit(pos(1, arg, args), false);
 	// ~UNIVERSE: this seems to be the problem, 'nums' is 2, and 0,1 is what mknum produces. 
 	// for ==1 it makes sense to skip the nums, otherwise include it (if pair etc.)
-	int_t fixednums = arity > 1? nums : nums - 1;
+	int_t fixednums = arity > 1 ? nums : nums; // : nums - 1;
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
 			leq_const(mkchr(chars-1), arg, args, bits))),

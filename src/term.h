@@ -28,7 +28,6 @@ struct term : public ints {
 		return (const ints&)*this < t;
 	}
 	void replace(const std::map<int_t, int_t>& m);
-	//inline int_t singlearity() const { return iseq ? 2 : 0; }
 	inline int_t singlearity() const 
 	{ return iseq ? 2 : (arity.size() == 1 ? arity[0] : 0); }
 };
