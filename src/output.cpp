@@ -268,6 +268,20 @@ wostream& operator<<(wostream& os, const options& o) {
 	return os << o.opts;
 }
 
+void tables::print(wostream& os, const tables::proof_elem& e) {
+	os << e.rl << L',' << e.al << L' ';
+	for (size_t n = 0; n != e.b.size(); ++n)
+		os << e.b[n].first << L' ' << to_raw_term(e.b[n].second)<<L' ';
+}
+
+void tables::print(wostream& os, const tables::proof& p) {
+	for (size_t n = 0; n != p.size(); ++n)
+		for (const auto& x : p[n])
+			for (const auto& y : x.second)
+				(os << n << L' ' << to_raw_term(x.first)
+					<< L" :- "), print(os, y), wcout<<endl;
+}
+
 /*void tables::print_env(const env& e) const {
 	for (auto x : e) {
 		int_t arg = r[n - 1];
