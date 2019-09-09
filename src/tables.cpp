@@ -66,11 +66,13 @@ void tables::range(size_t arg, size_t args, bdd_handles& v) {
 			::from_bit(pos(1, arg, args), true);
 	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), false);
+	// nums is set to max NUM, not universe size. While for syms it's the size. 
+	// It worked before because for arity==1 fact(nums) is always negated.
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
 			leq_const(mkchr(chars-1), arg, args, bits))),
 		(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
-			leq_const(mknum(nums-1), arg, args, bits))),
+			leq_const(mknum(nums), arg, args, bits))),
 		(!syms 	? bdd_handle::T%issym : bdd_impl(issym,
 			leq_const(((syms-1)<<2), arg, args, bits)))};
 	v.insert(v.end(), r.begin(), r.end());
@@ -641,7 +643,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	// we're adding eq (EQ/NEQ) here and doing and_many in the end on all.
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
-	DBG(assert(!a.empty());)
+	// doesn't seem to have any effect really, it's failing for ?x != ?y only.
+	//DBG(assert(!a.empty());)
 	for (size_t n = 0; n != a.size(); ++n)
 		if (bdd_handle::F == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
