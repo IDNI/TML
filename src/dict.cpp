@@ -58,11 +58,3 @@ lexeme dict_t::get_lexeme(const wstring& s) {
 	strs_extra.insert(l);
 	return l;
 }
-
-//lexeme dict_t::new_lexeme(const std::wstring& s) {
-//	cws w = s.c_str();
-//	wstr r = wcsdup(s.c_str());
-//	lexeme l = { r, r + s.size() };
-//	return l;
-//}
-

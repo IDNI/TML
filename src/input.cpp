@@ -19,7 +19,6 @@
 #include "err.h"
 #include "ast.h"
 #include "output.h"
-//#include "dict.h"
 using namespace std;
 
 // AST node adding helpers
@@ -183,28 +182,6 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, an_t(type), true;
 }
-
-// EQ/NEQ: all previous terms had a SYM, so make EQ/NEQ have that same format.
-//bool raw_term::parse_ex(const lexemes& l, size_t& pos) {
-//	bool success = parse_raw(l, pos);
-//	if (success && iseq) {
-//		std::vector<elem> enew;
-//		//t.push_back(dict.get_sym(dict.get_lexeme(L"_not_equals_")));
-//		//t.push_back(dict.get_sym(dict.get_lexeme(L"_equals_")));
-//		if (neg)
-//			enew.emplace_back(elem::etype::SYM, dict_t::new_lexeme(L"_not_equals_"));
-//		else
-//			enew.emplace_back(elem::etype::SYM, dict_t::new_lexeme(L"_equals_"));
-//		enew.emplace_back(elem::etype::OPENP, dict_t::new_lexeme(L"("));
-//		enew.push_back(e[0]);
-//		enew.push_back(e[2]);
-//		enew.emplace_back(elem::etype::CLOSEP, dict_t::new_lexeme(L")"));
-//		e = move(enew);
-//		calc_arity();
-//	}
-//	return success;
-//}
-//bool raw_term::parse_raw(const lexemes& l, size_t& pos) {
 
 bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos, curr2;

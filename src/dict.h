@@ -28,7 +28,6 @@ public:
 	int_t get_sym(const lexeme& l);
 
 	lexeme get_lexeme(const std::wstring& s);
-	//static lexeme new_lexeme(const std::wstring& s);
 	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }

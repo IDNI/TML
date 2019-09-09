@@ -59,35 +59,32 @@ spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 			leq_const(c, arg, args, bit));
 }
 
-void tables::range(size_t arg, size_t args, bdd_handles& v, int_t arity) {
+void tables::range(size_t arg, size_t args, bdd_handles& v) {
 	spbdd_handle	ischar= ::from_bit(pos(0, arg, args), true) &&
 			::from_bit(pos(1, arg, args), false);
 	spbdd_handle	isnum = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), true);
 	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), false);
-	// ~UNIVERSE: this seems to be the problem, 'nums' is 2, and 0,1 is what mknum produces. 
-	// for ==1 it makes sense to skip the nums, otherwise include it (if pair etc.)
-	int_t fixednums = arity > 1 ? nums : nums; // : nums - 1;
+	// nums is set to max NUM, not universe size. While for syms it's the size. 
+	// It worked before because for arity==1 fact(nums) is always negated.
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
 			leq_const(mkchr(chars-1), arg, args, bits))),
 		(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
-			leq_const(mknum(fixednums), arg, args, bits))),
+			leq_const(mknum(nums), arg, args, bits))),
 		(!syms 	? bdd_handle::T%issym : bdd_impl(issym,
 			leq_const(((syms-1)<<2), arg, args, bits)))};
-		//(!nums 	? bdd_handle::T%isnum : bdd_impl(isnum,
-		//	leq_const(mknum(nums-1), arg, args, bits))),
 	v.insert(v.end(), r.begin(), r.end());
 }
 
-spbdd_handle tables::range(size_t arg, ntable tab, int_t arity) {
+spbdd_handle tables::range(size_t arg, ntable tab) {
 	array<int_t, 6> k = { syms, nums, chars, (int_t)tab, (int_t)arg,
 		(int_t)bits };
 	auto it = range_memo.find(k);
 	if (it != range_memo.end()) return it->second;
 	bdd_handles v;
-	return	range(arg, ts[tab].len, v, arity),
+	return	range(arg, ts[tab].len, v),
 		range_memo[k] = bdd_and_many(move(v));
 }
 
@@ -161,7 +158,7 @@ spbdd_handle tables::from_fact(const term& t) {
 			r = r && from_sym(n, args, t[n]);
 		else if (vs.end() == (it = vs.find(t[n]))) {
 			vs.emplace(t[n], n);
-			if (!t.neg) r = r && range(n, t.tab, t.singlearity());
+			if (!t.neg) r = r && range(n, t.tab);
 		} else r = r && from_sym_eq(n, it->second, args);
 	return r;
 }
@@ -174,11 +171,7 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	//if (r.iseq) {
-	//	auto iseqineq = r.iseq;
-	//}
 	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
-	//for (size_t n = r.iseq ? 1 : 1; n < r.e.size(); ++n)
 	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
@@ -196,9 +189,8 @@ term tables::from_raw_term(const raw_term& r) {
 		}
 	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
 	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
-	//sig sg = r.iseq ? get_sig(r) : get_sig(r);
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
-	return term(r.neg, r.iseq, get_table(sg), t, r.arity);
+	return term(r.neg, r.iseq, get_table(sg), t);
 }
 
 void tables::out(wostream& os) const {
@@ -223,7 +215,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, false, tab, ints(len, 0), ints{0});
+		term r(false, false, tab, ints(len, 0));
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -246,22 +238,9 @@ raw_term tables::to_raw_term(const term& r) const {
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
 	for (size_t n = 1; n != args + 1; ++n) {
 		int_t arg = r[n - 1];
-		if (arg & 1) 
-			rt.e[n]=elem((wchar_t)(arg>>2));
-		else if (arg & 2) 
-			rt.e[n]=elem((int_t)(arg>>2));
-		else { // iseq // ~UNIVERSE:
-			rt.e[n] = elem(elem::SYM, dict.get_sym(arg));
-			//if (r.iseq) {
-			//	if (r.neg)
-			//		rt.e[n] = elem(elem::NEQ, dict_t::new_lexeme(L"NEQ"));
-			//	else
-			//		rt.e[n] = elem(elem::EQ, dict_t::new_lexeme(L"NEQ"));
-			//}
-			//else {
-			//	rt.e[n] = elem(elem::EQ, dict_t::new_lexeme(L"NEQ"));
-			//}
-		}
+		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
+		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 	}
 	return	rt.arity = get<ints>(ts[r.tab].s),
 	      	rt.insert_parens(dict.op, dict.cl), rt;
@@ -328,32 +307,18 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
 	set<int_t> pvars, nvars;
-	map<int_t, int_t> nvarity;
-	for (const term& t : a) {
-		for (size_t n = 0; n != t.size(); ++n) {
-			if (t[n] < 0) {
-				//(t.neg ? nvars : pvars).insert(t[n]);
-				if (t.neg) {
-					int_t ivar = t[n];
-					nvars.insert(ivar);
-					// TODO: how to handle multiple arity? we only care if one & > 1
-					nvarity[ivar] = t.singlearity();
-				}
-				else
-					pvars.insert(t[n]);
-			}
-		}
-	}
+	for (const term& t : a)
+		for (size_t n = 0; n != t.size(); ++n)
+			if (t[n] < 0) (t.neg ? nvars : pvars).insert(t[n]);
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
 	bdd_handles v;
-	// ~UNIVERSE: iseq:
-	for (int_t i : nvars) range(vm.at(i), len, v, nvarity[i]);
+	for (int_t i : nvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
-		for (int_t i : hvars) range(vm.at(i), len, v, h.singlearity());
+		for (int_t i : hvars) range(vm.at(i), len, v);
 	}
 	return bdd_and_many(v);
 }
@@ -369,7 +334,7 @@ map<size_t, int_t> varmap_inv(const varmap& vm) {
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
-	b.neg = t.neg, b.iseq = t.iseq, b.tab = t.tab, b.perm = get_perm(t, vm, len),
+	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
 	b.q = bdd_handle::T, b.ex = bools(t.size() * bits, false);
 	varmap m;
 	auto it = m.end();
@@ -480,11 +445,11 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			// t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
 				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
-				if (t.iseq) { // && t.size() == 2) {
+				if (t.iseq && t.size() == 2) {
 					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
 					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
 					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					//continue; // no body for eq-s
+					continue; // no body for eq-s
 				}
 				// body is created for each right-hand term (except eq/ineq)
 				b.insert({get_body(t, a.vm, a.varslen), t});
@@ -651,8 +616,6 @@ spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
 	b.tlast = ts[b.tab].t;
-	if (b.iseq) 
-		return (b.rlast = bdd_handle::T);
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, ts[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
@@ -680,7 +643,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	// we're adding eq (EQ/NEQ) here and doing and_many in the end on all.
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
-	DBG(assert(!a.empty());)
+	// doesn't seem to have any effect really, it's failing for ?x != ?y only.
+	//DBG(assert(!a.empty());)
 	for (size_t n = 0; n != a.size(); ++n)
 		if (bdd_handle::F == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
