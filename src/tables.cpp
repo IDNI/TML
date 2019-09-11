@@ -187,10 +187,10 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
-	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
-	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
-	return term(r.neg, r.iseq, get_table(sg), t);
+	// ints t is elems (VAR, consts) mapped to specific ints/ids, for permutations. 
+	return term(r.neg, r.iseq, r.iseq ? -1 : get_table(get_sig(r)), t);
+	//sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
+	//return term(r.neg, r.iseq, get_table(sg), t);
 }
 
 void tables::out(wostream& os) const {
@@ -238,9 +238,19 @@ raw_term tables::to_raw_term(const term& r) const {
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
 	for (size_t n = 1; n != args + 1; ++n) {
 		int_t arg = r[n - 1];
-		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
-		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
-		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
+		if (arg & 1) 
+			rt.e[n]=elem((wchar_t)(arg>>2));
+		else if (arg & 2) 
+			rt.e[n]=elem((int_t)(arg>>2));
+		else {
+			if (!(arg & 1) && !(arg & 2) && dict.nsyms() > (size_t)(arg >> 2))
+				rt.e[n] = elem(elem::SYM, dict.get_sym(arg));
+			else {
+				// the only way I can see is to anull this raw_term and skip it...
+				rt.e.clear();
+				return rt;
+			}
+		}
 	}
 	return	rt.arity = get<ints>(ts[r.tab].s),
 	      	rt.insert_parens(dict.op, dict.cl), rt;
@@ -248,7 +258,10 @@ raw_term tables::to_raw_term(const term& r) const {
 
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 	decompress(x&&ts[tab].t, tab, [f, this](const term& r) {
-		f(to_raw_term(r));
+		raw_term rt = to_raw_term(r);
+		if (!rt.e.empty()) 
+			f(rt);
+		//f(to_raw_term(r));
 	});
 }
 
