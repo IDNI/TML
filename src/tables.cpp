@@ -306,16 +306,23 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars;
-	//(t.neg ? nvars : pvars).insert(t[n]); if (!t.neg && t.iseq) evars.insert(t[n]);
-	//for (int_t i : eqvars) range(vm.at(i), len, v);
+	// all we need is: if (t[n] < 0) (t.neg || t.iseq ? nvars : pvars).insert(t[n]);
+	set<int_t> pvars, nvars, eqvars;
 	for (const term& t : a)
 		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0) (t.neg || t.iseq ? nvars : pvars).insert(t[n]);
+			if (t[n] < 0) { 
+				(t.neg ? nvars : pvars).insert(t[n]); 
+				if (!t.neg && t.iseq) eqvars.insert(t[n]);
+			}
+	// we can't optimize eqvars here (pvars are not 'range-ed')
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
 	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v);
+	for (int_t i : nvars) { 
+		range(vm.at(i), len, v); 
+		eqvars.erase(i); // optimize only
+	}
+	for (int_t i : eqvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
