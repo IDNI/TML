@@ -29,11 +29,18 @@ vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 }
 
 vector<term> subs_to_rule(const rule& r, const alt* a, const map<int, int>& e) {
-	vector<term> hb;
+	static vector<term> hb;
 	hb.clear(), hb.reserve(a->size() + 1),
 	hb.push_back(r.t), hb.insert(hb.end(), a->t.begin(), a->t.end());
 	for (term& t : hb) for (int_t& i : t) if (i < 0) i = e.at(i);
 	return hb;
+}
+
+vector<term> subs_to_body(const alt* a, const map<int, int>& e) {
+	static vector<term> b;
+	b = a->t;
+	for (term& t : b) for (int_t& i : t) if (i < 0) i = e.at(i);
+	return b;
 }
 
 void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
@@ -50,7 +57,7 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 			if (it != a->levels.end()) t = t % it->second;
 		}
 		for (const env& e : varbdd_to_subs(a, t))
-			f(rl, level, n, move(subs_to_rule(rules[rl], a, e)));
+			f(rl, level, n, move(subs_to_body(a, e)));
 	}
 }
 

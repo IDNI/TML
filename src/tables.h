@@ -34,7 +34,8 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
-typedef std::function<void(size_t,size_t,size_t, std::vector<term>)> cb_ground;
+typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
+	cb_ground;
 
 struct body {
 	bool neg, ext = false;
