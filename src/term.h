@@ -29,3 +29,4 @@ struct term : public ints {
 	void replace(const std::map<int_t, int_t>& m);
 };
 
+std::wostream& operator<<(std::wostream& os, const term& t);

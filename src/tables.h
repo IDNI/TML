@@ -133,6 +133,7 @@ class tables {
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 	void print(std::wostream&, const proof_elem&);
 	void print(std::wostream&, const proof&);
+	void print(std::wostream&, const witness&);
 
 	size_t nstep = 0;
 	std::vector<table> ts;
@@ -215,6 +216,7 @@ class tables {
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
 	std::set<witness> get_witnesses(const term& t, size_t l);
 	size_t get_proof(const term& q, proof& p, size_t level);
+	void get_goals();
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	raw_term to_raw_term(const term& t) const;

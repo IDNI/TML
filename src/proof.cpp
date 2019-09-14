@@ -40,7 +40,10 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
 	for (size_t n = 0; n != rules[rl].size(); ++n) {
 		const alt *a = rules[rl][n];
-		spbdd_handle t = a->levels.at(level) && h;
+		map<size_t, spbdd_handle>::const_iterator it;
+		it = a->levels.find(level);
+		if (it == a->levels.end()) continue;
+		spbdd_handle t = it->second && h;
 		if (t == bdd_handle::F) continue;
 		if (level) {
 			auto it = a->levels.find(level - 1);
@@ -68,11 +71,14 @@ set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
 size_t tables::get_proof(const term& q, proof& p, size_t level) {
 	set<witness> s;
 	proof_elem e;
+	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
+	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
-		if (!--level)
+		if (!level--)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
+		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
 		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
 		for (const term& t : w.b) {
 			f = false;
@@ -81,10 +87,19 @@ size_t tables::get_proof(const term& q, proof& p, size_t level) {
 					f = true;
 					break;
 				}
-			if (!f) e.b.emplace_back(get_proof(t, p, level), t);
+			if (!f) e.b.emplace_back(get_proof(t, p, level - 1), t);
 		}
 		p[level][q].insert(e);
 	}
-	if (level == levels.size()) print(wcout, p);
 	return level;
+}
+
+void tables::get_goals() {
+	proof p(levels.size());
+	set<term> s;
+	for (const term& t : goals)
+		decompress(ts[t.tab].t && from_fact(t), t.tab,
+			[&s](const term& t) { s.insert(t); }, t.size());
+	for (const term& g : s) get_proof(g, p, levels.size() - 1);
+	print(wcout, p);
 }
