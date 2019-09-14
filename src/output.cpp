@@ -53,16 +53,17 @@ wostream& operator<<(wostream& os, const vbools& x) {
 	return os;
 }
 
-/*wostream& operator<<(wostream& os, const term& t) {
-	os << t.rel() << ' ';
-	for (size_t n = 0; n != t.nargs(); ++n) {
-		os << t.arg(n);
-		if (n != t.nargs()-1) os << ' ';
+wostream& operator<<(wostream& os, const term& t) {
+	os << t.tab << L' ';
+	if (t.neg) os << L'~';
+	for (size_t n = 0; n != t.size(); ++n) {
+		os << t[n];
+		if (n != t.size()-1) os << L' ';
 	}
-	return os << L'.';
+	return os;
 }
 
-wostream& operator<<(wostream& os, const matrix& m) {
+/*wostream& operator<<(wostream& os, const matrix& m) {
 	for (const term& t : m) os << t << ',';
 	return os;
 }
@@ -264,9 +265,30 @@ wostream& operator<<(wostream& os, const std::map<std::wstring,option>& opts) {
 	return os;
 }
 
-wostream& operator<<(wostream& os, const options& o) {
-	return os << o.opts;
+wostream& operator<<(wostream& os, const options& o) { return os << o.opts; }
+
+void tables::print(wostream& os, const tables::proof_elem& e) {
+	os << L'[' << e.rl << L',' << e.al << L"] ";
+	for (const auto& b : e.b)
+		os << b.first << L' ' << to_raw_term(b.second) << L' ';
+	os << endl;
 }
+
+void tables::print(wostream& os, const tables::proof& p) {
+	for (size_t n = 0; n != p.size(); ++n)
+		for (const auto& x : p[n])
+			for (const auto& y : x.second)
+				(os<<n<<L' '<<to_raw_term(x.first)<<L" :- "),
+				print(os, y);
+}
+
+#ifdef DEBUG
+void tables::print(wostream& os, const tables::witness& w) {
+	os << L'[' << w.rl << L',' << w.al << L"] ";
+	for (const term& t : w.b) os << to_raw_term(t) << L", ";
+	os << L'.';
+}
+#endif
 
 /*void tables::print_env(const env& e) const {
 	for (auto x : e) {

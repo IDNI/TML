@@ -437,6 +437,7 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
+		if (x.second.empty()) continue;
 		// alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
 		for (const set<term>& al : x.second) {
 			alt a;
@@ -727,10 +728,8 @@ bool tables::pfp() {
 	level l;
 	for (;;) {
 		output::to(L"info") << "step: " << nstep++ << endl;
-		if (!fwd()) {
-//			if (bproof) get_proof(true);
-			return true;
-		}
+		if (!fwd())
+			return bproof ? get_goals(), true : true;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));

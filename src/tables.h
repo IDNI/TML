@@ -34,7 +34,8 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
-typedef std::function<void(size_t,size_t,size_t, std::vector<term>)> cb_ground;
+typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
+	cb_ground;
 
 struct body {
 	bool neg, ext = false;
@@ -120,6 +121,21 @@ class tables {
 		}
 	};
 
+	struct proof_elem {
+		size_t rl, al;
+		std::vector<std::pair<size_t, term>> b;
+		bool operator<(const proof_elem& t) const {
+			if (rl != t.rl) return rl < t.rl;
+			if (al != t.al) return al < t.al;
+			return b < t.b;
+		}
+	};
+
+	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
+	void print(std::wostream&, const proof_elem&);
+	void print(std::wostream&, const proof&);
+	void print(std::wostream&, const witness&);
+
 	size_t nstep = 0;
 	std::vector<table> ts;
 	std::map<sig, ntable> smap;
@@ -200,7 +216,8 @@ class tables {
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
 	std::set<witness> get_witnesses(const term& t, size_t l);
-	std::set<struct proof_elem*> get_proof(const term& q, size_t l);
+	size_t get_proof(const term& q, proof& p, size_t level);
+	void get_goals();
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	raw_term to_raw_term(const term& t) const;
