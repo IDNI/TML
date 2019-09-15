@@ -107,7 +107,9 @@ struct table {
 };
 
 class tables {
+public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+private:
 	typedef std::function<void(const term&)> cb_decompress;
 
 	struct witness {

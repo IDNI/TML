@@ -97,6 +97,8 @@ public:
 	driver(std::wstring);
 	driver(char *s);
 
+	void out(const tables::rt_printer& rtp) const { tbl.out(rtp); };
+
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
 //	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
