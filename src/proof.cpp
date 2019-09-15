@@ -45,18 +45,20 @@ vector<term> subs_to_body(const alt* a, const map<int, int>& e) {
 
 void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
+	spbdd_handle p;
 	for (size_t n = 0; n != rules[rl].size(); ++n) {
 		const alt *a = rules[rl][n];
 		map<size_t, spbdd_handle>::const_iterator it;
 		it = a->levels.find(level);
 		if (it == a->levels.end()) continue;
-		spbdd_handle t = it->second &&
-			addtail(h, rules[rl].t.size(), a->varslen);
+		spbdd_handle t = addtail(h, rules[rl].t.size(), a->varslen);
+		if (rules[rl].t.neg) t = t % it->second;
+		else t = t && it->second;
 		if (t == bdd_handle::F) continue;
-		if (level) {
-			auto it = a->levels.find(level - 1);
-			if (it != a->levels.end()) t = t % it->second;
-		}
+		if (level == 1) p = levels[0][rules[rl].t.tab];
+		else p = a->levels.find(level - 1)->second;
+		if (!rules[rl].t.neg) t = t % p;
+		else if (bdd_handle::F = t && p) continue;
 		for (const env& e : varbdd_to_subs(a, t))
 			f(rl, level, n, move(subs_to_body(a, e)));
 	}
@@ -79,10 +81,11 @@ set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
 size_t tables::get_proof(const term& q, proof& p, size_t level) {
 	set<witness> s;
 	proof_elem e;
+	if (!level) return 0;
 //	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
 //	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
-		if (!level--)
+		if (!--level)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
@@ -90,12 +93,14 @@ size_t tables::get_proof(const term& q, proof& p, size_t level) {
 		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
 		for (const term& t : w.b) {
 			f = false;
-			for (size_t n = 0; n != level; ++n)
+			for (size_t n = level; n--;)
 				if (p[n].find(t) != p[n].end()) {
 					f = true;
+					e.b.emplace_back(n, t);
 					break;
 				}
-			if (!f) e.b.emplace_back(get_proof(t, p, level - 1), t);
+			if (f) continue;
+			e.b.emplace_back(level ? get_proof(t,p,level-1) : 0, t);
 		}
 		p[level][q].insert(e);
 	}

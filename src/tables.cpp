@@ -735,9 +735,10 @@ bool tables::pfp() {
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
-		output::to(L"info") << "step: " << nstep++ << endl;
+		output::to(L"info") << "step: " << nstep << endl;
 		if (!fwd())
 			return bproof ? get_goals(), true : true;
+		++nstep;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));
