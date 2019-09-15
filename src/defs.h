@@ -51,7 +51,7 @@ typedef int_t ntable;
 #define DBG(x)
 #define NDBG(x) x
 #endif
-#define er(x)	output::to(L"error")<<x<<endl, exit(0)
+#define er(x) output::to(L"error")<<x<<endl, throw std::runtime_error(ws2s(x))
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())

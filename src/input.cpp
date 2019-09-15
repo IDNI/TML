@@ -35,7 +35,7 @@ lexeme lex(pcws s) {
 	cws t = *s;
 	if (!wcsncmp(*s, L"/*", 2)) {
 		while (wcsncmp(++*s, L"*/", 2))
-			if (!**s) parse_error(L"Unfinished comment", 0);
+			if (!**s) parse_error(t, err_comment, 0);
 		return ++++*s, lex(s);
 	}
 	if (**s == L'#') {
@@ -44,13 +44,13 @@ lexeme lex(pcws s) {
 	}
 	if (**s == L'"') {
 		while (*++*s != L'"')
-			if (!**s) parse_error(unmatched_quotes, *s);
+			if (!**s) parse_error(t, unmatched_quotes);
 			else if (**s == L'\\' && !wcschr(L"\\\"", *++*s))
-				parse_error(err_escape, *s);
+				parse_error(*s, err_escape);
 		return { t, ++(*s) };
 	}
 	if (**s == L'<') {
-		while (*++*s != L'>') if (!**s) parse_error(err_fname, *s);
+		while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		return { t, ++(*s) };
 	}
 	if (**s == L'\'') {
@@ -58,15 +58,15 @@ lexeme lex(pcws s) {
 		if (*(*s + 1) == L'\\') {
 //			if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
 			if (!wcschr(L"\\'rnt",*(*s+2)) ||*(*s+3)!=L'\'')
-				parse_error(err_escape, *s);
+				parse_error((*s+2), err_escape);
 			return { t, ++++++++*s };
 		}
-		if (*(*s + 2) != L'\'') parse_error(err_quote, *s);
+		if (*(*s + 2) != L'\'') parse_error(*s+2, err_quote);
 		return { t, ++++++*s };
 	}
 	if (**s == L':') {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
-		else parse_error(err_chr, *s);
+		else parse_error(*s, err_chr);
 	}
 	// neq: make sure we don't turn off directives (single '!'). limits?
 	if (**s == L'!' && *(*s + 1) == L'=') {
@@ -77,7 +77,7 @@ lexeme lex(pcws s) {
 	}
 	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
-	if (!iswalnum(**s) && **s != L'_') parse_error(err_chr, *s);
+	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
 	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
 	return { t, *s };
 }
@@ -96,10 +96,10 @@ int_t get_int_t(cws from, cws to) {
 	bool neg = false;
 	if (*from == L'-') neg = true, ++from;
 	for (cws s = from; s != to; ++s) if (!iswdigit(*s))
-		parse_error(err_int, from);
+		parse_error(from, err_int);
 	wstring s(from, to - from);
 	try { r = stoll(s); }
-	catch (...) { parse_error(err_int, from); }
+	catch (...) { parse_error(from, err_int); }
 	return neg ? -r : r;
 }
 
@@ -110,27 +110,32 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	if (l[++pos] == L"trace") {
 		type = TRACE;
 		if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
-			parse_error(err_trace_rel, l[pos]);
-		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+			parse_error(l[pos-1][0], err_trace_rel, l[pos-1]);
+		if (*l[pos++][0] != '.')
+			parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		an(DIR);
 		return true;
 	}
 	if (l[pos] == L"bwd") {
 		type = BWD;
-		if (*l[++pos][0] != '.') parse_error(dot_expected, l[pos]);
+		if (*l[++pos][0] != '.')
+			parse_error(l[pos][0], dot_expected, l[pos]);
 		an(DIR);
 		return ++pos, true;
 	}
 	if (l[pos] == L"stdout") {
 		type = STDOUT;
-		if (!t.parse(l, ++pos)) parse_error(err_stdout, l[pos]);
-		if (*l[pos++][0] != '.') parse_error(dot_expected, l[pos]);
+		if (!t.parse(l, ++pos))
+			parse_error(l[pos][0], err_stdout, l[pos]);
+		if (*l[pos++][0] != '.')
+			parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		an(DIR);
 		return true;
 	}
-	if (!(l[pos] == L"string")) parse_error(err_directive, l[pos]);
+	if (!(l[pos] == L"string"))
+		parse_error(l[pos][0], err_directive, l[pos]);
 	if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
-		parse_error(err_rel_expected, l[pos]);
+		parse_error(l[pos-1][0], err_rel_expected, l[pos-1]);
 	size_t curr2 = pos;
 	if (*l[pos][0] == L'<') type = FNAME, arg = l[pos++];
 	else if (*l[pos][0] == L'"') type = STR, arg = l[pos++];
@@ -139,12 +144,13 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	else if (l[pos] == L"stdin") type = STDIN;
 	else if (t.parse(l, pos)) {
 		type = TREE;
-		if (*l[pos++][0]!='.') parse_error(dot_expected, l[pos]);
+		if (*l[pos++][0]!='.')
+			parse_error(l[pos][0], dot_expected, l[pos]);
 		an(DIR);
 		return true;
-	} else parse_error(err_directive_arg, l[pos]);
+	} else parse_error(l[pos][0], err_directive_arg, l[pos]);
 	if (an_of(STR, -1, curr2), *l[pos++][0]!='.')
-		parse_error(dot_expected, l[pos]);
+		parse_error(l[curr2][1], dot_expected, l[curr2]);
 	an_of(DOT, -1, pos-1);
 	an(DIR);
 	return true;
@@ -191,29 +197,33 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
-			parse_error(L"unexpected end of file", s[0]);
-		noteq = noteq || e.back().type == elem::NEQ; 
+			parse_error(ast::source[1], err_eof, s[0]);
+		noteq = noteq || e.back().type == elem::NEQ;
 		eq = eq || e.back().type == elem::EQ;
 		if (!rel) an_of(REL, -1, curr2), rel = true;
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
 	if (noteq || eq) {
-		if (e.size() < 3) parse_error(err_term_or_dot, l[pos]);
+		if (e.size() < 3)
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front (no parentheses).
 		if (e[1].type != elem::NEQ &&
 			e[1].type != elem::EQ)
-			parse_error(err_term_or_dot, l[pos]);
-		if (noteq) 
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+		if (noteq)
 			neg = !neg; // flip the negation as we have the NEQ, don't do it for EQ ofc
 		iseq = true;
 		return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
 	}
-	if (e[0].type != elem::SYM) parse_error(err_relsym_expected, l[pos]);
+	if (e[0].type != elem::SYM)
+		parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return an(TERM), (neg ? an(NEG) : an(POS)),
 		calc_arity(), true;
-	if (e[1].type != elem::OPENP) parse_error(err_paren_expected, l[pos]);
-	if (e.back().type != elem::CLOSEP) parse_error(err_paren, l[pos]);
+	if (e[1].type != elem::OPENP)
+		parse_error(l[pos][0], err_paren_expected, l[pos]);
+	if (e.back().type != elem::CLOSEP)
+		parse_error(e.back().e[0], err_paren, l[pos]);
 	return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
 }
 
@@ -239,9 +249,9 @@ void raw_term::calc_arity() {
 		else if (e[n].type != elem::CLOSEP) {
 			if (arity.back() < 0) arity.push_back(1);
 			else ++arity.back();
-		} else if (!dep--) parse_error(err_paren, e[n].e);
+		} else if (!dep--) parse_error(e[n].e[0], err_paren, e[n].e);
 		else arity.push_back(-2);
-	if (dep) parse_error(err_paren, e[0].e);
+	if (dep) parse_error(e[0].e[0], err_paren, e[0].e);
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
@@ -264,21 +274,23 @@ head:	h.emplace_back();
 	if (*l[pos][0] == ',') { an_o(AND, 0); ++pos; goto head; }
 	an(HEAD);
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
-		parse_error(err_head, l[pos]);
+		parse_error(l[pos][0], err_head, l[pos]);
 	an_of(DELIM, 0, pos); curr2 = ++pos; b.emplace_back();
 	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
-		b.back().emplace_back(), ++pos)
+		b.back().emplace_back(), ++pos) {
 		if (*l[pos][0] == '.') return an_of(DOT, 0, pos),
 			an_of(BODY, -1, curr2), ++pos, an(RULE), true;
 		else if (*l[pos][0] == L';') an_of(OR, 0, pos),b.emplace_back();
-		else if (*l[pos][0] != ',') parse_error(err_term_or_dot,l[pos]);
+		else if (*l[pos][0] != ',')
+			parse_error(l[pos][0], err_term_or_dot,l[pos]);
 		else an_of(AND, 0, pos);
-	parse_error(err_body, l[pos]);
+	}
+	parse_error(l[pos][0], err_body, l[pos]);
 	return false;
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos;
+	size_t curr2, curr = pos;
 	elem e;
 	if (!e.parse(l, pos) || l.size() <= pos+1) goto fail;
 /*	if (*l[pos++][0] == L'<') {
@@ -290,13 +302,15 @@ bool production::parse(const lexemes& l, size_t& pos) {
 	}*/
 	if (*l[pos++][0] != '=' || l[pos++][0][0] != L'>') goto fail;
 	an_of(DELIM, -1, pos-2);
+	curr2 = pos;
 	for (p.push_back(e);;) {
 		elem e;
+		if (pos == l.size()) break;
 		if (*l[pos][0] == '.') return ++pos, an(PROD), true;
 		if (!e.parse(l, pos)) goto fail;
 		p.push_back(e);
 	}
-	parse_error(err_prod, l[pos]);
+	parse_error(l[curr2][0], err_prod, l[curr2]);
 fail:	return pos = curr, false;
 }
 
@@ -319,23 +333,30 @@ raw_progs::raw_progs(FILE* f) : raw_progs(file_read_text(f)) {}
 
 raw_progs::raw_progs(const std::wstring& s) {
 	ast::clear();
-	size_t pos = 0;
-	lexemes l = prog_lex(wcsdup(s.c_str()));
-	if (!l.size()) return;
-	if (*l[pos][0] != L'{') {
-		raw_prog x;
-		if (!x.parse(l, pos))
-			parse_error(err_rule_dir_prod_expected, l[pos]);
-		p.push_back(x);
-	} else do {
-		an_of(OPENC, 0, pos);
-		raw_prog x;
-		if (++pos, !x.parse(l, pos)) parse_error(err_parse, l[pos]);
-		if (p.push_back(x), pos == l.size() || *l[pos++][0] != L'}')
-			parse_error(err_close_curly, l[pos]);
-		an_of(CLOSEC, -1, pos-1);
-	} while (pos < l.size());
-	an_of(PROGS, -1, 0);
+	try {
+		size_t pos = 0;
+		lexemes l = prog_lex(wcsdup(s.c_str()));
+		if (!l.size()) return;
+		if (*l[pos][0] != L'{') {
+			raw_prog x;
+			if (!x.parse(l, pos))
+				parse_error(l[pos][0],
+					err_rule_dir_prod_expected, l[pos]);
+			p.push_back(x);
+		} else do {
+			an_of(OPENC, 0, pos);
+			raw_prog x;
+			if (++pos, !x.parse(l, pos))
+				parse_error(l[pos][0], err_parse, l[pos]);
+			if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
+				parse_error(l[pos-1][1],
+					err_close_curly, l[pos-1]);
+			an_of(CLOSEC, -1, pos-1);
+		} while (pos < l.size());
+		an_of(PROGS, -1, 0);
+	} catch (std::exception &e) {
+		output::to(L"error") << s2ws(e.what()) << std::endl;
+	}
 }
 
 bool operator==(const lexeme& x, const lexeme& y) {
@@ -429,25 +450,42 @@ wstring file_read_text(wstring wfname) {
 	return r;
 }
 
-void parse_error(std::wstring e, std::wstring s) { parse_error(e, s.c_str()); }
+void parse_error(cws o, std::wstring e) { parse_error(o, e, o); }
+void parse_error(wstring e, lexeme l) { parse_error(0, e, l); }
+void parse_error(std::wstring e, std::wstring s) { parse_error(0, e, s); }
 
-void parse_error(std::wstring e, cws s) {
-	output::to(L"error") << e << endl;
-	cws p = s;
-	while (*p && *p != L'\n') ++p;
-	if (s) {
-		wstring t(s, p-s);
-		output::to(L"error") << L"at: " << t << endl;
+void parse_error(cws o, std::wstring e, std::wstring s) {
+	parse_error(o, e, s.c_str());
+}
+
+void parse_error(cws o, std::wstring e, cws s, size_t len) {
+	parse_error(o, e, wstring(s, len).c_str());
+}
+
+void parse_error(cws o, wstring e, lexeme l) {
+	parse_error(o, e, wstring(l[0], l[1]-l[0]).c_str());
+}
+
+void count_pos(const cws& s, const cws& o, long& l, long& ch) {
+	l = 1;
+	cws c = s, n = c - 1;
+	while (c < o) {
+		if (*c && *c == L'\n') { n = c; ++l; }
+		++c;
 	}
-	exit(0); //FIXME
+	ch = o-n;
 }
 
-void parse_error(std::wstring e, cws s, size_t len) {
-	parse_error(e, wstring(s, len).c_str());
-}
-
-void parse_error(wstring e, lexeme l) {
-	parse_error(e, wstring(l[0], l[1]-l[0]).c_str());
+void parse_error(cws o, std::wstring e, cws s) {
+	std::wstringstream msg; msg << L"Parse error: \"" << e << L'"';
+	cws p = s;
+	while (p && *p && *p != L'\n') ++p;
+	if (o != 0) {
+		long l, ch; count_pos(ast::source[0], o, l, ch);
+		msg << L" at " << l << L':' << ch;
+	}
+	if (s) msg << L" close to \"" << std::wstring(s, p-s) << L'"';
+	throw parse_error_exception(ws2s(msg.str()));
 }
 
 #undef an

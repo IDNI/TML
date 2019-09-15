@@ -252,3 +252,7 @@ public:
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
+
+struct unsat_exception : public std::exception {
+	virtual const char* what() const noexcept { return "unsat."; }
+};

@@ -263,12 +263,19 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 	strs_t strtrees;
 	if (opts.enabled(L"proof")) tbl.set_proof(true);
 	output_ast();
-	for (size_t n = 0; n != rp.p.size(); ++n) {
-		prog_run(rp, n, strtrees);
-		DBG(if(opts.enabled(L"o"))tbl.out(output::to(L"output")<<endl);)
+	try {
+		for (size_t n = 0; n != rp.p.size(); ++n) {
+			prog_run(rp, n, strtrees);
+			DBG(if (opts.enabled(L"o"))
+				tbl.out(output::to(L"output") << endl);)
+		}
+		NDBG(if (opts.enabled(L"o"))
+			tbl.out(output::to(L"output") << endl);)
+		if (opts.enabled(L"csv")) save_csv();
+	} catch (unsat_exception& e) {
+		output::to(L"output") << s2ws(string(e.what())) << endl;
+		result = false;
 	}
-	NDBG(if (opts.enabled(L"o")) tbl.out(output::to(L"output")<<endl);)
-	if (opts.enabled(L"csv")) save_csv();
 }
 
 driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
