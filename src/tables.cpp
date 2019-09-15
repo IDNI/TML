@@ -233,6 +233,7 @@ set<term> tables::decompress() {
 
 raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
+	rt.neg = r.neg;
 	const size_t args = ts[r.tab].len;
 	rt.e.resize(args + 1),
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
