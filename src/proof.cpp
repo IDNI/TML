@@ -50,7 +50,8 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 		map<size_t, spbdd_handle>::const_iterator it;
 		it = a->levels.find(level);
 		if (it == a->levels.end()) continue;
-		spbdd_handle t = it->second && h;
+		spbdd_handle t = it->second &&
+			addtail(h, rules[rl].t.size(), a->varslen);
 		if (t == bdd_handle::F) continue;
 		if (level) {
 			auto it = a->levels.find(level - 1);
@@ -78,14 +79,14 @@ set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
 size_t tables::get_proof(const term& q, proof& p, size_t level) {
 	set<witness> s;
 	proof_elem e;
-	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
-	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
+//	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
+//	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
 		if (!level--)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
-		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
+//		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
 		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
 		for (const term& t : w.b) {
 			f = false;

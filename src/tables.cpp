@@ -610,6 +610,18 @@ pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	return { ex, perm };
 }
 
+uints tables::addtail(size_t len1, size_t len2) const {
+	uints perm = perm_init(len1 * bits);
+	for (size_t n = 0; n != len1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			perm[pos(k, n, len1)] = pos(k, n, len2);
+	return perm;
+}
+
+spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
+	return x ^ addtail(len1, len2);
+}
+
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	if (b.a) return alt_query(*b.a, 0);
 //	if (b.ext) return b.q;
