@@ -66,7 +66,7 @@ void tables::range(size_t arg, size_t args, bdd_handles& v) {
 			::from_bit(pos(1, arg, args), true);
 	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), false);
-	// nums is set to max NUM, not universe size. While for syms it's the size. 
+	// nums is set to max NUM, not universe size. While for syms it's the size.
 	// It worked before because for arity==1 fact(nums) is always negated.
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
@@ -188,7 +188,7 @@ term tables::from_raw_term(const raw_term& r) {
 			default: ;
 		}
 	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
-	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations. 
+	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations.
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	return term(r.neg, r.iseq, get_table(sg), t);
 }
@@ -677,10 +677,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 			     d = bdd_or_many(move(del)), s = a % d;
 //		DBG(assert(bdd_nvars(a) < len*bits);)
 //		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == bdd_handle::F) {
-			output::to(L"output") << "unsat." << endl;
-			exit(0); //FIXME
-		}
+		if (s == bdd_handle::F) throw unsat_exception();
 		x = (t || a) % d;
 	}
 //	DBG(assert(bdd_nvars(x) < len*bits);)
