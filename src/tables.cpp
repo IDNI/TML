@@ -690,14 +690,14 @@ bool table::commit(DBG(size_t /*bits*/)) {
 			     d = bdd_or_many(move(del)), s = a % d;
 //		DBG(assert(bdd_nvars(a) < len*bits);)
 //		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == bdd_handle::F) throw unsat_exception();
+		if (s == bdd_handle::F) return unsat = true;
 		x = (t || a) % d;
 	}
 //	DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
 
-char tables::fwd() {
+char tables::fwd() noexcept {
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
@@ -713,7 +713,10 @@ char tables::fwd() {
 		(r.neg ? ts[r.tab].del : ts[r.tab].add).push_back(x);
 	}
 	bool b = false;
-	for (table& t : ts) b |= t.commit(DBG(bits));
+	for (table& t : ts) {
+		b |= t.commit(DBG(bits));
+		if (t.unsat) return unsat = true;
+	}
 	return b;
 /*	if (!b) return false;
 	for (auto x : goals)
@@ -739,6 +742,7 @@ bool tables::pfp() {
 		if (!fwd())
 			return bproof ? get_goals(), true : true;
 		++nstep;
+		if (unsat) throw unsat_exception();
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));

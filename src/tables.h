@@ -102,11 +102,14 @@ struct table {
 	bdd_handles add, del;
 	std::vector<size_t> r;
 	bool ext = true; // extensional
+	bool unsat = false;
 	bool commit(DBG(size_t));
 };
 
 class tables {
+public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+private:
 	typedef std::function<void(const term&)> cb_decompress;
 
 	struct witness {
@@ -153,6 +156,7 @@ class tables {
 	dict_t& dict;
 	bool bproof;
 	bool datalog, optimize;
+	bool unsat = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -234,7 +238,7 @@ class tables {
 	void add_prog(const raw_prog& p, const strs_t& strs);
 	void add_prog(std::map<term, std::set<std::set<term>>> m,
 		const strs_t& strs, bool mknums = false);
-	char fwd();
+	char fwd() noexcept;
 	level get_front() const;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
