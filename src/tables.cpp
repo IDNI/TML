@@ -306,14 +306,33 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
-	// all we need is: if (t[n] < 0) (t.neg || t.iseq ? nvars : pvars).insert(t[n]);
 	set<int_t> pvars, nvars, eqvars;
-	for (const term& t : a)
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0) { 
-				(t.neg ? nvars : pvars).insert(t[n]); 
-				if (!t.neg && t.iseq) eqvars.insert(t[n]);
+	std::vector<term*> eqterms;
+	for (const term& t : a) {
+		bool haseq = false;
+		for (size_t n = 0; n != t.size(); ++n) {
+			if (t[n] < 0) {
+				if (t.iseq) haseq = true;
+				else (t.neg ? nvars : pvars).insert(t[n]);
 			}
+		}
+		if (haseq) eqterms.push_back(&t);
+	}
+	// this is just to optimize (we need 2 passes), otherwise all we need is: 
+	// if (t[n] < 0) (t.neg || t.iseq ? nvars : pvars).insert(t[n]);
+	for (const term& t : a) {
+		if (!t.iseq) continue;
+		bool noeqvars = true, haseq = false;
+		for (size_t n = 0; n != t.size(); ++n)
+			if (t[n] < 0) {
+				haseq = true;
+				noeqvars = noeqvars && !has(nvars, t[n]);
+				if (!noeqvars) break;
+			}
+		if (!haseq || !noeqvars) continue;
+		for (size_t n = 0; n != t.size(); ++n)
+			if (t[n] < 0) eqvars.insert(t[n]);
+	}
 	// we can't optimize eqvars here (pvars are not 'range-ed')
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
