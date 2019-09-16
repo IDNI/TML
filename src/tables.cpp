@@ -471,9 +471,15 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			for (const term& t : al) {
 				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
 				if (t.iseq && t.size() == 2) {
-					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
-					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
+					//size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
+					// this now doesn't work for consts
+					size_t arg0 = has(a.vm, t[0]) ? a.vm.at(t[0]) : 0; // t[0];
+					size_t arg1 = has(a.vm, t[1]) ? a.vm.at(t[1]) : 1; // t[1];
+					size_t vlen = max(a.varslen, size_t(2));
+					if (t.neg)
+						a.eq = a.eq % from_sym_eq(arg0, arg1, vlen); // a.varslen);
+					else 
+						a.eq = a.eq && from_sym_eq(arg0, arg1, vlen); // a.varslen);
 					continue; // no body for eq-s
 				}
 				// body is created for each right-hand term (except eq/ineq)
