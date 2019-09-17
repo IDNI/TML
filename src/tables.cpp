@@ -325,7 +325,12 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 		bool noeqvars = true;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] < 0) {
+				// nvars add range already, so skip in that case...
 				noeqvars = noeqvars && !has(nvars, t[n]);
+				// e.g.: e(2). b(?x ?y ?z) :- e(?x), ?x != ?z.
+				// this fails if we exclude for pvars as well (if negation, !=)
+				if (!t.neg)
+					noeqvars = noeqvars && !has(pvars, t[n]);
 				if (!noeqvars) break;
 			}
 		if (!noeqvars) continue;
