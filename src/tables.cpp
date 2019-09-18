@@ -308,6 +308,7 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
 	set<int_t> pvars, nvars, eqvars;
 	std::vector<const term*> eqterms;
+	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
 		bool haseq = false;
 		for (size_t n = 0; n != t.size(); ++n) {
@@ -316,28 +317,32 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 				else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
+		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
 	}
-	// this is just to optimize (we need 2 passes), otherwise all we need is: 
-	// if (t[n] < 0) (t.neg || t.iseq ? nvars : pvars).insert(t[n]);
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
 		bool noeqvars = true;
+		std::vector<int_t> tvars;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] < 0) {
-				// nvars add range already, so skip in that case...
-				noeqvars = noeqvars && !has(nvars, t[n]);
-				// e.g.: e(2). b(?x ?y ?z) :- e(?x), ?x != ?z.
-				// this fails if we exclude for pvars as well (if negation, !=)
-				if (!t.neg)
-					noeqvars = noeqvars && !has(pvars, t[n]);
-				if (!noeqvars) break;
+				// nvars add range already, so skip all in that case...
+				// and per 1.3 - if any one is contrained (outside) bail out
+				if (has(nvars, t[n])) { noeqvars = false; break; }
+				// if neither pvars has this var it should be ranged
+				if (!has(pvars, t[n])) tvars.push_back(t[n]);
+				else if (!t.neg) { noeqvars = false; break; }
+				// if is in pvars and == then other var is covered too, skip all.
+				// this isn't covered by 1.1-3 (?) but it's a further optimization.
 			}
 		if (!noeqvars) continue;
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0) eqvars.insert(t[n]);
+		for (const int_t tvar : tvars) {
+			eqvars.insert(tvar);
+			// 1.3 one is enough (we have one constrained, no need to range both).
+			// but this doesn't work well, we need to range all that fit.
+			//break;
+		}
 	}
-	// we can't optimize eqvars here (pvars are not 'range-ed')
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
 	bdd_handles v;
