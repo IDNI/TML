@@ -72,9 +72,11 @@ lexeme lex(pcws s) {
 	if (**s == L'!' && *(*s + 1) == L'=') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
-	if (**s == L'=' && *(*s + 1) == L'=') {
-		return *s += 2, lexeme{ *s - 2, *s };
-	}
+	// TODO: single = instead of == recheck if we're not messing up something?
+	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
+	//if (**s == L'=' && *(*s + 1) == L'=') {
+	//	return *s += 2, lexeme{ *s - 2, *s };
+	//}
 	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
@@ -166,10 +168,14 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = NEQ, an_t(type), true;
 	}
-	if (L'=' == l[pos][0][0] &&
-		L'=' == l[pos][0][1]) {
+	// TODO: single = instead of == recheck if we're not messing up something?
+	if (L'=' == l[pos][0][0]) {
 		return e = l[pos++], type = EQ, an_t(type), true;
 	}
+	//if (L'=' == l[pos][0][0] &&
+	//	L'=' == l[pos][0][1]) {
+	//	return e = l[pos++], type = EQ, an_t(type), true;
+	//}
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
