@@ -268,7 +268,7 @@ wostream& operator<<(wostream& os, const std::map<std::wstring,option>& opts) {
 wostream& operator<<(wostream& os, const options& o) { return os << o.opts; }
 
 void tables::print(wostream& os, const tables::proof_elem& e) {
-	os << L'[' << e.rl << L',' << e.al << L"] ";
+	if (e.rl != (size_t)-1) os << L'[' << e.rl << L',' << e.al << L"] ";
 	for (const auto& b : e.b)
 		os << b.first << L' ' << to_raw_term(b.second) << L' ';
 	os << endl;

@@ -115,9 +115,9 @@ void tables::add_bit() {
 }
 
 typedef tuple<size_t, size_t, size_t, int_t> skmemo;
-static map<skmemo, spbdd_handle> smemo;
 typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
-static map<ekmemo, spbdd_handle> ememo;
+map<skmemo, spbdd_handle> smemo;
+map<ekmemo, spbdd_handle> ememo;
 
 spbdd_handle tables::from_sym(size_t pos, size_t args, int_t i) const {
 	static skmemo x;
@@ -620,6 +620,7 @@ uints tables::addtail(size_t len1, size_t len2) const {
 }
 
 spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
+	if (len1 == len2) return x;
 	return x ^ addtail(len1, len2);
 }
 
@@ -654,10 +655,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
 //	DBG(bdd::gc();)
-	// we're adding eq (EQ/NEQ) here and doing and_many in the end on all.
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
-	// doesn't seem to have any effect really, it's failing for ?x != ?y only.
 	//DBG(assert(!a.empty());)
 	for (size_t n = 0; n != a.size(); ++n)
 		if (bdd_handle::F == (x = body_query(*a[n], a.varslen))) {
@@ -739,9 +738,8 @@ bool tables::pfp() {
 	level l;
 	for (;;) {
 		output::to(L"info") << "step: " << nstep << endl;
-		if (!fwd())
-			return bproof ? get_goals(), true : true;
 		++nstep;
+		if (!fwd()) return bproof ? get_goals(), true : true;
 		if (unsat) throw unsat_exception();
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;

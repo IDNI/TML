@@ -45,27 +45,25 @@ vector<term> subs_to_body(const alt* a, const map<int, int>& e) {
 
 void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
-	spbdd_handle p;
-	for (size_t n = 0; n != rules[rl].size(); ++n) {
-		const alt *a = rules[rl][n];
-		map<size_t, spbdd_handle>::const_iterator it;
-		it = a->levels.find(level);
-		if (it == a->levels.end()) continue;
-		spbdd_handle t = addtail(h, rules[rl].t.size(), a->varslen);
-		if (rules[rl].t.neg) t = t % it->second;
-		else t = t && it->second;
-		if (t == bdd_handle::F) continue;
-		if (level == 1) p = levels[0][rules[rl].t.tab];
-		else p = a->levels.find(level - 1)->second;
-		if (!rules[rl].t.neg) t = t % p;
-		else if (bdd_handle::F = t && p) continue;
-		for (const env& e : varbdd_to_subs(a, t))
-			f(rl, level, n, move(subs_to_body(a, e)));
-	}
+	const alt* a;
+	for (size_t n = 0; n != rules[rl].size(); ++n)
+		if (a = rules[rl][n], has(a->levels, level))
+			for (const env& e : varbdd_to_subs(a,
+				addtail(h, rules[rl].t.size(), a->varslen)))
+				f(rl, level, n, move(subs_to_body(a, e)));
 }
 
 void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
-	spbdd_handle h = from_fact(t);
+	spbdd_handle h = from_fact(t), x;
+	if (!level) f(-1, 0, -1, {t});
+	if (level > 1) {
+		if (t.neg) {
+			if ((bdd_handle::F == levels[level-1][t.tab] && h) ||
+				(bdd_handle::F != levels[level][t.tab] && h))
+				return;
+		} else if ((bdd_handle::F != levels[level-1][t.tab] && h) ||
+			(bdd_handle::F == levels[level][t.tab] && h)) return;
+	}
 	for (size_t r : ts[t.tab].r)
 		if (rules[r].neg == t.neg)
 			rule_get_grounds(h, r, level, f);
@@ -85,7 +83,7 @@ size_t tables::get_proof(const term& q, proof& p, size_t level) {
 //	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
 //	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
-		if (!--level)
+		if (!level--)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
