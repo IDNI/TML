@@ -171,7 +171,7 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
-	// skip the first symbol unless it's EQ/NEQ (which doesn't have rel, VAR is first)
+	// skip the first symbol unless it's EQ/NEQ (which has VAR as it's first)
 	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
@@ -187,7 +187,7 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// ints t is elems (VAR, consts) mapped to specific ints/ids, for permutations. 
+	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
 	return term(r.neg, r.iseq, r.iseq ? -1 : get_table(get_sig(r)), t);
 	//sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	//return term(r.neg, r.iseq, get_table(sg), t);
@@ -332,13 +332,13 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 				// if neither pvars has this var it should be ranged
 				if (!has(pvars, t[n])) tvars.push_back(t[n]);
 				else if (!t.neg) { noeqvars = false; break; }
-				// if is in pvars and == then other var is covered too, skip all.
-				// this isn't covered by 1.1-3 (?) but it's a further optimization.
+				// if is in pvars and == then other var is covered too, skip.
+				// this isn't covered by 1.1-3 (?) but further optimization.
 			}
 		if (!noeqvars) continue;
 		for (const int_t tvar : tvars) {
 			eqvars.insert(tvar);
-			// 1.3 one is enough (we have one constrained, no need to range both).
+			// 1.3 one is enough (we have one constrained, no need to do both).
 			// but this doesn't work well, we need to range all that fit.
 			//break;
 		}
@@ -470,14 +470,14 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 		set<alt> as;
 		r.len = t.size();
 		if (x.second.empty()) continue;
-		// alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
+		// alt-s as in multiple terms specified, OR-ed
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
-			// t redefinition, t is header, and below is a body term, then header again
+			// t redef, t is header, and below is a body term then header again
 			for (const term& t : al) {
 				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
 				if (t.iseq && t.size() == 2) {
@@ -485,18 +485,24 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 					bool has1 = has(a.vm, t[1]);
 					if (has0 && has1) {
 						size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-						if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
-						else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
+						if (t.neg) 
+							a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
+						else 
+							a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
 					}
 					else if (has0) {
 						size_t arg0 = a.vm.at(t[0]);
-						if (t.neg) a.eq = a.eq % from_sym(arg0, a.varslen, t[1]);
-						else a.eq = a.eq && from_sym(arg0, a.varslen, t[1]);
+						if (t.neg) 
+							a.eq = a.eq % from_sym(arg0, a.varslen, t[1]);
+						else 
+							a.eq = a.eq && from_sym(arg0, a.varslen, t[1]);
 					}
 					else if (has1) {
 						size_t arg1 = a.vm.at(t[1]);
-						if (t.neg) a.eq = a.eq % from_sym(arg1, a.varslen, t[0]);
-						else a.eq = a.eq && from_sym(arg1, a.varslen, t[0]);
+						if (t.neg) 
+							a.eq = a.eq % from_sym(arg1, a.varslen, t[0]);
+						else 
+							a.eq = a.eq && from_sym(arg1, a.varslen, t[0]);
 					}
 					else { // just consts?
 						auto tf = t[0] == t[1] ? bdd_handle::T : bdd_handle::F;
