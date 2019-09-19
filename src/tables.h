@@ -102,11 +102,14 @@ struct table {
 	bdd_handles add, del;
 	std::vector<size_t> r;
 	bool ext = true; // extensional
+	bool unsat = false;
 	bool commit(DBG(size_t));
 };
 
 class tables {
+public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+private:
 	typedef std::function<void(const term&)> cb_decompress;
 
 	struct witness {
@@ -153,6 +156,7 @@ class tables {
 	dict_t& dict;
 	bool bproof;
 	bool datalog, optimize;
+	bool unsat = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -205,6 +209,8 @@ class tables {
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
+	uints addtail(size_t len1, size_t len2) const;
+	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
@@ -232,7 +238,7 @@ class tables {
 	void add_prog(const raw_prog& p, const strs_t& strs);
 	void add_prog(std::map<term, std::set<std::set<term>>> m,
 		const strs_t& strs, bool mknums = false);
-	char fwd();
+	char fwd() noexcept;
 	level get_front() const;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
@@ -250,3 +256,7 @@ public:
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
+
+struct unsat_exception : public std::exception {
+	virtual const char* what() const noexcept { return "unsat."; }
+};

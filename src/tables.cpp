@@ -66,7 +66,7 @@ void tables::range(size_t arg, size_t args, bdd_handles& v) {
 			::from_bit(pos(1, arg, args), true);
 	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
 			::from_bit(pos(1, arg, args), false);
-	// nums is set to max NUM, not universe size. While for syms it's the size. 
+	// nums is set to max NUM, not universe size. While for syms it's the size.
 	// It worked before because for arity==1 fact(nums) is always negated.
 	bdd_handles r = {ischar || isnum || issym,
 		(!chars	? bdd_handle::T%ischar : bdd_impl(ischar,
@@ -189,8 +189,6 @@ term tables::from_raw_term(const raw_term& r) {
 		}
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
 	return term(r.neg, r.iseq, r.iseq ? -1 : get_table(get_sig(r)), t);
-	//sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
-	//return term(r.neg, r.iseq, get_table(sg), t);
 }
 
 void tables::out(wostream& os) const {
@@ -233,6 +231,7 @@ set<term> tables::decompress() {
 
 raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
+	rt.neg = r.neg;
 	const size_t args = ts[r.tab].len;
 	rt.e.resize(args + 1),
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
@@ -669,6 +668,18 @@ pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	return { ex, perm };
 }
 
+uints tables::addtail(size_t len1, size_t len2) const {
+	uints perm = perm_init(len1 * bits);
+	for (size_t n = 0; n != len1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			perm[pos(k, n, len1)] = pos(k, n, len2);
+	return perm;
+}
+
+spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
+	return x ^ addtail(len1, len2);
+}
+
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 	if (b.a) return alt_query(*b.a, 0);
 //	if (b.ext) return b.q;
@@ -736,17 +747,14 @@ bool table::commit(DBG(size_t /*bits*/)) {
 			     d = bdd_or_many(move(del)), s = a % d;
 //		DBG(assert(bdd_nvars(a) < len*bits);)
 //		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == bdd_handle::F) {
-			output::to(L"output") << "unsat." << endl;
-			exit(0); //FIXME
-		}
+		if (s == bdd_handle::F) return unsat = true;
 		x = (t || a) % d;
 	}
 //	DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
 
-char tables::fwd() {
+char tables::fwd() noexcept {
 	bdd_handles add, del;
 //	DBG(out(wcout<<"db before:"<<endl);)
 	for (rule& r : rules) {
@@ -762,7 +770,10 @@ char tables::fwd() {
 		(r.neg ? ts[r.tab].del : ts[r.tab].add).push_back(x);
 	}
 	bool b = false;
-	for (table& t : ts) b |= t.commit(DBG(bits));
+	for (table& t : ts) {
+		b |= t.commit(DBG(bits));
+		if (t.unsat) return unsat = true;
+	}
 	return b;
 /*	if (!b) return false;
 	for (auto x : goals)
@@ -784,9 +795,11 @@ bool tables::pfp() {
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
-		output::to(L"info") << "step: " << nstep++ << endl;
+		output::to(L"info") << "step: " << nstep << endl;
 		if (!fwd())
 			return bproof ? get_goals(), true : true;
+		++nstep;
+		if (unsat) throw unsat_exception();
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));

@@ -118,10 +118,13 @@ struct raw_progs {
 	raw_progs(const std::wstring& s);
 };
 
+void parse_error(cws o, std::wstring e);
+void parse_error(cws o, std::wstring e, cws s);
+void parse_error(cws o, std::wstring e, lexeme l);
+void parse_error(cws o, std::wstring e, std::wstring s);
+void parse_error(cws o, std::wstring e, cws s, size_t len);
 void parse_error(std::wstring e, lexeme l);
-void parse_error(std::wstring e, cws s);
 void parse_error(std::wstring e, std::wstring s);
-void parse_error(std::wstring e, cws s, size_t len);
 std::wostream& operator<<(std::wostream& os, const directive& d);
 std::wostream& operator<<(std::wostream& os, const elem& e);
 std::wostream& operator<<(std::wostream& os, const raw_term& t);
@@ -141,3 +144,7 @@ bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
 #define lexeme2str(l) wstring((l)[0], (l)[1]-(l)[0])
+
+struct parse_error_exception : public virtual std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
