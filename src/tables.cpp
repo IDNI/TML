@@ -343,7 +343,10 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 		}
 	}
 	for (int_t i : pvars) nvars.erase(i);
-	if (h.neg) for (int_t i : h) if (i < 0) nvars.erase(i);
+	if (h.neg) for (int_t i : h) if (i < 0) { 
+		nvars.erase(i); 
+		eqvars.erase(i);
+	}
 	bdd_handles v;
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
