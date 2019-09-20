@@ -234,17 +234,22 @@ private:
 	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
 	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
 	ntable get_table(const sig& s);
+	ntable get_new_tab(int_t x, ints ar);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);
 	void add_prog(std::map<term, std::set<std::set<term>>> m,
 		const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
+	void transform_bin(std::set<std::vector<term>>& p);
+	bool cqc(const std::vector<term>& x, std::vector<term> y);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+	std::function<int_t(void)>* get_new_rel;
 public:
-	tables(bool bproof = false, bool optimize = true);
+	tables(std::function<int_t(void)>* get_new_rel,
+		bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,

@@ -585,6 +585,10 @@ bool tables::run_nums(const map<term, set<set<term>>>& m, set<term>& r) {
 	return pfp() && (r = decompress(), true);
 }
 
+ntable tables::get_new_tab(int_t x, ints ar) {
+	return get_table({ x, ar });
+}
+
 void tables::add_prog(map<term, set<set<term>>> m, const strs_t& strs,
 	bool mknums) {
 	if (mknums) to_nums(m);
@@ -759,8 +763,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	return r;
 }
 
-tables::tables(bool bproof, bool optimize) :
-	dict(*new dict_t), bproof(bproof), optimize(optimize) {}
+tables::tables(function<int_t(void)>* get_new_rel, bool bproof, bool optimize) :
+	dict(*new dict_t), bproof(bproof), optimize(optimize),
+	get_new_rel(get_new_rel) {}
 
 tables::~tables() {
 	delete &dict;

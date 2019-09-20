@@ -16,7 +16,7 @@ using namespace std;
 
 void driver::save_csv() const {
 	map<elem, wofstream> files;
-	tbl.out([&files](const raw_term& t) {
+	tbl->out([&files](const raw_term& t) {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
 			wstring wfname = lexeme2str(t.e[0].e) + L".csv";

@@ -587,20 +587,6 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
-/*set<frule> driver::interpolate(const vector<frule>& r) {
-	struct cmp {
-		bool operator()(const raw_term& x, const raw_term& y) const {
-			if (x.e[0] != y.e[0]) return x.e[0] < y.e[0];
-			if (x.arity != y.arity) return x.arity < y.arity;
-			return false;
-		}
-	};
-	vector<raw_term, multiset<raw_term, cmp>> m(r.size());
-	for (size_t n = 0; n != r.size(); ++n)
-		for (const raw_term& t : r[n].second)
-			m[n].insert(t);
-}*/
-
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
 //	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
@@ -611,20 +597,16 @@ void driver::transform_bin(raw_prog& p) {
 			assert(f.back().first.e.size());
 	p.r.clear();
 	auto interpolate = [this](
-		const raw_term& x, const raw_term& y, set<elem> v) {
+		const vector<raw_term>& x, set<elem> v) {
 		raw_rule r;
-		r.b = {{x, y}};
-		r.h.emplace_back();
+		r.b = {x}, r.h.emplace_back();
 		r.h[0].e.emplace_back(elem::SYM, get_new_rel());
 		append_openp(r.h[0].e);
-		for (size_t n = 0; n != x.e.size(); ++n)
-			if (x.e[n].type == elem::VAR && has(v, x.e[n]))
-				r.h[0].e.push_back(x.e[n]), v.insert(x.e[n]);
-		for (size_t n = 0; n != y.e.size(); ++n)
-			if (y.e[n].type == elem::VAR && has(v, y.e[n]))
-				r.h[0].e.push_back(y.e[n]), v.insert(y.e[n]);
-		for (auto t : r.b) assert(!t.empty());
-		for (auto t : r.b) assert(!t.empty());
+		for (size_t k = 0; k != x.size(); ++k)
+			for (size_t n = 0; n != x[k].e.size(); ++n)
+				if (has(v, x[k].e[n]))
+					r.h[0].e.push_back(x[k].e[n]),
+					v.erase(x[k].e[n]);
 		return append_closep(r.h[0].e), r.h[0].calc_arity(), r;
 	};
 	for (auto x : f) {
@@ -638,25 +620,78 @@ void driver::transform_bin(raw_prog& p) {
 				if (x.first.e[k].type == elem::VAR)
 					v.insert(x.first.e[k]);
 			raw_rule r = interpolate(
-				x.second[0], x.second[1], move(v));
+				{ x.second[0], x.second[1] }, move(v));
 			x.second.erase(x.second.begin(), x.second.begin() + 2);
 			x.second.insert(x.second.begin(), r.h[0]);
 			p.r.push_back(move(r));
 		}
 		p.r.emplace_back(x.first, x.second);
-		for (auto x : p.r.back().b)
-			assert(!x.empty());
+//		for (auto x : p.r.back().b) assert(!x.empty());
 	}
-	if (f.q.e.size()) {
-		raw_rule r;
-		r.type = raw_rule::GOAL;
-		r.h = {f.q};
-		p.r.push_back(r);
-	}
+	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
+}
 
-/*	for (raw_rule r : p.r)
-		for (auto x : r.b)
-			assert(!x.empty());*/
+template<typename T> set<T> vec2set(const vector<T>& v, size_t n = 0) {
+	set<T> r;
+	r.insert(v.begin() + n, v.end());
+	return r;
+}
+
+void freeze(vector<term>& v) {
+	int_t m = 0;
+	map<int_t, int_t> p;
+	map<int_t, int_t>::const_iterator it;
+	for (const term& t : v) for (int_t i : t) if (i & 2) m = max(m, i >> 2);
+	for (term& t : v)
+		for (int_t& i : t)
+			if (i >= 0) continue;
+			else if ((it = p.find(i)) != p.end())
+				i = it->second;
+			else p.emplace(i, m), i = mknum(m++);
+}
+
+bool tables::cqc(const vector<term>& x, vector<term> y) {
+	set<term> r;
+	map<term, set<set<term>>> m;
+	for (const term& t : x) assert(!t.neg);
+	for (const term& t : y) assert(!t.neg);
+	m[x[0]].insert(vec2set(x, 1));
+	freeze(y);
+	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
+	tables t(0);
+	t.run_nums(m, r);
+	return has(r, y[0]);
+}
+
+void tables::transform_bin(set<vector<term>>& p) {
+	auto q = p;
+	p.clear();
+	auto interpolate = [this](vector<term> x, set<int_t> v) {
+		x.insert(x.begin(), term()), x[0].neg = false,
+		x[0].tab = get_new_tab((*get_new_rel)(), {(int_t)v.size()});
+		for (size_t k = 1; k != x.size(); ++k)
+			for (size_t n = 0; n != x[k].size(); ++n)
+				if (has(v, x[k][n]))
+					x[0].push_back(x[k][n]),
+					v.erase(x[k][n]);
+		return x;
+	};
+	for (vector<term> x : q) {
+		while (x.size() > 2) {
+			set<int_t> v;
+			for (size_t n = 3, k; n != x.size(); ++n)
+				for (k = 0; k != x[n].size(); ++k)
+					if (x[n][k] < 0) v.insert(x[n][k]);
+			for (size_t k = 0; k != x[0].size(); ++k)
+				if (x[0][k] < 0) v.insert(x[0][k]);
+			vector<term> r = interpolate(
+				{ x[1], x[2] }, move(v));
+			x.erase(x.begin() + 1,  x.begin() + 3);
+			x.insert(x.begin() + 1, r[0]);
+			p.insert(move(r));
+		}
+		p.insert(move(x));
+	}
 }
 
 /*raw_prog driver::reify(const raw_prog& p) {

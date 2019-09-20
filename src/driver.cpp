@@ -37,9 +37,6 @@ using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
-#define mkchr(x) ((((int_t)x)<<2)|1)
-#define mknum(x) ((((int_t)x)<<2)|2)
-
 void driver::transform_len(raw_term& r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (	r.e[n].type == elem::SYM && r.e[n].e == L"len" &&
@@ -236,7 +233,8 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	if (opts.disabled(L"run")) return;
 	clock_t start, end;
-	measure_time(tbl.run_prog(rp.p[n], pd.strs));
+	tbl = new tables(fget_new_rel);
+	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));
@@ -258,19 +256,21 @@ void driver::init() {
 	output::create(L"ast-html",    L".ast.html");
 }
 
-driver::driver(raw_progs rp, options o) : opts(o) {
+driver::driver(raw_progs rp, options o)
+	: fget_new_rel(new function<int_t(void)>), opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
+	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel());};
 	strs_t strtrees;
-	if (opts.enabled(L"proof")) tbl.set_proof(true);
+	if (opts.enabled(L"proof")) tbl->set_proof(true);
 	output_ast();
 	try {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);
 			DBG(if (opts.enabled(L"o"))
-				tbl.out(output::to(L"output") << endl);)
+				tbl->out(output::to(L"output") << endl);)
 		}
 		NDBG(if (opts.enabled(L"o"))
-			tbl.out(output::to(L"output") << endl);)
+			tbl->out(output::to(L"output") << endl);)
 		if (opts.enabled(L"csv")) save_csv();
 	} catch (unsat_exception& e) {
 		output::to(L"output") << s2ws(string(e.what())) << endl;

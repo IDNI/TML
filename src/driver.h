@@ -17,6 +17,9 @@
 #include "output.h"
 #include "options.h"
 
+#define mkchr(x) ((((int_t)x)<<2)|1)
+#define mknum(x) ((((int_t)x)<<2)|2)
+
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 
 struct prog_data {
@@ -40,6 +43,7 @@ class driver {
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
 	lexeme get_new_rel();
+	std::function<int_t(void)> *fget_new_rel;
 	lexeme get_num_lexeme(int_t i);
 	lexeme get_char_lexeme(wchar_t i);
 	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
@@ -84,7 +88,7 @@ class driver {
 	std::wstring std_input;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
-	tables tbl;
+	tables *tbl = 0;
 	void output_pl(const raw_prog& p) const;
 public:
 	bool result = true;
@@ -96,8 +100,9 @@ public:
 	driver(FILE *f);
 	driver(std::wstring);
 	driver(char *s);
+	~driver() { if (tbl) delete tbl; }
 
-	void out(const tables::rt_printer& rtp) const { tbl.out(rtp); };
+	void out(const tables::rt_printer& rtp) const { tbl->out(rtp); };
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
