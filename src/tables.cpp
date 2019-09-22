@@ -349,7 +349,7 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	return b;
 }
 
-void tables::get_facts(const map<term, set<set<term>>>& m) {
+void tables::get_facts(const flat_prog& m) {
 	map<ntable, set<spbdd_handle>> f;
 	for (const auto& r : m)
 		if (!r.second.empty()) continue;
@@ -391,8 +391,8 @@ void tables::get_nums(const raw_term& t) {
 			nums = max(nums, e.num);
 }
 
-map<term, set<set<term>>> tables::to_terms(const raw_prog& p) {
-	map<term, set<set<term>>> m;
+flat_prog tables::to_terms(const raw_prog& p) {
+	flat_prog m;
 	set<term> s;
 	term t;
 	for (const raw_rule& r : p.r)
@@ -413,7 +413,84 @@ map<term, set<set<term>>> tables::to_terms(const raw_prog& p) {
 	return m;
 }
 
-void tables::get_rules(const map<term, set<set<term>>>& m) {
+template<typename T> void set2vec(const set<T>& s, vector<T>& v) {
+	copy(s.begin(), s.end(), v.begin());
+}
+
+vector<term> to_vec(const term& h, const set<term>& b) {
+	vector<term> v;
+	v.reserve(b.size() + 1), v[0] = h;
+	for (const term& t : b) v.emplace_back(t);
+	return v;
+}
+
+template<typename T> set<T> vec2set(const vector<T>& v, size_t n = 0) {
+	set<T> r;
+	r.insert(v.begin() + n, v.end());
+	return r;
+}
+
+void freeze(vector<term>& v) {
+	int_t m = 0;
+	map<int_t, int_t> p;
+	map<int_t, int_t>::const_iterator it;
+	for (const term& t : v) for (int_t i : t) if (i & 2) m = max(m, i >> 2);
+	for (term& t : v)
+		for (int_t& i : t)
+			if (i >= 0) continue;
+			else if ((it = p.find(i)) != p.end())
+				i = it->second;
+			else p.emplace(i, m), i = mknum(m++);
+}
+
+void freeze(term& t, env& e1, env& e2, int_t& m) {
+	env::const_iterator it;
+	for (int_t& i : t)
+		if (i >= 0) continue;
+		else if ((it = e1.find(i)) == e1.end())
+			e1.emplace(i, m), e2.emplace(m, i), i = m++;
+		else i = it->second;
+}
+
+env freeze(term& h, vector<term>& b) {
+	env e1, e2;
+	int_t m = 0;
+	for (int_t i : h) m = max(m, i);
+	for (const term& t : b) for (int_t i : t) m = max(m, i);
+	freeze(h, e1, e2, ++m);
+	for (term& t : b) freeze(t, e1, e2, m);
+	return e2;
+}
+
+bool tables::cqc(const vector<term>& x, vector<term> y) const {
+	set<term> r;
+	map<term, set<set<term>>> m;
+	for (const term& t : x) assert(!t.neg);
+	for (const term& t : y) assert(!t.neg);
+	m[x[0]].insert(vec2set(x, 1));
+	freeze(y);
+	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
+	tables t(0);
+	t.run_nums(m, r);
+	return has(r, y[0]);
+}
+
+bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
+	auto it = m.find(h);
+	if (it == m.end()) return false;
+	vector<term> v = to_vec(h, b);
+	for (const set<term>& x : it->second)
+		if (cqc(v, to_vec(h, x))) return true;
+	return false;
+}
+
+void tables::cqc_minimize(const term& h, set<term>& b) const {
+	if (b.size() == 1) return;
+	set<term> s = b;
+	for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
+}
+
+void tables::get_rules(flat_prog m) {
 	get_facts(m);
 	set<rule> rs;
 	varmap::const_iterator it;
@@ -421,7 +498,12 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
 	body* y;
 	alt* aa;
-	for (auto x : m) {
+	for (auto& x : m) {
+		if (x.second.empty()) continue;
+		set<set<term>> s;
+		for (const set<term>& al : x.second)
+			if (cqc(x.first, al, m)) s.insert(al);
+		for (const set<term>& y : s) x.second.erase(y);
 		varmap v;
 		set<int_t> hvars;
 		const term &t = x.first;
@@ -436,25 +518,23 @@ void tables::get_rules(const map<term, set<set<term>>>& m) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
-		if (x.second.empty()) continue;
-		// alt-s as in multiple relations specified (bird:=...\nbird:=...\n...), OR-ing
 		for (const set<term>& al : x.second) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
-			// t redefinition, t is header, and below is a body term, then header again
 			for (const term& t : al) {
-				// alt-level EQ/NEQ-s have just 2 vars/consts (elems).
 				if (t.iseq && t.size() == 2) {
-					size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-					if (t.neg) a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
-					else a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					continue; // no body for eq-s
-				}
-				// body is created for each right-hand term (except eq/ineq)
-				b.insert({get_body(t, a.vm, a.varslen), t});
+					const size_t	arg0 = a.vm.at(t[0]),
+					     		arg1 = a.vm.at(t[1]);
+					if (t.neg) a.eq = a.eq %
+							from_sym_eq(arg0, arg1,
+								a.varslen);
+					else a.eq = a.eq && from_sym_eq(
+							arg0, arg1, a.varslen);
+				} else b.insert({
+					get_body(t, a.vm, a.varslen), t});
 			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
 			for (auto x : b) {
@@ -568,8 +648,8 @@ set<set<term>> to_nums(const set<set<term>>& s) {
 	return ss;
 }
 
-void to_nums(map<term, set<set<term>>>& m) {
-	map<term, set<set<term>>> mm;
+void to_nums(flat_prog& m) {
+	flat_prog mm;
 	for (auto x : m) mm[to_nums(x.first)] = move(to_nums(x.second));
 	m = move(mm);
 }
@@ -580,7 +660,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	add_prog(move(to_terms(p)), strs);
 }
 
-bool tables::run_nums(const map<term, set<set<term>>>& m, set<term>& r) {
+bool tables::run_nums(const flat_prog& m, set<term>& r) {
 	add_prog(m, {}, true);
 	return pfp() && (r = decompress(), true);
 }
@@ -589,13 +669,12 @@ ntable tables::get_new_tab(int_t x, ints ar) {
 	return get_table({ x, ar });
 }
 
-void tables::add_prog(map<term, set<set<term>>> m, const strs_t& strs,
-	bool mknums) {
+void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
 	if (mknums) to_nums(m);
 	rules.clear(), datalog = true;
 	syms = dict.nsyms();
 	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
-	get_rules(m);
+	get_rules(move(m));
 	clock_t start, end;
 	output::to(L"debug")<<"load_string: ";
 	measure_time_start();

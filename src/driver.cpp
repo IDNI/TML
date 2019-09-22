@@ -259,7 +259,7 @@ void driver::init() {
 driver::driver(raw_progs rp, options o)
 	: fget_new_rel(new function<int_t(void)>), opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
-	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel());};
+	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel()); };
 	strs_t strtrees;
 	if (opts.enabled(L"proof")) tbl->set_proof(true);
 	output_ast();

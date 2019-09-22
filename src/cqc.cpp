@@ -43,25 +43,6 @@ void sub(vector<term>& v, const env& m) { for (term& t : v) sub(t, m); }
 term sub1(term x, const env& m) { return sub(x, m), x; }
 vector<term> sub1(vector<term> v, const env& m) { return sub(v, m), v; }
 
-void freeze(term& t, env& e1, env& e2, int_t& m) {
-	env::const_iterator it;
-	for (int_t& i : t)
-		if (i >= 0) continue;
-		else if ((it = e1.find(i)) == e1.end())
-			e1.emplace(i, m), e2.emplace(m, i), i = m++;
-		else i = it->second;
-}
-
-env freeze(term& h, vector<term>& b) {
-	env e1, e2;
-	int_t m = 0;
-	for (int_t i : h) m = max(m, i);
-	for (const term& t : b) for (int_t i : t) m = max(m, i);
-	freeze(h, e1, e2, ++m);
-	for (term& t : b) freeze(t, e1, e2, m);
-	return e2;
-}
-
 bool derives(const term& t, term h, vector<term> b, const vector<term>& kb,
 	env& e, size_t n = 0) {
 	env v;
@@ -74,10 +55,10 @@ bool derives(const term& t, term h, vector<term> b, const vector<term>& kb,
 }
 
 // whether 1 is contained in 2, i.e. returns no more results than 2
-map<int_t, int_t> cqc(term h1, vector<term> b1, term h2, vector<term> b2) {
-	env f = freeze(h1, b1), e;
-	return derives(h1, h2, b2, b1, e) ? e : map<int_t, int_t>();
-}
+//map<int_t, int_t> cqc(term h1, vector<term> b1, term h2, vector<term> b2) {
+//	env f = freeze(h1, b1), e;
+//	return derives(h1, h2, b2, b1, e) ? e : map<int_t, int_t>();
+//}
 
 wostream& operator<<(wostream& os, const env& e) {
 	for (auto x : e) wcout << x.first << " = " << x.second << endl;

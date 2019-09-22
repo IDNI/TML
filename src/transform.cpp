@@ -631,38 +631,6 @@ void driver::transform_bin(raw_prog& p) {
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
 }
 
-template<typename T> set<T> vec2set(const vector<T>& v, size_t n = 0) {
-	set<T> r;
-	r.insert(v.begin() + n, v.end());
-	return r;
-}
-
-void freeze(vector<term>& v) {
-	int_t m = 0;
-	map<int_t, int_t> p;
-	map<int_t, int_t>::const_iterator it;
-	for (const term& t : v) for (int_t i : t) if (i & 2) m = max(m, i >> 2);
-	for (term& t : v)
-		for (int_t& i : t)
-			if (i >= 0) continue;
-			else if ((it = p.find(i)) != p.end())
-				i = it->second;
-			else p.emplace(i, m), i = mknum(m++);
-}
-
-bool tables::cqc(const vector<term>& x, vector<term> y) {
-	set<term> r;
-	map<term, set<set<term>>> m;
-	for (const term& t : x) assert(!t.neg);
-	for (const term& t : y) assert(!t.neg);
-	m[x[0]].insert(vec2set(x, 1));
-	freeze(y);
-	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
-	tables t(0);
-	t.run_nums(m, r);
-	return has(r, y[0]);
-}
-
 void tables::transform_bin(set<vector<term>>& p) {
 	auto q = p;
 	p.clear();

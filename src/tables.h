@@ -26,9 +26,10 @@ typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
+typedef std::map<term, std::set<std::set<term>>> flat_prog;
 
 std::wostream& operator<<(std::wostream& os, const env& e);
-env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
+//env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
@@ -230,19 +231,21 @@ private:
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_nums(const raw_term& t);
-	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
-	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
-	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
+	flat_prog to_terms(const raw_prog& p);
+	void get_rules(flat_prog m);
+	void get_facts(const flat_prog& m);
 	ntable get_table(const sig& s);
 	ntable get_new_tab(int_t x, ints ar);
 	void load_string(lexeme rel, const std::wstring& s);
 	void add_prog(const raw_prog& p, const strs_t& strs);
-	void add_prog(std::map<term, std::set<std::set<term>>> m,
-		const strs_t& strs, bool mknums = false);
+	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
 	void transform_bin(std::set<std::vector<term>>& p);
-	bool cqc(const std::vector<term>& x, std::vector<term> y);
+	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
+	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
+		const;
+	void cqc_minimize(const term& h, std::set<term>& b) const;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
@@ -252,8 +255,7 @@ public:
 		bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
-	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
-		std::set<term>& r);
+	bool run_nums(const flat_prog& m, std::set<term>& r);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
