@@ -33,6 +33,7 @@ set(TML_SOURCES
 	cqc.cpp
 	ast.cpp
 	bdd.cpp
+	binary.cpp
 	dict.cpp
 	driver.cpp
 	input.cpp
@@ -91,7 +92,7 @@ target_include_directories(TML PUBLIC
 )
 set_target_properties(TML PROPERTIES
 	EXPORT_NAME TML
-	PUBLIC_HEADER ${TML_HEADERS}
+	PUBLIC_HEADER "${TML_HEADERS}"
 )
 
 

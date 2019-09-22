@@ -34,6 +34,8 @@ struct prog_data {
 class driver {
 	friend struct flat_rules;
 	friend struct pattern;
+	friend std::ostream& operator<<(std::ostream& os, const driver& d);
+	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
