@@ -500,10 +500,10 @@ void tables::get_rules(flat_prog m) {
 	alt* aa;
 	for (auto& x : m) {
 		if (x.second.empty()) continue;
-		set<set<term>> s;
+/*		set<set<term>> s;
 		for (const set<term>& al : x.second)
 			if (cqc(x.first, al, m)) s.insert(al);
-		for (const set<term>& y : s) x.second.erase(y);
+		for (const set<term>& y : s) x.second.erase(y);*/
 		varmap v;
 		set<int_t> hvars;
 		const term &t = x.first;
