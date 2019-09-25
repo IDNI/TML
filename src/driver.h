@@ -104,7 +104,7 @@ public:
 	driver(char *s);
 	~driver() { if (tbl) delete tbl; }
 
-	void out(const tables::rt_printer& rtp) const { tbl->out(rtp); };
+	void out(const tables::rt_printer& rtp)const{ if (tbl) tbl->out(rtp); };
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;

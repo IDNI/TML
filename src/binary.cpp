@@ -112,7 +112,8 @@ ostream& write_bdd(ostream& os) {
 
 ostream& operator<<(ostream& os, const driver& d) {
 	write_int(os, 53437); // 0xbdd00000
-	os << *d.tbl;
+	if (!d.tbl) for (size_t i = 0; i != 4; ++i) write_int(os, 0);
+	else os << *d.tbl;
 	write_bdd(os);
 	return os << ast::source;
 }
