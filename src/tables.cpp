@@ -921,6 +921,11 @@ tables::~tables() {
 		bodies.erase(bodies.begin());
 		delete b;
 	}
+	while (!alts.empty()) {
+		alt *a = *alts.begin();
+		alts.erase(alts.begin());
+		delete a;
+	}
 }
 
 //set<body*, ptrcmp<body>> body::s;
