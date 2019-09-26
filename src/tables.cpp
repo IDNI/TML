@@ -84,7 +84,7 @@ spbdd_handle tables::range(size_t arg, ntable tab) {
 	auto it = range_memo.find(k);
 	if (it != range_memo.end()) return it->second;
 	bdd_handles v;
-	return	range(arg, ts[tab].len, v),
+	return	range(arg, tbls[tab].len, v),
 		range_memo[k] = bdd_and_many(move(v));
 }
 
@@ -109,8 +109,10 @@ void tables::add_bit() {
 	range_clear_memo();
 	spbdd_handle x = bdd_handle::F;
 	bdd_handles v;
-	for (size_t n = 0; n != ts.size(); ++n)
-		ts[n].t = add_bit(ts[n].t, ts[n].len);
+	for (auto& x : tbls)
+//	for (size_t n = 0; n != ts.size(); ++n)
+//		x.second.t = add_bit(x.second.t, x.second.len);
+		x.t = add_bit(x.t, x.len);
 	++bits;
 }
 
@@ -194,13 +196,17 @@ term tables::from_raw_term(const raw_term& r) {
 }
 
 void tables::out(wostream& os) const {
-	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
-		out(os, ts[tab].t, tab);
+//	for (const auto& x : tbls)
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		out(os, tbls[tab].t, tab);
+		//out(os, x.second.t, x.first);
 }
 
 void tables::out(const rt_printer& f) const {
-	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
-		out(ts[tab].t, tab, f);
+//	for (const auto& x : tbls)
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		out(tbls[tab].t, tab, f);
+		//out(x.second.t, x.first, f);
 }
 
 void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
@@ -211,7 +217,7 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len) const {
-	if (!len) len = ts[tab].len;
+	if (!len) len = tbls.at(tab).len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
@@ -226,29 +232,32 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 
 set<term> tables::decompress() {
 	set<term> r;
-	for (ntable tab = 0; (size_t)tab != ts.size(); ++tab)
-		decompress(ts[tab].t, tab, [&r](const term& t) {r.insert(t);});
+//	for (const auto& x : tbls)
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		decompress(tbls[tab].t, tab, [&r](const term& t) {
+		//decompress(x.second.t, x.first, [&r](const term& t) {
+			r.insert(t);});
 	return r;
 }
 
 raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
 	rt.neg = r.neg;
-	const size_t args = ts[r.tab].len;
+	const size_t args = tbls.at(r.tab).len;
 	rt.e.resize(args + 1),
-	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(ts[r.tab].s)));
+	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(tbls.at(r.tab).s)));
 	for (size_t n = 1; n != args + 1; ++n) {
 		int_t arg = r[n - 1];
 		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
 		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 	}
-	return	rt.arity = get<ints>(ts[r.tab].s),
+	return	rt.arity = get<ints>(tbls.at(r.tab).s),
 	      	rt.insert_parens(dict.op, dict.cl), rt;
 }
 
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-	decompress(x&&ts[tab].t, tab, [f, this](const term& r) {
+	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
 		f(to_raw_term(r));
 	});
 }
@@ -361,7 +370,7 @@ void tables::get_facts(const flat_prog& m) {
 	for (auto x : f) {
 		spbdd_handle r = bdd_handle::F;
 		for (auto y : x.second) r = r || y;
-		ts[x.first].t = r;
+		tbls[x.first].t = r;
 	}
 	measure_time_end();
 }
@@ -419,7 +428,7 @@ template<typename T> void set2vec(const set<T>& s, vector<T>& v) {
 
 vector<term> to_vec(const term& h, const set<term>& b) {
 	vector<term> v;
-	v.reserve(b.size() + 1), v[0] = h;
+	v.reserve(b.size() + 1), v.emplace_back(h);
 	for (const term& t : b) v.emplace_back(t);
 	return v;
 }
@@ -471,8 +480,7 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
 	tables t(0);
-	t.run_nums(m, r);
-	return has(r, y[0]);
+	return t.bcqc = false, t.run_nums(move(m), r), has(r, y[0]);
 }
 
 bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
@@ -490,6 +498,13 @@ void tables::cqc_minimize(const term& h, set<term>& b) const {
 	for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
 }
 
+void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
+	vector<set<term>> v;
+	v.reserve(b.size());
+	for (set<term> s : b) cqc_minimize(h, s), v.push_back(s);
+	b.clear(), b.insert(v.begin(), v.end());
+}
+
 void tables::get_rules(flat_prog m) {
 	get_facts(m);
 	set<rule> rs;
@@ -500,16 +515,19 @@ void tables::get_rules(flat_prog m) {
 	alt* aa;
 	for (auto& x : m) {
 		if (x.second.empty()) continue;
-/*		set<set<term>> s;
-		for (const set<term>& al : x.second)
-			if (cqc(x.first, al, m)) s.insert(al);
-		for (const set<term>& y : s) x.second.erase(y);*/
+		if (bcqc = false) {
+			cqc_minimize(x.first, x.second);
+			set<set<term>> s;
+			for (const set<term>& al : x.second)
+				if (cqc(x.first, al, m)) s.insert(al);
+			for (const set<term>& y : s) x.second.erase(y);
+		}
 		varmap v;
 		set<int_t> hvars;
 		const term &t = x.first;
 		rule r;
 		if (t.neg) datalog = false;
-		ts[t.tab].ext = false;
+		tbls[t.tab].ext = false;
 		r.neg = t.neg, r.tab = t.tab, r.eq = bdd_handle::T, r.t = t;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
@@ -556,7 +574,7 @@ void tables::get_rules(flat_prog m) {
 		rs.insert(r);
 	}
 	for (rule r : rs)
-		ts[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
+		tbls[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
 /*	if (!optimize) for (rule r : rs) rules.push_back(r);
 	else {
 		for (rule r : rs)
@@ -592,7 +610,7 @@ void tables::load_string(lexeme r, const wstring& s) {
 	clock_t start, end;
 	output::to(L"debug")<<"load_string or_many: ";
 	measure_time_start();
-	ts[t1].t = bdd_or_many(move(b1)), ts[t2].t = bdd_or_many(move(b2));
+	tbls[t1].t = bdd_or_many(move(b1)), tbls[t2].t = bdd_or_many(move(b2));
 	measure_time_end();
 }
 
@@ -612,12 +630,13 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 ntable tables::get_table(const sig& s) {
 	auto it = smap.find(s);
 	if (it != smap.end()) return it->second;
-	ntable nt = ts.size();
+	ntable nt = tbls.size(); //tbls.empty() ? 0 : ((++tbls.rbegin())->first + 1); //ts.size();
 	size_t len = sig_len(s);
 	max_args = max(max_args, len);
 	table tb;
 	tb.t = bdd_handle::F;
-	return tb.s = s, tb.len = len, ts.push_back(tb), smap.emplace(s,nt), nt;
+	return tb.s = s, tb.len = len, tbls.push_back(tb), //tbls[nt] = tb,
+	       smap.emplace(s,nt), nt;
 }
 
 term to_nums(term t) {
@@ -625,10 +644,10 @@ term to_nums(term t) {
 	return t;
 }
 
-term from_nums(term t) {
-	for (int_t& i : t)  if (i > 0) i >>= 2;
-	return t;
-}
+//term from_nums(term t) {
+//	for (int_t& i : t)  if (i > 0) i >>= 2;
+//	return t;
+//}
 
 set<term> to_nums(const set<term>& s) {
 	set<term> ss;
@@ -636,11 +655,11 @@ set<term> to_nums(const set<term>& s) {
 	return ss;
 }
 
-set<term> from_nums(const set<term>& s) {
-	set<term> ss;
-	for (const term& t : s) ss.insert(from_nums(t));
-	return ss;
-}
+//set<term> from_nums(const set<term>& s) {
+//	set<term> ss;
+//	for (const term& t : s) ss.insert(from_nums(t));
+//	return ss;
+//}
 
 set<set<term>> to_nums(const set<set<term>>& s) {
 	set<set<term>> ss;
@@ -660,9 +679,45 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	add_prog(move(to_terms(p)), strs);
 }
 
-bool tables::run_nums(const flat_prog& m, set<term>& r) {
-	add_prog(m, {}, true);
-	return pfp() && (r = decompress(), true);
+bool tables::run_nums(flat_prog m, set<term>& r) {
+	map<ntable, ntable> m1, m2;
+	auto f = [&m1, &m2](ntable *x) {
+		const int_t y = (int_t)m2.size();
+		m1.emplace(*x, y), m2.emplace(y, *x);
+		return *x = y;
+	};
+	auto g = [&m2](const set<term>& s) {
+		set<term> r;
+		for (term t : s) t.tab = m2.at(t.tab), r.insert(t);
+		return r;
+	};
+	auto h = [this, f](const set<term>& s) {
+		set<term> r;
+		for (term t : s)
+			get_table({ f(&t.tab), { (int_t)t.size() }}),
+			r.insert(t);
+		return r;
+	};
+	flat_prog p;
+//typedef std::map<term, std::set<std::set<term>>> flat_prog;
+	for (pair<term, set<set<term>>> x : m) {
+		get_table({ f(&x.first.tab), { (int_t)x.first.size() } });
+		for (set<term> y : x.second)
+			p[x.first].insert(h(y));
+/*		{
+			for (term z : y)
+				get_table({ f(z.tab), { (int_t)z.size() }});
+			p[x.first].insert(y);
+		}*/
+	}
+/*	for (const auto& x : m) {
+		get_table({ x.first.tab, { (int_t)x.first.size() } });
+		for (const auto& y : x.second)
+			for (const term& z : y)
+				get_table({ f(z.tab), { (int_t)z.size() }});
+	}*/
+	add_prog(move(p), {}, true);
+	return pfp() && (r = g(decompress()), true);
 }
 
 ntable tables::get_new_tab(int_t x, ints ar) {
@@ -681,7 +736,7 @@ void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
 	for (auto x : strs) load_string(x.first, x.second);
 	measure_time_end();
 	smemo.clear(), ememo.clear();
-	bdd::gc();
+	if (bcqc) bdd::gc();
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -708,14 +763,14 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 }
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
-	if (b.a) return alt_query(*b.a, 0);
+//	if (b.a) return alt_query(*b.a, 0);
 //	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
-	if (b.tlast && b.tlast->b == ts[b.tab].t->b) return b.rlast;
-	b.tlast = ts[b.tab].t;
+	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;
+	b.tlast = tbls[b.tab].t;
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
-		(b.q, ts[b.tab].t, b.ex, b.perm);
+		(b.q, tbls[b.tab].t, b.ex, b.perm);
 //	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
 //	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
 //	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
@@ -792,12 +847,14 @@ char tables::fwd() noexcept {
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
 //		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == bdd_handle::F) continue;
-		(r.neg ? ts[r.tab].del : ts[r.tab].add).push_back(x);
+		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 	}
 	bool b = false;
-	for (table& t : ts) {
+	for (auto& t : tbls) {
 		b |= t.commit(DBG(bits));
 		if (t.unsat) return unsat = true;
+		//b |= t.second.commit(DBG(bits));
+		//if (t.second.unsat) return unsat = true;
 	}
 	return b;
 /*	if (!b) return false;
@@ -809,9 +866,15 @@ char tables::fwd() noexcept {
 }
 
 level tables::get_front() const {
-	level r;
-	r.resize(ts.size());
-	for (ntable n = 0; n != (ntable)ts.size(); ++n) r[n] = ts[n].t;
+	level r(tbls.size()); //tbls.rbegin()->first + 1);
+//	for (size_t n = 0; n != r.size(); ++n) r[n] = 0;
+//	r.resize(tbls.size());
+	for (ntable n = 0; n != (ntable)tbls.size(); ++n)
+//	for (const auto& x : tbls)
+//		r[x.first] = x.second.t;
+		r[n] = tbls.at(n).t;
+		//r.emplace(x.first, x.second.t);
+//		r[n] = tbls.at(n).t;
 	return r;
 }
 

@@ -64,7 +64,7 @@ void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 		} else if ((bdd_handle::F != levels[level-1][t.tab] && h) ||
 			(bdd_handle::F == levels[level][t.tab] && h)) return;
 	}
-	for (size_t r : ts[t.tab].r)
+	for (size_t r : tbls[t.tab].r)
 		if (rules[r].neg == t.neg)
 			rule_get_grounds(h, r, level, f);
 }
@@ -109,7 +109,7 @@ void tables::get_goals() {
 	proof p(levels.size());
 	set<term> s;
 	for (const term& t : goals)
-		decompress(ts[t.tab].t && from_fact(t), t.tab,
+		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s) get_proof(g, p, levels.size() - 1);
 	print(wcout, p);

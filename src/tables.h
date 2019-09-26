@@ -25,6 +25,7 @@ class dict_t;
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
+//typedef std::map<ntable, spbdd_handle> level;
 typedef bdd_handles level;
 typedef std::map<term, std::set<std::set<term>>> flat_prog;
 
@@ -40,7 +41,7 @@ typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 
 struct body {
 	bool neg, ext = false;
-	struct alt *a = 0;
+//	struct alt *a = 0;
 	ntable tab;
 	bools ex;
 	uints perm;
@@ -141,7 +142,8 @@ private:
 	void print(std::wostream&, const witness&);
 
 	size_t nstep = 0;
-	std::vector<table> ts;
+	std::vector<table> tbls;
+//	std::map<ntable, table> tbls;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
@@ -194,6 +196,7 @@ private:
 	spbdd_handle range(size_t arg, ntable tab);
 	void range_clear_memo() { range_memo.clear(); }
 
+	sig get_sig(const term& t);
 	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
 
@@ -246,6 +249,8 @@ private:
 	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
 		const;
 	void cqc_minimize(const term& h, std::set<term>& b) const;
+	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
+	bool bcqc = true;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
@@ -255,7 +260,7 @@ public:
 		bool bproof = false, bool optimize = true);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
-	bool run_nums(const flat_prog& m, std::set<term>& r);
+	bool run_nums(flat_prog m, std::set<term>& r);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
