@@ -30,3 +30,5 @@ struct term : public ints {
 };
 
 std::wostream& operator<<(std::wostream& os, const term& t);
+std::vector<term> to_vec(const term& h, const std::set<term>& b);
+template<typename T> std::set<T> vec2set(const std::vector<T>& v, size_t n = 0);

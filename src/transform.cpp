@@ -14,30 +14,42 @@
 #include "err.h"
 using namespace std;
 
-lexeme driver::get_char_lexeme(wchar_t c) {
+/*lexeme driver::get_char_lexeme(wchar_t c) {
 	wstring s;
 	return dict.get_lexeme(s += c);
 }
 
 lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
+*/
+
+lexeme driver::get_lexeme(const wstring& s) {
+	cws w = s.c_str();
+	auto it = strs_extra.find({w, w + s.size()});
+	if (it != strs_extra.end()) return *it;
+	wstr r = wcsdup(s.c_str());
+	lexeme l = {r, r + s.size()};
+	strs_extra.insert(l);
+	return l;
+}
 
 lexeme driver::get_var_lexeme(int_t i) {
 	wstring s = L"?v";
-	return dict.get_lexeme(s += to_wstring(i));
+	return get_lexeme(s += to_wstring(i));
 }
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
 
 lexeme driver::get_new_var() {
 	static size_t last = 1;
-	size_t sz = dict.nvars();
+//	size_t sz = dict.nvars();
 	lexeme l;
-	for (;;)
-		if (l = get_var_lexeme(last++), dict.nvars() == sz) return l;
-		else sz = dict.nvars();
+//	for (;;)
+	while (vars.find(l = get_var_lexeme(last++)) != vars.end());
+	return vars.insert(l), l;//, dict.nvars() == sz) return l;
+//		else sz = dict.nvars();
 }
 
-void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
+/*void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
 	for (elem& e : t.e)
 		if (e.type == elem::VAR && m.find(e) == m.end())
 			m.emplace(e, get_var_elem(v++));
@@ -65,7 +77,7 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 		s.insert(t);
 	}
 	return s;
-}
+}*/
 
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
@@ -100,7 +112,7 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 	int_t v){
 	return { false, false, {
 		elem(elem::SYM, r),
-		elem_openp, elem(elem::SYM, dict.get_lexeme(b)),
+		elem_openp, elem(elem::SYM, get_lexeme(b)),
 		get_var_elem(v), get_var_elem(v+1), elem_closep}, {3}};
 }
 
@@ -265,7 +277,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		r.r.push_back(l);
 	}
 	raw_term t;
-	append_sym_elem(t.e, dict.get_lexeme(L"S")), append_openp(t.e),
+	append_sym_elem(t.e, get_lexeme(L"S")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity();
 	raw_rule rr;
@@ -397,7 +409,7 @@ bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }*/
-
+/*
 typedef pair<raw_term, vector<raw_term>> frule;
 
 struct flat_rules : public vector<frule> {
@@ -515,7 +527,7 @@ map<pair<elem, ints>, set<bools>> get_patterns(const flat_rules& f) {
 	map<pair<elem, ints>, set<bools>> r;
 	for (const pattern& p : v) r[{p.p, p.ar}].insert(p.s);
 	return r;
-}
+}*/
 
 /*void driver::refresh_vars(raw_prog& p) {
 	set<raw_rule> rs;
@@ -540,7 +552,7 @@ set<raw_term> driver::get_queries(const raw_prog& p) {
 	return qs;
 }*/
 
-lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
+/*lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
 	wstring s;
 	for (int_t j : i) s += to_wstring(j);
 	s += L'_';
@@ -585,9 +597,9 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	dict.get_rel(l);
 	if (dict.nrels() == sz) { ++last; goto retry; }
 	return l;
-}
+}*/
 
-void driver::transform_bin(raw_prog& p) {
+/*void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
 //	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
@@ -629,14 +641,35 @@ void driver::transform_bin(raw_prog& p) {
 //		for (auto x : p.r.back().b) assert(!x.empty());
 	}
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
+}*/
+
+void tables::transform_bin(flat_prog& p) {
+	set<vector<term>> s;
+	for (const auto& x : p)
+		for (const auto& y : x.second)
+			s.insert(to_vec(x.first, y));
+	p.clear();
+	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
+}
+
+lexeme tables::get_new_rel() {
+	static size_t last = 1;
+	wstring s = L"r";
+	size_t sz;
+	lexeme l;
+retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
+	dict.get_rel(l);
+	if (dict.nrels() == sz) { ++last; goto retry; }
+	return l;
 }
 
 void tables::transform_bin(set<vector<term>>& p) {
 	auto q = p;
 	p.clear();
+#define get_new_rel1() dict.get_rel(get_new_rel())
 	auto interpolate = [this](vector<term> x, set<int_t> v) {
 		x.insert(x.begin(), term()), x[0].neg = false,
-		x[0].tab = get_new_tab((*get_new_rel)(), {(int_t)v.size()});
+		x[0].tab = get_new_tab(get_new_rel1(), {(int_t)v.size()});
 		for (size_t k = 1; k != x.size(); ++k)
 			for (size_t n = 0; n != x[k].size(); ++n)
 				if (has(v, x[k][n]))

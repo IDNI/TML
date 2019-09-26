@@ -183,6 +183,20 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
+	auto get_vars = [this](const raw_term& t) {
+		for (const elem& e : t.e)
+			if (e.type == elem::VAR)
+				vars.insert(e.e);
+	};
+	auto get_all_vars = [this, get_vars](const raw_prog& p) {
+		for (const raw_rule& r : p.r) {
+			for (const raw_term& t : r.h) get_vars(t);
+			for (const vector<raw_term>& b : r.b)
+				for (const raw_term& t : b)
+					get_vars(t);
+		}
+	};
+	for (const raw_prog& p : rp.p) get_all_vars(p);
 //	for (auto x : pd.strs)
 //		if (!has(transformed_strings, x.first))
 //			transform_string(x.second, rp.p[n], x.first),
@@ -196,12 +210,12 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 		else transform_grammar(rp.p[n], pd.strs.begin()->first,
 			pd.strs.begin()->second.size());
 	}
-	if (opts.enabled(L"sdt"))
-		for (raw_prog& p : rp.p)
-			p = transform_sdt(move(p));
-	if (opts.enabled(L"bin"))
-		for (raw_prog& p : rp.p)
-			transform_bin(p);
+//	if (opts.enabled(L"sdt"))
+//		for (raw_prog& p : rp.p)
+//			p = transform_sdt(move(p));
+//	if (opts.enabled(L"bin"))
+//		for (raw_prog& p : rp.p)
+//			transform_bin(p);
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
@@ -232,7 +246,7 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	if (opts.disabled(L"run")) return;
 	clock_t start, end;
-	tbl = new tables(fget_new_rel);
+	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"));
 	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
@@ -255,10 +269,10 @@ void driver::init() {
 	output::create(L"ast-html",    L".ast.html");
 }
 
-driver::driver(raw_progs rp, options o)
-	: fget_new_rel(new function<int_t(void)>), opts(o) {
+driver::driver(raw_progs rp, options o) : opts(o) {
+//	: fget_new_rel(new function<int_t(void)>), opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
-	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel()); };
+//	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel()); };
 	strs_t strtrees;
 	if (opts.enabled(L"proof")) tbl->set_proof(true);
 	output_ast();
@@ -284,3 +298,9 @@ driver::driver(FILE *f)              : driver(f, options()) {}
 driver::driver(wstring s)            : driver(s, options()) {}
 driver::driver(char *s)              : driver(s, options()) {}
 driver::driver(raw_progs rp)         : driver(rp, options()) {}
+
+driver::~driver() {
+	if (tbl) delete tbl;
+	for (auto x : strs_extra) free((wstr)x[0]);
+}
+

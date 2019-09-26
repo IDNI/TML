@@ -247,25 +247,29 @@ private:
 	void get_facts(const flat_prog& m);
 	ntable get_table(const sig& s);
 	ntable get_new_tab(int_t x, ints ar);
+	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
+	lexeme get_var_lexeme(int_t i);
 	void add_prog(const raw_prog& p, const strs_t& strs);
 	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
 	void transform_bin(std::set<std::vector<term>>& p);
+	void transform_bin(flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
 		const;
 	void cqc_minimize(const term& h, std::set<term>& b) const;
 	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
-	bool bcqc = true;
+	bool bcqc = true, bin_transform = false;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-	std::function<int_t(void)>* get_new_rel;
+//	std::function<int_t(void)>* get_new_rel;
 public:
-	tables(std::function<int_t(void)>* get_new_rel,
-		bool bproof = false, bool optimize = true);
+	tables(//std::function<int_t(void)>* get_new_rel,
+		bool bproof = false, bool optimize = true,
+		bool bin_transform = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(flat_prog m, std::set<term>& r);

@@ -61,8 +61,8 @@ typedef int_t ntable;
 #define measure_time_end() end = clock(); \
 	output::to(L"debug") << double(end - start) / CLOCKS_PER_SEC << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
-#define elem_openp elem(elem::OPENP, dict.get_lexeme(L"("))
-#define elem_closep elem(elem::CLOSEP, dict.get_lexeme(L")"))
+#define elem_openp elem(elem::OPENP, get_lexeme(L"("))
+#define elem_closep elem(elem::CLOSEP, get_lexeme(L")"))
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);

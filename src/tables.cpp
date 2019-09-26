@@ -436,7 +436,7 @@ vector<term> to_vec(const term& h, const set<term>& b) {
 	return v;
 }
 
-template<typename T> set<T> vec2set(const vector<T>& v, size_t n = 0) {
+template<typename T> set<T> vec2set(const vector<T>& v, size_t n) {
 	set<T> r;
 	r.insert(v.begin() + n, v.end());
 	return r;
@@ -485,7 +485,7 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	m[x[0]].insert(vec2set(x, 1));
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
-	tables t(0);
+	tables t(false, true, true);
 	t.dict = dict;
 	return t.bcqc = false, t.run_nums(move(m), r), has(r, y[0]);
 }
@@ -536,6 +536,7 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 }
 
 void tables::get_rules(flat_prog m) {
+	if (bin_transform) transform_bin(m);
 	get_facts(m);
 	set<rule> rs;
 	varmap::const_iterator it;
@@ -545,7 +546,7 @@ void tables::get_rules(flat_prog m) {
 	alt* aa;
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		if (bcqc) {
+		if (bcqc = false) {
 			cqc_minimize(x.first, x.second);
 			set<set<term>> s;
 			for (const set<term>& al : x.second)
@@ -929,9 +930,11 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	return r;
 }
 
-tables::tables(function<int_t(void)>* get_new_rel, bool bproof, bool optimize) :
-	dict(*new dict_t), bproof(bproof), optimize(optimize),
-	get_new_rel(get_new_rel) {}
+tables::tables(//function<int_t(void)>* get_new_rel, 
+	bool bproof, bool optimize,
+	bool bin_transform) : dict(*new dict_t), bproof(bproof),
+	optimize(optimize), bin_transform(bin_transform) {}
+	//get_new_rel(get_new_rel) {}
 
 tables::~tables() {
 	if (bcqc) delete &dict;
