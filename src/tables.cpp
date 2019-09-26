@@ -475,9 +475,11 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	set<term> r;
 	map<term, set<set<term>>> m;
 	for (const term& t : x)
-		if(t.neg) throw "cqc not supported yet for terms with negation";
+		if(t.neg) return false;
+		//throw "cqc not supported yet for terms with negation";
 	for (const term& t : y)
-		if(t.neg) throw "cqc not supported yet for terms with negation";
+		if(t.neg) return false;
+		//throw "cqc not supported yet for terms with negation";
 	m[x[0]].insert(vec2set(x, 1));
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
