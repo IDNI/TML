@@ -474,8 +474,10 @@ env freeze(term& h, vector<term>& b) {
 bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	set<term> r;
 	map<term, set<set<term>>> m;
-	for (const term& t : x) assert(!t.neg);
-	for (const term& t : y) assert(!t.neg);
+	for (const term& t : x)
+		if(t.neg) throw "cqc not supported yet for terms with negation";
+	for (const term& t : y)
+		if(t.neg) throw "cqc not supported yet for terms with negation";
 	m[x[0]].insert(vec2set(x, 1));
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
@@ -486,16 +488,19 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
 	auto it = m.find(h);
 	if (it == m.end()) return false;
-	vector<term> v = to_vec(h, b);
+	vector<term> v = to_vec(h, b), v1;
 	for (const set<term>& x : it->second)
-		if (cqc(v, to_vec(h, x))) return true;
+		if (v != (v1 = to_vec(h, x)) && cqc(v1, v))
+			return true;
 	return false;
 }
 
 void tables::cqc_minimize(const term& h, set<term>& b) const {
-	if (b.size() == 1) return;
+	if (b.size() < 2) return;
 	set<term> s = b;
+	//for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
 	for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
+	b.clear(), b.insert(s.begin(), s.end());
 }
 
 void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
@@ -513,9 +518,9 @@ void tables::get_rules(flat_prog m) {
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
 	body* y;
 	alt* aa;
-	for (auto& x : m) {
+	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		if (bcqc = false) {
+		if (bcqc) {
 			cqc_minimize(x.first, x.second);
 			set<set<term>> s;
 			for (const set<term>& al : x.second)
@@ -557,20 +562,20 @@ void tables::get_rules(flat_prog m) {
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
 			for (auto x : b) {
 				a.t.push_back(x.second);
-				if ((bit=body::s.find(&x.first))!=body::s.end())
+				if ((bit=bodies.find(&x.first))!=bodies.end())
 					a.push_back(*bit);
 				else	*(y = new body) = x.first,
-					a.push_back(y), body::s.insert(y);
+					a.push_back(y), bodies.insert(y);
 			}
 			auto d = deltail(a.varslen, r.len);
 			a.ex = d.first, a.perm = d.second;
 			as.insert(a);
 		}
 		for (alt x : as)
-			if ((ait = alt::s.find(&x)) != alt::s.end())
+			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
 			else	*(aa = new alt) = x,
-				r.push_back(aa), alt::s.insert(aa);
+				r.push_back(aa), alts.insert(aa);
 		rs.insert(r);
 	}
 	for (rule r : rs)
@@ -911,12 +916,12 @@ tables::tables(function<int_t(void)>* get_new_rel, bool bproof, bool optimize) :
 
 tables::~tables() {
 	delete &dict;
-	while (!body::s.empty()) {
-		body *b = *body::s.begin();
-		body::s.erase(body::s.begin());
+	while (!bodies.empty()) {
+		body *b = *bodies.begin();
+		bodies.erase(bodies.begin());
 		delete b;
 	}
 }
 
-set<body*, ptrcmp<body>> body::s;
-set<alt*, ptrcmp<alt>> alt::s;
+//set<body*, ptrcmp<body>> body::s;
+//set<alt*, ptrcmp<alt>> alt::s;

@@ -46,7 +46,7 @@ struct body {
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
-	static std::set<body*, ptrcmp<body>> s;
+//	static std::set<body*, ptrcmp<body>> &s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
@@ -67,7 +67,7 @@ struct alt : public std::vector<body*> {
 	varmap vm;
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
-	static std::set<alt*, ptrcmp<alt>> s;
+//	static std::set<alt*, ptrcmp<alt>> &s;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
@@ -115,6 +115,8 @@ public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 private:
 	typedef std::function<void(const term&)> cb_decompress;
+	std::set<body*, ptrcmp<body>> bodies;
+	std::set<alt*, ptrcmp<alt>> alts;
 
 	struct witness {
 		size_t rl, al;
