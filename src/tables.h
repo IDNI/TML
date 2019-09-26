@@ -109,6 +109,8 @@ struct table {
 };
 
 class tables {
+	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
+	friend std::istream& operator>>(std::istream& is, tables& tbl);
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 private:

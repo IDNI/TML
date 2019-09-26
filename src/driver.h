@@ -34,6 +34,8 @@ struct prog_data {
 class driver {
 	friend struct flat_rules;
 	friend struct pattern;
+	friend std::ostream& operator<<(std::ostream& os, const driver& d);
+	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
@@ -102,7 +104,7 @@ public:
 	driver(char *s);
 	~driver() { if (tbl) delete tbl; }
 
-	void out(const tables::rt_printer& rtp) const { tbl->out(rtp); };
+	void out(const tables::rt_printer& rtp)const{ if (tbl) tbl->out(rtp); };
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;

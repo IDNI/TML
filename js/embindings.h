@@ -1,3 +1,10 @@
+using
+	emscripten::class_,
+	emscripten::register_vector,
+	emscripten::optional_override,
+	emscripten::select_overload,
+	emscripten::allow_raw_pointers;
+
 EMSCRIPTEN_BINDINGS(tml) {
 	class_<bdd>("bdd")
 		.class_function("init", &bdd::init)
