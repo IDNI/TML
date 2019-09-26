@@ -643,15 +643,6 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
 }*/
 
-void tables::transform_bin(flat_prog& p) {
-	set<vector<term>> s;
-	for (const auto& x : p)
-		for (const auto& y : x.second)
-			s.insert(to_vec(x.first, y));
-	p.clear();
-	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
-}
-
 lexeme tables::get_new_rel() {
 	static size_t last = 1;
 	wstring s = L"r";
@@ -663,32 +654,45 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
+void tables::transform_bin(flat_prog& p) {
+	set<vector<term>> s;
+	DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
+	for (const auto& x : p)
+		for (const auto& y : x.second)
+			s.insert(to_vec(x.first, y));
+	p.clear(), transform_bin(s);
+	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
+	DBG(print(wcout<<L"transform_bin output:"<<endl, p);)
+}
+
 void tables::transform_bin(set<vector<term>>& p) {
-	auto q = p;
-	p.clear();
-#define get_new_rel1() dict.get_rel(get_new_rel())
+	const auto q = move(p);
 	auto interpolate = [this](vector<term> x, set<int_t> v) {
-		x.insert(x.begin(), term()), x[0].neg = false,
-		x[0].tab = get_new_tab(get_new_rel1(), {(int_t)v.size()});
-		for (size_t k = 1; k != x.size(); ++k)
+		term t;
+		for (size_t k = 0; k != x.size(); ++k)
 			for (size_t n = 0; n != x[k].size(); ++n)
 				if (has(v, x[k][n]))
-					x[0].push_back(x[k][n]),
-					v.erase(x[k][n]);
+					t.push_back(x[k][n]), v.erase(x[k][n]);
+		t.neg = false,
+		t.tab = get_new_tab(dict.get_rel(get_new_rel()),
+			{(int_t)t.size()});
+		x.insert(x.begin(), t);
 		return x;
 	};
+	vector<term> r;
+	set<int_t> v;
 	for (vector<term> x : q) {
-		while (x.size() > 2) {
-			set<int_t> v;
+		while (x.size() > 3) {
 			for (size_t n = 3, k; n != x.size(); ++n)
 				for (k = 0; k != x[n].size(); ++k)
 					if (x[n][k] < 0) v.insert(x[n][k]);
 			for (size_t k = 0; k != x[0].size(); ++k)
 				if (x[0][k] < 0) v.insert(x[0][k]);
-			vector<term> r = interpolate(
-				{ x[1], x[2] }, move(v));
+			r = interpolate( { x[1], x[2] }, move(v));
 			x.erase(x.begin() + 1,  x.begin() + 3);
 			x.insert(x.begin() + 1, r[0]);
+			DBG(print(wcout, r)<<endl;)
+			DBG(print(wcout, x)<<endl;)
 			p.insert(move(r));
 		}
 		p.insert(move(x));

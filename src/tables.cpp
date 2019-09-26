@@ -246,6 +246,7 @@ raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
 	rt.neg = r.neg;
 	const size_t args = tbls.at(r.tab).len;
+	DBG(assert(args == r.size());)
 	rt.e.resize(args + 1),
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(tbls.at(r.tab).s)));
 	for (size_t n = 1; n != args + 1; ++n) {
@@ -500,6 +501,11 @@ bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
 	return false;
 }
 
+wostream& tables::print(wostream& os, const vector<term>& b) const {
+	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
+	return os;
+}
+
 wostream& tables::print(wostream& os, const set<term>& b) const {
 	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
 	return os;
@@ -514,7 +520,7 @@ wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 wostream& tables::print(wostream& os, const flat_prog& p) const {
 	for (const auto& x : p)
 		for (const auto& y : x.second)
-			print(os, x.first, y);
+			print(os, x.first, y) << endl;
 	return os;
 }
 
@@ -727,8 +733,7 @@ bool tables::run_nums(flat_prog m, set<term>& r) {
 	auto h = [this, f](const set<term>& s) {
 		set<term> r;
 		for (term t : s)
-			get_table({ f(&t.tab), { (int_t)t.size() }}),
-			r.insert(t);
+			get_table({ f(&t.tab), {(int_t)t.size()}}), r.insert(t);
 		return r;
 	};
 	flat_prog p;
