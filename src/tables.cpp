@@ -240,6 +240,8 @@ set<term> tables::decompress() {
 	return r;
 }
 
+#define get_var_lexeme(v) dict.get_lexeme(wstring(L"?v") + to_wstring(-v))
+
 raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
 	rt.neg = r.neg;
@@ -247,8 +249,9 @@ raw_term tables::to_raw_term(const term& r) const {
 	rt.e.resize(args + 1),
 	rt.e[0] = elem(elem::SYM, dict.get_rel(get<0>(tbls.at(r.tab).s)));
 	for (size_t n = 1; n != args + 1; ++n) {
-		int_t arg = r[n - 1];
-		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
+		const int_t arg = r[n - 1];
+		if (arg < 0) rt.e[n] = elem(elem::VAR, get_var_lexeme(arg));
+		else if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
 		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 	}
@@ -447,9 +450,8 @@ void freeze(vector<term>& v) {
 	for (term& t : v)
 		for (int_t& i : t)
 			if (i >= 0) continue;
-			else if ((it = p.find(i)) != p.end())
-				i = it->second;
-			else p.emplace(i, m), i = mknum(m++);
+			else if ((it = p.find(i)) != p.end()) i = it->second;
+			else p.emplace(i, mknum(m)), i = mknum(m++);
 }
 
 void freeze(term& t, env& e1, env& e2, int_t& m) {
@@ -484,6 +486,7 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
 	tables t(0);
+	t.dict = dict;
 	return t.bcqc = false, t.run_nums(move(m), r), has(r, y[0]);
 }
 
@@ -497,11 +500,31 @@ bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
 	return false;
 }
 
+wostream& tables::print(wostream& os, const set<term>& b) const {
+	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
+	return os;
+}
+
+wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
+	os << to_raw_term(h) << L" :- ";
+	for (const term& t : b) os << to_raw_term(t) << L' ';
+	return os << L'.';
+}
+
+wostream& tables::print(wostream& os, const flat_prog& p) const {
+	for (const auto& x : p)
+		for (const auto& y : x.second)
+			print(os, x.first, y);
+	return os;
+}
+
 void tables::cqc_minimize(const term& h, set<term>& b) const {
 	if (b.size() < 2) return;
 	set<term> s = b;
-	//for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
 	for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
+	DBG(//if (b.size() != s.size())
+		print(print(wcerr<<L"Rule\t\t", h, b)<<endl<<L"minimized into\t",
+		h, s)<<endl;)
 	b.clear(), b.insert(s.begin(), s.end());
 }
 
@@ -689,6 +712,8 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 bool tables::run_nums(flat_prog m, set<term>& r) {
 	map<ntable, ntable> m1, m2;
 	auto f = [&m1, &m2](ntable *x) {
+		auto it = m1.find(*x);
+		if (it != m1.end()) return *x = it->second;
 		const int_t y = (int_t)m2.size();
 		m1.emplace(*x, y), m2.emplace(y, *x);
 		return *x = y;
@@ -706,25 +731,17 @@ bool tables::run_nums(flat_prog m, set<term>& r) {
 		return r;
 	};
 	flat_prog p;
-//typedef std::map<term, std::set<std::set<term>>> flat_prog;
 	for (pair<term, set<set<term>>> x : m) {
 		get_table({ f(&x.first.tab), { (int_t)x.first.size() } });
-		for (set<term> y : x.second)
-			p[x.first].insert(h(y));
-/*		{
-			for (term z : y)
-				get_table({ f(z.tab), { (int_t)z.size() }});
-			p[x.first].insert(y);
-		}*/
+		set<set<term>> &s = p[x.first];
+		for (set<term> y : x.second) s.insert(h(y));
 	}
-/*	for (const auto& x : m) {
-		get_table({ x.first.tab, { (int_t)x.first.size() } });
-		for (const auto& y : x.second)
-			for (const term& z : y)
-				get_table({ f(z.tab), { (int_t)z.size() }});
-	}*/
-	add_prog(move(p), {}, true);
-	return pfp() && (r = g(decompress()), true);
+	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
+	add_prog(move(p), {}, false);//true);
+	if (!pfp()) return false;
+	r = g(decompress());
+	DBG(print(wcout, r) << endl;)
+	return true;
 }
 
 ntable tables::get_new_tab(int_t x, ints ar) {
@@ -917,7 +934,7 @@ tables::tables(function<int_t(void)>* get_new_rel, bool bproof, bool optimize) :
 	get_new_rel(get_new_rel) {}
 
 tables::~tables() {
-	delete &dict;
+	if (bcqc) delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());

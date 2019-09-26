@@ -144,6 +144,10 @@ private:
 	void print(std::wostream&, const proof_elem&);
 	void print(std::wostream&, const proof&);
 	void print(std::wostream&, const witness&);
+	std::wostream& print(std::wostream& os, const std::set<term>& b) const;
+	std::wostream& print(std::wostream& os, const term& h,
+		const std::set<term>& b) const;
+	std::wostream& print(std::wostream& os, const flat_prog& p) const;
 
 	size_t nstep = 0;
 	std::vector<table> tbls;

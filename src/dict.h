@@ -20,7 +20,10 @@ class dict_t {
 	std::set<lexeme, lexcmp> strs_extra;
 public:
 	dict_t();
-	const lexeme op, cl;
+	dict_t(const dict_t& d) : syms_dict(d.syms_dict),
+		vars_dict(d.vars_dict), rels_dict(d.rels_dict), syms(d.syms),
+		rels(d.rels), strs_extra(d.strs_extra), op(d.op), cl(d.cl) {}
+	lexeme op, cl;
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	lexeme get_sym(int_t t) const;
 	int_t get_var(const lexeme& l);
@@ -32,5 +35,11 @@ public:
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
+	dict_t& operator=(const dict_t& d) {
+		return syms_dict = d.syms_dict, vars_dict = d.vars_dict,
+			rels_dict = d.rels_dict, syms = d.syms,
+			rels = d.rels, strs_extra = d.strs_extra, op = d.op,
+			cl = d.cl, *this;
+	}
 	~dict_t();
 };
