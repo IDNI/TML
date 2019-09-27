@@ -519,8 +519,8 @@ wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 
 wostream& tables::print(wostream& os, const flat_prog& p) const {
 	for (const auto& x : p)
-		for (const auto& y : x.second)
-			print(os, x.first, y) << endl;
+		if (x.second.empty()) os << to_raw_term(x.first) << L'.'<<endl;
+		else for (const auto& y : x.second) print(os, x.first, y)<<endl;
 	return os;
 }
 
@@ -542,8 +542,10 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 }
 
 void tables::get_rules(flat_prog m) {
-	if (bin_transform) transform_bin(m);
 	get_facts(m);
+#ifndef TRANSFORM_BIN_DRIVER
+	if (bin_transform) transform_bin(m);
+#endif
 	set<rule> rs;
 	varmap::const_iterator it;
 	set<body*, ptrcmp<body>>::const_iterator bit;

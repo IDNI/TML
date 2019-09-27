@@ -213,9 +213,11 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 //	if (opts.enabled(L"sdt"))
 //		for (raw_prog& p : rp.p)
 //			p = transform_sdt(move(p));
-//	if (opts.enabled(L"bin"))
-//		for (raw_prog& p : rp.p)
-//			transform_bin(p);
+#ifdef TRANSFORM_BIN_DRIVER
+	if (opts.enabled(L"bin"))
+		for (raw_prog& p : rp.p)
+			transform_bin(p);
+#endif
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));

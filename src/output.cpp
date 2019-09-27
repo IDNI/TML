@@ -276,10 +276,11 @@ void tables::print(wostream& os, const tables::proof_elem& e) {
 
 void tables::print(wostream& os, const tables::proof& p) {
 	for (size_t n = 0; n != p.size(); ++n)
-		for (const auto& x : p[n])
+		for (const auto& x : p[n]) {
 			for (const auto& y : x.second)
 				(os<<n<<L' '<<to_raw_term(x.first)<<L" :- "),
 				print(os, y);
+		}
 }
 
 #ifdef DEBUG

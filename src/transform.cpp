@@ -39,6 +39,7 @@ lexeme driver::get_var_lexeme(int_t i) {
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
 
+#ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_var() {
 	static size_t last = 1;
 //	size_t sz = dict.nvars();
@@ -49,7 +50,7 @@ lexeme driver::get_new_var() {
 //		else sz = dict.nvars();
 }
 
-/*void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
+void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
 	for (elem& e : t.e)
 		if (e.type == elem::VAR && m.find(e) == m.end())
 			m.emplace(e, get_var_elem(v++));
@@ -77,8 +78,8 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 		s.insert(t);
 	}
 	return s;
-}*/
-
+}
+#endif
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
@@ -409,7 +410,8 @@ bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }*/
-/*
+
+#ifdef TRANSFORM_BIN_DRIVER
 typedef pair<raw_term, vector<raw_term>> frule;
 
 struct flat_rules : public vector<frule> {
@@ -437,7 +439,8 @@ wostream& operator<<(wostream& os, const flat_rules& f) {
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
 }
-
+#endif
+/*
 template<typename T> struct nullable {
 	const bool null;
 	const T t;
@@ -586,21 +589,25 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	DBG(wcout<<"sdt transform, input:"<<endl<<p<<endl;)
 	DBG(wcout<<"sdt transform, output:"<<endl<<r<<endl;)
 	return r;
-}
-
+}*/
+#ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_rel() {
 	static size_t last = 1;
 	wstring s = L"r";
 	size_t sz;
 	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
-	dict.get_rel(l);
-	if (dict.nrels() == sz) { ++last; goto retry; }
+retry:	sz = rels.size(), l = get_lexeme(s + to_wstring(last));
+	rels.insert(l);
+	if (rels.size() == sz) { ++last; goto retry; }
 	return l;
-}*/
+}
 
-/*void driver::transform_bin(raw_prog& p) {
+void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
+	for (const frule& r : f) {
+		rels.insert(r.first.e[0].e);
+		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
+	}
 //	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
@@ -641,8 +648,8 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 //		for (auto x : p.r.back().b) assert(!x.empty());
 	}
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
-}*/
-
+}
+#endif
 lexeme tables::get_new_rel() {
 	static size_t last = 1;
 	wstring s = L"r";
@@ -658,8 +665,8 @@ void tables::transform_bin(flat_prog& p) {
 	set<vector<term>> s;
 	DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
 	for (const auto& x : p)
-		for (const auto& y : x.second)
-			s.insert(to_vec(x.first, y));
+		if (x.second.empty()) s.insert({x.first});
+		else for (const auto& y : x.second) s.insert(to_vec(x.first,y));
 	p.clear(), transform_bin(s);
 	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
 	DBG(print(wcout<<L"transform_bin output:"<<endl, p);)
@@ -675,7 +682,7 @@ void tables::transform_bin(set<vector<term>>& p) {
 					t.push_back(x[k][n]), v.erase(x[k][n]);
 		t.neg = false,
 		t.tab = get_new_tab(dict.get_rel(get_new_rel()),
-			{(int_t)t.size()});
+			{(int_t)t.size()}),
 		x.insert(x.begin(), t);
 		return x;
 	};
@@ -690,9 +697,9 @@ void tables::transform_bin(set<vector<term>>& p) {
 				if (x[0][k] < 0) v.insert(x[0][k]);
 			r = interpolate( { x[1], x[2] }, move(v));
 			x.erase(x.begin() + 1,  x.begin() + 3);
+//			x.push_back(r[0]);
 			x.insert(x.begin() + 1, r[0]);
-			DBG(print(wcout, r)<<endl;)
-			DBG(print(wcout, x)<<endl;)
+//			DBG(print(wcout, r)<<endl; print(wcout, x)<<endl;)
 			p.insert(move(r));
 		}
 		p.insert(move(x));

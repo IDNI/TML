@@ -42,19 +42,19 @@ class driver {
 	int_t nums = 0, chars = 0, syms = 0;
 //	bool mult = false;
 
-	std::set<lexeme, lexcmp> strs_extra;
+	std::set<lexeme, lexcmp> strs_extra, rels;
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
 	lexeme get_lexeme(const std::wstring& s);
-//	lexeme get_new_rel();
+	lexeme get_new_rel();
 //	std::function<int_t(void)> *fget_new_rel;
 //	lexeme get_num_lexeme(int_t i);
 //	lexeme get_char_lexeme(wchar_t i);
 //	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
-//	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
-//	void refresh_vars(raw_prog& p);
-//	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
-//	std::set<raw_rule> refresh_vars(raw_rule& r);
+	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
+	void refresh_vars(raw_prog& p);
+	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
+	std::set<raw_rule> refresh_vars(raw_rule& r);
 	std::set<raw_term> get_queries(const raw_prog& p);
 
 	std::wstring directive_load(const directive& d);
@@ -63,7 +63,7 @@ class driver {
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
-//	void transform_bin(raw_prog& p);
+	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
 //	raw_prog transform_bwd(raw_prog& p);
 	raw_term get_try_pred(const raw_term& x);
