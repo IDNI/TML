@@ -15,6 +15,7 @@ set(JSLIB_SOURCES
 	../src/ast.h
 	../src/bdd.cpp
 	../src/bdd.h
+	../src/binary.cpp
 	../src/defs.h
 	../src/dict.cpp
 	../src/dict.h

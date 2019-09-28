@@ -29,16 +29,12 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
-using namespace emscripten;
 #include "../js/embindings.h"
 #endif
 
 using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
-
-#define mkchr(x) ((((int_t)x)<<2)|1)
-#define mknum(x) ((((int_t)x)<<2)|2)
 
 void driver::transform_len(raw_term& r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
@@ -187,6 +183,20 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
+	auto get_vars = [this](const raw_term& t) {
+		for (const elem& e : t.e)
+			if (e.type == elem::VAR)
+				vars.insert(e.e);
+	};
+	auto get_all_vars = [this, get_vars](const raw_prog& p) {
+		for (const raw_rule& r : p.r) {
+			for (const raw_term& t : r.h) get_vars(t);
+			for (const vector<raw_term>& b : r.b)
+				for (const raw_term& t : b)
+					get_vars(t);
+		}
+	};
+	for (const raw_prog& p : rp.p) get_all_vars(p);
 //	for (auto x : pd.strs)
 //		if (!has(transformed_strings, x.first))
 //			transform_string(x.second, rp.p[n], x.first),
@@ -200,12 +210,14 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 		else transform_grammar(rp.p[n], pd.strs.begin()->first,
 			pd.strs.begin()->second.size());
 	}
-	if (opts.enabled(L"sdt"))
-		for (raw_prog& p : rp.p)
-			p = transform_sdt(move(p));
+//	if (opts.enabled(L"sdt"))
+//		for (raw_prog& p : rp.p)
+//			p = transform_sdt(move(p));
+#ifdef TRANSFORM_BIN_DRIVER
 	if (opts.enabled(L"bin"))
 		for (raw_prog& p : rp.p)
 			transform_bin(p);
+#endif
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//wcout<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
@@ -236,7 +248,9 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	if (opts.disabled(L"run")) return;
 	clock_t start, end;
-	measure_time(tbl.run_prog(rp.p[n], pd.strs));
+	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"),
+		opts.enabled(L"t"));
+	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));
@@ -259,18 +273,20 @@ void driver::init() {
 }
 
 driver::driver(raw_progs rp, options o) : opts(o) {
+//	: fget_new_rel(new function<int_t(void)>), opts(o) {
 //	DBG(wcout<<L"parsed args: "<<opts<<endl;)
+//	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel()); };
 	strs_t strtrees;
-	if (opts.enabled(L"proof")) tbl.set_proof(true);
+	if (opts.enabled(L"proof")) tbl->set_proof(true);
 	output_ast();
 	try {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);
 			DBG(if (opts.enabled(L"o"))
-				tbl.out(output::to(L"output") << endl);)
+				tbl->out(output::to(L"output") << endl);)
 		}
 		NDBG(if (opts.enabled(L"o"))
-			tbl.out(output::to(L"output") << endl);)
+			tbl->out(output::to(L"output") << endl);)
 		if (opts.enabled(L"csv")) save_csv();
 	} catch (unsat_exception& e) {
 		output::to(L"output") << s2ws(string(e.what())) << endl;
@@ -285,3 +301,9 @@ driver::driver(FILE *f)              : driver(f, options()) {}
 driver::driver(wstring s)            : driver(s, options()) {}
 driver::driver(char *s)              : driver(s, options()) {}
 driver::driver(raw_progs rp)         : driver(rp, options()) {}
+
+driver::~driver() {
+	if (tbl) delete tbl;
+	for (auto x : strs_extra) free((wstr)x[0]);
+}
+

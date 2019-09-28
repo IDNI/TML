@@ -17,6 +17,9 @@
 #include "output.h"
 #include "options.h"
 
+#define mkchr(x) ((((int_t)x)<<2)|1)
+#define mknum(x) ((((int_t)x)<<2)|2)
+
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 
 struct prog_data {
@@ -31,18 +34,23 @@ struct prog_data {
 class driver {
 	friend struct flat_rules;
 	friend struct pattern;
-	dict_t dict;
+	friend std::ostream& operator<<(std::ostream& os, const driver& d);
+	friend std::istream& operator>>(std::istream& is, driver& d);
+//	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
 	int_t nums = 0, chars = 0, syms = 0;
 //	bool mult = false;
 
+	std::set<lexeme, lexcmp> strs_extra, rels;
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
+	lexeme get_lexeme(const std::wstring& s);
 	lexeme get_new_rel();
-	lexeme get_num_lexeme(int_t i);
-	lexeme get_char_lexeme(wchar_t i);
-	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
+//	std::function<int_t(void)> *fget_new_rel;
+//	lexeme get_num_lexeme(int_t i);
+//	lexeme get_char_lexeme(wchar_t i);
+//	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
@@ -54,7 +62,7 @@ class driver {
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
-	raw_prog transform_sdt(const raw_prog& p);
+//	raw_prog transform_sdt(const raw_prog& p);
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
 //	raw_prog transform_bwd(raw_prog& p);
@@ -84,8 +92,9 @@ class driver {
 	std::wstring std_input;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
-	tables tbl;
+	tables *tbl = 0;
 	void output_pl(const raw_prog& p) const;
+	std::set<lexeme> vars;
 public:
 	bool result = true;
 	options opts;
@@ -96,8 +105,9 @@ public:
 	driver(FILE *f);
 	driver(std::wstring);
 	driver(char *s);
+	~driver();
 
-	void out(const tables::rt_printer& rtp) const { tbl.out(rtp); };
+	void out(const tables::rt_printer& rtp)const{ if (tbl) tbl->out(rtp); };
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;

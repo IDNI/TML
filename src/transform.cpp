@@ -14,27 +14,40 @@
 #include "err.h"
 using namespace std;
 
-lexeme driver::get_char_lexeme(wchar_t c) {
+/*lexeme driver::get_char_lexeme(wchar_t c) {
 	wstring s;
 	return dict.get_lexeme(s += c);
 }
 
 lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
+*/
+
+lexeme driver::get_lexeme(const wstring& s) {
+	cws w = s.c_str();
+	auto it = strs_extra.find({w, w + s.size()});
+	if (it != strs_extra.end()) return *it;
+	wstr r = wcsdup(s.c_str());
+	lexeme l = {r, r + s.size()};
+	strs_extra.insert(l);
+	return l;
+}
 
 lexeme driver::get_var_lexeme(int_t i) {
 	wstring s = L"?v";
-	return dict.get_lexeme(s += to_wstring(i));
+	return get_lexeme(s += to_wstring(i));
 }
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
 
+#ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_var() {
 	static size_t last = 1;
-	size_t sz = dict.nvars();
+//	size_t sz = dict.nvars();
 	lexeme l;
-	for (;;)
-		if (l = get_var_lexeme(last++), dict.nvars() == sz) return l;
-		else sz = dict.nvars();
+//	for (;;)
+	while (vars.find(l = get_var_lexeme(last++)) != vars.end());
+	return vars.insert(l), l;//, dict.nvars() == sz) return l;
+//		else sz = dict.nvars();
 }
 
 void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
@@ -66,7 +79,7 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 	}
 	return s;
 }
-
+#endif
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
@@ -100,7 +113,7 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 	int_t v){
 	return { false, false, {
 		elem(elem::SYM, r),
-		elem_openp, elem(elem::SYM, dict.get_lexeme(b)),
+		elem_openp, elem(elem::SYM, get_lexeme(b)),
 		get_var_elem(v), get_var_elem(v+1), elem_closep}, {3}};
 }
 
@@ -265,11 +278,12 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		r.r.push_back(l);
 	}
 	raw_term t;
-	append_sym_elem(t.e, dict.get_lexeme(L"S")), append_openp(t.e),
+	append_sym_elem(t.e, get_lexeme(L"S")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity();
 	raw_rule rr;
 	rr.type = raw_rule::GOAL, rr.h = {t}, r.r.push_back(rr);
+	DBG(wcout<<"transformed grammar:"<<endl<<r;)
 //#ifdef BWD_GRAMMAR
 	//transform_bwd(r);
 //	transform_bin(r);
@@ -398,6 +412,7 @@ pass:	//DBG(wcout << L" returned " << res << endl;)
 	return true;
 }*/
 
+#ifdef TRANSFORM_BIN_DRIVER
 typedef pair<raw_term, vector<raw_term>> frule;
 
 struct flat_rules : public vector<frule> {
@@ -425,7 +440,8 @@ wostream& operator<<(wostream& os, const flat_rules& f) {
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
 }
-
+#endif
+/*
 template<typename T> struct nullable {
 	const bool null;
 	const T t;
@@ -515,7 +531,7 @@ map<pair<elem, ints>, set<bools>> get_patterns(const flat_rules& f) {
 	map<pair<elem, ints>, set<bools>> r;
 	for (const pattern& p : v) r[{p.p, p.ar}].insert(p.s);
 	return r;
-}
+}*/
 
 /*void driver::refresh_vars(raw_prog& p) {
 	set<raw_rule> rs;
@@ -540,7 +556,7 @@ set<raw_term> driver::get_queries(const raw_prog& p) {
 	return qs;
 }*/
 
-lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
+/*lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
 	wstring s;
 	for (int_t j : i) s += to_wstring(j);
 	s += L'_';
@@ -574,35 +590,25 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	DBG(wcout<<"sdt transform, input:"<<endl<<p<<endl;)
 	DBG(wcout<<"sdt transform, output:"<<endl<<r<<endl;)
 	return r;
-}
-
+}*/
+#ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_rel() {
 	static size_t last = 1;
 	wstring s = L"r";
 	size_t sz;
 	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
-	dict.get_rel(l);
-	if (dict.nrels() == sz) { ++last; goto retry; }
+retry:	sz = rels.size(), l = get_lexeme(s + to_wstring(last));
+	rels.insert(l);
+	if (rels.size() == sz) { ++last; goto retry; }
 	return l;
 }
 
-/*set<frule> driver::interpolate(const vector<frule>& r) {
-	struct cmp {
-		bool operator()(const raw_term& x, const raw_term& y) const {
-			if (x.e[0] != y.e[0]) return x.e[0] < y.e[0];
-			if (x.arity != y.arity) return x.arity < y.arity;
-			return false;
-		}
-	};
-	vector<raw_term, multiset<raw_term, cmp>> m(r.size());
-	for (size_t n = 0; n != r.size(); ++n)
-		for (const raw_term& t : r[n].second)
-			m[n].insert(t);
-}*/
-
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
+	for (const frule& r : f) {
+		rels.insert(r.first.e[0].e);
+		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
+	}
 //	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
@@ -611,20 +617,16 @@ void driver::transform_bin(raw_prog& p) {
 			assert(f.back().first.e.size());
 	p.r.clear();
 	auto interpolate = [this](
-		const raw_term& x, const raw_term& y, set<elem> v) {
+		const vector<raw_term>& x, set<elem> v) {
 		raw_rule r;
-		r.b = {{x, y}};
-		r.h.emplace_back();
+		r.b = {x}, r.h.emplace_back();
 		r.h[0].e.emplace_back(elem::SYM, get_new_rel());
 		append_openp(r.h[0].e);
-		for (size_t n = 0; n != x.e.size(); ++n)
-			if (x.e[n].type == elem::VAR && has(v, x.e[n]))
-				r.h[0].e.push_back(x.e[n]), v.insert(x.e[n]);
-		for (size_t n = 0; n != y.e.size(); ++n)
-			if (y.e[n].type == elem::VAR && has(v, y.e[n]))
-				r.h[0].e.push_back(y.e[n]), v.insert(y.e[n]);
-		for (auto t : r.b) assert(!t.empty());
-		for (auto t : r.b) assert(!t.empty());
+		for (size_t k = 0; k != x.size(); ++k)
+			for (size_t n = 0; n != x[k].e.size(); ++n)
+				if (has(v, x[k].e[n]))
+					r.h[0].e.push_back(x[k].e[n]),
+					v.erase(x[k].e[n]);
 		return append_closep(r.h[0].e), r.h[0].calc_arity(), r;
 	};
 	for (auto x : f) {
@@ -638,25 +640,101 @@ void driver::transform_bin(raw_prog& p) {
 				if (x.first.e[k].type == elem::VAR)
 					v.insert(x.first.e[k]);
 			raw_rule r = interpolate(
-				x.second[0], x.second[1], move(v));
+				{ x.second[0], x.second[1] }, move(v));
 			x.second.erase(x.second.begin(), x.second.begin() + 2);
 			x.second.insert(x.second.begin(), r.h[0]);
 			p.r.push_back(move(r));
 		}
 		p.r.emplace_back(x.first, x.second);
-		for (auto x : p.r.back().b)
-			assert(!x.empty());
+//		for (auto x : p.r.back().b) assert(!x.empty());
 	}
-	if (f.q.e.size()) {
-		raw_rule r;
-		r.type = raw_rule::GOAL;
-		r.h = {f.q};
-		p.r.push_back(r);
-	}
+	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
+}
+#endif
+lexeme tables::get_new_rel() {
+	static size_t last = 1;
+	wstring s = L"r";
+	size_t sz;
+	lexeme l;
+retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
+	dict.get_rel(l);
+	if (dict.nrels() == sz) { ++last; goto retry; }
+	return l;
+}
 
-/*	for (raw_rule r : p.r)
-		for (auto x : r.b)
-			assert(!x.empty());*/
+void tables::transform_bin(flat_prog& p) {
+	set<vector<term>> s;
+	DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
+	for (const auto& x : p)
+		if (x.second.empty()) s.insert({x.first});
+		else for (const auto& y : x.second) s.insert(to_vec(x.first,y));
+	p.clear(), transform_bin(s);
+	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
+//	print(wcout<<L"transform_bin output:"<<endl, p);
+	if (print_transformed)
+		print(output::to(L"transformed")<<L"transform_bin output:"<<endl
+			, p);
+//	DBG(else print(wcout<<L"transform_bin output:"<<endl, p);)
+}
+
+void tables::transform_bin(set<vector<term>>& p) {
+	const auto q = move(p);
+	auto getvars = [](const term& t, set<int_t>& v) {
+		for (int_t i : t) if (i < 0) v.insert(i);
+	};
+	auto interpolate = [this](vector<term> x, set<int_t> v) {
+		term t;
+		for (size_t k = 0; k != x.size(); ++k)
+			for (size_t n = 0; n != x[k].size(); ++n)
+				if (has(v, x[k][n]))
+					t.push_back(x[k][n]), v.erase(x[k][n]);
+		t.neg = false,
+		t.tab = get_new_tab(dict.get_rel(get_new_rel()),
+			{(int_t)t.size()}),
+		x.insert(x.begin(), t);
+		return x;
+	};
+	auto intersect = [](const set<int_t>& x, const set<int_t>& y) {
+		set<int_t> r;
+		set_intersection(x.begin(), x.end(), y.begin(), y.end(),
+			inserter(r, r.begin()));
+		return r;
+	};
+	vector<set<int_t>> vars;
+	auto getterms = [this, &vars, intersect]
+		(const vector<term>& x) -> vector<size_t> {
+		if (x.size() <= 3) return {};
+/*		vector<size_t> e;
+		for (size_t n = 1; n != x.size(); ++n)
+			if (has(exts, x[n].tab)) e.push_back(n);
+		if (e.size() == x.size() - 1) return { 1, 2 };
+		if (e.size() > 1) return { e[0], e[1] };*/
+		size_t max = 0, b1 = 0, b2, n;
+		for (size_t i = 2; i != x.size(); ++i)
+			for (size_t j = 1; j != i; ++j)
+				if (max < (n=intersect(vars[i],vars[j]).size()))
+					max = n, b1 = j, b2 = i;
+		if (!b1) b1 = 1, b2 = 2;
+		return { b1, b2 };
+	};
+	vector<term> r;
+	vector<size_t> m;
+	set<int_t> v;
+	for (vector<term> x : q) {
+		if (x[0].goal) { p.insert(move(x)); continue; }
+		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
+		while (!(m = getterms(x)).empty()) {
+			for (size_t i : m) r.push_back(x[i]);
+			for (size_t n = m.size(); n--;)
+				x.erase(x.begin() + m[n]),
+				vars.erase(vars.begin() + m[n]);
+			for (const auto& s : vars) v.insert(s.begin(), s.end());
+			r = interpolate(r, move(v)), x.push_back(r[0]),
+			getvars(r[0], v), vars.push_back(move(v)),
+			p.insert(move(r));
+		}
+		p.insert(move(x)), vars.clear();
+	}
 }
 
 /*raw_prog driver::reify(const raw_prog& p) {

@@ -48,8 +48,7 @@ struct elem {
 };
 
 struct raw_term {
-	bool neg = false;
-	bool iseq = false;
+	bool neg = false, iseq = false;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
@@ -89,7 +88,8 @@ struct raw_rule {
 	bool parse(const lexemes& l, size_t& pos);
 	void clear() { h.clear(), b.clear(), type = NONE; }
 	raw_rule(){}
-	raw_rule(const raw_term& t) : h({t}) {}
+	raw_rule(etype type, const raw_term& t) : h({t}), type(type) {}
+	raw_rule(const raw_term& t) : raw_rule(NONE, t) {}
 	raw_rule(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
 	raw_rule(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
 		if (!_b.empty()) b = {_b};

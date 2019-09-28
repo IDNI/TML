@@ -25,10 +25,12 @@ class dict_t;
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
+//typedef std::map<ntable, spbdd_handle> level;
 typedef bdd_handles level;
+typedef std::map<term, std::set<std::set<term>>> flat_prog;
 
 std::wostream& operator<<(std::wostream& os, const env& e);
-env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
+//env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
@@ -39,12 +41,12 @@ typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 
 struct body {
 	bool neg, ext = false;
-	struct alt *a = 0;
+//	struct alt *a = 0;
 	ntable tab;
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
-	static std::set<body*, ptrcmp<body>> s;
+//	static std::set<body*, ptrcmp<body>> &s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
@@ -65,7 +67,7 @@ struct alt : public std::vector<body*> {
 	varmap vm;
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
-	static std::set<alt*, ptrcmp<alt>> s;
+//	static std::set<alt*, ptrcmp<alt>> &s;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
@@ -107,10 +109,14 @@ struct table {
 };
 
 class tables {
+	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
+	friend std::istream& operator>>(std::istream& is, tables& tbl);
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 private:
 	typedef std::function<void(const term&)> cb_decompress;
+	std::set<body*, ptrcmp<body>> bodies;
+	std::set<alt*, ptrcmp<alt>> alts;
 
 	struct witness {
 		size_t rl, al;
@@ -138,9 +144,16 @@ private:
 	void print(std::wostream&, const proof_elem&);
 	void print(std::wostream&, const proof&);
 	void print(std::wostream&, const witness&);
+	std::wostream& print(std::wostream& os, const std::vector<term>& b)
+		const;
+	std::wostream& print(std::wostream& os, const std::set<term>& b) const;
+	std::wostream& print(std::wostream& os, const term& h,
+		const std::set<term>& b) const;
+	std::wostream& print(std::wostream& os, const flat_prog& p) const;
 
 	size_t nstep = 0;
-	std::vector<table> ts;
+	std::vector<table> tbls;
+//	std::map<ntable, table> tbls;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
@@ -154,9 +167,8 @@ private:
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
-	bool bproof;
-	bool datalog, optimize;
-	bool unsat = false;
+	bool bproof, datalog, optimize, unsat = false, bcqc = true,
+	     bin_transform = false, print_transformed;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -189,10 +201,13 @@ private:
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit)
 		const;
+	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
+		const;
 	void range(size_t arg, size_t args, bdd_handles& v);
 	spbdd_handle range(size_t arg, ntable tab);
 	void range_clear_memo() { range_memo.clear(); }
 
+	sig get_sig(const term& t);
 	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
 
@@ -230,25 +245,37 @@ private:
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_nums(const raw_term& t);
-	std::map<term, std::set<std::set<term>>> to_terms(const raw_prog& p);
-	void get_rules(const std::map<term, std::set<std::set<term>>>& m);
-	void get_facts(const std::map<term, std::set<std::set<term>>>& m);
+	flat_prog to_terms(const raw_prog& p);
+	void get_rules(flat_prog m);
+	void get_facts(const flat_prog& m);
 	ntable get_table(const sig& s);
+	ntable get_new_tab(int_t x, ints ar);
+	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
+	lexeme get_var_lexeme(int_t i);
 	void add_prog(const raw_prog& p, const strs_t& strs);
-	void add_prog(std::map<term, std::set<std::set<term>>> m,
-		const strs_t& strs, bool mknums = false);
+	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
+	void transform_bin(std::set<std::vector<term>>& p);
+	void transform_bin(flat_prog& p);
+	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
+	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
+		const;
+	void cqc_minimize(const term& h, std::set<term>& b) const;
+	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+	std::set<ntable> exts; // extensional
+//	std::function<int_t(void)>* get_new_rel;
 public:
-	tables(bool bproof = false, bool optimize = true);
+	tables(//std::function<int_t(void)>* get_new_rel,
+		bool bproof = false, bool optimize = true,
+		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
-	bool run_nums(const std::map<term, std::set<std::set<term>>>& m,
-		std::set<term>& r);
+	bool run_nums(flat_prog m, std::set<term>& r);
 	bool pfp();
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;

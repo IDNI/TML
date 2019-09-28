@@ -406,14 +406,18 @@ bool operator==(const lexeme& l, cws s) {
 }
 
 bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
-	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
-		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
+	if (x[1]-x[0] != y[1]-y[0]) return x[1]-x[0] < y[1]-y[0];
+	for (size_t n = 0; n != (size_t)(x[1]-x[0]); ++n)
+		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
+	return false;
+	// the following causes valgrind to complain about __wcsncmp_avx2:
+//	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
+//		: (wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
 }
 
 bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y){
 	if (x.size() != y.size()) return false;
-	for (size_t n = 0; n != x.size(); ++n)
-		if (!(x[n] == y[n])) return false;
+	for (size_t n = 0; n != x.size(); ++n) if (!(x[n]==y[n])) return false;
 	return true;
 }
 

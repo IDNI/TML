@@ -132,6 +132,8 @@ class bdd {
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
+	friend std::ostream& write_bdd(std::ostream& os);
+	friend std::istream& read_bdd(std::istream& is);
 
 	inline static bdd get(int_t x) {
 		if (x > 0) {
