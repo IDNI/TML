@@ -513,7 +513,10 @@ wostream& tables::print(wostream& os, const set<term>& b) const {
 
 wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 	os << to_raw_term(h) << L" :- ";
-	for (const term& t : b) os << to_raw_term(t) << L' ';
+	for (const term& t : b) {
+		if (t.goal) os << L'!';
+		os << to_raw_term(t) << L' ';
+	}
 	return os << L'.';
 }
 
@@ -543,6 +546,13 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 
 void tables::get_rules(flat_prog m) {
 	get_facts(m);
+	for (const auto& x : m) {
+		exts.insert(x.first.tab);
+		for (const auto& y : x.second)
+			for (const auto& z : y)
+				exts.insert(z.tab);
+	}
+	for (const auto& x : m) exts.erase(x.first.tab);
 #ifndef TRANSFORM_BIN_DRIVER
 	if (bin_transform) transform_bin(m);
 #endif
@@ -554,7 +564,7 @@ void tables::get_rules(flat_prog m) {
 	alt* aa;
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		if (bcqc = false) {
+		if ((bcqc = false)) {
 			cqc_minimize(x.first, x.second);
 			set<set<term>> s;
 			for (const set<term>& al : x.second)
@@ -937,14 +947,14 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	return r;
 }
 
-tables::tables(//function<int_t(void)>* get_new_rel, 
-	bool bproof, bool optimize,
-	bool bin_transform) : dict(*new dict_t), bproof(bproof),
-	optimize(optimize), bin_transform(bin_transform) {}
-	//get_new_rel(get_new_rel) {}
+tables::tables(bool bproof, bool optimize, bool bin_transform,
+	bool print_transformed) : dict(*new dict_t), bproof(bproof),
+	optimize(optimize), bin_transform(bin_transform),
+	print_transformed(print_transformed) {}
 
 tables::~tables() {
-	if (bcqc) delete &dict;
+//	if (bcqc)
+		delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());

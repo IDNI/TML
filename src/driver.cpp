@@ -248,7 +248,8 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	if (opts.disabled(L"run")) return;
 	clock_t start, end;
-	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"));
+	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"),
+		opts.enabled(L"t"));
 	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],

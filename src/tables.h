@@ -167,9 +167,8 @@ private:
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t& dict;
-	bool bproof;
-	bool datalog, optimize;
-	bool unsat = false;
+	bool bproof, datalog, optimize, unsat = false, bcqc = true,
+	     bin_transform = false, print_transformed;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -263,15 +262,15 @@ private:
 		const;
 	void cqc_minimize(const term& h, std::set<term>& b) const;
 	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
-	bool bcqc = true, bin_transform = false;
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+	std::set<ntable> exts; // extensional
 //	std::function<int_t(void)>* get_new_rel;
 public:
 	tables(//std::function<int_t(void)>* get_new_rel,
 		bool bproof = false, bool optimize = true,
-		bool bin_transform = false);
+		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
 	bool run_nums(flat_prog m, std::set<term>& r);

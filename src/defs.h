@@ -68,3 +68,4 @@ void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
 #endif
+#define TRANSFORM_BIN_DRIVER

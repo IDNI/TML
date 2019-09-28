@@ -283,6 +283,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	append_closep(t.e), t.calc_arity();
 	raw_rule rr;
 	rr.type = raw_rule::GOAL, rr.h = {t}, r.r.push_back(rr);
+	DBG(wcout<<"transformed grammar:"<<endl<<r;)
 //#ifdef BWD_GRAMMAR
 	//transform_bwd(r);
 //	transform_bin(r);
@@ -669,11 +670,18 @@ void tables::transform_bin(flat_prog& p) {
 		else for (const auto& y : x.second) s.insert(to_vec(x.first,y));
 	p.clear(), transform_bin(s);
 	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
-	DBG(print(wcout<<L"transform_bin output:"<<endl, p);)
+//	print(wcout<<L"transform_bin output:"<<endl, p);
+	if (print_transformed)
+		print(output::to(L"transformed")<<L"transform_bin output:"<<endl
+			, p);
+//	DBG(else print(wcout<<L"transform_bin output:"<<endl, p);)
 }
 
 void tables::transform_bin(set<vector<term>>& p) {
 	const auto q = move(p);
+	auto getvars = [](const term& t, set<int_t>& v) {
+		for (int_t i : t) if (i < 0) v.insert(i);
+	};
 	auto interpolate = [this](vector<term> x, set<int_t> v) {
 		term t;
 		for (size_t k = 0; k != x.size(); ++k)
@@ -686,23 +694,48 @@ void tables::transform_bin(set<vector<term>>& p) {
 		x.insert(x.begin(), t);
 		return x;
 	};
+	auto intersect = [](const set<int_t>& x, const set<int_t>& y) {
+		set<int_t> r;
+		set_intersection(x.begin(), x.end(), y.begin(), y.end(),
+			inserter(r, r.begin()));
+		return r;
+	};
+	vector<set<int_t>> vars;
+	auto getterms = [this, &vars, intersect]
+		(const vector<term>& x) -> vector<size_t> {
+		if (x.size() <= 3) return {};
+/*		vector<size_t> e;
+		for (size_t n = 1; n != x.size(); ++n)
+			if (has(exts, x[n].tab)) e.push_back(n);
+		if (e.size() == x.size() - 1) return { 1, 2 };
+		if (e.size() > 1) return { e[0], e[1] };*/
+		size_t max = 0, b1 = 0, b2, n;
+		for (size_t i = 1; i != x.size(); ++i)
+			for (size_t j = 1; j != i; ++j)
+				if (max < (n=intersect(vars[i],vars[j]).size()))
+					max = n, b1 = i, b2 = j;
+		if (!b1) b1 = 1, b2 = 2;
+		return { b1, b2 };
+	};
 	vector<term> r;
+	vector<size_t> m;
 	set<int_t> v;
 	for (vector<term> x : q) {
-		while (x.size() > 3) {
-			for (size_t n = 3, k; n != x.size(); ++n)
-				for (k = 0; k != x[n].size(); ++k)
-					if (x[n][k] < 0) v.insert(x[n][k]);
-			for (size_t k = 0; k != x[0].size(); ++k)
-				if (x[0][k] < 0) v.insert(x[0][k]);
-			r = interpolate( { x[1], x[2] }, move(v));
-			x.erase(x.begin() + 1,  x.begin() + 3);
-//			x.push_back(r[0]);
-			x.insert(x.begin() + 1, r[0]);
-//			DBG(print(wcout, r)<<endl; print(wcout, x)<<endl;)
+		if (x[0].goal) { p.insert(move(x)); continue; }
+		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
+		while (!(m = getterms(x)).empty()) {
+			for (size_t i : m) r.push_back(x[i]);
+			for (size_t n = m.size(); n--;) {
+				x.erase(x.begin() + m[n]);
+				vars.erase(vars.begin() + m[n]);
+			}
+			for (const set<int>& s : vars)
+				v.insert(s.begin(), s.end());
+			r = interpolate(r, move(v)), x.push_back(r[0]),
+			getvars(r[0], v), vars.push_back(move(v)),
 			p.insert(move(r));
 		}
-		p.insert(move(x));
+		p.insert(move(x)), vars.clear();
 	}
 }
 

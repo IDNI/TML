@@ -50,10 +50,11 @@ int_t dict_t::get_sym(const lexeme& l) {
 }
 
 lexeme dict_t::get_lexeme(const wstring& s) {
+	DBG(assert(!s.empty());)
 	cws w = s.c_str();
 	auto it = strs_extra.find({w, w + s.size()});
 	if (it != strs_extra.end()) return *it;
-	wstr r = wcsdup(s.c_str());
+	wstr r = wcsdup(w);
 	lexeme l = {r, r + s.size()};
 	strs_extra.insert(l);
 	return l;

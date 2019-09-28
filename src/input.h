@@ -48,8 +48,7 @@ struct elem {
 };
 
 struct raw_term {
-	bool neg = false;
-	bool iseq = false;
+	bool neg = false, iseq = false;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
