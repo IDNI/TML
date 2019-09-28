@@ -104,7 +104,7 @@ struct table {
 	bdd_handles add, del;
 	std::vector<size_t> r;
 	bool ext = true; // extensional
-	bool unsat = false;
+	bool unsat = false, tmp = false;
 	bool commit(DBG(size_t));
 };
 
@@ -153,7 +153,7 @@ private:
 
 	size_t nstep = 0;
 	std::vector<table> tbls;
-//	std::map<ntable, table> tbls;
+	std::set<ntable> tmps;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
@@ -257,13 +257,15 @@ private:
 	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
-	void transform_bin(std::set<std::vector<term>>& p);
+//	void transform_bin(std::set<std::vector<term>>& p);
 	void transform_bin(flat_prog& p);
-	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
-	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
+	bool cqc(const std::vector<term>& x, std::vector<term> y, bool tmp)
 		const;
+	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m,
+		bool tmp) const;
 	void cqc_minimize(const term& h, std::set<term>& b) const;
 	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
+	ntable prog_add_rule(flat_prog& p, const std::vector<term>& x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
@@ -275,8 +277,8 @@ public:
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
-	bool run_nums(flat_prog m, std::set<term>& r);
-	bool pfp();
+	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
+	bool pfp(size_t nsteps = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 	void set_proof(bool v) { bproof = v; }

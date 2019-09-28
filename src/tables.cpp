@@ -487,7 +487,8 @@ env freeze(term& h, vector<term>& b) {
 	return e2;
 }
 
-bool tables::cqc(const vector<term>& x, vector<term> y) const {
+bool tables::cqc(const vector<term>& x, vector<term> y, bool tmp) const {
+	if (tmp) y[0].tab = x[0].tab;
 	set<term> r;
 	map<term, set<set<term>>> m;
 	for (const term& t : x)
@@ -500,16 +501,18 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
 	tables t(false, true, true);
-	t.dict = dict;
-	return t.bcqc = false, t.run_nums(move(m), r), has(r, y[0]);
+	t.dict = dict, t.bcqc = false, t.run_nums(move(m), r, 1);
+	//DBG(print(wcout, r) << endl;)
+	return has(r, y[0]);
 }
 
-bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m) const {
+bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m,
+	bool tmp) const {
 	auto it = m.find(h);
 	if (it == m.end()) return false;
 	vector<term> v = to_vec(h, b), v1;
 	for (const set<term>& x : it->second)
-		if (v != (v1 = to_vec(h, x)) && cqc(v1, v))
+		if (v != (v1 = to_vec(h, x)) && cqc(v1, v, tmp))
 			return true;
 	return false;
 }
@@ -544,8 +547,9 @@ wostream& tables::print(wostream& os, const flat_prog& p) const {
 void tables::cqc_minimize(const term& h, set<term>& b) const {
 	if (b.size() < 2) return;
 	set<term> s = b;
-	for (const term& t : b) if (s.erase(t),!cqc(h,b,{{h,{s}}})) s.insert(t);
-	DBG(//if (b.size() != s.size())
+	for (const term& t : b)
+		if (s.erase(t), !cqc(h, b, {{ h, { s } }}, false)) s.insert(t);
+	DBG(if (b.size() != s.size())
 		print(print(wcerr<<L"Rule\t\t", h, b)<<endl<<L"minimized into\t",
 		h, s)<<endl;)
 	b.clear(), b.insert(s.begin(), s.end());
@@ -556,6 +560,25 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 	v.reserve(b.size());
 	for (set<term> s : b) cqc_minimize(h, s), v.push_back(s);
 	b.clear(), b.insert(v.begin(), v.end());
+}
+
+ntable tables::prog_add_rule(flat_prog& p, const vector<term>& x) {
+//	bcqc = false;
+	set<term> b(x.begin() + 1, x.end());
+	if (bcqc && has(tmps, x[0][0])) goto tmp;
+	if (!bcqc || x.size() == 1) goto add;
+	if (x.size() > 3) cqc_minimize(x[0], b);
+	if (cqc(x[0], b, p, false)) goto ret;
+add:	p[x[0]].emplace(b);
+ret:	return x[0].tab;
+tmp:	for (const auto& y : p)
+		if (has(tmps, y.first.tab))
+			for (const set<term>& a : y.second)
+				if (	cqc(x, to_vec(y.first, a), true) &&
+					cqc(to_vec(y.first, a), x, true)) {
+					return y.first.tab;
+				}
+	goto ret;
 }
 
 void tables::get_rules(flat_prog m) {
@@ -574,15 +597,14 @@ void tables::get_rules(flat_prog m) {
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
 	body* y;
 	alt* aa;
+	flat_prog p(move(m));
+	for (const auto& x : p) 
+		for (const auto& y : x.second)
+			prog_add_rule(m, to_vec(x.first, y));
+	if (bcqc) bdd::gc();
+//	print(wcout, m);
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		if ((bcqc/* = false*/)) {
-			cqc_minimize(x.first, x.second);
-			set<set<term>> s;
-			for (const set<term>& al : x.second)
-				if (cqc(x.first, al, m)) s.insert(al);
-			for (const set<term>& y : s) x.second.erase(y);
-		}
 		varmap v;
 		set<int_t> hvars;
 		const term &t = x.first;
@@ -636,14 +658,6 @@ void tables::get_rules(flat_prog m) {
 	}
 	for (rule r : rs)
 		tbls[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
-/*	if (!optimize) for (rule r : rs) rules.push_back(r);
-	else {
-		for (rule r : rs)
-			if (!cqc(rs, r))
-				rules.push_back(r);
-		break_shared();
-		cqc_minimize();
-	}*/
 }
 
 void tables::load_string(lexeme r, const wstring& s) {
@@ -740,7 +754,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs) {
 	add_prog(move(to_terms(p)), strs);
 }
 
-bool tables::run_nums(flat_prog m, set<term>& r) {
+bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	map<ntable, ntable> m1, m2;
 	auto f = [&m1, &m2](ntable *x) {
 		auto it = m1.find(*x);
@@ -770,11 +784,10 @@ bool tables::run_nums(flat_prog m, set<term>& r) {
 		set<set<term>> &s = p[x.first];
 		for (set<term> y : x.second) s.insert(h(y));
 	}
-	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
+//	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
 	add_prog(move(p), {}, false);//true);
-	if (!pfp()) return false;
+	if (!pfp(nsteps)) return false;
 	r = g(decompress());
-	DBG(print(wcout, r) << endl;)
 	return true;
 }
 
@@ -936,15 +949,16 @@ level tables::get_front() const {
 	return r;
 }
 
-bool tables::pfp() {
+bool tables::pfp(size_t nsteps) {
 	set<level> s;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
-		output::to(L"info") << "step: " << nstep << endl;
+		if (bcqc) output::to(L"info") << "step: " << nstep << endl;
 		++nstep;
 		if (!fwd()) return bproof ? get_goals(), true : true;
 		if (unsat) throw unsat_exception();
+		if (nsteps && nstep == nsteps) return true;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second) return false;
 		if (bproof) levels.push_back(move(l));
