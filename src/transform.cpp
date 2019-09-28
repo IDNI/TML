@@ -710,7 +710,7 @@ void tables::transform_bin(set<vector<term>>& p) {
 		if (e.size() == x.size() - 1) return { 1, 2 };
 		if (e.size() > 1) return { e[0], e[1] };*/
 		size_t max = 0, b1 = 0, b2, n;
-		for (size_t i = 1; i != x.size(); ++i)
+		for (size_t i = 2; i != x.size(); ++i)
 			for (size_t j = 1; j != i; ++j)
 				if (max < (n=intersect(vars[i],vars[j]).size()))
 					max = n, b1 = j, b2 = i;

@@ -201,6 +201,8 @@ private:
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit)
 		const;
+	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
+		const;
 	void range(size_t arg, size_t args, bdd_handles& v);
 	spbdd_handle range(size_t arg, ntable tab);
 	void range_clear_memo() { range_memo.clear(); }

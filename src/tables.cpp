@@ -53,10 +53,23 @@ spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 		return	(c & 1) ? bdd_handle::T :
 			::from_bit(pos(0, arg, args), false);
 	return (c & (1 << bit)) ?
-		bdd_ite_var(pos(bit,arg,args), leq_const(c, arg, args, bit),
+		bdd_ite_var(pos(bit, arg, args), leq_const(c, arg, args, bit),
 			bdd_handle::T) :
-		bdd_ite_var(pos(bit,arg,args), bdd_handle::F,
+		bdd_ite_var(pos(bit, arg, args), bdd_handle::F,
 			leq_const(c, arg, args, bit));
+}
+
+spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
+	const {
+	if (!--bit)
+		return	bdd_ite(::from_bit(pos(0, arg2, args), true),
+				bdd_handle::T,
+				::from_bit(pos(0, arg1, args), false));
+	return	bdd_ite(::from_bit(pos(bit, arg2, args), true),
+			bdd_ite_var(pos(bit, arg1, args),
+				leq_var(arg1, arg2, args, bit), bdd_handle::T),
+			bdd_ite_var(pos(bit, arg1, args), bdd_handle::F,
+				leq_var(arg1, arg2, args, bit)));
 }
 
 void tables::range(size_t arg, size_t args, bdd_handles& v) {
@@ -547,12 +560,10 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 
 void tables::get_rules(flat_prog m) {
 	get_facts(m);
-	for (const auto& x : m) {
-		exts.insert(x.first.tab);
+	for (const auto& x : m)
 		for (const auto& y : x.second)
 			for (const auto& z : y)
 				exts.insert(z.tab);
-	}
 	for (const auto& x : m) exts.erase(x.first.tab);
 #ifndef TRANSFORM_BIN_DRIVER
 	if (bin_transform) transform_bin(m);
@@ -565,7 +576,7 @@ void tables::get_rules(flat_prog m) {
 	alt* aa;
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		if ((bcqc = false)) {
+		if ((bcqc/* = false*/)) {
 			cqc_minimize(x.first, x.second);
 			set<set<term>> s;
 			for (const set<term>& al : x.second)
@@ -740,7 +751,11 @@ bool tables::run_nums(flat_prog m, set<term>& r) {
 	};
 	auto g = [&m2](const set<term>& s) {
 		set<term> r;
-		for (term t : s) t.tab = m2.at(t.tab), r.insert(t);
+		for (term t : s) {
+			auto it = m2.find(t.tab);
+			if (it == m2.end()) r.insert(t);
+			else t.tab = it->second, r.insert(t);
+		}
 		return r;
 	};
 	auto h = [this, f](const set<term>& s) {
@@ -954,8 +969,7 @@ tables::tables(bool bproof, bool optimize, bool bin_transform,
 	print_transformed(print_transformed) {}
 
 tables::~tables() {
-//	if (bcqc)
-		delete &dict;
+	if (bcqc) delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());
