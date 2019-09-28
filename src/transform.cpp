@@ -713,7 +713,7 @@ void tables::transform_bin(set<vector<term>>& p) {
 		for (size_t i = 1; i != x.size(); ++i)
 			for (size_t j = 1; j != i; ++j)
 				if (max < (n=intersect(vars[i],vars[j]).size()))
-					max = n, b1 = i, b2 = j;
+					max = n, b1 = j, b2 = i;
 		if (!b1) b1 = 1, b2 = 2;
 		return { b1, b2 };
 	};
@@ -725,12 +725,10 @@ void tables::transform_bin(set<vector<term>>& p) {
 		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
 		while (!(m = getterms(x)).empty()) {
 			for (size_t i : m) r.push_back(x[i]);
-			for (size_t n = m.size(); n--;) {
-				x.erase(x.begin() + m[n]);
+			for (size_t n = m.size(); n--;)
+				x.erase(x.begin() + m[n]),
 				vars.erase(vars.begin() + m[n]);
-			}
-			for (const set<int>& s : vars)
-				v.insert(s.begin(), s.end());
+			for (const auto& s : vars) v.insert(s.begin(), s.end());
 			r = interpolate(r, move(v)), x.push_back(r[0]),
 			getvars(r[0], v), vars.push_back(move(v)),
 			p.insert(move(r));

@@ -513,11 +513,12 @@ wostream& tables::print(wostream& os, const set<term>& b) const {
 
 wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 	os << to_raw_term(h) << L" :- ";
+	size_t n = b.size();
 	for (const term& t : b) {
 		if (t.goal) os << L'!';
-		os << to_raw_term(t) << L' ';
+		os << to_raw_term(t) << (!--n ? L"." : L", ");
 	}
-	return os << L'.';
+	return os;
 }
 
 wostream& tables::print(wostream& os, const flat_prog& p) const {
