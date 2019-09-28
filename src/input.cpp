@@ -49,7 +49,12 @@ lexeme lex(pcws s) {
 				parse_error(*s, err_escape);
 		return { t, ++(*s) };
 	}
-	if (**s == L'<') {
+    // LEQ: put this in front if '<file>' below (as that'll eat us + error out)
+    if (**s == L'<' && *(*s + 1) == L'=') {
+        return *s += 2, lexeme{ *s - 2, *s };
+    }
+    if (**s == L'>') return ++ * s, lexeme{ *s - 1, *s };
+    if (**s == L'<') {
 		while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		return { t, ++(*s) };
 	}
@@ -68,7 +73,7 @@ lexeme lex(pcws s) {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
 		else parse_error(*s, err_chr);
 	}
-	// neq: make sure we don't turn off directives (single '!'). limits?
+	// NEQ: make sure we don't turn off directives (single '!'). limits?
 	if (**s == L'!' && *(*s + 1) == L'=') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
@@ -163,12 +168,20 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   an_t(type),true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, an_t(type),true;
 	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,an_t(type),true;
-	// neq: should we check for any limits here?
+	// NEQ: should we check for any limits here?
 	if (L'!' == l[pos][0][0] &&
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = NEQ, an_t(type), true;
 	}
-	// TODO: single = instead of == recheck if we're not messing up something?
+    // LEQ: recheck if '<' is going to make any issues (order is important)
+    if (L'<' == l[pos][0][0] &&
+        L'=' == l[pos][0][1]) {
+        return e = l[pos++], type = LEQ, an_t(type), true;
+    }
+    if (L'>' == l[pos][0][0]) {
+        return e = l[pos++], type = GT, an_t(type), true;
+    }
+    // TODO: single = instead of == recheck if we're not messing up something?
 	if (L'=' == l[pos][0][0]) {
 		return e = l[pos++], type = EQ, an_t(type), true;
 	}
@@ -199,13 +212,16 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos, curr2;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) an_o(NOT, 0), ++pos;
-	curr2 = pos; bool rel = false, noteq = false, eq = false;
+	curr2 = pos; 
+    bool rel = false, noteq = false, eq = false, leq = false, gt = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(ast::source[1], err_eof, s[0]);
 		noteq = noteq || e.back().type == elem::NEQ;
 		eq = eq || e.back().type == elem::EQ;
+        leq = leq || e.back().type == elem::LEQ;
+        gt = gt || e.back().type == elem::GT;
 		if (!rel) an_of(REL, -1, curr2), rel = true;
 	}
 	if (e.empty()) return false;
@@ -213,15 +229,26 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	if (noteq || eq) {
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
-		// only supporting smth != smthelse (3-parts) and negation in front (no parentheses).
+		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::NEQ &&
 			e[1].type != elem::EQ)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		if (noteq)
-			neg = !neg; // flip the negation as we have the NEQ, don't do it for EQ ofc
+			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
 		iseq = true;
 		return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
 	}
+    if (leq || gt) {
+        if (e.size() < 3)
+            parse_error(l[pos][0], err_term_or_dot, l[pos]);
+        // only supporting smth != smthelse (3-parts) and negation in front ().
+        if (e[1].type != elem::LEQ &&
+            e[1].type != elem::GT)
+            parse_error(l[pos][0], err_term_or_dot, l[pos]);
+        if (gt) neg = !neg;
+        isleq = true;
+        return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
+    }
 	if (e[0].type != elem::SYM)
 		parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return an(TERM), (neg ? an(NEG) : an(POS)),
@@ -245,7 +272,7 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity() {
 	size_t dep = 0;
 	arity = {0};
-	if (iseq) {
+	if (iseq || isleq) {
 		arity = { 2 };
 		return;
 	}
@@ -372,7 +399,8 @@ bool operator==(const lexeme& x, const lexeme& y) {
 bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
 	if (x.iseq != y.iseq) return x.iseq < y.iseq;
-	if (x.e != y.e) return x.e < y.e;
+    if (x.isleq != y.isleq) return x.isleq < y.isleq;
+    if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;
 }

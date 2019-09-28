@@ -187,7 +187,7 @@ term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
 	// skip the first symbol unless it's EQ/NEQ (which has VAR as it's first)
-	for (size_t n = r.iseq ? 0 : 1; n < r.e.size(); ++n)
+	for (size_t n = (r.iseq || r.isleq) ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -203,7 +203,8 @@ term tables::from_raw_term(const raw_term& r) {
 			default: ;
 		}
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
-	return term(r.neg, r.iseq, r.iseq ? -1 : get_table(get_sig(r)), t);
+    auto tbl = (r.iseq || r.isleq) ? -1 : get_table(get_sig(r));
+	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
 
 void tables::out(wostream& os) const {
@@ -232,7 +233,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, false, tab, ints(len, 0));
+		term r(false, false, false, tab, ints(len, 0));
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -331,20 +332,22 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars;
-	std::vector<const term*> eqterms;
-	// first pass, just enlist eq terms (that have at least one var)
+	set<int_t> pvars, nvars, eqvars, leqvars;
+	std::vector<const term*> eqterms, leqterms;
+    // first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false;
+		bool haseq = false, hasleq = false;
 		for (size_t n = 0; n != t.size(); ++n) {
 			if (t[n] < 0) {
 				if (t.iseq) haseq = true;
-				else (t.neg ? nvars : pvars).insert(t[n]);
+                else if (t.isleq) hasleq = true;
+                else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
-	}
+        else if (hasleq) leqterms.push_back(&t);
+    }
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
 		bool noeqvars = true;
@@ -368,15 +371,33 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 			//break;
 		}
 	}
-	for (int_t i : pvars) nvars.erase(i);
+    for (const term* pt : leqterms) {
+        const term& t = *pt;
+        bool noleqvars = true;
+        std::vector<int_t> tvars;
+        for (size_t n = 0; n != t.size(); ++n)
+            if (t[n] < 0) {
+                if (has(nvars, t[n])) { noleqvars = false; break; }
+                if (!has(pvars, t[n])) tvars.push_back(t[n]);
+                //else if (!t.neg) { noleqvars = false; break; }
+                //// if is in pvars and == then other var is covered too, skip.
+            }
+        if (!noleqvars) continue;
+        for (const int_t tvar : tvars) {
+            leqvars.insert(tvar);
+        }
+    }
+    for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) { 
 		nvars.erase(i); 
 		eqvars.erase(i);
+        leqvars.erase(i);
 	}
 	bdd_handles v;
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
-	if (!h.neg) {
+    for (int_t i : leqvars) range(vm.at(i), len, v);
+    if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
@@ -564,7 +585,9 @@ wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 	size_t n = b.size();
 	for (const term& t : b) {
 		if (t.goal) os << L'!';
-		os << to_raw_term(t) << (!--n ? L"." : L", ");
+        if (t.iseq) { os << L"EQ()" << (!--n ? L"." : L", "); continue; }
+        if (t.isleq) { os << L"LEQ()" << (!--n ? L"." : L", "); continue; }
+        os << to_raw_term(t) << (!--n ? L"." : L", ");
 	}
 	return os;
 }
@@ -636,42 +659,75 @@ void tables::get_rules(flat_prog m) {
 			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
+            spbdd_handle leq = bdd_handle::T;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
 			for (const term& t : al) {
-				if (t.iseq && t.size() == 2) {
-					bool has0 = has(a.vm, t[0]);
-					bool has1 = has(a.vm, t[1]);
-					if (has0 && has1) {
-						size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-						if (t.neg) 
-							a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
-						else 
-							a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-					}
-					else if (has0) {
-						size_t arg0 = a.vm.at(t[0]);
-						if (t.neg) 
-							a.eq = a.eq % from_sym(arg0, a.varslen, t[1]);
-						else 
-							a.eq = a.eq && from_sym(arg0, a.varslen, t[1]);
-					}
-					else if (has1) {
-						size_t arg1 = a.vm.at(t[1]);
-						if (t.neg) 
-							a.eq = a.eq % from_sym(arg1, a.varslen, t[0]);
-						else 
-							a.eq = a.eq && from_sym(arg1, a.varslen, t[0]);
-					}
-					else { // just consts?
-						auto tf = t[0] == t[1] ? bdd_handle::T : bdd_handle::F;
-						if (t.neg) a.eq = a.eq % tf;
-						else a.eq = a.eq && tf;
-					}
-				} else b.insert({
+                if (t.iseq && t.size() == 2) {
+                    bool has0 = has(a.vm, t[0]);
+                    bool has1 = has(a.vm, t[1]);
+                    if (has0 && has1) {
+                        size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
+                        if (t.neg)
+                            a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
+                        else
+                            a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
+                    }
+                    else if (has0) {
+                        size_t arg0 = a.vm.at(t[0]);
+                        if (t.neg)
+                            a.eq = a.eq % from_sym(arg0, a.varslen, t[1]);
+                        else
+                            a.eq = a.eq && from_sym(arg0, a.varslen, t[1]);
+                    }
+                    else if (has1) {
+                        size_t arg1 = a.vm.at(t[1]);
+                        if (t.neg)
+                            a.eq = a.eq % from_sym(arg1, a.varslen, t[0]);
+                        else
+                            a.eq = a.eq && from_sym(arg1, a.varslen, t[0]);
+                    }
+                    else { // just consts?
+                        auto tf = t[0] == t[1] ? bdd_handle::T : bdd_handle::F;
+                        if (t.neg) a.eq = a.eq % tf;
+                        else a.eq = a.eq && tf;
+                    }
+                }
+                else if (t.isleq && t.size() == 2) {
+                    bool has0 = has(a.vm, t[0]);
+                    bool has1 = has(a.vm, t[1]);
+                    if (has0 && has1) {
+                        size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
+                        if (t.neg)
+                            leq = leq % leq_var(arg0, arg1, a.varslen, bits);
+                        else
+                            leq = leq && leq_var(arg0, arg1, a.varslen, bits);
+                    }
+                    else if (has0) {
+                        size_t arg0 = a.vm.at(t[0]);
+                        if (t.neg)
+                            leq = leq % leq_const(t[1], arg0, a.varslen, bits);
+                        else
+                            leq = leq && leq_const(t[1], arg0, a.varslen, bits);
+                    }
+                    else if (has1) {
+                        size_t arg1 = a.vm.at(t[1]);
+                        if (t.neg)
+                            leq = leq % leq_const(t[0], arg1, a.varslen, bits);
+                        else
+                            leq = leq && leq_const(t[0], arg1, a.varslen, bits);
+                    }
+                    else { // TODO: just consts: how to do <= for consts?
+                        auto tf = t[0] <= t[1] ? bdd_handle::T : bdd_handle::F;
+                        if (t.neg) leq = leq % tf;
+                        else leq = leq && tf;
+                    }
+                }
+                else b.insert({
 					get_body(t, a.vm, a.varslen), t});
 			}
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
+            a.rng = bdd_and_many({ a.rng, leq });
 			for (auto x : b) {
 				a.t.push_back(x.second);
 				if ((bit=bodies.find(&x.first))!=bodies.end())

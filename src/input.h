@@ -19,7 +19,8 @@
 bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
-	enum etype { SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ } type;
+	enum etype { 
+        SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT } type;
 	int_t num = 0;
 	lexeme e;
 	wchar_t ch;
@@ -48,7 +49,7 @@ struct elem {
 };
 
 struct raw_term {
-	bool neg = false, iseq = false;
+	bool neg = false, iseq = false, isleq = false;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);
@@ -56,7 +57,9 @@ struct raw_term {
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
-		return neg == t.neg && e == t.e && arity == t.arity;
+        return neg == t.neg && e == t.e && arity == t.arity && 
+            iseq == t.iseq && isleq == t.isleq;
+        //return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
 
