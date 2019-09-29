@@ -664,7 +664,8 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 
 void tables::transform_bin(flat_prog& p) {
 	set<vector<term>> s;
-	DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
+    // TODO: wasn't working well with LEQ/GT examples, 'randomly' failing.
+    //DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
 	for (const auto& x : p)
 		if (x.second.empty()) s.insert({x.first});
 		else for (const auto& y : x.second) s.insert(to_vec(x.first,y));

@@ -337,16 +337,29 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
     // first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
 		bool haseq = false, hasleq = false;
+        int_t lastleq = -1;
 		for (size_t n = 0; n != t.size(); ++n) {
 			if (t[n] < 0) {
 				if (t.iseq) haseq = true;
-                else if (t.isleq) hasleq = true;
+                else if (t.isleq) {
+                    leqvars.insert(t[n]);
+                    //if (t.neg && !hasleq) {
+                    //    // if '>' take first var available and range it.
+                    //    leqvars.insert(t[n]);
+                    //    hasleq = true;
+                    //}
+                    //else {
+                    //    // keep track of the last var and range it...
+                    //    lastleq = t[n];
+                    //}
+                }
                 else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
-        else if (hasleq) leqterms.push_back(&t);
+        if (lastleq > -1) leqvars.insert(lastleq);
+        //else if (hasleq) leqterms.push_back(&t);
     }
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -371,30 +384,20 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 			//break;
 		}
 	}
-    for (const term* pt : leqterms) {
-        const term& t = *pt;
-        bool noleqvars = true;
-        std::vector<int_t> tvars;
-        for (size_t n = 0; n != t.size(); ++n)
-            if (t[n] < 0) {
-                if (has(nvars, t[n])) { noleqvars = false; break; }
-                if (!has(pvars, t[n])) tvars.push_back(t[n]);
-                //else if (!t.neg) { noleqvars = false; break; }
-                //// if is in pvars and == then other var is covered too, skip.
-            }
-        if (!noleqvars) continue;
-        for (const int_t tvar : tvars) {
-            leqvars.insert(tvar);
-        }
+    for (int_t i : pvars) {
+        nvars.erase(i);
+        //leqvars.erase(i);
     }
-    for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) { 
 		nvars.erase(i); 
 		eqvars.erase(i);
         leqvars.erase(i);
 	}
 	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v);
+    for (int_t i : nvars) { 
+        range(vm.at(i), len, v); 
+        leqvars.erase(i);
+    }
 	for (int_t i : eqvars) range(vm.at(i), len, v);
     for (int_t i : leqvars) range(vm.at(i), len, v);
     if (!h.neg) {
@@ -882,11 +885,13 @@ bool tables::run_nums(flat_prog m, set<term>& r) {
 		set<set<term>> &s = p[x.first];
 		for (set<term> y : x.second) s.insert(h(y));
 	}
-	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
+    // TODO: wasn't working well with LEQ/GT examples, 'randomly' failing.
+	//DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
 	add_prog(move(p), {}, false);//true);
 	if (!pfp()) return false;
 	r = g(decompress());
-	DBG(print(wcout, r) << endl;)
+    // TODO: wasn't working well with LEQ/GT examples, 'randomly' failing.
+    //DBG(print(wcout, r) << endl;)
 	return true;
 }
 
