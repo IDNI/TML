@@ -59,6 +59,20 @@ spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 			leq_const(c, arg, args, bit));
 }
 
+typedef tuple<size_t, size_t, size_t, int_t> skmemo;
+typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
+map<skmemo, spbdd_handle> smemo;
+map<ekmemo, spbdd_handle> ememo;
+map<ekmemo, spbdd_handle> leqmemo;
+
+spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args) const {
+    static ekmemo x;
+    static map<ekmemo, spbdd_handle>::const_iterator it;
+    if ((it = leqmemo.find(x = { arg1, arg2, args, bits })) != leqmemo.end())
+        return it->second;
+    spbdd_handle r = leq_var(arg1, arg2, args, bits);
+    return leqmemo.emplace(x, r), r;
+}
 spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 	const {
 	if (!--bit)
@@ -129,10 +143,11 @@ void tables::add_bit() {
 	++bits;
 }
 
-typedef tuple<size_t, size_t, size_t, int_t> skmemo;
-typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
-map<skmemo, spbdd_handle> smemo;
-map<ekmemo, spbdd_handle> ememo;
+//typedef tuple<size_t, size_t, size_t, int_t> skmemo;
+//typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
+//map<skmemo, spbdd_handle> smemo;
+//map<ekmemo, spbdd_handle> ememo;
+//map<ekmemo, spbdd_handle> leqmemo;
 
 spbdd_handle tables::from_sym(size_t pos, size_t args, int_t i) const {
 	static skmemo x;
@@ -146,8 +161,10 @@ spbdd_handle tables::from_sym(size_t pos, size_t args, int_t i) const {
 
 spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 	static ekmemo x;
-	static map<skmemo, spbdd_handle>::const_iterator it;
-	if ((it = ememo.find(x = { p1, p2, args, bits })) != ememo.end())
+    // a typo should be ekmemo, all the same at the moment
+	//static map<skmemo, spbdd_handle>::const_iterator it;
+    static map<ekmemo, spbdd_handle>::const_iterator it;
+    if ((it = ememo.find(x = { p1, p2, args, bits })) != ememo.end())
 		return it->second;
 	spbdd_handle r = bdd_handle::T;
 	for (size_t b = 0; b != bits; ++b)
@@ -927,7 +944,7 @@ void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
 	measure_time_start();
 	for (auto x : strs) load_string(x.first, x.second);
 	measure_time_end();
-	smemo.clear(), ememo.clear();
+	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (bcqc) bdd::gc();
 }
 
