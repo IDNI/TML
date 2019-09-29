@@ -336,30 +336,18 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	std::vector<const term*> eqterms, leqterms;
     // first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false, hasleq = false;
-        int_t lastleq = -1;
+        bool haseq = false;
 		for (size_t n = 0; n != t.size(); ++n) {
 			if (t[n] < 0) {
 				if (t.iseq) haseq = true;
                 else if (t.isleq) {
                     leqvars.insert(t[n]);
-                    //if (t.neg && !hasleq) {
-                    //    // if '>' take first var available and range it.
-                    //    leqvars.insert(t[n]);
-                    //    hasleq = true;
-                    //}
-                    //else {
-                    //    // keep track of the last var and range it...
-                    //    lastleq = t[n];
-                    //}
                 }
                 else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
-        if (lastleq > -1) leqvars.insert(lastleq);
-        //else if (hasleq) leqterms.push_back(&t);
     }
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -386,7 +374,7 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	}
     for (int_t i : pvars) {
         nvars.erase(i);
-        //leqvars.erase(i);
+        leqvars.erase(i);
     }
 	if (h.neg) for (int_t i : h) if (i < 0) { 
 		nvars.erase(i); 
