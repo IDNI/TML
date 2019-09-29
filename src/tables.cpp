@@ -336,18 +336,20 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	std::vector<const term*> eqterms, leqterms;
     // first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-        bool haseq = false;
+        bool haseq = false, hasleq = false;
 		for (size_t n = 0; n != t.size(); ++n) {
 			if (t[n] < 0) {
 				if (t.iseq) haseq = true;
                 else if (t.isleq) {
-                    leqvars.insert(t[n]);
+                    hasleq = true;
+                    //leqvars.insert(t[n]);
                 }
                 else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
+        else if (hasleq) leqterms.push_back(&t);
     }
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -372,9 +374,36 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 			//break;
 		}
 	}
+    for (const term* pt : leqterms) {
+        const term& t = *pt;
+        bool noeqvars = true;
+        std::vector<int_t> tvars;
+        // for '>' it's enough to range the first one.
+        // for '<=' it's enough to range the last one.
+        // unless both vars are not mentioned anywhere else (nvars nor pvars)
+        for (size_t n = 0; n != t.size(); ++n)
+            if (t[n] < 0) {
+                if (has(nvars, t[n])) {
+                    if (t.neg) {
+                        noeqvars = false;
+                        break;
+                    }
+                }
+                else if (!has(pvars, t[n])) {
+                    tvars.push_back(t[n]);
+                    continue;
+                }
+                if (!t.neg && n == t.size()-1) { noeqvars = false; break; }
+            }
+        if (!noeqvars) continue;
+        for (const int_t tvar : tvars) {
+            leqvars.insert(tvar);
+        }
+    }
+
     for (int_t i : pvars) {
         nvars.erase(i);
-        leqvars.erase(i);
+        //leqvars.erase(i);
     }
 	if (h.neg) for (int_t i : h) if (i < 0) { 
 		nvars.erase(i); 
@@ -384,7 +413,7 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	bdd_handles v;
     for (int_t i : nvars) { 
         range(vm.at(i), len, v); 
-        leqvars.erase(i);
+        //leqvars.erase(i);
     }
 	for (int_t i : eqvars) range(vm.at(i), len, v);
     for (int_t i : leqvars) range(vm.at(i), len, v);
