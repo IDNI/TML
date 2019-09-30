@@ -389,73 +389,39 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 		}
 	}
     for (const term* pt : leqterms) {
+        // - for '>' (~(<=)) it's enough if 2nd var is in nvars/pvars.
+        // - for '<=' it's enough if 2nd var is in nvars/pvars.
+        // - if 1st/greater is const, still can't skip, needs to be ranged.
+        // - if neither var appears elsewhere (nvars nor pvars) => do both.
+        //   (that is a bit strange, i.e. if appears outside one is enough)
         const term& t = *pt;
-        //bool noeqvars = true;
-        //std::vector<int_t> tvars;
-        //bool hasv1 = false, hasv2 = false;
-        int_t v1 = t[0], v2 = t[1];
         assert(t.size() == 2);
-        // for '>' it's enough to range the first one.
-        // for '<=' it's enough to range the last one.
-        // unless both vars are not mentioned anywhere else (nvars nor pvars)
-        // this is counterintuitive, but ?x > ?y => ~(?x <= ?y) => ?y is limit
-        //if (!t.neg) 
-        swap(v1, v2); // in form of: v1 > v2
-        // if 1st/greater is const or already handled - const doesn't work?...
-        // if (v1 >= 0 || has(nvars, v1) || has(pvars, v1)) continue;
-        if (v1 < 0) {
-            // this doesn't work either, if in pvars, we can't skip 2nd var?
-            if (has(nvars, v1) || has(pvars, v1)) continue;
-            leqvars.insert(v1);
-            //continue;
-
-            //if (has(nvars, v1)) continue;
-            //if (!has(pvars, v1)) {
-            //    leqvars.insert(v1);
-            //    continue;
-            //}
-            //// if just in pvars, continue (condition not strong enough)
+        int_t v1 = t[0], v2 = t[1];
+        // ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ and GT.
+        if (v2 < 0) {
+            if (has(nvars, v2) || has(pvars, v2)) continue; // skip both
+            leqvars.insert(v2); // add and continue to 1st
         }
-        // if no var is handled anywhere we need to range both, regardless.
-        // that is a bit strange, i.e. if appears outside all is fine, but
-        // if we range 1st var, we still can't skip the 2nd??
-        if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2)) 
-            leqvars.insert(v2);
+        if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
+            leqvars.insert(v1);
 
-        //for (size_t n = 0; n != t.size(); ++n)
-        //    if (t[n] < 0) {
-        //        if (has(nvars, t[n])) {
-        //            if (t.neg) {
-        //                noeqvars = false;
-        //                break;
-        //            }
-        //        }
-        //        else if (!has(pvars, t[n])) {
-        //            tvars.push_back(t[n]);
-        //            continue;
-        //        }
-        //        if (!t.neg && n == t.size()-1) { noeqvars = false; break; }
-        //    }
-        //if (!noeqvars) continue;
-        //for (const int_t tvar : tvars) {
-        //    leqvars.insert(tvar);
+        //swap(v1, v2); // in form of: v1 >= v2
+        //if (v1 < 0) {
+        //    if (has(nvars, v1) || has(pvars, v1)) continue; // skip both
+        //    leqvars.insert(v1); // add and continue to 2nd
         //}
+        //if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2)) 
+        //    leqvars.insert(v2);
     }
 
-    for (int_t i : pvars) {
-        nvars.erase(i);
-        //leqvars.erase(i);
-    }
+    for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0) { 
 		nvars.erase(i); 
 		eqvars.erase(i);
         leqvars.erase(i);
 	}
 	bdd_handles v;
-    for (int_t i : nvars) { 
-        range(vm.at(i), len, v); 
-        //leqvars.erase(i);
-    }
+    for (int_t i : nvars) range(vm.at(i), len, v); 
 	for (int_t i : eqvars) range(vm.at(i), len, v);
     for (int_t i : leqvars) range(vm.at(i), len, v);
     if (!h.neg) {
