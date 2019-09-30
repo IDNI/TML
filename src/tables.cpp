@@ -357,10 +357,7 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 		for (size_t n = 0; n != t.size(); ++n) {
 			if (t[n] < 0) {
 				if (t.iseq) haseq = true;
-                else if (t.isleq) {
-                    hasleq = true;
-                    //leqvars.insert(t[n]);
-                }
+                else if (t.isleq) hasleq = true;
                 else (t.neg ? nvars : pvars).insert(t[n]);
 			}
 		}
@@ -393,29 +390,56 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	}
     for (const term* pt : leqterms) {
         const term& t = *pt;
-        bool noeqvars = true;
-        std::vector<int_t> tvars;
+        //bool noeqvars = true;
+        //std::vector<int_t> tvars;
+        //bool hasv1 = false, hasv2 = false;
+        int_t v1 = t[0], v2 = t[1];
+        assert(t.size() == 2);
         // for '>' it's enough to range the first one.
         // for '<=' it's enough to range the last one.
         // unless both vars are not mentioned anywhere else (nvars nor pvars)
-        for (size_t n = 0; n != t.size(); ++n)
-            if (t[n] < 0) {
-                if (has(nvars, t[n])) {
-                    if (t.neg) {
-                        noeqvars = false;
-                        break;
-                    }
-                }
-                else if (!has(pvars, t[n])) {
-                    tvars.push_back(t[n]);
-                    continue;
-                }
-                if (!t.neg && n == t.size()-1) { noeqvars = false; break; }
-            }
-        if (!noeqvars) continue;
-        for (const int_t tvar : tvars) {
-            leqvars.insert(tvar);
+        // this is counterintuitive, but ?x > ?y => ~(?x <= ?y) => ?y is limit
+        //if (!t.neg) 
+        swap(v1, v2); // in form of: v1 > v2
+        // if 1st/greater is const or already handled - const doesn't work?...
+        // if (v1 >= 0 || has(nvars, v1) || has(pvars, v1)) continue;
+        if (v1 < 0) {
+            // this doesn't work either, if in pvars, we can't skip 2nd var?
+            if (has(nvars, v1) || has(pvars, v1)) continue;
+            leqvars.insert(v1);
+            //continue;
+
+            //if (has(nvars, v1)) continue;
+            //if (!has(pvars, v1)) {
+            //    leqvars.insert(v1);
+            //    continue;
+            //}
+            //// if just in pvars, continue (condition not strong enough)
         }
+        // if no var is handled anywhere we need to range both, regardless.
+        // that is a bit strange, i.e. if appears outside all is fine, but
+        // if we range 1st var, we still can't skip the 2nd??
+        if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2)) 
+            leqvars.insert(v2);
+
+        //for (size_t n = 0; n != t.size(); ++n)
+        //    if (t[n] < 0) {
+        //        if (has(nvars, t[n])) {
+        //            if (t.neg) {
+        //                noeqvars = false;
+        //                break;
+        //            }
+        //        }
+        //        else if (!has(pvars, t[n])) {
+        //            tvars.push_back(t[n]);
+        //            continue;
+        //        }
+        //        if (!t.neg && n == t.size()-1) { noeqvars = false; break; }
+        //    }
+        //if (!noeqvars) continue;
+        //for (const int_t tvar : tvars) {
+        //    leqvars.insert(tvar);
+        //}
     }
 
     for (int_t i : pvars) {
@@ -654,6 +678,7 @@ void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
 }
 
 void tables::get_rules(flat_prog m) {
+    //bcqc = false;
 	get_facts(m);
 	for (const auto& x : m)
 		for (const auto& y : x.second)
@@ -749,10 +774,15 @@ void tables::get_rules(flat_prog m) {
                     }
                     else if (has1) {
                         size_t arg1 = a.vm.at(t[1]);
+                        spbdd_handle geq = bdd_handle::T;
+                        // 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
+                        geq = geq % leq_const(t[0], arg1, a.varslen, bits);
+                        geq = geq || from_sym(arg1, a.varslen, t[0]);
                         if (t.neg)
-                            leq = leq % leq_const(t[0], arg1, a.varslen, bits);
-                        else
-                            leq = leq && leq_const(t[0], arg1, a.varslen, bits);
+                            leq = leq % geq;
+                        else{
+                            leq = leq && geq;
+                        }
                     }
                     else { // TODO: just consts: how to do <= for consts?
                         auto tf = t[0] <= t[1] ? bdd_handle::T : bdd_handle::F;
