@@ -394,24 +394,17 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
         // - if 1st/greater is const, still can't skip, needs to be ranged.
         // - if neither var appears elsewhere (nvars nor pvars) => do both.
         //   (that is a bit strange, i.e. if appears outside one is enough)
+        // ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ and GT.
         const term& t = *pt;
         assert(t.size() == 2);
         int_t v1 = t[0], v2 = t[1];
-        // ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ and GT.
+        if (v1 == v2) { if (!has(nvars, v2)) leqvars.insert(v2); continue; }
         if (v2 < 0) {
             if (has(nvars, v2) || has(pvars, v2)) continue; // skip both
             leqvars.insert(v2); // add and continue to 1st
         }
         if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
             leqvars.insert(v1);
-
-        //swap(v1, v2); // in form of: v1 >= v2
-        //if (v1 < 0) {
-        //    if (has(nvars, v1) || has(pvars, v1)) continue; // skip both
-        //    leqvars.insert(v1); // add and continue to 2nd
-        //}
-        //if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2)) 
-        //    leqvars.insert(v2);
     }
 
     for (int_t i : pvars) nvars.erase(i);
