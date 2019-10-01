@@ -183,6 +183,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
     }
     // TODO: single = instead of == recheck if we're not messing up something?
 	if (L'=' == l[pos][0][0]) {
+		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, an_t(type), true;
 	}
 	//if (L'=' == l[pos][0][0] &&
