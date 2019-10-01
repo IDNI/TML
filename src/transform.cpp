@@ -662,15 +662,17 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
-vector<term> tables::interpolate(vector<term> x, set<int_t> v, size_t priority){
+vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
 	term t;
-	for (size_t k = 0; k != x.size(); ++k)
+	size_t priority = 0;
+	for (size_t k = 0; k != x.size(); ++k) {
+		priority = max(priority, tbls[x[k].tab].priority);
 		for (size_t n = 0; n != x[k].size(); ++n)
 			if (has(v, x[k][n]))
 				t.push_back(x[k][n]), v.erase(x[k][n]);
-	t.neg = false,
+	}
 	tmps.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
-		{(int_t)t.size()}, priority));
+		{(int_t)t.size()}, priority + 1));
 	return x.insert(x.begin(), t), x;
 }
 
@@ -717,7 +719,7 @@ void tables::transform_bin(flat_prog& p) {
 				x.erase(x.begin() + m[n]),
 				vars.erase(vars.begin() + m[n]);
 			for (const auto& s : vars) v.insert(s.begin(), s.end());
-			r = interpolate(r, move(v), tbls[x[0].tab].priority+1),
+			r = interpolate(r, move(v)),
 			x.push_back(r[0]), getvars(r[0], v),
 			vars.push_back(move(v)), p.insert(move(r));
 		}

@@ -261,8 +261,7 @@ private:
 	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
-	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v,
-		size_t priority);
+	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y, bool tmp)
 		const;
