@@ -12,6 +12,10 @@
 // modified over time by the Author.
 #include <map>
 #include <vector>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/val.h>
+#endif
 #include "bdd.h"
 #include "term.h"
 
@@ -279,6 +283,9 @@ public:
 	bool pfp(size_t nsteps = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
+#ifdef __EMSCRIPTEN__
+	void out(emscripten::val o) const;
+#endif
 	void set_proof(bool v) { bproof = v; }
 };
 

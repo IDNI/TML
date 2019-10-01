@@ -27,8 +27,6 @@
 #include "ast.h"
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/bind.h>
 #include "../js/embindings.h"
 #endif
 

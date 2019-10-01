@@ -238,6 +238,38 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 	out(x, tab, [&os](const raw_term& rt) { os << rt << L'.' << endl; });
 }
 
+#ifdef __EMSCRIPTEN__
+// o is `tabular_collector` - JS object with methods:
+// - length(relation_name) - returns number of rows (or index of next new row)
+// - set(relation_name, row, col, value) - sets value of the cell of a table
+void tables::out(emscripten::val o) const {
+	out([&o](const raw_term& t) {
+		wstring relation = lexeme2str(t.e[0].e);
+		int row = o.call<int>("length", ws2s(relation));
+		int col = 0;
+		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
+			wstringstream es;
+			while (t.arity[ar] == -1) ++ar, es << L'(';
+			if (n >= t.e.size()) break;
+			while (t.e[n].type == elem::OPENP) ++n;
+			for (int_t k = 0; k != t.arity[ar];)
+				if ((es<<t.e[n++]),++k!=t.arity[ar]) {
+					o.call<void>("set", relation, row, col++,
+						ws2s(es.str()));
+					es.str(L"");
+				}
+			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
+			++ar;
+			while (ar < t.arity.size()
+				&& t.arity[ar] == -2) ++ar, es<<L')';
+			if (es.str() != L"")
+				o.call<void>("set", relation, row, col++,
+					ws2s(es.str()));
+		}
+	});
+}
+#endif
+
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len) const {
 	if (!len) len = tbls.at(tab).len;
