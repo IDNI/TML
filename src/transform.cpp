@@ -677,32 +677,35 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 //	DBG(else print(wcout<<L"transform_bin output:"<<endl, p);)
 }*/
 
+vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
+	term t;
+	for (size_t k = 0; k != x.size(); ++k)
+		for (size_t n = 0; n != x[k].size(); ++n)
+			if (has(v, x[k][n]))
+				t.push_back(x[k][n]), v.erase(x[k][n]);
+	t.neg = false,
+	tmps.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
+		{(int_t)t.size()})),
+	x.insert(x.begin(), t);
+	return x;
+}
+
+void getvars(const term& t, set<int_t>& v) {
+	for (int_t i : t) if (i < 0) v.insert(i);
+}
+
+set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
+	set<int_t> r;
+	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
+		inserter(r, r.begin()));
+	return r;
+}
+
 //void tables::transform_bin(set<vector<term>>& p) {
 void tables::transform_bin(flat_prog& p) {
 	const flat_prog q = move(p);
-	auto getvars = [](const term& t, set<int_t>& v) {
-		for (int_t i : t) if (i < 0) v.insert(i);
-	};
-	auto interpolate = [this](vector<term> x, set<int_t> v) {
-		term t;
-		for (size_t k = 0; k != x.size(); ++k)
-			for (size_t n = 0; n != x[k].size(); ++n)
-				if (has(v, x[k][n]))
-					t.push_back(x[k][n]), v.erase(x[k][n]);
-		t.neg = false,
-		tmps.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
-			{(int_t)t.size()})),
-		x.insert(x.begin(), t);
-		return x;
-	};
-	auto intersect = [](const set<int_t>& x, const set<int_t>& y) {
-		set<int_t> r;
-		set_intersection(x.begin(), x.end(), y.begin(), y.end(),
-			inserter(r, r.begin()));
-		return r;
-	};
 	vector<set<int_t>> vars;
-	auto getterms = [this, &vars, intersect]
+	auto getterms = [this, &vars]
 		(const vector<term>& x) -> vector<size_t> {
 		if (x.size() <= 3) return {};
 /*		vector<size_t> e;
@@ -718,31 +721,33 @@ void tables::transform_bin(flat_prog& p) {
 		if (!b1) b1 = 1, b2 = 2;
 		return { b1, b2 };
 	};
-	vector<term> r, x;
+	vector<term> r;//, x;
 	vector<size_t> m;
 	set<int_t> v;
-	for (const auto& a : q)
-		for (const set<term>& b : a.second) {
-		x = to_vec(a.first, b);
+	for (vector<term> x : q) {
+//		for (const set<term>& b : a.second) {
+//		x = to_vec(a.first, b);
 //	for (vector<term> x : q) {
-		if (x[0].goal) { prog_add_rule(p, move(x)); continue; }
+		if (x[0].goal) { prog_add_rule(p, x); continue; }
 		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
-			while (!(m = getterms(x)).empty()) {
-				for (size_t i : m) r.push_back(x[i]);
-				for (size_t n = m.size(); n--;)
-					x.erase(x.begin() + m[n]),
-					vars.erase(vars.begin() + m[n]);
-				for (const auto& s : vars) v.insert(s.begin(), s.end());
-				r = interpolate(r, move(v)), x.push_back(r[0]),
-				getvars(r[0], v), vars.push_back(move(v)),
-				p[r[0]].insert(set<term>(r.begin() + 1, r.end()));
-				r.clear();
-//				x.back().tab = prog_add_rule(p, move(r));
-			}
-			//prog_add_rule(p, move(x)), 
-			p[x[0]].insert(set<term>(x.begin() + 1, x.end()));
-			vars.clear(), x.clear();
+		while (!(m = getterms(x)).empty()) {
+			for (size_t i : m) r.push_back(x[i]);
+			for (size_t n = m.size(); n--;)
+				x.erase(x.begin() + m[n]),
+				vars.erase(vars.begin() + m[n]);
+			for (const auto& s : vars) v.insert(s.begin(), s.end());
+			r = interpolate(r, move(v)), x.push_back(r[0]),
+			getvars(r[0], v), vars.push_back(move(v)),
+			p.insert(move(r));
+//			p[r[0]].insert(set<term>(r.begin() + 1, r.end()));
+//			r.clear();
+//			x.back().tab = prog_add_rule(p, move(r));
 		}
+		//prog_add_rule(p, move(x)), 
+//		p[x[0]].insert(set<term>(x.begin() + 1, x.end()));
+		p.insert(move(x)), vars.clear();
+//		vars.clear(), x.clear();
+	}
 }
 
 /*raw_prog driver::reify(const raw_prog& p) {

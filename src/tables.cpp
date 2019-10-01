@@ -279,34 +279,22 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 	});
 }
 
-template<typename T, typename F>
-void for_each1(T& x, F f) { for (auto y : x) f(y); }
-
-template<typename T, typename F>
-void for_each2(T& x, F f) { for (auto y : x) for (auto z : y) f(z); }
-
-template<typename T1, typename T2, typename F>
-void for_each12(T1& x, T2& y, F f) { for_each1(x, f), for_each2(y, f); }
-
 void term::replace(const map<int_t, int_t>& m) {
 	auto it = m.end();
 	for (int_t& i : *this) if (m.end() != (it = m.find(i))) i = it->second;
 }
 
-void tables::align_vars(term& h, set<term>& b) const {
+void tables::align_vars(vector<term>& v) const {
 	set<int_t> vs;
-	for_each12(h, b, [&vs](int_t i) { if (i < 0) vs.emplace(i); });
+	for (const term& t : v) for (int_t i : t) if (i < 0) vs.insert(i);
 	if (vs.empty()) return;
 	vs.clear();
 	map<int_t, int_t> m;
-	for (size_t n = 0; n != h.size(); ++n)
-		if (h[n] < 0 && !has(m, h[n])) m.emplace(h[n], -m.size()-1);
-	for (const term& t : b)
-		for (int_t i : t)
-			if (i < 0 && !has(m, i)) m.emplace(i, -m.size()-1);
-	set<term> sb;
-	for (term t : b) t.replace(m), sb.insert(t);
-	h.replace(m), b = sb;
+	for (size_t k = 0; k != v.size(); ++k)
+		for (size_t n = 0; n != v[k].size(); ++n)
+			if (v[k][n] < 0 && !has(m, v[k][n]))
+				m.emplace(v[k][n], -m.size() - 1);
+	for (term& t : v) t.replace(m);
 }
 
 uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
@@ -378,9 +366,9 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 void tables::get_facts(const flat_prog& m) {
 	map<ntable, set<spbdd_handle>> f;
 	for (const auto& r : m)
-		if (!r.second.empty()) continue;
-		else if (r.first.goal) goals.insert(r.first);
-		else f[r.first.tab].insert(from_fact(r.first));
+		if (r.size() != 1) continue;
+		else if (r[0].goal) goals.insert(r[0]);
+		else f[r[0].tab].insert(from_fact(r[0]));
 	clock_t start, end;
 	measure_time_start();
 	bdd_handles v;
@@ -419,23 +407,24 @@ void tables::get_nums(const raw_term& t) {
 
 flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
-	set<term> s;
+	vector<term> v;
 	term t;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
-				get_nums(x);
-				t = from_raw_term(x);
+				get_nums(x), t = from_raw_term(x),
+				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					for (const raw_term& z : y)
-						s.emplace(from_raw_term(z)),
+						v.push_back(from_raw_term(z)),
 						get_nums(z);
-					align_vars(t, s), m[t].emplace(move(s));
+					align_vars(v), m.insert(move(v));
 				}
 			}
 		else for (const raw_term& x : r.h)
 			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
-			m[t] = {}, get_nums(x);
+			//m[t] = {},
+			m.insert({t}), get_nums(x);
 	return m;
 }
 
@@ -490,34 +479,58 @@ env freeze(term& h, vector<term>& b) {
 bool tables::cqc(const vector<term>& x, vector<term> y, bool tmp) const {
 	if (tmp) y[0].tab = x[0].tab;
 	set<term> r;
-	map<term, set<set<term>>> m;
+	flat_prog m;
+//	map<term, set<set<term>>> m;
 	for (const term& t : x)
 		if(t.neg) return false;
 		//throw "cqc not supported yet for terms with negation";
 	for (const term& t : y)
 		if(t.neg) return false;
 		//throw "cqc not supported yet for terms with negation";
-	m[x[0]].insert(vec2set(x, 1));
+	m.insert(x);
+//	m[x[0]].insert(vec2set(x, 1));
 	freeze(y);
-	for (size_t n = 1; n != y.size(); ++n) m.emplace(y[n],set<set<term>>());
+	for (size_t n = 1; n != y.size(); ++n) m.insert({y[n]});
 	tables t(false, true, true);
 	t.dict = dict, t.bcqc = false, t.run_nums(move(m), r, 1);
 	//DBG(print(wcout, r) << endl;)
 	return has(r, y[0]);
 }
 
-bool tables::cqc(const term& h, const set<term>& b, const flat_prog& m,
-	bool tmp) const {
-	auto it = m.find(h);
-	if (it == m.end()) return false;
-	vector<term> v = to_vec(h, b), v1;
-	for (const set<term>& x : it->second)
-		if (v != (v1 = to_vec(h, x)) && cqc(v1, v, tmp))
-			return true;
+bool tables::cqc(const vector<term>& v, const flat_prog& m, bool tmp) const {
+	for (const vector<term>& x : m) if (cqc(x, v, tmp)) return true;
 	return false;
 }
 
-wostream& tables::print(wostream& os, const vector<term>& b) const {
+void tables::cqc_minimize(vector<term>& v) const {
+	if (v.size() < 2) return;
+	const vector<term> v1 = v;
+	term t;
+	for (size_t n = 1; n != v.size(); ++n) {
+		t = move(v[n]), v.erase(v.begin() + n);
+		if (!cqc(v1, v, false)) v.insert(v.begin() + n, t);
+	}
+	DBG(if (v.size() != v1.size())
+		print(print(wcerr<<L"Rule\t\t", v)<<endl<<L"minimized into\t"
+		, v1)<<endl;)
+}
+
+ntable tables::prog_add_rule(flat_prog& p, vector<term> x) {
+//	set<term> b(x.begin() + 1, x.end());
+	if (bcqc && has(tmps, x[0][0])) {
+		for (const vector<term>& y : p)
+			if (has(tmps, y[0].tab))
+				if (cqc(x, y, true) && cqc(y, x, true))
+					return y[0].tab;
+		return x[0].tab;
+	}
+	if (!bcqc || x.size() == 1) return p.emplace(x), x[0].tab;
+	if (x.size() > 3) cqc_minimize(x);
+	if (!cqc(x, p, false)) p.emplace(x);
+	return x[0].tab;
+}
+
+/*wostream& tables::print(wostream& os, const vector<term>& b) const {
 	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
 	return os;
 }
@@ -525,12 +538,14 @@ wostream& tables::print(wostream& os, const vector<term>& b) const {
 wostream& tables::print(wostream& os, const set<term>& b) const {
 	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
 	return os;
-}
+}*/
 
-wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
-	os << to_raw_term(h) << L" :- ";
-	size_t n = b.size();
-	for (const term& t : b) {
+wostream& tables::print(wostream& os, const vector<term>& v) const {
+	os << to_raw_term(v[0]);
+	if (v.size() == 1) return os << L'.';
+	os << L" :- ";
+	size_t n = v.size();
+	for (const term& t : v) {
 		if (t.goal) os << L'!';
 		os << to_raw_term(t) << (!--n ? L"." : L", ");
 	}
@@ -538,58 +553,19 @@ wostream& tables::print(wostream& os, const term& h, const set<term>& b) const {
 }
 
 wostream& tables::print(wostream& os, const flat_prog& p) const {
-	for (const auto& x : p)
-		if (x.second.empty()) os << to_raw_term(x.first) << L'.'<<endl;
-		else for (const auto& y : x.second) print(os, x.first, y)<<endl;
+	for (const auto& x : p) print(os, x);
 	return os;
 }
 
-void tables::cqc_minimize(const term& h, set<term>& b) const {
-	if (b.size() < 2) return;
-	set<term> s = b;
-	for (const term& t : b)
-		if (s.erase(t), !cqc(h, b, {{ h, { s } }}, false)) s.insert(t);
-	DBG(if (b.size() != s.size())
-		print(print(wcerr<<L"Rule\t\t", h, b)<<endl<<L"minimized into\t",
-		h, s)<<endl;)
-	b.clear(), b.insert(s.begin(), s.end());
-}
-
-void tables::cqc_minimize(const term& h, set<set<term>>& b) const {
-	vector<set<term>> v;
-	v.reserve(b.size());
-	for (set<term> s : b) cqc_minimize(h, s), v.push_back(s);
-	b.clear(), b.insert(v.begin(), v.end());
-}
-
-ntable tables::prog_add_rule(flat_prog& p, const vector<term>& x) {
-//	bcqc = false;
-	set<term> b(x.begin() + 1, x.end());
-	if (bcqc && has(tmps, x[0][0])) goto tmp;
-	if (!bcqc || x.size() == 1) goto add;
-	if (x.size() > 3) cqc_minimize(x[0], b);
-	if (cqc(x[0], b, p, false)) goto ret;
-add:	p[x[0]].emplace(b);
-ret:	return x[0].tab;
-tmp:	for (const auto& y : p)
-		if (has(tmps, y.first.tab))
-			for (const set<term>& a : y.second)
-				if (	cqc(x, to_vec(y.first, a), true) &&
-					cqc(to_vec(y.first, a), x, true)) {
-					return y.first.tab;
-				}
-	goto ret;
-}
-
-void tables::get_rules(flat_prog m) {
-	get_facts(m);
-	for (const auto& x : m)
-		for (const auto& y : x.second)
-			for (const auto& z : y)
-				exts.insert(z.tab);
-	for (const auto& x : m) exts.erase(x.first.tab);
+void tables::get_rules(flat_prog p) {
+	bcqc = false;
+	get_facts(p);
+	for (const vector<term>& x : p)
+		for (size_t n = 1; n != x.size(); ++n)
+			exts.insert(x[n].tab);
+	for (const vector<term>& x : p) if (x.size() > 1) exts.erase(x[0].tab);
 #ifndef TRANSFORM_BIN_DRIVER
-	if (bin_transform) transform_bin(m);
+	if (bin_transform) transform_bin(p);
 #endif
 	set<rule> rs;
 	varmap::const_iterator it;
@@ -597,12 +573,14 @@ void tables::get_rules(flat_prog m) {
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
 	body* y;
 	alt* aa;
-	flat_prog p(move(m));
-	for (const auto& x : p) 
-		for (const auto& y : x.second)
-			prog_add_rule(m, to_vec(x.first, y));
+	flat_prog q(move(p));
+	for (const auto& x : q) prog_add_rule(p, x);
 	if (bcqc) bdd::gc();
 //	print(wcout, m);
+	map<term, set<set<term>>> m;
+	for (const auto& x : p)
+		if (x.size() == 1) m[x[0]] = {};
+		else m[x[0]].insert(set<term>(x.begin() + 1, x.end()));
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
 		varmap v;
@@ -683,10 +661,10 @@ void tables::load_string(lexeme r, const wstring& s) {
 		if (iswprint(s[n])) t[0] = sprint, b2.push_back(from_fact(t));
 	}
 	clock_t start, end;
-	output::to(L"debug")<<"load_string or_many: ";
+	if (bcqc) output::to(L"debug")<<"load_string or_many: ";
 	measure_time_start();
 	tbls[t1].t = bdd_or_many(move(b1)), tbls[t2].t = bdd_or_many(move(b2));
-	measure_time_end();
+	if (bcqc) measure_time_end();
 }
 
 template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -724,10 +702,10 @@ term to_nums(term t) {
 //	return t;
 //}
 
-set<term> to_nums(const set<term>& s) {
-	set<term> ss;
-	for (const term& t : s) ss.insert(to_nums(t));
-	return ss;
+vector<term> to_nums(const vector<term>& v) {
+	vector<term> r;
+	for (const term& t : v) r.push_back(to_nums(t));
+	return r;
 }
 
 //set<term> from_nums(const set<term>& s) {
@@ -736,15 +714,9 @@ set<term> to_nums(const set<term>& s) {
 //	return ss;
 //}
 
-set<set<term>> to_nums(const set<set<term>>& s) {
-	set<set<term>> ss;
-	for (const auto& x : s) ss.insert(to_nums(x));
-	return ss;
-}
-
 void to_nums(flat_prog& m) {
 	flat_prog mm;
-	for (auto x : m) mm[to_nums(x.first)] = move(to_nums(x.second));
+	for (auto x : m) mm.insert(to_nums(x));
 	m = move(mm);
 }
 
@@ -779,10 +751,15 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		return r;
 	};
 	flat_prog p;
-	for (pair<term, set<set<term>>> x : m) {
-		get_table({ f(&x.first.tab), { (int_t)x.first.size() } });
-		set<set<term>> &s = p[x.first];
-		for (set<term> y : x.second) s.insert(h(y));
+//	for (pair<term, set<set<term>>> x : m) {
+	for (vector<term> x : m) {
+		get_table({ f(&x[0].tab), { (int_t)x[0].size() } });
+		auto s = h(set<term>(x.begin() + 1, x.end()));
+		x.erase(x.begin() + 1, x.end()),
+		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
+//		get_table({ f(&x.first.tab), { (int_t)x.first.size() } });
+//		set<set<term>> &s = p[x.first];
+//		for (set<term> y : x.second) s.insert(h(y));
 	}
 //	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
 	add_prog(move(p), {}, false);//true);
@@ -801,11 +778,11 @@ void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
 	syms = dict.nsyms();
 	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
 	get_rules(move(m));
-	clock_t start, end;
-	output::to(L"debug")<<"load_string: ";
-	measure_time_start();
+//	clock_t start, end;
+//	output::to(L"debug")<<"load_string: ";
+//	measure_time_start();
 	for (auto x : strs) load_string(x.first, x.second);
-	measure_time_end();
+//	measure_time_end();
 	smemo.clear(), ememo.clear();
 	if (bcqc) bdd::gc();
 }
@@ -937,15 +914,8 @@ char tables::fwd() noexcept {
 }
 
 level tables::get_front() const {
-	level r(tbls.size()); //tbls.rbegin()->first + 1);
-//	for (size_t n = 0; n != r.size(); ++n) r[n] = 0;
-//	r.resize(tbls.size());
-	for (ntable n = 0; n != (ntable)tbls.size(); ++n)
-//	for (const auto& x : tbls)
-//		r[x.first] = x.second.t;
-		r[n] = tbls.at(n).t;
-		//r.emplace(x.first, x.second.t);
-//		r[n] = tbls.at(n).t;
+	level r(tbls.size());
+	for (ntable n = 0; n != (ntable)tbls.size(); ++n) r[n] = tbls.at(n).t;
 	return r;
 }
 
@@ -968,12 +938,18 @@ bool tables::pfp(size_t nsteps) {
 
 bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	clock_t start, end;
-	measure_time_start();
+	double t;
+//	output::to(L"@stderr") << L"add_prog: ";
+	if (bcqc) measure_time_start();
 	add_prog(p, strs);
-	measure_time_end();
-	measure_time_start();
+	if (bcqc) {
+		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
+		wcerr << L"pfp: ";
+		measure_time_start();
+	}
+//	output::to(L"@stderr")
 	bool r = pfp();
-	measure_time_end();
+	if (bcqc) (wcerr << L"add_prog: " << t << L" pfp: "),measure_time_end();
 	return r;
 }
 

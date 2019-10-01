@@ -58,8 +58,9 @@ typedef int_t ntable;
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define measure_time_start() start = clock()
-#define measure_time_end() end = clock(); \
-	output::to(L"debug") << double(end - start) / CLOCKS_PER_SEC << endl
+#define measure_time_end() end = clock(), \
+		wcerr << double(end - start) / CLOCKS_PER_SEC << endl
+//	output::to(L"@stderr")
 #define measure_time(x) measure_time_start(); x; measure_time_end()
 #define elem_openp elem(elem::OPENP, get_lexeme(L"("))
 #define elem_closep elem(elem::CLOSEP, get_lexeme(L")"))
@@ -68,4 +69,4 @@ void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
 #endif
-//#define TRANSFORM_BIN_DRIVER
+#define TRANSFORM_BIN_DRIVER
