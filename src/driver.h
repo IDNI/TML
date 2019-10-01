@@ -10,7 +10,14 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __DRIVER_H__
+#define __DRIVER_H__
 #include <map>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
+#endif
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
@@ -107,7 +114,19 @@ public:
 	driver(char *s);
 	~driver();
 
-	void out(const tables::rt_printer& rtp)const{ if (tbl) tbl->out(rtp); };
+	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); };
+#ifdef __EMSCRIPTEN__
+	void out(emscripten::val o) const { if (tbl) tbl->out(o); };
+	emscripten::val to_bin() {
+		std::stringstream ss; ss << (*this);
+		std::string bin = ss.str();
+		emscripten::val r = emscripten::val::global("Uint8Array")
+							.new_(bin.size());
+		int n = 0;
+		for (unsigned char b : bin) r.set(n++, b);
+		return r;
+	}
+#endif
 
 //	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
 //		const prefix&) const;
@@ -137,3 +156,4 @@ std::wostream& printbdd_one(std::wostream& os, cr_spbdd_handle t, size_t bits,
 //	int_t rel);
 #endif
 std::wstring _unquote(std::wstring str);
+#endif

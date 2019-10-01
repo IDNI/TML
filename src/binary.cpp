@@ -177,8 +177,7 @@ istream& operator>>(istream& is, tables& tbl) {
 }
 
 istream& operator>>(istream& is, driver& d) {
-	int_t header = read_int(is);
-	assert(header == 53437);
+	read_int(is); // should be 53437
 	is >> *d.tbl;
 	read_bdd(is);
 	wstring source = read_string(is);
