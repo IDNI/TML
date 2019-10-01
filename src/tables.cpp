@@ -202,30 +202,25 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// EQ/NEQ still has its own table, as term ctor requires it and .tab is called all over.
-	// ints t is elems (VAR, consts) mapped to specific ints/ids, to be used for permutations.
+	// EQ/NEQ still has its own table, as term ctor requires it and .tab is
+	// called all over.  ints t is elems (VAR, consts) mapped to specific
+	// ints/ids, to be used for permutations.
 	sig sg = r.iseq ? get_sig(r.e[1].e, r.arity) : get_sig(r);
 	return term(r.neg, r.iseq, get_table(sg), t);
 }
 
 void tables::out(wostream& os) const {
-//	for (const auto& x : tbls)
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
 		out(os, tbls[tab].t, tab);
-		//out(os, x.second.t, x.first);
 }
 
 void tables::out(const rt_printer& f) const {
-//	for (const auto& x : tbls)
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
 		out(tbls[tab].t, tab, f);
-		//out(x.second.t, x.first, f);
 }
 
 void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
-	out(x, tab, [&os](const raw_term& rt) {
-		os << rt << L'.' << endl;
-	});
+	out(x, tab, [&os](const raw_term& rt) { os << rt << L'.' << endl; });
 }
 
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
@@ -491,7 +486,7 @@ bool tables::cqc(const vector<term>& x, vector<term> y, bool tmp) const {
 //	m[x[0]].insert(vec2set(x, 1));
 	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.insert({y[n]});
-	tables t(false, true, true);
+	tables t(false, false, true);
 	t.dict = dict, t.bcqc = false, t.run_nums(move(m), r, 1);
 	//DBG(print(wcout, r) << endl;)
 	return has(r, y[0]);
@@ -544,16 +539,15 @@ wostream& tables::print(wostream& os, const vector<term>& v) const {
 	os << to_raw_term(v[0]);
 	if (v.size() == 1) return os << L'.';
 	os << L" :- ";
-	size_t n = v.size();
-	for (const term& t : v) {
-		if (t.goal) os << L'!';
-		os << to_raw_term(t) << (!--n ? L"." : L", ");
+	for (size_t n = 1; n != v.size(); ++n) {
+		if (v[n].goal) os << L'!';
+		os << to_raw_term(v[n]) << (n == v.size() - 1 ? L"." : L", ");
 	}
 	return os;
 }
 
 wostream& tables::print(wostream& os, const flat_prog& p) const {
-	for (const auto& x : p) print(os, x);
+	for (const auto& x : p) print(os, x) << endl;
 	return os;
 }
 
@@ -575,7 +569,7 @@ void tables::get_rules(flat_prog p) {
 	alt* aa;
 	flat_prog q(move(p));
 	for (const auto& x : q) prog_add_rule(p, x);
-	if (bcqc) bdd::gc();
+	if (optimize) bdd::gc();
 //	print(wcout, m);
 	map<term, set<set<term>>> m;
 	for (const auto& x : p)
@@ -636,6 +630,8 @@ void tables::get_rules(flat_prog p) {
 	}
 	for (rule r : rs)
 		tbls[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
+	sort(rules.begin(), rules.end(), [this](const rule& x, const rule& y) {
+			return tbls[x.tab].priority > tbls[y.tab].priority; });
 }
 
 void tables::load_string(lexeme r, const wstring& s) {
@@ -661,10 +657,10 @@ void tables::load_string(lexeme r, const wstring& s) {
 		if (iswprint(s[n])) t[0] = sprint, b2.push_back(from_fact(t));
 	}
 	clock_t start, end;
-	if (bcqc) output::to(L"debug")<<"load_string or_many: ";
+	if (optimize) output::to(L"debug")<<"load_string or_many: ";
 	measure_time_start();
 	tbls[t1].t = bdd_or_many(move(b1)), tbls[t2].t = bdd_or_many(move(b2));
-	if (bcqc) measure_time_end();
+	if (optimize) measure_time_end();
 }
 
 template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -680,16 +676,16 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
-ntable tables::get_table(const sig& s) {
+ntable tables::get_table(const sig& s, size_t priority) {
 	auto it = smap.find(s);
 	if (it != smap.end()) return it->second;
-	ntable nt = tbls.size(); //tbls.empty() ? 0 : ((++tbls.rbegin())->first + 1); //ts.size();
+	ntable nt = tbls.size();
 	size_t len = sig_len(s);
 	max_args = max(max_args, len);
 	table tb;
-	tb.t = bdd_handle::F;
-	return tb.s = s, tb.len = len, tbls.push_back(tb), //tbls[nt] = tb,
-	       smap.emplace(s,nt), nt;
+	return	tb.t = bdd_handle::F, tb.s = s, tb.len = len,
+		tb.priority = priority, tbls.push_back(tb),
+		smap.emplace(s,nt), nt;
 }
 
 term to_nums(term t) {
@@ -751,15 +747,11 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		return r;
 	};
 	flat_prog p;
-//	for (pair<term, set<set<term>>> x : m) {
 	for (vector<term> x : m) {
 		get_table({ f(&x[0].tab), { (int_t)x[0].size() } });
 		auto s = h(set<term>(x.begin() + 1, x.end()));
 		x.erase(x.begin() + 1, x.end()),
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
-//		get_table({ f(&x.first.tab), { (int_t)x.first.size() } });
-//		set<set<term>> &s = p[x.first];
-//		for (set<term> y : x.second) s.insert(h(y));
 	}
 //	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
 	add_prog(move(p), {}, false);//true);
@@ -768,8 +760,8 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	return true;
 }
 
-ntable tables::get_new_tab(int_t x, ints ar) {
-	return get_table({ x, ar });
+ntable tables::get_new_tab(int_t x, ints ar, size_t priority) {
+	return get_table({ x, ar }, priority);
 }
 
 void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
@@ -784,7 +776,7 @@ void tables::add_prog(flat_prog m, const strs_t& strs, bool mknums) {
 	for (auto x : strs) load_string(x.first, x.second);
 //	measure_time_end();
 	smemo.clear(), ememo.clear();
-	if (bcqc) bdd::gc();
+	if (optimize) bdd::gc();
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -924,7 +916,7 @@ bool tables::pfp(size_t nsteps) {
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
-		if (bcqc) output::to(L"info") << "step: " << nstep << endl;
+		if (optimize) output::to(L"info") << "step: " << nstep << endl;
 		++nstep;
 		if (!fwd()) return bproof ? get_goals(), true : true;
 		if (unsat) throw unsat_exception();
@@ -940,16 +932,17 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	clock_t start, end;
 	double t;
 //	output::to(L"@stderr") << L"add_prog: ";
-	if (bcqc) measure_time_start();
+	if (optimize) measure_time_start();
 	add_prog(p, strs);
-	if (bcqc) {
+	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
 		wcerr << L"pfp: ";
 		measure_time_start();
 	}
 //	output::to(L"@stderr")
 	bool r = pfp();
-	if (bcqc) (wcerr << L"add_prog: " << t << L" pfp: "),measure_time_end();
+	if (optimize)
+		(wcerr << L"add_prog: " << t << L" pfp: "),measure_time_end();
 	return r;
 }
 
@@ -959,7 +952,7 @@ tables::tables(bool bproof, bool optimize, bool bin_transform,
 	print_transformed(print_transformed) {}
 
 tables::~tables() {
-	if (bcqc) delete &dict;
+	if (optimize) delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());

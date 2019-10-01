@@ -98,7 +98,7 @@ struct rule : public std::vector<alt*> {
 
 struct table {
 	sig s;
-	size_t len;
+	size_t len, priority = 0;
 	spbdd_handle t = bdd_handle::F;
 	bdd_handles add, del;
 	std::vector<size_t> r;
@@ -247,8 +247,8 @@ private:
 	flat_prog to_terms(const raw_prog& p);
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
-	ntable get_table(const sig& s);
-	ntable get_new_tab(int_t x, ints ar);
+	ntable get_table(const sig& s, size_t priority = 0);
+	ntable get_new_tab(int_t x, ints ar, size_t priority = 0);
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
@@ -256,7 +256,8 @@ private:
 	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
-	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
+	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v,
+		size_t priority);
 	void transform_bin(flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y, bool tmp)
 		const;
@@ -269,8 +270,7 @@ private:
 	std::set<ntable> exts; // extensional
 //	std::function<int_t(void)>* get_new_rel;
 public:
-	tables(//std::function<int_t(void)>* get_new_rel,
-		bool bproof = false, bool optimize = true,
+	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
