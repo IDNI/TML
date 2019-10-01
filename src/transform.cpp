@@ -662,47 +662,33 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
-void tables::transform_bin(flat_prog& p) {
-	set<vector<term>> s;
-    // TODO: wasn't working well with LEQ/GT examples, 'randomly' failing.
-    //DBG(print(wcout<<L"transform_bin input:"<<endl, p);)
-	for (const auto& x : p)
-		if (x.second.empty()) s.insert({x.first});
-		else for (const auto& y : x.second) s.insert(to_vec(x.first,y));
-	p.clear(), transform_bin(s);
-	for (const auto& x : s) p[x[0]].insert(vec2set(x, 1));
-//	print(wcout<<L"transform_bin output:"<<endl, p);
-	if (print_transformed)
-		print(output::to(L"transformed")<<L"transform_bin output:"<<endl
-			, p);
-//	DBG(else print(wcout<<L"transform_bin output:"<<endl, p);)
+vector<term> tables::interpolate(vector<term> x, set<int_t> v, size_t priority){
+	term t;
+	for (size_t k = 0; k != x.size(); ++k)
+		for (size_t n = 0; n != x[k].size(); ++n)
+			if (has(v, x[k][n]))
+				t.push_back(x[k][n]), v.erase(x[k][n]);
+	t.neg = false,
+	tmps.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
+		{(int_t)t.size()}, priority));
+	return x.insert(x.begin(), t), x;
 }
 
-void tables::transform_bin(set<vector<term>>& p) {
-	const auto q = move(p);
-	auto getvars = [](const term& t, set<int_t>& v) {
-		for (int_t i : t) if (i < 0) v.insert(i);
-	};
-	auto interpolate = [this](vector<term> x, set<int_t> v) {
-		term t;
-		for (size_t k = 0; k != x.size(); ++k)
-			for (size_t n = 0; n != x[k].size(); ++n)
-				if (has(v, x[k][n]))
-					t.push_back(x[k][n]), v.erase(x[k][n]);
-		t.neg = false,
-		t.tab = get_new_tab(dict.get_rel(get_new_rel()),
-			{(int_t)t.size()}),
-		x.insert(x.begin(), t);
-		return x;
-	};
-	auto intersect = [](const set<int_t>& x, const set<int_t>& y) {
-		set<int_t> r;
-		set_intersection(x.begin(), x.end(), y.begin(), y.end(),
-			inserter(r, r.begin()));
-		return r;
-	};
+void getvars(const term& t, set<int_t>& v) {
+	for (int_t i : t) if (i < 0) v.insert(i);
+}
+
+set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
+	set<int_t> r;
+	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
+		inserter(r, r.begin()));
+	return r;
+}
+
+void tables::transform_bin(flat_prog& p) {
+	const flat_prog q = move(p);
 	vector<set<int_t>> vars;
-	auto getterms = [this, &vars, intersect]
+	auto getterms = [this, &vars]
 		(const vector<term>& x) -> vector<size_t> {
 		if (x.size() <= 3) return {};
 /*		vector<size_t> e;
@@ -722,7 +708,8 @@ void tables::transform_bin(set<vector<term>>& p) {
 	vector<size_t> m;
 	set<int_t> v;
 	for (vector<term> x : q) {
-		if (x[0].goal) { p.insert(move(x)); continue; }
+		if (x[0].goal) { goals.insert(x[0]); continue; }
+			//prog_add_rule(p, x); continue; }
 		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
 		while (!(m = getterms(x)).empty()) {
 			for (size_t i : m) r.push_back(x[i]);
@@ -730,12 +717,13 @@ void tables::transform_bin(set<vector<term>>& p) {
 				x.erase(x.begin() + m[n]),
 				vars.erase(vars.begin() + m[n]);
 			for (const auto& s : vars) v.insert(s.begin(), s.end());
-			r = interpolate(r, move(v)), x.push_back(r[0]),
-			getvars(r[0], v), vars.push_back(move(v)),
-			p.insert(move(r));
+			r = interpolate(r, move(v), tbls[x[0].tab].priority+1),
+			x.push_back(r[0]), getvars(r[0], v),
+			vars.push_back(move(v)), p.insert(move(r));
 		}
 		p.insert(move(x)), vars.clear();
 	}
+	if (print_transformed) print(wcout<<L"after transform_bin:"<<endl, p);
 }
 
 /*raw_prog driver::reify(const raw_prog& p) {

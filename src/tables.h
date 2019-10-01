@@ -25,12 +25,11 @@ class dict_t;
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
-//typedef std::map<ntable, spbdd_handle> level;
 typedef bdd_handles level;
-typedef std::map<term, std::set<std::set<term>>> flat_prog;
+//typedef std::map<term, std::set<std::set<term>>> flat_prog;
+typedef std::set<std::vector<term>> flat_prog;
 
 std::wostream& operator<<(std::wostream& os, const env& e);
-//env cqc(term h1, std::vector<term> b1, term h2, std::vector<term> b2);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
@@ -58,7 +57,7 @@ struct body {
 };
 
 struct alt : public std::vector<body*> {
-	spbdd_handle rng = bdd_handle::T, eq = bdd_handle::T, rlast = bdd_handle::F;
+	spbdd_handle rng=bdd_handle::T, eq=bdd_handle::T, rlast=bdd_handle::F;
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
@@ -99,12 +98,12 @@ struct rule : public std::vector<alt*> {
 
 struct table {
 	sig s;
-	size_t len;
+	size_t len, priority = 0;
 	spbdd_handle t = bdd_handle::F;
 	bdd_handles add, del;
 	std::vector<size_t> r;
 	bool ext = true; // extensional
-	bool unsat = false;
+	bool unsat = false, tmp = false;
 	bool commit(DBG(size_t));
 };
 
@@ -153,7 +152,7 @@ private:
 
 	size_t nstep = 0;
 	std::vector<table> tbls;
-//	std::map<ntable, table> tbls;
+	std::set<ntable> tmps;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
@@ -221,7 +220,7 @@ private:
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-	void align_vars(term& h, std::set<term>& b) const;
+	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
@@ -249,8 +248,8 @@ private:
 	flat_prog to_terms(const raw_prog& p);
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
-	ntable get_table(const sig& s);
-	ntable get_new_tab(int_t x, ints ar);
+	ntable get_table(const sig& s, size_t priority = 0);
+	ntable get_new_tab(int_t x, ints ar, size_t priority = 0);
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
@@ -258,26 +257,26 @@ private:
 	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
-	void transform_bin(std::set<std::vector<term>>& p);
+	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v,
+		size_t priority);
 	void transform_bin(flat_prog& p);
-	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
-	bool cqc(const term& h, const std::set<term>& b, const flat_prog& m)
+	bool cqc(const std::vector<term>& x, std::vector<term> y, bool tmp)
 		const;
-	void cqc_minimize(const term& h, std::set<term>& b) const;
-	void cqc_minimize(const term& h, std::set<std::set<term>>& b) const;
+	bool cqc(const std::vector<term>&, const flat_prog& m, bool tmp) const;
+	void cqc_minimize(std::vector<term>&) const;
+	ntable prog_add_rule(flat_prog& p, std::vector<term> x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
 	std::set<ntable> exts; // extensional
 //	std::function<int_t(void)>* get_new_rel;
 public:
-	tables(//std::function<int_t(void)>* get_new_rel,
-		bool bproof = false, bool optimize = true,
+	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	bool run_prog(const raw_prog& p, const strs_t& strs);
-	bool run_nums(flat_prog m, std::set<term>& r);
-	bool pfp();
+	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
+	bool pfp(size_t nsteps = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 	void set_proof(bool v) { bproof = v; }
