@@ -156,10 +156,11 @@ private:
 
 	size_t nstep = 0;
 	std::vector<table> tbls;
-	std::set<ntable> tmps;
+	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
+	std::map<ntable, std::set<ntable>> deps;
 	alt get_alt(const std::vector<raw_term>&);
 	bool get_alt(const std::set<term>& al, const term& h, alt&);
 	rule get_rule(const raw_rule&);
@@ -253,8 +254,10 @@ private:
 	flat_prog to_terms(const raw_prog& p);
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
-	ntable get_table(const sig& s, size_t priority = 0);
-	ntable get_new_tab(int_t x, ints ar, size_t priority = 0);
+	ntable get_table(const sig& s);
+	void table_increase_priority(ntable t);
+	void set_priorities(const flat_prog&);
+	ntable get_new_tab(int_t x, ints ar);
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);

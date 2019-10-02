@@ -662,17 +662,48 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
 	return l;
 }
 
+template<typename T>
+void dag_get_reachable(const map<T, set<T>>& g, const T& t, set<T>& r) {
+	if (has(r, t)) return;
+	auto it = g.find(t);
+	if (it != g.end())
+		for (const T& x : it->second)
+			dag_get_reachable(g, x, r);
+	r.insert(t);
+}
+
+template<typename T>
+set<T> dag_get_reachable(const map<T, set<T>>& g, const T& t) {
+	set<T> r;
+	return dag_get_reachable<T>(g, t, r), r;
+}
+
+void tables::table_increase_priority(ntable t) {
+	for (ntable x : dag_get_reachable(deps, t)) ++tbls[x].priority;
+}
+
+void tables::set_priorities(const flat_prog& p) {
+	for (table& t : tbls) t.priority = 0;
+	for (const vector<term>& x : p) {
+		set<ntable>& s = deps[x[0].tab];
+		for (size_t n = 1; n != x.size(); ++n)
+			if (has(tmprels, x[n].tab))
+				s.insert(x[n].tab);
+	}
+	for (const auto& x : deps)
+		for (ntable y : x.second)
+			if (has(tmprels, y))
+				table_increase_priority(y);
+}
+
 vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
 	term t;
-	size_t priority = 0;
-	for (size_t k = 0; k != x.size(); ++k) {
-		priority = max(priority, tbls[x[k].tab].priority);
+	for (size_t k = 0; k != x.size(); ++k)
 		for (size_t n = 0; n != x[k].size(); ++n)
 			if (has(v, x[k][n]))
 				t.push_back(x[k][n]), v.erase(x[k][n]);
-	}
-	tmps.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
-		{(int_t)t.size()}, priority + 1));
+	tmprels.insert(t.tab = get_new_tab(dict.get_rel(get_new_rel()),
+		{(int_t)t.size()}));
 	return x.insert(x.begin(), t), x;
 }
 
@@ -725,6 +756,7 @@ void tables::transform_bin(flat_prog& p) {
 		}
 		p.insert(move(x)), vars.clear();
 	}
+	set_priorities(p);
 	if (print_transformed) print(wcout<<L"after transform_bin:"<<endl, p);
 }
 
