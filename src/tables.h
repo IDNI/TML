@@ -161,6 +161,7 @@ private:
 	std::vector<rule> rules;
 	std::vector<level> levels;
 	alt get_alt(const std::vector<raw_term>&);
+	bool get_alt(const std::set<term>& al, const term& h, alt&);
 	rule get_rule(const raw_rule&);
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;

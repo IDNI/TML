@@ -66,12 +66,12 @@ map<ekmemo, spbdd_handle> ememo;
 map<ekmemo, spbdd_handle> leqmemo;
 
 spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args) const {
-    static ekmemo x;
-    static map<ekmemo, spbdd_handle>::const_iterator it;
-    if ((it = leqmemo.find(x = { arg1, arg2, args, bits })) != leqmemo.end())
-        return it->second;
-    spbdd_handle r = leq_var(arg1, arg2, args, bits);
-    return leqmemo.emplace(x, r), r;
+	static ekmemo x;
+	static map<ekmemo, spbdd_handle>::const_iterator it;
+	if ((it = leqmemo.find(x = { arg1, arg2, args, bits })) != leqmemo.end())
+		return it->second;
+	spbdd_handle r = leq_var(arg1, arg2, args, bits);
+	return leqmemo.emplace(x, r), r;
 }
 spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 	const {
@@ -161,23 +161,16 @@ spbdd_handle tables::from_sym(size_t pos, size_t args, int_t i) const {
 
 spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 	static ekmemo x;
-    // a typo should be ekmemo, all the same at the moment
+	// a typo should be ekmemo, all the same at the moment
 	//static map<skmemo, spbdd_handle>::const_iterator it;
-    static map<ekmemo, spbdd_handle>::const_iterator it;
-    if ((it = ememo.find(x = { p1, p2, args, bits })) != ememo.end())
+	static map<ekmemo, spbdd_handle>::const_iterator it;
+	if ((it = ememo.find(x = { p1, p2, args, bits })) != ememo.end())
 		return it->second;
 	spbdd_handle r = bdd_handle::T;
 	for (size_t b = 0; b != bits; ++b)
 		r = r && ::from_eq(pos(b, p1, args), pos(b, p2, args));
 	return ememo.emplace(x, r), r;
 }
-
-/*spbdd_handle tables::from_ground(const term& t) {
-	spbdd_handle r = bdd_handle::T;
-	for (size_t n = 0, args = t.size(); n != args; ++n)
-		r = r && from_sym(n, args, t[n]);
-	return r;
-}*/
 
 spbdd_handle tables::from_fact(const term& t) {
 	// TODO: memoize
@@ -220,7 +213,7 @@ term tables::from_raw_term(const raw_term& r) {
 			default: ;
 		}
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
-    auto tbl = (r.iseq || r.isleq) ? -1 : get_table(get_sig(r));
+	ntable tbl = (r.iseq || r.isleq) ? -1 : get_table(get_sig(r));
 	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
 
@@ -254,7 +247,7 @@ void tables::out(emscripten::val o) const {
 			while (t.e[n].type == elem::OPENP) ++n;
 			for (int_t k = 0; k != t.arity[ar];)
 				if ((es<<t.e[n++]),++k!=t.arity[ar]) {
-					o.call<void>("set", relation, row, col++,
+					o.call<void>("set", relation, row,col++,
 						ws2s(es.str()));
 					es.str(L"");
 				}
@@ -287,11 +280,8 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 
 set<term> tables::decompress() {
 	set<term> r;
-//	for (const auto& x : tbls)
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		decompress(tbls[tab].t, tab, [&r](const term& t) {
-		//decompress(x.second.t, x.first, [&r](const term& t) {
-			r.insert(t);});
+		decompress(tbls[tab].t, tab, [&r](const term& t){r.insert(t);});
 	return r;
 }
 
@@ -312,13 +302,12 @@ raw_term tables::to_raw_term(const term& r) const {
 		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
 	}
 	return	rt.arity = get<ints>(tbls.at(r.tab).s),
-	      	rt.insert_parens(dict.op, dict.cl), rt;
+		  	rt.insert_parens(dict.op, dict.cl), rt;
 }
 
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
-		f(to_raw_term(r));
-	});
+		f(to_raw_term(r)); });
 }
 
 void term::replace(const map<int_t, int_t>& m) {
@@ -365,73 +354,70 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
 	set<int_t> pvars, nvars, eqvars, leqvars;
 	std::vector<const term*> eqterms, leqterms;
-    // first pass, just enlist eq terms (that have at least one var)
+	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-        bool haseq = false, hasleq = false;
-		for (size_t n = 0; n != t.size(); ++n) {
-			if (t[n] < 0) {
-				if (t.iseq) haseq = true;
-                else if (t.isleq) hasleq = true;
-                else (t.neg ? nvars : pvars).insert(t[n]);
-			}
-		}
+		bool haseq = false, hasleq = false;
+		for (size_t n = 0; n != t.size(); ++n)
+			if (t[n] >= 0) continue;
+			else if (t.iseq) haseq = true;
+			else if (t.isleq) hasleq = true;
+			else (t.neg ? nvars : pvars).insert(t[n]);
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
-        else if (hasleq) leqterms.push_back(&t);
-    }
+		else if (hasleq) leqterms.push_back(&t);
+	}
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
 		bool noeqvars = true;
 		std::vector<int_t> tvars;
 		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0) {
+			if (t[n] >= 0) continue;
 				// nvars add range already, so skip all in that case...
 				// and per 1.3 - if any one is contrained (outside) bail out
-				if (has(nvars, t[n])) { noeqvars = false; break; }
+			else if (has(nvars, t[n])) { noeqvars = false; break; }
 				// if neither pvars has this var it should be ranged
-				if (!has(pvars, t[n])) tvars.push_back(t[n]);
-				else if (!t.neg) { noeqvars = false; break; }
+			else if (!has(pvars, t[n])) tvars.push_back(t[n]);
+			else if (!t.neg) { noeqvars = false; break; }
 				// if is in pvars and == then other var is covered too, skip.
 				// this isn't covered by 1.1-3 (?) but further optimization.
-			}
-		if (!noeqvars) continue;
-		for (const int_t tvar : tvars) {
-			eqvars.insert(tvar);
+		if (noeqvars)
+			for (const int_t tvar : tvars)
+				eqvars.insert(tvar);
 			// 1.3 one is enough (we have one constrained, no need to do both).
 			// but this doesn't work well, we need to range all that fit.
 			//break;
+	}
+	for (const term* pt : leqterms) {
+	// - for '>' (~(<=)) it's enough if 2nd var is in nvars/pvars.
+		// - for '<=' it's enough if 2nd var is in nvars/pvars.
+		// - if 1st/greater is const, still can't skip, needs to be ranged.
+		// - if neither var appears elsewhere (nvars nor pvars) => do both.
+		//   (that is a bit strange, i.e. if appears outside one is enough)
+		// ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ and GT.
+		const term& t = *pt;
+		assert(t.size() == 2);
+		const int_t v1 = t[0], v2 = t[1];
+		if (v1 == v2) {
+			if (!has(nvars, v2)) leqvars.insert(v2);
+			continue;
 		}
+		if (v2 < 0) {
+			if (has(nvars, v2) || has(pvars, v2))
+				continue; // skip both
+			leqvars.insert(v2); // add and continue to 1st
+		}
+		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
+			leqvars.insert(v1);
 	}
-    for (const term* pt : leqterms) {
-        // - for '>' (~(<=)) it's enough if 2nd var is in nvars/pvars.
-        // - for '<=' it's enough if 2nd var is in nvars/pvars.
-        // - if 1st/greater is const, still can't skip, needs to be ranged.
-        // - if neither var appears elsewhere (nvars nor pvars) => do both.
-        //   (that is a bit strange, i.e. if appears outside one is enough)
-        // ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ and GT.
-        const term& t = *pt;
-        assert(t.size() == 2);
-        int_t v1 = t[0], v2 = t[1];
-        if (v1 == v2) { if (!has(nvars, v2)) leqvars.insert(v2); continue; }
-        if (v2 < 0) {
-            if (has(nvars, v2) || has(pvars, v2)) continue; // skip both
-            leqvars.insert(v2); // add and continue to 1st
-        }
-        if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
-            leqvars.insert(v1);
-    }
 
-    for (int_t i : pvars) nvars.erase(i);
-	if (h.neg) for (int_t i : h) if (i < 0) { 
-		nvars.erase(i); 
-		eqvars.erase(i);
-        leqvars.erase(i);
-	}
+	for (int_t i : pvars) nvars.erase(i);
+	if (h.neg) for (int_t i : h) if (i < 0)
+		nvars.erase(i), eqvars.erase(i), leqvars.erase(i);
 	bdd_handles v;
-    for (int_t i : nvars) range(vm.at(i), len, v); 
+	for (int_t i : nvars) range(vm.at(i), len, v); 
 	for (int_t i : eqvars) range(vm.at(i), len, v);
-    for (int_t i : leqvars) range(vm.at(i), len, v);
-    if (!h.neg) {
+	for (int_t i : leqvars) range(vm.at(i), len, v);
+	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
@@ -482,29 +468,8 @@ void tables::get_facts(const flat_prog& m) {
 	measure_time_end();
 }
 
-/*bool tables::cqc(const set<rule>& rs, const rule& r, size_t a, tables& tb)const{
-	int_t m = 0;
-	for (int_t i : r.t) m = max(m, i);
-	for (int_t i : r.r[a]) m = max(m, i);
-	bool bsym = false, bnum = false, bchr = false;
-
-}
-
-bool tables::cqc(const set<rule>& rs, rule& r) {
-	tables tb(false);
-	tb.bits = bits, tb.ts = ts, tb.smap = smap;
-	for (const rule& x : rs)
-		if (!x.equals_termwise(r))
-			tb.rules.push_back(x);
-	for (size_t n = 0; n < r.size();)
-		if (cqc(rs, r, n, tb)) r.erase(n);
-		else ++n;
-}*/
-
 void tables::get_nums(const raw_term& t) {
-	for (const elem& e : t.e)
-		if (e.type == elem::NUM)
-			nums = max(nums, e.num);
+	for (const elem& e : t.e) if (e.type==elem::NUM) nums=max(nums, e.num);
 }
 
 flat_prog tables::to_terms(const raw_prog& p) {
@@ -530,23 +495,6 @@ flat_prog tables::to_terms(const raw_prog& p) {
 	return m;
 }
 
-template<typename T> void set2vec(const set<T>& s, vector<T>& v) {
-	copy(s.begin(), s.end(), v.begin());
-}
-
-vector<term> to_vec(const term& h, const set<term>& b) {
-	vector<term> v;
-	v.reserve(b.size() + 1), v.emplace_back(h);
-	for (const term& t : b) v.emplace_back(t);
-	return v;
-}
-
-template<typename T> set<T> vec2set(const vector<T>& v, size_t n) {
-	set<T> r;
-	r.insert(v.begin() + n, v.end());
-	return r;
-}
-
 void freeze(vector<term>& v) {
 	int_t m = 0;
 	map<int_t, int_t> p;
@@ -559,39 +507,15 @@ void freeze(vector<term>& v) {
 			else p.emplace(i, mknum(m)), i = mknum(m++);
 }
 
-void freeze(term& t, env& e1, env& e2, int_t& m) {
-	env::const_iterator it;
-	for (int_t& i : t)
-		if (i >= 0) continue;
-		else if ((it = e1.find(i)) == e1.end())
-			e1.emplace(i, m), e2.emplace(m, i), i = m++;
-		else i = it->second;
-}
-
-env freeze(term& h, vector<term>& b) {
-	env e1, e2;
-	int_t m = 0;
-	for (int_t i : h) m = max(m, i);
-	for (const term& t : b) for (int_t i : t) m = max(m, i);
-	freeze(h, e1, e2, ++m);
-	for (term& t : b) freeze(t, e1, e2, m);
-	return e2;
-}
-
 bool tables::cqc(const vector<term>& x, vector<term> y, bool tmp) const {
 	if (tmp) y[0].tab = x[0].tab;
 	set<term> r;
 	flat_prog m;
-//	map<term, set<set<term>>> m;
-	for (const term& t : x)
-		if(t.neg) return false;
+	for (const term& t : x) if(t.neg) return false;
 		//throw "cqc not supported yet for terms with negation";
-	for (const term& t : y)
-		if(t.neg) return false;
+	for (const term& t : y) if(t.neg) return false;
 		//throw "cqc not supported yet for terms with negation";
-	m.insert(x);
-//	m[x[0]].insert(vec2set(x, 1));
-	freeze(y);
+	m.insert(x), freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.insert({y[n]});
 	tables t(false, false, true);
 	t.dict = dict, t.bcqc = false, t.run_nums(move(m), r, 1);
@@ -632,16 +556,6 @@ ntable tables::prog_add_rule(flat_prog& p, vector<term> x) {
 	return x[0].tab;
 }
 
-/*wostream& tables::print(wostream& os, const vector<term>& b) const {
-	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
-	return os;
-}
-
-wostream& tables::print(wostream& os, const set<term>& b) const {
-	for (const term& t : b) os << to_raw_term(t) << L'.' << endl;
-	return os;
-}*/
-
 wostream& tables::print(wostream& os, const vector<term>& v) const {
 	os << to_raw_term(v[0]);
 	if (v.size() == 1) return os << L'.';
@@ -654,8 +568,81 @@ wostream& tables::print(wostream& os, const vector<term>& v) const {
 }
 
 wostream& tables::print(wostream& os, const flat_prog& p) const {
-	for (const auto& x : p) print(os, x) << endl;
+	for (const auto& x : p)
+		print(os << tbls[x[0].tab].priority << L'\t', x) << endl;
+/*	map<size_t, flat_prog> m;
+	for (const auto& x : p) m[tbls[x[0].tab].priority].insert(x);
+	size_t n = m.rbegin()->first;
+	vector<flat_prog> v(n);
+	for (const auto& x : m) v[n--] = move(x.second);
+	for (n = 0; n != v.size(); ++n)
+		for (const vector<term>& y : v[n])
+			print(os << n << L'\t', y) << endl;*/
 	return os;
+}
+
+bool tables::get_alt(const set<term>& al, const term& h, alt& a) {
+	set<int_t> vs;
+	set<pair<body, term>> b;
+	spbdd_handle leq = bdd_handle::T, q;
+	a.vm = get_varmap(h, al, a.varslen),
+	a.inv = varmap_inv(a.vm);
+	for (const term& t : al) {
+		if (t.size() != 2 || (!t.iseq && !t.isleq))
+			b.insert({get_body(t, a.vm, a.varslen), t});
+		else if (t.iseq) {
+			if (t[0] == t[1]) {
+				if (t.neg) return false;
+				continue;
+			}
+			if (t[0] >= 0 && t[1] >= 0) {
+				if (t.neg == (t[0] == t[1])) return false;
+				continue;
+			}
+			if (t[0] < 0 && t[1] < 0)
+				q = from_sym_eq(a.vm.at(t[0]), a.vm.at(t[1]),
+					a.varslen);
+			else if (t[0] < 0)
+				q = from_sym(a.vm.at(t[0]), a.varslen, t[1]);
+			else if (t[1] < 0)
+				q = from_sym(a.vm.at(t[1]), a.varslen, t[0]);
+			a.eq = t.neg ? a.eq % q : (a.eq && q);
+		} else if (t.isleq) {
+			if (t[0] == t[1]) {
+				if (t.neg) return false;
+				continue;
+			}
+			if (t[0] >= 0 && t[1] >= 0) {
+				if (t.neg == (t[0] <= t[1])) return false;
+				continue;
+			}
+			if (t[0] < 0 && t[1] < 0)
+				q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]),
+					a.varslen, bits);
+			else if (t[0] < 0)
+				q = leq_const(t[1], a.vm.at(t[0]),
+					a.varslen, bits);
+			else if (t[1] < 0)
+				// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
+				q = bdd_handle::T % leq_const(t[0],
+					a.vm.at(t[1]), a.varslen, bits) ||
+					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
+			leq = t.neg ? leq % q : (leq && q);
+		}
+	}
+	a.rng = get_alt_range(h, al, a.vm, a.varslen);
+	a.rng = bdd_and_many({ a.rng, leq });
+	static set<body*, ptrcmp<body>>::const_iterator bit;
+	body* y;
+	for (auto x : b) {
+		a.t.push_back(x.second);
+		if ((bit=bodies.find(&x.first)) != bodies.end())
+			a.push_back(*bit);
+		else *(y=new body) = x.first, a.push_back(y), bodies.insert(y);
+	}
+	auto d = deltail(a.varslen, h.size());
+	a.ex = d.first, a.perm = d.second;
+	return true;
 }
 
 void tables::get_rules(flat_prog p) {
@@ -670,9 +657,7 @@ void tables::get_rules(flat_prog p) {
 #endif
 	set<rule> rs;
 	varmap::const_iterator it;
-	set<body*, ptrcmp<body>>::const_iterator bit;
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
-	body* y;
 	alt* aa;
 	flat_prog q(move(p));
 	for (const auto& x : q) prog_add_rule(p, x);
@@ -700,82 +685,71 @@ void tables::get_rules(flat_prog p) {
 		r.len = t.size();
 		for (const set<term>& al : x.second) {
 			alt a;
+			if (get_alt(al, t, a))
+				as.insert(move(a));
+		}
+/*		{
+			alt a;
 			set<int_t> vs;
 			set<pair<body, term>> b;
-            spbdd_handle leq = bdd_handle::T;
+			bdd_handle leq = bdd_handle::T, q;
+			bool alt_break = false;
 			a.vm = get_varmap(t, al, a.varslen),
 			a.inv = varmap_inv(a.vm);
 			for (const term& t : al) {
-                if (t.iseq && t.size() == 2) {
-                    bool has0 = has(a.vm, t[0]);
-                    bool has1 = has(a.vm, t[1]);
-                    if (has0 && has1) {
-                        size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-                        if (t.neg)
-                            a.eq = a.eq % from_sym_eq(arg0, arg1, a.varslen);
-                        else
-                            a.eq = a.eq && from_sym_eq(arg0, arg1, a.varslen);
-                    }
-                    else if (has0) {
-                        size_t arg0 = a.vm.at(t[0]);
-                        if (t.neg)
-                            a.eq = a.eq % from_sym(arg0, a.varslen, t[1]);
-                        else
-                            a.eq = a.eq && from_sym(arg0, a.varslen, t[1]);
-                    }
-                    else if (has1) {
-                        size_t arg1 = a.vm.at(t[1]);
-                        if (t.neg)
-                            a.eq = a.eq % from_sym(arg1, a.varslen, t[0]);
-                        else
-                            a.eq = a.eq && from_sym(arg1, a.varslen, t[0]);
-                    }
-                    else { // just consts?
-                        auto tf = t[0] == t[1] ? bdd_handle::T : bdd_handle::F;
-                        if (t.neg) a.eq = a.eq % tf;
-                        else a.eq = a.eq && tf;
-                    }
-                }
-                else if (t.isleq && t.size() == 2) {
-                    bool has0 = has(a.vm, t[0]);
-                    bool has1 = has(a.vm, t[1]);
-                    if (has0 && has1) {
-                        size_t arg0 = a.vm.at(t[0]), arg1 = a.vm.at(t[1]);
-                        if (t.neg)
-                            leq = leq % leq_var(arg0, arg1, a.varslen, bits);
-                        else
-                            leq = leq && leq_var(arg0, arg1, a.varslen, bits);
-                    }
-                    else if (has0) {
-                        size_t arg0 = a.vm.at(t[0]);
-                        if (t.neg)
-                            leq = leq % leq_const(t[1], arg0, a.varslen, bits);
-                        else
-                            leq = leq && leq_const(t[1], arg0, a.varslen, bits);
-                    }
-                    else if (has1) {
-                        size_t arg1 = a.vm.at(t[1]);
-                        spbdd_handle geq = bdd_handle::T;
-                        // 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
-                        geq = geq % leq_const(t[0], arg1, a.varslen, bits);
-                        geq = geq || from_sym(arg1, a.varslen, t[0]);
-                        if (t.neg)
-                            leq = leq % geq;
-                        else{
-                            leq = leq && geq;
-                        }
-                    }
-                    else { // TODO: just consts: how to do <= for consts?
-                        auto tf = t[0] <= t[1] ? bdd_handle::T : bdd_handle::F;
-                        if (t.neg) leq = leq % tf;
-                        else leq = leq && tf;
-                    }
-                }
-                else b.insert({
-					get_body(t, a.vm, a.varslen), t});
+				if (t.size() != 2 || (!t.iseq && !t.isleq))
+					b.insert({get_body(t, a.vm, a.varslen),t});
+				else if (t.iseq) {
+					if (t[0] == t[1]) {
+						if (neg) {
+							alt_break = true;
+							break;
+						}
+						continue;
+					}
+					if (t[0] >= 0 && t[1] >= 0) {
+						if (neg == (t[0] == t[1])) {
+							alt_break = true;
+							break;
+						}
+						continue;
+					}
+					if (t[0] < 0 && t[1] < 0)
+						q = from_sym_eq(a.vm.at(t[0]), a.vm.at(t[1]), a.varslen);
+					else if (t[0] < 0)
+						q = from_sym(a.vm.at(t[0]), a.varslen, t[1]);
+					else if (t[1] < 0)
+						q = from_sym(a.vm.at(t[1]), a.varslen, t[0]);
+					a.eq = t.neg ? a.eq % q : (a.eq && q);
+				} else if (t.isleq) {
+					if (t[0] == t[1]) {
+						if (neg) {
+							alt_break = true;
+							break;
+						}
+						continue;
+					}
+					if (t[0] >= 0 && t[1] >= 0) {
+						if (neg == (t[0] <= t[1])) {
+							alt_break = true;
+							break;
+						}
+						continue;
+					}
+					if (t[0] < 0 && t[1] < 0)
+						q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]), a.varslen, bits);
+					else if (t[0] < 0)
+						q = leq_const(t[1], a.vm.at(t[0]), a.varslen, bits);
+					else if (t[1] < 0)
+						// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
+						q = bdd_handle::T % leq_const(t[0], a.vm.at(t[1]), a.varslen, bits)
+							|| from_sym(arg1, a.varslen, t[0]);
+					leq = t.neg ? leq % q : (leq && q);
+				}
 			}
+			if (alt_break) continue;
 			a.rng = get_alt_range(t, al, a.vm, a.varslen);
-            a.rng = bdd_and_many({ a.rng, leq });
+			a.rng = bdd_and_many({ a.rng, leq });
 			for (auto x : b) {
 				a.t.push_back(x.second);
 				if ((bit=bodies.find(&x.first))!=bodies.end())
@@ -786,7 +760,7 @@ void tables::get_rules(flat_prog p) {
 			auto d = deltail(a.varslen, r.len);
 			a.ex = d.first, a.perm = d.second;
 			as.insert(a);
-		}
+		}*/
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
@@ -1030,7 +1004,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	else if (del.empty()) add.push_back(t), x = bdd_or_many(move(add));
 	else {
 		spbdd_handle a = bdd_or_many(move(add)),
-			     d = bdd_or_many(move(del)), s = a % d;
+				 d = bdd_or_many(move(del)), s = a % d;
 //		DBG(assert(bdd_nvars(a) < len*bits);)
 //		DBG(assert(bdd_nvars(d) < len*bits);)
 		if (s == bdd_handle::F) return unsat = true;
