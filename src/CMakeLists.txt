@@ -80,7 +80,7 @@ target_include_directories(TMLo PUBLIC
 #################
 
 add_library(TMLso SHARED)
-add_library(TML::TML ALIAS TMLso)
+add_library(TML::TMLso ALIAS TMLso)
 target_setup(TMLso)
 target_compile_options(TMLso     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLso        PRIVATE ${TML_LINK_OPTIONS})
@@ -99,6 +99,7 @@ set_target_properties(TMLso PROPERTIES
 #################
 
 add_library(TMLs STATIC)
+add_library(TML::TMLs ALIAS TMLs)
 target_setup(TMLs)
 target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLs        PRIVATE ${TML_LINK_OPTIONS})
@@ -128,7 +129,7 @@ target_setup(tml_shared)
 target_compile_options(tml_shared PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml_shared    PRIVATE ${TML_LINK_OPTIONS})
 target_sources(tml_shared         PRIVATE main.cpp)
-target_link_libraries(tml_shared  TML)
+target_link_libraries(tml_shared  TMLso)
 exclude(tml_shared)
 
 
