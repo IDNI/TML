@@ -247,6 +247,7 @@ private:
 	void get_goals();
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
+	struct elem get_elem(int_t arg) const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -255,27 +256,31 @@ private:
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
 	ntable get_table(const sig& s);
-	void table_increase_priority(ntable t);
+	void table_increase_priority(ntable t, size_t inc = 1);
 	void set_priorities(const flat_prog&);
 	ntable get_new_tab(int_t x, ints ar);
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
-	void add_prog(const raw_prog& p, const strs_t& strs);
-	void add_prog(flat_prog m, const strs_t& strs, bool mknums = false);
+	void add_prog(const raw_prog& p, const strs_t&);
+	void add_prog(flat_prog m, const std::vector<struct production>&,
+		bool mknums = false);
 	char fwd() noexcept;
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
-	bool cqc(const std::vector<term>& x, std::vector<term> y, bool tmp)
-		const;
-	bool cqc(const std::vector<term>&, const flat_prog& m, bool tmp) const;
+	void transform_grammar(std::vector<struct production> g, flat_prog& p);
+	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
+	bool cqc(const std::vector<term>&, const flat_prog& m) const;
+	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	void cqc_minimize(std::vector<term>&) const;
 	ntable prog_add_rule(flat_prog& p, std::vector<term> x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
 	std::set<ntable> exts; // extensional
+	strs_t strs;
+	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
 public:
 	tables(bool bproof = false, bool optimize = true,

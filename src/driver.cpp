@@ -50,78 +50,11 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 		}
 }
 
-/*term driver::get_term(raw_term r, const strs_t& s) {
-	term t(r.neg, dict.get_rel(r.e[0].e), {}, r.arity);
-	for (size_t n = 1; n < r.e.size(); ++n)
-		if (r.e[n].type == elem::NUM)
-			t.add_arg(mknum(r.e[n].num));
-		else if (r.e[n].type == elem::CHR)
-			t.add_arg(mkchr(r.e[n].ch));
-		else if (r.e[n].type == elem::VAR)
-			t.add_arg(dict.get_var(r.e[n].e));
-		else if (r.e[n].type == elem::STR) {
-			lexeme l = r.e[n].e;
-			++l[0], --l[1];
-			t.add_arg(dict.get_sym(dict.get_lexeme(
-				_unquote(lexeme2str(l)))));
-		}
-		else if (r.e[n].type!=elem::OPENP && r.e[n].type!=elem::CLOSEP)
-			t.add_arg(dict.get_sym(r.e[n].e));
-	return t;
-}
-
-pair<matrix, matrix> driver::get_rule(const raw_rule& r, const strs_t& s) {
-	matrix h, b;
-	for (auto x : r.h.size()) h.push_back(get_term(x, s));
-	for (auto x : r.bodies()) b.push_back(get_term(x, s));
-//	if (m[0][0] > 0)
-//		for (size_t i = 1; i < m[0].size(); ++i)
-//			if (m[0][i] == null) er(err_null_in_head);
-	return { h, b };
-}
-
-void driver::count_term(const raw_term& t, set<lexeme, lexcmp>& syms) {
-	for (size_t n = 1; n < t.e.size(); ++n)
-		if (t.e[n].type == elem::NUM) nums = max(nums, t.e[n].num+1);
-		else if (t.e[n].type == elem::SYM) syms.insert(t.e[n].e);
-		else if (t.e[n].type == elem::CHR) chars=max(chars, (int_t)256);
-}*/
-
 size_t driver::load_stdin() {
 	wstringstream ss;
 	std_input = ((ss << wcin.rdbuf()), ss.str());
 	return std_input.size();
 }
-
-/*void driver::get_dict_stats(const raw_prog& p) {
-	set<lexeme, lexcmp> syms;
-	for (const directive& d : p.d) {
-		chars = max(chars, (int_t)256);
-		switch (d.type) {
-		case directive::FNAME:
-			nums = max(nums, (int_t)fsize(d.arg[0]+1,
-			(size_t)(d.arg[1]-d.arg[0]-1))+1); break;
-		case directive::STR:
-			nums = max(nums,(int_t)(d.arg[1]-d.arg[0])+1);
-			break;
-		case directive::CMDLINE:
-			nums = max(nums,(int_t)(strlen(argv[d.n])+1));
-			break;
-		case directive::STDIN:
-			nums = max(nums,(int_t)(load_stdin()+1));
-		default: ;
-		}
-	}
-	for (const raw_rule& r : p.r) {
-		for (const raw_term& t : r.heads()) count_term(t, syms);
-		for (const raw_term& t : r.bodies()) count_term(t, syms);
-	}
-	for (const lexeme l : syms) dict.get_sym(l);
-//	for (const lexeme l : rels) dict.get_rel(l);
-//	for (auto y : s) rels.insert(y.first);
-	if (!(dict.nsyms()+nums+chars))nums=1,wcerr<<warning_empty_domain<<endl;
-//	return r;
-}*/
 
 wstring s2ws(const std::string& s) {
 	return std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(s);
@@ -166,18 +99,6 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		}
 }
 
-/*void driver::add_rules(raw_prog& p) {
-	for (const raw_rule& x : p.r)
-		switch (x.type) {
-		case raw_rule::NONE: pd.r.insert(get_rule(x,pd.strs)); break;
-		case raw_rule::GOAL: pd.goals.push_back(get_term(
-						x.head(0),pd.strs)); break;
-		case raw_rule::TREE: pd.tgoals.push_back(get_term(
-					x.head(0),pd.strs)); break;
-		default: assert(0);
-		}
-}*/
-
 void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
@@ -203,11 +124,11 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 //		if (!has(transformed_strings, x.first))
 //			transform_string(x.second, rp.p[n], x.first),
 //			transformed_strings.insert(x.first);
-	if (!rp.p[n].g.empty()) {
+	if (!rp.p[n].g.empty()) //{
 		if (pd.strs.size() != 1) er(err_one_input);
-		else transform_grammar(rp.p[n], pd.strs.begin()->first,
-			pd.strs.begin()->second.size());
-	}
+//		else transform_grammar(rp.p[n], pd.strs.begin()->first,
+//			pd.strs.begin()->second.size());
+//	}
 //	if (opts.enabled(L"sdt"))
 //		for (raw_prog& p : rp.p)
 //			p = transform_sdt(move(p));
@@ -252,7 +173,6 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));
-//	int_t tr = dict.get_rel(L"try");
 }
 
 void driver::init() {
@@ -271,11 +191,7 @@ void driver::init() {
 }
 
 driver::driver(raw_progs rp, options o) : opts(o) {
-//	: fget_new_rel(new function<int_t(void)>), opts(o) {
-//	DBG(wcout<<L"parsed args: "<<opts<<endl;)
-//	*fget_new_rel = [this](){ return dict.get_rel(get_new_rel()); };
 	strs_t strtrees;
-	if (opts.enabled(L"proof")) tbl->set_proof(true);
 	output_ast();
 	try {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
