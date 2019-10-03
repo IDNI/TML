@@ -79,18 +79,18 @@ target_include_directories(TMLo PUBLIC
 # shared library
 #################
 
-add_library(TML SHARED)
-add_library(TML::TML ALIAS TML)
-target_setup(TML)
-target_compile_options(TML     PRIVATE ${TML_COMPILE_OPTIONS})
-target_link_options(TML        PRIVATE ${TML_LINK_OPTIONS})
-target_link_libraries(TML      TMLo)
-target_include_directories(TML PUBLIC
+add_library(TMLso SHARED)
+add_library(TML::TMLso ALIAS TMLso)
+target_setup(TMLso)
+target_compile_options(TMLso     PRIVATE ${TML_COMPILE_OPTIONS})
+target_link_options(TMLso        PRIVATE ${TML_LINK_OPTIONS})
+target_link_libraries(TMLso      TMLo)
+target_include_directories(TMLso PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
 )
-set_target_properties(TML PROPERTIES
-	EXPORT_NAME TML
+set_target_properties(TMLso PROPERTIES
+	EXPORT_NAME TMLso
 	PUBLIC_HEADER "${TML_HEADERS}"
 )
 
@@ -99,6 +99,7 @@ set_target_properties(TML PROPERTIES
 #################
 
 add_library(TMLs STATIC)
+add_library(TML::TMLs ALIAS TMLs)
 target_setup(TMLs)
 target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLs        PRIVATE ${TML_LINK_OPTIONS})
@@ -128,7 +129,7 @@ target_setup(tml_shared)
 target_compile_options(tml_shared PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml_shared    PRIVATE ${TML_LINK_OPTIONS})
 target_sources(tml_shared         PRIVATE main.cpp)
-target_link_libraries(tml_shared  TML)
+target_link_libraries(tml_shared  TMLso)
 exclude(tml_shared)
 
 
@@ -136,7 +137,7 @@ exclude(tml_shared)
 ##########
 
 include(GNUInstallDirs)
-install(TARGETS tml TML TMLo
+install(TARGETS tml TMLso TMLo
 	EXPORT TML
 	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TML
