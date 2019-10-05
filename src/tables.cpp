@@ -107,8 +107,8 @@ void tables::range(size_t arg, size_t args, bdd_handles& v) {
 }
 
 spbdd_handle tables::range(size_t arg, ntable tab) {
-	array<int_t, 6> k = { syms, nums, chars, (int_t)tab, (int_t)arg,
-		(int_t)bits };
+	array<int_t, 6> k = { syms, nums, chars, (int_t)tbls[tab].len,
+		(int_t)arg, (int_t)bits };
 	auto it = range_memo.find(k);
 	if (it != range_memo.end()) return it->second;
 	bdd_handles v;
@@ -549,7 +549,8 @@ bool tables::cqc(const vector<term>& x, vector<term> y) const {
 	m.insert(x), freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.insert({y[n]});
 	tables t(false, false, true);
-	t.dict = dict, t.bcqc = false, t.run_nums(move(m), r, 1);
+	t.dict = dict, t.bcqc = false, t.chars = chars, t.nums = nums,
+	t.run_nums(move(m), r, 1);
 	//DBG(print(wcout, r) << endl;)
 	if (has(r, y[0]))
 		return //print(print(wcout, x) << L" is a generalization of ",yy),
@@ -579,7 +580,8 @@ ntable tables::prog_add_rule(flat_prog& p, vector<term> x) {
 	if (!bcqc || x.size() == 1) return p.emplace(x), x[0].tab;
 #define getbody(x) vector<term>((x).begin() + 1, (x).end())
 	for (const vector<term>& y : p)
-		if (bodies_equiv(getbody(x), getbody(y)))
+		if (y.size() > 1 && bodies_equiv(x, y))
+//		if (y.size() > 1 && bodies_equiv(getbody(x), getbody(y)))
 			if (x[0] == y[0]) return x[0].tab;
 	if (bcqc && has(tmprels, x[0][0])) {
 		for (const vector<term>& y : p)
@@ -738,12 +740,15 @@ void getvars(const vector<term>& t, set<int_t>& v) {
 }
 
 bool tables::bodies_equiv(vector<term> x, vector<term> y) const {
+	if (x[0].size() != y[0].size()) return false;
+	x[0].tab = y[0].tab;
 	set<int_t> vx, vy;
 	getvars(x, vx), getvars(y, vy);
 	term h;
-	h.insert(h.begin(), vx.begin(), vx.end()), h.tab = 0,
-	x.insert(x.begin(), move(h)), h.insert(h.begin(),
-	vy.begin(), vy.end()), h.tab = 0, y.insert(y.begin(), move(h));
+//	int_t r = get_new_tab(dict.get_rel(get_new_rel()),{(int_t)v.size()}));
+//	h.insert(h.begin(), vx.begin(), vx.end()), h.tab = x[0].tab,
+//	x.insert(x.begin(), move(h)), h.insert(h.begin(),
+//	vy.begin(), vy.end()), h.tab = x[0].tab, y.insert(y.begin(), move(h));
 	return cqc(x, y) && cqc(y, x);
 }
 
@@ -828,8 +833,7 @@ void tables::get_rules(flat_prog p) {
 	q = move(p);
 	for (const auto& x : q) prog_add_rule(p, x);
 	set_priorities(p);
-//	if (bcqc)
-		print(wcout<<L"after cqc, "<<p.size()<< L" rules."<<endl, p);
+	if (bcqc) print(wcout<<L"after cqc, "<<p.size()<< L" rules."<<endl, p);
 	if (optimize) bdd::gc();
 	map<term, set<set<term>>> m;
 	for (const auto& x : p)
@@ -853,8 +857,7 @@ void tables::get_rules(flat_prog p) {
 		r.len = t.size();
 		for (const set<term>& al : x.second) {
 			alt a;
-			if (get_alt(al, t, a))
-				as.insert(move(a));
+			if (get_alt(al, t, a)) as.insert(move(a));
 		}
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
@@ -1073,6 +1076,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 }
 
 void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
+	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (mknums) to_nums(m);
 	rules.clear(), datalog = true;
 	syms = dict.nsyms();
@@ -1084,7 +1088,6 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 //	output::to(L"debug")<<"load_string: ";
 //	measure_time_start();
 //	measure_time_end();
-	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (optimize) bdd::gc();
 }
 

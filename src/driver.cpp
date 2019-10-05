@@ -125,7 +125,7 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 //			transform_string(x.second, rp.p[n], x.first),
 //			transformed_strings.insert(x.first);
 	if (!rp.p[n].g.empty()) //{
-		if (pd.strs.size() != 1) er(err_one_input);
+		if (pd.strs.size() > 1) er(err_one_input);
 //		else transform_grammar(rp.p[n], pd.strs.begin()->first,
 //			pd.strs.begin()->second.size());
 //	}
