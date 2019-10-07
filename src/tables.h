@@ -274,7 +274,8 @@ private:
 	bool cqc(const std::vector<term>&, const flat_prog& m) const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	void cqc_minimize(std::vector<term>&) const;
-	ntable prog_add_rule(flat_prog& p, std::vector<term> x);
+	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
+		std::vector<term> x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;

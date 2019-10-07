@@ -18,7 +18,7 @@ using namespace std;
 vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 	const {
 	vector<env> r;
-	decompress(v, 0, [this, a, &r](const term& x) {
+	decompress(v, 0, [a, &r](const term& x) {
 		env m;
 		for (auto z : a->inv)
 			if (!m.emplace(z.second, x[z.first]).second)

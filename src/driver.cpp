@@ -107,7 +107,7 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 			if (e.type == elem::VAR)
 				vars.insert(e.e);
 	};
-	auto get_all_vars = [this, get_vars](const raw_prog& p) {
+	auto get_all_vars = [get_vars](const raw_prog& p) {
 		for (const raw_rule& r : p.r) {
 			for (const raw_term& t : r.h) get_vars(t);
 			for (const vector<raw_term>& b : r.b)

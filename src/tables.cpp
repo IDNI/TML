@@ -531,29 +531,49 @@ void freeze(vector<term>& v) {
 			else p.emplace(i, mknum(m)), i = mknum(m++);
 }
 
-bool tables::cqc(const vector<term>& x, vector<term> y) const {
-	const vector<term> yy = y;
+enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
+
+cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
+	if (x.size() == 1 || y.size() == 1) return NONE;
 	set<ntable> tx, ty;
-	for (const term& t : x)
-		if(t.neg) return false;
-		//throw "cqc not supported yet for terms with negation";
-		else tx.insert(t.tab);
-	for (const term& t : y)
-		if(t.neg) return false;
-		//throw "cqc not supported yet for terms with negation";
-		else ty.insert(t.tab);
-	if (tx.size() < ty.size()) return false;
-	for (ntable n : tx) if (!has(ty, n)) return false;
-	set<term> r;
-	flat_prog m;
-	m.insert(x), freeze(y);
+	for (size_t n = 1; n != x.size(); ++n) 
+		if (x[n].neg) return NONE; else tx.insert(x[n].tab); 
+	for (size_t n = 1; n != y.size(); ++n) 
+		if (y[n].neg) return NONE; else ty.insert(y[n].tab);
+	bool maybe_contained, maybe_contains;
+	if ((maybe_contained = tx.size() < ty.size()))
+		for (ntable n : tx)
+			if (!has(ty, n)) { maybe_contained = false; break; }
+	if ((maybe_contains = tx.size() > ty.size()))
+		for (ntable n : ty)
+			if (!has(tx, n))
+				return maybe_contained ? CONTAINED : NONE;
+	return maybe_contained ? BOTH : CONTAINS;
+}
+
+flat_prog tables::cqc(vector<term> x, vector<term> y) const {
+	const vector<term> yy = y;
+	switch (maybe_contains(x, y)) {
+		case NONE: return { x, y };
+		case BOTH:
+		case CONTAINS:
+		case CONTAINED:
+	}
+
+	if (x[0].tab == y[0].tab) {
+		assert(!has(tmprels, x[0].tab) || !has(tmprels, y[0].tab));
+
+	}
+	flat_prog m = { x };
+	freeze(y);
 	for (size_t n = 1; n != y.size(); ++n) m.insert({y[n]});
 	tables t(false, false, true);
-	t.dict = dict, t.bcqc = false, t.chars = chars, t.nums = nums,
-	t.run_nums(move(m), r, 1);
+	t.dict = dict, t.bcqc = false, t.chars = chars, t.nums = nums;
+	set<term> r;
+	if (!t.run_nums(move(m), r, 1)) throw 0;
 	//DBG(print(wcout, r) << endl;)
 	if (has(r, y[0]))
-		return //print(print(wcout, x) << L" is a generalization of ",yy),
+		return print(print(wcout, x) << L" is a generalization of ",yy),
 		       true;
 	return false;
 }
@@ -576,14 +596,29 @@ void tables::cqc_minimize(vector<term>& v) const {
 		, v1)<<endl;)
 }
 
-ntable tables::prog_add_rule(flat_prog& p, vector<term> x) {
+void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
+	auto it = m.end();
+	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
+}
+
+void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
+	flat_prog q(move(p));
+	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
+}
+
+ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>& r,
+	vector<term> x) {
 	if (!bcqc || x.size() == 1) return p.emplace(x), x[0].tab;
-#define getbody(x) vector<term>((x).begin() + 1, (x).end())
+//#define getbody(x) vector<term>((x).begin() + 1, (x).end())
 	for (const vector<term>& y : p)
-		if (y.size() > 1 && bodies_equiv(x, y))
-//		if (y.size() > 1 && bodies_equiv(getbody(x), getbody(y)))
-			if (x[0] == y[0]) return x[0].tab;
-	if (bcqc && has(tmprels, x[0][0])) {
+		if (x == y || y.size() == 1) continue;
+		else if (bodies_equiv(x, y)) {
+			if (has(tmprels, x[0].tab) && has(tmprels, y[0].tab)) {
+
+			}
+			return y[0].tab;
+		}
+	if (has(tmprels, x[0][0])) {
 		for (const vector<term>& y : p)
 			if (has(tmprels, y[0].tab) && cqc(x, y) && cqc(y, x))
 				return (tbls[x[0].tab].priority >
@@ -594,7 +629,7 @@ ntable tables::prog_add_rule(flat_prog& p, vector<term> x) {
 	if (!cqc(x, p)) p.emplace(x);
 	return x[0].tab;
 }
-#undef getbody
+//#undef getbody
 
 wostream& tables::print(wostream& os, const vector<term>& v) const {
 	os << to_raw_term(v[0]);
@@ -739,17 +774,22 @@ void getvars(const vector<term>& t, set<int_t>& v) {
 	for (const term& x : t) getvars(x, v);
 }
 
-bool tables::bodies_equiv(vector<term> x, vector<term> y) const {
-	if (x[0].size() != y[0].size()) return false;
-	x[0].tab = y[0].tab;
-	set<int_t> vx, vy;
-	getvars(x, vx), getvars(y, vy);
+void create_head(vector<term>& x, ntable tab) {
+	set<int_t> v;
+	getvars(x, v);
 	term h;
-//	int_t r = get_new_tab(dict.get_rel(get_new_rel()),{(int_t)v.size()}));
-//	h.insert(h.begin(), vx.begin(), vx.end()), h.tab = x[0].tab,
-//	x.insert(x.begin(), move(h)), h.insert(h.begin(),
-//	vy.begin(), vy.end()), h.tab = x[0].tab, y.insert(y.begin(), move(h));
-	return cqc(x, y) && cqc(y, x);
+	h.tab = tab, h.insert(h.begin(), vx.begin(), vx.end());
+	x.insert(x.begin(), move(h));
+}
+
+set<term> tables::bodies_equiv(vector<term> x, vector<term> y) const {
+//	if (x[0].size() != y[0].size()) return false;
+	x[0].tab = y[0].tab;
+	x.erase(x.begin()), y.erase(y.begin()),
+	create_head(x, x[0].tab), create_head(y, y[0].tab);
+	if (cqc(x, y)) {
+		if (cqc(y, x)) return true;
+	}
 }
 
 vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
@@ -773,7 +813,7 @@ set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
 void tables::transform_bin(flat_prog& p) {
 	const flat_prog q = move(p);
 	vector<set<int_t>> vars;
-	auto getterms = [this, &vars]
+	auto getterms = [&vars]
 		(const vector<term>& x) -> vector<size_t> {
 		if (x.size() <= 3) return {};
 /*		vector<size_t> e;
@@ -824,15 +864,19 @@ void tables::get_rules(flat_prog p) {
 	alt* aa;
 	if (bcqc) print(wcout<<L"before cqc, "<<p.size()<< L" rules:"<<endl, p);
 	flat_prog q(move(p));
-	for (const auto& x : q) prog_add_rule(p, x);
-	if (bcqc) print(wcout<<L"after cqc before tbin, "<<p.size()<< L" rules."<<endl, p);
+	map<ntable, ntable> r;
+	for (const auto& x : q) prog_add_rule(p, r, x);
+	replace_rel(move(r), p);
+	if (bcqc) print(wcout<<L"after cqc before tbin, "<<p.size()<< L" rules."
+		<<endl, p);
 #ifndef TRANSFORM_BIN_DRIVER
 	if (bin_transform) transform_bin(p);
 #endif
-	if (bcqc) print(wcout<<L"before cqc after tbin, "<<p.size()<< L" rules."<<endl, p);
+	if (bcqc) print(wcout<<L"before cqc after tbin, "<<p.size()<< L" rules."
+		<<endl, p);
 	q = move(p);
-	for (const auto& x : q) prog_add_rule(p, x);
-	set_priorities(p);
+	for (const auto& x : q) prog_add_rule(p, r, x);
+	replace_rel(move(r), p), set_priorities(p);
 	if (bcqc) print(wcout<<L"after cqc, "<<p.size()<< L" rules."<<endl, p);
 	if (optimize) bdd::gc();
 	map<term, set<set<term>>> m;
@@ -841,18 +885,25 @@ void tables::get_rules(flat_prog p) {
 		else m[x[0]].insert(set<term>(x.begin() + 1, x.end()));
 	for (pair<term, set<set<term>>> x : m) {
 		if (x.second.empty()) continue;
-		varmap v;
 		set<int_t> hvars;
 		const term &t = x.first;
 		rule r;
 		if (t.neg) datalog = false;
 		tbls[t.tab].ext = false;
+		varmap v;
 		r.neg = t.neg, r.tab = t.tab, r.eq = bdd_handle::T, r.t = t;
+/*	for (size_t n = 0, args = t.size(); n != args; ++n)
+		if (t[n] >= 0) r = r && from_sym(n, args, t[n]);
+		else if (vs.end() != (it = vs.find(t[n])))
+			r = r && from_sym_eq(n, it->second, args);
+		else if (vs.emplace(t[n], n), !t.neg)
+			r = r && range(n, t.tab);*/
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
-			else if (v.end() == (it = v.find(t[n])))
-				v.emplace(t[n], n);
+			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
+
+//		r.neg = t.neg, r.tab = t.tab, r.eq = from_fact(r.t = t);
 		set<alt> as;
 		r.len = t.size();
 		for (const set<term>& al : x.second) {
@@ -1034,7 +1085,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 		dict.get_sym(dict.get_lexeme(L"digit")),
 		dict.get_sym(dict.get_lexeme(L"printable"));
 	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
-	add_prog(move(to_terms(p)), p.g);
+	add_prog(to_terms(p), p.g);
 }
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
