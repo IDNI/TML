@@ -24,7 +24,6 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
-#include "ast.h"
 
 #ifdef __EMSCRIPTEN__
 #include "../js/embindings.h"
@@ -148,14 +147,6 @@ void driver::output_pl(const raw_prog& p) const {
 	if (opts.enabled(L"souffle")) print_souffle(output::to(L"souffle"), p);
 }
 
-void driver::output_ast() const {
-	if (opts.enabled(L"ast"))      print_ast     (output::to(L"ast"));
-	if (opts.enabled(L"ast-json")) print_ast_json(output::to(L"ast-json"));
-	if (opts.enabled(L"ast-xml"))  print_ast_xml (output::to(L"ast-xml"));
-	if (opts.enabled(L"ast-html")) print_ast_html(output::to(L"ast-html"));
-	ast::clear();
-}
-
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	pd.clear();
 	//DBG(wcout << L"original program:"<<endl<<p;)
@@ -184,15 +175,10 @@ void driver::init() {
 	output::create(L"xsb",         L".P");
 	output::create(L"swipl",       L".pl");
 	output::create(L"souffle",     L".souffle");
-	output::create(L"ast",         L".ast.tml");
-	output::create(L"ast-json",    L".ast.json");
-	output::create(L"ast-xml",     L".ast.xml");
-	output::create(L"ast-html",    L".ast.html");
 }
 
 driver::driver(raw_progs rp, options o) : opts(o) {
 	strs_t strtrees;
-	output_ast();
 	try {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);

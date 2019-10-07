@@ -17,17 +17,10 @@
 #include <vector>
 #include "input.h"
 #include "err.h"
-#include "ast.h"
 #include "output.h"
 using namespace std;
 
-// AST node adding helpers
-#define an_tof(type, offset, from) ast::add(type, \
-		cws_range({ l[from][0], l[pos+(offset)][1] }))
-#define an_of(type, offset, from) an_tof(ast::type, offset, from)
-#define an_o(type, offset) an_of(type, offset, curr)
-#define an_t(type) an_tof((ast::type) type, -1, curr)
-#define an(type) an_o(type, -1)
+cws_range input::source{0,0};
 
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
@@ -92,9 +85,9 @@ lexeme lex(pcws s) {
 lexemes prog_lex(cws s) {
 	lexeme l;
 	lexemes r;
-	ast::source[0] = s;
+	input::source[0] = s;
 	do { if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l); } while (*s);
-	ast::source[1] = s;
+	input::source[1] = s;
 	return r;
 }
 
@@ -111,23 +104,19 @@ int_t get_int_t(cws from, cws to) {
 }
 
 bool directive::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos;
 	if (*l[pos][0] != '@') return false;
-	an_o(DIRNAME, 1);
 	if (l[++pos] == L"trace") {
 		type = TRACE;
 		if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 			parse_error(l[pos-1][0], err_trace_rel, l[pos-1]);
 		if (*l[pos++][0] != '.')
 			parse_error(l[pos-1][0], dot_expected, l[pos-1]);
-		an(DIR);
 		return true;
 	}
 	if (l[pos] == L"bwd") {
 		type = BWD;
 		if (*l[++pos][0] != '.')
 			parse_error(l[pos][0], dot_expected, l[pos]);
-		an(DIR);
 		return ++pos, true;
 	}
 	if (l[pos] == L"stdout") {
@@ -136,7 +125,6 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 			parse_error(l[pos][0], err_stdout, l[pos]);
 		if (*l[pos++][0] != '.')
 			parse_error(l[pos-1][0], dot_expected, l[pos-1]);
-		an(DIR);
 		return true;
 	}
 	if (!(l[pos] == L"string"))
@@ -153,42 +141,38 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		type = TREE;
 		if (*l[pos++][0]!='.')
 			parse_error(l[pos][0], dot_expected, l[pos]);
-		an(DIR);
 		return true;
 	} else parse_error(l[pos][0], err_directive_arg, l[pos]);
-	if (an_of(STR, -1, curr2), *l[pos++][0]!='.')
+	if (*l[pos++][0]!='.')
 		parse_error(l[curr2][1], dot_expected, l[curr2]);
-	an_of(DOT, -1, pos-1);
-	an(DIR);
 	return true;
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos;
-	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   an_t(type),true;
-	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, an_t(type),true;
-	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,an_t(type),true;
+	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
+	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
+	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
 	// NEQ: should we check for any limits here?
 	if (L'!' == l[pos][0][0] &&
 		L'=' == l[pos][0][1]) {
-		return e = l[pos++], type = NEQ, an_t(type), true;
+		return e = l[pos++], type = NEQ, true;
 	}
 	// LEQ: recheck if '<' is going to make any issues (order is important)
 	if (L'<' == l[pos][0][0] &&
 		L'=' == l[pos][0][1]) {
-		return e = l[pos++], type = LEQ, an_t(type), true;
+		return e = l[pos++], type = LEQ, true;
 	}
 	if (L'>' == l[pos][0][0]) {
-		return e = l[pos++], type = GT, an_t(type), true;
+		return e = l[pos++], type = GT, true;
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
 	if (L'=' == l[pos][0][0]) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
-		return e = l[pos++], type = EQ, an_t(type), true;
+		return e = l[pos++], type = EQ, true;
 	}
 	//if (L'=' == l[pos][0][0] &&
 	//	L'=' == l[pos][0][1]) {
-	//	return e = l[pos++], type = EQ, an_t(type), true;
+	//	return e = l[pos++], type = EQ, true;
 	//}
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
@@ -206,19 +190,18 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	else if (iswalpha(*l[pos][0])) type = SYM;
 	else if (*l[pos][0] == L'"') type = STR;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
-	return ++pos, an_t(type), true;
+	return ++pos, true;
 }
 
 bool raw_term::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos, curr2;
+	size_t curr = pos;
 	lexeme s = l[pos];
-	if ((neg = *l[pos][0] == L'~')) an_o(NOT, 0), ++pos;
-	curr2 = pos; 
+	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
-			parse_error(ast::source[1], err_eof, s[0]);
+			parse_error(input::source[1], err_eof, s[0]);
 		switch (e.back().type) {
 			case elem::EQ: eq = true; break;
 			case elem::NEQ: noteq = true; break;
@@ -226,7 +209,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 			case elem::GT: gt = true; break;
 			default: break;
 		}
-		if (!rel) an_of(REL, -1, curr2), rel = true;
+		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
@@ -239,7 +222,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
 		iseq = true;
-		return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
+		return calc_arity(), true;
 	}
 	if (leq || gt) {
 		if (e.size() < 3)
@@ -249,17 +232,16 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		if (gt) neg = !neg;
 		isleq = true;
-		return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
+		return calc_arity(), true;
 	}
 	if (e[0].type != elem::SYM)
 		parse_error(l[curr][0], err_relsym_expected, l[curr]);
-	if (e.size() == 1) return an(TERM), (neg ? an(NEG) : an(POS)),
-		calc_arity(), true;
+	if (e.size() == 1) return calc_arity(), true;
 	if (e[1].type != elem::OPENP)
 		parse_error(l[pos][0], err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP)
 		parse_error(e.back().e[0], err_paren, l[pos]);
-	return an(TERM), (neg ? an(NEG) : an(POS)), calc_arity(), true;
+	return calc_arity(), true;
 }
 
 void raw_term::insert_parens(lexeme op, lexeme cl) {
@@ -290,35 +272,24 @@ void raw_term::calc_arity() {
 }
 
 bool raw_rule::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos, curr2;
+	size_t curr = pos;
 	if (*l[pos][0] == L'!') {
 		if (*l[++pos][0] == L'!') ++pos, type = TREE;
 		else type = GOAL;
 	}
 head:	h.emplace_back();
 	if (!h.back().parse(l, pos)) return pos = curr, false;
-	if (*l[pos][0] == '.') {
-		an(HEAD); an_of(DOT, 0, pos); ++pos;
-		switch (type) {
-			case TREE: an(TREE); break;
-			case GOAL: an(GOAL); break;
-			default: an(FACT);
-		}
-		return true;
-	}
-	if (*l[pos][0] == ',') { an_o(AND, 0); ++pos; goto head; }
-	an(HEAD);
+	if (*l[pos][0] == '.') return ++pos, true;
+	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(l[pos][0], err_head, l[pos]);
-	an_of(DELIM, 0, pos); curr2 = ++pos; b.emplace_back();
+	++pos; b.emplace_back();
 	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
-		if (*l[pos][0] == '.') return an_of(DOT, 0, pos),
-			an_of(BODY, -1, curr2), ++pos, an(RULE), true;
-		else if (*l[pos][0] == L';') an_of(OR, 0, pos),b.emplace_back();
+		if (*l[pos][0] == '.') return ++pos, true;
+		else if (*l[pos][0] == L';') b.emplace_back();
 		else if (*l[pos][0] != ',')
 			parse_error(l[pos][0], err_term_or_dot,l[pos]);
-		else an_of(AND, 0, pos);
 	}
 	parse_error(l[pos][0], err_body, l[pos]);
 	return false;
@@ -336,12 +307,11 @@ bool production::parse(const lexemes& l, size_t& pos) {
 		return true;
 	}*/
 	if (*l[pos++][0] != '=' || l[pos++][0][0] != L'>') goto fail;
-	an_of(DELIM, -1, pos-2);
 	curr2 = pos;
 	for (p.push_back(e);;) {
 		elem e;
 		if (pos == l.size()) break;
-		if (*l[pos][0] == '.') return ++pos, an(PROD), true;
+		if (*l[pos][0] == '.') return ++pos, true;
 		if (!e.parse(l, pos)) goto fail;
 		p.push_back(e);
 	}
@@ -350,7 +320,6 @@ fail:	return pos = curr, false;
 }
 
 bool raw_prog::parse(const lexemes& l, size_t& pos) {
-	size_t curr = pos;;
 	while (pos < l.size() && *l[pos][0] != L'}') {
 		directive x;
 		raw_rule y;
@@ -360,14 +329,12 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
-	an(PROG);
 	return true;
 }
 
 raw_progs::raw_progs(FILE* f) : raw_progs(file_read_text(f)) {}
 
 raw_progs::raw_progs(const std::wstring& s) {
-	ast::clear();
 	try {
 		size_t pos = 0;
 		lexemes l = prog_lex(wcsdup(s.c_str()));
@@ -379,16 +346,13 @@ raw_progs::raw_progs(const std::wstring& s) {
 					err_rule_dir_prod_expected, l[pos]);
 			p.push_back(x);
 		} else do {
-			an_of(OPENC, 0, pos);
 			raw_prog x;
 			if (++pos, !x.parse(l, pos))
 				parse_error(l[pos][0], err_parse, l[pos]);
 			if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
 				parse_error(l[pos-1][1],
 					err_close_curly, l[pos-1]);
-			an_of(CLOSEC, -1, pos-1);
 		} while (pos < l.size());
-		an_of(PROGS, -1, 0);
 	} catch (std::exception &e) {
 		output::to(L"error") << s2ws(e.what()) << std::endl;
 	}
@@ -521,15 +485,9 @@ void parse_error(cws o, std::wstring e, cws s) {
 	cws p = s;
 	while (p && *p && *p != L'\n') ++p;
 	if (o != 0) {
-		long l, ch; count_pos(ast::source[0], o, l, ch);
+		long l, ch; count_pos(input::source[0], o, l, ch);
 		msg << L" at " << l << L':' << ch;
 	}
 	if (s) msg << L" close to \"" << std::wstring(s, p-s) << L'"';
 	throw parse_error_exception(ws2s(msg.str()));
 }
-
-#undef an
-#undef an_t
-#undef an_o
-#undef an_of
-#undef an_tof

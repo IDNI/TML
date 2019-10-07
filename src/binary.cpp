@@ -10,10 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include <iostream>
 #include "driver.h"
-#include "ast.h"
-#include "defs.h"
 
 using namespace std;
 
@@ -115,7 +112,7 @@ ostream& operator<<(ostream& os, const driver& d) {
 	if (!d.tbl) for (size_t i = 0; i != 4; ++i) write_int(os, 0);
 	else os << *d.tbl;
 	write_bdd(os);
-	return os << ast::source;
+	return os << input::source;
 }
 
 
