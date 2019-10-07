@@ -10,17 +10,25 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __INPUT_H__
+#define __INPUT_H__
+
 #include "defs.h"
 #include <vector>
 #include <array>
 #include <iostream>
 #include <sys/stat.h>
 
+namespace input {
+	extern cws_range source;
+}
+
 bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
-	enum etype { 
-        SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT } type;
+	enum etype {
+		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT
+	} type;
 	int_t num = 0;
 	lexeme e;
 	wchar_t ch;
@@ -57,9 +65,9 @@ struct raw_term {
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
-        return neg == t.neg && e == t.e && arity == t.arity && 
-            iseq == t.iseq && isleq == t.isleq;
-        //return neg == t.neg && e == t.e && arity == t.arity;
+		return neg == t.neg && e == t.e && arity == t.arity &&
+			iseq == t.iseq && isleq == t.isleq;
+		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
 
@@ -151,3 +159,5 @@ void parser_test();
 struct parse_error_exception : public virtual std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
+
+#endif

@@ -18,35 +18,6 @@
 			border: 4px solid darkolivegreen;
 		}
 
-		/* default color as a fallback for not highlighted text
-		 * which is basically a color for comments (+ nonprintable ws)
-		 */
-		#highlighted          { color: darkolivegreen; }
-
-		.open_curly,
-		.close_curly,
-		.dot,
-		.alt,
-		.and,
-		.or,
-		.delimiter,
-		.open_paren,
-		.close_paren,
-		.directive .symbol    { color: peru; }
-
-		.char,
-		.string               { color: powderblue; }
-
-		.directive,
-		.fact                 { color: cornflowerblue }
-
-		.fact .head .negative,
-		.rule .head .negative { color: crimson; }
-		.body                 { color: burlywood; }
-		.production           { color: gold; }
-		.rule .head .positive { color: greenyellow; }
-		.variable             { text-decoration: underline; }
-
 	</style>
 </head>
 
@@ -74,9 +45,6 @@
 	~e(?x ?y) :- e(?x ?y).
 }
 </pre>
-	<h2>highlighted program (css styled --ast-html)</h2>
-	<pre id="highlighted"></pre>
-
 	<h2>--output, --o [TARGET=@stdout]</h2>
 	<pre id="output"></pre>
 
@@ -91,18 +59,6 @@
 
 	<h2>--souffle [TARGET=@null]</h2>
 	<pre id="souffle"></pre>
-
-	<h2>--ast, --at [TARGET=@null]</h2>
-	<pre id="ast"></pre>
-
-	<h2>--ast-json, --aj [TARGET=@null]</h2>
-	<pre id="ast-json"></pre>
-
-	<h2>--ast-xml, --ax [TARGET=@null]</h2>
-	<pre id="ast-xml"></pre>
-
-	<h2>--ast-html, --ah [TARGET=@null]</h2>
-	<pre id="ast-html"></pre>
 
 	<h2>TARGET</h2>
 	can be optionally path to a file or one of:
@@ -123,8 +79,7 @@ const program = document.getElementById("program").innerText;
 
 // names of TML output streams
 const stream_names = [
-	"output", "transformed", "xsb", "swipl", "souffle",
-	"ast", "ast-json", "ast-xml", "ast-html"
+	"output", "transformed", "xsb", "swipl", "souffle"
 ];
 
 // create args array and add argfor each stream to buffer data
@@ -165,10 +120,6 @@ tml.onRuntimeInitialized = _ => {
 		// put the data into buffer's HTML element
 		document.getElementById(n).innerText = data;
 	}
-
-	// copy ast-html content into highlighted frame as HTML
-	document.getElementById('highlighted')
-		.innerHTML = document.getElementById("ast-html").innerText;
 
 	// delete created objects
 	d.delete(); o.delete(); arg_strings.delete();

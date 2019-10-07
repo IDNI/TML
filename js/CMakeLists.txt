@@ -11,8 +11,6 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(tml-common)
 
 set(JSLIB_SOURCES
-	../src/ast.cpp
-	../src/ast.h
 	../src/bdd.cpp
 	../src/bdd.h
 	../src/binary.cpp

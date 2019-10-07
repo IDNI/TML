@@ -16,7 +16,6 @@ include(tml-common)
 
 set(TML_HEADERS
 	TML.h
-	ast.h
 	bdd.h
 	defs.h
 	dict.h
@@ -30,7 +29,6 @@ set(TML_HEADERS
 
 set(TML_SOURCES
 	proof.cpp
-	ast.cpp
 	bdd.cpp
 	binary.cpp
 	dict.cpp
