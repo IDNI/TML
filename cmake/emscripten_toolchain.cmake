@@ -1,7 +1,3 @@
-set(EMSCRIPTEN_DIR $ENV{EMSDK}/fastcomp/emscripten)
-if (NOT EXISTS EMSCRIPTEN_DIR)
-	set(EMSCRIPTEN_DIR "/usr/lib/emscripten")
-endif()
 set(EMSCRIPTEN_CMAKE "${EMSCRIPTEN_DIR}/cmake/Modules/Platform/Emscripten.cmake")
 
 # checks if emscripten toolchain file is available
@@ -19,6 +15,7 @@ function(set_emscripten_toolchain)
 	if (NOT ${EMSCRIPTEN_TOOLCHAIN_AVAILABLE})
 		message(SEND_ERROR "emscripten not found in ${EMSCRIPTEN_DIR}. Use -DEMSCRIPTEN_DIR=<emscripten_install_directory>.")
 	else()
+		set(EMSCRIPTEN_ROOT_PATH "${EMSCRIPTEN_DIR}")
 		set(CMAKE_TOOLCHAIN_FILE
 			"${EMSCRIPTEN_DIR}/cmake/Modules/Platform/Emscripten.cmake"
 			PARENT_SCOPE)
