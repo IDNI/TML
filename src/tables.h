@@ -30,7 +30,6 @@ typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
-//typedef std::map<term, std::set<std::set<term>>> flat_prog;
 typedef std::set<std::vector<term>> flat_prog;
 
 std::wostream& operator<<(std::wostream& os, const env& e);
@@ -61,7 +60,7 @@ struct body {
 };
 
 struct alt : public std::vector<body*> {
-	spbdd_handle rng=bdd_handle::T, eq=bdd_handle::T, rlast=bdd_handle::F;
+	spbdd_handle rng = htrue, eq = htrue, rlast = hfalse;
 	size_t varslen;
 	bdd_handles last;
 	std::vector<term> t;
@@ -82,7 +81,7 @@ struct alt : public std::vector<body*> {
 struct rule : public std::vector<alt*> {
 	bool neg;
 	ntable tab;
-	spbdd_handle eq, rlast = bdd_handle::F, h;
+	spbdd_handle eq, rlast = hfalse, h;
 	size_t len;
 	bdd_handles last;
 	term t;
@@ -103,7 +102,7 @@ struct rule : public std::vector<alt*> {
 struct table {
 	sig s;
 	size_t len, priority = 0;
-	spbdd_handle t = bdd_handle::F;
+	spbdd_handle t = hfalse;
 	bdd_handles add, del;
 	std::vector<size_t> r;
 	bool ext = true; // extensional
@@ -135,7 +134,7 @@ private:
 
 	struct proof_elem {
 		size_t rl, al;
-		std::vector<std::pair<size_t, term>> b;
+		std::vector<std::pair<nlevel, term>> b;
 		bool operator<(const proof_elem& t) const {
 			if (rl != t.rl) return rl < t.rl;
 			if (al != t.al) return al < t.al;
@@ -154,7 +153,7 @@ private:
 		const std::set<term>& b) const;
 	std::wostream& print(std::wostream& os, const flat_prog& p) const;
 
-	size_t nstep = 0;
+	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
@@ -162,7 +161,8 @@ private:
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
 	alt get_alt(const std::vector<raw_term>&);
-	bool get_alt(const std::set<term>& al, const term& h, alt&);
+	void get_alt(const std::set<term>& al, const term& h, std::set<alt>&as);
+//	bool get_alt(const std::set<term>& al, const term& h, alt&);
 	rule get_rule(const raw_rule&);
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
@@ -226,7 +226,7 @@ private:
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-	void align_vars(std::vector<term>& b) const;
+//	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
@@ -243,7 +243,10 @@ private:
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
 	std::set<witness> get_witnesses(const term& t, size_t l);
-	size_t get_proof(const term& q, proof& p, size_t level);
+	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
+	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
+	ntable create_tmp_rel(size_t len);
+	void create_tmp_head(std::vector<term>& x);
 	void get_goals();
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
@@ -271,6 +274,7 @@ private:
 	void transform_bin(flat_prog& p);
 	void transform_grammar(std::vector<struct production> g, flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
+//	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
 	bool cqc(const std::vector<term>&, const flat_prog& m) const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	void cqc_minimize(std::vector<term>&) const;

@@ -41,6 +41,7 @@ typedef std::map<lexeme, std::wstring, lexcmp> strs_t;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef int_t ntable;
+typedef size_t nlevel;
 //typedef std::vector<size_t> sizes;
 
 //#define DEEPDEBUG
@@ -64,6 +65,8 @@ typedef int_t ntable;
 #define measure_time(x) measure_time_start(); x; measure_time_end()
 #define elem_openp elem(elem::OPENP, get_lexeme(L"("))
 #define elem_closep elem(elem::CLOSEP, get_lexeme(L")"))
+#define htrue bdd_handle::T
+#define hfalse bdd_handle::F
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);

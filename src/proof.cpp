@@ -57,12 +57,9 @@ void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 	spbdd_handle h = from_fact(t), x;
 	if (!level) f(-1, 0, -1, {t});
 	if (level > 1) {
-		if (t.neg) {
-			if ((bdd_handle::F == levels[level-1][t.tab] && h) ||
-				(bdd_handle::F != levels[level][t.tab] && h))
-				return;
-		} else if ((bdd_handle::F != levels[level-1][t.tab] && h) ||
-			(bdd_handle::F == levels[level][t.tab] && h)) return;
+		spbdd_handle	x = levels[level-1][t.tab] && h,
+				y = levels[level][t.tab] && h;
+		if (t.neg?(hfalse==x||hfalse!=y):(hfalse!=x||hfalse==y)) return;
 	}
 	for (size_t r : tbls[t.tab].r)
 		if (rules[r].neg == t.neg)
@@ -76,10 +73,52 @@ set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
 	return r;
 }
 
-size_t tables::get_proof(const term& q, proof& p, size_t level) {
+/*void tables::explain(proof_elem& e) const {
+	for (size_t n = 0; n != e.b.size(); ++n)
+		if (e.b[n].first == -1) {
+		}
+}
+
+const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	set<witness> s;
 	proof_elem e;
 	if (!level) return 0;
+	if (auto it = p[level].find(q); it != p.end()) {
+		set<proof_elem> x
+		
+		for (const proof_elem& e : it->second) {
+			for (const auto& b : e.b) if (b.first == -1) x.insert(e);
+			if (x.empty()) continue;
+			for (const proof_elem& e : x) it->second.erase(e);
+		}
+		return it->second;
+	}
+	while ((s = get_witnesses(q, level)).empty()) if (!level--) return 0;
+	bool f;
+	for (const witness& w : s) {
+//		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
+		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
+		for (const term& t : w.b) {
+			f = false;
+			for (size_t n = level; n--;)
+				if (p[n].find(t) != p[n].end()) {
+					f = true;
+					e.b.emplace_back(n, t);
+					break;
+				}
+			if (f) continue;
+			e.b.emplace_back(level?get_proof(t,p,level-1,2):0, t);
+		}
+		p[level][q].insert(e);
+	}
+	return p[level][q];
+}*/
+
+size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
+	set<witness> s;
+	proof_elem e;
+	if (!level) return 0;
+	if (!--dep) return -1;
 //	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
 //	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
@@ -98,7 +137,7 @@ size_t tables::get_proof(const term& q, proof& p, size_t level) {
 					break;
 				}
 			if (f) continue;
-			e.b.emplace_back(level ? get_proof(t,p,level-1) : 0, t);
+			e.b.emplace_back(level?get_proof(t,p,level-1,dep):0, t);
 		}
 		p[level][q].insert(e);
 	}

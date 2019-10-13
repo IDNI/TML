@@ -46,7 +46,7 @@ map<bools, unordered_map<bdds, int_t>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, int_t>, vec2cmp<bool, uint_t>> AMXP;
 unordered_set<int_t> S;
 unordered_map<int_t, weak_ptr<bdd_handle>> bdd_handle::M;
-spbdd_handle bdd_handle::T, bdd_handle::F;
+spbdd_handle htrue, hfalse;
 map<bools, unordered_map<int_t, int_t>, veccmp<bool>> memos_ex;
 map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
 map<pair<uints, bools>, unordered_map<int_t, int_t>, vec2cmp<uint_t, bool>>
@@ -65,7 +65,7 @@ void bdd::init() {
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
-	bdd_handle::T = bdd_handle::get(T), bdd_handle::F = bdd_handle::get(F);
+	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
