@@ -17,6 +17,7 @@
 using namespace std;
 
 #define MEMO
+bool onexit = false;
 
 template<typename T> struct veccmp {
 	bool operator()(const vector<T>& x, const vector<T>& y) const{
