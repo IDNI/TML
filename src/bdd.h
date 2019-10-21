@@ -27,6 +27,8 @@
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
 
+extern bool onexit;
+
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
@@ -216,6 +218,7 @@ public:
 	static spbdd_handle get(int_t b);
 	static spbdd_handle T, F;
 	~bdd_handle() {
+		if (onexit) return;
 		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
 		if (abs(b) > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
 	}
