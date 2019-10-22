@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 		if (argc == 1) args = { "-v", "-h" };
 		driver d(L"", options(args));
 	}
-//	onexit = true;
+	onexit = true;
 //	print_memos_len();
 	return 0;
 }
