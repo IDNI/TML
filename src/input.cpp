@@ -46,8 +46,8 @@ lexeme lex(pcws s) {
 	if (**s == L'<' && *(*s + 1) == L'=') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
-	if (**s == L'>') return ++ * s, lexeme{ *s - 1, *s };
-	if (**s == L'<') {
+	if (**s == L'>' && !(*(*s + 1) == L'>')) return ++ * s, lexeme{ *s - 1, *s };
+	if (**s == L'<' && !(*(*s + 1) == L'<')) {
 		while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		return { t, ++(*s) };
 	}
@@ -75,6 +75,18 @@ lexeme lex(pcws s) {
 	//if (**s == L'=' && *(*s + 1) == L'=') {
 	//	return *s += 2, lexeme{ *s - 2, *s };
 	//}
+
+  //alu_op operator detection: ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
+  if (**s == L'+' || **s == L'-' || **s == L'*' ||
+      **s == L'|' || **s == L'&' || **s == L'^' ) {
+            return *s += 1, lexeme{ *s - 1, *s };
+  }
+  //alu_op operator detection: SHL, SHR
+  if ((**s == L'<' && *(*s + 1) == L'<') ||
+      (**s == L'>' && *(*s + 1) == L'>')) {
+		return *s += 2, lexeme{ *s - 2, *s };
+	}
+
 	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
@@ -149,6 +161,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
+  alu_type = NOP;
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
@@ -174,6 +187,32 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	//	L'=' == l[pos][0][1]) {
 	//	return e = l[pos++], type = EQ, true;
 	//}
+
+  if (L'+' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = ADD, true;
+  }
+  if (L'-' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = SUB, true;
+  }
+  if (L'*' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = MULT, true;
+  }
+  if (L'|' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = BITWOR, true;
+  }
+  if (L'&' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = BITWAND, true;
+  }
+  if (L'^' == l[pos][0][0]) {
+    return e = l[pos++], type = ALU, alu_type = BITWXOR, true;
+  }
+  if (L'>' == l[pos][0][0] && L'>' == l[pos][0][1]) {
+    return e = l[pos++], type = ALU, alu_type = SHR, true;
+  }
+  if (L'<' == l[pos][0][0] && L'<' == l[pos][0][1]) {
+    return e = l[pos++], type = ALU, alu_type = SHL, true;
+  }
+
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
@@ -197,7 +236,8 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
-	bool rel = false, noteq = false, eq = false, leq = false, gt = false;
+	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
+       alu = false;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
@@ -207,13 +247,14 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
+      case elem::ALU: alu = true; break;
 			default: break;
 		}
 		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
-	if (noteq || eq) {
+	if ( (noteq || eq) && !alu) {
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
@@ -224,7 +265,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		iseq = true;
 		return calc_arity(), true;
 	}
-	if (leq || gt) {
+	if ((leq || gt) && !alu) {
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
@@ -234,6 +275,19 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		isleq = true;
 		return calc_arity(), true;
 	}
+
+  if (alu) {
+    //TODO: improve checks here
+		if (e.size() < 3)
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+		if (e[1].type != elem::ALU)
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+
+    neg = false;
+		isalu = true;
+		return calc_arity(), true;
+	}
+
 	if (e[0].type != elem::SYM)
 		parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return calc_arity(), true;
@@ -256,7 +310,7 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity() {
 	size_t dep = 0;
 	arity = {0};
-	if (iseq || isleq) {
+	if (iseq || isleq || isalu) {
 		arity = { 2 };
 		return;
 	}
