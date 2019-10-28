@@ -40,6 +40,7 @@ set(TML_SOURCES
 	print_souffle.cpp
 	save_csv.cpp
 	tables.cpp
+	tables_ext.cpp
 	transform.cpp
 )
 

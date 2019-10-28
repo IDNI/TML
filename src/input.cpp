@@ -76,14 +76,14 @@ lexeme lex(pcws s) {
 	//	return *s += 2, lexeme{ *s - 2, *s };
 	//}
 
-  //alu_op operator detection: ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
-  if (**s == L'+' || **s == L'-' || **s == L'*' ||
-      **s == L'|' || **s == L'&' || **s == L'^' ) {
-            return *s += 1, lexeme{ *s - 1, *s };
-  }
-  //alu_op operator detection: SHL, SHR
-  if ((**s == L'<' && *(*s + 1) == L'<') ||
-      (**s == L'>' && *(*s + 1) == L'>')) {
+	//alu_op operator detection: ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
+	if (**s == L'+' || **s == L'-' || **s == L'*' ||
+			**s == L'|' || **s == L'&' || **s == L'^' ) {
+		return *s += 1, lexeme{ *s - 1, *s };
+	}
+	//alu_op operator detection: SHL, SHR
+	if ((**s == L'<' && *(*s + 1) == L'<') ||
+			(**s == L'>' && *(*s + 1) == L'>')) {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
 
@@ -161,7 +161,6 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 }
 
 bool elem::parse(const lexemes& l, size_t& pos) {
-  alu_type = NOP;
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
@@ -188,30 +187,31 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	//	return e = l[pos++], type = EQ, true;
 	//}
 
-  if (L'+' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = ADD, true;
-  }
-  if (L'-' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = SUB, true;
-  }
-  if (L'*' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = MULT, true;
-  }
-  if (L'|' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = BITWOR, true;
-  }
-  if (L'&' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = BITWAND, true;
-  }
-  if (L'^' == l[pos][0][0]) {
-    return e = l[pos++], type = ALU, alu_type = BITWXOR, true;
-  }
-  if (L'>' == l[pos][0][0] && L'>' == l[pos][0][1]) {
-    return e = l[pos++], type = ALU, alu_type = SHR, true;
-  }
-  if (L'<' == l[pos][0][0] && L'<' == l[pos][0][1]) {
-    return e = l[pos++], type = ALU, alu_type = SHL, true;
-  }
+	if (L'+' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = ADD, true;
+	}
+	if (L'-' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = SUB, true;
+	}
+	if (L'*' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = MULT, true;
+	}
+	if (L'|' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = BITWOR, true;
+	}
+	if (L'&' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = BITWAND, true;
+	}
+	if (L'^' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_type = BITWXOR, true;
+	}
+	if (L'>' == l[pos][0][0] && L'>' == l[pos][0][1]) {
+		return e = l[pos++], type = ALU, alu_type = SHR, true;
+	}
+	if (L'<' == l[pos][0][0] && L'<' == l[pos][0][1]) {
+		return e = l[pos++], type = ALU, alu_type = SHL, true;
+	}
+
 
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
@@ -247,7 +247,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
-      case elem::ALU: alu = true; break;
+			case elem::ALU: alu = true; break;
 			default: break;
 		}
 		if (!rel) rel = true;
@@ -275,17 +275,16 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		isleq = true;
 		return calc_arity(), true;
 	}
-
-  if (alu) {
-    //TODO: improve checks here
+	if (alu) {
+		//TODO: improve checks here
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		if (e[1].type != elem::ALU)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
-
-    neg = false;
+		neg = false;
 		isalu = true;
-		return calc_arity(), true;
+		//return calc_arity(), true;
+		return true;
 	}
 
 	if (e[0].type != elem::SYM)
@@ -420,6 +419,7 @@ bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
 	if (x.iseq != y.iseq) return x.iseq < y.iseq;
 	if (x.isleq != y.isleq) return x.isleq < y.isleq;
+	if (x.isalu != y.isalu) return x.isalu < y.isalu;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;

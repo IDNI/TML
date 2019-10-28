@@ -198,7 +198,7 @@ term tables::from_raw_term(const raw_term& r) {
 	ints t;
 	lexeme l;
 	// skip the first symbol unless it's EQ/NEQ (which has VAR as it's first)
-	for (size_t n = (r.iseq || r.isleq) ? 0 : 1; n < r.e.size(); ++n)
+	for (size_t n = (r.iseq || r.isleq || r.isalu ) ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
@@ -213,9 +213,9 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
-	ntable tbl = (r.iseq || r.isleq) ? -1 : get_table(get_sig(r));
-	return term(r.neg, r.iseq, r.isleq, tbl, t);
+	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
+	ntable tbl = (r.iseq || r.isleq || r.isalu) ? -1 : get_table(get_sig(r));
+	return term(r.neg, r.iseq, r.isleq, r.isalu, tbl, t);
 }
 
 void tables::out(wostream& os) const {
@@ -273,7 +273,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, false, false, tab, ints(len, 0));
+		term r(false, false, false, false, tab, ints(len, 0));
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -373,19 +373,21 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars, leqvars;
-	std::vector<const term*> eqterms, leqterms;
+	set<int_t> pvars, nvars, eqvars, leqvars, aluvars;
+	std::vector<const term*> eqterms, leqterms, aluterms;
 	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false, hasleq = false;
+		bool haseq = false, hasleq = false, hasalu = false;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) continue;
 			else if (t.iseq) haseq = true;
 			else if (t.isleq) hasleq = true;
+			else if (t.isalu) hasalu = true;
 			else (t.neg ? nvars : pvars).insert(t[n]);
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
 		else if (hasleq) leqterms.push_back(&t);
+		else if (hasalu) aluterms.push_back(&t);
 	}
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -438,13 +440,27 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 			leqvars.insert(v1);
 	}
 
+	//XXX: alu support - Work in progress
+	for (const term* pt : aluterms) {
+		const term& t = *pt;
+		assert(t.size() == 3);
+		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
+		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
+			aluvars.insert(v1);
+		if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2))
+			aluvars.insert(v2);
+		if (v3 < 0 && !has(nvars, v3) && !has(pvars, v3))
+			aluvars.insert(v3);
+	}
+
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i);
+		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // aluvars.erase(i);
 	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v); 
+	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
+	for (int_t i : aluvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
@@ -541,9 +557,9 @@ enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
 cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
 	if (x.size() == 1 || y.size() == 1) return NONE;
 	set<ntable> tx, ty;
-	for (size_t n = 1; n != x.size(); ++n) 
-		if (x[n].neg) return NONE; else tx.insert(x[n].tab); 
-	for (size_t n = 1; n != y.size(); ++n) 
+	for (size_t n = 1; n != x.size(); ++n)
+		if (x[n].neg) return NONE; else tx.insert(x[n].tab);
+	for (size_t n = 1; n != y.size(); ++n)
 		if (y[n].neg) return NONE; else ty.insert(y[n].tab);
 	bool maybe_contained, maybe_contains;
 	if ((maybe_contained = tx.size() < ty.size()))
@@ -731,8 +747,9 @@ void tables::get_alt(const set<term>& al, const term& h, set<alt>& as) {
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
 	a.vm = get_varmap(h, al, a.varslen), a.inv = varmap_inv(a.vm);
+
 	for (const term& t : al)
-		if (t.size() != 2 || (!t.iseq && !t.isleq))
+		if ((t.size() != 2 || (!t.iseq && !t.isleq)) && !t.isalu)
 			b.insert({get_body(t, a.vm, a.varslen), t});
 		else if (t.iseq) {
 			if (t[0] == t[1]) {
@@ -772,7 +789,11 @@ void tables::get_alt(const set<term>& al, const term& h, set<alt>& as) {
 					a.vm.at(t[1]), a.varslen, bits) ||
 					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
 			leq = t.neg ? leq % q : (leq && q);
+		} else if (t.isalu) {
+			//returning bdd handler on leq variable
+			if (!isalu_handler(t,a,leq)) return;
 		}
+
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y;

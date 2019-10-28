@@ -13,15 +13,16 @@
 #include "defs.h"
 
 struct term : public ints {
-	bool neg = false, goal = false, iseq = false, isleq = false;
+	bool neg = false, goal = false, iseq = false, isleq = false, isalu = false;
 	ntable tab = -1;
 	term() {}
-	term(bool neg, bool eq, bool isleq, ntable tab, const ints& args) :
-		ints(args), neg(neg), iseq(eq), isleq(isleq), tab(tab) {}
+	term(bool neg, bool eq, bool isleq, bool isalu, ntable tab, const ints& args) :
+		ints(args), neg(neg), iseq(eq), isleq(isleq), isalu(isalu), tab(tab) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		if (iseq != t.iseq) return iseq; // why not compare?
 		if (isleq != t.isleq) return isleq;
+		if (isalu != t.isalu) return isalu;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		return (const ints&)*this < t;

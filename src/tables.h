@@ -10,6 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __TABLES__
+#define __TABLES__
+
 #include <map>
 #include <vector>
 #ifdef __EMSCRIPTEN__
@@ -287,6 +290,29 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
+
+	//jarlab - work in progress
+	bool isalu_handler(const term& t, alt& a, spbdd_handle &leq);
+	spbdd_handle from_bit_or(uint_t b, bool v, uint_t c) const;
+	spbdd_handle from_add1(uint_t b0, uint_t b1, bool v, uint_t c) const;
+	spbdd_handle add_const(int_t c0, int_t c1, size_t arg, size_t args,
+		size_t bit) const;
+	spbdd_handle add_var_const_eq_const(size_t var, size_t n_vars,  int_t n0,
+		int_t n1) const;
+	spbdd_handle add_var_const_eq_var(size_t var0, size_t var2, size_t n_vars,
+		int_t n1) const;
+	spbdd_handle add_one(size_t arg1, size_t arg2, size_t args, size_t bits,
+		size_t bit, spbdd_handle r);
+	spbdd_handle add_one(size_t arg1, size_t arg2, size_t args);
+	spbdd_handle full_addder_one_carry(size_t var0, size_t n_vars, uint_t b, spbdd_handle r) const;
+	spbdd_handle full_adder_one(size_t var0, size_t n_vars, uint_t b) const;
+	spbdd_handle add_var(size_t arg0, size_t arg1, size_t arg2, size_t args);
+	spbdd_handle full_addder_carry(size_t var0, size_t var1, size_t n_vars, uint_t b, spbdd_handle r) const;
+	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars, uint_t b) const;
+	//spbdd_handle mul_var(size_t var0, size_t var1, size_t var2, size_t n_vars, alt& a);
+	spbdd_handle mul_var(size_t var0, int_t n1, size_t var2, size_t n_vars, alt& a);
+	spbdd_handle permute_test(size_t var0, int_t n1, size_t var2, size_t n_vars, alt& a);
+
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
@@ -307,3 +333,5 @@ std::wostream& operator<<(std::wostream& os, const vbools& x);
 struct unsat_exception : public std::exception {
 	virtual const char* what() const noexcept { return "unsat."; }
 };
+
+#endif

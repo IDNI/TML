@@ -88,7 +88,7 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 };*/
 
 raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
-	return { false, false, false, {
+	return { false, false, false, false, {
         v, elem_openp, get_var_elem(v1), get_var_elem(v2), elem_closep}, {2}};
 }
 
@@ -111,7 +111,7 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 
 raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 	int_t v){
-	return { false, false, false, {
+	return { false, false, false, false, {
 		elem(elem::SYM, r),
 		elem_openp, elem(elem::SYM, get_lexeme(b)),
 		get_var_elem(v), get_var_elem(v+1), elem_closep}, {3}};
@@ -244,7 +244,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
-#ifndef ELIM_NULLS			
+#ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
 			elem e = get_var_elem(2);
@@ -253,7 +253,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			r.r.push_back(l), l.clear(), l.h.push_back(t),
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
-#endif			
+#endif
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
@@ -287,7 +287,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 //#ifdef BWD_GRAMMAR
 	//transform_bwd(r);
 //	transform_bin(r);
-//#endif	
+//#endif
 //	r.delrel = dict_get_rel(L"try");
 //	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
@@ -690,7 +690,7 @@ void driver::transform_bin(raw_prog& p) {
 			for (const auto& x : r.b) {
 				rls.emplace(t, x);
 				raw_term th;
-				th.e = { fact, elem_openp, 
+				th.e = { fact, elem_openp,
 			}
 
 }*/

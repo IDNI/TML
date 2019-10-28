@@ -29,10 +29,10 @@ struct elem {
 	enum etype {
 		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, ALU
 	} type;
-
-  enum alu_op {
-    NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
-  } alu_type;
+	
+	enum alu_op {
+		NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
+	} alu_type;
 
 	int_t num = 0;
 	lexeme e;
@@ -71,8 +71,7 @@ struct raw_term {
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
 		return neg == t.neg && e == t.e && arity == t.arity &&
-			iseq == t.iseq && isleq == t.isleq &&
-      isalu == t.isalu;
+			iseq == t.iseq && isleq == t.isleq && isalu == t.isalu;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
