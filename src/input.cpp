@@ -174,7 +174,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = LEQ, true;
 	}
-	if (L'>' == l[pos][0][0] && !(L'>' == l[pos][0][0])) {
+	if (L'>' == l[pos][0][0] && !(L'>' == l[pos][0][1])) {
 		return e = l[pos++], type = GT, true;
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
