@@ -75,34 +75,26 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
 			int nconsts = 0;
 
-			for (size_t i = 0; i< args; ++i) {
+			for (size_t i = 0; i< args; ++i)
 				if (t[i] >= 0) {
 					spbdd_handle aux = from_sym(i, args, t[i]);
 					q = q && aux;
 					nconsts++;
 				}
-			}
 
 			bools exvec;
 			for (size_t i = 0; i < bits; ++i) {
-				for (size_t j = 0; j< args; ++j) {
-					if (t[j] >= 0)
-						exvec.push_back(true);
-					else
-						exvec.push_back(false);
-				}
+				for (size_t j = 0; j< args; ++j)
+					if (t[j] >= 0) exvec.push_back(true);
+					else exvec.push_back(false);
 			}
 			q = q/exvec;
 
 			uints perm = perm_init(args*bits);
 			for (size_t i = 0; i < bits; ++i) {
-				if (t[0] < 0)
-					perm[i*args] = perm[i*args]-(i*nconsts) ;
-				if (t[1] < 0)
-					 perm[i*args+1] = perm[i*args+1]-(i*nconsts) ;
-				if (t[2] < 0)
-					perm[i*args+2] = perm[i*args+2]-(i*nconsts) ;
-
+				if (t[0] < 0) perm[i*args] = perm[i*args]-(i*nconsts) ;
+				if (t[1] < 0) perm[i*args+1] = perm[i*args+1]-(i*nconsts) ;
+				if (t[2] < 0) perm[i*args+2] = perm[i*args+2]-(i*nconsts) ;
 			}
 			q = q^perm;
 		} break;
@@ -126,7 +118,7 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 		{
 			DBG(wcout << "MULT handler ... " << endl;)
 			q = bdd_handle::T;
-		} break;;
+		} break;
 
 	}
 
@@ -260,20 +252,19 @@ spbdd_handle tables::shl(size_t var0, int_t n1, size_t var2,
 	exvec[2*(bits-3)] = true;
 	//for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << exvec[i]; wcout << endl;
 
-    uints perm1;
- 	perm1 = perm_init(2*bits);
-    // for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
-    for (size_t i = 0; i < (bits-3); i++) {
-     	perm1[2*i] = perm1[2*i]+2;
-    }
-    //for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
+	uints perm1;
+	perm1 = perm_init(2*bits);
+	// for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
+	for (size_t i = 0; i < (bits-3); i++) {
+		perm1[2*i] = perm1[2*i]+2;
+	}
+	//for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
 
+	n = n/exvec;
 
-    n = n/exvec;
-
-    spbdd_handle shl = n^perm1 &&
-    		::from_bit(pos(bits-1, var0, n_vars), false) &&
-    		::from_bit(pos(2, var2, n_vars), false);
+	spbdd_handle shl = n^perm1 &&
+		::from_bit(pos(bits-1, var0, n_vars), false) &&
+		::from_bit(pos(2, var2, n_vars), false);
 
 	return shl;
 
