@@ -29,11 +29,7 @@ struct elem {
 	enum etype {
 		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, ALU
 	} type;
-	
-	enum alu_op {
-		NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
-	} alu_type;
-
+	t_alu_op alu_op = NOP;
 	int_t num = 0;
 	lexeme e;
 	wchar_t ch;
@@ -63,6 +59,7 @@ struct elem {
 
 struct raw_term {
 	bool neg = false, iseq = false, isleq = false, isalu = false;
+	t_alu_op alu_op = NOP;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos);

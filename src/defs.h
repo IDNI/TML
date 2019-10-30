@@ -71,5 +71,10 @@ template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
+
+typedef enum  {
+	NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
+} t_alu_op;
+
 #endif
 //#define TRANSFORM_BIN_DRIVER

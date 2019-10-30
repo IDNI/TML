@@ -1,0 +1,14 @@
+# TML test:
+# shift left feature
+
+b(200).
+setX(?x) :- ?x <= 9.
+setA(?x ?z) :- setX(?x), ?x << 1 = ?z.
+setB(?x ?z) :- ?x = 55, ?x << 1 = ?z.
+setC(?x ?z) :- ?x = 90, ?x << 1 = ?z.
+
+# expected output
+#b(200).
+#setA(24).
+#setB(110).
+#setC(180)

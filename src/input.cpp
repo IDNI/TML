@@ -174,7 +174,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = LEQ, true;
 	}
-	if (L'>' == l[pos][0][0]) {
+	if (L'>' == l[pos][0][0] && !(L'>' == l[pos][0][0])) {
 		return e = l[pos++], type = GT, true;
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
@@ -188,28 +188,28 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	//}
 
 	if (L'+' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = ADD, true;
+		return e = l[pos++], type = ALU, alu_op = ADD, true;
 	}
 	if (L'-' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = SUB, true;
+		return e = l[pos++], type = ALU, alu_op = SUB, true;
 	}
 	if (L'*' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = MULT, true;
+		return e = l[pos++], type = ALU, alu_op = MULT, true;
 	}
 	if (L'|' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = BITWOR, true;
+		return e = l[pos++], type = ALU, alu_op = BITWOR, true;
 	}
 	if (L'&' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = BITWAND, true;
+		return e = l[pos++], type = ALU, alu_op = BITWAND, true;
 	}
 	if (L'^' == l[pos][0][0]) {
-		return e = l[pos++], type = ALU, alu_type = BITWXOR, true;
+		return e = l[pos++], type = ALU, alu_op = BITWXOR, true;
 	}
 	if (L'>' == l[pos][0][0] && L'>' == l[pos][0][1]) {
-		return e = l[pos++], type = ALU, alu_type = SHR, true;
+		return e = l[pos++], type = ALU, alu_op = SHR, true;
 	}
 	if (L'<' == l[pos][0][0] && L'<' == l[pos][0][1]) {
-		return e = l[pos++], type = ALU, alu_type = SHL, true;
+		return e = l[pos++], type = ALU, alu_op = SHL, true;
 	}
 
 
@@ -238,6 +238,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
        alu = false;
+	t_alu_op alu_op_aux = NOP;
 	while (!wcschr(L".:,;{}", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
@@ -247,7 +248,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
-			case elem::ALU: alu = true; break;
+			case elem::ALU: alu = true; alu_op_aux = e.back().alu_op; break;
 			default: break;
 		}
 		if (!rel) rel = true;
@@ -276,13 +277,22 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 		return calc_arity(), true;
 	}
 	if (alu) {
-		//TODO: improve checks here
-		if (e.size() < 3)
+
+		// ALU operations are currently implemented to work with three operands
+		// symbol OPERATOR symbol RELATIONSHIP symbol
+		// supported OPERATORs : + - * | & ^ << >>
+		// supported RELATIONSHIPs: = (TODO: add support for <= => < > != )
+		// TODO: improve checks here
+		if (e.size() < 4)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
-		if (e[1].type != elem::ALU)
+		if (e[1].type != elem::ALU || e[3].type != elem::EQ)
 			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+
+		iseq = true;
 		neg = false;
 		isalu = true;
+
+		alu_op = alu_op_aux;
 		//return calc_arity(), true;
 		return true;
 	}

@@ -1,0 +1,5 @@
+# addittion test
+# case: VAR + CONST = VAR
+setA(15).
+setB(?x ?y) :- ?x + ?y = 10.
+setC(?x ?z) :- ?x + ?z = 3.

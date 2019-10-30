@@ -75,6 +75,7 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args) const {
 	spbdd_handle r = leq_var(arg1, arg2, args, bits);
 	return leqmemo.emplace(x, r), r;
 }
+
 spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 	const {
 	if (!--bit)
@@ -87,6 +88,21 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 			bdd_ite_var(pos(bit, arg1, args), hfalse,
 				leq_var(arg1, arg2, args, bit)));
 }
+
+
+spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit, spbdd_handle x)
+	const {
+	if (!--bit)
+		return	bdd_ite(::from_bit(pos(0, arg2, args), true),
+				x,
+				x && ::from_bit(pos(0, arg1, args), false));
+	return	bdd_ite(::from_bit(pos(bit, arg2, args), true),
+			bdd_ite_var(pos(bit, arg1, args),
+				leq_var(arg1, arg2, args, bit) && x, x),
+			bdd_ite_var(pos(bit, arg1, args), hfalse,
+				leq_var(arg1, arg2, args, bit) && x));
+}
+
 
 void tables::range(size_t arg, size_t args, bdd_handles& v) {
 	spbdd_handle	ischar= ::from_bit(pos(0, arg, args), true) &&
@@ -215,7 +231,7 @@ term tables::from_raw_term(const raw_term& r) {
 		}
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 	ntable tbl = (r.iseq || r.isleq || r.isalu) ? -1 : get_table(get_sig(r));
-	return term(r.neg, r.iseq, r.isleq, r.isalu, tbl, t);
+	return term(r.neg, r.iseq, r.isleq, r.isalu, r.alu_op, tbl, t);
 }
 
 void tables::out(wostream& os) const {
@@ -273,7 +289,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, false, false, false, tab, ints(len, 0));
+		term r(false, false, false, false, NOP, tab, ints(len, 0));
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -751,7 +767,11 @@ void tables::get_alt(const set<term>& al, const term& h, set<alt>& as) {
 	for (const term& t : al)
 		if ((t.size() != 2 || (!t.iseq && !t.isleq)) && !t.isalu)
 			b.insert({get_body(t, a.vm, a.varslen), t});
-		else if (t.iseq) {
+		else if (t.isalu) {
+			//returning bdd handler on leq variable
+			if (!isalu_handler(t,a,leq)) return;
+		}
+		else if (t.iseq) { //& !t.isalu
 			if (t[0] == t[1]) {
 				if (t.neg) return;
 				continue;
@@ -777,21 +797,41 @@ void tables::get_alt(const set<term>& al, const term& h, set<alt>& as) {
 				if (t.neg == (t[0] <= t[1])) return;
 				continue;
 			}
-			if (t[0] < 0 && t[1] < 0)
+			if (t[0] < 0 && t[1] < 0) {
 				q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]),
 					a.varslen, bits);
-			else if (t[0] < 0)
-				q = leq_const(t[1], a.vm.at(t[0]),
-					a.varslen, bits);
+
+			}
+			else if (t[0] < 0) {
+
+				//q = leq_const(t[1], a.vm.at(t[0]), a.varslen, bits);
+
+				//work-in-progress: initial replacement of leq_const by leq_var
+				size_t args = t.size();
+				spbdd_handle aux = from_sym(1, args, t[1]);
+				q = leq_var(a.vm.at(t[0]), a.vm.at(t[0])+1, a.varslen+1, bits, aux);
+
+				bools exvec;
+				for (size_t i = 0; i < bits; ++i) {
+					exvec.push_back(false);
+					exvec.push_back(true);
+				}
+				q = q/exvec;
+
+				uints perm1;
+				perm1 = perm_init(2*bits);
+				for (size_t i = 1; i < bits; ++i) {
+					perm1[i*2] = perm1[i*2]-i ;
+				}
+				q = q^perm1;
+
+			}
 			else if (t[1] < 0)
 				// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 				q = htrue % leq_const(t[0],
 					a.vm.at(t[1]), a.varslen, bits) ||
 					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
 			leq = t.neg ? leq % q : (leq && q);
-		} else if (t.isalu) {
-			//returning bdd handler on leq variable
-			if (!isalu_handler(t,a,leq)) return;
 		}
 
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });

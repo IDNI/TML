@@ -1,0 +1,6 @@
+# add 1 test
+# case: VAR + CONST = CONST
+setA(3).
+setB(?x) :- ?x + 1 = 3.
+setC(?x) :- ?x + 4 = 12.
+setD(?x) :- 7 + ?x  = 12.

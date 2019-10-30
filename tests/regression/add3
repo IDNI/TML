@@ -1,0 +1,7 @@
+# addition test
+# case: VAR + VAR = VAR
+setA(15).
+e(1).
+e(2).
+e(7).
+setB(?x ?y ?z) :- e(?x), e(?y), ?x + ?y = ?z.
