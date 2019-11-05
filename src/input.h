@@ -27,7 +27,7 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT
+		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, FORALL, EXISTS
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -113,6 +113,35 @@ struct raw_rule {
 		return h == r.h && b == r.b;
 	}
 	bool operator!=(const raw_rule& r) const { return !(*this == r); }
+};
+
+struct raw_qdecl {
+		elem qtype;
+		elem ident;
+		bool isfod =false;
+	
+	bool parse(const lexemes& l, size_t& pos);
+
+};
+struct raw_sof {
+	std::vector<raw_term> h;
+	std::vector<raw_qdecl> ql;
+	std::vector<std::vector<raw_term>> b;
+
+	bool parse(const lexemes& l, size_t& pos);
+	void clear() { h.clear(), b.clear(); }
+	raw_sof(){}
+	raw_sof(const raw_term& t) : h({t}) {}
+	
+	raw_sof(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
+	raw_sof(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
+		if (!_b.empty()) b = {_b};
+	}
+	
+	bool operator==(const raw_sof& r) const {
+		return h == r.h && b == r.b;
+	}
+	bool operator!=(const raw_sof& r) const { return !(*this == r); }
 };
 
 struct raw_prog {

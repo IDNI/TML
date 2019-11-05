@@ -187,7 +187,14 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		else throw 0;
 	}
 	else if (*l[pos][0] == L'?') type = VAR;
-	else if (iswalpha(*l[pos][0])) type = SYM;
+	else if (iswalpha(*l[pos][0])) {
+		size_t len = l[pos][1]-l[pos][0];
+		if( len == 6 && !wcsncmp(l[pos][0], L"forall", len )) 
+			type = FORALL;
+		else if ( len == 6 && !wcsncmp(l[pos][0], L"exists", len ) )
+			type = EXISTS;
+		else type = SYM;
+	}
 	else if (*l[pos][0] == L'"') type = STR;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, true;
@@ -284,7 +291,11 @@ head:	h.emplace_back();
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(l[pos][0], err_head, l[pos]);
 	++pos; b.emplace_back();
-	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
+	
+	raw_sof sof;
+	if( sof.parse(l, pos) ) return true;
+
+	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
 		if (*l[pos][0] == '.') return ++pos, true;
 		else if (*l[pos][0] == L';') b.emplace_back();
@@ -292,6 +303,55 @@ head:	h.emplace_back();
 			parse_error(l[pos][0], err_term_or_dot,l[pos]);
 	}
 	parse_error(l[pos][0], err_body, l[pos]);
+	return false;
+}
+
+bool raw_qdecl::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
+	isfod = false;
+
+	if ( !qtype.parse(l, pos) ) return false;
+	if ( qtype.type != elem::FORALL &&  qtype.type != elem::EXISTS)
+			return pos = curr, false;
+
+	if (*l[pos][0] == L'?' ) isfod = true;
+
+	if ( !ident.parse(l, pos) ) return false;
+	if ( ident.type != elem::VAR  && ident.type != elem::SYM)
+			return pos = curr, false;
+		
+	return true; 
+} 
+		
+bool raw_sof::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
+	/*
+	h.emplace_back();
+	if (!h.back().parse(l, pos)) return pos = curr, false;
+	if (*l[pos][0] == '.') return ++pos, true;
+	if (*l[pos][0] == ',') { parse_error(l[pos][0], err_head, l[pos]); }
+	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
+		parse_error(l[pos][0], err_head, l[pos]);
+	++pos;
+	*/
+
+	ql.emplace_back();
+	bool v=false;
+	while (ql.back().parse(l,pos)) {
+		
+		if(*l[pos][0] == '{') { ++pos; v=true; break; }
+		ql.emplace_back();		
+	}          
+
+	if(!v) return (pos = curr), false;
+	
+	b.emplace_back();
+	for (b.back().emplace_back(); b.back().back().parse(l, pos);
+		b.back().emplace_back(), ++pos) {
+		if (*l[pos][0] == '}') return ++pos, true;
+		else if (*l[pos][0] == L';') b.emplace_back();
+		else if (*l[pos][0] != ',') return false;
+	}
 	return false;
 }
 
