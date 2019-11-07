@@ -147,7 +147,13 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		parse_error(l[curr2][1], dot_expected, l[curr2]);
 	return true;
 }
-
+elem::etype elem::peek(const lexemes& l, size_t& pos) {
+	
+	size_t curr = pos;
+	parse(l,pos);
+	pos = curr;
+	return type;
+}
 bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
@@ -193,6 +199,12 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 			type = FORALL;
 		else if ( len == 6 && !wcsncmp(l[pos][0], L"exists", len ) )
 			type = EXISTS;
+		else if ( len == 6 && !wcsncmp(l[pos][0], L"unique", len ) )
+			type = UNIQUE;
+		if( len == 3 && !wcsncmp(l[pos][0], L"and", len )) 
+			type = AND;
+		else if ( len == 2 && !wcsncmp(l[pos][0], L"or", len ) )
+			type = OR;
 		else type = SYM;
 	}
 	else if (*l[pos][0] == L'"') type = STR;
@@ -290,11 +302,14 @@ head:	h.emplace_back();
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(l[pos][0], err_head, l[pos]);
-	++pos; b.emplace_back();
-	
+	++pos; 
+
+	curr = pos; 
 	raw_sof sof;
 	if( sof.parse(l, pos) ) return true;
+	else pos = curr;
 
+	b.emplace_back();
 	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
 		if (*l[pos][0] == '.') return ++pos, true;
@@ -311,7 +326,9 @@ bool raw_qdecl::parse(const lexemes& l, size_t& pos) {
 	isfod = false;
 
 	if ( !qtype.parse(l, pos) ) return false;
-	if ( qtype.type != elem::FORALL &&  qtype.type != elem::EXISTS)
+	if (qtype.type != elem::FORALL &&  
+		qtype.type != elem::EXISTS && 
+		qtype.type != elem::UNIQUE)
 			return pos = curr, false;
 
 	if (*l[pos][0] == L'?' ) isfod = true;
@@ -322,8 +339,78 @@ bool raw_qdecl::parse(const lexemes& l, size_t& pos) {
 		
 	return true; 
 } 
+
+bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
+
+	size_t curr = pos;
+
+	
+	if( *l[pos][0] == '~') ++pos;
+	if( *l[pos][0] == '(') {
+		++pos;
+		bool ret = parseform(l, pos);
+		if( !ret || *l[pos][0] != ')') 
+			return pos = curr, false;
+		else return ++pos, true;
+
+	} 
+	
+	elem next;
+	next.peek(l, pos);
+	
+	if( next.type == elem::SYM  ) {
+		raw_term t;
+		return t.parse(l, pos);
+	}
+	else {
+		vector<raw_qdecl> qdec;
+		while( next.type == elem::FORALL ||
+			next.type == elem::UNIQUE ||
+			next.type == elem::EXISTS ) {
 		
+			qdec.emplace_back();	
+			if ( ! qdec.back().parse(l,pos) ) return false;
+		
+			next.peek(l, pos);
+		}	
+		if( qdec.size() == 0 ) return false;
+
+		if( *l[pos][0] != '(')  return false;
+		
+		++pos;
+		bool ret = parseform(l, pos);
+		if( !ret || *l[pos][0] != ')') 	return pos = curr, false;
+		else return ++pos, true;
+		
+		return true;
+	} 
+
+}
+bool raw_sof::parseform(const lexemes& l, size_t& pos) {
+
+	bool ret = false;
+	size_t curr = pos;
+	 
+	ret = parseform1(l, pos);
+	elem nxt;
+	nxt.peek(l, pos);
+
+	while( nxt.type == elem::AND || nxt.type == elem::OR ) {
+		++pos;
+		ret = parseform1(l,pos);
+		if(!ret) return pos=curr, false;
+		
+		nxt.peek(l, pos);		
+	}
+
+	return true;
+
+}
+
+
+
 bool raw_sof::parse(const lexemes& l, size_t& pos) {
+	
 	size_t curr = pos;
 	/*
 	h.emplace_back();
@@ -335,16 +422,8 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	++pos;
 	*/
 
-	ql.emplace_back();
-	bool v=false;
-	while (ql.back().parse(l,pos)) {
-		
-		if(*l[pos][0] == '{') { ++pos; v=true; break; }
-		ql.emplace_back();		
-	}          
-
-	if(!v) return (pos = curr), false;
-	
+	return this->parseform(l , pos);
+	/*
 	b.emplace_back();
 	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
@@ -353,6 +432,7 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 		else if (*l[pos][0] != ',') return false;
 	}
 	return false;
+	*/
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {

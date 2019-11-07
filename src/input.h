@@ -27,7 +27,7 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, FORALL, EXISTS
+		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR, FORALL, EXISTS, UNIQUE
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -38,6 +38,7 @@ struct elem {
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
+	etype peek(const lexemes& l, size_t& pos);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }
 	bool parse(const lexemes& l, size_t& pos);
 	bool operator<(const elem& t) const {
@@ -125,11 +126,14 @@ struct raw_qdecl {
 };
 struct raw_sof {
 	std::vector<raw_term> h;
-	std::vector<raw_qdecl> ql;
 	std::vector<std::vector<raw_term>> b;
+	
+	std::vector<raw_sof> args;
+	bool parseform(const lexemes& l, size_t& pos);
+	bool parseform1(const lexemes& l, size_t& pos);
 
 	bool parse(const lexemes& l, size_t& pos);
-	void clear() { h.clear(), b.clear(); }
+	void clear() { b.clear(); }
 	raw_sof(){}
 	raw_sof(const raw_term& t) : h({t}) {}
 	
