@@ -150,7 +150,8 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 elem::etype elem::peek(const lexemes& l, size_t& pos) {
 	
 	size_t curr = pos;
-	parse(l,pos);
+	type = NONE;
+	if( pos < l.size() ) parse(l,pos);
 	pos = curr;
 	return type;
 }
@@ -201,7 +202,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 			type = EXISTS;
 		else if ( len == 6 && !wcsncmp(l[pos][0], L"unique", len ) )
 			type = UNIQUE;
-		if( len == 3 && !wcsncmp(l[pos][0], L"and", len )) 
+		else if( len == 3 && !wcsncmp(l[pos][0], L"and", len )) 
 			type = AND;
 		else if ( len == 2 && !wcsncmp(l[pos][0], L"or", len ) )
 			type = OR;
@@ -306,9 +307,11 @@ head:	h.emplace_back();
 
 	curr = pos; 
 	raw_sof sof;
-	if( sof.parse(l, pos) ) return true;
-	else pos = curr;
-
+	if( sof.parse(l, pos) )
+	{
+		if (*l[pos][0] == '.') return ++pos, true;
+	}
+	pos = curr;
 	b.emplace_back();
 	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
@@ -343,7 +346,7 @@ bool raw_qdecl::parse(const lexemes& l, size_t& pos) {
 bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 
 	size_t curr = pos;
-
+	if ( pos == l.size() ) return false;
 	
 	if( *l[pos][0] == '~') ++pos;
 	if( *l[pos][0] == '(') {
@@ -364,47 +367,42 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	}
 	else {
 		vector<raw_qdecl> qdec;
-		while( next.type == elem::FORALL ||
-			next.type == elem::UNIQUE ||
-			next.type == elem::EXISTS ) {
+		while( 	next.type == elem::FORALL ||
+				next.type == elem::UNIQUE ||
+				next.type == elem::EXISTS ) {
 		
 			qdec.emplace_back();	
-			if ( ! qdec.back().parse(l,pos) ) return false;
-		
+			if ( !qdec.back().parse(l,pos) ) return false;
+			
 			next.peek(l, pos);
 		}	
-		if( qdec.size() == 0 ) return false;
+		if( qdec.size() == 0 || pos == l.size() ) return false;
 
-		if( *l[pos][0] != '(')  return false;
+		if( *l[pos][0] != '{')  return false;
 		
 		++pos;
 		bool ret = parseform(l, pos);
-		if( !ret || *l[pos][0] != ')') 	return pos = curr, false;
+		if( !ret || *l[pos][0] != '}') 	return pos = curr, false;
 		else return ++pos, true;
 		
-		return true;
 	} 
 
 }
 bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 
-	bool ret = false;
 	size_t curr = pos;
 	 
-	ret = parseform1(l, pos);
-	elem nxt;
-	nxt.peek(l, pos);
+	if ( pos == l.size() ) return false;
 
-	while( nxt.type == elem::AND || nxt.type == elem::OR ) {
+	if ( !parseform1(l, pos) ) return pos = curr, false;
+
+	if ( pos == l.size() ) return true;
+
+	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
 		++pos;
-		ret = parseform1(l,pos);
-		if(!ret) return pos=curr, false;
-		
-		nxt.peek(l, pos);		
+		if ( !parseform1(l, pos) ) return pos = curr, false;
 	}
-
 	return true;
-
 }
 
 
@@ -422,7 +420,12 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	++pos;
 	*/
 
-	return this->parseform(l , pos);
+	bool ret = this->parseform(l , pos);
+
+	if( ret ) printf( "\ndone\n");
+
+	printf("\n %d %d \n ", pos, l.size());
+	return ret;
 	/*
 	b.emplace_back();
 	for (b.back().emplace_back(); b.back().back().parse(l, pos);

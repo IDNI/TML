@@ -35,12 +35,16 @@ production => relname ws "=>" ws alt ws alts ws '.' ws.
 alt =>	terminal ws alt ws | nonterminal ws alt ws | null.
 alts => null | '|' ws alt ws alts ws.
 
-quant => "forall" | "exists" .
-qvars = quant ws identifier ws qvars | quant ws identifier ws .
-qbody =>  ws qvars ws '{' ws preds qbody_rest ws '}'.
-qbody_rest => ws qop ws qbody | null.
-qop => "and" | "or" .
+quant => "forall" | "exists" | "unique" .
+qvars => quant ws identifier ws qvars | quant ws identifier ws .
+qform => qform1 qform_rest
+qform_rest => qbop qform qform_rest | null.
+qform1 => 	term | '(' qform ')' | '~' term | 
+			'~' '(' qform ')' |
+			qvars '(' form ')'.
+qbop => ',' | ';'.			
 
+sof => qform.
 
 
 fact => pred '.' ws.

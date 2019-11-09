@@ -27,7 +27,7 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR, FORALL, EXISTS, UNIQUE
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR, FORALL, EXISTS, UNIQUE
 	} type;
 	int_t num = 0;
 	lexeme e;
