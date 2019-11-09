@@ -309,7 +309,8 @@ head:	h.emplace_back();
 	raw_sof sof;
 	if( sof.parse(l, pos) )
 	{
-		if (*l[pos][0] == '.') return ++pos, true;
+		sof.printTree();
+		if (l.size() > pos && *l[pos][0] == '.') return ++pos, true;
 	}
 	pos = curr;
 	b.emplace_back();
@@ -348,10 +349,11 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	if ( pos == l.size() ) return false;
 	
-	if( *l[pos][0] == '~') ++pos;
+	if( *l[pos][0] == '~') isneg=true,++pos;
 	if( *l[pos][0] == '(') {
 		++pos;
-		bool ret = parseform(l, pos);
+		args.emplace_back();
+		bool ret = args.back().parseform(l, pos);
 		if( !ret || *l[pos][0] != ')') 
 			return pos = curr, false;
 		else return ++pos, true;
@@ -361,26 +363,27 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	next.peek(l, pos);
 	
 	if( next.type == elem::SYM  ) {
-		raw_term t;
-		return t.parse(l, pos);
+		terms.emplace_back();
+		return terms.back().parse(l, pos);
 	}
 	else {
-		vector<raw_qdecl> qdec;
+		
 		while( 	next.type == elem::FORALL ||
 				next.type == elem::UNIQUE ||
 				next.type == elem::EXISTS ) {
 		
-			qdec.emplace_back();	
-			if ( !qdec.back().parse(l,pos) ) return false;
+			ql.emplace_back();	
+			if ( !ql.back().parse(l,pos) ) return false;
 			
 			next.peek(l, pos);
 		}	
-		if( qdec.size() == 0 || pos == l.size() ) return false;
+		if( ql.size() == 0 || pos == l.size() ) return false;
 
 		if( *l[pos][0] != '{')  return false;
 		
 		++pos;
-		bool ret = parseform(l, pos);
+		args.emplace_back();
+		bool ret = args.back().parseform(l, pos);
 		if( !ret || *l[pos][0] != '}') 	return pos = curr, false;
 		else return ++pos, true;
 		
@@ -392,14 +395,17 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	 
 	if ( pos == l.size() ) return false;
-
-	if ( !parseform1(l, pos) ) return pos = curr, false;
+	args.emplace_back();
+	if ( !args.back().parseform1(l, pos) ) return pos = curr, false;
 
 	if ( pos == l.size() ) return true;
 
 	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
 		++pos;
-		if ( !parseform1(l, pos) ) return pos = curr, false;
+
+		args.emplace_back();
+
+		if ( !args.back().parseform1(l, pos) ) return pos = curr, false;
 	}
 	return true;
 }
@@ -409,32 +415,30 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	
 	size_t curr = pos;
-	/*
-	h.emplace_back();
-	if (!h.back().parse(l, pos)) return pos = curr, false;
-	if (*l[pos][0] == '.') return ++pos, true;
-	if (*l[pos][0] == ',') { parse_error(l[pos][0], err_head, l[pos]); }
-	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
-		parse_error(l[pos][0], err_head, l[pos]);
-	++pos;
-	*/
-
 	bool ret = this->parseform(l , pos);
-
+	
 	if( ret ) printf( "\ndone\n");
-
 	printf("\n %d %d \n ", pos, l.size());
 	return ret;
-	/*
-	b.emplace_back();
-	for (b.back().emplace_back(); b.back().back().parse(l, pos);
-		b.back().emplace_back(), ++pos) {
-		if (*l[pos][0] == '}') return ++pos, true;
-		else if (*l[pos][0] == L';') b.emplace_back();
-		else if (*l[pos][0] != ',') return false;
+}
+ void raw_sof::printTree( int level)
+{
+	wprintf(L"\n");
+	
+	for(int i=0;i<level;i++)
+		wprintf(L"\t");
+	
+	if( isneg) wprintf (L"~");
+	for( raw_qdecl &d:ql) {
+		wprintf(L"%s ", lexeme2str(d.qtype.e));
+		wprintf(L"%s ", lexeme2str(d.ident.e));
 	}
-	return false;
-	*/
+	for (raw_term & t:terms)
+		for(elem el: t.e)
+			wprintf(L"%s ", lexeme2str(el.e));
+	for( raw_sof &sof : args)
+		sof.printTree(level+1);
+
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {

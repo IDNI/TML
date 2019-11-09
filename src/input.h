@@ -125,27 +125,18 @@ struct raw_qdecl {
 
 };
 struct raw_sof {
-	std::vector<raw_term> h;
-	std::vector<std::vector<raw_term>> b;
-	
-	std::vector<raw_sof> args;
+	std::vector<raw_qdecl> ql;
+	std::vector<raw_term> terms;
+	std::vector<elem> elems;
+	bool isneg = false;
+	std::vector<raw_sof> args;	
 	bool parseform(const lexemes& l, size_t& pos);
 	bool parseform1(const lexemes& l, size_t& pos);
-
+	
 	bool parse(const lexemes& l, size_t& pos);
-	void clear() { b.clear(); }
-	raw_sof(){}
-	raw_sof(const raw_term& t) : h({t}) {}
+	void clear() { ql.clear(); terms.clear(); elems.clear(); }
+	void printTree(int level =0 );
 	
-	raw_sof(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
-	raw_sof(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
-		if (!_b.empty()) b = {_b};
-	}
-	
-	bool operator==(const raw_sof& r) const {
-		return h == r.h && b == r.b;
-	}
-	bool operator!=(const raw_sof& r) const { return !(*this == r); }
 };
 
 struct raw_prog {
