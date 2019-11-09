@@ -357,7 +357,6 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 		else return ++pos, true;
 
 	} 
-	
 	elem next;
 	next.peek(l, pos);
 	
