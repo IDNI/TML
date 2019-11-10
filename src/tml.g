@@ -39,9 +39,9 @@ quant => "forall" | "exists" | "unique" .
 qvars => quant ws identifier ws qvars | quant ws identifier ws .
 qform => qform1 qform_rest
 qform_rest => qbop qform qform_rest | null.
-qform1 => 	term | '(' qform ')' | '~' term | 
-			'~' '(' qform ')' |
-			qvars '(' form ')'.
+qform1 => 	term | '{' qform '}' | '~' term | 
+			'~' '{' qform '}' |
+			qvars '{' form '}'.
 qbop => ',' | ';'.			
 
 sof => qform.

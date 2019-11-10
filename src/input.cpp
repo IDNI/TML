@@ -177,6 +177,13 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
 	}
+	if (L';' == l[pos][0][0]) {
+		return e = l[pos++], type = OR, true;
+	}
+	if (L',' == l[pos][0][0]) {
+		return e = l[pos++], type = AND, true;
+	}
+
 	//if (L'=' == l[pos][0][0] &&
 	//	L'=' == l[pos][0][1]) {
 	//	return e = l[pos++], type = EQ, true;
@@ -202,10 +209,6 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 			type = EXISTS;
 		else if ( len == 6 && !wcsncmp(l[pos][0], L"unique", len ) )
 			type = UNIQUE;
-		else if( len == 3 && !wcsncmp(l[pos][0], L"and", len )) 
-			type = AND;
-		else if ( len == 2 && !wcsncmp(l[pos][0], L"or", len ) )
-			type = OR;
 		else type = SYM;
 	}
 	else if (*l[pos][0] == L'"') type = STR;
@@ -307,9 +310,8 @@ head:	h.emplace_back();
 
 	curr = pos; 
 	raw_sof sof;
-	if( sof.parse(l, pos) )
-	{
-		sof.printTree();
+	if( sof.parse(l, pos) ){
+		
 		if (l.size() > pos && *l[pos][0] == '.') return ++pos, true;
 	}
 	pos = curr;
@@ -350,14 +352,14 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	if ( pos == l.size() ) return false;
 	
 	if( *l[pos][0] == '~') isneg=true,++pos;
-	if( *l[pos][0] == '(') {
+	if( pos != l.size() && *l[pos][0] == '{') {
 		++pos;
 		args.emplace_back();
 		bool ret = args.back().parseform(l, pos);
-		if( !ret || *l[pos][0] != ')') 
+		if( pos == l.size() || !ret || *l[pos][0] != '}') 
 			return pos = curr, false;
 		else return ++pos, true;
-
+ 
 	} 
 	elem next;
 	next.peek(l, pos);
@@ -377,14 +379,14 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 			
 			next.peek(l, pos);
 		}	
-		if( ql.size() == 0 || pos == l.size() ) return false;
+		if( ql.size() == 0  ) return false;
 
-		if( *l[pos][0] != '{')  return false;
+		if(  pos == l.size() || *l[pos][0] != '{')  return false;
 		
 		++pos;
 		args.emplace_back();
 		bool ret = args.back().parseform(l, pos);
-		if( !ret || *l[pos][0] != '}') 	return pos = curr, false;
+		if( pos == l.size() || !ret || *l[pos][0] != '}') 	return pos = curr, false;
 		else return ++pos, true;
 		
 	} 
@@ -401,8 +403,8 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 	if ( pos == l.size() ) return true;
 
 	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
-		++pos;
-
+	
+		qbops.emplace_back().parse(l, pos);
 		args.emplace_back();
 
 		if ( !args.back().parseform1(l, pos) ) return pos = curr, false;
@@ -417,8 +419,8 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	bool ret = this->parseform(l , pos);
 	
-	if( ret ) printf( "\ndone\n");
-	printf("\n %d %d \n ", pos, l.size());
+	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
+	printTree();
 	return ret;
 }
  void raw_sof::printTree( int level)
@@ -427,18 +429,25 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	
 	for(int i=0;i<level;i++)
 		wprintf(L"\t");
-	
+
 	if( isneg) wprintf (L"~");
 	for( raw_qdecl &d:ql) {
-		wprintf(L"%s ", lexeme2str(d.qtype.e));
-		wprintf(L"%s ", lexeme2str(d.ident.e));
+		wprintf(L"%ls ", lexeme2str(d.qtype.e).c_str());
+		wprintf(L"%ls ", lexeme2str(d.ident.e).c_str());
 	}
 	for (raw_term & t:terms)
-		for(elem el: t.e)
-			wprintf(L"%s ", lexeme2str(el.e));
-	for( raw_sof &sof : args)
+		for(elem &el: t.e)
+			wprintf(L"%ls ", lexeme2str(el.e).c_str());
+	size_t j= 0;
+	for( raw_sof &sof : args) {
 		sof.printTree(level+1);
-
+		if( j < qbops.size()) {
+			for(int i=0;i<(1+level);i++)
+				wprintf(L"\t");
+			wprintf(L"%ls ", lexeme2str(qbops[j].e).c_str()),j++;
+		}
+	}
+	wprintf(L"\n");	
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {

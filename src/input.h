@@ -127,14 +127,14 @@ struct raw_qdecl {
 struct raw_sof {
 	std::vector<raw_qdecl> ql;
 	std::vector<raw_term> terms;
-	std::vector<elem> elems;
+	std::vector<elem> qbops;
 	bool isneg = false;
 	std::vector<raw_sof> args;	
 	bool parseform(const lexemes& l, size_t& pos);
 	bool parseform1(const lexemes& l, size_t& pos);
 	
 	bool parse(const lexemes& l, size_t& pos);
-	void clear() { ql.clear(); terms.clear(); elems.clear(); }
+	void clear() { ql.clear(); terms.clear(); qbops.clear(); }
 	void printTree(int level =0 );
 	
 };
