@@ -27,7 +27,7 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR, FORALL, EXISTS, UNIQUE
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -38,6 +38,7 @@ struct elem {
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
+	etype peek(const lexemes& l, size_t& pos);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }
 	bool parse(const lexemes& l, size_t& pos);
 	bool operator<(const elem& t) const {
@@ -113,6 +114,31 @@ struct raw_rule {
 		return h == r.h && b == r.b;
 	}
 	bool operator!=(const raw_rule& r) const { return !(*this == r); }
+};
+
+struct raw_prefix {
+		elem qtype;
+		elem ident;
+		bool isfod =false;
+	
+	bool parse(const lexemes& l, size_t& pos);
+
+};
+struct raw_sof {
+	bool isneg = false;
+	std::vector<raw_prefix> pref;
+	raw_term tm;
+	std::vector<raw_sof> recsof;    // recursive sof inside { }
+
+	std::vector<elem> qbops;
+	std::vector<raw_sof> nxtsof;	// next sibling sof separated by qbops binary operator
+	bool parseform(const lexemes& l, size_t& pos);
+	bool parseform1(const lexemes& l, size_t& pos);
+	
+	bool parse(const lexemes& l, size_t& pos);
+	void clear() { pref.clear(); recsof.clear(); nxtsof.clear(); qbops.clear(); }
+	void printTree(int level =0 );
+	
 };
 
 struct raw_prog {

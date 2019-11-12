@@ -147,7 +147,14 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 		parse_error(l[curr2][1], dot_expected, l[curr2]);
 	return true;
 }
-
+elem::etype elem::peek(const lexemes& l, size_t& pos) {
+	
+	size_t curr = pos;
+	type = NONE;
+	if( pos < l.size() ) parse(l,pos);
+	pos = curr;
+	return type;
+}
 bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
@@ -170,6 +177,13 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
 	}
+	if (L';' == l[pos][0][0]) {
+		return e = l[pos++], type = OR, true;
+	}
+	if (L',' == l[pos][0][0]) {
+		return e = l[pos++], type = AND, true;
+	}
+
 	//if (L'=' == l[pos][0][0] &&
 	//	L'=' == l[pos][0][1]) {
 	//	return e = l[pos++], type = EQ, true;
@@ -187,7 +201,16 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		else throw 0;
 	}
 	else if (*l[pos][0] == L'?') type = VAR;
-	else if (iswalpha(*l[pos][0])) type = SYM;
+	else if (iswalpha(*l[pos][0])) {
+		size_t len = l[pos][1]-l[pos][0];
+		if( len == 6 && !wcsncmp(l[pos][0], L"forall", len )) 
+			type = FORALL;
+		else if ( len == 6 && !wcsncmp(l[pos][0], L"exists", len ) )
+			type = EXISTS;
+		else if ( len == 6 && !wcsncmp(l[pos][0], L"unique", len ) )
+			type = UNIQUE;
+		else type = SYM;
+	}
 	else if (*l[pos][0] == L'"') type = STR;
 	else type = NUM, num = get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, true;
@@ -283,8 +306,17 @@ head:	h.emplace_back();
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
 		parse_error(l[pos][0], err_head, l[pos]);
-	++pos; b.emplace_back();
-	for (	b.back().emplace_back(); b.back().back().parse(l, pos);
+	++pos; 
+
+	curr = pos; 
+	raw_sof sof;
+	if( sof.parse(l, pos) ){
+		
+		if (l.size() > pos && *l[pos][0] == '.') return ++pos, true;
+	}
+	pos = curr;
+	b.emplace_back();
+	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
 		if (*l[pos][0] == '.') return ++pos, true;
 		else if (*l[pos][0] == L';') b.emplace_back();
@@ -293,6 +325,131 @@ head:	h.emplace_back();
 	}
 	parse_error(l[pos][0], err_body, l[pos]);
 	return false;
+}
+
+bool raw_prefix::parse(const lexemes& l, size_t& pos) {
+	size_t curr = pos;
+	isfod = false;
+
+	if ( !qtype.parse(l, pos) ) return false;
+	if (qtype.type != elem::FORALL &&  
+		qtype.type != elem::EXISTS && 
+		qtype.type != elem::UNIQUE)
+			return pos = curr, false;
+
+	if (*l[pos][0] == L'?' ) isfod = true;
+
+	if ( !ident.parse(l, pos) ) return false;
+	if ( ident.type != elem::VAR  && ident.type != elem::SYM)
+			return pos = curr, false;
+		
+	return true; 
+} 
+
+bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
+
+	size_t curr = pos;
+	if ( pos == l.size() ) return false;
+	
+	if( *l[pos][0] == '~') isneg=true,++pos;
+	if( pos != l.size() && *l[pos][0] == '{') {
+		++pos;
+		recsof.emplace_back();
+		bool ret = recsof.back().parseform(l, pos);
+		if( pos == l.size() || !ret || *l[pos][0] != '}') 
+			return pos = curr, false;
+		else return ++pos, true;
+ 
+	} 
+	elem next;
+	next.peek(l, pos);
+	
+	if( next.type == elem::SYM  ) {
+		
+		return tm.parse(l, pos);
+	}
+	else {
+		
+		while( 	next.type == elem::FORALL ||
+				next.type == elem::UNIQUE ||
+				next.type == elem::EXISTS ) {
+		
+			pref.emplace_back();	
+			if ( !pref.back().parse(l,pos) ) return false;
+			
+			next.peek(l, pos);
+		}	
+		if( pref.size() == 0  ) return false;
+
+		if(  pos == l.size() || *l[pos][0] != '{')  return false;
+		
+		++pos;
+		recsof.emplace_back();
+		bool ret = recsof.back().parseform(l, pos);
+		if( pos == l.size() || !ret || *l[pos][0] != '}') 	return pos = curr, false;
+		else return ++pos, true;
+		
+	} 
+
+}
+bool raw_sof::parseform(const lexemes& l, size_t& pos) {
+
+	size_t curr = pos;
+	 
+	if ( pos == l.size() ) return false;
+	
+	if ( !this->parseform1(l, pos) ) return pos = curr, false;
+
+	if ( pos == l.size() ) return true;
+
+	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
+	
+		qbops.emplace_back().parse(l, pos);
+		nxtsof.emplace_back();
+
+		if ( !nxtsof.back().parseform(l, pos) ) return pos = curr, false;
+	}
+	return true;
+}
+
+
+
+bool raw_sof::parse(const lexemes& l, size_t& pos) {
+	
+	bool ret = this->parseform(l , pos);
+	
+	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
+	printTree();
+	return ret;
+}
+ void raw_sof::printTree( int level)
+{
+	wprintf(L"\n");
+	
+	for(int i=0;i<level;i++)
+		wprintf(L"\t");
+
+	if( isneg) wprintf (L"~");
+	for( raw_prefix &d:pref) {
+		wprintf(L"%ls ", lexeme2str(d.qtype.e).c_str());
+		wprintf(L"%ls ", lexeme2str(d.ident.e).c_str());
+	}
+	
+	for(elem &el: tm.e)
+		wprintf(L"%ls ", lexeme2str(el.e).c_str());
+	
+	
+	for( raw_sof &sof : recsof) {
+		sof.printTree(level+1);		
+	}
+	
+	size_t j= 0;
+	for(  elem &ele : qbops) {
+		wprintf(L"\n");
+		for(int i=0;i<(level);i++)	wprintf(L"\t");
+		wprintf(L"%ls ", lexeme2str(ele.e).c_str());
+		if(j < nxtsof.size())	nxtsof[j++].printTree(level);
+	}
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {

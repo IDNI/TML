@@ -2,3 +2,6 @@ build-*
 tml-config.cmake
 
 .vscode
+src/inputsave.cpp
+src/inputsave.h
+src/tmlsave.g
