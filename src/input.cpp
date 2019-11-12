@@ -327,7 +327,7 @@ head:	h.emplace_back();
 	return false;
 }
 
-bool raw_qdecl::parse(const lexemes& l, size_t& pos) {
+bool raw_prefix::parse(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	isfod = false;
 
@@ -354,8 +354,8 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	if( *l[pos][0] == '~') isneg=true,++pos;
 	if( pos != l.size() && *l[pos][0] == '{') {
 		++pos;
-		args.emplace_back();
-		bool ret = args.back().parseform(l, pos);
+		recsof.emplace_back();
+		bool ret = recsof.back().parseform(l, pos);
 		if( pos == l.size() || !ret || *l[pos][0] != '}') 
 			return pos = curr, false;
 		else return ++pos, true;
@@ -365,8 +365,8 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	next.peek(l, pos);
 	
 	if( next.type == elem::SYM  ) {
-		terms.emplace_back();
-		return terms.back().parse(l, pos);
+		
+		return tm.parse(l, pos);
 	}
 	else {
 		
@@ -374,18 +374,18 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 				next.type == elem::UNIQUE ||
 				next.type == elem::EXISTS ) {
 		
-			ql.emplace_back();	
-			if ( !ql.back().parse(l,pos) ) return false;
+			pref.emplace_back();	
+			if ( !pref.back().parse(l,pos) ) return false;
 			
 			next.peek(l, pos);
 		}	
-		if( ql.size() == 0  ) return false;
+		if( pref.size() == 0  ) return false;
 
 		if(  pos == l.size() || *l[pos][0] != '{')  return false;
 		
 		++pos;
-		args.emplace_back();
-		bool ret = args.back().parseform(l, pos);
+		recsof.emplace_back();
+		bool ret = recsof.back().parseform(l, pos);
 		if( pos == l.size() || !ret || *l[pos][0] != '}') 	return pos = curr, false;
 		else return ++pos, true;
 		
@@ -397,17 +397,17 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 	size_t curr = pos;
 	 
 	if ( pos == l.size() ) return false;
-	args.emplace_back();
-	if ( !args.back().parseform1(l, pos) ) return pos = curr, false;
+	
+	if ( !this->parseform1(l, pos) ) return pos = curr, false;
 
 	if ( pos == l.size() ) return true;
 
 	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
 	
 		qbops.emplace_back().parse(l, pos);
-		args.emplace_back();
+		nxtsof.emplace_back();
 
-		if ( !args.back().parseform1(l, pos) ) return pos = curr, false;
+		if ( !nxtsof.back().parseform(l, pos) ) return pos = curr, false;
 	}
 	return true;
 }
@@ -416,7 +416,6 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 
 bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	
-	size_t curr = pos;
 	bool ret = this->parseform(l , pos);
 	
 	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
@@ -431,23 +430,26 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 		wprintf(L"\t");
 
 	if( isneg) wprintf (L"~");
-	for( raw_qdecl &d:ql) {
+	for( raw_prefix &d:pref) {
 		wprintf(L"%ls ", lexeme2str(d.qtype.e).c_str());
 		wprintf(L"%ls ", lexeme2str(d.ident.e).c_str());
 	}
-	for (raw_term & t:terms)
-		for(elem &el: t.e)
-			wprintf(L"%ls ", lexeme2str(el.e).c_str());
-	size_t j= 0;
-	for( raw_sof &sof : args) {
-		sof.printTree(level+1);
-		if( j < qbops.size()) {
-			for(int i=0;i<(1+level);i++)
-				wprintf(L"\t");
-			wprintf(L"%ls ", lexeme2str(qbops[j].e).c_str()),j++;
-		}
+	
+	for(elem &el: tm.e)
+		wprintf(L"%ls ", lexeme2str(el.e).c_str());
+	
+	
+	for( raw_sof &sof : recsof) {
+		sof.printTree(level+1);		
 	}
-	wprintf(L"\n");	
+	
+	size_t j= 0;
+	for(  elem &ele : qbops) {
+		wprintf(L"\n");
+		for(int i=0;i<(level);i++)	wprintf(L"\t");
+		wprintf(L"%ls ", lexeme2str(ele.e).c_str());
+		if(j < nxtsof.size())	nxtsof[j++].printTree(level);
+	}
 }
 
 bool production::parse(const lexemes& l, size_t& pos) {
