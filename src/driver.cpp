@@ -156,10 +156,10 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 		for (auto p : rp.p)
 			output::to(L"transformed")<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
-	if (opts.disabled(L"run")) return;
 	clock_t start, end;
 	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"),
 		opts.enabled(L"t"));
+	if (opts.disabled(L"run")) return;
 	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
@@ -197,6 +197,7 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
 driver::driver(wstring s, options o) : driver(raw_progs(s), o) {}
 driver::driver(char *s,   options o) : driver(raw_progs(s2ws(string(s))), o) {}
+driver::driver(options o)            : driver(raw_progs(o.input()), o) {}
 driver::driver(FILE *f)              : driver(f, options()) {}
 driver::driver(wstring s)            : driver(s, options()) {}
 driver::driver(char *s)              : driver(s, options()) {}

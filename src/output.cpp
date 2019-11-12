@@ -244,7 +244,7 @@ wostream& operator<<(wostream& os, const option& o) {
 			return os << (o.get_bool() ?L"":L"false");
 		case option::type::STRING: {
 			wstring s = o.get_string();
-			if (s.rfind(L"-", 0) == 0) os << L"--";
+			if (s != L"-" && s.rfind(L"-", 0) == 0) os << L"--";
 			os << L'"';
 			for (auto it = s.begin(); it < s.end(); ++it)
 				os << (*it == '\\' || *it == '"' ? L"\\" : L""),

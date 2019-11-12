@@ -19,29 +19,16 @@ using namespace std;
 
 //void print_memos_len();
 
-bool is_stdin_readable();
-
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	bdd::init();
 	driver::init();
-	if (is_stdin_readable())
-		driver d(file_read_text(stdin), options(argc, argv));
-	else {
-		strings args;
-		if (argc == 1) args = { "-v", "-h" };
-		driver d(L"", options(args));
-	}
+	options o(argc, argv);
+	if (o.disabled(L"i") && o.disabled(L"h") && o.disabled(L"v"))
+		// read from stdin by default if no --i and no --h and no --v
+		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
+	driver d(o);
 	onexit = true;
 //	print_memos_len();
 	return 0;
-}
-
-bool is_stdin_readable() {
-#ifdef __unix__
-	long n = 0;
-	return ioctl(0, FIONREAD, &n) == 0 && n > 0;
-#else // WIN TODO
-	return true;
-#endif
 }
