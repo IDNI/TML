@@ -116,7 +116,7 @@ struct raw_rule {
 	bool operator!=(const raw_rule& r) const { return !(*this == r); }
 };
 
-struct raw_qdecl {
+struct raw_prefix {
 		elem qtype;
 		elem ident;
 		bool isfod =false;
@@ -125,27 +125,20 @@ struct raw_qdecl {
 
 };
 struct raw_sof {
-	std::vector<raw_term> h;
-	std::vector<std::vector<raw_term>> b;
-	
-	std::vector<raw_sof> args;
+	bool isneg = false;
+	std::vector<raw_prefix> pref;
+	raw_term tm;
+	std::vector<raw_sof> recsof;    // recursive sof inside { }
+
+	std::vector<elem> qbops;
+	std::vector<raw_sof> nxtsof;	// next sibling sof separated by qbops binary operator
 	bool parseform(const lexemes& l, size_t& pos);
 	bool parseform1(const lexemes& l, size_t& pos);
-
+	
 	bool parse(const lexemes& l, size_t& pos);
-	void clear() { b.clear(); }
-	raw_sof(){}
-	raw_sof(const raw_term& t) : h({t}) {}
+	void clear() { pref.clear(); recsof.clear(); nxtsof.clear(); qbops.clear(); }
+	void printTree(int level =0 );
 	
-	raw_sof(const raw_term& h, const raw_term& b) : h({h}), b({{b}}) {}
-	raw_sof(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
-		if (!_b.empty()) b = {_b};
-	}
-	
-	bool operator==(const raw_sof& r) const {
-		return h == r.h && b == r.b;
-	}
-	bool operator!=(const raw_sof& r) const { return !(*this == r); }
 };
 
 struct raw_prog {
