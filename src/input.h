@@ -138,7 +138,6 @@ struct raw_sof {
 	bool parse(const lexemes& l, size_t& pos);
 	void clear() { pref.clear(); recsof.clear(); nxtsof.clear(); qbops.clear(); }
 	void printTree(int level =0 );
-	
 };
 
 struct raw_prog {

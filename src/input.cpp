@@ -75,7 +75,7 @@ lexeme lex(pcws s) {
 	//if (**s == L'=' && *(*s + 1) == L'=') {
 	//	return *s += 2, lexeme{ *s - 2, *s };
 	//}
-	if (wcschr(L"!~.,;(){}$@=<>|", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
 	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
@@ -177,10 +177,10 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
 	}
-	if (L';' == l[pos][0][0]) {
+	if (L'|' == l[pos][0][0]) {
 		return e = l[pos++], type = OR, true;
 	}
-	if (L',' == l[pos][0][0]) {
+	if (L'&' == l[pos][0][0]) {
 		return e = l[pos++], type = AND, true;
 	}
 
@@ -221,7 +221,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false;
-	while (!wcschr(L".:,;{}", *l[pos][0])) {
+	while (!wcschr(L".:,;{}|&", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
@@ -402,7 +402,7 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 
 	if ( pos == l.size() ) return true;
 
-	while( *l[pos][0] == ';' || *l[pos][0] == ',' ) {
+	while( *l[pos][0] == '&' || *l[pos][0] == '|' ) {
 	
 		qbops.emplace_back().parse(l, pos);
 		nxtsof.emplace_back();

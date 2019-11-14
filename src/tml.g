@@ -38,12 +38,12 @@ alts => null | '|' ws alt ws alts ws.
 
 prefix => "forall" | "exists" | "unique" .
 qvars => prefix ws identifier ws qvars | prefix ws identifier ws .
-qform => qform1 qform_rest
+qform => qform1 qform_rest.
 qform_rest => qbop qform qform_rest | null.
 qform1 => 	term | '{' qform '}' | '~' term | 
-			'~' '{' qform '}' |
+			'~' '{' qform '}' | qvars '{' form '}' |
 			'~' qvars '{' form '}'.
-qbop => ',' | ';'.			
+qbop => '|' | '&'.			
 
 sof => qform.
 
