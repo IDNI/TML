@@ -18,7 +18,7 @@
 #endif
 #include "bdd.h"
 #include "term.h"
-
+#include "input.h"
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
@@ -110,6 +110,7 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
+struct sof;
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
@@ -287,6 +288,12 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
+
+	sof* from_raw_term2(const raw_term& rt);
+	sof* from_raw_prefix(const std::vector<raw_prefix> &rpf);
+	sof* from_raw_bops(const elem& el );
+	sof* from_raw_sof(const raw_sof& rs);
+
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
@@ -300,6 +307,31 @@ public:
 	void out(emscripten::val o) const;
 #endif
 	void set_proof(bool v) { bproof = v; }
+};
+
+struct sof {
+	int_t arg;
+	term *tm;
+	sof *l;
+	sof *r;
+	enum softype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES 
+	} type;
+
+	
+	sof(){
+		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
+	}
+
+	sof( softype _type, int_t _arg=0, term *_t=NULL, sof *_l= NULL, sof *_r=NULL  ) {
+		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
+	}
+
+	~sof() {
+		if(l) delete l;
+		if(r) delete r;
+		if(tm) delete tm;
+	}
+	void printnode(int lv=0);
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);

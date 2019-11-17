@@ -127,7 +127,7 @@ struct raw_prefix {
 struct raw_sof {
 	bool isneg = false;
 	std::vector<raw_prefix> pref;
-	raw_term tm;
+	std::vector<raw_term> tm;
 	std::vector<raw_sof> recsof;    // recursive sof inside { }
 
 	std::vector<elem> qbops;

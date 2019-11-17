@@ -16,6 +16,7 @@
 #include <fstream>
 #include <vector>
 #include "input.h"
+#include "tables.h"
 #include "err.h"
 #include "output.h"
 using namespace std;
@@ -366,7 +367,7 @@ bool raw_sof::parseform1(const lexemes& l, size_t& pos) {
 	
 	if( next.type == elem::SYM  ) {
 		
-		return tm.parse(l, pos);
+		return tm.emplace_back().parse(l, pos);
 	}
 	else {
 		
@@ -407,7 +408,7 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos) {
 		qbops.emplace_back().parse(l, pos);
 		nxtsof.emplace_back();
 
-		if ( !nxtsof.back().parseform(l, pos) ) return pos = curr, false;
+		if ( !nxtsof.back().parseform1(l, pos) ) return pos = curr, false;
 	}
 	return true;
 }
@@ -420,6 +421,10 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 	
 	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
 	printTree();
+	/* to test sof, uncomment below.
+	sof * cur = from_raw_sof(*this);
+	if(cur) cur->printnode(),delete cur;
+	*/
 	return ret;
 }
  void raw_sof::printTree( int level)
@@ -434,8 +439,8 @@ bool raw_sof::parse(const lexemes& l, size_t& pos) {
 		wprintf(L"%ls ", lexeme2str(d.qtype.e).c_str());
 		wprintf(L"%ls ", lexeme2str(d.ident.e).c_str());
 	}
-	
-	for(elem &el: tm.e)
+	if( tm.size() > 0)
+	for(elem &el: tm.back().e)
 		wprintf(L"%ls ", lexeme2str(el.e).c_str());
 	
 	
