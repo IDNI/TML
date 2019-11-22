@@ -18,11 +18,12 @@
 #endif
 #include "bdd.h"
 #include "term.h"
-#include "input.h"
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
+struct raw_sof;
+struct raw_form_tree;
 class tables;
 class dict_t;
 
@@ -110,7 +111,7 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
-struct sof;
+struct form;
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
@@ -289,10 +290,7 @@ private:
 	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
 
-	sof* from_raw_term2(const raw_term& rt);
-	sof* from_raw_prefix(const std::vector<raw_prefix> &rpf);
-	sof* from_raw_bops(const elem& el );
-	sof* from_raw_sof(const raw_sof& rs);
+	bool from_raw_form(const raw_form_tree *rs, form *&froot);
 
 public:
 	tables(bool bproof = false, bool optimize = true,
@@ -309,27 +307,28 @@ public:
 	void set_proof(bool v) { bproof = v; }
 };
 
-struct sof {
+struct form{
 	int_t arg;
 	term *tm;
-	sof *l;
-	sof *r;
-	enum softype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES 
+	form *l;
+	form *r;
+	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES 
 	} type;
 
 	
-	sof(){
+	form(){
 		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
 	}
 
-	sof( softype _type, int_t _arg=0, term *_t=NULL, sof *_l= NULL, sof *_r=NULL  ) {
+	form( ftype _type, int_t _arg=0, term *_t=NULL, form *_l= NULL, form *_r=NULL  ) {
 		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
+		if( _t) tm = new term(), *tm = *_t;
 	}
 
-	~sof() {
-		if(l) delete l;
-		if(r) delete r;
-		if(tm) delete tm;
+	~form() {
+		if(l) delete l, l = NULL;
+		if(r) delete r, r = NULL;
+		if(tm) delete tm, tm = NULL;
 	}
 	void printnode(int lv=0);
 };

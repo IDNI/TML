@@ -219,99 +219,71 @@ term tables::from_raw_term(const raw_term& r) {
 }
 
 
-sof* tables::from_raw_term2(const raw_term& rt) {
 
-	term t =  from_raw_term(rt);
-	term *pt = new term(t);
-	return new sof(sof::ATOM, 0, pt );
-	
-	/* for testing, uncomment below , and comment above
-	
-	static int i=0; 
-	return new sof(sof::ATOM, i++, 0);
-	
-	*/
+bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 
-}
+	form::ftype ft = form::NONE;
+	bool ret =false;
+	form *root = NULL;
+	int_t arg= 0;
 
-sof* tables::from_raw_prefix( const std::vector<raw_prefix> &rpf){
-	sof* left = NULL;
-	sof* root = NULL;
-	sof** right = &root;
+	if(!rfm) return froot=root,  true;
+
 	
-	for ( const raw_prefix & rp : rpf) {
+	if(rfm->rt) {
+		ft = form::ATOM;
+		term t = from_raw_term(*rfm->rt);
+		root = new form(ft, 0, &t );
+		froot = root;
+		if(!root) return false;
+		return true;
+
 		
-		enum sof::softype ctype = sof::NONE;
+	}
+	else {
+		switch(rfm->type) {
+			case elem::NOT:
+				root = new form(form::NOT);
+				if(root ) {
+					ret =  from_raw_form(rfm->l, root->l);
+					froot = root;
+					return ret;
+				}
+				else return false;
 
-		switch ( rp.qtype.type) {
-			
-		case elem::FORALL: rp.isfod ?  ctype = sof::FORALL1 : ctype = sof::FORALL2; break;
-		case elem::UNIQUE: rp.isfod ?  ctype = sof::UNIQUE1 : ctype = sof::UNIQUE2; break;
-		case elem::EXISTS: rp.isfod ?  ctype = sof::EXISTS1 : ctype = sof::EXISTS2; break;
-		default: throw 0;
+			case elem::VAR:
+			case elem::SYM: 
+				ft = form::ATOM;
+				if( rfm->type == elem::VAR)
+					arg = dict.get_var(rfm->el->e);
+				else arg = dict.get_sym(rfm->el->e);
+				root = new form(ft, arg);
+				froot = root;
+				if(!root) return false;
+				return true;
+		
+			case elem::FORALL: if(rfm->l->type == elem::VAR) ft = form::FORALL1; else ft = form::FORALL2; break;
+			case elem::UNIQUE: if(rfm->l->type == elem::VAR) ft = form::UNIQUE1; else ft = form::UNIQUE2; break;
+			case elem::EXISTS: if(rfm->l->type == elem::VAR) ft = form::EXISTS1; else ft = form::EXISTS2; break;
+			case elem::OR:
+			case elem::ALT: ft = form::OR; break;
+			case elem::AND: ft = form::AND; break;
+			case elem::IMPLIES: ft= form::IMPLIES; break;
+			case elem::COIMPLIES: ft= form::COIMPLIES; break;
+			default: return froot= root, false;
 		}
-
-		int_t arg;
-		if (rp.isfod)  arg = dict.get_var(rp.ident.e);
-		else  arg = dict.get_rel(rp.ident.e);
-
-		/* for testing, uncomment below , and comment above
-	
-		int_t arg;
-		if (rp.isfod) arg = 1;  // dict.get_var(rp.ident.e);
-		else arg = 2;            // dict.get_rel(rp.ident.e);
-		
-		*/
-
-		*right = new sof(ctype, arg);
-
-		 // left = new sof();  when ident var is to be made left node;
-		right = &(*right)->r;
+		root =  new form(ft,0, 0); 
+		if( root ) {
+			ret= from_raw_form(rfm->l, root->l);
+			ret |= from_raw_form(rfm->r, root->r);
+			froot = root;
+			return ret;
+		}
+		return false;	
 	}
-	return root;
 }
-sof* tables::from_raw_bops(const elem& el ){
-	
-	if(el.type == elem::AND )
-	  	return new sof(sof::AND);
-	else if (el.type == elem::OR )
-		return new sof(sof::OR);
-	throw 0;
-}
-sof* tables::from_raw_sof(const raw_sof& rs) {
-	
-	sof* root = NULL;
-	sof** left = &root;
-	sof* right = NULL;
 
-	for( int i= rs.qbops.size()-1 ; i >= 0 ;i--) {
-
-		*left = from_raw_bops(rs.qbops[i]);
-		if(!*left) throw 0;
-		(*left)->r = from_raw_sof(rs.nxtsof[i]);
-		left = &(*left)->l;
-	}
-	if( rs.isneg) {
-		*left = new sof(sof::NOT);
-		if(!*left) throw 0;
-		 left = &(*left)->l;
-	}
-	if (rs.tm.size() > 0)
-		*left = from_raw_term2(rs.tm.back());
-
-	else if( rs.pref.size() > 0 ) {
-		*left = from_raw_prefix(rs.pref);  
-		if(!*left) throw 0;
-		while((*left)->r) 
-			left = &(*left)->r;
-		left = &(*left)->r;		// the last right node of prefix tree
-	}
-	if( rs.recsof.size() > 0)
-		*left = from_raw_sof(rs.recsof.back());	
-
-	return root;
-}
-void sof::printnode(int lv) {
+void form::printnode(int lv) {
 		if(r) r->printnode(lv+1);
 		wprintf(L"\n");
 		for( int i=0; i <lv; i++)

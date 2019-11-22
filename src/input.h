@@ -27,7 +27,8 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR = ALT, FORALL, EXISTS, UNIQUE
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, NOT, AND,
+		OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES 
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -122,22 +123,48 @@ struct raw_prefix {
 		bool isfod =false;
 	
 	bool parse(const lexemes& l, size_t& pos);
+};
 
+
+struct raw_form_tree {
+	elem::etype type;
+	raw_term *rt;
+	elem * el;
+
+	raw_form_tree *l;
+	raw_form_tree *r;
+
+	
+
+	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el= NULL, raw_form_tree *_l= NULL, raw_form_tree *_r= NULL ) {
+		
+		type = _type;
+		if(_rt) 
+			rt = new raw_term(*_rt);
+		else rt = NULL;
+
+		if(_el)
+			el = new elem(*_el);
+		else el = NULL;
+
+		l = _l;
+		r = _r;
+	}
+	~raw_form_tree() {
+		if( l ) delete l, l= NULL;
+		if (r ) delete r, r= NULL;
+		if (rt) delete rt,rt= NULL;
+		if (el) delete el, el= NULL;
+	}
+	void printTree(int level =0 );
 };
 struct raw_sof {
-	bool isneg = false;
-	std::vector<raw_prefix> pref;
-	std::vector<raw_term> tm;
-	std::vector<raw_sof> recsof;    // recursive sof inside { }
 
-	std::vector<elem> qbops;
-	std::vector<raw_sof> nxtsof;	// next sibling sof separated by qbops binary operator
-	bool parseform(const lexemes& l, size_t& pos);
-	bool parseform1(const lexemes& l, size_t& pos);
+	bool parseform(const lexemes& l, size_t& pos, raw_form_tree *&root, int precd= 0);
+	bool parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&root);
+
+	bool parse(const lexemes& l, size_t& pos, raw_form_tree *&root);
 	
-	bool parse(const lexemes& l, size_t& pos);
-	void clear() { pref.clear(); recsof.clear(); nxtsof.clear(); qbops.clear(); }
-	void printTree(int level =0 );
 };
 
 struct raw_prog {
