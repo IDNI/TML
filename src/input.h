@@ -159,6 +159,7 @@ struct raw_form_tree {
 	void printTree(int level =0 );
 };
 struct raw_sof {
+	std::vector<raw_term> h;
 
 	bool parseform(const lexemes& l, size_t& pos, raw_form_tree *&root, int precd= 0);
 	bool parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&root);

@@ -324,19 +324,18 @@ head:	h.emplace_back();
 	if (!h.back().parse(l, pos)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
 	if (*l[pos][0] == ',') { ++pos; goto head; }
-	if (*l[pos][0] != ':' || l[pos][0][1] != L'-')
+	if (*l[pos][0] != ':' || (l[pos][0][1] != L'-' && l[pos][0][1] != L'=' ))
 		parse_error(l[pos][0], err_head, l[pos]);
-	++pos; 
+	++pos;
+	if(l[pos-1][0][1] == L'=') { //  formula
+		curr = pos; 
+		raw_sof rsof;
+		raw_form_tree *rtr = NULL;
+		if( rsof.parse(l, pos, rtr) )
+			return true;
+		parse_error(l[pos][0], L"Formula has errors", l[pos]);
+	} else {
 
-	curr = pos; 
-	raw_sof rsof;
-	raw_form_tree *rtr = NULL;
-
-	if( rsof.parse(l, pos, rtr) ){
-		
-		if (l.size() > pos && *l[pos][0] == '.') return ++pos, true;
-	}
-	pos = curr;
 	b.emplace_back();
 	for (b.back().emplace_back(); b.back().back().parse(l, pos);
 		b.back().emplace_back(), ++pos) {
@@ -347,6 +346,7 @@ head:	h.emplace_back();
 	}
 	parse_error(l[pos][0], err_body, l[pos]);
 	return false;
+	}
 }
 
 bool raw_prefix::parse(const lexemes& l, size_t& pos) {
@@ -457,7 +457,6 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, in
 
 	bool ret = parsematrix(l, pos, root);
 	elem nxt;	
-	nxt.peek(l, pos);
 	if ( !ret ) goto Cleanup;	
 	
 	nxt.peek(l, pos);
@@ -478,8 +477,8 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, in
 		root = cur;
 		if( ! parseform(l, pos, root->r, 1) ) goto Cleanup;
 		nxt.peek(l,pos);
-	}
-
+	
+	} 
 	froot = root;
 	return true;
 	
@@ -494,6 +493,8 @@ bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *& root) {
 	
 	bool ret = parseform(l, pos, root, 0 );
 
+	if( pos >= l.size() || *l[pos][0] != '.') ret = false;
+	else pos++;
 	
 	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
 	if(root) root->printTree();
