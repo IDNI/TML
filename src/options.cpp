@@ -90,7 +90,7 @@ bool options::parse_option(const wstrings &wargs, const size_t &i) {
 	bool skip_next = false;
 	size_t pos = 0;
 	const wstring &arg = wargs[i];
-	//DBG(wcout<<L"parse_option: "<<arg<<L' '<<i<<endl;)
+	//DBG(o::out()<<L"parse_option: "<<arg<<L' '<<i<<endl;)
 	// skip hyphens
 	while (pos < arg.length() && arg[pos] == L'-' && pos < 2) ++pos;
 	wstring a = arg.substr(pos);
@@ -100,7 +100,7 @@ bool options::parse_option(const wstrings &wargs, const size_t &i) {
 	else if (a.rfind(L"no-",   0) == 0) disabled = true, a = a.substr(3);
 	if (!get(a, o)) {
 		if (!i) goto done; // arg[0] is not expected to be an argument
-		output::to(L"error") << L"Unknown argument: " << wargs[i]<<endl;
+		o::err() << L"Unknown argument: " << wargs[i]<<endl;
 		return is_value(wargs, i+1);
 	}
 	if (disabled) o.disable();
@@ -127,14 +127,14 @@ void options::setup() {
 
 	add(option(option::type::BOOL, { L"help", L"h", L"?" },
 		[this](const option::value& v) {
-			if (v.get_bool()) help(output::to(L"info"));
+			if (v.get_bool()) help(o::inf());
 		})
 		.description(L"this help"));
 	add(option(option::type::BOOL, { L"version", L"v" },
 		[](const option::value& v) {
-			if (v.get_bool()) output::to(L"info") << L"TML: "
+			if (v.get_bool()) o::inf() << L"TML: "
 				<< GIT_DESCRIBED << endl;
-			DBG(if (v.get_bool()) output::to(L"info")
+			DBG(if (v.get_bool()) o::inf()
 				<< L"commit: " << GIT_COMMIT_HASH << L" ("
 				<< GIT_BRANCH << L')' <<endl;)
 		})
@@ -147,7 +147,7 @@ void options::setup() {
 			else {
 				wifstream f(ws2s(v.get_string()));
 				if (f.good()) is << f.rdbuf();
-				else output::to(L"error")
+				else o::err()
 					<< L"Error while opening file: "
 					<< v.get_string() << endl;
 			}

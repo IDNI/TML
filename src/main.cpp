@@ -24,7 +24,8 @@ int main(int argc, char** argv) {
 	bdd::init();
 	driver::init();
 	options o(argc, argv);
-	if (o.disabled(L"i") && o.disabled(L"h") && o.disabled(L"v"))
+	if (o.disabled(L"i") && o.disabled(L"ie")
+				&& o.disabled(L"h") && o.disabled(L"v"))
 		// read from stdin by default if no --i and no --h and no --v
 		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
 	driver d(o);

@@ -244,7 +244,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == L"null") {
-#ifndef ELIM_NULLS			
+#ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
 			elem e = get_var_elem(2);
@@ -253,11 +253,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			r.r.push_back(l), l.clear(), l.h.push_back(t),
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
-#endif			
+#endif
 //			_r.r.push_back({{t, t}});
 //			_r.r.back().b[0].neg = true;
 		} else {
-//			wcout << p << endl;
+//			o::out() << p << endl;
 			size_t v = p.p.size();
 			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
 			l.b.emplace_back();
@@ -283,11 +283,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	append_closep(t.e), t.calc_arity();
 	raw_rule rr;
 	rr.type = raw_rule::GOAL, rr.h = {t}, r.r.push_back(rr);
-	DBG(wcout<<"transformed grammar:"<<endl<<r;)
+	DBG(o::out()<<"transformed grammar:"<<endl<<r;)
 //#ifdef BWD_GRAMMAR
 	//transform_bwd(r);
 //	transform_bin(r);
-//#endif	
+//#endif
 //	r.delrel = dict_get_rel(L"try");
 //	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
@@ -394,7 +394,7 @@ raw_term sub(const raw_term& x, map<elem, elem>& m) {
 
 bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 	if (r.b.empty()) return res.h = r.h, true;
-//	DBG(wcout << L"specializing" << endl << r << "wrt" << endl << t <<endl;)
+//	DBG(o::out() << L"specializing" << endl << r << "wrt" << endl << t <<endl;)
 	for (const raw_term& h : r.h) {
 		map<elem, elem> m;
 		if (!unify(h, t, m)) continue;
@@ -406,9 +406,9 @@ bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 		}
 	}
 	if (res.h.size()) goto pass;
-//	DBG(wcout << L" failed " << endl;)
+//	DBG(o::out() << L" failed " << endl;)
 	return false;
-pass:	//DBG(wcout << L" returned " << res << endl;)
+pass:	//DBG(o::out() << L" returned " << res << endl;)
 	return true;
 }*/
 
@@ -587,8 +587,8 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 			t.insert(t.begin(), move(d));
 		}
 	}
-	DBG(wcout<<"sdt transform, input:"<<endl<<p<<endl;)
-	DBG(wcout<<"sdt transform, output:"<<endl<<r<<endl;)
+	DBG(o::out()<<"sdt transform, input:"<<endl<<p<<endl;)
+	DBG(o::out()<<"sdt transform, output:"<<endl<<r<<endl;)
 	return r;
 }*/
 #ifdef TRANSFORM_BIN_DRIVER
@@ -609,7 +609,7 @@ void driver::transform_bin(raw_prog& p) {
 		rels.insert(r.first.e[0].e);
 		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
 	}
-//	DBG(wcout<<"bin before:"<<endl<<f<<endl;)
+//	DBG(o::out()<<"bin before:"<<endl<<f<<endl;)
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),
@@ -690,7 +690,7 @@ void driver::transform_bin(raw_prog& p) {
 			for (const auto& x : r.b) {
 				rls.emplace(t, x);
 				raw_term th;
-				th.e = { fact, elem_openp, 
+				th.e = { fact, elem_openp,
 			}
 
 }*/
@@ -729,8 +729,8 @@ raw_prog driver::transform_ms(raw_prog p) {
 	}
 	raw_prog res;
 	for (const raw_rule& t : rs) res.r.push_back(t);
-	DBG(wcout<<"orig:"<<endl<<p;)
-	DBG(wcout<<"spec:"<<endl<<res;)
+	DBG(o::out()<<"orig:"<<endl<<p;)
+	DBG(o::out()<<"spec:"<<endl<<res;)
 	return res;
 }
 */
@@ -742,8 +742,8 @@ raw_prog driver::transform_ms(raw_prog p) {
 	map<elem, elem> m;
 loop:	sz = qs.size();
 #ifdef DEBUG
-	wcout<<"qs:"<<endl;
-	for (auto x : qs) wcout << x << endl;
+	o::out()<<"qs:"<<endl;
+	for (auto x : qs) o::out() << x << endl;
 #endif
 	for (raw_term q : qs) {
 		m.clear(), v = 1, refresh_vars(q, v, m);
@@ -759,7 +759,7 @@ loop:	sz = qs.size();
 	if (sz != qs.size()) goto loop;
 	raw_prog r;
 	for (const raw_rule& t : s) r.r.push_back(t);
-	DBG(wcout<<"orig:"<<endl<<p;)
-	DBG(wcout<<"spec:"<<endl<<r;)
+	DBG(o::out()<<"orig:"<<endl<<p;)
+	DBG(o::out()<<"spec:"<<endl<<r;)
 	return r;
 }*/

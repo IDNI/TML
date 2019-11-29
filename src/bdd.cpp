@@ -561,13 +561,13 @@ void bdd::gc() {
 //	if (V.size() < S.size() << 3) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
-//	if (S.size() >= 1e+6) { wcerr << "out of memory" << endl; exit(1); }
+//	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
 	vector<bdd> v1;
 	v1.reserve(S.size());
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
-	output::to(L"error") << "S: " << S.size() << " V: "<< V.size() <<
+	o::inf() << "S: " << S.size() << " V: "<< V.size() <<
 		" AM: " << AM.size() << " C: "<< C.size() << endl;
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
@@ -678,7 +678,7 @@ void bdd::gc() {
 				V[n].h, V[n].l), n);
 		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
-	output::to(L"error") <<"AM: " << AM.size() << " C: "<< C.size() << endl;
+	o::inf() <<"AM: " << AM.size() << " C: "<< C.size() << endl;
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
@@ -750,9 +750,9 @@ spbdd_handle bdd_and_many(bdd_handles v) {
 	b.reserve(v.size());
 	for (size_t n = 0; n != v.size(); ++n) b.push_back(v[n]->b);
 	am_sort(b);
-//	DBG( wcout<<"am begin"<<endl;
+//	DBG( o::out()<<"am begin"<<endl;
 	auto r = bdd_handle::get(bdd::bdd_and_many(move(b)));
-//	DBG( wcout<<"am end"<<endl;
+//	DBG( o::out()<<"am end"<<endl;
 	return r;
 }
 
@@ -917,8 +917,8 @@ spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b) {
 //	DBG(assert(bdd_nvars(x) < b.size());)
 //	DBG(assert(bdd_nvars(y) < b.size());)
-//	out(wcout, x)<<endl<<endl;
-//	out(wcout, y)<<endl<<endl;
+//	out(o::out(), x)<<endl<<endl;
+//	out(o::out(), y)<<endl<<endl;
 	return bdd_handle::get(bdd::bdd_and_ex(x->b, y->b, b));
 }
 

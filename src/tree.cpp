@@ -97,5 +97,5 @@ wstring driver::get_trees(const term& root, const db_t& t, size_t bits) {
 
 	wstringstream ss;
 	return get_trees(ss, root, m, done), ss.str();
-//	wcout << L"get_trees: " << ss.str() << endl;
+//	o::out() << L"get_trees: " << ss.str() << endl;
 }

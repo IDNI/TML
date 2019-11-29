@@ -94,7 +94,7 @@ public:
 		if (t==L"@buffer") return os(new std::wstringstream());
 		if (t==L"@name") {
 			if (named != L"") filename(named+e);
-			else return std::wcerr<<L"output '"<<n<<
+			else return o::err()<<L"output '"<<n<<
 				"' targeting @name without name"<<std::endl,
 				os(&wcnull);
 		} else filename(t);

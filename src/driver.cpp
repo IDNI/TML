@@ -33,6 +33,13 @@ using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
+namespace o {
+wostream& out() { static wostream& os = output::to(L"output"); return os; }
+wostream& err() { static wostream& os = output::to(L"error");  return os; }
+wostream& inf() { static wostream& os = output::to(L"info");   return os; }
+wostream& dbg() { static wostream& os = output::to(L"debug");  return os; }
+}
+
 void driver::transform_len(raw_term& r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (	r.e[n].type == elem::SYM && r.e[n].e == L"len" &&
@@ -137,7 +144,7 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 			transform_bin(p);
 #endif
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
-	//wcout<<rp.p[n]<<endl;
+	//o::out()<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
 }
 
@@ -149,7 +156,7 @@ void driver::output_pl(const raw_prog& p) const {
 
 void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 //	pd.clear();
-	//DBG(wcout << L"original program:"<<endl<<p;)
+	//DBG(o::out() << L"original program:"<<endl<<p;)
 	transform(rp, n, strtrees);
 	output_pl(rp.p[n]);
 	if (opts.enabled(L"t"))
@@ -183,13 +190,13 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);
 			DBG(if (opts.enabled(L"o"))
-				tbl->out(output::to(L"output") << endl);)
+				tbl->out(o::out() << endl);)
 		}
 		NDBG(if (opts.enabled(L"o"))
-			tbl->out(output::to(L"output") << endl);)
+			tbl->out(o::out() << endl);)
 		if (opts.enabled(L"csv")) save_csv();
 	} catch (unsat_exception& e) {
-		output::to(L"output") << s2ws(string(e.what())) << endl;
+		o::out() << s2ws(string(e.what())) << endl;
 		result = false;
 	}
 }

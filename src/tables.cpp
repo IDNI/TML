@@ -213,7 +213,7 @@ term tables::from_raw_term(const raw_term& r) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
+	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 	ntable tbl = (r.iseq || r.isleq) ? -1 : get_table(get_sig(r));
 	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
@@ -221,7 +221,7 @@ term tables::from_raw_term(const raw_term& r) {
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
 returns false or the froot is not needed any more, the caller should delete the froot pointer.
-For a null input argument rfm, it returns true and makes froot null as well.	
+For a null input argument rfm, it returns true and makes froot null as well.
 	*/
 bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 
@@ -241,7 +241,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 		if(!root) return false;
 		return true;
 
-		
+
 	}
 	else {
 		switch(rfm->type) {
@@ -255,7 +255,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 				else return false;
 
 			case elem::VAR:
-			case elem::SYM: 
+			case elem::SYM:
 				ft = form::ATOM;
 				if( rfm->type == elem::VAR)
 					arg = dict.get_var(rfm->el->e);
@@ -264,7 +264,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 				froot = root;
 				if(!root) return false;
 				return true;
-		
+
 			case elem::FORALL: if(rfm->l->type == elem::VAR) ft = form::FORALL1; else ft = form::FORALL2; break;
 			case elem::UNIQUE: if(rfm->l->type == elem::VAR) ft = form::UNIQUE1; else ft = form::UNIQUE2; break;
 			case elem::EXISTS: if(rfm->l->type == elem::VAR) ft = form::EXISTS1; else ft = form::EXISTS2; break;
@@ -275,14 +275,14 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 			case elem::COIMPLIES: ft= form::COIMPLIES; break;
 			default: return froot= root, false;
 		}
-		root =  new form(ft,0, 0); 
+		root =  new form(ft,0, 0);
 		if( root ) {
 			ret= from_raw_form(rfm->l, root->l);
 			if(ret) ret = from_raw_form(rfm->r, root->r);
 			froot = root;
 			return ret;
 		}
-		return false;	
+		return false;
 	}
 }
 
@@ -295,7 +295,7 @@ void form::printnode(int lv) {
 		if(l) l->printnode(lv+1);
 
 	}
-	
+
 
 void tables::out(wostream& os) const {
 	strs_t::const_iterator it;
@@ -521,7 +521,7 @@ spbdd_handle tables::get_alt_range(const term& h, const set<term>& a,
 	if (h.neg) for (int_t i : h) if (i < 0)
 		nvars.erase(i), eqvars.erase(i), leqvars.erase(i);
 	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v); 
+	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
 	if (!h.neg) {
@@ -599,7 +599,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 				}
 			}
 		else if(r.prft != NULL) {
-			
+
 			from_raw_form(r.prft.get(), froot);
 			r.prft.get()->printTree();
 			froot->printnode();
@@ -609,7 +609,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		else for (const raw_term& x : r.h)
 			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
 			m.insert({t}), get_nums(x);
-		
+
 	return m;
 }
 
@@ -630,9 +630,9 @@ enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
 cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
 	if (x.size() == 1 || y.size() == 1) return NONE;
 	set<ntable> tx, ty;
-	for (size_t n = 1; n != x.size(); ++n) 
-		if (x[n].neg) return NONE; else tx.insert(x[n].tab); 
-	for (size_t n = 1; n != y.size(); ++n) 
+	for (size_t n = 1; n != x.size(); ++n)
+		if (x[n].neg) return NONE; else tx.insert(x[n].tab);
+	for (size_t n = 1; n != y.size(); ++n)
 		if (y[n].neg) return NONE; else ty.insert(y[n].tab);
 	bool maybe_contained, maybe_contains;
 	if ((maybe_contained = tx.size() < ty.size()))
@@ -731,7 +731,7 @@ void tables::create_tmp_head(vector<term>& x) {
 		return { x };
 	return { x, y };
 //	if (has(r, y[0]))
-//		return print(print(wcout, x) << L" is a generalization of ",yy),
+//		return print(print(o::out(),x)<<L" is a generalization of ",yy),
 //		       true;
 //	return false;
 }*/
@@ -750,7 +750,7 @@ void tables::cqc_minimize(vector<term>& v) const {
 		if (!cqc(v1, v)) v.insert(v.begin() + n, t);
 	}
 	DBG(if (v.size() != v1.size())
-		print(print(wcerr<<L"Rule\t\t", v)<<endl<<L"minimized into\t"
+		print(print(o::err()<<L"Rule\t\t", v)<<endl<<L"minimized into\t"
 		, v1)<<endl;)
 }*/
 
@@ -984,7 +984,7 @@ void tables::transform_bin(flat_prog& p) {
 		}
 		p.insert(move(x)), vars.clear();
 	}
-	if (print_transformed) print(wcout<<L"after transform_bin:"<<endl, p);
+	if (print_transformed) print(o::out()<<L"after transform_bin:"<<endl,p);
 }
 
 /*struct cqcdata {
@@ -1023,22 +1023,23 @@ void tables::get_rules(flat_prog p) {
 		for (size_t n = 1; n != x.size(); ++n)
 			exts.insert(x[n].tab);
 	for (const vector<term>& x : p) if (x.size() > 1) exts.erase(x[0].tab);
-	if (bcqc) print(wcout<<L"before cqc, "<<p.size()<< L" rules:"<<endl, p);
+	if (bcqc) print(o::out()<<L"before cqc, "<<p.size()<<L" rules:"<<endl,p);
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
 	for (const auto& x : q) prog_add_rule(p, r, x);
 	replace_rel(move(r), p);
-	if (bcqc) print(wcout<<L"after cqc before tbin, "<<p.size()<< L" rules."
-		<<endl, p);
+	if (bcqc) print(o::out()<<L"after cqc before tbin, "
+		<<p.size()<<L" rules."<<endl, p);
 #ifndef TRANSFORM_BIN_DRIVER
 	if (bin_transform) transform_bin(p);
 #endif
-	if (bcqc) print(wcout<<L"before cqc after tbin, "<<p.size()<< L" rules."
-		<<endl, p);
+	if (bcqc) print(o::out()<<L"before cqc after tbin, "
+		<<p.size()<< L" rules."<<endl, p);
 	q = move(p);
 	for (const auto& x : q) prog_add_rule(p, r, x);
 	replace_rel(move(r), p), set_priorities(p);
-	if (bcqc) print(wcout<<L"after cqc, "<<p.size()<< L" rules."<<endl, p);
+	if (bcqc) print(o::out()<<L"after cqc, "
+		<<p.size()<< L" rules."<<endl, p);
 	if (optimize) bdd::gc();
 	map<term, set<set<term>>> m;
 	for (const auto& x : p)
@@ -1100,7 +1101,7 @@ void tables::load_string(lexeme r, const wstring& s) {
 	}
 	clock_t start, end;
 	if (optimize)
-		(output::to(L"debug")<<"load_string or_many: "),
+		(o::dbg()<<"load_string or_many: "),
 		measure_time_start();
 	tbls[get_table({rel, ar})].t = bdd_or_many(move(b1)),
 	tbls[get_table({rel, {3}})].t = bdd_or_many(move(b2));
@@ -1163,8 +1164,8 @@ ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
-//	wcout<<"grammar before:"<<endl;
-//	for (production& p : g) wcout << p << endl;
+//	o::out()<<"grammar before:"<<endl;
+//	for (production& p : g) o::out() << p << endl;
 	for (size_t k = 0; k != g.size();) {
 		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
 		size_t n = 0;
@@ -1175,8 +1176,8 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
 		g.erase(g.begin() + k);
 	}
-//	wcout<<"grammar after:"<<endl;
-//	for (production& p : g) wcout << p << endl;
+//	o::out()<<"grammar after:"<<endl;
+//	for (production& p : g) o::out() << p << endl;
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
 			if (p.p[n].type == elem::STR) {
@@ -1226,7 +1227,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		}
 		p.insert(move(v));
 	}
-	print(wcout << L"transformed grammar: " << endl, p);
+	print(o::out() << L"transformed grammar: " << endl, p);
 }
 
 void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
@@ -1273,7 +1274,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		x.erase(x.begin() + 1, x.end()),
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
 	}
-//	DBG(print(wcout<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
+//	DBG(print(o::out()<<L"run_nums for:"<<endl, p)<<endl<<L"returned:"<<endl;)
 	add_prog(move(p), {});
 	if (!pfp(nsteps)) return false;
 	r = g(decompress());
@@ -1290,7 +1291,7 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	transform_grammar(g, m);
 	get_rules(move(m));
 //	clock_t start, end;
-//	output::to(L"debug")<<"load_string: ";
+//	o::dbg()<<"load_string: ";
 //	measure_time_start();
 //	measure_time_end();
 	if (optimize) bdd::gc();
@@ -1393,7 +1394,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 
 char tables::fwd() noexcept {
 	bdd_handles add, del;
-//	DBG(out(wcout<<"db before:"<<endl);)
+//	DBG(out(o::out()<<"db before:"<<endl);)
 	for (rule& r : rules) {
 		bdd_handles v(r.size());
 		for (size_t n = 0; n != r.size(); ++n)
@@ -1418,7 +1419,7 @@ char tables::fwd() noexcept {
 	for (auto x : goals)
 		for (auto y : x.second)
 			b &= (y && ts[x.first].t) == y;
-	if (b) return (wcout <<"found"<<endl), false;
+	if (b) return (o::out() <<"found"<<endl), false;
 	return b;*/
 }
 
@@ -1433,7 +1434,7 @@ bool tables::pfp(size_t nsteps) {
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
-		if (optimize) output::to(L"info") << "step: " << nstep << endl;
+		if (optimize) o::inf() << "step: " << nstep << endl;
 		++nstep;
 		if (!fwd()) return bproof ? get_goals(), true : true;
 		if (unsat) throw unsat_exception();
@@ -1448,18 +1449,18 @@ bool tables::pfp(size_t nsteps) {
 bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
 	clock_t start, end;
 	double t;
-//	output::to(L"@stderr") << L"add_prog: ";
+	// o::err() << L"add_prog: ";
 	if (optimize) measure_time_start();
 	add_prog(p, strs);
 	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		wcerr << L"pfp: ";
+		o::inf() << L"pfp: ";
 		measure_time_start();
 	}
-//	output::to(L"@stderr")
+	// o::err()
 	bool r = pfp();
 	if (optimize)
-		(wcerr << L"add_prog: " << t << L" pfp: "),measure_time_end();
+		(o::inf() <<L"add_prog: "<<t << L" pfp: "), measure_time_end();
 	return r;
 }
 

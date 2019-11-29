@@ -584,7 +584,7 @@ raw_progs::raw_progs(const std::wstring& s) {
 					err_close_curly, l[pos-1]);
 		} while (pos < l.size());
 	} catch (std::exception &e) {
-		output::to(L"error") << s2ws(e.what()) << std::endl;
+		o::err() << s2ws(e.what()) << std::endl;
 	}
 }
 

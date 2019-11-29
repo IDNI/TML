@@ -61,7 +61,7 @@ bool derives(const term& t, term h, vector<term> b, const vector<term>& kb,
 //}
 
 wostream& operator<<(wostream& os, const env& e) {
-	for (auto x : e) wcout << x.first << " = " << x.second << endl;
+	for (auto x : e) o::out() << x.first << " = " << x.second << endl;
 	return os;
 }
 
@@ -75,7 +75,7 @@ void set(term& t, const ints& i) {
 	::set(x1, { -1, -2 }), ::set(x2, { 1, -3 }), ::set(x3, { -3, -2 }),
 	::set(y1, { -5, -2 }), ::set(y2, { -1, -3 }), ::set(y3, { -4, -2 });
 	x1.tab = x2.tab = x3.tab = y1.tab = y2.tab = y3.tab = 1;
-	wcout << cqc(x1, {x2, x3}, y1, {y2, y3});
+	o::out() << cqc(x1, {x2, x3}, y1, {y2, y3});
 	return 0;
-	
+
 }*/

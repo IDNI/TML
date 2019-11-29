@@ -52,7 +52,7 @@ typedef size_t nlevel;
 #define DBG(x)
 #define NDBG(x) x
 #endif
-#define er(x) output::to(L"error")<<x<<endl, throw std::runtime_error(ws2s(x))
+#define er(x) o::err() << x << endl, throw std::runtime_error(ws2s(x))
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())
@@ -60,8 +60,7 @@ typedef size_t nlevel;
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define measure_time_start() start = clock()
 #define measure_time_end() end = clock(), \
-		wcerr << double(end - start) / CLOCKS_PER_SEC << endl
-//	output::to(L"@stderr")
+		o::inf() << double(end - start) / CLOCKS_PER_SEC << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
 #define elem_openp elem(elem::OPENP, get_lexeme(L"("))
 #define elem_closep elem(elem::CLOSEP, get_lexeme(L")"))
@@ -71,5 +70,11 @@ template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
+namespace o { // call driver::init() before using any o::xxx() wostream
+	std::wostream& out(); // for program output (in tml facts)
+	std::wostream& err(); // for errors
+	std::wostream& inf(); // for info (for debugging in Release)
+	std::wostream& dbg(); // for debugging (point to null if not Debug)
+}
 #endif
 //#define TRANSFORM_BIN_DRIVER

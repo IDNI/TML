@@ -80,7 +80,7 @@ struct option {
 	bool operator ==(const option& o) const { return n == o.names(); }
 	bool operator  <(const option& o) const { return n < o.names(); }
 	void parse_value(const std::wstring& s) {
-		//DBG(std::wcout << L"option::parse_value(s=\"" << s <<
+		//DBG(s::out() << L"option::parse_value(s=\"" << s <<
 		//	L"\") <" << (int)t << L'>' << std::endl;)
 		switch (t) {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
@@ -96,11 +96,12 @@ struct option {
 	}
 	void parse_bool(const std::wstring& s) {
 		if (s==L"" || s==L"true" || s==L"t" || s==L"1" || s==L"on" ||
-			s==L"enabled" || s==L"yes") return v.set(true), (void)0;
+						s==L"enabled" || s==L"yes")
+			return v.set(true), (void)0;
 		v.set(false);
 		if (!(s==L"false" || s==L"f" || s==L"0" || s==L"off" ||
-			s==L"disabled" || s==L"no")) output::to(L"error")
-				<< L"Wrong bool argument: " << s << std::endl;
+						s==L"disabled" || s==L"no"))
+			o::err() << L"Wrong bool argument: " << s << std::endl;
 	}
 	void disable() {
 		if (STRING == get_type() && is_output()) parse_value(L"@null");

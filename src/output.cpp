@@ -297,7 +297,7 @@ void tables::print(wostream& os, const tables::witness& w) {
 		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
 		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
-		wcout << x.first << " = " << x.second << endl;
+		o::out() << x.first << " = " << x.second << endl;
 	}
 	return os;
 }*/
