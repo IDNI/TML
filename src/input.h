@@ -17,11 +17,14 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <memory>
 #include <sys/stat.h>
 
 namespace input {
 	extern cws_range source;
 }
+struct raw_form_tree;
+typedef std::shared_ptr<raw_form_tree> sprawformtree;
 
 bool operator==(const lexeme& x, const lexeme& y);
 
@@ -95,6 +98,7 @@ bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y);
 struct raw_rule {
 	std::vector<raw_term> h;
 	std::vector<std::vector<raw_term>> b;
+	sprawformtree prft;
 
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
@@ -128,7 +132,7 @@ struct raw_prefix {
 
 struct raw_form_tree {
 	elem::etype type;
-	raw_term *rt;
+	raw_term *rt; // elem::NONE is used to identify it 
 	elem * el;
 
 	raw_form_tree *l;
@@ -159,13 +163,14 @@ struct raw_form_tree {
 	void printTree(int level =0 );
 };
 struct raw_sof {
-	std::vector<raw_term> h;
 
+	private:
 	bool parseform(const lexemes& l, size_t& pos, raw_form_tree *&root, int precd= 0);
 	bool parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&root);
 
+	public:
 	bool parse(const lexemes& l, size_t& pos, raw_form_tree *&root);
-	
+
 };
 
 struct raw_prog {

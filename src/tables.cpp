@@ -218,8 +218,11 @@ term tables::from_raw_term(const raw_term& r) {
 	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
 
-
-
+/* Populates froot argument by creating a binary tree from raw formula in rfm.
+It is caller's responsibility to manage the memory of froot. If the function,
+returns false or the froot is not needed any more, the caller should delete the froot pointer.
+For a null input argument rfm, it returns true and makes froot null as well.	
+	*/
 bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 
 	form::ftype ft = form::NONE;
@@ -229,7 +232,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 
 	if(!rfm) return froot=root,  true;
 
-	
+
 	if(rfm->rt) {
 		ft = form::ATOM;
 		term t = from_raw_term(*rfm->rt);
@@ -275,7 +278,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 		root =  new form(ft,0, 0); 
 		if( root ) {
 			ret= from_raw_form(rfm->l, root->l);
-			ret |= from_raw_form(rfm->r, root->r);
+			if(ret) ret = from_raw_form(rfm->r, root->r);
 			froot = root;
 			return ret;
 		}
@@ -582,6 +585,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
 	term t;
+	form* froot = NULL;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
@@ -594,9 +598,18 @@ flat_prog tables::to_terms(const raw_prog& p) {
 					align_vars(v), m.insert(move(v));
 				}
 			}
+		else if(r.prft != NULL) {
+			
+			from_raw_form(r.prft.get(), froot);
+			r.prft.get()->printTree();
+			froot->printnode();
+			if(froot) delete froot;
+		}
+
 		else for (const raw_term& x : r.h)
 			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
 			m.insert({t}), get_nums(x);
+		
 	return m;
 }
 

@@ -330,23 +330,27 @@ head:	h.emplace_back();
 	if(l[pos-1][0][1] == L'=') { //  formula
 		curr = pos; 
 		raw_sof rsof;
-		raw_form_tree *rtr = NULL;
-		if( rsof.parse(l, pos, rtr) )
-			return true;
+		raw_form_tree * root = NULL;
+		bool ret = rsof.parse(l, pos, root);
+		
+		sprawformtree temp(root);
+		this->prft = temp;
+
+		if(ret) return true;	
 		parse_error(l[pos][0], L"Formula has errors", l[pos]);
 	} else {
 
-	b.emplace_back();
-	for (b.back().emplace_back(); b.back().back().parse(l, pos);
-		b.back().emplace_back(), ++pos) {
-		if (*l[pos][0] == '.') return ++pos, true;
-		else if (*l[pos][0] == L';') b.emplace_back();
-		else if (*l[pos][0] != ',')
-			parse_error(l[pos][0], err_term_or_dot,l[pos]);
+		b.emplace_back();
+		for (b.back().emplace_back(); b.back().back().parse(l, pos);
+			b.back().emplace_back(), ++pos) {
+			if (*l[pos][0] == '.') return ++pos, true;
+			else if (*l[pos][0] == L';') b.emplace_back();
+			else if (*l[pos][0] != ',')
+				parse_error(l[pos][0], err_term_or_dot,l[pos]);
+		}
+		parse_error(l[pos][0], err_body, l[pos]);
 	}
-	parse_error(l[pos][0], err_body, l[pos]);
 	return false;
-	}
 }
 
 bool raw_prefix::parse(const lexemes& l, size_t& pos) {
@@ -368,7 +372,7 @@ bool raw_prefix::parse(const lexemes& l, size_t& pos) {
 	return true; 
 } 
 
-bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&mroot) {
+bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot) {
 
 	size_t curr = pos;
 	raw_form_tree * root = NULL;
@@ -386,7 +390,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&mroot) 
 		if( pos == l.size() && *l[pos][0] != '}') goto Cleanup;
 		++pos;
 
-		mroot = root;
+		matroot = root;
 		return true;
 	}
 	else {  
@@ -404,7 +408,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&mroot) 
 			if( isneg )
 				root = new raw_form_tree(elem::NOT, NULL, NULL, root);
 			
-			mroot = root;
+			matroot = root;
 			return true;
 		}
 		else {
@@ -439,14 +443,14 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&mroot) 
 			if(isneg)
 				root = new raw_form_tree(elem::NOT, NULL, NULL, root);
 			
-			mroot = root;
+			matroot = root;
 			return true;
 		}
 	} 
 
 	Cleanup:
 	//if(root) delete root;
-	mroot = root;
+	matroot = root;
 	return pos=curr, false;
 }
 bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, int_t prec ) {
@@ -488,18 +492,20 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, in
 	return pos=curr, false;
 }
 
+/* Populates root argument by creeating a binary tree of formula.
+	It is caller's responsibility to manage the memory of root. If the parse function,
+	returns false or the root is not needed any more, the caller should delete the root pointer.
+	*/
+bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *&root) {
 
-bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *& root) {
-	
-	bool ret = parseform(l, pos, root, 0 );
+	root = NULL;
+	bool ret = parseform(l, pos, root );
 
 	if( pos >= l.size() || *l[pos][0] != '.') ret = false;
 	else pos++;
 	
 	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
-	if(root) root->printTree();
-	if(root && !ret) delete root, root= NULL;
-	
+
 	return ret;
 }
  void raw_form_tree::printTree( int level)

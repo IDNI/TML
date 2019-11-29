@@ -1,0 +1,15 @@
+missqdecl(x):-forall men { unique R  t(x y)|z(x y) }} | x( t).
+termissue(x):-{t(x y)z(x y) } & (t(  u u)).
+emptypbop( j j) :- forall men  unique R  {t(x y)|z(x y) } &&& t(  u u) | exists ?k { R( 1 2)}.
+firsttermnocorrect(c) :- a(x 1) b (?c 2).
+badexists(a) :- a& b& ?c | a& b& c | forall ?a {exists b { c & d &e }}.
+failnot(a) :- ~{~a&~}.
+failnot(A) :- ~a | ~b.
+missqdecl(x):=forall men { unique R  t(x y)|z(x y) }} | x( t).
+termissue(x):={t(x y)z(x y) } & (t(  u u)).
+emptypbop( j j) := forall men  unique R  {t(x y)|z(x y) } &&& t(  u u) | exists ?k { R( 1 2)}.
+firsttermnocorrect(c) := a(x 1) b (?c 2).
+badexists(a) := a& b& ?c | a& b& c | forall ?a {exists b { c & d &e }}.
+failnot(a) := ~{~a&~}.
+failnot(A) := ~a | ~b.
+
