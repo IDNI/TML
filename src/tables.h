@@ -18,11 +18,12 @@
 #endif
 #include "bdd.h"
 #include "term.h"
-
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
+struct raw_sof;
+struct raw_form_tree;
 class tables;
 class dict_t;
 
@@ -110,6 +111,7 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
+struct form;
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
@@ -287,6 +289,9 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
+
+	bool from_raw_form(const raw_form_tree *rs, form *&froot);
+
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
@@ -300,6 +305,32 @@ public:
 	void out(emscripten::val o) const;
 #endif
 	void set_proof(bool v) { bproof = v; }
+};
+
+struct form{
+	int_t arg;
+	term *tm;
+	form *l;
+	form *r;
+	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES 
+	} type;
+
+	
+	form(){
+		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
+	}
+
+	form( ftype _type, int_t _arg=0, term *_t=NULL, form *_l= NULL, form *_r=NULL  ) {
+		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
+		if( _t) tm = new term(), *tm = *_t;
+	}
+
+	~form() {
+		if(l) delete l, l = NULL;
+		if(r) delete r, r = NULL;
+		if(tm) delete tm, tm = NULL;
+	}
+	void printnode(int lv=0);
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);

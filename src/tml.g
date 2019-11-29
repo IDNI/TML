@@ -37,15 +37,21 @@ alts => null | '|' ws alt ws alts ws.
 
 
 prefix => "forall" | "exists" | "unique" .
-qvars => prefix ws identifier ws qvars | prefix ws identifier ws .
-qform => qform1 qform_rest
-qform_rest => qbop qform qform_rest | null.
-qform1 => 	term | '{' qform '}' | '~' term | 
-			'~' '{' qform '}' |
-			'~' qvars '{' form '}'.
-qbop => ',' | ';'.			
+prefixdecl => prefix ws identifier ws prefixdecl | prefix ws identifier ws.
 
-sof => qform.
+form => form1 | form1 bop form.
+form1 => matrix | matrix bop1 form1. 
+
+matrix _=> 	term | '~' term |
+			'{' form '}'|'~' '{' form '}' |
+			prefixdecl'{' form '}' | '~' prefixdecl '{' form '}'.
+
+bop => '|' | '&'.			
+bop1 => "->" | "<->".
+
+sof => form.
+
+
 
 
 fact => pred '.' ws.

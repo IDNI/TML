@@ -1,0 +1,14 @@
+head(a) :- a(1 4) , b(2 3).
+a(1 4).
+b(2 3).
+sinlgle (A) :- ~a.
+simp(a) := a | b &c.
+impli(a) := a -> b | c & d <-> f.
+pred2(x):=forall men  { unique R  {t(x y)|z(x y) }} | x( t).
+pred3(x):=forall men  unique R  {t(x y)|z(x y) } & t(  u u).
+pred4 ( j j) := forall men  unique R  {t(x y)|z(x y) } & t(  u u) | exists ?k { R( 1 2)}.
+pred (c) := a(x 1)& b (?c 2).
+p(k) := { forall men { a ( 1 (2 3))& { exists y { b (1)& a (4) }& exists k { a(1)}}                 }}.
+pred(c d) := { exists y { b (1)& a (4) }& exists k { a(1)}}.
+rec(a) := a& b& c | a& b& c | forall a {exists b { c & d &e }}.
+fail(2) :=  ~{ forall a {~a(2)| exists b {a(1)} }}.

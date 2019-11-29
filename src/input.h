@@ -17,17 +17,21 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <memory>
 #include <sys/stat.h>
 
 namespace input {
 	extern cws_range source;
 }
+struct raw_form_tree;
+typedef std::shared_ptr<raw_form_tree> sprawformtree;
 
 bool operator==(const lexeme& x, const lexeme& y);
 
 struct elem {
 	enum etype {
-		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, AND, OR, FORALL, EXISTS, UNIQUE
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, NOT, AND,
+		OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES 
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -94,6 +98,7 @@ bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y);
 struct raw_rule {
 	std::vector<raw_term> h;
 	std::vector<std::vector<raw_term>> b;
+	sprawformtree prft;
 
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
@@ -122,23 +127,50 @@ struct raw_prefix {
 		bool isfod =false;
 	
 	bool parse(const lexemes& l, size_t& pos);
+};
 
+
+struct raw_form_tree {
+	elem::etype type;
+	raw_term *rt; // elem::NONE is used to identify it 
+	elem * el;
+
+	raw_form_tree *l;
+	raw_form_tree *r;
+
+	
+
+	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el= NULL, raw_form_tree *_l= NULL, raw_form_tree *_r= NULL ) {
+		
+		type = _type;
+		if(_rt) 
+			rt = new raw_term(*_rt);
+		else rt = NULL;
+
+		if(_el)
+			el = new elem(*_el);
+		else el = NULL;
+
+		l = _l;
+		r = _r;
+	}
+	~raw_form_tree() {
+		if( l ) delete l, l= NULL;
+		if (r ) delete r, r= NULL;
+		if (rt) delete rt,rt= NULL;
+		if (el) delete el, el= NULL;
+	}
+	void printTree(int level =0 );
 };
 struct raw_sof {
-	bool isneg = false;
-	std::vector<raw_prefix> pref;
-	raw_term tm;
-	std::vector<raw_sof> recsof;    // recursive sof inside { }
 
-	std::vector<elem> qbops;
-	std::vector<raw_sof> nxtsof;	// next sibling sof separated by qbops binary operator
-	bool parseform(const lexemes& l, size_t& pos);
-	bool parseform1(const lexemes& l, size_t& pos);
-	
-	bool parse(const lexemes& l, size_t& pos);
-	void clear() { pref.clear(); recsof.clear(); nxtsof.clear(); qbops.clear(); }
-	void printTree(int level =0 );
-	
+	private:
+	bool parseform(const lexemes& l, size_t& pos, raw_form_tree *&root, int precd= 0);
+	bool parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&root);
+
+	public:
+	bool parse(const lexemes& l, size_t& pos, raw_form_tree *&root);
+
 };
 
 struct raw_prog {

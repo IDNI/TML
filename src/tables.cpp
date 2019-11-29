@@ -218,6 +218,85 @@ term tables::from_raw_term(const raw_term& r) {
 	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
 
+/* Populates froot argument by creating a binary tree from raw formula in rfm.
+It is caller's responsibility to manage the memory of froot. If the function,
+returns false or the froot is not needed any more, the caller should delete the froot pointer.
+For a null input argument rfm, it returns true and makes froot null as well.	
+	*/
+bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
+
+	form::ftype ft = form::NONE;
+	bool ret =false;
+	form *root = NULL;
+	int_t arg= 0;
+
+	if(!rfm) return froot=root,  true;
+
+
+	if(rfm->rt) {
+		ft = form::ATOM;
+		term t = from_raw_term(*rfm->rt);
+		root = new form(ft, 0, &t );
+		froot = root;
+		if(!root) return false;
+		return true;
+
+		
+	}
+	else {
+		switch(rfm->type) {
+			case elem::NOT:
+				root = new form(form::NOT);
+				if(root ) {
+					ret =  from_raw_form(rfm->l, root->l);
+					froot = root;
+					return ret;
+				}
+				else return false;
+
+			case elem::VAR:
+			case elem::SYM: 
+				ft = form::ATOM;
+				if( rfm->type == elem::VAR)
+					arg = dict.get_var(rfm->el->e);
+				else arg = dict.get_sym(rfm->el->e);
+				root = new form(ft, arg);
+				froot = root;
+				if(!root) return false;
+				return true;
+		
+			case elem::FORALL: if(rfm->l->type == elem::VAR) ft = form::FORALL1; else ft = form::FORALL2; break;
+			case elem::UNIQUE: if(rfm->l->type == elem::VAR) ft = form::UNIQUE1; else ft = form::UNIQUE2; break;
+			case elem::EXISTS: if(rfm->l->type == elem::VAR) ft = form::EXISTS1; else ft = form::EXISTS2; break;
+			case elem::OR:
+			case elem::ALT: ft = form::OR; break;
+			case elem::AND: ft = form::AND; break;
+			case elem::IMPLIES: ft= form::IMPLIES; break;
+			case elem::COIMPLIES: ft= form::COIMPLIES; break;
+			default: return froot= root, false;
+		}
+		root =  new form(ft,0, 0); 
+		if( root ) {
+			ret= from_raw_form(rfm->l, root->l);
+			if(ret) ret = from_raw_form(rfm->r, root->r);
+			froot = root;
+			return ret;
+		}
+		return false;	
+	}
+}
+
+void form::printnode(int lv) {
+		if(r) r->printnode(lv+1);
+		wprintf(L"\n");
+		for( int i=0; i <lv; i++)
+			wprintf(L"\t");
+		wprintf(L"%d %d", type, arg );
+		if(l) l->printnode(lv+1);
+
+	}
+	
+
 void tables::out(wostream& os) const {
 	strs_t::const_iterator it;
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
@@ -506,6 +585,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
 	term t;
+	form* froot = NULL;
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
@@ -518,9 +598,18 @@ flat_prog tables::to_terms(const raw_prog& p) {
 					align_vars(v), m.insert(move(v));
 				}
 			}
+		else if(r.prft != NULL) {
+			
+			from_raw_form(r.prft.get(), froot);
+			r.prft.get()->printTree();
+			froot->printnode();
+			if(froot) delete froot;
+		}
+
 		else for (const raw_term& x : r.h)
 			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
 			m.insert({t}), get_nums(x);
+		
 	return m;
 }
 
