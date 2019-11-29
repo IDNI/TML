@@ -153,6 +153,10 @@ void options::setup() {
 			}
 			add_input_data(is.str());
 		}).description(L"input           (@stdin by default)"));
+	add(option(option::type::STRING, {L"input-eval", L"ie"},
+		[this](const option::value& v) {
+			add_input_data(v.get_string());
+		}).description(L"input string to evaluate"));
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
 	add_bool(L"proof",   L"extract proof");
@@ -211,6 +215,7 @@ void options::help(wostream& os) const {
 	os<<L"\t@stdin (or -) reads input from stdin"<<endl;
 	os<<L"\tFILENAME inputs can be used more than once to concatenate "
 		<<L"multiple files"<<endl;
+	os<<L"\t--input can be combined with --input-eval too"<<endl;
 	os<<endl;
 	os<<L"output:"<<endl;
 	os<<L"\t[FILENAME | @stdout | @stderr | @name | @null | @buffer]"<<endl;
