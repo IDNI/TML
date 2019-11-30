@@ -294,19 +294,33 @@ private:
 	//-------------------------------------------------------------------------
 	//jarlab - work in progress
 	bool isalu_handler(const term& t, alt& a, spbdd_handle &leq);
-	spbdd_handle add_var(size_t arg0, size_t arg1, size_t arg2, size_t args);
+	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
 	spbdd_handle full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 			uint_t b, spbdd_handle r) const;
 	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
 			uint_t b) const;
-	spbdd_handle mul_var(size_t var0, size_t var1, size_t var2,
-			size_t n_vars);
 	spbdd_handle shr_test(size_t var0, int_t n1, size_t var2,
 			size_t n_vars);
 	spbdd_handle shl(size_t var0, int_t n1, size_t var2,
 			size_t n_vars);
+
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
 			size_t bit, spbdd_handle x) const;
+
+
+	spbdd_handle full_addder_carry_shift(size_t var0, size_t var1, size_t n_vars,
+				uint_t b, uint_t s, spbdd_handle r) const;
+	spbdd_handle full_adder_shift(size_t var0, size_t var1, size_t n_vars,
+				uint_t b, uint_t s) const;
+
+	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
+	spbdd_handle add_ite_init(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
+	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
+	spbdd_handle mul_var_eq(size_t var0, size_t var1, size_t var2,
+				size_t n_vars);
+
+	spbdd_handle bdd_test(size_t var0, size_t var1, size_t var2, size_t n_vars);
+
 
 public:
 	tables(bool bproof = false, bool optimize = true,

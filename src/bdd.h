@@ -71,9 +71,12 @@ std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
+
 spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
 spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
+
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
+
 bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
@@ -94,6 +97,11 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
+
+void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+int_t bdd_root(cr_spbdd_handle x);
+spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 
 class bdd {
 	friend class bdd_handle;
@@ -137,6 +145,11 @@ class bdd {
 	friend std::ostream& write_bdd(std::ostream& os);
 	friend std::istream& read_bdd(std::istream& is);
 
+	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+	friend int_t bdd_root(cr_spbdd_handle x);
+	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
+
 	inline static bdd get(int_t x) {
 		if (x > 0) {
 			const bdd &y = V[x];
@@ -179,7 +192,10 @@ class bdd {
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
 	static void bdd_sz(int_t x, std::set<int_t>& s);
+	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
+
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
+
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
 	inline static int_t add(int_t v, int_t h, int_t l);
@@ -188,6 +204,10 @@ class bdd {
 	inline static bool trueleaf(int_t t) { return t > 0; }
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
+
+	static int_t bdd_xor(int_t x, int_t y);
+	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
+
 public:
 	bdd(int_t v, int_t h, int_t l);
 	inline bool operator==(const bdd& b) const {

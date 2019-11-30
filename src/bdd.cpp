@@ -706,6 +706,12 @@ void bdd::bdd_sz(int_t x, set<int_t>& s) {
 	bdd_sz(b.h, s), bdd_sz(b.l, s);
 }
 
+void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
+	if (!s.emplace(abs(x)).second) return;
+	bdd b = get(x);
+	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
+}
+
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y) {
 	spbdd_handle r = bdd_handle::get(bdd::bdd_and(x->b, y->b));
 	return r;
@@ -946,6 +952,11 @@ spbdd_handle from_eq(uint_t x, uint_t y) {
 	return bdd_ite(from_bit(x,true), from_bit(y,true), from_bit(y,false));
 }
 
+void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
+	bdd::bdd_sz_abs(x->b, s);
+}
+
+
 void bdd::bdd_nvars(int_t x, set<int_t>& s) {
 	if (!leaf(x)) s.insert(var(x)-1), bdd_nvars(hi(x),s),bdd_nvars(lo(x),s);
 }
@@ -968,6 +979,7 @@ size_t bdd_nvars(spbdd_handle x) { return bdd::bdd_nvars(x->b); }
 bool leaf(cr_spbdd_handle h) { return bdd::leaf(h->b); }
 bool trueleaf(cr_spbdd_handle h) { return bdd::trueleaf(h->b); }
 wostream& out(wostream& os, cr_spbdd_handle x) { return bdd::out(os, x->b); }
+
 
 size_t std::hash<ite_memo>::operator()(const ite_memo& m) const {
 	return m.hash;
@@ -992,5 +1004,7 @@ bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
 wostream& bdd::out(wostream& os, int_t x) {
 	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
 	const bdd b = get(x);
-	return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
+	//return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
+	return out(out(os << b.v << L" ? (", b.h) << L") : (", b.l) << L")";
+
 }
