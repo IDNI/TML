@@ -80,7 +80,7 @@ struct option {
 	bool operator ==(const option& o) const { return n == o.names(); }
 	bool operator  <(const option& o) const { return n < o.names(); }
 	void parse_value(const std::wstring& s) {
-		//DBG(s::out() << L"option::parse_value(s=\"" << s <<
+		//DBG(o::out() << L"option::parse_value(s=\"" << s <<
 		//	L"\") <" << (int)t << L'>' << std::endl;)
 		switch (t) {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
