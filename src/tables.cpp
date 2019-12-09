@@ -218,6 +218,94 @@ term tables::from_raw_term(const raw_term& r) {
 	return term(r.neg, r.iseq, r.isleq, tbl, t);
 }
 
+
+
+form::ftype transformer::getdual( form::ftype type) {
+		switch (type) {
+			case form::ftype::OR : return form::ftype::AND; 
+			case form::ftype::AND : return form::ftype::OR; 
+			case form::ftype::FORALL1 : return form::ftype::EXISTS1 ;
+			case form::ftype::FORALL2 : return form::ftype::EXISTS2 ;
+			case form::ftype::EXISTS1 : return form::ftype::FORALL1 ;
+			case form::ftype::EXISTS2 : return form::ftype::FORALL2 ;
+			default: throw 0;	
+		}
+}
+
+
+bool demorgan::push_negation( form *&root, form *&parent) {
+	
+	if( root->type == form::ftype::AND ||
+		root->type == form::ftype::OR ) {
+				
+			root->type = getdual(root->type);
+			if( ! push_negation(root->l, root) ||
+				! push_negation(root->r , root))
+				throw 0;
+			return true;
+	}
+	else {
+		if( root->type == form::ftype::NOT) {
+			form *t = root;
+			root = root->l;
+			t->l = t->r = NULL;
+			delete t;
+			return true;				
+		}
+		else if ( root->type == form::ftype::ATOM)	{
+				form* t = new form(form::ftype::NOT, 0 , NULL, root);
+				root = t;
+				return true;
+		}
+		return false;
+	}
+
+}
+	
+	
+bool demorgan::apply( form *&root) {
+		
+	if( root->type == form::ftype::NOT  &&
+		root->l->type != form::ftype::ATOM ) { 
+			
+		bool changed = push_negation(root->l, root);
+		if(changed ) {
+			form *t = root;
+			root = root->l;
+			t->l = t->r = NULL;
+			delete t;
+			return true;
+		}
+
+	}
+	return false;
+}
+
+ bool implic_removal::apply(form *&root) {
+	if( root->type == form::ftype::IMPLIES ) { 
+		root->type = form::OR;
+		form * temp = new form( form::NOT);
+		temp->l = root->l;
+		root->l = temp;
+		return true;
+	}
+	return false;
+}
+
+bool transformer::traverse(form *&root ) {
+	bool changed  = false;
+	if( root->type == form::ftype::ATOM ) return false; 
+
+	changed = apply(root);
+
+	if( root->l ) changed |= traverse(root->l );
+	if( root->r ) changed |= traverse(root->r );
+
+	
+	return changed;
+}
+
+
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
 returns false or the froot is not needed any more, the caller should delete the froot pointer.
@@ -601,8 +689,17 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		else if(r.prft != NULL) {
 			
 			from_raw_form(r.prft.get(), froot);
+			wprintf(L"\n ........... \n");
 			r.prft.get()->printTree();
+			wprintf(L"\n ........... \n");
 			froot->printnode();
+			demorgan demtrans;
+			implic_removal impltrans;
+			demtrans.traverse(froot);
+			impltrans.traverse(froot);
+			wprintf(L"\n ........... \n");
+			froot->printnode();
+
 			if(froot) delete froot;
 		}
 

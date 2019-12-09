@@ -307,7 +307,10 @@ public:
 	void set_proof(bool v) { bproof = v; }
 };
 
+struct transformer;
 struct form{
+friend struct transformer;
+
 	int_t arg;
 	term *tm;
 	form *l;
@@ -331,6 +334,25 @@ struct form{
 		if(tm) delete tm, tm = NULL;
 	}
 	void printnode(int lv=0);
+};
+
+struct transformer {
+	virtual bool apply(form *&root) = 0;
+	form::ftype getdual( form::ftype type);
+	virtual bool traverse(form *&);
+};
+
+
+struct implic_removal : public transformer {
+	 
+	 virtual bool apply(form *&root);
+};
+
+struct demorgan : public transformer {
+	 
+
+	bool push_negation( form *&root, form *&parent);
+	virtual bool apply( form *&root);
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
