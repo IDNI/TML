@@ -235,6 +235,7 @@ form::ftype transformer::getdual( form::ftype type) {
 
 bool demorgan::push_negation( form *&root, form *&parent) {
 	
+	if(!root) return false;
 	if( root->type == form::ftype::AND ||
 		root->type == form::ftype::OR ) {
 				
@@ -244,6 +245,12 @@ bool demorgan::push_negation( form *&root, form *&parent) {
 				throw 0;
 			return true;
 	}
+	else if ( allow_neg_move_quant && root->isquantifier()) {
+			root->type = getdual(root->type);
+			if( ! push_negation(root->r, root) ) throw 0;
+
+			return true;
+	}	
 	else {
 		if( root->type == form::ftype::NOT) {
 			form *t = root;
@@ -253,9 +260,9 @@ bool demorgan::push_negation( form *&root, form *&parent) {
 			return true;				
 		}
 		else if ( root->type == form::ftype::ATOM)	{
-				form* t = new form(form::ftype::NOT, 0 , NULL, root);
-				root = t;
-				return true;
+			form* t = new form(form::ftype::NOT, 0 , NULL, root);
+			root = t;
+			return true;
 		}
 		return false;
 	}
@@ -287,9 +294,76 @@ bool demorgan::apply( form *&root) {
 		form * temp = new form( form::NOT);
 		temp->l = root->l;
 		root->l = temp;
-		return true;
+		return true; 
 	}
 	return false;
+}
+
+bool pull_quantifier::apply( form *&root) {
+
+	bool changed = false;
+	if( root->isquantifier()) return false;
+
+	form *curr = root;
+	form *lprefbeg = NULL, *lprefend = NULL, *rprefbeg = NULL, *rprefend= NULL;
+
+	if( curr->l && curr->l->isquantifier()) {	
+
+		lprefbeg = curr->l;
+		lprefend = lprefbeg;
+
+		while( lprefend->r && lprefend->r->isquantifier())
+			lprefend = lprefend->r;
+	}
+	if( curr->r && curr->r->isquantifier()) {	
+
+		rprefbeg = curr->r;
+		rprefend = rprefbeg;
+
+		while( rprefend->r && rprefend->r->isquantifier())
+			rprefend = rprefend->r;
+	}
+	if( lprefbeg && rprefbeg ) {
+		curr->l = lprefend->r;
+		curr->r = rprefend->r;
+		lprefend->r = rprefbeg;
+		rprefend->r = curr;
+		root = lprefbeg;
+		changed = true;
+		wprintf(L"\nPulled both: ");
+		wprintf(L"%d %d , ", lprefbeg->type, lprefbeg->arg );
+		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );
+	}	
+	else if(lprefbeg) {
+
+		curr->l = lprefend->r;
+		lprefend->r = curr;		
+		root = lprefbeg;
+		changed = true;
+		wprintf(L"\nPulled left: ");
+		wprintf(L"%d %d\n", lprefbeg->type, lprefbeg->arg );
+	}
+	else if (rprefbeg) {
+		curr->r = rprefend->r;
+		rprefend->r = curr;		
+		root = rprefbeg;
+		changed = true;
+		wprintf(L"\nPulled right: ");
+		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );	
+	}
+	return changed;
+}
+
+bool pull_quantifier::traverse( form *&root ) {
+	
+	bool changed  = false;
+	if( root->type == form::ftype::ATOM ) return false; 
+	if( root->l ) changed |= traverse( root->l );
+	if( root->r ) changed |= traverse( root->r );
+	
+	changed = apply(root);
+
+	return changed;
 }
 
 bool transformer::traverse(form *&root ) {
@@ -301,7 +375,7 @@ bool transformer::traverse(form *&root ) {
 	if( root->l ) changed |= traverse(root->l );
 	if( root->r ) changed |= traverse(root->r );
 
-	
+
 	return changed;
 }
 
@@ -684,7 +758,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 						v.push_back(from_raw_term(z)),
 						get_nums(z);
 					align_vars(v), m.insert(move(v));
-				}
+				}   
 			}
 		else if(r.prft != NULL) {
 			
@@ -693,10 +767,16 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			r.prft.get()->printTree();
 			wprintf(L"\n ........... \n");
 			froot->printnode();
-			demorgan demtrans;
+
 			implic_removal impltrans;
-			demtrans.traverse(froot);
+			demorgan demtrans(true);
+			pull_quantifier pullquant;
+			
 			impltrans.traverse(froot);
+			demtrans.traverse(froot);
+			wprintf(L"\n ........... \n");
+			froot->printnode();			
+			pullquant.traverse(froot);
 			wprintf(L"\n ........... \n");
 			froot->printnode();
 

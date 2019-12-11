@@ -327,6 +327,17 @@ friend struct transformer;
 		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
 		if( _t) tm = new term(), *tm = *_t;
 	}
+	bool isquantifier() const {
+		 if( type == form::ftype::FORALL1 || 
+			 type == form::ftype::EXISTS1 ||
+			 type == form::ftype::UNIQUE1 ||
+			 type == form::ftype::EXISTS2 ||
+			 type == form::ftype::UNIQUE2 ||
+			 type == form::ftype::FORALL2 )
+			 return true;
+		return false;
+
+	}
 
 	~form() {
 		if(l) delete l, l = NULL;
@@ -351,8 +362,17 @@ struct implic_removal : public transformer {
 struct demorgan : public transformer {
 	 
 
+	bool allow_neg_move_quant =false;
 	bool push_negation( form *&root, form *&parent);
 	virtual bool apply( form *&root);
+	demorgan(bool _allow_neg_move_quant =false){
+		allow_neg_move_quant = _allow_neg_move_quant;
+	}
+};
+
+struct pull_quantifier: public transformer {
+	virtual bool apply( form *&root);
+	virtual bool traverse( form *&root);
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
