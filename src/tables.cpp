@@ -221,15 +221,15 @@ term tables::from_raw_term(const raw_term& r) {
 
 
 form::ftype transformer::getdual( form::ftype type) {
-		switch (type) {
-			case form::ftype::OR : return form::ftype::AND; 
-			case form::ftype::AND : return form::ftype::OR; 
-			case form::ftype::FORALL1 : return form::ftype::EXISTS1 ;
-			case form::ftype::FORALL2 : return form::ftype::EXISTS2 ;
-			case form::ftype::EXISTS1 : return form::ftype::FORALL1 ;
-			case form::ftype::EXISTS2 : return form::ftype::FORALL2 ;
-			default: throw 0;	
-		}
+	switch (type) {
+		case form::ftype::OR : return form::ftype::AND; 
+		case form::ftype::AND : return form::ftype::OR; 
+		case form::ftype::FORALL1 : return form::ftype::EXISTS1 ;
+		case form::ftype::FORALL2 : return form::ftype::EXISTS2 ;
+		case form::ftype::EXISTS1 : return form::ftype::FORALL1 ;
+		case form::ftype::EXISTS2 : return form::ftype::FORALL2 ;
+		default: throw 0;	
+	}
 }
 
 
@@ -266,13 +266,13 @@ bool demorgan::push_negation( form *&root, form *&parent) {
 		}
 		return false;
 	}
-
+ 
 }
 	
 	
 bool demorgan::apply( form *&root) {
 		
-	if( root->type == form::ftype::NOT  &&
+	if(root && root->type == form::ftype::NOT  &&
 		root->l->type != form::ftype::ATOM ) { 
 			
 		bool changed = push_negation(root->l, root);
@@ -289,7 +289,7 @@ bool demorgan::apply( form *&root) {
 }
 
  bool implic_removal::apply(form *&root) {
-	if( root->type == form::ftype::IMPLIES ) { 
+	if( root && root->type == form::ftype::IMPLIES ) { 
 		root->type = form::OR;
 		form * temp = new form( form::NOT);
 		temp->l = root->l;
@@ -298,32 +298,84 @@ bool demorgan::apply( form *&root) {
 	}
 	return false;
 }
+bool substitution::apply(form *&phi){
+	if( phi && phi->type == form::ATOM) {
+		if(phi->tm == NULL) {
+				// simple quant leaf declartion
+			auto it = submap_var.find(phi->arg);
+			if( it != submap_var.end())		//TODO: Both var/sym should have mutually excl.
+				return phi->arg = it->second, true;	
+			else if	( (it = submap_sym.find(phi->arg)) != submap_sym.end()) 
+				return phi->arg = it->second, true;
+			else return false;
+		}
+		else {
+			bool changed = false;
+			for( int &targ:*phi->tm) {
+				auto it = submap_var.find(targ);
+				if( it != submap_var.end())		//TODO: Both var/sym should have mutually excl.
+					targ = it->second, changed = true;	
+				else if	( (it = submap_sym.find(targ)) != submap_sym.end()) 
+					targ = it->second, changed =true;
+			
+			}
+			return changed;
+		}
+
+	}
+	return false;
+}
+
+void findprefix(form* curr, form*&beg, form*&end){
+	
+	if( !curr ||  !curr->isquantifier()) return;
+
+	beg = end = curr;
+	while(end->r && end->r->isquantifier())
+		end = end->r;
+}
+
+bool pull_quantifier::dosubstitution(form *phi, form * prefend){
+
+	substitution subst;
+	form *temp = phi;
+	
+	int_t fresh_int;
+	while(true) {
+		if( temp->type == form::FORALL1 ||
+			temp->type == form::EXISTS1 ||
+			temp->type == form::UNIQUE1 ) 
+				
+			fresh_int = dt.get_fresh_var(temp->l->arg);
+		else 
+			fresh_int = dt.get_fresh_sym(temp->l->arg);
+
+		subst.add( temp->l->arg, fresh_int );
+				
+		wprintf(L"\nNew fresh: %d --> %d ", temp->l->arg, fresh_int);
+		if( temp == prefend) break;
+		else temp = temp->r;
+	}
+
+	return subst.traverse(phi);
+}
 
 bool pull_quantifier::apply( form *&root) {
 
 	bool changed = false;
-	if( root->isquantifier()) return false;
+	if( !root || root->isquantifier()) return false;
 
 	form *curr = root;
 	form *lprefbeg = NULL, *lprefend = NULL, *rprefbeg = NULL, *rprefend= NULL;
 
-	if( curr->l && curr->l->isquantifier()) {	
-
-		lprefbeg = curr->l;
-		lprefend = lprefbeg;
-
-		while( lprefend->r && lprefend->r->isquantifier())
-			lprefend = lprefend->r;
-	}
-	if( curr->r && curr->r->isquantifier()) {	
-
-		rprefbeg = curr->r;
-		rprefend = rprefbeg;
-
-		while( rprefend->r && rprefend->r->isquantifier())
-			rprefend = rprefend->r;
-	}
+	findprefix(curr->l, lprefbeg, lprefend);
+	findprefix(curr->r, rprefbeg, rprefend);
+	
 	if( lprefbeg && rprefbeg ) {
+		
+		if(!dosubstitution(lprefbeg, lprefend) ||
+			!dosubstitution(rprefbeg, rprefend) )
+			throw 0;
 		curr->l = lprefend->r;
 		curr->r = rprefend->r;
 		lprefend->r = rprefbeg;
@@ -335,7 +387,8 @@ bool pull_quantifier::apply( form *&root) {
 		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );
 	}	
 	else if(lprefbeg) {
-
+		if(!dosubstitution(lprefbeg, lprefend))
+			throw 0;
 		curr->l = lprefend->r;
 		lprefend->r = curr;		
 		root = lprefbeg;
@@ -344,6 +397,8 @@ bool pull_quantifier::apply( form *&root) {
 		wprintf(L"%d %d\n", lprefbeg->type, lprefbeg->arg );
 	}
 	else if (rprefbeg) {
+		if(!dosubstitution(rprefbeg, rprefend))
+			throw 0;
 		curr->r = rprefend->r;
 		rprefend->r = curr;		
 		root = rprefbeg;
@@ -357,7 +412,7 @@ bool pull_quantifier::apply( form *&root) {
 bool pull_quantifier::traverse( form *&root ) {
 	
 	bool changed  = false;
-	if( root->type == form::ftype::ATOM ) return false; 
+	if( root == NULL ) return false; 
 	if( root->l ) changed |= traverse( root->l );
 	if( root->r ) changed |= traverse( root->r );
 	
@@ -368,7 +423,7 @@ bool pull_quantifier::traverse( form *&root ) {
 
 bool transformer::traverse(form *&root ) {
 	bool changed  = false;
-	if( root->type == form::ftype::ATOM ) return false; 
+	if( root == NULL ) return false; 
 
 	changed = apply(root);
 
@@ -449,14 +504,17 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 }
 
 void form::printnode(int lv) {
-		if(r) r->printnode(lv+1);
-		wprintf(L"\n");
-		for( int i=0; i <lv; i++)
-			wprintf(L"\t");
-		wprintf(L"%d %d", type, arg );
-		if(l) l->printnode(lv+1);
-
-	}
+	if(r) r->printnode(lv+1);
+	wprintf(L"\n");
+	for( int i=0; i <lv; i++)
+		wprintf(L"\t");
+	wprintf(L"%d", type);
+	if( tm == NULL)
+		wprintf(L" %d", arg );
+	else for( int targ: *tm)
+		wprintf(L" %d", targ );
+	if(l) l->printnode(lv+1);
+}
 	
 
 void tables::out(wostream& os) const {
@@ -770,8 +828,8 @@ flat_prog tables::to_terms(const raw_prog& p) {
 
 			implic_removal impltrans;
 			demorgan demtrans(true);
-			pull_quantifier pullquant;
-			
+			pull_quantifier pullquant(this->dict);
+
 			impltrans.traverse(froot);
 			demtrans.traverse(froot);
 			wprintf(L"\n ........... \n");

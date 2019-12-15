@@ -371,8 +371,27 @@ struct demorgan : public transformer {
 };
 
 struct pull_quantifier: public transformer {
+	dict_t &dt;
+	pull_quantifier(dict_t &_dt): dt(_dt) {}
 	virtual bool apply( form *&root);
 	virtual bool traverse( form *&root);
+	bool dosubstitution(form * phi, form* end);
+}; 
+struct substitution: public transformer {
+	
+	std::map<int_t, int_t> submap_var;
+	std::map<int_t, int_t> submap_sym;
+
+	void clear() { submap_var.clear(); submap_sym.clear();}
+	void add( int_t oldn, int_t newn) {
+		if(oldn < 0)
+			submap_var[oldn] = newn;
+		else 
+			submap_sym[oldn] = newn;
+	}
+	
+	virtual bool apply(form *&phi);
+	
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
