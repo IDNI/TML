@@ -363,7 +363,7 @@ struct demorgan : public transformer {
 	 
 
 	bool allow_neg_move_quant =false;
-	bool push_negation( form *&root, form *&parent);
+	bool push_negation( form *&root);
 	virtual bool apply( form *&root);
 	demorgan(bool _allow_neg_move_quant =false){
 		allow_neg_move_quant = _allow_neg_move_quant;

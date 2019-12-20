@@ -233,21 +233,21 @@ form::ftype transformer::getdual( form::ftype type) {
 }
 
 
-bool demorgan::push_negation( form *&root, form *&parent) {
+bool demorgan::push_negation( form *&root) {
 	
 	if(!root) return false;
 	if( root->type == form::ftype::AND ||
 		root->type == form::ftype::OR ) {
 				
 			root->type = getdual(root->type);
-			if( ! push_negation(root->l, root) ||
-				! push_negation(root->r , root))
+			if( ! push_negation(root->l) ||
+				! push_negation(root->r))
 				throw 0;
 			return true;
 	}
 	else if ( allow_neg_move_quant && root->isquantifier()) {
 			root->type = getdual(root->type);
-			if( ! push_negation(root->r, root) ) throw 0;
+			if( ! push_negation(root->r) ) throw 0;
 
 			return true;
 	}	
@@ -275,7 +275,7 @@ bool demorgan::apply( form *&root) {
 	if(root && root->type == form::ftype::NOT  &&
 		root->l->type != form::ftype::ATOM ) { 
 			
-		bool changed = push_negation(root->l, root);
+		bool changed = push_negation(root->l);
 		if(changed ) {
 			form *t = root;
 			root = root->l;
@@ -508,11 +508,7 @@ void form::printnode(int lv) {
 	wprintf(L"\n");
 	for( int i=0; i <lv; i++)
 		wprintf(L"\t");
-	wprintf(L"%d", type);
-	if( tm == NULL)
-		wprintf(L" %d", arg );
-	else for( int targ: *tm)
-		wprintf(L" %d", targ );
+	wprintf(L" %d %d", type, arg);
 	if(l) l->printnode(lv+1);
 }
 	
