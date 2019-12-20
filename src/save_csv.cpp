@@ -20,7 +20,7 @@ void driver::save_csv() const {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
 			wstring wfname = lexeme2str(t.e[0].e) + L".csv";
-			output::to(L"info") << L"Saving " << wfname << endl;
+			o::inf() << L"Saving " << wfname << endl;
 			files.emplace(t.e[0],
 				wofstream(ws2s(wfname)));
 			it = files.find(t.e[0]);

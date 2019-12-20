@@ -72,20 +72,19 @@ struct option {
 	type get_type() const { return t; }
 	value get() const { return v; }
 	bool          is_output () const { return output::exists(name()); }
+	bool          is_input  () const { return n[0]==L"input"||n[0]==L"i"; }
 	int           get_int   () const { return v.get_int(); };
 	bool          get_bool  () const { return v.get_bool(); };
 	std::wstring  get_string() const { return v.get_string(); };
 	bool operator ==(const value& ov) const { return v == ov; }
 	bool operator ==(const option& o) const { return n == o.names(); }
 	bool operator  <(const option& o) const { return n < o.names(); }
-	void parse_value(std::wstring s) {
-		//DBG(std::wcout << L"option::parse_value(s=\"" << s <<
+	void parse_value(const std::wstring& s) {
+		//DBG(o::out() << L"option::parse_value(s=\"" << s <<
 		//	L"\") <" << (int)t << L'>' << std::endl;)
 		switch (t) {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
-			case BOOL: v.set(s==L"" || s==L"true" || s==L"t" ||
-				s==L"1" || s==L"on" || s==L"enabled" ||
-				s==L"yes"); break;
+			case BOOL: parse_bool(s); break;
 			case STRING:
 				if (s == L"") {
 					if (is_output())
@@ -95,12 +94,21 @@ struct option {
 		}
 		if (e) e(v);
 	}
+	void parse_bool(const std::wstring& s) {
+		if (s==L"" || s==L"true" || s==L"t" || s==L"1" || s==L"on" ||
+						s==L"enabled" || s==L"yes")
+			return v.set(true), (void)0;
+		v.set(false);
+		if (!(s==L"false" || s==L"f" || s==L"0" || s==L"off" ||
+						s==L"disabled" || s==L"no"))
+			o::err() << L"Wrong bool argument: " << s << std::endl;
+	}
 	void disable() {
 		if (STRING == get_type() && is_output()) parse_value(L"@null");
 		else v.null();
 	}
 	bool is_undefined() const { return v.is_undefined(); }
-	option &description(std::wstring d) { return desc = d, *this; }
+	option &description(const std::wstring& d) { return desc = d, *this; }
 	std::wostream& help(std::wostream& os) const {
 		std::wstringstream ss; ss << L"";
 		long pos = ss.tellp();
@@ -115,6 +123,7 @@ struct option {
 			case BOOL: ss << "bool"; break;
 			case STRING:
 				if (is_output()) ss << "output";
+				else if (is_input()) ss << "input";
 				else ss << "string";
 				break;
 			default: throw 0;
@@ -141,8 +150,9 @@ class options {
 	std::map<std::wstring, option> opts = {};
 	std::map<std::wstring, std::wstring> alts = {};
 	std::vector<std::wstring> args;
-	std::wstring try_read_value(std::wstring v);
-	void parse_option(std::wstring arg, std::wstring v = L"");
+	std::wstring input_data = L"";
+	bool parse_option(const wstrings &wargs, const size_t &i);
+	bool is_value(const wstrings &wargs, const size_t &i);
 	void setup();
 	void init_defaults();
 public:
@@ -160,12 +170,14 @@ public:
 	void parse(int argc, char** argv, bool internal = false);
 	void parse(strings sargs,         bool internal = false);
 	void parse(wstrings wargs,        bool internal = false);
-	bool enabled (const std::wstring arg) const;
-	bool disabled(const std::wstring arg) const { return !enabled(arg); }
+	bool enabled (const std::wstring &arg) const;
+	bool disabled(const std::wstring &arg) const { return !enabled(arg); }
 	int           get_int   (std::wstring name) const;
 	bool          get_bool  (std::wstring name) const;
 	std::wstring  get_string(std::wstring name) const;
 	void help(std::wostream& os) const;
+	const std::wstring& input() const { return input_data; }
+	void add_input_data(const std::wstring& data) { input_data += data; }
 };
 
 std::wostream& operator<<(std::wostream&, const std::map<std::wstring,option>&);

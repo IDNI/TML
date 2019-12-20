@@ -106,6 +106,7 @@ public:
 	bool result = true;
 	options opts;
 	static void init();
+	driver(options o);
 	driver(FILE *f, options o);
 	driver(std::wstring, options o);
 	driver(char *s, options o);

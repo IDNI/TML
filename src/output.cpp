@@ -165,7 +165,7 @@ wostream& operator<<(wostream& os, const directive& d) {
 wostream& operator<<(wostream& os, const elem& e) {
 	switch (e.type) {
 		case elem::CHR: return os << '\'' <<
-			(e.ch == '\'' || e.ch == '\\' ? L"\\" : L"") << e.ch << '\'';
+			(e.ch=='\'' || e.ch=='\\' ? L"\\" : L"") << e.ch<<'\'';
 		case elem::OPENP:
 		case elem::CLOSEP: return os<<*e.e[0];
 		case elem::NUM: return os << e.num;
@@ -179,6 +179,25 @@ wostream& operator<<(wostream& os, const production& p) {
 	return os << L'.';
 }
 
+wstring quote_sym(const elem& e) {
+	std::wstringstream os, ss;
+	if (e.type == elem::SYM) {
+		bool q{false};
+		for (cws s = e.e[0]; s != e.e[1]; ++s) {
+			if (!q && !iswalnum(*s) && *s != L'_') {
+				q = true;
+				os << L'"';
+			}
+			if (q && (*s==L'"'|| *s==L'\\')) ss << L"\\";
+			ss << *s;
+		}
+		os << ss.str();
+		if (q) os << L'"';
+	} else
+		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
+	return os.str();
+}
+
 wostream& operator<<(wostream& os, const raw_term& t) {
 	if (t.neg) os << L'~';
 	os << t.e[0];
@@ -188,7 +207,8 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 		if (n >= t.e.size()) break;
 		while (t.e[n].type == elem::OPENP) ++n;
 		for (int_t k = 0; k != t.arity[ar];)
-			if ((os << t.e[n++]), ++k != t.arity[ar]) os << L' ';
+			if ((os << quote_sym(t.e[n++])), ++k != t.arity[ar])
+				os << L' ';
 		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 		++ar;
 		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
@@ -244,7 +264,7 @@ wostream& operator<<(wostream& os, const option& o) {
 			return os << (o.get_bool() ?L"":L"false");
 		case option::type::STRING: {
 			wstring s = o.get_string();
-			if (s.rfind(L"-", 0) == 0) os << L"--";
+			if (s != L"-" && s.rfind(L"-", 0) == 0) os << L"--";
 			os << L'"';
 			for (auto it = s.begin(); it < s.end(); ++it)
 				os << (*it == '\\' || *it == '"' ? L"\\" : L""),
@@ -297,7 +317,7 @@ void tables::print(wostream& os, const tables::witness& w) {
 		if (arg & 1) rt.e[n]=elem((wchar_t)(arg>>2));
 		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
 		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
-		wcout << x.first << " = " << x.second << endl;
+		o::out() << x.first << " = " << x.second << endl;
 	}
 	return os;
 }*/

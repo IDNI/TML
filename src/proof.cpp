@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include "tables.h"
 #include "input.h"
+#include "output.h"
 
 using namespace std;
 
@@ -85,7 +86,7 @@ const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	if (!level) return 0;
 	if (auto it = p[level].find(q); it != p.end()) {
 		set<proof_elem> x
-		
+
 		for (const proof_elem& e : it->second) {
 			for (const auto& b : e.b) if (b.first == -1) x.insert(e);
 			if (x.empty()) continue;
@@ -96,8 +97,8 @@ const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	while ((s = get_witnesses(q, level)).empty()) if (!level--) return 0;
 	bool f;
 	for (const witness& w : s) {
-//		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
-		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
+//		DBG(o::out()<<L"witness: "; print(o::out(), w); o::out()<<endl;)
+		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size());
 		for (const term& t : w.b) {
 			f = false;
 			for (size_t n = level; n--;)
@@ -119,15 +120,15 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	proof_elem e;
 	if (!level) return 0;
 	if (!--dep) return -1;
-//	DBG(wcout<<L"current p: " << endl; print(wcout, p);)
-//	DBG(wcout<<L"proving " << to_raw_term(q) << L" level " << level<<endl;)
+//	DBG(o::out()<<L"current p: " << endl; print(o::out(), p);)
+//	DBG(o::out()<<L"proving " << to_raw_term(q) << L" level "<<level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
 		if (!level--)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
-//		DBG(wcout<<L"witness: "; print(wcout, w); wcout << endl;)
-		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size()); 
+//		DBG(o::out()<<L"witness: "; print(o::out(), w); o::out()<<endl;)
+		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size());
 		for (const term& t : w.b) {
 			f = false;
 			for (size_t n = level; n--;)
@@ -151,5 +152,5 @@ void tables::get_goals() {
 		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s) get_proof(g, p, levels.size() - 1);
-	print(wcout, p);
+	print(o::out(), p);
 }

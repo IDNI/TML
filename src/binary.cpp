@@ -97,12 +97,11 @@ ostream& operator<<(ostream& os, const tables& tbl) {
 
 ostream& write_bdd(ostream& os) {
 	write_int(os, V.size()-2);
-	for (bdd b : V) {
-		if (b.v == 0 || b.v == 1) continue;
-		//DBG(wcout<<L"v: "<<b.v<<L" h: "<<b.h<<L" l: "<<b.l<<endl;)
-		write_int(os, b.v);
-		write_int(os, b.h);
-		write_int(os, b.l);
+	for (auto b = V.begin()+2; b < V.end(); ++b) {
+		//DBG(o::out()<<L"v: "<<b->v<<L" h: "<<b->h<<L" l: "<<b->l<<endl;)
+		write_int(os, b->v);
+		write_int(os, b->h);
+		write_int(os, b->l);
 	}
 	return os;
 }
@@ -137,10 +136,10 @@ istream& read_bdd(istream& is) {
 	bdd::gc();
 	V.clear();
 	bdd::init();
-	DBG(wcout << L"nnodes: " << nnodes << endl;)
+	DBG(o::out() << L"nnodes: " << nnodes << endl;)
 	for (int_t i = 0; i != nnodes; ++i) {
 		int_t v = read_int(is), h = read_int(is), l = read_int(is);
-		DBG(wcout<<L"v: "<<v<<L" h: "<<h<<L" l: "<<l<<endl;)
+		DBG(o::out()<<L"v: "<<v<<L" h: "<<h<<L" l: "<<l<<endl;)
 		V.emplace_back(v, h, l);
 	}
 	return is;
@@ -148,17 +147,17 @@ istream& read_bdd(istream& is) {
 
 istream& operator>>(istream& is, dict_t& d) {
 	int_t nrels = read_int(is);
-	DBG(wcout << L"nrels: " << nrels << endl;)
+	DBG(o::out() << L"nrels: " << nrels << endl;)
 	for (int_t i = 0; i != nrels; ++i) {
 		wstring t = read_string(is);
-		DBG(wcout << L"\t`" << t << L'`' << endl;)
+		DBG(o::out() << L"\t`" << t << L'`' << endl;)
 		d.get_rel(t);
 	}
 	int_t nsyms = read_int(is);
-	DBG(wcout << L"nsyms: " << nsyms << endl;)
+	DBG(o::out() << L"nsyms: " << nsyms << endl;)
 	for (int_t i = 0; i != nsyms; ++i) {
 		wstring t = read_string(is);
-		DBG(wcout << L"\t`" << t << L'`' << endl;)
+		DBG(o::out() << L"\t`" << t << L'`' << endl;)
 		d.get_sym(d.get_lexeme(t));
 	}
 	return is;
@@ -167,9 +166,9 @@ istream& operator>>(istream& is, dict_t& d) {
 istream& operator>>(istream& is, tables& tbl) {
 	is >> tbl.dict;
 	tbl.bits = read_int(is);
-	DBG(wcout << L"bits: " << tbl.bits << endl;)
+	DBG(o::out() << L"bits: " << tbl.bits << endl;)
 	tbl.nums = read_int(is);
-	DBG(wcout << L"nums: " << tbl.nums << endl;)
+	DBG(o::out() << L"nums: " << tbl.nums << endl;)
 	return is;
 }
 
@@ -178,6 +177,6 @@ istream& operator>>(istream& is, driver& d) {
 	is >> *d.tbl;
 	read_bdd(is);
 	wstring source = read_string(is);
-	DBG(wcout<<L"source: `"<<source<<L"`"<<endl;)
+	DBG(o::out()<<L"source: `"<<source<<L"`"<<endl;)
 	return is;
 }
