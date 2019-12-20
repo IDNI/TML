@@ -291,7 +291,7 @@ private:
 //	std::function<int_t(void)>* get_new_rel;
 
 	bool from_raw_form(const raw_form_tree *rs, form *&froot);
-
+	bool to_pnf( form *&froot);
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);

@@ -801,11 +801,29 @@ void tables::get_nums(const raw_term& t) {
 		else if (e.type == elem::CHR) chars = 255;
 }
 
+bool tables::to_pnf( form *&froot) {
+	
+	implic_removal impltrans;
+	demorgan demtrans(true);
+	pull_quantifier pullquant(this->dict);
+
+	bool changed = false;
+	changed = impltrans.traverse(froot);
+	changed |= demtrans.traverse(froot);
+	wprintf(L"\n ........... \n");
+	froot->printnode();			
+	changed |= pullquant.traverse(froot);
+	wprintf(L"\n ........... \n");
+	froot->printnode();
+
+	return changed;
+
+}
 flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
 	term t;
-	form* froot = NULL;
+
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
@@ -820,25 +838,18 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			}
 		else if(r.prft != NULL) {
 			
+			form* froot = NULL;
 			from_raw_form(r.prft.get(), froot);
+
 			wprintf(L"\n ........... \n");
 			r.prft.get()->printTree();
 			wprintf(L"\n ........... \n");
 			froot->printnode();
 
-			implic_removal impltrans;
-			demorgan demtrans(true);
-			pull_quantifier pullquant(this->dict);
-
-			impltrans.traverse(froot);
-			demtrans.traverse(froot);
-			wprintf(L"\n ........... \n");
-			froot->printnode();			
-			pullquant.traverse(froot);
-			wprintf(L"\n ........... \n");
-			froot->printnode();
+			to_pnf(froot);
 
 			if(froot) delete froot;
+	
 		}
 
 		else for (const raw_term& x : r.h)
