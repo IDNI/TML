@@ -291,7 +291,7 @@ private:
 //	std::function<int_t(void)>* get_new_rel;
 
 	bool from_raw_form(const raw_form_tree *rs, form *&froot);
-
+	bool to_pnf( form *&froot);
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
@@ -307,7 +307,10 @@ public:
 	void set_proof(bool v) { bproof = v; }
 };
 
+struct transformer;
 struct form{
+friend struct transformer;
+
 	int_t arg;
 	term *tm;
 	form *l;
@@ -324,6 +327,17 @@ struct form{
 		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
 		if( _t) tm = new term(), *tm = *_t;
 	}
+	bool isquantifier() const {
+		 if( type == form::ftype::FORALL1 || 
+			 type == form::ftype::EXISTS1 ||
+			 type == form::ftype::UNIQUE1 ||
+			 type == form::ftype::EXISTS2 ||
+			 type == form::ftype::UNIQUE2 ||
+			 type == form::ftype::FORALL2 )
+			 return true;
+		return false;
+
+	}
 
 	~form() {
 		if(l) delete l, l = NULL;
@@ -331,6 +345,53 @@ struct form{
 		if(tm) delete tm, tm = NULL;
 	}
 	void printnode(int lv=0);
+};
+
+struct transformer {
+	virtual bool apply(form *&root) = 0;
+	form::ftype getdual( form::ftype type);
+	virtual bool traverse(form *&);
+};
+
+
+struct implic_removal : public transformer {
+	 
+	 virtual bool apply(form *&root);
+};
+
+struct demorgan : public transformer {
+	 
+
+	bool allow_neg_move_quant =false;
+	bool push_negation( form *&root);
+	virtual bool apply( form *&root);
+	demorgan(bool _allow_neg_move_quant =false){
+		allow_neg_move_quant = _allow_neg_move_quant;
+	}
+};
+
+struct pull_quantifier: public transformer {
+	dict_t &dt;
+	pull_quantifier(dict_t &_dt): dt(_dt) {}
+	virtual bool apply( form *&root);
+	virtual bool traverse( form *&root);
+	bool dosubstitution(form * phi, form* end);
+}; 
+struct substitution: public transformer {
+	
+	std::map<int_t, int_t> submap_var;
+	std::map<int_t, int_t> submap_sym;
+
+	void clear() { submap_var.clear(); submap_sym.clear();}
+	void add( int_t oldn, int_t newn) {
+		if(oldn < 0)
+			submap_var[oldn] = newn;
+		else 
+			submap_sym[oldn] = newn;
+	}
+	
+	virtual bool apply(form *&phi);
+	
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);

@@ -27,6 +27,21 @@ lexeme dict_t::get_sym(int_t t) const {
 	return syms[t>>2];
 }
 
+int_t dict_t::get_fresh_var(int_t old) {
+	
+	static int_t counter=0;
+	wstring fresh = L"?0f"+ to_wstring(++counter)+to_wstring(old);
+	int_t fresh_int = get_var(get_lexeme(fresh));
+	return fresh_int;
+}
+
+int_t dict_t::get_fresh_sym(int_t old) {
+	
+	static int_t counter=0;
+	wstring fresh = L"0f" + to_wstring(++counter)+to_wstring(old);
+	int_t fresh_int = get_sym(get_lexeme(fresh));
+	return fresh_int;
+}
 int_t dict_t::get_var(const lexeme& l) {
 	assert(*l[0] == L'?');
 	auto it = vars_dict.find(l);

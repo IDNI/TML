@@ -1,0 +1,22 @@
+single (A) := ~a.
+double(a) := ~{~b}.
+notor(c) := ~{a | b}.
+notand(d):= ~{a & b}.
+combined(z) := ~{ ~{a & b}  | c & ~{z | d}}.
+justneg(z) := ~exists ?c { y }.
+justneg2(z) := ~forall x {z}.
+negquant(k) := ~forall x { x} | ~exists ?g {a & b}.
+combinquant(k) := forall x forall y { a | b} -> ~exists ?g forall k {a & b}.
+pullqone (j ) := forall x {a} | b.
+pullqone2 (j ) := b | exists x {a}.
+
+pullqboth(k) := forall x {z} | unique y {j}.
+pullmulibelow(j) := unique x {a | {forall y {forall x {x} | exists j exists k {j|k} }} }.
+
+freshvars(k ?x) := forall k { exists ?x { k(?x j)}}.
+
+undersamescope(X )       :=  forall X { forall ?y { exists X{ R(X ?y) }} | forall ?y {X(?y)}}.
+
+
+
+
