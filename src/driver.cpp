@@ -189,11 +189,12 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 	try {
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);
-			DBG(if (opts.enabled(L"o"))
-				tbl->out(o::out() << endl);)
+			DBG(if (opts.enabled(L"o")) {
+				if (n) o::out() << endl;
+				tbl->out(o::out());
+			})
 		}
-		NDBG(if (opts.enabled(L"o"))
-			tbl->out(o::out() << endl);)
+		NDBG(if (opts.enabled(L"o")) tbl->out(o::out());)
 		if (opts.enabled(L"csv")) save_csv();
 	} catch (unsat_exception& e) {
 		o::out() << s2ws(string(e.what())) << endl;
