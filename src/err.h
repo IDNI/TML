@@ -43,3 +43,8 @@ const wchar_t err_rel_expected[] = L"Expected relation symbol.";
 const wchar_t err_len[] = L"Taking the length of an unknown string.";
 const wchar_t err_comment[] = L"Unfinished comment.";
 const wchar_t err_eof[] = L"Unexpected end of file.";
+const wchar_t err_eq_expected[] = L"Expected =/!= in the middle of term.";
+const wchar_t err_leq_expected[] = L"Expected <=/> in the middle of term.";
+const wchar_t err_3_els_expected[] = L"Expected 3 elements in the term.";
+const wchar_t err_builtin_expected[] = L"Expected builtin name in the beginning of term.";
+

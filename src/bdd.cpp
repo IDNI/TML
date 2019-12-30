@@ -70,9 +70,9 @@ void bdd::init() {
 }
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
-	DBG(assert(h && l && v > 0);)
-	DBG(assert(leaf(h) || v < abs(V[abs(h)].v));)
-	DBG(assert(leaf(l) || v < abs(V[abs(l)].v));)
+	DBG(assert(h && l && v > 0););
+	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)););
+	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)););
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
 	static std::unordered_map<bdd_key, int_t>::const_iterator it;
@@ -395,7 +395,7 @@ char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t& m) {
 	m = b[0].v;//var(v[0]);
 	for (i = 1; i != v.size(); ++i) m = min(m, b[i].v);//var(v[i]));
 	int_t *ph = (int_t*)alloca(sizeof(int_t) * v.size()),
-	      *pl = (int_t*)alloca(sizeof(int_t) * v.size());
+		  *pl = (int_t*)alloca(sizeof(int_t) * v.size());
 	for (i = 0; ph && i != v.size(); ++i)
 		if (b[i].v != m) ph[sh++] = v[i];
 		else if (b[i].h == F) ph = 0;
@@ -805,6 +805,75 @@ spbdd_handle bdd_or_many(const bdd_handles& v) {
 	for (size_t n = 0; n != v.size(); ++n) b[n] = -v[n]->b;
 	return bdd_handle::get(-bdd::bdd_and_many(move(b)));*/
 }
+
+#pragma region sat count
+
+size_t bdd::satcount_perm(int_t x, size_t leafvar) {
+	const bdd bx = get(x);
+	return satcount_perm(bx, x, leafvar);
+}
+
+size_t bdd::satcount_perm(const bdd& bx, int_t x, size_t leafvar) {
+	size_t r = 0;
+	if (leaf(x)) return trueleaf(x) ? 1 : 0;
+	const bdd bhi = get(bx.h), blo = get(bx.l);
+	int_t hivar = leaf(bx.h) ? leafvar : bhi.v;
+	int_t lovar = leaf(bx.l) ? leafvar : blo.v;
+	r += satcount_perm(bhi, bx.h, leafvar) *
+		(1 << (hivar - bx.v - 1));
+	r += satcount_perm(blo, bx.l, leafvar) *
+		(1 << (lovar - bx.v - 1));
+	return r;
+}
+
+static std::set<size_t> ourvars;
+size_t bdd::getvar(int_t h, int_t l, int_t v, int_t x, size_t maxv) {
+	if (leaf(x)) return maxv;
+	const bdd bhi = get(h), blo = get(l);
+	maxv = leaf(h) ? maxv : max(maxv, getvar(bhi.h, bhi.l, bhi.v, h, maxv));
+	maxv = leaf(l) ? maxv : max(maxv, getvar(blo.h, blo.l, blo.v, l, maxv));
+	maxv = max(maxv, size_t(v));
+	ourvars.insert(v);
+	return maxv;
+}
+
+// D: this version does a manual 'permute' to align vars (1,2,...)
+// works better with rule(?x ?y ?out) :- headers
+size_t bdd::satcount(int_t x) {
+	const bdd bx = get(x);
+	ourvars.clear();
+	size_t leafvar = getvar(bx.h, bx.l, bx.v, x, 0) + 1;
+
+	map<int_t, int_t> inv;
+	int_t ivar = 1;
+	for (auto x : ourvars) {
+		wcout << L"satcount: inv: " << x << L", " << ivar << L" ." << endl;
+		inv.emplace(x, ivar++);
+	}
+	leafvar = ivar;
+
+	return satcount(bx, x, leafvar, inv);
+}
+
+// TODO: optimize/cache, on multiple calls/static, or similar/diff/patterns?
+size_t bdd::satcount(const bdd& bx, int_t x, size_t leafvar,
+	map<int_t, int_t>& mapvars) {
+	size_t r = 0;
+	if (leaf(x)) {
+		return trueleaf(x) ? 1 : 0;
+	}
+	const bdd bhi = get(bx.h), blo = get(bx.l);
+	int_t hivar = leaf(bx.h) ? leafvar : mapvars.at(bhi.v); // nvars + 1 - bx.v
+	int_t lovar = leaf(bx.l) ? leafvar : mapvars.at(blo.v);
+	r += satcount(bhi, bx.h, leafvar, mapvars) *
+		(1 << (hivar - mapvars.at(bx.v) - 1));
+	r += satcount(blo, bx.l, leafvar, mapvars) *
+		(1 << (lovar - mapvars.at(bx.v) - 1));
+	return r;
+}
+
+#pragma endregion
+
 
 void bdd::sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r) {
 	if (t == F) return;

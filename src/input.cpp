@@ -112,7 +112,7 @@ int_t get_int_t(cws from, cws to) {
 	return neg ? -r : r;
 }
 
-bool directive::parse(const lexemes& l, size_t& pos) {
+bool directive::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	if (*l[pos][0] != '@') return false;
 	if (l[++pos] == L"trace") {
 		type = TRACE;
@@ -130,7 +130,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	}
 	if (l[pos] == L"stdout") {
 		type = STDOUT;
-		if (!t.parse(l, ++pos))
+		if (!t.parse(l, ++pos, prog))
 			parse_error(l[pos][0], err_stdout, l[pos]);
 		if (*l[pos++][0] != '.')
 			parse_error(l[pos-1][0], dot_expected, l[pos-1]);
@@ -146,7 +146,7 @@ bool directive::parse(const lexemes& l, size_t& pos) {
 	else if (*l[pos][0] == L'$')
 		type=CMDLINE, ++pos, n = get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == L"stdin") type = STDIN;
-	else if (t.parse(l, pos)) {
+	else if (t.parse(l, pos, prog)) {
 		type = TREE;
 		if (*l[pos++][0]!='.')
 			parse_error(l[pos][0], dot_expected, l[pos]);
@@ -204,10 +204,6 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		return e = l[pos++], type = AND, true;
 	}
 
-	//if (L'=' == l[pos][0][0] &&
-	//	L'=' == l[pos][0][1]) {
-	//	return e = l[pos++], type = EQ, true;
-	//}
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
@@ -236,32 +232,51 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	return ++pos, true;
 }
 
-bool raw_term::parse(const lexemes& l, size_t& pos) {
+bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	size_t curr = pos;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
-	bool rel = false, noteq = false, eq = false, leq = false, gt = false;
+	bool rel = false, noteq = false, eq = false, leq = false, gt = false, 
+		bltin = false;
 	while (!wcschr(L".:,;{}|&-<", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
-		switch (e.back().type) {
+		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos) 
+		switch (el.type) {
 			case elem::EQ: eq = true; break;
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
+			case elem::SYM: 
+				if (prog.builtins.find(el.e) != prog.builtins.end()) {
+					el.type = elem::BLTIN;
+					bltin = true;
+				}
+				break;
 			default: break;
 		}
 		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
+	if (bltin) {
+		// similar as for SYM below (join?) but this format will expand.
+		if (e[0].type != elem::BLTIN)
+			parse_error(l[pos][0], err_builtin_expected, l[pos]);
+		if (e[1].type != elem::OPENP)
+			parse_error(l[pos][0], err_paren_expected, l[pos]);
+		if (e.back().type != elem::CLOSEP)
+			parse_error(e.back().e[0], err_paren, l[pos]);
+		isbltin = true;
+		return calc_arity(), true;
+	}
 	if (noteq || eq) {
 		if (e.size() < 3)
-			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::NEQ && e[1].type != elem::EQ)
-			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			parse_error(l[pos][0], err_eq_expected, l[pos]);
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
 		iseq = true;
@@ -269,10 +284,10 @@ bool raw_term::parse(const lexemes& l, size_t& pos) {
 	}
 	if (leq || gt) {
 		if (e.size() < 3)
-			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::LEQ && e[1].type != elem::GT)
-			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			parse_error(l[pos][0], err_leq_expected, l[pos]);
 		if (gt) neg = !neg;
 		isleq = true;
 		return calc_arity(), true;
@@ -314,14 +329,14 @@ void raw_term::calc_arity() {
 	if (dep) parse_error(e[0].e[0], err_paren, e[0].e);
 }
 
-bool raw_rule::parse(const lexemes& l, size_t& pos) {
+bool raw_rule::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	size_t curr = pos;
 	if (*l[pos][0] == L'!') {
 		if (*l[++pos][0] == L'!') ++pos, type = TREE;
 		else type = GOAL;
 	}
 head:	h.emplace_back();
-	if (!h.back().parse(l, pos)) return pos = curr, false;
+	if (!h.back().parse(l, pos, prog)) return pos = curr, false;
 	if (*l[pos][0] == '.') return ++pos, true;
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || (l[pos][0][1] != L'-' && l[pos][0][1] != L'=' ))
@@ -329,7 +344,7 @@ head:	h.emplace_back();
 	++pos;
 	if(l[pos-1][0][1] == L'=') { //  formula
 		curr = pos; 
-		raw_sof rsof;
+		raw_sof rsof(prog);
 		raw_form_tree * root = NULL;
 		bool ret = rsof.parse(l, pos, root);
 		
@@ -341,7 +356,7 @@ head:	h.emplace_back();
 	} else {
 
 		b.emplace_back();
-		for (b.back().emplace_back(); b.back().back().parse(l, pos);
+		for (b.back().emplace_back(); b.back().back().parse(l, pos, prog);
 			b.back().emplace_back(), ++pos) {
 			if (*l[pos][0] == '.') return ++pos, true;
 			else if (*l[pos][0] == L';') b.emplace_back();
@@ -401,7 +416,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 		if( next.type == elem::SYM  ) {
 			
 			raw_term tm;
-			if( !tm.parse(l,pos)) goto Cleanup;
+			if( !tm.parse(l,pos, prog)) goto Cleanup;
 
 			root = new raw_form_tree(elem::NONE, &tm);
 
@@ -554,8 +569,9 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		directive x;
 		raw_rule y;
 		production p;
-		if (x.parse(l, pos)) d.push_back(x);
-		else if (y.parse(l, pos)) r.push_back(y);
+		// TODO: temp. passing prog/context, make parse(s) prog static instead.
+		if (x.parse(l, pos, *this)) d.push_back(x);
+		else if (y.parse(l, pos, *this)) r.push_back(y);
 		else if (p.parse(l, pos)) g.push_back(p);
 		else return false;
 	}
@@ -570,16 +586,23 @@ raw_progs::raw_progs(const std::wstring& s) {
 		lexemes l = prog_lex(wcsdup(s.c_str()));
 		if (!l.size()) return;
 		if (*l[pos][0] != L'{') {
-			raw_prog x;
+			raw_prog& x = p.emplace_back();
+			//raw_prog x;
 			if (!x.parse(l, pos))
 				parse_error(l[pos][0],
 					err_rule_dir_prod_expected, l[pos]);
-			p.push_back(x);
+			//p.push_back(x);
 		} else do {
-			raw_prog x;
+			// emplace to avoid copying dict etc. (or handle to avoid issues)
+			raw_prog& x = p.emplace_back(); // if needed on err: p.pop_back();
+			//raw_prog x;
+			// BLTINS: prepare builtins (dict)
+			for (const wstring& s : str_bltins)
+				x.builtins.insert(x.dict.get_lexeme(s));
 			if (++pos, !x.parse(l, pos))
 				parse_error(l[pos][0], err_parse, l[pos]);
-			if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
+			//if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
+			if (pos == l.size() || *l[pos++][0] != L'}')
 				parse_error(l[pos-1][1],
 					err_close_curly, l[pos-1]);
 		} while (pos < l.size());
