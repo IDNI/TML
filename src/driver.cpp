@@ -187,6 +187,7 @@ void driver::init() {
 driver::driver(raw_progs rp, options o) : opts(o) {
 	strs_t strtrees;
 	try {
+		if (!rp.p.size()) return;
 		for (size_t n = 0; n != rp.p.size(); ++n) {
 			prog_run(rp, n, strtrees);
 			DBG(if (opts.enabled(L"o")) {
