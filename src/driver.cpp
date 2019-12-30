@@ -164,8 +164,8 @@ void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
 			output::to(L"transformed")<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	clock_t start, end;
-	tbl = new tables(opts.enabled(L"proof"), true, opts.enabled(L"bin"),
-		opts.enabled(L"t"));
+	tbl = tbl ? tbl : new tables(opts.enabled(L"proof"), true,
+		opts.enabled(L"bin"), opts.enabled(L"t"));
 	if (opts.disabled(L"run")) return;
 	measure_time(tbl->run_prog(rp.p[n], pd.strs));
 //	for (auto x : prog->strtrees_out)
