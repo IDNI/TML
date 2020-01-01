@@ -42,6 +42,20 @@ template<typename T> struct ptrcmp {
 typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 	cb_ground;
 
+struct natcmp { 
+	bool operator()(const term& l, const term& r) const {
+		if (l.orderid != r.orderid) return l.orderid < r.orderid;
+		if (l.neg != r.neg) return l.neg;
+		//if (iseq != t.iseq) return iseq;
+		//if (isleq != t.isleq) return isleq;
+		//if (extype != t.extype) return extype < t.extype;
+		//if (l.tab != r.tab) return l.tab < r.tab;
+		if (l.goal != r.goal) return l.goal;
+		return (const ints&)l < r;
+	}
+};
+typedef std::set<term, natcmp> term_set;
+
 struct body {
 	bool neg, ext = false;
 //	struct alt *a = 0;
@@ -71,6 +85,11 @@ struct alt : public std::vector<body*> {
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
 //	static std::set<alt*, ptrcmp<alt>> &s;
+	bool isbltin = false; // or bltin_type...
+	int_t bltinout; // TODO: use bltinargs instead
+	size_t bltinsize;
+	lexeme bltintype;
+	ints bltinargs;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
@@ -163,8 +182,8 @@ private:
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
 	alt get_alt(const std::vector<raw_term>&);
-	void get_alt(const std::set<term>& al, const term& h, std::set<alt>&as);
-//	bool get_alt(const std::set<term>& al, const term& h, alt&);
+	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
+	//void get_alt(const std::set<term>& al, const term& h, std::set<alt>&as);
 	rule get_rule(const raw_rule&);
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
@@ -175,7 +194,7 @@ private:
 	size_t bits = 2;
 	dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
-	     bin_transform = false, print_transformed;
+		 bin_transform = false, print_transformed;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -208,8 +227,8 @@ private:
 	spbdd_handle add_bit(spbdd_handle x, size_t args);
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit)
 		const;
-    spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
-    spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
+	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
+	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
 	void range(size_t arg, size_t args, bdd_handles& v);
 	spbdd_handle range(size_t arg, ntable tab);
@@ -223,14 +242,16 @@ private:
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len);
-	spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
-			const varmap& vm, size_t len);
+	//spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
+	//		const varmap& vm, size_t len);
+	spbdd_handle get_alt_range(const term& h, const term_set& a,
+		const varmap& vm, size_t len);
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
 //	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
-	term from_raw_term(const raw_term&);
+	term from_raw_term(const raw_term&, const size_t orderid = 0);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	uints addtail(size_t len1, size_t len2) const;
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;

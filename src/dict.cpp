@@ -64,6 +64,14 @@ int_t dict_t::get_sym(const lexeme& l) {
 	return syms.push_back(l), syms_dict[l] = (syms.size()-1)<<2;
 }
 
+int_t dict_t::get_bltin(const lexeme& l) {
+	if (*l[0] == L'?') parse_error(err_var_relsym, l);
+	auto it = bltins_dict.find(l);
+	if (it != bltins_dict.end()) return it->second;
+	bltins.push_back(l);
+	return bltins_dict[l] = bltins.size() - 1;
+}
+
 lexeme dict_t::get_lexeme(const wstring& s) {
 	DBG(assert(!s.empty());)
 	cws w = s.c_str();
