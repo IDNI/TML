@@ -102,6 +102,7 @@ class driver {
 	tables *tbl = 0;
 	void output_pl(const raw_prog& p) const;
 	std::set<lexeme> vars;
+	void run_(raw_progs &rp);
 public:
 	bool result = true;
 	options opts;
@@ -115,6 +116,8 @@ public:
 	driver(char *s);
 	~driver();
 
+	void run(raw_progs rp) { run_(rp); };
+	void out(std::wostream& os) const { if (tbl) tbl->out(os); };
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); };
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); };

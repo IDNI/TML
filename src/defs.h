@@ -75,6 +75,7 @@ namespace o { // call driver::init() before using any o::xxx() wostream
 	std::wostream& err(); // for errors
 	std::wostream& inf(); // for info (for debugging in Release)
 	std::wostream& dbg(); // for debugging (point to null if not Debug)
+	std::wostream& repl(); // for REPL prompt
 }
 #endif
 //#define TRANSFORM_BIN_DRIVER

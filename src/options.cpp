@@ -142,7 +142,7 @@ void options::setup() {
 	add(option(option::type::STRING, {L"input", L"i"},
 		[this](const option::value& v) {
 			wstringstream is;
-			if (v.get_string()== L"@stdin" || v.get_string()== L"-")
+			if (v.get_string()==L"@stdin" || v.get_string()==L"-")
 				is << wcin.rdbuf();
 			else {
 				wifstream f(ws2s(v.get_string()));
@@ -160,6 +160,7 @@ void options::setup() {
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
 	add_bool(L"proof",   L"extract proof");
+	add_bool(L"repl",    L"run TML in REPL mode");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
 	add(option(option::type::STRING, { L"name", L"n" },
@@ -172,6 +173,7 @@ void options::setup() {
 	add_output    (L"info",        L"info            (@stderr by default)");
 	add_output    (L"debug",       L"debug output");
 	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
+	add_output    (L"repl-output", L"repl output");
 	add_output(L"xsb",     L"attempt to translate program into XSB");
 	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
 	add_output(L"souffle", L"attempt to translate program into Souffle");
@@ -186,9 +188,10 @@ void options::setup() {
 void options::init_defaults() {
 	parse({
 		L"--run",
-		L"--output", L"@stdout",
-		L"--error",  L"@stderr",
-		L"--info",   L"@stderr"
+		L"--output",      L"@stdout",
+		L"--error",       L"@stderr",
+		L"--info",        L"@stderr",
+		L"--repl-output", L"@stdout"
 	}, true);
 	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
 }

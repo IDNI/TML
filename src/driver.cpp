@@ -34,10 +34,11 @@ using namespace std;
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
 namespace o {
-wostream& out() { static wostream& os = output::to(L"output"); return os; }
-wostream& err() { static wostream& os = output::to(L"error");  return os; }
-wostream& inf() { static wostream& os = output::to(L"info");   return os; }
-wostream& dbg() { static wostream& os = output::to(L"debug");  return os; }
+wostream& out() { static wostream& os = output::to(L"output");      return os; }
+wostream& err() { static wostream& os = output::to(L"error");       return os; }
+wostream& inf() { static wostream& os = output::to(L"info");        return os; }
+wostream& dbg() { static wostream& os = output::to(L"debug");       return os; }
+wostream& repl(){ static wostream& os = output::to(L"repl-output"); return os; }
 }
 
 void driver::transform_len(raw_term& r, const strs_t& s) {
@@ -179,12 +180,13 @@ void driver::init() {
 	output::create(L"info",        L".info.log");
 	output::create(L"debug",       L".debug.log");
 	output::create(L"transformed", L".trans.tml");
+	output::create(L"repl-output", L".repl.out.log");
 	output::create(L"xsb",         L".P");
 	output::create(L"swipl",       L".pl");
 	output::create(L"souffle",     L".souffle");
 }
 
-driver::driver(raw_progs rp, options o) : opts(o) {
+void driver::run_(raw_progs &rp) {
 	strs_t strtrees;
 	try {
 		if (!rp.p.size()) return;
@@ -203,6 +205,7 @@ driver::driver(raw_progs rp, options o) : opts(o) {
 	}
 }
 
+driver::driver(raw_progs rp, options o) : opts(o) { run_(rp); }
 driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
 driver::driver(wstring s, options o) : driver(raw_progs(s), o) {}
 driver::driver(char *s,   options o) : driver(raw_progs(s2ws(string(s))), o) {}
