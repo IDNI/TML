@@ -219,7 +219,7 @@ term tables::from_raw_term(const raw_term& r, const size_t orderid) {
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
-	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms. 
+	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 	term::textype extype = r.iseq ? term::EQ :
 		(r.isleq ? term::LEQ : (r.isbltin ? term::BLTIN : term::REL));
 	ntable tbl = (extype > term::REL) ? -1 : get_table(get_sig(r));
@@ -230,23 +230,23 @@ term tables::from_raw_term(const raw_term& r, const size_t orderid) {
 
 form::ftype transformer::getdual( form::ftype type) {
 	switch (type) {
-		case form::ftype::OR : return form::ftype::AND; 
-		case form::ftype::AND : return form::ftype::OR; 
+		case form::ftype::OR : return form::ftype::AND;
+		case form::ftype::AND : return form::ftype::OR;
 		case form::ftype::FORALL1 : return form::ftype::EXISTS1 ;
 		case form::ftype::FORALL2 : return form::ftype::EXISTS2 ;
 		case form::ftype::EXISTS1 : return form::ftype::FORALL1 ;
 		case form::ftype::EXISTS2 : return form::ftype::FORALL2 ;
-		default: throw 0;	
+		default: throw 0;
 	}
 }
 
 
 bool demorgan::push_negation( form *&root) {
-	
+
 	if(!root) return false;
 	if( root->type == form::ftype::AND ||
 		root->type == form::ftype::OR ) {
-				
+
 			root->type = getdual(root->type);
 			if( ! push_negation(root->l) ||
 				! push_negation(root->r))
@@ -258,14 +258,14 @@ bool demorgan::push_negation( form *&root) {
 			if( ! push_negation(root->r) ) throw 0;
 
 			return true;
-	}	
+	}
 	else {
 		if( root->type == form::ftype::NOT) {
 			form *t = root;
 			root = root->l;
 			t->l = t->r = NULL;
 			delete t;
-			return true;				
+			return true;
 		}
 		else if ( root->type == form::ftype::ATOM)	{
 			form* t = new form(form::ftype::NOT, 0 , NULL, root);
@@ -274,15 +274,15 @@ bool demorgan::push_negation( form *&root) {
 		}
 		return false;
 	}
- 
+
 }
-	
-	
+
+
 bool demorgan::apply( form *&root) {
-		
+
 	if(root && root->type == form::ftype::NOT  &&
-		root->l->type != form::ftype::ATOM ) { 
-			
+		root->l->type != form::ftype::ATOM ) {
+
 		bool changed = push_negation(root->l);
 		if(changed ) {
 			form *t = root;
@@ -297,12 +297,12 @@ bool demorgan::apply( form *&root) {
 }
 
  bool implic_removal::apply(form *&root) {
-	if( root && root->type == form::ftype::IMPLIES ) { 
+	if( root && root->type == form::ftype::IMPLIES ) {
 		root->type = form::OR;
 		form * temp = new form( form::NOT);
 		temp->l = root->l;
 		root->l = temp;
-		return true; 
+		return true;
 	}
 	return false;
 }
@@ -312,8 +312,8 @@ bool substitution::apply(form *&phi){
 				// simple quant leaf declartion
 			auto it = submap_var.find(phi->arg);
 			if( it != submap_var.end())		//TODO: Both var/sym should have mutually excl.
-				return phi->arg = it->second, true;	
-			else if	( (it = submap_sym.find(phi->arg)) != submap_sym.end()) 
+				return phi->arg = it->second, true;
+			else if	( (it = submap_sym.find(phi->arg)) != submap_sym.end())
 				return phi->arg = it->second, true;
 			else return false;
 		}
@@ -322,10 +322,10 @@ bool substitution::apply(form *&phi){
 			for( int &targ:*phi->tm) {
 				auto it = submap_var.find(targ);
 				if( it != submap_var.end())		//TODO: Both var/sym should have mutually excl.
-					targ = it->second, changed = true;	
-				else if	( (it = submap_sym.find(targ)) != submap_sym.end()) 
+					targ = it->second, changed = true;
+				else if	( (it = submap_sym.find(targ)) != submap_sym.end())
 					targ = it->second, changed =true;
-			
+
 			}
 			return changed;
 		}
@@ -335,7 +335,7 @@ bool substitution::apply(form *&phi){
 }
 
 void findprefix(form* curr, form*&beg, form*&end){
-	
+
 	if( !curr ||  !curr->isquantifier()) return;
 
 	beg = end = curr;
@@ -347,19 +347,19 @@ bool pull_quantifier::dosubstitution(form *phi, form * prefend){
 
 	substitution subst;
 	form *temp = phi;
-	
+
 	int_t fresh_int;
 	while(true) {
 		if( temp->type == form::FORALL1 ||
 			temp->type == form::EXISTS1 ||
-			temp->type == form::UNIQUE1 ) 
-				
+			temp->type == form::UNIQUE1 )
+
 			fresh_int = dt.get_fresh_var(temp->l->arg);
-		else 
+		else
 			fresh_int = dt.get_fresh_sym(temp->l->arg);
 
 		subst.add( temp->l->arg, fresh_int );
-				
+
 		wprintf(L"\nNew fresh: %d --> %d ", temp->l->arg, fresh_int);
 		if( temp == prefend) break;
 		else temp = temp->r;
@@ -378,9 +378,9 @@ bool pull_quantifier::apply( form *&root) {
 
 	findprefix(curr->l, lprefbeg, lprefend);
 	findprefix(curr->r, rprefbeg, rprefend);
-	
+
 	if( lprefbeg && rprefbeg ) {
-		
+
 		if(!dosubstitution(lprefbeg, lprefend) ||
 			!dosubstitution(rprefbeg, rprefend) )
 			throw 0;
@@ -393,12 +393,12 @@ bool pull_quantifier::apply( form *&root) {
 		wprintf(L"\nPulled both: ");
 		wprintf(L"%d %d , ", lprefbeg->type, lprefbeg->arg );
 		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );
-	}	
+	}
 	else if(lprefbeg) {
 		if(!dosubstitution(lprefbeg, lprefend))
 			throw 0;
 		curr->l = lprefend->r;
-		lprefend->r = curr;		
+		lprefend->r = curr;
 		root = lprefbeg;
 		changed = true;
 		wprintf(L"\nPulled left: ");
@@ -408,22 +408,22 @@ bool pull_quantifier::apply( form *&root) {
 		if(!dosubstitution(rprefbeg, rprefend))
 			throw 0;
 		curr->r = rprefend->r;
-		rprefend->r = curr;		
+		rprefend->r = curr;
 		root = rprefbeg;
 		changed = true;
 		wprintf(L"\nPulled right: ");
-		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );	
+		wprintf(L"%d %d\n", rprefbeg->type, rprefbeg->arg );
 	}
 	return changed;
 }
 
 bool pull_quantifier::traverse( form *&root ) {
-	
+
 	bool changed  = false;
-	if( root == NULL ) return false; 
+	if( root == NULL ) return false;
 	if( root->l ) changed |= traverse( root->l );
 	if( root->r ) changed |= traverse( root->r );
-	
+
 	changed = apply(root);
 
 	return changed;
@@ -431,7 +431,7 @@ bool pull_quantifier::traverse( form *&root ) {
 
 bool transformer::traverse(form *&root ) {
 	bool changed  = false;
-	if( root == NULL ) return false; 
+	if( root == NULL ) return false;
 
 	changed = apply(root);
 
@@ -617,7 +617,7 @@ raw_term tables::to_raw_term(const term& r) const {
 		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
 		rt.e[1] = elem(elem::SYM,dict.get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
-	// TODO: BLTINS: add term::BLTIN handling 
+	// TODO: BLTINS: add term::BLTIN handling
 	else {
 		args = tbls.at(r.tab).len, rt.e.resize(args + 1);
 		rt.e[0] = elem(elem::SYM,
@@ -808,7 +808,7 @@ void tables::get_nums(const raw_term& t) {
 }
 
 bool tables::to_pnf( form *&froot) {
-	
+
 	implic_removal impltrans;
 	demorgan demtrans(true);
 	pull_quantifier pullquant(this->dict);
@@ -817,7 +817,7 @@ bool tables::to_pnf( form *&froot) {
 	changed = impltrans.traverse(froot);
 	changed |= demtrans.traverse(froot);
 	wprintf(L"\n ........... \n");
-	froot->printnode();			
+	froot->printnode();
 	changed |= pullquant.traverse(froot);
 	wprintf(L"\n ........... \n");
 	froot->printnode();
@@ -841,7 +841,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 						v.push_back(from_raw_term(z, i++)),
 						get_nums(z);
 					align_vars(v), m.insert(move(v));
-				}   
+				}
 			}
 		else if(r.prft != NULL) {
 			form* froot = NULL;
@@ -856,7 +856,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			to_pnf(froot);
 
 			if(froot) delete froot;
-	
+
 		}
 
 		else for (const raw_term& x : r.h)
@@ -1134,7 +1134,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 					a.vm.at(t[1]), a.varslen, bits) ||
 					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
 			leq = t.neg ? leq % q : (leq && q);
-		} 
+		}
 	}
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
@@ -1654,7 +1654,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			int_t arg0 = int_t(a.bltinargs[1] >> 2);
 			int_t arg1 = int_t(a.bltinargs[2] >> 2);
 			if (arg0 > arg1) swap(arg0, arg1);
-			
+
 			//int_t rnd = arg0 + (std::rand() % (arg1 - arg0 + 1));
 			std::random_device rd;
 			std::mt19937 gen(rd());
@@ -1666,7 +1666,6 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			wcout << L"alt_query (rnd):" << rnd << L"" << endl;
 		}
 	}
-	
 
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) return a.rlast;// { v.push_back(a.rlast); return; }
@@ -1702,7 +1701,6 @@ bool table::commit(DBG(size_t /*bits*/)) {
 }
 
 char tables::fwd() noexcept {
-	bdd_handles add, del;
 //	DBG(out(o::out()<<"db before:"<<endl);)
 	for (rule& r : rules) {
 		bdd_handles v(r.size());
@@ -1742,14 +1740,17 @@ bool tables::pfp(size_t nsteps) {
 	set<level> s;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
+	auto sp = [this](){ if (bproof) get_goals(); }; // show proofs
 	for (;;) {
-		if (optimize) o::inf() << "step: " << nstep << endl;
+		if (optimize) o::inf() << L"step: " << nstep << endl;
 		++nstep;
-		if (!fwd()) return bproof ? get_goals(), true : true;
-		if (unsat) throw unsat_exception();
+		if (!fwd()) return sp(), true;
+		if (unsat) sp(), throw contradiction_exception();
+		if (bool steptrace{false}) sp(); // show proofs after each step?
 		if (nsteps && nstep == nsteps) return true;
 		l = get_front();
-		if (!datalog && !s.emplace(l).second) return false;
+		if (!datalog && !s.emplace(l).second)
+			sp(), throw infloop_exception();
 		if (bproof) levels.push_back(move(l));
 	}
 	throw 0;

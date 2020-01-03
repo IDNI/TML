@@ -42,7 +42,7 @@ template<typename T> struct ptrcmp {
 typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 	cb_ground;
 
-struct natcmp { 
+struct natcmp {
 	bool operator()(const term& l, const term& r) const {
 		if (l.orderid != r.orderid) return l.orderid < r.orderid;
 		if (l.neg != r.neg) return l.neg;
@@ -336,10 +336,10 @@ friend struct transformer;
 	term *tm;
 	form *l;
 	form *r;
-	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES 
+	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES
 	} type;
 
-	
+
 	form(){
 		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
 	}
@@ -349,7 +349,7 @@ friend struct transformer;
 		if( _t) tm = new term(), *tm = *_t;
 	}
 	bool isquantifier() const {
-		 if( type == form::ftype::FORALL1 || 
+		 if( type == form::ftype::FORALL1 ||
 			 type == form::ftype::EXISTS1 ||
 			 type == form::ftype::UNIQUE1 ||
 			 type == form::ftype::EXISTS2 ||
@@ -376,12 +376,12 @@ struct transformer {
 
 
 struct implic_removal : public transformer {
-	 
+
 	 virtual bool apply(form *&root);
 };
 
 struct demorgan : public transformer {
-	 
+
 
 	bool allow_neg_move_quant =false;
 	bool push_negation( form *&root);
@@ -397,9 +397,9 @@ struct pull_quantifier: public transformer {
 	virtual bool apply( form *&root);
 	virtual bool traverse( form *&root);
 	bool dosubstitution(form * phi, form* end);
-}; 
+};
 struct substitution: public transformer {
-	
+
 	std::map<int_t, int_t> submap_var;
 	std::map<int_t, int_t> submap_sym;
 
@@ -407,16 +407,28 @@ struct substitution: public transformer {
 	void add( int_t oldn, int_t newn) {
 		if(oldn < 0)
 			submap_var[oldn] = newn;
-		else 
+		else
 			submap_sym[oldn] = newn;
 	}
-	
+
 	virtual bool apply(form *&phi);
-	
+
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
 
 struct unsat_exception : public std::exception {
 	virtual const char* what() const noexcept { return "unsat."; }
+};
+
+struct contradiction_exception : public unsat_exception {
+	virtual const char* what() const noexcept {
+		return "unsat (contradiction).";
+	}
+};
+
+struct infloop_exception : public unsat_exception {
+	virtual const char* what() const noexcept {
+		return "unsat (infinite loop).";
+	}
 };
