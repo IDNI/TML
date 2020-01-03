@@ -33,12 +33,13 @@ struct raw_prog;
 bool operator==(const lexeme& x, const lexeme& y);
 
 static const std::set<std::wstring> str_bltins =
-	{ L"alpha", L"alnum", L"digit", L"space", L"printable", L"count", L"rnd" };
+	{ L"alpha", L"alnum", L"digit", L"space", L"printable", L"count",
+		L"rnd", L"print" };
 
 struct elem {
 	enum etype {
-		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, 
-		BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES 
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT,
+		BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -133,25 +134,25 @@ struct raw_prefix {
 		elem qtype;
 		elem ident;
 		bool isfod =false;
-	
+
 	bool parse(const lexemes& l, size_t& pos);
 };
 
 
 struct raw_form_tree {
 	elem::etype type;
-	raw_term *rt; // elem::NONE is used to identify it 
+	raw_term *rt; // elem::NONE is used to identify it
 	elem * el;
 
 	raw_form_tree *l;
 	raw_form_tree *r;
 
-	
+
 
 	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el= NULL, raw_form_tree *_l= NULL, raw_form_tree *_r= NULL ) {
-		
+
 		type = _type;
-		if(_rt) 
+		if(_rt)
 			rt = new raw_term(*_rt);
 		else rt = NULL;
 

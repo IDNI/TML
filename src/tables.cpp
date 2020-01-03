@@ -1665,6 +1665,20 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			v1.push_back(x);
 			wcout << L"alt_query (rnd):" << rnd << L"" << endl;
 		}
+		else if (a.bltintype == L"print") {
+			wstring ou{L"output"};
+			size_t n{0};
+			if (a.bltinargs.size() > 2) ++n,
+				ou = lexeme2str(dict.get_sym(a.bltinargs[1]));
+			wostream& os = output::to(ou);
+			do {
+				int_t arg = a.bltinargs[++n];
+				if      (arg < 0) os << get_var_lexeme(arg);
+				else if (arg & 1) os << (wchar_t)(arg >> 2);
+				else if (arg & 2) os << (int_t)  (arg >> 2);
+				else              os << dict.get_sym(arg);
+			} while (n + 1 < a.bltinargs.size());
+		}
 	}
 
 	sort(v1.begin(), v1.end(), handle_cmp);
@@ -1746,7 +1760,7 @@ bool tables::pfp(size_t nsteps) {
 		++nstep;
 		if (!fwd()) return sp(), true;
 		if (unsat) sp(), throw contradiction_exception();
-		if (bool steptrace{false}) sp(); // show proofs after each step?
+		// sp(); // show proofs after each step?
 		if (nsteps && nstep == nsteps) return true;
 		l = get_front();
 		if (!datalog && !s.emplace(l).second)

@@ -53,7 +53,7 @@ lexeme lex(pcws s) {
 	if (**s == L'<' && *(*s + 1) == L'-' && *(*s + 2) == L'>') {
 		return *s += 3, lexeme{ *s - 3, *s };
 	}
-	
+
 
 	if (**s == L'>') return ++ * s, lexeme{ *s - 1, *s };
 	if (**s == L'<') {
@@ -157,7 +157,7 @@ bool directive::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	return true;
 }
 elem::etype elem::peek(const lexemes& l, size_t& pos) {
-	
+
 	size_t curr = pos;
 	type = NONE;
 	if( pos < l.size() ) parse(l,pos);
@@ -219,7 +219,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	else if (*l[pos][0] == L'?') type = VAR;
 	else if (iswalpha(*l[pos][0])) {
 		size_t len = l[pos][1]-l[pos][0];
-		if( len == 6 && !wcsncmp(l[pos][0], L"forall", len )) 
+		if( len == 6 && !wcsncmp(l[pos][0], L"forall", len ))
 			type = FORALL;
 		else if ( len == 6 && !wcsncmp(l[pos][0], L"exists", len ) )
 			type = EXISTS;
@@ -236,19 +236,19 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	size_t curr = pos;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
-	bool rel = false, noteq = false, eq = false, leq = false, gt = false, 
+	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
 		bltin = false;
 	while (!wcschr(L".:,;{}|&-<", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
-		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos) 
+		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos)
 		switch (el.type) {
 			case elem::EQ: eq = true; break;
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
-			case elem::SYM: 
+			case elem::SYM:
 				if (prog.builtins.find(el.e) != prog.builtins.end()) {
 					el.type = elem::BLTIN;
 					bltin = true;
@@ -343,15 +343,15 @@ head:	h.emplace_back();
 		parse_error(l[pos][0], err_head, l[pos]);
 	++pos;
 	if(l[pos-1][0][1] == L'=') { //  formula
-		curr = pos; 
+		curr = pos;
 		raw_sof rsof(prog);
 		raw_form_tree * root = NULL;
 		bool ret = rsof.parse(l, pos, root);
-		
+
 		sprawformtree temp(root);
 		this->prft = temp;
 
-		if(ret) return true;	
+		if(ret) return true;
 		parse_error(l[pos][0], L"Formula has errors", l[pos]);
 	} else {
 
@@ -373,8 +373,8 @@ bool raw_prefix::parse(const lexemes& l, size_t& pos) {
 	isfod = false;
 
 	if ( !qtype.parse(l, pos) ) return false;
-	if (qtype.type != elem::FORALL &&  
-		qtype.type != elem::EXISTS && 
+	if (qtype.type != elem::FORALL &&
+		qtype.type != elem::EXISTS &&
 		qtype.type != elem::UNIQUE)
 			return pos = curr, false;
 
@@ -383,9 +383,9 @@ bool raw_prefix::parse(const lexemes& l, size_t& pos) {
 	if ( !ident.parse(l, pos) ) return false;
 	if ( ident.type != elem::VAR  && ident.type != elem::SYM)
 			return pos = curr, false;
-		
-	return true; 
-} 
+
+	return true;
+}
 
 bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot) {
 
@@ -394,7 +394,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 	bool isneg = false;
 
 	if ( pos == l.size() ) return NULL;
-	
+
 	if( *l[pos][0] == '~') isneg=true,++pos;
 	if( pos != l.size() && *l[pos][0] == '{') {
 		++pos;
@@ -408,13 +408,13 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 		matroot = root;
 		return true;
 	}
-	else {  
+	else {
 
 		elem next;
 		next.peek(l, pos);
-		
+
 		if( next.type == elem::SYM  ) {
-			
+
 			raw_term tm;
 			if( !tm.parse(l,pos, prog)) goto Cleanup;
 
@@ -422,7 +422,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 
 			if( isneg )
 				root = new raw_form_tree(elem::NOT, NULL, NULL, root);
-			
+
 			matroot = root;
 			return true;
 		}
@@ -431,24 +431,24 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 			while( 	next.type == elem::FORALL ||
 					next.type == elem::UNIQUE ||
 					next.type == elem::EXISTS ) {
-			
+
 				raw_prefix rpfx;
 
 				if( !rpfx.parse(l,pos) ) goto Cleanup;
-				
+
 				if(!cur)
 					root = cur = new raw_form_tree ( rpfx.qtype.type, NULL, &rpfx.qtype );
-				else 
+				else
 					cur->r = new raw_form_tree ( rpfx.qtype.type, NULL, &rpfx.qtype ), cur = cur->r;
 
 				cur->l = new raw_form_tree ( rpfx.ident.type, NULL, &rpfx.ident );
 
 				next.peek(l, pos);
-			}	
-			
-			if( cur == NULL ||  pos == l.size() || *l[pos][0] != '{')  
+			}
+
+			if( cur == NULL ||  pos == l.size() || *l[pos][0] != '{')
 				goto Cleanup;
-			
+
 			++pos;
 			if(! parseform(l, pos, cur->r, 0)) goto Cleanup;
 
@@ -457,11 +457,11 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 			++pos;
 			if(isneg)
 				root = new raw_form_tree(elem::NOT, NULL, NULL, root);
-			
+
 			matroot = root;
 			return true;
 		}
-	} 
+	}
 
 	Cleanup:
 	//if(root) delete root;
@@ -475,11 +475,11 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, in
 	raw_form_tree* cur = NULL;
 
 	bool ret = parsematrix(l, pos, root);
-	elem nxt;	
-	if ( !ret ) goto Cleanup;	
-	
+	elem nxt;
+	if ( !ret ) goto Cleanup;
+
 	nxt.peek(l, pos);
-	while( prec <=1 && (nxt.type == elem::IMPLIES || nxt.type == elem::COIMPLIES)) {	
+	while( prec <=1 && (nxt.type == elem::IMPLIES || nxt.type == elem::COIMPLIES)) {
 		nxt.parse(l, pos);
 		cur = new raw_form_tree(nxt.type, NULL, &nxt, root);
 		root = cur;
@@ -489,18 +489,18 @@ bool raw_sof::parseform(const lexemes& l, size_t& pos, raw_form_tree *&froot, in
 
 	nxt.peek(l, pos);
 	while( prec <= 0 && (nxt.type == elem::AND || nxt.type == elem::ALT) ) {
-	
+
 		nxt.parse(l, pos);
 		cur = new raw_form_tree( nxt.type, NULL, &nxt, root);
 
 		root = cur;
 		if( ! parseform(l, pos, root->r, 1) ) goto Cleanup;
 		nxt.peek(l,pos);
-	
-	} 
+
+	}
 	froot = root;
 	return true;
-	
+
 	Cleanup:
 	//if(root) delete root;
 	froot = root;
@@ -518,7 +518,7 @@ bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *&root) {
 
 	if( pos >= l.size() || *l[pos][0] != '.') ret = false;
 	else pos++;
-	
+
 	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
 
 	return ret;
@@ -528,7 +528,7 @@ bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *&root) {
 	if( r ) r->printTree(level + 1)	;
 
 	wprintf(L"\n");
-	
+
 	for(int i=0;i<level;i++)
 		wprintf(L"\t");
 
@@ -585,9 +585,15 @@ raw_progs::raw_progs(const std::wstring& s) {
 		size_t pos = 0;
 		lexemes l = prog_lex(wcsdup(s.c_str()));
 		if (!l.size()) return;
+		auto prepare_builtins = [this](raw_prog& x) {
+			// BLTINS: prepare builtins (dict)
+			for (const wstring& s : str_bltins)
+				x.builtins.insert(x.dict.get_lexeme(s));
+		};
 		if (*l[pos][0] != L'{') {
 			raw_prog& x = p.emplace_back();
 			//raw_prog x;
+			prepare_builtins(x);
 			if (!x.parse(l, pos))
 				parse_error(l[pos][0],
 					err_rule_dir_prod_expected, l[pos]);
@@ -596,9 +602,7 @@ raw_progs::raw_progs(const std::wstring& s) {
 			// emplace to avoid copying dict etc. (or handle to avoid issues)
 			raw_prog& x = p.emplace_back(); // if needed on err: p.pop_back();
 			//raw_prog x;
-			// BLTINS: prepare builtins (dict)
-			for (const wstring& s : str_bltins)
-				x.builtins.insert(x.dict.get_lexeme(s));
+			prepare_builtins(x);
 			if (++pos, !x.parse(l, pos))
 				parse_error(l[pos][0], err_parse, l[pos]);
 			//if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
