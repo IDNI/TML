@@ -28,7 +28,7 @@ lexeme dict_t::get_sym(int_t t) const {
 }
 
 int_t dict_t::get_fresh_var(int_t old) {
-	
+
 	static int_t counter=0;
 	wstring fresh = L"?0f"+ to_wstring(++counter)+to_wstring(old);
 	int_t fresh_int = get_var(get_lexeme(fresh));
@@ -36,7 +36,7 @@ int_t dict_t::get_fresh_var(int_t old) {
 }
 
 int_t dict_t::get_fresh_sym(int_t old) {
-	
+
 	static int_t counter=0;
 	wstring fresh = L"0f" + to_wstring(++counter)+to_wstring(old);
 	int_t fresh_int = get_sym(get_lexeme(fresh));
@@ -73,7 +73,6 @@ int_t dict_t::get_bltin(const lexeme& l) {
 }
 
 lexeme dict_t::get_lexeme(const wstring& s) {
-	DBG(assert(!s.empty());)
 	cws w = s.c_str();
 	auto it = strs_extra.find({w, w + s.size()});
 	if (it != strs_extra.end()) return *it;
