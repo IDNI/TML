@@ -22,24 +22,18 @@ using namespace std;
 
 cws_range input::source{0,0};
 
-/*
-	isdir - adds context to parsing, whether we're in directive or not.
-*/
-lexeme lex(pcws s, bool& isdir) {
-	while (iswspace(**s)) {
-		if (**s == L'\r' || **s == L'\n') isdir = false;
-		++* s;
-	}
+lexeme lex(pcws s) {
+	while (iswspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
 	cws t = *s;
 	if (!wcsncmp(*s, L"/*", 2)) {
 		while (wcsncmp(++*s, L"*/", 2))
 			if (!**s) parse_error(t, err_comment, 0);
-		return ++++*s, lex(s, isdir);
+		return ++++*s, lex(s);
 	}
 	if (**s == L'#') {
 		while (*++*s != L'\r' && **s != L'\n' && **s);
-		return lex(s, isdir);
+		return lex(s);
 	}
 	if (**s == L'"') {
 		while (*++*s != L'"')
@@ -61,10 +55,10 @@ lexeme lex(pcws s, bool& isdir) {
 	if (**s == L'<') {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
-		if (!isdir)
-			return ++ * s, lexeme{ *s - 1, *s };
-		while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
-		return { t, ++(*s) };
+		// D: lex/parse: <file> parsing is moved to directive::parse, tag just < 
+		return ++ * s, lexeme{ *s - 1, *s };
+		//while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
+		//return { t, ++(*s) };
 	}
 	if (**s == L'>') {
 		if (*(*s + 1) == L'=')
@@ -92,10 +86,6 @@ lexeme lex(pcws s, bool& isdir) {
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
 	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
-	if (**s == L'@') { 
-		isdir = true; 
-		return ++*s, lexeme{ *s-1, *s };
-	}
 	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
@@ -107,8 +97,7 @@ lexemes prog_lex(cws s) {
 	lexeme l;
 	lexemes r;
 	input::source[0] = s;
-	bool isdir = false;
-	do { if ((l = lex(&s, isdir)) != lexeme{0, 0}) r.push_back(l); } while (*s);
+	do { if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l); } while (*s);
 	input::source[1] = s;
 	return r;
 }
@@ -154,7 +143,13 @@ bool directive::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 		parse_error(l[pos-1][0], err_rel_expected, l[pos-1]);
 	size_t curr2 = pos;
-	if (*l[pos][0] == L'<') type = FNAME, arg = l[pos++];
+	if (*l[pos][0] == L'<') { 
+		// D: parsing <file> is moved here (from lex) so we could process LT.
+		//type = FNAME, arg = l[pos++]; 
+		while (*l[pos++][0] != L'>') 
+			if (!(pos < l.size())) parse_error(l[curr2][1], err_fname);
+		type = FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
+	}
 	else if (*l[pos][0] == L'"') type = STR, arg = l[pos++];
 	else if (*l[pos][0] == L'$')
 		type=CMDLINE, ++pos, n = get_int_t(l[pos][0], l[pos][1]), ++pos;
@@ -253,10 +248,8 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
 		lt = false, geq = false, bltin = false;
-	//while (!wcschr(L".:,;{}|&-<", *l[pos][0])) {
-	// D: why is '<' here? I'm guessing to detect input. Messes up LT.
-	// it's already used in direction, so just for rterm, whe/where?
-	while (!wcschr(L".:,;{}|&-", *l[pos][0])) {
+	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
+	while (!wcschr(L".:,;{}|&-", *l[pos][0])) { // L".:,;{}|&-<"
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);

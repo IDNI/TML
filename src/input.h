@@ -218,7 +218,7 @@ std::wostream& operator<<(std::wostream& os, const raw_prog& p);
 std::wostream& operator<<(std::wostream& os, const raw_progs& p);
 std::wostream& operator<<(std::wostream& os, const lexeme& l);
 std::wostream& operator<<(std::wostream& os, const production& p);
-lexeme lex(pcws s, bool& isdir);
+lexeme lex(pcws s);
 lexemes prog_lex(cws s);
 std::wstring file_read(std::wstring fname);
 std::wstring file_read_text(FILE *f);
