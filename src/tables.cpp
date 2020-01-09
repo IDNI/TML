@@ -199,9 +199,8 @@ term tables::from_raw_term(const raw_term& r, const size_t orderid) {
 	ints t;
 	lexeme l;
 	// skip the first symbol unless it's EQ/NEQ (which has VAR as it's first)
-	if (r.isbltin) {
-	}
-	bool isRel = !(r.iseq || r.isleq || r.isbltin);
+	//if (r.extype == raw_term::BLTIN) { }
+	bool isRel = r.extype == raw_term::REL; //!(r.iseq || r.isleq || r.isbltin);
 	for (size_t n = !isRel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
@@ -220,8 +219,10 @@ term tables::from_raw_term(const raw_term& r, const size_t orderid) {
 			default: ;
 		}
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
-	term::textype extype = r.iseq ? term::EQ :
-		(r.isleq ? term::LEQ : (r.isbltin ? term::BLTIN : term::REL));
+	//term::textype extype = r.iseq ? term::EQ :
+	//	(r.isleq ? term::LEQ : (r.isbltin ? term::BLTIN : term::REL));
+	// D: make sure enums match (should be the same), cast is just to warn.
+	term::textype extype = (term::textype)r.extype;
 	ntable tbl = (extype > term::REL) ? -1 : get_table(get_sig(r));
 	return term(r.neg, extype, tbl, t, orderid);
 }
@@ -615,6 +616,7 @@ raw_term tables::to_raw_term(const term& r) const {
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	else if (r.extype == term::LEQ) //r.isleq)
 		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
+		// D: TODO: is this a bug (never used)? for neg it should be > not <= ?
 		rt.e[1] = elem(elem::SYM,dict.get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	// TODO: BLTINS: add term::BLTIN handling
@@ -1135,6 +1137,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
 			leq = t.neg ? leq % q : (leq && q);
 		}
+		// we use LT/GEQ <==> LEQ + reversed args + !neg
 	}
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;

@@ -22,18 +22,24 @@ using namespace std;
 
 cws_range input::source{0,0};
 
-lexeme lex(pcws s) {
-	while (iswspace(**s)) ++*s;
+/*
+	isdir - adds context to parsing, whether we're in directive or not.
+*/
+lexeme lex(pcws s, bool& isdir) {
+	while (iswspace(**s)) {
+		if (**s == L'\r' || **s == L'\n') isdir = false;
+		++* s;
+	}
 	if (!**s) return { 0, 0 };
 	cws t = *s;
 	if (!wcsncmp(*s, L"/*", 2)) {
 		while (wcsncmp(++*s, L"*/", 2))
 			if (!**s) parse_error(t, err_comment, 0);
-		return ++++*s, lex(s);
+		return ++++*s, lex(s, isdir);
 	}
 	if (**s == L'#') {
 		while (*++*s != L'\r' && **s != L'\n' && **s);
-		return lex(s);
+		return lex(s, isdir);
 	}
 	if (**s == L'"') {
 		while (*++*s != L'"')
@@ -42,10 +48,7 @@ lexeme lex(pcws s) {
 				parse_error(*s, err_escape);
 		return { t, ++(*s) };
 	}
-	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
-	if (**s == L'<' && *(*s + 1) == L'=') {
-		return *s += 2, lexeme{ *s - 2, *s };
-	}
+
 	if (**s == L'-' && *(*s + 1) == L'>') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
@@ -54,11 +57,19 @@ lexeme lex(pcws s) {
 		return *s += 3, lexeme{ *s - 3, *s };
 	}
 
-
-	if (**s == L'>') return ++ * s, lexeme{ *s - 1, *s };
+	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
 	if (**s == L'<') {
+		if (*(*s + 1) == L'=')
+			return *s += 2, lexeme{ *s - 2, *s };
+		if (!isdir)
+			return ++ * s, lexeme{ *s - 1, *s };
 		while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		return { t, ++(*s) };
+	}
+	if (**s == L'>') {
+		if (*(*s + 1) == L'=')
+			return *s += 2, lexeme{ *s - 2, *s };
+		return ++ * s, lexeme{ *s - 1, *s };
 	}
 	if (**s == L'\'') {
 		if (*(*s + 1) == L'\'') return { t, ++++*s };
@@ -81,9 +92,10 @@ lexeme lex(pcws s) {
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
 	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
-	//if (**s == L'=' && *(*s + 1) == L'=') {
-	//	return *s += 2, lexeme{ *s - 2, *s };
-	//}
+	if (**s == L'@') { 
+		isdir = true; 
+		return ++*s, lexeme{ *s-1, *s };
+	}
 	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
@@ -95,7 +107,8 @@ lexemes prog_lex(cws s) {
 	lexeme l;
 	lexemes r;
 	input::source[0] = s;
-	do { if ((l = lex(&s)) != lexeme{0, 0}) r.push_back(l); } while (*s);
+	bool isdir = false;
+	do { if ((l = lex(&s, isdir)) != lexeme{0, 0}) r.push_back(l); } while (*s);
 	input::source[1] = s;
 	return r;
 }
@@ -173,11 +186,6 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = NEQ, true;
 	}
-	// LEQ: recheck if '<' is going to make any issues (order is important)
-	if (L'<' == l[pos][0][0] &&
-		L'=' == l[pos][0][1]) {
-		return e = l[pos++], type = LEQ, true;
-	}
 	if (L'-' == l[pos][0][0] &&
 		L'>' == l[pos][0][1]) {
 		return e = l[pos++], type = IMPLIES, true;
@@ -189,7 +197,14 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		return e = l[pos++], type = COIMPLIES, true;
 	}
 
+	// LEQ: recheck if '<' is going to make any issues (order/card is important)
+	// 	if (L'<' == l[pos][0][0] && L'=' == l[pos][0][1])
+	if (L'<' == l[pos][0][0]) {
+		if (L'=' == l[pos][0][1]) return e = l[pos++], type = LEQ, true;
+		return e = l[pos++], type = LT, true;
+	}
 	if (L'>' == l[pos][0][0]) {
+		if (L'=' == l[pos][0][1]) return e = l[pos++], type = GEQ, true;
 		return e = l[pos++], type = GT, true;
 	}
 	// TODO: single = instead of == recheck if we're not messing up something?
@@ -237,8 +252,11 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
-		bltin = false;
-	while (!wcschr(L".:,;{}|&-<", *l[pos][0])) {
+		lt = false, geq = false, bltin = false;
+	//while (!wcschr(L".:,;{}|&-<", *l[pos][0])) {
+	// D: why is '<' here? I'm guessing to detect input. Messes up LT.
+	// it's already used in direction, so just for rterm, whe/where?
+	while (!wcschr(L".:,;{}|&-", *l[pos][0])) {
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
@@ -248,6 +266,8 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
+			case elem::LT: lt = true; break;
+			case elem::GEQ: geq = true; break;
 			case elem::SYM:
 				if (prog.builtins.find(el.e) != prog.builtins.end()) {
 					el.type = elem::BLTIN;
@@ -268,7 +288,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 			parse_error(l[pos][0], err_paren_expected, l[pos]);
 		if (e.back().type != elem::CLOSEP)
 			parse_error(e.back().e[0], err_paren, l[pos]);
-		isbltin = true;
+		extype = raw_term::BLTIN; // isbltin = true;
 		return calc_arity(), true;
 	}
 	if (noteq || eq) {
@@ -279,7 +299,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 			parse_error(l[pos][0], err_eq_expected, l[pos]);
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
-		iseq = true;
+		extype = raw_term::EQ; // iseq = true;
 		return calc_arity(), true;
 	}
 	if (leq || gt) {
@@ -289,7 +309,19 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 		if (e[1].type != elem::LEQ && e[1].type != elem::GT)
 			parse_error(l[pos][0], err_leq_expected, l[pos]);
 		if (gt) neg = !neg;
-		isleq = true;
+		extype = raw_term::LEQ; // isleq = true;
+		return calc_arity(), true;
+	}
+	if (lt || geq) {
+		if (e.size() < 3)
+			parse_error(l[pos][0], err_3_els_expected, l[pos]);
+		// only supporting smth != smthelse (3-parts) and negation in front ().
+		if (e[1].type != elem::LT && e[1].type != elem::GEQ)
+			parse_error(l[pos][0], err_leq_expected, l[pos]);
+		// GEQ <==> LEQ + reverse args + !neg
+		swap(e[2], e[0]); // e = { e[2], e[1], e[0] };
+		if (!geq) neg = !neg;
+		extype = raw_term::LEQ;
 		return calc_arity(), true;
 	}
 	if (e[0].type != elem::SYM)
@@ -314,7 +346,8 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity() {
 	size_t dep = 0;
 	arity = {0};
-	if (iseq || isleq) {
+	//if (iseq || isleq || islt) {
+	if (extype > raw_term::REL && extype < raw_term::BLTIN) {
 		arity = { 2 };
 		return;
 	}
@@ -621,8 +654,10 @@ bool operator==(const lexeme& x, const lexeme& y) {
 
 bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
-	if (x.iseq != y.iseq) return x.iseq < y.iseq;
-	if (x.isleq != y.isleq) return x.isleq < y.isleq;
+	if (x.extype != y.extype) return x.extype < y.extype;
+	//if (x.iseq != y.iseq) return x.iseq < y.iseq;
+	//if (x.isleq != y.isleq) return x.isleq < y.isleq;
+	//if (x.islt != y.islt) return x.islt < y.islt;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;

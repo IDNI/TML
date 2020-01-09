@@ -847,7 +847,7 @@ size_t bdd::satcount(int_t x) {
 	map<int_t, int_t> inv;
 	int_t ivar = 1;
 	for (auto x : ourvars) {
-		wcout << L"satcount: inv: " << x << L", " << ivar << L" ." << endl;
+		//wcout << L"satcount: inv: " << x << L", " << ivar << L" ." << endl;
 		inv.emplace(x, ivar++);
 	}
 	leafvar = ivar;

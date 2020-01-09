@@ -38,8 +38,8 @@ static const std::set<std::wstring> str_bltins =
 
 struct elem {
 	enum etype {
-		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT,
-		BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES
+		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, LT,
+		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES
 	} type;
 	int_t num = 0;
 	lexeme e;
@@ -71,7 +71,9 @@ struct elem {
 
 struct raw_term {
 	// TODO: enum 'is...' stuff
-	bool neg = false, iseq = false, isleq = false, isbltin = false;
+	bool neg = false;
+	//bool iseq = false, isleq = false, islt = false, isbltin = false;
+	enum rtextype { REL, EQ, LEQ, BLTIN } extype = raw_term::REL;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog);
@@ -80,7 +82,8 @@ struct raw_term {
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
 		return neg == t.neg && e == t.e && arity == t.arity &&
-			iseq == t.iseq && isleq == t.isleq;
+			extype == t.extype;
+			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
@@ -215,7 +218,7 @@ std::wostream& operator<<(std::wostream& os, const raw_prog& p);
 std::wostream& operator<<(std::wostream& os, const raw_progs& p);
 std::wostream& operator<<(std::wostream& os, const lexeme& l);
 std::wostream& operator<<(std::wostream& os, const production& p);
-lexeme lex(pcws s);
+lexeme lex(pcws s, bool& isdir);
 lexemes prog_lex(cws s);
 std::wstring file_read(std::wstring fname);
 std::wstring file_read_text(FILE *f);
