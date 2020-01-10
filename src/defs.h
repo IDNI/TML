@@ -70,6 +70,7 @@ template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
+
 namespace o { // call driver::init() before using any o::xxx() wostream
 	std::wostream& out(); // for program output (in tml facts)
 	std::wostream& err(); // for errors
@@ -77,5 +78,10 @@ namespace o { // call driver::init() before using any o::xxx() wostream
 	std::wostream& dbg(); // for debugging (point to null if not Debug)
 	std::wostream& repl(); // for REPL prompt
 }
+
+typedef enum  {
+	NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
+} t_alu_op;
+
 #endif
 //#define TRANSFORM_BIN_DRIVER

@@ -30,6 +30,7 @@ set(TML_HEADERS
 set(TML_SOURCES
 	proof.cpp
 	bdd.cpp
+	bdd_ext.cpp
 	binary.cpp
 	dict.cpp
 	driver.cpp
@@ -40,6 +41,7 @@ set(TML_SOURCES
 	print_souffle.cpp
 	save_csv.cpp
 	tables.cpp
+	tables_ext.cpp
 	transform.cpp
 )
 

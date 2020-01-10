@@ -10,6 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+//#ifndef __TABLES__
+//#define __TABLES__
+
 #include <map>
 #include <vector>
 #ifdef __EMSCRIPTEN__
@@ -313,6 +317,40 @@ private:
 
 	bool from_raw_form(const raw_form_tree *rs, form *&froot);
 	bool to_pnf( form *&froot);
+
+	//-------------------------------------------------------------------------
+	//XXX: arithmetic support, work in progress
+	bool isalu_handler(const term& t, alt& a, spbdd_handle &leq);
+	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
+		size_t bit, spbdd_handle x) const;
+	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
+	spbdd_handle full_addder_carry(size_t var0, size_t var1, size_t n_vars,
+		uint_t b, spbdd_handle r) const;
+	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
+		uint_t b) const;
+	spbdd_handle shr_test(size_t var0, int_t n1, size_t var2,
+		size_t n_vars);
+	spbdd_handle shl(size_t var0, int_t n1, size_t var2,
+		size_t n_vars);
+	spbdd_handle full_addder_carry_shift(size_t var0, size_t var1, size_t n_vars,
+		uint_t b, uint_t s, spbdd_handle r) const;
+	spbdd_handle full_adder_shift(size_t var0, size_t var1, size_t n_vars,
+		uint_t b, uint_t s) const;
+	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b,
+		uint_t s);
+	spbdd_handle add_ite_init(size_t var0, size_t var1, size_t args, uint_t b,
+		uint_t s);
+	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args, uint_t b,
+		uint_t s);
+	spbdd_handle mul_var_eq(size_t var0, size_t var1, size_t var2,
+				size_t n_vars);
+	spbdd_handle mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
+		size_t var3, size_t n_vars);
+	spbdd_handle bdd_test(size_t n_vars);
+	spbdd_handle bdd_add_test(size_t n_vars);
+	spbdd_handle bdd_mult_test(size_t n_vars);
+	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
+
 public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
@@ -432,3 +470,5 @@ struct infloop_exception : public unsat_exception {
 		return "unsat (infinite loop).";
 	}
 };
+
+//#endif
