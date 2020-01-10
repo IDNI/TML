@@ -51,11 +51,26 @@ lexeme lex(pcws s) {
 		return *s += 3, lexeme{ *s - 3, *s };
 	}
 
+	//ALU operators:
+	//SHR, SHL, XXX: EQ?
+	if (**s == L'>' && !(*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
+	if (**s == L'<' && !(*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
+	//if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
+	/*
+	//ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
+	//XXX: lexed below with the rest of single character symbols
+	//XXX: check for substractin symbol "-"
+	if (**s == L'+' || **s == L'-' || **s == L'*' ||
+			**s == L'|' || **s == L'&' || **s == L'^' ) {
+		return *s += 1, lexeme{ *s - 1, *s };
+	}
+	*/
+
 	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
 	if (**s == L'<') {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
-		// D: lex/parse: <file> parsing is moved to directive::parse, tag just < 
+		// D: lex/parse: <file> parsing is moved to directive::parse, tag just <
 		return ++ * s, lexeme{ *s - 1, *s };
 		//while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		//return { t, ++(*s) };
@@ -68,7 +83,7 @@ lexeme lex(pcws s) {
 	if (**s == L'\'') {
 		if (*(*s + 1) == L'\'') return { t, ++++*s };
 		if (*(*s + 1) == L'\\') {
-//			if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
+			//if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
 			if (!wcschr(L"\\'rnt",*(*s+2)) ||*(*s+3)!=L'\'')
 				parse_error((*s+2), err_escape);
 			return { t, ++++++++*s };
@@ -87,6 +102,8 @@ lexeme lex(pcws s) {
 	// TODO: single = instead of == recheck if we're not messing up something?
 	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,;(){}$@=<>|&^+*", **s)) return ++*s, lexeme{ *s-1, *s };
+	//TODO: review - for substraction
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
 	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
@@ -143,10 +160,10 @@ bool directive::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	if (!rel.parse(l, ++pos) || rel.type != elem::SYM)
 		parse_error(l[pos-1][0], err_rel_expected, l[pos-1]);
 	size_t curr2 = pos;
-	if (*l[pos][0] == L'<') { 
+	if (*l[pos][0] == L'<') {
 		// D: parsing <file> is moved here (from lex) so we could process LT.
-		//type = FNAME, arg = l[pos++]; 
-		while (*l[pos++][0] != L'>') 
+		//type = FNAME, arg = l[pos++];
+		while (*l[pos++][0] != L'>')
 			if (!(pos < l.size())) parse_error(l[curr2][1], err_fname);
 		type = FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
 	}
@@ -194,11 +211,12 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 
 	// LEQ: recheck if '<' is going to make any issues (order/card is important)
 	// 	if (L'<' == l[pos][0][0] && L'=' == l[pos][0][1])
-	if (L'<' == l[pos][0][0]) {
+	if ((L'<' == l[pos][0][0])  && !(L'<' == l[pos][0][1])) {
 		if (L'=' == l[pos][0][1]) return e = l[pos++], type = LEQ, true;
 		return e = l[pos++], type = LT, true;
 	}
-	if (L'>' == l[pos][0][0]) {
+
+	if (L'>' == l[pos][0][0] && !(L'>' == l[pos][0][1])) {
 		if (L'=' == l[pos][0][1]) return e = l[pos++], type = GEQ, true;
 		return e = l[pos++], type = GT, true;
 	}
@@ -207,11 +225,44 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
 	}
+
+	//TODO: review puropose of this original operators, symbol is in conflict
+	// with bithwise operators
 	if (L'|' == l[pos][0][0]) {
 		return e = l[pos++], type = OR, true;
 	}
 	if (L'&' == l[pos][0][0]) {
 		return e = l[pos++], type = AND, true;
+	}
+
+	//if (L'=' == l[pos][0][0] &&
+	//	L'=' == l[pos][0][1]) {
+	//	return e = l[pos++], type = EQ, true;
+	//}
+
+	if (L'+' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = ADD, true;
+	}
+	if (L'-' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = SUB, true;
+	}
+	if (L'*' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = MULT, true;
+	}
+	if (L'|' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = BITWOR, true;
+	}
+	if (L'&' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = BITWAND, true;
+	}
+	if (L'^' == l[pos][0][0]) {
+		return e = l[pos++], type = ALU, alu_op = BITWXOR, true;
+	}
+	if (L'>' == l[pos][0][0] && L'>' == l[pos][0][1]) {
+		return e = l[pos++], type = ALU, alu_op = SHR, true;
+	}
+	if (L'<' == l[pos][0][0] && L'<' == l[pos][0][1]) {
+		return e = l[pos++], type = ALU, alu_op = SHL, true;
 	}
 
 	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
@@ -247,9 +298,11 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
-		lt = false, geq = false, bltin = false;
+		lt = false, geq = false, bltin = false, alu = false;
 	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
-	while (!wcschr(L".:,;{}|&-", *l[pos][0])) { // L".:,;{}|&-<"
+	t_alu_op alu_op_aux = NOP;
+	//XXX: review for "-"
+	while (!wcschr(L".:,;{}-", *l[pos][0])) { // L".:,;{}|&-<"
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
@@ -267,12 +320,14 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 					bltin = true;
 				}
 				break;
+			case elem::ALU: alu = true; alu_op_aux = e.back().alu_op; break;
 			default: break;
 		}
 		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
+
 	if (bltin) {
 		// similar as for SYM below (join?) but this format will expand.
 		if (e[0].type != elem::BLTIN)
@@ -284,7 +339,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 		extype = raw_term::BLTIN; // isbltin = true;
 		return calc_arity(), true;
 	}
-	if (noteq || eq) {
+	if ( (noteq || eq) && !alu) {
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
@@ -295,7 +350,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 		extype = raw_term::EQ; // iseq = true;
 		return calc_arity(), true;
 	}
-	if (leq || gt) {
+	if ((leq || gt) && !alu) {
 		if (e.size() < 3)
 			parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
@@ -317,6 +372,27 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 		extype = raw_term::LEQ;
 		return calc_arity(), true;
 	}
+	if (alu) {
+
+		// ALU operations are currently implemented to work with three vars
+		// var OPERATOR var RELATIONSHIP var
+		// supported OPERATORs : + * | & ^ << >> (XXX - is TBD)
+		// supported RELATIONSHIPs: = (TODO: add support for <= => < > != )
+		// TODO: improve checks here
+		if (e.size() < 4)
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+		if (e[1].type != elem::ALU || e[3].type != elem::EQ)
+			parse_error(l[pos][0], err_term_or_dot, l[pos]);
+
+		//iseq = true;
+		neg = false;
+		//isalu = true;
+		alu_op = alu_op_aux;
+		extype = raw_term::ALU;
+		//return calc_arity(), true;
+		return true;
+	}
+
 	if (e[0].type != elem::SYM)
 		parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return calc_arity(), true;
@@ -339,7 +415,7 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity() {
 	size_t dep = 0;
 	arity = {0};
-	//if (iseq || isleq || islt) {
+	//if (iseq || isleq || islt || isalu) {
 	if (extype > raw_term::REL && extype < raw_term::BLTIN) {
 		arity = { 2 };
 		return;
@@ -651,6 +727,7 @@ bool operator<(const raw_term& x, const raw_term& y) {
 	//if (x.iseq != y.iseq) return x.iseq < y.iseq;
 	//if (x.isleq != y.isleq) return x.isleq < y.isleq;
 	//if (x.islt != y.islt) return x.islt < y.islt;
+	//if (x.isalu != y.isalu) return x.isalu < y.isalu;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;

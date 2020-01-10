@@ -76,6 +76,7 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args) const {
 	spbdd_handle r = leq_var(arg1, arg2, args, bits);
 	return leqmemo.emplace(x, r), r;
 }
+
 spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 	const {
 	if (!--bit)
@@ -224,7 +225,7 @@ term tables::from_raw_term(const raw_term& r, const size_t orderid) {
 	// D: make sure enums match (should be the same), cast is just to warn.
 	term::textype extype = (term::textype)r.extype;
 	ntable tbl = (extype > term::REL) ? -1 : get_table(get_sig(r));
-	return term(r.neg, extype, tbl, t, orderid);
+	return term(r.neg, extype, r.alu_op, tbl, t, orderid);
 }
 
 
@@ -576,7 +577,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
-		term r(false, term::REL, tab, ints(len, 0), 0);
+		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
@@ -679,20 +680,22 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars, leqvars;
-	std::vector<const term*> eqterms, leqterms;
+	set<int_t> pvars, nvars, eqvars, leqvars, aluvars;
+	std::vector<const term*> eqterms, leqterms, aluterms;
 	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false, hasleq = false;
+		bool haseq = false, hasleq = false, hasalu = false;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) continue;
 			else if (t.extype == term::EQ) haseq = true; // .iseq
 			else if (t.extype == term::LEQ) hasleq = true; // .isleq
+			else if (t.extype == term::ALU) hasalu= true; // .isalu
 			else (t.neg ? nvars : pvars).insert(t[n]);
 		// TODO: BLTINS: add term::BLTIN handling
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
 		else if (hasleq) leqterms.push_back(&t);
+		else if (hasalu) aluterms.push_back(&t);
 	}
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -745,13 +748,27 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 			leqvars.insert(v1);
 	}
 
+	//XXX: alu support - Work in progress
+	for (const term* pt : aluterms) {
+		const term& t = *pt;
+		assert(t.size() == 3);
+		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
+		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
+			aluvars.insert(v1);
+		if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2))
+			aluvars.insert(v2);
+		if (v3 < 0 && !has(nvars, v3) && !has(pvars, v3))
+			aluvars.insert(v3);
+	}
+
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i);
+		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // aluvars.erase(i);
 	bdd_handles v;
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
+	for (int_t i : aluvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
@@ -1076,6 +1093,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 	spbdd_handle leq = htrue, q;
 	pair<body, term> lastbody;
 	a.vm = get_varmap(h, al, a.varslen), a.inv = varmap_inv(a.vm);
+
 	for (const term& t : al) {
 		//if (t.size() != 2 || (!t.iseq && !t.isleq && !t.isbltin))
 		if (t.extype == term::REL) {
@@ -1096,7 +1114,12 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			a.bltinsize = varcount; // BLTIN type (1st) + ?out (last)
 			//a.bltinsize = t.size() - 2; // BLTIN type (1st) + ?out (last)
 			a.bltintype = dict.get_bltin(t[0]);
-		} else if (t.extype == term::EQ) { //.iseq
+		} else if (t.extype == term::ALU) {
+			//returning bdd handler on leq variable
+			if (!isalu_handler(t,a,leq)) return;
+			continue;
+		}
+		else if (t.extype == term::EQ) { //.iseq
 			DBG(assert(t.size() == 2););
 			if (t[0] == t[1]) {
 				if (t.neg) return;
@@ -1124,12 +1147,35 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 				if (t.neg == (t[0] <= t[1])) return;
 				continue;
 			}
-			if (t[0] < 0 && t[1] < 0)
+			if (t[0] < 0 && t[1] < 0) {
 				q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]),
 					a.varslen, bits);
+
+			}
 			else if (t[0] < 0)
-				q = leq_const(t[1], a.vm.at(t[0]),
-					a.varslen, bits);
+				q = leq_const(t[1], a.vm.at(t[0]), a.varslen, bits);
+			/*
+			//XXX:replacement of leq_const by leq_var, needs further test and cleanup
+			else if (t[0] < 0) {
+				size_t args = t.size();
+				spbdd_handle aux = from_sym(1, args, t[1]);
+				q = leq_var(a.vm.at(t[0]), a.vm.at(t[0])+1, a.varslen+1, bits, aux);
+
+				bools exvec;
+				for (size_t i = 0; i < bits; ++i) {
+					exvec.push_back(false);
+					exvec.push_back(true);
+				}
+				q = q/exvec;
+
+				uints perm1;
+				perm1 = perm_init(2*bits);
+				for (size_t i = 1; i < bits; ++i) {
+					perm1[i*2] = perm1[i*2]-i ;
+				}
+				q = q^perm1;
+			}
+			*/
 			else if (t[1] < 0)
 				// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 				q = htrue % leq_const(t[0],
@@ -1139,6 +1185,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 		}
 		// we use LT/GEQ <==> LEQ + reversed args + !neg
 	}
+
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y;

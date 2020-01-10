@@ -13,18 +13,20 @@
 #include "defs.h"
 
 struct term : public ints {
-	bool neg = false, goal = false; // , iseq = false, isleq = false, isbltin;
-	enum textype { REL, EQ, LEQ, BLTIN } extype = term::REL;
+	bool neg = false, goal = false; // , iseq = false, isleq = false, isbltin, isalu = false;
+	enum textype { REL, EQ, LEQ, BLTIN, ALU } extype = term::REL;
+	t_alu_op alu_op = NOP;
 	ntable tab = -1;
 	size_t orderid = 0;
 	term() {}
-	term(bool neg, textype extype, ntable tab, const ints& args, size_t orderid) 
-		: ints(args), neg(neg), extype(extype), tab(tab), orderid(orderid) {}
+	term(bool neg, textype extype, t_alu_op alu_op, ntable tab, const ints& args, size_t orderid)
+		: ints(args), neg(neg),extype(extype), alu_op(alu_op), tab(tab), orderid(orderid) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		//if (iseq != t.iseq) return iseq;
 		//if (isleq != t.isleq) return isleq;
 		//if (extype != t.extype) return extype < t.extype;
+		//if (isalu != t.isalu) return isalu;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		return (const ints&)*this < t;

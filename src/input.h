@@ -39,8 +39,9 @@ static const std::set<std::wstring> str_bltins =
 struct elem {
 	enum etype {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, LT,
-		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES
+		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ALU
 	} type;
+	t_alu_op alu_op = NOP;
 	int_t num = 0;
 	lexeme e;
 	wchar_t ch;
@@ -72,8 +73,9 @@ struct elem {
 struct raw_term {
 	// TODO: enum 'is...' stuff
 	bool neg = false;
-	//bool iseq = false, isleq = false, islt = false, isbltin = false;
-	enum rtextype { REL, EQ, LEQ, BLTIN } extype = raw_term::REL;
+	//bool iseq = false, isleq = false, islt = false, isbltin = false, isalu = false;
+	enum rtextype { REL, EQ, LEQ, BLTIN, ALU } extype = raw_term::REL;
+	t_alu_op alu_op = NOP;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog);
@@ -84,6 +86,7 @@ struct raw_term {
 		return neg == t.neg && e == t.e && arity == t.arity &&
 			extype == t.extype;
 			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
+			//isalu == t.isalu;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };

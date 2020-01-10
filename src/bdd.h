@@ -71,9 +71,12 @@ std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
+
 spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
 spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
+
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
+
 bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
@@ -94,6 +97,14 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern std::vector<class bdd> V;
+
+void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+int_t bdd_root(cr_spbdd_handle x);
+spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, spbdd_handle *z, size_t bits, size_t n_vars);
 
 class bdd {
 	friend class bdd_handle;
@@ -136,6 +147,14 @@ class bdd {
 	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
 	friend std::ostream& write_bdd(std::ostream& os);
 	friend std::istream& read_bdd(std::istream& is);
+
+	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+	friend int_t bdd_root(cr_spbdd_handle x);
+	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, spbdd_handle *z, size_t bits , size_t n_vars );
 
 	inline static bdd get(int_t x) {
 		if (x > 0) {
@@ -188,6 +207,19 @@ class bdd {
 	inline static bool trueleaf(int_t t) { return t > 0; }
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
+
+	//XXX: work-in-progress 
+	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
+	static int_t bdd_xor(int_t x, int_t y);
+	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
+	static int_t bitwiseXOR(int_t a_in, int_t b_in); //, uint_t pos);
+	static int_t ADDER(int_t a_in, int_t b_in, bool carry, size_t bit);
+	static int_t ADDER_ACCS(int_t b_in, int_t *accs, size_t depth, size_t bits, size_t n_args);
+	static int_t ADDER_IDX(int_t a_in, int_t b_in, bool carry, size_t bit, size_t depth, size_t n_args);
+	static int_t MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits, size_t n_args, bool bit_acc) ;
+	static int_t COPY(int_t a_in);
+	static int_t SHR(int_t a_in, size_t depth, size_t bits, size_t n_args);
+
 public:
 	bdd(int_t v, int_t h, int_t l);
 	inline bool operator==(const bdd& b) const {
