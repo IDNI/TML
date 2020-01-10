@@ -316,10 +316,18 @@ private:
 	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
 	spbdd_handle add_ite_init(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
 	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args, uint_t b, uint_t s);
+
 	spbdd_handle mul_var_eq(size_t var0, size_t var1, size_t var2,
+				size_t n_vars);
+	spbdd_handle mul_var_eq_ext(size_t var0, size_t var1, size_t var2, size_t var3,
 				size_t n_vars);
 
 	spbdd_handle bdd_test(size_t var0, size_t var1, size_t var2, size_t n_vars);
+
+	spbdd_handle bdd_add_test(size_t var0, size_t var1, size_t var2, size_t n_vars);
+	spbdd_handle bdd_mult_test(size_t var0, size_t var1, size_t var2, size_t var3, size_t n_vars);
+
+	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
 
 
 public:
