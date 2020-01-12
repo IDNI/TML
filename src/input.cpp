@@ -53,9 +53,9 @@ lexeme lex(pcws s) {
 
 	//ALU operators:
 	//SHR, SHL, XXX: EQ?
-	if (**s == L'>' && !(*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
-	if (**s == L'<' && !(*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
-	//if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
+	//if (**s == L'>' && !(*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
+	//if (**s == L'<' && !(*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
+	////if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
 	/*
 	//ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
 	//XXX: lexed below with the rest of single character symbols
@@ -67,7 +67,8 @@ lexeme lex(pcws s) {
 	*/
 
 	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
-	if (**s == L'<') {
+	//if (**s == L'<') {
+	if (**s == L'<' && !(*(*s + 1) == L'<')) {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
 		// D: lex/parse: <file> parsing is moved to directive::parse, tag just <
@@ -75,7 +76,8 @@ lexeme lex(pcws s) {
 		//while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		//return { t, ++(*s) };
 	}
-	if (**s == L'>') {
+	//if (**s == L'>') {
+	if (**s == L'>' && !(*(*s + 1) == L'>')) {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
 		return ++ * s, lexeme{ *s - 1, *s };

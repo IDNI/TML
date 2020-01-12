@@ -196,36 +196,52 @@ sig tables::get_sig(const lexeme& rel, const ints& arity) {
 	return { dict.get_rel(rel), arity };
 }
 
-term tables::from_raw_term(const raw_term& r, const size_t orderid) {
+term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	ints t;
 	lexeme l;
-	// skip the first symbol unless it's EQ/NEQ (which has VAR as it's first)
-	//if (r.extype == raw_term::BLTIN) { }
-	bool isRel = r.extype == raw_term::REL; //!(r.iseq || r.isleq || r.isbltin);
-	for (size_t n = !isRel ? 0 : 1; n < r.e.size(); ++n)
+	size_t nvars = 0;
+	// D: make sure enums match (should be the same), cast is just to warn.
+	term::textype extype = (term::textype)r.extype;
+	// D: header builtin is treated as rel, but differentiated later (decomp.)
+	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
+	// skip the first symbol unless it's EQ/LEQ/ALU (which has VAR/CONST as 1st)
+	bool isrel = realrel || extype == term::BLTIN;
+	for (size_t n = !isrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM: t.push_back(mknum(r.e[n].num)); break;
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
 			case elem::VAR:
-				t.push_back(dict.get_var(r.e[n].e)); break;
+				++nvars;
+				t.push_back(dict.get_var(r.e[n].e)); 
+				break;
 			case elem::STR:
 				l = r.e[n].e;
 				++l[0], --l[1];
 				t.push_back(dict.get_sym(dict.get_lexeme(
 					_unquote(lexeme2str(l)))));
 				break;
-			case elem::BLTIN:
-				t.push_back(dict.get_bltin(r.e[n].e)); break;
+			//case elem::BLTIN: // no longer used, check and remove...
+			//	DBG(assert(false););
+			//	t.push_back(dict.get_bltin(r.e[n].e)); break;
 			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e));
 			default: ;
 		}
+	// stronger 'realrel' condition for tables, only REL and header BLTIN
+	ntable tab = realrel ? get_table(get_sig(r)) : -1;
+	// D: idbltin name isn't handled above (only args, much like rel-s & tab-s).
+	if (extype == term::BLTIN) {
+		int_t idbltin = dict.get_bltin(r.e[0].e);
+		if (tab > -1) {
+			// header BLTIN rel w table, save alongside table (for decomp. etc.)
+			tbls[tab].idbltin = idbltin;
+			tbls[tab].bltinargs = t; // if needed, for rule/header (all in tbl)
+			tbls[tab].bltinsize = nvars; // number of vars (<0)
+			//count_if(t.begin(), t.end(), [](int i) { return i < 0; });
+		}
+		return term(r.neg, tab, t, orderid, idbltin);
+	}
+	return term(r.neg, extype, r.alu_op, tab, t, orderid);
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
-	//term::textype extype = r.iseq ? term::EQ :
-	//	(r.isleq ? term::LEQ : (r.isbltin ? term::BLTIN : term::REL));
-	// D: make sure enums match (should be the same), cast is just to warn.
-	term::textype extype = (term::textype)r.extype;
-	ntable tbl = (extype > term::REL) ? -1 : get_table(get_sig(r));
-	return term(r.neg, extype, r.alu_op, tbl, t, orderid);
 }
 
 
@@ -572,8 +588,11 @@ void tables::out(emscripten::val o) const {
 #endif
 
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
-	size_t len) const {
-	if (!len) len = tbls.at(tab).len;
+	size_t len, bool allowbltins) const {
+	table tbl = tbls.at(tab);
+	// D: bltins are special type of REL-s, mostly as any but no decompress.
+	if (!allowbltins && tbl.idbltin > -1) return;
+	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
@@ -852,12 +871,12 @@ flat_prog tables::to_terms(const raw_prog& p) {
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x),
+				get_nums(x), t = from_raw_term(x, true),
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
 					for (const raw_term& z : y) // term_set(
-						v.push_back(from_raw_term(z, i++)),
+						v.push_back(from_raw_term(z, false, i++)),
 						get_nums(z);
 					align_vars(v), m.insert(move(v));
 				}
@@ -879,7 +898,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		}
 
 		else for (const raw_term& x : r.h)
-			t = from_raw_term(x), t.goal = r.type == raw_rule::GOAL,
+			t = from_raw_term(x, true), t.goal = r.type == raw_rule::GOAL,
 			m.insert({t}), get_nums(x);
 
 	return m;
@@ -1095,25 +1114,20 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 	a.vm = get_varmap(h, al, a.varslen), a.inv = varmap_inv(a.vm);
 
 	for (const term& t : al) {
-		//if (t.size() != 2 || (!t.iseq && !t.isleq && !t.isbltin))
 		if (t.extype == term::REL) {
 			b.insert(lastbody = { get_body(t, a.vm, a.varslen), t });
 		} else if (t.extype == term::BLTIN) {
-			DBG(assert(t.size() > 2);); // BLTIN + ?v, + could have many vars
+			//DBG(assert(t.size() >= 2);); // ?v, + could have many vars
 			// TODO: check that last body exists, but should always be present.
 			DBG(assert(lastbody.second.size() > 0););
-			a.isbltin = true; // TODO: use bltintype instead?
-			a.bltinout = t.back();
+			DBG(assert(t.idbltin >= 0););
+			a.idbltin = t.idbltin; // store just a dict id, fetch type on spot
 			a.bltinargs = t;
 			// TODO: check that vars match - in number and names too?
+			// this is only relevant for 'count'? use size differently per type
 			term& bt = lastbody.second;
-			int varcount = count_if(bt.begin(), bt.end(),
+			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
-			// assert no longer T if we have mix of vars and consts.
-			//DBG(assert(varcount == t.size() - 2););
-			a.bltinsize = varcount; // BLTIN type (1st) + ?out (last)
-			//a.bltinsize = t.size() - 2; // BLTIN type (1st) + ?out (last)
-			a.bltintype = dict.get_bltin(t[0]);
 		} else if (t.extype == term::ALU) {
 			//returning bdd handler on leq variable
 			if (!isalu_handler(t,a,leq)) return;
@@ -1384,6 +1398,8 @@ void tables::get_rules(flat_prog p) {
 		tbls[t.tab].ext = false;
 		varmap v;
 		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t;
+		// D: bltin and a header (moved to table instead, it's what we need)
+		//if (t.extype == term::BLTIN) {}
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
 			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
@@ -1686,23 +1702,25 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			return hfalse;
 		} else v1.push_back(x);
 
-	if (a.isbltin) {
-		if (a.bltintype == L"count") {
+	if (a.idbltin > -1) {
+		lexeme bltintype = dict.get_bltin(a.idbltin);
+		int_t bltinout = a.bltinargs.back(); // for those that have ?out
+		if (bltintype == L"count") {
 			//body& blast = *a[a.size() - 1];
 			//spbdd_handle xprmt = bdd_permute_ex(x, blast.ex, blast.perm);
 			//int_t cnt = bdd::satcount_perm(xprmt->b, bits * a.bltinsize + 1);
 			int_t cnt = bdd::satcount(x->b);
 
 			// just equate last var (output) with the count
-			x = from_sym(a.vm.at(a.bltinout), a.varslen, mknum(cnt));
+			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
 			v1.push_back(x);
 			wcout << L"alt_query (cnt):" << cnt << L"" << endl;
 		}
-		else if (a.bltintype == L"rnd") {
-			DBG(assert(a.bltinargs.size() == 4););
+		else if (bltintype == L"rnd") {
+			DBG(assert(a.bltinargs.size() == 3););
 			// TODO: check that it's num const
-			int_t arg0 = int_t(a.bltinargs[1] >> 2);
-			int_t arg1 = int_t(a.bltinargs[2] >> 2);
+			int_t arg0 = int_t(a.bltinargs[0] >> 2);
+			int_t arg1 = int_t(a.bltinargs[1] >> 2);
 			if (arg0 > arg1) swap(arg0, arg1);
 
 			//int_t rnd = arg0 + (std::rand() % (arg1 - arg0 + 1));
@@ -1711,23 +1729,24 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			std::uniform_int_distribution<> distr(arg0, arg1);
 			int_t rnd = distr(gen);
 
-			x = from_sym(a.vm.at(a.bltinout), a.varslen, mknum(rnd));
+			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(rnd));
 			v1.push_back(x);
 			wcout << L"alt_query (rnd):" << rnd << L"" << endl;
 		}
-		else if (a.bltintype == L"print") {
+		else if (bltintype == L"print") {
 			wstring ou{L"output"};
 			size_t n{0};
-			if (a.bltinargs.size() > 2) ++n,
-				ou = lexeme2str(dict.get_sym(a.bltinargs[1]));
+			// D: args are now [0,1,...] (we no longer have the bltin as 0 arg)
+			if (a.bltinargs.size() >= 2) ++n,
+				ou = lexeme2str(dict.get_sym(a.bltinargs[0]));
 			wostream& os = output::to(ou);
 			do {
-				int_t arg = a.bltinargs[++n];
-				if      (arg < 0) os << get_var_lexeme(arg);
+				int_t arg = a.bltinargs[n++];
+				if      (arg < 0) os << get_var_lexeme(arg) << endl;
 				else if (arg & 1) os << (wchar_t)(arg >> 2);
 				else if (arg & 2) os << (int_t)  (arg >> 2);
 				else              os << dict.get_sym(arg);
-			} while (n + 1 < a.bltinargs.size());
+			} while (n < a.bltinargs.size());
 		}
 	}
 
@@ -1779,11 +1798,48 @@ char tables::fwd() noexcept {
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 	}
 	bool b = false;
-	for (auto& t : tbls) {
-		b |= t.commit(DBG(bits));
-		if (t.unsat) return unsat = true;
-		//b |= t.second.commit(DBG(bits));
-		//if (t.second.unsat) return unsat = true;
+	// D: just temp ugly static, move this out of fwd/pass in, or in tables.
+	static map<ntable, set<term>> mhits;
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
+		table& tbl = tbls[tab];
+		bool changes = tbl.commit(DBG(bits));
+		b |= changes;
+		if (!changes && tbl.idbltin > -1) {
+			//lexeme bltintype = dict.get_bltin(tbl.idbltin);
+			set<term>& ts = mhits[tab];
+			bool ishalt = false, isfail = false;
+			decompress(tbl.t, tab, [&ts, &tbl, &ishalt, &isfail, this]
+			(const term& t) {
+				if (ts.end() == ts.find(t)) {
+					// ...we have a new hit
+					ts.insert(t);
+					// do what we have to do, we have a new tuple
+					lexeme bltintype = dict.get_bltin(tbl.idbltin);
+					if (bltintype == L"lprint") {
+						wostream& os = wcout << endl;
+						// this is supposed to be formatted r-term printout
+						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:"};
+						os << L"printing: " << rtp << L'.' << endl;
+					}
+					else if (bltintype == L"halt") {
+						ishalt = true;
+						wostream& os = wcout << endl;
+						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
+						os << L"program halt: " << rtp << L'.' << endl;
+					}
+					else if (bltintype == L"fail") {
+						ishalt = isfail = true;
+						wostream& os = wcout << endl;
+						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
+						os << L"program fail: " << rtp << L'.' << endl;
+					}
+				}
+			}, 0, true); 
+			// 'true' to allow decompress to handle builtins too
+			if (isfail) return unsat = true; // to throw exception, TODO:
+			if (ishalt) return false;
+		}
+		if (tbl.unsat) return unsat = true;
 	}
 	return b;
 /*	if (!b) return false;
