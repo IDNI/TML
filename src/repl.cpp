@@ -15,6 +15,7 @@
 using namespace std;
 
 repl::repl(options &o, wostream& os) : o(o), os(os) {
+	os<<L"# TML REPL ("<<GIT_DESCRIBED<<L"). Enter ? or h for help."<<endl;
 	redrive();
 	loop();
 }
