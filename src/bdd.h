@@ -208,7 +208,7 @@ class bdd {
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
 
-	//XXX: work-in-progress 
+	//XXX: work-in-progress
 	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
 	static int_t bdd_xor(int_t x, int_t y);
 	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
@@ -227,6 +227,7 @@ public:
 	}
 	static void init();
 	static void gc();
+	static std::wostream& stats(std::wostream& os);
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
 			: V[x].v < 0 ? V[x].l : V[x].h;

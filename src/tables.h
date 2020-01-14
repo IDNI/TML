@@ -293,7 +293,6 @@ private:
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
-	void add_prog(const raw_prog& p, const strs_t&);
 	void add_prog(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
 	char fwd() noexcept;
@@ -356,9 +355,12 @@ public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
-	bool run_prog(const raw_prog& p, const strs_t& strs);
+	size_t step() { return nstep; }
+	void add_prog(const raw_prog& p, const strs_t& strs);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
+		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
-	bool pfp(size_t nsteps = 0);
+	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 #ifdef __EMSCRIPTEN__

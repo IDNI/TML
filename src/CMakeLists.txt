@@ -24,6 +24,7 @@ set(TML_HEADERS
 	input.h
 	options.h
 	output.h
+	repl.h
 	tables.h
 )
 
@@ -39,6 +40,7 @@ set(TML_SOURCES
 	output.cpp
 	print_prolog.cpp
 	print_souffle.cpp
+	repl.cpp
 	save_csv.cpp
 	tables.cpp
 	tables_ext.cpp

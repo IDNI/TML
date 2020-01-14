@@ -193,7 +193,7 @@ wstring quote_sym(const elem& e) {
 		}
 		os << ss.str();
 		if (q) os << L'"';
-		if (!ss.str().size()) os << L"\"\"";
+		else if (e.e[0] == e.e[1]) os << L"\"\"";
 	} else
 		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
 	return os.str();

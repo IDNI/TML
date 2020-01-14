@@ -39,6 +39,7 @@ wostream& err() { static wostream& os = output::to(L"error");       return os; }
 wostream& inf() { static wostream& os = output::to(L"info");        return os; }
 wostream& dbg() { static wostream& os = output::to(L"debug");       return os; }
 wostream& repl(){ static wostream& os = output::to(L"repl-output"); return os; }
+wostream& ms()  { static wostream& os = output::to(L"benchmarks");  return os; }
 }
 
 void driver::transform_len(raw_term& r, const strs_t& s) {
@@ -155,23 +156,97 @@ void driver::output_pl(const raw_prog& p) const {
 	if (opts.enabled(L"souffle")) print_souffle(output::to(L"souffle"), p);
 }
 
-void driver::prog_run(raw_progs& rp, size_t n, strs_t& strtrees) {
+bool driver::prog_run(raw_progs& rp, size_t n, size_t steps,
+	size_t break_on_step)
+{
 //	pd.clear();
 	//DBG(o::out() << L"original program:"<<endl<<p;)
-	transform(rp, n, strtrees);
-	output_pl(rp.p[n]);
-	if (opts.enabled(L"t"))
-		for (auto p : rp.p)
-			output::to(L"transformed")<<L'{'<<endl<<p<<L'}'<<endl;
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	clock_t start, end;
-	tbl = tbl ? tbl : new tables(opts.enabled(L"proof"), true,
-		opts.enabled(L"bin"), opts.enabled(L"t"));
-	if (opts.disabled(L"run")) return;
-	measure_time(tbl->run_prog(rp.p[n], pd.strs));
+	size_t step = nsteps();
+	measure_time_start();
+	bool fp = tbl->run_prog(rp.p[n], pd.strs, steps, break_on_step);
+	o::ms() << L"# elapsed: ";
+	measure_time_end();
+	pd.elapsed_steps = nsteps() - step;
+	//if (pd.elapsed_steps > 0 && steps && pd.elapsed_steps > steps) throw 0;
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));
+	return fp;
+}
+
+void driver::add(wstring& prog, bool newseq) {
+	rp.parse(prog, newseq);
+	if (!newseq) transform(rp, pd.n, pd.strs);
+}
+
+void driver::list(wostream& os, size_t n) {
+	size_t e = n ? n-- : rp.p.size();
+	if (e > rp.p.size()) { os<<L"# no such program exist"<<endl; return; }
+	for (; n != e; ++n)
+		os<<L"# Listing program "<<(n + 1)<<L":\n{\n"<<rp.p[n]<<"}\n";
+	os << flush;
+}
+
+void driver::new_sequence() {
+	//DBG(o::dbg() << L"new sequence" << endl;)
+	transform(rp, pd.n, pd.strs);
+	raw_prog &p = rp.p[pd.n];
+	for (const wstring& s : str_bltins) p.builtins.insert(get_lexeme(s));
+	output_pl(p);
+	if (opts.enabled(L"t")) output::to(L"transformed")
+		<< L"# Transformed program " << pd.n + 1 << L":" << endl
+		<< L'{' << endl << p << L'}' << endl;
+}
+
+void driver::restart() {
+	pd.n = 0;
+	pd.start_step = nsteps();
+	running = true;
+}
+
+bool driver::run(size_t steps, size_t break_on_step, bool break_on_fp) {
+	try {
+		if (!rp.p.size()) return true;
+		if (!running) restart();
+next_sequence:
+		if (nsteps() == pd.start_step) new_sequence();
+		if (opts.disabled(L"run") && opts.disabled(L"repl"))
+			return true;
+		bool fp = prog_run(rp, pd.n, steps, break_on_step);
+		if (fp) {
+			DBG(static wostream& ds = output::to(L"dump");)
+			DBG(if (opts.enabled(L"dump")) out(ds);)
+			if (pd.n == rp.p.size()-1) // all progs fp
+				return result = true, true;
+			++pd.n;
+			pd.start_step = nsteps();
+			if (steps && steps >= pd.elapsed_steps)
+				if (!(steps -= pd.elapsed_steps)) return false;
+			if ((break_on_step && nsteps() == break_on_step)
+				|| break_on_fp) return false;
+			goto next_sequence;
+		}
+	} catch (unsat_exception& e) {
+		o::out() << s2ws(string(e.what())) << endl;
+		result = false;
+	}
+	return false;
+}
+
+bool driver::step(size_t steps, size_t break_on_step, bool break_on_fp) {
+	return run(steps, break_on_step, break_on_fp);
+}
+
+void driver::info(wostream& os) {
+	size_t l = rp.p.size();
+	os<<L"# prog n:    \t" << (pd.n+1) <<L" of: " << (l>0?l:0) << endl;
+	os<<L"# step:      \t" << nsteps() <<L" - " << pd.start_step <<L" = "
+		<< (nsteps() - pd.start_step) << L" ("
+		<< (running ? L"" : L"not ") << L"running)" << endl;
+	bdd::stats(os<<L"# bdds:     \t")<<endl;
+	//DBG(os<<L"# opts:    \t" << opts << endl;)
 }
 
 void driver::init() {
@@ -179,33 +254,20 @@ void driver::init() {
 	output::create(L"error",       L".error.log");
 	output::create(L"info",        L".info.log");
 	output::create(L"debug",       L".debug.log");
+	output::create(L"dump",        L".dump.tml");
+	output::create(L"benchmarks",  L".benchmarks.log"); // o::ms()
 	output::create(L"transformed", L".trans.tml");
 	output::create(L"repl-output", L".repl.out.log");
 	output::create(L"xsb",         L".P");
 	output::create(L"swipl",       L".pl");
 	output::create(L"souffle",     L".souffle");
+	bdd::init();
 }
 
-void driver::run_(raw_progs &rp) {
-	strs_t strtrees;
-	try {
-		if (!rp.p.size()) return;
-		for (size_t n = 0; n != rp.p.size(); ++n) {
-			prog_run(rp, n, strtrees);
-			DBG(if (opts.enabled(L"o")) {
-				if (n) o::out() << endl;
-				tbl->out(o::out());
-			})
-		}
-		NDBG(if (opts.enabled(L"o")) tbl->out(o::out());)
-		if (opts.enabled(L"csv")) save_csv();
-	} catch (unsat_exception& e) {
-		o::out() << s2ws(string(e.what())) << endl;
-		result = false;
-	}
+driver::driver(raw_progs rp, options o) : rp(rp), opts(o) {
+	tbl = new tables(opts.enabled(L"proof"), opts.enabled(L"optimize"),
+		opts.enabled(L"bin"), opts.enabled(L"t"));
 }
-
-driver::driver(raw_progs rp, options o) : opts(o) { run_(rp); }
 driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
 driver::driver(wstring s, options o) : driver(raw_progs(s), o) {}
 driver::driver(char *s,   options o) : driver(raw_progs(s2ws(string(s))), o) {}

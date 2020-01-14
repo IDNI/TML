@@ -212,7 +212,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 			case elem::CHR: t.push_back(mkchr(r.e[n].ch)); break;
 			case elem::VAR:
 				++nvars;
-				t.push_back(dict.get_var(r.e[n].e)); 
+				t.push_back(dict.get_var(r.e[n].e));
 				break;
 			case elem::STR:
 				l = r.e[n].e;
@@ -836,7 +836,9 @@ void tables::get_facts(const flat_prog& m) {
 		for (auto y : x.second) r = r || y;
 		tbls[x.first].t = r;
 	}
-	if (optimize) measure_time_end();
+	if (optimize)
+		(o::ms() << L"# get_facts: "),
+		measure_time_end();
 }
 
 void tables::get_nums(const raw_term& t) {
@@ -1443,7 +1445,7 @@ void tables::load_string(lexeme r, const wstring& s) {
 	}
 	clock_t start, end;
 	if (optimize)
-		(o::dbg()<<"load_string or_many: "),
+		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
 	tbls[get_table({rel, ar})].t = bdd_or_many(move(b1)),
 	tbls[get_table({rel, {3}})].t = bdd_or_many(move(b2));
@@ -1834,7 +1836,7 @@ char tables::fwd() noexcept {
 						os << L"program fail: " << rtp << L'.' << endl;
 					}
 				}
-			}, 0, true); 
+			}, 0, true);
 			// 'true' to allow decompress to handle builtins too
 			if (isfail) return unsat = true; // to throw exception, TODO:
 			if (ishalt) return false;
@@ -1856,7 +1858,7 @@ level tables::get_front() const {
 	return r;
 }
 
-bool tables::pfp(size_t nsteps) {
+bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	set<level> s;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
@@ -1864,10 +1866,11 @@ bool tables::pfp(size_t nsteps) {
 	for (;;) {
 		if (optimize) o::inf() << L"step: " << nstep << endl;
 		++nstep;
-		if (!fwd()) return sp(), true;
+		if (!fwd()) return sp(), true; // FP found
 		if (unsat) sp(), throw contradiction_exception();
 		// sp(); // show proofs after each step?
-		if (nsteps && nstep == nsteps) return true;
+		if ((break_on_step && nstep == break_on_step) ||
+			(nsteps && nstep == nsteps)) return false; // no FP yet
 		l = get_front();
 		if (!datalog && !s.emplace(l).second)
 			sp(), throw infloop_exception();
@@ -1876,21 +1879,22 @@ bool tables::pfp(size_t nsteps) {
 	throw 0;
 }
 
-bool tables::run_prog(const raw_prog& p, const strs_t& strs) {
+bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+	size_t break_on_step)
+{
 	clock_t start, end;
 	double t;
-	// o::err() << L"add_prog: ";
 	if (optimize) measure_time_start();
 	add_prog(p, strs);
 	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		o::inf() << L"pfp: ";
+		o::inf() << L"# pfp: ";
 		measure_time_start();
 	}
-	// o::err()
-	bool r = pfp();
+	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
 	if (optimize)
-		(o::inf() <<L"add_prog: "<<t << L" pfp: "), measure_time_end();
+		(o::ms() <<L"add_prog: "<<t << L" pfp: "),
+		measure_time_end();
 	return r;
 }
 

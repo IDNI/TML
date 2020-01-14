@@ -194,7 +194,6 @@ struct raw_prog {
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
-	dict_t dict;
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 	bool parse(const lexemes& l, size_t& pos);
@@ -203,7 +202,8 @@ struct raw_prog {
 struct raw_progs {
 	std::vector<raw_prog> p;
 	raw_progs(FILE*);
-	raw_progs(const std::wstring& s);
+	raw_progs(const std::wstring& s = L"");
+	void parse(const std::wstring& s, bool newseq = true);
 };
 
 void parse_error(cws o, std::wstring e);

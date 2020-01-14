@@ -555,6 +555,11 @@ void bdd::mark_all(int_t i) {
 		mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
 }
 
+wostream& bdd::stats(wostream& os) {
+	return os << "S: " << S.size() << " V: "<< V.size() <<
+		" AM: " << AM.size() << " C: "<< C.size();
+}
+
 void bdd::gc() {
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
@@ -567,8 +572,7 @@ void bdd::gc() {
 	v1.reserve(S.size());
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
-	o::inf() << "S: " << S.size() << " V: "<< V.size() <<
-		" AM: " << AM.size() << " C: "<< C.size() << endl;
+	stats(o::inf())<<endl;
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V.size(); ++n) {
