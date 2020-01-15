@@ -42,17 +42,14 @@ prefixdecl => prefix ws identifier ws prefixdecl | prefix ws identifier ws.
 form => form1 | form1 bop form.
 form1 => matrix | matrix bop1 form1. 
 
-matrix _=> 	term | '~' term |
-			'{' form '}'|'~' '{' form '}' |
-			prefixdecl'{' form '}' | '~' prefixdecl '{' form '}'.
+#matrix => 	term | '~' term |
+#			'{' form '}'|'~' '{' form '}' |
+#			prefixdecl'{' form '}' | '~' prefixdecl '{' form '}'.
 
-bop => '|' | '&'.			
-bop1 => "->" | "<->".
+#bop => '|' | '&'.			
+#bop1 => "->" | "<->".
 
 sof => form.
-
-
-
 
 fact => pred '.' ws.
 preds => ws pred preds_rest.

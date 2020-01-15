@@ -798,7 +798,7 @@ int_t bdd_or_reduce(bdds b) {
 	return bdd::bdd_or(t, bdd_or_reduce(move(x)));
 }
 
-spbdd_handle bdd_or_many(const bdd_handles& v) {
+spbdd_handle bdd_or_many(bdd_handles v) {
 	bdds b(v.size());
 	for (size_t n = 0; n != v.size(); ++n) b[n] = v[n]->b;
 	return bdd_handle::get(bdd_or_reduce(move(b)));
