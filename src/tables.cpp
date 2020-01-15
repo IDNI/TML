@@ -1782,6 +1782,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 		x = (t || a) % d;
 	}
 //	DBG(assert(bdd_nvars(x) < len*bits);)
+	add.clear(); del.clear();
 	return x != t && (t = x, true);
 }
 
