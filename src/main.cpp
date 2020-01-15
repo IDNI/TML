@@ -34,7 +34,8 @@ int main(int argc, char** argv) {
 		driver d(o);
 		d.run();
 		//DBG(d.info(o::dbg()<<endl); o::dbg()<<endl;)
-		NDBG(if (o.enabled(L"dump")) d.out(output::to(L"dump"));)
+		NDBG(if (o.enabled(L"dump") && d.result)
+			d.out(output::to(L"dump"));)
 		if (o.enabled(L"csv")) d.save_csv();
 	}
 	onexit = true;
