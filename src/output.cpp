@@ -193,7 +193,7 @@ wstring quote_sym(const elem& e) {
 		}
 		os << ss.str();
 		if (q) os << L'"';
-		if (!ss.str().size()) os << L"\"\"";
+		else if (e.e[0] == e.e[1]) os << L"\"\"";
 	} else
 		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
 	return os.str();
@@ -215,6 +215,25 @@ wostream& operator<<(wostream& os, const raw_term& t) {
 		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os<<L')';
 	}
 	return os << L')';
+}
+
+wostream& operator<<(wostream& os, const std::pair<raw_term, wstring>& p) {
+	const raw_term& t = p.first;
+	//if (t.neg) os << L'~';
+	//os << t.e[0];
+	//os << L'(';
+	for (size_t ar = 0, n = 1; ar != t.arity.size();) {
+		while (t.arity[ar] == -1) ++ar, os << L'(';
+		if (n >= t.e.size()) break;
+		while (t.e[n].type == elem::OPENP) ++n;
+		for (int_t k = 0; k != t.arity[ar];)
+			if ((os << quote_sym(t.e[n++])), ++k != t.arity[ar])
+				os << L' ';
+		while (n < t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
+		++ar;
+		while (ar < t.arity.size() && t.arity[ar] == -2) ++ar, os << L')';
+	}
+	return os; // << L')';
 }
 
 wostream& operator<<(wostream& os, const raw_rule& r) {

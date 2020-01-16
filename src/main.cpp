@@ -16,30 +16,28 @@
 #include <sys/ioctl.h>
 #endif
 #include "driver.h"
+#include "repl.h"
 using namespace std;
 
 //void print_memos_len();
 
-void repl(driver &d) {
-	wstring line;
-	while (wcin) {
-		o::repl() << endl << L"TML> ";
-		getline(wcin, line);
-		d.run(raw_progs(line));
-	}
-}
-
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
-	bdd::init();
 	driver::init();
 	options o(argc, argv);
+	// read from stdin by default if no -i(e), -h, -v and no -repl
 	if (o.disabled(L"i") && o.disabled(L"ie") && o.disabled(L"repl")
 				&& o.disabled(L"h") && o.disabled(L"v"))
-		// read from stdin by default if no -i, -h, -v and no -repl
 		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
-	driver d(o);
-	if (o.enabled(L"repl")) repl(d);
+	if (o.enabled(L"repl")) repl r(o);
+	else {
+		driver d(o);
+		d.run();
+		//DBG(d.info(o::dbg()<<endl); o::dbg()<<endl;)
+		NDBG(if (o.enabled(L"dump") && d.result)
+			d.out(output::to(L"dump"));)
+		if (o.enabled(L"csv")) d.save_csv();
+	}
 	onexit = true;
 //	print_memos_len();
 	return 0;

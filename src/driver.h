@@ -36,6 +36,9 @@ struct prog_data {
 //	matpairs r;
 //	matrix goals, tgoals;
 	bool bwd = false;
+	size_t n = 0;
+	size_t start_step = 0;
+	size_t elapsed_steps = 0;
 };
 
 class driver {
@@ -91,18 +94,19 @@ class driver {
 //		const std::map<term, std::vector<term>>&, std::set<term>& done);
 //	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(wstr s);
-	void prog_run(raw_progs& rp, size_t n, strs_t& strtrees);
+	void new_sequence();
+	bool prog_run(raw_progs& rp, size_t n, nlevel steps=0, size_t brstep=0);
 	driver(raw_progs, options o);
 	driver(raw_progs);
 	size_t load_stdin();
-	bool pfp();
 	std::wstring std_input;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
 	tables *tbl = 0;
 	void output_pl(const raw_prog& p) const;
 	std::set<lexeme> vars;
-	void run_(raw_progs &rp);
+	raw_progs rp;
+	bool running = false;
 public:
 	bool result = true;
 	options opts;
@@ -116,7 +120,13 @@ public:
 	driver(char *s);
 	~driver();
 
-	void run(raw_progs rp) { run_(rp); };
+	void info(std::wostream& os);
+	void list(std::wostream& os, size_t p = 0);
+	void add(std::wstring& prog, bool newseq = true);
+	void restart();
+	bool run(size_t steps = 0, size_t br_on_step=0, bool br_on_fp = false);
+	bool step(size_t steps = 1, size_t br_on_step=0, bool br_on_fp = false);
+	size_t nsteps() { return tbl->step(); };
 	void out(std::wostream& os) const { if (tbl) tbl->out(os); };
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); };
 #ifdef __EMSCRIPTEN__

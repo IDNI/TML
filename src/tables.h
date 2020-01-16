@@ -89,11 +89,9 @@ struct alt : public std::vector<body*> {
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
 //	static std::set<alt*, ptrcmp<alt>> &s;
-	bool isbltin = false; // or bltin_type...
-	int_t bltinout; // TODO: use bltinargs instead
-	size_t bltinsize;
-	lexeme bltintype;
+	int_t idbltin = -1; //lexeme bltintype;
 	ints bltinargs;
+	size_t bltinsize;
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
@@ -131,6 +129,9 @@ struct table {
 	std::vector<size_t> r;
 	bool ext = true; // extensional
 	bool unsat = false, tmp = false;
+	int_t idbltin = -1;
+	ints bltinargs;
+	size_t bltinsize;
 	bool commit(DBG(size_t));
 };
 
@@ -255,7 +256,7 @@ private:
 	body get_body(const term& t, const varmap&, size_t len) const;
 //	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
-	term from_raw_term(const raw_term&, const size_t orderid = 0);
+	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	uints addtail(size_t len1, size_t len2) const;
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
@@ -263,7 +264,7 @@ private:
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
-		size_t len = 0) const;
+		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
 	std::vector<env> varbdd_to_subs(const alt* a, cr_spbdd_handle v) const;
 	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
@@ -292,7 +293,6 @@ private:
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const std::wstring& s);
 	lexeme get_var_lexeme(int_t i);
-	void add_prog(const raw_prog& p, const strs_t&);
 	void add_prog(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
 	char fwd() noexcept;
@@ -355,9 +355,12 @@ public:
 	tables(bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
-	bool run_prog(const raw_prog& p, const strs_t& strs);
+	size_t step() { return nstep; }
+	void add_prog(const raw_prog& p, const strs_t& strs);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
+		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
-	bool pfp(size_t nsteps = 0);
+	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	void out(std::wostream&) const;
 	void out(const rt_printer&) const;
 #ifdef __EMSCRIPTEN__

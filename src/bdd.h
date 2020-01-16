@@ -82,7 +82,7 @@ spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
 spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
-spbdd_handle bdd_or_many(const bdd_handles& v);
+spbdd_handle bdd_or_many(bdd_handles v);
 spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools& b);
 spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
 spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
@@ -126,7 +126,7 @@ class bdd {
 		cr_spbdd_handle z);
 	friend spbdd_handle bdd_and_many(bdd_handles v);
 	friend spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
-	friend spbdd_handle bdd_or_many(const bdd_handles& v);
+	friend spbdd_handle bdd_or_many(bdd_handles v);
 	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
 		const uints& m);
 	friend spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle,
@@ -208,7 +208,7 @@ class bdd {
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
 
-	//XXX: work-in-progress 
+	//XXX: work-in-progress
 	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
 	static int_t bdd_xor(int_t x, int_t y);
 	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
@@ -227,6 +227,7 @@ public:
 	}
 	static void init();
 	static void gc();
+	static std::wostream& stats(std::wostream& os);
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
 			: V[x].v < 0 ? V[x].l : V[x].h;

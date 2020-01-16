@@ -163,15 +163,18 @@ void options::setup() {
 	add_bool(L"repl",    L"run TML in REPL mode");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
+	add_bool(L"optimize",L"optimize and show more benchmarks");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			output::set_name(v.get_string());
 		})
 		.description(L"name used for @name output"));
+	add_output    (L"dump",        L"dump output     (@stdout by default)");
 	add_output_alt(L"output", L"o",L"standard output (@stdout by default)");
 	add_output    (L"error",       L"errors          (@stderr by default)");
 	add_output    (L"info",        L"info            (@stderr by default)");
 	add_output    (L"debug",       L"debug output");
+	add_output    (L"benchmarks",  L"benchmarking results");
 	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
 	add_output    (L"repl-output", L"repl output");
 	add_output(L"xsb",     L"attempt to translate program into XSB");
@@ -189,9 +192,12 @@ void options::init_defaults() {
 	parse({
 		L"--run",
 		L"--output",      L"@stdout",
+		L"--dump",        L"@stdout",
 		L"--error",       L"@stderr",
 		L"--info",        L"@stderr",
-		L"--repl-output", L"@stdout"
+		L"--repl-output", L"@stdout",
+		L"--benchmarks",  L"@stdout",
+		L"--optimize"
 	}, true);
 	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
 }

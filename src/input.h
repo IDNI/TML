@@ -34,7 +34,7 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 static const std::set<std::wstring> str_bltins =
 	{ L"alpha", L"alnum", L"digit", L"space", L"printable", L"count",
-		L"rnd", L"print" };
+		L"rnd", L"print", L"lprint", L"halt", L"fail" };
 
 struct elem {
 	enum etype {
@@ -194,7 +194,6 @@ struct raw_prog {
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
-	dict_t dict;
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 	bool parse(const lexemes& l, size_t& pos);
@@ -203,7 +202,8 @@ struct raw_prog {
 struct raw_progs {
 	std::vector<raw_prog> p;
 	raw_progs(FILE*);
-	raw_progs(const std::wstring& s);
+	raw_progs(const std::wstring& s = L"");
+	void parse(const std::wstring& s, bool newseq = true);
 };
 
 void parse_error(cws o, std::wstring e);
@@ -216,6 +216,8 @@ void parse_error(std::wstring e, std::wstring s);
 std::wostream& operator<<(std::wostream& os, const directive& d);
 std::wostream& operator<<(std::wostream& os, const elem& e);
 std::wostream& operator<<(std::wostream& os, const raw_term& t);
+std::wostream& operator<<(std::wostream& os,
+	const std::pair<raw_term, std::wstring>& p);
 std::wostream& operator<<(std::wostream& os, const raw_rule& r);
 std::wostream& operator<<(std::wostream& os, const raw_prog& p);
 std::wostream& operator<<(std::wostream& os, const raw_progs& p);

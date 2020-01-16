@@ -53,9 +53,9 @@ lexeme lex(pcws s) {
 
 	//ALU operators:
 	//SHR, SHL, XXX: EQ?
-	if (**s == L'>' && !(*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
-	if (**s == L'<' && !(*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
-	//if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
+	//if (**s == L'>' && !(*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
+	//if (**s == L'<' && !(*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
+	////if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
 	/*
 	//ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR
 	//XXX: lexed below with the rest of single character symbols
@@ -67,7 +67,8 @@ lexeme lex(pcws s) {
 	*/
 
 	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
-	if (**s == L'<') {
+	//if (**s == L'<') {
+	if (**s == L'<' && !(*(*s + 1) == L'<')) {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
 		// D: lex/parse: <file> parsing is moved to directive::parse, tag just <
@@ -75,7 +76,8 @@ lexeme lex(pcws s) {
 		//while (*++*s != L'>') if (!**s) parse_error(t, err_fname);
 		//return { t, ++(*s) };
 	}
-	if (**s == L'>') {
+	//if (**s == L'>') {
+	if (**s == L'>' && !(*(*s + 1) == L'>')) {
 		if (*(*s + 1) == L'=')
 			return *s += 2, lexeme{ *s - 2, *s };
 		return ++ * s, lexeme{ *s - 1, *s };
@@ -682,20 +684,18 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 
 raw_progs::raw_progs(FILE* f) : raw_progs(file_read_text(f)) {}
 
-raw_progs::raw_progs(const std::wstring& s) {
+raw_progs::raw_progs(const std::wstring& s) { parse(s); }
+
+void raw_progs::parse(const std::wstring& s, bool newseq) {
 	try {
+		if (s == L"") return;
 		size_t pos = 0;
 		lexemes l = prog_lex(wcsdup(s.c_str()));
 		if (!l.size()) return;
-		auto prepare_builtins = [this](raw_prog& x) {
-			// BLTINS: prepare builtins (dict)
-			for (const wstring& s : str_bltins)
-				x.builtins.insert(x.dict.get_lexeme(s));
-		};
 		if (*l[pos][0] != L'{') {
-			raw_prog& x = p.emplace_back();
+			raw_prog& x = !p.size() || newseq
+				? p.emplace_back() : p.back();
 			//raw_prog x;
-			prepare_builtins(x);
 			if (!x.parse(l, pos))
 				parse_error(l[pos][0],
 					err_rule_dir_prod_expected, l[pos]);
@@ -704,7 +704,6 @@ raw_progs::raw_progs(const std::wstring& s) {
 			// emplace to avoid copying dict etc. (or handle to avoid issues)
 			raw_prog& x = p.emplace_back(); // if needed on err: p.pop_back();
 			//raw_prog x;
-			prepare_builtins(x);
 			if (++pos, !x.parse(l, pos))
 				parse_error(l[pos][0], err_parse, l[pos]);
 			//if (p.push_back(x), pos==l.size() || *l[pos++][0]!=L'}')
