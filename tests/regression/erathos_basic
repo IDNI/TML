@@ -1,5 +1,5 @@
-# Erathostenes sieve test
-# finds all primes <= 32   
+# Sieve of Eratosthenes test
+# finds all primes <= 31   
 U(1023).
 A(?x) :- 2 <= ?x, ?x <= 31.
 B(?x) :-  2 <= ?x, ?x <= 31.
