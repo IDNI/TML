@@ -55,7 +55,7 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit,
 
 bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
-	DBG(wcout << "ALU handler ... " << endl;)
+	DBG(o::dbg() << "ALU handler ... " << endl;)
 	spbdd_handle q;
 
 	switch (t.alu_op) {
@@ -119,11 +119,11 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 			//	if (t[2] < 0) perm[i*args+2] = perm[i*args+2]-(i*nconsts) ;
 			//}
 			//for (size_t i = 0; i < (3*bits); i++)
-			//	wcout << L" --- " << perm[i]; wcout << endl;
+			//	o::dbg() << L" --- " << perm[i]; o::dbg() << endl;
 
 			uints perm2 = get_perm(t, a.vm, a.varslen);
 			//for (size_t i = 0; i < (3*bits); i++)
-			//	wcout << L" --- " << perm2[i]; wcout << endl;
+			//	o::dbg() << L" --- " << perm2[i]; o::dbg() << endl;
 
 			q = q^perm2;
 
@@ -131,13 +131,13 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
 		case SHR:
 		{
-			DBG(wcout << "SHR handler ... " << endl;)
+			DBG(o::dbg() << "SHR handler ... " << endl;)
 			q = bdd_handle::T;
 		} break;
 
 		case SHL:
 		{
-			DBG(wcout << "SHL handler ... " << endl;)
+			DBG(o::dbg() << "SHL handler ... " << endl;)
 			size_t bit_0 = a.vm.at(t[0]);
 			size_t bit_2 = a.vm.at(t[2]);
 			assert(mknum(1) == t[1] && "only << 1 supported");
@@ -146,7 +146,7 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
 		case MULT:
 		{
-			DBG(wcout << "MULT handler ... " << endl;)
+			DBG(o::dbg() << "MULT handler ... " << endl;)
 
 			size_t args = 3; //t.size();
 			size_t n_vars = 0;
@@ -251,7 +251,7 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
 spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 
-	wcout << L" ------------------- BITS  :" << bits << L"\n";
+	o::dbg() << L" ------------------- BITS  :" << bits << L"\n";
 
 	//return bdd_handle::F;
 
@@ -354,14 +354,14 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 
 	bdd::gc();
 
-	wcout << L" ------------------- bdd mult  :\n";
+	o::dbg() << L" ------------------- bdd mult  :\n";
 
 	uints perm1;
 	perm1 = perm_init((bits-2)*n_args);
 	for (size_t i = 0; i < (bits-2)*n_args; i++) {
-		//wcout << L" perminit " << perm1[i] << L"\n";
+		//o::dbg() << L" perminit " << perm1[i] << L"\n";
 		perm1[i] = ((bits-2-1-(i/n_args))*n_args) + i % n_args;
-		//wcout << L" newperm " << perm1[i] << L"\n";
+		//o::dbg() << L" newperm " << perm1[i] << L"\n";
 	}
 	s0 = s0^perm1;
 	s1 = s1^perm1;
@@ -370,17 +370,17 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 		accs[i] = accs[i]^perm1;
 	}
 
-	wcout << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
-	::out(wcout, s0)<<endl<<endl;
-	wcout << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
-	::out(wcout, s1)<<endl<<endl;
+	o::dbg() << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
+	::out(o::dbg(), s0)<<endl<<endl;
+	o::dbg() << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
+	::out(o::dbg(), s1)<<endl<<endl;
 
 	bdd::gc();
 
 	spbdd_handle test = bdd_mult_dfs(s0,s1,accs, bits-2, n_args);
 
-	wcout << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
-	::out(wcout, test)<<endl<<endl;
+	o::dbg() << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
+	::out(o::dbg(), test)<<endl<<endl;
 
 	test = test^perm1 && ::from_bit(pos(1, 3, n_args),true) &&
 			::from_bit(pos(0, 3, n_args),false);
@@ -393,7 +393,7 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 spbdd_handle tables::bdd_add_test(size_t n_vars) {
 
 
-	wcout << L" ------------------- bdd adder  :\n";
+	o::dbg() << L" ------------------- bdd adder  :\n";
 
 	// TEST
 	spbdd_handle s0 = bdd_handle::T;
@@ -433,23 +433,23 @@ spbdd_handle tables::bdd_add_test(size_t n_vars) {
 	uints perm1;
 	perm1 = perm_init((bits-2)*n_vars);
 	for (size_t i = 0; i < (bits-2)*n_vars; i++) {
-		//wcout << L" perminit " << perm1[i] << L"\n";
+		//o::dbg() << L" perminit " << perm1[i] << L"\n";
 		perm1[i] = ((bits-2-1-(i/n_vars))*n_vars) + i % n_vars;
-		//wcout << L" newperm " << perm1[i] << L"\n";
+		//o::dbg() << L" newperm " << perm1[i] << L"\n";
 	}
 	s0 = s0^perm1;
 	s1 = s1^perm1;
 	bdd::gc();
 
-	wcout << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
-	::out(wcout, s0)<<endl<<endl;
-	wcout << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
-	::out(wcout, s1)<<endl<<endl;
+	o::dbg() << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
+	::out(o::dbg(), s0)<<endl<<endl;
+	o::dbg() << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
+	::out(o::dbg(), s1)<<endl<<endl;
 
 	spbdd_handle test = bdd_adder(s0,s1);
 
-	wcout << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
-	::out(wcout, test)<<endl<<endl;
+	o::dbg() << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
+	::out(o::dbg(), test)<<endl<<endl;
 
 	test = test^perm1 && ::from_bit(pos(1, 2, n_vars),true) && ::from_bit(pos(0, 2, n_vars),false);
 
@@ -466,16 +466,16 @@ spbdd_handle tables::bdd_test(size_t n_vars) {
 	s0 = s0 || from_sym( 0,  3, mknum(6));
 	s0 = s0 || from_sym( 0,  3, mknum(7));
     //s0 = s0 || from_sym( 0,  3, mknum(1));
-	wcout << L" ------------------- S0 " << L":\n";
-	::out(wcout, s0)<<endl<<endl;
+	o::dbg() << L" ------------------- S0 " << L":\n";
+	::out(o::dbg(), s0)<<endl<<endl;
 
 	//spbdd_handle s1 = bdd_handle::T;
 	//s1 = from_sym( 0,  2, mknum(1));
 	//s1 = s1 || from_sym( 0,  2, mknum(7));
 	////s1 = s1 || from_sym( 0,  3, mknum(2));
 	////s1 = s1 || from_sym( 0,  3, mknum(3));
-	wcout << L" ------------------- S1 " << L":\n";
-    ::out(wcout, s1)<<endl<<endl;
+	o::dbg() << L" ------------------- S1 " << L":\n";
+    ::out(o::dbg(), s1)<<endl<<endl;
 
     // s0, s1
 	// && intersection
@@ -493,12 +493,12 @@ spbdd_handle tables::bdd_test(size_t n_vars) {
 	s2 = s2 || from_sym( 0,  3, mknum(7));
 	//s2 = s2 || from_sym( 0,  3, mknum(2));
 
-	wcout << L" ------------------- S2 " << ::bdd_root(s2) << L" :\n";
-	::out(wcout, s2)<<endl<<endl;
+	o::dbg() << L" ------------------- S2 " << ::bdd_root(s2) << L" :\n";
+	::out(o::dbg(), s2)<<endl<<endl;
 
 	spbdd_handle r = s0 && s2;
-	wcout << L" ------------------- &&:union " << bdd_nvars(r )<< L" :\n";
-	::out(wcout, r)<<endl<<endl;
+	o::dbg() << L" ------------------- &&:union " << bdd_nvars(r )<< L" :\n";
+	::out(o::dbg(), r)<<endl<<endl;
 
 	//spbdd_handle test = bdd_ite_var(pos(4, 0, 3), s0 && s2 &&
 	//	 ::from_bit(pos(4, 0, 3), 1), ::from_bit(pos(4, 0, 3), 0));
@@ -628,10 +628,10 @@ spbdd_handle tables::bdd_test(size_t n_vars) {
 	// call to bitwise over bdds handlers...
 	// ***
 
-	//wcout << L" ------------------- bitwise_and  :\n";
+	//o::dbg() << L" ------------------- bitwise_and  :\n";
 	//spbdd_handle test = bdd_bitwise_and(s0,s1) && ::from_bit(pos(1, var2, n_vars),true) && ::from_bit(pos(0, var2, n_vars),false);
 
-	wcout << L" ------------------- bitwise_xor  :\n";
+	o::dbg() << L" ------------------- bitwise_xor  :\n";
 	spbdd_handle test = bdd_bitwise_xor(s0,s1) && ::from_bit(pos(1, 2, n_vars),true) && ::from_bit(pos(0, 2, n_vars),false);
 
 	return test;
@@ -726,14 +726,14 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 			{	if (elem > bsize)
 					bsize = elem;
 				count++;
-				//wcout << elem << L" , ";
+				//o::dbg() << elem << L" , ";
 			}
-			wcout <<  L" BDD size for adder bit " << b-2 << L" : "
+			o::dbg() <<  L" BDD size for adder bit " << b-2 << L" : "
 				  <<  bsize  << L" , "  << count << endl;
 		}
 
-		//wcout << L" ---------------------:\nr " << L": ";
-		//								::out(wcout, r)<<endl<<endl;
+		//o::dbg() << L" ---------------------:\nr " << L": ";
+		//								::out(o::dbg(), r)<<endl<<endl;
 		bdd::gc();
 
 	}
@@ -746,9 +746,9 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 	{	if (elem > bsize)
 			bsize = elem;
 		count++;
-		//wcout << elem << L" , ";
+		//o::dbg() << elem << L" , ";
 	}
-	wcout <<  L" BDD size for adder eq  : " <<  bsize  << L" , " \
+	o::dbg() <<  L" BDD size for adder eq  : " <<  bsize  << L" , " \
 		  << count << endl;
 
  	return r;
@@ -807,7 +807,7 @@ spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
 
 	if ((it = carrymemo.find(x = { var0, var1, n_vars, bits, i, j })) !=
 			carrymemo.end()) {
-		//wcout << L" [ memo carry]: " << i << L" -- " << j << endl;
+		//o::dbg() << L" [ memo carry]: " << i << L" -- " << j << endl;
 		return it->second;
 	}
 
@@ -839,12 +839,12 @@ spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
 spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 		uint_t j) {
 
-	//wcout << L" [ ADDITE : " << bits << L" ]: " << i << L" -- " << j << endl;
+	//o::dbg() << L" [ ADDITE : " << bits << L" ]: " << i << L" -- " << j << endl;
 	static alumemo x;
 	static map<alumemo, spbdd_handle>::const_iterator it;
 	if ((it = addermemo.find(x = { var0, var1, n_vars, bits, i, j })) !=
 			addermemo.end()) {
-		//wcout << L" [adder memo]: " << i << L" -- " << j << endl;
+		//o::dbg() << L" [adder memo]: " << i << L" -- " << j << endl;
 		return it->second;
 	}
 
@@ -856,7 +856,7 @@ spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 	}
 	//--
 
-	//wcout << L" [ ADDITE ]: " << i << L" -- " << j << endl;
+	//o::dbg() << L" [ ADDITE ]: " << i << L" -- " << j << endl;
 	else if (i == 2 || j == 2) {
 
 			r = ::from_bit(pos(j, var0, n_vars),true) &&
@@ -922,15 +922,15 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 
 		bdd::gc();
 
-		//wcout << L" -------------------ACC BIT " << b << L":\n";
-		//	::out(wcout, acc_bit)<<endl<<endl;
+		//o::dbg() << L" -------------------ACC BIT " << b << L":\n";
+		//	::out(o::dbg(), acc_bit)<<endl<<endl;
 
 		//equality
 		r = r && bdd_ite(acc_bit ,
 				::from_bit(pos(b, var2, n_vars), true),
 				::from_bit(pos(b, var2, n_vars), false));
 
-		wcout << L" ------------------- BIT " << b << L" of " << bits-1 << L" done\n";
+		o::dbg() << L" ------------------- BIT " << b << L" of " << bits-1 << L" done\n";
 
 	}
 
@@ -943,9 +943,9 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 	{	if (elem > bsize)
 			bsize = elem;
 		count++;
-		wcout << elem << L" , ";
+		o::dbg() << elem << L" , ";
 	}
-	wcout <<  L" BDD size for " << bits-2 << L" : " <<  bsize  << L" , "  << count << endl;
+	o::dbg() <<  L" BDD size for " << bits-2 << L" : " <<  bsize  << L" , "  << count << endl;
 	*/
 	//*sizes.end()
 
@@ -1018,7 +1018,7 @@ spbdd_handle tables::shr_test(size_t var0, int_t n1, size_t var2,
 	perm1 = perm_init(2*bits);
 	for (size_t i = 0; i < 2*(bits-3); i++) {
 		perm1[i] = perm1[i]+2;
-		wcout << perm1[i] << L" --- " << perm1[i]+2 << L"\n";
+		o::dbg() << perm1[i] << L" --- " << perm1[i]+2 << L"\n";
 	}
 
 	spbdd_handle shr = ex0^perm1 && ::from_bit(pos(bits-1, var0, n_vars), false);
@@ -1038,15 +1038,15 @@ spbdd_handle tables::shl(size_t var0, int_t n1, size_t var2,
 	for (size_t i = 0; i < (2*bits); i++)
 		exvec.push_back(false);
 	exvec[2*(bits-3)] = true;
-	//for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << exvec[i]; wcout << endl;
+	//for (size_t i = 0; i < (2*bits); i++) o::dbg() << L" --- " << exvec[i]; o::dbg() << endl;
 
 	uints perm1;
 	perm1 = perm_init(2*bits);
-	// for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
+	// for (size_t i = 0; i < (2*bits); i++) o::dbg() << L" --- " << perm1[i]; o::dbg() << endl;
 	for (size_t i = 0; i < (bits-3); i++) {
 		perm1[2*i] = perm1[2*i]+2;
 	}
-	//for (size_t i = 0; i < (2*bits); i++) wcout << L" --- " << perm1[i]; wcout << endl;
+	//for (size_t i = 0; i < (2*bits); i++) o::dbg() << L" --- " << perm1[i]; o::dbg() << endl;
 
 	n = n/exvec;
 

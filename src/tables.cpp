@@ -1750,7 +1750,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			// just equate last var (output) with the count
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
 			v1.push_back(x);
-			wcout << L"alt_query (cnt):" << cnt << L"" << endl;
+			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
 		}
 		else if (bltintype == L"rnd") {
 			DBG(assert(a.bltinargs.size() == 3););
@@ -1767,7 +1767,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(rnd));
 			v1.push_back(x);
-			wcout << L"alt_query (rnd):" << rnd << L"" << endl;
+			o::dbg() << L"alt_query (rnd):" << rnd << L"" << endl;
 		}
 		else if (bltintype == L"print") {
 			wstring ou{L"output"};
@@ -1854,20 +1854,20 @@ char tables::fwd() noexcept {
 					// do what we have to do, we have a new tuple
 					lexeme bltintype = dict.get_bltin(tbl.idbltin);
 					if (bltintype == L"lprint") {
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						// this is supposed to be formatted r-term printout
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:"};
 						os << L"printing: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"halt") {
 						ishalt = true;
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program halt: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"fail") {
 						ishalt = isfail = true;
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program fail: " << rtp << L'.' << endl;
 					}

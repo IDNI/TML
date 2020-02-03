@@ -80,7 +80,7 @@ int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
 	  int_t c = 0;
 	  uint_t pos = 0;
 
-	  wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	  o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 
 	  //XXX: assumes var a < var b
 	  if (a.v > b.v + 1 && b.v != 0) {
@@ -95,7 +95,7 @@ int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
 	  else
 	    pos = b.v + 1;
 
-	  wcout << L" ------------------- pos = " << pos << L"\n";
+	  o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	  // ---------------------------------------------------------------------------
 
@@ -244,7 +244,7 @@ int_t bdd::bitwiseXOR(int_t a_in, int_t b_in) {
 	int_t c = 0;
 	int_t pos = 0;
 
-	wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 
 	//XXX: assumes var a < var b
 	if (a.v > b.v + 1 && b.v != 0) {
@@ -259,7 +259,7 @@ int_t bdd::bitwiseXOR(int_t a_in, int_t b_in) {
 	else
 		pos = b.v + 1;
 
-	//wcout << L" ------------------- pos = " << pos << L"\n";
+	//o::dbg() << L" ------------------- pos = " << pos << L"\n";
 	// ---------------------------------------------------------------------------
 
 	if (a_in == T && b_in == T)
@@ -284,12 +284,12 @@ int_t bdd::ADDER(int_t a_in, int_t b_in, bool carry, size_t bit) {
 	int_t c = 0;
 	int_t pos = 0;
 
-	//wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	//o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 
 	pos = (bit + 1) * 3;
 	if (a.v > pos) a.h = a_in, a.l = a_in;
 	if (b.v > pos) b.h = b_in, b.l = b_in;
-	wcout << L" ------------------- pos = " << pos << L"\n";
+	o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	// ---------------------------------------------------------------------------
 
@@ -335,11 +335,11 @@ int_t bdd::ADDER_IDX(int_t a_in, int_t b_in, bool carry, size_t bit, size_t dept
 	int_t c = 0;
 	int_t pos = 0;
 
-	//wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	//o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 	pos = bit * n_args + 5 /*accs_offset*/ + depth  + 1;
 	if (a.v > pos) {a.h = a_in, a.l = a_in;}
 	if (b.v > pos) {b.h = b_in, b.l = b_in;}
-	//wcout << L" ------------------- pos = " << pos << L"\n";
+	//o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	// --------------------------------------------------------------------------
 
@@ -375,7 +375,7 @@ int_t bdd::ADDER_ACCS(int_t b_in, int_t *accs, size_t depth, size_t bits, size_t
 
 	perm1 = perm_init(tbits);
 
-	//wcout << L"[ADDER_ACCS] " << depth << L" " << bits << L" " << n_args << L"\n";
+	//o::dbg() << L"[ADDER_ACCS] " << depth << L" " << bits << L" " << n_args << L"\n";
 
 	size_t base = 4; // = number of arguments of the alt
 
@@ -393,7 +393,7 @@ int_t bdd::ADDER_ACCS(int_t b_in, int_t *accs, size_t depth, size_t bits, size_t
 	//return acc_false_aux;
 
 	for (size_t i = 1; n_args*i+base+depth < tbits ; i++) {
-		wcout << perm1[n_args*i+base + depth] << L" --- " << perm1[n_args*i+base+depth]-n_args << L"\n";
+		o::dbg() << perm1[n_args*i+base + depth] << L" --- " << perm1[n_args*i+base+depth]-n_args << L"\n";
 		perm1[n_args*i+base+depth] = perm1[n_args*i+base+depth]-n_args;
 	}
 
@@ -462,7 +462,7 @@ int_t bdd::SHR(int_t a_in, size_t depth, size_t bits, size_t n_args) {
 	int_t acc_aux = bdd_permute_ex(a_in, exvec ,perm1);
 
 	for (size_t i = 1; n_args*i+base+depth < tbits ; i++) {
-		//wcout << perm1[n_args*i+base + depth] << L" --- " << perm1[n_args*i+base+depth]-n_args << L"\n";
+		//o::dbg() << perm1[n_args*i+base + depth] << L" --- " << perm1[n_args*i+base+depth]-n_args << L"\n";
 		perm1[n_args*i+base+depth] = perm1[n_args*i+base+depth]-n_args;
 	}
 	acc_aux = bdd_permute(acc_aux, perm1, memos_perm[perm1]);
@@ -480,16 +480,16 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 	int_t c;
 	int_t pos = 4 + n_args * depth;
 
-	wcout << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L"\n";
-	wcout << L" ------------------- pos = " << pos << L"\n";
+	o::dbg() << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L"\n";
+	o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	if (a_in == F || b_in == F || bit_acc == false) {
-		wcout << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = F \n";
+		o::dbg() << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = F \n";
 		return  F;
 	}
 	else if (a_in == T && bit_acc == true && depth == bits)// && b_in == T)
 		{
-		wcout << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = T \n";
+		o::dbg() << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = T \n";
 		return T;
 	}
 	//XXX else if (a_in == T && bit_acc == false)// && b_in == T)
@@ -502,9 +502,9 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 		//XXX avoid addition and recursive in case a.h = f
 		accs[depth+1] = ADDER_ACCS(b_in, accs, depth, bits, n_args);
 
-		//wcout << L"##[ ACC TRUE " << depth+1 << L"]:" << endl;
-		//out(wcout, accs[depth+1]);
-		//wcout <<endl<<endl;
+		//o::dbg() << L"##[ ACC TRUE " << depth+1 << L"]:" << endl;
+		//out(o::dbg(), accs[depth+1]);
+		//o::dbg() <<endl<<endl;
 
 		bdd aux_acc_true = get(accs[depth+1]);
 		int_t aux_acc_true_h = add(aux_acc_true.v, aux_acc_true.h, F) ;
@@ -512,9 +512,9 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 
 		accs[depth+1] = aux_acc_true_h;
 
-		//wcout << L"##[ ACC TRUE check" << depth+1 << L"]:" << endl;
-		//out(wcout, accs[depth+1]);
-		//wcout <<endl<<endl;
+		//o::dbg() << L"##[ ACC TRUE check" << depth+1 << L"]:" << endl;
+		//out(o::dbg(), accs[depth+1]);
+		//o::dbg() <<endl<<endl;
 
 
 		int_t aux00  = MULT_DFS(a.h, b_in, accs, depth+1, bits, n_args, aux_acc_true.h != F || aux_acc_true.v > n_args);
@@ -522,9 +522,9 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 		//bdd aux_acc_true_h = aux_acc_true.h;
 		accs[depth+1] = aux_acc_true_l;
 
-		wcout << L"##[ ACC TRUE check" << depth+1 << L"]:" << endl;
-		out(wcout, accs[depth+1]);
-		wcout <<endl<<endl;
+		o::dbg() << L"##[ ACC TRUE check" << depth+1 << L"]:" << endl;
+		out(o::dbg(), accs[depth+1]);
+		o::dbg() <<endl<<endl;
 
 		int_t aux10  = MULT_DFS(a.h, b_in, accs, depth+1, bits, n_args, aux_acc_true.l != F || aux_acc_true.v > n_args);
 
@@ -532,9 +532,9 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 		accs[depth+1] = COPY(accs[depth]);
 		accs[depth+1] = SHR(accs[depth+1], depth+1, bits, n_args);
 
-		wcout << L"##[ ACC FALSE" << depth+1 << L"]:" << endl;
-		out(wcout, accs[depth+1]);
-		wcout <<endl<<endl;
+		o::dbg() << L"##[ ACC FALSE" << depth+1 << L"]:" << endl;
+		out(o::dbg(), accs[depth+1]);
+		o::dbg() <<endl<<endl;
 
 
 		bdd aux_acc_false = get(accs[depth+1]);
@@ -543,9 +543,9 @@ int_t bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bi
 
 		c = add(pos, bdd_or(aux00, aux01), bdd_or(aux10, aux11));
 
-		wcout << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = \n";
-		out(wcout, c);
-		wcout <<endl<<endl;
+		o::dbg() << L"[MULT_DFS] " << depth << L" " << bits << L" " << n_args <<  L" " << bit_acc << L" = \n";
+		out(o::dbg(), c);
+		o::dbg() <<endl<<endl;
 
 		return c;
 
