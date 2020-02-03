@@ -100,6 +100,7 @@ void repl::loop() {
 		if       (l == L"restart") restart();
 		else if  (l == L"reparse") reparse();
 		else if  (l == L"reset")   reset();
+		else if  (l == L"dict") {  d->out_dict(os); continue; }
 		else if  (l == L"q")   break; // quit
 		else if ((l == L"?") ||
 			 (l == L"h"))  help();
@@ -119,6 +120,13 @@ void repl::loop() {
 		else if  (size_t s =   parse_size_t(l, L"s")) step(s);
 		else if  (l == L"b")   break_on_fp();
 		else if  (size_t s =   parse_size_t(l, L"b")) break_on_step(s);
+		else if  (l == L"ps")
+			d->set_print_step(toggle(L"print steps", ps));
+		else if  (l == L"pu")
+			d->set_print_updates(toggle(L"print updates", pu));
+		else if  (l == L"cu")
+			d->set_populate_tml_update(
+				toggle(L"collect updates into tml_update", cu));
 		else
 			add(l);
 		if (ai) info();
@@ -139,7 +147,11 @@ void repl::help() const {
 		<< L"#\ts       - run pfp step\n"
 		<< L"#\ts NUM   - run NUM pfp steps\n"
 		<< L"#\td       - dump db (to the dump output)\n"
+		<< L"#\tdict    - print internal string dictionary\n"
 		<< L"#\tgc      - bdd garbage collection\n"
+		<< L"#\tcu      - toggle collect updates\n"
+		<< L"#\tps      - toggle print steps\n"
+		<< L"#\tpu      - toggle print updates\n"
 		<< L"#\tar      - toggle auto run\n"
 		<< L"#\tap      - toggle auto print\n"
 		<< L"#\tai      - toggle auto info\n"
@@ -152,8 +164,9 @@ void repl::help() const {
 		<< L"#\tq       - quit" << endl;
 }
 
-void repl::toggle(const wstring& name, bool &setting) {
+bool repl::toggle(const wstring& name, bool &setting) {
 	setting = !setting;
 	os << L"# Changed '" << name << "' to "
 		<< (setting ? "true" : "false") << endl;
+	return setting;
 }

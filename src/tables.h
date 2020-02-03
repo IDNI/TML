@@ -178,6 +178,7 @@ private:
 	std::wostream& print(std::wostream& os, const term& h,
 		const std::set<term>& b) const;
 	std::wostream& print(std::wostream& os, const flat_prog& p) const;
+	std::wostream& print(std::wostream& os, const rule& r) const;
 
 	nlevel nstep = 0;
 	std::vector<table> tbls;
@@ -315,6 +316,13 @@ private:
 	std::set<int_t> str_rels;
 //	std::function<int_t(void)>* get_new_rel;
 
+	// tml_update population
+	int_t rel_tml_update, sym_add, sym_del;
+	void init_tml_update();
+	void add_tml_update(const term& rt, bool neg);
+	std::wostream& decompress_update(std::wostream& os, spbdd_handle& x,
+		const rule& r); // decompress for --print-updates and tml_update
+
 	bool from_raw_form(const raw_form_tree *rs, form *&froot);
 	bool to_pnf( form *&froot);
 
@@ -367,6 +375,11 @@ public:
 	void out(emscripten::val o) const;
 #endif
 	void set_proof(bool v) { bproof = v; }
+
+	std::wostream& print_dict(std::wostream& os) const;
+	bool populate_tml_update = false;
+	bool print_updates       = false;
+	bool print_steps         = false;
 };
 
 struct transformer;

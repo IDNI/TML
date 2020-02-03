@@ -24,7 +24,7 @@ public:
 	dict_t();
 	dict_t(const dict_t& d) : syms_dict(d.syms_dict), vars_dict(d.vars_dict),
 		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), syms(d.syms),
-		rels(d.rels), bltins(d.bltins), strs_extra(d.strs_extra), op(d.op), 
+		rels(d.rels), bltins(d.bltins), strs_extra(d.strs_extra), op(d.op),
 		cl(d.cl) {}
 	lexeme op, cl;
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
@@ -46,9 +46,12 @@ public:
 	dict_t& operator=(const dict_t& d) {
 		return syms_dict = d.syms_dict, vars_dict = d.vars_dict,
 			rels_dict = d.rels_dict, bltins_dict = d.bltins_dict, syms = d.syms,
-			rels = d.rels, bltins = d.bltins, strs_extra = d.strs_extra, 
+			rels = d.rels, bltins = d.bltins, strs_extra = d.strs_extra,
 			op = d.op, cl = d.cl, *this;
 	}
 	~dict_t();
 };
+
+std::wostream& operator<<(std::wostream& os, const dict_t& d);
+
 #endif // __DICT_H__
