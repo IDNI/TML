@@ -104,7 +104,7 @@ spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
-spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, spbdd_handle *z, size_t bits, size_t n_vars);
+spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits, size_t n_vars);
 
 class bdd {
 	friend class bdd_handle;
@@ -154,7 +154,7 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
-	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, spbdd_handle *z, size_t bits , size_t n_vars );
+	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	inline static bdd get(int_t x) {
 		if (x > 0) {
@@ -214,11 +214,43 @@ class bdd {
 	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
 	static int_t bitwiseXOR(int_t a_in, int_t b_in); //, uint_t pos);
 	static int_t ADDER(int_t a_in, int_t b_in, bool carry, size_t bit);
-	static int_t ADDER_ACCS(int_t b_in, int_t *accs, size_t depth, size_t bits, size_t n_args);
-	static int_t ADDER_IDX(int_t a_in, int_t b_in, bool carry, size_t bit, size_t depth, size_t n_args);
-	static int_t MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits, size_t n_args, bool bit_acc) ;
+
+	typedef enum { L, H, X, U } t_path;
+	typedef std::vector<t_path> t_pathv;
+
+	static bool bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path,
+			size_t bits, size_t n_args);
+	static int_t balance_paths(t_pathv & next_path_a, t_pathv & next_path_b, size_t bits,
+			std::vector<t_pathv> &aux_path_a, std::vector<t_pathv> &aux_path_b);
+	static int_t solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+	static int_t merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
+
+	static void satcount_arith(bdd a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
+	static int_t zero(size_t arg, size_t bits, size_t n_args);
+	static bool is_zero(int_t a_in, size_t bits);
+
+	static void ADDER_BE(int_t a_in, int_t b_in, size_t bit, size_t bits, size_t depth,
+			size_t n_args, int_t &c);
+	static int_t ADDER_ACCS(int_t b_in, int_t accs, size_t depth, size_t bits, size_t n_args);
+	static void MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits,
+			size_t n_args, int_t &c) ;
+
 	static int_t COPY(int_t a_in);
-	static int_t SHR(int_t a_in, size_t depth, size_t bits, size_t n_args);
+	static int_t COPY_ARG2ARG(int_t a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
+	static int_t SHR(int_t a_in, size_t arg, size_t bits, size_t n_args);
+	static int_t SHLx(int_t b_in, size_t x, size_t bits, size_t n_args);
 
 public:
 	bdd(int_t v, int_t h, int_t l);

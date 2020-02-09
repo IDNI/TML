@@ -51,6 +51,27 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit,
 				leq_var(arg1, arg2, args, bit) && x));
 }
 
+void tables::set_constants(const term& t, alt& a, spbdd_handle &q) {
+
+	size_t args = t.size();
+	for (size_t i = 0; i< args; ++i)
+		if (t[i] >= 0) {
+			spbdd_handle aux = from_sym(i, args, t[i]);
+			q = q && aux;
+		}
+
+	bools exvec;
+	for (size_t i = 0; i < bits; ++i) {
+		for (size_t j = 0; j< args; ++j)
+			if (t[j] >= 0) exvec.push_back(true);
+			else exvec.push_back(false);
+	}
+	q = q/exvec;
+
+	uints perm2 = get_perm(t, a.vm, a.varslen);
+	q = q^perm2;
+}
+
 // ----------------------------------------------------------------------------
 
 bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
@@ -87,7 +108,7 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 			}
 			*/
 
-			//all types of addition hanlder by add_var
+			//all types of addition handled by add_var
 			//XXX not working for ?x + ?x = 2
 
 			size_t args = 3;
@@ -95,38 +116,7 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 			//XXX: temporary location to test adder over bdds
 			//q = bdd_add_test(args);
 
-			int nconsts = 0;
-
-			for (size_t i = 0; i< args; ++i)
-				if (t[i] >= 0) {
-					spbdd_handle aux = from_sym(i, args, t[i]);
-					q = q && aux;
-					nconsts++;
-				}
-
-			bools exvec;
-			for (size_t i = 0; i < bits; ++i) {
-				for (size_t j = 0; j< args; ++j)
-					if (t[j] >= 0) exvec.push_back(true);
-					else exvec.push_back(false);
-			}
-			q = q/exvec;
-
-			//uints perm = perm_init(args*bits);
-			//for (size_t i = 0; i < bits; ++i) {
-			//	if (t[0] < 0) perm[i*args] = perm[i*args]-(i*nconsts) ;
-			//	if (t[1] < 0) perm[i*args+1] = perm[i*args+1]-(i*nconsts) ;
-			//	if (t[2] < 0) perm[i*args+2] = perm[i*args+2]-(i*nconsts) ;
-			//}
-			//for (size_t i = 0; i < (3*bits); i++)
-			//	wcout << L" --- " << perm[i]; wcout << endl;
-
-			uints perm2 = get_perm(t, a.vm, a.varslen);
-			//for (size_t i = 0; i < (3*bits); i++)
-			//	wcout << L" --- " << perm2[i]; wcout << endl;
-
-			q = q^perm2;
-
+			set_constants(t,a,q);
 		} break;
 
 		case SHR:
@@ -148,91 +138,22 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 		{
 			DBG(wcout << "MULT handler ... " << endl;)
 
-			size_t args = 3; //t.size();
+			size_t args = t.size();
 			size_t n_vars = 0;
 
 			if (args == 3) {
 
 				q = mul_var_eq(0,1,2,3);
+				//q = bdd_mult_test(args);
+				set_constants(t,a,q);
 
-				int nconsts = 0;
-				for (size_t i = 0; i< args; ++i)
-					if (t[i] >= 0) {
-						spbdd_handle aux = from_sym(i, args, t[i]);
-						q = q && aux;
-						nconsts++;
-				}
-
-				bools exvec;
-				for (size_t i = 0; i < bits; ++i) {
-					for (size_t j = 0; j< args; ++j)
-						if (t[j] >= 0) exvec.push_back(true);
-						else exvec.push_back(false);
-				}
-				q = q/exvec;
-
-				uints perm2 = get_perm(t, a.vm, a.varslen);
-				q = q^perm2;
-
-				//q = bdd_test(args);
-				//n_vars = args;
 			}
-
-			/*
-			//XXX: hook for extended precition
+			//XXX: hook for extended precision
 			//XXX wont run, needs update in parser like ?x0:?x1
 			else if (args == 4) {
 				q = mul_var_eq_ext(0,1,2,3,args);
-				n_vars = args;
-
-				//XXX: temporay hook to test mult over bdds
-				//varmap extension:
-
-				//for (size_t n = 0; n != bits-2+1; ++n)
-				//	a.vm.emplace( -1*a.varslen , a.varslen++);
-				//q = bdd_mult_test(args);
-				//n_vars = args + bits - 2 +1;
-
+				set_constants(t,a,q);
 			}
-
-			int nconsts = 0;
-			for (size_t i = 0; i< args; ++i)
-				if (t[i] >= 0) {
-					spbdd_handle aux = from_sym(i, n_vars, t[i]);
-					q = q && aux;
-					nconsts++;
-				}
-
-			bools exvec;
-			for (size_t i = 0; i < bits; ++i) {
-				for (size_t j = 0; j< args; ++j)
-					if (t[j] >= 0) exvec.push_back(true);
-					else exvec.push_back(false);
-
-				for (size_t j = 0; j< n_vars - args; ++j)
-					exvec.push_back(true);
-			}
-			q = q/exvec;
-
-
-			//for (size_t n = 0; n < bits - 2; ++n) {
-			//	a.vm.erase(-1*a.varslen);
-			//	a.varslen--;
-			//}
-
-
-			bools exvec;
-			for (size_t i = 0; i < bits; ++i) {
-				for (size_t j = 0; j< args; ++j)
-					if (t[j] >= 0) exvec.push_back(true);
-					else exvec.push_back(false);
-			}
-
-			q = q/exvec;
-			//FIXME: memory fault, invalid read
-			uints perm2 = get_perm_ext(t, a.vm, a.varslen);
-			q = q^perm2;
-			*/
 
 		} break;
 
@@ -251,94 +172,32 @@ bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
 
 spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 
-	wcout << L" ------------------- BITS  :" << bits << L"\n";
-
 	//return bdd_handle::F;
-
-	size_t n_accs = bits - 2 + 1;
+    size_t n_accs = 0;//bits - 2 + 1;
 	size_t n_args = n_accs + n_vars;
+	size_t out_arg = 2;
 
-	/*
-	// TEST : ok
-	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0, n_args ,mknum(2));
-
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args,mknum(2));
-	s1 = s1 || from_sym(1, n_args,mknum(1));
-	*/
-
-	/*
-	// TEST : ok
-	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0, n_args ,mknum(1));
-	s0 = s0 || from_sym(0, n_args ,mknum(2));
-	s0 = s0 || from_sym(0, n_args ,mknum(3));
-
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args,mknum(2));
-	*/
-
-	/*
-	// TEST : ok
-	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0, n_args ,mknum(1));
-	s0 = s0 || from_sym(0, n_args ,mknum(2));
-	s0 = s0 || from_sym(0, n_args ,mknum(3));
-
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args,mknum(1));
-	*/
-
-	/*
-	// TEST : ok
 	spbdd_handle s0 = bdd_handle::F;
 	s0 = s0 || from_sym(0, n_args, mknum(0));
 	s0 = s0 || from_sym(0, n_args, mknum(1));
 	s0 = s0 || from_sym(0, n_args, mknum(2));
 	s0 = s0 || from_sym(0, n_args, mknum(3));
-
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args, mknum(3));
-	*/
-
-	/*
-	// TEST : ok
-	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0, n_args, mknum(1));
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args, mknum(1));
-	s1 = s1 || from_sym(1, n_args, mknum(2));
-	 */
-
-	/*
-	// TEST : ok
-	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0, n_args, mknum(1));
-	s0 = s0 || from_sym(0, n_args, mknum(2));
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1, n_args, mknum(1));
-	s1 = s1 || from_sym(1, n_args, mknum(2));
-	s1 = s1 || from_sym(1, n_args, mknum(3));
-	*/
-
-
-
-	// TEST : FAIL
-	spbdd_handle s0 = bdd_handle::F;
+	s0 = s0 || from_sym(0, n_args, mknum(4));
 	s0 = s0 || from_sym(0, n_args, mknum(5));
 	s0 = s0 || from_sym(0, n_args, mknum(6));
+	s0 = s0 || from_sym(0, n_args, mknum(7));
+
 	spbdd_handle s1 = bdd_handle::F;
+	s1 = s1 || from_sym(1, n_args, mknum(0));
 	s1 = s1 || from_sym(1, n_args, mknum(1));
-	s1 = s1 || from_sym(1, n_args, mknum(7));
+	s1 = s1 || from_sym(1, n_args, mknum(2));
 	s1 = s1 || from_sym(1, n_args, mknum(3));
+	s1 = s1 || from_sym(1, n_args, mknum(4));
+	s1 = s1 || from_sym(1, n_args, mknum(5));
+	s1 = s1 || from_sym(1, n_args, mknum(6));
+	s1 = s1 || from_sym(1, n_args, mknum(7));
 
-	spbdd_handle *accs = new spbdd_handle[n_accs] ;
-
-	for (size_t i = 0; i < n_accs; ++i) {
-		accs[i] = from_sym(n_vars + i, n_args ,mknum(0));
-	}
-
+	//remove "type" bits
 	bools exvec;
 	for (size_t i = 0; i < bits; ++i) {
 	  for (size_t j = 0; j< n_args; ++j)
@@ -347,47 +206,29 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 	}
 	s0 = s0 / exvec;
 	s1 = s1 / exvec;
-	//acc = acc / exvec;
-	for (size_t i = 0; i < n_accs; ++i) {
-		accs[i] = accs[i] / exvec;
-	}
 
+	//XXX: check need of gc here
 	bdd::gc();
 
-	wcout << L" ------------------- bdd mult  :\n";
-
+	//bit reverse
 	uints perm1;
 	perm1 = perm_init((bits-2)*n_args);
 	for (size_t i = 0; i < (bits-2)*n_args; i++) {
-		//wcout << L" perminit " << perm1[i] << L"\n";
 		perm1[i] = ((bits-2-1-(i/n_args))*n_args) + i % n_args;
-		//wcout << L" newperm " << perm1[i] << L"\n";
 	}
 	s0 = s0^perm1;
 	s1 = s1^perm1;
-	//acc = acc^perm1;
-	for (size_t i = 0; i < n_accs; ++i) {
-		accs[i] = accs[i]^perm1;
-	}
 
-	wcout << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
-	::out(wcout, s0)<<endl<<endl;
-	wcout << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
-	::out(wcout, s1)<<endl<<endl;
-
+	//XXX: check need of gc here
 	bdd::gc();
 
-	spbdd_handle test = bdd_mult_dfs(s0,s1,accs, bits-2, n_args);
+	wcout << L" ------------------- bdd mult  :\n";
+	spbdd_handle test = bdd_mult_dfs(s0, s1, bits-2, n_args);
 
-	wcout << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
-	::out(wcout, test)<<endl<<endl;
+	//bit reverse and append type bits
+	test = (test^perm1) && ::from_bit(pos(1, out_arg, n_args),true) && ::from_bit(pos(0, out_arg, n_args),false);
 
-	test = test^perm1 && ::from_bit(pos(1, 3, n_args),true) &&
-			::from_bit(pos(0, 3, n_args),false);
-
-	delete [] accs;
 	return test;
-
 }
 
 spbdd_handle tables::bdd_add_test(size_t n_vars) {
@@ -395,29 +236,16 @@ spbdd_handle tables::bdd_add_test(size_t n_vars) {
 
 	wcout << L" ------------------- bdd adder  :\n";
 
-	// TEST
-	spbdd_handle s0 = bdd_handle::T;
-	//s0 = s0 || from_sym(0,3,mknum(3));
-	//s0 = s0 || from_sym(0,3,mknum(2));
-
-	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1,3,mknum(3));
-	s1 = s1 || from_sym(1,3,mknum(2));
-	s1 = s1 || from_sym(1,3,mknum(1));
-	s1 = s1 || from_sym(1,3,mknum(0));
-
-	/*
-	// TEST
 	spbdd_handle s0 = bdd_handle::F;
-	s0 = s0 || from_sym(0,3,mknum(7));
-	s0 = s0 || from_sym(0,3,mknum(6));
-	s0 = s0 || from_sym(0,3,mknum(5));
-	s0 = s0 || from_sym(0,3,mknum(4));
+	s0 = s0 || from_sym(0,3,mknum(2));
+	s0 = s0 || from_sym(0,3,mknum(3));
 
 	spbdd_handle s1 = bdd_handle::F;
-	s1 = s1 || from_sym(1,3,mknum(3));
-	s1 = s1 || from_sym(1,3,mknum(2));
-    */
+	s1 = s1 || from_sym(1,3,mknum(16));
+	s1 = s1 || from_sym(1,3,mknum(20));
+	s1 = s1 || from_sym(1,3,mknum(24));
+	s1 = s1 || from_sym(1,3,mknum(28));
+
 
 	// remove "type" bits
 	bools exvec;
@@ -429,27 +257,17 @@ spbdd_handle tables::bdd_add_test(size_t n_vars) {
 	s0 = s0 / exvec;
 	s1 = s1 / exvec;
 
-	// invert endianess
+	// bit reverse
 	uints perm1;
 	perm1 = perm_init((bits-2)*n_vars);
 	for (size_t i = 0; i < (bits-2)*n_vars; i++) {
-		//wcout << L" perminit " << perm1[i] << L"\n";
 		perm1[i] = ((bits-2-1-(i/n_vars))*n_vars) + i % n_vars;
-		//wcout << L" newperm " << perm1[i] << L"\n";
 	}
 	s0 = s0^perm1;
 	s1 = s1^perm1;
 	bdd::gc();
 
-	wcout << L" ------------------- A " << ::bdd_root(s0) << L" :\n";
-	::out(wcout, s0)<<endl<<endl;
-	wcout << L" ------------------- B " << ::bdd_root(s1) << L" :\n";
-	::out(wcout, s1)<<endl<<endl;
-
 	spbdd_handle test = bdd_adder(s0,s1);
-
-	wcout << L" ------------------- testout " << ::bdd_root(test) << L" :\n";
-	::out(wcout, test)<<endl<<endl;
 
 	test = test^perm1 && ::from_bit(pos(1, 2, n_vars),true) && ::from_bit(pos(0, 2, n_vars),false);
 
@@ -922,15 +740,10 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 
 		bdd::gc();
 
-		//wcout << L" -------------------ACC BIT " << b << L":\n";
-		//	::out(wcout, acc_bit)<<endl<<endl;
-
 		//equality
 		r = r && bdd_ite(acc_bit ,
 				::from_bit(pos(b, var2, n_vars), true),
 				::from_bit(pos(b, var2, n_vars), false));
-
-		wcout << L" ------------------- BIT " << b << L" of " << bits-1 << L" done\n";
 
 	}
 
@@ -954,8 +767,8 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 
 // ----------------------------------------------------------------------------
 
-spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2, size_t var3,
-			size_t n_vars) {
+spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
+		size_t var3, size_t n_vars) {
 
 	spbdd_handle r = bdd_handle::T;
 

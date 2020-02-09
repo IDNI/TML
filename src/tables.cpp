@@ -770,7 +770,7 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	//XXX: alu support - Work in progress
 	for (const term* pt : aluterms) {
 		const term& t = *pt;
-		assert(t.size() == 3);
+		assert(t.size() >= 3);
 		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
 		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
 			aluvars.insert(v1);
