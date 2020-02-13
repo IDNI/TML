@@ -204,7 +204,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	term::textype extype = (term::textype)r.extype;
 	// D: header builtin is treated as rel, but differentiated later (decomp.)
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
-	// skip the first symbol unless it's EQ/LEQ/ALU (which has VAR/CONST as 1st)
+	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
 	bool isrel = realrel || extype == term::BLTIN;
 	for (size_t n = !isrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
@@ -240,7 +240,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		}
 		return term(r.neg, tab, t, orderid, idbltin);
 	}
-	return term(r.neg, extype, r.alu_op, tab, t, orderid);
+	return term(r.neg, extype, r.arith_op, tab, t, orderid);
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
@@ -699,22 +699,22 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars, leqvars, aluvars;
-	std::vector<const term*> eqterms, leqterms, aluterms;
+	set<int_t> pvars, nvars, eqvars, leqvars, arithvars;
+	std::vector<const term*> eqterms, leqterms, arithterms;
 	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false, hasleq = false, hasalu = false;
+		bool haseq = false, hasleq = false, hasarith = false;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) continue;
 			else if (t.extype == term::EQ) haseq = true; // .iseq
 			else if (t.extype == term::LEQ) hasleq = true; // .isleq
-			else if (t.extype == term::ALU) hasalu= true; // .isalu
+			else if (t.extype == term::ARITH) hasarith= true; // .isarith
 			else (t.neg ? nvars : pvars).insert(t[n]);
 		// TODO: BLTINS: add term::BLTIN handling
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
 		else if (hasleq) leqterms.push_back(&t);
-		else if (hasalu) aluterms.push_back(&t);
+		else if (hasarith) arithterms.push_back(&t);
 	}
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -767,27 +767,27 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 			leqvars.insert(v1);
 	}
 
-	//XXX: alu support - Work in progress
-	for (const term* pt : aluterms) {
+	//XXX: arith support - Work in progress
+	for (const term* pt : arithterms) {
 		const term& t = *pt;
 		assert(t.size() >= 3);
 		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
 		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
-			aluvars.insert(v1);
+			arithvars.insert(v1);
 		if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2))
-			aluvars.insert(v2);
+			arithvars.insert(v2);
 		if (v3 < 0 && !has(nvars, v3) && !has(pvars, v3))
-			aluvars.insert(v3);
+			arithvars.insert(v3);
 	}
 
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // aluvars.erase(i);
+		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // arithvars.erase(i);
 	bdd_handles v;
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
-	for (int_t i : aluvars) range(vm.at(i), len, v);
+	for (int_t i : arithvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
@@ -1130,9 +1130,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			term& bt = lastbody.second;
 			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
-		} else if (t.extype == term::ALU) {
+		} else if (t.extype == term::ARITH) {
 			//returning bdd handler on leq variable
-			if (!isalu_handler(t,a,leq)) return;
+			if (!isarith_handler(t,a,leq)) return;
 			continue;
 		}
 		else if (t.extype == term::EQ) { //.iseq

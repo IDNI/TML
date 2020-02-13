@@ -74,12 +74,12 @@ void tables::set_constants(const term& t, alt& a, spbdd_handle &q) {
 
 // ----------------------------------------------------------------------------
 
-bool tables::isalu_handler(const term& t, alt& a, spbdd_handle &leq) {
+bool tables::isarith_handler(const term& t, alt& a, spbdd_handle &leq) {
 
-	DBG(wcout << "ALU handler ... " << endl;)
+	DBG(wcout << "ARITH handler ... " << endl;)
 	spbdd_handle q;
 
-	switch (t.alu_op) {
+	switch (t.arith_op) {
 		case ADD:
 		{
 			/*
@@ -186,6 +186,14 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 	s0 = s0 || from_sym(0, n_args, mknum(5));
 	s0 = s0 || from_sym(0, n_args, mknum(6));
 	s0 = s0 || from_sym(0, n_args, mknum(7));
+	s0 = s0 || from_sym(0, n_args, mknum(8));
+	s0 = s0 || from_sym(0, n_args, mknum(9));
+	s0 = s0 || from_sym(0, n_args, mknum(10));
+	s0 = s0 || from_sym(0, n_args, mknum(11));
+	s0 = s0 || from_sym(0, n_args, mknum(12));
+	s0 = s0 || from_sym(0, n_args, mknum(13));
+	s0 = s0 || from_sym(0, n_args, mknum(14));
+	s0 = s0 || from_sym(0, n_args, mknum(15));
 
 	spbdd_handle s1 = bdd_handle::F;
 	s1 = s1 || from_sym(1, n_args, mknum(0));
@@ -196,6 +204,15 @@ spbdd_handle tables::bdd_mult_test(size_t n_vars) {
 	s1 = s1 || from_sym(1, n_args, mknum(5));
 	s1 = s1 || from_sym(1, n_args, mknum(6));
 	s1 = s1 || from_sym(1, n_args, mknum(7));
+	s1 = s1 || from_sym(1, n_args, mknum(8));
+	s1 = s1 || from_sym(1, n_args, mknum(9));
+	s1 = s1 || from_sym(1, n_args, mknum(10));
+	s1 = s1 || from_sym(1, n_args, mknum(11));
+	s1 = s1 || from_sym(1, n_args, mknum(12));
+	s1 = s1 || from_sym(1, n_args, mknum(13));
+	s1 = s1 || from_sym(1, n_args, mknum(14));
+	s1 = s1 || from_sym(1, n_args, mknum(15));
+
 
 	//remove "type" bits
 	bools exvec;

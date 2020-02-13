@@ -320,7 +320,7 @@ private:
 
 	//-------------------------------------------------------------------------
 	//XXX: arithmetic support, work in progress
-	bool isalu_handler(const term& t, alt& a, spbdd_handle &leq);
+	bool isarith_handler(const term& t, alt& a, spbdd_handle &leq);
 	void set_constants(const term& t, alt& a, spbdd_handle &q);
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
 		size_t bit, spbdd_handle x) const;
