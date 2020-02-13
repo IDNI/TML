@@ -1107,6 +1107,10 @@ wostream& tables::print(wostream& os, const flat_prog& p) const {
 	return os;
 }
 
+wostream& tables::print_dict(wostream& os) const {
+	return os << dict;
+}
+
 void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 	alt a;
 	set<int_t> vs;
@@ -1625,9 +1629,39 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	return true;
 }
 
+void tables::add_tml_update(const term& t, bool neg) {
+	// TODO: decompose nstep if too big for the current universe
+	nums = max(nums, (int_t)nstep);
+	ints arity = tbls.at(t.tab).s.second;
+	arity[0] += 3;
+	ntable tab = get_table({ rel_tml_update, arity });
+	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
+		dict.get_sym(dict.get_rel(tbls[t.tab].s.first)) };
+	args.insert(args.end(), t.begin(), t.end());
+	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
+}
+
+wostream& tables::decompress_update(wostream& os, spbdd_handle& x, const rule& r) {
+	if (print_updates) print(os << L"# ", r) << L"\n# \t-> ";
+	decompress(x, r.tab, [&os, &r, this](const term& x) {
+		if (print_updates)
+			os << (r.neg ? L"~" : L"") << to_raw_term(x) << L". ";
+		if (populate_tml_update) add_tml_update(x, r.neg);
+	});
+	if (print_updates) os << endl;
+	return os;
+}
+
+void tables::init_tml_update() {
+	rel_tml_update = dict.get_rel(dict.get_lexeme(L"tml_update"));
+	sym_add = dict.get_sym(dict.get_lexeme(L"add"));
+	sym_del = dict.get_sym(dict.get_lexeme(L"delete"));
+}
+
 void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (mknums) to_nums(m);
+	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
 	syms = dict.nsyms();
 	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
@@ -1716,7 +1750,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			// just equate last var (output) with the count
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
 			v1.push_back(x);
-			wcout << L"alt_query (cnt):" << cnt << L"" << endl;
+			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
 		}
 		else if (bltintype == L"rnd") {
 			DBG(assert(a.bltinargs.size() == 3););
@@ -1733,7 +1767,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(rnd));
 			v1.push_back(x);
-			wcout << L"alt_query (rnd):" << rnd << L"" << endl;
+			o::dbg() << L"alt_query (rnd):" << rnd << L"" << endl;
 		}
 		else if (bltintype == L"print") {
 			wstring ou{L"output"};
@@ -1786,7 +1820,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 }
 
 char tables::fwd() noexcept {
-//	DBG(out(o::out()<<"db before:"<<endl);)
+//	DBG(out(o::out()<<L"db before:"<<endl);)
 	for (rule& r : rules) {
 		bdd_handles v(r.size());
 		for (size_t n = 0; n != r.size(); ++n)
@@ -1798,6 +1832,8 @@ char tables::fwd() noexcept {
 //		DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
+		if (print_updates || populate_tml_update)
+			decompress_update(o::inf(), x, r);
 	}
 	bool b = false;
 	// D: just temp ugly static, move this out of fwd/pass in, or in tables.
@@ -1818,20 +1854,20 @@ char tables::fwd() noexcept {
 					// do what we have to do, we have a new tuple
 					lexeme bltintype = dict.get_bltin(tbl.idbltin);
 					if (bltintype == L"lprint") {
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						// this is supposed to be formatted r-term printout
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:"};
 						os << L"printing: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"halt") {
 						ishalt = true;
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program halt: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"fail") {
 						ishalt = isfail = true;
-						wostream& os = wcout << endl;
+						wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program fail: " << rtp << L'.' << endl;
 					}
@@ -1864,7 +1900,8 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	level l;
 	auto sp = [this](){ if (bproof) get_goals(); }; // show proofs
 	for (;;) {
-		if (optimize) o::inf() << L"step: " << nstep << endl;
+		if (print_steps || optimize)
+			o::inf() << L"# step: " << nstep << endl;
 		++nstep;
 		if (!fwd()) return sp(), true; // FP found
 		if (unsat) sp(), throw contradiction_exception();
@@ -1888,7 +1925,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	add_prog(p, strs);
 	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		o::inf() << L"# pfp: ";
+		o::ms() << L"# pfp: ";
 		measure_time_start();
 	}
 	bool r = pfp(steps ? nstep + steps : 0, break_on_step);

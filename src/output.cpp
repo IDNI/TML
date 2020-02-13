@@ -341,3 +341,31 @@ void tables::print(wostream& os, const tables::witness& w) {
 	}
 	return os;
 }*/
+
+// rule printer for --print_updates
+wostream& tables::print(wostream& os, const rule& r) const {
+	os << to_raw_term(r.t) << L" :- ";
+	for (auto it = r.begin(); it != r.end(); ++it)
+		for (size_t n = 0; n != (*it)->t.size(); ++n)
+			os << to_raw_term((*it)->t[n]) << (n==(*it)->t.size()-1
+				? it == r.end()-1 ? L"." : L"; "
+				: L", ");
+	return os;
+}
+
+wostream& operator<<(wostream& os, const dict_t& d) {
+	os <<   L"# nrels:   " << d.nrels() << L'\t';
+	for (size_t i = 0; i != d.nrels(); ++i)
+		os << i << L":" << d.get_rel(i)
+			<< (i != d.nrels() - 1 ? L", " : L"");
+	os << L"\n# nsyms:   " << d.nsyms() << L'\t' << std::flush;
+	for (size_t i = 0; i != d.nsyms(); ++i)
+		os << i << L":" << d.get_sym(i<<2)
+			<< (i != d.nsyms() - 1 ? L", " : L"");
+	os << L"\n# nvars:   " << d.nvars() << L'\t';
+	os << L"\n# nbltins: " << d.nbltins() << L'\t';
+	for (size_t i = 0; i != d.nbltins(); ++i)
+		os << i << L":" << d.get_bltin(i)
+			<< (i != d.nbltins() - 1 ? L", " : L"");
+	return os << endl;
+}

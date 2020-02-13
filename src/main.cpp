@@ -32,10 +32,13 @@ int main(int argc, char** argv) {
 	if (o.enabled(L"repl")) repl r(o);
 	else {
 		driver d(o);
-		d.run();
+		d.run((size_t)o.get_int(L"steps"),
+			(size_t)o.get_int(L"break"),
+			o.enabled(L"break-on-fp"));
 		//DBG(d.info(o::dbg()<<endl); o::dbg()<<endl;)
 		NDBG(if (o.enabled(L"dump") && d.result)
 			d.out(output::to(L"dump"));)
+		if (o.enabled(L"dict")) d.out_dict(o::inf());
 		if (o.enabled(L"csv")) d.save_csv();
 	}
 	onexit = true;

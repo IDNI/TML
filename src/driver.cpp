@@ -267,6 +267,9 @@ void driver::init() {
 driver::driver(raw_progs rp, options o) : rp(rp), opts(o) {
 	tbl = new tables(opts.enabled(L"proof"), opts.enabled(L"optimize"),
 		opts.enabled(L"bin"), opts.enabled(L"t"));
+	set_print_step(opts.enabled(L"ps"));
+	set_print_updates(opts.enabled(L"pu"));
+	set_populate_tml_update(opts.enabled(L"tml_update"));
 }
 driver::driver(FILE *f,   options o) : driver(raw_progs(f), o) {}
 driver::driver(wstring s, options o) : driver(raw_progs(s), o) {}

@@ -114,6 +114,8 @@ done:
 }
 
 #define add_bool(n,desc) add(option(option::type::BOOL, {n}).description(desc))
+#define add_bool2(n1,n2,desc) add(option(option::type::BOOL, \
+		{(n1),(n2)}).description(desc))
 #define add_output(n,desc) add(option(option::type::STRING, {n}, \
 		[](const option::value& v) { \
 			output::set_target(n,v.get_string()); \
@@ -163,6 +165,19 @@ void options::setup() {
 	add_bool(L"repl",    L"run TML in REPL mode");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
+
+	add(option(option::type::INT, { L"steps", L"s" })
+		.description(L"run N steps"));
+	add(option(option::type::INT, { L"break", L"b" })
+		.description(L"break on the N-th step"));
+	add_bool2(L"break-on-fp", L"bfp", L"break on a fixed point");
+
+	add_bool2(L"populate-tml_update", L"tml_update",
+		L"populates relation tml_update(N_step add|delete fact).");
+	add_bool2(L"print-steps", L"ps", L"print steps");
+	add_bool2(L"print-updates", L"pu", L"print updates");
+	add_bool2(L"print-dict", L"dict", L"print internal string dictionary");
+
 	add_bool(L"optimize",L"optimize and show more benchmarks");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
@@ -185,6 +200,7 @@ void options::setup() {
 }
 
 #undef add_bool
+#undef add_bool2
 #undef add_output
 #undef add_output_alt
 

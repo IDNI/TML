@@ -129,6 +129,10 @@ public:
 	size_t nsteps() { return tbl->step(); };
 	void out(std::wostream& os) const { if (tbl) tbl->out(os); };
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); };
+	void set_print_step   (bool val) { tbl->print_steps   = val; };
+	void set_print_updates(bool val) { tbl->print_updates = val; };
+	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	void out_dict(std::wostream& os) const { tbl->print_dict(os); };
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); };
 	emscripten::val to_bin() {

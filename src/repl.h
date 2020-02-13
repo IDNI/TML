@@ -22,6 +22,9 @@ class repl {
 	bool ar = false;  // auto run
 	bool ap = true;   // auto print
 	bool ai = false;  // auto info
+	bool ps = false;  // print steps
+	bool pu = false;  // print db updates each step
+	bool cu = false;  // collect updates into tml_update relation
 	bool ils = false; // input line sequencing: is each input line a newseq?
 	void help() const;
 	void redrive(const std::wstring src = L"");
@@ -37,7 +40,7 @@ class repl {
 	void reset();
 	void dump();
 	void info();
-	void toggle(const std::wstring& name, bool &setting);
+	bool toggle(const std::wstring& name, bool &setting);
 	void add(std::wstring line);
 public:
 	repl(options &o, std::wostream& os = o::repl());

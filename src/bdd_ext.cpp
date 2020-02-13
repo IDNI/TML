@@ -87,7 +87,7 @@ int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
 	  int_t c = 0;
 	  uint_t pos = 0;
 
-	  wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	  o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 
 	  //XXX: assumes var a < var b
 	  if (a.v > b.v + 1 && b.v != 0) {
@@ -102,7 +102,7 @@ int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
 	  else
 	    pos = b.v + 1;
 
-	  wcout << L" ------------------- pos = " << pos << L"\n";
+	  o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	  // ---------------------------------------------------------------------------
 
@@ -251,7 +251,7 @@ int_t bdd::bitwiseXOR(int_t a_in, int_t b_in) {
 	int_t c = 0;
 	int_t pos = 0;
 
-	wcout << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
+	o::dbg() << L" -- a.v = " << a.v << L", b.v = " <<  b.v  << L"\n";
 
 	//XXX: assumes var a < var b
 	if (a.v > b.v + 1 && b.v != 0) {
@@ -266,7 +266,7 @@ int_t bdd::bitwiseXOR(int_t a_in, int_t b_in) {
 	else
 		pos = b.v + 1;
 
-	//wcout << L" ------------------- pos = " << pos << L"\n";
+	//o::dbg() << L" ------------------- pos = " << pos << L"\n";
 	// ---------------------------------------------------------------------------
 
 	if (a_in == T && b_in == T)
@@ -293,7 +293,7 @@ int_t bdd::ADDER(int_t a_in, int_t b_in, bool carry, size_t bit) {
 	pos = (bit + 1) * 3;
 	if (a.v > pos) a.h = a_in, a.l = a_in;
 	if (b.v > pos) b.h = b_in, b.l = b_in;
-	wcout << L" ------------------- pos = " << pos << L"\n";
+	o::dbg() << L" ------------------- pos = " << pos << L"\n";
 
 	// ---------------------------------------------------------------------------
 
@@ -335,8 +335,10 @@ extern map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
 std::map<size_t, int_t> covered_cf;
 std::map<size_t, int_t> covered_ct;
 
+
 int_t bdd::merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
+
 	int_t c;
 
 	if (!carry) {
@@ -1229,5 +1231,3 @@ void bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bit
 		MULT_DFS(a.h, b_in, accs, depth+1, bits, n_args, c);
 	}
 }
-
-
