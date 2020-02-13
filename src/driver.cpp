@@ -40,6 +40,7 @@ wostream& inf() { static wostream& os = output::to(L"info");        return os; }
 wostream& dbg() { static wostream& os = output::to(L"debug");       return os; }
 wostream& repl(){ static wostream& os = output::to(L"repl-output"); return os; }
 wostream& ms()  { static wostream& os = output::to(L"benchmarks");  return os; }
+wostream& dump(){ static wostream& os = output::to(L"dump");        return os; }
 }
 
 void driver::transform_len(raw_term& r, const strs_t& s) {
@@ -216,8 +217,7 @@ next_sequence:
 			return true;
 		bool fp = prog_run(rp, pd.n, steps, break_on_step);
 		if (fp) {
-			DBG(static wostream& ds = output::to(L"dump");)
-			DBG(if (opts.enabled(L"dump")) out(ds);)
+			//DBG(if (opts.enabled(L"dump")) out(o::dump());)
 			if (pd.n == rp.p.size()-1) // all progs fp
 				return result = true, true;
 			++pd.n;

@@ -1898,19 +1898,16 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	set<level> s;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
-	auto sp = [this](){ if (bproof) get_goals(); }; // show proofs
 	for (;;) {
 		if (print_steps || optimize)
 			o::inf() << L"# step: " << nstep << endl;
 		++nstep;
-		if (!fwd()) return sp(), true; // FP found
-		if (unsat) sp(), throw contradiction_exception();
-		// sp(); // show proofs after each step?
+		if (!fwd()) return true; // FP found
+		if (unsat) throw contradiction_exception();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
 		l = get_front();
-		if (!datalog && !s.emplace(l).second)
-			sp(), throw infloop_exception();
+		if (!datalog && !s.emplace(l).second) throw infloop_exception();
 		if (bproof) levels.push_back(move(l));
 	}
 	throw 0;

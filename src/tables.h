@@ -276,7 +276,6 @@ private:
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	ntable create_tmp_rel(size_t len);
 	void create_tmp_head(std::vector<term>& x);
-	void get_goals();
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	struct elem get_elem(int_t arg) const;
@@ -375,6 +374,7 @@ public:
 	void out(emscripten::val o) const;
 #endif
 	void set_proof(bool v) { bproof = v; }
+	bool get_goals(std::wostream& os);
 
 	std::wostream& print_dict(std::wostream& os) const;
 	bool populate_tml_update = false;

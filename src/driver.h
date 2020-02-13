@@ -132,6 +132,7 @@ public:
 	void set_print_step   (bool val) { tbl->print_steps   = val; };
 	void set_print_updates(bool val) { tbl->print_updates = val; };
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	bool out_goals(std::wostream& os) const { return tbl->get_goals(os); };
 	void out_dict(std::wostream& os) const { tbl->print_dict(os); };
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); };
