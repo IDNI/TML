@@ -313,6 +313,7 @@ private:
 	std::set<ntable> exts; // extensional
 	strs_t strs;
 	std::set<int_t> str_rels;
+	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 //	std::function<int_t(void)>* get_new_rel;
 
 	// tml_update population

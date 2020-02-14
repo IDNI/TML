@@ -1546,8 +1546,13 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	for (const production& x : g) {
 		if (x.p.size() == 2 && x.p[1].e == L"null") {
 			term t;
-			t.resize(2), t[0] = t[1] = -1;
-			t.tab = get_table({dict.get_rel(x.p[0].e),{2}}),
+			t.resize(2);
+			t[0] = t[1] = -1;
+			t.tab = get_table({dict.get_rel(x.p[0].e),{2}});
+			vector<term> v{t, t};
+			v[0].neg = true;
+			align_vars(v);
+			prog_after_fp.insert(move(v));
 			p.insert({move(t)});
 			continue;
 		}
@@ -1575,7 +1580,8 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		}
 		p.insert(move(v));
 	}
-	print(o::out() << L"transformed grammar: " << endl, p);
+	DBG(print(o::dbg() << L"transformed grammar: " << endl, p);)
+	DBG(print(o::dbg() << L"run after transform: " << endl, prog_after_fp);)
 }
 
 void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
@@ -1926,6 +1932,8 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		measure_time_start();
 	}
 	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
+	if (r && prog_after_fp.size())
+		add_prog(move(prog_after_fp), {}, false), r = pfp();
 	if (optimize)
 		(o::ms() <<L"add_prog: "<<t << L" pfp: "),
 		measure_time_end();
