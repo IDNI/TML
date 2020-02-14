@@ -612,18 +612,21 @@ set<term> tables::decompress() {
 	return r;
 }
 
-#define get_var_lexeme(v) dict.get_lexeme(wstring(L"?v") + to_wstring(-v))
+// D: TODO: just a quick & dirty fix, get_elem, to_raw_term (out etc.) is const
+#define rdict() ((dict_t&)dict)
+//#define get_var_lexeme(v) dict.get_lexeme(wstring(L"?v") + to_wstring(-v))
+#define get_var_lexeme(v) rdict().get_lexeme(wstring(L"?v") + to_wstring(-v))
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
 	if (arg & 1) {
 		const wchar_t ch = arg >> 2;
 		if (iswprint(ch)) return elem(ch);
-		return	elem(elem::SYM, dict.get_lexeme(wstring(L"\"#") +
+		return	elem(elem::SYM, rdict().get_lexeme(wstring(L"\"#") +
 			to_wstring((unsigned char)(ch)) + L"\""));
 	}
 	if (arg & 2) return elem((int_t)(arg>>2));
-	return elem(elem::SYM, dict.get_sym(arg));
+	return elem(elem::SYM, rdict().get_sym(arg));
 }
 
 raw_term tables::to_raw_term(const term& r) const {
@@ -632,12 +635,12 @@ raw_term tables::to_raw_term(const term& r) const {
 	size_t args;
 	if (r.extype == term::EQ) //r.iseq)
 		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-		rt.e[1] = elem(elem::SYM,dict.get_lexeme(r.neg ? L"!=" : L"=")),
+		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"!=" : L"=")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	else if (r.extype == term::LEQ) //r.isleq)
 		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
 		// D: TODO: is this a bug (never used)? for neg it should be > not <= ?
-		rt.e[1] = elem(elem::SYM,dict.get_lexeme(r.neg ? L"<=" : L">")),
+		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	// TODO: BLTINS: add term::BLTIN handling
 	else {
@@ -958,8 +961,10 @@ flat_prog& get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 }
 
 void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
-	tables t(false, false, true);
-	t.dict = dict, t.bcqc = false, t.chars = chars, t.nums = nums;
+	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
+	tables t(move(tmpdict), false, false, true);
+	//t.dict = dict;
+	t.bcqc = false, t.chars = chars, t.nums = nums;
 	if (!t.run_nums(move(p), r, nsteps)) throw 0;
 }
 
@@ -1748,15 +1753,18 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		lexeme bltintype = dict.get_bltin(a.idbltin);
 		int_t bltinout = a.bltinargs.back(); // for those that have ?out
 		if (bltintype == L"count") {
-			//body& blast = *a[a.size() - 1];
-			//spbdd_handle xprmt = bdd_permute_ex(x, blast.ex, blast.perm);
-			//int_t cnt = bdd::satcount_perm(xprmt->b, bits * a.bltinsize + 1);
-			int_t cnt = bdd::satcount(x->b);
-
+			body& b = *a[a.size() - 1];
+			// old, official satcount algorithm, phased out
+			int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
+			// new satcount based on the adjusted allsat_cb::sat (decompress)
+			if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
+			int_t cnt = bdd::satcount(x, b.inv);
 			// just equate last var (output) with the count
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
 			v1.push_back(x);
 			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
+			if (cnt != cnt0)
+				o::dbg() << L"(cnt0 != cnt):" << cnt0 << L", " << cnt << endl;
 		}
 		else if (bltintype == L"rnd") {
 			DBG(assert(a.bltinargs.size() == 3););
@@ -1940,13 +1948,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	return r;
 }
 
-tables::tables(bool bproof, bool optimize, bool bin_transform,
-	bool print_transformed) : dict(*new dict_t), bproof(bproof),
+tables::tables(dict_t dict, bool bproof, bool optimize, bool bin_transform,
+	bool print_transformed) : dict(move(dict)), bproof(bproof),
 	optimize(optimize), bin_transform(bin_transform),
-	print_transformed(print_transformed) {}
+	print_transformed(print_transformed) {} // dict(*new dict_t)
 
 tables::~tables() {
-	if (optimize) delete &dict;
+	//if (optimize) delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());

@@ -96,8 +96,8 @@ class driver {
 	void progs_read(wstr s);
 	void new_sequence();
 	bool prog_run(raw_progs& rp, size_t n, nlevel steps=0, size_t brstep=0);
-	driver(raw_progs, options o);
-	driver(raw_progs);
+	//driver(raw_progs, options o);
+	//driver(raw_progs);
 	size_t load_stdin();
 	std::wstring std_input;
 	prog_data pd;

@@ -22,6 +22,7 @@
 #endif
 #include "bdd.h"
 #include "term.h"
+#include "dict.h"
 typedef int_t rel_t;
 struct raw_term;
 struct raw_prog;
@@ -29,7 +30,7 @@ struct raw_rule;
 struct raw_sof;
 struct raw_form_tree;
 class tables;
-class dict_t;
+//class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
@@ -67,7 +68,9 @@ struct body {
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
-//	static std::set<body*, ptrcmp<body>> &s;
+	// only for count, created on first use (rarely used)
+	bools inv;
+	//	static std::set<body*, ptrcmp<body>> &s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
@@ -75,6 +78,13 @@ struct body {
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
 		return perm < t.perm;
+	}
+	bools init_perm_inv(size_t args) {
+		bools inv(args, false);
+		// only count alt vars that are 'possible permutes' (of a body bit) 
+		for (size_t i = 0; i < perm.size(); ++i)
+			if (!ex[i]) inv[perm[i]] = true;
+		return inv;
 	}
 };
 
@@ -198,7 +208,7 @@ private:
 
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
-	dict_t& dict;
+	dict_t dict; // dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed;
 
@@ -360,7 +370,7 @@ private:
 	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
 
 public:
-	tables(bool bproof = false, bool optimize = true,
+	tables(dict_t dict, bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	size_t step() { return nstep; }
@@ -376,6 +386,7 @@ public:
 #endif
 	void set_proof(bool v) { bproof = v; }
 	bool get_goals(std::wostream& os);
+	dict_t& get_dict() { return dict; }
 
 	std::wostream& print_dict(std::wostream& os) const;
 	bool populate_tml_update = false;

@@ -109,6 +109,7 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, spbdd_handle *z,
 class bdd {
 	friend class bdd_handle;
 	friend class allsat_cb;
+	friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
 	friend struct sbdd_and_many_ex_perm;
@@ -244,9 +245,10 @@ public:
 	static size_t satcount_perm(const bdd& bx, int_t x, size_t leafvar);
 
 	static size_t getvar(int_t h, int_t l, int_t v, int_t x, size_t maxv);
-	static size_t satcount(int_t x);
-	static size_t satcount(const bdd& bx, int_t x, size_t leafvar,
+	static size_t satcount_k(int_t x, const bools& ex, const uints& perm);
+	static size_t satcount_k(const bdd& bx, int_t x, size_t leafvar,
 		std::map<int_t, int_t>& mapvars);
+	static size_t satcount(spbdd_handle x, const bools& inv);
 };
 
 class bdd_handle {
@@ -277,5 +279,23 @@ private:
 	uint_t v = 1;
 	callback f;
 	bools p;
+	void sat(int_t x);
+};
+
+class satcount_iter {
+public:
+	satcount_iter(cr_spbdd_handle r, uint_t nvars, const bools& inv) :
+		r(r->b), nvars(nvars), p(nvars), inv(inv), vp() {}
+	size_t count() { 
+		sat(r); 
+		return vp.size();
+	}
+private:
+	int_t r;
+	const uint_t nvars;
+	uint_t v = 1;
+	bools p;
+	const bools& inv;
+	std::set<bools> vp;
 	void sat(int_t x);
 };
