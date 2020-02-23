@@ -810,7 +810,8 @@ spbdd_handle bdd_or_many(bdd_handles v) {
 	return bdd_handle::get(-bdd::bdd_and_many(move(b)));*/
 }
 
-#pragma region sat count
+#define SATCOUNT
+#ifdef SATCOUNT
 
 size_t bdd::satcount_perm(int_t x, size_t leafvar) {
 	const bdd bx = get(x);
@@ -915,8 +916,7 @@ void satcount_iter::sat(int_t x) {
 	}
 }
 
-#pragma endregion
-
+#endif
 
 void bdd::sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r) {
 	if (t == F) return;
@@ -1056,6 +1056,20 @@ spbdd_handle from_bit(uint_t b, bool v) {
 
 spbdd_handle from_eq(uint_t x, uint_t y) {
 	return bdd_ite(from_bit(x,true), from_bit(y,true), from_bit(y,false));
+}
+
+bool bdd::solve(int_t x, int_t v, int_t& l, int_t& h) {
+	bools b(v, false);
+	b[v-1] = true;
+	int_t r = bdd_or( l = bdd_and_ex(x, from_bit(v, true), b),
+			-(h = -bdd_and_ex(x, from_bit(v, true), b)));
+	return leaf(r) && !trueleaf(r);
+}
+
+array<spbdd_handle, 2> solve(spbdd_handle x, int_t v) {
+	int_t h, l;
+	if (!bdd::solve(x->b, v, h, l)) return { nullptr, nullptr };
+	return { bdd_handle::get(l), bdd_handle::get(h) };
 }
 
 void bdd::bdd_nvars(int_t x, set<int_t>& s) {
