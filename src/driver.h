@@ -96,8 +96,8 @@ class driver {
 	void progs_read(wstr s);
 	void new_sequence();
 	bool prog_run(raw_progs& rp, size_t n, nlevel steps=0, size_t brstep=0);
-	driver(raw_progs, options o);
-	driver(raw_progs);
+	//driver(raw_progs, options o);
+	//driver(raw_progs);
 	size_t load_stdin();
 	std::wstring std_input;
 	prog_data pd;
@@ -132,6 +132,7 @@ public:
 	void set_print_step   (bool val) { tbl->print_steps   = val; };
 	void set_print_updates(bool val) { tbl->print_updates = val; };
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	bool out_goals(std::wostream& os) const { return tbl->get_goals(os); };
 	void out_dict(std::wostream& os) const { tbl->print_dict(os); };
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); };

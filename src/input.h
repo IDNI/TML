@@ -200,9 +200,8 @@ struct raw_prog {
 
 struct raw_progs {
 	std::vector<raw_prog> p;
-	raw_progs(FILE*);
-	raw_progs(const std::wstring& s = L"");
-	void parse(const std::wstring& s, bool newseq = true);
+	raw_progs();
+	void parse(const std::wstring& s, dict_t& dict, bool newseq = true);
 };
 
 void parse_error(cws o, std::wstring e);

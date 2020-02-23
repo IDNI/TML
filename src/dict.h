@@ -23,9 +23,33 @@ class dict_t {
 public:
 	dict_t();
 	dict_t(const dict_t& d) : syms_dict(d.syms_dict), vars_dict(d.vars_dict),
-		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), syms(d.syms),
-		rels(d.rels), bltins(d.bltins), strs_extra(d.strs_extra), op(d.op),
-		cl(d.cl) {}
+		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), 
+		syms(d.syms), rels(d.rels), bltins(d.bltins),
+		op(d.op), cl(d.cl) { // strs_extra(d.strs_extra), 
+		DBG(assert(false);); // we shouldn't be copying, use move instead
+		for (const lexeme& c : d.strs_extra) { 
+			wstr r = wcsdup((wstr)c[0]);
+			size_t s = wcslen(r);
+			lexeme l = { r, r + s };
+			strs_extra.insert(l);
+		}
+	}
+	dict_t(dict_t&& d) noexcept : 
+		syms_dict(std::move(d.syms_dict)), 
+		vars_dict(std::move(d.vars_dict)),
+		rels_dict(std::move(d.rels_dict)), 
+		bltins_dict(std::move(d.bltins_dict)),
+		//types_dict(std::move(d.types_dict)), 
+		syms(std::move(d.syms)), 
+		rels(std::move(d.rels)), 
+		bltins(std::move(d.bltins)),
+		//types(std::move(d.types)), 
+		strs_extra(std::move(d.strs_extra)), 
+		op(std::move(d.op)), cl(std::move(d.cl)) {
+		std::fill(std::begin(d.op), std::end(d.op), nullptr);
+		std::fill(std::begin(d.cl), std::end(d.cl), nullptr);
+		//d.strs_extra.clear();
+	}
 	lexeme op, cl;
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	const lexeme& get_bltin(int_t t) const { return bltins[t]; }
@@ -43,11 +67,25 @@ public:
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
 	size_t nbltins() const { return bltins.size(); }
-	dict_t& operator=(const dict_t& d) {
-		return syms_dict = d.syms_dict, vars_dict = d.vars_dict,
-			rels_dict = d.rels_dict, bltins_dict = d.bltins_dict, syms = d.syms,
-			rels = d.rels, bltins = d.bltins, strs_extra = d.strs_extra,
-			op = d.op, cl = d.cl, *this;
+
+	// copy and swap (utilize move)
+	dict_t& operator=(dict_t d) {
+		using std::swap;
+		DBG(assert(false););
+		return
+			swap(syms_dict, d.syms_dict),
+			swap(vars_dict, d.vars_dict),
+			swap(rels_dict, d.rels_dict),
+			swap(bltins_dict, d.bltins_dict),
+			swap(syms, d.syms),
+			swap(rels, d.rels),
+			swap(bltins, d.bltins),
+			swap(strs_extra, d.strs_extra),
+			swap(op, d.op),
+			swap(cl, d.cl),
+			//swap(types_dict, d.types_dict),
+			//swap(types, d.types),
+			*this;
 	}
 	~dict_t();
 };

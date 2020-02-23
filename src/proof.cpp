@@ -145,12 +145,15 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	return level;
 }
 
-void tables::get_goals() {
+bool tables::get_goals(wostream& os) {
 	proof p(levels.size());
 	set<term> s;
 	for (const term& t : goals)
 		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
-	for (const term& g : s) get_proof(g, p, levels.size() - 1);
-	print(o::out(), p);
+	for (const term& g : s)
+		if (bproof) get_proof(g, p, levels.size() - 1);
+		else os << to_raw_term(g) << L'.' << endl;
+	if (bproof) print(os, p);
+	return goals.size() || bproof;
 }
