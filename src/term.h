@@ -21,7 +21,7 @@ struct term : public ints {
 	// D: TODO: builtins are very different, handle as a same size union struct?
 	int_t idbltin = -1; // size_t bltinsize;
 	term() {}
-	term(bool neg, textype extype, t_arith_op artih_op, ntable tab, const ints& args, size_t orderid)
+	term(bool neg, textype extype, t_arith_op arith_op, ntable tab, const ints& args, size_t orderid)
 		: ints(args), neg(neg),extype(extype), arith_op(arith_op), tab(tab), orderid(orderid) {}
 	// builtins .ctor
 	term(bool neg, ntable tab, const ints& args, size_t orderid, int_t idbltin)

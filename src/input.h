@@ -34,7 +34,8 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 static const std::set<std::wstring> str_bltins =
 	{ L"alpha", L"alnum", L"digit", L"space", L"printable", L"count",
-		L"rnd", L"print", L"lprint", L"halt", L"fail" };
+		L"rnd", L"print", L"lprint", L"halt", L"fail",
+		L"bw_and", L"bw_or", L"bw_xor", L"bw_not", L"pw_add", L"pw_mult"};
 
 struct elem {
 	enum etype {

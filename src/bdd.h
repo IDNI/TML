@@ -104,7 +104,9 @@ void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 int_t bdd_root(cr_spbdd_handle x);
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits, size_t n_vars);
 
@@ -156,7 +158,9 @@ class bdd {
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
@@ -216,8 +220,12 @@ class bdd {
 	//XXX: work-in-progress
 	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
 	static int_t bdd_xor(int_t x, int_t y);
-	static int_t bitwiseAND(int_t a_in, int_t b_in); //, uint_t pos);
-	static int_t bitwiseXOR(int_t a_in, int_t b_in); //, uint_t pos);
+
+	static int_t bitwiseAND(int_t a_in, int_t b_in);
+	static int_t bitwiseOR(int_t a_in, int_t b_in);
+	static int_t bitwiseXOR(int_t a_in, int_t b_in);
+	static int_t bitwiseNOT(int_t a_in);
+
 	static int_t ADDER(int_t a_in, int_t b_in, bool carry, size_t bit);
 
 	typedef enum { L, H, X, U } t_path;
@@ -246,7 +254,7 @@ class bdd {
 	static int_t zero(size_t arg, size_t bits, size_t n_args);
 	static bool is_zero(int_t a_in, size_t bits);
 
-	static void ADDER_BE(int_t a_in, int_t b_in, size_t bit, size_t bits, size_t depth,
+	static void ADDER_BE(int_t a_in, int_t b_in, size_t bits, size_t depth,
 			size_t n_args, int_t &c);
 	static int_t ADDER_ACCS(int_t b_in, int_t accs, size_t depth, size_t bits, size_t n_args);
 	static void MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits,
@@ -323,7 +331,7 @@ public:
 	satcount_iter(cr_spbdd_handle r, uint_t nvars, const bools& inv) :
 		r(r->b), nvars(nvars), p(nvars), inv(inv), vp() {}
 	size_t count() { 
-		sat(r); 
+		sat(r);
 		return vp.size();
 	}
 private:

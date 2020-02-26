@@ -893,6 +893,7 @@ size_t bdd::satcount(spbdd_handle x, const bools& inv) {
 	// TODO: is it still possible that
 	// a) those bits are affected by something else, not body's bdd?
 	// b) other (unlisted) bits are affected via some bdd conversion?
+
 	return satcount_iter(x, inv.size(), inv).count();
 }
 

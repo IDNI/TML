@@ -347,10 +347,8 @@ private:
 		uint_t b, spbdd_handle r) const;
 	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
 		uint_t b) const;
-	spbdd_handle shr_test(size_t var0, int_t n1, size_t var2,
-		size_t n_vars);
-	spbdd_handle shl(size_t var0, int_t n1, size_t var2,
-		size_t n_vars);
+	spbdd_handle shr(size_t var0, size_t n1, size_t var2, size_t n_vars);
+	spbdd_handle shl(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle full_addder_carry_shift(size_t var0, size_t var1, size_t n_vars,
 		uint_t b, uint_t s, spbdd_handle r) const;
 	spbdd_handle full_adder_shift(size_t var0, size_t var1, size_t n_vars,
@@ -369,6 +367,18 @@ private:
 	spbdd_handle bdd_add_test(size_t n_vars);
 	spbdd_handle bdd_mult_test(size_t n_vars);
 	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
+
+	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
+	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
+	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
+	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
+			spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
+	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
+			spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
+
+	t_arith_op get_bwop(lexeme l);
+	t_arith_op get_pwop(lexeme l);
+
 
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,

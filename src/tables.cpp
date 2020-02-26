@@ -1743,6 +1743,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	//DBG(assert(!a.empty());)
+
 	for (size_t n = 0; n != a.size(); ++n)
 		if (hfalse == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
@@ -1750,17 +1751,29 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		} else v1.push_back(x);
 
 	if (a.idbltin > -1) {
+
 		lexeme bltintype = dict.get_bltin(a.idbltin);
 		int_t bltinout = a.bltinargs.back(); // for those that have ?out
+
+		// for bitwise and pairwise operators that take bdds as inputs
+		// these bdds are result of body query executed above
+		std::vector<int_t> bltininputs;
+		for(size_t i = 0; i < a.bltinargs.size(); i++) {
+			if (a.bltinargs[i] < 0) bltininputs.push_back(a.bltinargs[i]);
+		}
+
+
 		if (bltintype == L"count") {
 			body& b = *a[a.size() - 1];
 			// old, official satcount algorithm, phased out
 			int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
 			// new satcount based on the adjusted allsat_cb::sat (decompress)
 			if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
+
 			int_t cnt = bdd::satcount(x, b.inv);
 			// just equate last var (output) with the count
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
+
 			v1.push_back(x);
 			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
 			if (cnt != cnt0)
@@ -1797,6 +1810,24 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 				else if (arg & 2) os << (int_t)  (arg >> 2);
 				else              os << dict.get_sym(arg);
 			} while (n < a.bltinargs.size());
+		}
+		else if (t_arith_op op = get_bwop(bltintype); op != t_arith_op::NOP) {
+			size_t arg0_id = a.vm.at(bltininputs[0]);
+			size_t arg1_id = a.vm.at(bltininputs[1]);
+			spbdd_handle arg0 = v1[2];
+			spbdd_handle arg1 = v1[3];
+			x = bitwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+								arg0, arg1, a.varslen, op);
+			v1.push_back(x);
+		}
+		else if (t_arith_op op = get_pwop(bltintype); op != t_arith_op::NOP) {
+			size_t arg0_id = a.vm.at(bltininputs[0]);
+			size_t arg1_id = a.vm.at(bltininputs[1]);
+			spbdd_handle arg0 = v1[2];
+			spbdd_handle arg1 = v1[3];
+			x = pairwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+								 arg0, arg1, a.varslen, op);
+			v1.push_back(x);
 		}
 	}
 
