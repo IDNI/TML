@@ -204,7 +204,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	term::textype extype = (term::textype)r.extype;
 	// D: header builtin is treated as rel, but differentiated later (decomp.)
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
-	// skip the first symbol unless it's EQ/LEQ/ALU (which has VAR/CONST as 1st)
+	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
 	bool isrel = realrel || extype == term::BLTIN;
 	for (size_t n = !isrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
@@ -240,7 +240,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		}
 		return term(r.neg, tab, t, orderid, idbltin);
 	}
-	return term(r.neg, extype, r.alu_op, tab, t, orderid);
+	return term(r.neg, extype, r.arith_op, tab, t, orderid);
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
@@ -702,22 +702,22 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen) {
 
 spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars, leqvars, aluvars;
-	std::vector<const term*> eqterms, leqterms, aluterms;
+	set<int_t> pvars, nvars, eqvars, leqvars, arithvars;
+	std::vector<const term*> eqterms, leqterms, arithterms;
 	// first pass, just enlist eq terms (that have at least one var)
 	for (const term& t : a) {
-		bool haseq = false, hasleq = false, hasalu = false;
+		bool haseq = false, hasleq = false, hasarith = false;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) continue;
 			else if (t.extype == term::EQ) haseq = true; // .iseq
 			else if (t.extype == term::LEQ) hasleq = true; // .isleq
-			else if (t.extype == term::ALU) hasalu= true; // .isalu
+			else if (t.extype == term::ARITH) hasarith= true; // .isarith
 			else (t.neg ? nvars : pvars).insert(t[n]);
 		// TODO: BLTINS: add term::BLTIN handling
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
 		else if (hasleq) leqterms.push_back(&t);
-		else if (hasalu) aluterms.push_back(&t);
+		else if (hasarith) arithterms.push_back(&t);
 	}
 	for (const term* pt : eqterms) {
 		const term& t = *pt;
@@ -770,27 +770,27 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 			leqvars.insert(v1);
 	}
 
-	//XXX: alu support - Work in progress
-	for (const term* pt : aluterms) {
+	//XXX: arith support - Work in progress
+	for (const term* pt : arithterms) {
 		const term& t = *pt;
-		assert(t.size() == 3);
+		assert(t.size() >= 3);
 		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
 		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
-			aluvars.insert(v1);
+			arithvars.insert(v1);
 		if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2))
-			aluvars.insert(v2);
+			arithvars.insert(v2);
 		if (v3 < 0 && !has(nvars, v3) && !has(pvars, v3))
-			aluvars.insert(v3);
+			arithvars.insert(v3);
 	}
 
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // aluvars.erase(i);
+		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // arithvars.erase(i);
 	bdd_handles v;
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
-	for (int_t i : aluvars) range(vm.at(i), len, v);
+	for (int_t i : arithvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
@@ -1139,9 +1139,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			term& bt = lastbody.second;
 			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
-		} else if (t.extype == term::ALU) {
+		} else if (t.extype == term::ARITH) {
 			//returning bdd handler on leq variable
-			if (!isalu_handler(t,a,leq)) return;
+			if (!isarith_handler(t,a,leq)) return;
 			continue;
 		}
 		else if (t.extype == term::EQ) { //.iseq
@@ -1743,6 +1743,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	//DBG(assert(!a.empty());)
+
 	for (size_t n = 0; n != a.size(); ++n)
 		if (hfalse == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
@@ -1750,17 +1751,29 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		} else v1.push_back(x);
 
 	if (a.idbltin > -1) {
+
 		lexeme bltintype = dict.get_bltin(a.idbltin);
 		int_t bltinout = a.bltinargs.back(); // for those that have ?out
+
+		// for bitwise and pairwise operators that take bdds as inputs
+		// these bdds are result of body query executed above
+		std::vector<int_t> bltininputs;
+		for(size_t i = 0; i < a.bltinargs.size(); i++) {
+			if (a.bltinargs[i] < 0) bltininputs.push_back(a.bltinargs[i]);
+		}
+
+
 		if (bltintype == L"count") {
 			body& b = *a[a.size() - 1];
 			// old, official satcount algorithm, phased out
 			int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
 			// new satcount based on the adjusted allsat_cb::sat (decompress)
 			if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
+
 			int_t cnt = bdd::satcount(x, b.inv);
 			// just equate last var (output) with the count
 			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
+
 			v1.push_back(x);
 			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
 			if (cnt != cnt0)
@@ -1797,6 +1810,24 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 				else if (arg & 2) os << (int_t)  (arg >> 2);
 				else              os << dict.get_sym(arg);
 			} while (n < a.bltinargs.size());
+		}
+		else if (t_arith_op op = get_bwop(bltintype); op != t_arith_op::NOP) {
+			size_t arg0_id = a.vm.at(bltininputs[0]);
+			size_t arg1_id = a.vm.at(bltininputs[1]);
+			spbdd_handle arg0 = v1[2];
+			spbdd_handle arg1 = v1[3];
+			x = bitwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+								arg0, arg1, a.varslen, op);
+			v1.push_back(x);
+		}
+		else if (t_arith_op op = get_pwop(bltintype); op != t_arith_op::NOP) {
+			size_t arg0_id = a.vm.at(bltininputs[0]);
+			size_t arg1_id = a.vm.at(bltininputs[1]);
+			spbdd_handle arg0 = v1[2];
+			spbdd_handle arg1 = v1[3];
+			x = pairwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+								 arg0, arg1, a.varslen, op);
+			v1.push_back(x);
 		}
 	}
 

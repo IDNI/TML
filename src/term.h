@@ -14,15 +14,15 @@
 
 struct term : public ints {
 	bool neg = false, goal = false;
-	enum textype { REL, EQ, LEQ, BLTIN, ALU } extype = term::REL;
-	t_alu_op alu_op = NOP;
+	enum textype { REL, EQ, LEQ, BLTIN, ARITH } extype = term::REL;
+	t_arith_op arith_op = NOP;
 	ntable tab = -1;
 	size_t orderid = 0;
 	// D: TODO: builtins are very different, handle as a same size union struct?
 	int_t idbltin = -1; // size_t bltinsize;
 	term() {}
-	term(bool neg, textype extype, t_alu_op alu_op, ntable tab, const ints& args, size_t orderid)
-		: ints(args), neg(neg),extype(extype), alu_op(alu_op), tab(tab), orderid(orderid) {}
+	term(bool neg, textype extype, t_arith_op arith_op, ntable tab, const ints& args, size_t orderid)
+		: ints(args), neg(neg),extype(extype), arith_op(arith_op), tab(tab), orderid(orderid) {}
 	// builtins .ctor
 	term(bool neg, ntable tab, const ints& args, size_t orderid, int_t idbltin)
 		: ints(args), neg(neg), extype(term::BLTIN), tab(tab), orderid(orderid),
@@ -30,7 +30,6 @@ struct term : public ints {
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		//if (extype != t.extype) return extype < t.extype;
-		//if (isalu != t.isalu) return isalu;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		return (const ints&)*this < t;

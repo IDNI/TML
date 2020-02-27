@@ -85,8 +85,8 @@ namespace o { // call driver::init() before using any o::xxx() wostream
 }
 
 typedef enum  {
-	NOP, ADD, SUB, MULT, BITWOR, BITWAND, BITWXOR, SHR, SHL
-} t_alu_op;
+	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
+} t_arith_op;
 
 #endif
 //#define TRANSFORM_BIN_DRIVER

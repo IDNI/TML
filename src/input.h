@@ -34,14 +34,15 @@ bool operator==(const lexeme& x, const lexeme& y);
 
 static const std::set<std::wstring> str_bltins =
 	{ L"alpha", L"alnum", L"digit", L"space", L"printable", L"count",
-		L"rnd", L"print", L"lprint", L"halt", L"fail" };
+		L"rnd", L"print", L"lprint", L"halt", L"fail",
+		L"bw_and", L"bw_or", L"bw_xor", L"bw_not", L"pw_add", L"pw_mult"};
 
 struct elem {
 	enum etype {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, LT,
-		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ALU
+		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH
 	} type;
-	t_alu_op alu_op = NOP;
+	t_arith_op arith_op = NOP;
 	int_t num = 0;
 	lexeme e;
 	wchar_t ch;
@@ -73,9 +74,9 @@ struct elem {
 struct raw_term {
 	// TODO: enum 'is...' stuff
 	bool neg = false;
-	//bool iseq = false, isleq = false, islt = false, isbltin = false, isalu = false;
-	enum rtextype { REL, EQ, LEQ, BLTIN, ALU } extype = raw_term::REL;
-	t_alu_op alu_op = NOP;
+	//bool iseq = false, isleq = false, islt = false, isbltin = false;
+	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH } extype = raw_term::REL;
+	t_arith_op arith_op = NOP;
 	std::vector<elem> e;
 	ints arity;
 	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog);
@@ -86,7 +87,6 @@ struct raw_term {
 		return neg == t.neg && e == t.e && arity == t.arity &&
 			extype == t.extype;
 			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
-			//isalu == t.isalu;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };

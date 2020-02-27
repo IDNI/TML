@@ -1,0 +1,3 @@
+A(7).
+A(4).
+B(?out) :- A(?x), count( ?x ?out ).
