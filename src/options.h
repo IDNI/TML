@@ -60,13 +60,13 @@ struct option {
 		int          v_i = 0;
 		bool         v_b = false;
 		std::wstring v_s = L"";
-	};
+	} v;
 	typedef std::function<void(const value&)> callback;
 	option() {}
 	option(type t, wstrings n, callback e, option::value v={})
-		: t(t), n(n), v(v), e(e) {}
+		: v(v), t(t), n(n), e(e) {}
 	option(type t, wstrings n, option::value v={})
-		: t(t), n(n), v(v), e(0) {}
+		: v(v), t(t), n(n), e(0) {}
 	const std::wstring& name() const { return n[0]; }
 	const wstrings& names() const { return n; }
 	type get_type() const { return t; }
@@ -140,7 +140,6 @@ struct option {
 private:
 	type t;
 	wstrings n; // vector of name and alternative names (shortcuts)
-	value v;
 	callback e; // callback with value as argument, fired when option parsed
 	std::wstring desc = L"";
 };
@@ -167,9 +166,13 @@ public:
 	void set(const std::wstring name, const option o) {
 		opts.insert_or_assign(name, o);
 	}
+	template <typename T>
+	void set(const std::wstring &name, T val);
 	void parse(int argc, char** argv, bool internal = false);
 	void parse(strings sargs,         bool internal = false);
 	void parse(wstrings wargs,        bool internal = false);
+	void enable(const std::wstring &arg);
+	void disable(const std::wstring &arg);
 	bool enabled (const std::wstring &arg) const;
 	bool disabled(const std::wstring &arg) const { return !enabled(arg); }
 	int           get_int   (std::wstring name) const;

@@ -25,10 +25,12 @@ int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	driver::init();
 	options o(argc, argv);
-	// read from stdin by default if no -i(e), -h, -v and no -repl
+	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
 	if (o.disabled(L"i") && o.disabled(L"ie") && o.disabled(L"repl")
-				&& o.disabled(L"h") && o.disabled(L"v"))
+			&& o.disabled(L"h") && o.disabled(L"v")
+			&& o.disabled(L"udp"))
 		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
+	if (o.enabled(L"udp") && o.disabled(L"repl")) o.enable(L"repl");
 	if (o.enabled(L"repl")) repl r(o);
 	else {
 		driver d(o);

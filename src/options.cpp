@@ -61,6 +61,16 @@ void options::parse(wstrings wargs, bool internal) {
 	}
 }
 
+template <typename T>
+void options::set(const wstring &name, T val) {
+	option o;
+	if (!get(name, o)) return;
+	o.v.set(val);
+	set(name, o);
+}
+void options::enable (const wstring &name) { set(name, true ); }
+void options::disable(const wstring &name) { set(name, false); }
+
 bool options::enabled(const wstring &name) const {
 	option o;
 	if (!get(name, o)) return false;
@@ -159,6 +169,13 @@ void options::setup() {
 		[this](const option::value& v) {
 			add_input_data(v.get_string());
 		}).description(L"input string to evaluate"));
+
+	add_bool(L"udp",     L"open REPL on udp socket");
+	add(option(option::type::STRING, {L"udp-addr", L"ua"})
+		.description(L"IP address (udp)"));
+	add(option(option::type::INT, { L"udp-port", L"up" })
+		.description(L"port (udp)"));
+
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
 	add_bool(L"proof",   L"extract proof");
@@ -213,7 +230,9 @@ void options::init_defaults() {
 		L"--info",        L"@stderr",
 		L"--repl-output", L"@stdout",
 		L"--benchmarks",  L"@stdout",
-		L"--optimize"
+		L"--optimize",
+		L"--udp-addr",    L"127.0.0.1",
+		L"--udp-port",    L"6283"
 	}, true);
 	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
 }
