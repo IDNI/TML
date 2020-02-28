@@ -1,0 +1,8 @@
+father(Tom Amy).
+canFly(bird).
+edge(6 3).
+night().
+pair(1 2).
+direct(London NY).
+triple(3 9 12).
+beginsWithJ(Joe).

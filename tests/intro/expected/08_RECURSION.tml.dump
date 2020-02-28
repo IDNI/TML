@@ -1,0 +1,16 @@
+parent(Tom Amy).
+parent(Grace Amy).
+parent(Amy Fred).
+parent(Jack Fred).
+parent(Fred Sue).
+ancestor(Tom Amy).
+ancestor(Grace Amy).
+ancestor(Tom Sue).
+ancestor(Tom Fred).
+ancestor(Grace Sue).
+ancestor(Grace Fred).
+ancestor(Amy Sue).
+ancestor(Amy Fred).
+ancestor(Jack Sue).
+ancestor(Jack Fred).
+ancestor(Fred Sue).

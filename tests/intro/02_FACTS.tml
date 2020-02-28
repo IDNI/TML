@@ -1,0 +1,14 @@
+# Facts define RELATIONS between entities.
+# Fact clauses are considered to be true.
+
+father(Tom Amy).   # Tom is a father of Amy.
+canFly(bird).      # Bird can fly.
+edge(6 3).         # Exists an edge from 6 to 3.
+night.             # It's night.
+pair(1 2).         # Exists a pair 1, 2.
+direct(London NY). # London has a direct to NY.
+triple(3 9 12).    # Exists a triple 3-9-12.
+beginsWithJ(Joe).  # Joe begins with J.
+
+# Output is padded by '*' character when
+# different ARITIES are used.

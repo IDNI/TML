@@ -1,0 +1,13 @@
+setA(15).
+e(7).
+e(2).
+e(1).
+setB(7 7 14).
+setB(7 2 9).
+setB(7 1 8).
+setB(2 7 9).
+setB(1 7 8).
+setB(2 2 4).
+setB(2 1 3).
+setB(1 2 3).
+setB(1 1 2).

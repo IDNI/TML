@@ -1,0 +1,7 @@
+# Dyck's language
+{
+	@string str "((()()()((()()()))))".
+	S => '(' S ')' S | null.
+}{
+	~S(?x ?x):-S(?x ?x).
+}

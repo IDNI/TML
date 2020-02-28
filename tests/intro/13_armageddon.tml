@@ -1,0 +1,32 @@
+universe(100).
+
+# There are birds Charlie and Coco
+bird(Charlie).
+bird(Coco).
+
+# and there are humans John and Jane,
+human(John).
+human(Jane).
+
+# Uncomment the following line to end the world
+armageddon.
+
+# bird is a being
+being(?x) :- bird(?x), ~dead(?x).
+
+# human is a being
+being(?x) :- human(?x), ~dead(?x).
+
+# dead being is a corpse
+corpse(?x) :- being(?x), dead(?x).
+
+# beings are mortal
+mortal(?x) :- being(?x), ~dead(?x).
+
+# if armageddon, then all mortals die
+dead(?x) :- mortal(?x), armageddon.
+
+~mortal(?x)  :- mortal(?x), dead(?x).
+~being(?x)   :- being(?x), dead(?x).
+
+#died(?entity ?step) :- tml_update(?step add dead ?entity).

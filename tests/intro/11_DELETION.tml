@@ -1,0 +1,39 @@
+# Negation in heads deletes the fact from
+# the database of facts.
+
+happy.          # happy.
+~happy :- sad.  # not happy if sad.
+sad.            # sad.
+# will result into 'sad'. No 'happy'.
+
+# e relation represents directed graph:
+# 1->2, 2->3, 3->4, 4->5, 5->1
+e(1 2).
+e(2 3).
+e(3 4).
+e(4 5).
+e(5 1).
+
+# Following program should get the first
+# non-direct (transitive) path from each
+# node of the graph 'e'
+
+# state of the program: not done
+notdone.
+
+# TRANSITIVE CLOSURE to get all
+# possible paths through the graph
+# while notdone
+t(?x ?y) :- e(?x ?y), notdone.
+t(?x ?z) :- t(?x ?y), e(?y ?z), notdone.
+
+# and we are done (yes, in the 1st step)
+done :- notdone.
+
+# if done, remove original graph
+# from the resulting graph
+~t(?x ?y) :- e(?x ?y), done.
+
+# if done, then remove notdone fact to
+# stop the TC
+~notdone :- done.

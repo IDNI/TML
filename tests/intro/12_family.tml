@@ -1,0 +1,18 @@
+father(Tom Amy).
+father(Jack Fred).
+father(Tony CarolII).
+father(Fred CarolIII).
+
+mother(Grace Amy).
+mother(Amy Fred).
+mother(CarolI CarolII).
+mother(CarolII CarolIII).
+
+parent(?X ?Y) :- father(?X ?Y).
+parent(?X ?Y) :- mother(?X ?Y).
+ancestor(?X ?Y) :- parent(?X ?Y).
+ancestor(?X ?Y) :- parent(?X ?Z), ancestor(?Z ?Y).
+
+# This example is taken
+# from Datalog Educational System
+# http://des.sourceforge.net/

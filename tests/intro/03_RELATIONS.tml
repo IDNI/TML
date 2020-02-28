@@ -1,0 +1,36 @@
+# Every FACT begins with a predicate,
+# which is also the name of a relation.
+#
+# We can think of:
+#     relations as tables,
+#     facts as rows and
+#     entities as columns.
+#
+# Set of relations is called a model, or
+# relational structure.
+#                    _____________
+                   # |_beginsWithJ_|
+beginsWithJ(Jane). # |    Jane     |
+beginsWithJ(John). # |    John     |
+beginsWithJ(Jack). # |____Jack_____|
+                   #  _____________
+                   # |___uncle_____|
+uncle(Jim Joe).    # |  Jim | Joe  |
+uncle(Joe Jill).   # |  Joe | Jill |
+uncle(Joe Jack).   # |__Joe_|_Jack_|
+
+employee(John Doe sales).
+employee(Jane Doe support).
+#  ______________________
+# |______employee________|
+# | John | Doe | sales   |
+# |_Jane_|_Doe_|_support_|
+
+# FACTS (rows) in a relation (table) are
+# unordered. It means it doesn't matter which
+# fact comes first.
+# Entities (columns) are unnamed and ordered.
+# It's a difference from common relational
+# databases where columns are named.
+#
+# Number of columns is also called ARITY.

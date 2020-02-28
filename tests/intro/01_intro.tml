@@ -1,0 +1,12 @@
+# Enter your TML logic program here and
+# press RUN to execute.
+#
+# Any text following the '#' character is
+# a comment and is ignored by TML.
+#
+# Logic programs consist of logic clauses.
+# This program has no logic clause.
+#
+# Clauses can be either FACTS or RULES and
+# they are terminated by the '.' character
+# like sentences in English.

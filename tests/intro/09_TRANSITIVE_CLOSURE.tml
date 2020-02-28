@@ -1,0 +1,28 @@
+# Transitive closure (TC)
+#
+# TC of a directed graph is simply another
+# directed graph representing paths
+# in the original graph.
+#
+# This is a classical example of recursion.
+#
+# Let's have a directed graph represented by
+# following 'e' relation:
+
+e(1 2).
+e(2 3).
+e(3 4).
+e(4 5).
+e(5 1).
+e(8 9).
+
+tc(?x ?y) :- e(?x ?y).
+# Edge from ?x to ?y is a path from ?x to ?y.
+
+tc(?x ?y) :- tc(?x ?z), e(?z ?y).
+# If there is a path from ?x to ?z and there
+# is an edge from ?z to ?y there is path from
+# ?x to ?y
+
+# TML infers all the possible paths in the
+# 'e' graph into 'tc' graph.

@@ -1,0 +1,44 @@
+# Rules allow creation/inferring of new facts.
+# Every rule has a head and a body separated by
+# ':-' symbol. Head is on the left side and body
+# is on the right side.
+# Rules are also called Horn Clauses.
+# They work the way that head is true if body is
+# true.
+# You can imagine rules like facts (in head)
+# with conditions (in body).
+
+# TML takes all the known facts and tries to
+# match them into bodies of all the known rules.
+# When a fact matches a body of a rule it infers
+# new fact from the head of the rule.
+
+rain.                   # rain.
+wet :- rain.            # wet if rain.
+freezing :- bellowZero. # freezing if bellow 0.
+
+# Here TML infers it's wet because it knows it
+# rains.
+# See there is 'rain' and 'wet' in the output.
+# There is no 'freezing' because there is no
+# 'bellowZero'.
+
+p(1 2).           # 1-2 exists.
+p(1 4).           # 1-4 exists.
+p(3 1) :- p(1 3). # 3-1 exists if 1-3 exists.
+p(2 1) :- p(1 2). # 2-1 exists if 1-2 exists.
+
+# Here TML infers 2 1 because there exist 1 2.
+# You should see 1 2, 1 4 and 2 1 in the output.
+# There is no 3 1 because there is no 1 3.
+
+employee(Suzi female).
+salutation(Suzi Madam) :- employee(Suzi female).
+
+# If employee Suzi is female, Suzi's salutation
+# is Madam.
+# TML correctly infers that Suzi's salutation is
+# Madam because employee Suzi is female.
+
+# Rules become more powerful when used with
+# VARIABLES.

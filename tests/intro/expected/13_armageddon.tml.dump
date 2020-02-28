@@ -1,0 +1,14 @@
+universe(100).
+bird(Coco).
+bird(Charlie).
+human(Jane).
+human(John).
+armageddon().
+dead(Jane).
+dead(John).
+dead(Coco).
+dead(Charlie).
+corpse(Jane).
+corpse(John).
+corpse(Coco).
+corpse(Charlie).

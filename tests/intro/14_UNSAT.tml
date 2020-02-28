@@ -1,0 +1,10 @@
+# Following program does 6 steps and returns
+# to the state where it initially started.
+#
+# TML has to stop and outputs: unsat.
+#
+# Not stopping would cause an infinite loop
+
+ true.
+ toggle :- true.
+~toggle :- true.
