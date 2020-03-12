@@ -13,7 +13,7 @@ mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 rm -f ./CMakeCache.txt
 
-cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-cmake --build . -- -j5
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
+ninja
 
 cd ..

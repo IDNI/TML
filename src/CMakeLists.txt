@@ -79,6 +79,9 @@ target_setup(TMLo)
 target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS} -fPIC)
 target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
 target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
+target_link_libraries(TMLo
+		${CMAKE_THREAD_LIBS_INIT}
+		)
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )

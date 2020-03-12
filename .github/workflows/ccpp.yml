@@ -1,0 +1,35 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  linux-debug:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        compiler:
+          - clang-9
+          - gcc-8
+        os: [ubuntu-latest, macOS-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Bulding debug version
+        run: |
+          mkdir -p build-Debug
+          cd build-Debug
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
+          ninja
+      - name: Running tests
+        run: ./build-Debug/tests/test_tml
+      - name: TML execution
+        run: ./build-Debug/tml -ie "a(1)."
+

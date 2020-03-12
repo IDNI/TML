@@ -22,6 +22,11 @@ using namespace std;
 
 cws_range input::source{0,0};
 
+/**
+ * This function tokenizes the input string
+ * @param moving pointer to the string part
+ * @return pointer to the beginning and end of lexeme in the string
+ */
 lexeme lex(pcws s) {
 	while (iswspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };

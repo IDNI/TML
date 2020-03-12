@@ -1,3 +1,38 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Misc
+.idea
 build-*
 tml-config.cmake
 
@@ -5,3 +40,4 @@ tml-config.cmake
 src/inputsave.cpp
 src/inputsave.h
 src/tmlsave.g
+doctest.h
