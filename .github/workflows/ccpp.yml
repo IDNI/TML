@@ -16,7 +16,6 @@ jobs:
       matrix:
         compiler:
           - clang-9
-          - gcc-8
         os: [ubuntu-latest, macOS-latest]
 
     steps:
