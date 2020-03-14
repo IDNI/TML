@@ -1,11 +1,16 @@
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_CXX_COMPILER clang++)
-set(CMAKE_ASM_COMPILER clang)
+if(NOT DEFINED $ENV{CMAKE_CXX_COMPILER})
+    message("Using $ENV{CMAKE_CXX_COMPILER} compiler")
+else()
+    message("Using clang compiler")
+    set(CMAKE_C_COMPILER clang)
+    set(CMAKE_CXX_COMPILER clang++)
+    set(CMAKE_ASM_COMPILER clang)
+endif()
 set(CMAKE_VERBOSE_MAKEFILE true CACHE BOOL "")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#        -fcoverage-mapping -fprofile-instr-generate -coverage -fprofile-arcs -ftest-coverage
+
 set(CMAKE_CXX_FLAGS "\
 		-Wall \
 		-Wextra \
@@ -26,7 +31,7 @@ if (USED_CMAKE_GENERATOR MATCHES "Ninja")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 --coverage")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -58,11 +63,11 @@ set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 # Testing
 
 if (BUILD_TESTS)
-    set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
+    set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/doctest.h" CACHE PATH "Doctest header")
     if (NOT EXISTS "${DOCTEST_HEADER}")
-        message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}/src'")
+        message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
         find_package(Wget REQUIRED)
-        execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/onqtam/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
+        execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/onqtam/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR})
     endif ()
 
     add_library(doctest INTERFACE)

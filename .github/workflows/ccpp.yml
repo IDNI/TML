@@ -16,6 +16,7 @@ jobs:
       matrix:
         compiler:
           - clang-9
+          - gcc-9.2
         os: [ubuntu-latest, macOS-latest]
 
     steps:
@@ -29,6 +30,14 @@ jobs:
           ninja
       - name: Running tests
         run: ./build-Debug/tests/test_tml
+      - name: Generating coverage report
+        if: success() && matrix.compiler == 'gcc-9.2' && matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get -y install lcov
+          lcov -c -d ./build-Debug/src/CMakeFiles -o coverage.info
+          lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          lcov --list coverage.info # debug info
+          bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
       - name: TML execution
         run: ./build-Debug/tml -ie "a(1)."
 
