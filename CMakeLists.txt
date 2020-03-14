@@ -58,11 +58,11 @@ set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 # Testing
 
 if (BUILD_TESTS)
-    set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/doctest.h" CACHE PATH "Doctest header")
+    set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
     if (NOT EXISTS "${DOCTEST_HEADER}")
-        message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
+        message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}/src'")
         find_package(Wget REQUIRED)
-        execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/onqtam/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR})
+        execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/onqtam/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
     endif ()
 
     add_library(doctest INTERFACE)
