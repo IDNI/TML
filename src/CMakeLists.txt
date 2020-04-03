@@ -10,6 +10,7 @@ if(CMAKE_CONFIGURATION_TYPES)
 	)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(TML_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
 list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
@@ -79,12 +80,20 @@ target_setup(TMLo)
 target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS} -fPIC)
 target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
 target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
-target_link_libraries(TMLo
+target_link_libraries(TMLo PUBLIC
 		${CMAKE_THREAD_LIBS_INIT}
 		)
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
+
+# boost
+###########
+find_package(Boost COMPONENTS system thread REQUIRED)
+if(Boost_FOUND)
+	target_include_directories(TMLo PRIVATE ${Boost_INCLUDE_DIRS})
+	target_link_libraries(TMLo PUBLIC Boost::boost Boost::system)
+endif(Boost_FOUND)
 
 
 # shared library

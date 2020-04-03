@@ -1,0 +1,5 @@
+#!/bin/bash
+cd "@CMAKE_SOURCE_DIR@"
+git ls-files *.h *.cpp *.hpp | while read file; do
+    "@CLANG_FORMAT@" -i --verbose --style=file $file
+done

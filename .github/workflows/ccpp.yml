@@ -7,29 +7,72 @@ on:
     branches: [ master ]
 
 jobs:
-  linux-debug:
-
+  debug-build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        compiler:
-          - clang-9
-          - gcc-9.2
+        compiler: [clang-9, gcc-9.2]
         os: [ubuntu-latest, macOS-latest]
 
     steps:
       - uses: actions/checkout@v2
       - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Installing Boost on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo add-apt-repository ppa:mhier/libboost-latest
+          sudo apt-get update
+          sudo apt-get install -y libboost1.70 libboost1.70-dev
+#      - name: Install compilers for OSX
+#          if: matrix.os == 'macOS-latest'
+#          run: |
+#            if [ "${{ matrix.compiler }}" = "gcc-9.2" ]; then
+#            brew install gcc@9
+#            else
+#            sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
+#            fi
+      - name: Installing Boost on MacOS
+        if: matrix.os == 'macOS-latest'
+        run: |
+          brew install boost
+      - name: Installing clang tidy
+        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y clang-tidy-9
+      - name: Installing cppcheck on macOS
+        if: matrix.os == 'macOS-latest'
+        run: |
+          brew install cppcheck
       - name: Bulding debug version
         run: |
+          if [ "${{ matrix.compiler }}" = "gcc-9.2" ]; then
+            CMAKE_CXX_COMPILER=g++
+          else
+            CMAKE_CXX_COMPILER=clang++
+          fi
           mkdir -p build-Debug
           cd build-Debug
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-          ninja
+          cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          make -j5
       - name: Running tests
         run: ./build-Debug/tests/test_tml
+      - name: Running CPP check
+        if: matrix.compiler == 'clang-9' && matrix.os == 'macOS-latest'
+        run: |
+          cd build-Debug
+          make -j5 cppcheck
+#      - name: Formatting
+#        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+#        run: |
+#          cd build-Debug
+#          make -j5 clang-format
+      - name: Running clang tidy
+        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+        run: |
+          cd build-Debug
+          make -j5 clang-tidy
       - name: Generating coverage report
         if: success() && matrix.compiler == 'gcc-9.2' && matrix.os == 'ubuntu-latest'
         run: |
