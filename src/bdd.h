@@ -10,6 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __BDD_H__
+#define __BDD_H__
+
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -36,6 +39,10 @@ typedef std::vector<int_t> bdds;
 typedef std::vector<spbdd_handle> bdd_handles;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+
+typedef std::pair<bools, uints> xperm;
+typedef std::tuple<bools, uints, uints> xperm_bits;
+typedef std::tuple<uints, bools, uints> permex_bits;
 
 struct ite_memo {
 	int_t x, y, z;
@@ -85,12 +92,22 @@ spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 spbdd_handle bdd_or_many(bdd_handles v);
 spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools& b);
 spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
-spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b, const uints& m);
-spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b, const uints& m);
-spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
-spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
+//spbdd_handle bdd_and_ex_perm(
+//	cr_spbdd_handle x, cr_spbdd_handle y, const bools& b, const uints& m);
+spbdd_handle bdd_and_ex_perm(
+	cr_spbdd_handle, cr_spbdd_handle, const bools&, const uints&, const uints&);
+//spbdd_handle bdd_and_not_ex_perm(
+//	cr_spbdd_handle x, cr_spbdd_handle y, const bools& b, const uints& m);
+spbdd_handle bdd_and_not_ex_perm(
+	cr_spbdd_handle, cr_spbdd_handle, const bools&, const uints&, const uints&);
+//spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
+spbdd_handle bdd_and_many_ex_perm(
+	bdd_handles v, const bools& b, const uints&, const uints&);
+spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const xperm_bits&);
+//spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
+spbdd_handle bdd_permute_ex(
+	cr_spbdd_handle x, const bools& ex, const uints& perm, const uints& vbits);
+
 spbdd_handle from_eq(uint_t x, uint_t y);
 std::array<spbdd_handle, 2> solve(spbdd_handle x, int_t v);
 int_t bdd_or_reduce(bdds b);
@@ -132,14 +149,20 @@ class bdd {
 	friend spbdd_handle bdd_and_many(bdd_handles v);
 	friend spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 	friend spbdd_handle bdd_or_many(bdd_handles v);
-	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
-		const uints& m);
+	//friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
+	//	const uints& m);
+	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& ex,
+		const uints& perm, const uints& vbits);
 	friend spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle,
-		const bools& b, const uints& m);
-	friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x,
-		cr_spbdd_handle, const bools& b, const uints& m);
-	friend spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b,
-		const uints&);
+		const bools& ex, const uints& perm, const uints& vbits);
+	friend spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
+		const bools& ex, const uints& p, const uints& vbits);
+	//friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x,
+	//	cr_spbdd_handle, const bools& b, const uints& m);
+	friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle, cr_spbdd_handle,
+		const bools&, const uints&, const uints&);
+	friend spbdd_handle bdd_and_many_ex_perm(
+		bdd_handles v, const bools& b, const uints&, const uints&);
 	friend spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 		const bools& b);
 	friend spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
@@ -192,17 +215,26 @@ class bdd {
 	static int_t bdd_ex(int_t x, const bools& b);
 	static int_t bdd_permute(const int_t& x, const uints& m,
 		std::unordered_map<int_t, int_t>& memo);
-	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m,
-		size_t last, std::unordered_map<int_t, int_t>& memo);
-	static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
+	//static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m,
+	//	size_t last, std::unordered_map<int_t, int_t>& memo);
+	//static int_t bdd_permute_ex(int_t x, const bools& b, const uints& m);
+	static int_t bdd_permute_ex(int_t x, const bools& ex, const uints& perm, 
+		const uints& vbits, size_t last, std::unordered_map<int_t, int_t>& m);
+	static int_t bdd_permute_ex(
+		int_t x, const bools& ex, const uints& perm, const uints& vbits);
+
 	static bool solve(int_t x, int_t v, int_t& l, int_t& h);
 	static void mark_all(int_t i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, int_t&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		int_t &m);
-	static int_t bdd_and_ex_perm(int_t x, int_t y, const bools& ex,
-		const uints&);
-	static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
+	//static int_t bdd_and_ex_perm(
+	//	int_t x, int_t y, const bools& ex, const uints&);
+	static int_t bdd_and_ex_perm(
+		int_t x, int_t y, const bools& ex, const uints& p, const uints& vbits);
+	//static int_t bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
+	static int_t bdd_and_many_ex_perm(
+		bdds v, const bools&, const uints&, const uints&);
 	static void sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r);
 	static vbools allsat(int_t x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, int_t>&);
@@ -210,8 +242,8 @@ class bdd {
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
-	inline static int_t add(int_t v, int_t h, int_t l);
-	inline static int_t from_bit(uint_t b, bool v);
+	static int_t add(int_t v, int_t h, int_t l);
+	static int_t from_bit(uint_t b, bool v);
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
 	static std::wostream& out(std::wostream& os, int_t x);
@@ -272,6 +304,7 @@ public:
 	}
 	static void init();
 	static void gc();
+	static void cleancache();
 	static std::wostream& stats(std::wostream& os);
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
@@ -343,3 +376,4 @@ private:
 	std::set<bools> vp;
 	void sat(int_t x);
 };
+#endif // __BDD_H__

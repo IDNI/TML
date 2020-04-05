@@ -17,6 +17,7 @@
 #include <map>
 #include <fstream>
 #include "defs.h"
+#include "types.h"
 
 extern std::wostream wcnull;
 

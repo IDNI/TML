@@ -1,7 +1,7 @@
 rain().
 wet().
+p(1 2).
 p(1 4).
 p(2 1).
-p(1 2).
 employee(Suzi female).
 salutation(Suzi Madam).

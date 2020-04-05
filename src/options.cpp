@@ -196,6 +196,10 @@ void options::setup() {
 	add_bool2(L"print-dict", L"dict", L"print internal string dictionary");
 
 	add_bool(L"optimize",L"optimize and show more benchmarks");
+	add_bool(L"autotype",L"automatic prepare types, or off/optimize/manual");
+	add_bool(L"bitsfromright", L"internal: encode consts bits from left/right");
+	add_bool(L"dumptype",L"dump all types for debug purposes");
+	add_bool(L"addbit",  L"test addbit");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			output::set_name(v.get_string());

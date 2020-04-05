@@ -49,6 +49,8 @@ void from_range(size_t max, size_t bits, size_t arg, size_t args, spnode r) {
 
 void test_query() {
 	size_t bits, arg1 = 0, arg2 = 1, args = 3;
+	// D: this needs bitsmeta of some sort (table, alt or custom?)
+	//bitsmeta bm;
 	for (bits = 1; bits <= 10; ++bits)
 		for (size_t n = 0; n != (size_t)(1<<bits); ++n) {
 			wcout<<"max: "<<n<<" bits: "<<bits<<endl;

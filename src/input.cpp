@@ -80,9 +80,11 @@ lexeme lex(pcws s) {
 		if (*(*s + 2) != L'\'') parse_error(*s+2, err_quote);
 		return { t, ++++++*s };
 	}
+	bool istype = false;
 	if (**s == L':') {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
-		else parse_error(*s, err_chr);
+		++*s; // treat like ? and eat all after that
+		istype = true;
 	}
 	// NEQ: make sure we don't turn off directives (single '!'). limits?
 	if (**s == L'!' && *(*s + 1) == L'=') {
@@ -98,11 +100,14 @@ lexeme lex(pcws s) {
 	// TODO: single = instead of == recheck if we're not messing up something?
 	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
-	if (wcschr(L"!~.,;(){}$@=<>|&^+*", **s)) return ++*s, lexeme{ *s-1, *s };
+	if (wcschr(L"!~.,;(){}$@=<>|&^+*[]", **s)) return ++*s, lexeme{ *s-1, *s };
 	//TODO: review - for subtraction
 	if (wcschr(L"?-", **s)) ++*s;
 	if (!iswalnum(**s) && **s != L'_') parse_error(*s, err_chr);
-	while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
+	if (!istype)
+		while (**s && (iswalnum(**s) || **s == L'_')) ++*s;
+	else
+		while (**s && (iswalnum(**s) || wcschr(L"_[]", **s))) ++*s;
 	return { t, *s };
 }
 
@@ -254,7 +259,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		return e = l[pos++], type = ARITH, arith_op = SHL, true;
 	}
 
-	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?", *l[pos][0])) return false;
+	if (!iswalnum(*l[pos][0]) && !wcschr(L"\"'-?:", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == L'\'') {
 		type = CHR, e = { 0, 0 };
 		if (l[pos][0][1] == L'\'') ch = 0;
@@ -267,6 +272,8 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		else throw 0;
 	}
 	else if (*l[pos][0] == L'?') type = VAR;
+	else if (*l[pos][0] == L':') 
+		type = ARGTYP;
 	else if (iswalpha(*l[pos][0])) {
 		size_t len = l[pos][1]-l[pos][0];
 		if( len == 6 && !wcsncmp(l[pos][0], L"forall", len ))
@@ -288,14 +295,27 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
 		lt = false, geq = false, bltin = false, arith = false;
-	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
 	t_arith_op arith_op_aux = NOP;
 	//XXX: review for "-"
-	while (!wcschr(L".:,;{}-", *l[pos][0])) { // L".:,;{}|&-<"
+	nargs = 0;
+	bool isarg = false; // basically telling us whether previous elem was an arg
+	// these are the term terminators, ':' is not on its own but if :- or :=
+	while (!wcschr(L".,;{}-", *l[pos][0])) { // L".:,;{}|&-<"
+		// check if : is actually a terminator or the :type[bits]
+		if (L':' == *l[pos][0])
+			if (L'-' == l[pos][0][1] || L'=' == l[pos][0][1] || !isarg)
+				break;
+		// -> and <-> multichar terminators
+		if (L'-' == *l[pos][0] && L'>' == l[pos][0][1])
+			break;
+		if (L'<' == *l[pos][0] && L'-' == l[pos][0][1] && L'>' == l[pos][0][2])
+			break;
+
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
 		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos)
+		isarg = false;
 		switch (el.type) {
 			case elem::EQ: eq = true; break;
 			case elem::NEQ: noteq = true; break;
@@ -308,10 +328,21 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 					el.type = elem::BLTIN;
 					bltin = true;
 				}
+				isarg = true;
 				break;
-			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
+			case elem::NUM:
+			case elem::CHR:
+			case elem::STR:
+			case elem::VAR:
+				isarg = true;
+				break;
+			case elem::ARITH: 
+				arith = true; 
+				arith_op_aux = e.back().arith_op; 
+				break;
 			default: break;
 		}
+		if (isarg) ++nargs;
 		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
@@ -411,6 +442,7 @@ void raw_term::calc_arity() {
 	if (e.size() == 1) return;
 	for (size_t n = 2; n < e.size()-1; ++n)
 		if (e[n].type == elem::OPENP) ++dep, arity.push_back(-1);
+		else if (e[n].type == elem::ARGTYP) {} // && e[n-1].type == elem::VAR
 		else if (e[n].type != elem::CLOSEP) {
 			if (arity.back() < 0) arity.push_back(1);
 			else ++arity.back();
@@ -483,7 +515,7 @@ bool raw_sof::parsematrix(const lexemes& l, size_t& pos, raw_form_tree *&matroot
 	raw_form_tree * root = NULL;
 	bool isneg = false;
 
-	if ( pos == l.size() ) return NULL;
+	if (pos == l.size()) return false; // NULL;
 
 	if( *l[pos][0] == '~') isneg=true,++pos;
 	if( pos != l.size() && *l[pos][0] == '{') {
@@ -676,10 +708,10 @@ void raw_progs::parse(const std::wstring& s, dict_t& dict, bool newseq) {
 		size_t pos = 0;
 		lexemes l = prog_lex(wcsdup(s.c_str()));
 		if (!l.size()) return;
-		auto prepare_builtins = [&dict, this](raw_prog& x) {
+		auto prepare_builtins = [&dict](raw_prog& x) {
 			// BLTINS: prepare builtins (dict)
-			for (const wstring& s : str_bltins)
-				x.builtins.insert(dict.get_lexeme(s));
+			for (const wstring& str : str_bltins)
+				x.builtins.insert(dict.get_lexeme(str));
 		};
 		if (*l[pos][0] != L'{') {
 			raw_prog& x = !p.size() || newseq
@@ -806,6 +838,7 @@ wstring file_read_text(wstring wfname) {
 	return r;
 }
 
+void warning(cws o, std::wstring e) { warning(o, e, o); }
 void parse_error(cws o, std::wstring e) { parse_error(o, e, o); }
 void parse_error(wstring e, lexeme l) { parse_error(0, e, l); }
 void parse_error(std::wstring e, std::wstring s) { parse_error(0, e, s); }
@@ -842,4 +875,16 @@ void parse_error(cws o, std::wstring e, cws s) {
 	}
 	if (s) msg << L" close to \"" << std::wstring(s, p-s) << L'"';
 	throw parse_error_exception(ws2s(msg.str()));
+}
+
+void warning(cws o, std::wstring e, cws s) {
+	std::wstringstream msg; msg << L"warning: \"" << e << L'"';
+	cws p = s;
+	while (p && *p && *p != L'\n') ++p;
+	if (o != 0) {
+		long l, ch; count_pos(input::source[0], o, l, ch);
+		msg << L" at " << l << L':' << ch;
+	}
+	if (s) msg << L" close to \"" << std::wstring(s, p - s) << L'"';
+	//throw parse_error_exception(ws2s(msg.str()));
 }

@@ -1,59 +1,59 @@
-str(((19))(')')((20))).
-str(((18))(')')((19))).
-str(((17))(')')((18))).
-str(((16))(')')((17))).
-str(((15))(')')((16))).
-str(((14))('(')((15))).
-str(((13))(')')((14))).
-str(((12))('(')((13))).
-str(((11))(')')((12))).
-str(((10))('(')((11))).
-str(((9))('(')((10))).
-str(((8))('(')((9))).
-str(((7))(')')((8))).
-str(((6))('(')((7))).
-str(((5))(')')((6))).
-str(((4))('(')((5))).
-str(((3))(')')((4))).
-str(((2))('(')((3))).
-str(((1))('(')((2))).
 str(((0))('(')((1))).
-str(printable 19 20).
-str(printable 18 19).
-str(printable 17 18).
-str(printable 16 17).
-str(printable 15 16).
-str(printable 14 15).
-str(printable 13 14).
-str(printable 12 13).
-str(printable 11 12).
-str(printable 10 11).
-str(printable 9 10).
-str(printable 8 9).
-str(printable 7 8).
-str(printable 6 7).
-str(printable 5 6).
-str(printable 4 5).
-str(printable 3 4).
-str(printable 2 3).
-str(printable 1 2).
+str(((1))('(')((2))).
+str(((2))('(')((3))).
+str(((3))(')')((4))).
+str(((4))('(')((5))).
+str(((5))(')')((6))).
+str(((6))('(')((7))).
+str(((7))(')')((8))).
+str(((8))('(')((9))).
+str(((9))('(')((10))).
+str(((10))('(')((11))).
+str(((11))(')')((12))).
+str(((12))('(')((13))).
+str(((13))(')')((14))).
+str(((14))('(')((15))).
+str(((15))(')')((16))).
+str(((16))(')')((17))).
+str(((17))(')')((18))).
+str(((18))(')')((19))).
+str(((19))(')')((20))).
 str(printable 0 1).
-S(14 16).
-S(12 16).
-S(10 16).
+str(printable 1 2).
+str(printable 2 3).
+str(printable 3 4).
+str(printable 4 5).
+str(printable 5 6).
+str(printable 6 7).
+str(printable 7 8).
+str(printable 8 9).
+str(printable 9 10).
+str(printable 10 11).
+str(printable 11 12).
+str(printable 12 13).
+str(printable 13 14).
+str(printable 14 15).
+str(printable 15 16).
+str(printable 16 17).
+str(printable 17 18).
+str(printable 18 19).
+str(printable 19 20).
+S(0 20).
+S(1 19).
+S(2 4).
+S(2 6).
+S(2 8).
+S(2 18).
+S(4 6).
+S(4 8).
+S(4 18).
+S(6 8).
+S(6 18).
 S(8 18).
 S(9 17).
-S(6 18).
-S(4 18).
-S(0 20).
-S(2 18).
-S(1 19).
-S(12 14).
-S(10 14).
 S(10 12).
-S(6 8).
-S(4 8).
-S(2 8).
-S(4 6).
-S(2 6).
-S(2 4).
+S(10 14).
+S(10 16).
+S(12 14).
+S(12 16).
+S(14 16).

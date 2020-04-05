@@ -15,6 +15,7 @@
 #include <functional>
 #include <iostream>
 #include "defs.h"
+#include "types.h"
 #include "output.h"
 
 typedef std::vector<std::string> strings;

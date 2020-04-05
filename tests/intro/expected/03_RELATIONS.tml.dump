@@ -1,8 +1,8 @@
-beginsWithJ(Jack).
-beginsWithJ(John).
 beginsWithJ(Jane).
-uncle(Joe Jill).
-uncle(Joe Jack).
+beginsWithJ(John).
+beginsWithJ(Jack).
 uncle(Jim Joe).
+uncle(Joe Jack).
+uncle(Joe Jill).
 employee(Jane Doe support).
 employee(John Doe sales).

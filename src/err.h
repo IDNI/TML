@@ -47,4 +47,6 @@ const wchar_t err_eq_expected[] = L"Expected =/!= in the middle of term.";
 const wchar_t err_leq_expected[] = L"Expected <=/> in the middle of term.";
 const wchar_t err_3_els_expected[] = L"Expected 3 elements in the term.";
 const wchar_t err_builtin_expected[] = L"Expected builtin name in the beginning of term.";
+const wchar_t err_type[] = L"Type mismatch within the table/rule.";
+const wchar_t wrn_bodydepends[] = L"(internal) Body tbl not in depends.";
 

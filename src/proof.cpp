@@ -47,10 +47,12 @@ vector<term> subs_to_body(const alt* a, const map<int, int>& e) {
 void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
 	const alt* a;
+	// D: addtail needs a bitsmeta, one tbl.bm, another alt.bm (or custom?)
+	table& tbl = tbls[rules[rl].tab];
 	for (size_t n = 0; n != rules[rl].size(); ++n)
 		if (a = rules[rl][n], has(a->levels, level))
 			for (const env& e : varbdd_to_subs(a,
-				addtail(h, rules[rl].t.size(), a->varslen)))
+				addtail(h, rules[rl].t.size(), a->varslen, tbl.bm, a->bm)))
 				f(rl, level, n, move(subs_to_body(a, e)));
 }
 
@@ -149,7 +151,7 @@ bool tables::get_goals(wostream& os) {
 	proof p(levels.size());
 	set<term> s;
 	for (const term& t : goals)
-		decompress(tbls[t.tab].t && from_fact(t), t.tab,
+		decompress(tbls[t.tab].tq && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s)
 		if (bproof) get_proof(g, p, levels.size() - 1);

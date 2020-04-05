@@ -14,6 +14,8 @@
 
 using namespace std;
 
+//#define mksym(x) (int_t(x)<<2)
+
 // binary format of a source, dict and resulting bdd database
 //------------------------------------------------------------------------------
 //
@@ -83,15 +85,17 @@ ostream& operator<<(ostream& os, const dict_t& d) {
 	for (size_t i = 0; i != d.nrels(); ++i)
 		write_string(os, d.get_rel(i));
 	write_int(os, d.nsyms());
+	// D: this no longer works (<< >>2 for sym, num, chr), use just 'i'
 	for (size_t i = 0; i != d.nsyms(); ++i)
-		write_string(os, d.get_sym(i<<2));
+		write_string(os, d.get_sym(mksym(i))); // i<<2
 	return os;
 }
 
 ostream& operator<<(ostream& os, const tables& tbl) {
 	os << tbl.dict;
-	write_int(os, tbl.bits);
-	write_int(os, tbl.nums);
+	// D: this needs to be reimplemented, bits no more (as such)
+	//write_int(os, tbl.bits);
+	//write_int(os, tbl.nums);
 	return os;
 }
 
@@ -157,7 +161,8 @@ istream& operator>>(istream& is, dict_t& d) {
 	DBG(o::out() << L"nsyms: " << nsyms << endl;)
 	for (int_t i = 0; i != nsyms; ++i) {
 		wstring t = read_string(is);
-		DBG(o::out() << L"\t`" << t << L'`' << endl;)
+		DBG(o::out() << L"\t`" << t << L'`' << endl;);
+		// D: TODO: this might no longer work, it's just for syms, no shifting.
 		d.get_sym(d.get_lexeme(t));
 	}
 	return is;
@@ -165,10 +170,11 @@ istream& operator>>(istream& is, dict_t& d) {
 
 istream& operator>>(istream& is, tables& tbl) {
 	is >> tbl.dict;
-	tbl.bits = read_int(is);
-	DBG(o::out() << L"bits: " << tbl.bits << endl;)
-	tbl.nums = read_int(is);
-	DBG(o::out() << L"nums: " << tbl.nums << endl;)
+	// D: this needs to be reimplemented, bits no more (as such)
+	//tbl.bits = read_int(is);
+	//DBG(o::out() << L"bits: " << tbl.bits << endl;)
+	//tbl.nums = read_int(is);
+	//DBG(o::out() << L"nums: " << tbl.nums << endl;)
 	return is;
 }
 

@@ -19,11 +19,15 @@ set(TML_HEADERS
 	TML.h
 	async_reader.h
 	bdd.h
+	bitsmeta.h
 	defs.h
 	dict.h
 	driver.h
 	err.h
 	input.h
+	iterbdds.h
+	infer_types.h
+	types.h
 	options.h
 	output.h
 	repl.h
@@ -34,11 +38,15 @@ set(TML_HEADERS
 set(TML_SOURCES
 	proof.cpp
 	bdd.cpp
+	bitsmeta.cpp
 	bdd_ext.cpp
 	binary.cpp
 	dict.cpp
 	driver.cpp
 	input.cpp
+	iterbdds.cpp
+	infer_types.cpp
+	types.cpp
 	options.cpp
 	output.cpp
 	print_prolog.cpp

@@ -1,4 +1,4 @@
-bird(Charlie).
 bird(Coco).
+bird(Charlie).
 wounded(Charlie).
 canFly(Coco).

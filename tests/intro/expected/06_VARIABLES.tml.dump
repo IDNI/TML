@@ -1,21 +1,21 @@
-bird(John).
-bird(Coco).
 bird(Charlie).
+bird(Coco).
+bird(John).
 cat(Bella).
-canFly(John).
-canFly(Coco).
 canFly(Charlie).
-beeps(John).
-beeps(Coco).
+canFly(Coco).
+canFly(John).
 beeps(Charlie).
+beeps(Coco).
+beeps(John).
 meows(Bella).
-employee(Jane female).
-employee(John male).
 employee(Suzi female).
-salutation(Jane Madam).
-salutation(John Sir).
+employee(John male).
+employee(Jane female).
 salutation(Suzi Madam).
-parent(Suzi John).
+salutation(John Sir).
+salutation(Jane Madam).
 parent(Coco Charlie).
+parent(Suzi John).
 father(Coco Charlie).
 mother(Suzi John).
