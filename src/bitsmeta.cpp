@@ -142,7 +142,7 @@ void bitsmeta::init_bits() {
 }
 
 bool bitsmeta::set_args(
-	const ints& args, const argtypes& vtypes, const ints& vnums) {
+	const ints& DBG(args), const argtypes& vtypes, const ints& vnums) {
 	if (vtypes.empty()) return false;
 	DBG(assert(vtypes.size() > 0);); // don't call this if nothing to do
 	DBG(assert(args.size() == vtypes.size()););

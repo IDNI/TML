@@ -93,7 +93,7 @@ using namespace std;
 // - or we've just done alts, go through all bodies now, 
 //   use alts' perms if available (from cache), if not just null it.
 
-void iterbdds::permute_type(const tbl_arg& intype, size_t addbits) {
+void iterbdds::permute_type(const tbl_arg& intype, size_t DBG(addbits)) {
 	// we don't yet support more than 1 bit at the time
 	DBG(assert(addbits == 1););
 	DBG(assert(intype.tab != -1););
@@ -249,7 +249,9 @@ bool iterbdds::permute_table(ntable tab, size_t arg) {
 	return permute_table({ tab, arg }, bits, type);
 }
 
-bool iterbdds::permute_table(const tbl_arg& targ, size_t bits, base_type type) {
+bool iterbdds::permute_table(
+	const tbl_arg& targ, size_t DBG(bits), base_type DBG(type)) 
+{
 	ntable tab = targ.tab;
 	size_t arg = targ.arg;
 	if (tab == -1) return false; // continue;
@@ -284,8 +286,8 @@ bool iterbdds::permute_table(const tbl_arg& targ, size_t bits, base_type type) {
 }
 
 // const bits_perm& altp, 
-bool iterbdds::permute_bodies(const tbl_arg& targ, const bits_perm& p, alt& a, 
-	size_t bits, base_type type)
+bool iterbdds::permute_bodies(const tbl_arg& DBG(targ), const bits_perm& p, 
+	alt& a, size_t DBG(bits), base_type DBG(type))
 {
 	DBG(assert(targ.tab == p.tab && targ.arg == p.arg););
 	//ntable tab = targ.tab;

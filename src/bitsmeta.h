@@ -52,6 +52,7 @@ struct bitsmeta {
 		// we allow only one bit add at the time (for the moment)
 		DBG(assert(src.types.size() > 0);); // don't call this if empty
 		DBG(assert(bits2add == 1););
+		if (bits2add != 1) throw 0;
 		types = src.types;
 		nums = src.nums; // we don't need this, or increase ++nums[arg] too?
 		vargs = src.vargs;
@@ -134,19 +135,19 @@ struct bitsmeta {
 	- mleftargs - a map/cache of positions
 	- vargs - vector of arg-s ordered (has to contain all args, no duplicates)
 	*/
-	size_t pos(size_t bit, size_t arg, size_t args) const {
+	size_t pos(size_t bit, size_t arg, size_t) const { // size_t args
 		const std::map<size_t, size_t>& mpos = mleftargs.at(bit);
 		return mpos.at(arg); // vargs[arg]
 
-		DBG(assert(args == types.size()););
-		DBG(assert(bit < types[arg].bitness && arg < args););
-		size_t bits = types[arg].bitness;
-		DBG(assert(bit < bits && arg < args););
-		// lsum - sum of all the bits 'on the left' (same for all bit-s)
-		size_t lsum = mleftbits.at(arg);
-		// doubled consts fix: reverse bits, ie make it from-left (as consts)
-		return lsum + bit;
-		//return lsum + (bits - bit - 1); // bit; // 
+		//DBG(assert(args == types.size()););
+		//DBG(assert(bit < types[arg].bitness && arg < args););
+		//size_t bits = types[arg].bitness;
+		//DBG(assert(bit < bits && arg < args););
+		//// lsum - sum of all the bits 'on the left' (same for all bit-s)
+		//size_t lsum = mleftbits.at(arg);
+		//// doubled consts fix: reverse bits, ie make it from-left (as consts)
+		//return lsum + bit;
+		////return lsum + (bits - bit - 1); // bit; // 
 	}
 
 	//DBG(assert(b < bits););

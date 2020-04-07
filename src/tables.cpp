@@ -851,7 +851,8 @@ void tables::out(wostream& os) const {
 	//	return cmp < 0;
 	//	});
 	//for (size_t i = 0; i != otbls.size(); ++i)
-	//	out(os, tbls[otbls[i]].tq, otbls[i]);
+	//	if (!has(tmprels, otbls[i]))
+	//		out(os, tbls[otbls[i]].tq, otbls[i]);
 	//return;
 	
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
@@ -1812,21 +1813,23 @@ void tables::set_priorities(const flat_prog& p) {
 
 // set<arg_info> v
 vector<term> tables::interpolate(
-	vector<term> x, set<arg_info>, const map<int_t, arg_info>& mvars) {
+	vector<term> x, set<arg_info> v, const map<int_t, arg_info>& mvars) {
 	term t;
-	set<int_t> done;
+	//set<int_t> done;
 	for (size_t k = 0; k != x.size(); ++k)
-		for (size_t n = 0; n != x[k].size(); ++n)
-			if (has(mvars, x[k][n]) && !has(done, x[k][n])) {
-				// if (has(v, x[k][n])) {
+		for (size_t n = 0; n != x[k].size(); ++n) {
+			//if (has(mvars, x[k][n]) && !has(done, x[k][n])) {
+			arg_info val{ x[k][n], {base_type::NONE, 0}, 0 };
+			if (has(v, val)) {
 				const arg_info& info = mvars.at(x[k][n]);
 				t.push_back(x[k][n]);
 				t.types.push_back(info.type);
 				t.nums.push_back(info.num);
-				//v.erase(x[k][n]);
-				done.insert(x[k][n]);
+				v.erase(val); // x[k][n]);
+				//done.insert(x[k][n]);
 				//mvars.erase(x[k][n]);
 			}
+		}
 	t.tab = create_tmp_rel(t.size(), t.types, t.nums);
 	x.insert(x.begin(), t);
 	return x;
@@ -2902,21 +2905,21 @@ char tables::fwd() noexcept {
 					ts.insert(t);
 					// do what we have to do, we have a new tuple
 					lexeme bltintype = dict.get_bltin(tbl.idbltin);
+					wostream& os = o::dump() << endl; // o::dbg() << endl;
 					if (bltintype == L"lprint") {
-						wostream& os = o::dbg() << endl;
 						// this is supposed to be formatted r-term printout
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:"};
 						os << L"printing: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"halt") {
 						ishalt = true;
-						wostream& os = o::dbg() << endl;
+						//wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program halt: " << rtp << L'.' << endl;
 					}
 					else if (bltintype == L"fail") {
 						ishalt = isfail = true;
-						wostream& os = o::dbg() << endl;
+						//wostream& os = o::dbg() << endl;
 						pair<raw_term, wstring> rtp{ to_raw_term(t), L"p:" };
 						os << L"program fail: " << rtp << L'.' << endl;
 					}
