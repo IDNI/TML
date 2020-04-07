@@ -1419,7 +1419,11 @@ void tables::getvars(
 			} else {
 				if (t.tab != -1) {
 					arg_info info{ 
-						t[n], tbls[t.tab].bm.types[n], tbls[t.tab].bm.nums[n] };
+						t[n], 
+						tbls[t.tab].bm.types[n], 
+						tbls[t.tab].bm.nums[n],
+						{t.tab, n}
+					};
 					mvars.emplace(t[n], info);
 					v.insert(info);
 				} else {
@@ -1825,12 +1829,24 @@ vector<term> tables::interpolate(
 				t.push_back(x[k][n]);
 				t.types.push_back(info.type);
 				t.nums.push_back(info.num);
+				// we should map_type but we don't have a table yet, do it below
 				v.erase(val); // x[k][n]);
 				//done.insert(x[k][n]);
 				//mvars.erase(x[k][n]);
 			}
 		}
 	t.tab = create_tmp_rel(t.size(), t.types, t.nums);
+	for (size_t n = 0; n != t.size(); ++n) {
+		DBG(assert(t[n] < 0););
+		if (has(mvars, t[n])) {
+			const arg_info& info = mvars.at(t[n]);
+			// this should preserve the original 'relationship' otherwise lost
+			if (info.arg.tab != -1)
+				inference.map_type({ t.tab, n }, {info.arg.tab, info.arg.arg});
+			else
+				o::dump() << L"interpolate, no tbl/arg?" << L"" << endl;
+		}
+	}
 	x.insert(x.begin(), t);
 	return x;
 }

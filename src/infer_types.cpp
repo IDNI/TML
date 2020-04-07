@@ -102,25 +102,43 @@ void infer_types::propagate_types() {
 		DBG(assert(it.second.empty() || type == get_root_type(type)););
 		DBG(assert(type.arg < bm.get_args()););
 		//propagate_types(type);
-		for (const alt_arg& atype : it.second) {
-			if (atype.alt == -1) {
-				auto& tblbm = tbls[atype.tab].bm;
-				DBG(assert(atype.arg < tblbm.get_args()););
-				bitsmeta::sync_types(
-					tblbm.types[atype.arg], bm.types[type.arg],
-					tblbm.nums[atype.arg], bm.nums[type.arg]);
+		bool rootchanged; // = false;
+		size_t ntries = 0;
+		do {
+			rootchanged = false;
+			for (const alt_arg& atype : it.second) {
+				bool lchng = false, rchng = false;
+				if (atype.alt == -1) {
+					auto& tblbm = tbls[atype.tab].bm;
+					DBG(assert(atype.arg < tblbm.get_args()););
+					bitsmeta::sync_types(
+						tblbm.types[atype.arg], bm.types[type.arg],
+						tblbm.nums[atype.arg], bm.nums[type.arg], lchng, rchng);
+					if (rchng) 
+						rootchanged = true;
+				}
+				else {
+					// alt should be set up and present in the map
+					tbl_arg altkey{ atype.tab, size_t(atype.alt) };
+					DBG(assert(has(altstyped, altkey)););
+					alt& a = altstyped[altkey];
+					DBG(assert(atype.arg < a.bm.get_args()););
+					bitsmeta::sync_types(
+						a.bm.types[atype.arg], bm.types[type.arg],
+						a.bm.nums[atype.arg], bm.nums[type.arg], lchng, rchng);
+					if (rchng) 
+						rootchanged = true;
+				}
 			}
-			else {
-				// alt should be set up and present in the map
-				tbl_arg altkey{ atype.tab, size_t(atype.alt) };
-				DBG(assert(has(altstyped, altkey)););
-				alt& a = altstyped[altkey];
-				DBG(assert(atype.arg < a.bm.get_args()););
-				bitsmeta::sync_types(
-					a.bm.types[atype.arg], bm.types[type.arg],
-					a.bm.nums[atype.arg], bm.nums[type.arg]);
+			if (rootchanged) {
+				o::dump() << L"root changed, repeat..." << endl;
 			}
-		}
+			ntries++;
+			if (ntries > 3) {
+				o::dump() << L"root changed, repeating, ntries > 3..." << endl;
+				break;
+			}
+		} while (rootchanged);
 	}
 }
 

@@ -55,18 +55,6 @@ struct arg_type {
 
 typedef std::vector<arg_type> argtypes;
 
-struct arg_info {
-	int_t val, num;
-	arg_type type;
-	arg_info(int_t val_, arg_type type_, int_t num_) 
-		: val(val_), num(num_), type(type_) {}
-	inline bool operator<(const arg_info& other) const {
-		return val < other.val;
-		//if (val != other.val) return val < other.val;
-		//return arg < other.arg;
-	}
-};
-
 struct tbl_arg {
 	ntable tab;
 	size_t arg;
@@ -105,6 +93,19 @@ struct alt_arg {
 		if (tab != aa.tab) return tab < aa.tab;
 		if (alt != aa.alt) return alt < aa.alt;
 		return arg < aa.arg;
+	}
+};
+
+struct arg_info {
+	int_t val, num;
+	arg_type type;
+	tbl_arg arg;
+	arg_info(int_t val_, arg_type type_, int_t num_, tbl_arg arg_ = { -1,0 })
+		: val(val_), num(num_), type(type_), arg(arg_) {}
+	inline bool operator<(const arg_info& other) const {
+		return val < other.val;
+		//if (val != other.val) return val < other.val;
+		//return arg < other.arg;
 	}
 };
 
