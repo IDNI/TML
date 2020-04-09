@@ -43,12 +43,9 @@ The size of the universe (or domain of discourse) of a TML program is:
 of input strings counts as appearing in the program), plus
 * 256 if at least one character symbol is used in the program (or at least one
 string appears in the program).  
-[^1]  
+<sup>[1](#foot1)</sup>  
 
-[^1]: Universe is no longer 'uniform', it's defined per 'argument' 
-so the above no longer applies 
-('in the program' should be replaces with 'for an argument'). 
-This needs to be revised.
+ 
 
 # Fixed Points
 
@@ -70,7 +67,7 @@ evaluated to `unsat`, as no fixed point exists.
 
 Note that only one of the two options can happen because the arity and the
 universe size are fixed. Ultimately, for universe size n and maximum arity k,
-they will occur in no more than 2^n^k steps. [^1]  
+they will occur in no more than 2^n^k steps. <sup>[1](#foot1)</sup>  
 
 
 # Facts and Rules
@@ -386,8 +383,9 @@ a TML program. TBD
 
 # Builtins
 
-Builtins are internally supported (e.g. compiled in[^2]) functions[^3] 
-which could appear in header (left side) or as a body (on the rigth-hand-side).  
+Builtins are internally supported (e.g. compiled in<sup>[2](#foot2)</sup>) 
+functions<sup>[3](#foot3)</sup> which could appear in header (left side) or as a body 
+(on the rigth-hand-side).  
   
 Builtins are typically evaluated at each step (same as rules), but their nature 
 and impact could be very different. Some builtins are compressed and their 
@@ -411,9 +409,6 @@ Examples of builtins that are currently supported (still experimental):
     fail("#r1 > 3" ?x ?y) :- r1(?x ?y), count(?x ?y ?out), ?out>3.
 
 
-[^2]: Could also be imported from dll-s.
-[^3]: Or rules, bodies?
-
 # Variable Bits (and Dynamic Universe)
 
 Universe is no longer 'shared' in between the arguments 
@@ -433,7 +428,8 @@ anywhere that you have vars or consts.
 We can specify it manually: e.g.  
 `a(?x ?y ?z:int[2]) :- ...`  
 by adding the `:basetype[bitness]` where base-type is 
-`int | chr | str | NONE` (str stands for alphanumerics, symbols[^4]). 
+`int | chr | str | NONE` (str stands for alphanumerics, symbols
+<sup>[4](#foot4)</sup>). 
 `NONE` means 'unspecified' and is an error condition (which could happen if 
 [type inference](#Type-Inference) was unable to deduce the type).  
 We can also specify it on consts e.g. `a(5:int[3] 2 1)`, which may look 
@@ -450,7 +446,7 @@ conflicting types (bits can be different, max is used). E.g. this will fail...
 
     called(Earnest 5:int[3]).
     surname(?x:str[5]) :- called(Earnest ?x).
-...as type(called,1) == type(surname,0)[^5].  
+...as type(called,1) == type(surname,0)<sup>[5](#foot5)</sup>.  
   
 Similarly, we don't have 'casting' implemented at the moment, i.e. all dependent 
 types/args will be of the same type (max bitness is assumed).  
@@ -458,11 +454,6 @@ types/args will be of the same type (max bitness is assumed).
 More advanced types & features are planned short-term, e.g. record-like custom 
 types `?x:Person` etc.
   
-
-[^4]: str is somewhat misleading and the base-types will need to be expanded 
-to include both `str | sym`. Also, symbols are still sharing one universe (TBD).
-  
-[^5]: assuming 0-based arguments.
   
 ### Type Inference  
 
@@ -491,7 +482,7 @@ certain arguments, types.
   
 ### Dynamic Universe
 
-By dynamic universe (or 'dynamic bits'?[^6]) we assume changing the bitness of 
+By dynamic universe (or 'dynamic bits'?<sup>[6](#foot6)</sup>) we assume changing the bitness of 
 an argument dynamically (i.e. from one step to another). That means that we can 
 increase the size of a specific argument's universe as needed (keeping the 
 size/bitness optimal at all times). This also allows for various optimizations 
@@ -501,8 +492,6 @@ This is now fully supported and working but only for internal (dev) use. While
 no support yet (for the user in tml), builtins are coming up that'd enabled this.
 
 TBD  
-[^6]: which covers ability to change bit positions (not just the size), and all 
-this is basically part of the same feature.   
 
 
 # Misc
@@ -527,3 +516,25 @@ TBD
 # Further Examples
 
 TBD
+
+***
+
+<a name="foot1">1</a>. 
+Universe is no longer 'uniform', it's defined per 'argument' so the above no 
+longer applies ('in the program' should be replaces with 'for an argument'). 
+This needs to be revised.  
+
+<a name="foot2">2</a>. Could also be imported from dll-s.  
+
+<a name="foot3">3</a>. Or rules, bodies?  
+
+<a name="foot4">4</a>. `str` is somewhat misleading and the base-types will need to be expanded 
+to include both `str | sym`. Also, symbols are still sharing one universe (TBD).
+  
+<a name="foot5">5</a>. assuming 0-based arguments.
+
+<a name="foot6">6</a>. which covers ability to change bit positions (not just the size), and all 
+this is basically part of the same feature.   
+
+
+
