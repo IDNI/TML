@@ -271,7 +271,7 @@ driver::driver(wstring s, options o) : rp(), opts(o) {
 	// we don't need the dict any more, tables owns it from now on...
 	tbl = new tables(move(dict), opts.enabled(L"proof"), 
 		opts.enabled(L"optimize"), opts.enabled(L"bin"), opts.enabled(L"t"),
-		opts.enabled(L"autotype"), opts.enabled(L"dumptype"), 
+		opts.enabled(L"inference"), opts.enabled(L"dumptype"), 
 		opts.enabled(L"addbit"), opts.enabled(L"bitsfromright"));
 	set_print_step(opts.enabled(L"ps"));
 	set_print_updates(opts.enabled(L"pu"));
