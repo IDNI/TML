@@ -42,8 +42,7 @@ The size of the universe (or domain of discourse) of a TML program is:
 * The maximum nonnegative integer that appears in the program (where the length
 of input strings counts as appearing in the program), plus
 * 256 if at least one character symbol is used in the program (or at least one
-string appears in the program).  
-<sup>[1](#foot1)</sup>  
+string appears in the program).<sup>[1](#foot1)</sup>   
 
  
 
@@ -67,7 +66,7 @@ evaluated to `unsat`, as no fixed point exists.
 
 Note that only one of the two options can happen because the arity and the
 universe size are fixed. Ultimately, for universe size n and maximum arity k,
-they will occur in no more than 2^n^k steps. <sup>[1](#foot1)</sup>  
+they will occur in no more than 2^n^k steps.<sup>[1](#foot1)</sup>  
 
 
 # Facts and Rules
@@ -384,14 +383,13 @@ a TML program. TBD
 # Builtins
 
 Builtins are internally supported (e.g. compiled in<sup>[2](#foot2)</sup>) 
-functions<sup>[3](#foot3)</sup> which could appear in header (left side) or as a body 
-(on the rigth-hand-side).  
+functions<sup>[3](#foot3)</sup> which could appear in the header (left side) or as 
+a body (on the rigth-hand-side).  
   
 Builtins are typically evaluated at each step (same as rules), but their nature 
-and impact could be very different. Some builtins are compressed and their 
-effect is usually seen only at the very end/output (like the [count](#count)), 
-and some could have effects at at/after each step (e.g. [lprint](#lprint), 
-[halt](#halt), [fail](#fail)).  
+and impact could be very different. Some builtins are compressed and behave like
+any other relation (e.g. [count](#count)), and some work with uncompressed data 
+after each step (e.g. [lprint](#lprint), [halt](#halt), [fail](#fail)).<sup>[4](#foot4)</sup>  
   
 Examples of builtins that are currently supported (still experimental):  
 
@@ -411,8 +409,8 @@ Examples of builtins that are currently supported (still experimental):
 
 # Variable Bits (and Dynamic Universe)
 
-Universe is no longer 'shared' in between the arguments 
-(i.e. one universe for the entire program with fixed number of bits 
+Universe is no longer shared between the arguments 
+(one universe for the entire program with fixed number of bits 
 regardless of the argument type).  
   
 Variable-bits (implementation) means each argument (?var or const) 
@@ -428,8 +426,7 @@ anywhere that you have vars or consts.
 We can specify it manually: e.g.  
 `a(?x ?y ?z:int[2]) :- ...`  
 by adding the `:basetype[bitness]` where base-type is 
-`int | chr | str | NONE` (str stands for alphanumerics, symbols
-<sup>[4](#foot4)</sup>). 
+`int | chr | str | NONE` (str stands for alphanumerics, symbols<sup>[5](#foot5)</sup>).  
 `NONE` means 'unspecified' and is an error condition (which could happen if 
 [type inference](#Type-Inference) was unable to deduce the type).  
 We can also specify it on consts e.g. `a(5:int[3] 2 1)`, which may look 
@@ -446,9 +443,9 @@ conflicting types (bits can be different, max is used). E.g. this will fail...
 
     called(Earnest 5:int[3]).
     surname(?x:str[5]) :- called(Earnest ?x).
-...as type(called,1) == type(surname,0)<sup>[5](#foot5)</sup>.  
+...as type(called,1) == type(surname,0)<sup>[6](#foot6)</sup>.  
   
-Similarly, we don't have 'casting' implemented at the moment, i.e. all dependent 
+Similarly, we don't have *casting* implemented at the moment, i.e. all dependent 
 types/args will be of the same type (max bitness is assumed).  
   
 More advanced types & features are planned short-term, e.g. record-like custom 
@@ -458,15 +455,15 @@ types `?x:Person` etc.
 ### Type Inference  
 
 Generally, there's no need to manually specify types (only in special cases),
-as *type inference* should analyze and decide what's best (bitness and types).  
+as *type inference* should be able to decide what's best (both bitness and type).  
 
 That allows us to execute any old tml w/o any changes. 
 Inference is on by default.  
   
 Ideally, you can mix things, use type inference for the bulk of it, and just 
-place 'hints' on certain types/args (and advisable in certain cases) - 
-e.g. to increase bits/bitness (you won't normally be able to make it smaller - 
-though it's possible, with strange effects).  
+place 'hints' on certain types/args - 
+e.g. to increase bitness (you won't normally be able to make it smaller - 
+though it is possible with strange effects). This is the recommended approach.  
   
 You can dump types by specifying `--dumptype`, to see how the types are 
 inferred. If you see `NONE` that means it's wrong, i.e. you'd need to supply 
@@ -475,21 +472,21 @@ vars that don't relate to anything, or in case of new builtins (and features)
 which don't yet have proper inference support.  
   
 If you wish you can supply all the types manually and turn the inference off by 
-specifying `--no-inference` (but that's not supported at the moment, i.e. 
-inference is mandatory). And that's also not recommended as inference has almost 
-no impact on performance. Instead, leave the inference on and just 'tweak' 
-certain arguments, types.  
+specifying `--no-inference` (note: that's not supported at the moment, i.e. 
+inference is mandatory). That's also not recommended as inference has almost no 
+impact on performance.   
   
 ### Dynamic Universe
 
-By dynamic universe (or 'dynamic bits'?<sup>[6](#foot6)</sup>) we assume changing the bitness of 
-an argument dynamically (i.e. from one step to another). That means that we can 
-increase the size of a specific argument's universe as needed (keeping the 
-size/bitness optimal at all times). This also allows for various optimizations 
-internally (varying var positions, bit order etc.).  
+By dynamic universe (or 'dynamic bits'?<sup>[7](#foot7)</sup>) we assume 
+changing the bitness of an argument dynamically (i.e. from one step to another). 
+That means that we can increase the size of a specific argument's universe as 
+needed (keeping the size/bitness optimal at all times). This also allows for 
+various optimizations internally (varying var positions, bit order etc.).  
   
 This is now fully supported and working but only for internal (dev) use. While 
-no support yet (for the user in tml), builtins are coming up that'd enabled this.
+no support yet (for the user in tml), builtins are coming up that would enable 
+this.
 
 TBD  
 
@@ -521,20 +518,22 @@ TBD
 
 <a name="foot1">1</a>. 
 Universe is no longer 'uniform', it's defined per 'argument' so the above no 
-longer applies ('in the program' should be replaces with 'for an argument'). 
-This needs to be revised.  
+longer applies ('in the program' should be replaces with 'for an argument').  
+Also, symbols are an exception as all symbols are still sharing one universe (TBD)  
 
-<a name="foot2">2</a>. Could also be imported from dll-s.  
+<a name="foot2">2</a>. Could also be imported from dll-s.   
 
-<a name="foot3">3</a>. Or rules, bodies?  
+<a name="foot3">3</a>. Or rules, bodies?   
 
-<a name="foot4">4</a>. `str` is somewhat misleading and the base-types will need to be expanded 
-to include both `str | sym`. Also, symbols are still sharing one universe (TBD).
+<a name="foot4">4</a>. This requires some work (and more, better categorization).
+
+<a name="foot5">5</a>. `str` is somewhat misleading and the base-types will need to be expanded 
+to include both `str | sym`.  
   
-<a name="foot5">5</a>. assuming 0-based arguments.
+<a name="foot6">6</a>. assuming 0-based arguments.  
 
-<a name="foot6">6</a>. which covers ability to change bit positions (not just the size), and all 
-this is basically part of the same feature.   
+<a name="foot7">7</a>. which covers ability to change bit positions (not just the size), and all 
+this is basically part of the same feature.    
 
 
 
