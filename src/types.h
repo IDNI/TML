@@ -116,34 +116,4 @@ std::wostream& operator<<(std::wostream&, const argtypes&);
 std::wostream& operator<<(std::wostream& os, const bitsmeta& bm);
 //bool operator<(const alt_arg& aarg, const tbl_arg& ta);
 
-//struct infer_types {
-//	//tables& tables;
-//	std::map<tbl_arg, std::set<alt_arg>> minvtyps;
-//	std::map<alt_arg, tbl_arg> mtyps;
-//	// enumerates alts as they come, initially local, it needs to be here
-//	// we need to support multiple progs and transform/after
-//	std::map<ntable, size_t> altids4types;
-//
-//	// this is is auto typed info for pre-processing 
-//	std::map<tbl_alt, alt> altstyped;
-//
-//	//infer_types(tables& tables_) :tables(tables_) {}
-//
-//	// type inference related
-//	bool get_root_type(const alt_arg& type, tbl_arg& root) const;
-//	tbl_arg get_root_type(const tbl_arg& type) const;
-//	tbl_arg get_fix_root_type(const tbl_arg& type);
-//	bool map_type(tbl_arg from, tbl_arg to);
-//	void map_type(alt_arg from, tbl_arg to);
-//	//void map_type(tbl_arg to);
-//	void propagate_types();
-//	void propagate_types(const tbl_arg& intype);
-//	void get_alt_types(const term& h, size_t altid);
-//	void get_alt_types(const term& h, const term_set& al, size_t altid);
-//	//void get_types(const std::map<term, std::set<term_set>>& m);
-//	void get_prog_types(const flat_prog& p);
-//	void get_types(const flat_prog& p);
-//	//void get_types(flat_prog& p);
-//};
-
 #endif // __TYPES_H__
