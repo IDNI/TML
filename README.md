@@ -398,9 +398,8 @@ Examples of builtins that are currently supported (still experimental):
 ##### count
     individual(?x ?out) :- called(Earnest ?x), count(?x ?out), ?out = 1.
 count has to be preceded by a body/relation that we wish to take count of. Also 
-that relation should be the last relation (with count going after the last rel).
+that relation should be the last relation (with count going after it).
 You can have relational/arithmetics ops after the count, like `== <=`.
-
 
 ##### lprint
     lprint("prefix..." ?x "...and..." ?y "...suffix.") :- r2(?x ?y).

@@ -323,7 +323,7 @@ spbdd_handle table::init_bits() {
 		// (.t bdd gets 'eaten' by the get_rules/get_facts for facts tables)
 		return tq = bdd_and_many(move(v));
 	} else {
-		wcout << L"bits changed, addbit required, not implemented!" << endl;
+		o::dump() << L"bits changed, addbit required, not implemented!" << endl;
 		for (size_t arg = 0; arg != args; ++arg) {
 			size_t addbits = bm.types[arg].bitness - vbits[arg];
 			if (addbits > 0) {
@@ -2910,7 +2910,9 @@ char tables::fwd() noexcept {
 		//if (tbl.unsat) return unsat = true;
 		//continue;
 
-		if (!changes && tbl.idbltin > -1) {
+		//if (!changes && tbl.idbltin > -1) {
+		//if (tbl.idbltin > -1) {
+		if (changes && tbl.idbltin > -1) {
 			//lexeme bltintype = dict.get_bltin(tbl.idbltin);
 			set<term>& ts = mhits[tab];
 			bool ishalt = false, isfail = false;

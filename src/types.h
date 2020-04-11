@@ -41,7 +41,7 @@ struct arg_type {
 		//DBG(assert(bitness < 100););
 	}
 	void set_bitness(size_t bits) { 
-		DBG(assert(bits < 100););
+		//DBG(assert(bits < 100););
 		bitness = bits;
 	}
 	inline bool operator<(const arg_type& other) const {
