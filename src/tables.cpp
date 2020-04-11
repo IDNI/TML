@@ -918,15 +918,15 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	// D: bltins are special type of REL-s, mostly as any but no decompress.
 	if (!allowbltins && tbl.idbltin > -1) return;
 	if (!len) len = tbl.len;
-	const bitsmeta& bm = tbl.bm;
-	allsat_cb(x/*&&ts[tab].tq*/, bm.args_bits, //len * bits,
-		[tab, &f, len, &bm](const bools& p, int_t DBG(y)) {
+	allsat_cb(x/*&&ts[tab].tq*/, tbl.bm.args_bits, //len * bits,
+		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
 		//DBG(assert(abs(y) == 1);) // D: not sure about this, turn on again?
 #ifdef DEBUG
 		if (abs(y) != 1) {
 			wcout << L"decompress:   \t" << y << endl;
 		}
 #endif
+		const bitsmeta& bm = tbls.at(tab).bm;
 		DBG(assert(bm.types.size() == len););
 		term r(false, term::REL, NOP, tab, ints(len, 0), bm.types, 
 			ints(len, 0), 0, 0);
@@ -2525,21 +2525,33 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 }
 
 void tables::add_tml_update(const term& t, bool neg) {
-	// D: we need to rework this, nums etc. no longer works, it's varbits now
-	DBG(assert(false);); // throw 0;
-	// TODO: decompose nstep if too big for the current universe
-	// D: just temp to recheck initial universe for str_rels tbls
-	//_nums = max(_nums, (int_t)nstep);
-	ints arity = tbls.at(t.tab).s.second;
-	arity[0] += 3;
-	ntable tab = get_table({ rel_tml_update, arity });
-	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
+	//static nlevel lnstep = -1;
+	static size_t lnrels = -1;
+	static arg_type rel_type, nstep_type{ base_type::INT, 2 },
+		add_del_type{ base_type::STR, bitsmeta::BitScanR(
+						max(sym_add, sym_del)) };
+	ints nums(3, 0), args{ mknum(nstep), (neg ? sym_del : sym_add),
 		dict.get_sym(dict.get_rel(tbls[t.tab].s.first)) };
-	args.insert(args.end(), t.begin(), t.end());
-	size_t len = args.size();
-	// TODO: D: check if nvars is 0 (fact) or not, if relevant?
-	tbls[tab].add.push_back(from_fact(
-		term(false, tab, args, argtypes(len), ints(len, 0), 0, -1, 0)));
+	//if (nstep != lnstep) lnstep = nstep, nstep_type =
+	//	arg_type{ base_type::INT, bitsmeta::BitScanR(nstep+1) };
+	if (dict.nrels() != lnrels) lnrels = dict.nrels(),
+		rel_type = arg_type{base_type::STR, bitsmeta::BitScanR(lnrels)};
+	argtypes types{ nstep_type, add_del_type, rel_type };
+	types.insert(types.end(), t.types.begin(), t.types.end());
+	nums .insert(nums .end(), t.nums .begin(), t.nums .end());
+	args .insert(args .end(), t      .begin(), t      .end());
+	ints arity = tbls.at(t.tab).s.second; arity[0] += 3;
+	ntable maxtab=tbls.size()-1, tab = get_table({ rel_tml_update, arity });
+	table& tbl = tbls.at(tab);
+	term nt(false, tab, args, types, nums, 0, -1, 0);
+	if (tab > maxtab) { // new table. init, set args (types) and dumptype
+		tbl.init_bits();
+		tbl.bm.set_args(ints(nt.size(), 0), nt.types, ints(nt.size()));
+		tbl.bm.init(dict);
+		if (dumptype) o::dump() << dict.get_rel(tbl.s.first) << L"("
+			<< tbl.bm.types << L")" << endl;
+	}
+	tbl.add.push_back(from_fact(nt));
 }
 
 wostream& tables::decompress_update(wostream& os, spbdd_handle& x, const rule& r) {
@@ -2554,9 +2566,9 @@ wostream& tables::decompress_update(wostream& os, spbdd_handle& x, const rule& r
 }
 
 void tables::init_tml_update() {
-	rel_tml_update = dict.get_rel(dict.get_lexeme(L"tml_update"));
-	sym_add = dict.get_sym(dict.get_lexeme(L"add"));
-	sym_del = dict.get_sym(dict.get_lexeme(L"delete"));
+	rel_tml_update = dict.get_rel(L"tml_update");
+	sym_add        = dict.get_sym(L"add");
+	sym_del        = dict.get_sym(L"delete");
 }
 
 void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
