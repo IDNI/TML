@@ -137,7 +137,7 @@ for numerics (i.e. the max numeric value, per arg). Chars is known, and syms
 (for symbols) is still not implemented properly yet, all syms share one universe.
 
 
-### Types and Universe  
+### Types  
 
 Types are essential for `bitsmeta` (there's a type for each arg).  
   
@@ -252,6 +252,10 @@ added shortly.
 
 - addbit and sequences: more coming up shortly (some late changes)...TBD.
 
+- There were some tricky issues with previous (fixed) implementation when bits 
+change (sequences, e.g. if second prog adds/changes bits total). This should
+now be fully stable and supporting any bits change, order etc. (this also solves 
+the 'universe overflow' issue that was reported with sequences, I guess similar).
 
 
 
