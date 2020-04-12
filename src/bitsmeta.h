@@ -46,19 +46,18 @@ struct bitsmeta {
 		for (size_t i = 0; i != len; ++i) vargs[i] = i; // native ordering
 	}
 	/* sort of a copy .ctor w/ bits changed (for one arg) - supports add_bit */
-	bitsmeta(const bitsmeta& src, size_t arg, size_t bits2add = 1)
-		: bitsmeta(src.types.size()) 
-	{
-		// we allow only one bit add at the time (for the moment)
+	bitsmeta(const bitsmeta& src, size_t arg, size_t nbits = 1)
+		: bitsmeta(src.types.size()) {
 		DBG(assert(src.types.size() > 0);); // don't call this if empty
-		DBG(assert(bits2add == 1););
-		if (bits2add != 1) throw 0;
+		if (src.types.empty()) throw 0;
+		//DBG(assert(nbits == 1););
+		//if (nbits != 1) throw 0;
 		types = src.types;
 		nums = src.nums; // we don't need this, or increase ++nums[arg] too?
 		vargs = src.vargs;
 		++nterms; // set init 'flag'
 		// TODO: check if this makes sense (e.g. if it's CHR it has to be 8)
-		++types[arg].bitness; // increase bits...
+		types[arg].bitness += nbits; // add bits... //++types[arg].bitness;
 		init_cache();
 		// Only this (add_bit_perm/add_bit) & tables::init_bits will reset vbits
 		init_bits();
@@ -208,6 +207,7 @@ struct bits_perm {
 	size_t arg;
 	size_t args;
 	perminfo perm;
+	size_t nbits;
 };
 
 #endif // __BITSMETA_H__

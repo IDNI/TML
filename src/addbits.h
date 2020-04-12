@@ -10,8 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __ITERBDDS_H__
-#define __ITERBDDS_H__
+#ifndef __ADDBITS_H__
+#define __ADDBITS_H__
 #include <map>
 #include <vector>
 #include "bdd.h"
@@ -23,50 +23,47 @@
 class tables;
 struct alt;
 
-//struct tblperminfo {
-//	ntable tab;
-//	std::set<size_t> args;
-//	bitsmeta oldbm;
-//	perminfo info;
-//};
-
-struct iterbdds {
-	tables& rtbls;
-	//std::set<tbl_arg> tdone;
+struct AddBits {
+	tables& rtables;
 	std::set<tbl_arg> rdone;
-	//std::set<alt_arg> altdone;
 	std::map<tbl_arg, perminfo> tblargperms;
-	//std::map<ntable, tblperminfo> tblperms;
 	std::map<alt_arg, perminfo> altperms;
 	std::map<std::pair<alt*, size_t>, alt_arg> altdone;
 	std::set<std::pair<tbl_arg, alt*>> bodydone;
+	size_t target_bits;
+	base_type target_type;
 
-	iterbdds(tables& tbls) :rtbls(tbls) {}
+	AddBits(tables& tbls) :rtables(tbls) {}
 
 	void clear() {
-		//vperms.clear(); // clear any previous that are applied
 		altperms.clear();
 		tblargperms.clear();
-		//tblperms.clear();
 		altdone.clear();
 		rdone.clear();
-		//tdone.clear();
 		bodydone.clear();
 	}
 
 	alt* get_alt(const tbl_alt& talt) const;
-	void permute_type(const tbl_arg& intype, size_t addbits = 1);
-	bool permute_table(ntable tab, size_t arg);
-	bool permute_table(const tbl_arg& targ, size_t bits, base_type type);
-	bool permute_table(ntable tab, size_t arg, size_t bits, base_type type) {
-		return permute_table({ tab, arg }, bits, type);
+	void permute_type(
+		const tbl_arg& intype, size_t nbits = 1, bool bitsready = false);
+	bits_perm permute_table(const tbl_arg& targ, size_t nbits, bool bitsready);
+	bool permute_bodies(const bits_perm& p, alt& a); // , size_t nbits);
+
+	static xperm permex_add_bit(ints poss, c_bitsmeta& bm, c_bitsmeta& altbm);
+	static perminfo add_bit_perm(const bitsmeta& bm, 
+		size_t arg, size_t args, size_t nbits, bool bitsready = false);
+	static perminfo add_bit_perm(const bitsmeta& oldbm, const bitsmeta& newbm,
+		size_t arg, size_t args, size_t nbits);
+	static spbdd_handle add_bit(spbdd_handle h,
+		const perminfo& perm, size_t arg, size_t args, size_t nbits);
+	static spbdd_handle add_bit(spbdd_handle h, const bits_perm& p) {
+		return add_bit(h, p.perm, p.arg, p.args, p.nbits);
 	}
-	// const bits_perm& altperm
-	bool permute_bodies(const tbl_arg& targ, const bits_perm& p, alt& a, 
-		size_t bits, base_type type);
-	//bool permute_alt(ntable tab, size_t arg, size_t n, alt& a, 
-	//	size_t bits, base_type type);
-	//bool permute_all();
+	//static spbdd_handle add_bit(
+	//	spbdd_handle h, const bits_perm& p, size_t nbits) {
+	//	return add_bit(h, p.perm, p.arg, p.args, nbits);
+	//}
+	
 };
 
-#endif // __ITERBDDS_H__
+#endif // __ADDBITS_H__

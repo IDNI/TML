@@ -19,7 +19,8 @@
 #include "output.h"
 #include "err.h"
 #include "infer_types.h"
-#include "iterbdds.h"
+//#include "iterbdds.h"
+#include "addbits.h"
 using namespace std;
 
 #define mkchr(x) (int_t(x))
@@ -289,7 +290,7 @@ spbdd_handle tables::add_bit(
 }
 
 /* inits table's bitsmeta / bits info (after all facts are loaded) */
-spbdd_handle table::init_bits() {
+spbdd_handle table::init_bits(ntable tab, AddBits& addbits) {
 	spbdd_handle x = tq;
 	size_t args = len;
 	bm.init(dict);
@@ -325,26 +326,25 @@ spbdd_handle table::init_bits() {
 	} else {
 		o::dump() << L"bits changed, addbit required, not implemented!" << endl;
 		for (size_t arg = 0; arg != args; ++arg) {
-			size_t addbits = bm.types[arg].bitness - vbits[arg];
-			if (addbits > 0) {
-				// forget about this, instead of this, scan all progs, and do 
-				// propagate_types on all
-				// issue: we already have bits set up, but addbit should do that
-				//	iterbdds bdditer(*this);
-				//	while (a.bm.types[altretarg].bitness < altretbits) {
-				//		bdditer.clear();
-				//		bdditer.permute_type({ tab, altretarg }, 1);
-				//	}
+			size_t nbits = bm.types[arg].bitness - vbits[arg];
+			if (nbits > 0) {
+				addbits.clear();
+				// set bits to 'ready', meaning bm bits is where it should be
+				addbits.permute_type({ tab, arg }, nbits, true);
 			}
 		}
-		throw 0;
+		return tq; // = bdd_and_many(move(v));
+		//throw 0;
 	}
 }
 
 void tables::init_bits() {
 	range_clear_memo();
-	for (auto& x : tbls)
-		x.init_bits(); // x.t = x.init_bits();
+	static AddBits addBits{*this};
+	for (size_t tab = 0; tab < tbls.size(); ++tab)
+		tbls[tab].init_bits(tab, addBits);
+	//for (auto& x : tbls)
+	//	x.init_bits(); // x.t = x.init_bits();
 	//++bits;
 }
 
@@ -1261,7 +1261,9 @@ void tables::get_facts(const flat_prog& m) {
 	for (auto x : f) {
 		spbdd_handle r = hfalse;
 		for (auto y : x.second) r = r || y;
-		tbls[x.first].tq = r;
+		//tbls[x.first].tq = r;
+		// fix for sequences anulling previous tq, but not sure if this's right?
+		tbls[x.first].tq = (tbls[x.first].tq || r); //% d;
 	}
 	if (optimize)
 		(o::ms() << L"# get_facts: "),
@@ -2132,9 +2134,10 @@ void tables::load_string(
 	bdd_handles b1, b2;
 	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(3);
 
+	static AddBits addBits{ *this };
 	// to be removed: I've just added to test if this changes anything, nope
-	tbl1.init_bits();
-	tbl2.init_bits();
+	tbl1.init_bits(tab1, addBits);
+	tbl2.init_bits(tab2, addBits);
 	b1.push_back(tbl1.tq);
 	b2.push_back(tbl2.tq);
 
@@ -2544,8 +2547,9 @@ void tables::add_tml_update(const term& t, bool neg) {
 	ntable maxtab=tbls.size()-1, tab = get_table({ rel_tml_update, arity });
 	table& tbl = tbls.at(tab);
 	term nt(false, tab, args, types, nums, 0, -1, 0);
+	static AddBits addBits{ *this };
 	if (tab > maxtab) { // new table. init, set args (types) and dumptype
-		tbl.init_bits();
+		tbl.init_bits(tab, addBits);
 		tbl.bm.set_args(ints(nt.size(), 0), nt.types, ints(nt.size()));
 		tbl.bm.init(dict);
 		if (dumptype) o::dump() << dict.get_rel(tbl.s.first) << L"("
@@ -2585,6 +2589,7 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	// only one string is supported (transform_grammar), make this map if more
 	vector<ntable> strtabs;
 	DBG(assert(strs.size() <= 1););
+	static AddBits addBits{*this};
 	if (autotype) {
 		// tables are already in place from from_raw_term or later in grammar
 		// just init string tables, types first, no bdd-s, facts etc.
@@ -2619,7 +2624,7 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 			load_string(x.first, x.second, strtabs);
 		for (size_t tab = 0; tab < tbls.size(); ++tab)
 			if (strs.empty() || !hasf(strtabs, tab))
-				tbls[tab].init_bits();
+				tbls[tab].init_bits(tab, addBits);
 
 		// ...and init alt-s/bm-s as well (will include empty alts, redundant)
 		for (auto& akeyval : inference.altstyped) { // will be empty if no autotype
@@ -2646,7 +2651,7 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 			load_string(x.first, x.second, strtabs);
 		for (size_t tab = 0; tab < tbls.size(); ++tab)
 			if (size_t(strtabs[0]) != tab && size_t(strtabs[1]) != tab)
-				tbls[tab].init_bits();
+				tbls[tab].init_bits(tab, addBits);
 	}
 
 	if (dumptype) {
@@ -2964,25 +2969,15 @@ char tables::fwd() noexcept {
 
 	//out(wcout);
 
-	// this does a test addbit, until we have a good use/test case
+	// this does a test for addbit
 	static bool isfirst = testaddbit;
 	if (isfirst) {
 		isfirst = false;
-		// D: if clearing some cache is needed here (to proper bdd reorder)?
-		//bdd::cleanpermcache();
-		//smemo.clear(), ememo.clear(), leqmemo.clear();
-
-		// just for testing, add bit to the first table, first arg
-		ntable tab = 0;
-		size_t arg = 0;
-		//wcout << L"increasing universe / bitness (tbl:0, arg:0):" << endl;
-		//wcout << L"from: \t" << tbls[tab].bm.types[arg].bitness << endl;
-
 		// theoretically, iter handles any dynamic permutes, add_bit, reorder...
-		static iterbdds bdditer(*this);
+		//static iterbdds bdditer(*this);
+		static AddBits bdditer(*this);
 		bdditer.clear();
-		bdditer.permute_type({tab, arg});
-		//wcout << L"to:   \t" << tbls[tab].bm.types[arg].bitness << endl;
+		bdditer.permute_type({0, 0});
 	}
 	return b;
 /*	if (!b) return false;
@@ -3045,7 +3040,7 @@ tables::tables(dict_t dict_, bool bproof_, bool optimize_, bool bin_transform_,
 	dict(move(dict_)), bproof(bproof_), optimize(optimize_),
 	bin_transform(bin_transform_), print_transformed(print_transformed_),
 	autotype(autotype_), dumptype(dumptype_), testaddbit(addbit_),
-	doemptyalts(true), inference(*this) {
+	doemptyalts(true), inference(*this) { //, addBits(*this) {
 	// just a quick fix, we should have some global settings or something
 	bitsmeta::BITS_FROM_LEFT = !bitsfromright_;
 }

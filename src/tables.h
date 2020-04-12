@@ -34,6 +34,7 @@ struct raw_sof;
 struct raw_form_tree;
 class tables;
 //class dict_t;
+struct AddBits;
 
 typedef std::pair<rel_t, ints> sig;
 typedef std::map<int_t, size_t> varmap;
@@ -158,7 +159,7 @@ struct table {
 	bitsmeta bm;
 	const dict_t& dict; // TODO: remove this dep., only needed for dict.nsyms()
 	bool commit(DBG(size_t));
-	spbdd_handle init_bits();
+	spbdd_handle init_bits(ntable tab, AddBits& addbits);
 	//table() {}
 	table(const sig& sg, size_t l, const dict_t& d) 
 		: s(sg), len(l), tq{hfalse}, bm(l), dict(d) {}
@@ -168,8 +169,9 @@ struct form;
 struct infer_types;
 
 class tables {
-	friend struct iterbdds;
+	//friend struct iterbdds;
 	friend struct infer_types;
+	friend struct AddBits;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 public:

@@ -68,6 +68,9 @@ void bitsmeta::init(const dict_t& dict) {
 					type.bitness = BitScanR(nums[i]); // un_mknum(args[i])
 					// there's a bug with tight bits (dycks example), safe bits
 					//type.bitness += 2; // ...will be removed
+				} else if (nums[i] >= 1 << type.bitness) {
+					o::dump() << L"bitsmeta: nums > max(bits)..." << endl;
+					type.bitness = BitScanR(nums[i]); // un_mknum(args[i])
 				}
 				break;
 			case base_type::NONE:

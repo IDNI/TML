@@ -170,7 +170,7 @@ bitsmeta tables::InitArithTypes(
 		//size_t altretbits = 10;
 		//if (a.bm.types[altretarg].bitness < altretbits) {
 		//	DBG(assert(false);); // throw 0;
-		//	iterbdds bdditer(*this);
+		//	AddBits bdditer(*this);
 		//	while (a.bm.types[altretarg].bitness < altretbits) {
 		//		bdditer.clear();
 		//		bdditer.permute_type({ tab, altretarg }, 1);

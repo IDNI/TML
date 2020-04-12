@@ -123,8 +123,8 @@ order. **All `bitsmeta`** structs (tbl or alt) **need to be constructed &
 initialized before any bdd op** is done (i.e. before the first bdd call). If any
 changes are made to the `bitsmeta` (type, bitness, # of args, ordering) => we
 need to permute all bdd-s for that bdd-context (tbl, alt or custom). That is 
-supported too (iterbdds.cpp/h and `add_bit`, `permute_type`, more below) but 
-it's costly (and needed only in special cases). That's the reason for added 
+supported too (`AddBits` and `add_bit`, `permute_type`, more below) but it's 
+costly (and needed only in special cases). That's the reason for added 
 complexity in `add_prog` initialization (we first init bitsmeta for all, grammar
 too, do type inference, init tables/alts, and only then proceed w/ get_rules).
 This doesn't affect custom bdd contexts (like arithmetics) as long as you init 
@@ -200,7 +200,7 @@ types (usually there're only a few of those) and `minvtyps[root]` holds all
 dependent types. `mtyps` is inverse of that, `get_root_type` etc. This 
 dependency doesn't imply 'direction' or tables dependency, it's not like `deps`. 
 
-- inference maps (the above) are now used for add_bit (iterbdds) as well (which
+- inference maps (the above) are now used for add_bit (AddBits) as well (which
 is more optimal).  
 
 TBD.
@@ -238,7 +238,7 @@ TBD.
 - it can be tested with `--addbit`, one bit will be added (on arbitrary 
 tbl/arg), universe will increase and all should go on as before.  
 
-- it is called like `iterbdds.permute_type({tab, arg});` in `fwd` or similar. 
+- it is called like `AddBits.permute_type({tab, arg});` in `fwd` or similar. 
 Also, some more details in tables_ext.cpp (commented out) and in `fwd`.  
 
 - it adds a bit, propagates the change (to all depending type/args), reinits all
@@ -250,13 +250,17 @@ added shortly.
 - to change var positions we need to set the `vargs` and call the same routine
 (I'd need to test, tweak that).
 
-- addbit and sequences: more coming up shortly (some late changes)...TBD.
+##### addbit and sequences
 
-- There were some tricky issues with previous (fixed) implementation when bits 
-change (sequences, e.g. if second prog adds/changes bits total). This should
-now be fully stable and supporting any bits change, order etc. (this also solves 
-the 'universe overflow' issue that was reported with sequences, I guess similar).
+- There were some tricky issues with previous (fixed bits) implementation (bits 
+/ nums that changes with new sequence, also `consts bit-encoding` vs `addbit` 
+direction didn't match, `from-left` or `from-right`). This should now be fully 
+stable and supporting any bits change, layout, order etc.  
 
+- This also solves the 'universe overflow' issue that was reported.  
+`{a(1).m(120).} {m(128).}`  
+
+- `get_facts` overwriting / anulling for new sequences (needs to be rechecked).
 
 
 TBD  
