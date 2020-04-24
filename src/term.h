@@ -24,18 +24,20 @@ struct term : public ints {
 	// D: TODO: builtins are very different, handle as a same size union struct?
 	int_t idbltin = -1; // size_t bltinsize;
 	argtypes types;
-	ints nums;
+	std::vector<ints> compvals;
+	//ints nums;
 	term() {}
 	term(bool neg_, textype extype_, t_arith_op arith_op, ntable tab_,
-		 const ints& args, const argtypes& types_, const ints& nums_,
-		 size_t orderid_, size_t nvars_)
+		 const ints& args, std::vector<ints> compvals_, const argtypes& types_,
+		 size_t orderid_, size_t nvars_) // , const ints& nums_
 		: ints(args), neg(neg_), extype(extype_), arith_op(arith_op), tab(tab_),
-		  orderid(orderid_), nvars(nvars_), types(types_), nums(nums_) {}
-	term(bool neg_, ntable tab_, const ints& args, const argtypes& types_,
-		 const ints& nums_, size_t orderid_, int_t idbltin, size_t nvars_)
+		  orderid(orderid_), nvars(nvars_), types(types_),
+		  compvals(compvals_){} //, nums(nums_)
+	term(bool neg_, ntable tab_, const ints& args, std::vector<ints> compvals_,
+		 const argtypes& types_, size_t orderid_, int_t idbltin, size_t nvars_) 
 		: ints(args), neg(neg_), extype(term::BLTIN), tab(tab_), 
-		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_), 
-		  nums(nums_) {}
+		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_),
+		  compvals(compvals_) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		//if (extype != t.extype) return extype < t.extype;

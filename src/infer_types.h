@@ -28,8 +28,11 @@
 
 class tables;
 struct alt;
+struct table;
+struct rule;
 
-struct infer_types {
+class infer_types {
+public:
 	// TODO: rework this, fwd refs just a temp solution to separate things a bit
 	tables& rtables;
 	std::map<tbl_arg, std::set<alt_arg>> minvtyps;
@@ -37,11 +40,18 @@ struct infer_types {
 	// enumerates alts as they come, initially local, it needs to be here
 	// we need to support multiple progs and transform/after
 	std::map<ntable, size_t> altids4types;
-
 	// this is is auto typed info for pre-processing 
 	std::map<tbl_alt, alt> altstyped;
+	// all bodies related to a table or rule (across alt-s)
+	std::map<ntable, std::set<tbl_alt>> tblbodies;
+	// maps tbl to rules
+	std::map<ntable, std::set<size_t>> tblrules;
+	// this is the real alts type info, used for post-processing e.g. addbit
+	std::map<tbl_alt, alt*> altsmap;
+	// maps types (pre) ordering to (post) rules ordering (sorting is different)
+	std::map<tbl_alt, tbl_alt> altordermap;
 
-	infer_types(tables& tables_) :rtables(tables_) {}
+	infer_types(tables& tables_);
 
 	// type inference related
 	bool get_root_type(const alt_arg& type, tbl_arg& root) const;
@@ -54,10 +64,8 @@ struct infer_types {
 	void propagate_types(const tbl_arg& intype);
 	void get_alt_types(const term& h, size_t altid);
 	void get_alt_types(const term& h, const term_set& al, size_t altid);
-	//void get_types(const std::map<term, std::set<term_set>>& m);
 	void get_prog_types(const flat_prog& p);
 	void get_types(const flat_prog& p);
-	//void get_types(flat_prog& p);
 };
 
 #endif // __INFER_TYPES_H__

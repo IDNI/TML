@@ -58,9 +58,9 @@ struct elem {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
 	// this is just temp, this should be the base ctor otherwise
-	elem(int_t num, arg_type type) : elem(num) { bitype = type; }
-	elem(wchar_t ch, arg_type type) : elem(ch) { bitype = type; }
-	elem(etype type, lexeme e, arg_type atype) : elem(type, e) {bitype = atype;}
+	elem(int_t num, arg_type bitype_) : elem(num) { bitype = bitype_; }
+	elem(wchar_t ch, arg_type bitype_) : elem(ch) { bitype = bitype_; }
+	elem(etype type, lexeme e, arg_type bitype_):elem(type, e){bitype=bitype_;}
 
 	etype peek(const lexemes& l, size_t& pos);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }

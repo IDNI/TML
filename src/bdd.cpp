@@ -14,7 +14,9 @@
 #include <algorithm>
 #include "bdd.h"
 #include "output.h"
+//#include "my_allocator.h"
 using namespace std;
+//using namespace my_allocator_namespace;
 
 #define MEMO
 bool onexit = false;
@@ -53,12 +55,21 @@ vector<bdd> V;
 unordered_map<ite_memo, int_t> C;
 map<bools, unordered_map<array<int_t, 2>, int_t>, veccmp<bool>> CX;
 map<xperm, unordered_map<array<int_t,2>, int_t>, vec2cmp<bool,uint_t>> CXP;
+//map<xperm,
+//	unordered_map<array<int_t,2>, int_t>, 
+//	vec2cmp<bool,uint_t>,
+//	my_allocator<pair<const xperm, unordered_map<array<int_t, 2>, int_t>>, 10000>>
+//	CXP;
 //map<xperm_bits, 
 //	unordered_map<array<int_t, 2>, int_t>, 
 //	vec3cmp<bool, uint_t, uint_t>> CXP;
 unordered_map<bdds, int_t> AM;
 map<bools, unordered_map<bdds, int_t>, veccmp<bool>> AMX;
+//map<bools, unordered_map<bdds, int_t>, veccmp<bool>,
+//	my_allocator<pair<const bools, unordered_map<bdds, int_t>>, 10000>> AMX;
 map<pair<bools,uints>, unordered_map<bdds,int_t>, vec2cmp<bool,uint_t>> AMXP;
+//map<pair<bools, uints>, unordered_map<bdds, int_t>, vec2cmp<bool, uint_t>,
+//	my_allocator<pair<pair<bools, uints>, unordered_map<bdds, int_t>>, 10000>> AMXP;
 //map<xperm_bits, 
 //	unordered_map<bdds, int_t>, 
 //	vec3cmp<bool, uint_t, uint_t>> AMXP;
@@ -66,9 +77,16 @@ unordered_set<int_t> S;
 unordered_map<int_t, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle htrue, hfalse;
 map<bools, unordered_map<int_t, int_t>, veccmp<bool>> memos_ex;
+//map<bools, unordered_map<int_t, int_t>, veccmp<bool>,
+//	my_allocator<pair<bools, unordered_map<int_t, int_t>>, 10000>> memos_ex;
 map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
+//map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>,
+//	my_allocator<pair<uints, unordered_map<int_t, int_t>>, 10000>> memos_perm;
 map<pair<uints, bools>, unordered_map<int_t, int_t>, vec2cmp<uint_t, bool>>
 	memos_perm_ex;
+//map<pair<uints, bools>, unordered_map<int_t, int_t>, vec2cmp<uint_t, bool>,
+//	my_allocator<pair<pair<uints, bools>, unordered_map<int_t, int_t>>, 10000>>
+//	memos_perm_ex;
 //map<permex_bits, 
 //	unordered_map<int_t, int_t>, 
 //	vec3cmp<uint_t, bool, uint_t>>
@@ -408,9 +426,10 @@ int_t bdd::bdd_and_ex(int_t x, int_t y, const bools& ex) {
 
 int_t bdd::bdd_and_ex_perm(
 	int_t x, int_t y, const bools& ex, const uints& p, const uints& vbits) {
-	return sbdd_and_ex_perm(
+	auto retval = sbdd_and_ex_perm(
 		ex, p, vbits, CXP[{ex, p}], memos_perm_ex[{p, ex}])(x, y);
 		//ex, p, vbits, CXP[{ex, p, vbits}], memos_perm_ex[{p,ex,vbits}])(x, y);
+	return retval;
 }
 
 char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t& m) {
@@ -589,6 +608,16 @@ wostream& bdd::stats(wostream& os) {
 		" AM: " << AM.size() << " C: "<< C.size();
 }
 
+void bdd::init_cache() {
+	V.reserve(1000000);
+	Mp.reserve(1000000);
+	Mn.reserve(1000000);
+	S.reserve(1000000);
+	C.reserve(1000000);
+	AM.reserve(1000000);
+	bdd_handle::M.reserve(1000000);
+}
+
 void bdd::cleancache() {
 	C.clear();
 	CX.clear();
@@ -636,6 +665,7 @@ void bdd::gc() {
 			x.first.rehash(), c.emplace(x.first, f(x.second));
 	C = move(c);
 	map<bools, unordered_map<array<int_t, 2>, int_t>, veccmp<bool>> cx;
+	//unordered_map<bools, unordered_map<array<int_t, 2>, int_t>, hash<bools>, veccmp<bool>> cx;
 	unordered_map<array<int_t, 2>, int_t> cc;
 	for (const auto& x : CX) {
 		for (pair<array<int_t, 2>, int_t> y : x.second)
@@ -650,6 +680,11 @@ void bdd::gc() {
 	map<xperm, 
 		unordered_map<array<int_t, 2>, int_t>, 
 		vec2cmp<bool, uint_t>> cxp;
+	//map<xperm,
+	//	unordered_map<array<int_t, 2>, int_t>,
+	//	vec2cmp<bool, uint_t>,
+	//	my_allocator<pair<const xperm, unordered_map<array<int_t, 2>, int_t>>, 10000>>
+	//	cxp;
 	//map<xperm_bits,
 	//	unordered_map<array<int_t, 2>, int_t>,
 	//	vec3cmp<bool, uint_t, uint_t>> cxp;
@@ -665,6 +700,8 @@ void bdd::gc() {
 	CXP = move(cxp);
 	unordered_map<int_t, int_t> q;
 	map<bools, unordered_map<int_t, int_t>, veccmp<bool>> mex;
+	//map<bools, unordered_map<int_t, int_t>, veccmp<bool>,
+	//	my_allocator<pair<bools, unordered_map<int_t, int_t>>, 10000>> mex;
 	for (const auto& x : memos_ex) {
 		for (pair<int_t, int_t> y : x.second)
 			if (has(S, abs(y.first)) && has(S, abs(y.second)))
@@ -673,6 +710,8 @@ void bdd::gc() {
 	}
 	memos_ex = move(mex);
 	map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> mp;
+	//map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>,
+	//	my_allocator<pair<uints, unordered_map<int_t, int_t>>, 10000>> mp;
 	for (const auto& x : memos_perm) {
 		for (pair<int_t, int_t> y : x.second)
 			if (has(S, abs(y.first)) && has(S, abs(y.second)))
@@ -684,6 +723,11 @@ void bdd::gc() {
 		unordered_map<int_t, int_t>, 
 		vec2cmp<uint_t, bool>>
 		mpe;
+	//map<pair<uints, bools>,
+	//	unordered_map<int_t, int_t>,
+	//	vec2cmp<uint_t, bool>,
+	//	my_allocator<pair<pair<uints, bools>, unordered_map<int_t, int_t>>, 10000>>
+	//	mpe;
 	//map<permex_bits,
 	//	unordered_map<int_t, int_t>, 
 	//	vec3cmp<uint_t, bool, uint_t>> mpe;
@@ -696,6 +740,8 @@ void bdd::gc() {
 	memos_perm_ex = move(mpe);
 	bool b;
 	map<bools, unordered_map<bdds, int_t>, veccmp<bool>> amx;
+	//map<bools, unordered_map<bdds, int_t>, veccmp<bool>,
+	//	my_allocator<pair<const bools, unordered_map<bdds, int_t>>, 10000>> amx;
 	for (const auto& x : AMX) {
 		for (pair<bdds, int_t> y : x.second) {
 			b = false;
@@ -711,6 +757,10 @@ void bdd::gc() {
 	map<xperm, 
 		unordered_map<bdds, int_t>, 
 		vec2cmp<bool, uint_t>> amxp;
+	//map<xperm,
+	//	unordered_map<bdds, int_t>,
+	//	vec2cmp<bool, uint_t>,
+	//	my_allocator<pair<pair<bools, uints>, unordered_map<bdds, int_t>>, 10000>> amxp;
 	//map<xperm_bits, 
 	//	unordered_map<bdds, int_t>, 
 	//	vec3cmp<bool, uint_t, uint_t>> amxp;
@@ -1172,6 +1222,11 @@ size_t std::hash<ite_memo>::operator()(const ite_memo& m) const {
 
 size_t std::hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 	return hash_pair(x[0], x[1]);
+}
+size_t std::hash<xperm>::operator()(const xperm& xp) const {
+	std::size_t h1 = std::hash<bools>{}(xp.first);
+	std::size_t h2 = std::hash<uints>{}(xp.second);
+	return hash_pair(h1, h2);
 }
 
 size_t std::hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}

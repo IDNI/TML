@@ -14,29 +14,21 @@
 #include <list>
 #include "addbits.h"
 #include "tables.h"
+#include "infer_types.h"
 #include "dict.h"
 #include "input.h"
 #include "err.h"
 using namespace std;
 
-//uints perm_init(const bitsmeta& bm);
 uints perm_init(size_t n);
 
-//#define add_bit rtables.add_bit
-//#define add_bit_perm rtables.add_bit_perm
-//#define permex_add_bit rtables.permex_add_bit
-#define deltail rtables.deltail
 #define tbls rtables.tbls
-#define altsmap rtables.altsmap
-#define get_root_type rtables.inference.get_root_type
-#define minvtyps rtables.inference.minvtyps
-#define tblrules rtables.tblrules
-#define tblbodies rtables.tblbodies
-#define rulealts rtables.rulealts
-#define altrule rtables.altrule
-#define altordermap rtables.altordermap
-//#define get_var_ex rtables.get_var_ex
-//#define get_perm rtables.get_perm
+#define altsmap rtables.infer.altsmap
+#define get_root_type rtables.infer.get_root_type
+#define minvtyps rtables.infer.minvtyps
+#define tblrules rtables.infer.tblrules
+#define tblbodies rtables.infer.tblbodies
+#define altordermap rtables.infer.altordermap
 
 //   if it's a table...
 // - permute the main table/arg, test/save to tblperms (no argtbls)
@@ -98,23 +90,35 @@ uints perm_init(size_t n);
 // - or we've just done alts, go through all bodies now, 
 //   use alts' perms if available (from cache), if not just null it.
 
-void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
-	//DBG(assert(nbits == 1););
-	DBG(assert(intype.tab != -1););
+void AddBits::clear() {
+	altperms.clear();
+	tblargperms.clear();
+	altdone.clear();
+	rdone.clear();
+	bodydone.clear();
+}
 
+/*
+ - call permute_type({}, nbits) - to increase bits and update bm
+ - call permute_type({}, nbits, true) - if bm's already changed, just to do bdds
+ - change bm.vargs (var order) + call permute_type({}, 0, true) - should work?
+*/
+void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
+	DBG(assert(intype.tab != -1););
 	// check input, as it could be anything really, other types below are fine
 	if (tbls.size() <= size_t(intype.tab) ||
 		tbls[intype.tab].len <= intype.arg ||
 		tbls[intype.tab].bm.get_args() <= intype.arg)
 		return; // or error?
-
-	wcout << L"increasing universe / bitness (tbl:0, arg:0):" << endl;
+	wcout << L"increasing universe / bitness (tbl:" 
+		<< intype.tab << L", arg:" << intype.tab << L"):" << endl;
 	if (bitsready)
 		wcout << L"from:\t" << 
 		tbls[intype.tab].bm.get_bits(intype.arg) - nbits << endl;
 	else
 		wcout << L"from:\t" << tbls[intype.tab].bm.get_bits(intype.arg) << endl;
 
+	clear();
 	tbl_arg type = get_root_type(intype);
 	set<alt_arg>& types = minvtyps[type];
 	// if we actually have just that one type, could happen, 'types' w/o refs...
@@ -124,10 +128,9 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 	DBG(assert(type == intype || has(types, alt_arg{ intype })););
 
 	auto& bm = tbls[type.tab].bm;
-	target_bits = bitsready ? 
-		bm.types[type.arg].bitness : 
-		bm.types[type.arg].bitness + nbits;
-	target_type = bm.types[type.arg].type;
+
+	init_target(bm.types[type.arg], bitsready, nbits);
+
 	// first, process all tables, prepare tbls cache...
 	for (const alt_arg& atype : types) {
 		if (atype.alt != -1) continue;
@@ -136,9 +139,6 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 		tbl_arg targ{ tab, arg };
 		DBG(assert(arg < tbls[tab].bm.get_args()););
 		bits_perm perm = permute_table({ tab, arg }, nbits, bitsready);
-		//perminfo& info = tblargperms[{tab, arg}];
-		//size_t len = info.bm.get_args();
-		//bits_perm perm{ tab, arg, len, info, nbits };
 		for (size_t i : tblrules[tab]) {
 			rule& r = rtables.rules[i];
 			DBG(assert(arg < r.t.size()););
@@ -146,11 +146,11 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 			if (has(rdone, targ))
 				continue;
 			rdone.insert(targ);
-			r.eq = add_bit(r.eq, perm); // perm.perm, arg, perm.args);
-			r.rlast = add_bit(r.rlast, perm); // perm.perm, arg, perm.args);
-			r.h = add_bit(r.h, perm); // perm.perm, arg, perm.args);
+			r.eq = add_bit(r.eq, perm);
+			r.rlast = add_bit(r.rlast, perm);
+			r.h = add_bit(r.h, perm);
 			for (spbdd_handle& rl : r.last)
-				rl = add_bit(rl, perm); // perm.perm, arg, perm.args);
+				rl = add_bit(rl, perm);
 		}
 	}
 
@@ -176,22 +176,20 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 			continue; // shouldn't happen?
 		DBG(assert(atype.arg < a.bm.get_args()););
 		size_t args = a.bm.get_args(); // a.varslen;
-		if (bitsready) { DBG(assert(a.bm.types[arg].bitness == target_bits);); }
-		else { DBG(assert(a.bm.types[arg].bitness + nbits == target_bits);); }
-		DBG(assert(a.bm.types[arg].type == target_type););
+		DBG(check_bits(a.bm.types[arg], bitsready, nbits);); 
 		perminfo info = add_bit_perm(a.bm, arg, args, nbits, bitsready);
 		bits_perm perm{ tab, arg, args, info, nbits };
 		altperms[altype] = info;
 		a.bm = info.bm;
-		a.eq = add_bit(a.eq, perm); // info, arg, args);
-		a.rng = add_bit(a.rng, perm); // info, arg, args);
+		a.eq = add_bit(a.eq, perm);
+		a.rng = add_bit(a.rng, perm);
 		// this is the right way, we use rule's tbl perm (we should have it by now)
 		// some issue here, need to pass right tbl perm directly, may not have it?
 		////bits_perm& rperm = argtbls.at(tab);
 		////a.rlast = add_bit(a.rlast, rperm); //rp.perm, rp.arg, rp.args);
 		//for (spbdd_handle& al : a.last)
-		//	al = add_bit(al, perm); // info, arg, args);
-		auto pex = deltail(a.bm, tbls[tab].bm);
+		//	al = add_bit(al, perm);
+		auto pex = tables::deltail(a.bm, tbls[tab].bm);
 		a.ex = pex.first;
 		a.perm = pex.second;
 		// this is to reset and re-query on next step (last is synced w/ rlast)
@@ -210,7 +208,7 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 		DBG(assert(has(tblargperms, targ)););
 		perminfo& info = tblargperms[{tab, arg}];
 		size_t len = info.bm.get_args();
-		bits_perm perm{ tab, arg, len, info, nbits }; // tb.len
+		bits_perm perm{ tab, arg, len, info, nbits };
 		if (!has(tblbodies, tab))
 			continue;
 		for (const tbl_alt& talt : tblbodies[tab]) {
@@ -218,7 +216,7 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 			auto it = bodydone.find({ targ, palt });
 			if (it != bodydone.end()) continue;
 			bodydone.insert({ targ, palt });
-			permute_bodies(perm, *palt); // , nbits);
+			permute_bodies(perm, *palt);
 		}
 	}
 
@@ -238,7 +236,7 @@ bits_perm AddBits::permute_table(
 	size_t arg = targ.arg;
 	if (tab == -1) {
 		o::dump() << L"permute_table(-1)???" << endl;
-		throw 0; // return bits_perm{}; // return false; 
+		throw 0; // return bits_perm{};
 	}
 	if (has(tblargperms, targ)) {
 		perminfo& info = tblargperms[targ];
@@ -247,30 +245,27 @@ bits_perm AddBits::permute_table(
 	else {
 		table& tb = tbls[tab];
 		//size_t args = tb.len;
-		if (bitsready) { DBG(assert(tb.bm.types[arg].bitness == target_bits););}
-		else { DBG(assert(tb.bm.types[arg].bitness + nbits == target_bits);); }
-		DBG(assert(tb.bm.types[arg].type == target_type););
+		DBG(check_bits(tb.bm.types[arg], bitsready, nbits);); 
 		perminfo info = add_bit_perm(tb.bm, arg, tb.len, nbits, bitsready);
 		DBG(assert(info.bm.get_args() == tb.len););
 		bits_perm perm{ tab, arg, tb.len, info, nbits };
 		tblargperms[targ] = info;
 		tb.bm = info.bm;
-		tb.tq = add_bit(tb.tq, perm); // info, arg, tb.len, nbits);
+		tb.tq = add_bit(tb.tq, perm);
 		for (spbdd_handle& tadd : tb.add)
-			tadd = add_bit(tadd, perm); // info, arg, tb.len, nbits);
+			tadd = add_bit(tadd, perm);
 		for (spbdd_handle& tdel : tb.del)
-			tdel = add_bit(tdel, perm); // info, arg, tb.len, nbits);
+			tdel = add_bit(tdel, perm);
 		return perm;
 	}
 }
 
-bool AddBits::permute_bodies(const bits_perm& p, alt& a) { //, size_t nbits) {
+bool AddBits::permute_bodies(const bits_perm& p, alt& a) {
 	for (size_t n = 0; n != a.size(); ++n) {
 		DBG(assert(a[n] != nullptr););
 		body& b = *a[n];
 		if (b.tab == p.tab) {
-			DBG(assert(p.perm.bm.get_bits(p.arg) == target_bits););
-			DBG(assert(p.perm.bm.types[p.arg].type == target_type););
+			DBG(check_bits(p.perm.bm.types[p.arg]););
 
 			// the perm bm is 'stale', contains only data valid per single perm.
 			// - we need to perform addbit on single perm at the time (b by bit)
@@ -365,9 +360,10 @@ perminfo AddBits::add_bit_perm(const bitsmeta& oldbm, const bitsmeta& newbm,
 	uints perm = perm_init(oldbm.args_bits);
 	// map from old to new pos, affects all args for the arg shift bits by nbits 
 	// (bits+1) is handled internally by newbm.pos (it 'knows' each arg's bits)
-	// doubled consts fix: reverse bits tb from-left (as consts), empty bits-1
+	// doubled consts fix: reverse bits tb from-left (as consts), empty bits-1.
+	// get_bits: it's ok as we don't care which kind, we just need total bits
 	for (size_t n = 0; n != args; ++n)
-		for (size_t b = 0; b != oldbm.types[n].bitness; ++b)
+		for (size_t b = 0; b != oldbm.types[n].get_bits(); ++b)
 			if (n == arg && !bitsmeta::BITS_FROM_LEFT) // reversed for consts
 				perm[oldbm.pos(b, n, args)] = newbm.pos(b + nbits, n, args);
 			else
@@ -386,7 +382,10 @@ spbdd_handle AddBits::add_bit(spbdd_handle h,
 			v.push_back(::from_bit(perm.bm.pos(b, arg, args), false));
 	else {
 		// doubled consts: reverse bits, same as consts, from-left, empty bits-1
-		size_t bits = perm.bm.types[arg].bitness;
+		// all we need is total bits, but addbit only makes sense on primitives?
+		// and if compound, it's going to have to be different (addbit(subarg))
+		// TODO: isPrimitive, compounds
+		size_t bits = perm.bm.types[arg].get_bits();
 		for (size_t b = 0; b != nbits; ++b)
 			v.push_back(::from_bit(perm.bm.pos(bits-nbits+b, arg, args), false));
 			//v.push_back(::from_bit(perm.bm.pos(bits-1-b, arg, args), false));

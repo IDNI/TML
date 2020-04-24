@@ -272,7 +272,8 @@ driver::driver(wstring s, options o) : rp(), opts(o) {
 	tbl = new tables(move(dict), opts.enabled(L"proof"), 
 		opts.enabled(L"optimize"), opts.enabled(L"bin"), opts.enabled(L"t"),
 		opts.enabled(L"inference"), opts.enabled(L"dumptype"), 
-		opts.enabled(L"addbit"), opts.enabled(L"bitsfromright"));
+		opts.enabled(L"addbit"), opts.enabled(L"bitsfromright"), 
+		opts.enabled(L"optimize_memory"), opts.enabled(L"sort_tables"));
 	set_print_step(opts.enabled(L"ps"));
 	set_print_updates(opts.enabled(L"pu"));
 	set_populate_tml_update(opts.enabled(L"tml_update"));

@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "driver.h"
+#include "types.h"
 #include <iostream>
 #include <sstream>
 using namespace std;
@@ -196,7 +197,8 @@ wstring quote_sym(const elem& e) {
 		else if (e.e[0] == e.e[1]) os << L"\"\"";
 	} else
 		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
-	if (e.bitype.bitness != size_t(-1)) {
+	//if (e.bitype.bitness != size_t(-1)) {
+	if (e.bitype.get_bits() != size_t(-1)) {
 		os << e.bitype;
 		//switch (e.bitype.type) {
 		//	case base_type::CHR: os << L":chr"; break;

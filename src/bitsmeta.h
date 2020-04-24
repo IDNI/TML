@@ -25,9 +25,6 @@ class dict_t;
 struct bitsmeta {
 	// types.size() is always set at args (or table.len) in or right after .ctor
 	argtypes types;
-	// D: we need to track exact 'nums' for the range leq (bits are not enough).
-	ints nums;
-	//std::vector<size_t> vargs;
 	uints vargs, vbits;
 	size_t nterms = 0; // D: # of terms/types processed so far.
 	size_t args_bits = 0; // like args * bits (just now variable sum)
@@ -42,10 +39,13 @@ struct bitsmeta {
 
 	bitsmeta() {}
 	bitsmeta(size_t len) 
-		: types(len), nums(len), vargs(len), nterms{0}, args_bits{0} {
+		: types(len), vargs(len), nterms{0}, args_bits{0} {
 		for (size_t i = 0; i != len; ++i) vargs[i] = i; // native ordering
 	}
-	/* sort of a copy .ctor w/ bits changed (for one arg) - supports add_bit */
+	/* 
+	sort of a copy .ctor w/ bits changed (for one arg) - supports add_bit 
+	note: we shouldn't throw in ctor, just temporary while dev
+	*/
 	bitsmeta(const bitsmeta& src, size_t arg, size_t nbits = 1)
 		: bitsmeta(src.types.size()) {
 		DBG(assert(src.types.size() > 0);); // don't call this if empty
@@ -53,31 +53,37 @@ struct bitsmeta {
 		//DBG(assert(nbits == 1););
 		//if (nbits != 1) throw 0;
 		types = src.types;
-		nums = src.nums; // we don't need this, or increase ++nums[arg] too?
 		vargs = src.vargs;
 		++nterms; // set init 'flag'
 		// TODO: check if this makes sense (e.g. if it's CHR it has to be 8)
-		types[arg].bitness += nbits; // add bits... //++types[arg].bitness;
+		// for the moment we can only addbits to primitives (maybe more later)
+		if (!types[arg].isPrimitive()) throw 0;
+		types[arg].primitive.bitness += nbits; // add bits... //++
 		init_cache();
 		// Only this (add_bit_perm/add_bit) & tables::init_bits will reset vbits
 		init_bits();
 	}
 
-	int_t get_chars(size_t arg) const // TODO: 256 ? 
-	{
-		return types[arg].type == base_type::CHR ? 255 : 0;
+	int_t get_chars(size_t arg) const {
+		return types[arg].get_chars();
 	}
-	int_t get_syms(size_t arg, size_t nsyms = 0) const // D: Q: syms per arg?
-	{
-		return types[arg].type == base_type::STR ? nsyms : 0;
+	int_t get_syms(size_t arg, size_t nsyms = 0) const {
+		return types[arg].get_syms(nsyms);
 	}
 	size_t get_args() const { return types.size(); }
-	size_t sum_bits() const {
-		size_t args = types.size();
-		return mleftbits.at(vargs[args-1]) + types[vargs[args-1]].bitness;
+	
+	size_t get_bits(size_t arg) const {
+		return types[arg].get_bits();
 	}
-	size_t get_bits(size_t arg) const { return types[arg].bitness; }
-	base_type get_type(size_t arg) const { return types[arg].type; }
+	base_type get_type(size_t arg) const {
+		return types[arg].get_type();
+	}
+	size_t get_bits(size_t arg, size_t subarg) const {
+		return types[arg].get_bits(subarg);
+	}
+	base_type get_type(size_t arg, size_t subarg) const {
+		return types[arg].get_type(subarg);
+	}
 	/*
 	 check if bits changed, any propagate_type on new prog may do this (etc.)
 	 - once fixed, any added bits (or args??) have to be permuted (add_bit)
@@ -88,9 +94,9 @@ struct bitsmeta {
 		if (vbits.empty()) return false;
 		if (vbits.size() != types.size()) return true; // is this possible?
 		for (size_t i = 0; i != types.size(); ++i)
-			if (vbits[vargs[i]] != types[vargs[i]].bitness) {
+			if (vbits[vargs[i]] != types[vargs[i]].get_bits()) {
 				// only increase in bits is allowed (and enforced, just recheck)
-				DBG(assert(vbits[vargs[i]] < types[vargs[i]].bitness););
+				DBG(assert(vbits[vargs[i]] < types[vargs[i]].get_bits()););
 				return true;
 			}
 		return false;
@@ -99,31 +105,33 @@ struct bitsmeta {
 	void init_bits();
 	void init_cache();
 	void init(const dict_t& dict);
-	static bool sync_types(argtypes& ltypes, const argtypes& rtypes, 
-		ints& lnums, const ints& rnums, size_t larg, size_t rarg);
+	static void init_type(primitive_type& type, const dict_t& dict);
 	static bool sync_types(
-		arg_type& l, const arg_type& r, int_t& lnum, const int_t& rnum);
-	static bool sync_types(arg_type& l, arg_type& r, int_t& lnum, int_t& rnum);
-	static bool sync_types(arg_type& l, arg_type& r, int_t& lnum, int_t& rnum,
-		bool& lchanged, bool& rchanged);
+		argtypes& ltypes, const argtypes& rtypes, size_t larg, size_t rarg);
+	static bool sync_types(arg_type& l, const arg_type& r);
+	static bool sync_types(primitive_type& l, const primitive_type& r);
+	static bool sync_types(arg_type& l, arg_type& r);
+	static bool sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(
-		argtypes& ltypes, argtypes& rtypes, ints& lnums, ints& rnums);
+		primitive_type& l, primitive_type& r, bool& lchanged, bool& rchanged);
+	static bool sync_types(argtypes& ltypes, argtypes& rtypes);
 	static bool sync_types(
-		argtypes& ltypes, argtypes& rtypes, ints& lnums, ints& rnums,
-		bool& lchng, bool& rchng);
-	bool sync_types(argtypes& rtypes, ints& rnums);
-	static bool sync_types(bitsmeta& lbits, argtypes& rtypes, ints& rnums);
+		argtypes& ltypes, argtypes& rtypes, bool& lchng, bool& rchng);
+	bool sync_types(argtypes& rtypes);
+	static bool sync_types(bitsmeta& lbits, argtypes& rtypes);
 	//static bool sync_types(bitsmeta& l, term& t);
 	static bool sync_types(bitsmeta& lbits, bitsmeta& rbits);
-	void update_types(const argtypes& vtypes, const ints& vnums);
-	bool set_args(const ints& args, const argtypes& vtypes, const ints& vnums);
+	static bool update_type(arg_type& type, const arg_type& other);
+	static bool update_type(primitive_type& type, const primitive_type& other);
+	void update_types(const argtypes& vtypes);
+	bool set_args(const ints& args, const argtypes& vtypes);
 	// BSR op equivalent
 	inline static size_t BitScanR(int_t num, size_t min_bits = 0) {
 		// D: could num be < 0 (in the future?)
 		DBG(assert(num >= 0););
 		// D: what about just '0'? bits is 0 too? also 0 vs 'null'?
 		if (num == 0) num = 1; // just to force one bit at least. // n=!n?1:n;
-		if (num < 1 << min_bits) return min_bits; // nums = max(nums, num);
+		if (num < 1 << min_bits) return min_bits;
 		size_t bits;
 		for (bits = 0; num > 0; num >>= 1) ++bits;
 		return bits;
@@ -138,6 +146,7 @@ struct bitsmeta {
 		const std::map<size_t, size_t>& mpos = mleftargs.at(bit);
 		return mpos.at(arg); // vargs[arg]
 
+		// D: alternative, keep it for now.
 		//DBG(assert(args == types.size()););
 		//DBG(assert(bit < types[arg].bitness && arg < args););
 		//size_t bits = types[arg].bitness;
@@ -152,13 +161,9 @@ struct bitsmeta {
 	//DBG(assert(b < bits););
 	// doubled consts fix: make it again from-left (consts the same as pos)
 	/* this is bit mapping for consts basically */
-	//static inline size_t bit(size_t b, size_t) { return b; }
-	//static inline size_t bit(size_t b, size_t bits) { return (bits - b - 1); }
 	static inline size_t bit(size_t b, size_t bits) { 
 		return BITS_FROM_LEFT ? b : (bits - b - 1);
-		//return (bits - b - 1); 
 	}
-	//_bitsFromLeft
 
 	/*
 	- bit - bit from the right

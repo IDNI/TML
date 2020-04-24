@@ -88,7 +88,7 @@ bool equals(cws l0, cws l1, cws s) {
 	return (size_t)(l1 - l0) != n ? false : !wcsncmp(l0, s, n);
 }
 
-size_t get_index(const lexeme& l) {
+int_t get_index(const lexeme& l) {
 	if (*l[0] != L'[') parse_error(err_eof, l);
 	if ((size_t)(l[1] - l[0]) < 3) parse_error(err_eof, l); // [0]
 	cws fst = l[0], snd = fst+1, esnd = nullptr;
@@ -100,16 +100,21 @@ size_t get_index(const lexeme& l) {
 		if (*fst == L']') esnd = fst;
 	}
 	if (!esnd) parse_error(err_eof, l); // has [ but no ]
-	return size_t(get_int_t(snd, esnd)); // TODO: default bitness?
+	return get_int_t(snd, esnd); // TODO: default bitness?
+	//return size_t(get_int_t(snd, esnd)); // TODO: default bitness?
 }
 
 // use dict just to store type strings, avoid duplicate parsing.
 int_t dict_t::get_type(const lexeme& l) {
-	size_t nums;
+	size_t nums = 0;
 	return get_type(l, nums);
 }
-int_t dict_t::get_type(const lexeme& l, size_t& nums) {
-	nums = 0;
+
+/* 
+ - nums is any outside value for that term + we set it up if defined within type
+*/
+int_t dict_t::get_type(const lexeme& l, int_t nums) {
+	//nums = 0;
 	if (*l[0] != L':') parse_error(err_eof, l);
 	auto it = types_dict.find(l);
 	if (it != types_dict.end()) return it->second;
@@ -137,7 +142,7 @@ int_t dict_t::get_type(const lexeme& l, size_t& nums) {
 	else if (equals(fst, efst, L"str")) type = base_type::STR;
 	int_t bits = snd ? get_int_t(snd, esnd) : 0; // TODO: default bitness?
 
-	types.emplace_back(type, bits); // , fst, efst, snd, esnd);
+	types.emplace_back(type, bits, nums); // , fst, efst, snd, esnd);
 	return types_dict[l] = types.size() - 1;
 }
 

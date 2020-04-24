@@ -33,14 +33,31 @@ wostream& operator<<(wostream& os, const tbl_arg& arg) {
 	return os << L"(" << arg.tab << L"," << arg.arg << L")"; // << endl;
 }
 
-wostream& operator<<(std::wostream& os, const arg_type& type) {
+wostream& operator<<(wostream& os, const primitive_type& type) {
 	switch (type.type) {
-		case base_type::CHR: os << L":chr"; break;
-		case base_type::STR: os << L":str"; break;
-		case base_type::INT: os << L":int"; break;
-		case base_type::NONE: os << L":none"; break;
+	case base_type::CHR: os << L":chr"; break;
+	case base_type::STR: os << L":str"; break;
+	case base_type::INT: os << L":int"; break;
+	case base_type::NONE: os << L":none"; break;
 	}
 	return os << L"[" << type.bitness << L"]";
+}
+
+wostream& operator<<(wostream& os, const arg_type& type) {
+	if (type.isPrimitive())
+		return os << type.primitive;
+	else if (type.isCompound()) {
+		const primtypes& types = type.compound.types;
+		//auto types = type.get_types();
+		os << L"(";
+		for (size_t i = 0; i != types.size(); ++i) {
+			//if (i != 0) os << L" ";
+			os << types[i];
+		}
+		os << L")";
+		return os;
+	}
+	else throw 0;
 }
 
 wostream& operator<<(wostream& os, const argtypes& types) {
@@ -57,7 +74,22 @@ wostream& operator<<(wostream& os, const bitsmeta& bm) {
 	for (size_t i = 0; i != bm.types.size(); ++i) {
 		if (i > 0) os << L" ";
 		os << bm.types[i];
-		os << L"[" << bm.nums[i] << L"]";
+		auto type = bm.types[i];
+		if (type.isPrimitive())
+			os << L"[" << type.primitive.num << L"]";
+		else if (type.isCompound()) {
+			const primtypes& types = type.compound.types;
+			os << L"[";
+			for (size_t i = 0; i != types.size(); ++i) {
+				if (i != 0)
+					os << L" ";
+				os << types[i].num;
+			}
+			os << L"]";
+			return os;
+		}
+		//else {} // throw 0;
+		//os << L"[" << bm.types[i].nums[i] << L"]";
 	}
 	return os;
 }

@@ -103,7 +103,7 @@ bitsmeta tables::InitArithTypes(
 	//   note: bitness is the trickiest here
 	size_t len = args; // 3; // t.size() or # of args
 	argtypes types(len);
-	ints nums(len, 0);
+	//ints nums(len, 0);
 	bitsmeta bm(len);
 	// this logic really depends on a case by case
 	// term t has types / nums which is set w consts, custom types
@@ -112,26 +112,29 @@ bitsmeta tables::InitArithTypes(
 	// you need to go through it, 'tweak' it if not enough data...
 	for (size_t i = 0; i < len; ++i) {
 		// keep alt& const, as we don't want sync_types working both ways
-		bitsmeta::sync_types(
-			types[i], t.types[i], nums[i], t.nums[i]);
+		bitsmeta::sync_types(types[i], t.types[i]);
+		// , nums[i], t.nums[i]
 		// base types might expand in the future, so act if NONE/recheck
-		if (types[i].type == base_type::NONE)
-			types[i].type = base_type::INT;
-		if (nums[i] == 0 && types[i].bitness == 0)
-			types[i].bitness = 16; // e.g., not sure
+		// arithmetics won't deal with compound and other types, right?
+		if (!types[i].isPrimitive()) throw 0;
+		if (types[i].primitive.type == base_type::NONE)
+			types[i].primitive.type = base_type::INT;
+		if (types[i].primitive.num == 0 && types[i].primitive.bitness == 0)
+			types[i].primitive.bitness = 16; // e.g., not sure
 		// var arg needs to match the alt's related arg in type/bitness
 		// we don't have 'casting', and it most often wouldn't help if we did.
 		// i.e. all args that are related (alt's, body's, tbl's) need to match!
 		// type inference should match and init all the types + manually typed
 		if (t[i] < 0) {
 			size_t pos = a.vm.at(t[i]); // a.vm[t[i]];
-			if (a.bm.types[pos].type == base_type::NONE ||
-				a.bm.types[pos].bitness == 0) {
+			if (!a.bm.types[pos].isPrimitive()) throw 0;
+			if (a.bm.types[pos].primitive.type == base_type::NONE ||
+				a.bm.types[pos].primitive.bitness == 0) {
 				// this is an error basically, shouldn't happen
 				DBG(assert(false););
 			}
 			types[i] = a.bm.types[pos];
-			nums[i] = a.bm.nums[pos];
+			//nums[i] = a.bm.nums[pos];
 		}
 	}
 	// couple problems:
@@ -151,7 +154,7 @@ bitsmeta tables::InitArithTypes(
 	// set arg types (could be done multiple times, e.g. multiple facts)
 	// (it's cumulative, max bitness is taken if multiple entries)
 	// for you, call it just once
-	bm.set_args(ints(len), types, nums);
+	bm.set_args(ints(len), types); // , nums);
 	// initialize, finalize your types/bitsmeta (bits, pos, maps etc.)
 	bm.init(dict);
 	// ...now use that bm as your 'temp table' bits/types data,

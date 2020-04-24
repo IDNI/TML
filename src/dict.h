@@ -62,7 +62,7 @@ public:
 	int_t get_sym(const lexeme& l);
 	int_t get_bltin(const lexeme& l);
 	int_t get_type(const lexeme& l);
-	int_t get_type(const lexeme& l, size_t& nums);
+	int_t get_type(const lexeme& l, int_t nums);
 	int_t get_fresh_sym( int_t old);
 	int_t get_fresh_var( int_t old);
 	lexeme get_lexeme(const std::wstring& s);
@@ -73,7 +73,7 @@ public:
 	int_t get_type(const std::wstring& s) { return get_type(get_lexeme(s)); }
 	const arg_type& get_type_info(const lexeme& l)
 	{ return get_type(get_type(l)); }
-	const arg_type& get_type_info(const lexeme& l, size_t& nums)
+	const arg_type& get_type_info(const lexeme& l, int_t nums)
 	{ return get_type(get_type(l, nums)); }
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
@@ -81,7 +81,7 @@ public:
 	size_t nbltins() const { return bltins.size(); }
 	size_t ntypes() const { return types.size(); }
 	// copy and swap (utilize move)
-	dict_t& operator=(dict_t d) {
+	dict_t& operator=(dict_t d) { // noexcept 
 		using std::swap;
 		DBG(assert(false););
 		return

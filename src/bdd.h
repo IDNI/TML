@@ -68,6 +68,16 @@ template<> struct std::hash<std::array<int_t, 2>>{
 	size_t operator()(const std::array<int_t, 2>&) const;
 };
 template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
+template<> struct std::hash<uints> { 
+	size_t operator()(const uints& v) const {
+		size_t r = 0;
+		for (auto i : v) r ^= i;
+		return r;
+	}
+};
+template<> struct std::hash<xperm> {
+	size_t operator()(const xperm&) const;
+};
 
 const int_t T = 1, F = -1;
 
@@ -305,6 +315,7 @@ public:
 	static void init();
 	static void gc();
 	static void cleancache();
+	static void init_cache();
 	static std::wostream& stats(std::wostream& os);
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
