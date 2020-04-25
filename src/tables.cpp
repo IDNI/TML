@@ -322,6 +322,9 @@ spbdd_handle tables::range(size_t arg, ntable tab, const bitsmeta& bm) {
 		auto it = range_comp_memo.find(k);
 		if (it != range_comp_memo.end()) return it->second;
 		bdd_handles v;
+		//range(arg, args, v, bm);
+		////return bdd_and_many(move(v));
+		//return range_comp_memo[k] = bdd_and_many(move(v));
 		return	range(arg, args, v, bm),
 			range_comp_memo[k] = bdd_and_many(move(v));
 	} else throw 0;
@@ -471,6 +474,7 @@ spbdd_handle tables::from_sym(
 		// don't put bit() on both const/encode and pos(), either or.
 		startbit += type.bitness;
 	}
+	//return r;
 	return scompmemo.emplace(x, r), r;
 }
 
@@ -682,7 +686,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		sig sign{ dict.get_rel(r.e[0].e), arity }; // t.arity };
 		return to_tbl_term(
 			realrel ? sign : sig{}, vals, compvals, ptypes, nvars,
-			r.neg, extype, realrel, r.e[0].e, r.arith_op, orderid);
+			r.neg, extype, realrel, r.e[0].e, r.arith_op, orderid, true);
 	}
 	DBG(assert(t.size() == vals.size()););
 	DBG(assert(t.size() == compvals.size()););
@@ -693,18 +697,19 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 
 term tables::to_tbl_term(sig s, ints t, vector<ints> compvals, argtypes types, 
 	size_t nvars, bool neg, term::textype extype, bool realrel, lexeme rel, 
-	t_arith_op arith_op, size_t orderid){
+	t_arith_op arith_op, size_t orderid, bool hascompounds){
 	//bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
 	ntable tab = realrel ? get_table(s) : -1;
 	if (tab != -1)
 		tbls[tab].bm.set_args(t, types); // , nums);
 	return to_tbl_term(
-		tab, t, compvals, types, nvars, neg, extype, rel, arith_op, orderid);
+		tab, t, compvals, types, nvars, neg, extype, rel, arith_op, orderid,
+		hascompounds);
 }
 
 term tables::to_tbl_term(ntable tab, ints t, vector<ints> compvals, 
 	argtypes types, size_t nvars, bool neg, term::textype extype, lexeme rel, 
-	t_arith_op arith_op, size_t orderid) 
+	t_arith_op arith_op, size_t orderid, bool hascompounds)
 {
 	if (extype == term::BLTIN) {
 		int_t idbltin = dict.get_bltin(rel);
@@ -714,9 +719,11 @@ term tables::to_tbl_term(ntable tab, ints t, vector<ints> compvals,
 			tbls[tab].bltinargs = t; // if needed, for rule/header (all in tbl)
 			tbls[tab].bltinsize = nvars; // number of vars (<0)
 		}
-		return term(neg, tab, t, compvals, types, orderid, idbltin, nvars);
+		return term(neg, tab, t, compvals, types, orderid, idbltin, nvars, 
+					hascompounds);
 	}
-	return term(neg, extype, arith_op, tab, t, compvals, types, orderid, nvars);
+	return term(neg, extype, arith_op, tab, t, compvals, types, orderid, nvars, 
+				hascompounds);
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
@@ -1129,6 +1136,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 					startbit += type.bitness;
 				}
 				r.compvals[arg] = vals;
+				r[arg] = r.compvals[arg][0];
 			} else throw 0;
 		}
 		f(r);
@@ -1179,12 +1187,12 @@ elem tables::get_elem(ints vals, const arg_type& type) const {
 	//if (val < 0) return elem(elem::VAR, get_var_lexeme(val));
 	std::wstringstream os, ss;
 	primtypes types = type.compound.types;
-	os << L"(";
+	os << L"";
 	for (size_t i = 0; i != types.size(); ++i) {
 		const primitive_type& type = types[i];
 		int_t val = vals[i];
 		if (i != 0)
-			os << L" ";
+			os << L"(";
 		//if (val < 0) return elem(elem::VAR, get_var_lexeme(val));
 		if (val < 0) { 
 			os << get_var_lexeme(val);
@@ -1212,8 +1220,8 @@ elem tables::get_elem(ints vals, const arg_type& type) const {
 			default: throw 0;
 		}
 	}
-	os << L")";
-	return	elem(elem::SYM, rdict().get_lexeme(os.str()));
+	os << wstring(types.size() - 1, ')');
+	return	elem(elem::SYM, rdict().get_lexeme(os.str()), {compound_type{{}}});
 }
 
 raw_term tables::to_raw_term(const term& r) const {
@@ -2228,6 +2236,7 @@ bool tables::equal_types(const table& tbl, const alt& a) const {
 void tables::get_rules(flat_prog p) {
 	bcqc = false;
 	get_facts(p);
+	//out(o::dump());
 	for (const vector<term>& x : p)
 		for (size_t n = 1; n != x.size(); ++n)
 			exts.insert(x[n].tab);

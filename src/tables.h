@@ -369,11 +369,11 @@ private:
 	term to_tbl_term(sig s, ints t, std::vector<ints> compvals, argtypes types, 
 		size_t nvars = 0, bool neg = false, term::textype extype=term::REL, 
 		bool realrel = true, lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
-		size_t orderid = 0);
+		size_t orderid = 0, bool hascompounds = false);
 	term to_tbl_term(ntable tab, ints t, std::vector<ints> compvals, 
 		argtypes types, size_t nvars = 0, bool neg = false, 
 		term::textype extype=term::REL, lexeme rel=lexeme{0, 0}, 
-		t_arith_op arith_op = NOP, size_t orderid = 0);
+		t_arith_op arith_op = NOP, size_t orderid = 0, bool hascompounds=false);
 	
 	static xperm deltail(const bitsmeta& abm, const bitsmeta& tblbm);
 	xperm deltail(size_t args, size_t newargs,

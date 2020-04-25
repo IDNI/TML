@@ -25,25 +25,28 @@ struct term : public ints {
 	int_t idbltin = -1; // size_t bltinsize;
 	argtypes types;
 	std::vector<ints> compvals;
-	//ints nums;
+	bool hascompounds = false; // for fast check during op<, something smarter?
 	term() {}
 	term(bool neg_, textype extype_, t_arith_op arith_op, ntable tab_,
 		 const ints& args, std::vector<ints> compvals_, const argtypes& types_,
-		 size_t orderid_, size_t nvars_) // , const ints& nums_
+		 size_t orderid_, size_t nvars_, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(extype_), arith_op(arith_op), tab(tab_),
 		  orderid(orderid_), nvars(nvars_), types(types_),
-		  compvals(compvals_){} //, nums(nums_)
+		  compvals(compvals_), hascompounds(hascompounds_) {} //, nums(nums_)
 	term(bool neg_, ntable tab_, const ints& args, std::vector<ints> compvals_,
-		 const argtypes& types_, size_t orderid_, int_t idbltin, size_t nvars_) 
+		 const argtypes& types_, size_t orderid_, int_t idbltin, size_t nvars_,
+		 bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(term::BLTIN), tab(tab_), 
 		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_),
-		  compvals(compvals_) {}
+		  compvals(compvals_), hascompounds(hascompounds_) {}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		//if (extype != t.extype) return extype < t.extype;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		// D: TODO: order types, bltin...
+		if (hascompounds)
+			return compvals < t.compvals;
 		return (const ints&)*this < t;
 	}
 	void replace(const std::map<int_t, int_t>& m);
