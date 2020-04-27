@@ -16,40 +16,61 @@
 #include "types.h"
 
 struct term : public ints {
+public:
 	bool neg = false, goal = false;
 	enum textype { REL, EQ, LEQ, BLTIN, ARITH } extype = term::REL;
 	t_arith_op arith_op = NOP;
 	ntable tab = -1;
 	size_t orderid = 0, nvars = 0;
-	// D: TODO: builtins are very different, handle as a same size union struct?
-	int_t idbltin = -1; // size_t bltinsize;
+	int_t idbltin = -1;
 	argtypes types;
-	std::vector<ints> compvals;
-	bool hascompounds = false; // for fast check during op<, something smarter?
 	term() {}
 	term(bool neg_, textype extype_, t_arith_op arith_op, ntable tab_,
 		 const ints& args, std::vector<ints> compvals_, const argtypes& types_,
 		 size_t orderid_, size_t nvars_, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(extype_), arith_op(arith_op), tab(tab_),
 		  orderid(orderid_), nvars(nvars_), types(types_),
-		  compvals(compvals_), hascompounds(hascompounds_) {} //, nums(nums_)
+		  hasmultivals(hascompounds_), compoundvals(compvals_) {
+		DBG(assert(calc_hasmultivals(types) == hasmultivals););
+	}
 	term(bool neg_, ntable tab_, const ints& args, std::vector<ints> compvals_,
-		 const argtypes& types_, size_t orderid_, int_t idbltin, size_t nvars_,
-		 bool hascompounds_ = false)
+		 const argtypes& types_, size_t orderid_ = 0, int_t idbltin = -1, 
+		 size_t nvars_ = 0, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(term::BLTIN), tab(tab_), 
 		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_),
-		  compvals(compvals_), hascompounds(hascompounds_) {}
+		  hasmultivals(hascompounds_), compoundvals(compvals_) {
+		DBG(assert(calc_hasmultivals(types) == hasmultivals););
+	}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
 		//if (extype != t.extype) return extype < t.extype;
 		if (tab != t.tab) return tab < t.tab;
 		if (goal != t.goal) return goal;
 		// D: TODO: order types, bltin...
-		if (hascompounds)
-			return compvals < t.compvals;
+		if (hasmultivals)
+			return compoundvals < t.compoundvals;
 		return (const ints&)*this < t;
 	}
 	void replace(const std::map<int_t, int_t>& m);
+
+	const std::vector<ints>& multivals() const { return compoundvals; }
+	void set_multivals(size_t arg, ints vals) {
+		compoundvals[arg] = std::move(vals);
+		hasmultivals = true;
+	}
+
+private:
+	inline static bool calc_hasmultivals(const argtypes& types) {
+		for (auto type : types) if (type.isCompound()) return true;
+		return false;
+		//return std::accumulate(types.begin(), types.end(), false,
+		//	[](bool acc, const arg_type& type) {
+		//		return accumulator || type.isCompound();
+		//	});
+	}
+
+	bool hasmultivals = false; // for fast check during op<, something smarter?
+	std::vector<ints> compoundvals;
 };
 
 std::wostream& operator<<(std::wostream& os, const term& t);

@@ -106,6 +106,7 @@ bdd_handles tables::leq_const(
 		v.push_back(
 			leq_const(c, arg, args, type.bitness, type.bitness, startbit, bm));
 		startbit += type.bitness;
+		// TODO: this is bit-first, arg-first (used in varbits) proved better
 	}
 	// we'll we ever need it backwards? subargs order is irrelevant? anyways
 	//size_t startbit = bits;
@@ -517,7 +518,7 @@ spbdd_handle tables::from_fact(const term& t) {
 			if (t.types[n].isPrimitive())
 				r = r && from_sym(n, args, t[n], tbl.bm);
 			else if (t.types[n].isCompound())
-				r = r && from_sym(n, args, t.compvals[n], tbl.bm);
+				r = r && from_sym(n, args, t.multivals()[n], tbl.bm);
 			else throw 0; // not implemented exception or something
 		}
 		else if (vs.end() != (it = vs.find(t[n])))
@@ -632,6 +633,9 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 				types.emplace_back(base_type::STR, 0);
 			//syms = dict.nsyms();
 			isarg = true;
+			break;
+		case elem::ARGTYP:
+			isarg = isprevarg; // propagate fwd, if prev was arg this is arg too
 			break;
 		case elem::OPENP:
 			if (!is1stparenth) {
@@ -1135,8 +1139,9 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 					// put bit() on either const/encode or pos(), not both.
 					startbit += type.bitness;
 				}
-				r.compvals[arg] = vals;
-				r[arg] = r.compvals[arg][0];
+				r[arg] = vals[0];
+				r.set_multivals(arg, move(vals));
+				//r.hasmultivals = true;
 			} else throw 0;
 		}
 		f(r);
@@ -1252,7 +1257,7 @@ raw_term tables::to_raw_term(const term& r) const {
 			if (r.types[n-1].isPrimitive())
 				rt.e[n] = get_elem(r[n-1], r.types[n-1]);
 			else if (r.types[n-1].isCompound())
-				rt.e[n] = get_elem(r.compvals[n-1], r.types[n-1]);
+				rt.e[n] = get_elem(r.multivals()[n-1], r.types[n-1]);
 			else throw 0;
 		}
 		rt.insert_parens(dict.op, dict.cl);
@@ -1497,7 +1502,7 @@ body tables::get_body(
 			if (t.types[n].isPrimitive())
 				b.q = b.q && from_sym(n, t.size(), t[n], tbl.bm);
 			else if (t.types[n].isCompound())
-				b.q = b.q && from_sym(n, t.size(), t.compvals[n], tbl.bm);
+				b.q = b.q && from_sym(n, t.size(), t.multivals()[n], tbl.bm);
 			else throw 0; // not implemented exception or something
 			get_var_ex(n, t.size(), b.ex, tbl.bm); 
 		}
@@ -1535,7 +1540,7 @@ void tables::get_facts(const flat_prog& m) {
 }
 
 // D: this is no longer valid, there're no 'global' nums, chars, syms, bits
-void tables::get_nums(const raw_term&) {}
+//void tables::get_nums(const raw_term&) {}
 //void tables::get_nums(const raw_term& t) { 
 //	for (const elem& e : t.e)
 //		if (e.type == elem::NUM) _nums = max(_nums, e.num);
@@ -1564,18 +1569,18 @@ bool tables::to_pnf( form *&froot) {
 flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
-	term t;
+	//term t;
 
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty())
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x, true),
+				//get_nums(x);
+				term t (from_raw_term(x, true));
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
-					for (const raw_term& z : y) // term_set(
-						v.push_back(from_raw_term(z, false, i++)),
-						get_nums(z);
+					for (const raw_term& z : y)
+						v.push_back(from_raw_term(z, false, i++));//get_nums(z);
 					align_vars(v), m.insert(move(v));
 				}
 			}
@@ -1589,9 +1594,12 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			to_pnf(froot);
 			if(froot) delete froot;
 		}
-		else for (const raw_term& x : r.h)
-			t = from_raw_term(x, true), t.goal = r.type == raw_rule::GOAL,
-			m.insert({t}), get_nums(x);
+		else for (const raw_term& x : r.h) {
+			term t(from_raw_term(x, true));
+			t.goal = r.type == raw_rule::GOAL;
+			m.insert({t});
+			// get_nums(x);
+		}
 
 	return m;
 }
@@ -1611,7 +1619,7 @@ int_t freeze(vector<term>& v, int_t m = 0) {
 				for (size_t i = 0; i != types.size(); ++i) {
 					const primitive_type& type = types[i];
 					if (type.type == base_type::INT)
-						m = max(m, un_mknum(t.compvals[n][i]));
+						m = max(m, un_mknum(t.multivals()[n][i]));
 				}
 			} else throw 0; // not implemented exception or something
 		}
@@ -1662,7 +1670,7 @@ flat_prog& get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 					for (size_t i = 0; i != types.size(); ++i) {
 						const primitive_type& type = types[i];
 						if (type.type == base_type::INT)
-							m = max(m, un_mknum(t.compvals[n][i]));
+							m = max(m, un_mknum(t.multivals()[n][i]));
 					}
 				} else throw 0; // not implemented exception or something
 			}
@@ -1885,7 +1893,7 @@ void tables::get_alt(
 	set<int_t> vs;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
-	pair<body, term> lastbody;
+	pair<ints, size_t> lastbody;
 
 	if (autotype) {
 		map<tbl_arg, alt>::const_iterator ait = 
@@ -1923,17 +1931,19 @@ void tables::get_alt(
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
-			b.insert(lastbody = { get_body(t, a.vm, a.varslen, a), t });//.bm
+			b.emplace(get_body(t, a.vm, a.varslen, a), t);
+			lastbody = {t, t.nvars};
 			// track which bodies/tbls relate to tbls - for addbit/types
 			a.bodytbls.insert(t.tab);
 		} else if (t.extype == term::BLTIN) {
-			DBG(assert(lastbody.second.size() > 0););
+			DBG(assert(lastbody.first.size() > 0););
 			DBG(assert(t.idbltin >= 0););
 			a.idbltin = t.idbltin; // store just a dict id, fetch type on spot
 			a.bltinargs = t;
 			// TODO: check that vars match - in number and names too?
 			// this is only relevant for 'count'? use size differently per type
-			term& bt = lastbody.second;
+			//term& bt = lastbody.second;
+			const ints& bt = lastbody.first;
 			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
 		} else if (t.extype == term::ARITH) {
@@ -1966,12 +1976,12 @@ void tables::get_alt(
 				q = from_sym_eq(a.vm.at(t[0]), a.vm.at(t[1]), a.varslen, a);
 			else if (t[0] < 0) {
 				q = from_sym(a.vm.at(t[0]), a.varslen, t.types[1], t[1], 
-							 t.compvals[1], a.bm);
+							 t.multivals()[1], a.bm);
 				//q = from_sym(a.vm.at(t[0]), a.varslen, t[1], a.bm);
 			}
 			else if (t[1] < 0) {
 				q = from_sym(a.vm.at(t[1]), a.varslen, t.types[0], t[0],
-							 t.compvals[0], a.bm);
+							 t.multivals()[0], a.bm);
 				//q = from_sym(a.vm.at(t[1]), a.varslen, t[0], a.bm);
 			}
 			a.eq = t.neg ? a.eq % q : (a.eq && q);
@@ -2022,7 +2032,7 @@ void tables::get_alt(
 				q = htrue % leq_const(t[0],
 					a.vm.at(t[1]), a.varslen, a.bm) ||
 					from_sym(a.vm.at(t[1]), a.varslen, t.types[0], t[0],
-							 t.compvals[0], a.bm);
+							 t.multivals()[0], a.bm);
 					//from_sym(a.vm.at(t[1]), a.varslen, t[0], a);
 			leq = t.neg ? leq % q : (leq && q);
 		}
@@ -2138,6 +2148,8 @@ vector<term> tables::interpolate(
 				o::dump() << L"interpolate, no tbl/arg?" << L"" << endl;
 		}
 	}
+	//term r(false, tab, t, vector<ints>(t.size()), t.types);
+	//x.emplace(x.begin(), false, tab, t, vector<ints>(t.size()), t.types);
 	x.insert(x.begin(), t);
 	return x;
 }
@@ -2286,11 +2298,11 @@ void tables::get_rules(flat_prog p) {
 				altids[t.tab]++;
 			continue;
 		}
-		rule r;
 		if (t.neg) datalog = false;
 		tbls[t.tab].ext = false;
 		varmap v;
-		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t;
+		rule r(t.neg, t.tab, t);
+		//r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t;
 		// D: r.eq is rule bdd, i.e. header/term bdd, i.e. table bdd (and bm).
 		// TODO: we might want to keep tbl/alt/bm attached to bdd-s? (to DBG)
 		DBG(assert(t.tab != -1););
@@ -2300,7 +2312,7 @@ void tables::get_rules(flat_prog p) {
 				if (t.types[n].isPrimitive())
 					get_sym(t[n], n, t.size(), r.eq, tbl.bm);
 				else if (t.types[n].isCompound())
-					get_sym(t.compvals[n], n, t.size(), r.eq, tbl.bm);
+					get_sym(t.multivals()[n], n, t.size(), r.eq, tbl.bm);
 				else throw 0; // not implemented exception or something
 			}
 			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);

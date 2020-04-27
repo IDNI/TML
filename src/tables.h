@@ -132,6 +132,9 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
+	rule() {}
+	rule(bool neg_, ntable tab_, const term& t_) : 
+		neg(neg_), tab(tab_), eq(htrue), t(t_) {}
 	bool operator<(const rule& r) const {
 		if (neg != r.neg) return neg;
 		if (tab != r.tab) return tab < r.tab;
@@ -411,7 +414,7 @@ private:
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
-	void get_nums(const raw_term& t);
+	//void get_nums(const raw_term& t);
 	flat_prog to_terms(const raw_prog& p);
 
 	bool equal_types(const table& tbl, const alt& a) const;
@@ -547,7 +550,8 @@ friend struct transformer;
 
 	form( ftype _type, int_t _arg=0, term *_t=NULL, form *_l= NULL, form *_r=NULL  ) {
 		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
-		if( _t) tm = new term(), *tm = *_t;
+		if (_t) tm = new term(*_t); // , * tm = *_t;
+		//if( _t) tm = new term(), *tm = *_t;
 	}
 	bool isquantifier() const {
 		 if( type == form::ftype::FORALL1 ||

@@ -186,15 +186,6 @@ struct compound_type {
 		//return sumOfBits;
 	}
 
-	//std::vector<size_t> get_bits_vector() {
-	//	//std::vector<std::size_t> vbits;
-	//	if (vbits.empty())
-	//		std::transform(
-	//			types.begin(), types.end(), std::back_inserter(vbits),
-	//			[](const primitive_type& type) { return type.bitness; });
-	//	return vbits;
-	//}
-
 	size_t get_bits(size_t subarg) const {
 		if (subarg >= types.size()) throw 0;
 		return types[subarg].bitness;
@@ -207,7 +198,6 @@ struct compound_type {
 
 	primtypes types;
 	//size_t sumOfBits = 0;
-	//std::vector<size_t> vbits;
 };
 struct sub_type {
 	inline bool operator<(const sub_type&) const {
