@@ -21,9 +21,16 @@ vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 	vector<env> r;
 	decompress(v, 0, [a, &r](const term& x) {
 		env m;
-		for (auto z : a->inv)
-			if (!m.emplace(z.second, x[z.first]).second)
+		// D: VM: refactor this (and is questionable)
+		// why not use .vm, as we're iterating them all and var<->pos is 1<->1
+		for (auto z : a->vm) {
+			//inv.emplace(z.second.id, z.first);
+			if (!m.emplace(z.first, x[z.second.id]).second)
 				throw 0;
+		}
+		//for (auto z : a->inv)
+		//	if (!m.emplace(z.second, x[z.first]).second)
+		//		throw 0;
 		r.emplace_back(move(m));
 	}, a->varslen);
 	return r;

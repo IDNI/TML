@@ -61,11 +61,31 @@ public:
 	void map_type(alt_arg from, tbl_arg to);
 	//void map_type(tbl_arg to);
 	void propagate_types();
+	void get_types(const flat_prog& p);
+
+private:
+	struct alt_info {
+		ntable tab = -1;
+		std::map<int_t, vm_arg> m, mh;
+		argtypes types;
+		size_t varslen;
+		int_t altid;
+		bool headerOnly;
+		alt_info(
+			ntable tab, const argtypes& types, int_t altid, bool headerOnly) :
+			tab(tab), types(types), varslen(0), altid(altid), 
+			headerOnly(headerOnly) {}
+	};
+
 	void propagate_types(const tbl_arg& intype);
 	void get_alt_types(const term& h, size_t altid);
 	void get_alt_types(const term& h, const term_set& al, size_t altid);
 	void get_prog_types(const flat_prog& p);
-	void get_types(const flat_prog& p);
+	void get_header_types(
+		tbl_arg targ, int_t val, const arg_type& type, alt_info& info);
+	void get_term_types(
+		const term& t, tbl_arg targ, int_t val, const arg_type& type, 
+		bitsmeta& bm, size_t tnums, alt_info& info);
 };
 
 #endif // __INFER_TYPES_H__

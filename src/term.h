@@ -24,22 +24,37 @@ public:
 	size_t orderid = 0, nvars = 0;
 	int_t idbltin = -1;
 	argtypes types;
-	term() {}
+	//term() {} // to avoid wrong types, multivars initialization, use below
 	term(bool neg_, textype extype_, t_arith_op arith_op, ntable tab_,
 		 const ints& args, std::vector<ints> compvals_, const argtypes& types_,
-		 size_t orderid_, size_t nvars_, bool hascompounds_ = false)
+		 size_t orderid_ = 0, size_t nvars_ = 0, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(extype_), arith_op(arith_op), tab(tab_),
 		  orderid(orderid_), nvars(nvars_), types(types_),
 		  hasmultivals(hascompounds_), compoundvals(compvals_) {
-		DBG(assert(calc_hasmultivals(types) == hasmultivals););
+		DBG(check_hasmultivals(););
+		hasmultivals = calc_hasmultivals(types);
+		sync_multivals();
 	}
+	// this is the builtin .ctor overload
 	term(bool neg_, ntable tab_, const ints& args, std::vector<ints> compvals_,
 		 const argtypes& types_, size_t orderid_ = 0, int_t idbltin = -1, 
 		 size_t nvars_ = 0, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(term::BLTIN), tab(tab_), 
 		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_),
 		  hasmultivals(hascompounds_), compoundvals(compvals_) {
-		DBG(assert(calc_hasmultivals(types) == hasmultivals););
+		DBG(check_hasmultivals(););
+		hasmultivals = calc_hasmultivals(types);
+		sync_multivals();
+	}
+	// simplified .ctor 
+	term(ntable tab_, const ints& vals, const argtypes& types_,
+		 bool hascompounds_ = false) // std::vector<ints> compvals_, 
+		: ints(vals), neg(false), extype(term::REL), arith_op(NOP), tab(tab_),
+		  orderid(0), nvars(0), types(types_), hasmultivals(hascompounds_), 
+		  compoundvals(vals.size()) {
+		DBG(check_hasmultivals(););
+		hasmultivals = calc_hasmultivals(types);
+		sync_multivals();
 	}
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
@@ -53,21 +68,62 @@ public:
 	}
 	void replace(const std::map<int_t, int_t>& m);
 
-	const std::vector<ints>& multivals() const { return compoundvals; }
+	const std::vector<ints>& multivals() const { 
+		DBG(check_multivals(););
+		return compoundvals; 
+	}
+	const ints& multivals(size_t arg) const { 
+		DBG(check_multivals(arg););
+		return compoundvals[arg];
+	}
+	bool is_multi(size_t arg) const { return compoundvals[arg].size() > 1; }
+	bool is_const(size_t arg) const { 
+		if (!is_multi(arg))
+			return (*this)[arg] >= 0;
+		for (int_t val : compoundvals[arg]) if (val < 0) return false;
+		return true;
+	}
 	void set_multivals(size_t arg, ints vals) {
 		compoundvals[arg] = std::move(vals);
 		hasmultivals = true;
 	}
 
-private:
 	inline static bool calc_hasmultivals(const argtypes& types) {
 		for (auto type : types) if (type.isCompound()) return true;
 		return false;
-		//return std::accumulate(types.begin(), types.end(), false,
-		//	[](bool acc, const arg_type& type) {
-		//		return accumulator || type.isCompound();
-		//	});
 	}
+
+private:
+	void sync_multivals() {
+		for (size_t arg = 0; arg < size(); ++arg) {
+			ints& vals = compoundvals[arg];
+			if (vals.empty() || (*this)[arg] != vals[0]) {
+				if (is_multi(arg))
+					throw std::runtime_error("term: multivals not in sync??");
+				vals = ints{ (*this)[arg] };
+			}
+		}
+	}
+
+#ifdef DEBUG
+	void check_multivals(size_t arg) const {
+		if (compoundvals[arg].empty() ||
+			compoundvals[arg][0] != (*this)[arg])
+			throw std::runtime_error("check_multivals: multivals?");
+	}
+
+	void check_multivals() const {
+		for (size_t arg = 0; arg < size(); ++arg)
+			if (compoundvals[arg].empty() || 
+				compoundvals[arg][0] != (*this)[arg])
+				throw std::runtime_error("check_multivals: multivals?");
+	}
+
+	void check_hasmultivals() const {
+		if (calc_hasmultivals(types) != hasmultivals)
+			throw std::runtime_error("check_multivals: multivals?");
+	}
+#endif
 
 	bool hasmultivals = false; // for fast check during op<, something smarter?
 	std::vector<ints> compoundvals;

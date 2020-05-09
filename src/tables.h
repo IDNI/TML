@@ -38,11 +38,9 @@ class tables;
 class AddBits;
 
 typedef std::pair<rel_t, ints> sig;
-typedef std::map<int_t, size_t> varmap;
-//typedef std::map<size_t, size_t> posmap;
+typedef std::map<int_t, vm_arg> varmap;
 typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
-//typedef std::set<std::vector<term>> flat_prog;
 
 std::wostream& operator<<(std::wostream& os, const env& e);
 
@@ -53,21 +51,17 @@ template<typename T> struct ptrcmp {
 typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 	cb_ground;
 
-
 struct body {
 	bool neg, ext = false;
-//	struct alt *a = 0;
 	ntable tab;
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
 	// TODO: to reinit get_perm on add_bit (well in the pfp/fwd), temp fix only.
 	// (not sure how else to consistently perm from old bits perm to new one?)
-	//ints vals;
-	ints poss;
+	std::map<tbl_arg, int_t> poss;
 	// only for count, created on first use (rarely used)
 	bools inv;
-	//	static std::set<body*, ptrcmp<body>> &s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
@@ -75,7 +69,7 @@ struct body {
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
 		if (perm != t.perm) return perm < t.perm;
-		//if (vals != t.vals) return vals < t.vals;
+		// VM: TODO: proc_syms: is it good enough? map op < pair compare?
 		return poss < t.poss;
 	}
 	bools init_perm_inv(size_t args) {
@@ -90,7 +84,6 @@ struct body {
 struct table;
 
 // TODO: make a proper move ctor for this, as alt is 'heavy' now, bm and all.
-
 struct alt : public std::vector<body*> {
 	spbdd_handle rng = htrue, eq = htrue, rlast = hfalse;
 	size_t varslen;
@@ -99,9 +92,9 @@ struct alt : public std::vector<body*> {
 	bools ex;
 	uints perm;
 	varmap vm;
+	size_t hvarslen;
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
-//	static std::set<alt*, ptrcmp<alt>> &s;
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize;
@@ -132,7 +125,7 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	rule() {}
+	//rule() {}
 	rule(bool neg_, ntable tab_, const term& t_) : 
 		neg(neg_), tab(tab_), eq(htrue), t(t_) {}
 	bool operator<(const rule& r) const {
@@ -163,17 +156,15 @@ struct table {
 	bitsmeta bm;
 	const dict_t& dict; // TODO: remove this dep., only needed for dict.nsyms()
 	bool commit(DBG(size_t));
-	spbdd_handle init_bits(ntable, AddBits&); // tables&);
+	spbdd_handle init_bits(ntable, AddBits&);
 	//table() {}
 	table(const sig& sg, size_t l, const dict_t& d) 
 		: s(sg), len(l), tq{hfalse}, bm(l), dict(d) {}
 };
 
 struct form;
-//struct infer_types;
 
 class tables {
-	//friend struct iterbdds;
 	friend class infer_types;
 	friend class AddBits;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
@@ -204,10 +195,6 @@ private:
 	// saved bin transform done during get_types (to reuse in get_rules)
 	flat_prog pBin;
 
-	// D: old stuff, just for historical reasons, and some comparing/debugging.
-	//int_t _syms = 0, _nums = 0, _chars = 0;
-	//size_t _bits = 2;
-
 	dict_t dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed, autotype = true, dumptype,
@@ -218,6 +205,9 @@ private:
 	std::map<
 		std::tuple<ints, ints, ints, int_t, int_t, uints>,
 		spbdd_handle> range_comp_memo;
+	std::map<
+		std::tuple<int_t, int_t, int_t, size_t, size_t, size_t, uints>,
+		spbdd_handle> range_compound_memo;
 
 	//	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
@@ -279,9 +269,7 @@ private:
 	void get_sym(
 		int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta&) const;
 	void get_sym(
-		ints vals, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta&) const;
-	void get_sym(
-		size_t arg, size_t args, const arg_type& type, int_t val, ints vals, 
+		int_t val, tbl_arg arg, size_t args, size_t startbit, size_t bits,
 		spbdd_handle& r, c_bitsmeta& bm) const;
 
 	template<typename T> static void get_var_ex(
@@ -289,7 +277,8 @@ private:
 		return get_var_ex(arg, args, vbs, at.bm);
 	}
 	static void get_var_ex(
-		size_t arg, size_t args, bools& vbs, c_bitsmeta& bm); // const;
+		tbl_arg arg, size_t args, size_t startbit, size_t bits, 
+		bools& vbs, const bitsmeta& bm);
 
 	void get_alt_ex(alt& a, const term& h) const;
 	void merge_extensionals();
@@ -303,6 +292,9 @@ private:
 		return from_sym(arg, args, i, altbl.bm);
 	}
 	spbdd_handle from_sym(size_t arg, size_t args, int_t, c_bitsmeta&) const;
+	spbdd_handle from_sym(int_t val, tbl_arg arg, size_t args, size_t startbit, 
+						  size_t bits, const bitsmeta& bm) const;
+
 	spbdd_handle from_sym(size_t arg, size_t args, ints, c_bitsmeta&) const;
 	spbdd_handle from_sym(
 		size_t arg, size_t args, const arg_type& type,
@@ -314,19 +306,24 @@ private:
 	}
 	spbdd_handle from_sym_eq(
 		size_t p1, size_t p2, size_t args, c_bitsmeta& bm) const;
+	spbdd_handle from_sym_eq(
+		tbl_arg arg1, tbl_arg arg2, size_t args, c_bitsmeta& bm) const;
 
 	void init_bits();
 
 	template<typename T> spbdd_handle leq_const(
-		int_t c, size_t arg, size_t args, const T& altbl) const {
-		return leq_const(c, arg, args, altbl.bm);
+		ints vals, size_t arg, size_t args, const T& altbl) const {
+		return leq_const(vals, arg, args, altbl.bm);
 	}
-	spbdd_handle leq_const(
-		int_t c, size_t arg, size_t args, const bitsmeta& bm) const;
+	//spbdd_handle leq_const(
+	//	int_t val, size_t arg, size_t args, const bitsmeta& bm) const;
 	bdd_handles leq_const(
-		ints cs, size_t arg, size_t args, const bitsmeta& bm) const;
-	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit, 
-		size_t bits, const bitsmeta& bm) const;
+		ints vals, size_t arg, size_t args, const bitsmeta& bm) const;
+	spbdd_handle leq_const(
+		int_t val, tbl_arg arg, size_t args, 
+		const primtypes& types, const bitsmeta& bm) const;
+	//spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
+	//	size_t bits, const bitsmeta& bm) const;
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
 		size_t bits, size_t startbit, const bitsmeta& bm) const;
 
@@ -339,11 +336,25 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit, 
 		const bitsmeta& bm) const;
 
-	void range(size_t arg, size_t args, bdd_handles& v, const bitsmeta& bm) const;
-	spbdd_handle range(size_t arg, ntable tab, const bitsmeta& bm);
+	/*
+	 range - sets range conditions, universe limits
+	 note: we no longer have type encoded 'bits', so it's greatly simplified
+	*/
+	void range(
+		size_t arg, size_t args, bdd_handles& v, const bitsmeta& bm) const {
+		bm.types[arg].iterate([&](arg_type::iter& it) {
+			range({ arg, it.i }, args, v, bm);
+			});
+	}
+	//spbdd_handle range(size_t arg, ntable tab, const bitsmeta& bm);
+
+	void range(tbl_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm) const;
+	spbdd_handle range(tbl_arg arg, ntable tab, const bitsmeta& bm);
+
 	void range_clear_memo() {
 		range_memo.clear();
 		range_comp_memo.clear();
+		range_compound_memo.clear();
 	}
 
 	sig get_sig(const term& t);
@@ -353,7 +364,9 @@ private:
 	ntable add_table(sig s);
 
 	static uints get_perm(
-		const ints& poss, const bitsmeta& tblbm, const bitsmeta& altbm);
+		const std::map<tbl_arg, int_t>& poss, const bitsmeta& tblbm, 
+		const bitsmeta& altbm);
+	
 	uints get_perm(const term& t, const varmap& m, size_t len,
 		const bitsmeta& tblbm, const bitsmeta& altbm) const;
 	void init_varmap(alt& a, const term& h, const term_set& al);
@@ -366,7 +379,7 @@ private:
 	inline body get_body(const term&, const varmap&, size_t, const alt&) const;
 	body get_body(
 		const term& t, const varmap&, size_t len, const bitsmeta& bm) const;
-//	void align_vars(std::vector<term>& b) const;
+
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
 	term to_tbl_term(sig s, ints t, std::vector<ints> compvals, argtypes types, 
@@ -378,9 +391,8 @@ private:
 		term::textype extype=term::REL, lexeme rel=lexeme{0, 0}, 
 		t_arith_op arith_op = NOP, size_t orderid = 0, bool hascompounds=false);
 	
-	static xperm deltail(const bitsmeta& abm, const bitsmeta& tblbm);
-	xperm deltail(size_t args, size_t newargs,
-		const bitsmeta& abm, const bitsmeta& tblbm) const;
+	static xperm deltail(
+		const alt& a, const bitsmeta& abm, const bitsmeta& tblbm);
 	uints addtail(size_t len1, size_t len2, 
 		const bitsmeta& tblbm, const bitsmeta& abm) const;
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2,
@@ -401,8 +413,7 @@ private:
 	ntable create_tmp_rel(size_t len, const argtypes& types); //const ints&nums);
 	void create_tmp_head(std::vector<term>& x, 
 		std::vector<std::set<arg_info>>&, std::map<int_t, arg_info>&);
-	//void getvars(const term&, std::set<arg_info>&);
-	//void getvars(const std::vector<term>&, std::set<arg_info>&);
+
 	void getvars(const term&, 
 		std::vector<std::set<arg_info>>&, std::map<int_t, arg_info>&);
 	void getvars(const std::vector<term>&, 
@@ -417,6 +428,7 @@ private:
 	//void get_nums(const raw_term& t);
 	flat_prog to_terms(const raw_prog& p);
 
+	void proc_syms(const term& t, spbdd_handle& req);
 	bool equal_types(const table& tbl, const alt& a) const;
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);

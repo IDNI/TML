@@ -34,10 +34,11 @@ uints tables::get_perm_ext(const term& t, const varmap& m, size_t len,
 	const bitsmeta& tblbm, const bitsmeta& abm) const {
 	// XXX: will deprecate?
 	uints perm = perm_init(abm.args_bits); // len* bits);
+	// VM: we just need vm pos
 	for (size_t n = 0, b; n != len; ++n)
 		if (t[n] < 0)
 			for (b = 0; b != abm.get_bits(n); ++b)
-				perm[abm.pos(b,n,len)] = tblbm.pos(b,m.at(t[n]),len);
+				perm[abm.pos(b,n,len)] = tblbm.pos(b,m.at(t[n]).id,len);
 	return perm;
 }
 
@@ -126,7 +127,8 @@ bitsmeta tables::InitArithTypes(
 		// i.e. all args that are related (alt's, body's, tbl's) need to match!
 		// type inference should match and init all the types + manually typed
 		if (t[i] < 0) {
-			size_t pos = a.vm.at(t[i]); // a.vm[t[i]];
+			// VM: we just need vm pos
+			size_t pos = a.vm.at(t[i]).id; // a.vm[t[i]];
 			if (!a.bm.types[pos].isPrimitive()) throw 0;
 			if (a.bm.types[pos].primitive.type == base_type::NONE ||
 				a.bm.types[pos].primitive.bitness == 0) {
@@ -154,7 +156,7 @@ bitsmeta tables::InitArithTypes(
 	// set arg types (could be done multiple times, e.g. multiple facts)
 	// (it's cumulative, max bitness is taken if multiple entries)
 	// for you, call it just once
-	bm.set_args(ints(len), types); // , nums);
+	bm.set_args(types); // ints(len), 
 	// initialize, finalize your types/bitsmeta (bits, pos, maps etc.)
 	bm.init(dict);
 	// ...now use that bm as your 'temp table' bits/types data,

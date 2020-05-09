@@ -15,16 +15,12 @@
 #include "bitsmeta.h"
 #include "dict.h"
 #include "input.h"
-//#include "term.h"
+#include "term.h"
 //#include "output.h"
 #include "err.h"
 using namespace std;
 
 // this is going away anyways, copy it for now, who cares
-//#define mkchr(x) ((((int_t)x)<<2)|1)
-//#define mknum(x) ((((int_t)x)<<2)|2)
-//#define mksym(x) (int_t(x)<<2)
-//#define un_mknum(x) (int_t(x)>>2)
 #define mkchr(x) (int_t(x))
 #define mknum(x) (int_t(x))
 #define mksym(x) (int_t(x))
@@ -40,8 +36,7 @@ void bitsmeta::init_type(primitive_type& type, const dict_t& dict) {
 			if (type.bitness == 0) {
 				type.set_bitness(BitScanR(dict.nsyms()));
 				//type.bitness = BitScanR(dict.nsyms()); // nsyms-1? I guess
-				// add extra because we haven't handled syms properly yet
-				// i.e. we have 'shared dict universe' for all sym/str args
+				// we have 'shared dict universe' for all sym/str args
 			}
 			break;
 		case base_type::CHR:
@@ -77,19 +72,15 @@ void bitsmeta::init(const dict_t& dict) {
 	size_t lsum = 0, args = types.size(), maxb = 0;
 	mleftbits[vargs[0]] = lsum;
 	for (size_t i = 0; i != types.size(); ++i) {
-		//arg_type& type = types[i]; // this is a bug
 		arg_type& type = types[vargs[i]];
 		// either branch or use an iterator similar to get_types()
 		if (type.isPrimitive()) {
 			init_type(type.primitive, dict);
 		} else if (type.isCompound()) {
-			//for (size_t it = 0; it != primitives.size(); ++it) {
-			//	primitive_type& subtype = primitives[it];
 			for(primitive_type& subtype : type.compound.types)
 				init_type(subtype, dict);
 		} else throw 0;
 		//DBG(assert(type.get_bits() < 100););
-		//if (vargs[i] == arg) break;
 		if (i != args-1) {
 			// we calc cache/maps regardless of the type, just need total bits
 			// micro management is at the level of compound calls, eg leq_const
@@ -114,6 +105,7 @@ void bitsmeta::init(const dict_t& dict) {
 				mpos[vargs[arg]] = argsum++;
 	}
 	DBG(assert(argsum == args_bits););
+	hasmultivals = term::calc_hasmultivals(types);
 }
 
 /* this's probably not necessary, just do init() when done w/ changes */
@@ -140,6 +132,7 @@ void bitsmeta::init_cache() {
 				mpos[vargs[arg]] = argsum++;
 	}
 	DBG(assert(argsum == args_bits););
+	hasmultivals = term::calc_hasmultivals(types);
 }
 
 /* 
@@ -155,10 +148,9 @@ void bitsmeta::init_bits() {
 	bitsfixed = true;
 }
 
-bool bitsmeta::set_args(const ints& DBG(args), const argtypes& vtypes) {
+bool bitsmeta::set_args(const argtypes& vtypes, bool hasmultivals_) {
 	if (vtypes.empty()) return false;
 	DBG(assert(vtypes.size() > 0);); // don't call this if nothing to do
-	DBG(assert(args.size() == vtypes.size()););
 	// we're empty initialized already (to table len), so sizes need to match
 	DBG(assert(types.size() == vtypes.size()););
 	// !nterms meaning we have no previous types / bits data (size's always >0)
@@ -168,28 +160,32 @@ bool bitsmeta::set_args(const ints& DBG(args), const argtypes& vtypes) {
 		for (size_t i = 0; i != types.size(); ++i)
 			update_type(types[i], vtypes[i]);
 	++nterms;
+	hasmultivals = hasmultivals_;
 	return true;
 }
 
 bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
-	//if (type.kind != newtype.kind) return false;
 	if (!type.isCompatible(newtype)) return false;
 	if (newtype.isNone()) return false; // non-deterministic, can't help us
 	if (type.isNone()) return type = newtype, true;
 	// either branch or use an iterator similar to get_types()
 	// newtype is a 'concrete' type (non-NONE), so test it instead of the type
-	if (newtype.isPrimitive()) { // either both are primitive or NONE + prim.
+	if (newtype.isPrimitive()) // either both are primitive or NONE + prim.
 		return update_type(type.primitive, newtype.primitive);
-	}
 	else if (newtype.isCompound()) {
 		primtypes& types = type.compound.types;
 		const primtypes& newtypes = newtype.compound.types;
 		if (types.size() != newtypes.size()) {
-			//throw 0;
 			o::dump() << L"update_type: types.size() != newtypes.size()?"<<endl;
 			return false;
 		}
 		bool changed = false;
+		if (type.sig != newtype.sig) {
+			if (newtype.sig.empty()) {} // newtype.sig = type.sig;
+			else if (type.sig.empty()) type.sig = newtype.sig;
+			else throw runtime_error("update_type: different signatures?");
+			changed = true;
+		}
 		for (size_t i=0; i != types.size(); ++i)
 			changed |= 
 				update_type(types[i], newtypes[i]);
@@ -200,13 +196,13 @@ bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
 bool bitsmeta::update_type(primitive_type& type, const primitive_type& newtype){
 	bool changed = false;
 	// if not set, skip
-	if (newtype.isNone()) return false; //if (newtype.type == base_type::NONE)
-	if (type.isNone()) { //if (type.type == base_type::NONE) {
+	if (newtype.isNone()) return false;
+	if (type.isNone()) {
 		type = newtype;
 		changed = true; // first init...
 	}
 	if (type.type != newtype.type) 
-		parse_error(err_type, L""); //lexeme?
+		throw runtime_error("update_type: type mismatch?");
 	//if (type.type == base_type::INT) 
 	//	type.num = max(type.num, newtype.num); // no need if NONE but cheap
 	if (type.type == base_type::INT && newtype.num > type.num) {
@@ -243,8 +239,34 @@ bool bitsmeta::sync_types(
 	return sync_types(ltypes[larg], rtypes[rarg]);
 }
 
+bool bitsmeta::sync_types(
+	argtypes& ltypes, tbl_arg larg, const argtypes& rtypes, tbl_arg rarg) 
+{
+	arg_type& l = ltypes[larg.arg];
+	const arg_type& r = rtypes[rarg.arg];
+	if (larg.subarg == arg::none && rarg.subarg == arg::none)
+		return sync_types(l, r);
+	if (larg.subarg != arg::none && rarg.subarg != arg::none)
+		return sync_types(l[larg.subarg], r[rarg.subarg]);
+	// TODO: needs extra handling for none compound or non-primitive comps etc.
+	if (larg.subarg != arg::none && r.isPrimitive())
+		return sync_types(l[larg.subarg], r.primitive);
+	if (rarg.subarg != arg::none && l.isPrimitive())
+		return sync_types(l.primitive, r[rarg.subarg]);
+	return false;
+}
+
+bool bitsmeta::sync_types(argtypes& ltypes, tbl_arg larg, const arg_type& r) {
+	arg_type& l = ltypes[larg.arg];
+	if (larg.subarg == arg::none)
+		return sync_types(l, r);
+	// TODO: needs extra handling for none compound or non-primitive comps etc.
+	if (r.isPrimitive())
+		return sync_types(l[larg.subarg], r.primitive);
+	return false;
+}
+
 bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
-	//if (l.kind != r.kind) return false;
 	if (!l.isCompatible(r)) return false;
 	if (r.isNone()) return false; // non-deterministic, can't help us
 	if (l.isNone()) return l = r, true;
@@ -256,11 +278,16 @@ bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
 		primtypes& ltypes = l.compound.types;
 		const primtypes& rtypes = r.compound.types;
 		if (ltypes.size() != rtypes.size()) {
-			//throw 0;
 			o::dump() << L"sync_types: ltypes.size() != rtypes.size()??"<<endl;
 			return false;
 		}
 		bool changed = false;
+		if (l.sig != r.sig) {
+			if (r.sig.empty()) {} // r.sig = l.sig;
+			else if (l.sig.empty()) l.sig = r.sig;
+			else throw runtime_error("sync_types const: different signatures?");
+			changed = true;
+		}
 		for (size_t i = 0; i != ltypes.size(); ++i)
 			changed |= sync_types(ltypes[i], rtypes[i]);
 		return changed;
@@ -274,7 +301,8 @@ bool bitsmeta::sync_types(primitive_type& l, const primitive_type& r)
 	bool lnone = l.isNone(), rnone = r.isNone();
 	if (rnone) return false;
 	else if (lnone) return l = r, true;
-	if (l.type != r.type) parse_error(err_type, L"");
+	if (l.type != r.type) 
+		throw runtime_error("sync_types: type mismatch?");
 	if (l.type == base_type::INT && r.num > l.num) {
 		//l.num = r.num;
 		l.set_num(r.num);
@@ -290,6 +318,48 @@ bool bitsmeta::sync_types(primitive_type& l, const primitive_type& r)
 	return changed;
 }
 
+bool bitsmeta::sync_types(
+	argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg) {
+	bool lchng, rchng;
+	return sync_types(ltypes, larg, rtypes, rarg, lchng, rchng);
+}
+
+bool bitsmeta::sync_types(
+	argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg,
+	bool& lchng, bool& rchng) 
+{
+	lchng = rchng = false;
+	arg_type& l = ltypes[larg.arg];
+	arg_type& r = rtypes[rarg.arg];
+	if (larg.subarg == arg::none && rarg.subarg == arg::none)
+		return sync_types(l, r, lchng, rchng);
+	if (larg.subarg != arg::none && rarg.subarg != arg::none)
+		return sync_types(l[larg.subarg], r[rarg.subarg], lchng, rchng);
+	// TODO: needs extra handling for none compound or non-primitive comps etc.
+	if (larg.subarg != arg::none && r.isPrimitive())
+		return sync_types(l[larg.subarg], r.primitive, lchng, rchng);
+	if (rarg.subarg != arg::none && l.isPrimitive())
+		return sync_types(l.primitive, r[rarg.subarg], lchng, rchng);
+	return false;
+}
+
+bool bitsmeta::sync_types(argtypes& ltypes, tbl_arg larg, arg_type& r) {
+	bool lchng, rchng;
+	return sync_types(ltypes, larg, r, lchng, rchng);
+}
+
+bool bitsmeta::sync_types(
+	argtypes& ltypes, tbl_arg larg, arg_type& r, bool& lchng, bool& rchng) {
+	lchng = rchng = false;
+	arg_type& l = ltypes[larg.arg];
+	if (larg.subarg == arg::none)
+		return sync_types(l, r, lchng, rchng);
+	// TODO: needs extra handling for none compound or non-primitive comps etc.
+	if (r.isPrimitive())
+		return sync_types(l[larg.subarg], r.primitive, lchng, rchng);
+	return false;
+}
+
 bool bitsmeta::sync_types(arg_type& l, arg_type& r) {
 	bool lchng, rchng;
 	return sync_types(l, r, lchng, rchng);
@@ -297,7 +367,6 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r) {
 
 bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
 	lchng = rchng = false;
-	//if (l.kind != r.kind) return false;
 	if (!l.isCompatible(r)) return false;
 
 	bool lnone = l.isNone(), rnone = r.isNone();
@@ -312,11 +381,16 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
 		primtypes& ltypes = l.compound.types;
 		primtypes& rtypes = r.compound.types;
 		if (ltypes.size() != rtypes.size()) {
-			//throw 0;
 			o::dump() << L"sync_types: ltypes.size() != rtypes.size() ??"<<endl;
 			return false;
 		}
 		bool changed = false;
+		if (l.sig != r.sig) {
+			if (r.sig.empty()) r.sig = l.sig, rchng = true;
+			else if (l.sig.empty()) l.sig = r.sig, lchng = true;
+			else throw runtime_error("sync_types: different signatures?");
+			changed = true;
+		}
 		for (size_t i = 0; i != ltypes.size(); ++i) {
 			bool lchanged, rchanged;
 			changed |= 
@@ -333,12 +407,12 @@ bool bitsmeta::sync_types(
 	primitive_type& l, primitive_type& r, bool& lchng, bool& rchng)
 {
 	lchng = rchng = false;
-	//bool changed = false;
 	bool lnone = l.isNone(), rnone = r.isNone();
 	if (lnone && rnone) return false;
 	else if (rnone) return r = l, rchng = true;
 	else if (lnone) return l = r, lchng = true;
-	if (l.type != r.type) parse_error(err_type, L"");
+	if (l.type != r.type) 
+		throw runtime_error("sync_types: type mismatch?");
 	if (l.type == base_type::INT) {
 		if (r.num > l.num) {
 			//l.num = r.num;
@@ -373,16 +447,12 @@ bool bitsmeta::sync_types(argtypes& ltypes, argtypes& rtypes) {
 bool bitsmeta::sync_types(
 	argtypes& ltypes, argtypes& rtypes, bool& lchng, bool& rchng) {
 	DBG(assert(ltypes.size() == rtypes.size()););
-	//bool lchng = false, rchng = false;
 	for (size_t i = 0; i != ltypes.size(); ++i) {
 		bool lchanged, rchanged;
 		sync_types(ltypes[i], rtypes[i], lchanged, rchanged);
 		lchng |= lchanged;
 		rchng |= rchanged;
 	}
-	// this updates 'live', caches may change
-	//if (lchng) l.init_cache();
-	//if (rchng) r.init_cache();
 	return lchng || rchng;
 }
 
@@ -410,5 +480,3 @@ bool bitsmeta::sync_types(bitsmeta& l, bitsmeta& r) {
 	if (rchng) r.init_cache();
 	return changed; // lchng || rchng;
 }
-
-

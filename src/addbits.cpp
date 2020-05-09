@@ -189,7 +189,7 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 		////a.rlast = add_bit(a.rlast, rperm); //rp.perm, rp.arg, rp.args);
 		//for (spbdd_handle& al : a.last)
 		//	al = add_bit(al, perm);
-		auto pex = tables::deltail(a.bm, tbls[tab].bm);
+		auto pex = tables::deltail(a, a.bm, tbls[tab].bm);
 		a.ex = pex.first;
 		a.perm = pex.second;
 		// this is to reset and re-query on next step (last is synced w/ rlast)
@@ -312,17 +312,25 @@ bool AddBits::permute_bodies(const bits_perm& p, alt& a) {
 }
 
 /* add bit to permute/ex (of a body) */
-xperm AddBits::permex_add_bit(ints poss, c_bitsmeta& bm, c_bitsmeta& altbm) {
+xperm AddBits::permex_add_bit(
+	const map<tbl_arg, int_t>& poss, const bitsmeta& bm, const bitsmeta& abm) 
+{
 	DBG(assert(bm.get_args() == poss.size()););
 	bools ex = bools(bm.args_bits, false);
-	varmap m;
+	size_t args = bm.get_args();
+	map<int_t, tbl_arg> m;
 	// poss & vals/ints are similar, if 2 vals are same <--> poss are also same
-	for (size_t n = 0; n != poss.size(); ++n)
-		if (poss[n] == -1 || has(m, poss[n]))
-			tables::get_var_ex(n, poss.size(), ex, bm);
-		else
-			m.emplace(poss[n], n);
-	uints perm = tables::get_perm(poss, bm, altbm);
+	for (size_t n = 0; n != args; ++n) {
+		bm.types[n].iterate([&](arg_type::iter& it) {
+			auto itpos = poss.find({ n, it.i });
+			if (poss.end() == itpos || has(m, itpos->second))
+				tables::get_var_ex(
+					{n, it.i}, args, it.startbit, it.bits, ex, bm);
+			else
+				m.emplace(itpos->second, tbl_arg{n, it.i});
+		});
+	}
+	uints perm = tables::get_perm(poss, bm, abm);
 	return { ex, perm };
 }
 

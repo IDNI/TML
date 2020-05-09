@@ -997,6 +997,7 @@ size_t bdd::satcount_k(const bdd& bx, int_t x, size_t leafvar,
 	return r;
 }
 
+// D: VM: this uses inv, refactor it to use new vm, but no longer called?
 size_t bdd::satcount(spbdd_handle x, const bools& inv) {
 	// see: body::init_perm_inv(args)
 	// only count alt vars that are 'possible permutes' (of a body bit) 

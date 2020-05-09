@@ -23,9 +23,11 @@
 #include <map>
 #include <numeric>
 #include <algorithm>
+#include <functional>
 #include "defs.h"
 
 struct alt_arg;
+struct vm_arg;
 struct bitsmeta;
 struct term;
 
@@ -34,24 +36,16 @@ struct term;
 enum class base_type { NONE = 0, INT, CHR, STR };
 
 // D: make this just an int_t, lower bits for type + bitness the rest.
+struct arg {
+	//static constexpr int_t none = -1;
+	static constexpr size_t none = 0;
+};
 
-//struct arg_type {
 struct primitive_type {
 	primitive_type() : type(base_type::NONE), bitness(0) {}
-	primitive_type(base_type type_, size_t bits) : type(type_), bitness(bits) {
-		if (bits > 4) {
-			//o::dump() << L"bits > 4" << std::endl;
-		}
-	}
+	primitive_type(base_type type_, size_t bits) : type(type_), bitness(bits) {}
 	primitive_type(base_type type_, size_t bits, int_t num) 
-		: type(type_), bitness(bits), num(num) {
-		if (num > 9) {
-			//o::dump() << L"num > 9" << std::endl;
-		}
-		if (bits > 4) {
-			//o::dump() << L"bits > 4" << std::endl;
-		}
-	}
+		: type(type_), bitness(bits), num(num) {}
 
 	//primitive_type(const primitive_type& other) {
 	//	type = other.type;
@@ -102,16 +96,10 @@ struct primitive_type {
 
 	void set_bitness(size_t bits) {
 		//DBG(assert(bits < 100););
-		if (bits > 4) {
-			//o::dump() << L"bits > 4" << std::endl;
-		}
 		bitness = bits;
 	}
 
 	void set_num(int_t num_) {
-		if (num_ > 9) {
-			//o::dump() << L"num > 9" << std::endl;
-		}
 		num = num_;
 	}
 
@@ -121,11 +109,6 @@ struct primitive_type {
 	int_t num = 0;
 };
 
-//typedef primitive_type arg_type;
-//typedef std::vector<arg_type> argtypes;
-
-//typedef std::vector<arg_type> argtypes;
-//typedef arg_type primitive_type;
 typedef std::vector<primitive_type> primtypes;
 
 /* compound type (only has primitive types?) */
@@ -170,20 +153,10 @@ struct compound_type {
 		size_t sum = 0;
 		for (auto type : types) sum += type.bitness;
 		return sum;
-		//return std::accumulate(types.begin(), types.end(), 0,
-		//	[](size_t accumulator, const primitive_type& type) {
-		//		return accumulator + type.bitness;
-		//	});
 	}
 
 	size_t get_bits() const {
 		return calc_sum(types);
-		//if (sumOfBits == 0 && !types.empty()) // assume it's not sum==0
-		//	sumOfBits = std::accumulate(types.begin(), types.end(), 0,
-		//		[](size_t accumulator, const primitive_type& type) {
-		//			return accumulator + type.bitness;
-		//		});
-		//return sumOfBits;
 	}
 
 	size_t get_bits(size_t subarg) const {
@@ -241,7 +214,6 @@ struct union_type {
 };
 
 struct type;
-//typedef std::vector<type> vtypes;
 
 //struct field {
 //	type type;
@@ -274,8 +246,6 @@ struct record_type {
 	std::vector<std::wstring> names;
 };
 
-//enum class type_type { Primitive, Compound, Record };
-
 struct type {
 	//type(base_type type_, size_t bits):kind(Primitive),primitive{type_,bits}{}
 	//type(primitive_type type_) : kind(Primitive), primitive(type_) {}
@@ -284,7 +254,8 @@ struct type {
 	type(base_type type_, size_t bits, int_t num)
 		: kind(Primitive), primitive{type_, bits, num} {}
 	type(primitive_type type_) : type(type_.type, type_.bitness) {}
-	type(compound_type type_) : kind(Compound), compound(type_) {}
+	type(compound_type type_, std::vector<size_t> sig_ = {})
+		: kind(Compound), compound(type_), sig(move(sig_)) {}
 	type(record_type type_) : kind(Record), record(type_) {}
 	type(sub_type type_) : kind(Sub), sub(type_) {}
 	type(union_type type_) : kind(Union), uni(type_) {}
@@ -292,6 +263,7 @@ struct type {
 	// copy ctor, move, op=, dctor is only because of the union, nothing special
 	type(const type& other) { // noexcept
 		kind = other.kind;
+		sig = other.sig;
 		switch (kind) {
 			case Primitive: primitive = other.primitive; break;
 			case Compound: compound = other.compound; break;
@@ -303,6 +275,7 @@ struct type {
 	}
 	type(type&& other) noexcept {
 		kind = other.kind;
+		sig = std::move(other.sig);
 		switch (kind) {
 			case Primitive: primitive = std::move(other.primitive); break;
 			case Compound: compound = std::move(other.compound); break;
@@ -312,10 +285,11 @@ struct type {
 			default: break; // throw 0;
 		}
 	}
-	// TODO: suboptimal for this, make this a copy instead (or a move)
+	// TODO: suboptimal for this, make this a copy instead (or a move ass.)
 	//type& operator=(type other) { // noexcept 
 	//	using std::swap;
 	//	kind = other.kind;
+	//	sig = swap(other.sig);
 	//	switch (kind) {
 	//		case Primitive: swap(primitive, other.primitive); break;
 	//		case Compound: swap(compound, other.compound); break;
@@ -328,6 +302,7 @@ struct type {
 	//}
 	type& operator=(const type& other) { // noexcept 
 		kind = other.kind;
+		sig = other.sig;
 		switch (kind) {
 			case Primitive: primitive = other.primitive; break;
 			case Compound: compound = other.compound; break;
@@ -367,6 +342,34 @@ struct type {
 	inline bool operator<=(const type& r) const { return !operator>(r); }
 	inline bool operator>=(const type& r) const { return !operator<(r); }
 
+	primitive_type& operator[](size_t idx) {
+		switch (kind) {
+			case Primitive: 
+				if (idx > 0) 
+					throw std::out_of_range("type.operator[]<primitive>: id > 0");
+				return primitive;
+			case Compound:
+				if (idx >= compound.types.size())
+					throw std::out_of_range("type.operator[]<compound>: id > 0");
+				return compound.types[idx];
+			default: 
+				throw std::runtime_error("type[]: type kind not implemented?");
+		}
+	}
+	const primitive_type& operator[](size_t idx) const {
+		switch (kind) {
+			case Primitive: 
+				if (idx > 0) throw std::out_of_range("type[]<primitive>: id > 0");
+				return primitive;
+			case Compound:
+				if (idx >= compound.types.size())
+					throw std::out_of_range("type[]<compound>: id > 0");
+				return compound.types[idx];
+			default: 
+				throw std::runtime_error("type[]: type kind not implemented?");
+		}
+	}
+
 	/* isempty, isEmpty, is_empty, empty() ? */
 	inline bool isNone() const {
 		return isPrimitive() && primitive.type == base_type::NONE;
@@ -376,10 +379,17 @@ struct type {
 	 note: if one is primitive/NONE other can be anything (non-primitive too)
 	*/
 	inline bool isCompatible(const type& other) const {
-		if (kind == other.kind || 
+		if (kind == other.kind ||
 			isNone() ||
-			other.isNone()) 
-			return true;
+			other.isNone()) {
+			if (isPrimitive() ||
+				sig == other.sig || 
+				sig.empty() || 
+				other.sig.empty())
+				return true;
+			// should we throw here actually? throw runtime_error("");
+			return false; //return true;
+		}
 		return false;
 	}
 
@@ -415,19 +425,35 @@ struct type {
 	size_t get_bits(size_t subarg) const {
 		switch (kind) {
 		case Primitive:
-			if (subarg != 0) throw 0; // allow only 0 for primitives (?)
+			if (subarg != arg::none) throw 0;
 			return primitive.bitness;
 		case Compound: return compound.get_bits(subarg);
 		default: throw 0;
 		}
 	}
-	//std::vector<size_t> get_bits_vector() const {
-	//	switch (kind) {
-	//		case Primitive: return { primitive.bitness };
-	//		case Compound: return compound.get_bits_vector();
-	//		default: throw 0;
-	//	}
-	//}
+	size_t get_start(size_t subarg) const {
+		switch (kind) {
+			case Primitive:
+			{
+				if (subarg != arg::none) throw 0;
+				return 0;
+				break;
+			}
+			case Compound:
+			{
+				size_t startbit = 0;
+				for (size_t i = 0; i != compound.types.size(); ++i) {
+					const primitive_type& type = compound.types[i];
+					if (i == subarg) return startbit;
+					startbit += type.bitness;
+				}
+				throw 0;
+				break;
+			}
+			default: throw 0;
+		}
+	}
+
 	base_type get_type() const {
 		switch (kind) {
 			case Primitive: return primitive.type;
@@ -437,7 +463,7 @@ struct type {
 	base_type get_type(size_t subarg) const {
 		switch (kind) {
 			case Primitive: 
-				if (subarg != 0) throw 0; // allow only 0 for primitives (?)
+				if (subarg != arg::none) throw 0;
 				return primitive.type;
 			case Compound: return compound.get_type(subarg);
 			default: throw 0;
@@ -456,11 +482,68 @@ struct type {
 		}
 	}
 
+	struct iter {
+		const ints& vals;
+		bool is_multival;
+		const primitive_type& type;
+		int_t val;
+		// usually a 'sub-argument' within the compound type
+		size_t i;
+		size_t startbit, bits;
+		bool exit = false;
+		iter(const ints& vals, bool ismulti, const primitive_type& type,
+			 int_t val, size_t i, size_t startbit, size_t bits) :
+			vals(vals), is_multival(ismulti), type(type), val(val), i(i),
+			startbit(startbit), bits(bits) {}
+		iter(const ints& vals, const primitive_type& type, size_t i, 
+			 size_t startbit, size_t bits) : 
+			vals(vals), is_multival(true), type(type), val(0), i(i),
+			startbit(startbit), bits(bits) {}
+	};
+	typedef std::function<void(iter it)> callback;
+	typedef std::function<void(iter& it)> r_callback;
+	// poor men's iterator over all types within (mostly for compounds)...
+	void iterate(const ints& vals, callback f, size_t tbits = 0) const {
+		const primtypes& types = get_types();
+		for (size_t i = 0, startbit = 0; i != vals.size(); ++i) {
+			// if we have just ?x for comp, treat it the same as primitives
+			size_t bits = vals.size() > 1 ? 
+				types[i].bitness : 
+				(tbits ? tbits : get_bits());
+			bool is_multival = vals.size() > 1;
+			size_t arg = i ? i : arg::none;
+			f(iter{vals, is_multival, types[i], vals[i], arg, startbit, bits});
+			startbit += bits;
+		}
+	}
 
-	//type_type ofType;
+	void iterate(r_callback f) const {
+		const primtypes& types = get_types();
+		for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
+			size_t bits = types[i].bitness;
+			size_t arg = i ? i : arg::none;
+			iter it{ ints{}, types[i], arg, startbit, bits };
+			f(it);
+			if (it.exit) break;
+			startbit += it.bits; //startbit += bits;
+		}
+	}
+
+	template<typename T>
+	static void iterate(type& type, const ints& vals, callback f) {
+		const primtypes& types = type.get_types();
+		for (size_t i = 0, startbit = 0; i != vals.size(); ++i) {
+			// if we have just ?x for comp, treat it the same as primitives
+			size_t bits = vals.size() > 1 ? types[i].bitness : type.get_bits();
+			bool is_multival = vals.size() > 1;
+			f(iter{ vals, is_multival, types[i], vals[i], i, startbit, bits });
+			startbit += bits;
+		}
+	}
+
 	//enum class type_type { Primitive, Compound, Record, Sub, Union } ofType;
 	enum { Primitive, Compound, Record, Sub, Union } kind;
-	// TODO: turned off for debugging. Also make union private, provide get_...
+	// TODO: turned off for debugging. Also make union private provide get_ acc.
 	//union {
 		primitive_type primitive;
 		compound_type compound;
@@ -468,11 +551,11 @@ struct type {
 		sub_type sub;
 		union_type uni;
 	//};
+	std::vector<size_t> sig;
 };
 
 typedef std::vector<type> vtypes;
 typedef std::vector<type> argtypes;
-//typedef primitive_type arg_type;
 typedef type arg_type;
 
 //template<typename T, typename... Args>
@@ -483,41 +566,114 @@ typedef type arg_type;
 struct tbl_arg {
 	ntable tab;
 	size_t arg;
-	tbl_arg(ntable t, size_t i) : tab(t), arg(i) {}
-	tbl_arg(const alt_arg& aa);
+	/* 
+	 this is arg within arg, like for compounds 
+	 - it's normally '0' for all, and shouldn't disrupt non-compounds, sort etc.
+	*/
+	size_t subarg;
+	tbl_arg(ntable tab_, size_t arg_, size_t subarg_ = 0) 
+		: tab(tab_), arg(arg_), subarg(subarg_) {}
+	tbl_arg(size_t arg_, size_t subarg_)
+		: tab(-1), arg(arg_), subarg(subarg_) {}
+	explicit tbl_arg(const alt_arg&);
+	explicit tbl_arg(const vm_arg&);
 	inline bool operator<(const tbl_arg& other) const {
 		if (tab != other.tab) return tab < other.tab;
-		return arg < other.arg;
+		if (arg != other.arg) return arg < other.arg;
+		return subarg < other.subarg;
+		//return arg < other.arg;
 	}
 	inline bool operator==(const tbl_arg& other) const {
-		return tab == other.tab && arg == other.arg;
+		return tab == other.tab && arg == other.arg && subarg == other.subarg;
 	}
 	inline bool operator!=(const tbl_arg& r) const { return !operator==(r); }
 	inline bool operator> (const tbl_arg& r) const { return r.operator<(*this);}
 	inline bool operator<=(const tbl_arg& r) const { return !operator>(r); }
 	inline bool operator>=(const tbl_arg& r) const { return !operator<(r); }
 };
-//inline bool operator!=(const tbl_arg& l, const tbl_arg& r)
-//{ return !operator==(l, r); }
-//inline bool operator> (const tbl_arg& l, const tbl_arg& r)
-//{ return  operator<(r, l); }
-//inline bool operator<=(const tbl_arg& l, const tbl_arg& r)
-//{ return !operator>(l, r); }
-//inline bool operator>=(const tbl_arg& l, const tbl_arg& r)
-//{ return !operator<(l, r); }
 
 typedef tbl_arg tbl_alt;
+
+/*
+ used for alt-s only (and vm mapping)
+ - id - is an index into alt's types, i.e. the order # of alt's variable
+   (it's 'flattened' list of vars, while header args could be much less)
+ - tab, arg, subarg - is pointing to the actual table/arg/sub (header or body)
+ - {alt,id} != {h.tab,arg} no longer true, one h arg could have many vars (subs)
+*/
+struct vm_arg {
+	/* order id - what was the vm value / second arg before, i.e. vm[var] */
+	size_t id;
+	ntable tab;
+	size_t arg;
+	/*
+	 this is for (sub)arg within the arg, like for compounds (could be others)
+	 - it's normally '0' for all, and shouldn't disrupt non-compounds, sort etc.
+	 (this is safe as first subarg can't be a var (only leafs as per the specs))
+	 ??(- correction: none is -1, for ?x->compound (full arg map) vs )
+	*/
+	size_t subarg; // int_t subarg;
+	//vm_arg() {} // needed for varmap, work around it
+	vm_arg(size_t id, ntable tab, size_t arg, size_t subarg = arg::none)
+		: id(id), tab(tab), arg(arg), subarg(subarg) {}
+	vm_arg(size_t arg, size_t subarg) 
+		: id(0), tab(-1), arg(arg), subarg(subarg) {}
+	vm_arg(const tbl_arg& other, size_t id)
+		: id(id), tab(other.tab), arg(other.arg), subarg(other.subarg) {}
+
+	explicit operator tbl_arg() const { return { tab, arg, subarg }; }
+
+	bool operator<(const vm_arg& other) const {
+		if (tab != other.tab) return tab < other.tab;
+		if (arg != other.arg) return arg < other.arg;
+		if (subarg != other.subarg) return subarg < other.subarg;
+		return id < other.id;
+	}
+	bool operator==(const vm_arg& other) const {
+		return tab == other.tab &&
+			   arg == other.arg &&
+			   subarg == other.subarg &&
+			   id == other.id;
+	}
+
+	bool is_empty() { return tab == -1; }
+
+	/* to avoid empty .ctor */
+	static vm_arg get_empty() { 
+		return vm_arg{ 0, ntable(-1), arg::none, arg::none };
+	}
+
+};
 
 struct alt_arg {
 	ntable tab;
 	int_t alt;
 	size_t arg;
-	alt_arg(ntable t, int_t a, size_t i) : tab(t), alt(a), arg(i) {}
-	alt_arg(const tbl_arg& ta) : tab(ta.tab), alt(-1), arg(ta.arg) {}
-	bool operator<(const alt_arg& aa) const {
-		if (tab != aa.tab) return tab < aa.tab;
-		if (alt != aa.alt) return alt < aa.alt;
-		return arg < aa.arg;
+	/*
+	 this is for (sub)arg within the arg, like for compounds (could be others)
+	 - it's normally '0' for all, and shouldn't disrupt non-compounds, sort etc.
+	*/
+	size_t subarg;
+	alt_arg(ntable tab_, int_t alt_, size_t arg_, size_t subarg_ = 0) 
+		: tab(tab_), alt(alt_), arg(arg_), subarg(subarg_) {}
+	alt_arg(const tbl_arg& other, int_t alt_ = -1) 
+		: tab(other.tab), alt(alt_), arg(other.arg), subarg(other.subarg) {}
+	alt_arg(const vm_arg& other, int_t alt_ = -1)
+		: tab(other.tab), alt(alt_), arg(other.arg), subarg(other.subarg) {}
+
+	explicit operator tbl_arg() const { return { tab, arg, subarg }; }
+
+	bool operator<(const alt_arg& other) const {
+		if (tab != other.tab) return tab < other.tab;
+		if (alt != other.alt) return alt < other.alt;
+		if (arg != other.arg) return arg < other.arg;
+		return subarg < other.subarg;
+	}
+	bool operator==(const alt_arg& other) const {
+		return tab == other.tab && 
+			   alt == other.alt &&
+			   arg == other.arg && 
+			   subarg == other.subarg;
 	}
 };
 
@@ -540,6 +696,5 @@ std::wostream& operator<<(std::wostream&, const primitive_type&);
 std::wostream& operator<<(std::wostream&, const arg_type&);
 std::wostream& operator<<(std::wostream&, const argtypes&);
 std::wostream& operator<<(std::wostream& os, const bitsmeta& bm);
-//bool operator<(const alt_arg& aarg, const tbl_arg& ta);
 
 #endif // __TYPES_H__

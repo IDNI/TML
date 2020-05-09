@@ -35,6 +35,7 @@ struct bitsmeta {
 	std::map<size_t, std::map<size_t, size_t>> mleftargs;
 	// this is reset on any bits / type change, will trigger tbl init_bits/reset
 	bool bitsfixed = false;
+	bool hasmultivals = false;
 	static bool BITS_FROM_LEFT;
 
 	bitsmeta() {}
@@ -106,14 +107,28 @@ struct bitsmeta {
 	void init_cache();
 	void init(const dict_t& dict);
 	static void init_type(primitive_type& type, const dict_t& dict);
+
 	static bool sync_types(
 		argtypes& ltypes, const argtypes& rtypes, size_t larg, size_t rarg);
+	static bool sync_types(
+		argtypes& ltypes, tbl_arg larg, const argtypes& rtypes, tbl_arg rarg);
+	static bool sync_types(argtypes& ltypes, tbl_arg larg, const arg_type& r);
 	static bool sync_types(arg_type& l, const arg_type& r);
 	static bool sync_types(primitive_type& l, const primitive_type& r);
+
+	static bool sync_types(
+		argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg);
+	static bool sync_types(
+		argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg,
+		bool& lchng, bool& rchng);
+	static bool sync_types(argtypes& ltypes, tbl_arg larg, arg_type& r);
+	static bool sync_types(
+		argtypes& ltypes, tbl_arg larg, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(arg_type& l, arg_type& r);
 	static bool sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(
 		primitive_type& l, primitive_type& r, bool& lchanged, bool& rchanged);
+
 	static bool sync_types(argtypes& ltypes, argtypes& rtypes);
 	static bool sync_types(
 		argtypes& ltypes, argtypes& rtypes, bool& lchng, bool& rchng);
@@ -124,7 +139,7 @@ struct bitsmeta {
 	static bool update_type(arg_type& type, const arg_type& other);
 	static bool update_type(primitive_type& type, const primitive_type& other);
 	void update_types(const argtypes& vtypes);
-	bool set_args(const ints& args, const argtypes& vtypes);
+	bool set_args(const argtypes& vtypes, bool hasmultivals_ = false);
 	// BSR op equivalent
 	inline static size_t BitScanR(int_t num, size_t min_bits = 0) {
 		// D: could num be < 0 (in the future?)

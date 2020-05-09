@@ -20,8 +20,13 @@
 
 using namespace std;
 
-tbl_arg::tbl_arg(const alt_arg& aa) : tab(aa.tab), arg(aa.arg) {
-	DBG(assert(aa.alt == -1););
+tbl_arg::tbl_arg(const alt_arg& other) 
+	: tab(other.tab), arg(other.arg), subarg(other.subarg) {
+	//DBG(assert(other.alt == -1););
+}
+
+tbl_arg::tbl_arg(const vm_arg& other)
+	: tab(other.tab), arg(other.arg), subarg(other.subarg) {
 }
 
 wostream& operator<<(wostream& os, const alt_arg& arg) {

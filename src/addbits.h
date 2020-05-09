@@ -66,7 +66,9 @@ private:
 	bits_perm permute_table(const tbl_arg& targ, size_t nbits, bool bitsready);
 	bool permute_bodies(const bits_perm& p, alt& a);
 
-	static xperm permex_add_bit(ints poss, c_bitsmeta& bm, c_bitsmeta& altbm);
+	static xperm permex_add_bit(const std::map<tbl_arg, int_t>& poss, 
+								const bitsmeta& bm, const bitsmeta& abm);
+	
 	static perminfo add_bit_perm(const bitsmeta& bm, 
 		size_t arg, size_t args, size_t nbits, bool bitsready = false);
 	static perminfo add_bit_perm(const bitsmeta& oldbm, const bitsmeta& newbm,
