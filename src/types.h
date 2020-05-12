@@ -253,7 +253,12 @@ struct type {
 	type(base_type type_, size_t bits):kind(Primitive), primitive{type_, bits}{}
 	type(base_type type_, size_t bits, int_t num)
 		: kind(Primitive), primitive{type_, bits, num} {}
-	type(primitive_type type_) : type(type_.type, type_.bitness) {}
+	type(primitive_type type_, std::vector<size_t> sig_ = {}) 
+		//: type(type_.type, type_.bitness), sig(move(sig_)) {
+		: kind(Primitive), primitive{type_}, sig(move(sig_)) {
+		if (!type_.isNone() && !sig_.empty())
+			throw std::runtime_error("only none-primitive can have sig!");
+	}
 	type(compound_type type_, std::vector<size_t> sig_ = {})
 		: kind(Compound), compound(type_), sig(move(sig_)) {}
 	type(record_type type_) : kind(Record), record(type_) {}
@@ -379,16 +384,73 @@ struct type {
 	 note: if one is primitive/NONE other can be anything (non-primitive too)
 	*/
 	inline bool isCompatible(const type& other) const {
+		if (!isSigCompatible(*this, other)) return false;
 		if (kind == other.kind ||
 			isNone() ||
 			other.isNone()) {
 			if (isPrimitive() ||
+				other.isPrimitive() ||
 				sig == other.sig || 
 				sig.empty() || 
 				other.sig.empty())
 				return true;
+			else if (isCompound()) { // sig-s are different, drill into it
+				// sig-s are compatible so no need for this
+				return true;
+				//if (compound.types.size()!=other.compound.types.size())
+				//	return false;
+				//for (size_t i = 0; i != compound.types.size(); ++i) {
+				//	if (compound.types[i].isNone() ||
+				//		other.compound.types[i].isNone()) continue;
+				//	if (compound.types[i].type == 
+				//		other.compound.types[i].type) continue;
+				//	// we don't care about bitness?
+				//	return false;
+				//}
+				//if (normalize_sig(sig) == normalize_sig(other.sig))
+				//	return true;
+			}
 			// should we throw here actually? throw runtime_error("");
 			return false; //return true;
+		}
+		return false;
+	}
+
+	static bool isCompatible(
+		const std::vector<type>& l, const std::vector<type>& r) {
+		if (l.size() != r.size()) return false;
+		for (size_t i = 0; i != l.size(); ++i)
+			if (!l[i].isCompatible(r[i])) return false;
+		return true;
+	}
+
+	static bool isSigCompatible(const type& l, const type& r) {
+		if (l.sig == r.sig) return true; // in any case that's fine?
+		if (l.isNone() && !l.sig.empty())
+			return r.isCompound() && normalize_sig(l.sig)==normalize_sig(r.sig);
+		if (r.isNone() && !r.sig.empty())
+			return l.isCompound() && normalize_sig(l.sig)==normalize_sig(r.sig);
+		if (l.isNone() || r.isNone()) return true; // none and no-sig, all fine
+		if (l.isCompound() && r.isCompound()) {
+			if (l.sig.empty() || r.sig.empty()) {
+				// is this possible and allowed?
+				return true; // false;
+			}
+			// sig-s are different, drill into it
+			if (l.compound.types.size() != r.compound.types.size())
+				return false;
+			for (size_t i = 0; i != l.compound.types.size(); ++i) {
+				if (l.compound.types[i].isNone() ||
+					r.compound.types[i].isNone()) continue;
+				// we don't care about bitness?
+				if (l.compound.types[i].type ==
+					r.compound.types[i].type) continue;
+				return false;
+			}
+			if (normalize_sig(l.sig) == normalize_sig(r.sig))
+				return true;
+			// should we throw here actually? throw runtime_error("");
+			return false;
 		}
 		return false;
 	}
@@ -481,6 +543,8 @@ struct type {
 			default: throw 0;
 		}
 	}
+
+	static std::vector<size_t> normalize_sig(std::vector<size_t> sig);
 
 	struct iter {
 		const ints& vals;

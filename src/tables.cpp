@@ -287,7 +287,7 @@ spbdd_handle table::init_bits(ntable tab, AddBits& addbits){ //tables&rtables){
 		// (.t bdd gets 'eaten' by the get_rules/get_facts for facts tables)
 		return tq = bdd_and_many(move(v));
 	} else {
-		o::dump() << L"bits changed, addbit required, not implemented!" << endl;
+		o::dump() << L"bits changed, addbit required..." << endl;
 		for (size_t arg = 0; arg != args; ++arg) {
 			// this is safe/assumed only for primitives atm, others need work.
 			if (!bm.types[arg].isPrimitive()) throw 0;
@@ -519,7 +519,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	//vector<vector<primitive_type>> comptypes; // primtypes
 	//vector<primtypes> comptypes;
 	primtypes comptypes;
-	bool isprevarg = false, iscomp = false, hascomp = false,
+	bool isprevarg = false, iscomp = false, hascomp = false, isvarcomp = false,
 		 is1stparenth = extype == term::REL || extype == term::BLTIN;
 	size_t nparenth = 0;
 	vector<size_t> parenths;
@@ -604,6 +604,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 				if (isprevarg && !iscomp) {
 					iscomp = true;
 					hascomp = true;
+					isvarcomp = eprevarg == elem::etype::VAR;
 					parenths.push_back(eprevarg);
 				}
 				parenths.push_back(r.e[n].type);
@@ -616,9 +617,23 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 				parenths.push_back(r.e[n].type);
 				if (!nparenth && iscomp) { //if (iscomp) {
 					iscomp = false;
-					ptypes.pop_back();
-					ptypes.emplace_back(
-						compound_type{ comptypes }, move(parenths));
+					if (isvarcomp) {
+						// it's a case '?x(?x1 ?x2)' w 0-arg var, only for type.
+						// (btw. 0-arg vars are not supported (atm or ever?))
+						arg_type vartype = ptypes.back(); // don't use ref
+						DBG(assert(vartype.isPrimitive() && vartype.isNone()););
+						ptypes.pop_back();
+						ptypes.emplace_back(
+							move(vartype.primitive), move(parenths));
+						compvals.pop_back();
+						compvals.push_back(ints{ vals.back() });
+					}
+					else {
+						ptypes.pop_back();
+						ptypes.emplace_back(
+							compound_type{ comptypes }, move(parenths));
+					}
+					isvarcomp = false;
 					parenths.clear();
 				}
 			}
@@ -652,35 +667,43 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 
 	if (hascomp) {// vals, compvals, ptypes - is safe in both case, just to test
 		// our arity is different as parser is not 'aware' of compounds (yet?)
+		// (ints arity works differently and can't get # args right (for comps))
 		ints arity{ int_t(compvals.size()) };
-		sig sign{ dict.get_rel(r.e[0].e), arity }; // t.arity };
-		return to_tbl_term(
-			realrel ? sign : sig{}, vals, compvals, ptypes, nvars,
-			r.neg, extype, realrel, r.e[0].e, r.arith_op, orderid, true);
+		//ntable tab = realrel ? get_table(get_sig(r), compvals.size(), arity):-1;
+		ntable tab = realrel ?
+			get_table(sig{ dict.get_rel(r.e[0].e), arity }, ptypes) : -1;
+		return to_tbl_term(tab, move(vals), move(compvals), move(ptypes), nvars,
+			r.neg, extype, r.e[0].e, r.arith_op, orderid, true);
 	}
-	DBG(assert(t.size() == vals.size()););
-	DBG(assert(t.size() == compvals.size()););
-	DBG(assert(types.size() == ptypes.size()););
-	return to_tbl_term(realrel ? get_sig(r) : sig{}, t, compvals, types, nvars,
-		r.neg, extype, realrel, r.e[0].e, r.arith_op, orderid);
+	else {
+		DBG(assert(t.size() == vals.size()););
+		DBG(assert(t.size() == compvals.size()););
+		DBG(assert(types.size() == ptypes.size()););
+		// { dict.get_rel(r.e[0].e), r.arity }
+		ntable tab = realrel ? get_table(get_sig(r), types) : -1;
+		return to_tbl_term(tab, move(t), move(compvals), move(types), nvars, 
+			r.neg, extype, r.e[0].e, r.arith_op, orderid);
+	}
 }
 
-term tables::to_tbl_term(sig s, ints t, vector<ints> compvals, argtypes types, 
-	size_t nvars, bool neg, term::textype extype, bool realrel, lexeme rel, 
-	t_arith_op arith_op, size_t orderid, bool hascompounds){
-	//bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
-	ntable tab = realrel ? get_table(s) : -1;
-	if (tab != -1)
-		tbls[tab].bm.set_args(types, hascompounds); // t, 
-	return to_tbl_term(
-		tab, t, compvals, types, nvars, neg, extype, rel, arith_op, orderid,
-		hascompounds);
-}
+//term tables::to_tbl_term(ntable tab, ints t, vector<ints> compvals, argtypes types,
+//	size_t nvars, bool neg, term::textype extype, lexeme rel, 
+//	t_arith_op arith_op, size_t orderid, bool hascompounds){
+//	//bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
+//	//ntable tab = realrel ? get_table(s) : -1;
+//	if (tab != -1)
+//		tbls[tab].bm.set_args(types, hascompounds); // t, 
+//	return to_tbl_term(
+//		tab, t, compvals, types, nvars, neg, extype, rel, arith_op, orderid,
+//		hascompounds);
+//}
 
 term tables::to_tbl_term(ntable tab, ints t, vector<ints> compvals, 
 	argtypes types, size_t nvars, bool neg, term::textype extype, lexeme rel, 
 	t_arith_op arith_op, size_t orderid, bool hascompounds)
 {
+	if (tab != -1)
+		tbls[tab].bm.set_args(types, hascompounds); // t, 
 	if (extype == term::BLTIN) {
 		int_t idbltin = dict.get_bltin(rel);
 		if (tab > -1) {
@@ -689,11 +712,10 @@ term tables::to_tbl_term(ntable tab, ints t, vector<ints> compvals,
 			tbls[tab].bltinargs = t; // if needed, for rule/header (all in tbl)
 			tbls[tab].bltinsize = nvars; // number of vars (<0)
 		}
-		return term(neg, tab, t, compvals, types, orderid, idbltin, nvars, 
-					hascompounds);
+		return term(neg, tab, move(t), move(compvals), move(types), orderid, 
+			idbltin, nvars, hascompounds);
 	}
-	return term(neg, extype, arith_op, tab, t, compvals, types, orderid, nvars, 
-				hascompounds);
+	return term(neg, extype, arith_op, tab, move(t), move(compvals), move(types), orderid, nvars, hascompounds);
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
@@ -992,8 +1014,8 @@ void tables::out(wostream& os) const {
 		uints otbls = perm_init(tbls.size()); // std::transform?
 		sort(otbls.begin(), otbls.end(), 
 			[this](const uint_t& x, const uint_t& y) {
-				lexeme l = dict.get_rel(get<0>(tbls[x].s));
-				lexeme r = dict.get_rel(get<0>(tbls[y].s));
+				lexeme l = dict.get_rel(tbls[x].get_rel()); // get<0>(tbls[x].s)
+				lexeme r = dict.get_rel(tbls[y].get_rel());
 				size_t llen = l[1] - l[0], rlen = r[1] - r[0];
 				int_t cmp = wcsncasecmp(l[0], r[0], min(llen, rlen));
 				if (cmp == 0)
@@ -1231,8 +1253,8 @@ raw_term tables::to_raw_term(const term& r) const {
 	} else {
 		args = tbls.at(r.tab).len, rt.e.resize(args + 1);
 		rt.e[0] = elem(elem::SYM,
-			dict.get_rel(get<0>(tbls.at(r.tab).s)));
-		rt.arity = get<ints>(tbls.at(r.tab).s);
+			dict.get_rel(tbls.at(r.tab).get_rel()));
+		rt.arity = tbls.at(r.tab).get_arity();
 		for (size_t n = 1; n != args + 1; ++n) {
 			if (r.types[n-1].isPrimitive())
 				rt.e[n] = get_elem(r[n-1], r.types[n-1]);
@@ -1789,7 +1811,7 @@ void create_head(vector<term>&, ntable) {
 
 ntable tables::create_tmp_rel(size_t len, const argtypes& types) {
 //, const ints& nums) 
-	ntable tab = get_new_tab(dict.get_rel(get_new_rel()), {(int_t)len});
+	ntable tab = get_new_tab(dict.get_rel(get_new_rel()), {(int_t)len}, types);
 	// TODO: just some basic init, make it better
 	table& tbl = tbls[tab];
 	tbl.bm.set_args(types); // ints(len), 
@@ -2411,31 +2433,29 @@ vector<ntable> tables::init_string_tables(lexeme r, const wstring& s) {
 	dict.get_sym(L"digit");
 	dict.get_sym(L"printable");
 
-	// D: we have all for get_table and we now need it before from_fact/from_sym
-	ntable tab1 = get_table({rel, ar});
-	ntable tab2 = get_table({rel, {3}});
-
-	// it's {num, chr, num}
-	table& tbl1 = tbls[tab1];
-	size_t len = tbl1.len;
-	DBG(assert(len == 3););
+	constexpr size_t len = 3;
 	argtypes types(len);
-	//ints nums(len, 0);
 	types[1] = arg_type{ base_type::CHR, 0 };
-	//types[1] = arg_type{ base_type::CHR, 12 }; //should be 8
 	types[0] = types[2] = arg_type{ base_type::INT, 0 };
-	tbl1.bm.set_args(types); // ints(len), 
+	// D: we have all for get_table and we now need it before from_fact/from_sym
+	ntable tab1 = get_table({rel, ar}, types);
+	// it's {num, chr, num}
+	//table& tbl1 = tbls[tab1];
+	//size_t len = tbl1.len;
+	DBG(assert(len == tbls[tab1].len););
+	// don't use refs as we're adding el-s to tbls, can be moved (ffs D)
+	tbls[tab1].bm.set_args(types);
+
+	types = argtypes(len);
+	types[0] = arg_type{ base_type::STR, 0 };
+	types[1] = types[2] = arg_type{ base_type::INT, 0 };
+	ntable tab2 = get_table({rel, {3}}, types);
 
 	// it's {str, num, num}
-	table& tbl2 = tbls[tab2];
-	len = tbl2.len;
-	DBG(assert(len == 3););
-	types = argtypes(len);
-	//nums = ints(len, 0);
-	types[0] = arg_type{ base_type::STR, 0 };
-	//types[0] = arg_type{ base_type::STR, 12 };
-	types[1] = types[2] = arg_type{ base_type::INT, 0 };
-	tbl2.bm.set_args(types); // ints(len), 
+	//table& tbl2 = tbls[tab2];
+	//len = tbl2.len;
+	DBG(assert(len == tbls[tab2].len););
+	tbls[tab2].bm.set_args(types);
 
 	// do this or use _nums, whichever, this is better, _nums includes other?
 	ints maxnums(len, 0);
@@ -2445,23 +2465,19 @@ vector<ntable> tables::init_string_tables(lexeme r, const wstring& s) {
 	}
 
 	types[1] = arg_type{ base_type::CHR, 0, 0 };
-	//types[1] = arg_type{ base_type::CHR, 12 };
-	//nums[1] = 0;
 	types[0] = types[2] = 
 		arg_type{ base_type::INT, 0, max(maxnums[0], maxnums[2]) };
-	//nums[0] = nums[2] = max(maxnums[0], maxnums[2]);
-	tbl1.bm.set_args(types); // ints(len), 
+	tbls[tab1].bm.set_args(types);
 
 	types[0] = arg_type{ base_type::STR, 0, 0 };
-	//types[0] = arg_type{ base_type::STR, 12 };
-	//nums[0] = 0;
 	types[1] = types[2] = 
 		arg_type{ base_type::INT, 0, max(maxnums[1], maxnums[2]) };
-	//nums[1] = nums[2] = max(maxnums[1], maxnums[2]);
-	tbl2.bm.set_args(types); // ints(len), 
+	tbls[tab2].bm.set_args(types);
 
-	tbl1.bm.init(dict);
-	tbl2.bm.init(dict);
+	// TODO: we should do get_table-s now after the types are final, reorg it
+
+	tbls[tab1].bm.init(dict);
+	tbls[tab2].bm.init(dict);
 
 	return { tab1, tab2 };
 }
@@ -2707,15 +2723,36 @@ void tables::get_sym(
 	// don't put bit() on both const/encode and pos(), either or.
 }
 
-ntable tables::get_table(const sig& s) {
+ntable tables::get_table(const sig& s, const argtypes& types) {
+//	return get_table(s, sig_len(s)); // , get<ints>(s));
+//}
+//ntable tables::get_table(const sig& s, size_t len, ints arity) {
 	auto it = smap.find(s);
-	if (it != smap.end()) return it->second;
+	if (it != smap.end()) {
+		ntable tab = -1;
+		// all types sharing same name/arity will be stored here,
+		// then we go through and test actual type signatures to match.
+		// (only one match is allowed, otherwise it'd have to be specified)
+		for (ntable itab : it->second)
+			if (arg_type::isCompatible(tbls[itab].bm.types, types)) {
+				if (tab != -1)
+					throw runtime_error("get_table: ambiguous type resolution");
+				tab = itab;
+			} else {
+				o::dump() << endl;
+			}
+		if (tab != -1) return tab;
+	}
 	ntable nt = tbls.size();
 	size_t len = sig_len(s);
 	max_args = max(max_args, len);
 	// a proper ctor for table to init bm
-	table tb(s, len, dict);
-	return tbls.push_back(tb), smap.emplace(s, nt), nt;
+	table tb(s, len, dict); // , arity);
+	tbls.push_back(tb);
+	vector<ntable>& sigtbls = smap[s]; // create if none yet
+	sigtbls.push_back(nt);
+	//smap.emplace(s, nt);
+	return nt;
 	//return	tb.tq = hfalse, tb.s = s, tb.len = len,
 	//	tbls.push_back(tb), smap.emplace(s,nt), nt;
 }
@@ -2748,7 +2785,9 @@ void to_nums(flat_prog& m) {
 	m = move(mm);
 }
 
-ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
+ntable tables::get_new_tab(int_t x, ints ar, const argtypes& types) {
+	return get_table({ x, ar }, types); 
+}
 
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
@@ -2788,12 +2827,14 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		if (x.p.size() == 2 && x.p[1].e == L"null") {
 			//term t;
 			ntable tab;
-			argtypes types;
 			ints vals;
 			vals.resize(2);
 			vals[0] = vals[1] = -1;
 			// it's some rel(var var), and w/ null, means negated? (post proc.)
-			tab = get_table({dict.get_rel(x.p[0].e),{2}});
+			sig s{ dict.get_rel(x.p[0].e),{2} };
+			size_t len = sig_len(s);
+			argtypes types(len);
+			tab = get_table(s, types);
 			// TODO: just some basic init, make it better
 			table& tbl = tbls[tab];
 			tbl.bm.init(dict);
@@ -2809,26 +2850,32 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			//term t;
 			ntable tab;
-			argtypes types;
-			ints vals;
+			//argtypes types;
 			if (builtins.find(x.p[n].e) != builtins.end()) {
 				// it's {sym, num, num} (tbl2 of str_rels or str often)
 				// nums will be figured out by facts set up during load_string
-				tab = get_table({*str_rels.begin(), {3}});
-				vals.resize(3), vals[0] = dict.get_sym(x.p[n].e),
-				vals[1] = -n, vals[2] = -n-1;
-				table& tbl = tbls[tab];
-				size_t len = vals.size();
-				types = argtypes(len);
-				//types[0] = arg_type{ base_type::STR, 10 }; //bsr(nsyms())
+				sig s{*str_rels.begin(), {3}};
+				size_t len = sig_len(s);
+				argtypes types(len);
 				types[0] = arg_type{ base_type::STR, 0 }; //bsr(dict.nsyms())
 				types[1] = types[2] = arg_type{ base_type::INT, 0 };
+				tab = get_table(s, types);
+				ints vals(len); //vals.resize(3);
+				vals[0] = dict.get_sym(x.p[n].e);
+				vals[1] = -n;
+				vals[2] = -n-1;
+				table& tbl = tbls[tab];
+				//size_t len = vals.size();
 				tbl.bm.set_args(types);
 				tbl.bm.init(dict);
+				v.emplace_back(tab, vals, types);
 			} else if (x.p[n].type == elem::SYM) {
 				// it's just some rel(var var), types to be inferred from facts
-				vals.resize(2);
-				tab = get_table({dict.get_rel(x.p[n].e),{2}});
+				sig s{dict.get_rel(x.p[n].e),{2}};
+				size_t len = sig_len(s);
+				argtypes types(len);
+				tab = get_table(s, types);
+				ints vals(len); //vals.resize(2);
 				if (n) vals[0] = -n, vals[1] = -n-1;
 				else vals[0] = -1, vals[1] = -(int_t)(x.p.size());
 				// TODO: just some basic init, make it better
@@ -2837,9 +2884,10 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				//size_t len = vals.size();
 				tbl.bm.init(dict);
 				types = tbl.bm.types;
+				v.emplace_back(tab, vals, types);
 			} else if (x.p[n].type == elem::CHR) {
 				// it's {num, chr, num} (the 1st str_rels table w/ funny sig/ar)
-				vals.resize(3);
+				ints vals(3); //vals.resize(3);
 				if (str_rels.size() > 1) er(err_one_input);
 				if (str_rels.empty()) continue;
 				// D: this assumes that dict.get_rel and tab are the same
@@ -2848,15 +2896,16 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				vals[1] = mkchr((unsigned char)(x.p[n].ch));
 				table& tbl = tbls[tab];
 				size_t len = vals.size();
-				types = argtypes(len);
+				argtypes types(len); //types = argtypes(len);
 				//types[1] = arg_type{ base_type::CHR, 10 }; //should be 8
 				types[1] = arg_type{ base_type::CHR, 0 };
 				types[0] = types[2] = arg_type{ base_type::INT, 0 };
 				tbl.bm.set_args(types);
 				tbl.bm.init(dict);
+				v.emplace_back(tab, vals, types);
 			} else throw runtime_error(
 				"Unexpected grammar element");
-			v.emplace_back(tab, vals, types); //vector<ints>(vals.size()), 
+			//v.emplace_back(tab, vals, types); //vector<ints>(vals.size()), 
 			//v.push_back(move(t));
 		}
 		p.insert(move(v));
@@ -2905,6 +2954,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		}
 		return r;
 	};
+	// TODO: get_table needs types beforehand
 	auto h = [this, f](const set<term>& s) {
 		set<term> r;
 		for (term t : s)
@@ -2935,7 +2985,7 @@ void tables::add_tml_update(const term& t, bool neg) {
 		add_del_type{ base_type::STR, 0 }; // BitScanR(max(sym_add, sym_del)) };
 	//ints nums(3, 0);
 	ints args{ mknum(nstep), (neg ? sym_del : sym_add),
-		dict.get_sym(dict.get_rel(tbls[t.tab].s.first)) };
+		dict.get_sym(dict.get_rel(tbls[t.tab].get_rel())) };
 	//if (nstep != lnstep) lnstep = nstep, nstep_type =
 	//	arg_type{ base_type::INT, bitsmeta::BitScanR(nstep+1) };
 	if (dict.nrels() != lnrels) lnrels = dict.nrels(),
@@ -2944,8 +2994,9 @@ void tables::add_tml_update(const term& t, bool neg) {
 	types.insert(types.end(), t.types.begin(), t.types.end());
 	//nums .insert(nums .end(), t.nums .begin(), t.nums .end());
 	args .insert(args .end(), t      .begin(), t      .end());
-	ints arity = tbls.at(t.tab).s.second; arity[0] += 3;
-	ntable maxtab=tbls.size()-1, tab = get_table({ rel_tml_update, arity });
+	ints arity = tbls.at(t.tab).get_arity(); arity[0] += 3;
+	ntable maxtab=tbls.size()-1, 
+		tab = get_table({ rel_tml_update, arity }, types);
 	table& tbl = tbls.at(tab);
 	term nt(tab, args, types); // vector<ints>(types.size()), 
 	//static AddBits addBits{ *this };
@@ -2954,7 +3005,7 @@ void tables::add_tml_update(const term& t, bool neg) {
 		tbl.bm.init(dict);
 		// tbl.init_bits is the last thing, then bdd op-s can start
 		tbl.init_bits(tab, addBits);
-		if (dumptype) o::dump() << dict.get_rel(tbl.s.first) << L"("
+		if (dumptype) o::dump() << dict.get_rel(tbl.get_rel()) << L"("
 			<< tbl.bm.types << L")" << endl;
 	}
 	tbl.add.push_back(from_fact(nt));
@@ -3058,7 +3109,7 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 
 	if (dumptype) {
 		for (size_t tab = 0; tab < tbls.size(); ++tab) {
-			wstring name = lexeme2str(dict.get_rel(tbls.at(tab).s.first));
+			wstring name = lexeme2str(dict.get_rel(tbls.at(tab).get_rel()));
 			//o::dump() << name << L"(" << tbls[tab].bm << L")" << endl;
 			o::dump() << name << L"(" << tbls[tab].bm.types << L")" << endl;
 		}

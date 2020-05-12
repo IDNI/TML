@@ -143,7 +143,7 @@ struct rule : public std::vector<alt*> {
 };
 
 struct table {
-	sig s;
+public:
 	size_t len, priority = 0;
 	spbdd_handle tq = hfalse;
 	bdd_handles add, del;
@@ -155,11 +155,19 @@ struct table {
 	size_t bltinsize;
 	bitsmeta bm;
 	const dict_t& dict; // TODO: remove this dep., only needed for dict.nsyms()
+	// sig arity (mechanism) is wrong for compounds (# of args/len)
 	bool commit(DBG(size_t));
 	spbdd_handle init_bits(ntable, AddBits&);
 	//table() {}
-	table(const sig& sg, size_t l, const dict_t& d) 
-		: s(sg), len(l), tq{hfalse}, bm(l), dict(d) {}
+	table(const sig& sg, size_t l, const dict_t& d) //, ints ar = {})
+		: len(l), tq{hfalse}, bm(l), dict(d), sign(sg) {} //, arity(ar) {}
+	ints get_arity() const 
+	{ return std::get<ints>(sign); } //arity.empty() ?  : arity; }
+	rel_t get_rel() const 
+	{ return std::get<rel_t>(sign); }
+private:
+	sig sign;
+	//ints arity;
 };
 
 struct form;
@@ -184,7 +192,9 @@ private:
 	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::set<ntable> tmprels;
-	std::map<sig, ntable> smap;
+	//std::map<sig, ntable> smap;
+	// use vector to be have {sig, size_t} coordinate if needed
+	std::map<sig, std::vector<ntable>> smap;
 	std::vector<rule> rules;
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
@@ -382,14 +392,14 @@ private:
 
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
-	term to_tbl_term(sig s, ints t, std::vector<ints> compvals, argtypes types, 
+	//term to_tbl_term(ntable, ints t, std::vector<ints> compvals, argtypes types,
+	//	size_t nvars = 0, bool neg = false, term::textype extype=term::REL, 
+	//	lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
+	//	size_t orderid = 0, bool hascompounds = false);
+	term to_tbl_term(ntable, ints t, std::vector<ints> compvals, argtypes types, 
 		size_t nvars = 0, bool neg = false, term::textype extype=term::REL, 
-		bool realrel = true, lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
-		size_t orderid = 0, bool hascompounds = false);
-	term to_tbl_term(ntable tab, ints t, std::vector<ints> compvals, 
-		argtypes types, size_t nvars = 0, bool neg = false, 
-		term::textype extype=term::REL, lexeme rel=lexeme{0, 0}, 
-		t_arith_op arith_op = NOP, size_t orderid = 0, bool hascompounds=false);
+		lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
+		size_t orderid = 0, bool hascompounds=false);
 	
 	static xperm deltail(
 		const alt& a, const bitsmeta& abm, const bitsmeta& tblbm);
@@ -432,10 +442,11 @@ private:
 	bool equal_types(const table& tbl, const alt& a) const;
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
-	ntable get_table(const sig& s);
+	ntable get_table(const sig& s, const argtypes& types = {});
+	//ntable get_table(const sig& s, size_t len, ints arity = {});
 	void table_increase_priority(ntable t, size_t inc = 1);
 	void set_priorities(const flat_prog&);
-	ntable get_new_tab(int_t x, ints ar);
+	ntable get_new_tab(int_t x, ints ar, const argtypes& types);
 	lexeme get_new_rel();
 	std::vector<ntable> init_string_tables(lexeme rel, const std::wstring& s);
 	void load_string(

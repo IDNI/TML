@@ -120,8 +120,9 @@ private:
 	}
 
 	void check_hasmultivals() const {
-		if (calc_hasmultivals(types) != hasmultivals)
-			throw std::runtime_error("check_multivals: multivals?");
+		//if (calc_hasmultivals(types) != hasmultivals)
+		//	o::dump() << L"check_multivals: multivals?" << endl;
+		//	//throw std::runtime_error("check_multivals: multivals?");
 	}
 #endif
 

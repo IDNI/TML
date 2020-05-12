@@ -182,13 +182,21 @@ bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
 		bool changed = false;
 		if (type.sig != newtype.sig) {
 			if (newtype.sig.empty()) {} // newtype.sig = type.sig;
-			else if (type.sig.empty()) type.sig = newtype.sig;
-			else throw runtime_error("update_type: different signatures?");
-			changed = true;
+			else if (type.sig.empty()) type.sig = newtype.sig, changed = true;
+			else {
+				if (!type.isCompatible(newtype))
+					throw runtime_error("update_type: different signatures?");
+				// sigs are fine, just one needs to be updated, which one?
+			}
+			//changed = true;
 		}
 		for (size_t i=0; i != types.size(); ++i)
 			changed |= 
 				update_type(types[i], newtypes[i]);
+		// now see if 'left' has changed, if so and only then update its sig
+		// (or make some calc_sig() here just from types, if possible?)
+		if (changed && type.sig != newtype.sig)
+			type.sig = newtype.sig;
 		return changed;
 	} else throw 0;
 }
@@ -284,12 +292,17 @@ bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
 		bool changed = false;
 		if (l.sig != r.sig) {
 			if (r.sig.empty()) {} // r.sig = l.sig;
-			else if (l.sig.empty()) l.sig = r.sig;
-			else throw runtime_error("sync_types const: different signatures?");
-			changed = true;
+			else if (l.sig.empty()) l.sig = r.sig, changed = true;
+			else {
+				if (!l.isCompatible(r))
+					throw runtime_error("sync_types const: different signatures?");
+			}
+			//changed = true;
 		}
 		for (size_t i = 0; i != ltypes.size(); ++i)
 			changed |= sync_types(ltypes[i], rtypes[i]);
+		if (changed && l.sig != r.sig)
+			l.sig = r.sig;
 		return changed;
 	}
 	else throw 0;
@@ -386,10 +399,14 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
 		}
 		bool changed = false;
 		if (l.sig != r.sig) {
-			if (r.sig.empty()) r.sig = l.sig, rchng = true;
-			else if (l.sig.empty()) l.sig = r.sig, lchng = true;
-			else throw runtime_error("sync_types: different signatures?");
-			changed = true;
+			if (r.sig.empty()) r.sig = l.sig, rchng = changed = true;
+			else if (l.sig.empty()) l.sig = r.sig, lchng = changed = true;
+			else {
+				if (!l.isCompatible(r))
+					throw runtime_error("sync_types: different signatures?");
+			}
+			//else throw runtime_error("sync_types: different signatures?");
+			//changed = true;
 		}
 		for (size_t i = 0; i != ltypes.size(); ++i) {
 			bool lchanged, rchanged;
@@ -397,6 +414,17 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
 				sync_types(ltypes[i], rtypes[i], lchanged, rchanged);
 			lchng |= lchanged;
 			rchng |= rchanged;
+		}
+		if (l.sig != r.sig) {
+			if (lchng && rchng) {
+				// otherwise could happen, but not within compounds, l xor r
+				o::dump() << L"sync_types: both left and right changed?" << endl;
+				throw runtime_error("sync_types: both left and right changed?");
+			}
+			else if (lchng)
+				l.sig = r.sig;
+			else if (rchng)
+				r.sig = l.sig;
 		}
 		return changed;
 	}

@@ -83,21 +83,21 @@ lexeme lex(pcws s) {
 	bool istype = false;
 	if (**s == L':') {
 		if (*++*s==L'-' || **s==L'=') return ++*s, lexeme{ *s-2, *s };
-		++*s; // treat like ? and eat all after that
+		++*s; // treat like question mark and eat all after that
 		istype = true;
 	}
-	// NEQ: make sure we don't turn off directives (single '!'). limits?
+	// NEQ: make sure we don't turn off directives (single '!'). limits
 	if (**s == L'!' && *(*s + 1) == L'=') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
 
 	//ARITH operators:
-	//SHR, SHL, XXX: EQ?
+	//SHR, SHL, XXX: EQ
 	if (**s == L'>' && (*(*s + 1) == L'>')) return *s += 2, lexeme{ *s - 2, *s };
 	if (**s == L'<' && (*(*s + 1) == L'<')) return *s += 2, lexeme{ *s - 2, *s };
 	//if (**s == L'=' && *(*s + 1) == L'=') return *s += 2, lexeme{ *s - 2, *s };
 
-	// TODO: single = instead of == recheck if we're not messing up something?
+	// TODO: single = instead of == recheck if we're not messing up something
 	if (**s == L'=') return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
 	if (wcschr(L"!~.,;(){}$@=<>|&^+*[]", **s)) return ++*s, lexeme{ *s-1, *s };
@@ -194,7 +194,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if (L'(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (L')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
-	// NEQ: should we check for any limits here?
+	// NEQ: should we check for any limits here
 	if (L'!' == l[pos][0][0] &&
 		L'=' == l[pos][0][1]) {
 		return e = l[pos++], type = NEQ, true;
@@ -221,7 +221,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		if (L'=' == l[pos][0][1]) return e = l[pos++], type = GEQ, true;
 		return e = l[pos++], type = GT, true;
 	}
-	// TODO: single = instead of == recheck if we're not messing up something?
+	// TODO: single = instead of == recheck if we're not messing up something
 	if (L'=' == l[pos][0][0]) {
 		if (pos + 1 < l.size() && L'>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
@@ -271,8 +271,9 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 		else if (l[pos][0][2] == L'\'') ch = L'\'';
 		else throw 0;
 	}
-	else if (*l[pos][0] == L'?') type = VAR;
-	else if (*l[pos][0] == L':') 
+	else if (*l[pos][0] == L'?')
+		type = VAR;
+	else if (*l[pos][0] == L':')
 		type = ARGTYP;
 	else if (iswalpha(*l[pos][0])) {
 		size_t len = l[pos][1]-l[pos][0];

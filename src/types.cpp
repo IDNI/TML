@@ -15,6 +15,7 @@
 #include "types.h"
 #include "bitsmeta.h"
 #include "err.h"
+#include "input.h"
 //#include "term.h"
 //#include "tables.h"
 
@@ -27,6 +28,14 @@ tbl_arg::tbl_arg(const alt_arg& other)
 
 tbl_arg::tbl_arg(const vm_arg& other)
 	: tab(other.tab), arg(other.arg), subarg(other.subarg) {
+}
+
+vector<size_t> type::normalize_sig(vector<size_t> sig) {
+	for (size_t& el : sig)
+		if (el != elem::etype::OPENP &&
+			el != elem::etype::CLOSEP)
+			el = elem::etype::NONE;
+	return sig;
 }
 
 wostream& operator<<(wostream& os, const alt_arg& arg) {
