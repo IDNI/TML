@@ -1,0 +1,101 @@
+{
+
+#want(0 2).
+#want(1 2).
+
+#want(0 1).
+#want(1 2).
+#want(2 2).
+
+#want(0 1).
+#want(1 2).
+#want(3 2).
+
+#want(0 1).
+#want(1 2).
+#want(4 2).
+
+#want(0 1).
+#want(1 2).
+#want(6 2).
+
+#want(0 2).
+#want(1 1).
+#want(6 1).
+
+#wantp(?v1) :- want(?v1 2).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+#cntps1(?v1 ?o) :- wantp(?v1), count(?v1 ?o).
+#cnt2s(?v1 ?o) :- want(?v1 2), count(?v1 ?o).
+#cnt2s(?v1 ?o) :- want(?v1 1), count(?v1 ?o).
+#cnt2s(?v1 ?o) :- want(?v1 2), count(?v1 ?o).
+
+
+#doesn't work w/ 3,5,9,17
+#want(0 1).
+#want(1 2).
+#want(5 2).
+#cnt2s(?v1 ?o) :- want(?v1 2), count(?v1 ?o).
+
+# works w/ 0,2,4,6,7,8,10,11...
+#want(0 1).
+#want(1 2).
+#want(17 2).
+#cnt2s(?v1 ?o) :- want(?v1 2), count(?v1 ?o).
+
+# works for odd-s now
+#want(0 1).
+#want(5 1).
+#want(5 2).
+#cnt2s(?v1 ?o) :- want(?v1 1), count(?v1 ?o).
+
+# doesn't work for even when '1'
+#want(0 1).
+#want(4 1).
+#want(4 2).
+#cnt2s(?v1 ?o) :- want(?v1 1), count(?v1 ?o).
+
+# for '3' everything that has either 1 or 2 bit set works, 4, 8 don't, but 12 does?
+#want(0 3).
+#want(12 3).
+#want(4 2).
+#cnt2s(?v1 ?o) :- want(?v1 3), count(?v1 ?o).
+
+# for '3' everything that has either 1 or 2 bit set works, 4, 8, 16, 32 don't (single bit set only), but 12 does?
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?o) :- want(?v1 3), count(?v1 ?o).
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?o) :- want(?v1 ?v2), count(?v1 ?v2 ?o).
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?v2 ?o) :- want(?v1 ?v2), count(?v1 ?v2 ?o).
+
+# works for '1' as 0-var, doesn't for 0. Works for 5 (instead of 4), doesn't for 4.
+#want(1 3).
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?v2) :- want(?v1 ?v2), count(?v1 ?v2 ?o), ?o = 2.
+
+#want(0 1).
+#want(1 3).
+#want(4 3).
+#cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o >= 2.
+
+#want(1 3).
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?v2) :- want(?v1 ?v2), count(?v1 ?v2 ?o), ?o = 2.
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1 ?v2) :- want(?v1 ?v2), count(?v1 ?v2 ?o), ?o = 2.
+
+want(0 3).
+want(5 3).
+cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o = 2.
+
+}

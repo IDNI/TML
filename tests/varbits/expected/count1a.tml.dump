@@ -1,0 +1,4 @@
+want(0 3).
+want(5 3).
+cnt2s(0).
+cnt2s(5).

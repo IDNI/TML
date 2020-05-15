@@ -1,0 +1,17 @@
+want(u0 a p).
+want(u1 a p).
+want(u2 b k).
+want(u3 b q).
+want(u3 c r).
+want(u3 c s).
+wantp(u0 a).
+wantp(u1 a).
+wantk(u2 b).
+cnt(u0 a p 6).
+cnt(u1 a p 6).
+cnt(u2 b k 6).
+cnt(u3 b q 6).
+cnt(u3 c r 6).
+cnt(u3 c s 6).
+cntps1(u0 a 2).
+cntps1(u1 a 2).

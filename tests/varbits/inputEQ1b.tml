@@ -1,0 +1,16 @@
+{
+r(x a y). 
+r(z1 b z2). 
+r(g:str[8] a g). 
+r(b a b). 
+r(c b c). 
+r(?v1:str[8] ?v2:str[6]) :- r(?v1 a ?v2). 
+r(?v1:str[8] ?v2:str[6]) :- r(?v1 b ?v2). 
+r1(?v1:str[8] ?v2:str[6]) :- r(?v1 ?v2), count(?v1 ?v2 ?out). 
+r2(?v1:str[8] ?v2:str[6]) :- r1(?v1 ?v2), count(?v1 ?v2 ?out).
+
+#want(u0 p).
+#want(u1 p).
+#want(u2 k).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+}

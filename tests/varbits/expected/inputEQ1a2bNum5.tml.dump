@@ -1,0 +1,18 @@
+want(0 5).
+want(1 5).
+want(2 6).
+want(3 7).
+want(3 8).
+want(3 9).
+wantp(0).
+wantp(1).
+cnt(0 5 6).
+cnt(1 5 6).
+cnt(2 6 6).
+cnt(3 7 6).
+cnt(3 8 6).
+cnt(3 9 6).
+cntps1(0 2).
+cntps1(1 2).
+cntps2(0 2).
+cntps2(1 2).

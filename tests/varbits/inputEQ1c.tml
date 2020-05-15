@@ -1,0 +1,14 @@
+{
+
+want(u0 p).
+want(u1 p).
+want(u2 k).
+want(u3 q).
+want(u3 r).
+want(u3 s).
+wantp(?v1) :- want(?v1 p).
+#wantk(?v1) :- want(?v1 k).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+cntps1(?v1 ?o) :- wantp(?v1), count(?v1 ?o).
+
+}

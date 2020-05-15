@@ -114,9 +114,12 @@ private:
 
 	void check_multivals() const {
 		for (size_t arg = 0; arg < size(); ++arg)
-			if (compoundvals[arg].empty() || 
-				compoundvals[arg][0] != (*this)[arg])
-				throw std::runtime_error("check_multivals: multivals?");
+			if (compoundvals[arg].empty() ||
+				compoundvals[arg][0] != (*this)[arg]) {
+				if (types[arg].isCompound())
+					throw std::runtime_error("check_multivals: multivals?");
+				//o::dump() << L"check_multivals: multivals?" << std::endl;
+			}
 	}
 
 	void check_hasmultivals() const {

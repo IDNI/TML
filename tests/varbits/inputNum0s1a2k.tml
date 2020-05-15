@@ -1,0 +1,9 @@
+{
+
+want(1 1).
+want(2 1).
+wantp(?v1) :- want(?v1 1).
+cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+cntps1(?v1 ?o) :- wantp(?v1), count(?v1 ?o).
+
+}

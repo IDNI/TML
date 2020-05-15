@@ -1,0 +1,33 @@
+want(u0 q0 p).
+want(u1 q1 p).
+want(u2 q2 p).
+want(u3 q3 p).
+want(u4 q3 p).
+want(u5 q3 p).
+want2(u0 q0).
+want2(u1 q1).
+want2(u2 q2).
+want2(u3 q3).
+want2(u4 q3).
+want2(u5 q3).
+pwant(u0).
+pwant(u1).
+pwant(u2).
+cnt(u0 q0 6).
+cnt(u1 q1 6).
+cnt(u2 q2 6).
+cnt(u3 q3 6).
+cnt(u4 q3 6).
+cnt(u5 q3 6).
+want1(u3).
+want1(u4).
+want1(u5).
+cnt1a(u3 3).
+cnt1a(u4 3).
+cnt1a(u5 3).
+cnt1(u3 3).
+cnt1(u4 3).
+cnt1(u5 3).
+cntpw(u0 3).
+cntpw(u1 3).
+cntpw(u2 3).

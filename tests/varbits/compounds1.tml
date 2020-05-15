@@ -1,0 +1,11 @@
+{
+A(b(c d) 2).
+A(a(c1 d1) 1).
+A(f(g h) 3).
+B(?x ?y) :- A(?x ?y).
+C(a(b(c(d e f)))  1).
+D(?x) :- C(?x ?y).
+C1(a((b c d) (e f g))  1).
+D1(?x) :- C1(?x ?y).
+D2(?x ?x1 ?n) :- C1(a((?x ?y ?z) (?x1 ?y1 ?z1)) ?n).
+}

@@ -1,0 +1,20 @@
+r(x a y).
+r(z1 b z2).
+r(b a b).
+r(g a g).
+r(c b c).
+r(x y).
+r(z1 z2).
+r(b b).
+r(g g).
+r(c c).
+r1(x y).
+r1(z1 z2).
+r1(b b).
+r1(g g).
+r1(c c).
+r2(x y).
+r2(z1 z2).
+r2(b b).
+r2(g g).
+r2(c c).

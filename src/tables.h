@@ -403,17 +403,18 @@ private:
 	
 	static xperm deltail(
 		const alt& a, const bitsmeta& abm, const bitsmeta& tblbm);
-	uints addtail(size_t len1, size_t len2, 
-		const bitsmeta& tblbm, const bitsmeta& abm) const;
-	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2,
-		const bitsmeta& tblbm, const bitsmeta& abm) const;
+	uints addtail(
+		const alt& a, const bitsmeta& tblbm, const bitsmeta& abm) const;
+	spbdd_handle addtail(const alt& a, cr_spbdd_handle x, 
+						 const bitsmeta& tblbm, const bitsmeta& abm) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args, const bitsmeta& bm) const;)
-	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
-		size_t len = 0, bool allowbltins = false) const;
+	void decompress(spbdd_handle x, ntable tab, cb_decompress&&,
+		size_t len = 0, const alt* a = nullptr, bool allowbltins = false) const;
 	std::set<term> decompress();
-	std::vector<env> varbdd_to_subs(const alt* a, cr_spbdd_handle v) const;
+	std::vector<env> varbdd_to_subs(
+		const alt* a, ntable tab, cr_spbdd_handle v) const;
 	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);

@@ -1,0 +1,11 @@
+want(0 0).
+want(0 1).
+want(0 2).
+want(0 3).
+want(0 4).
+want(0 5).
+wantp(1).
+wantp(2).
+wantp(3).
+wantp(4).
+wantp(5).

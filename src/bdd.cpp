@@ -1054,20 +1054,20 @@ vbools allsat(cr_spbdd_handle x, uint_t nvars) {
 	return bdd::allsat(x->b, nvars);
 }
 
-void allsat_cb::sat(int_t x) {
-	if (x == F) return;
-	const bdd bx = bdd::get(x);
-	if (!bdd::leaf(x) && v < bdd::var(x)) {
-		if (bdd::var(x) > nvars) {
-			//return;
-		}
-		DBG(assert(bdd::var(x) <= nvars);)
-		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
-	} else if (v != nvars + 1)
-		p[++v-2] = true, sat(bx.h),
-		p[v-2] = false, sat(bx.l), --v;
-	else f(p, x);
-}
+//void allsat_cb::sat(int_t x) {
+//	if (x == F) return;
+//	const bdd bx = bdd::get(x);
+//	if (!bdd::leaf(x) && v < bdd::var(x)) {
+//		if (bdd::var(x) > nvars) {
+//			//return;
+//		}
+//		DBG(assert(bdd::var(x) <= nvars);)
+//		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
+//	} else if (v != nvars + 1)
+//		p[++v-2] = true, sat(bx.h),
+//		p[v-2] = false, sat(bx.l), --v;
+//	else f(p, x);
+//}
 
 int_t bdd::bdd_ex(int_t x, const bools& b, unordered_map<int_t, int_t>& memo,
 	int_t last) {

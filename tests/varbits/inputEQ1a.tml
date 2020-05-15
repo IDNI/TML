@@ -1,0 +1,35 @@
+{
+#want(u0 p).
+#want(u1 p).
+#want(u2 k).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+
+#want(u0 p).
+#want(u1 p).
+#want(u2 k).
+#want(u3 q).
+#want(u3 r).
+#want(u3 a).
+#wantp(?v1) :- want(?v1 p).
+#wantk(?v1) :- want(?v1 k).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+##cntps(?v1 ?out) :- ?v2 = p, want(?v1 ?v2), count(?v1 ?v2 ?out).
+##cntks(?v1 ?out) :- ?v2 = k, want(?v1 ?v2), count(?v1 ?v2 ?out).
+###cntps(?v1 ?out) :- want(?v1 p), count(?v1 ?out).
+###cntks(?v1 ?out) :- want(?v1 k), count(?v1 ?out).
+##cnt_p(?v1 ?v2 ?out) :- ?v2 = p, cnt(?v1 ?v2 ?o), count(?v1 ?v2 ?o ?out).
+##cnt_p1(?v1 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+#cntps1(?v1 ?o) :- wantp(?v1), count(?v1 ?o).
+
+want(u0 a p).
+want(u1 a p).
+want(u2 b k).
+want(u3 b q).
+want(u3 c r).
+want(u3 c s).
+wantp(?v1 ?v2) :- want(?v1 ?v2 p).
+wantk(?v1 ?v2) :- want(?v1 ?v2 k).
+cnt(?v1 ?v2 ?v3 ?out) :- want(?v1 ?v2 ?v3), count(?v1 ?v2 ?v3 ?out).
+cntps1(?v1 ?v2 ?o) :- wantp(?v1 ?v2), count(?v1 ?v2 ?o).
+
+}

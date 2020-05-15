@@ -1,0 +1,8 @@
+bitsmeta: num > max(bits)...
+bits changed, addbit required...
+increasing universe / bitness (tbl:1, arg:1):
+from:	7
+to:  	8
+a(1).
+m(120).
+m(128).

@@ -1,0 +1,18 @@
+{
+r(x a y).
+r(z1 b z2).
+r(g a g).
+r(b a b).
+r(c b c).
+r(?v1 ?v2) :- r(?v1 a ?v2).
+r(?v1 ?v2) :- r(?v1 b ?v2).
+r1(?v1 ?v2) :- r(?v1 ?v2), count(?v1 ?v2 ?out).
+halt("#r1>3") :- r1(?x ?y), count(?x ?y ?out), ?out>3.
+#fail("#r1 > 3" ?x ?y) :- r1(?x ?y), count(?x ?y ?out), ?out>3.
+
+r2(?v1 ?v2) :- r1(?v1 ?v2), count(?v1 ?v2 ?out).
+#lprint(prefix ?x ?y suffix) :- r2(?x ?y).
+#lprint("prefix: (1):" ?x "...is: (2):" ?y "suffix") :- r2(?x ?y).
+lprint("prefix..." ?x "...and..." ?y "...suffix.") :- r2(?x ?y).
+
+}

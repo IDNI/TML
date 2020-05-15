@@ -1,0 +1,8 @@
+want(1 1).
+want(2 1).
+wantp(1).
+wantp(2).
+cnt(1 1 2).
+cnt(2 1 2).
+cntps1(1 2).
+cntps1(2 2).

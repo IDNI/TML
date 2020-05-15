@@ -1,0 +1,29 @@
+{
+	r(x a y).
+	r(z1 b z2).
+	r(g a g).
+	r(b a b).
+	r(c b c).
+	r(?v1 ?v2) :- r(?v1 a ?v2).
+	r(?v1 ?v2) :- r(?v1 b ?v2).
+	r1(?v1 ?v2) :- r(?v1 ?v2), count(?v1 ?v2 ?out), ?out = 5.
+	r2(?v1 ?v2) :- r1(?v1 ?v2), count(?v1 ?v2 ?out), ?out = 5.
+	r3(?v1 ?out) :- r(?v1 a y), count(?v1 ?out).
+
+
+	#r(x a y).
+	#r(z1 b z2).
+	#r(g a g).
+	#r(b a b).
+	#r(c b c).
+	#r(?v1 ?v2) :- r(?v1 a ?v2).
+	#r(?v1 ?v2) :- r(?v1 b ?v2).
+	#r1(?v1 ?v2) :- r(?v1 ?v2), count(?v1 ?v2 ?out), ?out = 5.
+	##r1(?v1 ?v2) :- r(?v1 b ?v2), count(?v1 ?v2 ?out), ?out = 2.
+	###r1(?v1 ?v2) :- r(?v1 b c), count(?v1 ?out), ?out = 1.
+	###r1(?v1 ?v2) :- r(?v1 ?cc ?v2), count(?c1 ?c2 ?c3 ?out), ?out = 5.
+	##r1(?v1 ?v2) :- r(?v1 a ?v2), count(?v2 ?v1 ?out), ?out = 3.
+	##r2(?v1 ?v2) :- r(?v1 a ?v2), rnd(0 100 ?out), ?out > 50.
+
+
+}

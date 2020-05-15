@@ -110,13 +110,14 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 		tbls[intype.tab].len <= intype.arg ||
 		tbls[intype.tab].bm.get_args() <= intype.arg)
 		return; // or error?
-	wcout << L"increasing universe / bitness (tbl:" 
+	o::dump() << L"increasing universe / bitness (tbl:" 
 		<< intype.tab << L", arg:" << intype.tab << L"):" << endl;
 	if (bitsready)
-		wcout << L"from:\t" << 
+		o::dump() << L"from:\t" <<
 		tbls[intype.tab].bm.get_bits(intype.arg) - nbits << endl;
 	else
-		wcout << L"from:\t" << tbls[intype.tab].bm.get_bits(intype.arg) << endl;
+		o::dump() << 
+			L"from:\t" << tbls[intype.tab].bm.get_bits(intype.arg) << endl;
 
 	clear();
 	tbl_arg type = get_root_type(intype);
@@ -220,7 +221,7 @@ void AddBits::permute_type(const tbl_arg& intype, size_t nbits, bool bitsready){
 		}
 	}
 
-	wcout << L"to:  \t" << tbls[intype.tab].bm.get_bits(intype.arg) << endl;
+	o::dump() << L"to:  \t" << tbls[intype.tab].bm.get_bits(intype.arg) << endl;
 }
 
 alt* AddBits::get_alt(const tbl_alt& talt) const {

@@ -139,7 +139,7 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits, siz
 
 class bdd {
 	friend class bdd_handle;
-	friend class allsat_cb;
+	template<typename _Predicate> friend class allsat_cb;
 	friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
@@ -355,19 +355,32 @@ public:
 	}
 };
 
+template<typename _Predicate>
 class allsat_cb {
 public:
-	typedef std::function<void(const bools&, int_t)> callback;
-	allsat_cb(cr_spbdd_handle r, uint_t nvars, callback f) :
+	allsat_cb(cr_spbdd_handle r, uint_t nvars, _Predicate&& f) :
 		r(r->b), nvars(nvars), f(f), p(nvars) {}
 	void operator()() { sat(r); }
 private:
 	int_t r;
 	const uint_t nvars;
 	uint_t v = 1;
-	callback f;
+	_Predicate f;
 	bools p;
-	void sat(int_t x);
+	void sat(int_t x) {
+		if (x == F) return;
+		const bdd bx = bdd::get(x);
+		if (!bdd::leaf(x) && v < bdd::var(x)) {
+			if (bdd::var(x) > nvars) {
+				//return;
+			}
+			DBG(assert(bdd::var(x) <= nvars);)
+			p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
+		} else if (v != nvars + 1)
+			p[++v-2] = true, sat(bx.h),
+			p[v-2] = false, sat(bx.l), --v;
+		else f(p, x);
+	}
 };
 
 class satcount_iter {

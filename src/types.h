@@ -69,6 +69,7 @@ struct primitive_type {
 	//	return *this;
 	//}
 
+	// TODO: move this out, make them free, I was just lazy
 	inline bool operator<(const primitive_type& other) const {
 		if (type != other.type) return type < other.type;
 		return bitness < other.bitness;
@@ -222,12 +223,14 @@ struct type;
 
 /* record type */
 struct record_type {
-	inline bool operator<(const record_type& other) const {
-		if (types != other.types) return types < other.types;
-		return names < other.names;
+	inline bool operator<(const record_type&) const {
+		return true; // types < other.types;
+		//if (types != other.types) return types < other.types;
+		//return names < other.names;
 	}
-	inline bool operator==(const record_type& other) const {
-		return types == other.types && names == other.names;
+	inline bool operator==(const record_type&) const {
+		return true; // types < other.types;
+		//return types == other.types && names == other.names;
 	}
 	inline bool operator!=(const record_type& r) const {
 		return !operator==(r);
@@ -242,8 +245,8 @@ struct record_type {
 		return !operator<(r);
 	}
 
-	std::vector<type> types;
-	std::vector<std::wstring> names;
+	//std::vector<type> types;
+	//std::vector<std::wstring> names;
 };
 
 struct type {
@@ -564,10 +567,13 @@ struct type {
 			vals(vals), is_multival(true), type(type), val(0), i(i),
 			startbit(startbit), bits(bits) {}
 	};
-	typedef std::function<void(iter it)> callback;
-	typedef std::function<void(iter& it)> r_callback;
-	// poor men's iterator over all types within (mostly for compounds)...
-	void iterate(const ints& vals, callback f, size_t tbits = 0) const {
+	
+	/* 
+	 poor men's iterator over all types within (mostly for compounds)... 
+	 - predicate (lambda) should be (*)(type::iter) (or (iter&))
+	*/
+	template<typename _Predicate>
+	void iterate(const ints& vals, _Predicate f, size_t tbits = 0) const {
 		const primtypes& types = get_types();
 		for (size_t i = 0, startbit = 0; i != vals.size(); ++i) {
 			// if we have just ?x for comp, treat it the same as primitives
@@ -581,7 +587,12 @@ struct type {
 		}
 	}
 
-	void iterate(r_callback f) const {
+	/*
+	 poor men's iterator over all types within (mostly for compounds)...
+	 - predicate (lambda) should be (*)(type::iter) (or (iter&))
+	*/
+	template<typename _Predicate>
+	void iterate(_Predicate f) const {
 		const primtypes& types = get_types();
 		for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
 			size_t bits = types[i].bitness;
@@ -593,8 +604,12 @@ struct type {
 		}
 	}
 
-	template<typename T>
-	static void iterate(type& type, const ints& vals, callback f) {
+	/*
+	 poor men's iterator over all types within (mostly for compounds)...
+	 - predicate (lambda) should be (*)(type::iter) (or (iter&))
+	*/
+	template<typename T, typename _Predicate>
+	static void iterate(const T& type, const ints& vals, _Predicate&& f) {
 		const primtypes& types = type.get_types();
 		for (size_t i = 0, startbit = 0; i != vals.size(); ++i) {
 			// if we have just ?x for comp, treat it the same as primitives
@@ -607,14 +622,15 @@ struct type {
 
 	//enum class type_type { Primitive, Compound, Record, Sub, Union } ofType;
 	enum { Primitive, Compound, Record, Sub, Union } kind;
-	// TODO: turned off for debugging. Also make union private provide get_ acc.
-	//union {
-		primitive_type primitive;
-		compound_type compound;
-		record_type record;
-		sub_type sub;
-		union_type uni;
-	//};
+
+	// TODO: optimize this (mem), also make it private etc.
+	// (poly vec or so, though we have too little types normally to bother)
+	primitive_type primitive;
+	compound_type compound;
+	record_type record;
+	sub_type sub;
+	union_type uni;
+
 	std::vector<size_t> sig;
 };
 

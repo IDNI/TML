@@ -332,6 +332,7 @@ always defined by its total arguments/size, arg order, arg-types/bitness and
 universe). The only exception seems to be the ALU/arithmetics handler which 
 is creating some temp bdds (and args), TODO: not sure how to handle those.
 We also can't 'mix' the bdd-s of different origin (unless we adjust/permute 1st)
+note: this is obsolete now, use the below version (it's overload) w/ arg::none
 */
 spbdd_handle tables::from_sym(
 	size_t arg, size_t args, int_t val, c_bitsmeta& bm) const {
@@ -380,6 +381,7 @@ spbdd_handle tables::from_sym(
 		return it->second;
 	const primtypes& types = bm.types[arg].compound.types;
 	if (types.size() != vals.size()) throw 0;
+	// TODO: iterate instead
 	size_t startbit = 0;
 	spbdd_handle r = htrue;
 	for (size_t i = 0; i != types.size(); ++i) {
@@ -400,6 +402,7 @@ spbdd_handle tables::from_sym(
 
 /*
  note: no need to check against isCompound, we do / match all bits regardless
+ (this is obsolete now, use the below version w/o subarg (arg::none))
 */
 spbdd_handle tables::from_sym_eq(
 	size_t arg1, size_t arg2, size_t args, c_bitsmeta& bm) const {
@@ -543,8 +546,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 				types.emplace_back(
 					base_type::INT,
 					(!realrel ? bitsmeta::BitScanR(r.e[n].num) : 0),
-					r.e[n].num); // 0); // 
-					//(!realrel ? bitsmeta::BitScanR(r.e[n].num) + 2 : 0),
+					r.e[n].num);
 			isarg = true;
 			earg = r.e[n].type;
 			break;
@@ -1085,22 +1087,25 @@ void tables::out(emscripten::val o) const {
 }
 #endif
 
-void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
-	size_t len, bool allowbltins) const {
+void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
+	size_t len, const alt* a, bool allowbltins) const {
 	const table& tbl = tbls.at(tab);
 	// D: bltins are special type of REL-s, mostly as any but no decompress.
 	if (!allowbltins && tbl.idbltin > -1) return;
 	if (!len) len = tbl.len;
-	allsat_cb(x/*&&ts[tab].tq*/, tbl.bm.args_bits, //len * bits,
-		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
+	const bitsmeta& bm = a == nullptr ? tbl.bm : a->bm;
+	allsat_cb(x/*&&ts[tab].tq*/, bm.args_bits, //len * bits,
+		//[tab, f, &bm](const bools& p, int_t DBG(y)) { // this
+		[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
 		//DBG(assert(abs(y) == 1);) // D: not sure about this, turn on again?
 #ifdef DEBUG
 		if (abs(y) != 1) {
 			wcout << L"decompress:   \t" << y << endl;
 		}
 #endif
-		const bitsmeta& bm = tbls.at(tab).bm;
-		DBG(assert(bm.types.size() == len););
+		//const bitsmeta& bm = tbls.at(tab).bm;
+		//DBG(assert(bm.types.size() == len););
+		size_t len = bm.types.size();
 		term r(false, term::REL, NOP, tab, 
 			   ints(len, 0), vector<ints>(len), bm.types, 0, 0, bm.hasmultivals);
 		// VM: TODO: proc_syms: use iterate
@@ -2408,15 +2413,21 @@ void tables::get_rules(flat_prog p) {
 		}
 		rs.insert(r);
 	}
-	for (rule r : rs)
-		tbls[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
+
+	rules.insert(rules.end(), rs.begin(), rs.end());
+	//for (rule r : rs)
+	//	tbls[r.t.tab].r.push_back(rules.size()), rules.push_back(r);
 	sort(rules.begin(), rules.end(), [this](const rule& x, const rule& y) {
 			return tbls[x.tab].priority > tbls[y.tab].priority; });
 
 	infer.tblrules.clear();
-	size_t i = 0;
-	for (const rule& r : rules) {
-		infer.tblrules[r.tab].insert(i++);
+	//size_t i = 0;
+	//for (const rule& r : rules) infer.tblrules[r.tab].insert(i++);
+	
+	for (size_t i = 0; i != rules.size(); ++i) {
+		const rule& r = rules[i];
+		tbls[r.t.tab].r.push_back(i);
+		infer.tblrules[r.tab].insert(i);
 	}
 }
 
@@ -3137,6 +3148,8 @@ xperm tables::deltail(const alt& a, const bitsmeta& abm, const bitsmeta& tbm) {
 		const vm_arg& arg = a.vm.at(a.inv.at(n));
 		DBG(assert(arg.id == n););
 		size_t bits = abm.types[n].get_bits();
+		// alt args are only full vars, no need for startbit there, only tbl...
+		// and bits should be the same (? recheck)
 		size_t startbit = 
 			n >= a.hvarslen ? 0 : tbm.types[arg.arg].get_start(arg.subarg);
 		for (size_t b = 0; b != bits; ++b) {
@@ -3175,32 +3188,47 @@ shrinks from alt to tbl domain/bits (temp right-side args are being removed)
 expands from header/rule/tbl into alt domain/bits
 (TODO: args/newargs are not needed)
 */
-uints tables::addtail(size_t args, size_t newargs,
-	const bitsmeta& tblbm, const bitsmeta& abm) const{
-	DBG(assert(args == tblbm.get_args()););
-	DBG(assert(newargs == abm.get_args()););
-	// VM: this needs to be down similarly to deltail (doesn't work)
-	throw runtime_error("addtail: not implemented!");
-	uints perm = perm_init(tblbm.args_bits); // tblbm.perm_init();
-	for (size_t n = 0; n != args; ++n)
-		for (size_t k = 0; k != tblbm.get_bits(n); ++k)
-			perm[tblbm.pos(k, n, args)] = abm.pos(k, n, newargs);
-	// D: shouldn't we fill in the 'blanks' (i.e. 0- the new bits)
+uints tables::addtail(
+	const alt& a, const bitsmeta& tbm, const bitsmeta& abm) const {
+	size_t args = tbm.get_args();
+	size_t newargs = abm.get_args();
+	uints perm = perm_init(tbm.args_bits);
+
+	// a bit counterintuitive but we have to follow the alt arg-s/bits
+	// but bail out at > a.hvarslen - that's effectively taking tbl arg-s 
+	for (size_t n = 0; n != newargs; ++n) {
+		if (n >= a.hvarslen) break; // once we hit non-header vars we're done
+		const vm_arg& arg = a.vm.at(a.inv.at(n));
+		DBG(assert(arg.id == n););
+		// and bits should be the same (? recheck)
+		size_t bits = abm.types[n].get_bits();
+		// alt arguments are only full vars, no need for startbit there
+		size_t startbit =
+			n >= a.hvarslen ? 0 : tbm.types[arg.arg].get_start(arg.subarg);
+		for (size_t b = 0; b != bits; ++b) {
+			perm[tbm.pos(startbit + b, arg.arg, args)] = 
+				 abm.pos(b, n, newargs);
+		}
+	}
 	return perm;
+	//for (size_t n = 0; n != args; ++n)
+	//	for (size_t b = 0; b != tbm.get_bits(n); ++b)
+	//		perm[tbm.pos(b, n, args)] = abm.pos(b, n, newargs);
 }
 
 /* 
 expands from header/rule/tbl into alt domain/bits 
 (TODO: args/newargs are not needed)
 */
-spbdd_handle tables::addtail(cr_spbdd_handle x, size_t args, size_t newargs,
-	const bitsmeta& tblbm, const bitsmeta& abm) const{
-	DBG(assert(args == tblbm.get_args()););
-	DBG(assert(newargs == abm.get_args()););
-	if (args == newargs) return x;
+spbdd_handle tables::addtail(const alt& a, cr_spbdd_handle x, 
+							 const bitsmeta& tbm, const bitsmeta& abm) const {
+	//DBG(assert(args == tbm.get_args()););
+	//DBG(assert(newargs == abm.get_args()););
+	//if (args == newargs) return x;
+	if (tbm.get_args() == abm.get_args()) return x;
 	// permute is applied right away
-	//operator^(x, addtail(args, newargs, tblbm, abm));
-	return x ^ addtail(args, newargs, tblbm, abm);
+	//operator^(x, addtail(args, newargs, tbm, abm));
+	return x ^ addtail(a, tbm, abm);
 }
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
@@ -3434,7 +3462,7 @@ char tables::fwd() noexcept {
 						os << L"program fail: " << rtp << L'.' << endl;
 					}
 				}
-			}, 0, true);
+			}, 0, nullptr, true);
 			// 'true' to allow decompress to handle builtins too
 			if (isfail) return unsat = true; // to throw exception, TODO:
 			if (ishalt) return false;

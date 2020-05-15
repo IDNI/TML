@@ -1,0 +1,20 @@
+{
+#@string str <test.g>.
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o <= 1.
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o < 2.
+
+want(0 3).
+want(5 3).
+cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o >= 2.
+
+#want(0 3).
+#want(4 3).
+#cnt2s(?v1) :- want(?v1 3), count(?v1 ?o), ?o >= 2.
+
+}

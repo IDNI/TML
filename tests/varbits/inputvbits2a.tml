@@ -1,0 +1,22 @@
+{
+r(1 a y).
+r(2 b z2).
+r(3 a g).
+r(4 a b).
+r(5 b c).
+r(6 b c).
+r(7 b c).
+r(8 b c).
+r(9 b c).
+#r(?v1:int[6] ?v2:str[5]) :- r(?v1 a ?v2).
+#r(?v1:int[6] ?v2:str[5]) :- r(?v1 b ?v2).
+##r1(?v1 ?v2) :- r(?v1 ?v2), count(?v1 ?v2 ?out).
+##r2(?v1 ?v2) :- r1(?v1 ?v2), count(?v1 ?v2 ?out).
+#r1(?v1:int[6] ?v2:str[5]) :- r(?v1 ?v2), ?v1 < 3.
+#r2(?v1:int[6] ?v2:str[5]) :- r1(?v1 ?v2), ?v1 = 1.
+
+#want(u0 p).
+#want(u1 p).
+#want(u2 k).
+#cnt(?v1 ?v2 ?out) :- want(?v1 ?v2), count(?v1 ?v2 ?out).
+}

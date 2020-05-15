@@ -16,10 +16,12 @@
 
 using namespace std;
 
-vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
-	const {
+vector<env> tables::varbdd_to_subs(
+	const alt* a, ntable tab, cr_spbdd_handle v) const
+{
 	vector<env> r;
-	decompress(v, 0, [a, &r](const term& x) {
+	//decompress(v, 0, [a, &r](const term& x) {
+	decompress(v, tab, [a, &r](const term& x) {
 		env m;
 		// D: VM: refactor this (and is questionable)
 		// why not use .vm, as we're iterating them all and var<->pos is 1<->1
@@ -32,7 +34,7 @@ vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 		//	if (!m.emplace(z.second, x[z.first]).second)
 		//		throw 0;
 		r.emplace_back(move(m));
-	}, a->varslen);
+	}, a->varslen, a);
 	return r;
 }
 
@@ -53,22 +55,27 @@ vector<term> subs_to_body(const alt* a, const map<int, int>& e) {
 
 void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	cb_ground f) {
-	const alt* a;
-	// D: addtail needs a bitsmeta, one tbl.bm, another alt.bm (or custom?)
-	table& tbl = tbls[rules[rl].tab];
-	for (size_t n = 0; n != rules[rl].size(); ++n)
-		if (a = rules[rl][n], has(a->levels, level))
-			for (const env& e : varbdd_to_subs(a,
-				addtail(h, rules[rl].t.size(), a->varslen, tbl.bm, a->bm)))
+	ntable tab = rules[rl].tab;
+	table& tbl = tbls[tab];
+	DBG(assert(rules[rl].t.size() == tbl.bm.get_args()););
+	for (size_t n = 0; n != rules[rl].size(); ++n) {
+		const alt* a = rules[rl][n];
+		DBG(assert(a->varslen == a->bm.get_args()););
+		if (has(a->levels, level)) {
+			spbdd_handle htemp = addtail(*a, h, tbl.bm, a->bm);
+			for (const env& e : varbdd_to_subs(a, tab, move(htemp))) {
 				f(rl, level, n, move(subs_to_body(a, e)));
+			}
+		}
+	}
 }
 
 void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 	spbdd_handle h = from_fact(t), x;
 	if (!level) f(-1, 0, -1, {t});
 	if (level > 1) {
-		spbdd_handle	x = levels[level-1][t.tab] && h,
-				y = levels[level][t.tab] && h;
+		spbdd_handle x = levels[level-1][t.tab] && h,
+					 y = levels[level][t.tab] && h;
 		if (t.neg?(hfalse==x||hfalse!=y):(hfalse!=x||hfalse==y)) return;
 	}
 	for (size_t r : tbls[t.tab].r)
@@ -79,7 +86,9 @@ void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 set<tables::witness> tables::get_witnesses(const term& t, size_t l) {
 	set<witness> r;
 	term_get_grounds(t, l, [&r](size_t rl, size_t, size_t al,
-		const vector<term>& b) { r.emplace(rl, al, b); });
+		const vector<term>& b) { 
+			r.emplace(rl, al, b); 
+		});
 	return r;
 }
 
