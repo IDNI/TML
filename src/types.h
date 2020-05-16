@@ -325,6 +325,7 @@ struct type {
 
 	inline bool operator<(const type& other) const {
 		if (kind != other.kind) return kind < other.kind;
+		if (sig != other.sig) return sig < other.sig;
 		switch (kind) {
 			case Primitive: return primitive < other.primitive;
 			case Compound: return compound < other.compound;
@@ -336,6 +337,7 @@ struct type {
 	}
 	inline bool operator==(const type& other) const {
 		if (kind != other.kind) return false;
+		if (sig != other.sig) return false;
 		switch (kind) {
 			case Primitive: return primitive == other.primitive;
 			case Compound: return compound == other.compound;
@@ -507,6 +509,8 @@ struct type {
 			case Compound:
 			{
 				size_t startbit = 0;
+				// in case arg::none is -1 or so, handle it to ret full/0
+				if (subarg == arg::none) return 0;
 				for (size_t i = 0; i != compound.types.size(); ++i) {
 					const primitive_type& type = compound.types[i];
 					if (i == subarg) return startbit;

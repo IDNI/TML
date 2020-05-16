@@ -62,7 +62,7 @@ void tables::set_constants(
 	size_t args = t.size();
 	for (size_t i = 0; i< args; ++i)
 		if (t[i] >= 0) {
-			spbdd_handle aux = from_sym(i, args, t[i], bm);
+			spbdd_handle aux = from_sym(i, args, t[i], t.multivals()[i], bm);
 			q = q && aux;
 		}
 

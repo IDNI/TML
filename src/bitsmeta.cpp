@@ -160,7 +160,11 @@ bool bitsmeta::set_args(const argtypes& vtypes, bool hasmultivals_) {
 		for (size_t i = 0; i != types.size(); ++i)
 			update_type(types[i], vtypes[i]);
 	++nterms;
-	hasmultivals = hasmultivals_;
+	// TODO: a bug probably, once hasmultivals is set it can't be reset?
+	if (hasmultivals && !hasmultivals_) {
+		//o::dump() << endl;//L"set_args: hasmultivals && !hasmultivals_" << 
+	}
+	hasmultivals = hasmultivals || hasmultivals_;
 	return true;
 }
 
@@ -349,6 +353,7 @@ bool bitsmeta::sync_types(
 	if (larg.subarg != arg::none && rarg.subarg != arg::none)
 		return sync_types(l[larg.subarg], r[rarg.subarg], lchng, rchng);
 	// TODO: needs extra handling for none compound or non-primitive comps etc.
+	// TODO: here we map comp sub to comp, not handled atm.
 	if (larg.subarg != arg::none && r.isPrimitive())
 		return sync_types(l[larg.subarg], r.primitive, lchng, rchng);
 	if (rarg.subarg != arg::none && l.isPrimitive())

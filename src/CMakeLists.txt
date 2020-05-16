@@ -28,6 +28,7 @@ set(TML_HEADERS
 	addbits.h
 	infer_types.h
 	types.h
+	form.h
 	options.h
 	output.h
 	repl.h
@@ -47,6 +48,7 @@ set(TML_SOURCES
 	addbits.cpp
 	infer_types.cpp
 	types.cpp
+	form.cpp
 	options.cpp
 	output.cpp
 	print_prolog.cpp

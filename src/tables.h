@@ -157,7 +157,7 @@ public:
 	const dict_t& dict; // TODO: remove this dep., only needed for dict.nsyms()
 	// sig arity (mechanism) is wrong for compounds (# of args/len)
 	bool commit(DBG(size_t));
-	spbdd_handle init_bits(ntable, AddBits&);
+	void init_bits(ntable, AddBits&); // spbdd_handle
 	//table() {}
 	table(const sig& sg, size_t l, const dict_t& d) //, ints ar = {})
 		: len(l), tq{hfalse}, bm(l), dict(d), sign(sg) {} //, arity(ar) {}
@@ -297,43 +297,24 @@ private:
 		return v % args;
 	}
 
-	template<typename T> spbdd_handle from_sym(
-		size_t arg, size_t args, int_t i, const T& altbl) const {
-		return from_sym(arg, args, i, altbl.bm);
-	}
-	spbdd_handle from_sym(size_t arg, size_t args, int_t, c_bitsmeta&) const;
+	spbdd_handle from_sym(
+		size_t arg, size_t args, int_t val, ints vals, c_bitsmeta& bm) const; 
 	spbdd_handle from_sym(int_t val, tbl_arg arg, size_t args, size_t startbit, 
 						  size_t bits, const bitsmeta& bm) const;
-
 	spbdd_handle from_sym(size_t arg, size_t args, ints, c_bitsmeta&) const;
-	spbdd_handle from_sym(
-		size_t arg, size_t args, const arg_type& type,
-		int_t val, ints vals, c_bitsmeta& bm) const;
 
-	template<typename T> spbdd_handle from_sym_eq(
-		size_t p1, size_t p2, size_t args, const T& altbl) const {
-		return from_sym_eq(p1, p2, args, altbl.bm);
-	}
-	spbdd_handle from_sym_eq(
-		size_t p1, size_t p2, size_t args, c_bitsmeta& bm) const;
 	spbdd_handle from_sym_eq(
 		tbl_arg arg1, tbl_arg arg2, size_t args, c_bitsmeta& bm) const;
-
-	void init_bits();
 
 	template<typename T> spbdd_handle leq_const(
 		ints vals, size_t arg, size_t args, const T& altbl) const {
 		return leq_const(vals, arg, args, altbl.bm);
 	}
-	//spbdd_handle leq_const(
-	//	int_t val, size_t arg, size_t args, const bitsmeta& bm) const;
 	bdd_handles leq_const(
 		ints vals, size_t arg, size_t args, const bitsmeta& bm) const;
 	spbdd_handle leq_const(
 		int_t val, tbl_arg arg, size_t args, 
 		const primtypes& types, const bitsmeta& bm) const;
-	//spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
-	//	size_t bits, const bitsmeta& bm) const;
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
 		size_t bits, size_t startbit, const bitsmeta& bm) const;
 
@@ -356,7 +337,6 @@ private:
 			range({ arg, it.i }, args, v, bm);
 			});
 	}
-	//spbdd_handle range(size_t arg, ntable tab, const bitsmeta& bm);
 
 	void range(tbl_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm) const;
 	spbdd_handle range(tbl_arg arg, ntable tab, const bitsmeta& bm);
@@ -367,11 +347,11 @@ private:
 		range_compound_memo.clear();
 	}
 
-	sig get_sig(const term& t);
+	//sig get_sig(const term& t);
 	sig get_sig(const raw_term& t);
-	sig get_sig(const lexeme& rel, const ints& arity);
+	//sig get_sig(const lexeme& rel, const ints& arity);
 
-	ntable add_table(sig s);
+	//ntable add_table(sig s);
 
 	static uints get_perm(
 		const std::map<tbl_arg, int_t>& poss, const bitsmeta& tblbm, 
@@ -379,7 +359,7 @@ private:
 	
 	uints get_perm(const term& t, const varmap& m, size_t len,
 		const bitsmeta& tblbm, const bitsmeta& altbm) const;
-	void init_varmap(alt& a, const term& h, const term_set& al);
+	//void init_varmap(alt& a, const term& h, const term_set& al);
 	spbdd_handle get_alt_range(
 		const term&, const term_set&, const varmap&, size_t len, const alt&);
 	spbdd_handle get_alt_range(const term& h, const term_set& a,
@@ -554,94 +534,6 @@ public:
 	dict_t& get_dict() { return dict; }
 
 	std::wostream& print_dict(std::wostream& os) const;
-};
-
-struct transformer;
-struct form{
-friend struct transformer;
-
-	int_t arg;
-	term *tm;
-	form *l;
-	form *r;
-	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES
-	} type;
-
-
-	form(){
-		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
-	}
-
-	form( ftype _type, int_t _arg=0, term *_t=NULL, form *_l= NULL, form *_r=NULL  ) {
-		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
-		if (_t) tm = new term(*_t); // , * tm = *_t;
-		//if( _t) tm = new term(), *tm = *_t;
-	}
-	bool isquantifier() const {
-		 if( type == form::ftype::FORALL1 ||
-			 type == form::ftype::EXISTS1 ||
-			 type == form::ftype::UNIQUE1 ||
-			 type == form::ftype::EXISTS2 ||
-			 type == form::ftype::UNIQUE2 ||
-			 type == form::ftype::FORALL2 )
-			 return true;
-		return false;
-
-	}
-
-	~form() {
-		if(l) delete l, l = NULL;
-		if(r) delete r, r = NULL;
-		if(tm) delete tm, tm = NULL;
-	}
-	void printnode(int lv=0);
-};
-
-struct transformer {
-	virtual bool apply(form *&root) = 0;
-	form::ftype getdual( form::ftype type);
-	virtual bool traverse(form *&);
-};
-
-
-struct implic_removal : public transformer {
-
-	 virtual bool apply(form *&root);
-};
-
-struct demorgan : public transformer {
-
-
-	bool allow_neg_move_quant =false;
-	bool push_negation( form *&root);
-	virtual bool apply( form *&root);
-	demorgan(bool _allow_neg_move_quant =false){
-		allow_neg_move_quant = _allow_neg_move_quant;
-	}
-};
-
-struct pull_quantifier: public transformer {
-	dict_t &dt;
-	pull_quantifier(dict_t &_dt): dt(_dt) {}
-	virtual bool apply( form *&root);
-	virtual bool traverse( form *&root);
-	bool dosubstitution(form * phi, form* end);
-};
-struct substitution: public transformer {
-
-	std::map<int_t, int_t> submap_var;
-	std::map<int_t, int_t> submap_sym;
-
-	void clear() { submap_var.clear(); submap_sym.clear();}
-	void add( int_t oldn, int_t newn) {
-		if(oldn < 0)
-			submap_var[oldn] = newn;
-		else
-			submap_sym[oldn] = newn;
-	}
-
-	virtual bool apply(form *&phi);
-
 };
 
 std::wostream& operator<<(std::wostream& os, const vbools& x);
