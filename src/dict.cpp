@@ -35,6 +35,7 @@ lexeme get_lexeme(const wstring& s) {
 }
 
 lexeme dict_t::get_sym(int_t t) const {
+	if (!(t < syms.size())) throw out_of_range("get_sym: index.");
 	return syms[un_mknum(t)];
 }
 

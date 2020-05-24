@@ -47,7 +47,7 @@ struct bitsmeta {
 	sort of a copy .ctor w/ bits changed (for one arg) - supports add_bit 
 	note: we shouldn't throw in ctor, just temporary while dev
 	*/
-	bitsmeta(const bitsmeta& src, size_t arg, size_t nbits = 1)
+	bitsmeta(const bitsmeta& src, multi_arg arg, size_t nbits = 1)
 		: bitsmeta(src.types.size()) {
 		DBG(assert(src.types.size() > 0);); // don't call this if empty
 		if (src.types.empty()) throw 0;
@@ -58,8 +58,10 @@ struct bitsmeta {
 		++nterms; // set init 'flag'
 		// TODO: check if this makes sense (e.g. if it's CHR it has to be 8)
 		// for the moment we can only addbits to primitives (maybe more later)
-		if (!types[arg].isPrimitive()) throw 0;
-		types[arg].primitive.bitness += nbits; // add bits... //++
+		arg_type& type = types[arg.arg][arg];
+		if (!type.isPrimitive()) throw 0;
+		// TODO: set_bitness
+		type.primitive.bitness += nbits; // add bits... //++
 		init_cache();
 		// Only this (add_bit_perm/add_bit) & tables::init_bits will reset vbits
 		init_bits();
@@ -76,15 +78,15 @@ struct bitsmeta {
 	size_t get_bits(size_t arg) const {
 		return types[arg].get_bits();
 	}
-	base_type get_type(size_t arg) const {
-		return types[arg].get_type();
-	}
-	size_t get_bits(size_t arg, size_t subarg) const {
-		return types[arg].get_bits(subarg);
-	}
-	base_type get_type(size_t arg, size_t subarg) const {
-		return types[arg].get_type(subarg);
-	}
+	//base_type get_type(size_t arg) const {
+	//	return types[arg].get_type();
+	//}
+	//size_t get_bits(size_t arg, size_t subarg) const {
+	//	return types[arg].get_bits(subarg);
+	//}
+	//base_type get_type(size_t arg, size_t subarg) const {
+	//	return types[arg].get_type(subarg);
+	//}
 	/*
 	 check if bits changed, any propagate_type on new prog may do this (etc.)
 	 - once fixed, any added bits (or args??) have to be permuted (add_bit)
@@ -111,19 +113,19 @@ struct bitsmeta {
 	static bool sync_types(
 		argtypes& ltypes, const argtypes& rtypes, size_t larg, size_t rarg);
 	static bool sync_types(
-		argtypes& ltypes, tbl_arg larg, const argtypes& rtypes, tbl_arg rarg);
-	static bool sync_types(argtypes& ltypes, tbl_arg larg, const arg_type& r);
+		argtypes& ltypes, multi_arg l, const argtypes& rtypes, multi_arg r);
+	static bool sync_types(argtypes& ltypes, multi_arg l, const arg_type& r);
 	static bool sync_types(arg_type& l, const arg_type& r);
 	static bool sync_types(primitive_type& l, const primitive_type& r);
 
 	static bool sync_types(
-		argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg);
+		argtypes& ltypes, multi_arg l, argtypes& rtypes, multi_arg r);
 	static bool sync_types(
-		argtypes& ltypes, tbl_arg larg, argtypes& rtypes, tbl_arg rarg,
+		argtypes& ltypes, multi_arg l, argtypes& rtypes, multi_arg r,
 		bool& lchng, bool& rchng);
-	static bool sync_types(argtypes& ltypes, tbl_arg larg, arg_type& r);
+	static bool sync_types(argtypes& ltypes, multi_arg l, arg_type& r);
 	static bool sync_types(
-		argtypes& ltypes, tbl_arg larg, arg_type& r, bool& lchng, bool& rchng);
+		argtypes& ltypes, multi_arg l, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(arg_type& l, arg_type& r);
 	static bool sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(
@@ -224,7 +226,7 @@ struct perminfo {
 struct bits_perm {
 	//bitsmeta bm;
 	ntable tab;
-	size_t arg;
+	multi_arg arg; // size_t arg;
 	size_t args;
 	perminfo perm;
 	size_t nbits;

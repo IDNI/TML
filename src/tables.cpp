@@ -89,13 +89,15 @@ bdd_handles tables::leq_const(
 }
 
 spbdd_handle tables::leq_const(
-	int_t val, tbl_arg arg, size_t args, 
+	int_t val, multi_arg arg, size_t args,
 	const primtypes& types, const bitsmeta& bm) const {
 	// TODO: this is bit-first, arg-first (used in varbits) proved better
 	size_t startbit = 0;
+	size_t subarg = arg::none == arg.subarg ? 0 : arg.subarg;
+	// TODO: use bm.types[arg.arg][arg] (path) instead (this is ok, just slow)
 	for (size_t i = 0; i != types.size(); ++i) {
 		size_t bits = types[i].bitness;
-		if (i == arg.subarg)
+		if (i == subarg) //arg.subarg)
 			return leq_const(val, arg.arg, args, bits, bits, startbit, bm);
 		startbit += bits;
 	}
@@ -129,10 +131,10 @@ spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t b,
 
 typedef tuple<size_t, size_t, size_t, uints> skmemo;
 typedef tuple<size_t, size_t, size_t, uints> ekmemo;
-typedef tuple<tbl_arg, tbl_arg, size_t, uints> symeqsubkey;
+typedef tuple<multi_arg, multi_arg, size_t, uints> symeqsubkey;
 typedef tuple<int_t, size_t, size_t, uints> ekcmemo;
 typedef tuple<ints, size_t, size_t, uints> skcompmemo;
-typedef tuple<int_t, tbl_arg, size_t, uints> symsubkey;
+typedef tuple<int_t, multi_arg, size_t, uints> symsubkey;
 map<skmemo, spbdd_handle> smemo;
 map<symsubkey, spbdd_handle> msymsub;
 map<ekmemo, spbdd_handle> ememo;
@@ -183,12 +185,17 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit,
  note: we no longer have encoded type 'bits', so it's greatly simplified
  - tbl_arg arg - can now also be arg/subarg for compounds
 */
-void tables::range(tbl_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm)
+void tables::range(multi_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm)
 const {
-	const primtypes& types = bm.types[arg.arg].get_types();
+	// rec comp: 
+	const primtypes& types = bm.types[arg.arg].get_primitives(); // .get_types();
 	if (arg.subarg >= types.size())
 		throw out_of_range("range: subarg >= types.size() for compound type?");
-	const primitive_type& type = types[arg.subarg];
+	// where do we need to react on none to take the whole compound or sub-comp?
+	size_t subarg = arg.subarg == arg::none ? 0 : arg.subarg;
+	// TODO: we use subarg (primitives) but should just bm.types[arg.arg][arg]
+	// (but this is ok too, it's just not optimized, winded)
+	const primitive_type& type = types[subarg]; // arg.subarg];
 	switch (type.type) {
 		case base_type::CHR:
 			v.push_back(leq_const((1 << type.bitness)-1, arg, args, types, bm));
@@ -207,12 +214,16 @@ const {
 	}
 }
 
-spbdd_handle tables::range(tbl_arg arg, ntable tab, const bitsmeta& bm) {
+spbdd_handle tables::range(multi_arg arg, ntable tab, const bitsmeta& bm) {
 	size_t args = tbls[tab].len;
-	const primtypes& types = bm.types[arg.arg].get_types();
+	// rec comp: 
+	const primtypes& types = bm.types[arg.arg].get_primitives(); //.get_types();
 	if (arg.subarg >= types.size())
 		throw out_of_range("range: subarg >= types.size() for compound type?");
-	const primitive_type& type = types[arg.subarg];
+	// where do we need to react on none to take the whole compound or sub-comp?
+	size_t subarg = arg.subarg == arg::none ? 0 : arg.subarg;
+	// TODO: use bm.types[arg.arg][arg] (path) instead of primitives(subarg)
+	const primitive_type& type = types[subarg]; // arg.subarg];
 	int_t nums = 0, chars = 0, syms = 0;
 	switch (type.type) {
 	case base_type::CHR:
@@ -276,7 +287,7 @@ void table::init_bits(ntable tab, AddBits& addbits) {
 			if (nbits > 0) {
 				addbits.clear();
 				// set bits to 'ready', meaning bm bits is where it should be
-				addbits.permute_type({ tab, arg }, nbits, true);
+				addbits.permute_type({tab, arg, arg::none, {}}, nbits, true);
 			}
 		}
 	}
@@ -301,7 +312,7 @@ is creating some temp bdds (and args), TODO: not sure how to handle those.
 We also can't 'mix' the bdd-s of different origin (unless we adjust/permute 1st)
 */
 spbdd_handle tables::from_sym(
-	int_t val, tbl_arg arg, size_t args,
+	int_t val, multi_arg arg, size_t args,
 	size_t startbit, size_t bits, const bitsmeta& bm) const 
 {
 	static decltype(msymsub)::const_iterator it;
@@ -330,19 +341,22 @@ spbdd_handle tables::from_sym(
 
 	spbdd_handle r = htrue;
 	bm.types[arg].iterate(vals, [&](arg_type::iter it) {
-		r = r && from_sym(it.val, {arg, it.i}, args, it.startbit, it.bits, bm);
+		r = r && from_sym(
+			it.val, {arg, it.i, it.path}, args, it.startbit, it.bits, bm);
 	});
 	return scompmemo.emplace(x, r), r;
 }
 
 /*
  note: no need to check against isCompound, we do / match all bits regardless
+ - this is sub-arg as in sub-compound (as we take all bits, depends on caller)
 */
 spbdd_handle tables::from_sym_eq(
-	tbl_arg arg1, tbl_arg arg2, size_t args, c_bitsmeta& bm) const 
+	multi_arg arg1, multi_arg arg2, size_t args, c_bitsmeta& bm) const
 {
 	// (sub)types should match no matter how we put it
-	if (bm.types[arg1.arg][arg1.subarg] != bm.types[arg2.arg][arg2.subarg])
+	//if (bm.types[arg1.arg][arg1.subarg] != bm.types[arg2.arg][arg2.subarg])
+	if (bm.types[arg1.arg][arg1] != bm.types[arg2.arg][arg2])
 		throw runtime_error("from_sym_eq: types differ?"); // return hfalse;
 
 	// test if in cache first...
@@ -354,14 +368,14 @@ spbdd_handle tables::from_sym_eq(
 	const arg_type& type1 = bm.types[arg1.arg];
 	const arg_type& type2 = bm.types[arg2.arg];
 	// these args are both vars, if 0-subarg => it's a var for full compound/arg
-	size_t bits = arg1.subarg == arg::none ? 
-		type1.get_bits() : type1.get_bits(arg1.subarg);
+	size_t bits = arg1.subarg == arg::none ?
+		type1.get_bits() : type1[arg1].get_bits(); // .get_bits(arg1.subarg);
 	size_t bits2 = arg2.subarg == arg::none ? 
-		type2.get_bits() : type2.get_bits(arg2.subarg);
+		type2.get_bits() : type2[arg2].get_bits(); // .get_bits(arg2.subarg);
 	if (bits != bits2)
 		throw runtime_error("from_sym_eq: bits differ?"); // return hfalse;
-	size_t startbit1 = type1.get_start(arg1.subarg);
-	size_t startbit2 = type2.get_start(arg2.subarg);
+	size_t startbit1 = type1.get_start(arg1); // .subarg);
+	size_t startbit2 = type2.get_start(arg2); // .subarg);
 
 	spbdd_handle r = htrue;
 	for (size_t b = 0; b != bits; ++b)
@@ -375,27 +389,29 @@ spbdd_handle tables::from_sym_eq(
 spbdd_handle tables::from_fact(const term& t) {
 	// TODO: memoize
 	spbdd_handle r = htrue;
-	static map<int_t, tbl_arg> vs;
+	static map<int_t, multi_arg> vs;
 	vs.clear();
 	// D: we need table for any bdd ops (e.g. from_sym etc.)
 	DBG(assert(t.tab != -1););
 	table& tbl = tbls[t.tab];
 	const bitsmeta& bm = tbl.bm;
 	for (size_t n = 0, args = t.size(); n != args; ++n) {
+		// rec comp: get multi_arg in here instead of tbl_arg
 		bm.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
 			if (it.val >= 0)
-				r = r && 
-					from_sym(it.val, {n, it.i}, args, it.startbit, it.bits, bm);
+				r = r && from_sym(
+					it.val, {n, it.i, it.path}, args, it.startbit, it.bits, bm);
 			else {
 				// VM: proc_syms: this actually happens for tml.g
 				decltype(vs)::const_iterator itvar = vs.find(it.val);
 				if (vs.end() != itvar)
-					r = r && from_sym_eq({n, it.i}, itvar->second, args, bm);
+					r = r && from_sym_eq(
+						{n, it.i, it.path}, itvar->second, args, bm);
 				else {
-					vs.emplace(it.val, tbl_arg{n, it.i});
+					vs.emplace(it.val, multi_arg{n, it.i, it.path});
 					// TODO: this was mentioned, should we do for neg too?
 					if (!t.neg)
-						r = r && range({n, it.i}, t.tab, bm);
+						r = r && range({n, it.i, it.path}, t.tab, bm);
 				}
 			}
 		});
@@ -422,8 +438,11 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
 	bool isrel = realrel || extype == term::BLTIN;
 	// D: use -1, numeric_limits<int>::min()
-	vector<arg_type> types, ptypes;
-	primtypes comptypes;
+	argtypes types, ptypes;
+	argtypes comptypes;
+	//size_t complevel = 0;
+	//bool issubcompclosed = false;
+	//argtypes comp; //arg_type comp;
 	bool isprevarg = false, iscomp = false, hascomp = false, isvarcomp = false,
 		 is1stparenth = extype == term::REL || extype == term::BLTIN;
 	size_t nparenth = 0;
@@ -504,12 +523,56 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 			break;
 		case elem::OPENP:
 			if (!is1stparenth) {
-				++nparenth;
-				if (isprevarg && !iscomp) {
-					iscomp = true;
-					hascomp = true;
-					isvarcomp = eprevarg == elem::etype::VAR;
-					parenths.push_back(eprevarg);
+				// correct for 'no-names', only within comps as that's safe...
+				// problem may be the sig overall (tbl and types)?
+				if (iscomp && !isprevarg) {
+					t.push_back(dict.get_sym(L"__no_name__"));
+					types.emplace_back(base_type::STR, 0);
+					// turn off after-processing (it's done) to avoid dupes
+					tsize = t.size(); //isarg = true; //earg = elem::SYM;
+					isprevarg = true;
+					eprevarg = elem::SYM;
+					int_t val = t.back();
+					const arg_type& type = types.back();
+					if (!iscomp) {
+						vals.push_back(val);
+						compvals.push_back(ints{ val });
+						ptypes.push_back(type);
+						comptypes = argtypes{ type };
+					} else {
+						compvals.back().push_back(val);
+						arg_type::get_tail_types(comptypes, nparenth-1).
+							push_back(type);
+					}
+					// this will be added below, so avoid dupes
+					if (iscomp && isprevarg)
+						parenths.push_back(eprevarg);
+				}
+				++nparenth; // also comp level
+				// TODO: handle 'no-name' ones w/o arg
+				if (isprevarg) {
+					if (!iscomp) {
+						iscomp = true;
+						hascomp = true;
+						isvarcomp = eprevarg == elem::etype::VAR;
+						parenths.push_back(eprevarg);
+					} else {
+						// a new compound within, reshuffle, make a hierarchy...
+						// the prev type in comptypes is the begin of a new comp
+						//arg_type& back = comptypes.back();
+						//argtypes& vtail = back.isPrimitive() ? 
+						//	comptypes : // means we're at top
+						//	back.get_tail_types(); // we're deep, get tail...
+						argtypes& vtail = arg_type::get_tail_types(comptypes);
+						// we now got the 'last level', need to create a comp...
+						arg_type ctype = vtail.back(); // copy, no ref
+						DBG(assert(ctype.isPrimitive()););
+						vtail.pop_back();
+						// what about sig? don't fill in, only for consts
+						// ...and branch...
+						vtail.emplace_back(compound_type{ {ctype} });
+					}
+					//complevel = nparenth;
 				}
 				parenths.push_back(r.e[n].type);
 			}
@@ -519,26 +582,30 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 			if (nparenth > 0) {
 				--nparenth;
 				parenths.push_back(r.e[n].type);
-				if (!nparenth && iscomp) { //if (iscomp) {
-					iscomp = false;
-					if (isvarcomp) {
-						// it's a case '?x(?x1 ?x2)' w 0-arg var, only for type.
-						// (btw. 0-arg vars are not supported (atm or ever?))
-						arg_type vartype = ptypes.back(); // don't use ref
-						DBG(assert(vartype.isPrimitive() && vartype.isNone()););
-						ptypes.pop_back();
-						ptypes.emplace_back(
-							move(vartype.primitive), move(parenths));
-						compvals.pop_back();
-						compvals.push_back(ints{ vals.back() });
-					}
-					else {
-						ptypes.pop_back();
-						ptypes.emplace_back(
-							compound_type{ comptypes }, move(parenths));
-					}
-					isvarcomp = false;
-					parenths.clear();
+				if (iscomp) {
+					if (!nparenth) {
+						iscomp = false;
+						if (isvarcomp) {
+							// a case '?x(?x1 ?x2)' w 0-arg var, only for type.
+							// btw. 0-arg vars are not supported (atm or ever?)
+							arg_type vartype = ptypes.back(); // don't use ref
+							DBG(assert(
+								vartype.isPrimitive() && vartype.isNone()););
+							ptypes.pop_back();
+							ptypes.emplace_back(
+								move(vartype.primitive), move(parenths));
+							compvals.pop_back();
+							compvals.push_back(ints{ vals.back() });
+						}
+						else {
+							// TODO: we need to form compounds based on parenths
+							ptypes.pop_back();
+							ptypes.emplace_back(
+								compound_type{ comptypes }, move(parenths));
+						}
+						isvarcomp = false;
+						parenths.clear();
+					} else {}
 				}
 			}
 			break;
@@ -553,13 +620,15 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 				compvals.push_back(ints{ val });
 				ptypes.push_back(type);
 				if (!type.isPrimitive()) throw 0;
-				comptypes = primtypes{ type.primitive };
+				comptypes = argtypes{ type };
+				//comptypes = primtypes{ type.primitive };
 				//comptypes.push_back(primtypes{ type.primitive });
 			} else {
 				compvals.back().push_back(val);
 				if (!type.isPrimitive()) throw 0;
-				comptypes.push_back(type.primitive);
-				//comptypes.back().push_back(type.primitive);
+				arg_type::get_tail_types(comptypes, nparenth-1).
+					push_back(type);
+				//comptypes.push_back(type);
 			}
 		}
 
@@ -776,21 +845,35 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 			   ints(len, 0), vector<ints>(len), bm.types, 0, 0, bm.hasmultivals);
 		// VM: TODO: proc_syms: use iterate
 		for (size_t arg = 0; arg != len; ++arg) {
-			const primtypes& types = bm.types[arg].get_types();
-			ints vals(types.size(), 0);
-			for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
-				const primitive_type& type = types[i];
-				size_t bits = type.bitness; // fine for primitive, has only one.
-				int_t& val = vals[i];
+			size_t valsize = bm.types[arg].sizeof_primitives();
+			ints vals(valsize, 0);
+			bm.types[arg].iterate([&](arg_type::iter& it) {
+				int_t& val = vals[it.i];
 				// bits are 'per compound-arg' (used to encode the val)
-				for (size_t b = 0; b != bits; ++b)
-					if (p[bm.pos(startbit + b, arg, len)])
-						val |= 1 << bm.bit(b, bits); 
+				for (size_t b = 0; b != it.bits; ++b)
+					if (p[bm.pos(it.startbit + b, arg, len)])
+						val |= 1 << bm.bit(b, it.bits);
 				// put bit() on either const/encode or pos(), not both.
-				startbit += bits;
-			}
+				//(it.val, arg, args, it.bits, it.bits, it.startbit);
+			});
 			r[arg] = vals[0];
 			r.set_multivals(arg, move(vals));
+
+			//const primtypes& types = bm.types[arg].get_types();
+			//ints vals(types.size(), 0);
+			//for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
+			//	const primitive_type& type = types[i];
+			//	size_t bits = type.bitness; // fine for primitive, has only one.
+			//	int_t& val = vals[i];
+			//	// bits are 'per compound-arg' (used to encode the val)
+			//	for (size_t b = 0; b != bits; ++b)
+			//		if (p[bm.pos(startbit + b, arg, len)])
+			//			val |= 1 << bm.bit(b, bits); 
+			//	// put bit() on either const/encode or pos(), not both.
+			//	startbit += bits;
+			//}
+			//r[arg] = vals[0];
+			//r.set_multivals(arg, move(vals));
 		}
 		f(r);
 	})();
@@ -837,30 +920,61 @@ elem tables::get_elem(ints vals, const arg_type& ctype) const {
 	if (!ctype.isCompound()) throw 0;
 	// TODO: what if we really have vars inside compound? or just one var?
 	std::wstringstream os, ss;
-	primtypes types = ctype.compound.types;
+	// TODO: rec comp: are vals and types of same size? vals are different now
+	//primtypes types = ctype.get_primitives(); // .compound.types;
+	primtype_paths types = ctype.get_primitives(sizes{});
 	os << L"";
-	bool usesig = !ctype.sig.empty();
-	bool open = false, close = false;
-	size_t isig = 0;
+	//bool usesig = !ctype.sig.empty();
+	//bool open = false, close = false;
+	//size_t isig = 0;
+	size_t iparenth = 0;
+	int_t level = -1, idx = -1, isub = 0;
+	bool prevNoName = false;
 	for (size_t i = 0; i != types.size(); ++i) {
-		const primitive_type& type = types[i];
+		const primitive_type& type = types[i].first;
+		const sizes& path = types[i].second;
 		int_t val = vals[i];
+		int_t newlevel = path.size()-1;
+		int_t newidx = path.size() > 1 ? path.rbegin()[1] : -1;
 
-		if (usesig) {
-			while (isig < ctype.sig.size()) {
-				if (ctype.sig[isig] == elem::etype::OPENP)
-					close ? (os << L" (", open = true, close = false) :
-							(os << L"(", open = true);
-				else if (ctype.sig[isig] == elem::etype::CLOSEP)
-					os << L")", close = true, open = false;
-				else break;
-				++isig; // for parenthesis
+		if (newlevel > level) {
+			if (level >= 0)
+				os << L"(", iparenth++;
+			level = newlevel;
+			idx = newidx;
+			isub = 0; // reset
+		} else if (newlevel == level) {
+			if (newidx > idx) { // it'll always increase only, or stay equal
+				// it's a sibling, new compound, close first then reset the isub
+				idx = newidx;
+				os << L") ", iparenth--;
+				isub = 0; // reset
+			} else { // same idx and level, same compound
+				if (++isub == 1) // when we come to 1st (after the 0- arg/functor)
+					os << L"(", iparenth++;
+				else if(!prevNoName) os << L" ";
 			}
-		} else if (i != 0) os << L"(";
-		++isig; // for value
-		if (!open && i != 0) os << L" ";
-		open = close = false;
+		} else {
+			// we're moving 'back, up', so close the parenthesis
+			os << L") ", iparenth--;
+		}
 
+		//if (usesig) {
+		//	while (isig < ctype.sig.size()) {
+		//		if (ctype.sig[isig] == elem::etype::OPENP)
+		//			close ? (os << L" (", open = true, close = false) :
+		//					(os << L"(", open = true);
+		//		else if (ctype.sig[isig] == elem::etype::CLOSEP)
+		//			os << L")", close = true, open = false;
+		//		else break;
+		//		++isig; // for parenthesis
+		//	}
+		//} else if (i != 0) os << L"(";
+		//++isig; // for value
+		//if (!open && i != 0) os << L" ";
+		//open = close = false;
+
+		prevNoName = false;
 		if (val < 0)
 			os << get_var_lexeme(val);
 		else
@@ -873,30 +987,37 @@ elem tables::get_elem(ints vals, const arg_type& ctype) const {
 					else
 						os << wstring(L"\"#") + 
 							  to_wstring((unsigned char)(ch)) + L"\"";
+					break;
 				}
-				break;
 				case base_type::INT:
 					os << (int_t)un_mknum(val);
 					break;
 				case base_type::STR:
-					os << rdict().get_sym(val);
+					if ((rdict().get_sym(val) == L"__no_name__"))
+						prevNoName = true; // {}//--isub;
+					else
+						os << rdict().get_sym(val);
 					break;
 				case base_type::NONE:
 					os << L"???";
 				default: throw 0;
 			}
 	}
+	if (size_t(level+1) != iparenth)
+		o::dump() << L"level + 1 != iparenth" << endl;
+	if (level+1 > 0)
+		os << wstring(level+1, ')');
 
-	if (usesig) {
-		while (isig < ctype.sig.size()) {
-			if (ctype.sig[isig] == elem::etype::OPENP)
-				os << L"(";
-			else if (ctype.sig[isig] == elem::etype::CLOSEP)
-				os << L")";
-			else throw runtime_error("get_elem: signature is wrong?");
-			++isig; // for parenthesis
-		}
-	} else os << wstring(types.size() - 1, ')');
+	//if (usesig) {
+	//	while (isig < ctype.sig.size()) {
+	//		if (ctype.sig[isig] == elem::etype::OPENP)
+	//			os << L"(";
+	//		else if (ctype.sig[isig] == elem::etype::CLOSEP)
+	//			os << L")";
+	//		else throw runtime_error("get_elem: signature is wrong?");
+	//		++isig; // for parenthesis
+	//	}
+	//} else os << wstring(types.size() - 1, ')');
 
 	//return	elem(elem::SYM, rdict().get_lexeme(os.str()), ctype);
 	return	elem(elem::SYM, rdict().get_lexeme(os.str()), {compound_type{{}}});
@@ -973,7 +1094,7 @@ void align_vars(vector<term>& v) {
 }
 
 uints tables::get_perm(
-	const map<tbl_arg, int_t>& poss, const bitsmeta& tbm,
+	const map<multi_arg, int_t>& poss, const bitsmeta& tbm,
 	const bitsmeta& abm) {
 	uints perm = perm_init(tbm.args_bits);
 	size_t args = tbm.get_args();
@@ -981,29 +1102,44 @@ uints tables::get_perm(
 	// VM: TODO: proc_syms: use iterate
 	for (size_t n = 0; n != args; ++n) {
 		const arg_type& type = tbm.types[n];
-		const primtypes& types = type.get_types();
-		for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
-			size_t bits = types[i].bitness;
-			//size_t arg = i ? i : arg::none;
-			map<tbl_arg, int_t>::const_iterator it = poss.find({ n, i });
-			if (poss.end() != it) {
-				if (i==0) bits = type.get_bits(); // we've var 0-pos == full arg
-				for (size_t b = 0; b != bits; ++b)
-					perm[tbm.pos(startbit + b, n, args)] = 
-						 abm.pos(b, size_t(it->second), len);
-				if (i==0) break;
+		type.iterate([&](arg_type::iter& it) {
+			map<multi_arg, int_t>::const_iterator itvar = 
+				poss.find({n, it.i, it.path});
+			if (poss.end() != itvar) {
+				// if we have a 0-pos full arg var
+				if (it.i == 0) {
+					it.bits = type.get_bits();
+					it.exit = true;
+				}
+				for (size_t b = 0; b != it.bits; ++b)
+					perm[tbm.pos(it.startbit + b, n, args)] = 
+						 abm.pos(b, size_t(itvar->second), len);
 			}
-			startbit += bits;
-		}
+		});
+		//const primtypes& types = type.get_types();
+		//for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
+		//	size_t bits = types[i].bitness;
+		//	//size_t arg = i ? i : arg::none;
+		//	map<tbl_arg, int_t>::const_iterator it = poss.find({ n, i });
+		//	if (poss.end() != it) {
+		//		if (i==0) bits = type.get_bits(); // we've var 0-pos == full arg
+		//		for (size_t b = 0; b != bits; ++b)
+		//			perm[tbm.pos(startbit + b, n, args)] = 
+		//				 abm.pos(b, size_t(it->second), len);
+		//		if (i==0) break;
+		//	}
+		//	startbit += bits;
+		//}
 	}
 	return perm;
 	//for (size_t n = 0; n != args; ++n) {
-	//	tbm.types[n].iterate([&](arg_type::iter& it) {
+	//	const arg_type& type = tbm.types[n];
+	//	type.iterate([&](arg_type::iter& it) {
 	//		map<tbl_arg, int_t>::const_iterator itvar = poss.find({n, it.i});
 	//		if (poss.end() != itvar) {
-	//			// if we've var 0-pos == full arg
+	//			// if we have a 0-pos full arg var
 	//			if (it.i == 0) {
-	//				it.bits = tbm.types[n].get_bits();
+	//				it.bits = type.get_bits();
 	//				it.exit = true;
 	//			}
 	//			for (size_t b = 0; b != it.bits; ++b)
@@ -1178,19 +1314,19 @@ void tables::proc_syms(const term& t, spbdd_handle& req) {//const bitsmeta& bm){
 	DBG(assert(t.tab != -1););
 	table& tbl = tbls[t.tab];
 	bitsmeta& bm = tbl.bm;
-	map<int_t, tbl_arg> v;
+	map<int_t, multi_arg> v;
 	for (size_t n = 0; n != t.size(); ++n)
 		bm.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
 			if (it.val >= 0)
-				get_sym(
-					it.val, {n,it.i}, t.size(), it.startbit, it.bits, req, bm);
+				get_sym(it.val, {n, it.i, it.path}, t.size(), it.startbit, 
+						it.bits, req, bm);
 			else {
 				decltype(v)::const_iterator itvar = v.find(it.val);
 				if (v.end() == itvar)
-					v.emplace(it.val, tbl_arg{ n, it.i });
+					v.emplace(it.val, multi_arg{n, it.i, it.path});
 				else
 					req = req && from_sym_eq(
-						{ n, it.i }, itvar->second, t.size(), bm);
+						{n, it.i, it.path}, itvar->second, t.size(), bm);
 			}
 		});
 }
@@ -1212,29 +1348,27 @@ body tables::get_body(
 	// instead of saving ints, for permex_add_bit, caches better (alts, bodies)
 	// how to init now/map? if no entry then it's like -1?
 	//b.poss = ints(t.size(), -1);
-	map<int_t, tbl_arg> m;
+	map<int_t, multi_arg> m;
 	// VM: proc_syms:
 	for (size_t n = 0; n != t.size(); ++n)
 		bm.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
 			if (it.val >= 0){
-				b.q = b.q && from_sym(
-					it.val, {n, it.i}, t.size(), it.startbit, it.bits, bm);
-				get_var_ex(
-					{n, it.i}, t.size(), it.startbit, it.bits, b.ex, bm);
+				b.q = b.q && from_sym(it.val, {n, it.i, it.path}, t.size(), 
+									  it.startbit, it.bits, bm);
+				get_var_ex({n, it.i, it.path}, t.size(), it.startbit, it.bits, 
+						   b.ex, bm);
 			}
 			else {
-				b.poss[{n, it.i}] = vm.at(it.val).id;
+				b.poss[{n, it.i, it.path}] = vm.at(it.val).id;
 				decltype(m)::const_iterator itvar = m.find(it.val);
 				if (m.end() == itvar)
-					m.emplace(it.val, tbl_arg{ n, it.i });
+					m.emplace(it.val, multi_arg{n, it.i, it.path});
 				else {
-					//const tbl_arg& arg = itvar->second;
-					// TODO: save bits/start in map, f_s_eq to accept it.
-					// (works this way, just to optimize)
+					// TODO: use it instead of bits/start
 					b.q = b.q && from_sym_eq(
-						{n, it.i}, itvar->second, t.size(), bm);
-					get_var_ex(
-						{n, it.i}, t.size(), it.startbit, it.bits, b.ex, bm);
+						{n, it.i, it.path}, itvar->second, t.size(), bm);
+					get_var_ex({n, it.i, it.path}, t.size(), it.startbit, 
+							   it.bits, b.ex, bm);
 				}
 			}
 		});
@@ -1329,8 +1463,9 @@ int_t freeze(vector<term>& v, int_t m = 0) {
 				if (t.types[n].primitive.type == base_type::INT)
 					m = max(m, un_mknum(t[n]));
 			} else if (t.types[n].isCompound()) {
-				const primtypes& types = t.types[n].compound.types;
-				//for (const primitive_type& type : t.types[n].compound.types) {
+				const primtypes& types = t.types[n].get_primitives();
+				// .compound.types;
+				// TODO: rec comp: do multivals and primitives match in size?
 				for (size_t i = 0; i != types.size(); ++i) {
 					const primitive_type& type = types[i];
 					if (type.type == base_type::INT)
@@ -1380,18 +1515,22 @@ flat_prog& get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 	for (vector<term>& v : x)
 		for (const term& t : v)
 			for (size_t n = 0; n != t.size(); ++n) {
-				if (t.types[n].isPrimitive()) {
-					if (t.types[n].primitive.type == base_type::INT)
-						m = max(m, un_mknum(t[n]));
-				} else if (t.types[n].isCompound()) {
-					const primtypes& types = t.types[n].compound.types;
-					for (size_t i = 0; i != types.size(); ++i) {
-						const primitive_type& type = types[i];
-						if (type.type == base_type::INT)
-							m = max(m, un_mknum(t.multivals()[n][i]));
-					}
-				} else 
-					throw runtime_error("get_c_db: type kind not implemented?");
+				t.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
+					if (it.type.type == base_type::INT)
+						m = max(m, un_mknum(it.val));
+				});
+				//if (t.types[n].isPrimitive()) {
+				//	if (t.types[n].primitive.type == base_type::INT)
+				//		m = max(m, un_mknum(t[n]));
+				//} else if (t.types[n].isCompound()) {
+				//	const primtypes& types = t.types[n].compound.types;
+				//	for (size_t i = 0; i != types.size(); ++i) {
+				//		const primitive_type& type = types[i];
+				//		if (type.type == base_type::INT)
+				//			m = max(m, un_mknum(t.multivals()[n][i]));
+				//	}
+				//} else 
+				//	throw runtime_error("get_c_db: type kind not implemented?");
 			}
 	for (vector<term>& t : x) {
 		freeze(t, m);
@@ -1675,8 +1814,8 @@ void tables::get_alt(
 			// TODO: if we can have compound EQ then expand override w/ tbl_arg
 			if (t[0] < 0 && t[1] < 0)
 				q = from_sym_eq(
-					{ a.vm.at(t[0]).id, arg::none },
-					{ a.vm.at(t[1]).id, arg::none },
+					{ a.vm.at(t[0]).id, arg::none, {} },
+					{ a.vm.at(t[1]).id, arg::none, {} },
 					a.varslen, 
 					a.bm);
 			else if (t[0] < 0) {
@@ -1856,7 +1995,9 @@ vector<term> tables::interpolate(
 			const arg_info& info = mvars.at(vals[n]);
 			// this should preserve the original 'relationship' otherwise lost
 			if (info.arg.tab != -1)
-				infer.map_type({ tab, n }, {info.arg.tab, info.arg.arg});
+				infer.map_type(
+					multi_arg{tab, n, arg::none, {}},
+					multi_arg{info.arg.tab, info.arg.arg, arg::none, {}});
 			else
 				o::dump() << L"interpolate, no tbl/arg?" << L"" << endl;
 		}
@@ -2336,7 +2477,7 @@ void tables::load_string(
 }*/
 
 void tables::get_var_ex(
-	tbl_arg arg, size_t args, size_t startbit, size_t bits, 
+	multi_arg arg, size_t args, size_t startbit, size_t bits,
 	bools& ex, const bitsmeta& bm)
 {
 	//size_t bits = bm.types[arg.arg].get_bits();
@@ -2347,19 +2488,19 @@ void tables::get_var_ex(
 	//	ex[bm.pos(b, arg, args)] = true;
 }
 
-// D: only called from get_rules, arg/args is rule header term's (i.e. =>table).
-void tables::get_sym(
-	int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta& bm) const{
-	// TODO: this needs Compound version
-	if (!bm.types[arg].isPrimitive()) throw 0;
-	size_t bits = bm.types[arg].primitive.bitness;// .get_bits();
-	for (size_t b = 0; b != bits; ++b)
-		r = r && bm.from_bit_re(b, bits, arg, args, val); // from_bit
-}
+//// D: only called from get_rules, arg/args is rule header term's (i.e. =>table).
+//void tables::get_sym(
+//	int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta& bm) const{
+//	// TODO: this needs Compound version
+//	if (!bm.types[arg].isPrimitive()) throw 0;
+//	size_t bits = bm.types[arg].primitive.bitness;// .get_bits();
+//	for (size_t b = 0; b != bits; ++b)
+//		r = r && bm.from_bit_re(b, bits, arg, args, val); // from_bit
+//}
 
 // proc_syms
 void tables::get_sym(
-	int_t val, tbl_arg arg, size_t args, size_t startbit, size_t bits,
+	int_t val, multi_arg arg, size_t args, size_t startbit, size_t bits,
 	spbdd_handle& r, c_bitsmeta& bm) const
 {
 	// bits are 'per compound-arg' (used to encode the val only)
@@ -2377,13 +2518,20 @@ ntable tables::get_table(const sig& s, const argtypes& types) {
 		// all types sharing same name/arity will be stored here,
 		// then we go through and test actual type signatures to match.
 		// (only one match is allowed, otherwise it'd have to be specified)
+		//deduced conflicting types for argument
+		//table: couldn't infer argument type
+		// couldn't infer template argument T
+		// deduced conflicting types for parameter T
 		for (ntable itab : it->second)
 			if (arg_type::isCompatible(tbls[itab].bm.types, types)) {
 				if (tab != -1)
-					throw runtime_error("get_table: ambiguous type resolution");
+					throw runtime_error(
+						"table: deduced conflicting types for argument");
 				tab = itab;
+				if (conflicting_types) // ...alowed but non-deterministic
+					return tab;
 			} else {
-				o::dump() << endl;
+				//o::dump() << endl;
 			}
 		if (tab != -1) return tab;
 	}
@@ -2781,8 +2929,9 @@ xperm tables::deltail(const alt& a, const bitsmeta& abm, const bitsmeta& tbm) {
 		size_t bits = abm.types[n].get_bits();
 		// alt args are only full vars, no need for startbit there, only tbl...
 		// and bits should be the same (? recheck)
-		size_t startbit = 
-			n >= a.hvarslen ? 0 : tbm.types[arg.arg].get_start(arg.subarg);
+		// rec comp: start is of a primitive, as vm_arg sub is it.i (of a prim)
+		size_t startbit = n >= a.hvarslen ? 
+			0 : tbm.types[arg.arg].get_start(multi_arg{arg}); //.subarg);
 		for (size_t b = 0; b != bits; ++b) {
 			//if (arg.tab != tab) ex[abm.pos(b, n, args)] = true;
 			//if (n >= newargs) ex[abm.pos(b, n, args)] = true;
@@ -2819,8 +2968,8 @@ uints tables::addtail(
 		// and bits should be the same (? recheck)
 		size_t bits = abm.types[n].get_bits();
 		// alt arguments are only full vars, no need for startbit there
-		size_t startbit =
-			n >= a.hvarslen ? 0 : tbm.types[arg.arg].get_start(arg.subarg);
+		size_t startbit = n >= a.hvarslen ? 
+			0 : tbm.types[arg.arg].get_start(multi_arg{arg});// .subarg);
 		for (size_t b = 0; b != bits; ++b) {
 			perm[tbm.pos(startbit + b, arg.arg, args)] = 
 				 abm.pos(b, n, newargs);
@@ -3103,7 +3252,17 @@ char tables::fwd() noexcept {
 		//static iterbdds bdditer(*this);
 		//static AddBits bdditer(*this);
 		addBits.clear();
-		addBits.permute_type({0, 0});
+		if (!infer.minvtyps.empty()) {
+			for (auto& entry : infer.minvtyps) {
+				multi_arg arg = entry.first;
+				auto& argbm = tbls[arg.tab].bm;
+				if (!argbm.types[arg.arg][arg].isPrimitive()) continue;
+				addBits.permute_type(arg);
+				break;
+				//addBits.permute_type({0, 0, arg::none, {}});
+				//addBits.permute_type({0, 0, arg::none, {0}});
+			}
+		}
 	}
 	return b;
 /*	if (!b) return false;
@@ -3162,12 +3321,14 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 
 tables::tables(dict_t dict_, bool bproof_, bool optimize_, bool bin_transform_,
 	bool print_transformed_, bool autotype_, bool dumptype_, bool addbit_,
-	bool bitsfromright_, bool optimize_memory_, bool sort_tables_) :
+	bool bitsfromright_, bool optimize_memory_, bool sort_tables_,
+	bool conflicting_types_) :
 	dict(move(dict_)), bproof(bproof_), optimize(optimize_),
 	bin_transform(bin_transform_), print_transformed(print_transformed_),
 	autotype(autotype_), dumptype(dumptype_), testaddbit(addbit_),
 	doemptyalts(true), optimize_memory(optimize_memory_),
-	sort_tables(sort_tables_), infer(*this), addBits(*this) {
+	sort_tables(sort_tables_), conflicting_types(conflicting_types_),
+	infer(*this), addBits(*this) {
 	// just a quick fix, we should have some global settings or something
 	bitsmeta::BITS_FROM_LEFT = !bitsfromright_;
 	if (optimize_memory)

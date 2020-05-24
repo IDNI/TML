@@ -59,7 +59,7 @@ struct body {
 	spbdd_handle q, tlast, rlast;
 	// TODO: to reinit get_perm on add_bit (well in the pfp/fwd), temp fix only.
 	// (not sure how else to consistently perm from old bits perm to new one?)
-	std::map<tbl_arg, int_t> poss;
+	std::map<multi_arg, int_t> poss;
 	// only for count, created on first use (rarely used)
 	bools inv;
 	bool operator<(const body& t) const {
@@ -208,7 +208,8 @@ private:
 	dict_t dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed, autotype = true, dumptype,
-		 testaddbit, doemptyalts, optimize_memory, sort_tables;
+		 testaddbit, doemptyalts, optimize_memory, sort_tables,
+		 conflicting_types = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -272,22 +273,22 @@ private:
 		const term_set& al, const term& h, alt_set& as, size_t altid);
 	rule get_rule(const raw_rule&);
 	
-	template<typename T> void get_sym(
-		int_t s, size_t n, size_t args, spbdd_handle& r, const T& at) const {
-		return get_sym(s, n, args, r, at.bm);
-	}
+	//template<typename T> void get_sym(
+	//	int_t val, size_t arg, size_t args, spbdd_handle& r, const T& at) const{
+	//	return get_sym(val, arg, args, r, at.bm);
+	//}
+	//void get_sym(
+	//	int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta&) const;
 	void get_sym(
-		int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta&) const;
-	void get_sym(
-		int_t val, tbl_arg arg, size_t args, size_t startbit, size_t bits,
+		int_t val, multi_arg arg, size_t args, size_t startbit, size_t bits,
 		spbdd_handle& r, c_bitsmeta& bm) const;
 
-	template<typename T> static void get_var_ex(
-		size_t arg, size_t args, bools& vbs, const T& at) {
-		return get_var_ex(arg, args, vbs, at.bm);
-	}
+	//template<typename T> static void get_var_ex(
+	//	size_t arg, size_t args, bools& vbs, const T& at) {
+	//	return get_var_ex(arg, args, vbs, at.bm);
+	//}
 	static void get_var_ex(
-		tbl_arg arg, size_t args, size_t startbit, size_t bits, 
+		multi_arg arg, size_t args, size_t startbit, size_t bits,
 		bools& vbs, const bitsmeta& bm);
 
 	void get_alt_ex(alt& a, const term& h) const;
@@ -299,21 +300,21 @@ private:
 
 	spbdd_handle from_sym(
 		size_t arg, size_t args, int_t val, ints vals, c_bitsmeta& bm) const; 
-	spbdd_handle from_sym(int_t val, tbl_arg arg, size_t args, size_t startbit, 
+	spbdd_handle from_sym(int_t val, multi_arg arg, size_t args, size_t startbit,
 						  size_t bits, const bitsmeta& bm) const;
 	spbdd_handle from_sym(size_t arg, size_t args, ints, c_bitsmeta&) const;
 
 	spbdd_handle from_sym_eq(
-		tbl_arg arg1, tbl_arg arg2, size_t args, c_bitsmeta& bm) const;
+		multi_arg arg1, multi_arg arg2, size_t args, c_bitsmeta& bm) const;
 
-	template<typename T> spbdd_handle leq_const(
-		ints vals, size_t arg, size_t args, const T& altbl) const {
-		return leq_const(vals, arg, args, altbl.bm);
-	}
+	//template<typename T> spbdd_handle leq_const(
+	//	ints vals, size_t arg, size_t args, const T& altbl) const {
+	//	return leq_const(vals, arg, args, altbl.bm);
+	//}
 	bdd_handles leq_const(
 		ints vals, size_t arg, size_t args, const bitsmeta& bm) const;
 	spbdd_handle leq_const(
-		int_t val, tbl_arg arg, size_t args, 
+		int_t val, multi_arg arg, size_t args,
 		const primtypes& types, const bitsmeta& bm) const;
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
 		size_t bits, size_t startbit, const bitsmeta& bm) const;
@@ -334,12 +335,13 @@ private:
 	void range(
 		size_t arg, size_t args, bdd_handles& v, const bitsmeta& bm) const {
 		bm.types[arg].iterate([&](arg_type::iter& it) {
-			range({ arg, it.i }, args, v, bm);
+			range({arg, it.i, it.path}, args, v, bm);
 			});
 	}
 
-	void range(tbl_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm) const;
-	spbdd_handle range(tbl_arg arg, ntable tab, const bitsmeta& bm);
+	void range(
+		multi_arg arg, size_t args, bdd_handles& v, const bitsmeta& bm) const;
+	spbdd_handle range(multi_arg arg, ntable tab, const bitsmeta& bm);
 
 	void range_clear_memo() {
 		range_memo.clear();
@@ -354,7 +356,7 @@ private:
 	//ntable add_table(sig s);
 
 	static uints get_perm(
-		const std::map<tbl_arg, int_t>& poss, const bitsmeta& tblbm, 
+		const std::map<multi_arg, int_t>& poss, const bitsmeta& tblbm,
 		const bitsmeta& altbm);
 	
 	uints get_perm(const term& t, const varmap& m, size_t len,
@@ -516,7 +518,7 @@ public:
 		bool bin_transform = false, bool print_transformed = false,
 		bool autotype = true, bool dumptype = false, bool addbit = false,
 		bool bitsfromright = true, bool optimize_memory = false,
-		bool sort_tables = false);
+		bool sort_tables = false, bool conflicting_types = false);
 	~tables();
 	size_t step() { return nstep; }
 	void add_prog(const raw_prog& p, const strs_t& strs);

@@ -1,0 +1,6 @@
+{
+A(b(c d)).
+#A(a(?x)) :- A(?x). # this fails with type resolution error, you need to decide...
+A(a(?x)) :- A(?x(?_ ?_)).
+#A(a(?x:int[2])) :- A(?x).
+}

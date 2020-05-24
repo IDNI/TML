@@ -121,7 +121,7 @@ bitsmeta tables::InitArithTypes(
 		if (types[i].primitive.type == base_type::NONE)
 			types[i].primitive.type = base_type::INT;
 		if (types[i].primitive.num == 0 && types[i].primitive.bitness == 0)
-			types[i].primitive.bitness = 16; // e.g., not sure
+			types[i].primitive.set_bitness(16); // e.g., not sure
 		// var arg needs to match the alt's related arg in type/bitness
 		// we don't have 'casting', and it most often wouldn't help if we did.
 		// i.e. all args that are related (alt's, body's, tbl's) need to match!

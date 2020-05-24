@@ -29,7 +29,7 @@ public:
 
 	void clear();
 	void permute_type(
-		const tbl_arg& intype, size_t nbits = 1, bool bitsready = false);
+		const multi_arg& intype, size_t nbits = 1, bool bitsready = false);
 
 private:
 	inline void init_target(const arg_type& type, bool bitsready, size_t nbits){
@@ -63,29 +63,29 @@ private:
 	#endif
 
 	alt* get_alt(const tbl_alt& talt) const;
-	bits_perm permute_table(const tbl_arg& targ, size_t nbits, bool bitsready);
+	bits_perm permute_table(const multi_arg& targ, size_t nbits, bool bitsready);
 	bool permute_bodies(const bits_perm& p, alt& a);
 
-	static xperm permex_add_bit(const std::map<tbl_arg, int_t>& poss, 
+	static xperm permex_add_bit(const std::map<multi_arg, int_t>& poss,
 								const bitsmeta& bm, const bitsmeta& abm);
 	
 	static perminfo add_bit_perm(const bitsmeta& bm, 
-		size_t arg, size_t args, size_t nbits, bool bitsready = false);
+		multi_arg arg, size_t args, size_t nbits, bool bitsready = false);
 	static perminfo add_bit_perm(const bitsmeta& oldbm, const bitsmeta& newbm,
-		size_t arg, size_t args, size_t nbits);
+		multi_arg arg, size_t args, size_t nbits);
 	static spbdd_handle add_bit(spbdd_handle h,
-		const perminfo& perm, size_t arg, size_t args, size_t nbits);
+		const perminfo& perm, multi_arg arg, size_t args, size_t nbits);
 	static spbdd_handle add_bit(spbdd_handle h, const bits_perm& p) {
 		return add_bit(h, p.perm, p.arg, p.args, p.nbits);
 	}
 
 	tables& rtables;
 
-	std::set<tbl_arg> rdone;
-	std::map<tbl_arg, perminfo> tblargperms;
+	std::set<multi_arg> rdone;
+	std::map<multi_arg, perminfo> tblargperms;
 	std::map<alt_arg, perminfo> altperms;
 	std::map<std::pair<alt*, size_t>, alt_arg> altdone;
-	std::set<std::pair<tbl_arg, alt*>> bodydone;
+	std::set<std::pair<multi_arg, alt*>> bodydone;
 
 	primitive_type target;
 };

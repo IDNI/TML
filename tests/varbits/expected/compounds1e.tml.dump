@@ -1,0 +1,10 @@
+A(b(c d) 2).
+A(a(c1 d1) 1).
+A(f(g h) 3).
+B(b(c d) 2).
+B(a(c1 d1) 1).
+B(f(g h) 3).
+C(a(b(c(d e f))) 1).
+D(a(b(c(d e f)))).
+C1(a(b(c d) e(f g)) 1).
+D1(a(b(c d) e(f g))).

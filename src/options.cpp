@@ -202,6 +202,8 @@ void options::setup() {
 	add_bool(L"addbit",  L"test addbit");
 	add_bool(L"optimize_memory", L"turn memory optimization on");
 	add_bool(L"sort_tables", L"sort tables during decompress");
+	add_bool(L"conflicting-types", L"allow type conflicts");
+	
 	add(option(option::type::BOOL, {L"inference", L"inf"}, option::value{true})
 		.description(L"type inference (or turn off to optimize/manual)"));
 	add(option(option::type::STRING, { L"name", L"n" },

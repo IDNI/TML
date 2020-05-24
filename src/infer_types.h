@@ -35,8 +35,8 @@ class infer_types {
 public:
 	// TODO: rework this, fwd refs just a temp solution to separate things a bit
 	tables& rtables;
-	std::map<tbl_arg, std::set<alt_arg>> minvtyps;
-	std::map<alt_arg, tbl_arg> mtyps;
+	std::map<multi_arg, std::set<alt_arg>> minvtyps;
+	std::map<alt_arg, multi_arg> mtyps;
 	// enumerates alts as they come, initially local, it needs to be here
 	// we need to support multiple progs and transform/after
 	std::map<ntable, size_t> altids4types;
@@ -54,12 +54,12 @@ public:
 	infer_types(tables& tables_);
 
 	// type inference related
-	bool get_root_type(const alt_arg& type, tbl_arg& root) const;
-	tbl_arg get_root_type(const tbl_arg& type) const;
-	tbl_arg get_fix_root_type(const tbl_arg& type);
-	bool map_type(tbl_arg from, tbl_arg to);
-	void map_type(alt_arg from, tbl_arg to);
-	//void map_type(tbl_arg to);
+	bool get_root_type(const alt_arg& type, multi_arg& root) const;
+	multi_arg get_root_type(const multi_arg& type) const;
+	multi_arg get_fix_root_type(const multi_arg& type);
+	bool map_type(multi_arg from, multi_arg to);
+	void map_type(alt_arg from, multi_arg to);
+	//void map_type(multi_arg to);
 	void propagate_types();
 	void get_types(const flat_prog& p);
 
@@ -77,14 +77,14 @@ private:
 			headerOnly(headerOnly) {}
 	};
 
-	void propagate_types(const tbl_arg& intype);
+	void propagate_types(const multi_arg& intype);
 	void get_alt_types(const term& h, size_t altid);
 	void get_alt_types(const term& h, const term_set& al, size_t altid);
 	void get_prog_types(const flat_prog& p);
 	void get_header_types(
-		tbl_arg targ, int_t val, const arg_type& type, alt_info& info);
+		multi_arg targ, int_t val, const arg_type& type, alt_info& info);
 	void get_term_types(
-		const term& t, tbl_arg targ, int_t val, const arg_type& type, 
+		const term& t, multi_arg targ, int_t val, const arg_type& type,
 		bitsmeta& bm, size_t tnums, alt_info& info);
 };
 
