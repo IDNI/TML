@@ -163,14 +163,80 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	return level;
 }
 
+
+void tables::print_dot(std::wstringstream &ss, const gnode &gh, std::set<std::pair<int,term>> &visit, int space) {
+
+	std::wstring sp;
+	for(int i=0; i< space; i++)	sp += L"\t";
+	
+	if(!visit.insert({gh.lev,gh.t}).second) return;
+
+	ss << std::endl << sp << size_t(&gh) << L"[label=\""<<gh.lev<< " "<< to_raw_term(gh.t)<< L"\"];";
+
+	for( const auto& x:gh.next) {
+		ss << std::endl << size_t(&gh) << L"->" << size_t(x)<< L';';
+		print_dot(ss, *x, visit, space+1);
+	}
+}
+
+bool tables::build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &g){
+	
+	std::wcout<<endl<<g.lev<<to_raw_term(g.t)<<endl;
+	for( int i = p.size()-1 ; i >= 0 ; i--) {
+		if( p[i].find(g.t) != p[i].end() && i == g.lev ) {
+			for( const auto &pfe : p[i][g.t]) 
+				for( const auto &nt : pfe.b) {
+					auto it = tg.find(nt);
+					if( it == tg.end()) {
+						gnode *cur = new gnode(nt.first,nt.second);
+						tg[nt] = cur; 
+						std::wcout<<endl<<nt.first<<to_raw_term(nt.second)<<endl;
+						g.next.emplace_back(cur);
+						build(tg, p, *cur);
+					}
+					else {
+						g.next.emplace_back( it->second);
+					}
+				}
+			}
+			
+	}	
+	return true;
+}
+
+gnode* tables::get_forest(std::wostream&os, const term& t, proof& p ) {
+
+	std::map<pair<int,term>, gnode*> tg;
+	set<std::pair<int,term>> v;
+
+	gnode* root =  nullptr;
+	for(int i =p.size()-1; i >=0; i-- )
+		if( p[i].find(t) != p[i].end() ) {
+			root = new gnode(i,t);
+			tg[{i,t}] = root;
+			build(tg, p, *root);
+			break;
+		}
+
+	std::wstringstream ss;
+	print_dot(ss, *root, v);
+	os<< L"digraph {" << endl<< ss.str() << endl<<L"}"<<endl;
+
+	return root;
+}
+
 bool tables::get_goals(wostream& os) {
 	proof p(levels.size());
 	set<term> s;
+	
 	for (const term& t : goals)
 		decompress(tbls[t.tab].tq && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s)
-		if (bproof) get_proof(g, p, levels.size() - 1);
+		if (bproof) {
+			get_proof(g, p, levels.size() - 1);
+			get_forest(os, g, p);
+		}
 		else os << to_raw_term(g) << L'.' << endl;
 	if (bproof) print(os, p);
 	return goals.size() || bproof;

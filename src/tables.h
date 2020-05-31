@@ -142,6 +142,16 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+
+struct gnode {
+	
+	const term &t;
+	int lev;
+	std::vector<gnode*> next;
+	gnode(int level, const term &_t): t(_t),lev(level){ }	
+};
+
+
 struct table {
 public:
 	size_t len, priority = 0;
@@ -257,7 +267,7 @@ private:
 	};
 
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
-
+	void print_dot(std::wstringstream &s, const gnode &gh, std::set<std::pair<int,term>> &visit, int level =0);
 	void print(std::wostream&, const proof_elem&);
 	void print(std::wostream&, const proof&);
 	void print(std::wostream&, const witness&);
@@ -533,6 +543,9 @@ public:
 #endif
 	void set_proof(bool v) { bproof = v; }
 	bool get_goals(std::wostream& os);
+	gnode* get_forest(std::wostream& os,const term& q, proof& p );
+	bool build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &cur);
+
 	dict_t& get_dict() { return dict; }
 
 	std::wostream& print_dict(std::wostream& os) const;
