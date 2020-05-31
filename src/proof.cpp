@@ -181,7 +181,7 @@ void tables::print_dot(std::wstringstream &ss, const gnode &gh, std::set<std::pa
 
 bool tables::build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &g){
 	
-	std::wcout<<endl<<g.lev<<to_raw_term(g.t)<<endl;
+	//std::wcout<<endl<<g.lev<<to_raw_term(g.t)<<endl;
 	for( int i = p.size()-1 ; i >= 0 ; i--) {
 		if( p[i].find(g.t) != p[i].end() && i == g.lev ) {
 			for( const auto &pfe : p[i][g.t]) 
@@ -190,7 +190,7 @@ bool tables::build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &
 					if( it == tg.end()) {
 						gnode *cur = new gnode(nt.first,nt.second);
 						tg[nt] = cur; 
-						std::wcout<<endl<<nt.first<<to_raw_term(nt.second)<<endl;
+					//	std::wcout<<endl<<nt.first<<to_raw_term(nt.second)<<endl;
 						g.next.emplace_back(cur);
 						build(tg, p, *cur);
 					}
