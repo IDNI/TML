@@ -142,13 +142,16 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
-
 struct gnode {
-	
+	enum gntype{
+		pack, symbol
+
+	} type;
 	const term &t;
 	int lev;
-	std::vector<gnode*> next;
-	gnode(int level, const term &_t): t(_t),lev(level){ }	
+	std::vector<gnode*> next;	
+	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level)
+	 { type = typ; }
 };
 
 
@@ -267,7 +270,7 @@ private:
 	};
 
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
-	void print_dot(std::wstringstream &s, const gnode &gh, std::set<std::pair<int,term>> &visit, int level =0);
+	void print_dot(std::wstringstream &s, gnode &gh, std::set<gnode *> &visit, int level =0);
 	void print(std::wostream&, const proof_elem&);
 	void print(std::wostream&, const proof&);
 	void print(std::wostream&, const witness&);
@@ -545,6 +548,9 @@ public:
 	bool get_goals(std::wostream& os);
 	gnode* get_forest(std::wostream& os,const term& q, proof& p );
 	bool build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &cur);
+	bool isvalid( const raw_term &rt);
+	bool prune_proof( proof &p);
+
 
 	dict_t& get_dict() { return dict; }
 

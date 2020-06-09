@@ -164,15 +164,17 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 }
 
 
-void tables::print_dot(std::wstringstream &ss, const gnode &gh, std::set<std::pair<int,term>> &visit, int space) {
+void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int space) {
 
 	std::wstring sp;
 	for(int i=0; i< space; i++)	sp += L"\t";
 	
-	if(!visit.insert({gh.lev,gh.t}).second) return;
-
-	ss << std::endl << sp << size_t(&gh) << L"[label=\""<<gh.lev<< " "<< to_raw_term(gh.t)<< L"\"];";
-
+	if(!visit.insert(&gh).second) return;
+	if( gh.type == gnode::gntype::symbol)
+		ss  << endl<< sp << size_t(&gh) << L"[label=\""<<gh.lev<< " "<< to_raw_term(gh.t)<< L"\"];";
+	else
+		ss  << endl<< sp << size_t(&gh) << L"[shape = \"point\" label=\""<< L"\"];";
+	
 	for( const auto& x:gh.next) {
 		ss << std::endl << size_t(&gh) << L"->" << size_t(x)<< L';';
 		print_dot(ss, *x, visit, space+1);
@@ -181,33 +183,94 @@ void tables::print_dot(std::wstringstream &ss, const gnode &gh, std::set<std::pa
 
 bool tables::build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &g){
 	
-	//std::wcout<<endl<<g.lev<<to_raw_term(g.t)<<endl;
 	for( int i = p.size()-1 ; i >= 0 ; i--) {
 		if( p[i].find(g.t) != p[i].end() && i == g.lev ) {
-			for( const auto &pfe : p[i][g.t]) 
+			
+			for( const auto &pfe : p[i][g.t]) {
+				g.next.emplace_back(new gnode(i, g.t, gnode::gntype::pack));
+
 				for( const auto &nt : pfe.b) {
 					auto it = tg.find(nt);
 					if( it == tg.end()) {
 						gnode *cur = new gnode(nt.first,nt.second);
 						tg[nt] = cur; 
-					//	std::wcout<<endl<<nt.first<<to_raw_term(nt.second)<<endl;
-						g.next.emplace_back(cur);
+	
+						g.next.back()->next.emplace_back(cur);
 						build(tg, p, *cur);
 					}
-					else {
-						g.next.emplace_back( it->second);
-					}
+					else g.next.back()->next.emplace_back( it->second);
+					
 				}
 			}
-			
+		}		
 	}	
 	return true;
 }
+bool tables::isvalid( const raw_term &rt) {
+	
+	if( rt.e.size() == 5  &&         // Symbol(pos1, pos2 )
+		rt.e[0].type == elem::SYM &&
+		rt.e[2].type == elem::NUM &&
+		rt.e[3].type == elem::NUM &&
+		rt.e[3].num < rt.e[2].num  ) {
+		
+			return false;
+	} 
+	else if( rt.e.size() == 16  &&         // str(((2))('+')((5)))
+		rt.e[0].type == elem::SYM &&
+		rt.e[4].type == elem::NUM &&
+		rt.e[12].type == elem::NUM &&
+		((rt.e[12].num - rt.e[4].num) != 1)  ) {	
+			return false;				
+		}
+	return true;
+}
+bool tables::prune_proof( proof &p) {
 
+	bool done=false;
+	int cheadrem=0, cbodyrem=0;
+	for( int i = 0 ; i < p.size() ; i++) {
+		for( auto mit = p[i].begin(); mit!= p[i].end();) {		
+			raw_term rt = to_raw_term(mit->first);
+			//std::wcout<<endl<<rt<<endl;
+			if(!isvalid(rt)) {
+				std::wcout<<endl<<L"Pruning " <<rt<<endl;
+				mit = p[i].erase(mit);
+				cheadrem++;
+			} 
+			else {
+				for( auto pfeit = mit->second.begin(); pfeit!= mit->second.end();) {
+					bool btvalid = true;
+					for( const auto &nt : pfeit->b) {
+						raw_term brt = to_raw_term(nt.second);
+						bool ispresent =false;
+						if( bdd_handle::F != (tbls[nt.second.tab].tq && from_fact(nt.second)) )
+							ispresent = true;		 
+						btvalid = isvalid(brt);
+						
+						if(!btvalid) {
+							std::wcout<<endl<<L"Pruning proof element body of "<<ispresent<<L" " <<rt<<L" due to "<<brt<<endl;
+							pfeit = mit->second.erase(pfeit);
+							cbodyrem++;
+							break;
+						} 
+					}
+					if(btvalid)  pfeit++;
+				}
+				if(mit->second.size() == 0 ) 
+					mit = p[i].erase(mit), cheadrem++;
+				else mit++;
+			}
+		}
+	}
+	std::wcout<<endl<<L"Pruned proof : headcount, bodycount:"<< cheadrem << "," <<cbodyrem<<endl;
+	if(cheadrem || cbodyrem) return true;
+	else return false;
+}
 gnode* tables::get_forest(std::wostream&os, const term& t, proof& p ) {
 
 	std::map<pair<int,term>, gnode*> tg;
-	set<std::pair<int,term>> v;
+	set<gnode*> v;
 
 	gnode* root =  nullptr;
 	for(int i =p.size()-1; i >=0; i-- )
@@ -235,6 +298,7 @@ bool tables::get_goals(wostream& os) {
 	for (const term& g : s)
 		if (bproof) {
 			get_proof(g, p, levels.size() - 1);
+			prune_proof( p );
 			get_forest(os, g, p);
 		}
 		else os << to_raw_term(g) << L'.' << endl;
