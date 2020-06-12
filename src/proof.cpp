@@ -232,9 +232,8 @@ bool tables::prune_proof( proof &p) {
 	for( int i = 0 ; i < p.size() ; i++) {
 		for( auto mit = p[i].begin(); mit!= p[i].end();) {		
 			raw_term rt = to_raw_term(mit->first);
-			//std::wcout<<endl<<rt<<endl;
 			if(!isvalid(rt)) {
-				std::wcout<<endl<<L"Pruning " <<rt<<endl;
+				DBG(o::dbg()<<endl<<L"Pruning " <<rt<<endl;)
 				mit = p[i].erase(mit);
 				cheadrem++;
 			} 
@@ -243,13 +242,12 @@ bool tables::prune_proof( proof &p) {
 					bool btvalid = true;
 					for( const auto &nt : pfeit->b) {
 						raw_term brt = to_raw_term(nt.second);
-						bool ispresent =false;
-						if( bdd_handle::F != (tbls[nt.second.tab].tq && from_fact(nt.second)) )
-							ispresent = true;		 
+						bool ispresent = (bdd_handle::F != (tbls[nt.second.tab].tq && from_fact(nt.second)) );
+								 
 						btvalid = isvalid(brt);
 						
 						if(!btvalid) {
-							std::wcout<<endl<<L"Pruning proof element body of "<<ispresent<<L" " <<rt<<L" due to "<<brt<<endl;
+							DBG(o::dbg()<<endl<<L"Pruning proof element body of "<<ispresent<<L" " <<rt<<L" due to "<<brt<<endl;)
 							pfeit = mit->second.erase(pfeit);
 							cbodyrem++;
 							break;
@@ -263,7 +261,7 @@ bool tables::prune_proof( proof &p) {
 			}
 		}
 	}
-	std::wcout<<endl<<L"Pruned proof : headcount, bodycount:"<< cheadrem << "," <<cbodyrem<<endl;
+	DBG(o::dbg()<<endl<<L"Pruned proof : headcount, bodycount:"<< cheadrem << "," <<cbodyrem<<endl;)
 	if(cheadrem || cbodyrem) return true;
 	else return false;
 }
@@ -271,18 +269,18 @@ gnode* tables::get_forest(std::wostream&os, const term& t, proof& p ) {
 
 	std::map<pair<int,term>, gnode*> tg;
 	set<gnode*> v;
-
+	std::wstringstream ss;
 	gnode* root =  nullptr;
 	for(int i =p.size()-1; i >=0; i-- )
 		if( p[i].find(t) != p[i].end() ) {
 			root = new gnode(i,t);
-			tg[{i,t}] = root;
-			build(tg, p, *root);
-			break;
+			if( tg.find({i,t}) == tg.end() ) {
+				tg[{i,t}] = root; 
+				build(tg, p, *root);
+				print_dot(ss, *root, v);
+			}
+			else delete root;
 		}
-
-	std::wstringstream ss;
-	print_dot(ss, *root, v);
 	os<< L"digraph {" << endl<< ss.str() << endl<<L"}"<<endl;
 
 	return root;
