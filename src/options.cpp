@@ -78,9 +78,8 @@ bool options::enabled(const wstring &name) const {
 		case option::type::BOOL:   return o.get_bool();
 		case option::type::INT:    return o.get_int() > 0;
 		case option::type::STRING: {
-			return output::exists(o.name())
-				? !output::is_null(o.name())
-				: o.get_string() != L"";
+			output* t = outputs::get(o.name());
+			return t ? !t->is_null() : o.get_string() != L"";
 		}
 		default: ;
 	}
@@ -127,12 +126,12 @@ done:
 #define add_bool2(n1,n2,desc) add(option(option::type::BOOL, \
 		{(n1),(n2)}).description(desc))
 #define add_output(n,desc) add(option(option::type::STRING, {n}, \
-		[](const option::value& v) { \
-			output::set_target(n,v.get_string()); \
+		[this](const option::value& v) { \
+			oo->target(n, v.get_string()); \
 		}).description((desc)))
 #define add_output_alt(n,alt,desc) add(option(option::type::STRING, {n, alt}, \
-		[](const option::value& v) { \
-			output::set_target(n,v.get_string()); \
+		[this](const option::value& v) { \
+			oo->target(n, v.get_string()); \
 		}).description((desc)))
 
 void options::setup() {
@@ -198,7 +197,7 @@ void options::setup() {
 	add_bool(L"optimize",L"optimize and show more benchmarks");
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
-			output::set_name(v.get_string());
+			outputs::name(v.get_string());
 		})
 		.description(L"name used for @name output"));
 	add_output    (L"dump",        L"dump output     (@stdout by default)");

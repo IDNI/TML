@@ -71,7 +71,7 @@ struct option {
 	const wstrings& names() const { return n; }
 	type get_type() const { return t; }
 	value get() const { return v; }
-	bool          is_output () const { return output::exists(name()); }
+	bool          is_output () const { return outputs::exists(name()); }
 	bool          is_input  () const { return n[0]==L"input"||n[0]==L"i"; }
 	int           get_int   () const { return v.get_int(); };
 	bool          get_bool  () const { return v.get_bool(); };
@@ -85,11 +85,9 @@ struct option {
 		switch (t) {
 			case INT: if (s != L"") v.set(std::stoi(s)); break;
 			case BOOL: parse_bool(s); break;
-			case STRING:
-				if (s == L"") {
-					if (is_output())
-						v.set(std::wstring(L"@stdout"));
-				} else v.set(s); break;
+			case STRING: if (s != L"") v.set(s);
+				else if (is_output()) v.set(L"@stdout");
+				break;
 			default: throw 0;
 		}
 		if (e) e(v);
@@ -145,21 +143,16 @@ private:
 };
 
 class options {
-	friend std::wostream& operator<<(std::wostream&, const options&);
-	std::map<std::wstring, option> opts = {};
-	std::map<std::wstring, std::wstring> alts = {};
-	std::vector<std::wstring> args;
-	std::wstring input_data = L"";
-	bool parse_option(const wstrings &wargs, const size_t &i);
-	bool is_value(const wstrings &wargs, const size_t &i);
-	void setup();
-	void init_defaults();
 public:
-	options()                      { setup(); }
-	options(int argc, char** argv) { setup(); parse(argc, argv); }
-	options(strings args)          { setup(); parse(args); }
-	options(wstrings args)         { setup(); parse(args); }
-	int argc()               const { return args.size(); }
+	options() : options(0) { }
+	options(outputs *oo) : oo(oo) { setup(); }
+	options(int argc, char** argv, outputs *oo = 0) : oo(oo) {
+		setup(); parse(argc, argv); }
+	options(strings args, outputs *oo = 0) : oo(oo) {
+		setup(); parse(args); }
+	options(wstrings args, outputs *oo = 0) : oo(oo) {
+		setup(); parse(args); }
+	int argc() const { return args.size(); }
 	std::wstring argv(int n) const { if (n<argc()) return args[n]; throw 0;}
 	void add(option o);
 	bool get(std::wstring name, option& o) const;
@@ -168,6 +161,7 @@ public:
 	}
 	template <typename T>
 	void set(const std::wstring &name, T val);
+	void set_outputs(outputs* oo);
 	void parse(int argc, char** argv, bool internal = false);
 	void parse(strings sargs,         bool internal = false);
 	void parse(wstrings wargs,        bool internal = false);
@@ -181,6 +175,17 @@ public:
 	void help(std::wostream& os) const;
 	const std::wstring& input() const { return input_data; }
 	void add_input_data(const std::wstring& data) { input_data += data; }
+private:
+	friend std::wostream& operator<<(std::wostream&, const options&);
+	outputs* oo;
+	std::map<std::wstring, option> opts = {};
+	std::map<std::wstring, std::wstring> alts = {};
+	std::vector<std::wstring> args;
+	std::wstring input_data = L"";
+	bool parse_option(const wstrings &wargs, const size_t &i);
+	bool is_value(const wstrings &wargs, const size_t &i);
+	void setup();
+	void init_defaults();
 };
 
 std::wostream& operator<<(std::wostream&, const std::map<std::wstring,option>&);

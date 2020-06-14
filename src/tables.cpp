@@ -1802,7 +1802,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			// D: args are now [0,1,...] (we no longer have the bltin as 0 arg)
 			if (a.bltinargs.size() >= 2) ++n,
 				ou = lexeme2str(dict.get_sym(a.bltinargs[0]));
-			wostream& os = output::to(ou);
+			wostream& os = o::to(ou);
 			do {
 				int_t arg = a.bltinargs[n++];
 				if      (arg < 0) os << get_var_lexeme(arg) << endl;

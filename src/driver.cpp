@@ -33,16 +33,6 @@ using namespace std;
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p);
 
-namespace o {
-wostream& out() { static wostream& os = output::to(L"output");      return os; }
-wostream& err() { static wostream& os = output::to(L"error");       return os; }
-wostream& inf() { static wostream& os = output::to(L"info");        return os; }
-wostream& dbg() { static wostream& os = output::to(L"debug");       return os; }
-wostream& repl(){ static wostream& os = output::to(L"repl-output"); return os; }
-wostream& ms()  { static wostream& os = output::to(L"benchmarks");  return os; }
-wostream& dump(){ static wostream& os = output::to(L"dump");        return os; }
-}
-
 void driver::transform_len(raw_term& r, const strs_t& s) {
 	for (size_t n = 1; n < r.e.size(); ++n)
 		if (	r.e[n].type == elem::SYM && r.e[n].e == L"len" &&
@@ -63,14 +53,6 @@ size_t driver::load_stdin() {
 	wstringstream ss;
 	std_input = ((ss << wcin.rdbuf()), ss.str());
 	return std_input.size();
-}
-
-wstring s2ws(const std::string& s) {
-	return std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(s);
-}
-
-string ws2s(const wstring& s) {
-	return std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(s);
 }
 
 void unquote(wstring& str);
@@ -152,9 +134,9 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 }
 
 void driver::output_pl(const raw_prog& p) const {
-	if (opts.enabled(L"xsb"))     print_xsb    (output::to(L"xsb"),     p);
-	if (opts.enabled(L"swipl"))   print_swipl  (output::to(L"swipl"),   p);
-	if (opts.enabled(L"souffle")) print_souffle(output::to(L"souffle"), p);
+	if (opts.enabled(L"xsb"))     print_xsb    (o::to(L"xsb"),     p);
+	if (opts.enabled(L"swipl"))   print_swipl  (o::to(L"swipl"),   p);
+	if (opts.enabled(L"souffle")) print_souffle(o::to(L"souffle"), p);
 }
 
 bool driver::prog_run(raw_progs& rp, size_t n, size_t steps,
@@ -196,7 +178,7 @@ void driver::new_sequence() {
 	raw_prog &p = rp.p[pd.n];
 	for (const wstring& s : str_bltins) p.builtins.insert(get_lexeme(s));
 	output_pl(p);
-	if (opts.enabled(L"t")) output::to(L"transformed")
+	if (opts.enabled(L"t")) o::to(L"transformed")
 		<< L"# Transformed program " << pd.n + 1 << L":" << endl
 		<< L'{' << endl << p << L'}' << endl;
 }
@@ -249,28 +231,14 @@ void driver::info(wostream& os) {
 	//DBG(os<<L"# opts:    \t" << opts << endl;)
 }
 
-void driver::init() {
-	output::create(L"output",      L".out.tml");
-	output::create(L"error",       L".error.log");
-	output::create(L"info",        L".info.log");
-	output::create(L"debug",       L".debug.log");
-	output::create(L"dump",        L".dump.tml");
-	output::create(L"benchmarks",  L".benchmarks.log"); // o::ms()
-	output::create(L"transformed", L".trans.tml");
-	output::create(L"repl-output", L".repl.out.log");
-	output::create(L"xsb",         L".P");
-	output::create(L"swipl",       L".pl");
-	output::create(L"souffle",     L".souffle");
-	bdd::init();
-}
-
 driver::driver(wstring s, options o) : rp(), opts(o) {
 	dict_t dict;
 	// parse outside the rp's ctor
 	rp.parse(s, dict);
 	// we don't need the dict any more, tables owns it from now on...
 	tbl = new tables(move(dict), opts.enabled(L"proof"), 
-		opts.enabled(L"optimize"), opts.enabled(L"bin"), opts.enabled(L"t"));
+		opts.enabled(L"optimize"), opts.enabled(L"bin"),
+		opts.enabled(L"t"));
 	set_print_step(opts.enabled(L"ps"));
 	set_print_updates(opts.enabled(L"pu"));
 	set_populate_tml_update(opts.enabled(L"tml_update"));

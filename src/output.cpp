@@ -10,14 +10,116 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "driver.h"
 #include <iostream>
 #include <sstream>
+
+#include "input.h"
+#include "output.h"
+#include "options.h"
+#include "tables.h"
+
 using namespace std;
 
 wostream wcnull(0);
-map<std::wstring, output> output::outputs = {};
-wstring output::named = L"";
+const std::map<output::type_t, std::wstring> output::type_names_ = {
+	{ NONE,   L"@null"   },
+	{ STDOUT, L"@stdout" },
+	{ STDERR, L"@stderr" },
+	{ BUFFER, L"@buffer" },
+	{ NAME,   L"@name"   }
+};
+outputs* outputs::o_ = 0;
+
+namespace o {
+	void init_defaults(outputs* oo) { oo->init_defaults(); }
+	void use          (outputs* oo) { oo->use(); }
+	wostream& to(const wstring& n) { return outputs::to(n); }
+	wostream& out()  { return outputs::out();  }
+	wostream& err()  { return outputs::err();  }
+	wostream& inf()  { return outputs::inf();  }
+	wostream& dbg()  { return outputs::dbg();  }
+	wostream& repl() { return outputs::repl(); }
+	wostream& ms()   { return outputs::ms();   }
+	wostream& dump() { return outputs::dump(); }
+}
+
+output::type_t output::get_type(std::wstring t) {
+	t = t == L"" ? L"@stdout" : t;
+	for (auto& it : output::type_names_)
+		if (it.second == t) return it.first;
+	return FILE;
+}
+
+output::type_t output::target(const std::wstring t) {
+	type_ = t == L"" ? STDOUT : get_type(t);
+	bool open_path_before_finish = false;
+	switch (type_) {
+		case NONE:                os(&wcnull);     break;
+		case STDOUT:              os(&std::wcout); break;
+		case STDERR:              os(&std::wcerr); break;
+		case BUFFER:
+			buffer_.str(L""); os(&buffer_); break;
+		case NAME:
+			{
+				std::wstring name = outputs::named();
+				if (!name.size())
+					return o::err()<<L"output '"
+					<<name_<<L"' targeting @name without "
+					L"setting name"<<std::endl, os(&wcnull),
+					NONE;
+				std::wstringstream ss; ss << name << ext_;
+				path_ = ss.str();
+			}
+			open_path_before_finish = true;
+			break;
+		case FILE:
+			path_ = t, open_path_before_finish = true;
+			break;
+		default:
+			throw 0;
+	}
+	if (open_path_before_finish)
+		file_.open(ws2s(path_), ofstream::binary | ofstream::app),
+		os(&file_);
+	return type_;
+}
+
+void outputs::update_pointers(const std::wstring& n, output* out) {
+	if      (n == L"output")      out_  = out;
+	else if (n == L"error")       err_  = out;
+	else if (n == L"info")        inf_  = out;
+	else if (n == L"debug")       dbg_  = out;
+	else if (n == L"repl-output") repl_ = out;
+	else if (n == L"benchmarks")  ms_   = out;
+	else if (n == L"dump")        dump_ = out;
+}
+
+bool outputs::add(sp_output out) {
+	wstring n = out->name();
+	auto it = find(n);
+	if (it != end()) {
+		wcout << L"already exists: " << n << L" target: " << out->target() << endl;
+		it->second->target(out->target());
+		out = it->second;
+	} else emplace(n, out);
+	o_->update_pointers(n, out.get());
+	return true;
+}
+
+wostream& outputs::to(const std::wstring& n) {
+	output* o = get(n);
+	if (!o) throw 0;
+	return o->os();
+}
+
+void outputs::target(const std::wstring& n, const std::wstring& t) {
+	output* o = get(n);
+	if (o) o->target(t);
+	else {
+		wcout << L"target not exists: " << n << endl,
+		throw 0;
+	}
+}
 
 wostream& operator<<(wostream& os, const pair<cws, size_t>& p) {
 	for (size_t n = 0; n != p.second; ++n) os << p.first[n];

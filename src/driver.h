@@ -110,7 +110,6 @@ class driver {
 public:
 	bool result = true;
 	options opts;
-	static void init();
 	driver(options o);
 	driver(FILE *f, options o);
 	driver(std::wstring, options o);
@@ -156,7 +155,6 @@ public:
 	std::wostream& print_xsb(std::wostream&, const raw_prog&) const;
 	std::wostream& print_swipl(std::wostream&, const raw_prog&) const;
 	std::wostream& print_souffle(std::wostream&, const raw_prog&) const;
-	void output_ast() const;
 	std::wostream& print_ast(std::wostream&) const;
 	std::wostream& print_ast_json(std::wostream&) const;
 	std::wostream& print_ast_xml(std::wostream&) const;

@@ -45,6 +45,7 @@ set(TML_SOURCES
 	tables.cpp
 	tables_ext.cpp
 	transform.cpp
+	utils.cpp
 )
 
 set(CLI_HEADERS
