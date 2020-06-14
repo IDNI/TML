@@ -676,7 +676,7 @@ void raw_progs::parse(const std::wstring& s, dict_t& dict, bool newseq) {
 		size_t pos = 0;
 		lexemes l = prog_lex(wcsdup(s.c_str()));
 		if (!l.size()) return;
-		auto prepare_builtins = [&dict, this](raw_prog& x) {
+		auto prepare_builtins = [&dict](raw_prog& x) {
 			// BLTINS: prepare builtins (dict)
 			for (const wstring& s : str_bltins)
 				x.builtins.insert(dict.get_lexeme(s));

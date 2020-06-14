@@ -39,8 +39,9 @@ void repl::prompt(wostream& os) {
 
 void repl::redrive(wstring src) {
 	fin = false;
-	if (d) free(d);
-	d = src == L"" ? new driver(o) : new driver(src, o);
+	d = src == L""
+		? std::make_unique<driver>(o)
+		: std::make_unique<driver>(src, o);
 }
 
 void repl::restart(wostream& os) {
@@ -219,5 +220,4 @@ void repl::loop() {
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
-	if (d) free(d);
 }

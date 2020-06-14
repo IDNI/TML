@@ -34,7 +34,7 @@ protected:
 class repl {
 	options& o;
 	std::wostream& os;
-	driver *d = 0;
+	std::unique_ptr<driver> d = 0;
 	std::unique_ptr<udp> up_udp;
 	wistream_async_reader wcin_reader{&std::wcin};
 	bool fin = false;

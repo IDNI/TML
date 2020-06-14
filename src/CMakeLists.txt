@@ -17,7 +17,6 @@ include(tml-common)
 
 set(TML_HEADERS
 	TML.h
-	async_reader.h
 	bdd.h
 	defs.h
 	dict.h
@@ -26,13 +25,10 @@ set(TML_HEADERS
 	input.h
 	options.h
 	output.h
-	repl.h
 	tables.h
-	udp.h
 )
 
 set(TML_SOURCES
-	proof.cpp
 	bdd.cpp
 	bdd_ext.cpp
 	binary.cpp
@@ -43,11 +39,23 @@ set(TML_SOURCES
 	output.cpp
 	print_prolog.cpp
 	print_souffle.cpp
+	proof.cpp
 	repl.cpp
 	save_csv.cpp
 	tables.cpp
 	tables_ext.cpp
 	transform.cpp
+)
+
+set(CLI_HEADERS
+	async_reader.h
+	repl.h
+	udp.h
+)
+
+set(CLI_SOURCES
+	main.cpp
+	repl.cpp
 )
 
 set(TML_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
@@ -67,10 +75,10 @@ set(TML_COMPILE_OPTIONS
 )
 set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
 
-# pthreads
-###########
+# pthreads - not REQUIRED for static/shared library
+####################################################
 set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+find_package(Threads)
 
 # object library
 #################
@@ -137,7 +145,7 @@ add_executable(tml)
 target_setup(tml)
 target_compile_options(tml PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml    PRIVATE ${TML_LINK_OPTIONS})
-target_sources(tml         PRIVATE main.cpp)
+target_sources(tml         PRIVATE ${CLI_SOURCES} ${CLI_HEADERS})
 target_link_libraries(tml  TMLs Threads::Threads)
 
 
@@ -148,7 +156,7 @@ add_executable(tml_shared)
 target_setup(tml_shared)
 target_compile_options(tml_shared PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml_shared    PRIVATE ${TML_LINK_OPTIONS})
-target_sources(tml_shared         PRIVATE main.cpp)
+target_sources(tml_shared         PRIVATE ${CLI_SOURCES} ${CLI_HEADERS})
 target_link_libraries(tml_shared  TMLso Threads::Threads)
 exclude(tml_shared)
 
