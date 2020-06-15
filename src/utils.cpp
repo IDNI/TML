@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include <locale>
 #include <codecvt>
+#include <filesystem>
 
 #include "defs.h"
 
@@ -23,4 +24,14 @@ wstring s2ws(const std::string& s) {
 
 string ws2s(const wstring& s) {
 	return wstring_convert<codecvt_utf8<wchar_t>>().to_bytes(s);
+}
+
+int temp_fileno() {
+        return fileno(std::tmpfile());
+}
+
+std::string filename(int fd) {
+        return std::filesystem::read_symlink(
+                        std::filesystem::path("/proc/self/fd") /
+                                std::to_string(fd));
 }

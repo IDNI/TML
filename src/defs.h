@@ -71,8 +71,11 @@ typedef size_t nlevel;
 #define hfalse bdd_handle::F
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 void parse_error(std::wstring e, lexeme l);
+
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
+std::string filename(int fd);
+int temp_fileno();
 
 typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
