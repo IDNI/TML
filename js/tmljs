@@ -7,28 +7,28 @@ const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);
 
 tml.onRuntimeInitialized = _ => {
-	// load stuff from tml
-	const { bdd, driver, options, output, strings } = tml;
+	// import from tml
+	const { bdd, driver, options, outputs, strings } = tml;
 
-	// initialize bdd database and driver's outputs
+	// initialize bdd database
 	bdd.init();
-	driver.init();
 
-	// create vector<string> arg_strings
+	// create vector<string> arg_strings from command line args
 	const arg_strings = new strings();
 	args.forEach(arg => arg_strings.push_back(arg));
 
-	// create options object and parse args
-	const o = new options();
-	o.parse(arg_strings, false);
-
+	// create outputs and parse options
+	const oo = new outputs();
+	const o = new options(arg_strings, outputs.ref(oo));
 	// console.log('args:', o.to_string());
 
 	// create a driver and run program
-	const d = driver.create(program, o);
+	const d = new driver(program, o);
+	d.run(0, 0, false);
 
 	if (!d.result) console.log('unsat');
+	else d.dump();
 
-	// delete created objects
-	d.delete(); o.delete(); arg_strings.delete();
+		// delete created objects
+	d.delete(); o.delete(); oo.delete(); arg_strings.delete();
 };

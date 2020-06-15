@@ -13,6 +13,7 @@ include(tml-common)
 set(JSLIB_SOURCES
 	../src/bdd.cpp
 	../src/bdd.h
+	../src/bdd_ext.cpp
 	../src/binary.cpp
 	../src/defs.h
 	../src/dict.cpp
@@ -22,6 +23,7 @@ set(JSLIB_SOURCES
 	../src/err.h
 	../src/input.cpp
 	../src/input.h
+	../src/memory_map.h
 	../src/options.cpp
 	../src/options.h
 	../src/output.cpp
@@ -32,7 +34,10 @@ set(JSLIB_SOURCES
 	../src/save_csv.cpp
 	../src/tables.cpp
 	../src/tables.h
+	../src/tables_ext.cpp
+	../src/term.h
 	../src/transform.cpp
+	../src/utils.cpp
 )
 
 set(JSLIB_COMPILE_OPTIONS
@@ -48,6 +53,7 @@ string(APPEND JSLIB_LINK_OPTIONS " -s WARN_UNALIGNED=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s MODULARIZE_INSTANCE=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_NAME='tml'")
 string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_CATCHING=0")
+string(APPEND JSLIB_LINK_OPTIONS " -s ERROR_ON_UNDEFINED_SYMBOLS=0")
 
 # tml.js library
 add_executable(tml)

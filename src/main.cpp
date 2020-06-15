@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
 			(size_t)o.get_int(L"break"),
 			o.enabled(L"break-on-fp"));
 		if (o.enabled(L"dump") && d.result &&
-			!d.out_goals(o::dump())) d.out(o::dump());
+			!d.out_goals(o::dump())) d.dump();
 		if (o.enabled(L"dict")) d.out_dict(o::inf());
 		if (o.enabled(L"csv")) d.save_csv();
 #ifdef WITH_THREADS
