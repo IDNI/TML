@@ -12,13 +12,17 @@
 // modified over time by the Author.
 #ifndef __MEMORY_MAP_H__
 #define __MEMORY_MAP_H__
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>   // TODO: MSVC mmap impl
 #include <exception>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#endif
 
 #include "defs.h"
 #include "output.h"
@@ -36,19 +40,15 @@ public:
 		: mode_(m), state_(CLOSED), filename_(filename), size_(s)
 	{
 		if (mode_ == MMAP_NONE) return;
-		int oflag = m == MMAP_READ ? O_RDONLY : O_RDWR;
-		DBG(std::wcout<<L"memory_map "//<<s2ws(std::string(filename_))
-		 	<<" size: "<<size_<<" mode: "<<mode_
-		 	<<" oflag: "<<oflag
-		 	<<" do_open: "<<do_open<<" do_map: "<<do_map;)
-		if (!size_) size_ = (size_t)file_size(); // autodetect map size
-		DBG(std::wcout<<L" new_size: "<<size_<<std::endl;)
-		if (do_open || do_map) if (open(oflag) == -1) return;
+		//DBG(o::dbg()<<L"memory_map "//<<s2ws(std::string(filename_))
+		// 	<<L" size: "<<size_<<L" mode: "<<mode_
+		// 	<<L" do_open: "<<do_open<<L" do_map: "<<do_map<<L"\n";)
+		if (do_open || do_map) if (open() == -1) return;
 		if (do_map) map();
 	}
 	~memory_map() { if (state_ != CLOSED) close(); }
 	size_t size() { return size_; }
-	void reset_error() { error = false, error_message = L""; }
+	void clear_error() { error = false, error_message = L""; }
 	void* data() {
 		if (state_ != MAPPED) {
 			err(L"not MAPPED, cannot retrieve data pointer");
@@ -56,64 +56,107 @@ public:
 		}
 		return data_;
 	}
-	int open(int oflag = O_RDONLY, int open_mode = 0644) {
-		//DBG(std::wcout<<L"memory_map: open "<<s2ws(std::string(filename_))<<" size: "
-		//	<<size_<<" mode: "<<mode_<<" oflag: "<<oflag<<std::endl;)
+	int open() {
+		//DBG(o::dbg()<<L"memory_map: open "<<s2ws(std::string(filename_))<<" size: "
+		//	<<size_<<" mode: "<<mode_<<std::endl;)
 		if (mode_  == MMAP_NONE) return err(L"none mmap - cannot");
 		if (state_ != CLOSED)    return err(L"file is already opened");
-		if ((oflag & O_WRONLY || oflag & O_RDWR) && !file_exists())
+#ifdef _WIN32
+		if (filename_ == "") create_temp();
+		fh_ = CreateFileA(filename_.c_str(),
+			mode_ == MMAP_READ ? GENERIC_READ
+				: GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+		if (fh_ == INVALID_HANDLE_VALUE)
+			return err(L"cannot open file for memory map");
+#else
+		if (mode_ == MMAP_WRITE && !file_exists())
 			create();
 		else {
-			fd_ = ::open(filename_.c_str(), oflag, open_mode);
+			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
+				O_RDONLY : O_RDWR, 0644);
     			if (fd_ == -1) return err(errno,
 			    		L"cannot open file for memory map");
-			if (oflag & O_WRONLY || oflag & O_RDWR)
+			if (mode_ == MMAP_WRITE)
 				if (truncate() == -1) return -1;
 		}
-		//DBG(std::wcout<<L"memory_map: changing state to UNMAPPED (open)" << std::endl;)
+#endif
 		state_ = UNMAPPED;
-		return fd_;
+		if (!size_) { // autodetect map size
+			size_ = file_size();
+			//DBG(o::dbg()<<L" new_size: "<<size_<<std::endl;)
+		}
+		return 0;
 	}
 	int map() {
-		int prot = mode_==MMAP_READ ? PROT_READ : PROT_READ|PROT_WRITE;
-		//DBG(std::wcout<<L"memory_map: map "<<s2ws(std::string(filename_))
-		//	<<" size: "<<size_<<" prot: "<<prot
-		//	<<std::endl;)
 		if (state_ != UNMAPPED)
 			return err(L"file is not opened or already mapped");
-		data_ = ::mmap(0, size_, prot, MAP_SHARED, fd_, 0);
-		if (data_ == MAP_FAILED) return data_=0,err(errno, L"mmap err");
-		//DBG(std::wcout<<L"memory_map: changing state to MAPPED data: "<<&data_<<std::endl;)
+#ifdef _WIN32
+		mh_ = ::CreateFileMapping(fh_, 0, mode_ == MMAP_READ ?
+			PAGE_READONLY : PAGE_READWRITE, 0, size_, 0);
+    		if (mh_ == INVALID_HANDLE_VALUE)
+			return data_ = 0, err(L"mmap err mfd");
+		data_ = ::MapViewOfFile(mh_, mode_ == MMAP_READ ? FILE_MAP_READ
+			: FILE_MAP_WRITE, 0, 0, size_);
+		if (data_ == 0) {
+			::CloseHandle(mh_);
+			return err(GetLastError(), L"mmap err");
+		}
+#else
+		//DBG(o::dbg()<<L"memory_map: map "<<s2ws(std::string(filename_))
+		//	<<L" size: "<<size_<<std::endl;)
+		data_ = ::mmap(0, size_, mode_ == MMAP_READ ? PROT_READ :
+			PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0);
+		if (data_==MAP_FAILED) return data_=0,err(errno, L"mmap err");
+#endif
 		state_ = MAPPED;
 		return 0;
 	}
 	int sync() {
-		int r = ::msync(data_, size_, MS_SYNC);
+		int r = 0;
+#ifdef _WIN32
+		if (::FlushViewOfFile(data_, size_) == 0 ||
+			::FlushFileBuffers(fh_) == 0) r = -1;
+#else
+		r = ::msync(data_, size_, MS_SYNC);
+#endif
 		if (r == -1) return err(errno, L"memory_map: sync");
 		return r;
 	}
 	int unmap() {
 		if (state_ != MAPPED)
-			return err(L"file not mapped. it cannot be unmapped\n");
+			return err(L"file not mapped, cannot be unmapped\n");
 		if (sync() == -1) return -1;
-		int r = ::munmap(data_, size_);
-		data_ = 0;
-		//DBG(std::wcout << L"memory_map: changing state to UNMAPPED (unmap)" << std::endl;)
-		state_ = UNMAPPED;
+		int r = 0;
+#ifdef _WIN32
+		::UnmapViewOfFile(data_);
+		::CloseHandle(mh_);
+#else
+		r = ::munmap(data_, size_);
+#endif
+		data_ = 0, state_ = UNMAPPED;
 		return r;
 	}
 	int unlink() {
 		if (state_ != CLOSED) return err(
 			L"file is not closed. it cannot be deleted\n");
+#ifdef _WIN32
+		return ::DeleteFileA(filename_.c_str());
+#else
 		return ::unlink(filename_.c_str());
+#endif
 	}
 	int close() {
 		if (state_ == CLOSED) return -1;
 		else if (state_ == MAPPED && unmap() == -1) return -1;
+#ifdef _WIN32
+		::CloseHandle(fh_);
+#else
 		if (fd_ != -1) ::close(fd_), fd_ = -1;
-		//DBG(std::wcout << L"memory_map: changing state to CLOSED" << std::endl;)
+#endif
 		state_ = CLOSED;
-		if (temporary) temporary = false, unlink();
+		if (temporary_) temporary_ = false, unlink();
 		return 0;
 	}
 	char operator[](const size_t i) noexcept {
@@ -124,15 +167,19 @@ private:
 	enum { CLOSED, UNMAPPED, MAPPED } state_;
 	std::string filename_;
 	size_t size_;
-	int fd_ = -1;
 	void* data_ = 0;
-	bool temporary = false;
+	bool temporary_ = false;
+#ifdef _WIN32
+	HANDLE fh_;
+	HANDLE mh_;
+	inline void create_temp() {
+		filename_ = temp_filename(), temporary_ = true;
+	}
+#else
+	int fd_;
 	int truncate() {
 		if (state_==MAPPED) return err(L"cannot truncate mapped file");
 		if (size_ && size_ != (size_t)file_size()) {
-			//DBG(std::wcout<<L"memory_map: truncate "
-			//	<<s2ws(std::string(filename_))
-			//	<<L" to size: "<<size_<<L"\n";)
 			if (::ftruncate(fd_, size_) == -1)
 				return err(errno, L"error truncate failed");
 		}
@@ -149,7 +196,7 @@ private:
 		return w;
 	}
 	inline void create_temp() {
-		temporary = true,
+		temporary_ = true,
 		fd_ = temp_fileno(),
 		filename_ = filename(fd_);
 	}
@@ -158,29 +205,31 @@ private:
 		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0644);
     		if (fd_ == -1) { err(errno, L"memory_map: create"); return; }
 		if (fill() == -1) return;
-		DBG(std::wcout<<L"memory_map: create "
-			<<s2ws(std::string(filename_))
-			<<L" created with size: "<<size_<<L"\n";)
+		//DBG(o::dbg()<<L"memory_map: create "
+		//	<<s2ws(std::string(filename_))
+		//	<<L" created with size: "<<size_<<L"\n";)
 	}
 	bool file_exists() {
  		struct stat s;
-    		return filename_=="" ? false : stat(filename_.c_str(), &s) == 0;
+    		return filename_=="" ? false : stat(filename_.c_str(),&s) == 0;
 	}
-	off_t file_size() {
+#endif
+	size_t file_size() {
+#ifdef _WIN32
+		LARGE_INTEGER file_size;
+		if (::GetFileSizeEx(fh_, &file_size) != 0)
+			return static_cast<size_t>(file_size.QuadPart);
+#else
 		struct stat s;
-		bool stat_nok = ::stat(filename_.c_str(), &s) == -1;
-		if (stat_nok) {
-			// DBG(std::wcout<<L"stat nok "<<s2ws(std::string(filename_))<<std::endl;)
-			err(errno, L"cannot get file stats");
-			return 0;
-		}
-		//DBG(std::wcout<<L"stats size: "<<s.st_size<<std::endl;)
-		return s.st_size;
+		if (::stat(filename_.c_str(), &s) != -1)
+			return s.st_size;
+#endif
+		return err(errno, L"cannot get file stats"), 0;
 	}
 	int err(int err_code, std::wstring message, int return_value = -1) {
 		return err(message, return_value, err_code);
 	}
-	int err(std::wstring message, int return_value = -1, int err_code = 0) {
+	int err(std::wstring message, int return_value = -1, int err_code = 0){
 		error = true; std::wstringstream ss; ss << L"error: ";
 		if (err_code) ss << L'[' << err_code << L"] ";
 		ss << message << std::endl; error_message = ss.str();
@@ -199,18 +248,18 @@ public:
 	memory_map_allocator(const memory_map_allocator<T>& a) :
 		fn(a.fn), m(a.m) { }
 	T* allocate(size_t n, const void *hint=0) {
-		DBG(std::wcout<<L"allocate n= "<<n<<L" fn="
-			<<s2ws(fn)<<L" m="<<m<<std::endl;)
+		//DBG(o::dbg()<<L"allocate n= "<<n<<L" fn="
+		//	<<s2ws(fn)<<L" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (T*) nommap.allocate(n, hint);
 		if (n == 0) return 0;
 		if (hint != 0) return 0;
 		mm = std::make_unique<memory_map>(fn, n*sizeof(T), m);
-		//std::wcout << L"mm.data() = " << mm->data() << std::endl;
+		//o::dbg() << L"mm.data() = " << mm->data() << std::endl;
 		return (T*) mm->data();
 	}
 	void deallocate(T* p, size_t n) {
-		DBG(std::wcout<<L"deallocate n= "<<n<<
-			L" fn="<<s2ws(std::string(fn))<<L" m="<<m<<std::endl;)
+		//DBG(o::dbg()<<L"deallocate n= "<<n<<
+		//	L" fn="<<s2ws(std::string(fn))<<L" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (void) nommap.deallocate(p, n);
 		if (!p || !n) return;
 		mm->close();

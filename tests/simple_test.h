@@ -43,11 +43,21 @@ int run(const std::vector<test>& tests, std::wstring name, std::wostream* os=&st
 
 // read file content
 int file_read(const char* path, char* data, size_t size) {
+#ifdef _WIN32
+	HANDLE fd = ::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, 0,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	if (fd == INVALID_HANDLE_VALUE) return fail(L"file cannot be opened", -1);
+	DWORD r;
+	if (::ReadFile(fd, data, size, &r, 0) == FALSE) return fail(L"file cannot be read", -3);
+	if (r != (DWORD)size) return fail(L"read failed", -2);
+        ::CloseHandle(fd);
+#else
 	int fd = ::open(path, O_RDONLY | O_NONBLOCK);
 	if (fd == -1) return fail(L"file cannot be opened", -1);
 	int r = ::read(fd, data, size);
 	if (r != (int)size) return fail(L"read failed", -2);
 	::close(fd);
+#endif
 	return ok();
 }
 

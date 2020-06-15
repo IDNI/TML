@@ -77,7 +77,9 @@ public:
 		create(L"dump",        L".dump.tml");
 		create(L"benchmarks",  L".bench.log");
 		create(L"transformed", L".trans.tml");
+#ifdef WITH_THREADS
 		create(L"repl-output", L".repl.out.log");
+#endif
 		create(L"xsb",         L".P");
 		create(L"swipl",       L".pl");
 		create(L"souffle",     L".souffle");
@@ -87,7 +89,9 @@ public:
 	static std::wostream& err()  { return o_to(o_->err_);  }
 	static std::wostream& inf()  { return o_to(o_->inf_);  }
 	static std::wostream& dbg()  { return o_to(o_->dbg_);  }
+#ifdef WITH_THREADS
 	static std::wostream& repl() { return o_to(o_->repl_); }
+#endif
 	static std::wostream& ms()   { return o_to(o_->ms_);   }
 	static std::wostream& dump() { return o_to(o_->dump_); }
 	static output* get(const std::wstring& n) { return o_->o_get(n); }
@@ -98,7 +102,10 @@ public:
 	static void name(std::wstring n) { o_->name_ = n; }
 	static std::wstring named() { return o_->name_; }
 private:
-	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *repl_=0, *ms_=0, *dump_=0;
+	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0;
+#ifdef WITH_THREADS
+	output *repl_=0;
+#endif
 	std::wstring name_ = L"";
 	static outputs* o_; // global outputs
 	p_output o_get(std::wstring n) {
@@ -115,7 +122,9 @@ namespace o { // o:: namespace shortcuts
 	std::wostream& err();
 	std::wostream& inf();
 	std::wostream& dbg();
+#ifdef WITH_THREADS
 	std::wostream& repl();
+#endif
 	std::wostream& ms();
 	std::wostream& dump();
 }

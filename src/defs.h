@@ -23,7 +23,9 @@
 #include <map>
 
 #ifndef __EMSCRIPTEN__
+#ifdef __unix__
 #include <execinfo.h>
+#endif
 #endif
 
 typedef int32_t int_t;
@@ -74,8 +76,14 @@ void parse_error(std::wstring e, lexeme l);
 
 std::wstring s2ws(const std::string&);
 std::string  ws2s(const std::wstring&);
-std::string filename(int fd);
+#ifdef _WIN32
+std::string temp_filename();
+#else
 int temp_fileno();
+std::string filename(int fd);
+#endif
+std::string to_string_(int_t v);
+std::wstring to_wstring_(int_t v);
 
 typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL

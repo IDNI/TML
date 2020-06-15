@@ -23,6 +23,7 @@ set(TML_HEADERS
 	driver.h
 	err.h
 	input.h
+	memory_map.h
 	options.h
 	output.h
 	tables.h
@@ -40,7 +41,6 @@ set(TML_SOURCES
 	print_prolog.cpp
 	print_souffle.cpp
 	proof.cpp
-	repl.cpp
 	save_csv.cpp
 	tables.cpp
 	tables_ext.cpp
@@ -48,16 +48,12 @@ set(TML_SOURCES
 	utils.cpp
 )
 
-set(CLI_HEADERS
-	async_reader.h
-	repl.h
-	udp.h
-)
-
-set(CLI_SOURCES
-	main.cpp
-	repl.cpp
-)
+if (WITH_THREADS)
+	set(CLI_HEADERS async_reader.h repl.h udp.h)
+	set(CLI_SOURCES main.cpp repl.cpp)
+else()
+	set(CLI_SOURCES main.cpp)
+endif()
 
 set(TML_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TML_RELEASE_OPTIONS "-O3;-DNDEBUG")
@@ -76,34 +72,38 @@ set(TML_COMPILE_OPTIONS
 )
 set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
 
-# pthreads - not REQUIRED for static/shared library
-####################################################
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads)
-
 # object library
 #################
-
 add_library(TMLo OBJECT)
 target_setup(TMLo)
 target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS} -fPIC)
 target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
 target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
-target_link_libraries(TMLo PUBLIC
-		${CMAKE_THREAD_LIBS_INIT}
-		)
+target_link_libraries(TMLo PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
+if (WITH_THREADS)
+	target_compile_definitions(TMLo PRIVATE "-DWITH_THREADS")
+endif ()
 
 # boost
 ###########
-find_package(Boost COMPONENTS system thread REQUIRED)
-if(Boost_FOUND)
-	target_include_directories(TMLo PRIVATE ${Boost_INCLUDE_DIRS})
-	target_link_libraries(TMLo PUBLIC Boost::boost Boost::system)
-endif(Boost_FOUND)
+if (WITH_BOOST)
+	target_compile_definitions(TMLo PRIVATE "-DWITH_BOOST")
+	find_package(Boost COMPONENTS system thread REQUIRED)
+	if (Boost_FOUND)
+		target_include_directories(TMLo PRIVATE ${Boost_INCLUDE_DIRS})
+		target_link_libraries(TMLo PUBLIC Boost::boost Boost::system)
+	endif (Boost_FOUND)
+endif ()
 
+# pthreads
+###########
+if (WITH_THREADS)
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
+	find_package(Threads)
+endif()
 
 # shared library
 #################
@@ -147,7 +147,11 @@ target_setup(tml)
 target_compile_options(tml PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml    PRIVATE ${TML_LINK_OPTIONS})
 target_sources(tml         PRIVATE ${CLI_SOURCES} ${CLI_HEADERS})
-target_link_libraries(tml  TMLs Threads::Threads)
+target_link_libraries(tml  TMLs)
+if (WITH_THREADS)
+	target_compile_definitions(tml PRIVATE "-DWITH_THREADS")
+	target_link_libraries(tml Threads::Threads)
+endif()
 
 
 # executable using shared library
@@ -158,7 +162,11 @@ target_setup(tml_shared)
 target_compile_options(tml_shared PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(tml_shared    PRIVATE ${TML_LINK_OPTIONS})
 target_sources(tml_shared         PRIVATE ${CLI_SOURCES} ${CLI_HEADERS})
-target_link_libraries(tml_shared  TMLso Threads::Threads)
+target_link_libraries(tml_shared  TMLso)
+if (WITH_THREADS)
+	target_compile_definitions(tml_shared PRIVATE "-DWITH_THREADS")
+	target_link_libraries(tml_shared Threads::Threads)
+endif()
 exclude(tml_shared)
 
 

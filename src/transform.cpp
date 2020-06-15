@@ -34,7 +34,7 @@ lexeme driver::get_lexeme(const wstring& s) {
 
 lexeme driver::get_var_lexeme(int_t i) {
 	wstring s = L"?v";
-	return get_lexeme(s += to_wstring(i));
+	return get_lexeme(s += to_wstring_(i));
 }
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))

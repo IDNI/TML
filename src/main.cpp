@@ -16,7 +16,9 @@
 #include <sys/ioctl.h>
 #endif
 #include "driver.h"
+#ifdef WITH_THREADS
 #include "repl.h"
+#endif
 using namespace std;
 
 //void print_memos_len();
@@ -29,11 +31,16 @@ int main(int argc, char** argv) {
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
 	if (o.disabled(L"i") && o.disabled(L"ie") && o.disabled(L"repl")
 			&& o.disabled(L"h") && o.disabled(L"v")
-			&& o.disabled(L"udp"))
+#ifdef WITH_THREADS
+			&& o.disabled(L"udp")
+#endif
+			)
 		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
+#ifdef WITH_THREADS
 	if (o.enabled(L"udp") && o.disabled(L"repl")) o.enable(L"repl");
 	if (o.enabled(L"repl")) repl r(o);
 	else {
+#endif
 		driver d(o);
 		d.run((size_t)o.get_int(L"steps"),
 			(size_t)o.get_int(L"break"),
@@ -42,7 +49,9 @@ int main(int argc, char** argv) {
 			!d.out_goals(o::dump())) d.out(o::dump());
 		if (o.enabled(L"dict")) d.out_dict(o::inf());
 		if (o.enabled(L"csv")) d.save_csv();
+#ifdef WITH_THREADS
 	}
+#endif
 	onexit = true;
 //	print_memos_len();
 	return 0;

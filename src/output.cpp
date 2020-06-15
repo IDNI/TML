@@ -38,7 +38,9 @@ namespace o {
 	wostream& err()  { return outputs::err();  }
 	wostream& inf()  { return outputs::inf();  }
 	wostream& dbg()  { return outputs::dbg();  }
+#ifdef WITH_THREADS
 	wostream& repl() { return outputs::repl(); }
+#endif
 	wostream& ms()   { return outputs::ms();   }
 	wostream& dump() { return outputs::dump(); }
 }
@@ -89,7 +91,9 @@ void outputs::update_pointers(const std::wstring& n, output* out) {
 	else if (n == L"error")       err_  = out;
 	else if (n == L"info")        inf_  = out;
 	else if (n == L"debug")       dbg_  = out;
+#ifdef WITH_THREADS
 	else if (n == L"repl-output") repl_ = out;
+#endif
 	else if (n == L"benchmarks")  ms_   = out;
 	else if (n == L"dump")        dump_ = out;
 }

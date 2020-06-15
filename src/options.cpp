@@ -168,20 +168,20 @@ void options::setup() {
 		[this](const option::value& v) {
 			add_input_data(v.get_string());
 		}).description(L"input string to evaluate"));
-
+#ifdef WITH_THREADS
 	add_bool(L"udp",     L"open REPL on udp socket");
 	add(option(option::type::STRING, {L"udp-addr", L"ua"})
 		.description(L"IP address (udp)"));
 	add(option(option::type::INT, { L"udp-port", L"up" })
 		.description(L"port (udp)"));
-
+	add_bool(L"repl",    L"run TML in REPL mode");
+#endif
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
 	add_bool(L"proof",   L"extract proof");
-	add_bool(L"repl",    L"run TML in REPL mode");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
-
+	
 	add(option(option::type::INT, { L"steps", L"s" })
 		.description(L"run N steps"));
 	add(option(option::type::INT, { L"break", L"b" })
@@ -207,7 +207,9 @@ void options::setup() {
 	add_output    (L"debug",       L"debug output");
 	add_output    (L"benchmarks",  L"benchmarking results");
 	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
+#ifdef WITH_THREADS
 	add_output    (L"repl-output", L"repl output");
+#endif
 	add_output(L"xsb",     L"attempt to translate program into XSB");
 	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
 	add_output(L"souffle", L"attempt to translate program into Souffle");
@@ -227,11 +229,13 @@ void options::init_defaults() {
 		L"--dump",        L"@stdout",
 		L"--error",       L"@stderr",
 		L"--info",        L"@stderr",
-		L"--repl-output", L"@stdout",
 		L"--benchmarks",  L"@stdout",
 		L"--optimize",
+#ifdef WITH_THREADS
+		L"--repl-output", L"@stdout",
 		L"--udp-addr",    L"127.0.0.1",
 		L"--udp-port",    L"6283"
+#endif
 	}, true);
 	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
 }

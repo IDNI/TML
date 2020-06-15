@@ -615,7 +615,7 @@ set<term> tables::decompress() {
 // D: TODO: just a quick & dirty fix, get_elem, to_raw_term (out etc.) is const
 #define rdict() ((dict_t&)dict)
 //#define get_var_lexeme(v) dict.get_lexeme(wstring(L"?v") + to_wstring(-v))
-#define get_var_lexeme(v) rdict().get_lexeme(wstring(L"?v") + to_wstring(-v))
+#define get_var_lexeme(v) rdict().get_lexeme(wstring(L"?v") + to_wstring_(-v))
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
@@ -623,7 +623,7 @@ elem tables::get_elem(int_t arg) const {
 		const wchar_t ch = arg >> 2;
 		if (iswprint(ch)) return elem(ch);
 		return	elem(elem::SYM, rdict().get_lexeme(wstring(L"\"#") +
-			to_wstring((unsigned char)(ch)) + L"\""));
+			to_wstring_((unsigned char)(ch)) + L"\""));
 	}
 	if (arg & 2) return elem((int_t)(arg>>2));
 	return elem(elem::SYM, rdict().get_sym(arg));
@@ -1229,7 +1229,7 @@ lexeme tables::get_new_rel() {
 	wstring s = L"r";
 	size_t sz;
 	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring(last));
+retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_wstring_(last));
 	dict.get_rel(l);
 	if (dict.nrels() == sz) { ++last; goto retry; }
 	return l;

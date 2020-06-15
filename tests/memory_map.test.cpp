@@ -24,7 +24,7 @@
 
 using namespace std;
 
-test create_new_and_write = [] {
+test create_new_and_open = [] {
 	memory_map mm(TF1, S1, MMAP_WRITE);
 	if (mm.error) return fail(mm.error_message);
 	memory_map mm2(TF1);
@@ -119,6 +119,15 @@ test mmap_vector_with_nommap_allocator_int_t_write = [] {
 	return ok();
 };
 
+test temporary = [] {
+	memory_map mm("", S2, MMAP_WRITE);
+	if (mm.error) return fail(mm.error_message);
+	char* data = (char*) mm.data();
+	if (mm.error) return fail(mm.error_message);
+	for (size_t i = 0; i != S2; ++i) data[i] = 255 - (i % 255);
+	return ok();
+};
+
 //test bdd_mmap_write = [] {
 //	std::unique_ptr<bdd_mmap> pM;
 //	pM = std::make_unique<bdd_mmap>();
@@ -139,7 +148,7 @@ int main() {
 	oo.target(L"debug",  L"@stdout");
 	oo.target(L"output", L"@stdout");
 	vector<test> tests = {
-		create_new_and_write,
+		create_new_and_open,
 		open_and_write,
 		open_and_read_written,
 		open_and_overwrite,
@@ -147,6 +156,7 @@ int main() {
 		vector_with_memory_map_allocator_int_t_write,
 		vector_with_memory_map_allocator_int_t_read,
 		mmap_vector_with_nommap_allocator_int_t_write,
+		temporary,
 		//bdd_mmap_write,
 	};
 	return run(tests, L"memory_map");
