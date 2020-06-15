@@ -29,12 +29,11 @@ int main(int argc, char** argv) {
 	options o(argc, argv, &oo);
 	bdd::init();
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
-	if (o.disabled(L"i") && o.disabled(L"ie") && o.disabled(L"repl")
-			&& o.disabled(L"h") && o.disabled(L"v")
+	if (o.disabled(L"i") && o.disabled(L"ie")
 #ifdef WITH_THREADS
-			&& o.disabled(L"udp")
+			&& o.disabled(L"repl") && o.disabled(L"udp")
 #endif
-			)
+			&& o.disabled(L"h") && o.disabled(L"v"))
 		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
 #ifdef WITH_THREADS
 	if (o.enabled(L"udp") && o.disabled(L"repl")) o.enable(L"repl");
