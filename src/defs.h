@@ -85,6 +85,7 @@ namespace o { // call driver::init() before using any o::xxx() wostream
 	std::wostream& repl();// for REPL
 	std::wostream& ms();  // benchmarks output for time measurings
 	std::wostream& dump();// for dumping of database or goals/proofs
+	std::wostream& dump_eol();// for dumping of database or goals/proofs
 }
 
 typedef enum  {

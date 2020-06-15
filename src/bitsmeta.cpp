@@ -27,6 +27,7 @@ using namespace std;
 #define un_mknum(x) (int_t(x))
 
 bool bitsmeta::BITS_FROM_LEFT = false;
+bool bitsmeta::NULLVALUE = false;
 
 void bitsmeta::init_type(primitive_type& type, const dict_t& dict) {
 	switch (type.type) {
@@ -34,32 +35,35 @@ void bitsmeta::init_type(primitive_type& type, const dict_t& dict) {
 			// D: Q: TODO: how to set up individual arg's sym universe?
 			// always init for STR/CHR or not? may alt universe size differ?
 			if (type.bitness == 0) {
-				type.set_bitness(BitScanR(dict.nsyms()));
-				//type.bitness = BitScanR(dict.nsyms()); // nsyms-1? I guess
+				int_t maxnum = NULLVALUE ? dict.nsyms() + 1 : dict.nsyms();
+				type.set_bitness(BitScanR(maxnum)); // type.bitness = 
 				// we have 'shared dict universe' for all sym/str args
 			}
 			break;
 		case base_type::CHR:
 			// it's always 8, always init (or if correct it's 0)
 			if (type.bitness == 0) {
-				type.set_bitness(8);
+				size_t bits = NULLVALUE ? 8 : 8; // no change in this case?
+				type.set_bitness(bits);
 				//type.bitness = 8;
 			}
 			break;
 		case base_type::INT: 
+		{
 			// calc bitness for ints (we just have num at this point).
-			if (type.bitness == 0) {
-				type.set_bitness(BitScanR(type.num));
-				//type.bitness = BitScanR(type.num);
-			}
-			else if (type.num >= 1 << type.bitness) {
-				o::dump() << L"bitsmeta: num > max(bits)..." << endl;
-				type.set_bitness(BitScanR(type.num));
-				//type.bitness = BitScanR(type.num);
+			int_t maxnum = NULLVALUE ? type.num + 1 : type.num;
+			if (type.bitness == 0)
+				type.set_bitness(BitScanR(maxnum)); //type.bitness = 
+			else if (maxnum >= 1 << type.bitness) {
+				if (type.num >= 1 << type.bitness)
+					o::dump() << L"bitsmeta: num > max(bits)..." << endl;
+				type.set_bitness(BitScanR(maxnum)); //type.bitness = 
 			}
 			break;
+		}
 		case base_type::NONE:
 			type.set_bitness(1);
+			//throw runtime_error("NONE type, infer failed? use --dumptype"); 
 		default: ;
 	}
 }
@@ -71,25 +75,35 @@ void bitsmeta::init(const dict_t& dict) {
 	mleftbits.clear();
 	size_t lsum = 0, args = types.size(), maxb = 0;
 	mleftbits[vargs[0]] = lsum;
+	// this is strictly bits, so use w_align?
 	for (size_t i = 0; i != types.size(); ++i) {
 		arg_type& type = types[vargs[i]];
-		// either branch or use an iterator similar to get_types()
-		type.r_iterate([&](primitive_type& subtype, size_t, sizes, size_t) {
-			// we don't care about start, path for this
-			init_type(subtype, dict);
-		});
+		// set root compound types & prepare if 'alignment' for it (extra bits)
+		// type/bits were not really used before this
+		if (type.isCompound())
+			type = { 
+			compound_type{ 
+					compound_type::trim_align(type.compound), true, true },
+			type.sig };
+
+		// we don't care about start, path for this
+		// TODO: this is weak point for large compounds, need to use comp array
+		for (auto& it : type)
+			init_type(it.type(), dict);
+
 		type.init();
 		if (i != args-1) {
 			// we calc cache/maps regardless of the type, just need total bits
 			// micro management is at the level of compound calls, eg leq_const
-			lsum += types[vargs[i]].get_bits();
+			lsum += types[vargs[i]].get_bits_w_align();
 			mleftbits[vargs[i+1]] = lsum;
 		}
 		// vargs is redundant here as it's an aggregate, maxb/vbits will be same
-		maxb = max(maxb, type.get_bits());
+		maxb = max(maxb, type.get_bits_w_align());
 		//vbits[vargs[i]] = types[vargs[i]].get_bits();
 	}
-	args_bits = mleftbits.at(vargs[args-1]) + types[vargs[args-1]].get_bits();
+	args_bits = 
+		mleftbits.at(vargs[args-1]) + types[vargs[args-1]].get_bits_w_align();
 	maxbits = maxb;
 
 	size_t argsum = 0;
@@ -99,14 +113,15 @@ void bitsmeta::init(const dict_t& dict) {
 	for (int_t bit = maxbits-1; bit >= 0; --bit) {
 		map<size_t, size_t>& mpos = mleftargs[bit];
 		for (size_t arg = 0; arg != types.size(); ++arg)
-			if (types[vargs[arg]].get_bits() > size_t(bit))
+			if (types[vargs[arg]].get_bits_w_align() > size_t(bit))
 				mpos[vargs[arg]] = argsum++;
 	}
 	DBG(assert(argsum == args_bits););
 	hasmultivals = term::calc_hasmultivals(types);
 }
 
-/* this's probably not necessary, just do init() when done w/ changes */
+// this's probably not necessary, just do init() when done w/ changes 
+// but for the moment, addbits only does this (no init()), so we have to repeat
 void bitsmeta::init_cache() {
 	DBG(assert(!types.empty()););
 	size_t args = types.size(), lsum = 0, maxb = 0, argsum = 0;
@@ -114,19 +129,31 @@ void bitsmeta::init_cache() {
 	mleftbits.clear();
 	mleftbits[vargs[0]] = lsum;
 	// recalculate everything...
-	for (size_t i = 0; i < args-1; ++i) { // process [0..args-2] (skip last)
-		lsum += types[vargs[i]].get_bits();
+	// this is strictly bits, so use w_align?
+	//for (size_t i = 0; i < args-1; ++i) { // process [0..args-2] (skip last)
+	for (size_t i = 0; i < args; ++i) {
+		arg_type& type = types[vargs[i]];
+		// set root compound types & prepare if 'alignment' for it (extra bits)
+		if (type.isCompound())
+			type = { 
+			compound_type{ 
+					compound_type::trim_align(type.compound), true, true },
+			type.sig };
+		if (i == args-1) break; // process [0..args-1) (skip last)
+		lsum += type.get_bits_w_align();
 		mleftbits[vargs[i+1]] = lsum;
-		maxb = std::max(maxb, types[vargs[i]].get_bits());
-		//vbits[vargs[i]] = types[vargs[i]].get_bits(); // wrong, missing args-1
+		maxb = std::max(maxb, type.get_bits_w_align());
+		//vbits[vargs[i]] = type.get_bits(); // wrong, missing args-1
 	}
-	args_bits = mleftbits.at(vargs[args-1]) + types[vargs[args-1]].get_bits();
-	maxbits = std::max(maxb, types[vargs[args-1]].get_bits());
+	args_bits = 
+		mleftbits.at(vargs[args-1]) + types[vargs[args-1]].get_bits_w_align();
+	maxbits = std::max(maxb, types[vargs[args-1]].get_bits_w_align());
 	DBG(assert(maxbits != 0);); // if (maxbits == 0) return;
 	for (int_t bit = maxbits - 1; bit >= 0; --bit) {
 		map<size_t, size_t>& mpos = mleftargs[bit];
+		// this is strictly bits, so use w_align?
 		for (size_t arg = 0; arg != types.size(); ++arg)
-			if (types[vargs[arg]].get_bits() > size_t(bit))
+			if (types[vargs[arg]].get_bits_w_align() > size_t(bit))
 				mpos[vargs[arg]] = argsum++;
 	}
 	DBG(assert(argsum == args_bits););
@@ -142,11 +169,13 @@ void bitsmeta::init_bits() {
 	// TODO: easier is just vbits.push_back(types[i].get_bits());
 	for (size_t i = 0; i != types.size(); ++i)
 		// vargs is redundant here as it's an aggregate, maxb/vbits will be same
-		vbits[vargs[i]] = types[vargs[i]].get_bits();
+		// this is strictly bits, so use w_align?
+		vbits[vargs[i]] = types[vargs[i]].get_bits_w_align();
 	bitsfixed = true;
 }
 
-bool bitsmeta::set_args(const argtypes& vtypes, bool hasmultivals_) {
+bool bitsmeta::set_args(
+	const argtypes& vtypes, bool isheader, bool multivals, bool optimistic) {
 	if (vtypes.empty()) return false;
 	DBG(assert(vtypes.size() > 0);); // don't call this if nothing to do
 	// we're empty initialized already (to table len), so sizes need to match
@@ -154,15 +183,21 @@ bool bitsmeta::set_args(const argtypes& vtypes, bool hasmultivals_) {
 	// !nterms meaning we have no previous types / bits data (size's always >0)
 	if (!nterms)
 		types = vtypes;
-	else
-		for (size_t i = 0; i != types.size(); ++i)
-			update_type(types[i], vtypes[i]);
+	else {
+		// optimistic should not update, once set from header allow only headers
+		// TODO: more logic needed, propagate, only ban 'unformed' compounds
+		if (!optimistic && (isheader || !fromheader)) {
+			for (size_t i = 0; i != types.size(); ++i)
+				update_type(types[i], vtypes[i]);
+		}
+	}
 	++nterms;
 	// TODO: a bug probably, once hasmultivals is set it can't be reset?
-	if (hasmultivals && !hasmultivals_) {
-		//o::dump() << endl;//L"set_args: hasmultivals && !hasmultivals_" << 
+	if (hasmultivals && !multivals) {
+		//o::dump() << endl;//L"set_args: hasmultivals && !multivals" << 
 	}
-	hasmultivals = hasmultivals || hasmultivals_;
+	hasmultivals = hasmultivals || multivals;
+	fromheader = fromheader || isheader;
 	return true;
 }
 
@@ -175,8 +210,7 @@ bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
 	if (newtype.isPrimitive()) // either both are primitive or NONE + prim.
 		return update_type(type.primitive, newtype.primitive);
 	else if (newtype.isCompound()) {
-		//primtypes& types = type.compound.types;
-		//const primtypes& newtypes = newtype.compound.types;
+		// we don't need this, just for check and early exit?
 		const primtypes& types = type.get_primitives();
 		const primtypes& newtypes = newtype.get_primitives();
 		if (types.size() != newtypes.size()) {
@@ -194,13 +228,8 @@ bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
 			}
 			//changed = true;
 		}
-
-		type.r_iterate([&](primitive_type& subtype, size_t, sizes, size_t i) {
-			changed |= update_type(subtype, newtypes[i]);
-		});
-		//for (size_t i=0; i != types.size(); ++i)
-		//	changed |= 
-		//		update_type(types[i], newtypes[i]);
+		for (auto& it : type)
+			changed |= update_type(it.type(), newtypes[it.id]);
 
 		// now see if 'left' has changed, if so and only then update its sig
 		// (or make some calc_sig() here just from types, if possible?)
@@ -265,29 +294,24 @@ bool bitsmeta::sync_types(
 		return sync_types(l, r);
 	if (larg.subarg != arg::none && rarg.subarg != arg::none)
 		return sync_types(l[larg], r[rarg]);
-		//return sync_types(l[larg.subarg], r[rarg.subarg]);
 	
-	// TODO: needs extra handling for none compound or non-primitive comps etc.
-	//if (larg.subarg != arg::none && r.isPrimitive())
-	//	return sync_types(l[larg.subarg], r.primitive);
-	//if (rarg.subarg != arg::none && l.isPrimitive())
-	//	return sync_types(l.primitive, r[rarg.subarg]);
-
 	if (larg.subarg != arg::none) {
-		//arg_type& lsub = l[larg.subarg];
-		arg_type& lsub = l[larg];
-		if (r.isPrimitive() && lsub.isPrimitive())
-			return sync_types(lsub.primitive, r.primitive);
-		return sync_types(lsub, r);
-		//return sync_types(lsub, r.primitive);
+		// it's still in inference type construction phase, so just ignore it...
+		if (arg::is_zero(larg.subarg) || l.isCompound()) {
+			arg_type& lsub = l[larg];
+			if (r.isPrimitive() && lsub.isPrimitive())
+				return sync_types(lsub.primitive, r.primitive);
+			return sync_types(lsub, r);
+		}
 	}
 	if (rarg.subarg != arg::none) {
-		//const arg_type& rsub = r[rarg.subarg];
-		const arg_type& rsub = r[rarg];
-		if (l.isPrimitive() && rsub.isPrimitive())
-			return sync_types(l.primitive, rsub.primitive);
-		return sync_types(l, rsub);
-		//return sync_types(l.primitive, rsub);
+		// it's still in inference type construction phase, so just ignore it...
+		if (arg::is_zero(rarg.subarg) || r.isCompound()) {
+			const arg_type& rsub = r[rarg];
+			if (l.isPrimitive() && rsub.isPrimitive())
+				return sync_types(l.primitive, rsub.primitive);
+			return sync_types(l, rsub);
+		}
 	}
 
 	return false;
@@ -300,7 +324,7 @@ bool bitsmeta::sync_types(argtypes& ltypes, multi_arg larg, const arg_type& r) {
 	// TODO: needs extra handling for none compound or non-primitive comps etc.
 	if (r.isPrimitive()) // this isn't optimal, but should wind down below
 		return sync_types(l[larg], r.primitive);
-		//return sync_types(l[larg.subarg], r.primitive);
+
 	return false;
 }
 
@@ -313,8 +337,6 @@ bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
 	if (r.isPrimitive()) // either both are primitive or NONE + primitive
 		return sync_types(l.primitive, r.primitive);
 	else if (r.isCompound()) {
-		//primtypes& ltypes = l.compound.types;
-		//const primtypes& rtypes = r.compound.types;
 		const primtypes& ltypes = l.get_primitives();
 		const primtypes& rtypes = r.get_primitives();
 		if (ltypes.size() != rtypes.size()) {
@@ -331,12 +353,8 @@ bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
 			}
 			//changed = true;
 		}
-
-		l.r_iterate([&](primitive_type& subtype, size_t, sizes, size_t i) {
-			changed |= sync_types(subtype, rtypes[i]);
-		});
-		//for (size_t i = 0; i != ltypes.size(); ++i)
-		//	changed |= sync_types(ltypes[i], rtypes[i]);
+		for (auto& it : l)
+			changed |= sync_types(it.type(), rtypes[it.id]);
 
 		if (changed && l.sig != r.sig)
 			l.sig = r.sig;
@@ -376,31 +394,40 @@ bool bitsmeta::sync_types(
 
 bool bitsmeta::sync_types(
 	argtypes& ltypes, multi_arg larg, argtypes& rtypes, multi_arg rarg,
-	bool& lchng, bool& rchng) 
+	bool& lchng, bool& rchng, bool force2left)
 {
 	lchng = rchng = false;
 	arg_type& l = ltypes[larg.arg];
 	arg_type& r = rtypes[rarg.arg];
 	if (larg.subarg == arg::none && rarg.subarg == arg::none)
-		return sync_types(l, r, lchng, rchng);
-	if (larg.subarg != arg::none && rarg.subarg != arg::none)
-		return sync_types(l[larg], r[rarg], lchng, rchng);
-		//return sync_types(l[larg.subarg], r[rarg.subarg], lchng, rchng);
+		return sync_types(l, r, lchng, rchng, force2left);
+	if (larg.subarg != arg::none && rarg.subarg != arg::none) {
+		// it's still in inference type construction phase, so just ignore it...
+		if ((arg::is_zero(larg.subarg) || l.isCompound()) && 
+			(arg::is_zero(rarg.subarg) || r.isCompound()))
+			return sync_types(l[larg], r[rarg], lchng, rchng, force2left);
+	}
+
 	// TODO: needs extra handling for none compound or non-primitive comps etc.
 	// TODO: here we map comp sub to comp, not handled atm.
 	if (larg.subarg != arg::none) {
-		//arg_type& lsub = l[larg.subarg];
-		arg_type& lsub = l[larg];
-		if (r.isPrimitive() && lsub.isPrimitive())
-			return sync_types(lsub.primitive, r.primitive, lchng, rchng);
-		return sync_types(lsub, r, lchng, rchng);
+		// it's still in inference type construction phase, so just ignore it...
+		//if (larg.subarg > 0 && !l.isCompound()) return false;
+		if (arg::is_zero(larg.subarg) || l.isCompound()) {
+			arg_type& lsub = l[larg];
+			if (r.isPrimitive() && lsub.isPrimitive())
+				return sync_types(lsub.primitive, r.primitive, lchng, rchng);
+			return sync_types(lsub, r, lchng, rchng, force2left);
+		}
 	}
 	if (rarg.subarg != arg::none) {
-		//arg_type& rsub = r[rarg.subarg];
-		arg_type& rsub = r[rarg];
-		if (l.isPrimitive() && rsub.isPrimitive())
-			return sync_types(l.primitive, rsub.primitive, lchng, rchng);
-		return sync_types(l, rsub, lchng, rchng);
+		// it's still in inference type construction phase, so just ignore it...
+		if (arg::is_zero(rarg.subarg) || r.isCompound()) {
+			arg_type& rsub = r[rarg];
+			if (l.isPrimitive() && rsub.isPrimitive())
+				return sync_types(l.primitive, rsub.primitive, lchng, rchng);
+			return sync_types(l, rsub, lchng, rchng, force2left);
+		}
 	}
 	return false;
 }
@@ -417,7 +444,10 @@ bool bitsmeta::sync_types(
 	if (larg.subarg == arg::none)
 		return sync_types(l, r, lchng, rchng);
 	// TODO: needs extra handling for none compound or non-primitive comps etc.
-	//arg_type& lsub = l[larg.subarg];
+
+	// it's still in inference type construction phase, so just ignore it...
+	if (larg.subarg > 0 && !l.isCompound()) return false;
+
 	arg_type& lsub = l[larg];
 	if (r.isPrimitive() && lsub.isPrimitive())
 		return sync_types(lsub.primitive, r.primitive, lchng, rchng);
@@ -430,21 +460,23 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r) {
 	return sync_types(l, r, lchng, rchng);
 }
 
-bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
+bool bitsmeta::sync_types(
+	arg_type& l, arg_type& r, bool& lchng, bool& rchng, bool force2left) {
 	lchng = rchng = false;
-	if (!l.isCompatible(r)) return false;
+	bool force = 
+		force2left && !r.isAllNone() && !l.isAllNone() &&
+		!l.isCompatible(r);
+	if (!force && !l.isCompatible(r)) return false;
 
 	bool lnone = l.isNone(), rnone = r.isNone();
 	if (lnone && rnone) return false;
 	else if (rnone) return r = l, rchng = true;
-	else if (lnone) return l = r, lchng = true;
+	else if (lnone || force) return l = r, lchng = true;
 
 	// at this point, both are of same type (as are compatible + not NONE)
 	if (l.isPrimitive())
 		return sync_types(l.primitive, r.primitive, lchng, rchng);
 	else if (l.isCompound()) {
-		//primtypes& ltypes = l.compound.types;
-		//primtypes& rtypes = r.compound.types;
 		const primtypes& ltypes = l.get_primitives();
 		const primtypes& rtypes = r.get_primitives();
 		// TODO: we need sizes upfront
@@ -463,23 +495,13 @@ bool bitsmeta::sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng) {
 			//else throw runtime_error("sync_types: different signatures?");
 			//changed = true;
 		}
-
-		l.r_iterate([&](primitive_type& subtype, size_t, sizes, size_t i) {
+		for (auto& it : l) {
 			bool lchanged, rchanged;
-			changed |=
-				sync_types(subtype, r.get_primitive(i), lchanged, rchanged);
+			changed |= sync_types(
+				it.type(), r.get_primitive(it.id), lchanged, rchanged);
 			lchng |= lchanged;
 			rchng |= rchanged;
-		});
-		//for (size_t i = 0; i != ltypes.size(); ++i) {
-		//	bool lchanged, rchanged;
-		//	primitive_type& ltype = l.get_primitive(i);
-		//	primitive_type& rtype = r.get_primitive(i);
-		//	changed |= 
-		//		sync_types(ltype, rtype, lchanged, rchanged);
-		//	lchng |= lchanged;
-		//	rchng |= rchanged;
-		//}
+		}
 
 		if (l.sig != r.sig) {
 			if (lchng && rchng) {

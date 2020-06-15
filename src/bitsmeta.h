@@ -35,8 +35,8 @@ struct bitsmeta {
 	std::map<size_t, std::map<size_t, size_t>> mleftargs;
 	// this is reset on any bits / type change, will trigger tbl init_bits/reset
 	bool bitsfixed = false;
-	bool hasmultivals = false;
-	static bool BITS_FROM_LEFT;
+	bool hasmultivals = false, fromheader = false;
+	static bool BITS_FROM_LEFT, NULLVALUE;
 
 	bitsmeta() {}
 	bitsmeta(size_t len) 
@@ -75,8 +75,9 @@ struct bitsmeta {
 	}
 	size_t get_args() const { return types.size(); }
 	
-	size_t get_bits(size_t arg) const {
-		return types[arg].get_bits();
+	size_t get_bits(size_t arg) const { return types[arg].get_bits(); }
+	size_t get_bits_w_align(size_t arg) const {
+		return types[arg].get_bits_w_align();
 	}
 	//base_type get_type(size_t arg) const {
 	//	return types[arg].get_type();
@@ -96,10 +97,12 @@ struct bitsmeta {
 		if (!bitsfixed) return false; // only fixed bits of interest
 		if (vbits.empty()) return false;
 		if (vbits.size() != types.size()) return true; // is this possible?
+		// vbits use w_align in init_bits and that makes sense, pure bits stuff
 		for (size_t i = 0; i != types.size(); ++i)
-			if (vbits[vargs[i]] != types[vargs[i]].get_bits()) {
+			if (vbits[vargs[i]] != types[vargs[i]].get_bits_w_align()) {
 				// only increase in bits is allowed (and enforced, just recheck)
-				DBG(assert(vbits[vargs[i]] < types[vargs[i]].get_bits()););
+				DBG(assert(
+					vbits[vargs[i]] < types[vargs[i]].get_bits_w_align()););
 				return true;
 			}
 		return false;
@@ -122,12 +125,13 @@ struct bitsmeta {
 		argtypes& ltypes, multi_arg l, argtypes& rtypes, multi_arg r);
 	static bool sync_types(
 		argtypes& ltypes, multi_arg l, argtypes& rtypes, multi_arg r,
-		bool& lchng, bool& rchng);
+		bool& lchng, bool& rchng, bool force2left = false);
 	static bool sync_types(argtypes& ltypes, multi_arg l, arg_type& r);
 	static bool sync_types(
 		argtypes& ltypes, multi_arg l, arg_type& r, bool& lchng, bool& rchng);
 	static bool sync_types(arg_type& l, arg_type& r);
-	static bool sync_types(arg_type& l, arg_type& r, bool& lchng, bool& rchng);
+	static bool sync_types(
+		arg_type& l, arg_type& r, bool& lchng, bool& rchng, bool force = false);
 	static bool sync_types(
 		primitive_type& l, primitive_type& r, bool& lchanged, bool& rchanged);
 
@@ -141,7 +145,8 @@ struct bitsmeta {
 	static bool update_type(arg_type& type, const arg_type& other);
 	static bool update_type(primitive_type& type, const primitive_type& other);
 	void update_types(const argtypes& vtypes);
-	bool set_args(const argtypes& vtypes, bool hasmultivals_ = false);
+	bool set_args(const argtypes& vtypes, bool isheader = true, 
+				  bool hasmultivals_ = false, bool optimistic = false);
 	// BSR op equivalent
 	inline static size_t BitScanR(int_t num, size_t min_bits = 0) {
 		// D: could num be < 0 (in the future?)
@@ -213,6 +218,32 @@ struct bitsmeta {
 		int_t val, const bitsmeta& bm) {
 		return ::from_bit(bm.pos(bit, arg, args), val & (1 << bit));
 	}
+
+	// the opposite of from_bit() (used from decompress only)
+	inline int_t to_val(
+		const bools& p, size_t bits, size_t startbit, size_t arg, size_t args) 
+		const {
+		// bits are 'per compound-arg' (used to encode the val)
+		int_t val = 0;
+		for (size_t b = 0; b != bits; ++b)
+			if (p[pos(startbit + b, arg, args)])
+				val |= 1 << bit(b, bits);
+		// put bit() on either const/encode or pos(), not both.
+		return val;
+	}
+
+	// the opposite of from_bit() (used from decompress only)
+	inline void to_val(int_t& val,
+		const bools& p, size_t bits, size_t startbit, size_t arg, size_t args) 
+		const {
+		// bits are 'per compound-arg' (used to encode the val)
+		//int_t val = 0;
+		for (size_t b = 0; b != bits; ++b)
+			if (p[pos(startbit + b, arg, args)])
+				val |= 1 << bit(b, bits);
+		// put bit() on either const/encode or pos(), not both.
+	}
+
 };
 
 typedef const bitsmeta& cr_bitsmeta;

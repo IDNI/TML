@@ -28,8 +28,8 @@ public:
 	AddBits(tables& tbls) : rtables(tbls) {}
 
 	void clear();
-	void permute_type(
-		const multi_arg& intype, size_t nbits = 1, bool bitsready = false);
+	void permute_type(const multi_arg& intype, size_t nbits = 1, 
+					  bool bitsready = false, bool permissive = false);
 
 private:
 	inline void init_target(const arg_type& type, bool bitsready, size_t nbits){

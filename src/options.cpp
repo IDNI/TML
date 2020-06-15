@@ -203,9 +203,22 @@ void options::setup() {
 	add_bool(L"optimize_memory", L"turn memory optimization on");
 	add_bool(L"sort_tables", L"sort tables during decompress");
 	add_bool(L"conflicting-types", L"allow type conflicts");
+	//add_bool(L"nonzerovarcomp", L"allow only non 0-vars in compounds");
+	add_bool(L"optimistic-signature-match", L"allow 0-vars in compounds");
+	add_bool(L"compound-align-bits", L"compounds have extra bits");
+	add_bool(L"nullvalue", L"allow for special null value (e.g. for cast)");
 	
 	add(option(option::type::BOOL, {L"inference", L"inf"}, option::value{true})
 		.description(L"type inference (or turn off to optimize/manual)"));
+	add(option(option::type::BOOL, 
+			  {L"stringtables", L"strs"}, 
+			   option::value{ true })
+		.description(L"load strings into tables (on by default)"));
+	add(option(option::type::BOOL, 
+			  {L"zerovarcomp", L"comp0"}, 
+			   option::value{ true })
+		.description(L"allow 0-position-vars in compounds (on by default)"));
+
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			output::set_name(v.get_string());

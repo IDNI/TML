@@ -1,6 +1,8 @@
+# requires: run w/ '--nonzerovarcomp' flag for ?x(?_ ?-) signature to work
+# zero-var (?x(...)) is only used to specify the type, so need to turn it off 
+# (zerovars are now on by default)
 {
 A(b(c d)).
 #A(a(?x)) :- A(?x). # this fails with type resolution error, you need to decide...
 A(a(?x)) :- A(?x(?_ ?_)).
-#A(a(?x:int[2])) :- A(?x).
 }

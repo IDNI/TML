@@ -1,5 +1,5 @@
 {
 ##A(b(c d) 2).
 #A(a(?x)) :- A(?x).
-A(a(?x:int[2])) :- A(?x).
+A(a(?x:int[2])) :- A(?x). # auto-recursing as well, can't work on its own
 }

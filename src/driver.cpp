@@ -41,6 +41,8 @@ wostream& dbg() { static wostream& os = output::to(L"debug");       return os; }
 wostream& repl(){ static wostream& os = output::to(L"repl-output"); return os; }
 wostream& ms()  { static wostream& os = output::to(L"benchmarks");  return os; }
 wostream& dump(){ static wostream& os = output::to(L"dump");        return os; }
+wostream& dump_eol()
+{ static wostream& os = output::to(L"dump") << endl; return os; }
 }
 
 void driver::transform_len(raw_term& r, const strs_t& s) {
@@ -274,7 +276,10 @@ driver::driver(wstring s, options o) : rp(), opts(o) {
 		opts.enabled(L"inference"), opts.enabled(L"dumptype"), 
 		opts.enabled(L"addbit"), opts.enabled(L"bitsfromright"), 
 		opts.enabled(L"optimize_memory"), opts.enabled(L"sort_tables"),
-		opts.enabled(L"conflicting-types"));
+		opts.enabled(L"conflicting-types"), opts.enabled(L"zerovarcomp"), 
+		opts.enabled(L"optimistic-signature-match"),
+		opts.enabled(L"compound-align-bits"), opts.enabled(L"nullvalue"),
+		opts.enabled(L"stringtables"));
 	set_print_step(opts.enabled(L"ps"));
 	set_print_updates(opts.enabled(L"pu"));
 	set_populate_tml_update(opts.enabled(L"tml_update"));

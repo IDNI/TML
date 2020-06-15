@@ -30,7 +30,8 @@ public:
 		 size_t orderid_ = 0, size_t nvars_ = 0, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(extype_), arith_op(arith_op), tab(tab_),
 		  orderid(orderid_), nvars(nvars_), types(types_),
-		  hasmultivals(hascompounds_), compoundvals(compvals_) {
+		  hasmultivals(hascompounds_), compoundvals(compvals_), 
+		  shift(args.size(), 0) {
 		DBG(check_hasmultivals(););
 		hasmultivals = calc_hasmultivals(types);
 		sync_multivals();
@@ -41,7 +42,8 @@ public:
 		 size_t nvars_ = 0, bool hascompounds_ = false)
 		: ints(args), neg(neg_), extype(term::BLTIN), tab(tab_), 
 		  orderid(orderid_), nvars(nvars_), idbltin(idbltin), types(types_),
-		  hasmultivals(hascompounds_), compoundvals(compvals_) {
+		  hasmultivals(hascompounds_), compoundvals(compvals_),
+		  shift(args.size(), 0) {
 		DBG(check_hasmultivals(););
 		hasmultivals = calc_hasmultivals(types);
 		sync_multivals();
@@ -51,7 +53,7 @@ public:
 		 bool hascompounds_ = false) // std::vector<ints> compvals_, 
 		: ints(vals), neg(false), extype(term::REL), arith_op(NOP), tab(tab_),
 		  orderid(0), nvars(0), types(types_), hasmultivals(hascompounds_), 
-		  compoundvals(vals.size()) {
+		  compoundvals(vals.size()), shift(types.size(), 0) {
 		DBG(check_hasmultivals(););
 		hasmultivals = calc_hasmultivals(types);
 		sync_multivals();
@@ -64,6 +66,7 @@ public:
 		// D: TODO: order types, bltin...
 		if (hasmultivals)
 			return compoundvals < t.compoundvals;
+		//if (shift != t.shift) return shift < t.shift;
 		return (const ints&)*this < t;
 	}
 	void replace(const std::map<int_t, int_t>& m);
@@ -87,6 +90,8 @@ public:
 		compoundvals[arg] = std::move(vals);
 		hasmultivals = true;
 	}
+	int_t get_shift(size_t arg) const { return shift[arg]; }
+	void set_shift(size_t arg, int_t shift_) { shift[arg] = shift_; }
 
 	inline static bool calc_hasmultivals(const argtypes& types) {
 		for (auto type : types) if (type.isCompound()) return true;
@@ -131,6 +136,7 @@ private:
 
 	bool hasmultivals = false; // for fast check during op<, something smarter?
 	std::vector<ints> compoundvals;
+	ints shift; // shift for compounds only (if any)
 };
 
 std::wostream& operator<<(std::wostream& os, const term& t);

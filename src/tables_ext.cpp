@@ -35,9 +35,10 @@ uints tables::get_perm_ext(const term& t, const varmap& m, size_t len,
 	// XXX: will deprecate?
 	uints perm = perm_init(abm.args_bits); // len* bits);
 	// VM: we just need vm pos
+	// any perm related is pure bits op, use w_align
 	for (size_t n = 0, b; n != len; ++n)
 		if (t[n] < 0)
-			for (b = 0; b != abm.get_bits(n); ++b)
+			for (b = 0; b != abm.get_bits_w_align(n); ++b)
 				perm[abm.pos(b,n,len)] = tblbm.pos(b,m.at(t[n]).id,len);
 	return perm;
 }
@@ -73,13 +74,21 @@ void tables::set_constants(
 	//		else exvec.push_back(false);
 	//}
 	bools exvec;
-	for (size_t arg = 0; arg < args; ++arg) {
-		for (size_t b = 0; b < bm.get_bits(arg); ++b) {
-			// TODO: this needs to be rechecked
-			if (t[arg] >= 0) exvec.push_back(true);
-			else exvec.push_back(false);
-		}
+	// any perm related is pure bits op, use w_align
+	size_t bits = bm.get_bits_w_align(0); // all bits should be the same?
+	for (size_t i = 0; i < bits; ++i) {
+		for (size_t j = 0; j< args; ++j)
+			exvec.push_back(t[j] >= 0);
+			//if (t[j] >= 0) exvec.push_back(true);
+			//else exvec.push_back(false);
 	}
+	//for (size_t arg = 0; arg < args; ++arg) {
+	//	for (size_t b = 0; b < bm.get_bits_w_align(arg); ++b) {
+	//		// TODO: this needs to be rechecked
+	//		if (t[arg] >= 0) exvec.push_back(true);
+	//		else exvec.push_back(false);
+	//	}
+	//}
 
 	q = q/exvec;
 
@@ -333,92 +342,113 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 		size_t n_vars, const bitsmeta& bm) const
 {
 	spbdd_handle r = bdd_handle::T;
-
-	// bits are no longer fixed, you can't loop w bits as outer loop, reverse it
-	// i.e. loop the args first, then get the bm.get_bits(arg) & then loop bits
-	for (size_t n = 0, b; n != n_vars; ++n)
-		for (b = 0; b != bm.get_bits(n); ++b) {
-			spbdd_handle fa = bdd_handle::T;
-			if (b == 0) {
-				fa = ::from_bit(bm.pos(b, var0, n_vars), false) &&
-					::from_bit(bm.pos(b, var1, n_vars), false);
-				r = fa && ::from_bit(bm.pos(b, var2, n_vars), false);
-			}
-			else if (b == 1) {
-				fa = ::from_bit(bm.pos(b, var0, n_vars), true) &&
-					::from_bit(bm.pos(b, var1, n_vars), true);
-				r = r && fa && ::from_bit(bm.pos(b, var2, n_vars), true);
-			}
-			else {
-				fa = full_adder(var0, var1, n_vars, b, bm);
-				r = r && bdd_ite(fa,
-					::from_bit(bm.pos(b, var2, n_vars), true),
-					::from_bit(bm.pos(b, var2, n_vars), false));
-			}
+	size_t bits = bm.get_bits_w_align(0); // all bits should be the same?
+	for (size_t b = 0; b != bits; ++b) {
+		spbdd_handle fa = bdd_handle::T;
+		if (b == 0) {
+			fa = ::from_bit(bm.pos(b, var0, n_vars),false) &&
+					::from_bit(bm.pos(b, var1, n_vars),false);
+			r = fa && ::from_bit(bm.pos(b, var2, n_vars),false);
 		}
-
-	//for (size_t b = 0; b != bits; ++b) {
-	//	spbdd_handle fa = bdd_handle::T;
-	//	if (b == 0) {
-	//		/*
-	//		fa = bdd_ite(::from_bit(pos(b, var0, n_vars),false),
-	//				 	 ::from_bit(pos(b, var1, n_vars),false),
-	//					  bdd_handle::F);
-	//		*/
-	//		fa = ::from_bit(bm.pos(b, var0, n_vars),false) &&
-	//				::from_bit(bm.pos(b, var1, n_vars),false);
-	//		r = fa && ::from_bit(bm.pos(b, var2, n_vars),false);
-	//	}
-	//	else if (b == 1) {
-	//		/*
-	//		fa = bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-	//					 ::from_bit(pos(b, var1, n_vars),true),
-	//					 bdd_handle::F);
-	//		*/
-	//		fa = ::from_bit(pos(b, var0, n_vars),true) &&
-	//				::from_bit(pos(b, var1, n_vars),true);
-	//		r = r && fa && ::from_bit(pos(b, var2, n_vars),true);
-	//	}
-	//	else {
-	//		fa = full_adder( var0, var1, n_vars , b);
-	//		r = r && bdd_ite(fa ,
-	//			::from_bit(pos(b, var2, n_vars), true),
-	//			::from_bit(pos(b, var2, n_vars), false));
-	//		/*
-	//		set<int_t> sizes;
-	//		bdd_size(r, sizes);
-	//		int_t bsize = 0;
-	//		int_t count = 0;
-	//		for (auto elem : sizes)
-	//		{	if (elem > bsize)
-	//				bsize = elem;
-	//			count++;
-	//			//o::dbg() << elem << L" , ";
-	//		}
-	//		o::dbg() <<  L" BDD size for adder bit " << b-2 << L" : "
-	//			  <<  bsize  << L" , "  << count << endl;
-	//		*/
-	//	}
-	//	//bdd::gc();
-	//}
-
-	/*
-	set<int_t> sizes;
-	bdd_size(r, sizes);
-	int_t bsize = 0;
-	int_t count = 0;
-	for (auto elem : sizes)
-	{	if (elem > bsize)
-			bsize = elem;
-		count++;
-		//o::dbg() << elem << L" , ";
+		else if (b == 1) {
+			fa = ::from_bit(bm.pos(b, var0, n_vars),true) &&
+					::from_bit(bm.pos(b, var1, n_vars),true);
+			r = r && fa && ::from_bit(bm.pos(b, var2, n_vars),true);
+		}
+		else {
+			fa = full_adder(var0, var1, n_vars , b, bm);
+			r = r && bdd_ite(fa ,
+				::from_bit(bm.pos(b, var2, n_vars), true),
+				::from_bit(bm.pos(b, var2, n_vars), false));
+		}
 	}
-	o::dbg() <<  L" BDD size for adder eq  : " <<  bsize  << L" , " \
-		  << count << endl;
-	*/
-
 	bdd::gc();
  	return r;
+
+	//spbdd_handle r = bdd_handle::T;
+	//// bits are no longer fixed, you can't loop w bits as outer loop, reverse it
+	//// i.e. loop the args first, then get the bm.get_bits(arg) & then loop bits
+	//// leq_var uses w_align, this is bits ops stuff (and full args, all roots)
+	//for (size_t n = 0, b; n != n_vars; ++n)
+	//	for (b = 0; b != bm.get_bits_w_align(n); ++b) {
+	//		spbdd_handle fa = bdd_handle::T;
+	//		if (b == 0) {
+	//			fa = ::from_bit(bm.pos(b, var0, n_vars), false) &&
+	//				::from_bit(bm.pos(b, var1, n_vars), false);
+	//			r = fa && ::from_bit(bm.pos(b, var2, n_vars), false);
+	//		}
+	//		else if (b == 1) {
+	//			fa = ::from_bit(bm.pos(b, var0, n_vars), true) &&
+	//				::from_bit(bm.pos(b, var1, n_vars), true);
+	//			r = r && fa && ::from_bit(bm.pos(b, var2, n_vars), true);
+	//		}
+	//		else {
+	//			fa = full_adder(var0, var1, n_vars, b, bm);
+	//			r = r && bdd_ite(fa,
+	//				::from_bit(bm.pos(b, var2, n_vars), true),
+	//				::from_bit(bm.pos(b, var2, n_vars), false));
+	//		}
+	//	}
+	////for (size_t b = 0; b != bits; ++b) {
+	////	spbdd_handle fa = bdd_handle::T;
+	////	if (b == 0) {
+	////		/*
+	////		fa = bdd_ite(::from_bit(pos(b, var0, n_vars),false),
+	////				 	 ::from_bit(pos(b, var1, n_vars),false),
+	////					  bdd_handle::F);
+	////		*/
+	////		fa = ::from_bit(bm.pos(b, var0, n_vars),false) &&
+	////				::from_bit(bm.pos(b, var1, n_vars),false);
+	////		r = fa && ::from_bit(bm.pos(b, var2, n_vars),false);
+	////	}
+	////	else if (b == 1) {
+	////		/*
+	////		fa = bdd_ite(::from_bit(pos(b, var0, n_vars),true),
+	////					 ::from_bit(pos(b, var1, n_vars),true),
+	////					 bdd_handle::F);
+	////		*/
+	////		fa = ::from_bit(pos(b, var0, n_vars),true) &&
+	////				::from_bit(pos(b, var1, n_vars),true);
+	////		r = r && fa && ::from_bit(pos(b, var2, n_vars),true);
+	////	}
+	////	else {
+	////		fa = full_adder( var0, var1, n_vars , b);
+	////		r = r && bdd_ite(fa ,
+	////			::from_bit(pos(b, var2, n_vars), true),
+	////			::from_bit(pos(b, var2, n_vars), false));
+	////		/*
+	////		set<int_t> sizes;
+	////		bdd_size(r, sizes);
+	////		int_t bsize = 0;
+	////		int_t count = 0;
+	////		for (auto elem : sizes)
+	////		{	if (elem > bsize)
+	////				bsize = elem;
+	////			count++;
+	////			//o::dbg() << elem << L" , ";
+	////		}
+	////		o::dbg() <<  L" BDD size for adder bit " << b-2 << L" : "
+	////			  <<  bsize  << L" , "  << count << endl;
+	////		*/
+	////	}
+	////	//bdd::gc();
+	////}
+	//
+	//set<int_t> sizes;
+	//bdd_size(r, sizes);
+	//int_t bsize = 0;
+	//int_t count = 0;
+	//for (auto elem : sizes)
+	//{	if (elem > bsize)
+	//		bsize = elem;
+	//	count++;
+	//	//o::dbg() << elem << L" , ";
+	//}
+	//o::dbg() <<  L" BDD size for adder eq  : " <<  bsize  << L" , " \
+	//	  << count << endl;
+	//
+	//bdd::gc();
+ //	return r;
 }
 
 //// ----------------------------------------------------------------------------

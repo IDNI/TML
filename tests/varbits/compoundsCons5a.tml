@@ -1,0 +1,12 @@
+{
+#@string str <tml040720.tml>.
+## #@string str <tml.g>.
+## #A( a(b(c(d(e(f(g)))))) ).
+@string str "2+2+2 test something".
+##@string str "2+2+2 testsomething".
+##@string str "some string to test how this works, testing".
+A( str_____ ).
+#B(?x ?y) :- A(?x(?y)). 
+#B(?x ?y) :- B(?p ?comp), decompose(?x ?y ?comp).
+#C(?y) :- B('w' ?y).
+}

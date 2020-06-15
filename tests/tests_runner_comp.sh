@@ -15,13 +15,20 @@ usage() {
 [[ ! -f ./tests_runner.sh ]] && usage
 [[ ! -f $tml ]] && echo "tml executable '$tml' not found" && exit 1
 
+# dir="$1"
+# shift
+# dir_expected="$1/expected"
+# save=false
+# [[ "$1" == "--save" ]] && echo "saving" && save=true && shift
+# flags="$@"
+# status=0
+
 dir="$1"
-shift
 dir_expected="$1/expected"
 save=false
-[[ "$1" == "--save" ]] && echo "saving" && save=true && shift
-flags="$@"
+[[ "$2" == "--save" ]] && echo "saving" && save=true
 status=0
+
 
 # saves output ($1) as expected ($2)
 save_output() {
@@ -49,13 +56,9 @@ clean_output() {
 
 # runs program ($1) and redirect outputs into files
 run() {
-	options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug $flags)
-	##if [[ $save == true ]]
-	##then
-	##	options+=(${@:2})
-	##else
-	##	options+=(${@:1})
-	##fi
+	#options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug $flags)
+	#options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug --conflicting-types --optimistic-signature-match --nullvalue)
+	options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug --conflicting-types)
 	for output in ${outputs[*]}; do
 		options+=("--$output" "$1.$output")
 	done

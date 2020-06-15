@@ -209,13 +209,11 @@ private:
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed, autotype = true, dumptype,
 		 testaddbit, doemptyalts, optimize_memory, sort_tables,
-		 conflicting_types = false;
+		 conflicting_types = false, zerovarcomp = true,
+		 optimistic_signature_match = false, align_bits = false,
+		 nullvalue = false, stringtables = true;
 
 	size_t max_args = 0;
-	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
-	std::map<
-		std::tuple<ints, ints, ints, int_t, int_t, uints>,
-		spbdd_handle> range_comp_memo;
 	std::map<
 		std::tuple<int_t, int_t, int_t, size_t, size_t, size_t, uints>,
 		spbdd_handle> range_compound_memo;
@@ -273,20 +271,10 @@ private:
 		const term_set& al, const term& h, alt_set& as, size_t altid);
 	rule get_rule(const raw_rule&);
 	
-	//template<typename T> void get_sym(
-	//	int_t val, size_t arg, size_t args, spbdd_handle& r, const T& at) const{
-	//	return get_sym(val, arg, args, r, at.bm);
-	//}
-	//void get_sym(
-	//	int_t val, size_t arg, size_t args, spbdd_handle& r, c_bitsmeta&) const;
 	void get_sym(
 		int_t val, multi_arg arg, size_t args, size_t startbit, size_t bits,
 		spbdd_handle& r, c_bitsmeta& bm) const;
 
-	//template<typename T> static void get_var_ex(
-	//	size_t arg, size_t args, bools& vbs, const T& at) {
-	//	return get_var_ex(arg, args, vbs, at.bm);
-	//}
 	static void get_var_ex(
 		multi_arg arg, size_t args, size_t startbit, size_t bits,
 		bools& vbs, const bitsmeta& bm);
@@ -305,17 +293,31 @@ private:
 	spbdd_handle from_sym(size_t arg, size_t args, ints, c_bitsmeta&) const;
 
 	spbdd_handle from_sym_eq(
-		multi_arg arg1, multi_arg arg2, size_t args, c_bitsmeta& bm) const;
+		multi_arg arg1, multi_arg arg2, size_t args, c_bitsmeta& bm,
+		bool samesize = true, size_t start1 = 0, size_t start2 = 0) const;
+	spbdd_handle from_sym_eq_cast(
+		multi_arg first, multi_arg rest, multi_arg from, size_t args, 
+		c_bitsmeta& bm) const;
+	spbdd_handle from_sym_eq_compose(
+		multi_arg first, multi_arg second, multi_arg from, multi_arg to, 
+		size_t args, c_bitsmeta& bm) const;
+	spbdd_handle from_sym_eq_list(
+		multi_arg tofirst, multi_arg from, size_t args,
+		c_bitsmeta& bm) const;
 
-	//template<typename T> spbdd_handle leq_const(
-	//	ints vals, size_t arg, size_t args, const T& altbl) const {
-	//	return leq_const(vals, arg, args, altbl.bm);
-	//}
+	spbdd_handle from_comp_sym_eq(
+		multi_arg arg, multi_arg itarg, multi_arg outarg, size_t args,
+		c_bitsmeta& bm) const;
+
 	bdd_handles leq_const(
 		ints vals, size_t arg, size_t args, const bitsmeta& bm) const;
+	
+	// start w/ bit b as 'bits'
 	spbdd_handle leq_const(
-		int_t val, multi_arg arg, size_t args,
-		const primtypes& types, const bitsmeta& bm) const;
+		int_t c, size_t arg, size_t args, size_t bits, size_t startbit, 
+		const bitsmeta& bm) const { 
+		return leq_const(c, arg, args, bits, bits, startbit, bm); 
+	}
 	spbdd_handle leq_const(int_t c, size_t arg, size_t args, size_t bit,
 		size_t bits, size_t startbit, const bitsmeta& bm) const;
 
@@ -333,10 +335,11 @@ private:
 	 note: we no longer have type encoded 'bits', so it's greatly simplified
 	*/
 	void range(
-		size_t arg, size_t args, bdd_handles& v, const bitsmeta& bm) const {
-		bm.types[arg].iterate([&](arg_type::iter& it) {
-			range({arg, it.i, it.path}, args, v, bm);
-			});
+		size_t arg, size_t args, bdd_handles& v, const bitsmeta& bm) const 
+	{
+		// range is for consts and we split here into subargs, so no arg::none?
+		for (auto& it : bm.types[arg])
+			range({arg, it.arg, it.path}, args, v, bm);
 	}
 
 	void range(
@@ -344,8 +347,8 @@ private:
 	spbdd_handle range(multi_arg arg, ntable tab, const bitsmeta& bm);
 
 	void range_clear_memo() {
-		range_memo.clear();
-		range_comp_memo.clear();
+		//range_memo.clear();
+		//range_comp_memo.clear();
 		range_compound_memo.clear();
 	}
 
@@ -374,14 +377,11 @@ private:
 
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
-	//term to_tbl_term(ntable, ints t, std::vector<ints> compvals, argtypes types,
-	//	size_t nvars = 0, bool neg = false, term::textype extype=term::REL, 
-	//	lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
-	//	size_t orderid = 0, bool hascompounds = false);
 	term to_tbl_term(ntable, ints t, std::vector<ints> compvals, argtypes types, 
 		size_t nvars = 0, bool neg = false, term::textype extype=term::REL, 
 		lexeme rel=lexeme{0, 0}, t_arith_op arith_op = NOP, 
-		size_t orderid = 0, bool hascompounds=false);
+		size_t orderid = 0, bool isheader = true, bool hascompounds = false, 
+		bool optimistic = false);
 	
 	static xperm deltail(
 		const alt& a, const bitsmeta& abm, const bitsmeta& tblbm);
@@ -414,7 +414,7 @@ private:
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	struct elem get_elem(int_t val, const arg_type& type) const;
-	struct elem get_elem(ints vals, const arg_type& type) const;
+	struct elem get_elem(ints vals, const arg_type& type, int_t shift) const;
 	raw_term to_raw_term(const term& t) const;
 	void out(std::wostream&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -425,7 +425,8 @@ private:
 	bool equal_types(const table& tbl, const alt& a) const;
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
-	ntable get_table(const sig& s, const argtypes& types = {});
+	ntable get_table(const sig& s, const argtypes& types);
+	ntable get_table(const sig& s, const argtypes& types, bool& optimistic);
 	//ntable get_table(const sig& s, size_t len, ints arity = {});
 	void table_increase_priority(ntable t, size_t inc = 1);
 	void set_priorities(const flat_prog&);
@@ -518,7 +519,10 @@ public:
 		bool bin_transform = false, bool print_transformed = false,
 		bool autotype = true, bool dumptype = false, bool addbit = false,
 		bool bitsfromright = true, bool optimize_memory = false,
-		bool sort_tables = false, bool conflicting_types = false);
+		bool sort_tables = false, bool conflicting_types = false,
+		bool zerovarcomp = true, bool optimistic_signature_match = false,
+		bool align_bits = false, bool nullvalue = false, 
+		bool stringtables = true);
 	~tables();
 	size_t step() { return nstep; }
 	void add_prog(const raw_prog& p, const strs_t& strs);

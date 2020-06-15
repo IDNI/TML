@@ -44,12 +44,14 @@ maps tbl to tbl, it should always be from > to, if not swap.
 (we always call map_type w/ rvalues, we don't care if they change)
 { table/rule, alt|-1, arg } // nothing for body|term?
 */
-bool infer_types::map_type(multi_arg from, multi_arg to) {
+bool infer_types::map_type(multi_arg from, multi_arg to, bool noswap) {
 	if (from == to) return true; // do nothing
 	bool ret = true;
-	if (from < to) {
+	if (!noswap && from < to) {
 		swap(from, to);
 		ret = false; // it's flipped
+	} else if (noswap && from < to) {
+		o::dump() << L"no swap but wrong order map?" << endl;
 	}
 	// TODO: alt_arg needs no path?
 	map_type(alt_arg{ from, -1 }, to);
@@ -89,30 +91,62 @@ void infer_types::map_type(alt_arg from, multi_arg to) {
 	}
 	related.insert(from);
 
-	multi_arg root{-1, arg::none, arg::none, {}};
+	//multi_arg root{-1, arg::none, arg::none, {}};
+	multi_arg root = multi_arg::get_empty();
 	if (get_root_type(from, root) && root != to) { // if(root!=from && root!=to)
 		if (root < to) swap(root, to);
 		map_type(root, to);
 	}
 
-	mtyps.emplace(from, to);
+	if (auto ret = mtyps.emplace(from, to); ret.second == false) {
+		mtyps.find(from)->second = to;
+	}
 }
 
+void infer_types::propagate_types(const alt_arg& atype, bitsmeta& bm,
+								  const multi_arg& type, bitsmeta& rootbm,
+								  bool& lchg, bool& rchg, bool force) {
+	if (atype.special == multi_arg::Size) {
+		const arg_type& subtype = rootbm.types[type.arg][type];
+		subtype.ensureCompound("propagate_types.::Size"); 
+		// if (!subtype.isCompound()) throw 0;
+		size_t size = subtype.compound.get_primitives().size();
+		bitsmeta::sync_types(
+			bm.types, (multi_arg)atype, 
+			{base_type::INT, bitsmeta::BitScanR(int_t(size-1)), int_t(size-1)});
+		lchg = true;
+	} else if(atype.special == multi_arg::Element) {
+		const arg_type& subtype = rootbm.types[type.arg][type];
+		subtype.ensureCompound("propagate_types.::Element");
+		// if (!subtype.isCompound()) throw 0;
+		const primitive_type& element = subtype.compound.get_primitives()[0];
+		bitsmeta::sync_types(
+			bm.types, (multi_arg)atype, 
+			element);
+		lchg = true;
+	} else {
+		//if(force && bm.types)
+		bitsmeta::sync_types(
+			bm.types, (multi_arg)atype,
+			rootbm.types, type, lchg, rchg, force);
+	}
+}
 /*
  This actually syncs all types, once type inference is done (get_types)
 */
 void infer_types::propagate_types() {
-	for (auto& it : minvtyps) {
-		const multi_arg& type = it.first;
+	//for (auto& it : minvtyps) {
+	for (const auto& [type, related] : minvtyps) {
+		//const multi_arg& type = it.first;
 		auto& bm = tbls[type.tab].bm;
 
-		// this is a 'hint' of recursion here if it fails
+		// there's a 'hint' of recursion here if it fails
 		//DBG(assert(type == get_root_type(type)););
 		//if (type != get_root_type(type)) {
 		//	wcout << L"type!=root_type:" << 
 		//		type << L"," << get_root_type(type) << L"," << endl;
 		//}
-		//DBG(assert(it.second.empty() || type == get_root_type(type)););
+		//DBG(assert(related.empty() || type == get_root_type(type)););
 
 		DBG(assert(type.arg < bm.get_args()););
 		//propagate_types(type);
@@ -120,14 +154,15 @@ void infer_types::propagate_types() {
 		size_t ntries = 0;
 		do {
 			rootchanged = false;
-			for (const alt_arg& atype : it.second) {
+			for (const alt_arg& atype : related) { // it.second
 				bool lchg = false, rchg = false;
 				if (atype.alt == -1) {
 					auto& tblbm = tbls[atype.tab].bm;
 					DBG(assert(atype.arg < tblbm.get_args()););
-					bitsmeta::sync_types(
-						tblbm.types, (multi_arg)atype,
-						bm.types, type, lchg, rchg);
+					propagate_types(atype, tblbm, type, bm, lchg, rchg);
+					//bitsmeta::sync_types(
+					//	tblbm.types, (multi_arg)atype,
+					//	bm.types, type, lchg, rchg);
 					if (rchg)
 						rootchanged = true;
 				}
@@ -137,14 +172,19 @@ void infer_types::propagate_types() {
 					DBG(assert(has(altstyped, altkey)););
 					alt& a = altstyped[altkey];
 					DBG(assert(atype.arg < a.bm.get_args()););
-					bitsmeta::sync_types(
-						a.bm.types, (multi_arg)atype, bm.types, type, lchg, rchg);
+					// it happens (rarely) that alt is not synced w tbl if !none
+					// so if mapping alt to an 'own' table - force alt args sync
+					bool force= atype.tab == type.tab && atype.arg < a.hvarslen;
+					// && atype.arg == type.arg // ?
+					propagate_types(atype, a.bm, type, bm, lchg, rchg, force);
+					//bitsmeta::sync_types(
+					//	a.bm.types, (multi_arg)atype, bm.types, type, lchg, rchg);
 					if (rchg)
 						rootchanged = true;
 				}
 			}
 			if (rootchanged) {
-				o::dump() << L"root changed, repeat..." << endl;
+				//o::dump() << L"root changed, repeat..." << endl;
 			}
 			ntries++;
 			if (ntries > 3) {
@@ -182,7 +222,9 @@ bool infer_types::get_root_type(const alt_arg& type, multi_arg& root) const {
 	return false; // type;
 }
 multi_arg infer_types::get_root_type(const multi_arg& type) const {
-	multi_arg root{-1, arg::none, arg::none, {}}; //multi_arg root{ -1, 0 };
+	//multi_arg root{-1, arg::none, arg::none, {}};
+	multi_arg root = multi_arg::get_empty();
+
 	if (get_root_type(alt_arg{type, -1}, root))
 		return root;
 	return type;
@@ -271,7 +313,9 @@ void infer_types::get_term_types(
 	if (t.tab == -1) {
 		// if we're 'exiting' we need to sync types changes to root
 		// comp arg will also always have root, just could be {tbl, arg, subarg}
-		multi_arg root{-1, arg::none, arg::none, {}}; //multi_arg root{ -1, 0 };
+		//multi_arg root{-1, arg::none, arg::none, {}};
+		multi_arg root = multi_arg::get_empty();
+
 		// h.tab, alt + alt-var# (arg.id) (for alt arg/sub rarely play)
 		if (get_root_type({ info.tab, info.altid, arg.id }, root)) {
 			bitsmeta::sync_types(
@@ -294,8 +338,9 @@ void infer_types::get_term_types(
 			alt_arg{ info.tab, info.altid, arg.id },
 			multi_arg{ info.tab, harg.arg, harg.subarg, harg.path });
 		// rule/tbl => body/tbl
-		if (!map_type(
-			multi_arg{ info.tab, harg.arg, harg.subarg, harg.path }, targ)) {
+		//bool ret = 
+		map_type(multi_arg{ info.tab, harg.arg, harg.subarg, harg.path }, targ);
+		if (true) { //!ret) {
 			// false==flipped, root is rule/tbl, uptodate it
 			// we only need to keep the root up-to-date w/ latest
 			bitsmeta::sync_types(
@@ -342,26 +387,42 @@ void infer_types::get_alt_types(const term& h, size_t altid) {
 		// either a prim, or is a 0-arg of a comp. we can't have in the middle.
 		// and path should help w/ that, if last arg in the path is 0, it's prim
 		// or full comp, nothing else to think about here.
-		bm.types[n].iterate(h.multivals()[n], [&](arg_type::iter it) {
-			get_header_types({h.tab, n, it.i, it.path}, it.val, it.type, info);
-		});
-		//bool issinglevar = h[n] < 0 && !h.is_multi(n);
-		//if (issinglevar || bm.types[n].isPrimitive())
-		//	get_header_types({ h.tab , n, arg::none}, h[n], bm.types[n], info);
-		//else if (bm.types[n].isCompound()) {
-		//	const ints& vals = h.multivals()[n];
-		//	const primtypes& ctypes = bm.types[n].compound.types;
-		//	if (vals.size() != ctypes.size())
-		//		throw runtime_error("get_alt_types: types vals sizes differ?");
-		//	for (size_t i = 0; i != vals.size(); ++i)
-		//		get_header_types({ h.tab, n, i }, vals[i], ctypes[i], info);
-		//}
-		//else 
-		//	throw runtime_error("get_alt_types: type kind not implemented?");
+		for (auto& it : type_vals{ bm.types[n], h.multivals()[n] }) {
+			// it.i can be none, so leave it for now
+			//const arg_type& subtype = it.container; // it.type()
+			get_header_types(
+				{h.tab, n, it.arg, it.path}, it.val, it.container, info);
+		}
 	}
 	DBG(assert(info.m.size() == info.varslen););
 }
 
+void infer_types::sync_map_alt_var(
+	const term& h, int_t val1, int_t val2, alt_info& info) {
+	//map_type(toarg, fromarg);
+	bitsmeta::sync_types(
+		info.types, {info.m.at(val1).id, arg::none, {}}, 
+		info.types, {info.m.at(val2).id, arg::none, {}});
+	if (auto it = info.mh.find(val1); it != info.mh.end())
+		bitsmeta::sync_types(
+			info.types, {info.m.at(val1).id, arg::none, {}}, 
+			tbls[h.tab].bm.types, (multi_arg)it->second);
+}
+
+multi_arg infer_types::sync_map_alt_var(
+	const term& h, int_t val, const primitive_type& type, alt_info& info) {
+	// TODO: this may not be right, multi_arg loses the alt 'id'
+	//multi_arg arg = (multi_arg)info.m.at(val);
+	//alt_arg arg{info.tab, info.altid, info.m.at(val).id, arg::none, {}};
+	multi_arg arg{ info.m.at(val).id, arg::none, {} };
+	bitsmeta::sync_types(info.types, arg, type);
+	if (auto it = info.mh.find(val); it != info.mh.end()) {
+		//map_type(arg, (multi_arg)it->second);
+		bitsmeta::sync_types(
+			info.types, arg, tbls[h.tab].bm.types, (multi_arg)it->second);
+	}
+	return arg;
+}
 /*
  Go through alt/terms and do 2 things a) sync or b) map types
  - sync is important to keep the 'root table' in sync (and build up/merge types)
@@ -373,7 +434,7 @@ void infer_types::get_alt_types(const term& h, const term_set& al, size_t altid)
 	alt_info info{ h.tab, argtypes{}, int_t(altid), al.empty() };
 	bitsmeta& hbm = tbls[h.tab].bm;
 	for (size_t n = 0; n != h.size(); ++n) {
-		DBG(assert(hbm.types[n].isPrimitive() == h.types[n].isPrimitive()););
+		//DBG(assert(hbm.types[n].isPrimitive() == h.types[n].isPrimitive()););
 		#ifdef INCLUDE_CONSTS
 		if (include_consts && h.is_const(n)) {
 			// this is if we at all want to include consts in types/varslen
@@ -388,22 +449,12 @@ void infer_types::get_alt_types(const term& h, const term_set& al, size_t altid)
 		// to include compound vars (that represent the whole compound)
 		// TODO: use .iterate now that we have it
 		// rec comp: it.i should be a path and multi_arg too
-		hbm.types[n].iterate(h.multivals()[n], [&](arg_type::iter it) {
-			get_header_types({h.tab, n, it.i, it.path}, it.val, it.type, info);
-		});
-		//bool issinglevar = h[n] < 0 && !h.is_multi(n);
-		//if (issinglevar || hbm.types[n].isPrimitive())
-		//	get_header_types({ h.tab, n }, h[n], hbm.types[n], info);
-		//else if (hbm.types[n].isCompound()) {
-		//	const ints& vals = h.multivals()[n];
-		//	const primtypes& ctypes = hbm.types[n].compound.types;
-		//	if (vals.size() != ctypes.size())
-		//		throw runtime_error("get_alt_types: types vals sizes differ?");
-		//	for (size_t i = 0; i != vals.size(); ++i)
-		//		get_header_types({h.tab, n, i}, vals[i], ctypes[i], info);
-		//}
-		//else 
-		//	throw runtime_error("get_alt_types: type kind not implemented?");
+		for (auto& it : type_vals{ hbm.types[n], h.multivals()[n] }) {
+			// it.i can be none, so leave it for now
+			//const arg_type& subtype = it.container; // it.type()
+			get_header_types(
+				{h.tab, n, it.arg, it.path}, it.val, it.container, info);
+		}
 	}
 
 	DBG(assert(info.varslen == info.m.size()););
@@ -419,38 +470,19 @@ void infer_types::get_alt_types(const term& h, const term_set& al, size_t altid)
 					for (const primitive_type& prim : type.get_primitives())
 						acc = max(acc, prim.num);
 					return acc;
-					//if (type.isPrimitive())
-					//	return std::max(acc, type.primitive.num);
-					//else if (type.isCompound()) {
-					//	// not sure if this makes sense though
-					//	for (const primitive_type& prim : type.get_primitives())
-					//		acc = max(acc, prim.num);
-					//	return acc;
-					//}
-					//return acc; // throw 0; // ??
 				});
 		for (size_t n = 0; n != t.size(); ++n) {
-			// TODO: use .iterate now that we have it
-			t.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
-				get_term_types(t, {t.tab, n, it.i, it.path}, it.val, it.type, 
+			for (auto& it : type_vals{ t.types[n], t.multivals()[n] }) {
+				// it.i can be none, so leave it for now
+				// TODO: produces strange effect, it's primitive to start (here)
+				// gets subarg 1 and path {1}, but later in inference becomes a 
+				// compound, subarg is no longer valid, path still is
+				// no easy way, we should just sync subarg/path after inference.
+				const arg_type& subtype = it.container; // it.type()
+					//it.container.isPrimitive() ? it.type() : it.container;
+				get_term_types(t, {t.tab, n, it.arg, it.path}, it.val, subtype,
 							   bm, tnums, info);
-			});
-			//bool issinglevar = t[n] < 0 && !t.is_multi(n);
-			//if (issinglevar || t.types[n].isPrimitive())
-			//	get_term_types(
-			//		t, { t.tab, n }, t[n], t.types[n], bm, tnums, info); 
-			//else if (t.types[n].isCompound()) {
-			//	const ints& vals = t.multivals()[n];
-			//	const primtypes& ctypes = t.types[n].compound.types;
-			//	if (vals.size() != ctypes.size())
-			//		throw runtime_error(
-			//			"get_alt_types: types vals sizes differ?");
-			//	for (size_t i = 0; i != vals.size(); ++i)
-			//		get_term_types(
-			//			t, {t.tab, n, i}, vals[i], ctypes[i], bm, tnums, info); 
-			//}
-			//else 
-			//	throw runtime_error("get_alt_types: type kind not implemented?");
+			}
 		}
 		// process builtins, eq-s etc. that have special type mapping rules
 		// do it 'outside the loop' as builtins often need to calc as a whole
@@ -472,10 +504,58 @@ void infer_types::get_alt_types(const term& h, const term_set& al, size_t altid)
 						info.types, (multi_arg)arg,
 						tbls[h.tab].bm.types, (multi_arg)harg);
 				}
+			} else if (bltintype == L"iterate") {
+				multi_arg arg{ info.m.at(t[0]) };
+				alt_arg itarg{ 
+					info.tab, info.altid, info.m.at(t[1]).id, arg::none, {} };
+				alt_arg outarg{
+					info.tab, info.altid, info.m.at(bltinout).id, arg::none,{}};
+				multi_arg argsize{ arg };
+				itarg.special = multi_arg::Size; // put this on dependent type
+				outarg.special = multi_arg::Element;
+				map_type(outarg, arg); // , true);
+				map_type(itarg, argsize); // , true);
+			} else if(bltintype == L"cast") {
+			} else if (bltintype == L"decompose") {
+				multi_arg from{ info.m.at(t[2]) };
+				alt_arg to{h.tab, info.altid, info.m.at(t[1]).id, arg::none,{}};
+				map_type(to, from);
+				sync_map_alt_var(h, t[1], t[2], info);
+
+			} else if (bltintype == L"rnd") {
 			}
 			// TODO: add other builtins type support
 		}
-		else if (t.extype == term::ARITH) {}
+		else if (t.extype == term::ARITH) {
+			switch (t.arith_op) {
+			case ADD:
+			{
+				multi_arg arg0{ multi_arg::get_empty() };
+				multi_arg arg1{ multi_arg::get_empty() };
+				if (t[0] < 0) arg0 = 
+					sync_map_alt_var(h, t[0], { base_type::INT, 0 }, info);
+				if (t[1] < 0) arg1 = 
+					sync_map_alt_var(h, t[1], { base_type::INT, 0 }, info);
+				if (t[2] < 0) {
+					multi_arg argsum = 
+						sync_map_alt_var(h, t[2], {base_type::INT, 0},info);
+					if (t[0] < 0)
+						map_type(
+							{h.tab, int_t(altid),
+							 info.m.at(t[2]).id, multi_arg::Sum},
+							arg0);
+					if (t[1] < 0)
+						map_type(
+							{h.tab, int_t(altid),
+							 info.m.at(t[2]).id, multi_arg::Sum},
+							arg1);
+				}
+
+				break;
+			}
+			default: break;
+			}
+		}
 		// TODO: we can optimize this based on eq/neg/leq and consts if any
 		// simple rule atm: var has the min bits of the largest const 
 		else if (t.extype == term::EQ || t.extype == term::LEQ) {}

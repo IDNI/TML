@@ -1,0 +1,8 @@
+A(a(b(c(d(e(f(g))))))).
+B(a b(c(d(e(f(g)))))).
+B(b c(d(e(f(g))))).
+B(c d(e(f(g)))).
+B(d e(f(g))).
+B(e f(g)).
+B(f g)).
+B(g ()).

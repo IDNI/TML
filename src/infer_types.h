@@ -57,7 +57,7 @@ public:
 	bool get_root_type(const alt_arg& type, multi_arg& root) const;
 	multi_arg get_root_type(const multi_arg& type) const;
 	multi_arg get_fix_root_type(const multi_arg& type);
-	bool map_type(multi_arg from, multi_arg to);
+	bool map_type(multi_arg from, multi_arg to, bool noswap = false);
 	void map_type(alt_arg from, multi_arg to);
 	//void map_type(multi_arg to);
 	void propagate_types();
@@ -77,6 +77,14 @@ private:
 			headerOnly(headerOnly) {}
 	};
 
+	void sync_map_alt_var(
+		const term& h, int_t val1, int_t val2, alt_info& info);
+	multi_arg sync_map_alt_var(
+		const term& h, int_t val, const primitive_type& type, alt_info& info);
+
+	static void propagate_types(
+		const alt_arg& atype, bitsmeta& bm, const multi_arg& type,
+		bitsmeta& rootbm, bool& lchg, bool& rchg, bool force = false);
 	void propagate_types(const multi_arg& intype);
 	void get_alt_types(const term& h, size_t altid);
 	void get_alt_types(const term& h, const term_set& al, size_t altid);

@@ -21,6 +21,8 @@
 
 using namespace std;
 
+bool compound_type::align_bits = false;
+
 tbl_arg::tbl_arg(const alt_arg& other) 
 	: tab(other.tab), arg(other.arg), subarg(other.subarg) {
 	//DBG(assert(other.alt == -1););
@@ -30,9 +32,9 @@ tbl_arg::tbl_arg(const alt_arg& other)
 //	: tab(other.tab), arg(other.arg), subarg(other.subarg) {
 //}
 
-multi_arg::multi_arg(const alt_arg& other)
-	: tab(other.tab), arg(other.arg), subarg(other.subarg), path{other.path} {
-}
+multi_arg::multi_arg(const alt_arg& other) : 
+	tab(other.tab), arg(other.arg), subarg(other.subarg), path{other.path},
+	special(other.special) {}
 multi_arg::multi_arg(const vm_arg& other)
 	: tab(other.tab), arg(other.arg), subarg(other.subarg), path(other.path) {
 }
@@ -40,14 +42,17 @@ multi_arg::multi_arg(const vm_arg& other)
 // not optimal, cache this somehow? (on init, no changes after?)
 size_t compound_type::calc_sum(const vtypes& types) {
 	size_t sum = 0;
+	// this is base raw sum, only regular sub-type bits, alignment's added later
 	for (auto type : types) sum += type.get_bits();
+	//if (has_alignment()) sum += alignment.bitness;
 	return sum;
 }
 
-//size_t compound_type::get_bits(size_t subarg) const {
-//	if (subarg >= types.size()) throw 0;
-//	return types[subarg].get_bits(); // .bitness;
-//}
+size_t compound_type::calc_no_primitives(const vtypes& types) {
+	size_t sum = 0;
+	for (auto type : types) sum += type.get_no_primitives();
+	return sum;
+}
 
 // TODO: we'll need some index or path returned w/ this to be usable
 primtypes compound_type::get_primitives() const {
@@ -91,6 +96,28 @@ primtype_paths compound_type::get_primitives(sizes path) const {
 		}
 	}
 	return primes;
+}
+
+bool compound_type::isAllNone() const {
+	for (const arg_type& type : types) if (!type.isAllNone()) return false;
+	return true;
+}
+
+// just to check/DBG overall corectness, only top/roots should have alignment on
+bool compound_type::check_sub_types_noalign() const {
+	for (const arg_type& type : types)
+		if (type.has_alignment() || !type.check_sub_types_noalign())
+			return false;
+	return true;
+}
+
+compound_type compound_type::trim_align(compound_type original) {
+	for (size_t i = 0; i < original.types.size(); ++i) {
+		arg_type& type = original.types[i];
+		if (!type.has_alignment() && type.check_sub_types_noalign()) continue;
+		type = type::trim_align(std::move(type));
+	}
+	return original;
 }
 
 // copy ctor, move, op=, dctor is only because of the union, nothing special
@@ -159,12 +186,15 @@ type& type::get_idx(sizes path, size_t level) {//, size_t subarg = 0
 	size_t idx = path[level];
 	switch (kind) {
 		case Primitive: 
-			if (idx > 0) throw std::out_of_range("type[]: id > 0");
+			if (idx > 0) 
+				throw std::out_of_range("type[]: id > 0");
 			return *this; // eol, just ret this
 		case Compound:
 			if (idx >= compound.types.size())
 				throw std::out_of_range("type[]<compound>: id >= size");
 			// iffy, if path stops at compound return comp? might make sense
+			// arg::none means 0 in this context (we're alone and 0, full type)
+			idx = arg::get_zero_based(idx);
 			if (level+1 >= path.size()) return compound.types[idx];
 			return compound.types[idx].get_idx(path, level + 1);
 		default: 
@@ -179,7 +209,8 @@ const type& type::get_idx(
 	size_t idx = path[level];
 	switch (kind) {
 		case Primitive: 
-			if (idx > 0) throw std::out_of_range("type[]: id > 0");
+			if (idx > 0) 
+				throw std::out_of_range("type[]: id > 0");
 			return *this; // eol, just ret this
 		case Compound:
 			if (idx >= compound.types.size())
@@ -273,17 +304,6 @@ int_t type::get_syms(size_t nsyms) const {
 	}
 }
 
-// this isn't right any more and thus removed, rework or don't use
-//size_t type::get_bits(size_t subarg) const {
-//	switch (kind) {
-//	case Primitive:
-//		if (subarg != arg::none) throw 0;
-//		return primitive.bitness;
-//	case Compound: return compound.get_bits(subarg);
-//	default: throw 0;
-//	}
-//}
-
 /*
 	get_start of a sub-primitive
 	- arg (multi_arg) has arg set to type, and subarg is what counts here
@@ -291,9 +311,10 @@ int_t type::get_syms(size_t nsyms) const {
 */
 size_t type::get_start(const multi_arg& arg) const {
 	const primtypes& types = get_primitives();
-	if (arg.subarg == arg::none) return 0;
+	//if (arg.subarg == arg::none) return 0;
+	if (arg::is_zero(arg.subarg)) return 0;
 	for (size_t i = 0, startbit = 0; i != types.size(); ++i) {
-		if (i == arg.subarg) return startbit;
+		if (i == size_t(arg.subarg)) return startbit;
 		startbit += types[i].bitness;
 	}
 	throw std::runtime_error("get_start, out of range?");
@@ -303,11 +324,12 @@ size_t type::get_start(const multi_arg& arg) const {
 	get_start of a sub-compound (sub-type), not sub-primitive (see below)
 	TODO: this needs get_start(get_primitives)
 */
-size_t type::get_compound_start(size_t subarg) const {
+size_t type::get_compound_start(int_t subarg) const { // size_t subarg
 	switch (kind) {
 		case Primitive:
 		{
-			if (subarg != arg::none) throw 0;
+			//if (subarg != arg::none) throw 0;
+			if (subarg > 0) throw 0;
 			return 0;
 			break;
 		}
@@ -317,9 +339,10 @@ size_t type::get_compound_start(size_t subarg) const {
 			// in case arg::none is -1 or so, handle it to ret full/0
 			if (subarg == arg::none) return 0;
 			for (size_t i = 0; i != compound.types.size(); ++i) {
-				if (i == subarg) return startbit;
+				if (i == (size_t)subarg) return startbit;
 				const type& type = compound.types[i];
-				startbit += type.get_bits();
+				// w startbits we have to take all bits (w/ align)
+				startbit += type.get_bits_w_align(); // get_bits();
 			}
 			throw 0;
 			break;
@@ -368,10 +391,10 @@ size_t type::sizeof_primitives() const {
 
 void type::calc_primes_map() {
 	if (mprimes.empty()) {
-		r_iterate([&](primitive_type&, size_t, sizes path, size_t i) {
-			if (mprimes.size() != i) throw std::runtime_error("mprimes, i");
-			mprimes.emplace_back(path); // mprimes[i] = path;
-		});
+		for (const auto& it : *this) {
+			if (mprimes.size() != it.id) throw std::runtime_error("mprimes, i");
+			mprimes.emplace_back(it.path); // mprimes[it.id] = path;
+		}
 	}
 }
 
@@ -391,29 +414,32 @@ primitive_type& type::get_primitive(size_t idx) {
 	return type.get_primitive(idpath[1]);
 }
 
-type& type::get_sub_type(size_t idx) {
+type& type::get_sub_type(int_t idx) { // size_t idx
+	size_t subarg = arg::get_zero_based(idx);
 	if (isPrimitive()) {
 		if (idx > 0) throw std::out_of_range("get_sub_type: primitive");
 		return *this;
 	}
 	calc_primes_map();
-	if (mprimes.size() <= idx) throw std::out_of_range("get_sub_type");
-	sizes idpath = mprimes[idx]; //.at instead
+	if (mprimes.size() <= subarg) throw std::out_of_range("get_sub_type");
+	sizes idpath = mprimes[subarg]; //.at instead
 	if (idpath.empty()) throw std::out_of_range("get_sub_type: idpath");
 	type& type = get_idx({ idpath[0] }); //= operator[](sizes{idpath[0]});
 	if (idpath.size() == 1) return type; // means 1st is primitive
 	return type.get_sub_type(idpath[1]);
 }
 
-const type& type::get_sub_type(size_t idx) const {
+// doesn't handle subarg==arg::none, we just need sub by idx, that ok?
+const type& type::get_sub_type(int_t idx) const { // size_t idx
+	size_t subarg = arg::get_zero_based(idx);
 	if (isPrimitive()) {
 		if (idx > 0) throw std::out_of_range("get_sub_type: primitive");
 		return *this;
 	}
-	if (!isCompound()) throw std::runtime_error("not implemented type");
+	ensureCompound(); // if (!isCompound()) throw std::runtime_error("");
 	if (!mprimes.empty()) {
-		if (mprimes.size() <= idx) throw std::out_of_range("get_sub_type");
-		sizes idpath = mprimes.at(idx);
+		if (mprimes.size() <= subarg) throw std::out_of_range("get_sub_type");
+		sizes idpath = mprimes.at(subarg);
 		if (idpath.empty()) throw std::out_of_range("get_sub_type: idpath");
 		const type& type = get_idx({ idpath[0] }); //operator[]({idpath[0]});
 		if (idpath.size() == 1) return type;
@@ -421,21 +447,23 @@ const type& type::get_sub_type(size_t idx) const {
 	} else {
 		for (size_t i = 0; i != compound.types.size(); ++i) {
 			const type& type = compound.types[i];
-			if (i == idx) return type;
+			if (i == subarg) return type;
 			if (type.isPrimitive()) continue;
-			if (!type.isCompound())
-				throw std::runtime_error("not implemented type");
-			return type.get_sub_type(idx - i);
+			type.ensureCompound("get_sub_type: compound required!");
+			//if (!type.isCompound()) throw std::runtime_error("");
+			return type.get_sub_type(subarg - i);
 		}
 		throw std::runtime_error("get_sub_type: shouldn't happen?");
 		//get_primitives(sizes path)
-		//return compound.get_sub_type(idx);
+		//return compound.get_sub_type(subarg);
 	}
 }
 
 // called on bitsmeta init, when done syncing and all, to create mprimes
 void type::init() {
 	if (isCompound()) {
+		compound.reset();
+		compound.init();
 		calc_primes_map();
 		// probably not needed but who knows if recursion takes off
 		for (size_t i = 0; i != compound.types.size(); ++i)
@@ -454,16 +482,24 @@ bool type::can_discard_path(multi_arg) const {
 }
 
 bool type::check_arg_path(multi_arg arg) const {
-	if (mprimes.empty() || (arg.subarg == arg::none && arg.path.empty()))
+	size_t subarg = arg::get_zero_based(arg.subarg);
+	//if (mprimes.empty() || (arg.subarg == arg::none && arg.path.empty()))
+	if (mprimes.empty() || (arg::is_zero(subarg) && arg.path.empty()))
 		return true;
-	if (mprimes[arg.subarg] != arg.path) {
+	if (mprimes[subarg] != arg.path) {
 		// mprimes vs paths are created differently, mprimes has 0 as last
-		const sizes& path = mprimes[arg.subarg];
-		if (path.size() == arg.path.size() + 1 && path.back() == 0) {
-			//sizes trimmed(path.begin(), path.begin() + (path.size() -1));
-			sizes trimmed(path.begin(), path.end() - 1);
-			if (trimmed == arg.path) return true;
+		//const sizes& path = mprimes[subarg];
+		sizes path = mprimes[subarg];
+		// trim zeroes at the end?
+		while (path.back() == 0) {
+			path.pop_back();
+			if (path == arg.path) return true;
 		}
+		//if (path.size() == arg.path.size() + 1 && path.back() == 0) {
+		//	//sizes trimmed(path.begin(), path.begin() + (path.size() -1));
+		//	sizes trimmed(path.begin(), path.end() - 1);
+		//	if (trimmed == arg.path) return true;
+		//}
 		throw std::runtime_error("op[] subarg, path mismatch?");
 	}
 	return true;
@@ -477,7 +513,7 @@ type& type::get_tail_type() {
 
 // should be called on comp only, not on primitives
 type& type::get_tail_compound() {
-	if (!isCompound()) throw std::runtime_error("compound expected!");
+	ensureCompound(); // if (!isCompound()) throw std::runtime_error("");
 	if (compound.types.back().isPrimitive()) return *this;
 	return compound.types.back().get_tail_compound();
 }
@@ -486,7 +522,7 @@ type& type::get_tail_compound() {
 vtypes& type::get_tail_types() {
 	if (isPrimitive()) throw std::runtime_error("primitive not expected!");
 	// TODO: handle other types?
-	if (!isCompound()) throw std::runtime_error("only compound expected!");
+	ensureCompound(); // if (!isCompound()) throw std::runtime_error("");
 	if (compound.types.back().isPrimitive()) return compound.types;
 	return compound.types.back().get_tail_types();
 }
@@ -500,21 +536,45 @@ vtypes& type::get_tail_types(vtypes& types) {
 vtypes& type::get_tail_types(vtypes& types, size_t level) {
 	if (level == 0) return types;
 	if (types.back().isPrimitive()) return types; // means we're at top
-	if (!types.back().isCompound())
-		throw std::runtime_error("only compound expected!");
+	types.back().ensureCompound("get_tail_types: only compound expected!");
+	//if (!types.back().isCompound()) throw std::runtime_error("");
 	return get_tail_types(types.back().compound.types, level-1);
 }
 
+bool type::isCompatible(const type& other, bool optimistic) const {
+	if (!isSigCompatible(*this, other, optimistic)) return false;
+	if (kind == other.kind ||
+		isNone() ||
+		other.isNone()) {
+		if (isPrimitive() ||
+			other.isPrimitive() ||
+			sig == other.sig || 
+			sig.empty() || 
+			other.sig.empty())
+			return true;
+		else if (isCompound()) { // sig-s are different, drill into it
+			// sig-s are compatible so no need for this
+			return true;
+		}
+		// should we throw here actually? throw runtime_error("");
+		return false; //return true;
+	}
+	return false;
+}
+
 bool type::isCompatible(
-	const std::vector<type>& l, const std::vector<type>& r) {
+	const std::vector<type>& l, const std::vector<type>& r, bool optimistic) {
 	if (l.size() != r.size()) return false;
 	for (size_t i = 0; i != l.size(); ++i)
-		if (!l[i].isCompatible(r[i])) return false;
+		if (!l[i].isCompatible(r[i], optimistic)) return false;
 	return true;
 }
 
-bool type::isSigCompatible(const type& l, const type& r) {
+bool type::isSigCompatible(const type& l, const type& r, bool optimistic) {
+	//if (optimistic) return true; // just like that, for now
 	if (l.sig == r.sig) return true; // in any case that's fine?
+	if (optimistic && (l.isNone() || r.isNone())) 
+		return true;
 	if (l.isNone() && !l.sig.empty())
 		return r.isCompound() && normalize_sig(l.sig)==normalize_sig(r.sig);
 	if (r.isNone() && !r.sig.empty())
@@ -525,6 +585,8 @@ bool type::isSigCompatible(const type& l, const type& r) {
 			// is this possible and allowed?
 			return true; // false;
 		}
+		if (optimistic && (l.isAllNone() || r.isAllNone()))
+			return true;
 		// sig-s are different, drill into it
 		if (l.compound.types.size() != r.compound.types.size())
 			return false;
@@ -537,7 +599,7 @@ bool type::isSigCompatible(const type& l, const type& r) {
 				// we don't care about bitness?
 				if (lsub.primitive.type == rsub.primitive.type) continue;
 			}
-			else if (isSigCompatible(lsub, rsub)) continue;
+			else if (isSigCompatible(lsub, rsub, optimistic)) continue;
 			// not sure if recursing here is right, we just want same type?
 			return false;
 		}
@@ -580,6 +642,8 @@ wostream& operator<<(wostream& os, const arg_type& type) {
 			//if (i != 0) os << L" ";
 			os << types[i];
 		}
+		if (type.has_alignment())
+			os << L":align" << L"[" << type.get_alignment_bits() << L"]";
 		os << L")";
 		return os;
 	}
@@ -619,107 +683,3 @@ wostream& operator<<(wostream& os, const bitsmeta& bm) {
 	}
 	return os;
 }
-
-//compound_type::compound_type(const compound_type& other) { // noexcept
-//	types = other.types;
-//	sumOfBits = other.sumOfBits;
-//	//sumOfBits = calc_sum();
-//}
-//compound_type::compound_type(compound_type&& other) noexcept {
-//	types = std::move(other.types); break;
-//	sumOfBits = other.sumOfBits;
-//	//sumOfBits = calc_sum();
-//}
-//compound_type& compound_type::operator=(const compound_type& other){//noexcept 
-//	types = other.types;
-//	sumOfBits = other.sumOfBits;
-//	return *this;
-//}
-//base_type compound_type::get_type(size_t subarg) const {
-//	if (subarg >= types.size()) throw 0;
-//	return types[subarg].type;
-//}
-//const type& compound_type::get_sub_type(size_t idx) const {
-//	size_t i = 0;
-//	for (auto type : types) {
-//		switch (type.kind) {
-//			case type::Primitive:
-//				primes.push_back({ type.primitive, path });
-//				break;
-//			case type::Compound:
-//			{
-//				//path.push_back(0);
-//				primtype_paths cprimes = type.compound.get_primitives(path);
-//				primes.insert(primes.end(), cprimes.begin(), cprimes.end());
-//				break; 
-//			}
-//			default: throw 0;
-//		}
-//	}
-//	return primes;
-//}
-//type& type::operator[](size_t idx) {
-//	switch (kind) {
-//		case Primitive: 
-//			if (idx > 0) 
-//				throw std::out_of_range("type[]<primitive>: id > 0");
-//			// eol here, just ret this
-//			return *this; // primitive;
-//		case Compound:
-//			if (idx >= compound.types.size())
-//				throw std::out_of_range("type[]<compound>: id > 0");
-//			return compound.types[idx];
-//		default: 
-//			throw std::runtime_error("type[]: type kind not implemented?");
-//	}
-//}
-//const type& type::operator[](size_t idx) const {
-//	switch (kind) {
-//		case Primitive: 
-//			if (idx > 0) throw std::out_of_range("type[]<primitive>: id > 0");
-//			// eol here, just ret this
-//			return *this; // primitive;
-//		case Compound:
-//			if (idx >= compound.types.size())
-//				throw std::out_of_range("type[]<compound>: id > 0");
-//			return compound.types[idx];
-//		default: 
-//			throw std::runtime_error("type[]: type kind not implemented?");
-//	}
-//}
-//base_type type::get_type() const {
-//	switch (kind) {
-//		case Primitive: return primitive.type;
-//		default: throw 0;
-//	}
-//}
-//base_type type::get_type(size_t subarg) const {
-//	switch (kind) {
-//		case Primitive: 
-//			if (subarg != arg::none) throw 0;
-//			return primitive.type;
-//		case Compound: return compound.get_type(subarg);
-//		default: throw 0;
-//	}
-//}
-//primitive_type::primitive_type(const primitive_type& other) {
-//	type = other.type;
-//	bitness = other.bitness;
-//}
-//primitive_type::primitive_type(primitive_type&& other) noexcept {
-//	type = other.type;
-//	bitness = other.bitness;
-//}
-//primitive_type& primitive_type::operator=(primitive_type&& other) {
-//	type = other.type;
-//	bitness = other.bitness;
-//	//type(std::move(other.type));
-//	//bitness(std::move(other.bitness));
-//	return *this;
-//}
-//primitive_type& primitive_type::operator=(primitive_type other) {
-//	using std::swap;
-//	type = other.type;
-//	bitness = other.bitness;
-//	return *this;
-//}
