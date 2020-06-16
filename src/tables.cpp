@@ -507,8 +507,8 @@ spbdd_handle tables::from_sym_eq_cast(
 }
 
 spbdd_handle tables::from_sym_eq_compose(
-	multi_arg leftarg, multi_arg secondarg, multi_arg rightarg, multi_arg toarg,
-	size_t args, c_bitsmeta& bm) const {
+	multi_arg /*leftarg*/, multi_arg /*secondarg*/, multi_arg /*rightarg*/, 
+	multi_arg /*toarg*/, size_t /*args*/, c_bitsmeta& /*bm*/) const {
 	if (!nullvalue) throw runtime_error("cast/decompose requires --nullvalue");
 	spbdd_handle r = htrue;
 	return r;
@@ -611,6 +611,7 @@ sig tables::get_sig(const raw_term&r) {
 	return{ dict.get_rel(r.e[0].e), r.arity };
 }
 
+// TODO: !!! this function is huge, reorg/split this, templates something
 term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	// D: use new raw_term.nargs to preinit nums, simplifies code/nums handling.
 	ints t, vals;
@@ -1003,7 +1004,8 @@ void tables::out(wostream& os, spbdd_handle x, ntable tab) const {
 	// we're sorting tuples so it's not random, this is more natural, consistent
 	set<term> r;
 	// TODO: sort terms differently for chr-s, or actually don't sort?
-	decompress(x && tbls.at(tab).tq, tab, [&r, &os, this](const term& t) {
+	//decompress(x && tbls.at(tab).tq, tab, [&r, &os, this](const term& t) {
+	decompress(x && tbls.at(tab).tq, tab, [&r](const term& t) {
 		//os << to_raw_term(t) << L'.' << endl;
 		r.insert(t);
 		});

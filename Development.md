@@ -2,6 +2,12 @@
 
 Note: types mentioned here are actually 'kinds' (as in type theory).
 
+[Universe](#Universe)  
+[Builtins](#Builtins)  
+[Variable Bits](#variable-bits)  
+[Compound terms](#compound-terms)  
+[Varbits vs BDD-s, use cases](#varbits-vs-bdd-s-and-use-cases)
+
 # Universe
 
 # Builtins
@@ -289,7 +295,7 @@ substitute the compound as a whole, or one of its parts. So, supported is
 `A(?x)` (?x represents full compound) but also `A(a(?x))` (?x is the 'rest').
 It could also be in the middle but only for fixed-length/known compounds.
 For recursive (potentially large / unknown size scenarios) we need to use couple
-supported builtins to compose, decompose etc.
+supported builtins to compose, decompose etc.  
 As a rule of thumb, a) 'lone' variable represents the compound as a whole; b) 
 variable at the beginning represents the head/first primitive value; c) variable
 at the end represents whatever is left of the compound (i.e. the 'rest').
@@ -302,8 +308,8 @@ Compounds are not tables but only arguments within tables. This is different
 from what prolog supports (where compound terms are also used to define rules 
 and are in that sense more powerful). This was by specs/design but is also the 
 limitation of tml's tables design and strongly-typed implementation (we need to
-have 'bits' defined ahead of time, even with varbits). IMO that's something to 
-think about and try to define it well and make it future proof.
+have 'bits' defined ahead of time, even with varbits). That's something to 
+think about and try to define it well and future proof.
 
 Performance is largely related to possible # of bits involved. Also, compounds 
 are not yet optimized for large arrays (like loading a file) but that's expected
@@ -319,6 +325,13 @@ multi dimensional - i.e. the `multi_arg` struct (which could be just an arg of
 size_t or arg + subarg, or a `path` within a compound hierarchy). All ops 
 already support (and require) that, and expect multi_arg. There's in an easy
 conversion for simple arg cases.
+
+##### Additional experimental flags
+(that may be needed for tests)
+- `--conflicting-types`, `--optimistic-signature-match` - allows for more 
+flexible table/type signature matching (exclusively used with compounds), see
+below for more on signatures.
+- `--nullvalue` - allows for compose/decompose (temporary feature, tbd w/ ++/--)
 
 ##### How to iterate complex arguments / types
 TBD
@@ -406,6 +419,70 @@ B(g ()).
 A(b(c d)).
 A(a(?x)) :- A(?x).
 ```
+
+### Varbits vs BDD-s and use cases
+
+First, varbits (version) is 'strongly typed' in a sense that all argument types
+and 'memory layout' need to be defined before hand (before applying any bdd ops).  
+Whether we specify it manually or it's done during type inference, for each 
+argument we need to know its type (if it's num, char, sym or a compound), # of 
+bits and their layout (order of bits within and between the arguments, compound 
+bits hierarchy, argument ordering and possibly any other relationships in the 
+future). Once we have all the bits exactly defined only then we can start w/ the 
+bdd ops.  
+Even with the 'dynamic universe' (addbits) it's the same, once we add the bits (
+or change types, order, whatever) we need to go and re-permute all bdd-s before
+we can use them (i.e. it's like we're starting from scratch).  
+I.e. an argument can't be ambiguous about its type or bits (or its universe). 
+While in the master 'fixed bits' version, arguments were sharing the universe,
+same # of bits and type info is encoded. One consequence of that is with table 
+'signatures' (or rule signatures), in master, tables are differentiated only by 
+their name and arity (while arity could hold some more, hierarchical info, like
+w/ parentheses).  
+With varbits that's no longer the case, table signatures need to include the 
+argument type information as well. Which has its pros and cons (one of which is 
+the more 'strongly-typed' nature of it - for good or bad).  
+
+We can also look at the variable-bits layer (and types) as sort of a 'static 
+information' (that describes the arguments, bits etc.) vs the 'fully dynamic 
+info' of bdd-s.
+
+##### When to use varbits and when to use bdd-s
+
+(from the experience so far - for development purposes, when implementing new 
+features)  
+
+We have to think about the nature of the info/data we're adding (and is it more
+native to bdd-s or variable-bits/types).  
+
+If we're manipulating data that's dynamic and only available to bdd-s and bdd 
+ops (i.e. compressed) then it has to be done via bdd-s (varbits can't help).  
+Otherwise, as a rule of thumb, use variable bits (+types combo) if possible.  
+
+I.e. if information is more structural in nature - chances are that it's easier
+to use varbits/types (e.g. a new 'type of kind'). If we're dealing with 
+(organizing bits), again it's probably better to try and implement that using 
+varbits layer. Lastly if the data is 'static' like consts or facts (and 
+available before bdd-s, like strings etc.) we possibly don't need bdd-s at all. 
+E.g. if we're shifting or sharing bits => that's more native to the varbits.
+
+pros of using varbits (over bdd-s) - where that is more native and makes sense:  
+
+- keeps bdd-s smaller and less complex.
+- implementation/dev is faster + the debugging is much easier (for new features) 
+if our logic is 'higher level' than fully in bdd-s low-level. I.e. we can faster 
+prototype and produce new features (and if needed for some reason rewrite it 
+later on for full-in-bdd-s).  
+- we don't need to decompress the data which is expensive (e.g. if we need to 
+temporarely extract some of it out at some point). E.g. type info was previously
+encoded into bdd-s (and basically only accessible on decompress), now we pulled
+that out and we know the type of any arg at any time (at the expense of the 
+'loosely typed' nature).  
+
+Usually, the nature of the feature/problem to be solved is either predominantly
+static (and appropriate for variable-bits/types) - or dynamic (unknown) (bdd-s).
+
+  
   
 # Performance
 
