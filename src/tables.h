@@ -142,16 +142,34 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+
+
 struct gnode {
 	enum gntype{
-		pack, symbol
+		pack, interm, symbol
 
 	} type;
 	const term &t;
 	int lev;
 	std::vector<gnode*> next;	
-	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level)
-	 { type = typ; }
+	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level) {
+		type = typ; }
+	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){ 
+		type = interm;
+		this->next.emplace_back(new gnode(lev, t, gnode::gntype::pack));
+		next.back()->next = inter;
+		
+	}
+	
+	bool binarise() {
+		interm2g.clear();
+		visited.clear();
+		return _binarise();
+	} 
+	private:
+	static std::set<const gnode*> visited;
+	static std::map<std::set<std::pair<int,term>>, gnode*> interm2g;
+	bool _binarise();	
 };
 
 
@@ -546,7 +564,7 @@ public:
 #endif
 	void set_proof(bool v) { bproof = v; }
 	bool get_goals(std::wostream& os);
-	gnode* get_forest(std::wostream& os,const term& q, proof& p );
+	gnode* get_forest(const term& q, proof& p );
 	bool build( std::map<std::pair<int,term>, gnode*> &tg, proof &p, gnode &cur);
 	bool isvalid( const raw_term &rt);
 	bool prune_proof( proof &p);

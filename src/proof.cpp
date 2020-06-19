@@ -163,6 +163,38 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	return level;
 }
 
+std::set<const gnode*> gnode::visited;
+std::map<std::set<std::pair<int,term>>, gnode*> gnode::interm2g;
+
+bool gnode::_binarise() { 
+
+	if (visited.insert(this).second == false) return false;
+	
+	bool done = false;
+	if( this->type == gntype::pack &&
+		this->next.size() > 2 ) { // the first node is not changed	
+			gnode* gninter = nullptr;
+			std::vector<gnode*> temp(next.begin()+1, next.end());
+			
+			std::set<std::pair<int,term>> key;
+			for( auto &gn: temp )
+				key.insert( {gn->lev,gn->t} );
+			if( interm2g.find( key ) != interm2g.end() )
+				gninter = interm2g[key];
+			else
+				gninter = new gnode( lev, t, temp ),
+				interm2g[key]= gninter;
+
+			this->next.erase(next.begin()+1, next.end());
+			this->next.push_back(gninter);		
+			done = true;
+		}	
+
+	for( gnode *gn : next)	done |= gn->_binarise();
+	
+	return done;
+}
+
 
 void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int space) {
 
@@ -172,11 +204,12 @@ void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visi
 	if(!visit.insert(&gh).second) return;
 	if( gh.type == gnode::gntype::symbol)
 		ss  << endl<< sp << size_t(&gh) << L"[label=\""<<gh.lev<< " "<< to_raw_term(gh.t)<< L"\"];";
-	else
+	else if (gh.type == gnode::gntype::pack)
 		ss  << endl<< sp << size_t(&gh) << L"[shape = \"point\" label=\""<< L"\"];";
-	
+	else if (gh.type == gnode::gntype::interm)
+		ss  << endl<< sp << size_t(&gh) << L"[shape = \"rectangle\" label=\""<< L"\"];";
 	for( const auto& x:gh.next) {
-		ss << std::endl << size_t(&gh) << L"->" << size_t(x)<< L';';
+		ss << std::endl << sp << size_t(&gh) << L"->" << size_t(x)<< L';';
 		print_dot(ss, *x, visit, space+1);
 	}
 }
@@ -226,10 +259,8 @@ bool tables::isvalid( const raw_term &rt) {
 	return true;
 }
 bool tables::prune_proof( proof &p) {
-
-	bool done=false;
 	int cheadrem=0, cbodyrem=0;
-	for( int i = 0 ; i < p.size() ; i++) {
+	for( size_t i = 0 ; i < p.size() ; i++) {
 		for( auto mit = p[i].begin(); mit!= p[i].end();) {		
 			raw_term rt = to_raw_term(mit->first);
 			if(!isvalid(rt)) {
@@ -262,27 +293,39 @@ bool tables::prune_proof( proof &p) {
 		}
 	}
 	DBG(o::dbg()<<endl<<L"Pruned proof : headcount, bodycount:"<< cheadrem << "," <<cbodyrem<<endl;)
-	if(cheadrem || cbodyrem) return true;
-	else return false;
+	return (cheadrem || cbodyrem) ?
+	 		true : false;
 }
-gnode* tables::get_forest(std::wostream&os, const term& t, proof& p ) {
+gnode* tables::get_forest(const term& t, proof& p ) {
 
 	std::map<pair<int,term>, gnode*> tg;
-	set<gnode*> v;
-	std::wstringstream ss;
 	gnode* root =  nullptr;
 	for(int i =p.size()-1; i >=0; i-- )
 		if( p[i].find(t) != p[i].end() ) {
-			root = new gnode(i,t);
 			if( tg.find({i,t}) == tg.end() ) {
+				root = new gnode(i,t);
 				tg[{i,t}] = root; 
 				build(tg, p, *root);
-				print_dot(ss, *root, v);
+				break;
 			}
-			else delete root;
 		}
-	os<< L"digraph {" << endl<< ss.str() << endl<<L"}"<<endl;
+	if(root) {
 
+		set<gnode*> v;
+		std::wstringstream ss;
+		std::wofstream file("sppf.dot");
+		print_dot(ss, *root, v);
+		file << L"digraph {" << endl<< ss.str() << endl<<L"}"<<endl;
+		file.close();
+
+		v.clear(), ss.str(L""), ss.clear();
+		root->binarise(); 
+		print_dot(ss, *root, v);
+		std::wofstream binfile("sppf-binarised.dot");		
+		binfile << L"digraph {" << endl<< ss.str() << endl<<L"}"<<endl;
+		binfile.close();
+		
+	}
 	return root;
 }
 
@@ -297,7 +340,7 @@ bool tables::get_goals(wostream& os) {
 		if (bproof) {
 			get_proof(g, p, levels.size() - 1);
 			prune_proof( p );
-			get_forest(os, g, p);
+			get_forest(g, p);
 		}
 		else os << to_raw_term(g) << L'.' << endl;
 	if (bproof) print(os, p);
