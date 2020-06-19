@@ -39,6 +39,7 @@ typedef std::array<cws, 2> cws_range;
 typedef cws_range lexeme;
 typedef std::vector<lexeme> lexemes;
 typedef std::vector<int_t> ints;
+typedef std::vector<ints> multiints;
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
 typedef std::map<lexeme, std::wstring, lexcmp> strs_t;
 typedef std::vector<bool> bools;

@@ -563,10 +563,46 @@ bool type::isCompatible(const type& other, bool optimistic) const {
 }
 
 bool type::isCompatible(
-	const std::vector<type>& l, const std::vector<type>& r, bool optimistic) {
+	const vtypes& l, const vtypes& r, const multiints& multivals, 
+	bool optimistic) {
 	if (l.size() != r.size()) return false;
+	if (!multivals.empty() && !isCompatible(l, multivals)) return false;
 	for (size_t i = 0; i != l.size(); ++i)
 		if (!l[i].isCompatible(r[i], optimistic)) return false;
+	return true;
+}
+
+bool isCompatibleWithTypes(
+	set<type>& types, const type& ltype, bool optimistic) {
+	for (auto& type : types)
+		if (!type.isCompatible(ltype, optimistic)) return false;
+	types.insert(ltype);
+	return true;
+}
+
+bool type::isCompatible(
+	const vtypes& l, const multiints& multivals, bool optimistic) {
+	return true;
+	if (multivals.empty()) return true;
+	map<int_t, set<type>> vars;
+	for (size_t i = 0; i < l.size(); ++i) {
+		if (multivals[i].empty()) continue;
+		int_t val = multivals[i][0];
+		const type& ltype = l[i];
+		if (val < 0) {
+			if (!isCompatibleWithTypes(vars[val], ltype, optimistic))
+				return false;
+		} else if (multivals[i].size() > 1 && ltype.isCompound()) {
+			if (ltype.get_no_primitives() != multivals[i].size()) // ok or not?
+				continue;
+			for (auto& it : ltype) {
+				val = multivals[i][it.id];
+				if (val < 0 && 
+					!isCompatibleWithTypes(vars[val], it.container, optimistic))
+					return false;
+			}
+		}
+	}
 	return true;
 }
 
@@ -630,6 +666,7 @@ wostream& operator<<(wostream& os, const primitive_type& type) {
 	case base_type::NONE: os << L":none"; break;
 	}
 	return os << L"[" << type.bitness << L"]";
+	//return os << L"[" << type.bitness << L", " << type.num << L"]";
 }
 
 wostream& operator<<(wostream& os, const arg_type& type) {

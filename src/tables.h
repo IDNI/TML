@@ -426,7 +426,11 @@ private:
 	void get_rules(flat_prog m);
 	void get_facts(const flat_prog& m);
 	ntable get_table(const sig& s, const argtypes& types);
-	ntable get_table(const sig& s, const argtypes& types, bool& optimistic);
+	ntable get_table(
+		const sig& s, const argtypes& types, const multiints& multivals);
+	ntable get_table(
+		const sig& s, const argtypes& types, const multiints& multivals, 
+		bool& optimistic);
 	//ntable get_table(const sig& s, size_t len, ints arity = {});
 	void table_increase_priority(ntable t, size_t inc = 1);
 	void set_priorities(const flat_prog&);

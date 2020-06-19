@@ -378,8 +378,10 @@ struct type {
 	// note: if one is primitive/NONE other can be anything (non-primitive too)
 	bool isCompatible(const type& other, bool optimistic = false) const;
 	static bool isCompatible(
-		const std::vector<type>& l, const std::vector<type>& r, 
+		const vtypes& l, const vtypes& r, const multiints& multivals, 
 		bool optimistic = false);
+	static bool isCompatible(
+		const vtypes& l, const multiints& multivals, bool optimistic = false);
 	static bool isSigCompatible(
 		const type& l, const type& r, bool optimistic = false);
 

@@ -25,14 +25,15 @@ vector<env> tables::varbdd_to_subs(
 		env m;
 		// D: VM: refactor this (and is questionable)
 		// why not use .vm, as we're iterating them all and var<->pos is 1<->1
-		for (auto z : a->vm) {
-			//inv.emplace(z.second.id, z.first);
-			if (!m.emplace(z.first, x[z.second.id]).second)
-				throw 0;
-		}
-		//for (auto z : a->inv)
-		//	if (!m.emplace(z.second, x[z.first]).second)
+		//for (auto z : a->vm) {
+		//	//inv.emplace(z.second.id, z.first);
+		//	if (!m.emplace(z.first, x[z.second.id]).second)
 		//		throw 0;
+		//}
+		for (auto z : a->inv)
+			if (!m.emplace(z.second, x[z.first]).second)
+				throw 0;
+
 		r.emplace_back(move(m));
 	}, a->varslen, a);
 	return r;
@@ -62,7 +63,9 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 		const alt* a = rules[rl][n];
 		DBG(assert(a->varslen == a->bm.get_args()););
 		if (has(a->levels, level)) {
+			// to try and restrict the universe, h is just a 'fact', no rng/alt
 			spbdd_handle htemp = addtail(*a, h, tbl.bm, a->bm);
+			//htemp = bdd_and_many({ a->rng, htemp });
 			for (const env& e : varbdd_to_subs(a, tab, move(htemp))) {
 				f(rl, level, n, move(subs_to_body(a, e)));
 			}
@@ -166,9 +169,22 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 bool tables::get_goals(wostream& os) {
 	proof p(levels.size());
 	set<term> s;
-	for (const term& t : goals)
+	for (const term& t : goals) {
+		//bdd_handles v;
+		//table tbl = tbls[t.tab];
+		//size_t len = tbl.bm.get_args();
+		//for (size_t arg = 0; arg < len; ++arg)
+		//	range(arg, len, v, tbl.bm);
+		////spbdd_handle htemp = addtail(*a, h, tbl.bm, a->bm);
+		//spbdd_handle h = bdd_and_many(v);
+		//h = bdd_and_many({ h, tbl.tq, from_fact(t) });
+		//decompress(h, t.tab, [&s](const term& t) { 
+		//	s.insert(t); 
+		//}, t.size());
+
 		decompress(tbls[t.tab].tq && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
+	}
 	for (const term& g : s)
 		if (bproof) get_proof(g, p, levels.size() - 1);
 		else os << to_raw_term(g) << L'.' << endl;

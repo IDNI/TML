@@ -165,8 +165,7 @@ void infer_types::propagate_types() {
 					//	bm.types, type, lchg, rchg);
 					if (rchg)
 						rootchanged = true;
-				}
-				else {
+				} else {
 					// alt should be set up and present in the map
 					tbl_alt altkey{ atype.tab, size_t(atype.alt) };
 					DBG(assert(has(altstyped, altkey)););
@@ -621,4 +620,7 @@ void infer_types::get_prog_types(const flat_prog& p) {
 			for (const term_set& al : x.second)
 				get_alt_types(t, al, n++); // get_alt(al, t, as);
 	}
+}
+void infer_types::rewire_tables(flat_prog& p) {
+
 }

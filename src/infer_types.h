@@ -94,6 +94,7 @@ private:
 	void get_term_types(
 		const term& t, multi_arg targ, int_t val, const arg_type& type,
 		bitsmeta& bm, size_t tnums, alt_info& info);
+	void rewire_tables(flat_prog& p);
 };
 
 #endif // __INFER_TYPES_H__

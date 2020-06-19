@@ -863,8 +863,8 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		// (ints arity works differently and can't get # args right (for comps))
 		ints arity{ int_t(compvals.size()) };
 		bool optimistic = false;
-		ntable tab = realrel ?
-			get_table(sig{ dict.get_rel(r.e[0].e), arity }, ptypes, optimistic):
+		ntable tab = realrel ? get_table(
+			sig{dict.get_rel(r.e[0].e), arity}, ptypes, compvals, optimistic) :
 			-1;
 		return to_tbl_term(tab, move(vals), move(compvals), move(ptypes), nvars,
 			r.neg, extype, r.e[0].e, r.arith_op, orderid, isheader, true, 
@@ -874,7 +874,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		DBG(assert(t.size() == vals.size()););
 		DBG(assert(t.size() == compvals.size()););
 		DBG(assert(types.size() == ptypes.size()););
-		ntable tab = realrel ? get_table(get_sig(r), types) : -1;
+		ntable tab = realrel ? get_table(get_sig(r), types, compvals) : -1;
 		return to_tbl_term(tab, move(t), move(compvals), move(types), nvars, 
 			r.neg, extype, r.e[0].e, r.arith_op, orderid, isheader);
 	}
@@ -1053,8 +1053,8 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 	if (!len) len = tbl.len;
 	const bitsmeta& bm = a == nullptr ? tbl.bm : a->bm;
 	allsat_cb(x/*&&ts[tab].tq*/, bm.args_bits,
-		//[tab, f, &bm](const bools& p, int_t DBG(y)) {
-		[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
+		[tab, f, &bm, this](const bools& p, int_t DBG(y)) {
+		//[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
 		//DBG(assert(abs(y) == 1);)
 		DBG(if (abs(y) != 1) o::dump_eol() << L"decompress:\t" << y;);
 
@@ -1076,6 +1076,11 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 				bm.to_val(val, p, it.bits, it.startbit, arg, len);
 			}
 			r[arg] = vals[0];
+			if (bproof &&
+				type.isPrimitive() &&
+				type.primitive.type == base_type::INT &&
+				vals[0] > type.primitive.num) 
+				return;
 			r.set_multivals(arg, move(vals));
 			r.set_shift(arg, shift);
 		}
@@ -1209,20 +1214,23 @@ raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
 	rt.neg = r.neg;
 	size_t args;
+	const argtypes& types = bproof && r.tab != -1 ? 
+		tbls.at(r.tab).bm.types : 
+		r.types;
 	if (r.extype == term::EQ) {
 		args = 2;
 		rt.e.resize(args + 1);
-		rt.e[0] = get_elem(r[0], r.types[0]);
+		rt.e[0] = get_elem(r[0], types[0]);
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"!=" : L"="));
-		rt.e[2] = get_elem(r[1], r.types[1]);
+		rt.e[2] = get_elem(r[1], types[1]);
 		rt.arity = { 2 };
 	} else if (r.extype == term::LEQ) {
 		args = 2;
 		rt.e.resize(args + 1);
-		rt.e[0] = get_elem(r[0], r.types[0]);
+		rt.e[0] = get_elem(r[0], types[0]);
 		// D: TODO: is this a bug (never used)? for neg it should be > not <= ?
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">"));
-		rt.e[2] = get_elem(r[1], r.types[1]);
+		rt.e[2] = get_elem(r[1], types[1]);
 		rt.arity = { 2 };
 	} else {
 		args = tbls.at(r.tab).len, rt.e.resize(args + 1);
@@ -1230,11 +1238,11 @@ raw_term tables::to_raw_term(const term& r) const {
 			dict.get_rel(tbls.at(r.tab).get_rel()));
 		rt.arity = tbls.at(r.tab).get_arity();
 		for (size_t n = 1; n != args + 1; ++n) {
-			if (r.types[n-1].isPrimitive())
-				rt.e[n] = get_elem(r[n-1], r.types[n-1]);
-			else if (r.types[n-1].isCompound())
+			if (types[n-1].isPrimitive())
+				rt.e[n] = get_elem(r[n-1], types[n-1]);
+			else if (types[n-1].isCompound())
 				rt.e[n] = get_elem(
-					r.multivals()[n-1], r.types[n-1], r.get_shift(n-1));
+					r.multivals()[n-1], types[n-1], r.get_shift(n-1));
 			else 
 				throw runtime_error("to_raw_term: type kind not implemented?");
 		}
@@ -2535,11 +2543,17 @@ void tables::get_sym(
 }
 
 ntable tables::get_table(const sig& s, const argtypes& types) {
-	bool optimistic = false;
-	return get_table(s, types, optimistic);
+	return get_table(s, types, {});
 }
 ntable tables::get_table(
-	const sig& s, const argtypes& types, bool& optimistic) {
+	const sig& s, const argtypes& types, const multiints& multivals) {
+	bool optimistic = false;
+	return get_table(s, types, multivals, optimistic);
+}
+
+ntable tables::get_table(
+	const sig& s, const argtypes& types, const multiints& multivals, 
+	bool& optimistic) {
 	auto it = smap.find(s);
 	optimistic = false;
 	if (it != smap.end()) {
@@ -2553,20 +2567,19 @@ ntable tables::get_table(
 		// couldn't infer template argument T
 		// deduced conflicting types for parameter T
 		for (ntable itab : it->second)
-			if (arg_type::isCompatible(tbls[itab].bm.types, types)) {
+			if (arg_type::isCompatible(tbls[itab].bm.types, types, multivals)) {
 				if (tab != -1)
 					throw runtime_error(
 						"table: deduced conflicting types for argument");
 				tab = itab;
 				if (conflicting_types) // ...alowed but non-deterministic
 					return tab;
-			} else {
-				if (optimistic_signature_match &&
-					arg_type::isCompatible(tbls[itab].bm.types, types, true)) {
+			} else if(optimistic_signature_match) {
+				if (arg_type::isCompatible(
+					tbls[itab].bm.types, types, multivals, true)) {
 					if (tab_optimistic != -1) optimistic_conflict = true;
 					tab_optimistic = itab; // what if multiple of these?
 				}
-				//o::dump() << endl;
 			}
 		if (tab != -1) return tab;
 		if (tab_optimistic != -1) {
