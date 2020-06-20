@@ -858,6 +858,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 			parenths.push_back(earg);
 	}
 
+	//realrel = isheader;
 	if (hascomp) {// vals, compvals, ptypes - is safe in both case, just to test
 		// our arity is different as parser is not 'aware' of compounds (yet?)
 		// (ints arity works differently and can't get # args right (for comps))
@@ -1052,8 +1053,18 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 	if (!allowbltins && tbl.idbltin > -1) return;
 	if (!len) len = tbl.len;
 	const bitsmeta& bm = a == nullptr ? tbl.bm : a->bm;
+	if (bproof && a != nullptr) {
+		//if (a == nullptr) x = x; 
+		bdd_handles v = { x };
+		size_t args = bm.get_args();
+		for (size_t arg = 0; arg != args; ++arg)
+			for (size_t b = 0; b != bm.types[arg].get_bits_w_align(); ++b)
+				v.push_back(::from_bit(bm.pos(b, arg, args), false));
+		spbdd_handle q = bdd_and_many(move(v));
+		x = x && q; // || q;
+	}
 	allsat_cb(x/*&&ts[tab].tq*/, bm.args_bits,
-		[tab, f, &bm, this](const bools& p, int_t DBG(y)) {
+		[tab, f, &bm](const bools& p, int_t DBG(y)) {
 		//[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
 		//DBG(assert(abs(y) == 1);)
 		DBG(if (abs(y) != 1) o::dump_eol() << L"decompress:\t" << y;);
@@ -1076,11 +1087,11 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 				bm.to_val(val, p, it.bits, it.startbit, arg, len);
 			}
 			r[arg] = vals[0];
-			if (bproof &&
-				type.isPrimitive() &&
-				type.primitive.type == base_type::INT &&
-				vals[0] > type.primitive.num) 
-				return;
+			//if (bproof &&
+			//	type.isPrimitive() &&
+			//	type.primitive.type == base_type::INT &&
+			//	vals[0] > type.primitive.num) 
+			//	{} //return;
 			r.set_multivals(arg, move(vals));
 			r.set_shift(arg, shift);
 		}

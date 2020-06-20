@@ -582,7 +582,7 @@ bool isCompatibleWithTypes(
 
 bool type::isCompatible(
 	const vtypes& l, const multiints& multivals, bool optimistic) {
-	return true;
+	//return true;
 	if (multivals.empty()) return true;
 	map<int_t, set<type>> vars;
 	for (size_t i = 0; i < l.size(); ++i) {
