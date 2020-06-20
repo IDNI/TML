@@ -467,8 +467,8 @@ struct type {
 
 	ints get_not_null_vals(ints vals) const {
 		ints validvals;
-		for (auto& it : *this) {
-			if (it.type().get_null() == vals[it.id]) break;
+		for (const auto& it : *this) {
+			if (it.get_type().get_null() == vals[it.id]) break;
 			validvals.push_back(vals[it.id]);
 		}
 		return validvals;
@@ -529,11 +529,11 @@ public:
 			: container(container_), startbit(startbit_), level(level_), 
 			  path(path_), id(id_), bits(bits_), arg(arg_) {}
 
-		reference type() const {
+		reference get_type() const {
 			if (container.isCompound()) throw std::runtime_error("type: prim?");
 			return container.primitive;
 		}
-		reference type() {
+		reference get_type() {
 			if (container.isCompound()) throw std::runtime_error("type: prim?");
 			return container.primitive;
 		}
@@ -813,12 +813,12 @@ struct type_vals {
 	//using iterator = type::iterator_t<std::is_const<T>::value>;
 	//using const_iterator = type::iterator_t<std::is_const<T>::value>;
 	using iterator = type::iterator_t<isconst>;
-	T& type;
+	T& type_;
 	ints vals;
-	type_vals(T& type_, ints vals_) :type(type_), vals(vals_) {}
-	iterator begin() { return iterator(type, vals).begin(); }
+	type_vals(T& type_, ints vals_) :type_(type_), vals(vals_) {}
+	iterator begin() { return iterator(type_, vals).begin(); }
 	iterator end() { return iterator(); }
-	iterator begin() const { return iterator(type, vals).begin(); }
+	iterator begin() const { return iterator(type_, vals).begin(); }
 	iterator end() const { return iterator(); }
 	//type::const_iterator begin() const
 	//{ return type::const_iterator(type, vals).begin(); }

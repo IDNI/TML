@@ -476,7 +476,7 @@ spbdd_handle tables::from_sym_eq_cast(
 		} 
 		if (!(iterfrom != subfrom.end())) {
 			r = r && from_sym(
-				irest.type().get_null(),
+				irest.get_type().get_null(),
 				restarg, args, startrest + irest.startbit, irest.bits, bm);
 		}
 	}
@@ -630,7 +630,7 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 		 is1stparenth = extype == term::REL || extype == term::BLTIN;
 	size_t nparenth = 0;
 	vector<size_t> parenths;
-	elem::etype eprevarg;
+	elem::etype eprevarg = elem::NONE;
 	// skip the first symbol unless it's EQ/LEQ/ALU (which has VAR/CONST as 1st)
 	for (size_t n = !isrel ? 0 : 1; n < r.e.size(); ++n) {
 		elem::etype earg;
@@ -1140,7 +1140,7 @@ elem tables::get_elem(ints valsin, const arg_type& ctypein, int_t) const{//shift
 	bool prevNoName = false;
 	// cast:
 	for (auto& it : ctype) {
-		const primitive_type& type = it.type();
+		const primitive_type& type = it.get_type();
 		const sizes& path = it.path;
 		size_t i = it.id;
 		int_t val = vals[i]; // it.id
@@ -1560,9 +1560,10 @@ void tables::get_facts(const flat_prog& m) {
 		// fix for sequences anulling previous tq, but not sure if this's right?
 		tbls[x.first].tq = (tbls[x.first].tq || r); //% d;
 	}
-	if (optimize)
-		(o::ms() << L"# get_facts: "),
+	if (optimize) {
+		(o::ms() << L"# get_facts: ");
 		measure_time_end();
+	}
 }
 
 bool tables::to_pnf( form *&froot) {
@@ -1689,7 +1690,7 @@ flat_prog& get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 				for (auto& it : type_vals{ t.types[n], t.multivals()[n] }) {
 					// id not used // size_t subarg = arg::get_zero_based(it.i);
 					// TODO: what if we have a ?var on a comp here?
-					if (it.type().type == base_type::INT)
+					if (it.get_type().type == base_type::INT)
 						m = max(m, un_mknum(it.val));
 				}
 				//t.types[n].iterate(t.multivals()[n], [&](arg_type::iter it) {
@@ -2506,14 +2507,15 @@ void tables::load_string(
 		}
 	}
 	clock_t start, end;
-	if (optimize)
+	if (optimize) {
 		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
+	}
 	// D: move get_table above, we now need table for all bdd ops (from_sym)
 	tbl1.tq = bdd_or_many(move(b1)),
 	tbl2.tq = bdd_or_many(move(b2));
 
-	if (optimize) measure_time_end();
+	if (optimize) { measure_time_end(); }
 }
 
 /*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -3381,7 +3383,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 {
 	clock_t start, end;
 	double t;
-	if (optimize) measure_time_start();
+	if (optimize) { measure_time_start(); }
 	add_prog(p, strs);
 	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;

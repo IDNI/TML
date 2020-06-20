@@ -89,7 +89,7 @@ void bitsmeta::init(const dict_t& dict) {
 		// we don't care about start, path for this
 		// TODO: this is weak point for large compounds, need to use comp array
 		for (auto& it : type)
-			init_type(it.type(), dict);
+			init_type(it.get_type(), dict);
 
 		type.init();
 		if (i != args-1) {
@@ -229,7 +229,7 @@ bool bitsmeta::update_type(arg_type& type, const arg_type& newtype) {
 			//changed = true;
 		}
 		for (auto& it : type)
-			changed |= update_type(it.type(), newtypes[it.id]);
+			changed |= update_type(it.get_type(), newtypes[it.id]);
 
 		// now see if 'left' has changed, if so and only then update its sig
 		// (or make some calc_sig() here just from types, if possible?)
@@ -354,7 +354,7 @@ bool bitsmeta::sync_types(arg_type& l, const arg_type& r) {
 			//changed = true;
 		}
 		for (auto& it : l)
-			changed |= sync_types(it.type(), rtypes[it.id]);
+			changed |= sync_types(it.get_type(), rtypes[it.id]);
 
 		if (changed && l.sig != r.sig)
 			l.sig = r.sig;
@@ -498,7 +498,7 @@ bool bitsmeta::sync_types(
 		for (auto& it : l) {
 			bool lchanged, rchanged;
 			changed |= sync_types(
-				it.type(), r.get_primitive(it.id), lchanged, rchanged);
+				it.get_type(), r.get_primitive(it.id), lchanged, rchanged);
 			lchng |= lchanged;
 			rchng |= rchanged;
 		}

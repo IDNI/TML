@@ -621,6 +621,6 @@ void infer_types::get_prog_types(const flat_prog& p) {
 				get_alt_types(t, al, n++); // get_alt(al, t, as);
 	}
 }
-void infer_types::rewire_tables(flat_prog& p) {
+void infer_types::rewire_tables(flat_prog&) {
 
 }
