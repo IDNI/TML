@@ -1898,6 +1898,8 @@ ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
 }
 
 wostream& tables::print(wostream& os, const vector<term>& v) const {
+	// this was a bug, goal was not printed if just a header? which is most?
+	if (v[0].goal) os << L'!';
 	os << to_raw_term(v[0]);
 	if (v.size() == 1) return os << L'.';
 	os << L" :- ";
