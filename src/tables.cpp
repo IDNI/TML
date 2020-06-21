@@ -1064,8 +1064,8 @@ void tables::decompress(spbdd_handle x, ntable tab, cb_decompress&& f,
 		x = x && q; // || q;
 	}
 	allsat_cb(x/*&&ts[tab].tq*/, bm.args_bits,
-		[tab, f, &bm](const bools& p, int_t DBG(y)) {
-		//[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
+		//[tab, f, &bm](const bools& p, int_t DBG(y)) {
+		[tab, f, bm](const bools& p, int_t DBG(y)) { // just a perf. test
 		//DBG(assert(abs(y) == 1);)
 		DBG(if (abs(y) != 1) o::dump_eol() << L"decompress:\t" << y;);
 
