@@ -643,6 +643,17 @@ raw_term tables::to_raw_term(const term& r) const {
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	// TODO: BLTINS: add term::BLTIN handling
+	else if( r.tab == -1 && r.extype == term::ARITH ) {
+			//TODO: convert to arithm form v1 + 1 = v2
+			// For now, it fixes the crash.
+			rt.e.resize(5);
+			rt.e[0] = get_elem(r[0]);
+			rt.e[1] = get_elem(r[1]);
+			rt.e[2] = get_elem(r[2]);
+			rt.arity = {3};
+			rt.extype = raw_term::ARITH;
+			return rt;
+		}
 	else {
 		args = tbls.at(r.tab).len, rt.e.resize(args + 1);
 		rt.e[0] = elem(elem::SYM,
@@ -1582,12 +1593,13 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			
 				term plus1;
 				plus1.resize(3);
-				int_t relp = dict.get_rel(dict.get_lexeme(L"plus1"));
-				plus1.tab =  get_table({relp, {3}});
+				//int_t relp = dict.get_rel(dict.get_lexeme(L"plus1"));
+				plus1.tab = -1; // get_table({relp, {3}});
 				plus1.extype = term::textype::ARITH;
 				plus1.arith_op = t_arith_op::ADD;
 				plus1[0] = -n, plus1[1] = mknum(1), plus1[2] = -n-1;
 				v.push_back(move(plus1));
+
 			} else throw runtime_error(
 				"Unexpected grammar element");
 			v.push_back(move(t));
