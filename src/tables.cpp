@@ -648,9 +648,8 @@ raw_term tables::to_raw_term(const term& r) const {
 			// For now, it fixes the crash.
 			rt.e.resize(5);
 			rt.e[0] = get_elem(r[0]);
-			rt.e[1] = get_elem(r[1]);
-			rt.e[2] = get_elem(r[2]);
-			rt.arity = {3};
+			rt.e[2] = get_elem(r[1]);
+			rt.e[4] = get_elem(r[2]);
 			rt.extype = raw_term::ARITH;
 			return rt;
 		}
