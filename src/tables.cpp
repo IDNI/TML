@@ -643,12 +643,21 @@ raw_term tables::to_raw_term(const term& r) const {
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	// TODO: BLTINS: add term::BLTIN handling
-	else if( r.tab == -1 && r.extype == term::ARITH ) {
-			//TODO: convert to arithm form v1 + 1 = v2
-			// For now, it fixes the crash.
+	else if( r.tab == -1 && r.extype == term::ARITH ) {			//TODO: convert to arithm form v1 + 1 = v2
 			rt.e.resize(5);
+			elem elp;
+			elp.arith_op = t_arith_op::ADD;
+			elp.type = elem::ARITH;
+			elp.e = const_cast<dict_t*>(&dict)->get_lexeme(L"+");
+
+			elem elq;
+			elq.type = elem::EQ;
+			elq.e = const_cast<dict_t*>(&dict)->get_lexeme(L"=");
+
 			rt.e[0] = get_elem(r[0]);
+			rt.e[1] = elp;
 			rt.e[2] = get_elem(r[1]);
+			rt.e[3] = elq;
 			rt.e[4] = get_elem(r[2]);
 			rt.extype = raw_term::ARITH;
 			return rt;
