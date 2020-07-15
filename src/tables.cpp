@@ -643,6 +643,25 @@ raw_term tables::to_raw_term(const term& r) const {
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">")),
 		rt.e[2] = get_elem(r[1]), rt.arity = {2};
 	// TODO: BLTINS: add term::BLTIN handling
+	else if( r.tab == -1 && r.extype == term::ARITH ) {			//TODO: convert to arithm form v1 + 1 = v2
+			rt.e.resize(5);
+			elem elp;
+			elp.arith_op = t_arith_op::ADD;
+			elp.type = elem::ARITH;
+			elp.e = const_cast<dict_t*>(&dict)->get_lexeme(L"+");
+
+			elem elq;
+			elq.type = elem::EQ;
+			elq.e = const_cast<dict_t*>(&dict)->get_lexeme(L"=");
+
+			rt.e[0] = get_elem(r[0]);
+			rt.e[1] = elp;
+			rt.e[2] = get_elem(r[1]);
+			rt.e[3] = elq;
+			rt.e[4] = get_elem(r[2]);
+			rt.extype = raw_term::ARITH;
+			return rt;
+		}
 	else {
 		args = tbls.at(r.tab).len, rt.e.resize(args + 1);
 		rt.e[0] = elem(elem::SYM,
@@ -1434,7 +1453,7 @@ void tables::get_rules(flat_prog p) {
 void tables::load_string(lexeme r, const wstring& s) {
 	int_t rel = dict.get_rel(r);
 	str_rels.insert(rel);
-	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
+//	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
 	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
 		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
 		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
@@ -1442,9 +1461,9 @@ void tables::load_string(lexeme r, const wstring& s) {
 		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
 	term t;
 	bdd_handles b1, b2;
-	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(3);
+	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2);
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
-		t[0] = mknum(n), t[1] = mkchr(s[n]), t[2] = mknum(n + 1),
+		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
 		b1.push_back(from_fact(t)), t[1] = t[0];
 		if (iswspace(s[n])) t[0] = sspace, b2.push_back(from_fact(t));
 		if (iswdigit(s[n])) t[0] = sdigit, b2.push_back(from_fact(t));
@@ -1456,8 +1475,8 @@ void tables::load_string(lexeme r, const wstring& s) {
 	if (optimize)
 		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
-	tbls[get_table({rel, ar})].t = bdd_or_many(move(b1)),
-	tbls[get_table({rel, {3}})].t = bdd_or_many(move(b2));
+	ntable st = get_table({rel, {2}});
+	tbls[st].t = bdd_or_many(move(b1)) || bdd_or_many(move(b2));
 	if (optimize) measure_time_end();
 }
 
@@ -1573,12 +1592,22 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
 			} else if (x.p[n].type == elem::CHR) {
-				t.resize(3);
+				t.resize(2);
 				if (str_rels.size() > 1) er(err_one_input);
 				if (str_rels.empty()) continue;
-				t.tab = *str_rels.begin();
-				t[0] = -n, t[2] = -n-1,
+				t.tab = get_table({*str_rels.begin(),{2}});
+				t[0] = -n, //t[2] = -n-1,
 				t[1] = mkchr((unsigned char)(x.p[n].ch));
+			
+				term plus1;
+				plus1.resize(3);
+				//int_t relp = dict.get_rel(dict.get_lexeme(L"plus1"));
+				plus1.tab = -1; // get_table({relp, {3}});
+				plus1.extype = term::textype::ARITH;
+				plus1.arith_op = t_arith_op::ADD;
+				plus1[0] = -n, plus1[1] = mknum(1), plus1[2] = -n-1;
+				v.push_back(move(plus1));
+
 			} else throw runtime_error(
 				"Unexpected grammar element");
 			v.push_back(move(t));
