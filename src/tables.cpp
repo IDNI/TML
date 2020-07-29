@@ -616,6 +616,7 @@ set<term> tables::decompress() {
 #define rdict() ((dict_t&)dict)
 //#define get_var_lexeme(v) dict.get_lexeme(wstring(L"?v") + to_wstring(-v))
 #define get_var_lexeme(v) rdict().get_lexeme(wstring(L"?v") + to_wstring(-v))
+//#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
@@ -633,26 +634,34 @@ raw_term tables::to_raw_term(const term& r) const {
 	raw_term rt;
 	rt.neg = r.neg;
 	size_t args;
-	if (r.extype == term::EQ) //r.iseq)
-		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
+	if (r.extype == term::EQ) {//r.iseq) {
+		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]), 
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"!=" : L"=")),
-		rt.e[2] = get_elem(r[1]), rt.arity = {2};
-	else if (r.extype == term::LEQ) //r.isleq)
+		rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::EQ;
+		return rt ;
+	}
+	else if (r.extype == term::LEQ) { //r.isleq)
 		args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
 		// D: TODO: is this a bug (never used)? for neg it should be > not <= ?
 		rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? L"<=" : L">")),
-		rt.e[2] = get_elem(r[1]), rt.arity = {2};
+		rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::LEQ;
+		return rt;
+	}
 	// TODO: BLTINS: add term::BLTIN handling
-	else if( r.tab == -1 && r.extype == term::ARITH ) {			//TODO: convert to arithm form v1 + 1 = v2
+	else if( r.tab == -1 && r.extype == term::ARITH ) {		
 			rt.e.resize(5);
 			elem elp;
-			elp.arith_op = t_arith_op::ADD;
+			elp.arith_op = r.arith_op;
 			elp.type = elem::ARITH;
-			elp.e = const_cast<dict_t*>(&dict)->get_lexeme(L"+");
-
+			switch ( r.arith_op ) {
+				case t_arith_op::ADD: elp.e = rdict().get_lexeme(L"+");break;
+				case t_arith_op::MULT: elp.e = rdict().get_lexeme(L"*");break;
+				case t_arith_op::SUB: elp.e = rdict().get_lexeme(L"-");break;
+				default: __throw_runtime_error( "to_raw_term to support other operator ");
+			}
 			elem elq;
 			elq.type = elem::EQ;
-			elq.e = const_cast<dict_t*>(&dict)->get_lexeme(L"=");
+			elq.e = rdict().get_lexeme(L"=");
 
 			rt.e[0] = get_elem(r[0]);
 			rt.e[1] = elp;
@@ -1534,6 +1543,50 @@ void to_nums(flat_prog& m) {
 
 ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
+int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs, 
+							std::vector<term> &v, std::set<term> &done){
+
+	int_t lopd=0;
+	if( n < rt.e.size() && rt.e[n].type == elem::SYM ) {
+		wstring attrib = lexeme2str( rt.e[n].e);
+		if( ! std::wcscmp(attrib.c_str() , L"len") 
+			&& 	(n+3) < rt.e.size() 
+			&& 	rt.e[n+1].type == elem::OPENP  
+			&&	rt.e[n+2].type == elem::NUM    
+			&&	rt.e[n+3].type == elem::CLOSEP ) {
+				int_t posi =  rt.e[n+2].num;
+				if( posi <0 || posi >= (int_t)refs.size()) 
+					parse_error(L"Wrong symbol index in len", rt.e[n+2].e );
+
+
+				if( refs[posi].size() > 1 ) {
+					
+					term lent;
+					lent.resize(3), lent.tab = -1 , 
+					lent.extype = term::textype::ARITH ,lent.arith_op = t_arith_op::ADD;
+
+					lent[0] = refs[posi][0];
+					if( refs[posi][1] < 0 )	lent[2] = refs[posi][1];
+					else lent[2] = refs[posi][0] -1; // so len(i) refers to str relation 
+
+					lent[1] = dict.get_var(dict.get_lexeme(L"?len"+to_wstring(posi)));
+					lopd = lent[1];	
+					n += 4;
+					//if(!done.insert(lent).second)
+					v.push_back(lent);
+				}
+				else parse_error(L"Wrong term for ref",L"");
+ 
+			}
+	} 
+	else if( n < rt.e.size() && rt.e[n].type == elem::NUM ) {
+			lopd = mknum(rt.e[n].num);
+			n += 1;
+		
+	}
+	else parse_error(L"Invalid start of constraint",L"");
+	return lopd;
+}
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
 //	o::out()<<"grammar before:"<<endl;
@@ -1580,6 +1633,8 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			p.insert({move(t)});
 			continue;
 		}
+		// ref: maps ith sybmol production to resp. terms
+		std::map<size_t, term> refs;
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
 			if (builtins.find(x.p[n].e) != builtins.end()) {
@@ -1598,7 +1653,6 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				t.tab = get_table({*str_rels.begin(),{2}});
 				t[0] = -n, //t[2] = -n-1,
 				t[1] = mkchr((unsigned char)(x.p[n].ch));
-			
 				term plus1;
 				plus1.resize(3);
 				//int_t relp = dict.get_rel(dict.get_lexeme(L"plus1"));
@@ -1611,6 +1665,84 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			} else throw runtime_error(
 				"Unexpected grammar element");
 			v.push_back(move(t));
+			refs[n] = v.back(); 		
+		}
+		
+		// add vars to dictionary to avoid collision with new vars
+		for(int_t i =-1; i >= (int_t)-x.p.size(); i--) 
+			dict.get_var_lexeme_from(i);
+
+		std::set<term> done;
+		//every constraint raw_term should be :
+		//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
+		// e.g. len(1) + 2 = 5  | len(1) = len(2
+		for( raw_term rt : x.c ) {
+			
+			size_t n = 0;
+			int_t lopd = get_factor(rt, n, refs, v, done);
+			int_t ropd, oside;    
+			if( n < rt.e.size() && rt.e[n].type == elem::ARITH ) {
+				// format : lopd + ropd = oside 
+				term aritht;
+				aritht.resize(3);
+				aritht.tab = -1; 
+				aritht.extype = term::textype::ARITH;
+				aritht.arith_op = rt.e[n].arith_op;
+				n++; // operator
+				
+				int_t ropd = get_factor(rt, n, refs, v, done);
+				
+				if( rt.e[n].type != elem::EQ) 
+					parse_error(L"Only EQ supported in Constraints ", rt.e[n].e);
+				n++; // assignment
+
+				aritht[0] = lopd;
+				aritht[1] = ropd;
+				oside = get_factor(rt, n, refs, v, done);
+				aritht[2] = oside;
+				//if(!done.insert(aritht).second)
+				if(n == rt.e.size())	v.push_back(aritht);
+				else parse_error(L" Only simple binary operation allowed ", L"" );
+			}
+			else if( n < rt.e.size() && 
+				   (rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
+				//format: lopd = ropd
+				term equalt;
+				equalt.resize(2);
+				equalt.extype = rt.e[n].type == elem::EQ ? 
+								term::textype::EQ : term::textype::LEQ;
+				
+				equalt[0]= lopd; //TODO: switched order due to bug <= 
+				n++; //equal
+				ropd =  get_factor(rt, n, refs, v, done);
+				equalt[1] = ropd;
+
+				//if(!done.insert(equalt).second )
+				if(n == rt.e.size())	v.push_back(equalt);
+				else if( n < rt.e.size() 
+						&& rt.e[n].type == elem::ARITH
+						&& equalt.extype == term::textype::EQ ) {
+					//format: lopd = ropd + oside 
+						
+						term aritht;
+						aritht.resize(3);
+						aritht.tab = -1; 
+						aritht.extype = term::textype::ARITH;
+						aritht.arith_op = rt.e[n].arith_op;
+						n++; // operator
+						
+						oside = get_factor(rt, n, refs, v, done);
+						aritht[0] = ropd;
+						aritht[1] = oside;
+						aritht[2] = lopd;
+						//if(!done.insert(aritht).second)
+						if(n == rt.e.size())	v.push_back(aritht);
+						else parse_error(L"Only simple binary operation allowed",L"");
+		
+				} else parse_error(L" Constraint syntax not supported",L"");
+			}
+			else parse_error(L" Constraint syntax not supported",L"");
+		
 		}
 		p.insert(move(v));
 	}

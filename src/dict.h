@@ -18,13 +18,13 @@
 class dict_t {
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
 	dictmap syms_dict, vars_dict, rels_dict, bltins_dict;
-	std::vector<lexeme> syms, rels, bltins;
+	std::vector<lexeme> vars, syms, rels, bltins;
 	std::set<lexeme, lexcmp> strs_extra;
 public:
 	dict_t();
 	dict_t(const dict_t& d) : syms_dict(d.syms_dict), vars_dict(d.vars_dict),
 		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), 
-		syms(d.syms), rels(d.rels), bltins(d.bltins),
+		vars(d.vars), syms(d.syms), rels(d.rels), bltins(d.bltins),
 		op(d.op), cl(d.cl) { // strs_extra(d.strs_extra), 
 		DBG(assert(false);); // we shouldn't be copying, use move instead
 		for (const lexeme& c : d.strs_extra) { 
@@ -39,7 +39,8 @@ public:
 		vars_dict(std::move(d.vars_dict)),
 		rels_dict(std::move(d.rels_dict)), 
 		bltins_dict(std::move(d.bltins_dict)),
-		//types_dict(std::move(d.types_dict)), 
+		//types_dict(std::move(d.types_dict)),
+		vars(std::move(d.vars)), 
 		syms(std::move(d.syms)), 
 		rels(std::move(d.rels)), 
 		bltins(std::move(d.bltins)),
@@ -60,6 +61,7 @@ public:
 	int_t get_bltin(const lexeme& l);
 	int_t get_fresh_sym( int_t old);
 	int_t get_fresh_var( int_t old);
+	lexeme get_var_lexeme_from(int_t r);
 	lexeme get_lexeme(const std::wstring& s);
 	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
 	int_t get_bltin(const std::wstring& s) { return get_bltin(get_lexeme(s)); }
@@ -77,6 +79,7 @@ public:
 			swap(vars_dict, d.vars_dict),
 			swap(rels_dict, d.rels_dict),
 			swap(bltins_dict, d.bltins_dict),
+			swap(vars, d.vars),
 			swap(syms, d.syms),
 			swap(rels, d.rels),
 			swap(bltins, d.bltins),

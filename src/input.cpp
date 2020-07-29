@@ -282,7 +282,7 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	return ++pos, true;
 }
 
-bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
+bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog, raw_term::rtextype pref_type) {
 	size_t curr = pos;
 	lexeme s = l[pos];
 	if ((neg = *l[pos][0] == L'~')) ++pos;
@@ -316,6 +316,12 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	}
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
+
+	if (pref_type == rtextype::CONSTRAINT)  {
+
+		extype = rtextype::CONSTRAINT;		
+		return true;	
+	}
 
 	if (bltin) {
 		// similar as for SYM below (join?) but this format will expand.
@@ -380,7 +386,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 		//return calc_arity(), true;
 		return true;
 	}
-
+	
 	if (e[0].type != elem::SYM)
 		parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return calc_arity(), true;
@@ -630,7 +636,7 @@ bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *&root) {
 	if( l ) l->printTree( level +1 );
 }
 
-bool production::parse(const lexemes& l, size_t& pos) {
+bool production::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 	size_t curr2, curr = pos;
 	elem e;
 	if (!e.parse(l, pos) || l.size() <= pos+1) goto fail;
@@ -647,6 +653,21 @@ bool production::parse(const lexemes& l, size_t& pos) {
 		elem e;
 		if (pos == l.size()) break;
 		if (*l[pos][0] == '.') return ++pos, true;
+		if (*l[pos][0] == ',') {
+
+			if(p.size() < 2 ) goto fail;  // prod rhs atleast one non-terminal
+			
+			for( ;*l[pos][0] == L',';) { 
+				++pos;	
+				raw_term rt;
+				if(!rt.parse(l, pos, prog, raw_term::CONSTRAINT)) goto fail;
+				c.push_back(rt);
+			}
+			if (*l[pos][0] != '.') goto fail;
+			return ++pos, true;
+		}
+
+		
 		if (!e.parse(l, pos)) goto fail;
 		p.push_back(e);
 	}
@@ -662,7 +683,7 @@ bool raw_prog::parse(const lexemes& l, size_t& pos) {
 		// TODO: temp. passing prog/context, make parse(s) prog static instead.
 		if (x.parse(l, pos, *this)) d.push_back(x);
 		else if (y.parse(l, pos, *this)) r.push_back(y);
-		else if (p.parse(l, pos)) g.push_back(p);
+		else if (p.parse(l, pos, *this)) g.push_back(p);
 		else return false;
 	}
 	return true;

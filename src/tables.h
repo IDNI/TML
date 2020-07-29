@@ -309,6 +309,8 @@ private:
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
+	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+					std::vector<term> &v, std::set<term> &done);
 	void transform_grammar(std::vector<struct production> g, flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
