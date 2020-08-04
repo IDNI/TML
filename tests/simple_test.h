@@ -65,7 +65,18 @@ int file_read(const char* path, char* data, size_t size) {
 int file_and_mem_cmp(const char* path, const char* expected, size_t size) {
 	char* data = (char*) malloc(size);
 	if (file_read(path, data, size) == -1) return -1;
-	if (memcmp(data, expected, size)) return -2;
+	auto flags = std::wcout.flags();
+	for (size_t pos = 0; pos != size; ++pos) {
+		if (data[pos] != expected[pos]) {
+			std::wcout << L"differs at pos: " << pos << L" 0x"
+				<< std::hex << std::setw(2) <<std::setfill(L'0')
+				<< pos << std::endl;
+			std::wcout.flags(flags);
+			std::wcout << L"\t" << (int_t)data[pos]
+				<< L' ' << (int_t)expected[pos] << std::endl;
+			return -2;
+		}
+	}
 	free(data);
 	return ok();
 }

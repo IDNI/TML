@@ -15,7 +15,10 @@
 #include "defs.h"
 #include <map>
 
+class archive;
+
 class dict_t {
+	friend class archive;
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
 	dictmap syms_dict, vars_dict, rels_dict, bltins_dict;
 	std::vector<lexeme> syms, rels, bltins;

@@ -29,6 +29,8 @@
 
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 
+class archive;
+
 struct prog_data {
 	strs_t strs;
 //	std::unordered_map<int_t, term> strtrees;
@@ -42,6 +44,7 @@ struct prog_data {
 };
 
 class driver {
+	friend class archive;
 	friend struct flat_rules;
 	friend struct pattern;
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
@@ -134,6 +137,13 @@ public:
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
 	bool out_goals(std::wostream& os) const { return tbl->get_goals(os); }
 	void out_dict(std::wostream& os) const { tbl->print_dict(os); }
+	void save_bdd(std::string filename);
+	size_t size();
+	void load(std::wstring filename);
+	void save(std::wstring filename);
+	size_t db_size();
+	void db_load(std::wstring filename);
+	void db_save(std::wstring filename);
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
 	emscripten::val to_bin() {

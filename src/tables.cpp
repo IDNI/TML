@@ -1940,7 +1940,6 @@ level tables::get_front() const {
 }
 
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
-	set<level> s;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
@@ -1952,7 +1951,8 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
 		l = get_front();
-		if (!datalog && !s.emplace(l).second) throw infloop_exception();
+		if (!datalog && !fronts.emplace(l).second)
+			throw infloop_exception();
 		if (bproof) levels.push_back(move(l));
 	}
 	throw 0;

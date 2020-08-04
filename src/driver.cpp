@@ -24,6 +24,7 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
+#include "archive.h"
 
 #ifdef __EMSCRIPTEN__
 #include "../js/embindings.h"
@@ -229,6 +230,32 @@ void driver::info(wostream& os) {
 		<< (running ? L"" : L"not ") << L"running)" << endl;
 	bdd::stats(os<<L"# bdds:     \t")<<endl;
 	//DBG(os<<L"# opts:    \t" << opts << endl;)
+}
+
+size_t driver::size() {
+	return archive::size(*this);
+}
+
+void driver::db_load(wstring filename) {
+	archive ar(archive::type::BDD, ws2s(filename), 0, false);
+	ar << *this;
+}
+
+void driver::db_save(wstring filename) {
+	archive ar(archive::type::BDD, ws2s(filename), archive::size(*this),
+		true);
+	ar << *this;
+}
+
+void driver::load(wstring filename) {
+	archive ar(archive::type::DRIVER, ws2s(filename), 0, false);
+	ar >> *this;
+}
+
+void driver::save(wstring filename) {
+	archive ar(archive::type::DRIVER, ws2s(filename), archive::size(*this),
+		true);
+	ar << *this;
 }
 
 driver::driver(wstring s, options o) : rp(), opts(o) {

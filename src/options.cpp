@@ -68,6 +68,9 @@ void options::set(const wstring &name, T val) {
 	o.v.set(val);
 	set(name, o);
 }
+template void options::set<int_t>(const std::wstring&, int_t);
+template void options::set<std::wstring>(const std::wstring&, std::wstring);
+
 void options::enable (const wstring &name) { set(name, true ); }
 void options::disable(const wstring &name) { set(name, false); }
 
@@ -138,14 +141,14 @@ void options::setup() {
 
 	add(option(option::type::BOOL, { L"help", L"h", L"?" },
 		[this](const option::value& v) {
-			if (v.get_bool()) help(o::inf());
+			if (v.get_bool()) help(o::out());
 		})
 		.description(L"this help"));
 	add(option(option::type::BOOL, { L"version", L"v" },
 		[](const option::value& v) {
-			if (v.get_bool()) o::inf() << L"TML: "
+			if (v.get_bool()) o::out() << L"TML: "
 				<< GIT_DESCRIBED << endl;
-			DBG(if (v.get_bool()) o::inf()
+			DBG(if (v.get_bool()) o::out()
 				<< L"commit: " << GIT_COMMIT_HASH << L" ("
 				<< GIT_BRANCH << L')' <<endl;)
 		})
@@ -175,13 +178,20 @@ void options::setup() {
 	add(option(option::type::INT, { L"udp-port", L"up" })
 		.description(L"port (udp)"));
 	add_bool(L"repl",    L"run TML in REPL mode");
+	add_output    (L"repl-output", L"repl output");
 #endif
 	add_bool(L"sdt",     L"sdt transformation");
 	add_bool(L"bin",     L"bin transformation");
 	add_bool(L"proof",   L"extract proof");
 	add_bool(L"run",     L"run program     (enabled by default)");
 	add_bool(L"csv",     L"save result into CSV files");
-	
+
+	add_bool(L"bdd-mmap",L"use memory mapping for BDD database");
+	add(option(option::type::INT, { L"bdd-max-size" }).description(
+		L"Maximum size of a bdd memory map (default: 128 MB)"));
+	add(option(option::type::STRING, { L"bdd-file" })
+		.description(L"Memory map file used for BDD database"));
+
 	add(option(option::type::INT, { L"steps", L"s" })
 		.description(L"run N steps"));
 	add(option(option::type::INT, { L"break", L"b" })
@@ -198,18 +208,18 @@ void options::setup() {
 	add(option(option::type::STRING, { L"name", L"n" },
 		[](const option::value& v) {
 			outputs::name(v.get_string());
-		})
-		.description(L"name used for @name output"));
+		}).description(L"name used for @name output"));
+	add(option(option::type::STRING, { L"load", L"l" })
+		.description(L"load database from file before start"));
+	add(option(option::type::STRING, { L"save", L"s" })
+		.description(L"save database to file after finish"));
 	add_output    (L"dump",        L"dump output     (@stdout by default)");
 	add_output_alt(L"output", L"o",L"standard output (@stdout by default)");
 	add_output    (L"error",       L"errors          (@stderr by default)");
-	add_output    (L"info",        L"info            (@stderr by default)");
+	add_output    (L"info",        L"info            (@null by default)");
 	add_output    (L"debug",       L"debug output");
-	add_output    (L"benchmarks",  L"benchmarking results");
+	add_output    (L"benchmarks",  L"benchmarking results (@null by default)");
 	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
-#ifdef WITH_THREADS
-	add_output    (L"repl-output", L"repl output");
-#endif
 	add_output(L"xsb",     L"attempt to translate program into XSB");
 	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
 	add_output(L"souffle", L"attempt to translate program into Souffle");
@@ -228,9 +238,12 @@ void options::init_defaults() {
 		L"--output",      L"@stdout",
 		L"--dump",        L"@stdout",
 		L"--error",       L"@stderr",
+#ifdef DEBUG
 		L"--info",        L"@stderr",
-		L"--benchmarks",  L"@stdout",
+		L"--benchmarks",  L"@stderr",
+#endif
 		L"--optimize",
+		L"--bdd-max-size",L"134217728", // 128 MB
 #ifdef WITH_THREADS
 		L"--repl-output", L"@stdout",
 		L"--udp-addr",    L"127.0.0.1",

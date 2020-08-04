@@ -17,12 +17,16 @@
 #include "defs.h"
 #include "output.h"
 
+class archive;
+
 typedef std::vector<std::string> strings;
 typedef std::vector<std::wstring> wstrings;
 
 struct option {
+	friend class archive;
 	enum type { UNDEFINED, INT, BOOL, STRING };
 	struct value {
+		friend class archive;
 		value()               : t(UNDEFINED)         {}
 		value(int i)          : t(INT),      v_i(i)  {}
 		value(bool b)         : t(BOOL),     v_b(b)  {}
@@ -143,6 +147,7 @@ private:
 };
 
 class options {
+	friend class archive;
 public:
 	options() : options(0) { }
 	options(outputs *oo) : oo(oo) { setup(); }

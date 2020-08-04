@@ -27,7 +27,9 @@ int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	outputs oo;
 	options o(argc, argv, &oo);
-	bdd::init();
+	//o.parse(wstrings{ L"-autotype" }, true);
+	bdd::init(o.enabled(L"bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
+		o.get_int(L"bdd-max-size"), ws2s(o.get_string(L"bdd-file")));
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
 	if (o.disabled(L"i") && o.disabled(L"ie")
 #ifdef WITH_THREADS
@@ -41,9 +43,13 @@ int main(int argc, char** argv) {
 	else {
 #endif
 		driver d(o);
+		wstring archive_file = o.get_string(L"load");
+		if (archive_file != L"") d.load(archive_file);
 		d.run((size_t)o.get_int(L"steps"),
 			(size_t)o.get_int(L"break"),
 			o.enabled(L"break-on-fp"));
+		archive_file = o.get_string(L"save");
+		if (archive_file != L"") d.save(archive_file);
 		if (o.enabled(L"dump") && d.result &&
 			!d.out_goals(o::dump())) d.dump();
 		if (o.enabled(L"dict")) d.out_dict(o::inf());

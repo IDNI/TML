@@ -112,8 +112,17 @@ size_t parse_size_t(wstring l, wstring cmd) {
 	return 0;
 }
 
+wstring parse_string(wstring l, wstring cmd) {
+	try {
+		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
+			return (wstring(l.begin()+cmd.size()+1, l.end()));
+	} catch (...) { }
+	return L"";
+}
+
 bool repl::eval_input(wostream& os, wstring &l) {
 	static wstring ll = L"";
+	wstring f;
 	if (l == L"") os<<L"# Repeating: '"<<(l = ll)<<L"'"<<endl;
 	else          ll = l;
 	if       (l == L"restart") restart(os);
@@ -139,6 +148,10 @@ bool repl::eval_input(wostream& os, wstring &l) {
 	else if  (size_t s =   parse_size_t(l, L"s")) step(os, s);
 	else if  (l == L"b")   break_on_fp(os);
 	else if  (size_t s =   parse_size_t(l, L"b")) break_on_step(os, s);
+	else if  ((f = parse_string(l, L"load")) != L"")
+		d->load(f);
+	else if  ((f = parse_string(l, L"save")) != L"")
+		d->save(f);
 	else if  (l == L"ps")
 		d->set_print_step(toggle(os, L"print steps", ps));
 	else if  (l == L"pu")

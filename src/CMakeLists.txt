@@ -17,6 +17,7 @@ include(tml-common)
 
 set(TML_HEADERS
 	TML.h
+	archive.h
 	bdd.h
 	defs.h
 	dict.h
@@ -30,9 +31,9 @@ set(TML_HEADERS
 )
 
 set(TML_SOURCES
+	archive.cpp
 	bdd.cpp
 	bdd_ext.cpp
-	binary.cpp
 	dict.cpp
 	driver.cpp
 	input.cpp

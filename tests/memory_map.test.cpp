@@ -128,20 +128,20 @@ test temporary = [] {
 	return ok();
 };
 
-//test bdd_mmap_write = [] {
-//	std::unique_ptr<bdd_mmap> pM;
-//	pM = std::make_unique<bdd_mmap>();
-//	pM->emplace_back(0,0,0);
-//	pM->emplace_back(1,1,1);
-//	pM = 0;
-//	pM = std::make_unique<bdd_mmap>(
-//		memory_map_allocator<bdd>(TF1, MMAP_WRITE));
-//	pM->reserve(2);
-//	pM->emplace_back(0,0,0);
-//	pM->emplace_back(1,1,1);
-//	return ok();
-//};
-//
+test bdd_mmap_write = [] {
+	std::unique_ptr<bdd_mmap> pM;
+	pM = std::make_unique<bdd_mmap>();
+	pM->emplace_back(0,0,0);
+	pM->emplace_back(1,1,1);
+	pM = 0;
+	pM = std::make_unique<bdd_mmap>(
+		memory_map_allocator<bdd>(TF1, MMAP_WRITE));
+	pM->reserve(2);
+	pM->emplace_back(0,0,0);
+	pM->emplace_back(1,1,1);
+	return ok();
+};
+
 int main() {
 	setlocale(LC_ALL, "");
 	outputs oo;
@@ -157,7 +157,7 @@ int main() {
 		vector_with_memory_map_allocator_int_t_read,
 		mmap_vector_with_nommap_allocator_int_t_write,
 		temporary,
-		//bdd_mmap_write,
+		bdd_mmap_write,
 	};
 	return run(tests, L"memory_map");
 }

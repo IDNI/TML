@@ -24,6 +24,7 @@
 #include "term.h"
 #include "dict.h"
 typedef int_t rel_t;
+class archive;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
@@ -141,12 +142,13 @@ struct table {
 	bool unsat = false, tmp = false;
 	int_t idbltin = -1;
 	ints bltinargs;
-	size_t bltinsize;
+	size_t bltinsize = 0;
 	bool commit(DBG(size_t));
 };
 
 struct form;
 class tables {
+	friend class archive;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 public:
@@ -195,6 +197,7 @@ private:
 	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
+	std::set<level> fronts;
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
 	alt get_alt(const std::vector<raw_term>&);

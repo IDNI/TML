@@ -71,7 +71,7 @@ public:
 		if (fh_ == INVALID_HANDLE_VALUE)
 			return err(L"cannot open file for memory map");
 #else
-		if (mode_ == MMAP_WRITE && !file_exists())
+		if (mode_ == MMAP_WRITE && (filename_ == "" || !file_exists()))
 			create();
 		else {
 			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
@@ -85,7 +85,7 @@ public:
 		state_ = UNMAPPED;
 		if (!size_) { // autodetect map size
 			size_ = file_size();
-			//DBG(o::dbg()<<L" new_size: "<<size_<<std::endl;)
+			//DBG(o::dbg()<<L" detected size: "<<size_<<std::endl;)
 		}
 		return 0;
 	}
@@ -199,6 +199,7 @@ private:
 		temporary_ = true,
 		fd_ = temp_fileno(),
 		filename_ = filename(fd_);
+		//DBG(o::dbg()<<L"temporary file: "<<s2ws(filename_)<<L"\n";)
 	}
 	void create() {
 		if (filename_ == "") create_temp();
@@ -248,7 +249,7 @@ public:
 	memory_map_allocator(const memory_map_allocator<T>& a) :
 		fn(a.fn), m(a.m) { }
 	T* allocate(size_t n, const void *hint=0) {
-		//DBG(o::dbg()<<L"allocate n= "<<n<<L" fn="
+		//DBG(o::dbg()<<L"allocate n="<<n<<L" fn="
 		//	<<s2ws(fn)<<L" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (T*) nommap.allocate(n, hint);
 		if (n == 0) return 0;
@@ -258,7 +259,7 @@ public:
 		return (T*) mm->data();
 	}
 	void deallocate(T* p, size_t n) {
-		//DBG(o::dbg()<<L"deallocate n= "<<n<<
+		//DBG(o::dbg()<<L"deallocate n="<<n<<
 		//	L" fn="<<s2ws(std::string(fn))<<L" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (void) nommap.deallocate(p, n);
 		if (!p || !n) return;

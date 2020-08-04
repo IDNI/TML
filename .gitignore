@@ -33,6 +33,7 @@
 
 # Misc
 .idea
+build
 build-*
 tml-config.cmake
 
