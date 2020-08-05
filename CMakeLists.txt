@@ -32,6 +32,10 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 ################################################################################
+option(WITH_BOOST "use Boost" FALSE)
+################################################################################
+
+################################################################################
 option(BUILD_JSLIB "Build JS version of TML library" OFF)
 if (BUILD_JSLIB)
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)

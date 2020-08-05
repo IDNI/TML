@@ -139,12 +139,12 @@ void options::setup() {
 
 	add(option(option::type::BOOL, { L"help", L"h", L"?" },
 		[this](const option::value& v) {
-			if (v.get_bool()) help(o::inf());
+			if (v.get_bool()) help(o::out());
 		})
 		.description(L"this help"));
 	add(option(option::type::BOOL, { L"version", L"v" },
 		[](const option::value& v) {
-			if (v.get_bool()) o::inf() << L"TML: "
+			if (v.get_bool()) o::out() << L"TML: "
 				<< GIT_DESCRIBED << endl;
 			DBG(if (v.get_bool()) o::inf()
 				<< L"commit: " << GIT_COMMIT_HASH << L" ("
@@ -227,9 +227,11 @@ void options::init_defaults() {
 		L"--output",      L"@stdout",
 		L"--dump",        L"@stdout",
 		L"--error",       L"@stderr",
-		L"--info",        L"@stderr",
 		L"--repl-output", L"@stdout",
-		L"--benchmarks",  L"@stdout",
+#ifdef DEBUG
+		L"--info",        L"@stderr",
+		L"--benchmarks",  L"@stderr",
+#endif
 		L"--optimize",
 		L"--udp-addr",    L"127.0.0.1",
 		L"--udp-port",    L"6283"

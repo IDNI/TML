@@ -38,7 +38,7 @@ class repl {
 	std::unique_ptr<udp> up_udp;
 	wistream_async_reader wcin_reader{&std::wcin};
 	bool fin = false;
-	bool ar = false;  // auto run
+	bool ar = true;  // auto run
 	bool ap = true;   // auto print
 	bool ai = false;  // auto info
 	bool ps = false;  // print steps
