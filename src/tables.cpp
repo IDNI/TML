@@ -1468,24 +1468,28 @@ void tables::load_string(lexeme r, const wstring& s) {
 		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
 		sdigit = dict.get_sym(dict.get_lexeme(L"digit")),
 		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
-	term t;
+	term t,tb;
 	bdd_handles b1, b2;
-	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2);
+	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
-		b1.push_back(from_fact(t)), t[1] = t[0];
-		if (iswspace(s[n])) t[0] = sspace, b2.push_back(from_fact(t));
-		if (iswdigit(s[n])) t[0] = sdigit, b2.push_back(from_fact(t));
-		if (iswalpha(s[n])) t[0] = salpha, b2.push_back(from_fact(t));
-		if (iswalnum(s[n])) t[0] = salnum, b2.push_back(from_fact(t));
-		if (iswprint(s[n])) t[0] = sprint, b2.push_back(from_fact(t));
+		b1.push_back(from_fact(t));
+		tb[1] = t[0], tb[2] = mknum(0);
+		if (iswspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
+		if (iswdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
+		if (iswalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
+		if (iswalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
+		if (iswprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
 	}
 	clock_t start, end;
 	if (optimize)
 		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
 	ntable st = get_table({rel, {2}});
-	tbls[st].t = bdd_or_many(move(b1)) || bdd_or_many(move(b2));
+	ntable stb = get_table({rel, {3}});
+	
+	tbls[st].t = bdd_or_many(move(b1));
+	tbls[stb].t = bdd_or_many(move(b2));
 	if (optimize) measure_time_end();
 }
 
@@ -1640,7 +1644,16 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			if (builtins.find(x.p[n].e) != builtins.end()) {
 				t.tab = get_table({*str_rels.begin(), {3}});
 				t.resize(3), t[0] = dict.get_sym(x.p[n].e),
-				t[1] = -n, t[2] = -n-1;
+				t[1] = -n, t[2] = mknum(0);
+
+				term plus1;
+				plus1.tab = -1;
+				plus1.resize(3);
+				plus1.extype = term::textype::ARITH;
+				plus1.arith_op = t_arith_op::ADD;
+				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
+				v.push_back(move(plus1));
+
 			} else if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
