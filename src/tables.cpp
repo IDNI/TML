@@ -1547,6 +1547,48 @@ void to_nums(flat_prog& m) {
 
 ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
+bool tables::get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &refs, 
+							std::vector<term> &v, std::set<term> &done){
+	//format : sval(1) = sval(2)
+	term svalt;
+	svalt.resize(4);
+	int_t relp = dict.get_rel(dict.get_lexeme(L"equals"));
+	svalt.tab = get_table({relp, {(int_t)svalt.size()}});
+	svalt.extype = term::textype::REL;
+				
+	for( int i=0; i<2 ; i++) {
+		if( n >= rt.e.size() || rt.e[n].type != elem::SYM ) 
+			return false;
+		wstring attrib = lexeme2str( rt.e[n].e);
+		if( !	(!std::wcscmp(attrib.c_str() , L"sval")
+			&& 	(n+3) < rt.e.size() 
+			&& 	rt.e[n+1].type == elem::OPENP  
+			&&	rt.e[n+2].type == elem::NUM    
+			&&	rt.e[n+3].type == elem::CLOSEP ) ) 
+			return false;
+		
+		int_t posi =  rt.e[n+2].num;
+		if( posi < 0 || posi >= (int_t)refs.size()) 
+			parse_error(L"Wrong symbol index in sval", rt.e[n+2].e );
+
+		if( refs[posi].size() <= 1 )  // has to be size 2 , e.g.  S( 0 1)
+			parse_error(L"Incorrect term size for sval(index)", L"" );
+
+		svalt[i*2] = refs[posi][0];
+		//normal S( i j ) term, but for str relation, get the var by decrementing that at pos0
+		svalt[i*2+1] = refs[posi][1] >= 0 ? refs[posi][0]-1 : refs[posi][1];
+		n += 4;  // parse sval(i)
+		if( i == 0 && !( n < rt.e.size() &&  
+			(rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)))
+			parse_error(L"Missing operator", rt.e[n].e );
+		else if( i == 1 && n < rt.e.size())
+			parse_error(L"Incorrect syntax", rt.e[n].e );
+		else n++; //parse operator	
+	}
+	v.push_back(move(svalt));
+	return true;
+}
+
 int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs, 
 							std::vector<term> &v, std::set<term> &done){
 
@@ -1561,7 +1603,6 @@ int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs,
 				int_t posi =  rt.e[n+2].num;
 				if( posi <0 || posi >= (int_t)refs.size()) 
 					parse_error(L"Wrong symbol index in len", rt.e[n+2].e );
-
 
 				if( refs[posi].size() > 1 ) {
 					
@@ -1580,16 +1621,54 @@ int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs,
 					v.push_back(lent);
 				}
 				else parse_error(L"Wrong term for ref",L"");
- 
 			}
 	} 
 	else if( n < rt.e.size() && rt.e[n].type == elem::NUM ) {
 			lopd = mknum(rt.e[n].num);
 			n += 1;
-		
 	}
 	else parse_error(L"Invalid start of constraint",L"");
 	return lopd;
+}
+
+bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
+
+	if (str_rels.size() > 1) er(err_one_input);
+	if (str_rels.empty()) return false;
+	eqr.resize(3); // three rules for substr equality
+	for(size_t r = 0; r < eqr.size(); r++) {
+		int_t var = 0;
+		int_t i= --var, j= --var , k=--var, n= --var;
+		ntable nt = get_table({dict.get_rel(dict.get_lexeme(L"equals")), {4}});
+		// making head   equals( i j k n) :-
+		eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP, nt, 
+								std::initializer_list<int>{i, j, k, n}, 0 );
+		// making fact equals( i i k k).
+		if( r == 0 ) eqr[r].back().assign({i,i,k,k});
+		else if( r == 1 ) { // inductive case
+			// equals(i j k n ) ;- str(i cv), str(j cv), i + 1 = j, k +1 = n.
+			int_t cv = --var;
+			// str(i cv) ,str( k, cv)	
+			for( int vi=0; vi<2; vi++)
+				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
+									get_table({*str_rels.begin(),{2}}),
+									std::initializer_list<int>{eqr[r][0][2*vi], cv} , 0);
+
+			eqr[r].emplace_back( false, term::ARITH, t_arith_op::ADD, -1,
+								 std::initializer_list<int>{i, mknum(1), j}, 0); 			
+			eqr[r].emplace_back( eqr[r].back());
+			eqr[r].back()[0] = k, eqr[r].back()[2] = n ;
+		} 
+		else if( r == 2) { // inductive case.
+			//equals(i j k n ) :- equals( i x k y)	, equals( x j y n)
+			int_t x = --var, y = --var;								
+			term eqs(false, term::textype::REL, t_arith_op::NOP, nt, { i, x, k, y }, 0);
+			eqr[r].emplace_back(eqs);
+			eqs.assign({x, j, y, n});
+			eqr[r].emplace_back(eqs);
+		}
+	}
+	return true;
 }
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
@@ -1686,12 +1765,23 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			dict.get_var_lexeme_from(i);
 
 		std::set<term> done;
-		//every constraint raw_term should be :
-		//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
-		// e.g. len(1) + 2 = 5  | len(1) = len(2
+		bool beqrule = false;
 		for( raw_term rt : x.c ) {
 			
 			size_t n = 0;
+			if( get_substr_equality(rt, n, refs, v, done)) {
+				// lets add equality rule since sval is being used
+				if(!beqrule) {
+					vector<vector<term>> eqr;
+					beqrule = get_rule_substr_equality(eqr);
+					for( auto vt: eqr) p.insert(vt);
+				} 
+				continue;
+			}
+			//every len constraint raw_term should be :
+			//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
+			// e.g. len(1) + 2 = 5  | len(1) = len(2
+			n = 0;
 			int_t lopd = get_factor(rt, n, refs, v, done);
 			int_t ropd, oside;    
 			if( n < rt.e.size() && rt.e[n].type == elem::ARITH ) {

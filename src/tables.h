@@ -311,6 +311,11 @@ private:
 	void transform_bin(flat_prog& p);
 	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
 					std::vector<term> &v, std::set<term> &done);
+	
+	bool get_rule_substr_equality(std::vector<std::vector<term>> &eqr);
+	
+	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+					std::vector<term> &v, std::set<term> &done);
 	void transform_grammar(std::vector<struct production> g, flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
