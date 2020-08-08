@@ -33,7 +33,9 @@
 
 # Misc
 .idea
+build
 build-*
+cmake-build*
 tml-config.cmake
 
 .vscode

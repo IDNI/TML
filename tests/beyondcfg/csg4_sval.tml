@@ -1,0 +1,7 @@
+@string str "cccaccc".
+
+C => 'c' C .
+C => 'c'.
+A => 'a' A | 'a'.
+S => C A C, sval(1) = sval(3), len(2) = 1.
+!S(0 7).
