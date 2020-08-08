@@ -1,0 +1,5 @@
+# every B is A
+A(0).
+A(1).
+B(0).
+ALL_B_IS_A(1) := forall ?x { B(?x) -> A(?x) }.

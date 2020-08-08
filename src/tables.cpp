@@ -245,6 +245,11 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 }
 
 
+//---------------------------------------------------------
+
+//TODO: we need to put all formula manipulation code in separated
+// sources. Dragan already did this in varbits, but in the meantime
+// in next commit we should refactor this
 
 form::ftype transformer::getdual( form::ftype type) {
 	switch (type) {
@@ -258,6 +263,21 @@ form::ftype transformer::getdual( form::ftype type) {
 	}
 }
 
+bool form::is_sol() {
+	if (type == FORALL2 || type == EXISTS2 || type == UNIQUE2) return true;
+	bool is_sol = false;
+	if(l) is_sol |= l->is_sol();
+	if(r && !is_sol) is_sol |= r->is_sol();
+	return is_sol;
+}
+
+bool form::implic_rmoval() {
+	implic_removal impltrans;
+	auto ref = &(*this);
+	return(impltrans.traverse(ref));
+}
+
+//---------------------------------------------------------
 
 bool demorgan::push_negation( form *&root) {
 
@@ -295,7 +315,6 @@ bool demorgan::push_negation( form *&root) {
 
 }
 
-
 bool demorgan::apply( form *&root) {
 
 	if(root && root->type == form::ftype::NOT  &&
@@ -314,7 +333,7 @@ bool demorgan::apply( form *&root) {
 	return false;
 }
 
- bool implic_removal::apply(form *&root) {
+bool implic_removal::apply(form *&root) {
 	if( root && root->type == form::ftype::IMPLIES ) {
 		root->type = form::OR;
 		form * temp = new form( form::NOT);
@@ -324,6 +343,7 @@ bool demorgan::apply( form *&root) {
 	}
 	return false;
 }
+
 bool substitution::apply(form *&phi){
 	if( phi && phi->type == form::ATOM) {
 		if(phi->tm == NULL) {
@@ -398,7 +418,6 @@ bool pull_quantifier::apply( form *&root) {
 	findprefix(curr->r, rprefbeg, rprefend);
 
 	if( lprefbeg && rprefbeg ) {
-
 		if(!dosubstitution(lprefbeg, lprefend) ||
 			!dosubstitution(rprefbeg, rprefend) )
 			throw 0;
@@ -441,9 +460,7 @@ bool pull_quantifier::traverse( form *&root ) {
 	if( root == NULL ) return false;
 	if( root->l ) changed |= traverse( root->l );
 	if( root->r ) changed |= traverse( root->r );
-
 	changed = apply(root);
-
 	return changed;
 }
 
@@ -460,21 +477,21 @@ bool transformer::traverse(form *&root ) {
 	return changed;
 }
 
+//---------------------------------------------------------
 
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
 returns false or the froot is not needed any more, the caller should delete the froot pointer.
 For a null input argument rfm, it returns true and makes froot null as well.
 	*/
-bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
+bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol) {
 
 	form::ftype ft = form::NONE;
 	bool ret =false;
 	form *root = NULL;
 	int_t arg= 0;
 
-	if(!rfm) return froot=root,  true;
-
+	if(!rfm) return froot=root, true;
 
 	if(rfm->rt) {
 		ft = form::ATOM;
@@ -483,15 +500,13 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 		froot = root;
 		if(!root) return false;
 		return true;
-
-
 	}
 	else {
 		switch(rfm->type) {
 			case elem::NOT:
 				root = new form(form::NOT);
 				if(root ) {
-					ret =  from_raw_form(rfm->l, root->l);
+					ret =  from_raw_form(rfm->l, root->l, is_sol);
 					froot = root;
 					return ret;
 				}
@@ -508,9 +523,19 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 				if(!root) return false;
 				return true;
 
-			case elem::FORALL: if(rfm->l->type == elem::VAR) ft = form::FORALL1; else ft = form::FORALL2; break;
-			case elem::UNIQUE: if(rfm->l->type == elem::VAR) ft = form::UNIQUE1; else ft = form::UNIQUE2; break;
-			case elem::EXISTS: if(rfm->l->type == elem::VAR) ft = form::EXISTS1; else ft = form::EXISTS2; break;
+			//identifying sol formula
+			case elem::FORALL:
+				if(rfm->l->type == elem::VAR) ft = form::FORALL1;
+				else ft = form::FORALL2, is_sol = true;
+				break;
+			case elem::UNIQUE:
+				if(rfm->l->type == elem::VAR) ft = form::UNIQUE1;
+				else ft = form::UNIQUE2, is_sol = true;
+				break;
+			case elem::EXISTS:
+				if(rfm->l->type == elem::VAR) ft = form::EXISTS1;
+				else ft = form::EXISTS2, is_sol = true;
+				break;
 			case elem::OR:
 			case elem::ALT: ft = form::OR; break;
 			case elem::AND: ft = form::AND; break;
@@ -520,8 +545,8 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 		}
 		root =  new form(ft,0, 0);
 		if( root ) {
-			ret= from_raw_form(rfm->l, root->l);
-			if(ret) ret = from_raw_form(rfm->r, root->r);
+			ret= from_raw_form(rfm->l, root->l, is_sol);
+			if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
 			froot = root;
 			return ret;
 		}
@@ -531,12 +556,14 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot) {
 
 void form::printnode(int lv) {
 	if(r) r->printnode(lv+1);
-	wprintf(L"\n");
 	for( int i=0; i <lv; i++)
 		wprintf(L"\t");
-	wprintf(L" %d %d", type, arg);
+	wprintf(L" %d %d\n", type, arg);
 	if(l) l->printnode(lv+1);
 }
+
+//---------------------------------------------------------
+
 
 void tables::out(wostream& os) const {
 	strs_t::const_iterator it;
@@ -887,6 +914,7 @@ bool tables::to_pnf( form *&froot) {
 	bool changed = false;
 	changed = impltrans.traverse(froot);
 	changed |= demtrans.traverse(froot);
+
 	wprintf(L"\n ........... \n");
 	froot->printnode();
 	changed |= pullquant.traverse(froot);
@@ -896,13 +924,14 @@ bool tables::to_pnf( form *&froot) {
 	return changed;
 
 }
+
 flat_prog tables::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
 	term t;
 
 	for (const raw_rule& r : p.r)
-		if (r.type == raw_rule::NONE && !r.b.empty())
+		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
 				get_nums(x), t = from_raw_term(x, true),
 				v.push_back(t);
@@ -914,25 +943,35 @@ flat_prog tables::to_terms(const raw_prog& p) {
 					align_vars(v), m.insert(move(v));
 				}
 			}
-		else if(r.prft != NULL) {
-			form* froot = NULL;
-
-			from_raw_form(r.prft.get(), froot);
-
-			wprintf(L"\n ........... \n");
-			r.prft.get()->printTree();
-			wprintf(L"\n ........... \n");
-			froot->printnode();
-
-			to_pnf(froot);
-
-			if(froot) delete froot;
-
 		}
+		else if(r.prft != NULL) {
+			bool is_sol = false;
+			form* froot = NULL;
+			from_raw_form(r.prft.get(), froot, is_sol);
 
-		else for (const raw_term& x : r.h)
-			t = from_raw_term(x, true), t.goal = r.type == raw_rule::GOAL,
+			DBG(wprintf(L"\n ........... \n"));
+			DBG(r.prft.get()->printTree());
+			DBG(wprintf(L"\n ........... \n"));
+			DBG(froot->printnode());
+
+			term::textype extype = term::FORM1;
+			if(is_sol) to_pnf(froot), extype = term::FORM2;
+			//if(froot->is_sol()) to_pnf(froot), extype = term::FORM2;
+			//else froot->implic_rmoval(), froot->printnode(); //forcing implic removal for FOL here
+			//assert(froot);
+			const raw_term& x = r.h.front();
+			term t;
+			get_nums(x), t = from_raw_term(x, true), v.push_back(t);
+			t = term(extype, move(froot));
+			v.push_back(t);
+			//align_vars(v); ???
+			m.insert(move(v));
+			//delete froot;
+		} else  {
+			for (const raw_term& x : r.h)
+				t = from_raw_term(x, true), t.goal = r.type == raw_rule::GOAL,
 			m.insert({t}), get_nums(x);
+		}
 
 	return m;
 }
@@ -1167,12 +1206,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			term& bt = lastbody.second;
 			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
-		} else if (t.extype == term::ARITH) {
-			//returning bdd handler on leq variable
-			if (!isarith_handler(t,a,leq)) return;
-			continue;
-		}
-		else if (t.extype == term::EQ) { //.iseq
+		} else if (t.extype == term::EQ) { //.iseq
 			DBG(assert(t.size() == 2););
 			if (t[0] == t[1]) {
 				if (t.neg) return;
@@ -1203,38 +1237,27 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			if (t[0] < 0 && t[1] < 0) {
 				q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]),
 					a.varslen, bits);
-
 			}
 			else if (t[0] < 0)
 				q = leq_const(t[1], a.vm.at(t[0]), a.varslen, bits);
-			/*
-			//XXX:replacement of leq_const by leq_var, needs further test and cleanup
-			else if (t[0] < 0) {
-				size_t args = t.size();
-				spbdd_handle aux = from_sym(1, args, t[1]);
-				q = leq_var(a.vm.at(t[0]), a.vm.at(t[0])+1, a.varslen+1, bits, aux);
-
-				bools exvec;
-				for (size_t i = 0; i < bits; ++i) {
-					exvec.push_back(false);
-					exvec.push_back(true);
-				}
-				q = q/exvec;
-
-				uints perm1;
-				perm1 = perm_init(2*bits);
-				for (size_t i = 1; i < bits; ++i) {
-					perm1[i*2] = perm1[i*2]-i ;
-				}
-				q = q^perm1;
-			}
-			*/
 			else if (t[1] < 0)
 				// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 				q = htrue % leq_const(t[0],
 					a.vm.at(t[1]), a.varslen, bits) ||
 					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
+
 			leq = t.neg ? leq % q : (leq && q);
+
+		} else if (t.extype == term::ARITH) {
+			//XXX: returning bdd handler on leq variable
+			if (!handler_arith(t,a,leq)) return;
+		} else if (t.extype == term::FORM1) {
+			//XXX: initially placing this handler on the elaboration stage in
+			//     order to work feature.
+			//     Will be combined with a query method
+			//     on the execution stage
+			o::dbg()<<L"\n FOL preparation ... \n " << endl;
+			if (!handler_form1(t,a,leq)) return;
 		}
 		// we use LT/GEQ <==> LEQ + reversed args + !neg
 	}
@@ -1329,11 +1352,12 @@ void tables::transform_bin(flat_prog& p) {
 	auto getterms = [&vars]
 		(const vector<term>& x) -> vector<size_t> {
 		if (x.size() <= 3) return {};
-/*		vector<size_t> e;
+		/* XXX: OK to remove?
+		vector<size_t> e;
 		for (size_t n = 1; n != x.size(); ++n)
 			if (has(exts, x[n].tab)) e.push_back(n);
 		if (e.size() == x.size() - 1) return { 1, 2 };
-		if (e.size() > 1) return { e[0], e[1] };*/
+		if (e.size() > 1) return { e[0], e[1] }; */
 		size_t max = 0, b1 = 0, b2, n;
 		for (size_t i = 2; i != x.size(); ++i)
 			for (size_t j = 1; j != i; ++j)
@@ -1396,10 +1420,12 @@ void tables::cqc(flat_prog& p) {
 void tables::get_rules(flat_prog p) {
 	bcqc = false;
 	get_facts(p);
+	/*
+	//XXX: OK to remove?
 	for (const vector<term>& x : p)
 		for (size_t n = 1; n != x.size(); ++n)
 			exts.insert(x[n].tab);
-	for (const vector<term>& x : p) if (x.size() > 1) exts.erase(x[0].tab);
+	for (const vector<term>& x : p) if (x.size() > 1) exts.erase(x[0].tab);*/
 	if (bcqc) print(o::out()<<L"before cqc, "<<p.size()<<L" rules:"<<endl,p);
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
@@ -1420,6 +1446,7 @@ void tables::get_rules(flat_prog p) {
 	if (optimize) bdd::gc();
 
 	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
+	//XXX: why m is not just map<term, term_set> ?
 	map<term, set<term_set>> m;
 	for (const auto& x : p)
 		if (x.size() == 1) m[x[0]] = {};
@@ -1428,7 +1455,7 @@ void tables::get_rules(flat_prog p) {
 	varmap::const_iterator it;
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
 	alt* aa;
-	for (pair<term, set<term_set>> x : m) {
+	for (auto x : m) {
 		if (x.second.empty()) continue;
 		set<int_t> hvars;
 		const term &t = x.first;
@@ -1445,6 +1472,7 @@ void tables::get_rules(flat_prog p) {
 			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
+
 		for (const term_set& al : x.second) get_alt(al, t, as);
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
@@ -1760,6 +1788,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 		dict.get_sym(dict.get_lexeme(L"digit")),
 		dict.get_sym(dict.get_lexeme(L"printable"));
 	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
+
 	add_prog(to_terms(p), p.g);
 }
 
@@ -1891,8 +1920,98 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 	return x->b < y->b;
 };
 
+
+
+spbdd_handle tables::alt_query_bltin(alt& a, bdd_handles& v1) {
+
+	spbdd_handle x;
+
+	lexeme bltintype = dict.get_bltin(a.idbltin);
+	int_t bltinout = a.bltinargs.back(); // for those that have ?out
+
+	// for bitwise and pairwise operators that take bdds as inputs
+	// these bdds are result of body query executed above
+	std::vector<int_t> bltininputs;
+	for(size_t i = 0; i < a.bltinargs.size(); i++) {
+		if (a.bltinargs[i] < 0) bltininputs.push_back(a.bltinargs[i]);
+	}
+
+
+	if (bltintype == L"count") {
+		body& b = *a[a.size() - 1];
+		// old, official satcount algorithm, phased out
+		int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
+		// new satcount based on the adjusted allsat_cb::sat (decompress)
+		if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
+
+		int_t cnt = bdd::satcount(x, b.inv);
+		// just equate last var (output) with the count
+		x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
+
+		v1.push_back(x);
+		o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
+		if (cnt != cnt0)
+			o::dbg() << L"(cnt0 != cnt):" << cnt0 << L", " << cnt << endl;
+	}
+	else if (bltintype == L"rnd") {
+		DBG(assert(a.bltinargs.size() == 3););
+		// TODO: check that it's num const
+		int_t arg0 = int_t(a.bltinargs[0] >> 2);
+		int_t arg1 = int_t(a.bltinargs[1] >> 2);
+		if (arg0 > arg1) swap(arg0, arg1);
+
+		//int_t rnd = arg0 + (std::rand() % (arg1 - arg0 + 1));
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<> distr(arg0, arg1);
+		int_t rnd = distr(gen);
+
+		x = from_sym(a.vm.at(bltinout), a.varslen, mknum(rnd));
+		v1.push_back(x);
+		o::dbg() << L"alt_query (rnd):" << rnd << L"" << endl;
+	}
+	else if (bltintype == L"print") {
+		wstring ou{L"output"};
+		size_t n{0};
+		// D: args are now [0,1,...] (we no longer have the bltin as 0 arg)
+		if (a.bltinargs.size() >= 2) ++n,
+			ou = lexeme2str(dict.get_sym(a.bltinargs[0]));
+		wostream& os = output::to(ou);
+		do {
+			int_t arg = a.bltinargs[n++];
+			if      (arg < 0) os << get_var_lexeme(arg) << endl;
+			else if (arg & 1) os << (wchar_t)(arg >> 2);
+			else if (arg & 2) os << (int_t)  (arg >> 2);
+			else              os << dict.get_sym(arg);
+		} while (n < a.bltinargs.size());
+	}
+	else if (t_arith_op op = get_bwop(bltintype); op != t_arith_op::NOP) {
+		size_t arg0_id = a.vm.at(bltininputs[0]);
+		size_t arg1_id = a.vm.at(bltininputs[1]);
+		spbdd_handle arg0 = v1[2];
+		spbdd_handle arg1 = v1[3];
+		x = bitwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+							arg0, arg1, a.varslen, op);
+		v1.push_back(x);
+	}
+	else if (t_arith_op op = get_pwop(bltintype); op != t_arith_op::NOP) {
+		size_t arg0_id = a.vm.at(bltininputs[0]);
+		size_t arg1_id = a.vm.at(bltininputs[1]);
+		spbdd_handle arg0 = v1[2];
+		spbdd_handle arg1 = v1[3];
+		x = pairwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
+							 arg0, arg1, a.varslen, op);
+		v1.push_back(x);
+	}
+}
+
+
+
 spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
-/*	spbdd_handle t = htrue;
+
+	/*
+	//XXX: OK to remove?
+	spbdd_handle t = htrue;
 	for (auto x : a.order) {
 		bdd_handles v1;
 		v1.push_back(t);
@@ -1900,7 +2019,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		t = bdd_and_many(move(v1)) / x.second;
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
-//	DBG(bdd::gc();)
+	//DBG(bdd::gc();)
+
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
 	//DBG(assert(!a.empty());)
@@ -1911,86 +2031,12 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			return hfalse;
 		} else v1.push_back(x);
 
-	if (a.idbltin > -1) {
 
-		lexeme bltintype = dict.get_bltin(a.idbltin);
-		int_t bltinout = a.bltinargs.back(); // for those that have ?out
+	//XXX: for over bdd arithmetic (currently handled as a bltin, although may change)
+	// In case arguments are the same than last iteration,
+	// here is were it should be avoided to recompute.
 
-		// for bitwise and pairwise operators that take bdds as inputs
-		// these bdds are result of body query executed above
-		std::vector<int_t> bltininputs;
-		for(size_t i = 0; i < a.bltinargs.size(); i++) {
-			if (a.bltinargs[i] < 0) bltininputs.push_back(a.bltinargs[i]);
-		}
-
-
-		if (bltintype == L"count") {
-			body& b = *a[a.size() - 1];
-			// old, official satcount algorithm, phased out
-			int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
-			// new satcount based on the adjusted allsat_cb::sat (decompress)
-			if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
-
-			int_t cnt = bdd::satcount(x, b.inv);
-			// just equate last var (output) with the count
-			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
-
-			v1.push_back(x);
-			o::dbg() << L"alt_query (cnt):" << cnt << L"" << endl;
-			if (cnt != cnt0)
-				o::dbg() << L"(cnt0 != cnt):" << cnt0 << L", " << cnt << endl;
-		}
-		else if (bltintype == L"rnd") {
-			DBG(assert(a.bltinargs.size() == 3););
-			// TODO: check that it's num const
-			int_t arg0 = int_t(a.bltinargs[0] >> 2);
-			int_t arg1 = int_t(a.bltinargs[1] >> 2);
-			if (arg0 > arg1) swap(arg0, arg1);
-
-			//int_t rnd = arg0 + (std::rand() % (arg1 - arg0 + 1));
-			std::random_device rd;
-			std::mt19937 gen(rd());
-			std::uniform_int_distribution<> distr(arg0, arg1);
-			int_t rnd = distr(gen);
-
-			x = from_sym(a.vm.at(bltinout), a.varslen, mknum(rnd));
-			v1.push_back(x);
-			o::dbg() << L"alt_query (rnd):" << rnd << L"" << endl;
-		}
-		else if (bltintype == L"print") {
-			wstring ou{L"output"};
-			size_t n{0};
-			// D: args are now [0,1,...] (we no longer have the bltin as 0 arg)
-			if (a.bltinargs.size() >= 2) ++n,
-				ou = lexeme2str(dict.get_sym(a.bltinargs[0]));
-			wostream& os = output::to(ou);
-			do {
-				int_t arg = a.bltinargs[n++];
-				if      (arg < 0) os << get_var_lexeme(arg) << endl;
-				else if (arg & 1) os << (wchar_t)(arg >> 2);
-				else if (arg & 2) os << (int_t)  (arg >> 2);
-				else              os << dict.get_sym(arg);
-			} while (n < a.bltinargs.size());
-		}
-		else if (t_arith_op op = get_bwop(bltintype); op != t_arith_op::NOP) {
-			size_t arg0_id = a.vm.at(bltininputs[0]);
-			size_t arg1_id = a.vm.at(bltininputs[1]);
-			spbdd_handle arg0 = v1[2];
-			spbdd_handle arg1 = v1[3];
-			x = bitwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
-								arg0, arg1, a.varslen, op);
-			v1.push_back(x);
-		}
-		else if (t_arith_op op = get_pwop(bltintype); op != t_arith_op::NOP) {
-			size_t arg0_id = a.vm.at(bltininputs[0]);
-			size_t arg1_id = a.vm.at(bltininputs[1]);
-			spbdd_handle arg0 = v1[2];
-			spbdd_handle arg1 = v1[3];
-			x = pairwise_handler(arg0_id, arg1_id, a.vm.at(bltinout),
-								 arg0, arg1, a.varslen, op);
-			v1.push_back(x);
-		}
-	}
+	if (a.idbltin > -1) alt_query_bltin(a, v1) ;
 
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) return a.rlast;// { v.push_back(a.rlast); return; }

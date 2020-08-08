@@ -76,7 +76,11 @@ struct raw_term {
 	bool neg = false;
 	//bool iseq = false, isleq = false, islt = false, isbltin = false;
 	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT } extype = raw_term::REL;
+
+	//XXX we can add FORM1, FORM2 etc to rtextype
+	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
 	t_arith_op arith_op = NOP;
+
 	std::vector<elem> e;
 	ints arity;
 
@@ -156,8 +160,6 @@ struct raw_form_tree {
 
 	raw_form_tree *l;
 	raw_form_tree *r;
-
-
 
 	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el= NULL, raw_form_tree *_l= NULL, raw_form_tree *_r= NULL ) {
 

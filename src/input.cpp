@@ -238,6 +238,8 @@ bool elem::parse(const lexemes& l, size_t& pos) {
 	if (L'*' == l[pos][0][0]) {
 		return e = l[pos++], type = ARITH, arith_op = MULT, true;
 	}
+
+	//FIXME conflicting with ALT
 	if (L'|' == l[pos][0][0]) {
 		return e = l[pos++], type = ARITH, arith_op = BITWOR, true;
 	}
@@ -288,16 +290,20 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog, raw_te
 	if ((neg = *l[pos][0] == L'~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
 		lt = false, geq = false, bltin = false, arith = false;
-	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
+
 	t_arith_op arith_op_aux = NOP;
+
+	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
 	//XXX: review for "-"
+	//FIXME: here we have conflict with LEC, ARITH and SOL(formula) parsing.
+	//       also eventually ARITH will become formula as well.
 	while (!wcschr(L".:,;{}-", *l[pos][0])) { // L".:,;{}|&-<"
 		if (e.emplace_back(), !e.back().parse(l, pos)) return false;
 		else if (pos == l.size())
 			parse_error(input::source[1], err_eof, s[0]);
 		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos)
 		switch (el.type) {
-			case elem::EQ: eq = true; break;
+			case elem::EQ: eq = true; break;//TODO: review - for substraction
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq = true; break;
 			case elem::GT: gt = true; break;
@@ -369,7 +375,7 @@ bool raw_term::parse(const lexemes& l, size_t& pos, const raw_prog& prog, raw_te
 	}
 	if (arith) {
 
-		// ARITH operations are currently implemented to work with three vars
+		// ARITH operations are currently implemented to work with three arguments
 		// var OPERATOR var RELATIONSHIP var
 		// supported OPERATORs : + * | & ^ << >> (XXX - is TBD)
 		// supported RELATIONSHIPs: = (TODO: add support for <= => < > != )
@@ -615,7 +621,7 @@ bool raw_sof::parse(const lexemes& l, size_t& pos, raw_form_tree *&root) {
 	if( pos >= l.size() || *l[pos][0] != '.') ret = false;
 	else pos++;
 
-	wprintf(L"\n cur = %d tot= %d \n ", pos, l.size());
+	DBG(wprintf(L"\n cur = %d tot= %d \n ", pos, l.size()));
 
 	return ret;
 }
