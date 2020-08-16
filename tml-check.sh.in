@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cp @CMAKE_SOURCE_DIR@/src/tml.g @CMAKE_BINARY_DIR@
+WC=($(wc -c < @CMAKE_BINARY_DIR@/tml.g))
+
+while read PARSELINE; do
+  if [[ $PARSELINE =~ ^.*S\(0[[:space:]]($WC).*$ ]];
+  then
+    echo "Tml parsing check successful"
+    rm @CMAKE_BINARY_DIR@/tml.g
+    exit 0
+  fi
+done < <(@CMAKE_BINARY_DIR@/tml -i tml.g 2> /dev/null)
+echo "Error running tml -i tml.g!" 1>&2
+rm @CMAKE_BINARY_DIR@/tml.g
+exit 1
