@@ -23,6 +23,7 @@ set(TML_HEADERS
 	dict.h
 	driver.h
 	err.h
+	form.h
 	input.h
 	options.h
 	output.h
@@ -38,6 +39,7 @@ set(TML_SOURCES
 	binary.cpp
 	dict.cpp
 	driver.cpp
+	form.cpp
 	input.cpp
 	options.cpp
 	output.cpp

@@ -21,6 +21,8 @@
 #include <iomanip>
 #include <cstdio>
 #include <map>
+#include <memory>
+
 
 #ifndef __EMSCRIPTEN__
 #include <execinfo.h>
@@ -88,6 +90,15 @@ typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
 } t_arith_op;
 
+struct alt;
 struct form;
+struct body;
+
+struct pnf_t;
+typedef enum {EX, UN, FA} quant_t;
+typedef std::map<int_t, size_t> varmap;
+
+typedef std::shared_ptr<class bdd_handle> spbdd_handle;
+
 #endif
 //#define TRANSFORM_BIN_DRIVER

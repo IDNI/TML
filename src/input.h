@@ -85,7 +85,7 @@ struct raw_term {
 	ints arity;
 
 	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog,
-				rtextype pref_type = raw_term::REL );
+				bool is_form = false, rtextype pref_type = raw_term::REL);
 	void calc_arity();
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
@@ -147,7 +147,7 @@ struct raw_rule {
 struct raw_prefix {
 		elem qtype;
 		elem ident;
-		bool isfod =false;
+		bool isfod = false;
 
 	bool parse(const lexemes& l, size_t& pos);
 };
