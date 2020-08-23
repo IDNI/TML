@@ -1615,7 +1615,7 @@ ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
 bool tables::get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &refs, 
 							std::vector<term> &v, std::set<term> &done){
-	//format : sval(1) = sval(2)
+	//format : substr(1) = substr(2)
 	term svalt;
 	svalt.resize(4);
 	int_t relp = dict.get_rel(dict.get_lexeme(L"equals"));
@@ -1626,23 +1626,23 @@ bool tables::get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t,
 		if( n >= rt.e.size() || rt.e[n].type != elem::SYM ) 
 			return false;
 		wstring attrib = lexeme2str( rt.e[n].e);
-		if( !	(!std::wcscmp(attrib.c_str() , L"sval")
+		if( !(!std::wcscmp(attrib.c_str() , L"substr")
 			&& 	(n+3) < rt.e.size() 
 			&& 	rt.e[n+1].type == elem::OPENP  
 			&&	rt.e[n+2].type == elem::NUM    
 			&&	rt.e[n+3].type == elem::CLOSEP ) ) 
 			return false;
 		
-		int_t posi =  rt.e[n+2].num;
-		if( posi < 0 || posi >= (int_t)refs.size()) 
-			parse_error(L"Wrong symbol index in sval", rt.e[n+2].e );
+		int_t pos =  rt.e[n+2].num;
+		if( pos < 0 || pos >= (int_t)refs.size()) 
+			parse_error(L"Wrong symbol index in substr", rt.e[n+2].e );
 
-		if( refs[posi].size() <= 1 )  // has to be size 2 , e.g.  S( 0 1)
-			parse_error(L"Incorrect term size for sval(index)", L"" );
+		if( refs[pos].size() <= 1 )  // has to be size 2 , e.g.  S( 0 1)
+			parse_error(L"Incorrect term size for substr(index)", L"" );
 
-		svalt[i*2] = refs[posi][0];
+		svalt[i*2] = refs[pos][0];
 		//normal S( i j ) term, but for str relation, get the var by decrementing that at pos0
-		svalt[i*2+1] = refs[posi][1] >= 0 ? refs[posi][0]-1 : refs[posi][1];
+		svalt[i*2+1] = refs[pos][1] >= 0 ? refs[pos][0]-1 : refs[pos][1];
 		n += 4;  // parse sval(i)
 		if( i == 0 && !( n < rt.e.size() &&  
 			(rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)))
@@ -1666,34 +1666,34 @@ int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs,
 			&& 	rt.e[n+1].type == elem::OPENP  
 			&&	rt.e[n+2].type == elem::NUM    
 			&&	rt.e[n+3].type == elem::CLOSEP ) {
-				int_t posi =  rt.e[n+2].num;
-				if( posi <0 || posi >= (int_t)refs.size()) 
+				int_t pos =  rt.e[n+2].num;
+				if( pos <0 || pos >= (int_t)refs.size()) 
 					parse_error(L"Wrong symbol index in len", rt.e[n+2].e );
 
-				if( refs[posi].size() > 1 ) {
+				if( refs[pos].size() > 1 ) {
 					
 					term lent;
 					lent.resize(3), lent.tab = -1 , 
 					lent.extype = term::textype::ARITH ,lent.arith_op = t_arith_op::ADD;
 
-					lent[0] = refs[posi][0];
-					if( refs[posi][1] < 0 )	lent[2] = refs[posi][1];
-					else lent[2] = refs[posi][0] -1; // so len(i) refers to str relation 
+					lent[0] = refs[pos][0];
+					if( refs[pos][1] < 0 )	lent[2] = refs[pos][1];
+					else lent[2] = refs[pos][0] -1; // so len(i) refers to str relation 
 
-					lent[1] = dict.get_var(dict.get_lexeme(L"?len"+to_wstring(posi)));
+					lent[1] = dict.get_var(dict.get_lexeme(L"?len"+to_wstring(pos)));
 					lopd = lent[1];	
 					n += 4;
 					//if(!done.insert(lent).second)
 					v.push_back(lent);
 				}
-				else parse_error(L"Wrong term for ref",L"");
+				else er(L"Wrong term for ref.");
 			}
 	} 
 	else if( n < rt.e.size() && rt.e[n].type == elem::NUM ) {
 			lopd = mknum(rt.e[n].num);
 			n += 1;
 	}
-	else parse_error(L"Invalid start of constraint",L"");
+	else er(L"Invalid start of constraint.");
 	return lopd;
 }
 
@@ -1837,7 +1837,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			
 			size_t n = 0;
 			if( get_substr_equality(rt, n, refs, v, done)) {
-				// lets add equality rule since sval is being used
+				// lets add equality rule since substr(i) is being used
 				if(!beqrule) {
 					vector<vector<term>> eqr;
 					beqrule = get_rule_substr_equality(eqr);
@@ -1863,7 +1863,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				int_t ropd = get_factor(rt, n, refs, v, done);
 				
 				if( rt.e[n].type != elem::EQ) 
-					parse_error(L"Only EQ supported in Constraints ", rt.e[n].e);
+					parse_error(L"Only EQ supported in len constraints. ", rt.e[n].e);
 				n++; // assignment
 
 				aritht[0] = lopd;
@@ -1872,7 +1872,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				aritht[2] = oside;
 				//if(!done.insert(aritht).second)
 				if(n == rt.e.size())	v.push_back(aritht);
-				else parse_error(L" Only simple binary operation allowed ", L"" );
+				else er(L" Only simple binary operation allowed." );
 			}
 			else if( n < rt.e.size() && 
 				   (rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
@@ -1907,12 +1907,11 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 						aritht[2] = lopd;
 						//if(!done.insert(aritht).second)
 						if(n == rt.e.size())	v.push_back(aritht);
-						else parse_error(L"Only simple binary operation allowed",L"");
+						else er(L"Only simple binary operation allowed.");
 		
-				} else parse_error(L" Constraint syntax not supported",L"");
+				} else parse_error(err_constraint_syntax, L"");
 			}
-			else parse_error(L" Constraint syntax not supported",L"");
-		
+			else parse_error(err_constraint_syntax, rt.e[n].e);		
 		}
 		p.insert(move(v));
 	}

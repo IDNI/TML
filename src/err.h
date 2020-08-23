@@ -17,6 +17,7 @@ const wchar_t err_chr[] = L"Unexpected character.";
 const wchar_t err_body[] = L"Rule's body expected.";
 const wchar_t err_prod[] = L"Production's body expected.";
 const wchar_t err_empty_prod[] = L"Empty production.";
+const wchar_t err_constraint_syntax[] = L"Constraint Syntax not supported.";
 const wchar_t err_start_sym[] = L"Expected a term to be fed to the start symbol.";
 const wchar_t err_term_or_dot[] = L"Term or dot expected.";
 const wchar_t err_close_curly[] = L"'}' expected.";
