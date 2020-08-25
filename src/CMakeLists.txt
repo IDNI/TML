@@ -99,13 +99,6 @@ if (WITH_BOOST)
 	endif (Boost_FOUND)
 endif ()
 
-# pthreads
-###########
-if (WITH_THREADS)
-	set(THREADS_PREFER_PTHREAD_FLAG ON)
-	find_package(Threads)
-endif()
-
 # shared library
 #################
 

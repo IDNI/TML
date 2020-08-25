@@ -141,6 +141,10 @@ extern mmap_mode bdd_mmap_mode;
 
 void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 int_t bdd_root(cr_spbdd_handle x);
+spbdd_handle bdd_and_hl(cr_spbdd_handle x);
+spbdd_handle bdd_or_hl(cr_spbdd_handle x);
+spbdd_handle bdd_xor_hl(cr_spbdd_handle x);
+spbdd_handle bdd_not(cr_spbdd_handle x);
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -196,7 +200,11 @@ class bdd {
 
 	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
+	friend spbdd_handle bdd_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
+	friend spbdd_handle bdd_and_hl(cr_spbdd_handle x);
+	friend spbdd_handle bdd_or_hl(cr_spbdd_handle x);
+	friend spbdd_handle bdd_xor_hl(cr_spbdd_handle x);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -258,9 +266,12 @@ class bdd {
 	static std::wostream& out(std::wostream& os, int_t x);
 	int_t h, l, v;
 
-	//XXX: work-in-progress
+	//---
 	static void bdd_sz_abs(int_t x, std::set<int_t>& s);
 	static int_t bdd_xor(int_t x, int_t y);
+	static int_t bdd_and_hl(int_t b);
+	static int_t bdd_or_hl(int_t b);
+	static int_t bdd_xor_hl(int_t b);
 
 	static int_t bitwiseAND(int_t a_in, int_t b_in);
 	static int_t bitwiseOR(int_t a_in, int_t b_in);

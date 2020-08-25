@@ -17,6 +17,7 @@
 #include "math.h"
 using namespace std;
 
+
 //------------------------------------------------------------------------------
 // auxiliary functions
 int_t bdd_root(cr_spbdd_handle x) {
@@ -28,10 +29,26 @@ void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
 }
 
 //------------------------------------------------------------------------------
+
+spbdd_handle bdd_and_hl(cr_spbdd_handle x) {
+	return bdd_handle::get(bdd::bdd_and_hl(x->b));
+}
+
+spbdd_handle bdd_or_hl(cr_spbdd_handle x) {
+	return bdd_handle::get(bdd::bdd_or_hl(x->b));
+}
+
+spbdd_handle bdd_xor_hl(cr_spbdd_handle x) {
+	return bdd_handle::get(bdd::bdd_xor_hl(x->b));
+}
+
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
 	return bdd_handle::get(bdd::bdd_xor(x->b,y->b));
 }
 
+spbdd_handle bdd_not(cr_spbdd_handle x) {
+	return bdd_handle::get(-x->b);
+}
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -78,6 +95,20 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 }
 
 // ----------------------------------------------------------------------------
+
+int_t bdd::bdd_and_hl(int_t x) {
+	bdd b = get(x);
+	return bdd_and(b.h,b.l);
+}
+
+int_t bdd::bdd_or_hl(int_t x) {
+	bdd b = get(x);
+	return bdd_or( b.h, b.l);
+}
+int_t bdd::bdd_xor_hl(int_t x) {
+	bdd b = get(x);
+	return bdd_xor( b.h, b.l);
+}
 
 void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
 	if (!s.emplace(abs(x)).second) return;

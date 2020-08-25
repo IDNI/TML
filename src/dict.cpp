@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include "dict.h"
 #include "err.h"
+#include "defs.h"
 using namespace std;
 
 dict_t::dict_t() : op(get_lexeme(L"(")), cl(get_lexeme(L")")) {}
@@ -47,7 +48,22 @@ int_t dict_t::get_var(const lexeme& l) {
 	auto it = vars_dict.find(l);
 	if (it != vars_dict.end()) return it->second;
 	int_t r = -vars_dict.size() - 1;
+	vars.push_back(l);
 	return vars_dict[l] = r;
+}
+
+lexeme dict_t::get_var_lexeme_from(int_t r) {
+	DBG(assert(r<0);)
+	int index = (-r -1);
+	if ( index < (int_t)vars.size() ) {
+		int nr = get_var(vars[index]);
+		DBG(assert(nr == r);)
+		return vars[index];
+	}
+	lexeme l = get_lexeme(wstring(L"?v") + to_wstring(-r));
+	int nr = get_var(l) ;
+	DBG(assert(nr == r));
+	return l;
 }
 
 int_t dict_t::get_rel(const lexeme& l) {

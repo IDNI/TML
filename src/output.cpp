@@ -307,6 +307,15 @@ wstring quote_sym(const elem& e) {
 
 wostream& operator<<(wostream& os, const raw_term& t) {
 	if (t.neg) os << L'~';
+	
+	if( t.extype == raw_term::ARITH || 
+		t.extype == raw_term::EQ 	|| 
+		t.extype == raw_term::LEQ 	) {
+		for ( elem el : t.e) 
+			os << el;
+		return os;		
+	}
+
 	os << t.e[0];
 	os << L'(';
 	for (size_t ar = 0, n = 1; ar != t.arity.size();) {

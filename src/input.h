@@ -75,11 +75,17 @@ struct raw_term {
 	// TODO: enum 'is...' stuff
 	bool neg = false;
 	//bool iseq = false, isleq = false, islt = false, isbltin = false;
-	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH } extype = raw_term::REL;
+	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT } extype = raw_term::REL;
+
+	//XXX we can add FORM1, FORM2 etc to rtextype
+	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
 	t_arith_op arith_op = NOP;
+
 	std::vector<elem> e;
 	ints arity;
-	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog);
+
+	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog,
+				rtextype pref_type = raw_term::REL );
 	void calc_arity();
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
@@ -104,8 +110,10 @@ struct production {
 //	bool start = false;
 //	raw_term t;
 	std::vector<elem> p;
-	bool parse(const lexemes& l, size_t& pos);
-	bool operator<(const production& t) const { return p < t.p; }
+	std::vector<raw_term> c;   // constraints after production
+	bool parse(const lexemes& l, size_t& pos, const raw_prog& prog);
+
+	bool operator<(const production& t) const { return p < t.p && c < t.c; }
 };
 
 bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y);
@@ -152,8 +160,6 @@ struct raw_form_tree {
 
 	raw_form_tree *l;
 	raw_form_tree *r;
-
-
 
 	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el= NULL, raw_form_tree *_l= NULL, raw_form_tree *_r= NULL ) {
 

@@ -1,0 +1,6 @@
+@string str "aabbaabbcc".
+A => 'a' A 'b' | "ab" .
+B => A.
+C => 'c' C , substr(1) = sval(2).
+C => 'c'.
+S => A B C,    substr(1) = substr(2).

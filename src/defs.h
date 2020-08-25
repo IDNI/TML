@@ -89,5 +89,6 @@ typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
 } t_arith_op;
 
+struct form;
 #endif
 //#define TRANSFORM_BIN_DRIVER

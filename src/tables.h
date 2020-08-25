@@ -28,7 +28,7 @@ class archive;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
-struct raw_sof;
+//struct raw_sof;
 struct raw_form_tree;
 class tables;
 //class dict_t;
@@ -100,9 +100,12 @@ struct alt : public std::vector<body*> {
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
 //	static std::set<alt*, ptrcmp<alt>> &s;
+
+	//XXX why do we have bltins here
 	int_t idbltin = -1; //lexeme bltintype;
 	ints bltinargs;
 	size_t bltinsize;
+
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
@@ -146,7 +149,6 @@ struct table {
 	bool commit(DBG(size_t));
 };
 
-struct form;
 class tables {
 	friend class archive;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
@@ -276,6 +278,7 @@ private:
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
+	spbdd_handle alt_query_bltin(alt& a, bdd_handles& v1); //XXX review
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
@@ -312,6 +315,13 @@ private:
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
+	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+					std::vector<term> &v, std::set<term> &done);
+	
+	bool get_rule_substr_equality(std::vector<std::vector<term>> &eqr);
+	
+	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+					std::vector<term> &v, std::set<term> &done);
 	void transform_grammar(std::vector<struct production> g, flat_prog& p);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
@@ -323,7 +333,7 @@ private:
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-	std::set<ntable> exts; // extensional
+//	std::set<ntable> exts; // extensional
 	strs_t strs;
 	std::set<int_t> str_rels;
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
@@ -336,13 +346,25 @@ private:
 	std::wostream& decompress_update(std::wostream& os, spbdd_handle& x,
 		const rule& r); // decompress for --print-updates and tml_update
 
-	bool from_raw_form(const raw_form_tree *rs, form *&froot);
+	bool from_raw_form(const raw_form_tree *rs, form *&froot, bool &is_sol);
 	bool to_pnf( form *&froot);
 
 	//-------------------------------------------------------------------------
-	//XXX: arithmetic support, work in progress
-	bool isarith_handler(const term& t, alt& a, spbdd_handle &leq);
-	void set_constants(const term& t, alt& a, spbdd_handle &q);
+	//arithmetic/formulas support
+
+	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
+	void set_constants(const term& t, alt& a, spbdd_handle &q) const;
+	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
+	void perm_qvar(spbdd_handle &s, size_t var, size_t nvars) const;
+
+	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
+	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
+	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
+
+	bool handler_form1(const term& t, alt& a, spbdd_handle &cons);
+	spbdd_handle fol_eval(form *root);
+	bool handler_arith(const term& t, alt& a, spbdd_handle &cons);
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
 		size_t bit, spbdd_handle x) const;
 	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
@@ -369,11 +391,6 @@ private:
 	spbdd_handle bdd_test(size_t n_vars);
 	spbdd_handle bdd_add_test(size_t n_vars);
 	spbdd_handle bdd_mult_test(size_t n_vars);
-	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
-
-	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
-	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
-	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
 	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 			spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
@@ -408,7 +425,15 @@ public:
 	bool print_steps         = false;
 };
 
+
+//TODO: we need to put all formula manipulation code in separated
+// sources. For next commit we should refactor this
+
 struct transformer;
+
+//XXX: should define higher level struct?
+// formula { form* root,  type: FOL/SOL/ARITH }
+
 struct form{
 friend struct transformer;
 
@@ -418,7 +443,6 @@ friend struct transformer;
 	form *r;
 	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES
 	} type;
-
 
 	form(){
 		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
@@ -439,6 +463,11 @@ friend struct transformer;
 		return false;
 
 	}
+
+	//evaluation of is_sol,
+	//alternatively from_raw_terms gets it as well by using a new argument
+	bool is_sol();
+	bool implic_rmoval();
 
 	~form() {
 		if(l) delete l, l = NULL;
@@ -461,7 +490,6 @@ struct implic_removal : public transformer {
 };
 
 struct demorgan : public transformer {
-
 
 	bool allow_neg_move_quant =false;
 	bool push_negation( form *&root);

@@ -27,6 +27,117 @@ map<alumemo, spbdd_handle> addermemo;
 extern uints perm_init(size_t n);
 
 // ----------------------------------------------------------------------------
+
+void tables::ex_typebits(spbdd_handle &s, size_t nvars) const {
+	bools exvec;
+	for (size_t i = 0; i < bits; ++i)
+		for (size_t j = 0; j< nvars; ++j)
+			if (i == bits - 2 || i == bits - 1 ) exvec.push_back(true);
+			else exvec.push_back(false);
+	s = s / exvec;
+}
+
+void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
+	for (size_t j = 0; j< nvars; ++j)
+		s = s && ::from_bit(pos(1, j, nvars),1)
+			  && ::from_bit(pos(0, j, nvars),0);
+}
+
+void tables::perm_qvar(spbdd_handle &s, size_t var, size_t nvars) const {
+
+	uints perm = perm_init(bits*nvars);
+	perm[0] = var;
+	//TODO: put var first
+	/*
+	for (size_t i = 0; i < n_bits*n_vars; i++) {
+		perm1[i] = ((n_bits-1-(i/n_vars))*n_vars) + i % n_vars;
+	}
+	*/
+	s = s^perm;
+}
+
+//-----------------------------------------------------------------------------
+
+spbdd_handle tables::fol_eval(form *f) {
+
+	assert(f!=NULL);
+
+	//NONE, ATOM, FORALL1, EXISTS1, UNIQUE1, AND, OR, NOT, IMPLIES, COIMPLIES
+	//FORALL2, EXISTS2, UNIQUE2
+	DBG(assert((f->type == form::ATOM && f->l == NULL && f->r == NULL) || \
+		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) || \
+		   (f->l != NULL && f->r != NULL)));
+
+	spbdd_handle q = htrue;
+
+	//TODO: properly bring nvars here
+	size_t nvars = 1;
+
+	switch (f->type) {
+		case form::ATOM:
+			DBG(assert(f->arg == 0));
+
+			q = tbls[f->tm->tab].t;
+			//set_constants(t,a,q);
+			//b.perm = get_perm(t, vm, len), //check get_body
+			ex_typebits(q, nvars);
+			o::dbg() << L" ------------------- " << ::bdd_root(q) << L" :\n";
+			::out(wcout, q)<<endl<<endl;
+			append_num_typebits(q,nvars);
+			break;
+
+		case form::IMPLIES:
+			//XXX: review how to deal with different arity
+			q = bdd_impl(fol_eval(f->l), fol_eval(f->r));
+
+			ex_typebits(q, nvars);
+			o::dbg() << L" implies ------------------- " << ::bdd_root(q) << L" :\n";
+			::out(wcout, q)<<endl<<endl;
+			append_num_typebits(q,nvars);
+			break;
+
+		case form::COIMPLIES: /*q = bdd_coimpl(fol_eval(f->l), fol_eval(f->l));*/ break;
+		case form::AND: q = fol_eval(f->l) && fol_eval(f->r); break;
+		case form::OR: q = fol_eval(f->l) && fol_eval(f->r); break;
+		case form::NOT: q = bdd_not(fol_eval(f->l)); break;
+
+		case form::EXISTS1: ;
+			  //b.insert(lastbody = { get_body(t, a.vm, a.varslen), t });
+			  //permute according to ?x
+			  //bdd_or
+			  //undo permute or register perm as in body
+			break;
+
+		case form::FORALL1: ;
+			q = fol_eval(f->r);
+			//TOO: permute according to: f->l->arg
+			o::dbg() << L" in forall ------------------- " << ::bdd_root(q) << L" :\n";
+			::out(wcout, q)<<endl<<endl;
+			ex_typebits(q, nvars);
+			q = bdd_and_hl(q);
+			append_num_typebits(q,nvars);
+			o::dbg() << L" out forall ------------------- " << ::bdd_root(q) << L" :\n";
+						::out(wcout, q)<<endl<<endl;
+			break;
+
+		case form::UNIQUE1: ; break;
+
+		default: break;
+
+	}
+
+	return q;
+}
+
+bool tables::handler_form1(const term& t, alt& a, spbdd_handle &cons) {
+	DBG(assert(a.varslen != 0));
+	cons = fol_eval(t.qbf);
+	o::dbg() << L" ---------%%%%---------- " << ::bdd_root(cons) << L" :\n";
+	::out(wcout, cons)<<endl<<endl;
+	return true;
+}
+
+// ----------------------------------------------------------------------------
 // XXX: will deprecate?
 uints tables::get_perm_ext(const term& t, const varmap& m, size_t len) const {
 	uints perm = perm_init(len * bits);
@@ -51,7 +162,7 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit,
 				leq_var(arg1, arg2, args, bit) && x));
 }
 
-void tables::set_constants(const term& t, alt& a, spbdd_handle &q) {
+void tables::set_constants(const term& t, alt& a, spbdd_handle &q) const {
 
 	size_t args = t.size();
 	for (size_t i = 0; i< args; ++i)
@@ -68,13 +179,14 @@ void tables::set_constants(const term& t, alt& a, spbdd_handle &q) {
 	}
 	q = q/exvec;
 
+	//XXX: this is not part of constants, this is var alignment with head
 	uints perm2 = get_perm(t, a.vm, a.varslen);
 	q = q^perm2;
 }
 
 // ----------------------------------------------------------------------------
 
-bool tables::isarith_handler(const term& t, alt& a, spbdd_handle &leq) {
+bool tables::handler_arith(const term& t, alt& a, spbdd_handle &leq) {
 
 
 	//DBG(o::dbg() << "ARITH handler ... " << endl;)
@@ -109,7 +221,6 @@ bool tables::isarith_handler(const term& t, alt& a, spbdd_handle &leq) {
 				q = add_var_eq(bit_0, bit_1, bit_2, a.varslen);
 			}
 			*/
-
 			//all types of addition handled by add_var
 			//XXX not working for ?x + ?x = 2
 			size_t args = 3;
@@ -148,7 +259,6 @@ bool tables::isarith_handler(const term& t, alt& a, spbdd_handle &leq) {
 			if (args == 3) {
 				q = mul_var_eq(0,1,2,3);
 				set_constants(t,a,q);
-
 			}
 			//XXX: hook for extended precision
 			//XXX wont run, needs update in parser like ?x0:?x1
@@ -687,49 +797,6 @@ spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t
 	return x;
 }
 
-//-----------------------------------------------------------------------------
-//-----------------------------------------------------------------------------
-//XXX: will deprecate ?
-
-spbdd_handle tables::full_addder_carry_shift(size_t var0, size_t var1,
-		size_t n_vars, uint_t b, uint_t s, spbdd_handle r) const {
-
-	if (b == 1) return bdd_handle::F;
-
-	return bdd_ite( full_addder_carry_shift(var0, var1, n_vars, b-1, s, r),
-					bdd_ite( ::from_bit(pos(b, var0, n_vars),true),
-							 bdd_handle::T,
-							 b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),true) : bdd_handle::F),
-					bdd_ite( ::from_bit(pos(b, var0, n_vars),true),
-							 b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),true) : bdd_handle::F,
-							 bdd_handle::F));
-}
-
-spbdd_handle tables::full_adder_shift(size_t var0, size_t var1, size_t n_vars,
-		uint_t b, uint_t s) const {
-
-	if (b == 2) return ::from_bit( pos(b, var0, n_vars),true)
-								&& ::from_bit( pos(b, var1, n_vars),true);
-
-
-	else if (b == 2)
-		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-				 	   b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),false) : bdd_handle::T,
-				 	   b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),true) : bdd_handle::F);
-
-	spbdd_handle carry = bdd_handle::F;
-	carry = full_addder_carry_shift(var0, var1, n_vars, b-1, s, carry);
-
-	return bdd_ite(
-			carry,
-			bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-					b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),true) : bdd_handle::T ,
-					b - s > 1 ? ::from_bit(pos(b - s, var1, n_vars),false) : bdd_handle::F),
-			bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-					b - s > 1 ? ::from_bit( pos(b - s, var1, n_vars),false) : bdd_handle::T,
-					b - s > 1 ? ::from_bit( pos(b - s, var1, n_vars),true) : bdd_handle::F)
-			);
-}
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -1069,8 +1136,9 @@ spbdd_handle tables::bdd_test(size_t n_vars) {
 
 	return test;
 	*/
-	size_t n_args = n_vars;
-	spbdd_handle s0 = bdd_handle::F;
+
+	//size_t n_args = n_vars;
+	//spbdd_handle s0 = bdd_handle::F;
 	/*
 	s0 = s0 || from_sym(2, n_args, mknum(0));
 	s0 = s0 || from_sym(2, n_args, mknum(6));
@@ -1089,26 +1157,73 @@ spbdd_handle tables::bdd_test(size_t n_vars) {
 	s0 = s0 || from_sym(2, n_args, mknum(84));
 	s0 = s0 || from_sym(2, n_args, mknum(90));
 	*/
+	/*
 	spbdd_handle s1 = bdd_handle::F;
 	for (int i = 2; i < 256 ; i++) {
 		for (int j = 2; j < 256 ; j++) {
 			s1 = s1 || from_sym(2, n_args, mknum(i*j));
 		}
 	}
-
+	*/
 	/*
 	for (int i = 1; i < 256 ; i++) {
 			s0 = s0 || from_sym(2, n_args, mknum(6*i+1));
 			s0 = s0 || from_sym(2, n_args, mknum(6*i-1));
 	}
 	*/
-	bdd::gc();
 
-	s0 = s1;
-	o::dbg() << L" ------------------- S2 " << ::bdd_root(s0) << L" :\n";
-	::out(wcout, s0)<<endl<<endl;
-	//s0 = s0 || from_sym(2, n_args, mknum(16));
+
+/*
+	spbdd_handle s0 = bdd_handle::F;
+	s0 = from_sym( 0,  1, mknum(0));
+	s0 = s0 || from_sym( 0,  1, mknum(1));
+	s0 = s0 || from_sym( 0,  1, mknum(2));
+
+	spbdd_handle s1 = bdd_handle::F;
+	s1 =  from_sym(0,  1, mknum(0));
+	//s1 =  s1 || from_sym(0,  1, mknum(3));
+
+	//s1 =  s1 || from_sym( 1,  3, mknum(5));
+	//s1 =  s1 || from_sym( 1,  3, mknum(6));
+	//s1 =  s1 || from_sym( 1,  3, mknum(7));
+
+	// remove "type" bits
+	bools exvec;
+	for (size_t i = 0; i < bits; ++i) {
+		if (i == bits - 2 || i == bits - 1 ) exvec.push_back(true);
+				else exvec.push_back(false);
+	}
+	s0 = s0 / exvec;
+	s1 = s1 / exvec;
+*/
+
+	spbdd_handle s0 = bdd_handle::F;
+	s0 = s0 || from_sym( 0,  2, mknum(1));
+	s0 = s0 || from_sym( 1,  2, mknum(0));
+
+	s0 = s0 || from_sym( 0,  2, mknum(1));
+	s0 = s0 || from_sym( 1,  2, mknum(1));
+
+	s0 = s0 || from_sym( 0,  2, mknum(1));
+	s0 = s0 || from_sym( 1,  2, mknum(0)); //not necessary
+
+
+	spbdd_handle s1 = bdd_handle::F;
+	s1 =  from_sym(0,  1, mknum(0));
+	//s1 =  s1 || from_sym(0,  1, mknum(3));
+	//s1 =  s1 || from_sym( 1,  3, mknum(5));
+	//s1 =  s1 || from_sym( 1,  3, mknum(6));
+	//s1 =  s1 || from_sym( 1,  3, mknum(7));
+	ex_typebits(s0, n_vars);
+	ex_typebits(s1, n_vars);
+
+	o::dbg() << L" ------------------- " << ::bdd_root(s1) << L" :\n";
+	::out(wcout, s1)<<endl<<endl;
+
+	spbdd_handle test = bdd_not(s1) || s0 ;
+
+	o::dbg() << L" ------------------- " << ::bdd_root(test) << L" :\n";
+	::out(wcout, test)<<endl<<endl;
 
 	return s0;
-
 }
