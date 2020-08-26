@@ -440,6 +440,7 @@ head:	h.emplace_back();
 	//XXX: workaround to use ":-" both for standard rules and formulas
 	//     syntax revision for formula may be required
 	bool is_form = false;
+	//TODO: check for fault
 	for (size_t x = pos; l[x][0][0] != L'.'; x++) {
 		if (l[x] == L"forall" || l[x] == L"exists" || l[x] == L"unique" ||
 			l[x] == L"&&" || l[x] == L"||" || l[x] == L"|") {
@@ -670,7 +671,7 @@ bool production::parse(const lexemes& l, size_t& pos, const raw_prog& prog) {
 			for( ;*l[pos][0] == L',';) { 
 				++pos;	
 				raw_term rt;
-				if(!rt.parse(l, pos, prog, raw_term::CONSTRAINT)) goto fail;
+				if(!rt.parse(l, pos, prog, false, raw_term::CONSTRAINT)) goto fail;
 				c.push_back(rt);
 			}
 			if (*l[pos][0] != '.') goto fail;
