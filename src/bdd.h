@@ -113,6 +113,7 @@ spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits, size_t n_vars);
+spbdd_handle bdd_qsolve(cr_spbdd_handle x, std::vector<quant_t> &quants);
 
 class bdd {
 	friend class bdd_handle;
@@ -165,6 +166,7 @@ class bdd {
 	friend spbdd_handle bdd_and_hl(cr_spbdd_handle x);
 	friend spbdd_handle bdd_or_hl(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor_hl(cr_spbdd_handle x);
+	friend spbdd_handle bdd_qsolve(cr_spbdd_handle x, std::vector<quant_t> &quants);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -231,6 +233,7 @@ class bdd {
 	static int_t bdd_and_hl(int_t b);
 	static int_t bdd_or_hl(int_t b);
 	static int_t bdd_xor_hl(int_t b);
+	static int_t bdd_qsolve(int_t x, int_t bit, std::vector<quant_t> &quants);
 
 	static int_t bitwiseAND(int_t a_in, int_t b_in);
 	static int_t bitwiseOR(int_t a_in, int_t b_in);

@@ -200,8 +200,11 @@ term tables::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
 	ints t;
 	lexeme l;
 	size_t nvars = 0;
+
+	//FIXME: this is too error prone.
 	// D: make sure enums match (should be the same), cast is just to warn.
 	term::textype extype = (term::textype)r.extype;
+
 	// D: header builtin is treated as rel, but differentiated later (decomp.)
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
 	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
@@ -545,7 +548,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 		}
 		root =  new form(ft,0, 0);
 		if( root ) {
-			ret= from_raw_form(rfm->l, root->l, is_sol);
+			ret = from_raw_form(rfm->l, root->l, is_sol);
 			if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
 			froot = root;
 			return ret;
@@ -945,6 +948,10 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			}
 		}
 		else if(r.prft != NULL) {
+
+			const raw_term& x = r.h.front();
+			get_nums(x), t = from_raw_term(x, true), v.push_back(t);
+
 			bool is_sol = false;
 			form* froot = NULL;
 			from_raw_form(r.prft.get(), froot, is_sol);
@@ -959,12 +966,10 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			//if(froot->is_sol()) to_pnf(froot), extype = term::FORM2;
 			//else froot->implic_rmoval(), froot->printnode(); //forcing implic removal for FOL here
 			//assert(froot);
-			const raw_term& x = r.h.front();
-			term t;
-			get_nums(x), t = from_raw_term(x, true), v.push_back(t);
+
 			t = term(extype, move(froot));
 			v.push_back(t);
-			//align_vars(v); ???
+			//align_vars(v);
 			m.insert(move(v));
 			//delete froot;
 		} else  {
@@ -1250,14 +1255,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 
 		} else if (t.extype == term::ARITH) {
 			//XXX: returning bdd handler on leq variable
-			if (!handler_arith(t,a,leq)) return;
-		} else if (t.extype == term::FORM1) {
-			//XXX: initially placing this handler on the elaboration stage in
-			//     order to work feature.
-			//     Will be combined with a query method
-			//     on the execution stage
-			o::dbg()<<L"\n FOL preparation ... \n " << endl;
-			if (!handler_form1(t,a,leq)) return;
+			if (!handler_arith(t,a.vm, a.varslen,leq)) return;
 		}
 		// we use LT/GEQ <==> LEQ + reversed args + !neg
 	}
@@ -1417,6 +1415,43 @@ void tables::cqc(flat_prog& p) {
 		v.emplace_back(r), cqc_minimize(v.back());
 }*/
 
+void tables::get_form(pnf_t *p, const term_set& al, const term& h, std::set<alt>& as) {
+
+	auto t = al.begin();
+	DBG(assert(t->extype == term::FORM1));
+	DBG(assert(as.size() == 0));
+
+	//XXX: do same that for alts, but for pnf_t formula tree?
+	alt a;
+	a.vm = get_varmap(h, al, a.varslen);
+	a.inv = varmap_inv(a.vm);
+
+	o::dbg()<<L"\n FOL preparation ... \n " << endl;
+
+	//XXX: check vars in header
+	varmap vm;
+	form* f = t->qbf;
+	handler_form1(p, f, vm);
+
+	varmap vmh;
+	size_t varslen;
+	const term_set anull;
+	vmh = get_varmap(h, anull, varslen);
+
+	//**** varslen should be provided by from_raw_form
+	if (vmh.size() > 0) {
+		auto d = deltail(2, h.size());
+		p->ex = d.first;
+		p->perm = get_perm(h, p->vm, p->vm.size());
+	}
+
+	/*
+	set<int_t> vs;
+	set<pair<body, term>> b;
+	*/
+	return;
+}
+
 void tables::get_rules(flat_prog p) {
 	bcqc = false;
 	get_facts(p);
@@ -1446,7 +1481,6 @@ void tables::get_rules(flat_prog p) {
 	if (optimize) bdd::gc();
 
 	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
-	//XXX: why m is not just map<term, term_set> ?
 	map<term, set<term_set>> m;
 	for (const auto& x : p)
 		if (x.size() == 1) m[x[0]] = {};
@@ -1463,7 +1497,7 @@ void tables::get_rules(flat_prog p) {
 		if (t.neg) datalog = false;
 		tbls[t.tab].ext = false;
 		varmap v;
-		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t;
+		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //XXX: review why we replicate t variables in r
 		// D: bltin and a header (moved to table instead, it's what we need)
 		//if (t.extype == term::BLTIN) {}
 		for (size_t n = 0; n != t.size(); ++n)
@@ -1473,7 +1507,11 @@ void tables::get_rules(flat_prog p) {
 		set<alt> as;
 		r.len = t.size();
 
-		for (const term_set& al : x.second) get_alt(al, t, as);
+		for (const term_set& al : x.second)
+			if (al.begin()->extype != term::FORM1)
+				get_alt(al, t, as);
+			else r.f = new(pnf_t), get_form(r.f, al, t, as);
+
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
@@ -1788,6 +1826,7 @@ bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
 	}
 	return true;
 }
+
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
 //	o::out()<<"grammar before:"<<endl;
@@ -2138,9 +2177,7 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 	return x->b < y->b;
 };
 
-
-
-spbdd_handle tables::alt_query_bltin(alt& a, bdd_handles& v1) {
+void tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 
 	spbdd_handle x;
 
@@ -2223,8 +2260,6 @@ spbdd_handle tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 	}
 }
 
-
-
 spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 
 	/*
@@ -2251,7 +2286,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 
 
 	//XXX: for over bdd arithmetic (currently handled as a bltin, although may change)
-	// In case arguments are the same than last iteration,
+	// In case arguments/ATOMS are the same than last iteration,
 	// here is were it should be avoided to recompute.
 
 	if (a.idbltin > -1) alt_query_bltin(a, v1) ;
@@ -2292,10 +2327,23 @@ bool table::commit(DBG(size_t /*bits*/)) {
 char tables::fwd() noexcept {
 //	DBG(out(o::out()<<L"db before:"<<endl);)
 	for (rule& r : rules) {
-		bdd_handles v(r.size());
-		for (size_t n = 0; n != r.size(); ++n)
-			v[n] = alt_query(*r[n], r.len);
+		bdd_handles v(r.size() == 0 ? 1 : r.size());
 		spbdd_handle x;
+		bdd_handles f; //form
+
+		if (r.f == NULL)
+			for (size_t n = 0; n != r.size(); ++n)
+				v[n] = alt_query(*r[n], r.len);
+		else {
+			form_query(r.f, f);
+			//XXX: wrap up this for any type, working with ints so far
+			append_num_typebits(f[0], r.f->vm.size());
+
+			if (r.f->ex.size() != 0 && r.f->perm.size() != 0) //workaround for const header
+				v[0] = bdd_and_many_ex_perm(f,r.f->ex, r.f->perm);
+			else v[0] = f[0];
+		}
+
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
 		// applying the r.eq and or-ing all alt-s
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
