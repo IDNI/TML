@@ -1487,9 +1487,89 @@ void tables::get_rules(flat_prog p) {
 			return tbls[x.tab].priority > tbls[y.tab].priority; });
 }
 
+struct unary_string{
+	//IMPROVE: use array [ pos] = rel or unorderedmap instead
+	map< wchar_t, set<int> > rel;
+	size_t pbsz, vmask;
+	vector<wchar_t> sort_rel;
+
+	unary_string(size_t _pbsz): pbsz(_pbsz){
+		assert(sizeof(wchar_t)*8 >= pbsz);
+		assert(pbsz  && !(pbsz & (pbsz-1))); // power of 2 only, 1 2 4 8 16...
+		vmask = ((1UL<<(pbsz)) -1);
+	}
+	
+	bool buildfrom( wstring s){
+		if(!s.size()) return false;
+
+		size_t n = (sizeof(s[0])<<3)/pbsz;
+		sort_rel.resize(s.size()*n);
+
+		for( size_t i=0; i < s.size(); i++) 
+			for(size_t a=0; a < n; a++)
+				rel[ wchar_t(vmask & s[i]) ].insert(i*n+a),
+				sort_rel[i*n+a] = wchar_t(vmask & s[i]),
+				s[i] = ulong(s[i])>>pbsz;
+				
+		return true;
+	}
+	wstring getrelin_str(wchar_t r){
+		return ( r == L'\0') ? L"00": wstring(1,r);
+
+	}
+	wostream& toprint(wostream& o) {
+		for(size_t i = 0; i < sort_rel.size(); i++)
+			if( iswalnum(sort_rel[i]))
+				o << sort_rel[i] << " " << i<<endl;
+			else o <<uint(sort_rel[i])<<"  "<< i <<endl;	
+	}
+};
 void tables::load_string(lexeme r, const wstring& s) {
+	
+	unary_string us(sizeof(wchar_t)*8);
+	us.buildfrom(s);	
+	DBG(us.toprint(o::dbg()));
+	for( auto it: us.rel ){
+		int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(it.first)));
+		term t; t.resize(1);
+		bdd_handles b;
+		ntable tb = get_table({r, {1} });
+		b.reserve(it.second.size());
+		for( int_t i :it.second)
+			t[0]= mknum(i), b.push_back(from_fact(t));	
+		t.tab =tb;
+		tbls[tb].t = bdd_or_many(b);
+	}
 	int_t rel = dict.get_rel(r);
 	str_rels.insert(rel);
+	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
+		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
+		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme(L"digit")),
+		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
+	term tb;
+	bdd_handles bb;
+	bb.reserve(s.size()),tb.resize(3);
+
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		tb[1] = mknum(n), tb[2] = mknum(0);
+		if (iswspace(s[n])) tb[0] = sspace, bb.push_back(from_fact(tb));
+		if (iswdigit(s[n])) tb[0] = sdigit, bb.push_back(from_fact(tb));
+		if (iswalpha(s[n])) tb[0] = salpha, bb.push_back(from_fact(tb));
+		if (iswalnum(s[n])) tb[0] = salnum, bb.push_back(from_fact(tb));
+		if (iswprint(s[n])) tb[0] = sprint, bb.push_back(from_fact(tb));
+	}
+	clock_t start, end;
+	if (optimize)
+		(o::ms()<<"# load_string or_many: "),
+		measure_time_start();
+	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
+	tbls[stb].t = bdd_or_many(move(bb));
+	if (optimize) measure_time_end();
+	/*
+	int_t rel = dict.get_rel(r);
+	str_rels.insert(rel);
+
 //	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
 	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
 		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
@@ -1513,12 +1593,13 @@ void tables::load_string(lexeme r, const wstring& s) {
 	if (optimize)
 		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
-	ntable st = get_table({rel, {2}});
-	ntable stb = get_table({rel, {3}});
+	ntable st = get_table({rel, {2}}); // str(pos char)
+	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
 	
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
 	if (optimize) measure_time_end();
+	*/
 }
 
 /*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -1596,15 +1677,22 @@ bool tables::get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t,
 			return false;
 		
 		int_t pos =  rt.e[n+2].num;
-		if( pos < 0 || pos >= (int_t)refs.size()) 
+		if( pos < 1 || pos >= (int_t)refs.size()) 
 			parse_error(L"Wrong symbol index in substr", rt.e[n+2].e );
 
-		if( refs[pos].size() <= 1 )  // has to be size 2 , e.g.  S( 0 1)
+		
+		if( refs[pos].size()) svalt[i*2] = refs[pos][0];
+		// normal S( ?i ?j ) term, but for binary str(?i a) relation, 
+		// get the var by decrementing that at pos0
+		//IMPROVE: Following code needs to aware of bitsz of unary string.
+		//Currently, it assume whole char (32 bits) as a relation.	
+		if( refs[pos].size()==2) 
+			svalt[i*2+1] = refs[pos][1] >= 0 ? refs[pos][0]-1 : refs[pos][1];
+		else if ( refs[pos].size()==1) // for unary str
+			svalt[i*2+1] = refs[pos][0]-1;
+		else
 			parse_error(L"Incorrect term size for substr(index)", L"" );
 
-		svalt[i*2] = refs[pos][0];
-		//normal S( i j ) term, but for str relation, get the var by decrementing that at pos0
-		svalt[i*2+1] = refs[pos][1] >= 0 ? refs[pos][0]-1 : refs[pos][1];
 		n += 4;  // parse sval(i)
 		if( i == 0 && !( n < rt.e.size() &&  
 			(rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)))
@@ -1676,6 +1764,8 @@ bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
 		else if( r == 1 ) { // inductive case
 			// equals(i j k n ) ;- str(i cv), str(j cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
+			// IMPROVE FIX: For unary_string, the relation is not known in advance, so the 
+			// rules need to change below .  
 			// str(i cv) ,str( k, cv)	
 			for( int vi=0; vi<2; vi++)
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
@@ -1766,7 +1856,32 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
-			} else if (x.p[n].type == elem::CHR) {
+			} else if (x.p[n].type == elem::CHR) {				
+				unary_string us(sizeof(wchar_t)*8);
+				us.buildfrom(wstring(1,x.p[n].ch));
+				int_t tv=n;
+				DBG(us.toprint(o::dbg()));
+				for( auto rl: us.sort_rel) {
+					int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(rl)));
+					term t; t.resize(1);
+					t.tab= get_table({r, {1}});
+					t[0] = -tv;
+					term plus1;
+					plus1.resize(3);
+					plus1.tab = -1; 
+					plus1.extype = term::textype::ARITH;
+					plus1.arith_op = t_arith_op::ADD;
+					plus1[0] = -tv, plus1[1] = mknum(1), plus1[2] = -tv-1;
+					v.push_back(move(plus1));
+					v.push_back(move(t));
+					// IMPROVE FIX: the symbol index n e.g. in len(i) should refer
+					// to what is the relative position inside the rhs of production. This
+					// should change when pbsz of unary_str is NOT sizeof(wchar_t)*8. 					 
+					refs[n] = v.back();
+					tv++;
+				}
+				continue;
+				/*
 				t.resize(2);
 				if (str_rels.size() > 1) er(err_one_input);
 				if (str_rels.empty()) continue;
@@ -1781,6 +1896,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				plus1.arith_op = t_arith_op::ADD;
 				plus1[0] = -n, plus1[1] = mknum(1), plus1[2] = -n-1;
 				v.push_back(move(plus1));
+				*/
 
 			} else throw runtime_error(
 				"Unexpected grammar element");

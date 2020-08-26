@@ -67,7 +67,7 @@ lexeme dict_t::get_var_lexeme_from(int_t r) {
 }
 
 int_t dict_t::get_rel(const lexeme& l) {
-	if (*l[0] == L'?') parse_error(err_var_relsym, l);
+	//if (*l[0] == L'?') parse_error(err_var_relsym, l);
 	auto it = rels_dict.find(l);
 	if (it != rels_dict.end()) return it->second;
 	rels.push_back(l);
