@@ -27,7 +27,7 @@ template<typename T> struct veccmp {
 };
 
 template<typename T1, typename T2> struct vec2cmp {
-	typedef pair<std::vector<T1>, vector<T2>> t;
+	typedef pair<vector<T1>, vector<T2>> t;
 	bool operator()(const t& x, const t& y) const {
 		static veccmp<T1> t1;
 		static veccmp<T2> t2;
@@ -37,10 +37,10 @@ template<typename T1, typename T2> struct vec2cmp {
 };
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
-std::unique_ptr<bdd_mmap> V;
+unique_ptr<bdd_mmap> V;
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
-std::string bdd_mmap_file = "";
+string bdd_mmap_file = "";
 unordered_map<ite_memo, int_t> C;
 map<bools, unordered_map<array<int_t, 2>, int_t>, veccmp<bool>> CX;
 map<pair<bools, uints>, unordered_map<array<int_t, 2>, int_t>,
@@ -64,16 +64,16 @@ auto am_cmp = [](int_t x, int_t y) {
 
 const size_t gclimit = 1e+6;
 
-void bdd::init(mmap_mode m, size_t max_size, const std::string fn) {
+void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 	bdd_mmap_mode = m;
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
-	V = std::make_unique<bdd_mmap>(memory_map_allocator<bdd>(fn, m));
+	V = make_unique<bdd_mmap>(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V->reserve(max_bdd_nodes);
 
-	DBG(o::dbg() << L"bdd::init(m: MMAP_" <<
-		(m == MMAP_NONE ? L"NONE" : L"WRITE") <<
-		L", max_size: " << max_size << L", fn: " << s2ws(fn)
-		<< L") max_bdd_nodes=" << max_bdd_nodes << L"\n";)
+	DBG(o::dbg() << "bdd::init(m: MMAP_" <<
+		(m == MMAP_NONE ? "NONE" : "WRITE") <<
+		", max_size: " << max_size << ", fn: " << fn
+		<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
 
 	S.insert(0), S.insert(1), V->emplace_back(0, 0, 0), // dummy
 	V->emplace_back(0, 1, 1), Mp.resize(1),
@@ -83,11 +83,11 @@ void bdd::init(mmap_mode m, size_t max_size, const std::string fn) {
 }
 
 void bdd::max_bdd_size_check() {
-	//DBG(o::dbg() << L"add_check V->size()-1=" << V->size()-1
-	//	<< L" max_bdd_nodes=" << max_bdd_nodes << std::endl;)
+	//DBG(o::dbg() << "add_check V->size()-1=" << V->size()-1
+	//	<< " max_bdd_nodes=" << max_bdd_nodes << endl;)
 	if (V->size() == max_bdd_nodes)
-		std::wcerr << L"Maximum bdd size reached. Increase the limit"
-		L" with --bdd-max-size parameter. Exitting." << std::endl,
+		CERR << "Maximum bdd size reached. Increase the limit"
+		" with --bdd-max-size parameter. Exitting." << endl,
 		onexit = true,
 		exit(0);
 		// TODO: offer user to remap instead of exit
@@ -99,7 +99,7 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(leaf(l) || v < abs((*V)[abs(l)].v)););
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
-	static std::unordered_map<bdd_key, int_t>::const_iterator it;
+	static unordered_map<bdd_key, int_t>::const_iterator it;
 	static bdd_key k;
 	auto &mm = v < 0 ? Mn : Mp;
 	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
@@ -108,13 +108,13 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 		k = bdd_key(hash_pair(-h, -l), -h, -l);
 		return	(it = m.find(k)) != m.end() ? -it->second :
 			(V->emplace_back(v, -h, -l),
-			m.emplace(std::move(k), V->size()-1),
+			m.emplace(move(k), V->size()-1),
 			-V->size()+1);
 	}
 	k = bdd_key(hash_pair(h, l), h, l);
 	return	(it = m.find(k)) != m.end() ? it->second :
 		(V->emplace_back(v, h, l),
-		m.emplace(std::move(k), V->size()-1),
+		m.emplace(move(k), V->size()-1),
 		V->size()-1);
 }
 
@@ -579,12 +579,16 @@ void bdd::mark_all(int_t i) {
 		mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
 }
 
-wostream& bdd::stats(wostream& os) {
+template <typename T>
+basic_ostream<T>& bdd::stats(basic_ostream<T>& os) {
 	return os << "S: " << S.size() << " V: "<< V->size() <<
 		" AM: " << AM.size() << " C: "<< C.size();
 }
+template basic_ostream<char>& bdd::stats(basic_ostream<char>&);
+template basic_ostream<wchar_t>& bdd::stats(basic_ostream<wchar_t>&);
 
 void bdd::gc() {
+	if (!V) return;
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V->size() < S.size() << 3) return;
@@ -592,7 +596,7 @@ void bdd::gc() {
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V->size(), 0);
-	std::unique_ptr<bdd_mmap> v1 = make_unique<bdd_mmap>(
+	unique_ptr<bdd_mmap> v1 = make_unique<bdd_mmap>(
 		memory_map_allocator<bdd>("", bdd_mmap_mode));
 	v1->reserve(bdd_mmap_mode == MMAP_NONE ? S.size() : max_bdd_nodes);
 	for (size_t n = 0; n < V->size(); ++n)
@@ -711,8 +715,8 @@ void bdd::gc() {
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
-	std::unordered_map<int_t, std::weak_ptr<bdd_handle>> m;
-	for (pair<int_t, std::weak_ptr<bdd_handle>> x : M)
+	unordered_map<int_t, weak_ptr<bdd_handle>> m;
+	for (pair<int_t, weak_ptr<bdd_handle>> x : M)
 		//DBG(assert(!x.second.expired());) // is this needed? cannot load from archive with this
 		if (!x.second.expired())
 			f(x.second.lock()->b), m.emplace(f(x.first), x.second);
@@ -725,7 +729,7 @@ spbdd_handle bdd_handle::get(int_t b) {
 	auto it = M.find(b);
 	if (it != M.end()) return it->second.lock();
 	spbdd_handle h(new bdd_handle(b));
-	return M.emplace(b, std::weak_ptr<bdd_handle>(h)), h;
+	return M.emplace(b, weak_ptr<bdd_handle>(h)), h;
 }
 
 void bdd::bdd_sz(int_t x, set<int_t>& s) {
@@ -855,7 +859,7 @@ size_t bdd::satcount_perm(const bdd& bx, int_t x, size_t leafvar) {
 	return r;
 }
 
-static std::set<size_t> ourvars;
+static set<size_t> ourvars;
 size_t bdd::getvar(int_t h, int_t l, int_t v, int_t x, size_t maxv) {
 	if (leaf(x)) return maxv;
 	const bdd bhi = get(h), blo = get(l);
@@ -884,7 +888,7 @@ size_t bdd::satcount_k(int_t x, const bools& ex, const uints&) {
 	map<int_t, int_t> inv;
 	int_t ivar = 1;
 	for (auto x : ourvars) {
-		//o::dbg() << L"satcount: inv: " << x << L", " << ivar << L" ." << endl;
+		//o::dbg() << "satcount: inv: " << x << ", " << ivar << " ." << endl;
 		inv.emplace(x, ivar++);
 	}
 	leafvar = ivar;
@@ -1118,20 +1122,23 @@ size_t bdd_nvars(bdd_handles x) {
 size_t bdd_nvars(spbdd_handle x) { return bdd::bdd_nvars(x->b); }
 bool leaf(cr_spbdd_handle h) { return bdd::leaf(h->b); }
 bool trueleaf(cr_spbdd_handle h) { return bdd::trueleaf(h->b); }
-wostream& out(wostream& os, cr_spbdd_handle x) { return bdd::out(os, x->b); }
+template <typename T>
+basic_ostream<T>& out(basic_ostream<T>& os, cr_spbdd_handle x) { return bdd::out(os, x->b); }
+template basic_ostream<char>& out(basic_ostream<char>&, cr_spbdd_handle);
+template basic_ostream<wchar_t>& out(basic_ostream<wchar_t>&, cr_spbdd_handle);
 
 
-size_t std::hash<ite_memo>::operator()(const ite_memo& m) const {
+size_t hash<ite_memo>::operator()(const ite_memo& m) const {
 	return m.hash;
 }
 
-size_t std::hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
+size_t hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 	return hash_pair(x[0], x[1]);
 }
 
-size_t std::hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}
+size_t hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}
 
-size_t std::hash<bdds>::operator()(const bdds& b) const {
+size_t hash<bdds>::operator()(const bdds& b) const {
 	size_t r = 0;
 	for (int_t i : b) r ^= i;
 	return r;
@@ -1141,9 +1148,10 @@ bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
 //	DBG(assert(V->size() < 2 || (v && h && l));)
 }
 
-wostream& bdd::out(wostream& os, int_t x) {
-	if (leaf(x)) return os << (trueleaf(x) ? L'T' : L'F');
+template <typename T>
+basic_ostream<T>& bdd::out(basic_ostream<T>& os, int_t x) {
+	if (leaf(x)) return os << (trueleaf(x) ? 'T' : 'F');
 	const bdd b = get(x);
-	//return out(out(os << b.v << L" ? ", b.h) << L" : ", b.l);
-	return out(out(os << b.v << L" ? (", b.h) << L") : (", b.l) << L")";
+	//return out(out(os << b.v << " ? ", b.h) << " : ", b.l);
+	return out(out(os << b.v << " ? (", b.h) << ") : (", b.l) << ")";
 }

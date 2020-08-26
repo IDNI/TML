@@ -32,9 +32,9 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.class_function("gc", &bdd::gc)
 		;
 	class_<driver>("driver")
-		.constructor<std::wstring, options>()
+		.constructor<string_t, options>()
 		.class_function("create",
-			optional_override([](std::wstring s, options o) {
+			optional_override([](string_t s, options o) {
 				return new driver(s, o);
 			}), allow_raw_pointers())
 		.class_function("create",
@@ -77,7 +77,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("get_bool", &options::get_bool)
 		.function("get_string", &options::get_string)
 		.function("to_string", optional_override([](options& o) {
-			std::wstringstream wss; wss << o;
+			ostringstream_t wss; wss << o;
 			return wss.str();
 		}), allow_raw_pointers())
 		;
@@ -85,8 +85,8 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("name", &output::name)
 		.function("type", &output::type)
 		//.function("os", &output::os)
-		.function("target", select_overload<std::wstring()const>(&output::target), allow_raw_pointers())
-		//.function("set_target", select_overload<type_t(std::wstring)>(&output::target))
+		.function("target", select_overload<string_t()const>(&output::target), allow_raw_pointers())
+		//.function("set_target", select_overload<type_t(string_t)>(&output::target))
 		//.function("target", &output::target)
 		.function("read", &output::read)
 		.function("is_null", &output::is_null)

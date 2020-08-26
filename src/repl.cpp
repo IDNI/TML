@@ -17,14 +17,14 @@
 
 using namespace std;
 
-repl::repl(options &o, wostream& os) : o(o), os(os) {
-	os<<L"# TML REPL ("<<GIT_DESCRIBED<<L"). Enter ? or h for help."<<endl;
-	redrive();
-	if (o.enabled(L"udp")) {
-		wstring addr = o.get_string(L"udp-addr");
-		int_t port = o.get_int(L"udp-port");
-		os<<L"# listening on "<<addr<<L':'<<port<<L"/udp"<<endl;
-		up_udp = make_unique<udp>(ws2s(addr), port);
+repl::repl(options &o, ostream_t& os) : o(o), os(os) {
+	os<<"# TML REPL ("<<GIT_DESCRIBED<<"). Enter ? or h for help."<<endl;
+	redrive("");
+	if (o.enabled("udp")) {
+		string addr = o.get_string("udp-addr");
+		int_t port = o.get_int("udp-port");
+		os<<"# listening on "<<addr<<':'<<port<<"/udp"<<endl;
+		up_udp = make_unique<udp>(addr, port);
 		if (up_udp->error()) {
 			o::err() << up_udp->error_message() << endl;
 			up_udp = 0;
@@ -33,182 +33,247 @@ repl::repl(options &o, wostream& os) : o(o), os(os) {
 	loop();
 }
 
-void repl::prompt(wostream& os) {
-	os << L"\n?- " << std::flush;
+template <typename T>
+void repl::prompt(basic_ostream<T>& os) {
+	os << "\n?- " << flush;
 }
+template void repl::prompt(basic_ostream<char>&);
+template void repl::prompt(basic_ostream<wchar_t>&);
 
-void repl::redrive(wstring src) {
+void repl::redrive(const string& src) {
 	fin = false;
-	d = src == L""
-		? std::make_unique<driver>(o)
-		: std::make_unique<driver>(src, o);
+	d = src == ""
+		? make_unique<driver>(o)
+		: make_unique<driver>(src, o);
 }
 
-void repl::restart(wostream& os) {
+template <typename T>
+void repl::restart(basic_ostream<T>& os) {
 	d->restart();
-	os << L"# Restarted" << endl;
+	os << "# Restarted" << endl;
 }
+template void repl::restart(basic_ostream<char>& os);
+template void repl::restart(basic_ostream<wchar_t>& os);
 
-void repl::reparse(wostream& os) {
-	wstringstream ss;
+template <typename T>
+void repl::reparse(basic_ostream<T>& os) {
+	ostringstream_t ss;
 	d->list(ss);
-	redrive(ss.str());
-	os << L"# Reparsed" << endl;
+	redrive(ws2s(ss.str()));
+	os << "# Reparsed" << endl;
 }
+template void repl::reparse(basic_ostream<char>&);
+template void repl::reparse(basic_ostream<wchar_t>&);
 
-void repl::reset(wostream& os) {
-	redrive();
-	os << L"# Reset" << endl;
+template <typename T>
+void repl::reset(basic_ostream<T>& os) {
+	redrive("");
+	os << "# Reset" << endl;
 }
+template void repl::reset(basic_ostream<char>&);
+template void repl::reset(basic_ostream<wchar_t>&);
 
-void repl::run(wostream& os, size_t steps, size_t break_on_step,
+template <typename T>
+void repl::run(basic_ostream<T>& os, size_t steps, size_t break_on_step,
 	bool break_on_fp)
 {
-	os << L"# Running";
-	if (steps) os << L" " << steps << L" step" << (steps==1?L"":L"s");
-	if (break_on_step) os << L", break on step: "<<break_on_step;
-	if (break_on_fp) os << L", break on fixed point";
+	os << "# Running";
+	if (steps) os << " " << steps << " step" << (steps==1?"":"s");
+	if (break_on_step) os << ", break on step: "<<break_on_step;
+	if (break_on_fp) os << ", break on fixed point";
 	os << endl;
 
 	if (!fin) fin = d->run(steps, break_on_step, break_on_fp);
 	if (ap) d->out(os);
 }
+template void repl::run(basic_ostream<char>&, size_t, size_t, bool);
+template void repl::run(basic_ostream<wchar_t>&, size_t, size_t, bool);
 
-void repl::add(wostream& os, wstring line) {
-	os<<L"# Adding '"<<line<<L"'"<<(ils?L" as a sequence":L"")<<endl;
+template <typename T>
+void repl::add(basic_ostream<T>& os, string line) {
+	os<<"# Adding '"<<line<<"'"<<(ils?" as a sequence":"")<<endl;
 	fin = false;
-	d->add(line, ils);
+	inputs *ii = d->get_inputs();
+	ii->add_string(line);
+	while (input *in = ii->next()) {
+		in->newseq = true;
+		d->add(*in);
+	}
 	if (ar) run(os);
 }
+template void repl::add(basic_ostream<char>&, string);
+template void repl::add(basic_ostream<wchar_t>&, string);
 
 void repl::dump() {
-	os<<L"# Dumping to '"<<o.get_string(L"dump")<<L"'"<<endl;
+	os<<"# Dumping to '"<<o.get_string("dump")<<"'"<<endl;
 	dump(o::dump());
 }
 
-void repl::dump(wostream& os) {
+template <typename T>
+void repl::dump(basic_ostream<T>& os) {
 	d->out(os);
 }
+template void repl::dump(basic_ostream<char>& os);
+template void repl::dump(basic_ostream<wchar_t>& os);
 
-void repl::info(wostream& os) {
+template <typename T>
+void repl::info(basic_ostream<T>& os) {
 	d->info(os);
-	os<<L"# auto run: "<<ar<<L"\tauto print: "<<ap<<L"\tauto info: "<<ai
+	os<<"# auto run: "<<ar<<"\tauto print: "<<ap<<"\tauto info: "<<ai
 		<<endl;
 }
+template void repl::info(basic_ostream<char>&);
+template void repl::info(basic_ostream<wchar_t>&);
 
-void repl::print(wostream& os) {
-	d->out(os << L"# Printing database content:" << endl);
+template <typename T>
+void repl::print(basic_ostream<T>& os) {
+	d->out(os << "# Printing database content:" << endl);
 }
+template void repl::print(basic_ostream<char>&);
+template void repl::print(basic_ostream<wchar_t>&);
 
-void repl::list(wostream&os, size_t p) {
+template <typename T>
+void repl::list(basic_ostream<T>& os, size_t p) {
 	d->list(os, p);
 }
+template void repl::list(basic_ostream<char>&, size_t);
+template void repl::list(basic_ostream<wchar_t>&, size_t);
 
-size_t parse_size_t(wstring l, wstring cmd) {
+size_t parse_size_t(string l, string cmd) {
 	try {
-		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == L' ')
-			return stoi(wstring(l.begin()+cmd.size()+1, l.end()));
-	} catch (...) { }
+		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
+			return stoi(string(l.begin() + cmd.size() +1, l.end()));
+	} catch (...) { } // TODO FIX
 	return 0;
 }
 
-wstring parse_string(wstring l, wstring cmd) {
+string parse_string(string l, string cmd) {
 	try {
 		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
-			return (wstring(l.begin()+cmd.size()+1, l.end()));
-	} catch (...) { }
-	return L"";
+			return (string(l.begin() + cmd.size() + 1, l.end()));
+	} catch (...) { } // TODO FIX
+	return "";
 }
 
-bool repl::eval_input(wostream& os, wstring &l) {
-	static wstring ll = L"";
-	wstring f;
-	if (l == L"") os<<L"# Repeating: '"<<(l = ll)<<L"'"<<endl;
+void repl::out_dict(wostream& os) {
+	ostringstream_t ss;
+	d->out_dict(ss);
+#ifdef WITH_WCHAR
+	os << ss.str();
+#else
+	os << s2ws(ss.str());
+#endif
+}
+
+void repl::out_dict(ostream& os) {
+	ostringstream_t ss;
+	d->out_dict(ss);
+#ifdef WITH_WCHAR
+	os << ws2s(ss.str());
+#else
+	os << ss.str();
+#endif
+}
+
+template <typename T>
+bool repl::eval_input(basic_ostream<T>& os, string l) {
+	static string ll = "";
+	string f;
+	if (l == "") os<<"# Repeating: '"<<(l = ll)<<"'"<<endl;
 	else          ll = l;
-	if       (l == L"restart") restart(os);
-	else if  (l == L"reparse") reparse(os);
-	else if  (l == L"reset")   reset(os);
-	else if  (l == L"dict") {  d->out_dict(os); return false; }
-	else if  (l == L"q")   return true; // quit
-	else if ((l == L"?") ||
-			(l == L"h"))  help(os);
-	else if  (l == L"p")   print(os);
-	else if  (l == L"i") { info(os); return false; }
-	else if  (l == L"ar")  toggle(os, L"auto run",   ar);
-	else if  (l == L"ap")  toggle(os, L"auto print", ap);
-	else if  (l == L"ai")  toggle(os, L"auto info",  ai);
-	else if  (l == L"ils") toggle(os, L"input line sequencing", ils);
-	else if  (l == L"gc")  bdd::gc();
-	else if  (l == L"d")   dump(os);
-	else if ((l == L"c") ||
-			(l == L"r"))  run(os);
-	else if  (l == L"l")   list(os);
-	else if  (size_t p =   parse_size_t(l, L"l")) list(os, p);
-	else if  (l == L"s")   step(os);
-	else if  (size_t s =   parse_size_t(l, L"s")) step(os, s);
-	else if  (l == L"b")   break_on_fp(os);
-	else if  (size_t s =   parse_size_t(l, L"b")) break_on_step(os, s);
-	else if  ((f = parse_string(l, L"load")) != L"")
+	if       (l == "restart") restart(os);
+	else if  (l == "reparse") reparse(os);
+	else if  (l == "reset")   reset(os);
+	else if  (l == "dict") {  out_dict(os); return false; }
+	else if  (l == "q") return true; // quit
+	else if ((l == "?") ||
+			(l == "h"))  help(os);
+	else if  (l == "p")   print(os);
+	else if  (l == "i") { info(os); return false; }
+	else if  (l == "ar")  toggle(os, "auto run",   ar);
+	else if  (l == "ap")  toggle(os, "auto print", ap);
+	else if  (l == "ai")  toggle(os, "auto info",  ai);
+	else if  (l == "ils") toggle(os, "input line sequencing", ils);
+	else if  (l == "gc")  bdd::gc();
+	else if  (l == "d")   dump(os);
+	else if ((l == "c") ||
+			(l == "r"))  run(os);
+	else if  (l == "l")   list(os);
+	else if  (size_t p =   parse_size_t(l, "l")) list(os, p);
+	else if  (l == "s")   step(os);
+	else if  (size_t s =   parse_size_t(l, "s")) step(os, s);
+	else if  (l == "b")   break_on_fp(os);
+	else if  (size_t s =   parse_size_t(l, "b")) break_on_step(os, s);
+	else if  ((f = ws2s(parse_string(l, "load"))) != "")
 		d->load(f);
-	else if  ((f = parse_string(l, L"save")) != L"")
+	else if  ((f = ws2s(parse_string(l, "save"))) != "")
 		d->save(f);
-	else if  (l == L"ps")
-		d->set_print_step(toggle(os, L"print steps", ps));
-	else if  (l == L"pu")
-		d->set_print_updates(toggle(os, L"print updates", pu));
-	else if  (l == L"cu")
+	else if  (l == "ps")
+		d->set_print_step(toggle(os, "print steps", ps));
+	else if  (l == "pu")
+		d->set_print_updates(toggle(os, "print updates", pu));
+	else if  (l == "cu")
 		d->set_populate_tml_update(
-			toggle(os, L"collect updates into tml_update", cu));
+			toggle(os, "collect updates into tml_update", cu));
 	else
 		add(os, l);
 	if (ai) info(os);
-	os << L"# " << (fin ? L"finished " : L"") << L"ok" << endl;
+	os << "# " << (fin ? "finished " : "") << "ok" << endl;
 	fin = false;
 	return false;
 }
+template bool repl::eval_input(basic_ostream<char>&, string);
+template bool repl::eval_input(basic_ostream<wchar_t>&, string);
 
-void repl::help(wostream& os) const {
-	os << L"# Commands:\n"
-		<< L"#\t?, h    - help\n"
-		<< L"#\ti       - info\n"
-		<< L"#\tp       - print database\n"
-		<< L"#\tl       - list programs\n"
-		<< L"#\tl NUM   - list program NUM (1st program = 1)\n"
-		<< L"#\tr, c    - run/continue\n"
-		<< L"#\ts       - run pfp step\n"
-		<< L"#\ts NUM   - run NUM pfp steps\n"
-		<< L"#\td       - dump db (to the dump output)\n"
-		<< L"#\tdict    - print internal string dictionary\n"
-		<< L"#\tgc      - bdd garbage collection\n"
-		<< L"#\tcu      - toggle collect updates\n"
-		<< L"#\tps      - toggle print steps\n"
-		<< L"#\tpu      - toggle print updates\n"
-		<< L"#\tar      - toggle auto run\n"
-		<< L"#\tap      - toggle auto print\n"
-		<< L"#\tai      - toggle auto info\n"
-		<< L"#\tils     - toggle input line sequencing\n"
-		<< L"#\tb       - run and break on fixed point\n"
-		<< L"#\tb NUM   - run and break on NUM step\n"
-		<< L"#\treparse - reparses the program\n"
-		<< L"#\trestart - restarts the program\n"
-		<< L"#\treset   - resets repl (clears the entered program)\n"
-		<< L"#\tq       - quit" << endl;
+
+template <typename T>
+void repl::help(basic_ostream<T>& os) const {
+	os << "# Commands:\n"
+		<< "#\t?, h    - help\n"
+		<< "#\ti       - info\n"
+		<< "#\tp       - print database\n"
+		<< "#\tl       - list programs\n"
+		<< "#\tl NUM   - list program NUM (1st program = 1)\n"
+		<< "#\tr, c    - run/continue\n"
+		<< "#\ts       - run pfp step\n"
+		<< "#\ts NUM   - run NUM pfp steps\n"
+		<< "#\td       - dump db (to the dump output)\n"
+		<< "#\tdict    - print internal string dictionary\n"
+		<< "#\tgc      - bdd garbage collection\n"
+		<< "#\tcu      - toggle collect updates\n"
+		<< "#\tps      - toggle print steps\n"
+		<< "#\tpu      - toggle print updates\n"
+		<< "#\tar      - toggle auto run\n"
+		<< "#\tap      - toggle auto print\n"
+		<< "#\tai      - toggle auto info\n"
+		<< "#\tils     - toggle input line sequencing\n"
+		<< "#\tb       - run and break on fixed point\n"
+		<< "#\tb NUM   - run and break on NUM step\n"
+		<< "#\treparse - reparses the program\n"
+		<< "#\trestart - restarts the program\n"
+		<< "#\treset   - resets repl (clears the entered program)\n"
+		<< "#\tq       - quit" << endl;
 }
+template void repl::help(basic_ostream<char>&) const;
+template void repl::help(basic_ostream<wchar_t>&) const;
 
-bool repl::toggle(wostream& os, const wstring& name, bool &setting) {
+template <typename T>
+bool repl::toggle(basic_ostream<T>& os, const string& name, bool &setting) {
 	setting = !setting;
-	os << L"# Changed '" << name << "' to "
+	os << "# Changed '" << name << "' to "
 		<< (setting ? "true" : "false") << endl;
 	return setting;
 }
+template bool repl::toggle(basic_ostream<char>&, const string&, bool &);
+template bool repl::toggle(basic_ostream<wchar_t>&, const string&, bool &);
 
 void repl::loop() {
-	wstring input;
+	string input;
 	prompt(os);
 	for (;;) {
 		input = {};
-		if (wcin && wcin_reader.readable()) {
-			input = wcin_reader.read();
+		if (CIN && in_reader.readable()) {
+			input = ws2s(in_reader.read());
 			if (input.size()) {
 				if (eval_input(input)) break;
 				prompt(os);
@@ -216,9 +281,9 @@ void repl::loop() {
 		}
 		if (up_udp && up_udp->readable()) {
 			udp_message msg = up_udp->read();
-			input = s2ws(msg.second);
+			input = msg.second;
 			if (!input.empty()) input.pop_back(); // remove \n
-			wstringstream ss;
+			stringstream ss;
 			bool br = eval_input(ss, input);
 			// TODO split responses bigger than BUFLEN
 			if (ss.str().size()) {
@@ -231,6 +296,6 @@ void repl::loop() {
 			if (br) break;
 
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		this_thread::sleep_for(chrono::milliseconds(20));
 	}
 }

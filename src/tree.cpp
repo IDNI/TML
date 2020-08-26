@@ -75,10 +75,10 @@ void driver::get_trees(wostream& os, const term& root,
 	const map<term, vector<term>>& m, set<term>& done) {
 	if (!done.emplace(root).second) return;
 	for (int_t i : root.args())
-		if (i & 1) os << (wchar_t)(i>>2);
+		if (i & 1) os << (char)(i>>2);
 		else if (i & 2) os << (int_t)(i>>2);
 		else if ((size_t)(i>>2) < dict.nsyms()) os << dict.get_sym(i);
-		else os << L'[' << (i>>2) << L']';
+		else os << '[' << (i>>2) << ']';
 	auto it = m.find(root);
 	if (it == m.end()) return;
 	for (auto x : it->second) get_trees(os, x, m, done);
@@ -97,5 +97,5 @@ wstring driver::get_trees(const term& root, const db_t& t, size_t bits) {
 
 	wstringstream ss;
 	return get_trees(ss, root, m, done), ss.str();
-//	o::out() << L"get_trees: " << ss.str() << endl;
+//	o::out() << "get_trees: " << ss.str() << endl;
 }

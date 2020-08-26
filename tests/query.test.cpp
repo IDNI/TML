@@ -16,8 +16,8 @@ using namespace std;
 /*
 size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 	size_t y = fact(t, bits), ar = t.size()-1, r;
-	wcout << "x:"<<endl << from_bits(x, bits, ar);
-	wcout << "y:"<<endl << from_bits(y, bits, ar);
+	COUT << "x:"<<endl << from_bits(x, bits, ar);
+	COUT << "y:"<<endl << from_bits(y, bits, ar);
 	bools ex(ar*bits, 0);
 	map<int_t, size_t> m;
 
@@ -31,11 +31,11 @@ size_t query_ref(size_t x, term t, size_t bits, vector<size_t>& perm) {
 		else perm.push_back(n);
 
 	r = bdd_and(x, y);
-	wcout << "and:" << endl << from_bits(r, bits, ar);
+	COUT << "and:" << endl << from_bits(r, bits, ar);
 	r = bdd_ex(r, ex);
-	wcout << "ex:" << endl << from_bits(r, bits, ar);
+	COUT << "ex:" << endl << from_bits(r, bits, ar);
 	r = bdd_permute(r, perm);
-	wcout << "perm:"<<endl << from_bits(r, bits, ar);
+	COUT << "perm:"<<endl << from_bits(r, bits, ar);
 	return r;
 }
 */
@@ -51,13 +51,13 @@ void test_query() {
 	size_t bits, arg1 = 0, arg2 = 1, args = 3;
 	for (bits = 1; bits <= 10; ++bits)
 		for (size_t n = 0; n != (size_t)(1<<bits); ++n) {
-			wcout<<"max: "<<n<<" bits: "<<bits<<endl;
+			COUT<<"max: "<<n<<" bits: "<<bits<<endl;
 			builtins<leq_const> l1({arg1},bits,args,leq_const(n,bits,args));
 			builtins<leq_const> l2({arg2},bits,args,leq_const(n,bits,args));
 			spnode x = T, y = bdd_and(l1(T),l2(T));
 			from_range(n, bits, arg1, args, x);
 			from_range(n, bits, arg2, args, x);
-			wcout<<"x:"<<endl<<allsat(x,bits*args)
+			COUT<<"x:"<<endl<<allsat(x,bits*args)
 				<<"y:"<<endl<<allsat(y,bits*args)<<endl;
 			assert(x == y);
 		}
@@ -74,8 +74,8 @@ void test_query() {
 	f = query_ref(x,  { 1, 2, -1, -2 }, bits, perm);
 	query q(bits, { 1, 2, -1, -2 }, perm);
 	r = q(x);
-	wcout << "f:"<<endl << from_bits(f, bits, ar);
-	wcout << "q:"<<endl << from_bits(r, bits, ar);
+	COUT << "f:"<<endl << from_bits(f, bits, ar);
+	COUT << "q:"<<endl << from_bits(r, bits, ar);
 	assert(r == f);
 	perm.clear();
 	f = query_ref(x,  { 1, -1, -1, -2 }, bits, perm);
@@ -86,15 +86,15 @@ void test_query() {
 	for (term t : m) x = bdd_or(x, fact(t, bits));
 	extents e(bits, ar, bits*(ar-0), {0,1,2,3}, 6, 0, {0,0,0}, 
 		{0,0,0}, {0,0,-2}, {0,0,0}, {0,1,0});
-	wcout << "x:"<<endl << from_bits(x, bits, ar)<<endl;
-	wcout << "e:"<<endl << from_bits(e(x), bits, ar)<<endl;
+	COUT << "x:"<<endl << from_bits(x, bits, ar)<<endl;
+	COUT << "e:"<<endl << from_bits(e(x), bits, ar)<<endl;
 	exit(0);
 //	assert(q(x) = bdd_or(term(m[1],bits), term(m[2],bits),ex)
 	for(size_t k=0; k!=100;++k) {
-		wcout << k << endl;
+		COUT << k << endl;
 		size_t bits = 3, ar = 10;
 		tt t = rndtt(bits * ar, 1000);
-	//	wcout << t << endl;
+	//	COUT << t << endl;
 		size_t x = t.bdd(), y = x;
 		for (size_t n = 0; n < bits; ++n)
 			y = bdd_and(y, from_eq(n, bits*3+n)),

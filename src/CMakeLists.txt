@@ -87,6 +87,9 @@ target_include_directories(TMLo PUBLIC
 if (WITH_THREADS)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_THREADS")
 endif ()
+if (WITH_WCHAR)
+	target_compile_definitions(TMLo PRIVATE "-DWITH_WCHAR")
+endif ()
 
 # boost
 ###########
@@ -98,6 +101,13 @@ if (WITH_BOOST)
 		target_link_libraries(TMLo PUBLIC Boost::boost Boost::system)
 	endif (Boost_FOUND)
 endif ()
+
+# pthreads
+###########
+if (WITH_THREADS)
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
+	find_package(Threads)
+endif()
 
 # shared library
 #################
@@ -146,7 +156,9 @@ if (WITH_THREADS)
 	target_compile_definitions(tml PRIVATE "-DWITH_THREADS")
 	target_link_libraries(tml Threads::Threads)
 endif()
-
+if (WITH_WCHAR)
+	target_compile_definitions(tml PRIVATE "-DWITH_WCHAR")
+endif ()
 
 # executable using shared library
 ##################################
@@ -161,6 +173,9 @@ if (WITH_THREADS)
 	target_compile_definitions(tml_shared PRIVATE "-DWITH_THREADS")
 	target_link_libraries(tml_shared Threads::Threads)
 endif()
+if (WITH_WCHAR)
+	target_compile_definitions(tml_shared PRIVATE "-DWITH_WCHAR")
+endif ()
 exclude(tml_shared)
 
 

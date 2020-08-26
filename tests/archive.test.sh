@@ -1,4 +1,6 @@
-rm -f ./test_file*
+#!/bin/bash
+
+#rm -f ./test_file*
 ret=1
 g++ archive.test.cpp \
 	../build-Debug/libTML.a \
@@ -8,6 +10,6 @@ g++ archive.test.cpp \
 					&& ./archive.test
 
 ret=$?
-#hexdump -Cv ./test_file1.bin
+#hexdump -Cv ./test_file1.bin > ./test_file1.bin.hexdump
 rm -f ./archive.test ./test_file* ./archive.test.debug
 exit $ret

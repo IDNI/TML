@@ -16,6 +16,7 @@
 #include <sys/ioctl.h>
 #endif
 #include "driver.h"
+#include "err.h"
 #ifdef WITH_THREADS
 #include "repl.h"
 #endif
@@ -25,35 +26,43 @@ using namespace std;
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
+	inputs ii;
 	outputs oo;
-	options o(argc, argv, &oo);
-	//o.parse(wstrings{ L"-autotype" }, true);
-	bdd::init(o.enabled(L"bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
-		o.get_int(L"bdd-max-size"), ws2s(o.get_string(L"bdd-file")));
+	options o(argc, argv, &ii, &oo);
+	//o.parse({ "-autotype" }, true);
+	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
+		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
-	if (o.disabled(L"i") && o.disabled(L"ie")
+	if (o.disabled("i") && o.disabled("ie")
 #ifdef WITH_THREADS
-			&& o.disabled(L"repl") && o.disabled(L"udp")
+			&& o.disabled("repl") && o.disabled("udp")
 #endif
-			&& o.disabled(L"h") && o.disabled(L"v"))
-		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
+			&& o.disabled("h") && o.disabled("v"))
+		o.parse(strings{ "-i",  "@stdin" }, true);
 #ifdef WITH_THREADS
-	if (o.enabled(L"udp") && o.disabled(L"repl")) o.enable(L"repl");
-	if (o.enabled(L"repl")) repl r(o);
+	if (o.enabled("udp") && o.disabled("repl")) o.enable("repl");
+	if (o.enabled("repl")) repl r(o);
 	else {
 #endif
-		driver d(o);
-		wstring archive_file = o.get_string(L"load");
-		if (archive_file != L"") d.load(archive_file);
-		d.run((size_t)o.get_int(L"steps"),
-			(size_t)o.get_int(L"break"),
-			o.enabled(L"break-on-fp"));
-		archive_file = o.get_string(L"save");
-		if (archive_file != L"") d.save(archive_file);
-		if (o.enabled(L"dump") && d.result &&
-			!d.out_goals(o::dump())) d.dump();
-		if (o.enabled(L"dict")) d.out_dict(o::inf());
-		if (o.enabled(L"csv")) d.save_csv();
+		try {
+			driver d(o);
+			string archive_file = o.get_string("load");
+			if (archive_file != "") d.load(archive_file);
+			d.run((size_t)o.get_int("steps"),
+				(size_t)o.get_int("break"),
+				o.enabled("break-on-fp"));
+			archive_file = o.get_string("save");
+			if (archive_file != "") d.save(archive_file);
+			if (o.enabled("dump") && d.result &&
+				!d.out_goals(o::dump())) d.dump();
+			if (o.enabled("dict")) d.out_dict(o::inf());
+			if (o.enabled("csv")) d.save_csv();
+
+		} catch (parse_error_exception &e) {
+			o::err() << e.what() << endl;
+		} catch (runtime_error_exception &e) {
+			o::err() << e.what() << endl;
+		}
 #ifdef WITH_THREADS
 	}
 #endif

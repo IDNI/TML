@@ -16,8 +16,6 @@
 #include "driver.h"
 #include "memory_map.h"
 
-using lexeme_range = std::array<size_t, 2>;
-
 inline static mmap_mode bool2mode(bool write) {
 	return write ? MMAP_WRITE : MMAP_READ;
 }
@@ -33,46 +31,55 @@ private:
 	size_t pos_ = 0;
 	size_t size_ = 0;
 	size_t version_ = 0;
-	dict_t* dict = 0;
+	dict_t* dict_ = 0;
+	std::ostringstream ldata_;
+	size_t lpos_ = 0;
+	std::map<lexeme, lexeme_range, lexcmp> lmap_;
+	std::vector<std::pair<lexeme_range, bool>> lranges_;
+	ccs lexemes_extra_ = 0;
 public:
 	// archive with mmap
-	archive(std::string filename, size_t s, bool mmap_writeable)
-		: archive(NONE, filename, s, mmap_writeable) {}
-	archive(type typ, std::string filename, size_t s, bool mmap_writeable)
-		: type_(typ),
-		mm_(filename.c_str(), s, bool2mode(mmap_writeable)),
-		data_(mm_.data()), size_(s)
-	{
-		// DBG(o::dbg()<<
-		// 	L"archive (mmap): " << s2ws(filename)
-		// 	<< L" size: " << s << L" writeable: " << mmap_writeable
-		// 	<< L" map size: " << mm_.size()
-		// <<std::endl;)
-	}
+	archive(const std::string& filename, size_t s, bool mm_write)
+		: archive(NONE, filename, s, mm_write) {}
+	archive(type typ, const std::string& filename, size_t s, bool mm_write);
 	// archive with provided data pointer
-	archive(void* data, size_t s) : archive(NONE, data, s) {};
+	archive(void* data, size_t s) : archive(NONE, data, s) {}
 	archive(type typ, void* data, size_t s) : type_(typ), mm_(),
-		data_(data), size_(s)
-	{
-		// DBG(o::dbg()<<
-		// 	L"archive (ptr): " << (char*)data << L" " << &data
-		// 	<< L" size: " << s
-		// 	<< L" map size: " << mm_.size()
-		// <<std::endl;)
-	}
-	virtual ~archive() { mm_.close(); }
+		data_(data), size_(s) {}
 
-	dict_t dict_fallback;
-	dict_t* get_dict() { return dict ? dict : &dict_fallback; }
+	// pos and spos are debugging methods for logging positions and sizes
+	template <typename T>
+	static void spos(const std::string& n, const T& v, size_t s) {
+		sposl(n, archive::size(v), s);
+	}
+	static void sposl(const std::string& n, size_t l, size_t s) {
+		DBG(COUT << "spos: \t" << s << " \t0x" << std::hex << s
+			<< std::dec << " \t" << n << "\t size: " << l <<
+			std::endl;)
+	}
+	archive& pos(const std::string& n) {
+		DBG(COUT << "pos: \t" << pos_ << " \t0x" << std::hex <<
+			pos_ << std::dec << " \t" << n << std::endl;)
+		return *this;
+	}
+
+	dict_t dict_fallback_;
+	dict_t* get_dict() { return dict_ ? dict_ : &dict_fallback_; }
 	
 	unsigned char enc_bools(std::initializer_list<bool> list);
 	bool dec_bool(unsigned char bls, int pos = 0);
 
-	void write(const char* data, size_t s);
-	void read(char* data, size_t s);
+	const char* read_chars(size_t l);
+	ccs read_ccs(size_t l);
+	archive& write_ccs(const char* s, size_t l);
+//	archive& write_ccs(const wchar_t* s, size_t l);
+	archive& write_ccs(const char* s);
+//	archive& write_ccs(const wchar_t* s);
+	archive& write(const char* data, size_t s);
+	archive& read(char* data, size_t s);
 
-	void write(const void* data, size_t s);
-	void read(void* data, size_t s);
+	archive& write(const void* data, size_t s);
+	archive& read(void* data, size_t s);
 
 	// common writer for vector/set/map
 	template <typename T>
@@ -81,6 +88,14 @@ public:
 		for (auto m : v) *this << m;
 		return *this;
 	}
+
+	// arrays
+	template <typename T, size_t N>
+	archive& operator<<(const std::array<T, N>& a);
+	template <typename T, size_t N>
+	archive& operator>>(std::array<T, N>& a);
+	template <typename T, size_t N>
+	static size_t size(const std::array<T, N>& a);
 
 	// vectors
 	template <typename T>
@@ -91,9 +106,6 @@ public:
 	static size_t vecsize(const std::vector<T>& v);
 	template <typename T>
 	static size_t size(const std::vector<T>& v) { return vecsize(v); }
-	//template <typename V, typename T>
-	//static size_t size(const std::vector<T>& v) {
-	//	return sizeof(size_t) + v.size() * sizeof(T); }
 	static size_t size(const std::vector<spbdd_handle>& v) {
 		return vecsize(v); }
 
@@ -112,8 +124,6 @@ public:
 	static size_t size(const std::set<T>& v) { return setsize(v); }
 	template <typename T, typename... U>
 	static size_t size(const std::set<T, U...>& v) { return setsize(v); }
-	//static size_t size(const std::set<lexeme>& lxms);
-	//static size_t size(const std::set<lexeme, lexcmp>& lxms);
 
 	// maps
 	template <typename Key, typename T>
@@ -130,10 +140,7 @@ public:
 	archive& read_map(std::map<Key, T>& m);
 	archive& operator>>(std::map<ntable, std::set<ntable>>& deps);
 	archive& operator>>(std::map<ntable, std::set<term>>& mhits);
-	archive& operator>>(std::map<multi_arg, std::set<alt_arg>>& minvtyps);
-	archive& operator>>(std::map<ntable, std::set<tbl_alt>>& tblbodies);
-	archive& operator>>(std::map<alt_arg, multi_arg>& mtyps);
-	archive& operator>>(std::map<tbl_alt, tbl_alt>& altordermap);
+
 	template <typename Key, typename T>
 	static size_t mapsize(const std::map<Key, T>& m);
 	template <typename Key, typename T, typename C>
@@ -147,7 +154,7 @@ public:
 
 	archive& write_header();
 	archive& read_header();
-	static size_t header_size();
+	inline static size_t header_size();
 
 	archive& operator<<(const int_t&);
 	archive& operator>>(int_t&);
@@ -180,23 +187,23 @@ public:
 	archive& operator<<(const lexeme_range&);
 	archive& operator>>(lexeme_range&);
 
-	archive& operator<<(const std::wstring&);
-	archive& operator>>(std::wstring&);
-	static size_t size(const std::wstring& s) { return size(ws2s(s)); }
-
 	archive& operator<<(const std::string&);
 	archive& operator>>(std::string&);
 	static size_t size(const std::string& s) {
-		return s.size() + sizeof(size_t); }
+		return sizeof(size_t) + s.size() + 1; }
 
 	archive& operator<<(const spbdd_handle&);
 	archive& operator>>(spbdd_handle&);
 	static size_t size(const spbdd_handle&) { return sizeof(int_t); }
 	static size_t size(const bdd_handle&) { return sizeof(int_t); }
 
-	archive& operator<<(const dict_t&);
-	archive& operator>>(dict_t&);
-	static size_t size(const dict_t&);
+	archive& add_lexeme_and_map(const dict_t& d,const lexeme& l,bool add=1);
+	template <typename T>
+	archive& add_lexemes(const dict_t& d, const T& lxms);
+	archive& add_dict_lexemes(const dict_t&);
+	archive& write_lexemes();
+
+	static size_t dict_and_lexemes_size(const driver& drv);
 
 	archive& operator<<(const term&);
 	archive& operator>>(term&);
@@ -209,49 +216,6 @@ public:
 	archive& operator<<(const sig&);
 	archive& operator>>(sig&);
 	static size_t size(const sig&);
-
-	archive& operator<<(const alt_arg&);
-	archive& operator>>(alt_arg&);
-	static size_t size(const alt_arg&);
-
-	archive& operator<<(const tbl_arg&);
-	archive& operator>>(tbl_arg&);
-	static size_t size(const tbl_arg&);
-
-	archive& operator<<(const multi_arg&);
-	archive& operator>>(multi_arg&);
-	static size_t size(const multi_arg&);
-
-	archive& operator<<(const infer_types&);
-	archive& operator>>(infer_types&);
-	static size_t size(const infer_types&);
-
-	archive& operator<<(const union_type&);
-	archive& operator>>(union_type&);
-
-	archive& operator<<(const sub_type&);
-	archive& operator>>(sub_type&);
-
-	archive& operator<<(const record_type&);
-	archive& operator>>(record_type&);
-
-	archive& operator<<(const compound_type&);
-	archive& operator>>(compound_type&);
-	static size_t size(const compound_type&);
-
-	archive& operator<<(const primitive_type&);
-	archive& operator>>(primitive_type&);
-	static size_t size(const primitive_type&);
-
-	archive& operator<<(const ::type&);
-	archive& operator>>(::type&);
-	static size_t size(const ::type&);
-
-	archive& operator<<(const argtypes&);
-
-	archive& operator<<(const bitsmeta&);
-	archive& operator>>(bitsmeta&);
-	static size_t size(const bitsmeta&);
 
 	archive& operator<<(const elem&);
 	archive& operator>>(elem&);
@@ -280,6 +244,10 @@ public:
 	archive& operator<<(const raw_progs&);
 	archive& operator>>(raw_progs&);
 	static size_t size(const raw_progs&);
+
+	archive& operator<<(const input&);
+	archive& operator>>(input&);
+	static size_t size(const input&);
 
 	archive& operator<<(const option&);
 	static size_t size(const option&);
@@ -319,13 +287,6 @@ public:
 	archive& read_bdd();
 	static size_t bdd_size();
 
-	// range_compound_memo
-	archive& operator<<(const std::tuple<
-		int_t, int_t, int_t, size_t, size_t, size_t, uints>&);
-	archive& operator>>(std::tuple<
-		int_t, int_t, int_t, size_t, size_t, size_t, uints>&);
-	static size_t size(const std::tuple<
-		int_t, int_t, int_t, size_t, size_t, size_t, uints>&);
 };
 
 #endif

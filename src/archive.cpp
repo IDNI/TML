@@ -13,10 +13,30 @@
 #include "archive.h"
 #include "input.h"
 #include "options.h"
-#include "types.h"
+#include "err.h"
 
-using std::wstring;
 using std::endl;
+
+//#define DEBUG_ARCHIVE_POS
+#ifdef DEBUG_ARCHIVE_POS
+#define POS(x)      pos(x);
+#define SPOS(x, v)  spos((x), (v), s);
+#define SPOS0(x)    spos((x), (char)0, s);
+#define SPOSL(x, l) sposl((x), (l), s);
+//#define SPOS(x)     spos((x), (size_t)-1, s);
+#else
+#define POS(x)
+#define SPOS(x, v)
+#define SPOS0(x)
+#define SPOSL(x, l)
+#endif
+
+archive::archive(type typ, const std::string& filename, size_t s, bool mm_write)
+	: type_(typ), mm_(filename, s, bool2mode(mm_write)), data_(mm_.data()),
+	size_(s)
+{
+	if (mm_.error) throw_runtime_error(err_fnf, filename);
+}
 
 unsigned char archive::enc_bools(std::initializer_list<bool> list) {
 	DBG(assert(list.size() <= 8);)
@@ -24,28 +44,49 @@ unsigned char archive::enc_bools(std::initializer_list<bool> list) {
 	for (auto b : list) r |= (unsigned char) (b << i++);
 	return r;
 }
+
 bool archive::dec_bool(unsigned char bls, int pos) {
 	return (bls >> pos) & 1;
 }
 
-void archive::write(const char* data, size_t s) {
-	// DBG(o::dbg() << L"write const char* data[0]: " << &data << L' ' << (int)data[0] << std::endl;)
+archive& archive::write(const char* data, size_t s) {
+	// DBG(o::dbg() << "write const char* data[0]: " << &data << ' ' << (int)data[0] << std::endl;)
 	memcpy(((char*)data_) + pos_, data, s);
 	pos_ += s;
+	return *this;
 }
-void archive::read(char* data, size_t s) {
-	// o::dbg() << L"read char* data: " << &data << std::endl;
+archive& archive::read(char* data, size_t s) {
+	// o::dbg() << "read char* data: " << &data << std::endl;
 	memcpy(data, ((char*)data_) + pos_, s);
 	pos_ += s;
+	return *this;
 }
 
-void archive::write(const void* data, size_t s) {
-	// DBG(o::dbg() << L"write const void* data: " << &data << L' ' << data  << std::endl;)
-	write(static_cast<const char*>(data), s);
+archive& archive::write(const void* data, size_t s) {
+	// DBG(o::dbg() << "write const void* data: " << &data << ' ' << data  << std::endl;)
+	return write(static_cast<const char*>(data), s);
 }
-void archive::read(void* data, size_t s) {
-	// o::dbg() << L"read void* data: " << &data << std::endl;
-	read(static_cast<char*>(data), s);
+archive& archive::read(void* data, size_t s) {
+	// o::dbg() << "read void* data: " << &data << std::endl;
+	return read(static_cast<char*>(data), s);
+}
+
+// arrays
+template <typename T, size_t N>
+archive& archive::operator<<(const std::array<T, N>& a) {
+	for (auto m : a) *this << m;
+	return *this;
+}
+template <typename T, size_t N>
+archive& archive::operator>>(std::array<T, N>& a) {
+	for (size_t i = 0; i != N; ++i) *this >> a[i];
+	return *this;
+}
+template <typename T, size_t N>
+size_t archive::size(const std::array<T, N>& a) {
+	size_t s = sizeof(size_t);
+	for (auto e : a) s += size(e);
+	return s;
 }
 
 // vectors
@@ -84,8 +125,8 @@ archive& archive::operator>>(std::set<T, U...>& v) {
 archive& archive::operator>>(std::set<term> &st) {
 	size_t s; *this >> s;
 	for(size_t i = 0; i != s; ++i) {
-		o::dbg() << L"i: " << i << L" ";
-		term t(0, {}, {});
+		//DBG(o::dbg() << "i: " << i << " ";)
+		term t;
 		*this >> t, st.insert(t);	
 	};
 	return *this;
@@ -110,16 +151,6 @@ size_t archive::setsize(const std::set<T>& v) {
 	for (auto e : v) s += size(e);
 	return s;
 }
-//size_t archive::size(const std::set<lexeme>& lxms) {
-//	size_t s = sizeof(size_t);
-//	for (auto l : lxms) s += l.size() + sizeof(size_t);
-//	return s;
-//}
-//size_t archive::size(const std::set<lexeme, lexcmp>& lxms) {
-//	size_t s = sizeof(size_t);
-//	for (auto l : lxms) s += l.size() + sizeof(size_t);
-//	return s;
-//}
 
 // maps
 template <typename Key, typename T>
@@ -176,7 +207,7 @@ archive& archive::operator>>(std::map<ntable, std::set<term>>& mhits) {
 	if (nsize) do {
 		*this >> nt >> tsize;
 		if (tsize) do {
-			term t = {0, {}, {}};
+			term t;
 			*this >> t;
 			st.insert(t);			
 		} while (tsize-- > 0);
@@ -184,61 +215,7 @@ archive& archive::operator>>(std::map<ntable, std::set<term>>& mhits) {
 	} while (--nsize > 0);
 	return *this;
 }
-archive& archive::operator>>(std::map<multi_arg, std::set<alt_arg>>& minvtyps) {
-	size_t nsize, ssize;
-	*this >> nsize;
-	std::set<alt_arg> saa;
-	if (nsize) do {
-		multi_arg ma(0, 0, {});
-		*this >> ma >> ssize;
-		if (ssize) do {
-			alt_arg aa(0, 0, 0, 0);
-			*this >> aa;
-			saa.insert(aa);
-		} while (ssize-- > 0);
-		minvtyps.emplace(ma, saa);
-	} while (--nsize > 0);
-	return *this;
-}
-archive& archive::operator>>(std::map<ntable, std::set<tbl_alt>>& tblbodies) {
-	size_t nsize, ssize;
-	ntable nt;
-	*this >> nsize;
-	std::set<tbl_alt> sta;
-	if (nsize) do {
-		*this >> nt >> ssize;
-		if (ssize) do {
-			tbl_alt ta = tbl_alt::get_empty();
-			*this >> ta;
-			sta.insert(ta);
-		} while (ssize-- > 0);
-		tblbodies.emplace(nt, sta);
-	} while (--nsize > 0);
-	return *this;
-}
 
-archive& archive::operator>>(std::map<alt_arg, multi_arg>& mtyps) {
-	size_t nsize;
-	*this >> nsize;
-	if (nsize) do {
-		alt_arg aa(0, 0, 0, 0);
-		multi_arg ma(0, 0, {});
-		*this >> aa >> ma;
-		mtyps.emplace(aa, ma);
-	} while (--nsize > 0);
-	return *this;
-}
-archive& archive::operator>>(std::map<tbl_alt, tbl_alt>& altordermap) {
-	size_t nsize;
-	*this >> nsize;
-	if (nsize) do {
-		tbl_alt k = tbl_alt::get_empty();
-		tbl_alt v = tbl_alt::get_empty();
-		*this >> k >> v;
-		altordermap.emplace(k, v);
-	} while (--nsize > 0);
-	return *this;
-}
 template <typename Key, typename T>
 size_t archive::mapsize(const std::map<Key, T>& m) {
 	size_t s = sizeof(size_t);
@@ -273,84 +250,86 @@ size_t archive::header_size() {
 }
 
 archive& archive::operator<<(const int_t& val) {
-	//DBG(o::dbg() << L"writing int_t: " << val << endl;)
+	//DBG(o::dbg() << "writing int_t: " << val << endl;)
 	write((const char*)&val, sizeof(int_t));
 	return *this;
 }
 archive& archive::operator>>(int_t& val) {
 	read(&val, sizeof(int_t));
-	//DBG(o::dbg() << L"reading int_t: " << val << endl;)
+	//DBG(o::dbg() << "reading int_t: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const int16_t& val) {
-	//DBG(o::dbg() << L"writing int16_t: " << val << endl;)
-	write((const char*)&val, sizeof(int16_t));
+	//DBG(o::dbg() << "writing int16_t: " << val << endl;)
+	write((const char*) &val, sizeof(int16_t));
 	return *this;
 }
 archive& archive::operator>>(int16_t& val) {
 	read(&val, sizeof(int16_t));
-	//DBG(o::dbg() << L"reading int16_t: " << val << endl;)
+	//DBG(o::dbg() << "reading int16_t: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const size_t& val) {
-	// DBG(o::dbg() << L"writing size_t: " << val << endl;)
-	write((const char*)&val, sizeof(size_t));
+	// DBG(o::dbg() << "writing size_t: " << val << endl;)
+	write((const char*) &val, sizeof(size_t));
 	return *this;
 }
 
 archive& archive::operator>>(size_t& val) {
-	read((char*)&val, sizeof(size_t));
-	// DBG(o::dbg() << L"reading size_t: " << val << endl;)
+	read((char*) &val, sizeof(size_t));
+	// DBG(o::dbg() << "reading size_t: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const unsigned int& val) {
-	//DBG(o::dbg() << L"writing uint: " << val << endl;)
-	write((const char*)&val, sizeof(unsigned int));
+	//DBG(o::dbg() << "writing uint: " << val << endl;)
+	write((const char*) &val, sizeof(unsigned int));
 	return *this;
 }
 archive& archive::operator>>(unsigned int& val) {
 	read(&val, sizeof(unsigned int));
-	//DBG(o::dbg() << L"reading uint: " << val << endl;)
+	//DBG(o::dbg() << "reading uint: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const unsigned char& val) {
-	// DBG(o::dbg() << L"writing char: " << val << endl;)
-	write((const char*)(&val), sizeof(unsigned char));
+	// DBG(o::dbg() << "writing char: " << val << endl;)
+	write((const char*) &val, sizeof(unsigned char));
 	return *this;
 }
 archive& archive::operator>>(unsigned char& val) {
 	read(&val, sizeof(unsigned char));
-	// DBG(o::dbg() << L"reading char: " << val << endl;)
+	// DBG(o::dbg() << "reading char: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const char& val) {
-	// DBG(o::dbg() << L"writing char: " << val << endl;)
-	write((const char*)(&val), sizeof(char));
+	// DBG(o::dbg() << "writing char: " << val << endl;)
+	write((const char*) &val, sizeof(char));
 	return *this;
 }
 archive& archive::operator>>(char& val) {
 	read(&val, sizeof(char));
-	// DBG(o::dbg() << L"reading char: " << val << endl;)
+	// DBG(o::dbg() << "reading char: " << val << endl;)
 	return *this;
 }
 
 archive& archive::operator<<(const lexeme& val) {
-	// DBG(o::dbg() << L"writing lexeme: " << lexeme2str(val) << endl;)
-	return *this << std::wstring(val[0], val[1]-val[0]);
+//	//DBG(o::dbg() << "writing lexeme: " << lexeme2str(val) << endl;)
+	auto it = lmap_.find(val);
+	if (it == lmap_.end()) throw 0;
+	return *this << it->second;
 }
 archive& archive::operator>>(lexeme& r) {
-	std::wstring s;
-	*this >> s;
-	r = get_dict()->get_lexeme(s);
+	size_t pos;
+	*this >> pos; r[0] = (ccs) data_ + pos;
+	*this >> pos; r[1] = (ccs) data_ + pos;
 	return *this;
 }
-size_t archive::size(const lexeme& l) {
-	return l[1] - l[0] + sizeof(size_t);
+size_t archive::size(const lexeme& /*l*/) {
+	return 2 * sizeof(size_t);
 }
 
 archive& archive::operator<<(const lexeme_range& r) {
@@ -360,99 +339,35 @@ archive& archive::operator>>(lexeme_range& r) {
 	return *this >> r[0] >> r[1];
 }
 
-archive& archive::operator<<(const std::wstring& val) {
-	// DBG(o::dbg() << L"writing wstring: " << val << endl;)
-	return *this << ws2s(val);
-}
-archive& archive::operator>>(std::wstring& val) {
-	std::string s; *this >> s; val = s2ws(s);
-	return *this;
-}
-
 archive& archive::operator<<(const std::string& val) {
-	// DBG(o::dbg() << L"writing string: " << s2ws(val)
-	// 	 << L" size: " << val.size() << endl;)
+	//COUT << "writing string: " << val
+	// 	 << " size: " << val.size() << endl;
+	//POS("string begin")
 	*this << val.size();
-	write((const char*)val.c_str(), val.size());
+	if (val.size() > 0) write((const char*)val.c_str(), val.size());
+	*this << (char)0;
+	//POS("string end")
 	return *this;
 }
 archive& archive::operator>>(std::string& val) {
-	size_t s; *this >> s;
-	//DBG(o::dbg() << L"reading string, size: " << s << endl;)
-	if (s == 0) {
-		val = "";
-		return *this;
-	}
-	char* str = new char[s+1]; str[s] = 0x0; // ???
-	read(str, s); 
-	val = std::string(str);
-	//DBG(o::dbg() << L"reading string, value: " << s2ws(val) << endl;)
+	//POS("string begin")
+	size_t l; *this >> l;
+	//DBG(o::dbg() << "reading string, size: " << l << endl;)
+	if (l == 0) return (val = "", ++pos_), *this;
+	val = std::string(read_ccs(l));
+	//POS("string end")
 	return *this;
 }
 
 archive& archive::operator<<(const spbdd_handle& val) {
-	//DBG(o::dbg() << L"writing spbdd_handle: " << (val ? val->b : (int_t)0) << endl;)
+	//DBG(o::dbg() << "writing spbdd_handle: " << (val ? val->b : (int_t)0) << endl;)
 	return *this << (val ? val->b : (int_t)0);
 }
 archive& archive::operator>>(spbdd_handle& val) {
 	int_t b; *this >> b;
 	val = bdd_handle::get(b);
-	//DBG(o::dbg() << L"reading spbdd_handle: " << b << endl;)
+	//DBG(o::dbg() << "reading spbdd_handle: " << b << endl;)
 	return *this;
-}
-
-archive& archive::operator<<(const dict_t& d) {
-	std::wostringstream data;
-	std::map<lexeme, lexeme_range> lmap{};
-	std::vector<lexeme_range> lranges;
-	size_t pos = 0;
-	auto add_lexeme_and_map =
-		[&data, &lmap, &lranges, &pos] (const lexeme& l) {
-			lexeme_range r = { pos, pos };
-			auto it = lmap.find(l);
-			if (it == lmap.end()) { // not in map
-				if (l[1]-l[0] > 0) // non-0
-					for (cws c = l[0]; c != l[1]; ++c)
-						data << *c, ++pos, r[1] = pos;
-				lmap.insert({ l, r });
-				lranges.push_back(r);
-			} else lranges.push_back(it->second);
-		};
-	for (auto& v : {d.rels, d.syms, d.bltins})
-		for (auto& l : v) add_lexeme_and_map(l);
-	*this << ws2s(data.str()) << d.rels_dict.size() << d.syms_dict.size()
-		<< d.bltins_dict.size();
-	for (auto& r : lranges) *this << r;
-	write_container(d.types);
-	return *this;
-}
-archive& archive::operator>>(dict_t& d) {
-	size_t nrels, nsyms, nbltins;
-	// TODO: don't allocate. use mmap addresses (switch from wchar first?)
-	std::string s; *this >> s; cws source = wcsdup(s2ws(s).c_str());
-	*this >> nrels >> nsyms >> nbltins;
-	lexeme_range r;
-	for (size_t i = 0; i != nrels; ++i) *this >> r,
-		d.get_rel(lexeme{ source+r[0], source+r[1] });
-	for (size_t i = 0; i != nsyms; ++i) *this >> r,
-		d.get_sym(lexeme{ source+r[0], source+r[1] });
-	for (size_t i = 0; i != nbltins; ++i) *this >> r,
-		d.get_bltin(lexeme{ source+r[0], source+r[1] });
-	return *this >> d.types;
-}
-size_t archive::size(const dict_t& d) {
-	size_t s = (4 * sizeof(size_t)) + size(d.types)
-		+ (2 * sizeof(size_t)
-			* (d.rels.size() + d.syms.size() + d.bltins.size()));
-	std::set<lexeme> lexemes{};
-	auto add_lexeme_size =
-		[&lexemes, &s] (const lexeme& l) {
-			if (lexemes.insert(l).second) s += l[1]-l[0];
-		};
-	for (auto& l : d.rels)   add_lexeme_size(l);
-	for (auto& l : d.syms)   add_lexeme_size(l);
-	for (auto& l : d.bltins) add_lexeme_size(l);
-	return s;
 }
 
 archive& archive::operator<<(const term& t) {
@@ -505,187 +420,13 @@ size_t archive::size(const sig& sign) {
 	return (sign.second.size() + 1) * sizeof(int_t) + sizeof(size_t);
 }
 
-archive& archive::operator<<(const alt_arg& a) {
-	return *this << a.tab << a.alt
-		<< a.arg << a.subarg << a.path
-		<< (unsigned char)a.special;
-}
-archive& archive::operator>>(alt_arg& a) {
-	unsigned char tmp;
-	*this
-		>> a.tab
-		>> a.alt
-		>> a.arg
-		>> a.subarg
-		>> a.path
-		>> tmp;
-	a.special = (decltype(a.special)) tmp;
-	return *this;
-}
-size_t archive::size(const alt_arg& a) {
-	return 3 * sizeof(int_t) + ((a.path.size() + 2) * sizeof(size_t))
-		+ sizeof(unsigned char);
-}
-
-archive& archive::operator<<(const tbl_arg& a) {
-	return *this << a.tab << a.arg << a.subarg;
-}
-archive& archive::operator>>(tbl_arg& a) {
-	return *this >> a.tab >> a.arg >> a.subarg;
-}
-size_t archive::size(const tbl_arg&) {
-	return 2 * sizeof(int_t) + sizeof(size_t);
-}
-
-archive& archive::operator<<(const multi_arg& a) {
-	return *this << a.tab << a.arg << a.subarg << a.path
-		<< (unsigned char)a.special;
-}
-archive& archive::operator>>(multi_arg& a) {
-	unsigned char tmp;
-	*this >> a.tab >> a.arg >> a.subarg >> a.path >> tmp;
-	a.special = (decltype(a.special)) tmp;
-	return *this;
-}
-size_t archive::size(const multi_arg& a) {
-	return 2 * sizeof(int_t) + ((a.path.size() + 2) * sizeof(size_t))
-		+ sizeof(unsigned char);
-}
-
-archive& archive::operator<<(const infer_types& inf) {
-	return *this
-		<< inf.minvtyps
-		<< inf.mtyps
-		<< inf.altids4types
-		<< inf.tblbodies
-		<< inf.tblrules
-		<< inf.altordermap
-		//<< inf.altsmap
-		;
-}
-archive& archive::operator>>(infer_types& inf) {
-	return *this
-		>> inf.minvtyps
-		>> inf.mtyps
-		>> inf.altids4types
-		>> inf.tblbodies
-		>> inf.tblrules
-		>> inf.altordermap
-		// >> inf.altsmap
-		;
-}
-size_t archive::size(const infer_types& inf) {
-	return size(inf.minvtyps) + size(inf.mtyps) + size(inf.altids4types)
-		+ size(inf.tblbodies) + size(inf.tblrules)
-		+ size(inf.altordermap) ;//+ size(inf.altsmap);
-}
-
-archive& archive::operator<<(const compound_type& ct) {
-	*this
-		<< enc_bools({ ct.isroot, ct.bitaligned })
-		<< ct.alignment // only if bitaligned?
-		<< ct.sumOfBits << ct.sumOfPrimitives // mutable
-		;
-	return write_container<vtypes>(ct.types);
-		// static align_bits bool
-}
-archive& archive::operator>>(compound_type& ct) {
-	unsigned char bls;
-	*this >> bls >> ct.alignment >> ct.sumOfBits >> ct.sumOfPrimitives;
-	ct.isroot = dec_bool(bls), ct.bitaligned = dec_bool(bls, 1);
-	return *this >> ct.types;
-}
-size_t archive::size(const compound_type& ct) {
-	return sizeof(unsigned char) + size(ct.alignment)
-		+ 2 * sizeof(size_t) + size(ct.types);
-}
-
-archive& archive::operator<<(const primitive_type& pt) {
-	return *this << (unsigned char) pt.type << pt.bitness << pt.num; 
-}
-archive& archive::operator>>(primitive_type& pt) {
-	unsigned char t;
-	*this >> t >> pt.bitness >> pt.num;
-	pt.type = (base_type)t;
-	return *this;
-}
-size_t archive::size(const primitive_type&) {
-	return sizeof(unsigned char) + sizeof(size_t) + sizeof(int_t);
-}
-
-archive& archive::operator<<(const ::type& at) {
-	*this
-		<< at.sig
-		<< at.mprimes
-		<< (unsigned char) at.kind;
-	if (at.isPrimitive()) *this << at.primitive;
-	else if (at.isCompound()) *this << at.compound;
-	return *this;
-}
-archive& archive::operator>>(::type& at) {
-	unsigned char tmp;
-	*this
-		>> at.sig
-		>> at.mprimes
-		>> tmp;
-	at.kind = static_cast<decltype(at.kind)>(tmp);
-	if (at.isPrimitive()) *this >> at.primitive;
-	else if (at.isCompound()) *this >> at.compound;
-	return *this;
-}
-size_t archive::size(const ::type& at) {
-	size_t s = size(at.sig) + size(at.mprimes) + sizeof(unsigned char);
-	if (at.isPrimitive()) s += size(at.primitive);
-	else if (at.isCompound()) s += size(at.compound);
-	return s;
-}
-
-archive& archive::operator<<(const bitsmeta& bm) {
-	write_container<std::vector<::type>>(bm.types)
-		<< bm.vargs
-		<< bm.vbits
-		<< bm.nterms
-		<< bm.args_bits
-		<< bm.maxbits
-		<< bm.mleftbits
-		<< bm.mleftargs
-		<< enc_bools({ bm.bitsfixed, bm.hasmultivals, bm.fromheader });
-	return *this;
-}
-archive& archive::operator>>(bitsmeta& bm) {
-	char bls;
-	*this
-		>> bm.types
-		>> bm.vargs
-		>> bm.vbits
-		>> bm.nterms
-		>> bm.args_bits
-		>> bm.maxbits
-		>> bm.mleftbits
-		>> bm.mleftargs
-		>> bls;
-	bm.bitsfixed    = dec_bool(bls),
-	bm.hasmultivals = dec_bool(bls, 1),
-	bm.fromheader   = dec_bool(bls, 2);
-	return *this;
-}
-size_t archive::size(const bitsmeta& bm) {
-	size_t s = size(bm.types)
-		+ 3 * sizeof(size_t)
-		+ size(bm.vargs) + size(bm.vbits)
-		+ size(bm.mleftbits)
-		+ sizeof(unsigned char)
-		+ sizeof(size_t);
-	for (auto m : bm.mleftargs) s += sizeof(size_t) + size(m.second);
-	return s;
-}
-
 archive& archive::operator<<(const elem& e) {
 	*this << (unsigned char)e.type;
 	switch (e.type) {
 		case elem::ARITH: *this << (unsigned char)e.arith_op; break;
 		case elem::NUM:   *this << e.num; break;
-		case elem::CHR:   *this << (unsigned int)e.ch; break; // TODO save char as utf8 string?
+		case elem::CHR:   *this << (unsigned int)e.ch; break;
+		case elem::SYM:
 		case elem::STR:
 		case elem::VAR:   *this << e.e;
 		default:;
@@ -693,15 +434,15 @@ archive& archive::operator<<(const elem& e) {
 	return *this;
 }
 archive& archive::operator>>(elem& e) {
-	wstring s;
 	unsigned int ch;
 	unsigned char tmp; *this >> tmp, e.type = (elem::etype)tmp;
 	switch (e.type) {
 		case elem::ARITH: *this>>tmp, e.arith_op=(t_arith_op)tmp; break;
 		case elem::NUM:   *this >> e.num; break;
-		case elem::CHR:   *this >> ch, e.ch = (wchar_t)ch; break;
+		case elem::CHR:   *this >> ch, e.ch = (char)ch; break;
+		case elem::SYM:
 		case elem::STR:
-	 	case elem::VAR:   *this >> s, e.e = get_dict()->get_lexeme(s);
+	 	case elem::VAR:   *this >> e.e;
 		                  break;
 		default:;
 	}
@@ -713,8 +454,9 @@ size_t archive::size(const elem& e) {
 		case elem::ARITH: s += sizeof(unsigned char); break;
 		case elem::NUM:   s += sizeof(int_t); break;
 		case elem::CHR:   s += sizeof(unsigned int); break;
+		case elem::SYM:
 		case elem::STR:
-	 	case elem::VAR:   s += size(e.e); break;
+	 	case elem::VAR:   s += 2 * sizeof(size_t); break;
 		default:;
 	}
 	return s;
@@ -746,8 +488,7 @@ archive& archive::operator<<(const directive& d) {
 }
 archive& archive::operator>>(directive& d) {
 	*this >> d.rel;
-	wstring s; *this >> s;
-	d.arg = get_dict()->get_lexeme(s);
+	*this >> d.arg;
 	return *this >> d.t;
 }
 size_t archive::size(const directive& d) {
@@ -777,18 +518,45 @@ size_t archive::size(const raw_rule& r) {
 	return s;
 }
 archive& archive::operator<<(const raw_prog& rp) {
-	return *this << rp.d << rp.g << rp.r << rp.builtins;
+	//POS("rp.d")
+	*this << rp.d;
+	//POS("rp.g")
+	*this << rp.g;
+	//POS("rp.r")
+	*this << rp.r;
+	//POS("rp.builtins")
+	*this << rp.builtins;
+	//POS("rp end")
+	return *this;
 }
 archive& archive::operator>>(raw_prog& rp) {
 	size_t nsize;
-	wstring s;
-	*this >> rp.d >> rp.g >> rp.r >> nsize;
+	lexeme l;
+	//POS("rp.d")
+	*this >> rp.d;
+	//POS("rp.g")
+	*this >> rp.g;
+	//POS("rp.r")
+	*this >> rp.r;
+	//POS("rp.builtins size")
+	*this >> nsize;
+	//POS("rp.builtins pairs")
 	for (size_t i = 0; i != nsize; ++i)
-		*this >> s, rp.builtins.insert(get_dict()->get_lexeme(s));
+		*this >> l, rp.builtins.insert(l);
+	//POS("rp end")
 	return *this;
 }
 size_t archive::size(const raw_prog& rp) {
-	return size(rp.d) + size(rp.g) + size(rp.r) + size(rp.builtins);
+	size_t s = 0;
+	//SPOS("rp.d", rp.d)
+	s += size(rp.d);
+	//SPOS("rp.g", rp.g)
+	s += size(rp.g);
+	//SPOS("rp.r", rp.r)
+	s += size(rp.r);
+	//SPOS("rp.builtins", rp.builtins)
+	s += size(rp.builtins);
+	return s;
 }
 
 archive& archive::operator<<(const raw_progs& rps) {
@@ -800,14 +568,68 @@ archive& archive::operator>>(raw_progs& rps) {
 size_t archive::size(const raw_progs& rps) {
 	return size(rps.p);
 }
+
+archive& archive::write_ccs(const char* s, size_t l) {
+	*this << l; write(s, l);
+	return *this;
+}
+
+archive& archive::write_ccs(const char* s) {
+	size_t l = strlen(s);
+	return write_ccs(s, l);
+}
+
+ccs archive::read_ccs(size_t l) {
+	ccs s = (ccs)data_ + pos_;
+	//POS("read_chars")
+	pos_ += l * sizeof(char) + 1;
+	//POS("chars read")
+	return s;
+}
+
+archive& archive::operator<<(const input& in) {
+	//POS("input bools")
+	*this << enc_bools({ in.newseq });
+	//POS("input data")
+	//COUT << "writing in.beg_: " << (void*)in.beg_ << " " << in.beg_ << endl;
+	write_ccs(in.beg_);
+	*this << '\0';
+	//POS("input end")
+	return *this;
+}
+archive& archive::operator>>(input& in) {
+	unsigned char tmp;
+	//POS("input bools")
+	*this >> tmp; in.newseq = dec_bool(tmp);
+	in.allocated_ = false;
+	//POS("input data")
+	*this >> in.size_;
+	in.beg_ = read_ccs(in.size_);
+	//COUT << "loading in.size_: " << in.size_ << " in.beg_: " << (void*)in.beg_ << " " << in.beg_ << endl;
+	in.data_ = in.beg_;
+	//POS("input end")
+	return *this;
+}
+size_t archive::size(const input& in) {
+	return 2 * sizeof(unsigned char) +
+		+ sizeof(size_t)
+		+ strlen(in.beg_);
+}
+
 archive& archive::operator<<(const option& o) {
-	*this << (unsigned char)o.t << o.n[0];
+	//POS("option type")
+	*this << (unsigned char)o.t;
+	//POS("option name")
+	*this << o.n[0];
+	//COUT << "option name written: " << o.n[0] << " type: " << (int_t) o.t << endl;
+	//POS("option value")
 	switch (o.t) {
 		case option::type::INT:    *this << o.v.v_i; break;
 		case option::type::BOOL:   *this << enc_bools({ o.v.v_b }); break;
 		case option::type::STRING: *this << o.v.v_s; break;
 		default: ;
 	}
+	//POS("option end")
 	return *this;
 }
 size_t archive::size(const option& o) {
@@ -823,56 +645,99 @@ size_t archive::size(const option& o) {
 
 archive& archive::operator<<(const options& o) {
 	size_t n = 0;
+	//POS("options size")
 	for (auto it : o.opts) if (!it.second.is_undefined()) n++;
 	*this << n;
+	//POS("option pairs")
 	for (auto it : o.opts) if (!it.second.is_undefined()) *this<<it.second;
+	//POS("options end")
 	return *this;
 }
 archive& archive::operator>>(options& opts) {
 	size_t nsize;
+	//POS("options size")
 	*this >> nsize;
+	//POS("option pairs")
 	for (size_t i = 0; i != nsize; ++i) {
 		int_t val;
-		wstring ws, n;
+		std::string s, n;
 		unsigned char uch;
-		*this >> uch >> n;
+		//POS("option start: type[1]")
+		*this >> uch;
+		//POS("option name");
+		*this >> n;
+		//COUT << "name: " << n << " type: " << (int_t)uch << endl;
 		// option o; opts.get(n, o);
+		//POS("option value")
 		switch ((option::type) uch) {
 			case option::type::INT:
-				*this >> val; opts.set(n, val); break;
+				*this >> val; opts.set(n, val);
+				//COUT << "int written: " << val << endl;
+				break;
 			case option::type::BOOL:
 				*this >> uch; opts.set(n, dec_bool(uch));
+				//COUT << "bool read: " << dec_bool(uch) << endl;
 				break;
 			case option::type::STRING:
-				*this >> ws;  opts.set(n, ws); break;
+				*this >> s;   opts.set(n, s);
+				//COUT << "string read: " << s << endl;
+				break;
 			default: throw 0;
 		}
+		//POS("option end")
 	}
 	return *this;
 }
 size_t archive::size(const options& opts) {
-	size_t s = sizeof(size_t);
-	for (auto it : opts.opts) if (!it.second.is_undefined())
+	size_t s = 0;
+	//SPOS("options size", s);
+	s += sizeof(size_t);
+	for (auto it : opts.opts) if (!it.second.is_undefined()) {
+		//SPOS("option pair", it.second)
 		s += size(it.second);
+	}
+	//SPOS0("options end")
 	return s;
 }
 
 archive& archive::operator<<(const prog_data& pd) {
-	return *this
-		<< pd.strs
-		<< enc_bools({ pd.bwd })
-		<< pd.n
-		<< pd.start_step
-		<< pd.elapsed_steps;
+	//POS("std_input")
+	*this << pd.std_input;
+	//POS("pd.strs")
+	*this << pd.strs;
+	//POS("pd.bools (bwd)")
+	*this << enc_bools({ pd.bwd });
+	//POS("pd.n")
+	*this << pd.n;
+	//POS("pd.start_step")
+	*this << pd.start_step;
+	//POS("pd.elapsed_steps")
+	*this << pd.elapsed_steps;
+	//POS("pd end")
+	return *this;
 }
 archive& archive::operator>>(prog_data& pd) {
 	unsigned char bls;
-	*this >> pd.strs >> bls;
+	//POS("pd.std_input")
+	*this >> pd.std_input;
+	//POS("pd.strs")
+	*this >> pd.strs;
+	//POS("pd.bools (bwd)")
+	*this >> bls;
 	pd.bwd = dec_bool(bls);
-	return *this >> pd.n >> pd.start_step >> pd.elapsed_steps;
+	//POS("pd.n")
+	*this >> pd.n;
+	//POS("pd.start_step")
+	*this >> pd.start_step;
+	//POS("pd.elapsed_steps")
+	*this >> pd.elapsed_steps;
+	//POS("pd end")
+	return *this;
 }
 size_t archive::size(const prog_data& pd) {
-	return size(pd.strs) + sizeof(unsigned char) + 3 * sizeof(size_t);
+	return size(pd.strs) + size(pd.std_input)
+		+ sizeof(unsigned char)
+		+ 3 * sizeof(size_t);
 }
 
 archive& archive::operator<<(const strs_t& strs) {
@@ -900,9 +765,7 @@ archive& archive::operator>>(flat_prog& fp) {
 		std::vector<term> vt{};
 		*this >> tsize;
 		if (tsize) do {
-			term t = {0, {}, {}};
-			*this >> t;
-			vt.push_back(t);			
+			term t; *this >> t; vt.push_back(t);			
 		} while (tsize-- > 0);
 		fp.insert(vt);
 	} while (--nsize > 0);
@@ -915,234 +778,533 @@ size_t archive::size(const flat_prog& fp) {
 }
 
 archive& archive::operator<<(const table& t) {
-	*this
-		<< t.sign
-		<< t.bm
-		<< t.tq
-		<< t.len
-		<< t.priority
-		<< t.r
-		<< enc_bools({ t.ext, t.unsat, t.tmp })
-		<< t.idbltin
-		<< t.bltinargs
-		<< t.bltinsize;
+	//POS("table signature")
+	*this << t.s;
+	//POS("table t")
+	*this << t.t;
+	//POS("table len")
+	*this << t.len;
+	//POS("table priority")
+	*this << t.priority;
+	//POS("table r")
+	*this << t.r;
+	//POS("table bools(ext, unsat, tmp)")
+	*this << enc_bools({ t.ext, t.unsat, t.tmp });
+	//POS("table idbltin")
+	*this << t.idbltin;
+	//POS("table bltinargs")
+	*this << t.bltinargs;
+	//POS("table bltinsize")
+	*this << t.bltinsize;
+	//POS("table end")
 	return *this;
 }
 archive& archive::read_table(tables& tbls) {
 	char bls;
 	sig s;
-	bitsmeta bm;
-	if (!dict) dict = &tbls.dict;
-	*this
-		>> s 
-		>> bm;
-	ntable nt = tbls.get_table(s, bm.types);
-	table&  t = tbls.tbls[nt];
-	t.bm = bm;
-	*this
-		>> t.tq
-		>> t.len
-		>> t.priority
-		>> t.r
-		>> bls
-		>> t.idbltin
-		>> t.bltinargs
-		>> t.bltinsize
-		;
+	if (!dict_) dict_ = &tbls.dict;
+	//POS("table signature")
+	*this >> s;
+	//POS("table t")
+	table&  t = tbls.tbls[tbls.get_table(s)];
+	*this >> t.t;
+	//POS("table len")
+	*this >> t.len;
+	//POS("table priority")
+	*this >> t.priority;
+	//POS("table r")
+	*this >> t.r;
+	//POS("table bools(ext, unsat, tmp)")
+	*this >> bls;
 	t.ext   = dec_bool(bls),
 	t.unsat = dec_bool(bls, 1),
 	t.tmp   = dec_bool(bls, 2);
+	//POS("table idbltin")
+	*this >> t.idbltin;
+	//POS("table bltinargs")
+	*this >> t.bltinargs;
+	//POS("table bltinsize")
+	*this >> t.bltinsize;
+	//POS("table end")
 	return *this;
 }
 size_t archive::size(const table& t) {
-	size_t s = 0
-		+ size(t.sign)
-		+ size(t.bm)
-		+ size(t.len)
-		+ size(t.priority)
-		+ size(t.tq)
-		+ size(t.r)
-		+ size(t.idbltin)
-		+ size(t.bltinargs)
-		+ size(t.bltinsize)
-		+ sizeof(unsigned char);
-	//DBG(o::dbg() << L"table size: " << t.sign.first << L'/' << t.sign.second[0] << L' ' << s
-	//	<< L" size(bm): " << size(t.bm)
-	//	<< L" (t.bltinargs.size(): " << t.bltinargs.size()
-	//	<< L" (t.r.size(): " << t.r.size()
+	size_t s = 0;
+	//SPOS("t.s", t.s)
+	s += size(t.s);
+	//SPOS("table t", t.t)
+	s += size(t.t);
+	//SPOS("table len", t.len)
+	s += size(t.len);
+	//SPOS("table priority", t.priority)
+	s += size(t.priority);
+	//SPOS("table r", t.r)
+	s += size(t.r);
+	//SPOS0("table bools")
+	s += sizeof(unsigned char);
+	//SPOS("table idbltin", t.idbltin)
+	s += size(t.idbltin);
+	//SPOS("table bltinargs", t.bltinargs)
+	s += size(t.bltinargs);
+	//SPOS("table bltinsize", t.bltinsize)
+	s += size(t.bltinsize);
+	//DBG(o::dbg() << "table size: " << t.sign.first << '/' << t.sign.second[0] << ' ' << s
+	//	<< " size(bm): " << size(t.bm)
+	//	<< " (t.bltinargs.size(): " << t.bltinargs.size()
+	//	<< " (t.r.size(): " << t.r.size()
 	//	<< std::endl;)
 	return s;
 }
 archive& archive::operator<<(const tables& tbls) {
-	*this
-		<< tbls.dict
-		<< tbls.rules
-		<< tbls.fronts
-		<< tbls.levels
-		//<< bodies
-		//<< alts
-		<< tbls.nstep
-		<< tbls.tmprels
-		<< tbls.deps
-		<< tbls.mhits
-		<< tbls.altids
-		<< tbls.pBin
-		<< tbls.max_args
-		<< tbls.range_compound_memo
-		<< tbls.goals
-		<< tbls.to_drop
-		<< tbls.exts
-		<< tbls.strs
-		<< tbls.str_rels
-		<< tbls.prog_after_fp
-		<< tbls.infer
-		//<< tbls.addBits
-		<< enc_bools({ tbls.populate_tml_update, tbls.print_updates,
-			tbls.print_steps, tbls.autotype })
-		;
+	//POS("tables rules")
+	*this << tbls.rules;
+	//POS("tables fronts")
+	*this << tbls.fronts;
+	//POS("tables levels")
+	*this << tbls.levels;
+	//POS("tables nstep")
+	*this << tbls.nstep;
+	//POS("tables tmprels")
+	*this << tbls.tmprels;
+	//POS("tables deps")
+	*this << tbls.deps;
+	//POS("tables max_args")
+	*this << tbls.max_args;
+	//POS("tables range_memo")
+	*this << tbls.range_memo;
+	//POS("tables goals")
+	*this << tbls.goals;
+	//POS("tables to_drop")
+	*this << tbls.to_drop;
+	//POS("tables exts")
+	//*this << tbls.exts;
+	//POS("tables strs")
+	*this << tbls.strs;
+	//POS("tables str_rels")
+	*this << tbls.str_rels;
+	//POS("tables prog_after_fp")
+	*this << tbls.prog_after_fp;
+	//POS("tables bools(populate_tml_update, print_updates, print_steps)")
+	*this << enc_bools({ tbls.populate_tml_update, tbls.print_updates,
+			tbls.print_steps });
+	//POS("tables tbls size")
 	*this << tbls.tbls.size();
+	//POS("tables tbls")
 	for (size_t  i = 0; i != tbls.tbls.size(); ++i)
 		*this << tbls.tbls[i];
+	//POS("tables end")
 	return *this;
 }
+
 archive& archive::operator>>(tables& tbls) {
 	unsigned char tmp;
 	size_t nsize;
-	*this >> tbls.dict >> nsize;
-	for (size_t i = 0; i != nsize; ++i) {
-		tbls.rules.push_back(rule(false, 0, term(0, {}, {})));
-		*this >> tbls.rules.back();
-	}
-	*this
-		>> tbls.fronts
-		>> tbls.levels
-		>> tbls.nstep
-		>> tbls.tmprels
-		>> tbls.deps
-		>> tbls.mhits
-		>> tbls.altids
-		>> tbls.pBin
-		>> tbls.max_args
-		>> tbls.range_compound_memo
-		>> tbls.goals
-		>> tbls.to_drop
-		>> tbls.exts
-		>> tbls.strs
-		>> tbls.str_rels
-		>> tbls.prog_after_fp
-		>> tbls.infer
-		//>> tbls.addBits
-		>> tmp
-		>> nsize;
-	for (size_t i = 0; i != nsize; ++i) read_table(tbls);
+	//POS("tables rules")
+	*this >> tbls.rules;
+	//POS("tables fronts")
+	*this >> tbls.fronts;
+	//POS("tables levels")
+	*this >> tbls.levels;
+	//POS("tables nstep")
+	*this >> tbls.nstep;
+	//POS("tables tmprels")
+	*this >> tbls.tmprels;
+	//POS("tables deps")
+	*this >> tbls.deps;
+	//POS("tables max_args")
+	*this >> tbls.max_args;
+	//POS("tables range_memo")
+	*this >> tbls.range_memo;
+	//POS("tables goals")
+	*this >> tbls.goals;
+	//POS("tables to_drop")
+	*this >> tbls.to_drop;
+	//POS("tables exts")
+	//*this >> tbls.exts;
+	//POS("tables strs")
+	*this >> tbls.strs;
+	//POS("tables str_rels")
+	*this >> tbls.str_rels;
+	//POS("tables prog_after_fp")
+	*this >> tbls.prog_after_fp;
+	//POS("tables bools(populate_tml_update, print_updates, print_steps)")
+	*this >> tmp;
 	tbls.populate_tml_update = dec_bool(tmp);
 	tbls.print_updates       = dec_bool(tmp, 1);
 	tbls.print_steps         = dec_bool(tmp, 2);
-	tbls.autotype            = dec_bool(tmp, 3);
+	//POS("tables tbls size")
+	*this >> nsize;
+	//POS("tables tbls")	
+	for (size_t i = 0; i != nsize; ++i) read_table(tbls);
+	//POS("tables end")
+	//COUT << "dict after load: " << tbls.dict << endl;
 	return *this;
 }
 size_t archive::size(const tables& t) {
-	size_t s = 0
-		+ size(t.rules)
-		+ size(t.fronts)
-		+ size(t.levels)
-		+ sizeof(nlevel)
-		+ size(t.tmprels)
-		+ size(t.deps)
-		+ size(t.mhits)
-		+ size(t.altids)
-		+ size(t.pBin)
-		+ size(t.dict)
-		+ 2 * sizeof(size_t)
-		+ size(t.goals)
-		+ size(t.strs)
-		+ size(t.prog_after_fp)
-		+ size(t.infer)
-		+ 3 * sizeof(size_t)
-		+ sizeof(int_t)
-			* (t.to_drop.size() + t.exts.size() + t.str_rels.size())
-		+ sizeof(unsigned char)
-		+ sizeof(size_t);
-	for (auto p : t.range_compound_memo) s += size(p.first) + sizeof(int_t);
+	size_t s = 0;
+	//SPOS("tables rules", t.rules)
+	s += size(t.rules);
+	//SPOS("tables fronts", t.fronts)
+	s += size(t.fronts);
+	//SPOS("tables levels", t.levels)
+	s += size(t.levels);
+	//SPOS("tables nstep", t.nstep)
+	s += size(t.nstep);
+	//SPOS("tables tmprels", t.tmprels)
+	s += size(t.tmprels);
+	//SPOS("tables deps", t.deps)
+	s += size(t.deps);
+	//SPOS("tables max_args", t.max_args)
+	s += size(t.max_args);
+	//SPOS("tables range_memo", t.range_memo)
+	s += size(t.range_memo);
+	//SPOS("tables goals", t.goals)
+	s += size(t.goals);
+	//SPOS("tables to_drop", t.to_drop)
+	s += size(t.to_drop);
+	//SPOS("tables exts", t.exts)
+	//s += size(t.exts);
+	//SPOS("tables strs", t.strs)
+	s += size(t.strs);
+	//SPOS("tables str_rels", t.str_rels)
+	s += size(t.str_rels);
+	//SPOS("tables prog_after_fp", t.prog_after_fp)
+	s += size(t.prog_after_fp);
+	//SPOS0("tables bools")
+	s += sizeof(unsigned char);
+	//SPOS("tables tbls size", t.tbls.size())
+	s += size(t.tbls.size());
+	//for (auto p : t.range_memo) s += size(p.first) + sizeof(int_t);
+	//SPOS("tables tbls", t.tbls)
 	for (size_t i = 0; i != t.tbls.size(); ++i) s += size(t.tbls[i]);
+	//SPOS0("tables end")
 	return s;
+}
+
+
+archive& archive::add_lexeme_and_map(const dict_t &d, const lexeme& l,bool add){
+	//COUT << "add_lexeme_and_map: " << (add ? "" : "no add ") << l << endl;
+	size_t inp = header_size() + sizeof(size_t) + sizeof(int_t);
+	lexeme_range lr; input* in;
+	if (d.ii && d.ii->lexeme_pos(inp, l, &in, lr)) {
+		auto it = lmap_.find(l);
+		if (it == lmap_.end()) lmap_.insert({ l, lr });
+		if (add) lranges_.push_back({ lr, true });
+	} else {
+		lr = { lpos_, lpos_ };
+		auto it = lmap_.find(l);
+		if (it == lmap_.end()) { // not in map
+			if (l[1]-l[0] > 0) // non-0
+				for (ccs c = l[0]; c != l[1]; ++c)
+					ldata_ << *c, ++lpos_, lr[1] = lpos_;
+			lmap_.insert({ l, lr });
+			if (add) lranges_.push_back({ lr, false });
+		} else if (add) lranges_.push_back({ it->second, false });
+	}
+	return *this;
+}
+
+template <typename T>
+archive& archive::add_lexemes(const dict_t& d, const T& lxms) {
+	for (const lexeme& l : lxms) add_lexeme_and_map(d, l);
+	return *this;
+}
+
+archive& archive::add_dict_lexemes(const dict_t& d) {
+	//POS("dict rels")
+	add_lexemes(d, d.rels);
+	//POS("dict syms")
+	add_lexemes(d, d.syms);
+	//POS("dict bltins")
+	add_lexemes(d, d.bltins);
+	//POS("dict strs_extra")
+	add_lexemes(d, d.strs_extra);
+	//POS("dict end")
+	return *this;
+}
+
+archive& archive::write_lexemes() {
+	write_ccs(ldata_.str().c_str());
+	//POS("lexeme ranges")
+	//*this << lranges_.size();
+	for (auto& r : lranges_) {
+		//POS("lexeme")
+		if (r.second) *this << r.first; // points to input, no recount
+		else *this<<lexeme_range{ r.first[0]+lpos_, r.first[1]+lpos_}; 
+	}
+	//POS("lexemes end")
+	return *this;
 }
 
 archive& archive::operator<<(const driver& d) {
 	write_header();
+	//POS("inputs")
+	int_t current = -1;
+	if (d.ii) {
+		*this << d.ii->size();
+		input *in = d.ii->first();
+		while (in) {
+			current++;
+			*this << in;
+			in = in->next();
+		}
+		*this << current;
+	} else *this << (size_t)0 << (int_t)-1;
+	//POS("dict")
+	dict_t& dr = d.tbl->dict;
+	dict_ = &dr;
+	*this << dict_->rels.size();
+	*this << dict_->syms.size();
+	*this << dict_->bltins.size();
+	*this << dict_->strs_extra.size();
+	*this << d.strs_extra.size();
+	*this << d.rels.size();
+	*this << d.vars.size();
+	lpos_ = pos_ + sizeof(size_t);
+	//POS("dict lexemes")
+	add_dict_lexemes(*dict_);
+	//POS("strs_extra lexemes")
+	add_lexemes(*dict_, d.strs_extra);
+	add_lexemes(*dict_, d.rels);
+	add_lexemes(*dict_, d.vars);
+	for (const raw_prog& p : d.rp.p) {
+		for (const lexeme& l : p.builtins)
+			add_lexeme_and_map(dr, l, false);
+		for (const directive& dir : p.d)
+			add_lexeme_and_map(dr, dir.arg, false);
+		for (const raw_rule& r : p.r) {
+			for (const raw_term& rt : r.h)
+				for (const elem& e : rt.e)
+					add_lexeme_and_map(dr, e.e, false);
+			for (const std::vector<raw_term>& vrt : r.b)
+				for (const raw_term& rt : vrt)
+					for (const elem& e : rt.e)
+					add_lexeme_and_map(dr, e.e, false);
+		}
+	}
+	//POS("lexemes data and lexemes")
+	write_lexemes();
+	//POS("bdd")
 	write_bdd();
-	*this
-		<< d.pd
-		<< d.nums
-		<< d.chars
-		<< d.syms
-		<< d.builtin_rels
-		<< d.transformed_strings
-		<< d.strs_extra
-		<< d.rels
-		<< d.vars
-		<< d.rp
-		<< d.opts
-		<< d.std_input
-		<< enc_bools({ d.result, d.running })
-		;
+	//POS("opts");
+	*this << d.opts;
+	//POS("pd")
+	*this << d.pd;
+	//POS("nums")
+	*this << d.nums;
+	//POS("chars")
+	*this << d.chars;
+	//POS("syms")
+	*this << d.syms;
+	//POS("builtin_rels")
+	*this << d.builtin_rels;
+	//POS("transformed_strings")
+	*this << d.transformed_strings;
+	//POS("rp")
+	*this << d.rp;
+	//POS("bools(result, running)")
+	*this << enc_bools({ d.result, d.running });
+	//POS("tables")
 	write_tables(d);
-	return *this << input::source << int16_t(0x8362);
+	//POS("footer")
+	*this << int16_t(0x8362);
+	//POS("end")
+	return *this;
 }
 
 archive& archive::operator>>(driver& d) {
-	std::string source;
-	//DBG(o::dbg() << L"loading driver\n";)
+	//DBG(o::dbg() << "loading driver\n";)
 	size_t nsize;
-	wstring s;
+	std::string s;
 	char bls;
 	dict_t& dict_r = d.tbl->dict;
-	dict = &(dict_r);
+	dict_ = &(dict_r);
 	read_header();
+
+	//POS("inputs")
+	int_t current = -1;
+	*this >> nsize;
+	if (nsize > 0 && d.ii) do {
+		d.ii->add(std::make_unique<input>((void*)0, (size_t)0));
+		*this >> *(d.ii->last());
+	} while (--nsize > 0);
+	if (!d.ii) {
+		*this >> current;
+		if (current >= 0) {
+			input *in = d.ii->first();
+			while (in && current >= 0) {
+				current--;
+				in = in->next();
+			}
+			if (in) d.ii->current_ = in;
+		}
+	} else pos_ += sizeof(int_t);
+	
+	//POS("dict")
+	size_t nrels, nsyms, nbltins, ndict_strs_extra, nstrs_extra,
+		ndriver_rels, nvars;
+	*this >> nrels >> nsyms >> nbltins >> ndict_strs_extra >> nstrs_extra
+		>> ndriver_rels >> nvars;
+	//POS("extra lexemes data")
+	*this >> nsize; pos_ += nsize; // skip (strs) extra lexemes data
+	lexeme_range r;
+	#define LEXEME (lexeme{ (ccs) data_ + r[0], (ccs) data_ + r[1] }) 
+	//POS("rel lexemes")
+	for (size_t i = 0; i != nrels; ++i) *this >> r,
+		dict_r.get_rel(LEXEME);
+	//POS("sym lexemes")
+	for (size_t i = 0; i != nsyms; ++i) *this >> r,
+		dict_r.get_sym(LEXEME);
+	//POS("bltin lexemes")
+	for (size_t i = 0; i != nbltins; ++i) *this >> r,
+		dict_r.get_bltin(LEXEME);
+	//POS("strs_extra lexemes")
+	for (size_t i = 0; i != ndict_strs_extra; ++i) *this >> r,
+		dict_r.strs_extra.insert(LEXEME);
+	//POS("dict strs_extra lexemes")
+	for (size_t i = 0; i != nstrs_extra; ++i) *this >> r,
+		d.strs_extra.insert(LEXEME);
+	//POS("dict rels lexemes")
+	for (size_t i = 0; i != ndriver_rels; ++i) *this >> r,
+		d.rels.insert(LEXEME);
+	//POS("dict vars lexemes")
+	for (size_t i = 0; i != nvars; ++i) *this >> r,
+		d.vars.insert(LEXEME);
+	#undef LEXEME
+
+	//POS("bdd")
 	read_bdd();
-	*this >> d.pd >> d.nums >> d.chars >> d.syms >> d.builtin_rels 
-		>> d.transformed_strings >> nsize;
-	for (size_t i = 0; i != nsize; ++i)
-		*this >> s, d.strs_extra.insert(dict_r.get_lexeme(s));
-	*this >> nsize;
-	for (size_t i = 0; i != nsize; ++i)
-		*this >> s, d.rels.insert(dict_r.get_lexeme(s));
-	*this >> nsize;
-	for (size_t i = 0; i != nsize; ++i)
-		*this >> s, d.vars.insert(dict_r.get_lexeme(s));
-	*this >> d.rp >> d.opts >> d.std_input >> bls;
+	//POS("opts")
+	*this >> d.opts;
+	//POS("pd");
+	*this >> d.pd;
+	//POS("nums")
+	*this >> d.nums;
+	//POS("chars")
+	*this >> d.chars;
+	//POS("syms")
+	*this >> d.syms;
+	//POS("buildtin_rels")
+	*this >> d.builtin_rels;
+	//POS("transformed_strings")
+	*this >> d.transformed_strings;
+	//POS("rp")
+	*this >> d.rp;
+	//POS("bools(running, result")
+	*this >> bls;
 	d.running = dec_bool(bls, 1), d.result = dec_bool(bls);
-	*this >> *d.tbl >> source;
-	input::source = dict_r.get_lexeme(s2ws(source));
+	//POS("tables")
+	*this >> *d.tbl;
+	//POS("footer")
+
 	int16_t footer; *this >> footer;
+	//POS("end")
 	DBG(assert(footer == (int16_t)0x8362));
 	return *this;
 }
+
+size_t archive::dict_and_lexemes_size(const driver& drv) {
+	const dict_t& d = drv.tbl->dict;
+	size_t beg = header_size() + sizeof(size_t) + sizeof(int_t);
+	size_t s = 0;
+	//SPOS0("dict_and_lexemes_size begin")
+	s += 8 * sizeof(size_t) + (2 * sizeof(size_t) * (d.rels.size() +
+		d.syms.size() + d.bltins.size() + d.strs_extra.size() +
+		drv.strs_extra.size() + drv.rels.size() + drv.vars.size()));
+	std::set<lexeme, lexcmp> lexemes{};
+	auto add_lexeme_size =
+		[&d, &lexemes, &beg, &s] (const lexeme& l) {
+			input* in; lexeme_range lr;
+			//COUT << "add lexeme size: " << l[1]-l[0] << " " << l << endl;
+			//s += l[1]-l[0];
+			if ((!d.ii || !d.ii->lexeme_pos(beg, l, &in, lr))
+				&& (lexemes.insert(l).second)) {
+					//COUT << "adding lexeme size: " << l[1]-l[0] << endl;
+					s += l[1]-l[0];
+				}
+		};
+	//SPOS0("dict rels")
+	for (const lexeme& l : d.rels)             add_lexeme_size(l);
+	//SPOS0("dict syms")
+	for (const lexeme& l : d.syms)             add_lexeme_size(l);
+	//SPOS0("dict bltins")
+	for (const lexeme& l : d.bltins)           add_lexeme_size(l);
+	//SPOS0("dict strs_extra")
+	for (const lexeme& l : d.strs_extra)       add_lexeme_size(l);
+	//SPOS0("driver strs_extra")
+	for (const lexeme& l : drv.strs_extra)     add_lexeme_size(l);
+	//SPOS0("driver rels")
+	for (const lexeme& l : drv.rels)           add_lexeme_size(l);
+	//SPOS0("driver varsd")
+	for (const lexeme& l : drv.vars)           add_lexeme_size(l);
+	//SPOS0("driver raw prog")
+	for (const raw_prog& p : drv.rp.p) {
+		//SPOS0("rp builtins")
+		for (const lexeme& l : p.builtins) add_lexeme_size(l);
+		//SPOS0("rp directive args")
+		for (const directive& dir : p.d)   add_lexeme_size(dir.arg);
+		//SPOS0("rp raw rule")
+		for (const raw_rule& r : p.r) {
+			//SPOS0("rp h")
+			for (const raw_term& rt : r.h)
+				for (const elem& e : rt.e)
+					           add_lexeme_size(e.e);
+			//SPOS0("rp b")
+			for (const std::vector<raw_term>& vrt : r.b)
+				for (const raw_term& rt : vrt)
+					for (const elem& e : rt.e)
+						   add_lexeme_size(e.e);
+		}
+	}
+	//SPOS0("driver_and_lexemes_size_end")
+	return s;
+}
+
 size_t archive::size(const driver& d) {
-	size_t s = header_size()
-		+ bdd_size()
-		+ size(d.pd)
-		+ 3 * sizeof(int_t)
-		+ size(d.builtin_rels)
-		+ size(d.transformed_strings)
-		+ size(d.strs_extra)
-		+ size(d.rels)
-		+ size(d.vars)
-		+ size(d.rp)
-		+ size(d.opts)
-		+ size(d.std_input)
-		+ sizeof(unsigned char)
-		+ tables_size(d)
-		+ size(input::source)
-		+ sizeof(int16_t);
-	DBG(o::dbg() << L"driver size: " << s
-		<< L" tbls: " << size(*(d.tbl))
-		<< L" (includes dict: " << size(d.tbl->dict)
-		<< L") bdd: " << bdd_size()
-		<< L" (" << V->size() << L" nodes) input.size: "
-		<< size(input::source)
-		<< sizeof(int16_t)
-		<< std::endl;)
+	size_t s = 0;
+	s += header_size();
+	//SPOS("inputs size", s);
+	s += sizeof(size_t);
+	s += sizeof(int_t);
+	if (d.ii) {
+		input *in = d.ii->first();
+		while (in) {
+			s += size(*in);
+			in = in->next();
+		}
+	}
+	//SPOS0("dict")
+	s += dict_and_lexemes_size(d);
+	//SPOS("bdd", bdd_size())
+	s += bdd_size();
+	//SPOS("opts", d.opts);
+	s += size(d.opts);
+	//SPOS("pd", d.pd)
+	s += size(d.pd);
+	//SPOS("nums", (int_t)0)
+	s += sizeof(int_t);
+	//SPOS("chars", (int_t)0)
+	s += sizeof(int_t);
+	//SPOS("syms", (int_t)0)
+	s += sizeof(int_t);
+	//SPOS("builtin_rels", d.builtin_rels)
+	s += size(d.builtin_rels);
+	//SPOS("transformed_strings", d.transformed_strings)
+	s += size(d.transformed_strings);
+	//SPOS("rp", d.rp)
+	s += size(d.rp);
+	//SPOS0("bools(result, running)")
+	s += sizeof(unsigned char);
+	//SPOS("tables", (size_t)0)
+	s += tables_size(d);
+	//SPOS("footer", (int16_t)0)
+	s += sizeof(int16_t);
+	//SPOS0("end")
+	//DBG(o::dbg() << "driver size: " << s
+	//	<< " tbls: " << size(*(d.tbl))
+	//	//<< " (includes dict: " << size(d.tbl->dict) << ")"
+	//	<< " bdd: " << bdd_size()
+	//	<< " (" << V->size() << " nodes)" << std::endl;)
 	return s;
 }
 
@@ -1153,18 +1315,20 @@ archive& archive::write_bdd() {
 }
 archive& archive::read_bdd() {
 	size_t nsize;
+	//POS("reading bdd size")
 	*this >> nsize;
+	//COUT << "nsize: " << nsize << endl;
 	size_t s = nsize * 3 * sizeof(int_t);
-	//DBG(o::dbg() << L"loading bdd size: " << s << endl;)
+	//COUT << "loading bdd size: " << nsize << " " << s << endl;
 	V = std::make_unique<bdd_mmap>(nsize, bdd{0,0,0},
 		memory_map_allocator<bdd>("", bdd_mmap_mode));
 	read((char *)V->data(), s);
 	//for (size_t i = 0; i != V->size(); ++i) {
 	//	bdd& b = (*V)[i];
-	//	DBG(o::dbg() << i << L" "
-	//		<< b.v << L' '
-	//		<< b.h << L' '
-	//		<< b.l << L' ' << endl;)
+	//	DBG(COUT << i << " "
+	//		<< b.v << ' '
+	//		<< b.h << ' '
+	//		<< b.l << ' ' << endl;)
 	//}
 	return *this;
 }
@@ -1173,29 +1337,3 @@ size_t archive::bdd_size() {
 	return s;
 }
 
-archive& archive::operator<<(const std::tuple<int_t, int_t, int_t, size_t, size_t, size_t, uints>& rcm) {
-	return *this
-		<< std::get<0>(rcm)
-		<< std::get<1>(rcm)
-		<< std::get<2>(rcm)
-		<< std::get<3>(rcm)
-		<< std::get<4>(rcm)
-		<< std::get<5>(rcm)
-		<< std::get<6>(rcm);
-}
-archive& archive::operator>>(std::tuple<int_t, int_t, int_t, size_t, size_t, size_t, uints>& rcm) {
-	return *this
-		>> std::get<0>(rcm)
-		>> std::get<1>(rcm)
-		>> std::get<2>(rcm)
-		>> std::get<3>(rcm)
-		>> std::get<4>(rcm)
-		>> std::get<5>(rcm)
-		>> std::get<6>(rcm);
-}
-size_t archive::size(
-	const std::tuple<int_t, int_t, int_t, size_t, size_t, size_t, uints>& t)
-{
-	return 3 * sizeof(int_t) + 3 * sizeof(size_t)
-		+ size((uints)std::get<6>(t));
-}

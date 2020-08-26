@@ -20,61 +20,61 @@ void options::add(option o) {
 	for (auto n : o.names()) alts[n] = o.name();
 }
 
-bool options::get(const wstring name, option& o) const {
+bool options::get(const string name, option& o) const {
 	auto ait = alts.find(name);        if (ait == alts.end()) return false;
 	auto oit = opts.find(ait->second); if (oit == opts.end()) return false;
 	return o = oit->second, true;
 }
 
-int options::get_int(wstring name) const {
+int options::get_int(string name) const {
 	option o; return get(name, o) ? o.get_int() : 0;
 }
 
-bool options::get_bool(wstring name) const {
+bool options::get_bool(string name) const {
 	option o; return get(name, o) ? o.get_bool() : false;
 }
 
-wstring options::get_string(wstring name) const {
-	option o; return get(name, o) ? o.get_string() : L"";
+string options::get_string(string name) const {
+	option o; return get(name, o) ? o.get_string() : "";
 }
 
 void options::parse(int c, char** v, bool internal) {
-	wstrings wargs = {};
+	strings sargs = {};
 	for (int i = 0; i < c; ++i)
-		wargs.push_back(s2ws(string(v[i])));
-	parse(wargs, internal);
-}
-
-void options::parse(strings sargs, bool internal) {
-	wstrings wargs = {};
-	for (size_t i=0; i < sargs.size(); ++i) wargs.push_back(s2ws(sargs[i]));
-	parse(wargs, internal);
+		sargs.push_back(string(v[i]));
+	parse(sargs, internal);
 }
 
 void options::parse(wstrings wargs, bool internal) {
-	wstring v;
+	strings sargs;
+	for (size_t i=0; i < wargs.size(); ++i) sargs.push_back(ws2s(wargs[i]));
+	parse(sargs, internal);
+}
+
+void options::parse(strings sargs, bool internal) {
+	string v;
 	bool skip_next = false;
-	for (size_t i = 0; i < wargs.size(); ++i) {
-		if (!internal) args.push_back(wargs[i]);
+	for (size_t i = 0; i < sargs.size(); ++i) {
+		if (!internal) args.push_back(sargs[i]);
 		if (skip_next) skip_next = false;
-		else skip_next = parse_option(wargs, i);
+		else skip_next = parse_option(sargs, i);
 	}
 }
 
 template <typename T>
-void options::set(const wstring &name, T val) {
+void options::set(const string &name, T val) {
 	option o;
 	if (!get(name, o)) return;
 	o.v.set(val);
 	set(name, o);
 }
-template void options::set<int_t>(const std::wstring&, int_t);
-template void options::set<std::wstring>(const std::wstring&, std::wstring);
+template void options::set<int_t>(const std::string&, int_t);
+template void options::set<std::string>(const std::string&, std::string);
 
-void options::enable (const wstring &name) { set(name, true ); }
-void options::disable(const wstring &name) { set(name, false); }
+void options::enable (const string &name) { set(name, true ); }
+void options::disable(const string &name) { set(name, false); }
 
-bool options::enabled(const wstring &name) const {
+bool options::enabled(const string &name) const {
 	option o;
 	if (!get(name, o)) return false;
 	switch (o.get_type()) {
@@ -82,44 +82,44 @@ bool options::enabled(const wstring &name) const {
 		case option::type::INT:    return o.get_int() > 0;
 		case option::type::STRING: {
 			output* t = outputs::get(o.name());
-			return t ? !t->is_null() : o.get_string() != L"";
+			return t ? !t->is_null() : o.get_string() != "";
 		}
 		default: ;
 	}
 	return false;
 }
 
-bool options::is_value(const wstrings &wargs, const size_t &i) {
-	if (i >= wargs.size()) return false;
-	else return wargs[i] == L"-" ||
-			(wargs[i].rfind(L"---", 0) == 0) ||
-			wargs[i][0] != L'-';
+bool options::is_value(const strings &sargs, const size_t &i) {
+	if (i >= sargs.size()) return false;
+	else return sargs[i] == "-" ||
+			(sargs[i].rfind("---", 0) == 0) ||
+			sargs[i][0] != '-';
 }
 
-bool options::parse_option(const wstrings &wargs, const size_t &i) {
+bool options::parse_option(const strings &sargs, const size_t &i) {
 	option o;
 	bool disabled = false;
 	bool skip_next = false;
 	size_t pos = 0;
-	const wstring &arg = wargs[i];
-	//DBG(o::out()<<L"parse_option: "<<arg<<L' '<<i<<endl;)
+	const string &arg = sargs[i];
+	//DBG(o::out()<<"parse_option: "<<arg<<' '<<i<<endl;)
 	// skip hyphens
-	while (pos < arg.length() && arg[pos] == L'-' && pos < 2) ++pos;
-	wstring a = arg.substr(pos);
+	while (pos < arg.length() && arg[pos] == '-' && pos < 2) ++pos;
+	string a = arg.substr(pos);
 	// is option disabled?
-	if (a.rfind(L"disable-",   0) == 0) disabled = true, a = a.substr(8);
-	else if (a.rfind(L"dont-", 0) == 0) disabled = true, a = a.substr(5);
-	else if (a.rfind(L"no-",   0) == 0) disabled = true, a = a.substr(3);
+	if (a.rfind("disable-",   0) == 0) disabled = true, a = a.substr(8);
+	else if (a.rfind("dont-", 0) == 0) disabled = true, a = a.substr(5);
+	else if (a.rfind("no-",   0) == 0) disabled = true, a = a.substr(3);
 	if (!get(a, o)) {
 		if (!i) goto done; // arg[0] is not expected to be an argument
-		o::err() << L"Unknown argument: " << wargs[i]<<endl;
-		return is_value(wargs, i+1);
+		o::err() << "Unknown argument: " << sargs[i]<<endl;
+		return is_value(sargs, i+1);
 	}
 	if (disabled) o.disable();
-	else if (is_value(wargs, i+1))
-		o.parse_value(wargs[i+1]),
+	else if (is_value(sargs, i+1))
+		o.parse_value(sargs[i+1]),
 		skip_next = true;
-	else o.parse_value(L"");
+	else o.parse_value("");
 	set(o.name(), o);
 done:
 	return skip_next;
@@ -138,91 +138,84 @@ done:
 		}).description((desc)))
 
 void options::setup() {
-
-	add(option(option::type::BOOL, { L"help", L"h", L"?" },
+	add(option(option::type::BOOL, { "help", "h", "?" },
 		[this](const option::value& v) {
 			if (v.get_bool()) help(o::out());
 		})
-		.description(L"this help"));
-	add(option(option::type::BOOL, { L"version", L"v" },
+		.description("this help"));
+	add(option(option::type::BOOL, { "version", "v" },
 		[](const option::value& v) {
-			if (v.get_bool()) o::out() << L"TML: "
+			if (v.get_bool()) o::out() << "TML: "
 				<< GIT_DESCRIBED << endl;
 			DBG(if (v.get_bool()) o::out()
-				<< L"commit: " << GIT_COMMIT_HASH << L" ("
-				<< GIT_BRANCH << L')' <<endl;)
+				<< "commit: " << GIT_COMMIT_HASH << " ("
+				<< GIT_BRANCH << ')' <<endl;)
 		})
-		.description(L"this help"));
-	add(option(option::type::STRING, {L"input", L"i"},
+		.description("this help"));
+	add(option(option::type::STRING, { "input", "i" },
 		[this](const option::value& v) {
-			wstringstream is;
-			if (v.get_string()==L"@stdin" || v.get_string()==L"-")
-				is << wcin.rdbuf();
-			else {
-				wifstream f(ws2s(v.get_string()));
-				if (f.good()) is << f.rdbuf();
-				else o::err()
-					<< L"Error while opening file: "
-					<< v.get_string() << endl;
-			}
-			add_input_data(is.str());
-		}).description(L"input           (@stdin by default)"));
-	add(option(option::type::STRING, {L"input-eval", L"ie"},
+			if (v.get_string() == "@stdin" || v.get_string() == "-")
+				ii->add_stdin();
+			else ii->add_file(v.get_string());
+		}).description("input           (@stdin by default)"));
+	add(option(option::type::STRING, { "input-eval", "ie" },
 		[this](const option::value& v) {
-			add_input_data(v.get_string());
-		}).description(L"input string to evaluate"));
+			ii->add_string(v.get_string());
+			//COUT << "inputs.size now: " << ii->size()
+			//	<< " this: " << this << std::endl;
+		}).description("input string to evaluate"));
 #ifdef WITH_THREADS
-	add_bool(L"udp",     L"open REPL on udp socket");
-	add(option(option::type::STRING, {L"udp-addr", L"ua"})
-		.description(L"IP address (udp)"));
-	add(option(option::type::INT, { L"udp-port", L"up" })
-		.description(L"port (udp)"));
-	add_bool(L"repl",    L"run TML in REPL mode");
-	add_output    (L"repl-output", L"repl output");
+	add_bool("udp",     "open REPL on udp socket");
+	add(option(option::type::STRING, {"udp-addr", "ua"})
+		.description("IP address (udp)"));
+	add(option(option::type::INT, { "udp-port", "up" })
+		.description("port (udp)"));
+	add_bool("repl",    "run TML in REPL mode");
+	add_output    ("repl-output", "repl output");
 #endif
-	add_bool(L"sdt",     L"sdt transformation");
-	add_bool(L"bin",     L"bin transformation");
-	add_bool(L"proof",   L"extract proof");
-	add_bool(L"run",     L"run program     (enabled by default)");
-	add_bool(L"csv",     L"save result into CSV files");
+	add_bool("sdt",     "sdt transformation");
+	add_bool("bin",     "bin transformation");
+	add_bool("proof",   "extract proof");
+	add_bool("run",     "run program     (enabled by default)");
+	add_bool("csv",     "save result into CSV files");
 
-	add_bool(L"bdd-mmap",L"use memory mapping for BDD database");
-	add(option(option::type::INT, { L"bdd-max-size" }).description(
-		L"Maximum size of a bdd memory map (default: 128 MB)"));
-	add(option(option::type::STRING, { L"bdd-file" })
-		.description(L"Memory map file used for BDD database"));
+	add_bool("bdd-mmap","use memory mapping for BDD database");
+	add(option(option::type::INT, { "bdd-max-size" }).description(
+		"Maximum size of a bdd memory map (default: 128 MB)"));
+	add(option(option::type::STRING, { "bdd-file" })
+		.description("Memory map file used for BDD database"));
 
-	add(option(option::type::INT, { L"steps", L"s" })
-		.description(L"run N steps"));
-	add(option(option::type::INT, { L"break", L"b" })
-		.description(L"break on the N-th step"));
-	add_bool2(L"break-on-fp", L"bfp", L"break on a fixed point");
+	add(option(option::type::INT, { "steps", "s" })
+		.description("run N steps"));
+	add(option(option::type::INT, { "break", "b" })
+		.description("break on the N-th step"));
+	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
-	add_bool2(L"populate-tml_update", L"tml_update",
-		L"populates relation tml_update(N_step add|delete fact).");
-	add_bool2(L"print-steps", L"ps", L"print steps");
-	add_bool2(L"print-updates", L"pu", L"print updates");
-	add_bool2(L"print-dict", L"dict", L"print internal string dictionary");
+	add_bool2("populate-tml_update", "tml_update",
+		"populates relation tml_update(N_step add|delete fact).");
+	add_bool2("print-steps", "ps", "print steps");
+	add_bool2("print-updates", "pu", "print updates");
+	add_bool2("print-dict", "dict", "print internal string dictionary");
 
-	add_bool(L"optimize",L"optimize and show more benchmarks");
-	add(option(option::type::STRING, { L"name", L"n" },
+	add_bool("optimize","optimize and show more benchmarks");
+	add(option(option::type::STRING, { "name", "n" },
 		[](const option::value& v) {
 			outputs::name(v.get_string());
-		}).description(L"name used for @name output"));
-	add(option(option::type::STRING, { L"load", L"l" })
-		.description(L"load database from file before start"));
-	add(option(option::type::STRING, { L"save", L"s" })
-		.description(L"save database to file after finish"));
-	add_output    (L"dump",        L"dump output     (@stdout by default)");
-	add_output_alt(L"output", L"o",L"standard output (@stdout by default)");
-	add_output    (L"error",       L"errors          (@stderr by default)");
-	add_output    (L"info",        L"info            (@null by default)");
-	add_output    (L"debug",       L"debug output");
-	add_output    (L"benchmarks",  L"benchmarking results (@null by default)");
-	add_output_alt(L"transformed", L"t",  L"transformation into clauses");
-	add_output(L"xsb",     L"attempt to translate program into XSB");
-	add_output(L"swipl",   L"attempt to translate program into SWI-Prolog");
-	add_output(L"souffle", L"attempt to translate program into Souffle");
+		}).description("name used for @name output"));
+	add(option(option::type::STRING, { "load", "l" })
+		.description("load database from file before start"));
+	add(option(option::type::STRING, { "save", "s" })
+		.description("save database to file after finish"));
+	add_output    ("dump",        "dump output     (@stdout by default)");
+	add_output_alt("output", "o","standard output (@stdout by default)");
+	add_output    ("error",       "errors          (@stderr by default)");
+	add_output    ("info",        "info            (@null by default)");
+	add_output    ("debug",       "debug output");
+	add_output    ("benchmarks",  "benchmarking results (@null by default)");
+	add_output_alt("transformed", "t",  "transformation into clauses");
+	add_output("xsb",     "attempt to translate program into XSB");
+	add_output("swipl",   "attempt to translate program into SWI-Prolog");
+	add_output("souffle", "attempt to translate program into Souffle");
 
 	init_defaults();
 }
@@ -233,57 +226,56 @@ void options::setup() {
 #undef add_output_alt
 
 void options::init_defaults() {
-	parse({
-		L"--run",
-		L"--output",      L"@stdout",
-		L"--dump",        L"@stdout",
-		L"--error",       L"@stderr",
+	parse(strings{
+		"--run",
+		"--output",      "@stdout",
+		"--dump",        "@stdout",
+		"--error",       "@stderr",
 #ifdef DEBUG
-		L"--info",        L"@stderr",
-		L"--benchmarks",  L"@stderr",
+		"--info",        "@stderr",
+		"--benchmarks",  "@stderr",
 #endif
-		L"--optimize",
-		L"--bdd-max-size",L"134217728", // 128 MB
+		"--optimize",
+		"--bdd-max-size","134217728", // 128 MB
 #ifdef WITH_THREADS
-		L"--repl-output", L"@stdout",
-		L"--udp-addr",    L"127.0.0.1",
-		L"--udp-port",    L"6283"
+		"--repl-output", "@stdout",
+		"--udp-addr",    "127.0.0.1",
+		"--udp-port",    "6283"
 #endif
 	}, true);
-	DBG(parse(wstrings{ L"--debug", L"@stderr" }, true);)
+	DBG(parse(strings{ "--debug", "@stderr" }, true);)
 }
 
-void options::help(wostream& os) const {
-	os<<L"Usage:"<<endl;
-	os<<L"\ttml [options]"<<endl;
-	os<<endl;
-	os<<L"options:"<<endl;
-	os<<L"\tOptions are preceded by one or two hyphens (--run/-run)."<<endl;
-	os<<L"\tDisable option by prefixing it with disable-, no- or dont-"
-		<<endl;
-	os<<L"\t\t(--disable-run/--no-run/--dont-run)."<<endl;
-	os<<endl;
-	for (auto oit : opts) oit.second.help(os)<<endl;
-	os<<endl;
-	os<<L"bool:"<<endl;
-	os<<L"\tEnabled if 'true', 't', '1', 'yes', 'on', 'enabled' or "
-		<<L"if no argument."<<endl;
-	os<<endl;
-	os<<L"input:"<<endl;
-	os<<L"\t[FILENAME | @stdin | - ]"<<endl;
-	os<<endl;
-	os<<L"\t@stdin (or -) reads input from stdin"<<endl;
-	os<<L"\tFILENAME inputs can be used more than once to concatenate "
-		<<L"multiple files"<<endl;
-	os<<L"\t--input can be combined with --input-eval too"<<endl;
-	os<<endl;
-	os<<L"output:"<<endl;
-	os<<L"\t[FILENAME | @stdout | @stderr | @name | @null | @buffer]"<<endl;
-	os<<endl;
-	os<<L"\t@null\tdisable output"<<endl;
-	os<<L"\t@stdout\tredirect to stdout"<<endl;
-	os<<L"\t@stderr\tredirect to stderr"<<endl;
-	os<<L"\t@buffer\tredirect to buffer to be read through API later"<<endl;
-	os<<L"\t@name\tredirect to a file named by --name (ext predefined)"
-		<<endl;
+template <typename T>
+void options::help(std::basic_ostream<T>& os) const {
+	os<<"Usage:\n";
+	os<<"\ttml [options]\n";
+	os<<"\n";
+	os<<"options:\n";
+	os<<"\tOptions are preceded by one or two hyphens (--run/-run).\n";
+	os<<"\tDisable option by prefixing it with disable-, no- or dont-\n";
+	os<<"\t\t(--disable-run/--no-run/--dont-run).\n";
+	os<<"\n";
+	for (auto oit : opts) oit.second.help(os)<<"\n";
+	os<<"\n";
+	os<<"bool:\n";
+	os<<"\tEnabled if 'true', 't', '1', 'yes', 'on', 'enabled' or "
+		<<"if no argument.\n";
+	os<<"\n";
+	os<<"input:\n";
+	os<<"\t[FILENAME | @stdin | - ]\n";
+	os<<"\n";
+	os<<"\t@stdin (or -) reads input from stdin\n";
+	os<<"\tFILENAME inputs can be used more than once to concatenate "
+		<<"multiple files\n";
+	os<<"\t--input can be combined with --input-eval too\n";
+	os<<"\n";
+	os<<"output:\n";
+	os<<"\t[FILENAME | @stdout | @stderr | @name | @null | @buffer]\n";
+	os<<"\n";
+	os<<"\t@null\tdisable output\n";
+	os<<"\t@stdout\tredirect to stdout\n";
+	os<<"\t@stderr\tredirect to stderr\n";
+	os<<"\t@buffer\tredirect to buffer to be read through API later\n";
+	os<<"\t@name\tredirect to a file named by --name (ext predefined)\n";
 }

@@ -88,7 +88,7 @@ struct tt { // truth table
 		tt r = *this;
 		for (size_t n = 0; n < bits; ++n) if (b[n]) r = r.ex(n);
 		if (r.bdd() != bdd_ex(bdd(), b)) {
-/*			wcout	<< "existential quantification of" <<endl
+/*			COUT	<< "existential quantification of" <<endl
 				<< *this << endl << "with" << endl << b
 				<< endl << "wrongly returned" << endl
 				<< allsat(bdd_ex(bdd(), b), bits) << endl
@@ -109,9 +109,9 @@ struct tt { // truth table
 		set<bools> sb;
 		for (auto& x : s) sb.emplace(x);
 		if (sb != table) {
-			wcout << "expected"<<endl;
-			for (auto& x : table) wcout << x << endl;
-			wcout << "got"<<endl<<allsat(r, bits);
+			COUT << "expected"<<endl;
+			for (auto& x : table) COUT << x << endl;
+			COUT << "got"<<endl<<allsat(r, bits);
 			assert(sb == table);
 		}
 		return r;
@@ -139,7 +139,7 @@ wostream& operator<<(wostream& os, const tt& t) {
 void test_and_many() {
 	size_t bits = 3, tts = 3;
 	for (size_t k = 0; k < 1500; ++k) {
-		wcout<<k<<endl;
+		COUT<<k<<endl;
 		tt *t = new tt[tts];
 		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
 		spnode r = T;
@@ -149,14 +149,14 @@ void test_and_many() {
 		nodes v;
 		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
 		if (r != bdd_and_many(v)) {
-			wcout<<endl;
-			for (size_t i = 0; i < tts; ++i) wcout<<t[i]<<endl;
-			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_and_many(v),bits)
+			COUT<<endl;
+			for (size_t i = 0; i < tts; ++i) COUT<<t[i]<<endl;
+			COUT<<endl<<rr<<endl<<endl<<allsat(bdd_and_many(v),bits)
 				<<endl<<endl<<allsat(r,bits)<<endl;
 			assert(r == bdd_and_many(v));
 		}
 		assert(r == rr.bdd());
-		if (r != F) wcout << "sat" << endl;
+		if (r != F) COUT << "sat" << endl;
 		delete[] t;
 	}
 }
@@ -164,7 +164,7 @@ void test_and_many() {
 void test_or_many() {
 	size_t bits = 3, tts = 3;
 	for (size_t k = 0; k < 1500; ++k) {
-		wcout<<k<<endl;
+		COUT<<k<<endl;
 		tt *t = new tt[tts];
 		for (size_t i = 0; i < tts; ++i) t[i] = rndtt(bits).ex(i);
 		spnode r = F;
@@ -174,14 +174,14 @@ void test_or_many() {
 		nodes v;
 		for (size_t i = 0; i < tts; ++i) v.push_back(t[i].bdd());
 		if (r != bdd_or_many(v)) {
-			wcout<<endl;
-			for (size_t i = 0; i < tts; ++i) wcout<<t[i]<<endl;
-			wcout<<endl<<rr<<endl<<endl<<allsat(bdd_or_many(v),bits)
+			COUT<<endl;
+			for (size_t i = 0; i < tts; ++i) COUT<<t[i]<<endl;
+			COUT<<endl<<rr<<endl<<endl<<allsat(bdd_or_many(v),bits)
 				<<endl<<endl<<allsat(r,bits)<<endl;
 			assert(r == bdd_or_many(v));
 		}
 		assert(r == rr.bdd());
-		if (r != T) wcout << "tau" << endl;
+		if (r != T) COUT << "tau" << endl;
 		delete[] t;
 	}
 }
@@ -218,7 +218,7 @@ int main() {
 			delete[] e;
 			t[0].ex(brnd(k));
 			t[1].ex(brnd(k));
-			wcout<<k<<endl;
+			COUT<<k<<endl;
 		}
 	return 0;
 }

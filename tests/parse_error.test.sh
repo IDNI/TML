@@ -1,3 +1,5 @@
+#!/bin/bash
+
 rm -f ./parse_error.test
 ret=1
 g++ parse_error.test.cpp \

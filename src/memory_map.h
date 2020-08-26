@@ -31,36 +31,37 @@ enum mmap_mode { MMAP_NONE, MMAP_READ, MMAP_WRITE };
 
 class memory_map {
 public:
-	bool silent = false; // true to disable printing messages to o::err()
+	bool silent = true; // true to disable printing messages to o::err()
 	bool error = false;
-	std::wstring error_message = L"";
+	std::string error_message = "";
 	memory_map() : mode_(MMAP_NONE),state_(CLOSED),filename_(""),size_(0) {}
 	memory_map(std::string filename, size_t s=0, mmap_mode m = MMAP_READ,
 		bool do_open=1, bool do_map=1)
 		: mode_(m), state_(CLOSED), filename_(filename), size_(s)
 	{
 		if (mode_ == MMAP_NONE) return;
-		//DBG(o::dbg()<<L"memory_map "//<<s2ws(std::string(filename_))
-		// 	<<L" size: "<<size_<<L" mode: "<<mode_
-		// 	<<L" do_open: "<<do_open<<L" do_map: "<<do_map<<L"\n";)
+		//DBG(o::dbg()<<"memory_map "//<<s2ws(std::string(filename_))
+		// 	<<" size: "<<size_<<" mode: "<<mode_
+		// 	<<" do_open: "<<do_open<<" do_map: "<<do_map<<"\n";)
 		if (do_open || do_map) if (open() == -1) return;
 		if (do_map) map();
 	}
-	~memory_map() { if (state_ != CLOSED) close(); }
-	size_t size() { return size_; }
-	void clear_error() { error = false, error_message = L""; }
+	~memory_map() { close(); }
+	size_t size() const { return size_; }
+	std::string file_name() const { return filename_; }
+	void clear_error() { error = false, error_message = ""; }
 	void* data() {
 		if (state_ != MAPPED) {
-			err(L"not MAPPED, cannot retrieve data pointer");
+			//err("not MAPPED, cannot retrieve data pointer");
 			return 0;
 		}
 		return data_;
 	}
 	int open() {
-		//DBG(o::dbg()<<L"memory_map: open "<<s2ws(std::string(filename_))<<" size: "
+		//DBG(o::dbg()<<"memory_map: open "<<s2ws(std::string(filename_))<<" size: "
 		//	<<size_<<" mode: "<<mode_<<std::endl;)
-		if (mode_  == MMAP_NONE) return err(L"none mmap - cannot");
-		if (state_ != CLOSED)    return err(L"file is already opened");
+		if (mode_  == MMAP_NONE) return err("none mmap - cannot");
+		if (state_ != CLOSED)    return err("file is already opened");
 #ifdef _WIN32
 		if (filename_ == "") create_temp();
 		fh_ = CreateFileA(filename_.c_str(),
@@ -69,7 +70,7 @@ public:
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 		if (fh_ == INVALID_HANDLE_VALUE)
-			return err(L"cannot open file for memory map");
+			return err("cannot open file for memory map");
 #else
 		if (mode_ == MMAP_WRITE && (filename_ == "" || !file_exists()))
 			create();
@@ -77,7 +78,7 @@ public:
 			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
 				O_RDONLY : O_RDWR, 0644);
     			if (fd_ == -1) return err(errno,
-			    		L"cannot open file for memory map");
+			    		"cannot open file for memory map");
 			if (mode_ == MMAP_WRITE)
 				if (truncate() == -1) return -1;
 		}
@@ -85,30 +86,30 @@ public:
 		state_ = UNMAPPED;
 		if (!size_) { // autodetect map size
 			size_ = file_size();
-			//DBG(o::dbg()<<L" detected size: "<<size_<<std::endl;)
+			//DBG(o::dbg()<<" detected size: "<<size_<<std::endl;)
 		}
 		return 0;
 	}
 	int map() {
 		if (state_ != UNMAPPED)
-			return err(L"file is not opened or already mapped");
+			return err("file is not opened or already mapped");
 #ifdef _WIN32
 		mh_ = ::CreateFileMapping(fh_, 0, mode_ == MMAP_READ ?
 			PAGE_READONLY : PAGE_READWRITE, 0, size_, 0);
     		if (mh_ == INVALID_HANDLE_VALUE)
-			return data_ = 0, err(L"mmap err mfd");
+			return data_ = 0, err("mmap err mfd");
 		data_ = ::MapViewOfFile(mh_, mode_ == MMAP_READ ? FILE_MAP_READ
 			: FILE_MAP_WRITE, 0, 0, size_);
 		if (data_ == 0) {
 			::CloseHandle(mh_);
-			return err(GetLastError(), L"mmap err");
+			return err(GetLastError(), "mmap err");
 		}
 #else
-		//DBG(o::dbg()<<L"memory_map: map "<<s2ws(std::string(filename_))
-		//	<<L" size: "<<size_<<std::endl;)
+		//DBG(o::dbg()<<"memory_map: map "<<s2ws(std::string(filename_))
+		//	<<" size: "<<size_<<std::endl;)
 		data_ = ::mmap(0, size_, mode_ == MMAP_READ ? PROT_READ :
 			PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0);
-		if (data_==MAP_FAILED) return data_=0,err(errno, L"mmap err");
+		if (data_==MAP_FAILED) return data_=0,err(errno, "mmap err");
 #endif
 		state_ = MAPPED;
 		return 0;
@@ -121,12 +122,12 @@ public:
 #else
 		r = ::msync(data_, size_, MS_SYNC);
 #endif
-		if (r == -1) return err(errno, L"memory_map: sync");
+		if (r == -1) return err(errno, "memory_map: sync");
 		return r;
 	}
 	int unmap() {
 		if (state_ != MAPPED)
-			return err(L"file not mapped, cannot be unmapped\n");
+			return err("file not mapped, cannot be unmapped\n");
 		if (sync() == -1) return -1;
 		int r = 0;
 #ifdef _WIN32
@@ -140,7 +141,7 @@ public:
 	}
 	int unlink() {
 		if (state_ != CLOSED) return err(
-			L"file is not closed. it cannot be deleted\n");
+			"file is not closed. it cannot be deleted\n");
 #ifdef _WIN32
 		return ::DeleteFileA(filename_.c_str());
 #else
@@ -178,10 +179,10 @@ private:
 #else
 	int fd_;
 	int truncate() {
-		if (state_==MAPPED) return err(L"cannot truncate mapped file");
+		if (state_==MAPPED) return err("cannot truncate mapped file");
 		if (size_ && size_ != (size_t)file_size()) {
 			if (::ftruncate(fd_, size_) == -1)
-				return err(errno, L"error truncate failed");
+				return err(errno, "error truncate failed");
 		}
 		return size_;
 	}
@@ -191,7 +192,7 @@ private:
 	}
 	inline int fill() {
 		int w = ::write(fd_, std::string(size_, 0).c_str(), size_);
-		if (w == -1) err(errno, L"memory_map: create (fill)");
+		if (w == -1) err(errno, "memory_map: create (fill)");
 		else seek_beginning();
 		return w;
 	}
@@ -199,16 +200,16 @@ private:
 		temporary_ = true,
 		fd_ = temp_fileno(),
 		filename_ = filename(fd_);
-		//DBG(o::dbg()<<L"temporary file: "<<s2ws(filename_)<<L"\n";)
+		//DBG(o::dbg()<<"temporary file: "<<s2ws(filename_)<<"\n";)
 	}
 	void create() {
 		if (filename_ == "") create_temp();
 		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0644);
-    		if (fd_ == -1) { err(errno, L"memory_map: create"); return; }
+    		if (fd_ == -1) { err(errno, "memory_map: create"); return; }
 		if (fill() == -1) return;
-		//DBG(o::dbg()<<L"memory_map: create "
+		//DBG(o::dbg()<<"memory_map: create "
 		//	<<s2ws(std::string(filename_))
-		//	<<L" created with size: "<<size_<<L"\n";)
+		//	<<" created with size: "<<size_<<"\n";)
 	}
 	bool file_exists() {
  		struct stat s;
@@ -225,14 +226,14 @@ private:
 		if (::stat(filename_.c_str(), &s) != -1)
 			return s.st_size;
 #endif
-		return err(errno, L"cannot get file stats"), 0;
+		return err(errno, "cannot get file stats"), 0;
 	}
-	int err(int err_code, std::wstring message, int return_value = -1) {
+	int err(int err_code, std::string message, int return_value = -1) {
 		return err(message, return_value, err_code);
 	}
-	int err(std::wstring message, int return_value = -1, int err_code = 0){
-		error = true; std::wstringstream ss; ss << L"error: ";
-		if (err_code) ss << L'[' << err_code << L"] ";
+	int err(std::string message, int return_value = -1, int err_code = 0){
+		error = true; std::stringstream ss; ss << "error: ";
+		if (err_code) ss << '[' << err_code << "] ";
 		ss << message << std::endl; error_message = ss.str();
 		if (!silent) o::err() << error_message;
 		return return_value;
@@ -249,18 +250,18 @@ public:
 	memory_map_allocator(const memory_map_allocator<T>& a) :
 		fn(a.fn), m(a.m) { }
 	T* allocate(size_t n, const void *hint=0) {
-		//DBG(o::dbg()<<L"allocate n="<<n<<L" fn="
-		//	<<s2ws(fn)<<L" m="<<m<<std::endl;)
+		//DBG(o::dbg()<<"allocate n="<<n<<" fn="
+		//	<<s2ws(fn)<<" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (T*) nommap.allocate(n, hint);
 		if (n == 0) return 0;
 		if (hint != 0) return 0;
 		mm = std::make_unique<memory_map>(fn, n*sizeof(T), m);
-		//o::dbg() << L"mm.data() = " << mm->data() << std::endl;
+		//o::dbg() << "mm.data() = " << mm->data() << std::endl;
 		return (T*) mm->data();
 	}
 	void deallocate(T* p, size_t n) {
-		//DBG(o::dbg()<<L"deallocate n="<<n<<
-		//	L" fn="<<s2ws(std::string(fn))<<L" m="<<m<<std::endl;)
+		//DBG(o::dbg()<<"deallocate n="<<n<<
+		//	" fn="<<s2ws(std::string(fn))<<" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (void) nommap.deallocate(p, n);
 		if (!p || !n) return;
 		mm->close();

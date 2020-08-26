@@ -24,20 +24,20 @@ using test = std::function<int()>;
 size_t f = 0; // fails
 size_t n = 0; // current test no.
 
-std::wostream* tout;
+ostream_t* tout;
 
-int fail(std::wstring msg, int r=1) {
-	return *tout<<L'#'<<n<<L": "<<msg<<L"\n", r; }
+int fail(std::string msg, int r=1) {
+	return *tout<<'#'<<n<<": "<<msg<<"\n", r; }
 int ok() { return 0; }
 
-int run(const std::vector<test>& tests, std::wstring name, std::wostream* os=&std::wcout){
-	try {
+int run(const std::vector<test>& tests, std::string name, ostream_t* os=&COUT){
+	//try {
 		tout = os;
 		for (auto t : tests) ++n, f += t();
-		*tout << name << L": " << n-f << L'/' << n << L" ok.\n";
-		if (f) *tout << f << L'/' << n << " failed.\n";
-		//*tout << std::flush;
-	} catch (std::exception& e) { *tout <<s2ws(e.what()) << std::endl;}
+		*tout << name << ": " << n-f << '/' << n << " ok.\n";
+		if (f) *tout << f << '/' << n << " failed.\n";
+		*tout << std::flush;
+	//} catch (std::exception& e) { *tout << e.what() << std::endl;}
 	return f > 0 ? 1 : 0;
 }
 
@@ -46,16 +46,16 @@ int file_read(const char* path, char* data, size_t size) {
 #ifdef _WIN32
 	HANDLE fd = ::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, 0,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	if (fd == INVALID_HANDLE_VALUE) return fail(L"file cannot be opened", -1);
+	if (fd == INVALID_HANDLE_VALUE) return fail("file cannot be opened", -1);
 	DWORD r;
-	if (::ReadFile(fd, data, size, &r, 0) == FALSE) return fail(L"file cannot be read", -3);
-	if (r != (DWORD)size) return fail(L"read failed", -2);
+	if (::ReadFile(fd, data, size, &r, 0) == FALSE) return fail("file cannot be read", -3);
+	if (r != (DWORD)size) return fail("read failed", -2);
         ::CloseHandle(fd);
 #else
 	int fd = ::open(path, O_RDONLY | O_NONBLOCK);
-	if (fd == -1) return fail(L"file cannot be opened", -1);
+	if (fd == -1) return fail("file cannot be opened", -1);
 	int r = ::read(fd, data, size);
-	if (r != (int)size) return fail(L"read failed", -2);
+	if (r != (int)size) return fail("read failed", -2);
 	::close(fd);
 #endif
 	return ok();
@@ -65,15 +65,15 @@ int file_read(const char* path, char* data, size_t size) {
 int file_and_mem_cmp(const char* path, const char* expected, size_t size) {
 	char* data = (char*) malloc(size);
 	if (file_read(path, data, size) == -1) return -1;
-	auto flags = std::wcout.flags();
+	auto flags = COUT.flags();
 	for (size_t pos = 0; pos != size; ++pos) {
 		if (data[pos] != expected[pos]) {
-			std::wcout << L"differs at pos: " << pos << L" 0x"
-				<< std::hex << std::setw(2) <<std::setfill(L'0')
-				<< pos << std::endl;
-			std::wcout.flags(flags);
-			std::wcout << L"\t" << (int_t)data[pos]
-				<< L' ' << (int_t)expected[pos] << std::endl;
+			COUT << "differs at pos: " << pos << " 0x"
+				<< std::hex << std::setw(2)
+				<< std::setfill(syschar_t('0')) << pos <<std::endl;
+			COUT.flags(flags);
+			COUT << "\t got: " << (int_t)data[pos]
+				<< " exp: " << (int_t)expected[pos] << std::endl;
 			return -2;
 		}
 	}

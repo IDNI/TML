@@ -48,11 +48,11 @@ test open_and_read_written = [] {
 	if (mm.error) return fail(mm.error_message);
 	char* data = (char*) mm.data();
 	if (mm.error) return fail(mm.error_message);
-	wstringstream ss;
+	ostringstream ss;
 	for (size_t i = 0; i != S2; ++i) {
 		if (data[i] != (char)(255 - (i % 255)))
-			return ss << L"open_and_read_written pos: " << i
-				<< L" '" << (int)data[i] << "'", fail(ss.str());
+			return ss << "open_and_read_written pos: " << i
+				<< " '" << (int)data[i] << "'", fail(ss.str());
 	}
 	return ok();
 };
@@ -73,11 +73,11 @@ test open_and_read_written_again = [] {
 	if (mm.error) return fail(mm.error_message);
 	char* data = (char*) mm.data();
 	if (mm.error) return fail(mm.error_message);
-	wstringstream ss;
+	ostringstream ss;
 	for (size_t i = 0; i != S3; ++i) {
 		if (data[i] != (char)(i % 255))
-			return ss << L"open_and_read_written_again pos: " << i
-				<< L" '" << (int)data[i] << "'", fail(ss.str());
+			return ss << "open_and_read_written_again pos: " << i
+				<< " '" << (int)data[i] << "'", fail(ss.str());
 	}
 	return ok();
 };
@@ -90,20 +90,20 @@ test vector_with_memory_map_allocator_int_t_write = [] {
 	for (int_t i = 0; i != 1000; ++i) v[i] = i-500;
 	for (int_t i = 0; i != 1000; ++i)
 		if (i-500 != v[i]) { f = true; break; }
-	//o::out() << L"done" << std::endl;
-	if (f) return fail(L"vector_with_memory_map_allocator_int_t_write");
+	//o::out() << "done" << std::endl;
+	if (f) return fail("vector_with_memory_map_allocator_int_t_write");
 	return ok();
 };
 
 test vector_with_memory_map_allocator_int_t_read = [] {
-	//o::out() << L"read" << std::endl;
+	//o::out() << "read" << std::endl;
 	memory_map_allocator<int_t> a(TF1, MMAP_READ);
 	vector<int_t, memory_map_allocator<int_t> > v(a);
 	v.reserve(1000);
 	bool f = false;
 	for (int_t i = 0; i != 1000; ++i)
 		if (i-500 != v[i]) { f = true; break; }
-	if (f) return fail(L"vector_with_memory_map_allocator_int_t_read");
+	if (f) return fail("vector_with_memory_map_allocator_int_t_read");
 	return ok();
 };
 
@@ -115,7 +115,7 @@ test mmap_vector_with_nommap_allocator_int_t_write = [] {
 	for (int_t i = 0; i != 1000; ++i) v[i] = i-500;
 	for (int_t i = 0; i != 1000; ++i)
 		if (i-500 != v[i]) { f = true; break; }
-	if (f) return fail(L"vector_with_memory_map_allocator_int_t_write");
+	if (f) return fail("vector_with_memory_map_allocator_int_t_write");
 	return ok();
 };
 
@@ -145,8 +145,8 @@ test bdd_mmap_write = [] {
 int main() {
 	setlocale(LC_ALL, "");
 	outputs oo;
-	oo.target(L"debug",  L"@stdout");
-	oo.target(L"output", L"@stdout");
+	oo.target("debug",  "@stdout");
+	oo.target("output", "@stdout");
 	vector<test> tests = {
 		create_new_and_open,
 		open_and_write,
@@ -159,5 +159,5 @@ int main() {
 		temporary,
 		bdd_mmap_write,
 	};
-	return run(tests, L"memory_map");
+	return run(tests, "memory_map");
 }

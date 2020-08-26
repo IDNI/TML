@@ -41,6 +41,7 @@ struct prog_data {
 	size_t n = 0;
 	size_t start_step = 0;
 	size_t elapsed_steps = 0;
+	std::string std_input;
 };
 
 class driver {
@@ -56,13 +57,14 @@ class driver {
 //	bool mult = false;
 
 	std::set<lexeme, lexcmp> strs_extra, rels;
+	std::vector<ccs> strs_allocated;
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
-	lexeme get_lexeme(const std::wstring& s);
+	lexeme get_lexeme(const std::string& s);
 	lexeme get_new_rel();
 //	std::function<int_t(void)> *fget_new_rel;
 //	lexeme get_num_lexeme(int_t i);
-//	lexeme get_char_lexeme(wchar_t i);
+//	lexeme get_char_lexeme(char_t i);
 //	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
@@ -70,7 +72,7 @@ class driver {
 	std::set<raw_rule> refresh_vars(raw_rule& r);
 	std::set<raw_term> get_queries(const raw_prog& p);
 
-	std::wstring directive_load(const directive& d);
+	std::string directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
@@ -84,25 +86,25 @@ class driver {
 		std::set<raw_rule>& s);
 	void transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
-//	void transform_string(const std::wstring&, raw_prog&, int_t);
+//	void transform_string(const sysstring_t&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
-	raw_term from_grammar_elem_builtin(const lexeme& r,const std::wstring&b,
+	raw_term from_grammar_elem_builtin(const lexeme& r, const std::string&b,
 		int_t v);
 	raw_term prepend_arg(const raw_term& t, lexeme s);
-//	void get_trees(std::wostream& os, const term& root,
+//	template <typename T>
+//	void get_trees(std::basic_ostream<T>& os, const term& root,
 //		const std::map<term, std::vector<term>>&, std::set<term>& done);
-//	std::wstring get_trees(const term& roots,const db_t& t,size_t bits);
-	void progs_read(wstr s);
+//	sysstring_t get_trees(const term& roots,const db_t& t,size_t bits);
+	void progs_read(cstr s);
 	void new_sequence();
 	bool prog_run(raw_progs& rp, size_t n, nlevel steps=0, size_t brstep=0);
 	//driver(raw_progs, options o);
 	//driver(raw_progs);
 	size_t load_stdin();
-	std::wstring std_input;
 	prog_data pd;
 	std::set<int_t> transformed_strings;
 	tables *tbl = 0;
@@ -110,40 +112,51 @@ class driver {
 	std::set<lexeme> vars;
 	raw_progs rp;
 	bool running = false;
+	inputs* ii;
+	std::vector<archive> load_archives;
 public:
 	bool result = true;
 	options opts;
 	driver(options o);
 	driver(FILE *f, options o);
-	driver(std::wstring, options o);
+	driver(std::string, options o);
 	driver(char *s, options o);
+	driver(ccs s, options o);
 	driver(FILE *f);
-	driver(std::wstring);
+	driver(std::string);
 	driver(char *s);
+	driver(ccs s);
 	~driver();
 
-	void info(std::wostream& os);
-	void list(std::wostream& os, size_t p = 0);
-	void add(std::wstring& prog, bool newseq = true);
+	template <typename T>
+	void info(std::basic_ostream<T>&);
+	template <typename T>
+	void list(std::basic_ostream<T>& os, size_t p = 0);
+	void add(input& in);
 	void restart();
 	bool run(size_t steps = 0, size_t br_on_step=0, bool br_on_fp = false);
 	bool step(size_t steps = 1, size_t br_on_step=0, bool br_on_fp = false);
 	size_t nsteps() { return tbl->step(); };
-	void out(std::wostream& os) const { if (tbl) tbl->out(os); }
+	template <typename T>
+	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
 	void dump() { out(o::dump()); }
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
-	bool out_goals(std::wostream& os) const { return tbl->get_goals(os); }
-	void out_dict(std::wostream& os) const { tbl->print_dict(os); }
+	template <typename T>
+	bool out_goals(std::basic_ostream<T>& os) const {
+		return tbl->get_goals(os); }
+	template <typename T>
+	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
 	void save_bdd(std::string filename);
 	size_t size();
-	void load(std::wstring filename);
-	void save(std::wstring filename);
+	void load(std::string filename);
+	void save(std::string filename);
 	size_t db_size();
-	void db_load(std::wstring filename);
-	void db_save(std::wstring filename);
+	void db_load(std::string filename);
+	void db_save(std::string filename);
+	inputs* get_inputs() const { return ii; }
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
 	emscripten::val to_bin() {
@@ -157,31 +170,43 @@ public:
 	}
 #endif
 
-//	std::wostream& printbdd(std::wostream& os, spbdd t, size_t bits,
+//	std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, spbdd t, size_t bits,
 //		const prefix&) const;
-//	std::wostream& printbdd_one(std::wostream& os, spbdd t, size_t bits,
+//	std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, spbdd t, size_t bits,
 //		const prefix&) const;
-	std::wostream& print_prolog(std::wostream&, const raw_prog&,
-		const prolog_dialect) const;
-	std::wostream& print_xsb(std::wostream&, const raw_prog&) const;
-	std::wostream& print_swipl(std::wostream&, const raw_prog&) const;
-	std::wostream& print_souffle(std::wostream&, const raw_prog&) const;
-	std::wostream& print_ast(std::wostream&) const;
-	std::wostream& print_ast_json(std::wostream&) const;
-	std::wostream& print_ast_xml(std::wostream&) const;
-	std::wostream& print_ast_html(std::wostream&) const;
+	template <typename T>
+	std::basic_ostream<T>& print_prolog(std::basic_ostream<T>& os,
+		const raw_prog&, prolog_dialect) const;
+	template <typename T>
+	std::basic_ostream<T>& print_xsb(std::basic_ostream<T>& os,
+		const raw_prog&) const;
+	template <typename T>
+	std::basic_ostream<T>& print_swipl(std::basic_ostream<T>& os,
+		const raw_prog&) const;
+	template <typename T>
+	std::basic_ostream<T>& print_souffle(std::basic_ostream<T>& os,
+		const raw_prog&) const;
 	void save_csv() const;
 };
 
+template void driver::out<char>(std::ostream&) const;
+template void driver::out<wchar_t>(std::wostream&) const;
+template bool driver::out_goals(std::basic_ostream<char>&) const;
+template bool driver::out_goals(std::basic_ostream<wchar_t>&) const;
+template void driver::out_dict(std::basic_ostream<char>&) const;
+template void driver::out_dict(std::basic_ostream<wchar_t>&) const;
+
 #ifdef DEBUG
 extern driver* drv;
-//std::wostream& printdb(std::wostream& os, lp *p);
-std::wostream& printbdd(std::wostream& os, cr_spbdd_handle t, size_t bits,
-	ints ar, int_t rel);
-std::wostream& printbdd_one(std::wostream& os, cr_spbdd_handle t, size_t bits,
-	ints ar, int_t rel);
-//std::wostream& printbdd(std::wostream& os, size_t t, size_t bits, ints ar,
+//template <typename T>
+//std::basic_ostream<T>& printdb(std::basic_ostream<T>& os, lp *p);
+template <typename T>
+std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
+template <typename T>
+std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
+//template <typename T>
+//std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
-std::wstring _unquote(std::wstring str);
+std::string _unquote(std::string str);
 #endif

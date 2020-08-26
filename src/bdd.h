@@ -69,7 +69,8 @@ const int_t T = 1, F = -1;
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
 bool trueleaf(cr_spbdd_handle h);
-std::wostream& out(std::wostream& os, cr_spbdd_handle x);
+template <typename T>
+std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -194,10 +195,8 @@ class bdd {
 	friend size_t bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
-	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
-	friend std::ostream& write_bdd(std::ostream& os);
-	friend std::istream& read_bdd(std::istream& is);
-
+	template <typename T>
+	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
 	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
@@ -258,12 +257,13 @@ class bdd {
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
-	inline static int_t add(int_t v, int_t h, int_t l);
+	static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
-	static std::wostream& out(std::wostream& os, int_t x);
+	template <typename T>
+	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, int_t x);
 	int_t h, l, v;
 
 	//---
@@ -325,7 +325,8 @@ public:
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
 		const std::string fn="");
 	static void gc();
-	static std::wostream& stats(std::wostream& os);
+	template <typename T>
+	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static int_t hi(int_t x) {
 		return	x < 0 ? (*V)[-x].v < 0 ? -(*V)[-x].l : -(*V)[-x].h
 			: (*V)[x].v < 0 ? (*V)[x].l : (*V)[x].h;

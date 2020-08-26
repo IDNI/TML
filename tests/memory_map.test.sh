@@ -1,3 +1,5 @@
+#!/bin/bash
+
 rm -f ./test_file*.mmap
 ret=1
 g++ memory_map.test.cpp \
