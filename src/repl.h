@@ -32,6 +32,9 @@ protected:
 };
 
 class repl {
+public:
+	repl(options &o, ostream_t& os = o::repl());
+private:
 	options& o;
 	ostream_t& os;
 	std::unique_ptr<driver> d = 0;
@@ -103,8 +106,6 @@ class repl {
 	void step(size_t steps = 1)                       { run(steps); };
 	void break_on_fp()                                { run(0, 0, true); };
 	void break_on_step(size_t brs)                    { run(0, brs); };
-public:
-	repl(options &o, ostream_t& os = o::repl());
 };
 
 #endif

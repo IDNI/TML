@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
 	outputs oo;
 	options o(argc, argv, &ii, &oo);
 	//o.parse({ "-autotype" }, true);
+	string archive_file = o.get_string("load");
 	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
 		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
@@ -37,16 +38,16 @@ int main(int argc, char** argv) {
 #ifdef WITH_THREADS
 			&& o.disabled("repl") && o.disabled("udp")
 #endif
-			&& o.disabled("h") && o.disabled("v"))
+			&& o.disabled("h") && o.disabled("v")
+			&& archive_file == "")
 		o.parse(strings{ "-i",  "@stdin" }, true);
+	try {
 #ifdef WITH_THREADS
-	if (o.enabled("udp") && o.disabled("repl")) o.enable("repl");
-	if (o.enabled("repl")) repl r(o);
-	else {
+		if (o.enabled("udp") && o.disabled("repl")) o.enable("repl");
+		if (o.enabled("repl")) repl r(o);
+		else {
 #endif
-		try {
 			driver d(o);
-			string archive_file = o.get_string("load");
 			if (archive_file != "") d.load(archive_file);
 			d.run((size_t)o.get_int("steps"),
 				(size_t)o.get_int("break"),
@@ -57,15 +58,14 @@ int main(int argc, char** argv) {
 				!d.out_goals(o::dump())) d.dump();
 			if (o.enabled("dict")) d.out_dict(o::inf());
 			if (o.enabled("csv")) d.save_csv();
-
-		} catch (parse_error_exception &e) {
-			o::err() << e.what() << endl;
-		} catch (runtime_error_exception &e) {
-			o::err() << e.what() << endl;
-		}
 #ifdef WITH_THREADS
-	}
+		}
 #endif
+	} catch (parse_error_exception &e) {
+		o::err() << e.what() << endl;
+	} catch (runtime_error_exception &e) {
+		o::err() << e.what() << endl;
+	}
 	onexit = true;
 //	print_memos_len();
 	return 0;

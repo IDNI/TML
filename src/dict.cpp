@@ -44,7 +44,7 @@ int_t dict_t::get_fresh_sym(int_t old) {
 	return fresh_int;
 }
 int_t dict_t::get_var(const lexeme& l) {
-	assert(*l[0] == '?');
+	//DBG(assert(*l[0] == '?');)
 	auto it = vars_dict.find(l);
 	if (it != vars_dict.end()) return it->second;
 	int_t r = -vars_dict.size() - 1;
@@ -55,7 +55,7 @@ int_t dict_t::get_var(const lexeme& l) {
 lexeme dict_t::get_var_lexeme_from(int_t r) {
 	DBG(assert(r<0);)
 	int index = (-r -1);
-	if ( index < (int_t)vars.size() ) {
+	if (index < (int_t)vars.size()) {
 		int nr = get_var(vars[index]);
 		DBG(assert(nr == r);)
 		return vars[index];

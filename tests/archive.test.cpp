@@ -175,6 +175,8 @@ test write_driver = [] {
 	COUT << "d.out:" << endl;
 	d.out(COUT);
 
+	d.out_dict(COUT << "dict before save: ");
+
 	d.save(TF1);
 
 	if (file_and_mem_cmp(TF1, data_driver_expected,
@@ -192,6 +194,8 @@ test read_driver = [] {
 	d.load(TF1);
 
 	//d.save(TF2);
+
+	d.out_dict(COUT << "dict after load: ");
 
 	d.run();
 
@@ -237,10 +241,10 @@ int main() {
 		return e.type == elem::NUM && e.num == 3;
 	});
 	test write_elem_chr = write_test<elem>(
-		elem('$'), "\x03\x24\x00\x00\x00", 5
+		elem(U'$'), "\x03\x24\x00\x00\x00", 5
 	);
 	test read_elem_chr = read_test<elem>([] (elem& e) {
-		return e.type == elem::CHR && e.ch == '$';
+		return e.type == elem::CHR && e.ch == U'$';
 	});
 	test write_elem_str = write_test<elem>(
 		elem(elem::STR, test_dict.get_lexeme("ABC")), "\x08\x03\x00\x00\x00\x00\x00\x00\x00\x41\x42\x43", 12

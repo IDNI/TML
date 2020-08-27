@@ -159,70 +159,69 @@ int_t input::get_int_t(ccs from, ccs to) {
 	return neg ? -r : r;
 }
 
-bool directive::parse(input& in, const raw_prog& prog) {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;
+bool directive::parse(input* in, const raw_prog& prog) {
+	const lexemes& l = in->l; size_t& pos = in->pos;
 	if (*l[pos][0] != '@') return false;
 	if (l[++pos] == "trace") {
 		type = TRACE; ++pos;
 		if (!rel.parse(in) || rel.type != elem::SYM)
-			in.parse_error(l[pos-1][0], err_trace_rel, l[pos-1]);
+			in->parse_error(l[pos-1][0], err_trace_rel, l[pos-1]);
 		if (*l[pos++][0] != '.')
-			in.parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
 	if (l[pos] == "bwd") {
 		type = BWD;
 		if (*l[++pos][0] != '.')
-			in.parse_error(l[pos][0], dot_expected, l[pos]);
+			in->parse_error(l[pos][0], dot_expected, l[pos]);
 		return ++pos, true;
 	}
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
 		if (!t.parse(in, prog))
-			in.parse_error(l[pos][0], err_stdout, l[pos]);
+			in->parse_error(l[pos][0], err_stdout, l[pos]);
 		if (*l[pos++][0] != '.')
-			in.parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
 	if (!(l[pos] == "string"))
-		in.parse_error(l[pos][0], err_directive, l[pos]);
+		in->parse_error(l[pos][0], err_directive, l[pos]);
 	++pos;
 	if (!rel.parse(in) || rel.type != elem::SYM)
-		in.parse_error(l[pos-1][0], err_rel_expected, l[pos-1]);
+		in->parse_error(l[pos-1][0], err_rel_expected, l[pos-1]);
 	size_t curr2 = pos;
 	if (*l[pos][0] == '<') {
 		// D: parsing <file> is moved here (from lex) so we could process LT.
 		//type = FNAME, arg = l[pos++];
 		while (*l[pos++][0] != '>')
 			if (!(pos < l.size()))
-				in.parse_error(l[curr2][1], err_fname);
+				in->parse_error(l[curr2][1], err_fname);
 		type = FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
 	}
 	else if (*l[pos][0] == '"') type = STR, arg = l[pos++];
 	else if (*l[pos][0] == '$')
-		type=CMDLINE, ++pos, n = in.get_int_t(l[pos][0], l[pos][1]), ++pos;
+		type=CMDLINE, ++pos, n = in->get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == "stdin") type = STDIN;
 	else if (t.parse(in, prog)) {
 		type = TREE;
 		if (*l[pos++][0]!='.')
-			in.parse_error(l[pos][0], dot_expected, l[pos]);
+			in->parse_error(l[pos][0], dot_expected, l[pos]);
 		return true;
-	} else in.parse_error(l[pos][0], err_directive_arg, l[pos]);
+	} else in->parse_error(l[pos][0], err_directive_arg, l[pos]);
 	if (*l[pos++][0]!='.')
-		in.parse_error(l[curr2][1], dot_expected, l[curr2]);
+		in->parse_error(l[curr2][1], dot_expected, l[curr2]);
 	return true;
 }
-elem::etype elem::peek(input& in) {
-	size_t curr = in.pos;
+elem::etype elem::peek(input* in) {
+	size_t curr = in->pos;
 	type = NONE;
-	if (in.pos < in.l.size()) parse(in);
-	in.pos = curr;
+	if (in->pos < in->l.size()) parse(in);
+	in->pos = curr;
 	return type;
 }
-bool elem::parse(input& in) {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;
+bool elem::parse(input* in) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;
 	if ('|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if ('(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
@@ -317,15 +316,15 @@ bool elem::parse(input& in) {
 		else type = SYM;
 	}
 	else if (*l[pos][0] == '"') type = STR;
-	else type = NUM, num = in.get_int_t(l[pos][0], l[pos][1]);
+	else type = NUM, num = in->get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, true;
 }
 
-bool raw_term::parse(input& in, const raw_prog& prog,
+bool raw_term::parse(input* in, const raw_prog& prog,
 	raw_term::rtextype pref_type)
 {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;
 	const lexeme &s = l[pos];
 	size_t curr = pos;
 	if ((neg = *l[pos][0] == '~')) ++pos;
@@ -341,7 +340,7 @@ bool raw_term::parse(input& in, const raw_prog& prog,
 	while (!strchr(".:,;{}-", *l[pos][0])) { // ".:,;{}|&-<"
 		if (e.emplace_back(), !e.back().parse(in)) return false;
 		else if (pos == l.size())
-			in.parse_error(l[pos-1][1], err_eof, s[0]);
+			in->parse_error(l[pos-1][1], err_eof, s[0]);
 		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos)
 		switch (el.type) {
 			case elem::EQ:  eq    = true; break;//TODO: review - for substraction
@@ -374,20 +373,20 @@ bool raw_term::parse(input& in, const raw_prog& prog,
 	if (bltin) {
 		// similar as for SYM below (join?) but this format will expand.
 		if (e[0].type != elem::BLTIN)
-			in.parse_error(l[pos][0], err_builtin_expected, l[pos]);
+			in->parse_error(l[pos][0], err_builtin_expected, l[pos]);
 		if (e[1].type != elem::OPENP)
-			in.parse_error(l[pos][0], err_paren_expected, l[pos]);
+			in->parse_error(l[pos][0], err_paren_expected, l[pos]);
 		if (e.back().type != elem::CLOSEP)
-			in.parse_error(e.back().e[0], err_paren, l[pos]);
+			in->parse_error(e.back().e[0], err_paren, l[pos]);
 		extype = raw_term::BLTIN; // isbltin = true;
 		return calc_arity(in), true;
 	}
 	if ( (noteq || eq) && !arith) {
 		if (e.size() < 3)
-			in.parse_error(l[pos][0], err_3_els_expected, l[pos]);
+			in->parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::NEQ && e[1].type != elem::EQ)
-			in.parse_error(l[pos][0], err_eq_expected, l[pos]);
+			in->parse_error(l[pos][0], err_eq_expected, l[pos]);
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
 		extype = raw_term::EQ; // iseq = true;
@@ -395,20 +394,20 @@ bool raw_term::parse(input& in, const raw_prog& prog,
 	}
 	if ((leq || gt) && !arith) {
 		if (e.size() < 3)
-			in.parse_error(l[pos][0], err_3_els_expected, l[pos]);
+			in->parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::LEQ && e[1].type != elem::GT)
-			in.parse_error(l[pos][0], err_leq_expected, l[pos]);
+			in->parse_error(l[pos][0], err_leq_expected, l[pos]);
 		if (gt) neg = !neg;
 		extype = raw_term::LEQ; // isleq = true;
 		return calc_arity(in), true;
 	}
 	if (lt || geq) {
 		if (e.size() < 3)
-			in.parse_error(l[pos][0], err_3_els_expected, l[pos]);
+			in->parse_error(l[pos][0], err_3_els_expected, l[pos]);
 		// only supporting smth != smthelse (3-parts) and negation in front ().
 		if (e[1].type != elem::LT && e[1].type != elem::GEQ)
-			in.parse_error(l[pos][0], err_leq_expected, l[pos]);
+			in->parse_error(l[pos][0], err_leq_expected, l[pos]);
 		// GEQ <==> LEQ + reverse args + !neg
 		swap(e[2], e[0]); // e = { e[2], e[1], e[0] };
 		if (!geq) neg = !neg;
@@ -423,9 +422,9 @@ bool raw_term::parse(input& in, const raw_prog& prog,
 		// supported RELATIONSHIPs: = (TODO: add support for <= => < > != )
 		// TODO: improve checks here
 		if (e.size() < 4)
-			in.parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			in->parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		if (e[1].type != elem::ARITH || e[3].type != elem::EQ)
-			in.parse_error(l[pos][0], err_term_or_dot, l[pos]);
+			in->parse_error(l[pos][0], err_term_or_dot, l[pos]);
 
 		//iseq = true;
 		neg = false;
@@ -436,12 +435,12 @@ bool raw_term::parse(input& in, const raw_prog& prog,
 	}
 	
 	if (e[0].type != elem::SYM)
-		in.parse_error(l[curr][0], err_relsym_expected, l[curr]);
+		in->parse_error(l[curr][0], err_relsym_expected, l[curr]);
 	if (e.size() == 1) return calc_arity(in), true;
 	if (e[1].type != elem::OPENP)
-		in.parse_error(l[pos][0], err_paren_expected, l[pos]);
+		in->parse_error(l[pos][0], err_paren_expected, l[pos]);
 	if (e.back().type != elem::CLOSEP)
-		in.parse_error(e.back().e[0], err_paren, l[pos]);
+		in->parse_error(e.back().e[0], err_paren, l[pos]);
 	return calc_arity(in), true;
 }
 
@@ -454,7 +453,7 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 		else k += arity[n];
 }
 
-void raw_term::calc_arity(input& in) {
+void raw_term::calc_arity(input* in) {
 	size_t dep = 0;
 	arity = {0};
 	//if (iseq || isleq || islt || isarith) {
@@ -468,14 +467,14 @@ void raw_term::calc_arity(input& in) {
 		else if (e[n].type != elem::CLOSEP) {
 			if (arity.back() < 0) arity.push_back(1);
 			else ++arity.back();
-		} else if (!dep--) in.parse_error(e[n].e[0], err_paren, e[n].e);
+		} else if (!dep--) in->parse_error(e[n].e[0], err_paren, e[n].e);
 		else arity.push_back(-2);
-	if (dep) in.parse_error(e[0].e[0], err_paren, e[0].e);
+	if (dep) in->parse_error(e[0].e[0], err_paren, e[0].e);
 }
 
-bool raw_rule::parse(input& in, const raw_prog& prog) {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;	size_t curr = pos;
+bool raw_rule::parse(input* in, const raw_prog& prog) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
 	if (*l[pos][0] == '!') {
 		if (*l[++pos][0] == '!') ++pos, type = TREE;
 		else type = GOAL;
@@ -485,7 +484,7 @@ head:	h.emplace_back();
 	if (*l[pos][0] == '.') return ++pos, true;
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || (l[pos][0][1] != '-' && l[pos][0][1] != '=' ))
-		in.parse_error(l[pos][0], err_head, l[pos]);
+		in->parse_error(l[pos][0], err_head, l[pos]);
 	++pos;
 	if(l[pos-1][0][1] == '=') { //  formula
 		curr = pos;
@@ -497,7 +496,7 @@ head:	h.emplace_back();
 		this->prft = temp;
 
 		if(ret) return true;
-		in.parse_error(l[pos][0], "Formula has errors", l[pos]);
+		in->parse_error(l[pos][0], "Formula has errors", l[pos]);
 	} else {
 
 		b.emplace_back();
@@ -505,32 +504,32 @@ head:	h.emplace_back();
 			b.back().emplace_back(), ++pos) {
 			if (*l[pos][0] == '.') return ++pos, true;
 			else if (*l[pos][0] == ';') b.emplace_back();
-			else if (*l[pos][0] != ',') in
-				.parse_error(l[pos][0], err_term_or_dot,l[pos]);
+			else if (*l[pos][0] != ',') in->parse_error(
+				l[pos][0], err_term_or_dot,l[pos]);
 		}
-		in.parse_error(l[pos][0], err_body, l[pos]);
+		in->parse_error(l[pos][0], err_body, l[pos]);
 	}
 	return false;
 }
 
-bool raw_prefix::parse(input& in) {
-	size_t curr = in.pos;
+bool raw_prefix::parse(input* in) {
+	size_t curr = in->pos;
 	isfod = false;
 	if (!qtype.parse(in)) return false;
 	if (qtype.type != elem::FORALL &&
 		qtype.type != elem::EXISTS &&
 		qtype.type != elem::UNIQUE)
-			return in.pos = curr, false;
-	if (*in.l[in.pos][0] == '?') isfod = true;
+			return in->pos = curr, false;
+	if (*in->l[in->pos][0] == '?') isfod = true;
 	if (!ident.parse(in)) return false;
 	if (ident.type != elem::VAR && ident.type != elem::SYM)
-		return in.pos = curr, false;
+		return in->pos = curr, false;
 	return true;
 }
 
-bool raw_sof::parsematrix(input& in, raw_form_tree *&matroot) {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;
+bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;
 	size_t curr = pos;
 	raw_form_tree * root = NULL;
 	bool isneg = false;
@@ -605,9 +604,9 @@ bool raw_sof::parsematrix(input& in, raw_form_tree *&matroot) {
 	matroot = root;
 	return pos=curr, false;
 }
-bool raw_sof::parseform(input& in, raw_form_tree *&froot, int_t prec ) {
+bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
 
-	size_t curr = in.pos;
+	size_t curr = in->pos;
 	raw_form_tree* root = NULL;
 	raw_form_tree* cur = NULL;
 
@@ -643,22 +642,22 @@ bool raw_sof::parseform(input& in, raw_form_tree *&froot, int_t prec ) {
 	Cleanup:
 	//if(root) delete root;
 	froot = root;
-	return in.pos=curr, false;
+	return in->pos=curr, false;
 }
 
 /* Populates root argument by creeating a binary tree of formula.
 	It is caller's responsibility to manage the memory of root. If the parse function,
 	returns false or the root is not needed any more, the caller should delete the root pointer.
 	*/
-bool raw_sof::parse(input& in, raw_form_tree *&root) {
+bool raw_sof::parse(input* in, raw_form_tree *&root) {
 
 	root = NULL;
 	bool ret = parseform(in, root );
 
-	if( in.pos >= in.l.size() || *in.l[in.pos][0] != '.') ret = false;
-	else in.pos++;
+	if( in->pos >= in->l.size() || *in->l[in->pos][0] != '.') ret = false;
+	else in->pos++;
 
-	DBG(COUT << "\n cur = " << in.pos << " tot= " << in.l.size() << " \n ";)
+	DBG(COUT << "\n cur = " << in->pos << " tot= " << in->l.size() << " \n ";)
 
 	return ret;
 }
@@ -677,9 +676,9 @@ bool raw_sof::parse(input& in, raw_form_tree *&root) {
 	if (l) l->printTree(level + 1);
 }
 
-bool production::parse(input &in, const raw_prog& prog) {
-	const lexemes& l = in.l;
-	size_t& pos = in.pos;
+bool production::parse(input *in, const raw_prog& prog) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;
 	size_t curr2, curr = pos;
 	elem e;
 	if (!e.parse(in) || l.size() <= pos+1) goto fail;
@@ -713,12 +712,12 @@ bool production::parse(input &in, const raw_prog& prog) {
 		if (!e.parse(in)) goto fail;
 		p.push_back(e);
 	}
-	in.parse_error(l[curr2][0], err_prod, l[curr2]);
+	in->parse_error(l[curr2][0], err_prod, l[curr2]);
 fail:	return pos = curr, false;
 }
 
-bool raw_prog::parse(input& in) {
-	while (in.pos < in.l.size() && *in.l[in.pos][0] != '}') {
+bool raw_prog::parse(input* in) {
+	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}') {
 		directive x;
 		raw_rule y;
 		production p;
@@ -733,12 +732,12 @@ bool raw_prog::parse(input& in) {
 
 raw_progs::raw_progs() { } // parse(s); 
 
-void raw_progs::parse(input& in, dict_t& dict, bool newseq) {
+void raw_progs::parse(input* in, dict_t& dict, bool newseq) {
 	try {
-		if (!in.data_) return;
-		lexemes& l = in.l;
-		size_t& pos = in.pos;
-		in.prog_lex();
+		if (!in->data()) return;
+		lexemes& l = in->l;
+		size_t& pos = in->pos;
+		in->prog_lex();
 		if (!l.size()) return;
 		auto prepare_builtins = [&dict](raw_prog& x) {
 			// BLTINS: prepare builtins (dict)
@@ -752,7 +751,7 @@ void raw_progs::parse(input& in, dict_t& dict, bool newseq) {
 			//raw_prog x;
 			prepare_builtins(x);
 			if (!x.parse(in))
-				in.parse_error(l[pos][0],
+				in->parse_error(l[pos][0],
 					err_rule_dir_prod_expected, l[pos]);
 			//p.push_back(x);
 		} else do {
@@ -761,10 +760,10 @@ void raw_progs::parse(input& in, dict_t& dict, bool newseq) {
 			//raw_prog x;
 			prepare_builtins(x);
 			if (++pos, !x.parse(in))
-				in.parse_error(l[pos][0], err_parse, l[pos]);
+				in->parse_error(l[pos][0], err_parse, l[pos]);
 			//if (p.push_back(x), pos==l.size() || *l[pos++][0]!='}')
 			if (pos == l.size() || *l[pos++][0] != '}')
-				in.parse_error(l[pos-1][1],
+				in->parse_error(l[pos-1][1],
 					err_close_curly, l[pos-1]);
 		} while (pos < l.size());
 	} catch (parse_error_exception &e) {
@@ -913,7 +912,7 @@ void input::parse_error(ccs offset, const char* err, lexeme close_to) {
 }
 
 void input::parse_error(ccs offset, const char* err, ccs close_to) {
-	DBG(o::dbg() << "parse_error: in.data: " << &data_ << " '" << data_
+	DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
 		<< "' offset: " << &offset << " '" << offset << "' "
 		<< " error: '" << err << "' "
 		<< " s: " << &close_to << " '" << close_to << "'"

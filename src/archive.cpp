@@ -17,7 +17,9 @@
 
 using std::endl;
 
+#ifdef DEBUG
 //#define DEBUG_ARCHIVE_POS
+#endif
 #ifdef DEBUG_ARCHIVE_POS
 #define POS(x)      pos(x);
 #define SPOS(x, v)  spos((x), (v), s);
@@ -984,7 +986,7 @@ size_t archive::size(const tables& t) {
 
 archive& archive::add_lexeme_and_map(const dict_t &d, const lexeme& l,bool add){
 	//COUT << "add_lexeme_and_map: " << (add ? "" : "no add ") << l << endl;
-	size_t inp = header_size() + sizeof(size_t) + sizeof(int_t);
+	size_t inp = header_size() + sizeof(size_t) + sizeof(size_t);
 	lexeme_range lr; input* in;
 	if (d.ii && d.ii->lexeme_pos(inp, l, &in, lr)) {
 		auto it = lmap_.find(l);
@@ -1038,19 +1040,17 @@ archive& archive::write_lexemes() {
 
 archive& archive::operator<<(const driver& d) {
 	write_header();
-	//POS("inputs")
-	int_t current = -1;
-	if (d.ii) {
-		*this << d.ii->size();
+	POS("inputs")
+	*this << d.ii->size();
+	if (d.ii->size()) {
+		*this << d.current_input_id;
 		input *in = d.ii->first();
 		while (in) {
-			current++;
-			*this << in;
+			*this << *in;
 			in = in->next();
 		}
-		*this << current;
-	} else *this << (size_t)0 << (int_t)-1;
-	//POS("dict")
+	}
+	POS("dict")
 	dict_t& dr = d.tbl->dict;
 	dict_ = &dr;
 	*this << dict_->rels.size();
@@ -1061,9 +1061,9 @@ archive& archive::operator<<(const driver& d) {
 	*this << d.rels.size();
 	*this << d.vars.size();
 	lpos_ = pos_ + sizeof(size_t);
-	//POS("dict lexemes")
+	POS("dict lexemes")
 	add_dict_lexemes(*dict_);
-	//POS("strs_extra lexemes")
+	POS("strs_extra lexemes")
 	add_lexemes(*dict_, d.strs_extra);
 	add_lexemes(*dict_, d.rels);
 	add_lexemes(*dict_, d.vars);
@@ -1082,9 +1082,9 @@ archive& archive::operator<<(const driver& d) {
 					add_lexeme_and_map(dr, e.e, false);
 		}
 	}
-	//POS("lexemes data and lexemes")
+	POS("lexemes data and lexemes")
 	write_lexemes();
-	//POS("bdd")
+	POS("bdd")
 	write_bdd();
 	//POS("opts");
 	*this << d.opts;
@@ -1117,62 +1117,46 @@ archive& archive::operator>>(driver& d) {
 	size_t nsize;
 	std::string s;
 	char bls;
-	dict_t& dict_r = d.tbl->dict;
-	dict_ = &(dict_r);
+	dict_t& dct = d.tbl->dict;
+	dict_ = &(dct);
 	read_header();
 
-	//POS("inputs")
-	int_t current = -1;
+	POS("inputs")
 	*this >> nsize;
-	if (nsize > 0 && d.ii) do {
-		d.ii->add(std::make_unique<input>((void*)0, (size_t)0));
-		*this >> *(d.ii->last());
-	} while (--nsize > 0);
-	if (!d.ii) {
-		*this >> current;
-		if (current >= 0) {
-			input *in = d.ii->first();
-			while (in && current >= 0) {
-				current--;
-				in = in->next();
-			}
-			if (in) d.ii->current_ = in;
-		}
-	} else pos_ += sizeof(int_t);
-	
-	//POS("dict")
-	size_t nrels, nsyms, nbltins, ndict_strs_extra, nstrs_extra,
-		ndriver_rels, nvars;
-	*this >> nrels >> nsyms >> nbltins >> ndict_strs_extra >> nstrs_extra
-		>> ndriver_rels >> nvars;
-	//POS("extra lexemes data")
+	if (nsize > 0) {
+		*this >> d.current_input_id;
+		do {
+			d.ii->add(std::make_unique<input>((void*)0, (size_t)0));
+			*this >> *(d.ii->last());
+		} while (--nsize > 0);
+		d.current_input = d.ii->first();
+		for (size_t i = 0; i != d.current_input_id; ++i)
+			d.current_input = d.current_input->next();
+	}
+
+	POS("dict")
+	size_t nrels, nsyms, nbltins, ndse, nse, ndrels, nvars;
+	*this >> nrels >> nsyms >> nbltins >> ndse >> nse >> ndrels >> nvars;
+	POS("extra lexemes data")
 	*this >> nsize; pos_ += nsize; // skip (strs) extra lexemes data
 	lexeme_range r;
-	#define LEXEME (lexeme{ (ccs) data_ + r[0], (ccs) data_ + r[1] }) 
+	#define LX (lexeme{ (ccs) data_ + r[0], (ccs) data_ + r[1] }) 
 	//POS("rel lexemes")
-	for (size_t i = 0; i != nrels; ++i) *this >> r,
-		dict_r.get_rel(LEXEME);
+	for (size_t i = 0; i != nrels; ++i) *this >> r,dct.get_rel(LX);
 	//POS("sym lexemes")
-	for (size_t i = 0; i != nsyms; ++i) *this >> r,
-		dict_r.get_sym(LEXEME);
+	for (size_t i = 0; i != nsyms; ++i) *this >> r,dct.get_sym(LX);
 	//POS("bltin lexemes")
-	for (size_t i = 0; i != nbltins; ++i) *this >> r,
-		dict_r.get_bltin(LEXEME);
+	for (size_t i = 0; i !=nbltins;++i) *this >> r,dct.get_bltin(LX);
 	//POS("strs_extra lexemes")
-	for (size_t i = 0; i != ndict_strs_extra; ++i) *this >> r,
-		dict_r.strs_extra.insert(LEXEME);
+	for (size_t i = 0; i != ndse;  ++i) *this >>r,dct.strs_extra.insert(LX);
 	//POS("dict strs_extra lexemes")
-	for (size_t i = 0; i != nstrs_extra; ++i) *this >> r,
-		d.strs_extra.insert(LEXEME);
+	for (size_t i = 0; i != nse;   ++i) *this >> r,d.strs_extra.insert(LX);
 	//POS("dict rels lexemes")
-	for (size_t i = 0; i != ndriver_rels; ++i) *this >> r,
-		d.rels.insert(LEXEME);
+	for (size_t i = 0; i != ndrels;++i) *this >> r, d.rels.insert(LX);
 	//POS("dict vars lexemes")
-	for (size_t i = 0; i != nvars; ++i) *this >> r,
-		d.vars.insert(LEXEME);
-	#undef LEXEME
-
-	//POS("bdd")
+	for (size_t i = 0; i != nvars; ++i) *this >> r, d.vars.insert(LX);
+	#undef LX
+	POS("bdd")
 	read_bdd();
 	//POS("opts")
 	*this >> d.opts;
@@ -1199,13 +1183,13 @@ archive& archive::operator>>(driver& d) {
 
 	int16_t footer; *this >> footer;
 	//POS("end")
-	DBG(assert(footer == (int16_t)0x8362));
+	DBG(assert(footer == (int16_t)0x8362)); // TODO what to do if not true?
 	return *this;
 }
 
 size_t archive::dict_and_lexemes_size(const driver& drv) {
 	const dict_t& d = drv.tbl->dict;
-	size_t beg = header_size() + sizeof(size_t) + sizeof(int_t);
+	size_t beg = header_size() + sizeof(size_t) + sizeof(size_t);
 	size_t s = 0;
 	//SPOS0("dict_and_lexemes_size begin")
 	s += 8 * sizeof(size_t) + (2 * sizeof(size_t) * (d.rels.size() +
@@ -1217,7 +1201,7 @@ size_t archive::dict_and_lexemes_size(const driver& drv) {
 			input* in; lexeme_range lr;
 			//COUT << "add lexeme size: " << l[1]-l[0] << " " << l << endl;
 			//s += l[1]-l[0];
-			if ((!d.ii || !d.ii->lexeme_pos(beg, l, &in, lr))
+			if ((!d.ii->lexeme_pos(beg, l, &in, lr))
 				&& (lexemes.insert(l).second)) {
 					//COUT << "adding lexeme size: " << l[1]-l[0] << endl;
 					s += l[1]-l[0];
@@ -1261,17 +1245,13 @@ size_t archive::dict_and_lexemes_size(const driver& drv) {
 }
 
 size_t archive::size(const driver& d) {
-	size_t s = 0;
-	s += header_size();
+	size_t s = header_size();
 	//SPOS("inputs size", s);
 	s += sizeof(size_t);
-	s += sizeof(int_t);
-	if (d.ii) {
+	if (d.ii->size()) {
+		s += sizeof(size_t);
 		input *in = d.ii->first();
-		while (in) {
-			s += size(*in);
-			in = in->next();
-		}
+		while (in) s += size(*in), in = in->next();
 	}
 	//SPOS0("dict")
 	s += dict_and_lexemes_size(d);

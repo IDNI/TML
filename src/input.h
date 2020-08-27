@@ -35,49 +35,35 @@ struct input {
 	friend class archive;
 	enum type { STDIN, FILE, STRING } type_;
 	bool newseq = false;
-	memory_map mm_;
-	ccs beg_  = 0;
-	ccs data_ = 0;
-	size_t size_ = 0;
-	bool allocated_ = false;
-	int fd_ = -1;
 	size_t offset = 0;
 	size_t pos = 0;
 	lexemes l = {};
-	std::unique_ptr<input> next_ = 0;
+	input(bool ns = false) : type_(STDIN), newseq(ns), beg_(0), data_(0),
+		size_(load_stdin()) {
+		//COUT << "created stdin input *: " << beg_ << std::endl;
+	}
+	input(void* s, size_t sz, bool ns = false) : type_(STRING), newseq(ns),
+		beg_((ccs) s), data_(beg_), size_(sz), allocated_(false) {
+		//COUT << "created pointer input: " << beg_ << std::endl;
+	}
+	input(ccs s, bool ns = false) : type_(STRING), newseq(ns),
+		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true)
+	{	//COUT << "created string input *: " << s << std::endl;
+	}
+	input(std::string f, bool ns = false); // FILE
+	~input();
 	lexeme lex(pccs s);
 	lexemes& prog_lex();
 	// is l in this input? if true set l's offset into lr
-	bool lexeme_pos(size_t beg, lexeme l, lexeme_range& lr) {
+	bool lexeme_pos(const size_t& beg, const lexeme& l, lexeme_range& lr) {
 		if ((l[0] >= beg_ && l[0] < beg_ + size_)
 		 || (l[1] >= beg_ && l[1] < beg_ + size_))
 			return	lr[0] = l[0] - beg_ + beg,
 				lr[1] = l[1] - beg_ + beg, true;
 		return false;
 	}
-	static std::string file_read(std::string fname);
-	static std::string file_read_text(::FILE *f);
-	static std::string file_read_text(std::string fname);
-	static off_t fsize(const char *fname);
-	static off_t fsize(ccs s, size_t len);
-	input(bool ns = false) : type_(STDIN), newseq(ns), beg_(0), data_(0),
-		size_(load_stdin())
-	{
-		//COUT << "created stdin input *: " << beg_ << std::endl;
-	}
-	input(void* s, size_t sz, bool ns = false) : type_(STRING), newseq(ns),
-		beg_((ccs) s), data_(beg_), size_(sz), allocated_(false)
-	{
-		//COUT << "created pointer input: " << beg_ << std::endl;
-	}
-	input(ccs s, bool ns = false) : type_(STRING), newseq(ns),
-		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true)
-	{
-		//COUT << "created string input *: " << s << std::endl;
-	}
-	input(std::string f, bool ns = false); // FILE
-	~input();
-	struct input* next() { return next_.get(); }
+	input* next() { return next_.get(); }
+	void set_next(std::unique_ptr<input> ni) { next_ = std::move(ni); }
 	ccs begin() { return beg_; }
 	ccs data() { return data_; }
 	size_t size() { return size_; }
@@ -89,7 +75,20 @@ struct input {
 	}
 	void parse_error(ccs offset, const char* err, ccs close_to);
 	void parse_error(ccs offset, const char* err, lexeme close_to);
+
+	static std::string file_read(std::string fname);
+	static std::string file_read_text(::FILE *f);
+	static std::string file_read_text(std::string fname);
+	static off_t fsize(const char *fname);
+	static off_t fsize(ccs s, size_t len);
 private:
+	memory_map mm_;
+	ccs beg_  = 0;
+	ccs data_ = 0;
+	size_t size_ = 0;
+	bool allocated_ = false;
+	int fd_ = -1;
+	std::unique_ptr<input> next_ = 0;
 	size_t load_stdin() {
 		ostringstream_t ss; ss << CIN.rdbuf();
 		beg_ = strdup((ws2s(ss.str())).c_str()), data_ = beg_,
@@ -101,53 +100,52 @@ private:
 class inputs { 
 	friend class archive;
 	std::unique_ptr<input> first_ = 0;
-	struct input *current_ = 0;
 	struct input *last_ = 0;
 	size_t size_ = 0;
 public:
 	void add(std::unique_ptr<input> in) {
+		//COUT << "inputs size: " << size_ << " adding input: " << in.get() << " last: " << last_<< std::endl;
 		input *inp = in.get();
-		if (last_) last_->next_ = std::move(in);
-		else if (first_ == 0) first_ = std::move(in);
+		if (last_) last_->set_next(std::move(in));
+		else first_ = std::move(in);
 		last_ = inp;
 		size_++;
 	}
-	void add_stdin() {
-		add(std::make_unique<input>());
+	input* add_stdin() {
+		std::unique_ptr<input> in = std::make_unique<input>();
+		input* ret = in.get();
+		add(std::move(in));
+		return ret;
 	}
-	void add_file(std::string filename) {
+	input* add_file(std::string filename) {
 		//COUT << "adding file input: " << filename << std::endl;
-		add(std::make_unique<input>(filename));
+		std::unique_ptr<input> in = std::make_unique<input>(filename);
+		input* ret = in.get();
+		add(std::move(in));
 		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
+		return ret;
 	}
-	void add_string(const std::string& str) {
+	input* add_string(const std::string& str) {
 		//COUT << "adding string input: " << str << std::endl;
-		add(std::make_unique<input>(str.c_str()));
+		std::unique_ptr<input> in = std::make_unique<input>(str.c_str());
+		input* ret = in.get();
+		add(std::move(in));
 		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
+		return ret;
 	}
 	input* first() const { return first_.get(); }
 	input* last() const { return last_; }
-	input* current() const {
-		return current_;
-		//if (current_ == -1) return 0;
-		//return &(at(current_));
-	}
-	input* next() {
-		if (!current_) return (current_ = first_.get());
-		if (current_->next_) {
-			current_->next_->set_offset(current_->offset +
-				current_->size_);
-			return (current_ = current_->next_.get());
-		} else return 0;
-	}
 	size_t size() const { return size_; }
-	bool lexeme_pos(size_t& beg, lexeme l, input** in, lexeme_range& lr) {
-		struct input* it = first_.get();
+	//is l in inputs? then point *in to the input and set l's offset into lr
+	bool lexeme_pos(size_t& beg, const lexeme& l, input** in,
+		lexeme_range& lr)
+	{
+		input* it = first_.get();
 		while (it) {
 			beg += sizeof(size_t) + 1;
 			if (it->lexeme_pos(beg, l, lr)) return *in = it, true;
-			beg += it->size_ + 1;
-			it = it->next_.get();
+			beg += it->size() + 1;
+			it = it->next();
 		}
 		return *in = 0, false;
 	}
@@ -180,9 +178,9 @@ struct elem {
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
-	etype peek(input& in);
+	etype peek(input* in);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }
-	bool parse(input& in);
+	bool parse(input* in);
 	bool operator<(const elem& t) const {
 		if (type != t.type) return type < t.type;
 		if (type == NUM) return num < t.num;
@@ -211,9 +209,9 @@ struct raw_term {
 
 	std::vector<elem> e;
 	ints arity;
-	bool parse(input& in, const raw_prog& prog,
+	bool parse(input* in, const raw_prog& prog,
 		rtextype pref_type = raw_term::REL);
-	void calc_arity(input& in);
+	void calc_arity(input* in);
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
@@ -230,7 +228,7 @@ struct directive {
 	raw_term t;
 	int_t n;
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD }type;
-	bool parse(input& in, const raw_prog& prog);
+	bool parse(input* in, const raw_prog& prog);
 };
 
 struct production {
@@ -238,7 +236,7 @@ struct production {
 //	raw_term t;
 	std::vector<elem> p;
 	std::vector<raw_term> c{};   // constraints after production
-	bool parse(input& in, const raw_prog& prog);
+	bool parse(input* in, const raw_prog& prog);
 	bool operator<(const production& t) const { return p < t.p && c < t.c; }
 };
 
@@ -251,7 +249,7 @@ struct raw_rule {
 
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
-	bool parse(input& in, const raw_prog& prog);
+	bool parse(input* in, const raw_prog& prog);
 	void clear() { h.clear(), b.clear(), type = NONE; }
 	raw_rule(){}
 	raw_rule(etype type, const raw_term& t) : h({t}), type(type) {}
@@ -274,7 +272,7 @@ struct raw_prefix {
 	elem qtype;
 	elem ident;
 	bool isfod =false;
-	bool parse(input& in);
+	bool parse(input* in);
 };
 
 
@@ -308,10 +306,10 @@ struct raw_sof {
 	const raw_prog& prog;
 	raw_sof(const raw_prog& prog) :prog(prog) {}
 private:
-	bool parseform(input& in, raw_form_tree *&root, int precd= 0);
-	bool parsematrix(input& in, raw_form_tree *&root);
+	bool parseform(input* in, raw_form_tree *&root, int precd= 0);
+	bool parsematrix(input* in, raw_form_tree *&root);
 public:
-	bool parse(input& in, raw_form_tree *&root);
+	bool parse(input* in, raw_form_tree *&root);
 
 };
 
@@ -321,13 +319,13 @@ struct raw_prog {
 	std::vector<raw_rule> r;
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
-	bool parse(input& in);
+	bool parse(input* in);
 };
 
 struct raw_progs {
 	std::vector<raw_prog> p;
 	raw_progs();
-	void parse(input& in, dict_t& dict, bool newseq = true);
+	void parse(input* in, dict_t& dict, bool newseq = true);
 };
 
 void throw_runtime_error(std::string err, std::string details = "");

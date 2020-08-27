@@ -47,19 +47,20 @@ public:
 	archive(type typ, void* data, size_t s) : type_(typ), mm_(),
 		data_(data), size_(s) {}
 
-	// pos and spos are debugging methods for logging positions and sizes
+	// pos and spos(l) are debugging methods. Use macros POS, SPOS, SPOS0
+	// and SPOSL to use them and define DEBUG_ARCHIVE_POS.
 	template <typename T>
 	static void spos(const std::string& n, const T& v, size_t s) {
 		sposl(n, archive::size(v), s);
 	}
 	static void sposl(const std::string& n, size_t l, size_t s) {
-		DBG(COUT << "spos: \t" << s << " \t0x" << std::hex << s
+		COUT << "spos: \t" << s << " \t0x" << std::hex << s
 			<< std::dec << " \t" << n << "\t size: " << l <<
-			std::endl;)
+			std::endl;
 	}
 	archive& pos(const std::string& n) {
-		DBG(COUT << "pos: \t" << pos_ << " \t0x" << std::hex <<
-			pos_ << std::dec << " \t" << n << std::endl;)
+		COUT << "pos: \t" << pos_ << " \t0x" << std::hex <<
+			pos_ << std::dec << " \t" << n << std::endl;
 		return *this;
 	}
 

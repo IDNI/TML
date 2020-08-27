@@ -47,7 +47,7 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 //			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
 			r.e.insert(r.e.begin()+n, elem(len)),
-			r.calc_arity(*(ii->current()));
+			r.calc_arity(current_input);
 		}
 }
 
@@ -162,9 +162,9 @@ bool driver::prog_run(raw_progs& rp, size_t n, size_t steps,
 	return fp;
 }
 
-void driver::add(input& in) {
-	rp.parse(in, tbl->get_dict(), in.newseq);
-	if (!in.newseq) transform(rp, pd.n, pd.strs);
+void driver::add(input* in) {
+	rp.parse(in, tbl->get_dict(), in->newseq);
+	if (!in->newseq) transform(rp, pd.n, pd.strs);
 }
 
 template <typename T>
@@ -255,8 +255,9 @@ void driver::db_save(std::string filename) {
 }
 
 void driver::load(std::string filename) {
-	load_archives.emplace_back(archive::type::DRIVER, filename, 0,
-		false);
+	if (ii->size()) throw_runtime_error( // TODO
+		"Loading into a running program is not yet supported.");
+	load_archives.emplace_back(archive::type::DRIVER, filename, 0, false);
 	load_archives.back() >> *this;
 }
 
@@ -266,13 +267,23 @@ void driver::save(std::string filename) {
 	ar << *this;
 }
 
+void driver::read_inputs() {
+	//COUT << "read_inputs() current_input: " << current_input << " next_input: " << (current_input ? current_input->next() : 0) << endl;
+	while (current_input && current_input->next()) {
+		current_input = current_input->next();
+		add(current_input);
+		++current_input_id;
+		//COUT << "current_inputid: " << current_input_id << endl;
+	}
+}
+
 driver::driver(string s, options o) : rp(), opts(o) {
 	dict_t dict;
 
-	if (s.size()) opts.parse(strings{ "-ie", s });
-
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
+
+	if (s.size()) opts.parse(strings{ "-ie", s });
 
 	// we don't need the dict any more, tables owns it from now on...
 	tbl = new tables(move(dict), opts.enabled("proof"), 
@@ -282,7 +293,11 @@ driver::driver(string s, options o) : rp(), opts(o) {
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
 
-	while (input* in = ii->next()) add(*in);
+	if (ii) {
+		current_input = ii->first();
+		if (current_input) add(current_input);
+		read_inputs();
+	}
 }
 driver::driver(FILE *f,   options o) : driver(input::file_read_text(f), o) {}
 driver::driver(char *s,   options o) : driver(string(s), o) {}

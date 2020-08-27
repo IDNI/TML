@@ -20,6 +20,8 @@ using namespace std;
 repl::repl(options &o, ostream_t& os) : o(o), os(os) {
 	os<<"# TML REPL ("<<GIT_DESCRIBED<<"). Enter ? or h for help."<<endl;
 	redrive("");
+	string archive_file = o.get_string("load");
+	if (archive_file.size()) d->load(archive_file);
 	if (o.enabled("udp")) {
 		string addr = o.get_string("udp-addr");
 		int_t port = o.get_int("udp-port");
@@ -31,6 +33,8 @@ repl::repl(options &o, ostream_t& os) : o(o), os(os) {
 		}
 	}
 	loop();
+	archive_file = o.get_string("save");
+	if (archive_file != "") d->save(archive_file);
 }
 
 template <typename T>
@@ -94,11 +98,12 @@ void repl::add(basic_ostream<T>& os, string line) {
 	os<<"# Adding '"<<line<<"'"<<(ils?" as a sequence":"")<<endl;
 	fin = false;
 	inputs *ii = d->get_inputs();
-	ii->add_string(line);
-	while (input *in = ii->next()) {
-		in->newseq = true;
-		d->add(*in);
+	input *in = ii->add_string(line);
+	if (!d->get_current_input()) {
+		d->set_current_input(in);
+		if (in) d->add(in);
 	}
+	d->read_inputs();
 	if (ar) run(os);
 }
 template void repl::add(basic_ostream<char>&, string);
@@ -164,7 +169,6 @@ void repl::out_dict(wostream& os) {
 	os << s2ws(ss.str());
 #endif
 }
-
 void repl::out_dict(ostream& os) {
 	ostringstream_t ss;
 	d->out_dict(ss);
@@ -180,14 +184,14 @@ bool repl::eval_input(basic_ostream<T>& os, string l) {
 	static string ll = "";
 	string f;
 	if (l == "") os<<"# Repeating: '"<<(l = ll)<<"'"<<endl;
-	else          ll = l;
+	else ll = l;
 	if       (l == "restart") restart(os);
 	else if  (l == "reparse") reparse(os);
 	else if  (l == "reset")   reset(os);
 	else if  (l == "dict") {  out_dict(os); return false; }
 	else if  (l == "q") return true; // quit
 	else if ((l == "?") ||
-			(l == "h"))  help(os);
+		(l == "h"))  help(os);
 	else if  (l == "p")   print(os);
 	else if  (l == "i") { info(os); return false; }
 	else if  (l == "ar")  toggle(os, "auto run",   ar);
@@ -197,7 +201,7 @@ bool repl::eval_input(basic_ostream<T>& os, string l) {
 	else if  (l == "gc")  bdd::gc();
 	else if  (l == "d")   dump(os);
 	else if ((l == "c") ||
-			(l == "r"))  run(os);
+		(l == "r"))  run(os);
 	else if  (l == "l")   list(os);
 	else if  (size_t p =   parse_size_t(l, "l")) list(os, p);
 	else if  (l == "s")   step(os);

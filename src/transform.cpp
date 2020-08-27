@@ -108,7 +108,7 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	t.e.emplace_back(get_var_elem(v2)),
 	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
 	t.e.emplace_back(elem_closep);
-	return t.calc_arity(*(ii->current())), t;
+	return t.calc_arity(current_input), t;
 }
 
 raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string& b,
@@ -283,7 +283,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	raw_term t;
 	append_sym_elem(t.e, get_lexeme("S")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
-	append_closep(t.e), t.calc_arity(*(ii->current()));
+	append_closep(t.e), t.calc_arity(current_input);
 	raw_rule rr;
 	rr.type = raw_rule::GOAL, rr.h = {t}, r.r.push_back(rr);
 	DBG(o::out() << "transformed grammar:" << endl << r;)

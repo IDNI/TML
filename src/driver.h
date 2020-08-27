@@ -113,6 +113,8 @@ class driver {
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
+	input* current_input = 0;
+	size_t current_input_id = 0;
 	std::vector<archive> load_archives;
 public:
 	bool result = true;
@@ -132,7 +134,7 @@ public:
 	void info(std::basic_ostream<T>&);
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
-	void add(input& in);
+	void add(input* in);
 	void restart();
 	bool run(size_t steps = 0, size_t br_on_step=0, bool br_on_fp = false);
 	bool step(size_t steps = 1, size_t br_on_step=0, bool br_on_fp = false);
@@ -157,6 +159,9 @@ public:
 	void db_load(std::string filename);
 	void db_save(std::string filename);
 	inputs* get_inputs() const { return ii; }
+	input* get_current_input() const { return current_input; }
+	void set_current_input(input* in) { current_input = in; }
+	void read_inputs();
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
 	emscripten::val to_bin() {
