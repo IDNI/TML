@@ -23,6 +23,9 @@
 #include "bdd.h"
 #include "term.h"
 #include "dict.h"
+
+#include "form.h"
+
 typedef int_t rel_t;
 class archive;
 struct raw_term;
@@ -34,7 +37,7 @@ class tables;
 //class dict_t;
 
 typedef std::pair<rel_t, ints> sig;
-typedef std::map<int_t, size_t> varmap;
+//typedef std::map<int_t, size_t> varmap;
 typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
 typedef std::set<std::vector<term>> flat_prog;
@@ -122,6 +125,7 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
+	pnf_t* f = NULL; //TODO destruct or make it smart
 	bool operator<(const rule& t) const {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
@@ -211,14 +215,10 @@ private:
 	std::set<level> fronts;
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
-	alt get_alt(const std::vector<raw_term>&);
-	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
-	//void get_alt(const std::set<term>& al, const term& h, std::set<alt>&as);
-	rule get_rule(const raw_rule&);
+
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
-	void merge_extensionals();
 
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
@@ -287,6 +287,7 @@ private:
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
+	void form_query(pnf_t *f, bdd_handles& v1);
 	void alt_query_bltin(alt& a, bdd_handles& v1); //XXX review
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
@@ -310,8 +311,12 @@ private:
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_nums(const raw_term& t);
 	flat_prog to_terms(const raw_prog& p);
-	void get_rules(flat_prog m);
+
 	void get_facts(const flat_prog& m);
+	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
+	void get_form(pnf_t*, const term_set& al, const term& h, std::set<alt>& as);
+	void get_rules(flat_prog m);
+
 	ntable get_table(const sig& s);
 	void table_increase_priority(ntable t, size_t inc = 1);
 	void set_priorities(const flat_prog&);
@@ -364,18 +369,17 @@ private:
 	//arithmetic/formulas support
 
 	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+	void ex_typebits(bools &exvec, size_t nvars) const;
 	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
-	void set_constants(const term& t, alt& a, spbdd_handle &q) const;
+	void set_constants(const term& t, spbdd_handle &q) const;
 	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
-	void perm_qvar(spbdd_handle &s, size_t var, size_t nvars) const;
-
 	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
 
-	bool handler_form1(const term& t, alt& a, spbdd_handle &cons);
-	spbdd_handle fol_eval(form *root);
-	bool handler_arith(const term& t, alt& a, spbdd_handle &cons);
+	void handler_form1(pnf_t *p, form* f, varmap &vm);
+	bool handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_handle &cons);
+
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
 		size_t bit, spbdd_handle x) const;
 	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
@@ -446,7 +450,7 @@ public:
 struct transformer;
 
 //XXX: should define higher level struct?
-// formula { form* root,  type: FOL/SOL/ARITH }
+// formula { form* root,  type: FOL/SOL/ARITH/ } //CONSTRAINTS
 
 struct form{
 friend struct transformer;

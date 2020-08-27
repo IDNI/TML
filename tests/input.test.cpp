@@ -39,42 +39,37 @@ test multiple_inputs = [] {
 
 	inputs ii;
 	if (ii.size() != 0) return fail("inputs size != 0");
-	if (ii.current() != 0) return fail("empty inputs current != 0");
 
 	ii.add_string(prog1);
 	if (ii.size() != 1) return fail("inputs size != 1");
-	if (ii.current() != 0) return fail("inputs(of size 1) current != 0");
 
 	ii.add_string(prog2);
 	if (ii.size() != 2) return fail("inputs size != 2");
-	if (ii.current() != 0) return fail("inputs(of size 2) current != 0");
 
 	ii.add_file("input.test.file");
 	if (ii.size() != 3) return fail("inputs size != 3");
-	if (ii.current() != 0) return fail("inputs(of size 3) current != 0");
 
-	input* i = ii.next();
-	if (ii.current() != i) return fail("input1 current error");
+	input* i = ii.first();
 	if (i == 0) return fail("input1 next == 0");
 	if ((string(i->data())  != prog1)
  	 || (string(i->begin()) != prog1))
 		return fail("wrong input1 data");
 
-	i = ii.next();
-	if (ii.current() != i) return fail("input2 current error");
+	i = i->next();
 	if (i == 0) return fail("input2 next == 0");
 	if ((string(i->data())  != prog2)
 	 || (string(i->begin()) != prog2))
 		return fail("wrong input2 data");
 
-	i = ii.next();
-	if (ii.current() != i) return fail("input3 current error");
+	i = i->next();
 	if (i == 0) return fail("input3 == 0");
 	//COUT << "prog3: '" << prog3 << "'\n i->begin(): '"
 	//	<< i->begin() << "'\n";
 	if ((string(i->data())  != prog3)
 	 || (string(i->begin()) != prog3))
 		return fail("wrong input3 data");
+
+	if (i->next()) return fail("4th input reached but only 3 added");
 
 	return ok();
 };

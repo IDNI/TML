@@ -30,7 +30,7 @@ test pe(std::string prog, std::string err, long line, long chr, std::string to) 
 	if (to != "") ss << " close to \"" << to << "\"";
 	std::string expected = ss.str();
 	auto got_output = [] () {
-		char_t t[256];
+		syschar_t t[256];
 		istringstream_t is(::outputs::get("error")->read());
 		is.getline(t, 256);
 		return ws2s(t);
@@ -46,7 +46,7 @@ test pe(std::string prog, std::string err, long line, long chr, std::string to) 
 		} catch (std::exception& e) {
 			return fail(e.what());
 		}
-		char_t t[256];
+		syschar_t t[256];
 		istringstream_t is(oo.get("error")->read());
 		is.getline(t, 256);
 		got = ws2s(t);

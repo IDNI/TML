@@ -5,11 +5,16 @@ SUFFIX="Debug"
 BUILD_DIR="build-${SUFFIX}"
 CMAKE_OPTIONS="-DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=clang++ ${@:3}"
 
-mkdir -p "${BUILD_DIR}"
-cd "${BUILD_DIR}"
-rm -f ./CMakeCache.txt
+./build.sh Debug $CMAKE_OPTIONS
 
-cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${CMAKE_OPTIONS} &&
-make -j5 &&
-make -j5 cppcheck &&
-make -j5 clang-tidy
+cd "${BUILD_DIR}"
+NINJA_BIN="$(which ninja 2>&1)";
+if [ -z $NINJA_BIN ]; then
+  make -j5 cppcheck
+  make -j5 clang-tidy
+  make -j5 tml-check
+else
+  ninja cppcheck
+  ninja clang-tidy
+  ninja tml-check
+fi

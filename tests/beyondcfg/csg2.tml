@@ -5,4 +5,4 @@ C => 'c'C .
 C => 'c' .
 D =>  'd'D | 'd'.
 
-S => AB C D ,  len(2) *2 = len(1) , len (3) <= len(2). 
+S => AB C D ,  len(2) *2 = len(1) , len (2) <= len(3). 

@@ -76,31 +76,44 @@ lexeme input::lex(pccs s) {
 		return { t, ++(*s) };
 	}
 
+	// implication and coimplication
 	if (**s == '-' && *(*s + 1) == '>') {
 		return *s += 2, lexeme{ *s - 2, *s };
 	}
-	// implication and coimplication
 	if (**s == '<' && *(*s + 1) == '-' && *(*s + 2) == '>') {
 		return *s += 3, lexeme{ *s - 3, *s };
 	}
-	// LEQ: put this in front if '<file>' below (as that'll eat us + error out)
-	//if (**s == '<') {
-	if (**s == '<' && !(*(*s + 1) == '<')) {
-		if (*(*s + 1) == '=')
-			return *s += 2, lexeme{ *s - 2, *s };
-		// D: lex/parse: <file> parsing is moved to directive::parse, tag just <
-		return ++*s, lexeme{ *s-1, *s };
+
+	// AND &&, OR ||
+	if (**s == '&' && *(*s + 1) == '&') {
+		return *s += 2, lexeme{ *s - 2, *s };
 	}
-	//if (**s == '>') {
-	if (**s == '>' && !(*(*s + 1) == '>')) {
-		if (*(*s + 1) == '=')
-			return *s += 2, lexeme{ *s - 2, *s };
-		return ++*s, lexeme{ *s-1, *s };
+	if (**s == '|' && *(*s + 1) == '|') {
+		return *s += 2, lexeme{ *s - 2, *s };
 	}
+	// LEQ, GEQ, NEQ
+	if ( (**s == '<' && *(*s + 1) == '=') ||
+		 (**s == '>' && *(*s + 1) == '=') ||
+		 (**s == '!' && *(*s + 1) == '=') )
+		return *s += 2, lexeme{ *s - 2, *s };
+
+	//shift operators:
+	if (**s == '>' && (*(*s + 1) == '>'))
+		return *s += 2, lexeme{ *s - 2, *s };
+	if (**s == '<' && (*(*s + 1) == '<'))
+		return *s += 2, lexeme{ *s - 2, *s };
+
+	// rule symbol
+	//XXX: ":=" will deprecate
+	if (**s == ':') {
+		if (*++*s=='-' || **s=='=') return ++*s, lexeme{ *s-2, *s };
+		else parse_error(*s, err_chr);
+	}
+
 	if (**s == '\'') {
 		if (*(*s + 1) == '\'') return { t, ++++*s };
 		if (*(*s + 1) == '\\') {
-			//if ((*(*s+2)!='\''&&*(*s+2)!='\\')
+			//if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
 			if (!strchr("\\'rnt",*(*s+2)) ||*(*s+3)!='\'')
 				parse_error((*s+2), err_escape);
 			return { t, ++++++++*s };
@@ -108,27 +121,10 @@ lexeme input::lex(pccs s) {
 		if (*(*s + 2) != '\'') parse_error(*s+2, err_quote);
 		return { t, ++++++*s };
 	}
-	if (**s == ':') {
-		if (*++*s=='-' || **s=='=') return ++*s, lexeme{ *s-2, *s };
-		else parse_error(*s, err_chr);
-	}
-	// NEQ: make sure we don't turn off directives (single '!'). limits?
-	if (**s == '!' && *(*s + 1) == '=') {
-		return *s += 2, lexeme{ *s - 2, *s };
-	}
 
-	//ARITH operators:
-	//SHR, SHL, XXX: EQ?
-	if (**s == '>' && (*(*s + 1) == '>')) return *s += 2, lexeme{ *s - 2, *s };
-	if (**s == '<' && (*(*s + 1) == '<')) return *s += 2, lexeme{ *s - 2, *s };
-	//if (**s == '=' && *(*s + 1) == '=') return *s += 2, lexeme{ *s - 2, *s };
+	if (strchr("!~.,;(){}$@=<>|&^+*-", **s)) return ++*s, lexeme{ *s-1, *s};
 
-	// TODO: single = instead of == recheck if we're not messing up something?
-	if (**s == '=') return ++*s, lexeme{ *s-1, *s };
-	if (strchr("!~.,;(){}$@=<>|&", **s)) return ++*s, lexeme{ *s-1, *s };
-	if (strchr("!~.,;(){}$@=<>|&^+*", **s)) return ++*s, lexeme{ *s-1, *s };
-	//TODO: review - for subtraction
-	if (strchr("?-", **s)) ++*s;
+	if (strchr("?", **s)) ++*s;
 	if (!isalnum(**s) && **s != '_') parse_error(*s, err_chr);
 	while (**s && (isalnum(**s) || **s == '_')) ++*s;
 	return { t, *s };
@@ -241,8 +237,6 @@ bool elem::parse(input* in) {
 		return e = l[pos++], type = COIMPLIES, true;
 	}
 
-	// LEQ: recheck if '<' is going to make any issues (order/card is important)
-	// 	if ('<' == l[pos][0][0] && '=' == l[pos][0][1])
 	if (('<' == l[pos][0][0])  && !('<' == l[pos][0][1])) {
 		if ('=' == l[pos][0][1]) return e = l[pos++], type = LEQ, true;
 		return e = l[pos++], type = LT, true;
@@ -252,7 +246,7 @@ bool elem::parse(input* in) {
 		if ('=' == l[pos][0][1]) return e = l[pos++], type = GEQ, true;
 		return e = l[pos++], type = GT, true;
 	}
-	// TODO: single = instead of == recheck if we're not messing up something?
+	//XXX: EQ "=", "==" is undefined
 	if ('=' == l[pos][0][0]) {
 		if (pos + 1 < l.size() && '>' == l[pos+1][0][0]) return false;
 		return e = l[pos++], type = EQ, true;
@@ -292,7 +286,7 @@ bool elem::parse(input* in) {
 		return e = l[pos++], type = ARITH, arith_op = SHL, true;
 	}
 
-	if (!isalnum(*l[pos][0]) && !strchr("\"'-?", *l[pos][0])) return false;
+	if (!isalnum(*l[pos][0]) && !strchr("\"'?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == '\'') {
 		type = CHR, e = { 0, 0 };
 		if (l[pos][0][1] == '\'') ch = 0;
@@ -320,7 +314,7 @@ bool elem::parse(input* in) {
 	return ++pos, true;
 }
 
-bool raw_term::parse(input* in, const raw_prog& prog,
+bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	raw_term::rtextype pref_type)
 {
 	const lexemes& l = in->l;
@@ -333,17 +327,14 @@ bool raw_term::parse(input* in, const raw_prog& prog,
 
 	t_arith_op arith_op_aux = NOP;
 
-	// D: why was '<' a terminator? (only in directive). Removed, messes up LT.
-	//XXX: review for "-"
-	//FIXME: here we have conflict with LEC, ARITH and SOL(formula) parsing.
-	//       also eventually ARITH will become formula as well.
-	while (!strchr(".:,;{}-", *l[pos][0])) { // ".:,;{}|&-<"
+	while ((!strchr(".:,;{}", *l[pos][0]) && !is_form) ||
+		   (!strchr(".:,;{}|&-<", *l[pos][0]) && is_form)) {
 		if (e.emplace_back(), !e.back().parse(in)) return false;
 		else if (pos == l.size())
 			in->parse_error(l[pos-1][1], err_eof, s[0]);
 		elem& el = e.back(); // TODO: , el = e.back(), !el.parse(l, pos)
 		switch (el.type) {
-			case elem::EQ:  eq    = true; break;//TODO: review - for substraction
+			case elem::EQ:     eq = true; break;
 			case elem::NEQ: noteq = true; break;
 			case elem::LEQ: leq   = true; break;
 			case elem::GT:  gt    = true; break;
@@ -456,7 +447,7 @@ void raw_term::insert_parens(lexeme op, lexeme cl) {
 void raw_term::calc_arity(input* in) {
 	size_t dep = 0;
 	arity = {0};
-	//if (iseq || isleq || islt || isarith) {
+	//XXX: are we comparing over an enum?
 	if (extype > raw_term::REL && extype < raw_term::BLTIN) {
 		arity = { 2 };
 		return;
@@ -485,30 +476,41 @@ head:	h.emplace_back();
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || (l[pos][0][1] != '-' && l[pos][0][1] != '=' ))
 		in->parse_error(l[pos][0], err_head, l[pos]);
+
 	++pos;
-	if(l[pos-1][0][1] == '=') { //  formula
-		curr = pos;
+
+	//XXX: workaround to use ":-" both for standard rules and formulas
+	//     syntax revision for formula may be required
+	bool is_form = false;
+	//TODO: check for fault
+	for (size_t x = pos; l[x][0][0] != '.'; x++) {
+		if (l[x] == "forall" || l[x] == "exists" || l[x] == "unique" ||
+			l[x] == "&&" || l[x] == "||" || l[x] == "|") {
+			is_form = true; break;
+		}
+	}
+
+	if(is_form) {
 		raw_sof rsof(prog);
 		raw_form_tree * root = NULL;
 		bool ret = rsof.parse(in, root);
-
 		sprawformtree temp(root);
 		this->prft = temp;
-
 		if(ret) return true;
 		in->parse_error(l[pos][0], "Formula has errors", l[pos]);
 	} else {
-
 		b.emplace_back();
 		for (b.back().emplace_back(); b.back().back().parse(in, prog);
 			b.back().emplace_back(), ++pos) {
 			if (*l[pos][0] == '.') return ++pos, true;
-			else if (*l[pos][0] == ';') b.emplace_back();
-			else if (*l[pos][0] != ',') in->parse_error(
-				l[pos][0], err_term_or_dot,l[pos]);
+			//XXX: this causes a segfault, why we need semi-colon here?
+			//else if (*l[pos][0] == L';') b.emplace_back();
+			else if (*l[pos][0] != ',')
+				in->parse_error(l[pos][0], err_term_or_dot,l[pos]);
 		}
 		in->parse_error(l[pos][0], err_body, l[pos]);
 	}
+
 	return false;
 }
 
@@ -551,15 +553,21 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 	else {
 		elem next;
 		next.peek(in);
-		if (next.type == elem::SYM) {
+
+		if(next.type == elem::SYM) {
 			raw_term tm;
-			if( !tm.parse(in, prog)) goto Cleanup;
-
+			if( !tm.parse(in, prog, true)) goto Cleanup;
 			root = new raw_form_tree(elem::NONE, &tm);
-
-			if (isneg) root = new raw_form_tree(elem::NOT,
-				NULL, NULL, root);
-
+			if( isneg ) root = new raw_form_tree(elem::NOT, NULL, NULL, root);
+			matroot = root;
+			return true;
+		}
+		//XXX: Constraints, by now using && in the form matrix
+		else if(next.type == elem::VAR) {
+			raw_term tm;
+			if( !tm.parse(in, prog, false)) goto Cleanup;
+			root = new raw_form_tree(elem::NONE, &tm);
+			if( isneg ) root = new raw_form_tree(elem::NOT, NULL, NULL, root);
 			matroot = root;
 			return true;
 		} else {
@@ -627,14 +635,11 @@ bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
 
 	nxt.peek(in);
 	while( prec <= 0 && (nxt.type == elem::AND || nxt.type == elem::ALT) ) {
-
 		nxt.parse(in);
 		cur = new raw_form_tree(nxt.type, NULL, &nxt, root);
-
 		root = cur;
-		if (!parseform(in, root->r, 1)) goto Cleanup;
+		if (!parseform(in, root->r, 1) ) goto Cleanup;
 		nxt.peek(in);
-
 	}
 	froot = root;
 	return true;
@@ -661,8 +666,9 @@ bool raw_sof::parse(input* in, raw_form_tree *&root) {
 
 	return ret;
 }
- void raw_form_tree::printTree( int level)
-{
+
+void raw_form_tree::printTree( int level) {
+
 	if( r ) r->printTree(level + 1)	;
 
 	COUT << '\n';
@@ -702,7 +708,7 @@ bool production::parse(input *in, const raw_prog& prog) {
 			for (;*l[pos][0] == L','; ) { 
 				++pos;	
 				raw_term rt;
-				if (!rt.parse(in, prog, raw_term::CONSTRAINT))
+				if (!rt.parse(in, prog, 0,raw_term::CONSTRAINT))
 					goto fail;
 				c.push_back(rt);
 			}

@@ -23,6 +23,7 @@ set(TML_HEADERS
 	dict.h
 	driver.h
 	err.h
+	form.h
 	input.h
 	memory_map.h
 	options.h
@@ -36,6 +37,7 @@ set(TML_SOURCES
 	bdd_ext.cpp
 	dict.cpp
 	driver.cpp
+	form.cpp
 	input.cpp
 	options.cpp
 	output.cpp

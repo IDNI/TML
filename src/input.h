@@ -209,7 +209,7 @@ struct raw_term {
 
 	std::vector<elem> e;
 	ints arity;
-	bool parse(input* in, const raw_prog& prog,
+	bool parse(input* in, const raw_prog& prog, bool is_form = false,
 		rtextype pref_type = raw_term::REL);
 	void calc_arity(input* in);
 	void insert_parens(lexeme op, lexeme cl);
@@ -271,10 +271,9 @@ struct raw_rule {
 struct raw_prefix {
 	elem qtype;
 	elem ident;
-	bool isfod =false;
+	bool isfod = false;
 	bool parse(input* in);
 };
-
 
 struct raw_form_tree {
 	elem::etype type;

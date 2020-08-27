@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <algorithm>
+#include <list>
 #include "tables.h"
 #include "dict.h"
 #include "input.h"
@@ -37,28 +38,23 @@ void tables::ex_typebits(spbdd_handle &s, size_t nvars) const {
 	s = s / exvec;
 }
 
+void tables::ex_typebits(bools &exvec, size_t nvars) const {
+	for (size_t i = 0; i < bits; ++i)
+		for (size_t j = 0; j< nvars; ++j)
+			if (i == bits - 2 || i == bits - 1 )
+				exvec[i*nvars+j]=true;
+}
+
+
 void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 	for (size_t j = 0; j< nvars; ++j)
 		s = s && ::from_bit(pos(1, j, nvars),1)
 			  && ::from_bit(pos(0, j, nvars),0);
 }
 
-void tables::perm_qvar(spbdd_handle &s, size_t var, size_t nvars) const {
-
-	uints perm = perm_init(bits*nvars);
-	perm[0] = var;
-	//TODO: put var first
-	/*
-	for (size_t i = 0; i < n_bits*n_vars; i++) {
-		perm1[i] = ((n_bits-1-(i/n_vars))*n_vars) + i % n_vars;
-	}
-	*/
-	s = s^perm;
-}
-
 //-----------------------------------------------------------------------------
 
-spbdd_handle tables::fol_eval(form *f) {
+void tables::handler_form1(pnf_t *p, form* f, varmap &vm) { //std::vector<body*> bs
 
 	assert(f!=NULL);
 
@@ -68,73 +64,155 @@ spbdd_handle tables::fol_eval(form *f) {
 		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) || \
 		   (f->l != NULL && f->r != NULL)));
 
-	spbdd_handle q = htrue;
+	if (f->type == form::ATOM) {
+		//TODO: check that all vars in REL are already in map
+		//( by now assumoing non free variables in qbf)
 
-	//TODO: properly bring nvars here
-	size_t nvars = 1;
+		//XXX: here is possible to get the non quantified variables.
+		//     also possible to check whether were set in header, if not?
+		//     either way, should be placed in vm after first quant (at the tail)
+		//     for further alignment on pnf splits
 
-	switch (f->type) {
-		case form::ATOM:
-			DBG(assert(f->arg == 0));
+		DBG(assert(f->arg == 0));
 
-			q = tbls[f->tm->tab].t;
-			//set_constants(t,a,q);
-			//b.perm = get_perm(t, vm, len), //check get_body
-			ex_typebits(q, nvars);
+		//XXX: vm.size as varslen wont work for pnf splits. should be provided by parser
+		// or on a pre fol preparation / or leave get_body as burst after handler_form1
+		if (f->tm->extype == term::REL) {
+			p->b = new body(get_body(*f->tm, vm, vm.size()));
+			ex_typebits(p->b->ex,f->tm->size());
+			spbdd_handle q = body_query(*(p->b),0);
 			o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
-			::out(wcout, q)<<endl<<endl;
-			append_num_typebits(q,nvars);
-			break;
-
-		case form::IMPLIES:
-			//XXX: review how to deal with different arity
-			q = bdd_impl(fol_eval(f->l), fol_eval(f->r));
-
-			ex_typebits(q, nvars);
-			o::dbg() << " implies ------------------- " << ::bdd_root(q) << " :\n";
-			::out(wcout, q)<<endl<<endl;
-			append_num_typebits(q,nvars);
-			break;
-
-		case form::COIMPLIES: /*q = bdd_coimpl(fol_eval(f->l), fol_eval(f->l));*/ break;
-		case form::AND: q = fol_eval(f->l) && fol_eval(f->r); break;
-		case form::OR: q = fol_eval(f->l) && fol_eval(f->r); break;
-		case form::NOT: q = bdd_not(fol_eval(f->l)); break;
-
-		case form::EXISTS1: ;
-			  //b.insert(lastbody = { get_body(t, a.vm, a.varslen), t });
-			  //permute according to ?x
-			  //bdd_or
-			  //undo permute or register perm as in body
-			break;
-
-		case form::FORALL1: ;
-			q = fol_eval(f->r);
-			//TOO: permute according to: f->l->arg
-			o::dbg() << " in forall ------------------- " << ::bdd_root(q) << " :\n";
-			::out(wcout, q)<<endl<<endl;
-			ex_typebits(q, nvars);
-			q = bdd_and_hl(q);
-			append_num_typebits(q,nvars);
-			o::dbg() << " out forall ------------------- " << ::bdd_root(q) << " :\n";
-						::out(wcout, q)<<endl<<endl;
-			break;
-
-		case form::UNIQUE1: ; break;
-
-		default: break;
+			::out(COUT, q)<<endl<<endl;
+		}
+		else if (f->tm->extype == term::ARITH) {
+			handler_arith(*f->tm, vm, vm.size(), p->cons);
+			ex_typebits(p->cons, f->tm->size());
+		}
+		//TODO: LEQ, EQ etc
+		else {
+			DBG(assert(false));
+		}
 
 	}
+	else if (f->type == form::IMPLIES) {
+		//XXX: review how to deal with different arity
+		DBG(assert(f->l->arg == 0 && f->r->arg == 0));
 
-	return q;
+		pnf_t *p0 = new(pnf_t);
+		handler_form1(p0, f->l,vm);
+
+		pnf_t *p1 = new(pnf_t);
+		handler_form1(p1, f->r,vm);
+		//if (p1->b) p1->b->neg = true;
+		//else p1->neg = true;
+		p1->neg = true;
+
+		p->matrix.push_back(p0);
+		p->matrix.push_back(p1);
+		p->neg = true;
+		//o::dbg() << L" implies ------------------- " << ::bdd_root(q) << L" :\n";
+		//::out(wcout, q)<<endl<<endl;
+	}
+	//else if (f->type == form::COIMPLIES) q = bdd_coimpl(handler_form1(f->l), handler_form1(f->l));
+	else if (f->type == form::AND) {
+		DBG(assert(f->l->arg == 0 && f->r->arg == 0));
+
+		pnf_t *p0 = new(pnf_t);
+		handler_form1(p0, f->l,vm);
+		pnf_t *p1 = new(pnf_t);
+		handler_form1(p1, f->r,vm);
+
+		p->matrix.push_back(p0);
+		p->matrix.push_back(p1);
+	}
+	else if (f->type == form::OR) {
+		pnf_t *p0 = new(pnf_t);
+		handler_form1(p0, f->l,vm);
+		if (p0->b) p0->b->neg = true;
+		else p0->neg = true;
+
+		pnf_t *p1 = new(pnf_t);
+		handler_form1(p1, f->r,vm);
+		if (p1->b) p1->b->neg = true;
+		else p1->neg = true;
+
+		p->matrix.push_back(p0);
+		p->matrix.push_back(p1);
+		p->neg = true;
+	}
+	else if (f->type == form::NOT) {
+		handler_form1(p, f->l, vm);
+		p->neg = !p->neg;
+	}
+	else if (f->type == form::EXISTS1) {
+		//XXX: handle variables used in q's more than once?
+		vm.emplace(f->l->arg, vm.size()); //nvars-1-vm.size());
+		for (auto &v : vm)
+		    v.second = vm.size()-1-v.second;
+		p->vm = vm;
+		p->quants.emplace(p->quants.begin(), quant_t::EX);
+		handler_form1(p, f->r,vm);
+
+		vm.erase(f->l->arg);
+	}
+	else if (f->type == form::FORALL1) {
+		//XXX: just for current iteration until
+		//     syntax, parser & some semantics cleared
+		vm.emplace(f->l->arg, vm.size()); //nvars-1-vm.size());
+		for (auto &v : vm)
+			v.second = vm.size()-1-v.second;
+		p->vm = vm;
+		p->quants.emplace(p->quants.begin(), quant_t::FA);
+		handler_form1(p, f->r,vm);
+
+		vm.erase(f->l->arg);
+	}
+	else if (f->type == form::UNIQUE1) {
+		;//p->quants = bdd_xor_hl(q);
+	}
+
 }
 
-bool tables::handler_form1(const term& t, alt& a, spbdd_handle &cons) {
-	DBG(assert(a.varslen != 0));
-	cons = fol_eval(t.qbf);
-	o::dbg() << " ---------%%%%---------- " << ::bdd_root(cons) << " :\n";
-	::out(wcout, cons)<<endl<<endl;
-	return true;
+//-----------------------------------------------------------------------------
+
+void tables::form_query(pnf_t *f, bdd_handles &v) {
+
+	spbdd_handle q = htrue;
+
+	if (f->cons != bdd_handle::T) {
+		v.push_back(f->cons);
+	}
+
+	for (auto p : f->matrix) {
+		if (p->b) {
+			q = body_query(*p->b,0);
+			if (p->neg) q = bdd_not(q);
+		}
+		else {
+			form_query(p,v);
+			assert(v.size() == 1);
+			q = v[0]; //from an inner pnf
+			//XXX: realign variables
+		}
+		v.push_back(q);
+	}
+	if( f->b) {
+		q = body_query(*f->b,0);
+		v.push_back(q);
+	}
+
+	//XXX: feasible place to realign variables by means of bdd_and_many_ex_perm
+	q = bdd_and_many(move(v));
+
+	if (f->neg) q = bdd_not(q);
+
+	if (f->quants.size() != 0) {
+		//first quant appied to var 0, second to var 1 and so ...
+		q = bdd_qsolve(q, f->quants);
+		//o::dbg() << L" quants ------------------- " << ::bdd_root(q) << L" :\n";
+		//::out(wcout, q)<<endl<<endl;
+	}
+	v.push_back(q);
 }
 
 // ----------------------------------------------------------------------------
@@ -162,7 +240,7 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit,
 				leq_var(arg1, arg2, args, bit) && x));
 }
 
-void tables::set_constants(const term& t, alt& a, spbdd_handle &q) const {
+void tables::set_constants(const term& t, spbdd_handle &q) const {
 
 	size_t args = t.size();
 	for (size_t i = 0; i< args; ++i)
@@ -178,20 +256,13 @@ void tables::set_constants(const term& t, alt& a, spbdd_handle &q) const {
 			else exvec.push_back(false);
 	}
 	q = q/exvec;
-
-	//XXX: this is not part of constants, this is var alignment with head
-	uints perm2 = get_perm(t, a.vm, a.varslen);
-	q = q^perm2;
 }
 
 // ----------------------------------------------------------------------------
 
-bool tables::handler_arith(const term& t, alt& a, spbdd_handle &leq) {
+bool tables::handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_handle &leq) {
 
-
-	//DBG(o::dbg() << "ARITH handler ... " << endl;)
-
-	spbdd_handle q;
+	spbdd_handle q = bdd_handle::T;
 
 	switch (t.arith_op) {
 		case ADD:
@@ -225,59 +296,53 @@ bool tables::handler_arith(const term& t, alt& a, spbdd_handle &leq) {
 			//XXX not working for ?x + ?x = 2
 			size_t args = 3;
 			q = add_var_eq(0, 1, 2, args);
-			set_constants(t,a,q);
-
+			set_constants(t,q);
+			//XXX: var alignment with head
+			uints perm2 = get_perm(t, vm, varslen);
+			q = q^perm2;
 		} break;
 
 		case SHR:
 		{
-			//DBG(o::dbg() << "SHL handler ... " << endl;)
-			size_t var0 = a.vm.at(t[0]);
+			size_t var0 = vm.at(t[0]);
 			assert(t[1] > 0 && "shift value must be a constant");
 			size_t num1 = t[1] >> 2;
-			size_t var2 = a.vm.at(t[2]);
-			q = shr(var0, num1, var2, a.varslen);
+			size_t var2 = vm.at(t[2]);
+			q = shr(var0, num1, var2, varslen);
 		} break;
 
 		case SHL:
 		{
-			//DBG(o::dbg() << "SHL handler ... " << endl;)
-			size_t var0 = a.vm.at(t[0]);
+			size_t var0 = vm.at(t[0]);
 			assert(t[1] > 0 && "shift value must be a constant");
 			size_t num1 = t[1] >> 2;
-			size_t var2 = a.vm.at(t[2]);
-			q = shl(var0, num1, var2, a.varslen);
-
+			size_t var2 = vm.at(t[2]);
+			q = shl(var0, num1, var2, varslen);
 		} break;
 
 		case MULT:
 		{
-			//DBG(o::dbg() << "MULT handler ... " << endl;)
-
 			size_t args = t.size();
-
 			if (args == 3) {
 				q = mul_var_eq(0,1,2,3);
-				set_constants(t,a,q);
+				set_constants(t,q);
 			}
 			//XXX: hook for extended precision
 			//XXX wont run, needs update in parser like ?x0:?x1
 			else if (args == 4) {
 				q = mul_var_eq_ext(0,1,2,3,args);
-				set_constants(t,a,q);
+				set_constants(t,q);
 			}
-
+			//XXX: var alignment with head
+			uints perm2 = get_perm(t, vm, varslen);
+			q = q^perm2;
 		} break;
 
-		default:
-			break;
-
-	}
+		default: break;
+	};
 
 	leq = leq && q;
-
 	return true;
-
 }
 
 // ----------------------------------------------------------------------------
@@ -376,9 +441,7 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 				  <<  bsize  << " , "  << count << endl;
 			*/
 		}
-
 		//bdd::gc();
-
 	}
 
 	/*
@@ -656,11 +719,8 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 			for (size_t j = 0; j < n_vars; ++j) {
 				if (j == var0 )
 					perm1[i*n_vars+j] = perm1[(i+n)*n_vars+j];
-
 				COUT << i*n_vars+j+1 << "--" << perm1[i*n_vars+j]+1 << endl;
-
 			}
-
 		s = s^perm1;
 
 		for(size_t i = 0; i < n; i++)
@@ -670,7 +730,6 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 		for(size_t i = 0; i < bits-2; i++)
 		    	s = s && ::from_bit(pos(i+2, var2, n_vars), false);
 	}
-
 	return s;
 }
 
