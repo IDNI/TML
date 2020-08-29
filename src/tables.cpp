@@ -1539,8 +1539,8 @@ struct unary_string{
 	vector<char_t> sort_rel;
 
 	unary_string(size_t _pbsz): pbsz(_pbsz){
-		assert(sizeof(char_t)*16 >= pbsz);
-		assert(pbsz  && !(pbsz & (pbsz-1))); // power of 2 only, 1 2 4 8 16...
+		DBG(assert(sizeof(char_t)*8 >= pbsz);)
+		DBG(assert(pbsz  && !(pbsz & (pbsz-1)));) // power of 2 only, 1 2 4 8 16...
 		vmask = ((1UL<<(pbsz)) -1);
 	}
 	
@@ -1553,7 +1553,7 @@ struct unary_string{
 		for( size_t i=0; i < s.size(); i++) 
 			for(size_t a=0; a < n; a++)
 				rel[ char_t(vmask & s[i]) ].insert(i*n+a),
-				sort_rel[i*n+a] = wchar_t(vmask & s[i]),
+				sort_rel[i*n+a] = char_t(vmask & s[i]),
 				s[i] = ulong(s[i])>>pbsz;
 				
 		return true;
@@ -1572,7 +1572,7 @@ struct unary_string{
 };
 void tables::load_string(lexeme r, const string_t& s) {
 	
-	unary_string us(sizeof(wchar_t)*8);
+	unary_string us(sizeof(char_t)*8);
 	us.buildfrom(s);	
 	DBG(us.toprint(o::dbg()));
 	for( auto it: us.rel ){
@@ -1855,6 +1855,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		}
 		// ref: maps ith sybmol production to resp. terms
 		std::map<size_t, term> refs;
+		DBG(o::dbg()<<x;)
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
 			if (builtins.find(x.p[n].e) != builtins.end()) {
@@ -1876,7 +1877,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
 			} else if (x.p[n].type == elem::CHR) {				
-				unary_string us(sizeof(wchar_t)*8);
+				unary_string us(sizeof(char_t)*8);
 				us.buildfrom(string_t(1,x.p[n].ch));
 				int_t tv=n;
 				DBG(us.toprint(o::dbg()));
