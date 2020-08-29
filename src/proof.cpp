@@ -97,7 +97,7 @@ const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	while ((s = get_witnesses(q, level)).empty()) if (!level--) return 0;
 	bool f;
 	for (const witness& w : s) {
-//		DBG(o::out()<<L"witness: "; print(o::out(), w); o::out()<<endl;)
+//		DBG(o::out()<<"witness: "; print(o::out(), w); o::out()<<endl;)
 		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size());
 		for (const term& t : w.b) {
 			f = false;
@@ -120,14 +120,14 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	proof_elem e;
 	if (!level) return 0;
 	if (!--dep) return -1;
-//	DBG(o::out()<<L"current p: " << endl; print(o::out(), p);)
-//	DBG(o::out()<<L"proving " << to_raw_term(q) << L" level "<<level<<endl;)
+//	DBG(o::out()<<"current p: " << endl; print(o::out(), p);)
+//	DBG(o::out()<<"proving " << to_raw_term(q) << " level "<<level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
 		if (!level--)
 			return 0;
 	bool f;
 	for (const witness& w : s) {
-//		DBG(o::out()<<L"witness: "; print(o::out(), w); o::out()<<endl;)
+//		DBG(o::out()<<"witness: "; print(o::out(), w); o::out()<<endl;)
 		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size());
 		for (const term& t : w.b) {
 			f = false;
@@ -145,7 +145,8 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	return level;
 }
 
-bool tables::get_goals(wostream& os) {
+template <typename T>
+bool tables::get_goals(std::basic_ostream<T>& os) {
 	proof p(levels.size());
 	set<term> s;
 	for (const term& t : goals)
@@ -153,7 +154,9 @@ bool tables::get_goals(wostream& os) {
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s)
 		if (bproof) get_proof(g, p, levels.size() - 1);
-		else os << to_raw_term(g) << L'.' << endl;
+		else os << to_raw_term(g) << '.' << endl;
 	if (bproof) print(os, p);
 	return goals.size() || bproof;
 }
+template bool tables::get_goals(std::basic_ostream<char>&);
+template bool tables::get_goals(std::basic_ostream<wchar_t>&);

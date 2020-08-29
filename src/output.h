@@ -16,95 +16,115 @@
 #include <sstream>
 #include <map>
 #include <fstream>
+#include <memory>
 #include "defs.h"
 
-extern std::wostream wcnull;
-
 class output {
-	static std::map<std::wstring, output> outputs;
-	static std::wstring named; // filename w/o ext (used for @name)
-	std::wstring n = L"";      // name of the output stream
-	std::wstring e = L"";      // filename extension
-	std::wstring t = L"@null"; // target
-	std::wstring f;            // filename
-	std::wostream* s;          // output stream
-	std::wstringstream bs{L""};// buffer stream output
-	std::wofstream fs;         // file stream output
-	std::wostream& os(std::wostream* wos) { s = wos; return *s; }
 public:
-	static output& create(std::wstring n,std::wstring e,std::wstring t=L""){
-		auto it = outputs.find(n);
-		if (it == outputs.end())
-			it = outputs.emplace(n, output(n, e)).first;
-		if (it != outputs.end() && t != L"") it->second.target(t);
-		return it->second;
-	}
-	static const std::wstring& set_name(const std::wstring fn = L"") {
-		return named = fn;
-	}
-	static bool exists(const std::wstring nam) {
-		auto it = outputs.find(nam);
-		return it != outputs.end();
-	}
-	static output* get(const std::wstring nam) {
-		auto it = outputs.find(nam);
-		if (it == outputs.end()) return 0;
-		return &(it->second);
-	}
-	static std::wostream& to(const std::wstring nam) {
-		output* o = get(nam);
-		return o && L"@null" != o->target() ? *o->s : wcnull;
-	}
-	static std::wstring get_target(const std::wstring nam) {
-		output* o = get(nam);
-		return o ? o->target() : L"@null";
-	}
-	static std::wostream& set_target(const std::wstring nam,
-						const std::wstring tar) {
-		output *o = get(nam);
-		return o ? o->target(tar) : wcnull;
-	}
-	static bool is_null(const std::wstring nam) {
-		output *o = get(nam);
-		return !o || o->is_null();
-	}
-	static std::wstring file(const std::wstring nam) {
-		output *o = get(nam);
-		return o ? o->filename() : L"";
-	}
-	static std::wstring read(std::wstring nam) {
-		output *o = get(nam);
-		return o && o->target() == L"@buffer" && o->bs.good()
-			? o->bs.str() : L"";
-	}
-	output() = delete;
-	output(std::wstring n, std::wstring e) : n(n), e(e) {}
-	std::wstring name() const { return n; }
-	std::wstring filename() const { return f; }
-	std::wstring filename(const std::wstring fn) { return f = fn; }
-	std::wostream& os() const { return *s; }
-	std::wstring target() const { return t; }
-	std::wostream& target(const std::wstring tar) {
-		t = tar == L"" ? L"@stdout" : tar;
-		if (t==L"@null")   return os(&wcnull);
-		if (t==L"@stdout") return os(&std::wcout);
-		if (t==L"@stderr") return os(&std::wcerr);
-		if (t==L"@buffer") { bs.str(L""); return os(&bs); }
-		if (t==L"@name") {
-			if (named != L"") filename(named+e);
-			else return o::err()<<L"output '"<<n<<"' targeting "
-					"@name without setting name"<<std::endl,
-				os(&wcnull);
-		} else filename(t);
-		fs.open(ws2s(filename()));
-		return os(&fs);
-	}
-	bool is_null() const {
-		return t == L"@null" || outputs.find(n) == outputs.end();
-	}
-	bool operator ==(const output& o) const {
-		return n == o.n && filename() == o.filename();
-	}
-	bool operator <(const output& o) const { return n < o.n; }
+	enum type_t { NONE, STDOUT, STDERR, FILE, BUFFER, NAME };
+	output(const std::string n, const std::string t = "", std::string e = "")
+		: os_(&CNULL), file_(), buffer_(),
+		name_(n), ext_(e), path_(""), type_(target(t)) { }
+	std::string name() const { return name_; }
+	std::string path() const { return path_; }
+	type_t type() const { return type_; }
+	ostream_t& os() { return *os_; }
+	std::string target() const {
+		return (type_ == FILE) ? path_ : type_name(type_); }
+	type_t target(const std::string t);
+	sysstring_t read() {
+		return type_ == BUFFER ? buffer_.str() : sysstring_t(); }
+	bool is_null() const { return type_ == NONE; }
+	template <typename T>
+	output& operator<<(const T& value) { *os_ << value; return *this; }
+	static type_t get_type(std::string t);
+	static std::string type_name(type_t t) { return type_names_.at(t); }
+	static std::shared_ptr<output> create(std::string n,
+		std::string t = "", std::string e = "") {
+			return std::make_shared<output>(n, t, e); }
+private:
+	ostream_t* os_;          // output stream
+	ofstream_t file_;        // file stream output
+	ostringstream_t buffer_; // buffer stream output
+	std::string name_;          // name of the output stream
+	std::string ext_;           // filename extension
+	std::string path_;          // file path
+	type_t type_ = NONE;
+	ostream_t& os(ostream_t* s) { os_ = s; return *os_; }
+	static const std::map<type_t, std::string> type_names_;
 };
+
+using p_output   = output*;
+using sp_output  = std::shared_ptr<output>;
+using outputmap  = std::map<std::string, sp_output>;
+
+class outputs : public outputmap {
+public:
+	outputs() : outputmap() { if (!o_) { o_ = this; init_defaults(); } }
+	bool add(sp_output o);
+	void use() { o_ = this; }
+	void update_pointers(const std::string& n, output* o);
+	void create(std::string n, std::string e, std::string t = "@null") {
+		add(output::create(n, t, e));
+	}
+	void init_defaults() {
+		create("output",      ".out.tml");
+		create("error",       ".error.log");
+		create("info",        ".info.log");
+		create("debug",       ".debug.log");
+		create("dump",        ".dump.tml");
+		create("benchmarks",  ".bench.log");
+		create("transformed", ".trans.tml");
+#ifdef WITH_THREADS
+		create("repl-output", ".repl.out.log");
+#endif
+		create("xsb",         ".P");
+		create("swipl",       ".pl");
+		create("souffle",     ".souffle");
+	}
+	static outputs* in_use() { return o_; }
+	static ostream_t& out()  { return o_to(o_->out_);  }
+	static ostream_t& err()  { return o_to(o_->err_);  }
+	static ostream_t& inf()  { return o_to(o_->inf_);  }
+	static ostream_t& dbg()  { return o_to(o_->dbg_);  }
+#ifdef WITH_THREADS
+	static ostream_t& repl() { return o_to(o_->repl_); }
+#endif
+	static ostream_t& ms()   { return o_to(o_->ms_);   }
+	static ostream_t& dump() { return o_to(o_->dump_); }
+	static output* get(const std::string& n) { return o_->o_get(n); }
+	static ostream_t& to(const std::string& n);
+	static bool exists(const std::string& n) { return o_->o_exists(n); }
+	static sysstring_t read(const std::string& n) { return get(n)->read();}
+	static void target(const std::string& n, const std::string& t);
+	static void name(std::string n) { o_->name_ = n; }
+	static std::string named() { return o_->name_; }
+private:
+	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0;
+#ifdef WITH_THREADS
+	output *repl_=0;
+#endif
+	std::string name_ = "";
+	static outputs* o_; // global outputs
+	p_output o_get(std::string n) {
+		auto it = find(n); return it != end() ? it->second.get() : 0; }
+	bool o_exists(const std::string nam) { return find(nam) != end(); }
+	static ostream_t& o_to(output* x) { return x ? x->os() : CNULL; }
+};
+
+namespace o { // o:: namespace shortcuts
+	void init_defaults(outputs* oo);
+	void use (outputs* oo);
+	ostream_t& to(const std::string& n);
+	ostream_t& out();
+	ostream_t& err();
+	ostream_t& inf();
+	ostream_t& dbg();
+#ifdef WITH_THREADS
+	ostream_t& repl();
+#endif
+	ostream_t& ms();
+	ostream_t& dump();
+}
+
 #endif

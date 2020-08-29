@@ -10,11 +10,12 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <cstring>
 #include "driver.h"
 #include "err.h"
 using namespace std;
 
-/*lexeme driver::get_char_lexeme(wchar_t c) {
+/*lexeme driver::get_char_lexeme(char_t c) {
 	wstring s;
 	return dict.get_lexeme(s += c);
 }
@@ -22,19 +23,20 @@ using namespace std;
 lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
 */
 
-lexeme driver::get_lexeme(const wstring& s) {
-	cws w = s.c_str();
-	auto it = strs_extra.find({w, w + s.size()});
+lexeme driver::get_lexeme(const string& s) {
+	ccs w = s.c_str();
+	auto it = strs_extra.find({ w, w + s.size() });
 	if (it != strs_extra.end()) return *it;
-	wstr r = wcsdup(s.c_str());
-	lexeme l = {r, r + s.size()};
+	cstr r = strdup(s.c_str());
+	strs_allocated.push_back(r);
+	lexeme l = { r, r + s.size() };
 	strs_extra.insert(l);
 	return l;
 }
 
 lexeme driver::get_var_lexeme(int_t i) {
-	wstring s = L"?v";
-	return get_lexeme(s += to_wstring(i));
+	std::string s = "?v";
+	return get_lexeme(s += to_string_(i));
 }
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
@@ -83,7 +85,7 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
-			(wcsncmp(x[0], y[0], x[1]-x[0]) < 0);
+			(STRNCMP(x[0], y[0], x[1]-x[0]) < 0);
 	}
 };*/
 
@@ -106,10 +108,10 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	t.e.emplace_back(get_var_elem(v2)),
 	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
 	t.e.emplace_back(elem_closep);
-	return t.calc_arity(), t;
+	return t.calc_arity(current_input), t;
 }
 
-raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
+raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string& b,
 	int_t v){
 	return { false, raw_term::REL, NOP, {
 		elem(elem::SYM, r),
@@ -120,7 +122,7 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const wstring& b,
 /*#define from_string_lex(rel, lex, n) raw_rule({ false, { \
 		elem(elem::SYM, rel), \
 		elem_openp, \
-		elem(elem::SYM, dict.get_lexeme(lex)), \
+		elem(elem::SYM, dict.get_lexeme(to_string_t(lex))), \
 		elem(n), elem(n+1), \
 		elem_closep},{3}})
 
@@ -134,21 +136,21 @@ void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
 			elem_closep, elem_openp, elem_openp, elem(n+1),
 			elem_closep, elem_closep, elem_closep},{}}));
 		r.r.back().h[0].calc_arity();
-		if (iswspace(s[n]))
+		if (ISSPACE(s[n]))
 			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), L"space", n));
-		if (iswdigit(s[n]))
+					dict.get_rel(rel), "space", n));
+		if (ISDIGIT(s[n]))
 			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), L"digit", n));
-		if (iswalpha(s[n]))
+					dict.get_rel(rel), "digit", n));
+		if (ISALPHA(s[n]))
 			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), L"alpha", n));
-		if (iswalnum(s[n]))
+					dict.get_rel(rel), "alpha", n));
+		if (ISALNUM(s[n]))
 			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), L"alnum", n));
-		if (iswprint(s[n]))
+					dict.get_rel(rel), "alnum", n));
+		if (ISPRINT(s[n]))
 			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), L"printable", n));
+					dict.get_rel(rel), "printable", n));
 	}
 }*/
 
@@ -166,7 +168,7 @@ void elim_nullables(set<production>& s) {
 loop1:	size_t sz = nullables.size();
 	for (const production& p : s) {
 		bool null = true;
-		if (p.p.size() != 2 || !(p.p[1].e == L"null"))
+		if (p.p.size() != 2 || !(p.p[1].e == "null"))
 			for (size_t n = 1; null && n != p.p.size(); ++n)
 				null &= has(nullables, p.p[n]);
 		if (null) nullables.insert(p.p[0]);
@@ -174,7 +176,7 @@ loop1:	size_t sz = nullables.size();
 	if (sz != nullables.size()) goto loop1;
 	set<production> t;
 	for (auto p : s)
-		if (p.p.size() == 2 && p.p[1].e == L"null")
+		if (p.p.size() == 2 && p.p[1].e == "null")
 			t.insert(p);
 	for (auto x : t) s.erase(x);
 	t.clear();
@@ -197,17 +199,17 @@ loop2:	sz = s.size();
 
 void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	if (r.g.empty()) return;
-	static const set<wstring> b =
-		{ L"alpha", L"alnum", L"digit", L"space", L"printable"};
+	static const set<std::string> b =
+		{ "alpha", "alnum", "digit", "space", "printable" };
 	for (size_t k = 0; k != r.g.size();) {
 		if (r.g[k].p.size()<2)parse_error(err_empty_prod,r.g[k].p[0].e);
 		size_t n = 0;
 		while (n<r.g[k].p.size() && r.g[k].p[n].type != elem::ALT) ++n;
 		if (n == r.g[k].p.size()) { ++k; continue; }
-		r.g.push_back(
-			{vector<elem>(r.g[k].p.begin(), r.g[k].p.begin() + n)});
-		r.g.push_back(
-			{vector<elem>(r.g[k].p.begin()+n+1, r.g[k].p.end())});
+		r.g.push_back({
+			vector<elem>(r.g[k].p.begin(), r.g[k].p.begin() + n) });
+		r.g.push_back({
+			vector<elem>(r.g[k].p.begin()+n+1, r.g[k].p.end()) });
 		r.g.back().p.insert(r.g.back().p.begin(), r.g[k].p[0]);
 		r.g.erase(r.g.begin() + k);
 	}
@@ -217,8 +219,8 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 				lexeme l = p.p[n].e;
 				p.p.erase(p.p.begin() + n);
 				bool esc = false;
-				for (cws s = l[0]+1; s != l[1]-1; ++s)
-					if (*s == L'\\' && !esc) esc=true;
+				for (ccs s = l[0]+1; s != l[1]-1; ++s)
+					if (*s == '\\' && !esc) esc=true;
 					else p.p.insert(p.p.begin()+n++,
 						elem(*s)),esc=false;
 			}
@@ -232,7 +234,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 #endif
 	raw_rule l;
 /*	raw_term m;
-	m = fro_grammar_elem({elem::SYM,0,dict.get_lexeme(L"null")},1,1);
+	m = fro_grammar_elem({elem::SYM,0,dict.get_lexeme("null")},1,1);
 	l.add_head(m);
 	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
 				{elem::VAR,0,get_var_lexeme(2)},1,3));
@@ -243,7 +245,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
-		if (p.p.size() == 2 && p.p[1].e == L"null") {
+		if (p.p.size() == 2 && p.p[1].e == "null") {
 #ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
@@ -267,10 +269,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 						rel, p.p[n], n, n+1));
 					continue;
 				}
-				wstring str = lexeme2str(p.p[n].e);
+				std::string str = lexeme2str(p.p[n].e);
 				if (has(b, str))
-					l.b.back().push_back(from_grammar_elem_builtin(
-						rel, str,n)), ++v;
+					l.b.back().push_back(
+						from_grammar_elem_builtin(
+							rel, str,n)), ++v;
 				else l.b.back().push_back(
 					from_grammar_elem(p.p[n],n,n+1));
 			}
@@ -278,24 +281,24 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		r.r.push_back(l);
 	}
 	raw_term t;
-	append_sym_elem(t.e, get_lexeme(L"S")), append_openp(t.e),
+	append_sym_elem(t.e, get_lexeme("S")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
-	append_closep(t.e), t.calc_arity();
+	append_closep(t.e), t.calc_arity(current_input);
 	raw_rule rr;
 	rr.type = raw_rule::GOAL, rr.h = {t}, r.r.push_back(rr);
-	DBG(o::out()<<"transformed grammar:"<<endl<<r;)
+	DBG(o::out() << "transformed grammar:" << endl << r;)
 //#ifdef BWD_GRAMMAR
 	//transform_bwd(r);
 //	transform_bin(r);
 //#endif
-//	r.delrel = dict_get_rel(L"try");
+//	r.delrel = dict_get_rel("try");
 //	return transform_string(s, r, d.rel), array<raw_prog, 2>{ r, _r };
 }
 
 /*void driver::insert_goals(raw_prog& r, const std::vector<raw_rule>& g) {
 	for (const raw_rule& t : g) {
 		raw_term gg;
-		cat_relsym_openp(gg, L"G"), cat(gg.e, t.head(0).e),
+		cat_relsym_openp(gg, "G"), cat(gg.e, t.head(0).e),
 		term_close(gg), r.r.emplace_back(gg, t.head(0));
 	}
 }
@@ -322,7 +325,7 @@ nexthead:	const raw_term &head = x.head(n);
 }*/
 
 /*raw_term driver::get_try_pred(const raw_term& x) {
-	static elem tr(elem::SYM, dict.get_lexeme(L"try"));
+	static elem tr(elem::SYM, dict.get_lexeme("try)));
 	raw_term t;
 	return	t.e.push_back(tr), append_openp(t.e),
 		t.e.insert(t.e.begin()+2, x.e.begin(), x.e.end()),
@@ -394,7 +397,7 @@ raw_term sub(const raw_term& x, map<elem, elem>& m) {
 
 bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 	if (r.b.empty()) return res.h = r.h, true;
-//	DBG(o::out() << L"specializing" << endl << r << "wrt" << endl << t <<endl;)
+//	DBG(o::out() << "specializing" << endl << r << "wrt" << endl << t <<endl;)
 	for (const raw_term& h : r.h) {
 		map<elem, elem> m;
 		if (!unify(h, t, m)) continue;
@@ -406,9 +409,9 @@ bool specialize(const raw_rule& r, const raw_term& t, raw_rule& res) {
 		}
 	}
 	if (res.h.size()) goto pass;
-//	DBG(o::out() << L" failed " << endl;)
+//	DBG(o::out() << " failed " << endl;)
 	return false;
-pass:	//DBG(o::out() << L" returned " << res << endl;)
+pass:	//DBG(o::out() << " returned " << res << endl;)
 	return true;
 }*/
 
@@ -436,7 +439,8 @@ struct flat_rules : public vector<frule> {
 	}
 };
 
-wostream& operator<<(wostream& os, const flat_rules& f) {
+template <typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const flat_rules& f) {
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
 }
@@ -557,11 +561,11 @@ set<raw_term> driver::get_queries(const raw_prog& p) {
 }*/
 
 /*lexeme driver::get_demand_lexeme(elem e, const ints& i, const bools& b) {
-	wstring s;
-	for (int_t j : i) s += to_wstring(j);
-	s += L'_';
-	for (bool x : b) s += x ? L'b' : L'f';
-	return dict.get_lexeme(wstring(L"d_") + lexeme2str(e.e) + s);
+	sysstring_t s;
+	for (int_t j : i) s += to_string_t(j);
+	s += '_';
+	for (bool x : b) s += x ? 'b' : 'f';
+	return dict.get_lexeme(to_string_t("d_") + lexeme2str(e.e) + s);
 }
 
 #define get_demand_elem(t, b)\
@@ -594,10 +598,10 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 #ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_rel() {
 	static size_t last = 1;
-	wstring s = L"r";
+	string s = "r";
 	size_t sz;
 	lexeme l;
-retry:	sz = rels.size(), l = get_lexeme(s + to_wstring(last));
+retry:	sz = rels.size(), l = get_lexeme(s + to_string_(last));
 	rels.insert(l);
 	if (rels.size() == sz) { ++last; goto retry; }
 	return l;
@@ -661,10 +665,10 @@ void driver::transform_bin(raw_prog& p) {
 			for (const raw_term& y : x)
 				rels.emplace(x.e[0]);
 	}
-	elem relname = elem(elem::SYM, dict.get_lexeme(L"relname"));
-	elem fact = elem(elem::SYM, dict.get_lexeme(L"fact"));
-	elem rule = elem(elem::SYM, dict.get_lexeme(L"rule"));
-	lexeme op = dict.get_lexeme(L"("), cp = dict.get_lexeme(L")");
+	elem relname = elem(elem::SYM, dict.get_lexeme(Lrelname"));
+	elem fact = elem(elem::SYM, dict.get_lexeme("fact"));
+	elem rule = elem(elem::SYM, dict.get_lexeme("rule"));
+	lexeme op = dict.get_lexeme("("), cp = dict.get_lexeme(")");
 	raw_term t;
 	for (const lexeme& l : rels)
 		t.e = { r, elem_openp, l, elem_closep },

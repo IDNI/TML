@@ -10,41 +10,41 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <cstring>
+#include "defs.h"
 #include "dict.h"
 #include "err.h"
-#include "defs.h"
+#include "input.h"
 using namespace std;
 
-dict_t::dict_t() : op(get_lexeme(L"(")), cl(get_lexeme(L")")) {}
+dict_t::dict_t() : op(get_lexeme("(")), cl(get_lexeme(")")) {}
 
-dict_t::~dict_t() { for (auto x : strs_extra) free((wstr)x[0]); }
+dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
 
 lexeme dict_t::get_sym(int_t t) const {
 	DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
-	static wchar_t str_nums[20], str_chr[] = L"'a'";
+	static char str_nums[20], str_chr[] = { '\'', 'a', '\'' };
 	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
-	if (t & 2) return wcscpy(str_nums, to_wstring(t>>=2).c_str()),
-			lexeme{ str_nums, str_nums + wcslen(str_nums) };
+	if (t & 2) return strcpy(str_nums, to_string_(t>>=2).c_str()),
+			lexeme{ str_nums, str_nums + strlen(str_nums) };
 	return syms[t>>2];
 }
 
 int_t dict_t::get_fresh_var(int_t old) {
-
-	static int_t counter=0;
-	wstring fresh = L"?0f"+ to_wstring(++counter)+to_wstring(old);
+	static int_t counter = 0;
+	std::string fresh = "?0f" + to_string_(++counter) + to_string_(old);
 	int_t fresh_int = get_var(get_lexeme(fresh));
 	return fresh_int;
 }
 
 int_t dict_t::get_fresh_sym(int_t old) {
-
-	static int_t counter=0;
-	wstring fresh = L"0f" + to_wstring(++counter)+to_wstring(old);
+	static int_t counter = 0;
+	std::string fresh = "0f" + to_string_(++counter) + to_string_(old);
 	int_t fresh_int = get_sym(get_lexeme(fresh));
 	return fresh_int;
 }
 int_t dict_t::get_var(const lexeme& l) {
-	assert(*l[0] == L'?');
+	//DBG(assert(*l[0] == '?');)
 	auto it = vars_dict.find(l);
 	if (it != vars_dict.end()) return it->second;
 	int_t r = -vars_dict.size() - 1;
@@ -55,12 +55,12 @@ int_t dict_t::get_var(const lexeme& l) {
 lexeme dict_t::get_var_lexeme_from(int_t r) {
 	DBG(assert(r<0);)
 	int index = (-r -1);
-	if ( index < (int_t)vars.size() ) {
+	if (index < (int_t)vars.size()) {
 		int nr = get_var(vars[index]);
 		DBG(assert(nr == r);)
 		return vars[index];
 	}
-	lexeme l = get_lexeme(wstring(L"?v") + to_wstring(-r));
+	lexeme l = get_lexeme(string("?v") + to_string_(-r));
 	int nr = get_var(l) ;
 	DBG(assert(nr == r));
 	return l;
@@ -81,19 +81,20 @@ int_t dict_t::get_sym(const lexeme& l) {
 }
 
 int_t dict_t::get_bltin(const lexeme& l) {
-	if (*l[0] == L'?') parse_error(err_var_relsym, l);
+	if (*l[0] == '?') parse_error(err_var_relsym, l);
 	auto it = bltins_dict.find(l);
 	if (it != bltins_dict.end()) return it->second;
 	bltins.push_back(l);
 	return bltins_dict[l] = bltins.size() - 1;
 }
 
-lexeme dict_t::get_lexeme(const wstring& s) {
-	cws w = s.c_str();
-	auto it = strs_extra.find({w, w + s.size()});
+lexeme dict_t::get_lexeme(const std::string& s) {
+	ccs w = s.c_str();
+	auto it = strs_extra.find({ w, w + s.size() });
 	if (it != strs_extra.end()) return *it;
-	wstr r = wcsdup(w);
-	lexeme l = {r, r + s.size()};
+	cstr r = strdup(w);
+	strs_allocated.push_back(r);
+	lexeme l = { r, r + s.size() };
 	strs_extra.insert(l);
 	return l;
 }

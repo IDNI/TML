@@ -39,13 +39,13 @@ class udp : public async_reader<udp_message> {
 	// size_t buflen = BUFLEN;
 	bool closed=true;
 	bool error_=false;
-	std::wstring error_message_;
+	std::string error_message_;
 	int s, b;
 	bool create_socket() {
 		s = socket(family, SOCK_DGRAM, IPPROTO_UDP);
 		if (s == -1) {
 			error_ = true;
-			error_message_ = L"socket_error";
+			error_message_ = "socket_error";
 			return false;
 		}
 		fcntl(s, F_SETFL, fcntl(s, F_GETFL, 0) | O_NONBLOCK);
@@ -62,7 +62,7 @@ class udp : public async_reader<udp_message> {
 		b = bind(s, (struct sockaddr*) &sin, sizeof(sin));
 		if (b == -1) {
 			error_ = true;
-			error_message_ = L"bind error";
+			error_message_ = "bind error";
 			return false;
 		}
 		closed = false;
@@ -81,7 +81,7 @@ public:
 		// std::lock_guard<std::mutex> lk(m);
 		if (!create_socket()) return;
 		if (!bind_socket())   return;
-		// std::wcout<<L"socket bound"<<std::endl;
+		// COUT<<"socket bound"<<std::endl;
 	}
 	bool send(udp_message m) {
 		return send(m.second, m.first.get());
@@ -91,14 +91,14 @@ public:
 					to, sizeof(struct sockaddr));
 		if (sent_len == -1) return false;
 		// std::lock_guard<std::mutex> lk(m);
-		// std::wcout << L"sent: " << sent_len << L" bytes to: " <<
-		// 	inet_ntoa(((struct sockaddr_in *)&to)->sin_addr) << L':' <<
+		// COUT << "sent: " << sent_len << " bytes to: " <<
+		// 	inet_ntoa(((struct sockaddr_in *)&to)->sin_addr) << ':' <<
 		// 	ntohs(((struct sockaddr_in *)&to)->sin_port) << std::endl;
 		return true;
 	}
 	void close() { if (!closed) ::close(s), eof = closed = true; }
 	bool error() { return error_; }
-	std::wstring error_message() { return error_message_; }
+	std::string error_message() { return error_message_; }
 	~udp() { close(); }
 private:
 	socklen_t clen = sizeof(struct sockaddr *);
@@ -114,8 +114,8 @@ protected:
 			recv_len = recvfrom(s, buf, BUFLEN, 0, client.get(),
 									&clen);
 			if (recv_len == -1) goto skip;
-			// m.lock(); std::wcout << L"received: " << recv_len << L" bytes from: " <<
-			// 	inet_ntoa(((struct sockaddr_in *)&client)->sin_addr) << L':' <<
+			// m.lock(); COUT << "received: " << recv_len << " bytes from: " <<
+			// 	inet_ntoa(((struct sockaddr_in *)&client)->sin_addr) << ':' <<
 			// 	ntohs(((struct sockaddr_in *)&client)->sin_port) << std::endl;
 			if (recv_len > 0) {
 				m.lock();

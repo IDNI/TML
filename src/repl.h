@@ -16,13 +16,13 @@
 #include "udp.h"
 #include "async_reader.h"
 
-class wistream_async_reader : public async_reader<std::wstring> {
+class istream_async_reader : public async_reader<sysstring_t> {
 public:
-	wistream_async_reader(std::wistream* is) : async_reader(), is(is) { }
+	istream_async_reader(istream_t* is) : async_reader(), is(is) { }
 protected:
-	std::wistream* is;
+	istream_t* is;
 	void read_in_thread() {
-		std::wstring l;
+		sysstring_t l;
 		while (std::getline(*is, l)) {
 			std::lock_guard<std::mutex> lk(m);
 			q.push(std::move(l));
@@ -32,13 +32,16 @@ protected:
 };
 
 class repl {
+public:
+	repl(options &o, ostream_t& os = o::repl());
+private:
 	options& o;
-	std::wostream& os;
-	driver *d = 0;
+	ostream_t& os;
+	std::unique_ptr<driver> d = 0;
 	std::unique_ptr<udp> up_udp;
-	wistream_async_reader wcin_reader{&std::wcin};
+	istream_async_reader in_reader{&CIN};
 	bool fin = false;
-	bool ar = true;  // auto run
+	bool ar = true;   // auto run
 	bool ap = true;   // auto print
 	bool ai = false;  // auto info
 	bool ps = false;  // print steps
@@ -47,28 +50,44 @@ class repl {
 	bool ils = false; // input line sequencing: is each input line a newseq?
 
 	void loop();
-	bool eval_input(std::wostream& os, std::wstring &l);
-	void prompt(std::wostream& os);
-	void redrive(const std::wstring src = L"");
+	template <typename T>
+	bool eval_input(std::basic_ostream<T>&, std::string l);
+	template <typename T>
+	void prompt(std::basic_ostream<T>&);
+	void redrive(const std::string& src);
 
-	void help(std::wostream& os) const;
-	void print(std::wostream& os);
-	void list(std::wostream& os, size_t p = 0);
-	void restart(std::wostream& os);
-	void reparse(std::wostream& os);
-	void reset(std::wostream& os);
-	void dump(std::wostream& os);
-	void info(std::wostream& os);
-	bool toggle(std::wostream& os, const std::wstring& name, bool &setting);
-	void add(std::wostream& os, std::wstring line);
-	void run(std::wostream& os, size_t steps = 0, size_t break_on_step=0,
+	template <typename T>
+	void help(std::basic_ostream<T>&) const;
+	template <typename T>
+	void print(std::basic_ostream<T>&);
+	template <typename T>
+	void list(std::basic_ostream<T>&, size_t p = 0);
+	template <typename T>
+	void restart(std::basic_ostream<T>&);
+	template <typename T>
+	void reparse(std::basic_ostream<T>&);
+	template <typename T>
+	void reset(std::basic_ostream<T>&);
+	template <typename T>
+	void dump(std::basic_ostream<T>&);
+	template <typename T>
+	void info(std::basic_ostream<T>&);
+	template <typename T>
+	bool toggle(std::basic_ostream<T>&, const std::string& name, bool &setting);
+	template <typename T>
+	void add(std::basic_ostream<T>&, std::string line);
+	template <typename T>
+	void run(std::basic_ostream<T>&, size_t steps = 0, size_t break_on_step=0,
 		bool break_on_fp=0);
-	void step(std::wostream& os, size_t steps = 1)    { run(os, steps); };
-	void break_on_fp(std::wostream& os)               { run(os,0,0,true); };
-	void break_on_step(std::wostream& os, size_t brs) { run(os, 0, brs); };
-
-	// default os
-	bool eval_input(std::wstring &l) { return eval_input(os, l); }
+	template <typename T>
+	void step(std::basic_ostream<T>&, size_t steps = 1)    { run(os, steps); }
+	template <typename T>
+	void break_on_fp(std::basic_ostream<T>&)               { run(os, 0, 0, true); }
+	template <typename T>
+	void break_on_step(std::basic_ostream<T>&, size_t brs) { run(os, 0, brs); }
+	void out_dict(std::wostream& os);
+	void out_dict(std::ostream& os);
+	bool eval_input(const std::string &l) { return eval_input(os, l); }
 	void help() const { help(os); }
 	void print() { print(os); }
 	void list(size_t p = 0) { list(os, p); }
@@ -77,18 +96,16 @@ class repl {
 	void reset() { reset(os); }
 	void dump();
 	void info() { info(os); }
-	bool toggle(const std::wstring& name, bool &setting) {
+	bool toggle(const std::string& name, bool &setting) {
 		return toggle(os, name, setting);
 	}
-	void add(std::wstring line) { add(os, line); }
+	void add(const std::string& line) { add(os, line); }
 	void run(size_t steps, size_t break_on_step = 0, bool break_on_fp = 0) {
 		run(os, steps, break_on_step, break_on_fp);
 	}
 	void step(size_t steps = 1)                       { run(steps); };
 	void break_on_fp()                                { run(0, 0, true); };
 	void break_on_step(size_t brs)                    { run(0, brs); };
-public:
-	repl(options &o, std::wostream& os = o::repl());
 };
 
 #endif

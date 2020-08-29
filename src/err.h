@@ -1,51 +1,72 @@
-const wchar_t dot_expected[] = L"'.' expected.";
-const wchar_t sep_expected[] = L"Term or ':-' or '.' expected.";
-const wchar_t unmatched_quotes[] = L"Unmatched \"";
-const wchar_t err_inrel[] = L"Unable to read the input relation symbol.";
-const wchar_t err_src[] = L"Unable to read src file.";
-const wchar_t err_dst[] = L"Unable to read dst file.";
-const wchar_t err_quotes[] = L"Expected \".";
-const wchar_t err_dots[] = L"Two consecutive dots, or dot in beginning of document.";
-const wchar_t err_quote[] = L"' should come before and after a single character only.";
-const wchar_t err_fname[] = L"Malformed filename.";
-const wchar_t err_directive_arg[] = L"Invalid directive argument.";
-const wchar_t err_escape[] = L"Invalid escaped character";
-const wchar_t err_int[] = L"Malformed int.";
-const wchar_t err_lex[] = L"Lexer error (please report as a bug).";
-const wchar_t err_parse[] = L"Parser error (please report as a bug).";
-const wchar_t err_chr[] = L"Unexpected character.";
-const wchar_t err_body[] = L"Rule's body expected.";
-const wchar_t err_prod[] = L"Production's body expected.";
-const wchar_t err_empty_prod[] = L"Empty production.";
-const wchar_t err_constraint_syntax[] = L"Constraint Syntax not supported.";
-const wchar_t err_start_sym[] = L"Expected a term to be fed to the start symbol.";
-const wchar_t err_term_or_dot[] = L"Term or dot expected.";
-const wchar_t err_close_curly[] = L"'}' expected.";
-const wchar_t err_fnf[] = L"File not found.";
-const wchar_t err_rule_dir_prod_expected[] = L"Rule or production or directive expected.";
-const wchar_t err_paren[] = L"Unbalanced parenthesis.";
-const wchar_t err_relsym_expected[] = L"Expected relation name in beginning of term.";
-const wchar_t err_paren_expected[] = L"Expected parenthesis after a nonzero arity relation symbol.";
-const wchar_t err_head[] = L"Expected dot or comma or update operator.";
-const wchar_t err_digit[] = L"Symbol name cannot begin with a digit.";
-const wchar_t err_var_relsym[] = L"Relation symbol cannot be a variable.";
-const wchar_t err_proof[] = L"Proof extraction yet unsupported for programs with negation or deletion.";
-const wchar_t err_directive_elem[] = L"Universe element in directive not appearing in program.";
-const wchar_t err_goalsym[] = L"Goal symbol not appearing in program.";
-const wchar_t err_goalarity[] = L"Goal arity larger than the program's.";
-const wchar_t err_num_cmdline[] = L"Program expects more command line arguments.";
-const wchar_t err_one_input[] = L"Only one input string allowed given grammar.";
-const wchar_t err_str_defined[] = L"String already defined.";
-const wchar_t warning_empty_domain[] = L"Warning: empty domain, adding dummy element.";
-const wchar_t err_trace_rel[] = L"Trace directive has to be followed by a relation symbol.";
-const wchar_t err_directive[] = L"Directives can be @string or @stdout or @trace.";
-const wchar_t err_stdout[] = L"Expected term after @stdout.";
-const wchar_t err_rel_expected[] = L"Expected relation symbol.";
-const wchar_t err_len[] = L"Taking the length of an unknown string.";
-const wchar_t err_comment[] = L"Unfinished comment.";
-const wchar_t err_eof[] = L"Unexpected end of file.";
-const wchar_t err_eq_expected[] = L"Expected =/!= in the middle of term.";
-const wchar_t err_leq_expected[] = L"Expected <=/> in the middle of term.";
-const wchar_t err_3_els_expected[] = L"Expected 3 elements in the term.";
-const wchar_t err_builtin_expected[] = L"Expected builtin name in the beginning of term.";
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+
+struct parse_error_exception : public virtual std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+struct runtime_error_exception : public virtual std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+const char dot_expected[] = "'.' expected.";
+const char sep_expected[] = "Term or ':-' or '.' expected.";
+const char unmatched_quotes[] = "Unmatched \"";
+const char err_inrel[] = "Unable to read the input relation symbol.";
+const char err_src[] = "Unable to read src file.";
+const char err_dst[] = "Unable to read dst file.";
+const char err_quotes[] = "Expected \".";
+const char err_dots[] = "Two consecutive dots, or dot in beginning of document.";
+const char err_quote[] = "' should come before and after a single character only.";
+const char err_fname[] = "Malformed filename.";
+const char err_directive_arg[] = "Invalid directive argument.";
+const char err_escape[] = "Invalid escaped character";
+const char err_int[] = "Malformed int.";
+const char err_lex[] = "Lexer error (please report as a bug).";
+const char err_parse[] = "Parser error (please report as a bug).";
+const char err_chr[] = "Unexpected character.";
+const char err_body[] = "Rule's body expected.";
+const char err_prod[] = "Production's body expected.";
+const char err_empty_prod[] = "Empty production.";
+const char err_constraint_syntax[] = "Constraint Syntax not supported.";
+const char err_start_sym[] = "Expected a term to be fed to the start symbol.";
+const char err_term_or_dot[] = "Term or dot expected.";
+const char err_close_curly[] = "'}' expected.";
+const char err_fnf[] = "File not found.";
+const char err_rule_dir_prod_expected[] = "Rule or production or directive expected.";
+const char err_paren[] = "Unbalanced parenthesis.";
+const char err_relsym_expected[] = "Expected relation name in beginning of term.";
+const char err_paren_expected[] = "Expected parenthesis after a nonzero arity relation symbol.";
+const char err_head[] = "Expected dot or comma or update operator.";
+const char err_digit[] = "Symbol name cannot begin with a digit.";
+const char err_var_relsym[] = "Relation symbol cannot be a variable.";
+const char err_proof[] = "Proof extraction yet unsupported for programs with negation or deletion.";
+const char err_directive_elem[] = "Universe element in directive not appearing in program.";
+const char err_goalsym[] = "Goal symbol not appearing in program.";
+const char err_goalarity[] = "Goal arity larger than the program's.";
+const char err_num_cmdline[] = "Program expects more command line arguments.";
+const char err_one_input[] = "Only one input string allowed given grammar.";
+const char err_str_defined[] = "String already defined.";
+const char warning_empty_domain[] = "Warning: empty domain, adding dummy element.";
+const char err_trace_rel[] = "Trace directive has to be followed by a relation symbol.";
+const char err_directive[] = "Directives can be @string or @stdout or @trace.";
+const char err_stdout[] = "Expected term after @stdout.";
+const char err_rel_expected[] = "Expected relation symbol.";
+const char err_len[] = "Taking the length of an unknown string.";
+const char err_comment[] = "Unfinished comment.";
+const char err_eof[] = "Unexpected end of file.";
+const char err_eq_expected[] = "Expected =/!= in the middle of term.";
+const char err_leq_expected[] = "Expected <=/> in the middle of term.";
+const char err_3_els_expected[] = "Expected 3 elements in the term.";
+const char err_builtin_expected[] = "Expected builtin name in the beginning of term.";
 

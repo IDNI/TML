@@ -27,6 +27,7 @@
 #include "form.h"
 
 typedef int_t rel_t;
+class archive;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
@@ -41,7 +42,8 @@ typedef std::map<int_t, int_t> env;
 typedef bdd_handles level;
 typedef std::set<std::vector<term>> flat_prog;
 
-std::wostream& operator<<(std::wostream& os, const env& e);
+template<typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
 
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
@@ -148,11 +150,12 @@ struct table {
 	bool unsat = false, tmp = false;
 	int_t idbltin = -1;
 	ints bltinargs;
-	size_t bltinsize;
+	size_t bltinsize = 0;
 	bool commit(DBG(size_t));
 };
 
 class tables {
+	friend class archive;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 public:
@@ -185,22 +188,31 @@ private:
 	};
 
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
-	void print(std::wostream&, const proof_elem&);
-	void print(std::wostream&, const proof&);
-	void print(std::wostream&, const witness&);
-	std::wostream& print(std::wostream& os, const std::vector<term>& b)
+	template <typename T>
+	void print(std::basic_ostream<T>&, const proof_elem&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const proof&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const witness&);
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::vector<term>& b)
 		const;
-	std::wostream& print(std::wostream& os, const std::set<term>& b) const;
-	std::wostream& print(std::wostream& os, const term& h,
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
 		const std::set<term>& b) const;
-	std::wostream& print(std::wostream& os, const flat_prog& p) const;
-	std::wostream& print(std::wostream& os, const rule& r) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r) const;
 
 	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
+	std::set<level> fronts;
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
 
@@ -294,7 +306,8 @@ private:
 	void print_env(const env& e) const;
 	struct elem get_elem(int_t arg) const;
 	raw_term to_raw_term(const term& t) const;
-	void out(std::wostream&, spbdd_handle, ntable) const;
+	template <typename T>
+	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
 	void get_nums(const raw_term& t);
 	flat_prog to_terms(const raw_prog& p);
@@ -309,7 +322,7 @@ private:
 	void set_priorities(const flat_prog&);
 	ntable get_new_tab(int_t x, ints ar);
 	lexeme get_new_rel();
-	void load_string(lexeme rel, const std::wstring& s);
+	void load_string(lexeme rel, const std::string& s);
 	lexeme get_var_lexeme(int_t i);
 	void add_prog(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
@@ -345,7 +358,8 @@ private:
 	int_t rel_tml_update, sym_add, sym_del;
 	void init_tml_update();
 	void add_tml_update(const term& rt, bool neg);
-	std::wostream& decompress_update(std::wostream& os, spbdd_handle& x,
+	template <typename T>
+	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&, spbdd_handle& x,
 		const rule& r); // decompress for --print-updates and tml_update
 
 	bool from_raw_form(const raw_form_tree *rs, form *&froot, bool &is_sol);
@@ -411,16 +425,19 @@ public:
 		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-	void out(std::wostream&) const;
+	template <typename T>
+	void out(std::basic_ostream<T>&) const;
 	void out(const rt_printer&) const;
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
 	void set_proof(bool v) { bproof = v; }
-	bool get_goals(std::wostream& os);
+	template <typename T>
+	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }
 
-	std::wostream& print_dict(std::wostream& os) const;
+	template <typename T>
+	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
@@ -524,7 +541,8 @@ struct substitution: public transformer {
 
 };
 
-std::wostream& operator<<(std::wostream& os, const vbools& x);
+template <typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 
 struct unsat_exception : public std::exception {
 	virtual const char* what() const noexcept { return "unsat."; }

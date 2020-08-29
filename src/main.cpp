@@ -16,31 +16,55 @@
 #include <sys/ioctl.h>
 #endif
 #include "driver.h"
+#include "err.h"
+#ifdef WITH_THREADS
 #include "repl.h"
+#endif
 using namespace std;
 
 //void print_memos_len();
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
-	driver::init();
-	options o(argc, argv);
+	inputs ii;
+	outputs oo;
+	options o(argc, argv, &ii, &oo);
+	//o.parse({ "-autotype" }, true);
+	string archive_file = o.get_string("load");
+	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
+		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
-	if (o.disabled(L"i") && o.disabled(L"ie") && o.disabled(L"repl")
-			&& o.disabled(L"h") && o.disabled(L"v")
-			&& o.disabled(L"udp"))
-		o.parse(wstrings{ L"-i",  L"@stdin" }, true);
-	if (o.enabled(L"udp") && o.disabled(L"repl")) o.enable(L"repl");
-	if (o.enabled(L"repl")) repl r(o);
-	else {
-		driver d(o);
-		d.run((size_t)o.get_int(L"steps"),
-			(size_t)o.get_int(L"break"),
-			o.enabled(L"break-on-fp"));
-		if (o.enabled(L"dump") && d.result &&
-			!d.out_goals(o::dump())) d.out(o::dump());
-		if (o.enabled(L"dict")) d.out_dict(o::inf());
-		if (o.enabled(L"csv")) d.save_csv();
+	if (o.disabled("i") && o.disabled("ie")
+#ifdef WITH_THREADS
+			&& o.disabled("repl") && o.disabled("udp")
+#endif
+			&& o.disabled("h") && o.disabled("v")
+			&& archive_file == "")
+		o.parse(strings{ "-i",  "@stdin" }, true);
+	try {
+#ifdef WITH_THREADS
+		if (o.enabled("udp") && o.disabled("repl")) o.enable("repl");
+		if (o.enabled("repl")) repl r(o);
+		else {
+#endif
+			driver d(o);
+			if (archive_file != "") d.load(archive_file);
+			d.run((size_t)o.get_int("steps"),
+				(size_t)o.get_int("break"),
+				o.enabled("break-on-fp"));
+			archive_file = o.get_string("save");
+			if (archive_file != "") d.save(archive_file);
+			if (o.enabled("dump") && d.result &&
+				!d.out_goals(o::dump())) d.dump();
+			if (o.enabled("dict")) d.out_dict(o::inf());
+			if (o.enabled("csv")) d.save_csv();
+#ifdef WITH_THREADS
+		}
+#endif
+	} catch (parse_error_exception &e) {
+		o::err() << e.what() << endl;
+	} catch (runtime_error_exception &e) {
+		o::err() << e.what() << endl;
 	}
 	onexit = true;
 //	print_memos_len();

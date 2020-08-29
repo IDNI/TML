@@ -15,24 +15,40 @@
 #include "defs.h"
 #include <map>
 
+class inputs;
+class archive;
+
 class dict_t {
+	friend class archive;
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
 	dictmap syms_dict, vars_dict, rels_dict, bltins_dict;
 	std::vector<lexeme> vars, syms, rels, bltins;
 	std::set<lexeme, lexcmp> strs_extra;
+	std::vector<ccs> strs_allocated;
+	inputs* ii;
 public:
 	dict_t();
 	dict_t(const dict_t& d) : syms_dict(d.syms_dict), vars_dict(d.vars_dict),
 		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), 
 		vars(d.vars), syms(d.syms), rels(d.rels), bltins(d.bltins),
-		op(d.op), cl(d.cl) { // strs_extra(d.strs_extra), 
+		ii(d.ii), op(d.op), cl(d.cl) { // strs_extra(d.strs_extra), 
 		DBG(assert(false);); // we shouldn't be copying, use move instead
-		for (const lexeme& c : d.strs_extra) { 
-			wstr r = wcsdup((wstr)c[0]);
-			size_t s = wcslen(r);
-			lexeme l = { r, r + s };
-			strs_extra.insert(l);
+		std::map<ccs, ccs> remap;
+		for (ccs c : d.strs_allocated) {
+			ccs r = strdup(c);
+			remap.insert({ c, r });
+			strs_allocated.push_back(r);
 		}
+		for (const lexeme& l : d.strs_extra)
+			for (ccs c : d.strs_allocated)
+				if (l[0] == c) { // remapped
+					auto it = remap.find(c);
+					if (it == remap.end()) throw 0;
+					ccs r = it->second;
+					size_t s = strlen(r);
+					lexeme lx = { r, r+s };
+					strs_extra.insert(lx);
+				} else strs_extra.insert(l);
 	}
 	dict_t(dict_t&& d) noexcept : 
 		syms_dict(std::move(d.syms_dict)), 
@@ -45,13 +61,16 @@ public:
 		rels(std::move(d.rels)), 
 		bltins(std::move(d.bltins)),
 		//types(std::move(d.types)), 
-		strs_extra(std::move(d.strs_extra)), 
+		strs_extra(std::move(d.strs_extra)),
+		strs_allocated(std::move(d.strs_allocated)),
+		ii(d.ii),
 		op(std::move(d.op)), cl(std::move(d.cl)) {
 		std::fill(std::begin(d.op), std::end(d.op), nullptr);
 		std::fill(std::begin(d.cl), std::end(d.cl), nullptr);
 		//d.strs_extra.clear();
 	}
 	lexeme op, cl;
+	void set_inputs(inputs* ins) { ii = ins; }
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	const lexeme& get_bltin(int_t t) const { return bltins[t]; }
 	lexeme get_sym(int_t t) const;
@@ -59,12 +78,12 @@ public:
 	int_t get_rel(const lexeme& l);
 	int_t get_sym(const lexeme& l);
 	int_t get_bltin(const lexeme& l);
-	int_t get_fresh_sym( int_t old);
-	int_t get_fresh_var( int_t old);
+	int_t get_fresh_sym(int_t old);
+	int_t get_fresh_var(int_t old);
 	lexeme get_var_lexeme_from(int_t r);
-	lexeme get_lexeme(const std::wstring& s);
-	int_t get_rel(const std::wstring& s) { return get_rel(get_lexeme(s)); }
-	int_t get_bltin(const std::wstring& s) { return get_bltin(get_lexeme(s)); }
+	lexeme get_lexeme(const std::string& s);
+	int_t get_rel(const std::string& s) { return get_rel(get_lexeme(s)); }
+	int_t get_bltin(const std::string& s) { return get_bltin(get_lexeme(s)); }
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
@@ -84,6 +103,7 @@ public:
 			swap(rels, d.rels),
 			swap(bltins, d.bltins),
 			swap(strs_extra, d.strs_extra),
+			swap(ii, d.ii),
 			swap(op, d.op),
 			swap(cl, d.cl),
 			//swap(types_dict, d.types_dict),
@@ -93,6 +113,7 @@ public:
 	~dict_t();
 };
 
-std::wostream& operator<<(std::wostream& os, const dict_t& d);
+template <typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const dict_t& d);
 
 #endif // __DICT_H__

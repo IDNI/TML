@@ -20,6 +20,7 @@
 #include <memory>
 #include <functional>
 #include "defs.h"
+#include "memory_map.h"
 
 #define fpairing(x, y) \
 	((((size_t)(x)+(size_t)(y))*((size_t)(x)+(size_t)(y)+1)>>1)+(size_t)(y))
@@ -36,6 +37,7 @@ typedef std::vector<int_t> bdds;
 typedef std::vector<spbdd_handle> bdd_handles;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+typedef std::vector<class bdd, memory_map_allocator<bdd> >bdd_mmap;
 
 struct ite_memo {
 	int_t x, y, z;
@@ -67,7 +69,8 @@ const int_t T = 1, F = -1;
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
 bool trueleaf(cr_spbdd_handle h);
-std::wostream& out(std::wostream& os, cr_spbdd_handle x);
+template <typename T>
+std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -98,7 +101,44 @@ int_t bdd_or_reduce(bdds b);
 size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
-extern std::vector<class bdd> V;
+extern std::unique_ptr<bdd_mmap> V;
+extern size_t max_bdd_nodes;
+extern mmap_mode bdd_mmap_mode;
+
+// template<typename T>
+// struct veccmp {
+// 	bool operator()(const std::vector<T>& x, const std::vector<T>& y) const;
+// };
+// 
+// template<typename T1, typename T2>
+// struct vec2cmp {
+// 	typedef std::pair<std::vector<T1>, std::vector<T2>> t;
+// 	bool operator()(const t& x, const t& y) const;
+// };
+// 
+// template<typename T1, typename T2, typename T3>
+// struct vec3cmp {
+// 	typedef std::tuple<std::vector<T1>, std::vector<T2>, std::vector<T3>> t;
+// 	bool operator()(const t& x, const t& y) const;
+// };
+// 
+// // these are extern because archive needs access to them. TODO: make it better
+// extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
+// extern std::unordered_map<ite_memo, int_t> C;
+// extern std::map<bools, std::unordered_map<std::array<int_t, 2>, int_t>,
+// 	veccmp<bool>> CX;
+// extern std::map<xperm, std::unordered_map<std::array<int_t,2>, int_t>,
+// 	vec2cmp<bool,uint_t>> CXP;
+// extern std::unordered_map<bdds, int_t> AM;
+// extern std::map<bools, std::unordered_map<bdds, int_t>, veccmp<bool>> AMX;
+// extern std::map<std::pair<bools,uints>, std::unordered_map<bdds,int_t>,
+// 	vec2cmp<bool,uint_t>> AMXP;
+// extern std::unordered_set<int_t> S;
+// extern std::map<bools, std::unordered_map<int_t, int_t>, veccmp<bool>> memos_ex;
+// extern std::map<uints, std::unordered_map<int_t, int_t>, veccmp<uint_t>>
+// 	memos_perm;
+// extern std::map<std::pair<uints, bools>, std::unordered_map<int_t, int_t>,
+// 	vec2cmp<uint_t, bool>> memos_perm_ex;
 
 void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 int_t bdd_root(cr_spbdd_handle x);
@@ -116,6 +156,7 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits, siz
 spbdd_handle bdd_qsolve(cr_spbdd_handle x, std::vector<quant_t> &quants);
 
 class bdd {
+	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
 	friend class satcount_iter;
@@ -155,10 +196,8 @@ class bdd {
 	friend size_t bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
-	friend std::wostream& out(std::wostream& os, cr_spbdd_handle x);
-	friend std::ostream& write_bdd(std::ostream& os);
-	friend std::istream& read_bdd(std::istream& is);
-
+	template <typename T>
+	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
 	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
@@ -176,10 +215,10 @@ class bdd {
 
 	inline static bdd get(int_t x) {
 		if (x > 0) {
-			const bdd &y = V[x];
+			const bdd &y = (*V)[x];
 			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
 		}
-		const bdd &y = V[-x];
+		const bdd &y = (*V)[-x];
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
@@ -220,11 +259,13 @@ class bdd {
 	static void bdd_nvars(int_t x, std::set<int_t>& s);
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
-	inline static int_t add(int_t v, int_t h, int_t l);
+	static int_t add(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
+	inline static void max_bdd_size_check();
 	inline static bool leaf(int_t t) { return abs(t) == T; }
 	inline static bool trueleaf(int_t t) { return t > 0; }
-	static std::wostream& out(std::wostream& os, int_t x);
+	template <typename T>
+	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, int_t x);
 	int_t h, l, v;
 
 	//---
@@ -284,20 +325,22 @@ public:
 	inline bool operator==(const bdd& b) const {
 		return v == b.v && h == b.h && l == b.l;
 	}
-	static void init();
+	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
+		const std::string fn="");
 	static void gc();
-	static std::wostream& stats(std::wostream& os);
+	template <typename T>
+	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static int_t hi(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
-			: V[x].v < 0 ? V[x].l : V[x].h;
+		return	x < 0 ? (*V)[-x].v < 0 ? -(*V)[-x].l : -(*V)[-x].h
+			: (*V)[x].v < 0 ? (*V)[x].l : (*V)[x].h;
 	}
 
 	inline static int_t lo(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
-			: V[x].v < 0 ? V[x].h : V[x].l;
+		return	x < 0 ? (*V)[-x].v < 0 ? -(*V)[-x].h : -(*V)[-x].l
+			: (*V)[x].v < 0 ? (*V)[x].h : (*V)[x].l;
 	}
 
-	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
+	inline static uint_t var(int_t x) { return abs((*V)[abs(x)].v); }
 
 	static size_t satcount_perm(int_t x, size_t leafvar);
 	static size_t satcount_perm(const bdd& bx, int_t x, size_t leafvar);
@@ -311,6 +354,7 @@ public:
 
 class bdd_handle {
 	friend class bdd;
+	friend class archive;
 	bdd_handle(int_t b) : b(b) { }//bdd::mark(b); }
 	static void update(const std::vector<int_t>& p);
 	static std::unordered_map<int_t, std::weak_ptr<bdd_handle>> M;
