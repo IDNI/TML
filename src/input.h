@@ -171,10 +171,10 @@ struct elem {
 	t_arith_op arith_op = NOP;
 	int_t num = 0;
 	lexeme e;
-	codepoint ch;
+	char ch;
 	elem() {}
 	elem(int_t num)   : type(NUM), num(num) {}
-	elem(codepoint ch) : type(CHR), ch(ch) {}
+	elem(char ch) : type(CHR), ch(ch) {}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}

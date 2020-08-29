@@ -655,7 +655,7 @@ elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
 	if (arg & 1) {
 		const int_t ch = arg >> 2;
-		if (ch > 31) return elem((codepoint) ch); // is printable
+		if (ch > 31) return elem((char) ch); // is printable
 		return	elem(elem::SYM, rdict().get_lexeme("\"#" +
 			to_string_((ch)) + "\""));
 	}
