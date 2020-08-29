@@ -1578,33 +1578,7 @@ void tables::load_string(lexeme r, const wstring& s) {
 		t.tab =tb;
 		tbls[tb].t = bdd_or_many(b);
 	}
-	int_t rel = dict.get_rel(r);
-	str_rels.insert(rel);
-	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
-		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
-		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
-		sdigit = dict.get_sym(dict.get_lexeme(L"digit")),
-		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
-	term tb;
-	bdd_handles bb;
-	bb.reserve(s.size()),tb.resize(3);
 
-	for (int_t n = 0; n != (int_t)s.size(); ++n) {
-		tb[1] = mknum(n), tb[2] = mknum(0);
-		if (iswspace(s[n])) tb[0] = sspace, bb.push_back(from_fact(tb));
-		if (iswdigit(s[n])) tb[0] = sdigit, bb.push_back(from_fact(tb));
-		if (iswalpha(s[n])) tb[0] = salpha, bb.push_back(from_fact(tb));
-		if (iswalnum(s[n])) tb[0] = salnum, bb.push_back(from_fact(tb));
-		if (iswprint(s[n])) tb[0] = sprint, bb.push_back(from_fact(tb));
-	}
-	clock_t start, end;
-	if (optimize)
-		(o::ms()<<"# load_string or_many: "),
-		measure_time_start();
-	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
-	tbls[stb].t = bdd_or_many(move(bb));
-	if (optimize) measure_time_end();
-	/*
 	int_t rel = dict.get_rel(r);
 	str_rels.insert(rel);
 
@@ -1637,7 +1611,6 @@ void tables::load_string(lexeme r, const wstring& s) {
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
 	if (optimize) measure_time_end();
-	*/
 }
 
 /*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
@@ -1800,10 +1773,8 @@ bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
 		// making fact equals( i i k k).
 		if( r == 0 ) eqr[r].back().assign({i,i,k,k});
 		else if( r == 1 ) { // inductive case
-			// equals(i j k n ) ;- str(i cv), str(j cv), i + 1 = j, k +1 = n.
+			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
-			// IMPROVE FIX: For unary_string, the relation is not known in advance, so the 
-			// rules need to change below .  
 			// str(i cv) ,str( k, cv)	
 			for( int vi=0; vi<2; vi++)
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
