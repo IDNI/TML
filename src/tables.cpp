@@ -1591,11 +1591,11 @@ void tables::load_string(lexeme r, const string_t& s) {
 	str_rels.insert(rel);
 
 //	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
-	const int_t sspace = dict.get_sym(dict.get_lexeme(L"space")),
-		salpha = dict.get_sym(dict.get_lexeme(L"alpha")),
-		salnum = dict.get_sym(dict.get_lexeme(L"alnum")),
-		sdigit = dict.get_sym(dict.get_lexeme(L"digit")),
-		sprint = dict.get_sym(dict.get_lexeme(L"printable"));
+	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
+		salpha = dict.get_sym(dict.get_lexeme("alpha")),
+		salnum = dict.get_sym(dict.get_lexeme("alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme("digit")),
+		sprint = dict.get_sym(dict.get_lexeme("printable"));
 	term t,tb;
 	bdd_handles b1, b2;
 	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
