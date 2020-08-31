@@ -18,7 +18,7 @@
 extern std::wostream wcnull;
 extern std::ostream cnull;
 
-#define WITH_WCHAR
+//#define WITH_WCHAR
 #ifdef WITH_WCHAR
 typedef wchar_t syschar_t;
 #define CIN   std::wcin
