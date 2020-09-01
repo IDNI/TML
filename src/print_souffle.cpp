@@ -73,7 +73,7 @@ string souffle_rel_name(string rel, bools p) {
 }
 
 relation_info get_rel_info(const raw_term& t) {
-	string rel = ws2s(lexeme2str(t.e[0].e));
+	string rel = to_string(lexeme2str(t.e[0].e));
 	bools p = {};
 	bool search = true;
 	size_t l = 0;
@@ -148,7 +148,9 @@ std::basic_ostream<T>& output_souffle_term(std::basic_ostream<T>& os, const raw_
 }
 
 template <typename T>
-std::basic_ostream<T>& output_souffle_elem(std::basic_ostream<T>& os, const elem& e) {
+std::basic_ostream<T>& output_souffle_elem(std::basic_ostream<T>& os,
+	const elem& e)
+{
 	switch (e.type) {
 		case elem::CHR:
 			os << '"';

@@ -23,9 +23,9 @@ dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
 
 lexeme dict_t::get_sym(int_t t) const {
 	DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
-	static char str_nums[20], str_chr[] = { '\'', 'a', '\'' };
+	static char_t str_nums[20], str_chr[] = { '\'', 'a', '\'' };
 	if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
-	if (t & 2) return strcpy(str_nums, to_string_(t>>=2).c_str()),
+	if (t & 2) return strcpy(str_nums, to_string_t(t>>=2).c_str()),
 			lexeme{ str_nums, str_nums + strlen(str_nums) };
 	return syms[t>>2];
 }
@@ -88,13 +88,21 @@ int_t dict_t::get_bltin(const lexeme& l) {
 	return bltins_dict[l] = bltins.size() - 1;
 }
 
-lexeme dict_t::get_lexeme(const std::string& s) {
-	ccs w = s.c_str();
-	auto it = strs_extra.find({ w, w + s.size() });
+lexeme dict_t::get_lexeme(ccs w, size_t l) {
+	if (l == (size_t)-1) l = strlen(w);
+	auto it = strs_extra.find({ w, w + l });
 	if (it != strs_extra.end()) return *it;
 	cstr r = strdup(w);
 	strs_allocated.push_back(r);
-	lexeme l = { r, r + s.size() };
-	strs_extra.insert(l);
-	return l;
+	lexeme lx = { r, r + l };
+	strs_extra.insert(lx);
+	return lx;
+}
+lexeme dict_t::get_lexeme(const std::basic_string<unsigned char>& s) {
+	ccs w = s.c_str();
+	return get_lexeme(w, s.size());
+}
+lexeme dict_t::get_lexeme(const std::basic_string<char>& s) {
+	ccs w = (ccs) s.c_str();
+	return get_lexeme(w, s.size());
 }

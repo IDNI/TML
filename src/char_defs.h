@@ -18,7 +18,7 @@
 extern std::wostream wcnull;
 extern std::ostream cnull;
 
-//#define WITH_WCHAR
+#define WITH_WCHAR
 #ifdef WITH_WCHAR
 typedef wchar_t syschar_t;
 #define CIN   std::wcin
@@ -44,7 +44,7 @@ typedef std::basic_istringstream<syschar_t> istringstream_t;
 typedef std::vector<std::string>            strings;
 typedef std::vector<std::wstring>           wstrings;
 
-typedef char char_t;                        // internal char representation
+typedef unsigned char char_t;               // internal char representation
 typedef std::basic_string<char_t> string_t; // internal string representation
 typedef char32_t codepoint;                 // single unicode codepoint / symbol
 typedef char_t* cstr;
@@ -56,7 +56,7 @@ typedef std::vector<lexeme> lexemes;
 typedef std::array<size_t, 2> lexeme_range;
 
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
-typedef std::map<lexeme, std::string, lexcmp> strs_t;
+typedef std::map<lexeme, string_t, lexcmp> strs_t;
 
 std::wstring s2ws(const std::string&);
 std::wstring s2ws(const std::wstring&);
@@ -67,3 +67,19 @@ std::wostream& operator<<(std::wostream& os, const std::string& s);
 std::ostream&  operator<<(std::ostream&  os, const char c);
 
 std::string to_string_(int_t v);
+string_t to_string_t(int_t v);
+string_t to_string_t(const std::string& s);
+string_t to_string_t(const char* s);
+std::string to_string(const string_t& s);
+
+string_t to_lower_first(string_t s);
+string_t to_upper_first(string_t s);
+
+unsigned char* strdup(const unsigned char* src);
+size_t strlen(const unsigned char *src);
+unsigned char* strcpy(unsigned char* dst, const unsigned char* src);
+int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num);
+
+// only for comparing with const char* literals containing ASCII
+int strncmp(const unsigned char* str1, const char* str2, size_t num);
+int strcmp(const unsigned char* str1, const char* str2);

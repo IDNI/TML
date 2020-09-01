@@ -23,15 +23,23 @@ using namespace std;
 lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
 */
 
-lexeme driver::get_lexeme(const string& s) {
-	ccs w = s.c_str();
-	auto it = strs_extra.find({ w, w + s.size() });
+lexeme driver::get_lexeme(ccs w, size_t l) {
+	if (l == (size_t)-1) l = strlen(w);
+	auto it = strs_extra.find({ w, w + l });
 	if (it != strs_extra.end()) return *it;
-	cstr r = strdup(s.c_str());
+	cstr r = strdup(w);
 	strs_allocated.push_back(r);
-	lexeme l = { r, r + s.size() };
-	strs_extra.insert(l);
-	return l;
+	lexeme lx = { r, r + l };
+	strs_extra.insert(lx);
+	return lx;
+}
+lexeme driver::get_lexeme(const std::basic_string<unsigned char>& s) {
+	ccs w = s.c_str();
+	return get_lexeme(w, s.size());
+}
+lexeme driver::get_lexeme(const std::basic_string<char>& s) {
+	ccs w = (ccs) s.c_str();
+	return get_lexeme(w, s.size());
 }
 
 lexeme driver::get_var_lexeme(int_t i) {
@@ -111,7 +119,7 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	return t.calc_arity(current_input), t;
 }
 
-raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string& b,
+raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string_t& b,
 	int_t v){
 	return { false, raw_term::REL, NOP, {
 		elem(elem::SYM, r),
@@ -199,8 +207,10 @@ loop2:	sz = s.size();
 
 void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	if (r.g.empty()) return;
-	static const set<std::string> b =
-		{ "alpha", "alnum", "digit", "space", "printable" };
+	static const set<string_t> b = {
+		to_string_t("alpha"), to_string_t("alnum"),
+		to_string_t("digit"), to_string_t("space"),
+		to_string_t("printable") };
 	for (size_t k = 0; k != r.g.size();) {
 		if (r.g[k].p.size()<2)parse_error(err_empty_prod,r.g[k].p[0].e);
 		size_t n = 0;
@@ -269,7 +279,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 						rel, p.p[n], n, n+1));
 					continue;
 				}
-				std::string str = lexeme2str(p.p[n].e);
+				string_t str = lexeme2str(p.p[n].e);
 				if (has(b, str))
 					l.b.back().push_back(
 						from_grammar_elem_builtin(

@@ -98,7 +98,7 @@ template ostream_t& driver::print_prolog(ostream_t& os, const raw_prog&,
 	prolog_dialect) const;
 
 relarity get_relarity(const raw_term& t) {
-	string rel = lexeme2str(t.e[0].e);
+	string rel = to_string(lexeme2str(t.e[0].e));
 	rel[0] = towlower(rel[0]);
 	int_t depth = 0, ar = t.arity[0];
 	if (ar == 0)
@@ -175,11 +175,13 @@ std::basic_ostream<T>& output_prolog_elem(std::basic_ostream<T>& os, const elem&
 				default: os << e.ch;
 			}
 			return os << '\'';
-		case elem::VAR: return output_lexeme_adjust_first(os,
-			(lexeme{ e.e[0]+1, e.e[1] }), towupper);
+
+		case elem::VAR:
+			return os << to_string(to_upper_first(lexeme2str(e.e)));
 		case elem::OPENP:
 		case elem::CLOSEP: return os << *e.e[0];
 		case elem::NUM: return os << e.num;
-		default: return output_lexeme_adjust_first(os, e.e, towlower);
+		default:
+			return os << to_string(to_lower_first(lexeme2str(e.e)));
 	}
 }

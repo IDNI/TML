@@ -137,14 +137,21 @@ template basic_ostream<char>& operator<<(basic_ostream<char>&, const pair<ccs, s
 template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const pair<ccs, size_t>&);
 
 
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const lexeme& l) {
-	for (ccs s = l[0]; s != l[1]; ++s) os << *s;
-	//DBG(os << " (" << (void*)l[0] << " " << (void*)l[1] << ")";)
-	return os;
+basic_ostream<char>& operator<<(basic_ostream<char>& os, const lexeme& l) {
+	return os << to_string(lexeme2str(l));
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const lexeme&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const lexeme&);
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& os, const lexeme& l){
+	return os << s2ws(to_string(lexeme2str(l)));
+}
+//template <typename T>
+//basic_ostream<T>& operator<<(basic_ostream<T>& os, const lexeme& l) {
+//	os << (l[0], l[1], l[1]-l[0]);
+//	//for (ccs s = l[0]; s != l[1]; ++s) os << *s;
+//	//DBG(os << " (" << (void*)l[0] << " " << (void*)l[1] << ")";)
+//	return os;
+//}
+//template basic_ostream<char>& operator<<(basic_ostream<char>&, const lexeme&);
+//template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const lexeme&);
 
 #ifdef DEBUG
 /*template <typename T>
@@ -302,14 +309,16 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
 	if (d.type == directive::TREE) return os << d.t << '.';
 	return os << d.rel << ' ' << d.arg << '.';
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const directive&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const directive&);
+template
+basic_ostream<char>& operator<<(basic_ostream<char>&, const directive&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const directive&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const elem& e) {
 	switch (e.type) {
 		case elem::CHR: return os << '\'' <<
-			(e.ch=='\'' || e.ch=='\\' ? "\\" : "") << e.ch<<'\'';
+			(e.ch=='\'' || e.ch=='\\' ? "\\":"") <<(char)e.ch<<'\'';
 		case elem::OPENP:
 		case elem::CLOSEP: return os<<*e.e[0];
 		case elem::NUM: return os << e.num;
@@ -317,7 +326,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const elem& e) {
 	}
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const elem&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const elem&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const elem&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const production& p) {
@@ -325,11 +335,14 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const production& p) {
 	for (size_t n = 1; n < p.p.size(); ++n) os << p.p[n] << ' ';
 	return os << '.';
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const production&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const production&);
+template
+basic_ostream<char>& operator<<(basic_ostream<char>&, const production&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const production&);
 
-string quote_sym(const elem& e) {
-	stringstream os, ss;
+std::string quote_sym(const elem& e) {
+	ostringstream_t os;
+	basic_ostringstream<char_t> ss;
 	if (e.type == elem::SYM) {
 		bool q{false};
 		for (ccs s = e.e[0]; s != e.e[1]; ++s) {
@@ -337,17 +350,16 @@ string quote_sym(const elem& e) {
 				q = true;
 				os.put('"');
 			}
-			if (q && (*s=='"'|| *s=='\\')) ss << "\\";
+			if (q && (*s=='"'|| *s=='\\')) ss << to_string_t("\\");
 			ss << *s;
 		}
-		os << ss.str();
+		os << to_string(ss.str());
 		if (q) os.put('"');
 		else if (e.e[0] == e.e[1]) os << "\"\"";
 	} else {
-		ostringstream_t wss; wss << e;
-		os << ws2s(wss.str()); // CHR, OPENP, CLOSEP or NUM = no quotes
+		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
 	}
-	return os.str();
+	return ws2s(os.str());
 }
 
 template <typename T>
@@ -378,10 +390,13 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 	return os << ')';
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_term&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_term&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_term&);
 
 template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const pair<raw_term, string>& p) {
+basic_ostream<T>& operator<<(basic_ostream<T>& os,
+	const pair<raw_term, string>& p)
+{
 	const raw_term& t = p.first;
 	//if (t.neg) os << '~';
 	//os << t.e[0];
@@ -399,8 +414,10 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const pair<raw_term, string>&
 	}
 	return os; // << ')';
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const pair<raw_term, string>&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const pair<raw_term, string>&);
+template basic_ostream<char>& operator<<(basic_ostream<char>&,
+	const pair<raw_term, string>&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
+	const pair<raw_term, string>&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_rule& r) {
@@ -422,7 +439,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_rule& r) {
 	return os << '.';
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_rule&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_prog& p) {
@@ -431,9 +449,10 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_prog& p) {
 	for (auto x : p.r) os << x << endl;
 	return os;
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_prog& p);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& os, const raw_prog& p);
-
+template
+basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_prog& p);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& s,const raw_prog& p);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_progs& p) {
@@ -441,15 +460,18 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_progs& p) {
 	else for (auto x : p.p) os << '{' << endl << x << '}' << endl;
 	return os;
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_progs& p);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& os, const raw_progs& p);
+template
+basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_progs& p);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& s,const raw_progs&p);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const output& o) {
 	return os << o.target();
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const output&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const output&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const output&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const option& o) {
@@ -476,7 +498,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const option& o) {
 	return os;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const option&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const option&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const option&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const map<string,option>& opts) {
@@ -487,13 +510,17 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const map<string,option>& opt
 	}
 	return os;
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const map<string,option>&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const map<string,option>&);
+template basic_ostream<char>& operator<<(basic_ostream<char>&,
+	const map<string,option>&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
+	const map<string,option>&);
 
 template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const options& o) { return os << o.opts; }
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const options& o) {
+	return os << o.opts; }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const options&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const options&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const options&);
 
 template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
@@ -502,8 +529,10 @@ void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
 		os << b.first << ' ' << to_raw_term(b.second) << ' ';
 	os << endl;
 }
-template void tables::print<char>(basic_ostream<char>&, const tables::proof_elem&);
-template void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof_elem&);
+template
+void tables::print<char>(basic_ostream<char>&, const tables::proof_elem&);
+template
+void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof_elem&);
 
 template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof& p) {
@@ -515,7 +544,8 @@ void tables::print(basic_ostream<T>& os, const tables::proof& p) {
 		}
 }
 template void tables::print<char>(basic_ostream<char>&, const tables::proof&);
-template void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof&);
+template
+void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof&);
 
 #ifdef DEBUG
 template <typename T>
@@ -526,7 +556,8 @@ void tables::print(basic_ostream<T>& os, const tables::witness& w) {
 }
 
 template void tables::print<char>(basic_ostream<char>&, const tables::witness&);
-template void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
+template
+void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
 #endif
 
 /*void tables::print_env(const env& e) const {
@@ -551,8 +582,10 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 				: ", ");
 	return os;
 }
-template basic_ostream<char>& tables::print(basic_ostream<char>&, const rule&) const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const rule&) const;
+template
+basic_ostream<char>& tables::print(basic_ostream<char>&, const rule&) const;
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
+	const rule&) const;
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
@@ -572,4 +605,5 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
 	return os << endl;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const dict_t&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);

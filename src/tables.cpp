@@ -29,12 +29,12 @@ size_t sig_len(const sig& s) {
 	return r;
 }
 
-void unquote(string& str) {
+void unquote(string_t& str) {
 	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == '\\') str.erase(str.begin() + i);
+		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
 }
 
-string _unquote(string str) { unquote(str); return str; }
+string_t _unquote(string_t str) { unquote(str); return str; }
 
 #ifdef DEBUG
 vbools tables::allsat(spbdd_handle x, size_t args) const {
@@ -649,13 +649,13 @@ set<term> tables::decompress() {
 #define rdict() ((dict_t&)dict)
 //#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
 //#define get_var_lexeme(v) dict.get_lexeme(string("?v") + to_string_(-v))
-#define get_var_lexeme(v) rdict().get_lexeme(string("?v")+to_string_(-v))
+#define get_var_lexeme(v) rdict().get_lexeme(to_string_t("?v")+to_string_t(-v))
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
 	if (arg & 1) {
 		const int_t ch = arg >> 2;
-		if (ch > 31) return elem((char) ch); // is printable
+		if (ch > 31) return elem((char_t) ch); // is printable
 		return	elem(elem::SYM, rdict().get_lexeme("\"#" +
 			to_string_((ch)) + "\""));
 	}
@@ -1555,19 +1555,19 @@ struct unary_string{
 				rel[ char_t(vmask & s[i]) ].insert(i*n+a),
 				sort_rel[i*n+a] = char_t(vmask & s[i]),
 				s[i] = ulong(s[i])>>pbsz;
-				
+
 		return true;
 	}
 	string_t getrelin_str(char_t r){
-		return ( r == '\0') ? "00": string_t(1,r);
+		return ( r == '\0') ? to_string_t("00"): string_t(1,r);
 
 	}
 	ostream_t& toprint(ostream_t& o) {
 		for(size_t i = 0; i < sort_rel.size(); i++)
 			if(isalnum(sort_rel[i]))
-				o << sort_rel[i] << " " << i<<endl;
+				o << (char)sort_rel[i] << " " << i<<endl;
 			else o <<uint(sort_rel[i])<<"  "<< i <<endl;
-		return o;	
+		return o;
 	}
 };
 void tables::load_string(lexeme r, const string_t& s) {
@@ -1603,11 +1603,11 @@ void tables::load_string(lexeme r, const string_t& s) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
 		b1.push_back(from_fact(t));
 		tb[1] = t[0], tb[2] = mknum(0);
-		if (iswspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
-		if (iswdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
-		if (iswalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
-		if (iswalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
-		if (iswprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
+		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
+		if (isdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
+		if (isalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
+		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
+		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
 	}
 	clock_t start, end;
 	if (optimize)
@@ -1688,8 +1688,8 @@ bool tables::get_substr_equality(const raw_term &rt, size_t &n,
 	for( int i=0; i<2 ; i++) {
 		if( n >= rt.e.size() || rt.e[n].type != elem::SYM ) 
 			return false;
-		string attrib = lexeme2str(rt.e[n].e);
-		if( !(!std::strcmp(attrib.c_str() , "substr")
+		string_t attrib = lexeme2str(rt.e[n].e);
+		if( !(!strcmp(attrib.c_str(), "substr")
 			&& 	(n+3) < rt.e.size() 
 			&& 	rt.e[n+1].type == elem::OPENP  
 			&&	rt.e[n+2].type == elem::NUM    
@@ -1711,7 +1711,7 @@ bool tables::get_substr_equality(const raw_term &rt, size_t &n,
 		else if ( refs[pos].size()==1) // for unary str
 			svalt[i*2+1] = refs[pos][0]-1;
 		else
-			parse_error("Incorrect term size for substr(index)", "" );
+			parse_error("Incorrect term size for substr(index)");
 
 		n += 4;  // parse sval(i)
 		if( i == 0 && !( n < rt.e.size() &&  
@@ -1730,8 +1730,8 @@ int_t tables::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &refs,
 
 	int_t lopd=0;
 	if( n < rt.e.size() && rt.e[n].type == elem::SYM ) {
-		string attrib = lexeme2str(rt.e[n].e);
-		if( ! std::strcmp(attrib.c_str() , "len") 
+		string_t attrib = lexeme2str(rt.e[n].e);
+		if( ! strcmp(attrib.c_str() , "len") 
 			&& 	(n+3) < rt.e.size() 
 			&& 	rt.e[n+1].type == elem::OPENP  
 			&&	rt.e[n+2].type == elem::NUM    
@@ -2006,7 +2006,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 						if(n == rt.e.size())	v.push_back(aritht);
 						else er("Only simple binary operation allowed.");
 		
-				} else parse_error(err_constraint_syntax, "");
+				} else parse_error(err_constraint_syntax);
 			}
 			else parse_error(err_constraint_syntax, rt.e[n].e);		
 		}
@@ -2211,7 +2211,7 @@ void tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 		size_t n{0};
 		// D: args are now [0,1,...] (we no longer have the bltin as 0 arg)
 		if (a.bltinargs.size() >= 2) ++n,
-			ou = lexeme2str(dict.get_sym(a.bltinargs[0]));
+			ou= to_string(lexeme2str(dict.get_sym(a.bltinargs[0])));
 		ostream_t& os = o::to(ou);
 		do {
 			int_t arg = a.bltinargs[n++];

@@ -81,7 +81,9 @@ public:
 	int_t get_fresh_sym(int_t old);
 	int_t get_fresh_var(int_t old);
 	lexeme get_var_lexeme_from(int_t r);
-	lexeme get_lexeme(const std::string& s);
+	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
+	lexeme get_lexeme(const std::basic_string<char>& s);
+	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
 	int_t get_rel(const std::string& s) { return get_rel(get_lexeme(s)); }
 	int_t get_bltin(const std::string& s) { return get_bltin(get_lexeme(s)); }
 	size_t nsyms() const { return syms.size(); }

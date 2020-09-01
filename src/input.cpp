@@ -149,7 +149,7 @@ int_t input::get_int_t(ccs from, ccs to) {
 	if (*from == '-') neg = true, ++from;
 	for (ccs s = from; s != to; ++s) if (!isdigit(*s))
 		::parse_error(from, err_int);
-	string s(from, to - from);
+	string s((const char*) from, to - from);
 	try { r = stoll(s); }
 	catch (...) { ::parse_error(from, err_int); }
 	return neg ? -r : r;
@@ -848,7 +848,9 @@ off_t fsize(const char *fname) {
 	return stat(fname, &s) ? 0 : s.st_size;
 }
 
-off_t fsize(ccs s, size_t len) { return fsize(string(s, len).c_str()); }
+off_t fsize(ccs s, size_t len) {
+	return fsize(to_string(string_t(s, len)).c_str());
+}
 
 string input::file_read(string fname) {
 	ifstream s(fname);
@@ -906,7 +908,7 @@ void parse_error(const char* e) {
 }
 
 void parse_error(const char* e, std::string s) {
-	input in((void*) 0, (size_t) 0); in.parse_error(0, e, s.c_str());
+	input in((void*) 0, (size_t) 0); in.parse_error(0, e, (ccs) s.c_str());
 }
 
 void parse_error(ccs offset, const char* err) {
@@ -932,6 +934,6 @@ void input::parse_error(ccs offset, const char* err, ccs close_to) {
 		msg << " at " << l << ':' << ch;
 	}
 	if (close_to) msg << " close to \""
-		<< string(close_to, p - close_to) << '"';
+		<< to_string(string_t(close_to, p - close_to)) << '"';
 	throw parse_error_exception(msg.str());
 }

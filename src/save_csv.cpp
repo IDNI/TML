@@ -19,7 +19,8 @@ void driver::save_csv() const {
 	tbl->out([&files](const raw_term& t) {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
-			std::string fname = ws2s(lexeme2str(t.e[0].e)) + ".csv";
+			std::string fname = to_string(lexeme2str(t.e[0].e))
+				+ ".csv";
 			o::inf() << "Saving " << fname << endl;
 			files.emplace(t.e[0], ofstream(fname));
 			it = files.find(t.e[0]);
@@ -32,7 +33,7 @@ void driver::save_csv() const {
 			if (n >= t.e.size()) break;
 			while (t.e[n].type == elem::OPENP) ++n;
 			for (int_t k = 0; k != t.arity[ar];)
-				if ((os<<elem2str(t.e[n++])),
+				if ((os<<to_string(elem2str(t.e[n++]))),
 					++k!=t.arity[ar]) os<<'\t';
 			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 			++ar;

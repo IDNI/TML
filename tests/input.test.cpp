@@ -16,7 +16,7 @@
 using namespace std;
 
 test string_input = [] {
-	ccs s = "string";
+	ccs s = to_string_t("string").c_str();
 	input i(s);
 	if (i.begin() != i.data())
 		return fail("input beg != data");
@@ -51,22 +51,22 @@ test multiple_inputs = [] {
 
 	input* i = ii.first();
 	if (i == 0) return fail("input1 next == 0");
-	if ((string(i->data())  != prog1)
- 	 || (string(i->begin()) != prog1))
+	if ((string_t(i->data())  != to_string_t(prog1))
+ 	 || (string_t(i->begin()) != to_string_t(prog1)))
 		return fail("wrong input1 data");
 
 	i = i->next();
 	if (i == 0) return fail("input2 next == 0");
-	if ((string(i->data())  != prog2)
-	 || (string(i->begin()) != prog2))
+	if ((string_t(i->data())  != to_string_t(prog2))
+	 || (string_t(i->begin()) != to_string_t(prog2)))
 		return fail("wrong input2 data");
 
 	i = i->next();
 	if (i == 0) return fail("input3 == 0");
 	//COUT << "prog3: '" << prog3 << "'\n i->begin(): '"
 	//	<< i->begin() << "'\n";
-	if ((string(i->data())  != prog3)
-	 || (string(i->begin()) != prog3))
+	if ((string_t(i->data())  != to_string_t(prog3))
+	 || (string_t(i->begin()) != to_string_t(prog3)))
 		return fail("wrong input3 data");
 
 	if (i->next()) return fail("4th input reached but only 3 added");

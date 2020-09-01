@@ -322,7 +322,7 @@ private:
 	void set_priorities(const flat_prog&);
 	ntable get_new_tab(int_t x, ints ar);
 	lexeme get_new_rel();
-	void load_string(lexeme rel, const std::string& s);
+	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
 	void add_prog(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);

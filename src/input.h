@@ -91,7 +91,8 @@ private:
 	std::unique_ptr<input> next_ = 0;
 	size_t load_stdin() {
 		ostringstream_t ss; ss << CIN.rdbuf();
-		beg_ = strdup((ws2s(ss.str())).c_str()), data_ = beg_,
+		beg_ = (ccs) strdup((ws2s(ss.str())).c_str()),
+		data_ = beg_,
 		allocated_ = true;
 		return ss.str().size();
 	}
@@ -125,9 +126,18 @@ public:
 		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
 		return ret;
 	}
+	input* add_string(const string_t& str) {
+		//COUT << "adding string input: " << to_string(str) << std::endl;
+		std::unique_ptr<input> in =std::make_unique<input>(str.c_str());
+		input* ret = in.get();
+		add(std::move(in));
+		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
+		return ret;
+	}
 	input* add_string(const std::string& str) {
 		//COUT << "adding string input: " << str << std::endl;
-		std::unique_ptr<input> in = std::make_unique<input>(str.c_str());
+		std::unique_ptr<input> in = std::make_unique<input>(
+			to_string_t(str).c_str());
 		input* ret = in.get();
 		add(std::move(in));
 		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
@@ -171,10 +181,10 @@ struct elem {
 	t_arith_op arith_op = NOP;
 	int_t num = 0;
 	lexeme e;
-	char ch;
+	char_t ch;
 	elem() {}
-	elem(int_t num)   : type(NUM), num(num) {}
-	elem(char ch) : type(CHR), ch(ch) {}
+	elem(int_t num) : type(NUM), num(num) {}
+	elem(char_t ch) : type(CHR), ch(ch) {}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
@@ -351,9 +361,9 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_prog& p);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_progs& p);
 template <typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const lexeme& l);
-template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const production& p);
+std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const lexeme& l);
+std::basic_ostream<wchar_t>& operator<<(std::basic_ostream<wchar_t>& os, const lexeme& l);
 
 bool operator==(const lexeme& l, std::string s);
 bool operator==(const lexeme& l, const char* s);

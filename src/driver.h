@@ -41,7 +41,7 @@ struct prog_data {
 	size_t n = 0;
 	size_t start_step = 0;
 	size_t elapsed_steps = 0;
-	std::string std_input;
+	string_t std_input;
 };
 
 class driver {
@@ -60,7 +60,9 @@ class driver {
 	std::vector<ccs> strs_allocated;
 	lexeme get_var_lexeme(int_t i);
 	lexeme get_new_var();
-	lexeme get_lexeme(const std::string& s);
+	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
+	lexeme get_lexeme(const std::basic_string<char>& s);
+	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
 	lexeme get_new_rel();
 //	std::function<int_t(void)> *fget_new_rel;
 //	lexeme get_num_lexeme(int_t i);
@@ -72,7 +74,7 @@ class driver {
 	std::set<raw_rule> refresh_vars(raw_rule& r);
 	std::set<raw_term> get_queries(const raw_prog& p);
 
-	std::string directive_load(const directive& d);
+	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
@@ -92,7 +94,7 @@ class driver {
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
 		int_t v1, int_t v2);
-	raw_term from_grammar_elem_builtin(const lexeme& r, const std::string&b,
+	raw_term from_grammar_elem_builtin(const lexeme& r, const string_t&b,
 		int_t v);
 	raw_term prepend_arg(const raw_term& t, lexeme s);
 //	template <typename T>
@@ -121,12 +123,14 @@ public:
 	options opts;
 	driver(options o);
 	driver(FILE *f, options o);
+	driver(string_t, options o);
 	driver(std::string, options o);
-	driver(char *s, options o);
+	driver(const char *s, options o);
 	driver(ccs s, options o);
 	driver(FILE *f);
 	driver(std::string);
-	driver(char *s);
+	driver(string_t);
+	driver(const char *s);
 	driver(ccs s);
 	~driver();
 
@@ -206,12 +210,14 @@ extern driver* drv;
 //template <typename T>
 //std::basic_ostream<T>& printdb(std::basic_ostream<T>& os, lp *p);
 template <typename T>
-std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
+std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t,
+	size_t bits, ints ar, int_t rel);
 template <typename T>
-std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
+std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
+	size_t bits, ints ar, int_t rel);
 //template <typename T>
 //std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
-std::string _unquote(std::string str);
+string_t _unquote(string_t str);
 #endif

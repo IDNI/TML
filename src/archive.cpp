@@ -341,7 +341,7 @@ archive& archive::operator>>(lexeme_range& r) {
 	return *this >> r[0] >> r[1];
 }
 
-archive& archive::operator<<(const std::string& val) {
+archive& archive::operator<<(const string_t& val) {
 	//COUT << "writing string: " << val
 	// 	 << " size: " << val.size() << endl;
 	//POS("string begin")
@@ -351,12 +351,12 @@ archive& archive::operator<<(const std::string& val) {
 	//POS("string end")
 	return *this;
 }
-archive& archive::operator>>(std::string& val) {
+archive& archive::operator>>(string_t& val) {
 	//POS("string begin")
 	size_t l; *this >> l;
 	//DBG(o::dbg() << "reading string, size: " << l << endl;)
-	if (l == 0) return (val = "", ++pos_), *this;
-	val = std::string(read_ccs(l));
+	if (l == 0) return (val = string_t(), ++pos_), *this;
+	val = string_t(read_ccs(l));
 	//POS("string end")
 	return *this;
 }
@@ -571,12 +571,12 @@ size_t archive::size(const raw_progs& rps) {
 	return size(rps.p);
 }
 
-archive& archive::write_ccs(const char* s, size_t l) {
+archive& archive::write_ccs(ccs s, size_t l) {
 	*this << l; write(s, l);
 	return *this;
 }
 
-archive& archive::write_ccs(const char* s) {
+archive& archive::write_ccs(ccs s) {
 	size_t l = strlen(s);
 	return write_ccs(s, l);
 }
@@ -622,13 +622,13 @@ archive& archive::operator<<(const option& o) {
 	//POS("option type")
 	*this << (unsigned char)o.t;
 	//POS("option name")
-	*this << o.n[0];
+	*this << to_string_t(o.n[0]);
 	//COUT << "option name written: " << o.n[0] << " type: " << (int_t) o.t << endl;
 	//POS("option value")
 	switch (o.t) {
 		case option::type::INT:    *this << o.v.v_i; break;
-		case option::type::BOOL:   *this << enc_bools({ o.v.v_b }); break;
-		case option::type::STRING: *this << o.v.v_s; break;
+		case option::type::BOOL:   *this << enc_bools({o.v.v_b}); break;
+		case option::type::STRING: *this << to_string_t(o.v.v_s); break;
 		default: ;
 	}
 	//POS("option end")
@@ -662,7 +662,7 @@ archive& archive::operator>>(options& opts) {
 	//POS("option pairs")
 	for (size_t i = 0; i != nsize; ++i) {
 		int_t val;
-		std::string s, n;
+		string_t s, n;
 		unsigned char uch;
 		//POS("option start: type[1]")
 		*this >> uch;
@@ -673,15 +673,18 @@ archive& archive::operator>>(options& opts) {
 		//POS("option value")
 		switch ((option::type) uch) {
 			case option::type::INT:
-				*this >> val; opts.set(n, val);
+				*this >> val;
+				opts.set(to_string(n), val);
 				//COUT << "int written: " << val << endl;
 				break;
 			case option::type::BOOL:
-				*this >> uch; opts.set(n, dec_bool(uch));
+				*this >> uch;
+				opts.set(to_string(n), dec_bool(uch));
 				//COUT << "bool read: " << dec_bool(uch) << endl;
 				break;
 			case option::type::STRING:
-				*this >> s;   opts.set(n, s);
+				*this >> s;
+				opts.set(to_string(n), to_string(s));
 				//COUT << "string read: " << s << endl;
 				break;
 			default: throw 0;

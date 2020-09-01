@@ -1,43 +1,63 @@
-str(((19))(')')((20))).
-str(((18))(')')((19))).
-str(((17))(')')((18))).
-str(((16))(')')((17))).
-str(((15))(')')((16))).
-str(((14))('(')((15))).
-str(((13))(')')((14))).
-str(((12))('(')((13))).
-str(((11))(')')((12))).
-str(((10))('(')((11))).
-str(((9))('(')((10))).
-str(((8))('(')((9))).
-str(((7))(')')((8))).
-str(((6))('(')((7))).
-str(((5))(')')((6))).
-str(((4))('(')((5))).
-str(((3))(')')((4))).
-str(((2))('(')((3))).
-str(((1))('(')((2))).
-str(((0))('(')((1))).
-str(printable 19 20).
-str(printable 18 19).
-str(printable 17 18).
-str(printable 16 17).
-str(printable 15 16).
-str(printable 14 15).
-str(printable 13 14).
-str(printable 12 13).
-str(printable 11 12).
-str(printable 10 11).
-str(printable 9 10).
-str(printable 8 9).
-str(printable 7 8).
-str(printable 6 7).
-str(printable 5 6).
-str(printable 4 5).
-str(printable 3 4).
-str(printable 2 3).
-str(printable 1 2).
-str(printable 0 1).
+((14).
+((12).
+((10).
+((9).
+((8).
+((6).
+((4).
+((2).
+((1).
+((0).
+)(19).
+)(18).
+)(17).
+)(16).
+)(15).
+)(13).
+)(11).
+)(7).
+)(5).
+)(3).
+str(19 ')').
+str(18 ')').
+str(17 ')').
+str(16 ')').
+str(15 ')').
+str(14 '(').
+str(13 ')').
+str(12 '(').
+str(11 ')').
+str(10 '(').
+str(9 '(').
+str(8 '(').
+str(7 ')').
+str(6 '(').
+str(5 ')').
+str(4 '(').
+str(3 ')').
+str(2 '(').
+str(1 '(').
+str(0 '(').
+str(printable 19 0).
+str(printable 18 0).
+str(printable 17 0).
+str(printable 16 0).
+str(printable 15 0).
+str(printable 14 0).
+str(printable 13 0).
+str(printable 12 0).
+str(printable 11 0).
+str(printable 10 0).
+str(printable 9 0).
+str(printable 8 0).
+str(printable 7 0).
+str(printable 6 0).
+str(printable 5 0).
+str(printable 4 0).
+str(printable 3 0).
+str(printable 2 0).
+str(printable 1 0).
+str(printable 0 0).
 S(14 16).
 S(12 16).
 S(10 16).

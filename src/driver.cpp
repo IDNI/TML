@@ -53,16 +53,17 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 
 size_t driver::load_stdin() {
 	ostringstream_t ss; ss << CIN.rdbuf();
-	pd.std_input = ws2s(ss.str());
+	pd.std_input = to_string_t(ws2s(ss.str()));
 	return pd.std_input.size();
 }
 
-void unquote(std::string& str);
+void unquote(string_t& str);
 
-string driver::directive_load(const directive& d) {
-	std::string str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
+string_t driver::directive_load(const directive& d) {
+	string_t str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
 	switch (d.type) {
-		case directive::FNAME: return input::file_read(ws2s(str));
+		case directive::FNAME:
+			return to_string_t(input::file_read(to_string(str)));
 		case directive::STDIN: return move(pd.std_input);
 		default: return unquote(str), str;
 	}
@@ -77,7 +78,8 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::CMDLINE:
 			if (d.n < opts.argc())
-				pd.strs.emplace(d.rel.e, opts.argv(d.n));
+				pd.strs.emplace(d.rel.e,
+					to_string_t(opts.argv(d.n)));
 			else parse_error(err_num_cmdline);
 			break;
 /*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
@@ -299,17 +301,18 @@ driver::driver(string s, options o) : rp(), opts(o) {
 		read_inputs();
 	}
 }
-driver::driver(FILE *f,   options o) : driver(input::file_read_text(f), o) {}
-driver::driver(char *s,   options o) : driver(string(s), o) {}
-driver::driver(ccs   s,   options o) : driver(string(s), o) {}
-driver::driver(options o)            : driver(string(), o) {}
-driver::driver(FILE *f)              : driver(f, options()) {}
-driver::driver(string s)             : driver(s, options()) {}
-driver::driver(char *s)              : driver(s, options()) {}
-driver::driver(ccs   s)              : driver(string(s), options()) {}
+driver::driver(FILE *f,    options o)   : driver(input::file_read_text(f), o) {}
+driver::driver(string_t s, options o)   : driver(to_string(s), o) {}
+driver::driver(const char *s,options o) : driver(string(s), o) {}
+driver::driver(ccs   s,    options o)   : driver(string_t(s), o) {}
+driver::driver(options o)               : driver(string(), o) {}
+driver::driver(string s)                : driver(s, options()) {}
+driver::driver(FILE *f)                 : driver(f, options()) {}
+driver::driver(string_t s)              : driver(to_string(s)) {}
+driver::driver(const char *s)           : driver(s, options()) {}
+driver::driver(ccs   s)                 : driver(string_t(s)) {}
 
 driver::~driver() {
 	if (tbl) delete tbl;
 	for (auto x : strs_allocated) free((char *)x);
 }
-

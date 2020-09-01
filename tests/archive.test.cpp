@@ -84,10 +84,10 @@ test write_unsigned_char = write_test<unsigned char>(
 test read_unsigned_char  = read_test<unsigned char>([](const unsigned char& v){
 	return v == 250; });
 
-test write_string = write_test<string>(string("Hello World!"),
+test write_string = write_test<string_t>(to_string_t(string("Hello World!")),
 	"\x0c\0\0\0\0\0\0\0Hello World!\0", 21);
-test read_string = read_test<string>(
-	[](const string& val){ return val == string("Hello World!"); });
+test read_string = read_test<string_t>([](const string_t& val) {
+	return val == to_string_t(string("Hello World!")); });
 
 dict_t& data_dict_input() {
 	static dict_t d;
@@ -241,16 +241,16 @@ int main() {
 		return e.type == elem::NUM && e.num == 3;
 	});
 	test write_elem_chr = write_test<elem>(
-		elem(U'$'), "\x03\x24\x00\x00\x00", 5
+		elem(char_t('$')), "\x03\x24\x00\x00\x00", 5
 	);
 	test read_elem_chr = read_test<elem>([] (elem& e) {
-		return e.type == elem::CHR && e.ch == U'$';
+		return e.type == elem::CHR && e.ch == char_t('$');
 	});
 	test write_elem_str = write_test<elem>(
 		elem(elem::STR, test_dict.get_lexeme("ABC")), "\x08\x03\x00\x00\x00\x00\x00\x00\x00\x41\x42\x43", 12
 	);
 	test read_elem_str = read_test<elem>([] (elem& e) {
-		return e.type == elem::STR && lexeme2str(e.e) == "ABC";
+		return e.type == elem::STR && to_string(lexeme2str(e.e))=="ABC";
 	});
 
 	vector<test> tests = {

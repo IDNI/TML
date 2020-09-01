@@ -32,7 +32,7 @@ private:
 	size_t size_ = 0;
 	size_t version_ = 0;
 	dict_t* dict_ = 0;
-	std::ostringstream ldata_;
+	std::basic_ostringstream<char_t> ldata_;
 	size_t lpos_ = 0;
 	std::map<lexeme, lexeme_range, lexcmp> lmap_;
 	std::vector<std::pair<lexeme_range, bool>> lranges_;
@@ -72,10 +72,8 @@ public:
 
 	const char* read_chars(size_t l);
 	ccs read_ccs(size_t l);
-	archive& write_ccs(const char* s, size_t l);
-//	archive& write_ccs(const wchar_t* s, size_t l);
-	archive& write_ccs(const char* s);
-//	archive& write_ccs(const wchar_t* s);
+	archive& write_ccs(ccs s, size_t l);
+	archive& write_ccs(ccs s);
 	archive& write(const char* data, size_t s);
 	archive& read(char* data, size_t s);
 
@@ -188,8 +186,10 @@ public:
 	archive& operator<<(const lexeme_range&);
 	archive& operator>>(lexeme_range&);
 
-	archive& operator<<(const std::string&);
-	archive& operator>>(std::string&);
+	archive& operator<<(const string_t&);
+	archive& operator>>(string_t&);
+	static size_t size(const string_t& s) {
+		return sizeof(size_t) + s.size() + 1; }
 	static size_t size(const std::string& s) {
 		return sizeof(size_t) + s.size() + 1; }
 
