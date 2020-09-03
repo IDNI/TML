@@ -1534,14 +1534,15 @@ void tables::get_rules(flat_prog p) {
 
 struct unary_string{
 	//IMPROVE: use array [ pos] = rel or unorderedmap instead
-	map< char_t, set<int> > rel;
-	size_t pbsz, vmask;
+	map<char_t, set<int_t> > rel;
+	size_t pbsz;
+	uintmax_t vmask;
 	vector<char_t> sort_rel;
 
 	unary_string(size_t _pbsz): pbsz(_pbsz){
 		DBG(assert(sizeof(char_t)*8 >= pbsz);)
 		DBG(assert(pbsz  && !(pbsz & (pbsz-1)));) // power of 2 only, 1 2 4 8 16...
-		vmask = ((1UL<<(pbsz)) -1);
+		vmask = ((uintmax_t(1)<<(pbsz)) -1);
 	}
 	
 	bool buildfrom(string_t s){
@@ -1554,7 +1555,7 @@ struct unary_string{
 			for(size_t a=0; a < n; a++)
 				rel[ char_t(vmask & s[i]) ].insert(i*n+a),
 				sort_rel[i*n+a] = char_t(vmask & s[i]),
-				s[i] = ulong(s[i])>>pbsz;
+				s[i] = uintmax_t(s[i])>>pbsz;
 
 		return true;
 	}
@@ -1565,8 +1566,8 @@ struct unary_string{
 	ostream_t& toprint(ostream_t& o) {
 		for(size_t i = 0; i < sort_rel.size(); i++)
 			if(isalnum(sort_rel[i]))
-				o << (char)sort_rel[i] << " " << i<<endl;
-			else o <<uint(sort_rel[i])<<"  "<< i <<endl;
+				o << (char_t)sort_rel[i] << " " << i<<endl;
+			else o <<uint_t(sort_rel[i])<<"  "<< i <<endl;
 		return o;
 	}
 };
