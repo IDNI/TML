@@ -560,7 +560,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 void form::printnode(int lv) {
 	if (r) r->printnode(lv+1);
 	for (int i = 0; i < lv; i++) COUT << '\t';
-	COUT << " " << type << " " << arg;
+	COUT << " " << type << " " << arg << "\n";
 	if (l) l->printnode(lv+1);
 }
 
@@ -963,7 +963,11 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			DBG(froot->printnode();)
 
 			term::textype extype = term::FORM1;
-			if(is_sol) to_pnf(froot), extype = term::FORM2;
+			if(is_sol) {
+				DBG(COUT << "\n SOL parsed \n";)
+				//to_pnf(froot);
+				extype = term::FORM2;
+			}
 			//if(froot->is_sol()) to_pnf(froot), extype = term::FORM2;
 			//else froot->implic_rmoval(), froot->printnode(); //forcing implic removal for FOL here
 			//assert(froot);
@@ -2162,7 +2166,7 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 
 void tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 
-	spbdd_handle x;
+	spbdd_handle x = hfalse;
 
 	lexeme bltintype = dict.get_bltin(a.idbltin);
 	int_t bltinout = a.bltinargs.back(); // for those that have ?out
@@ -2175,16 +2179,18 @@ void tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 	}
 
 	if (bltintype == "count") {
+
+		x = v1[v1.size()-1]; //workaround until we review syntax/arguments for count
+
 		body& b = *a[a.size() - 1];
+
 		// old, official satcount algorithm, phased out
 		int_t cnt0 = bdd::satcount_k(x->b, b.ex, b.perm);
 		// new satcount based on the adjusted allsat_cb::sat (decompress)
 		if (b.inv.empty()) b.inv = b.init_perm_inv(a.varslen * bits);
-
 		int_t cnt = bdd::satcount(x, b.inv);
 		// just equate last var (output) with the count
 		x = from_sym(a.vm.at(bltinout), a.varslen, mknum(cnt));
-
 		v1.push_back(x);
 		o::dbg() << "alt_query (cnt):" << cnt << "" << endl;
 		if (cnt != cnt0)
