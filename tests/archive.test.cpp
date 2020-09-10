@@ -241,10 +241,10 @@ int main() {
 		return e.type == elem::NUM && e.num == 3;
 	});
 	test write_elem_chr = write_test<elem>(
-		elem(char_t('$')), "\x03\x24\x00\x00\x00", 5
+		elem(U'$'), "\x03\x24\x00\x00\x00", 5
 	);
 	test read_elem_chr = read_test<elem>([] (elem& e) {
-		return e.type == elem::CHR && e.ch == char_t('$');
+		return e.type == elem::CHR && e.ch == U'$';
 	});
 	test write_elem_str = write_test<elem>(
 		elem(elem::STR, test_dict.get_lexeme("ABC")), "\x08\x03\x00\x00\x00\x00\x00\x00\x00\x41\x42\x43", 12

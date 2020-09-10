@@ -29,8 +29,6 @@
 
 class archive;
 
-uint_t file_size(const std::string &filename);
-
 struct input {
 	friend class archive;
 	enum type { STDIN, FILE, STRING } type_;
@@ -181,10 +179,10 @@ struct elem {
 	t_arith_op arith_op = NOP;
 	int_t num = 0;
 	lexeme e;
-	char_t ch;
+	char32_t ch;
 	elem() {}
 	elem(int_t num) : type(NUM), num(num) {}
-	elem(char_t ch) : type(CHR), ch(ch) {}
+	elem(char32_t ch) : type(CHR), ch(ch) {}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}

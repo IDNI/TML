@@ -46,7 +46,6 @@ typedef std::vector<std::wstring>           wstrings;
 
 typedef unsigned char char_t;               // internal char representation
 typedef std::basic_string<char_t> string_t; // internal string representation
-typedef char32_t codepoint;                 // single unicode codepoint / symbol
 typedef char_t* cstr;
 typedef const char_t* ccs;
 typedef ccs* pccs;
@@ -83,3 +82,15 @@ int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num);
 // only for comparing with const char* literals containing ASCII
 int strncmp(const unsigned char* str1, const char* str2, size_t num);
 int strcmp(const unsigned char* str1, const char* str2);
+
+bool is_mb_codepoint(const char_t str);
+size_t peek_codepoint(ccs s, size_t l, char32_t &ch);
+size_t codepoint_size(char32_t ch);
+size_t emit_codepoint(char32_t ch, char_t *s);
+string_t to_string_t(char32_t ch);
+string_t to_string_t(const std::u32string& str);
+std::u32string to_u32string(const string_t& str);
+
+bool is_alnum(ccs s, size_t n, size_t& l);
+bool is_alpha(ccs s, size_t n, size_t& l);
+bool is_printable(char32_t ch);

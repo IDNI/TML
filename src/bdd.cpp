@@ -69,12 +69,10 @@ void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
 	V = make_unique<bdd_mmap>(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V->reserve(max_bdd_nodes);
-
-	DBG(o::dbg() << "bdd::init(m: MMAP_" <<
-		(m == MMAP_NONE ? "NONE" : "WRITE") <<
-		", max_size: " << max_size << ", fn: " << fn
-		<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
-
+	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
+	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
+	//	", max_size: " << max_size << ", fn: " << fn
+	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
 	S.insert(0), S.insert(1), V->emplace_back(0, 0, 0), // dummy
 	V->emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),

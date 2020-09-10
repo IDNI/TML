@@ -56,12 +56,18 @@ lexeme dict_t::get_var_lexeme_from(int_t r) {
 	DBG(assert(r<0);)
 	int index = (-r -1);
 	if (index < (int_t)vars.size()) {
-		int nr = get_var(vars[index]);
+#ifdef DEBUG
+		int nr =
+#endif
+			get_var(vars[index]);
 		DBG(assert(nr == r);)
 		return vars[index];
 	}
 	lexeme l = get_lexeme(string("?v") + to_string_(-r));
-	int nr = get_var(l) ;
+#ifdef DEBUG
+	int nr =
+#endif
+		get_var(l) ;
 	DBG(assert(nr == r));
 	return l;
 }

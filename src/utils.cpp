@@ -70,8 +70,8 @@ string temp_filename() {
 #else
 int temp_fileno() { return fileno(tmpfile()); }
 string filename(int fd) {
-        return filesystem::read_symlink(
-                        filesystem::path("/proc/self/fd") /
+        return std::filesystem::read_symlink(
+                        std::filesystem::path("/proc/self/fd") /
                                 to_string(fd));
 }
 #endif
@@ -97,4 +97,144 @@ int strncmp(const unsigned char* str1, const char* str2, size_t num) {
 }
 int strcmp(const unsigned char* str1, const char* str2) {
 	return strcmp(reinterpret_cast<const char *>(str1), str2);
+}
+
+/**
+ * checks if character is a begining of a multibyte codepoint
+ */
+bool is_mb_codepoint(const char_t ch) {
+	return ch >= 0x80;
+}
+
+/**
+ * convert ccs sequence s of 1-4 utf8 code units into codepoint &ch
+ * @param str string of unsigned chars containing utf8 text
+ * @param l size of the str string
+ * @param ch reference to a codepoint read from string 
+ * @return size (0, 1 - 4 bytes) or (size_t) -1 if illegal UTF8 code unit
+ */
+#define utf_cont(ch) (((ch) & 0xc0) == 0x80)
+size_t peek_codepoint(ccs str, size_t l, char32_t &ch) {
+	ch = -1;
+  	if (!l) return 0;
+	ccs end = str + l;
+	unsigned char s[4] = { str[0] };
+	ch = s[0];
+	if  (ch < 0x80) return 1;
+	if ((ch - 0xc2) > (0xf4 - 0xc2)) return -1;
+	s[1] = *(str + 1);
+	if  (ch < 0xe0) {
+		if ((size_t)(str + 1) >= (size_t)end || !utf_cont(s[1]))
+			return -1;
+		ch = ((ch & 0x1f) << 6) | (s[1] & 0x3f);
+		return 2;
+	}
+	s[2] = *(str + 2);
+	if (ch < 0xf0) {
+		if ((str + 2 >= end) || !utf_cont(s[1]) || !utf_cont(s[2]))
+			return -1;
+		if (ch == 0xed && s[1] > 0x9f) return -1;
+		ch = ((ch & 0xf) << 12) | ((s[1] & 0x3f) << 6) | (s[2] &0x3f);
+		if (ch < 0x800) return -1;
+		return 3;
+	}
+	s[3] = *(str + 3);
+	if ((str + 3 >= end) ||
+		!utf_cont(s[1]) || !utf_cont(s[2]) || !utf_cont(s[3]))
+			return -1;
+	if      (ch == 0xf0) { if (s[1] < 0x90) return -1; }
+	else if (ch == 0xf4) { if (s[1] > 0x8f) return -1; }
+	ch = ((ch&7)<<18) | ((s[1]&0x3f)<<12) | ((s[2]&0x3f)<<6) | (s[3]&0x3f);
+	return 4;
+}
+
+/**
+ * Returns size of a unicode codepoint in bytes
+ * @return size (0-4)
+ */
+size_t codepoint_size(char32_t ch) {
+	if      (ch < 0x80)     return 1;
+	else if (ch < 0x800)    return 2;
+	else if (ch < 0x10000)  return 3;
+	else if (ch < 0x110000) return 4;
+	else return 0;
+}
+
+/**
+ * Converts char32_t to a unsigned char *
+ * @param ch unicode codepoint
+ * @param s pointer to a char_t (of size 4+ bytes) where the result is stored
+ * @return byte size of the codepoint
+ */
+size_t emit_codepoint(char32_t ch, char_t *s) {
+	if (ch < 0x80) {
+		s[0] = (char_t) ch;
+		return 1;
+	} else if (ch < 0x800) {
+		s[0] = (char_t) (0xC0 + (ch >> 6));
+		s[1] = (char_t) (0x80 + (ch & 0x3F));
+		return 2;
+	} else if (ch < 0x10000) {
+		s[0] = (char_t) (0xE0 + (ch >> 12));
+		s[1] = (char_t) (0x80 + ((ch >> 6) & 0x3F));
+		s[2] = (char_t) (0x80 + (ch & 0x3F));
+		return 3;
+	} else if (ch < 0x110000) {
+		s[0] = (char_t) (0xF0 + (ch >> 18));
+		s[1] = (char_t) (0x80 + ((ch >> 12) & 0x3F));
+		s[2] = (char_t) (0x80 + ((ch >> 6) & 0x3F));
+		s[3] = (char_t) (0x80 + (ch & 0x3F));
+		return 4;
+	} else return 0;
+}
+
+string_t to_string_t(char32_t ch) {
+	char_t s[4];
+	size_t l = emit_codepoint(ch, s);
+	if (l == (size_t) -1) return string_t();
+	return string_t(s, l);
+}
+
+string_t to_string_t(const u32string& str) {
+	basic_ostringstream<char_t> ss;
+	auto it = str.begin();
+	while (it != str.end()) {
+		char_t s[5] = "\0\0\0\0";
+		emit_codepoint(*(it++), s);
+		ss << s;
+		it++;
+	}
+	return ss.str();
+}
+
+u32string to_u32string(const string_t& str) {
+	basic_ostringstream<char32_t> ss;
+	char32_t ch;
+	ccs s = str.c_str();
+	size_t chl, sl = str.size();
+	while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+		sl -= chl;
+		s += chl;
+		ss << ch;
+	}
+	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
+	return ss.str();
+}
+
+bool is_alnum(ccs s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return isalnum(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
+}
+
+bool is_alpha(ccs s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return isalpha(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
+}
+
+bool is_printable(char32_t ch) {
+	return (uint32_t) ch > 31;
 }

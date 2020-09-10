@@ -318,9 +318,10 @@ template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const elem& e) {
 	switch (e.type) {
 		case elem::CHR: return os << '\'' <<
-			(e.ch=='\'' || e.ch=='\\' ? "\\":"") <<(char)e.ch<<'\'';
+			(e.ch == U'\'' || e.ch == U'\\' ? "\\":"") <<
+			to_string(to_string_t(e.ch)) << '\'';
 		case elem::OPENP:
-		case elem::CLOSEP: return os<<*e.e[0];
+		case elem::CLOSEP: return os << *e.e[0];
 		case elem::NUM: return os << e.num;
 		default: return os << e.e;
 	}
@@ -345,13 +346,21 @@ std::string quote_sym(const elem& e) {
 	basic_ostringstream<char_t> ss;
 	if (e.type == elem::SYM) {
 		bool q{false};
-		for (ccs s = e.e[0]; s != e.e[1]; ++s) {
-			if (!q && !isalnum(*s) && *s != '_') {
-				q = true;
-				os.put('"');
+		for (ccs s = e.e[0]; s < e.e[1]; ) {
+			if (is_mb_codepoint(*s)) {
+				char32_t ch;
+				size_t chl = peek_codepoint(s, e.e[1] - s, ch);
+				if (!chl || chl > 4) throw 0;
+				ss << string_t(s, chl);
+				s += chl;
+			} else {
+				if (!q && !isalnum(*s) && *s != '_')
+					os.put('"'), q = true;
+				if (q && (*s=='"'|| *s=='\\'))
+					ss << to_string_t("\\");
+				ss << *s;
+				++s;
 			}
-			if (q && (*s=='"'|| *s=='\\')) ss << to_string_t("\\");
-			ss << *s;
 		}
 		os << to_string(ss.str());
 		if (q) os.put('"');

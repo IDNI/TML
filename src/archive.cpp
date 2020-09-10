@@ -427,7 +427,7 @@ archive& archive::operator<<(const elem& e) {
 	switch (e.type) {
 		case elem::ARITH: *this << (unsigned char)e.arith_op; break;
 		case elem::NUM:   *this << e.num; break;
-		case elem::CHR:   *this << (unsigned int)e.ch; break;
+		case elem::CHR:   *this << (uint32_t)e.ch; break;
 		case elem::SYM:
 		case elem::STR:
 		case elem::VAR:   *this << e.e;
@@ -441,7 +441,7 @@ archive& archive::operator>>(elem& e) {
 	switch (e.type) {
 		case elem::ARITH: *this>>tmp, e.arith_op=(t_arith_op)tmp; break;
 		case elem::NUM:   *this >> e.num; break;
-		case elem::CHR:   *this >> ch, e.ch = (char)ch; break;
+		case elem::CHR:   *this >> ch, e.ch = (char32_t)ch; break;
 		case elem::SYM:
 		case elem::STR:
 	 	case elem::VAR:   *this >> e.e;
@@ -455,7 +455,7 @@ size_t archive::size(const elem& e) {
 	switch (e.type) {
 		case elem::ARITH: s += sizeof(unsigned char); break;
 		case elem::NUM:   s += sizeof(int_t); break;
-		case elem::CHR:   s += sizeof(unsigned int); break;
+		case elem::CHR:   s += sizeof(char32_t); break;
 		case elem::SYM:
 		case elem::STR:
 	 	case elem::VAR:   s += 2 * sizeof(size_t); break;

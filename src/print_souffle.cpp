@@ -155,12 +155,15 @@ std::basic_ostream<T>& output_souffle_elem(std::basic_ostream<T>& os,
 		case elem::CHR:
 			os << '"';
 			switch (e.ch) {
-				case '"':
-				case '\\': os << '\\' << e.ch; break;
-				case '\r': os << "\\r"; break;
-				case '\n': os << "\\n"; break;
-				case '\t': os << "\\t"; break;
-				default: os << e.ch;
+				case U'"':
+				case U'\\': os << '\\' << e.ch; break;
+				case U'\r': os << "\\r"; break;
+				case U'\n': os << "\\n"; break;
+				case U'\t': os << "\\t"; break;
+				default:
+					char_t s[5];
+					s[emit_codepoint(e.ch, s)] = 0;
+					os << s;
 			}
 			return os << '"';
 		case elem::VAR: return os << lexeme{ e.e[0]+1, e.e[1] };

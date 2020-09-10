@@ -654,10 +654,10 @@ set<term> tables::decompress() {
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
 	if (arg & 1) {
-		const int_t ch = arg >> 2;
-		if (ch > 31) return elem((char_t) ch); // is printable
+		const char32_t ch = arg >> 2;
+		if (is_printable(ch)) return elem(ch);
 		return	elem(elem::SYM, rdict().get_lexeme("\"#" +
-			to_string_((ch)) + "\""));
+			to_string_((int_t) ch) + "\""));
 	}
 	if (arg & 2) return elem((int_t)(arg>>2));
 	return elem(elem::SYM, rdict().get_sym(arg));
@@ -890,7 +890,7 @@ void tables::get_facts(const flat_prog& m) {
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else f[r[0].tab].insert(from_fact(r[0]));
-	clock_t start, end;
+	clock_t start{}, end;
 	if (optimize) measure_time_start();
 	bdd_handles v;
 	for (auto x : f) {
@@ -1426,7 +1426,11 @@ void tables::cqc(flat_prog& p) {
 		v.emplace_back(r), cqc_minimize(v.back());
 }*/
 
-void tables::get_form(pnf_t *p, const term_set& al, const term& h, std::set<alt>& as) {
+void tables::get_form(pnf_t *p, const term_set& al, const term& h,std::set<alt>&
+#ifdef DEBUG
+	as
+#endif
+) {
 
 	auto t = al.begin();
 	DBG(assert(t->extype == term::FORM1));
@@ -1538,46 +1542,48 @@ void tables::get_rules(flat_prog p) {
 
 struct unary_string{
 	//IMPROVE: use array [ pos] = rel or unorderedmap instead
-	map<char_t, set<int_t> > rel;
+	map< char32_t, set<int_t> > rel;
 	size_t pbsz;
 	uint64_t vmask;
-	vector<char_t> sort_rel;
+	vector<char32_t> sort_rel;
 
-	unary_string(size_t _pbsz): pbsz(_pbsz){
-		DBG(assert(sizeof(char_t)*8 >= pbsz);)
+	unary_string(size_t _pbsz): pbsz(_pbsz) {
+		DBG(assert(sizeof(char32_t)*8 >= pbsz);)
 		DBG(assert(pbsz  && !(pbsz & (pbsz-1)));) // power of 2 only, 1 2 4 8 16...
 		vmask = ((uint64_t(1)<<(pbsz)) -1);
 	}
-	
-	bool buildfrom(string_t s){
+	bool buildfrom(string_t s) { return buildfrom(to_u32string(s)); }
+	bool buildfrom(u32string s) {
 		if(!s.size()) return false;
 
 		size_t n = (sizeof(s[0])<<3)/pbsz;
 		sort_rel.resize(s.size()*n);
 
-		for( size_t i=0; i < s.size(); i++) 
-			for(size_t a=0; a < n; a++)
-				rel[ char_t(vmask & s[i]) ].insert(i*n+a),
-				sort_rel[i*n+a] = char_t(vmask & s[i]),
-				s[i] = uint64_t(s[i])>>pbsz;
-
+		for (size_t i=0; i < s.size(); i++) {
+			for (size_t a=0; a < n; a++) {
+				rel[ char32_t(vmask & s[i]) ].insert(i*n+a),
+				sort_rel[i*n+a] = char32_t(vmask & s[i]),
+				s[i] = uint64_t(s[i]) >> pbsz;
+			}
+		}
 		return true;
 	}
-	string_t getrelin_str(char_t r){
-		return ( r == '\0') ? to_string_t("00"): string_t(1,r);
+	string_t getrelin_str(char32_t r) {
+		return (r == '\0') ? to_string_t("00"): to_string_t(r);
 
 	}
 	ostream_t& toprint(ostream_t& o) {
 		for(size_t i = 0; i < sort_rel.size(); i++)
 			if(isalnum(sort_rel[i]))
-				o << (char_t)sort_rel[i] << " " << i<<endl;
+				o << to_string(to_string_t(sort_rel[i]))
+					<< " " << i << endl;
 			else o <<uint_t(sort_rel[i])<<"  "<< i <<endl;
 		return o;
 	}
 };
 void tables::load_string(lexeme r, const string_t& s) {
 	
-	unary_string us(sizeof(char_t)*8);
+	unary_string us(sizeof(char32_t)*8);
 	us.buildfrom(s);	
 	DBG(us.toprint(o::dbg()));
 	for( auto it: us.rel ){
@@ -1614,7 +1620,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
 		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
 	}
-	clock_t start, end;
+	clock_t start{}, end;
 	if (optimize)
 		(o::ms()<<"# load_string or_many: "),
 		measure_time_start();
@@ -1831,13 +1837,17 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
 			if (p.p[n].type == elem::STR) {
-				lexeme l = p.p[n].e;
 				p.p.erase(p.p.begin() + n);
+				ccs s = p.p[n].e[0]+1;
+				size_t chl, sl = p.p[n].e[1]-1 - s;
+				char32_t ch;
 				bool esc = false;
-				for (ccs s = l[0]+1; s != l[1]-1; ++s)
-					if (*s == '\\' && !esc) esc = true;
+				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+					sl -= chl; s += chl;
+					if (ch == U'\\' && !esc) esc = true;
 					else p.p.insert(p.p.begin() + n++,
-						elem(*s)), esc = false;
+						elem(ch)), esc = false;
+				}
 			}
 	vector<term> v;
 	static const set<string> b =
@@ -1882,8 +1892,8 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
 			} else if (x.p[n].type == elem::CHR) {				
-				unary_string us(sizeof(char_t)*8);
-				us.buildfrom(string_t(1,x.p[n].ch));
+				unary_string us(sizeof(char32_t)*8);
+				us.buildfrom(u32string(1, x.p[n].ch));
 				int_t tv=n;
 				DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
@@ -1901,7 +1911,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 					v.push_back(move(t));
 					// IMPROVE FIX: the symbol index n e.g. in len(i) should refer
 					// to what is the relative position inside the rhs of production. This
-					// should change when pbsz of unary_str is NOT sizeof(wchar_t)*8. 					 
+					// should change when pbsz of unary_str is NOT sizeof(char32_t)*8. 					 
 					refs[n] = v.back();
 					tv++;
 				}
@@ -2223,7 +2233,7 @@ void tables::alt_query_bltin(alt& a, bdd_handles& v1) {
 		do {
 			int_t arg = a.bltinargs[n++];
 			if      (arg < 0) os << get_var_lexeme(arg) << endl;
-			else if (arg & 1) os << (wchar_t)(arg >> 2);
+			else if (arg & 1) os << (char32_t) (arg >> 2);
 			else if (arg & 2) os << (int_t)  (arg >> 2);
 			else              os << dict.get_sym(arg);
 		} while (n < a.bltinargs.size());
@@ -2422,7 +2432,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	size_t break_on_step)
 {
-	clock_t start, end;
+	clock_t start{}, end;
 	double t;
 	if (optimize) measure_time_start();
 	add_prog(p, strs);

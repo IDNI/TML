@@ -15,21 +15,14 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
-#include <filesystem>
 #include "input.h"
 #include "err.h"
 #include "output.h"
 using namespace std;
 
-uint_t file_size(const string &filename) {
-    try {
-	return filesystem::file_size(filename);
-    } catch(exception & e) {
-        cout << e.what() << '\n';
-    }
-    return 0;
-}
-
+/**
+ * creates a file (mmap) input
+ */
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
 	allocated_(false)
@@ -44,6 +37,9 @@ input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	}
 }
 
+/**
+ * destructor - frees the input's data pointer if it was allocated
+ */
 input::~input() {
 	//COUT << "destroying input" << (allocated_ ? " freeing *" : "")
 	//	<< " data: " << beg_ << endl;
@@ -118,24 +114,30 @@ lexeme input::lex(pccs s) {
 				parse_error((*s+2), err_escape);
 			return { t, ++++++++*s };
 		}
-		if (*(*s + 2) != '\'') parse_error(*s+2, err_quote);
-		return { t, ++++++*s };
+		char32_t ch;
+		size_t chl = peek_codepoint(*s+1, size_ - ((*s+1) - beg_), ch);
+		if (*(*s + 1 + chl) != '\'') parse_error(*s+2, err_quote);
+		return { t, (*s += 2 + chl) };
 	}
 
 	if (strchr("!~.,;(){}$@=<>|&^+*-", **s)) return ++*s, lexeme{ *s-1, *s};
 
 	if (strchr("?", **s)) ++*s;
-	if (!isalnum(**s) && **s != '_') parse_error(*s, err_chr);
-	while (**s && (isalnum(**s) || **s == '_')) ++*s;
+	size_t chl, maxs = size_ - (*s - beg_);
+	if (!is_alnum(*s, maxs, chl) && **s != '_') parse_error(*s, err_chr);
+	while (**s && (is_alnum(*s, maxs, chl) || **s == '_')) *s += chl;
 	return { t, *s };
 }
 
+/**
+ * scans input's data for lexemes
+ * @return scanned lexemes
+ */
 lexemes& input::prog_lex() {
 	lexeme e;
 	do {
 		if ((e=lex(&data_)) != lexeme{0,0}) l.push_back(e);
 	} while (*(data_));
-	//size_ = (*(data_)) - (*(beg_));
 	size_ = (data_ - beg_) * sizeof(ccs);
 	//DBG(o::dbg() << "size of input: " << size_
 	//	<< " beg_: " << (void*)beg_ << " data_: " << (void*)data_
@@ -218,6 +220,7 @@ elem::etype elem::peek(input* in) {
 bool elem::parse(input* in) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;
+	size_t chl;
 	if ('|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if ('(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
@@ -286,20 +289,22 @@ bool elem::parse(input* in) {
 		return e = l[pos++], type = ARITH, arith_op = SHL, true;
 	}
 
-	if (!isalnum(*l[pos][0]) && !strchr("\"'?", *l[pos][0])) return false;
+	if (!is_alnum(l[pos][0], l[pos][1]-l[pos][0], chl) &&
+		!strchr("\"'?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == '\'') {
 		type = CHR, e = { 0, 0 };
 		if (l[pos][0][1] == '\'') ch = 0;
-		else if (l[pos][0][1] != '\\') ch = l[pos][0][1];
-		else if (l[pos][0][2] == 'r') ch = '\r';
-		else if (l[pos][0][2] == 'n') ch = '\n';
-		else if (l[pos][0][2] == 't') ch = '\t';
-		else if (l[pos][0][2] == '\\') ch = '\\';
-		else if (l[pos][0][2] == '\'') ch = '\'';
+		else if (l[pos][0][1] != '\\') chl = peek_codepoint(
+			l[pos][0]+1, l[pos][1]-l[pos][0]-2, ch);
+		else if (l[pos][0][1+chl] == 'r') ch = '\r';
+		else if (l[pos][0][1+chl] == 'n') ch = '\n';
+		else if (l[pos][0][1+chl] == 't') ch = '\t';
+		else if (l[pos][0][1+chl] == '\\') ch = '\\';
+		else if (l[pos][0][1+chl] == '\'') ch = '\'';
 		else throw 0;
 	}
 	else if (*l[pos][0] == '?') type = VAR;
-	else if (isalpha(*l[pos][0])) {
+	else if (is_alpha(l[pos][0], l[pos][1]-l[pos][0], chl)) {
 		size_t len = l[pos][1]-l[pos][0];
 		if( len == 6 && !strncmp(l[pos][0], "forall", len ))
 			type = FORALL;
@@ -920,11 +925,11 @@ void input::parse_error(ccs offset, const char* err, lexeme close_to) {
 }
 
 void input::parse_error(ccs offset, const char* err, ccs close_to) {
-	DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
-		<< "' offset: " << &offset << " '" << offset << "' "
-		<< " error: '" << err << "' "
-		<< " s: " << &close_to << " '" << close_to << "'"
-		<< endl;)
+	//DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
+	//	<< "' offset: " << &offset << " '" << offset << "' "
+	//	<< " error: '" << err << "' "
+	//	<< " s: " << &close_to << " '" << close_to << "'"
+	//	<< endl;)
 
 	ostringstream msg; msg << "Parse error: \"" << err << '"';
 	ccs p = close_to;

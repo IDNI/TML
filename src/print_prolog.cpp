@@ -167,12 +167,12 @@ std::basic_ostream<T>& output_prolog_elem(std::basic_ostream<T>& os, const elem&
 		case elem::CHR:
 			os << '\'';
 			switch (e.ch) {
-				case '\'':
-				case '\\': os << '\\' << e.ch; break;
-				case '\r': os << "\\r"; break;
-				case '\n': os << "\\n"; break;
-				case '\t': os << "\\t"; break;
-				default: os << e.ch;
+				case U'\'':
+				case U'\\': os << '\\' << e.ch; break;
+				case U'\r': os << "\\r"; break;
+				case U'\n': os << "\\n"; break;
+				case U'\t': os << "\\t"; break;
+				default: os << to_string(to_string_t(e.ch));
 			}
 			return os << '\'';
 
