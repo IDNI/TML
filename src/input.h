@@ -179,7 +179,7 @@ struct elem {
 	} type;
 	t_arith_op arith_op = NOP;
 	int_t num = 0;
-	lexeme e;
+	lexeme e{ 0, 0 };
 	char32_t ch;
 	elem() {}
 	elem(int_t num) : type(NUM), num(num) {}
