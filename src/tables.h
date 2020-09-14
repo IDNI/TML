@@ -23,7 +23,7 @@
 #include "bdd.h"
 #include "term.h"
 #include "dict.h"
-
+#include "input.h"
 #include "form.h"
 
 typedef int_t rel_t;
@@ -338,6 +338,7 @@ private:
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
 					std::vector<term> &v, std::set<term> &done);
 	void transform_grammar(std::vector<struct production> g, flat_prog& p);
+	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
 	bool cqc(const std::vector<term>&, const flat_prog& m) const;
@@ -541,6 +542,23 @@ struct substitution: public transformer {
 
 };
 
+struct ptransformer{
+	struct production &p;
+	std::vector<struct production> lp;
+	dict_t &d;
+	
+	ptransformer(struct production &_p, dict_t &_d ): p(_p), d(_d) { }
+	bool parse_alt( std::vector<elem> &next, size_t& cur);
+	bool is_firstoffactor(elem &c);
+	bool parse_alts( std::vector<elem> &next, size_t& cur);
+	lexeme get_fresh_nonterminal();
+	bool synth_recur( struct production &np, std::vector<elem>::const_iterator from, 
+		std::vector<elem>::const_iterator till, bool bnull, bool brecur,
+		bool balt);
+	bool parse_factor( std::vector<elem> &next, size_t& cur);
+	bool visit( );
+};
+
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 
@@ -559,5 +577,7 @@ struct infloop_exception : public unsat_exception {
 		return "unsat (infinite loop).";
 	}
 };
+
+
 
 //#endif
