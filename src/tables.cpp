@@ -1818,10 +1818,165 @@ bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
 	return true;
 }
 
+struct ptransformer{
+	production &p;
+	list<production> lp;
+	dict_t &d;
+	
+	ptransformer(production &_p, dict_t &_d ): p(_p), d(_d) { }
+
+	bool parse_alt( vector<elem> &next, size_t& cur){	
+		bool ret = false;
+		size_t cur1 = cur;
+		while( cur < next.size() && is_firstoffactor(next[cur])){
+				ret = parse_factor(next, cur);
+				if(!ret) break;
+		}
+		return ret;
+	}
+
+	bool is_firstoffactor(elem &c) {
+		if(c.type == elem::SYM ||
+			c.type == elem::STR ||
+			c.type == elem::CHR ||
+			c.type == elem::OPENB ||
+			c.type == elem::OPENP ||
+			c.type == elem::OPENSB )
+			return true;
+		else return false;
+	}
+	bool parse_alts( vector<elem> &next, size_t& cur){
+		bool ret = false;
+		while(cur < next.size()) {
+			ret = parse_alt(next, cur);
+			if(!ret) return false;
+			if(next[cur].type == elem::ALT ) cur++;
+			else break;
+		}
+		return ret;
+	}
+	lexeme get_fresh_nonterminal(){
+		static size_t count=0;
+		string fnt = "R" + to_string(count++);
+		return d.get_lexeme(fnt);
+	}
+	bool synth_recur( production &np, vector<elem>::const_iterator from, 
+		vector<elem>::const_iterator till, bool bnull = true, bool brecur =true,
+		bool balt= true ){
+		
+		elem sym = elem(elem::SYM,  get_fresh_nonterminal());   
+		np.p.push_back( sym);
+		np.p.insert(np.p.end(), from , till);
+		if(brecur) np.p.push_back( sym);
+		elem alte = elem(elem::ALT, d.get_lexeme( "|" ) );
+		if(balt) np.p.emplace_back(alte);
+		if( balt && bnull )	np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
+		else if(balt) np.p.insert(np.p.end(), from, till);
+		return true;
+	}
+
+	bool parse_factor( vector<elem> &next, size_t& cur){
+		size_t cur1 = cur;
+		if(cur >= next.size()) return false;
+		if( next[cur].type ==  elem::SYM ||
+			next[cur].type ==  elem::STR ||
+			next[cur].type ==  elem::CHR ) {
+			size_t start = cur;
+			++cur;
+			if( next.size() > cur 				&&
+				next[cur].type == elem::ARITH 	&& 
+				(next[cur].arith_op == MULT 	||
+				 next[cur].arith_op == ADD		)) {  
+			
+				lp.emplace_back(),
+				synth_recur(lp.back(), next.begin()+start, next.begin()+cur,
+				next[cur].arith_op == MULT),
+				++cur;
+				next.erase( next.begin()+start, next.begin()+cur);
+				next.insert( next.begin()+start, lp.back().p[0]);
+				return cur = start+1, true; 
+			}
+			return true;	
+		}		
+		if( next[cur].type == elem::OPENSB ) {
+			size_t start = cur;
+			++cur;
+			if( !parse_alts(next, cur)) return cur = cur1, false;
+			if(next[cur].type != elem::CLOSESB) return false;			
+			++cur;
+			lp.emplace_back();
+			synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur-1, true, false);
+			next.erase( next.begin()+start, next.begin()+cur);
+			next.insert( next.begin()+start, lp.back().p[0]);
+			return cur = start+1, true; 
+		}
+		else if( next[cur].type == elem::OPENP ) {
+			size_t start = cur;
+			++cur;
+			if( !parse_alts(next, cur)) return cur = cur1, false;
+			if(next[cur].type != elem::CLOSEP) return false;			
+			++cur;
+			lp.emplace_back();
+			if(next[cur].type == elem::ARITH && 
+				(next[cur].arith_op == MULT 	||
+				next[cur].arith_op == ADD		)) 
+				synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur-1,
+				next[cur].arith_op == MULT),
+				++cur;			
+			else //making R => ...
+				synth_recur(this->lp.back(), begin(next)+start+1, begin(next)+cur -1,
+				false, false, false);
+			next.erase( next.begin()+start, next.begin()+cur);
+			next.insert( next.begin()+start, this->lp.back().p[0]);
+			return cur = start+1, true; 
+		}
+		else if( next[cur].type == elem::OPENB ) {
+			size_t start = cur;
+			++cur;
+			if( !parse_alts(next, cur)) return cur = cur1, false;
+			if(next[cur].type != elem::CLOSEB) return false;			
+			++cur;
+			lp.emplace_back();
+			// making R => ... R | null 
+			synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur -1);
+			next.erase( next.begin()+start, next.begin()+cur);
+			next.insert( next.begin()+start, lp.back().p[0]);
+			return cur = start+1, true; 
+		}
+		else return cur = cur1, false;
+	}
+	bool visit( ) {
+		size_t cur = 1;		
+		DBG(COUT<<endl<<p<<endl);
+		bool ret = this->parse_alts( this->p.p, cur);
+		if( this->p.p.size() > cur ) ret = false;
+
+		DBG(COUT<<p<<endl);
+		for ( production t : lp )
+			DBG(COUT<<t<<endl);
+		if(!ret) parse_error("Error Production", cur < this->p.p.size()?p.p[cur].e : p.p[0].e );
+		return ret;
+		}
+};
+
+bool transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
+	bool ret= true;
+	changed = false;
+	for (size_t k = 0; k != g.size();k++) {
+		ptransformer pt(g[k], d);
+		if(!pt.visit()) { ret = false;  continue; }
+		g.insert( g.end(), pt.lp.begin(), pt.lp.end() ), 
+		changed |= pt.lp.size()>0;
+	}
+	return ret;
+}
 void tables::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return;
 //	o::out()<<"grammar before:"<<endl;
 //	for (production& p : g) o::out() << p << endl;
+	bool changed;
+	if(!transform_ebnf(g, dict, changed )) return;
+
 	for (size_t k = 0; k != g.size();) {
 		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
 		size_t n = 0;

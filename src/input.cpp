@@ -120,7 +120,7 @@ lexeme input::lex(pccs s) {
 		return { t, (*s += 2 + chl) };
 	}
 
-	if (strchr("!~.,;(){}$@=<>|&^+*-", **s)) return ++*s, lexeme{ *s-1, *s};
+	if (strchr("!~.,;(){}[]$@=<>|&^+*-", **s)) return ++*s, lexeme{ *s-1, *s};
 
 	if (strchr("?", **s)) ++*s;
 	size_t chl, maxs = size_ - (*s - beg_);
@@ -224,6 +224,10 @@ bool elem::parse(input* in) {
 	if ('|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if ('(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
+	if ('[' == *l[pos][0]) return e = l[pos++],type=OPENSB, true;
+	if (']' == *l[pos][0]) return e = l[pos++],type=CLOSESB,true;
+	if ('{' == *l[pos][0]) return e = l[pos++],type=OPENB, true;
+	if ('}' == *l[pos][0]) return e = l[pos++],type=CLOSEB,true;
 	// NEQ: should we check for any limits here?
 	if ('!' == l[pos][0][0] &&
 		'=' == l[pos][0][1]) {

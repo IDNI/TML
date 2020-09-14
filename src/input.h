@@ -174,7 +174,8 @@ static const std::set<std::string> str_bltins =
 struct elem {
 	enum etype {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR, EQ, NEQ, LEQ, GT, LT,
-		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH
+		GEQ, BLTIN, NOT, AND, OR, FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH,
+		OPENB, CLOSEB, OPENSB, CLOSESB,
 	} type;
 	t_arith_op arith_op = NOP;
 	int_t num = 0;

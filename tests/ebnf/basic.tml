@@ -1,0 +1,8 @@
+@string str "aabbccdd".
+A0 => {'a' }.
+A => { ['a' { ['a' ] }[ 'f'] ] }.
+C => 'c'+.
+B => 'b'[B] .
+D => "dd"*.
+S => A*B+C*D+|A+(B*).
+K =>  (C+)*[B+].
