@@ -19,9 +19,7 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <filesystem>
 #include <sys/stat.h>
-#include <cuchar>
 
 #include "defs.h"
 #include "dict.h"
