@@ -4,28 +4,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
 set(CMAKE_VERBOSE_MAKEFILE true CACHE BOOL "")
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra \
-	-Wdouble-promotion \
-	-Wformat=2 \
-	-Wno-variadic-macros \
-	-Wcast-align \
-	-Wstrict-aliasing=2 \
-	-Wstrict-overflow=5 \
-	-Wfloat-equal \
-	-Wwrite-strings \
-	-Wno-missing-braces \
-	-Wno-parentheses-equality") #-Werror
 
 set(USED_CMAKE_GENERATOR "${CMAKE_GENERATOR}" CACHE STRING "Expose CMAKE_GENERATOR" FORCE)
 if (USED_CMAKE_GENERATOR MATCHES "Ninja")
 	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif ()
-
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 --coverage")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 if (NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "Release")
@@ -34,6 +17,7 @@ endif ()
 ################################################################################
 option(WITH_THREADS "use Threads" TRUE)
 option(WITH_BOOST "use Boost" FALSE)
+option(WITH_WCHAR "use wchar_t for system calls (instead of char)" TRUE)
 ################################################################################
 
 ################################################################################
@@ -44,7 +28,7 @@ if (BUILD_JSLIB)
 	set_emscripten_toolchain()
 	set(BUILD_TESTS OFF CACHE STRING "")         # no automated tests
 	set(BUILD_CODE_COVERAGE OFF CACHE STRING "") # no coverage
-	set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")          # remove --coverage
+	set(WITH_WCHAR OFF CACHE STRING "")          # don't use wchar_t
 endif ()
 ################################################################################
 

@@ -19,6 +19,7 @@ set(TML_HEADERS
 	TML.h
 	archive.h
 	bdd.h
+	char_defs.h
 	defs.h
 	dict.h
 	driver.h
@@ -74,6 +75,10 @@ set(TML_COMPILE_OPTIONS
 	${TML_PGO_OPTIONS}
 )
 set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
+if (BUILD_CODE_COVERAGE)
+	set(TML_DEBUG_OPTIONS "${TML_DEBUG_OPTIONS}" --coverage)
+	set(TML_RELEASE_OPTIONS "${TML_RELEASE_OPTIONS}" --coverage)
+endif ()
 
 # object library
 #################
@@ -161,6 +166,9 @@ endif()
 if (WITH_WCHAR)
 	target_compile_definitions(tml PRIVATE "-DWITH_WCHAR")
 endif ()
+if (BUILD_CODE_COVERAGE)
+	target_link_libraries(TMLo PUBLIC gcov)
+endif ()
 
 # executable using shared library
 ##################################
@@ -177,6 +185,9 @@ if (WITH_THREADS)
 endif()
 if (WITH_WCHAR)
 	target_compile_definitions(tml_shared PRIVATE "-DWITH_WCHAR")
+endif ()
+if (BUILD_CODE_COVERAGE)
+	target_link_libraries(TMLo PUBLIC gcov)
 endif ()
 exclude(tml_shared)
 

@@ -351,14 +351,12 @@ std::string quote_sym(const elem& e) {
 				char32_t ch;
 				size_t chl = peek_codepoint(s, e.e[1] - s, ch);
 				if (!chl || chl > 4) throw 0;
-				ss << string_t(s, chl);
-				s += chl;
+				for (size_t i = 0; i != chl; ++i) ss.put(*s++);
 			} else {
 				if (!q && !isalnum(*s) && *s != '_')
 					os.put('"'), q = true;
-				if (q && (*s=='"'|| *s=='\\'))
-					ss << to_string_t("\\");
-				ss << *s;
+				if (q && (*s=='"'|| *s=='\\')) ss.put('\\');
+				ss.put(*s);
 				++s;
 			}
 		}

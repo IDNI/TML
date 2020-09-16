@@ -99,7 +99,7 @@ public:
 	void close() { if (!closed) ::close(s), eof = closed = true; }
 	bool error() { return error_; }
 	std::string error_message() { return error_message_; }
-	~udp() { close(); }
+	virtual ~udp() { close(); }
 private:
 	socklen_t clen = sizeof(struct sockaddr *);
 protected:

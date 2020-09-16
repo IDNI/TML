@@ -594,7 +594,7 @@ void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
 // - set(relation_name, row, col, value) - sets value of the cell of a table
 void tables::out(emscripten::val o) const {
 	out([&o](const raw_term& t) {
-		string relation = lexeme2str(t.e[0].e);
+		string_t relation = lexeme2str(t.e[0].e);
 		int row = o.call<int>("length", relation);
 		int col = 0;
 		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
@@ -1823,7 +1823,7 @@ bool tables::get_rule_substr_equality(vector<vector<term>> &eqr ){
 
 bool ptransformer::parse_alt( vector<elem> &next, size_t& cur){	
 	bool ret = false;
-	size_t cur1 = cur;
+	//size_t cur1 = cur;
 	while( cur < next.size() && is_firstoffactor(next[cur])){
 		ret = parse_factor(next, cur);
 		if(!ret) break;

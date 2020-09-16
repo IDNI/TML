@@ -89,20 +89,27 @@ stream_names.forEach(n => { args.push("--"+n); args.push("@buffer"); });
 
 console.log(`running: '${program}' with options: '${args.join(' ')}'`);
 
-tml.onRuntimeInitialized = _ => {
+tml().then(tml => {
 	// import from tml
-	const { bdd, driver, options, outputs, strings } = tml;
+	const { bdd, driver, options, inputs, outputs, strings, mmap_mode } = tml;
+
+	console.log('imported');
 
 	// initialize bdd database
-	bdd.init();
+	bdd.init(mmap_mode.MMAP_NONE, 10000, "");
+
+	console.log('bdd initialized');
 
 	// create vector<string> arg_strings from command line args
 	const arg_strings = new strings();
 	args.forEach(arg => arg_strings.push_back(arg));
 
-	// create outputs and parse options
+	console.log('options', args);
+
+	// create inputs, outputs and parse options
+	const ii = new inputs();
 	const oo = new outputs();
-	const o = new options(arg_strings, outputs.ref(oo));
+	const o = new options(arg_strings, inputs.ref(ii), outputs.ref(oo));
 	console.log('args:', o.to_string());
 
 	// create a driver and run program
@@ -122,8 +129,8 @@ tml.onRuntimeInitialized = _ => {
 	}
 
 	// delete created objects
-	d.delete(); o.delete(); oo.delete(); arg_strings.delete();
-};
+	d.delete(); o.delete(); ii.delete(); oo.delete(); arg_strings.delete();
+});
 </script>
 </body>
 </html>

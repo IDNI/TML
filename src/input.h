@@ -27,30 +27,76 @@
 
 class archive;
 
+/**
+ * input class contains input data. input can be one of three types: STDIN,
+ * FILE or STRING. STDIN works as a STRING which is read from the standard input
+ * FILE uses system's memory mapping to access file data.
+ * STDIN and STRING inputs from command line options and repl queries are
+ * allocated and are freed when input is deconstructed.
+ * STRING inputs loaded from archives are pointed to file's mmap. 
+ */
 struct input {
 	friend class archive;
-	enum type { STDIN, FILE, STRING } type_;
-	bool newseq = false;
-	size_t offset = 0;
-	size_t pos = 0;
-	lexemes l = {};
+	enum type { STDIN, FILE, STRING } type_; // input type
+	bool newseq = false; // input is understood as a new prog sequence
+	size_t offset = 0;   // offset of this input from the beginning
+	size_t pos = 0;      // position of the currently parsed lexeme
+	lexemes l = {};      // lexemes scanned from the input data
+	/**
+	 * STDIN input constructor
+	 * @param ns - if true this input would be added as a new sequence ({})
+	 */
 	input(bool ns = false) : type_(STDIN), newseq(ns), beg_(0), data_(0),
 		size_(load_stdin()) {
 		//COUT << "created stdin input *: " << beg_ << std::endl;
 	}
+	/**
+	 * STRING input constructor - without allocation (input from a mmap)
+	 * @param s - pointer to a utf8 encoded input data
+	 * @param sz - size of the input data
+	 * @param ns - set ns true for making the input a new prog sequence
+	 */
 	input(void* s, size_t sz, bool ns = false) : type_(STRING), newseq(ns),
 		beg_((ccs) s), data_(beg_), size_(sz), allocated_(false) {
 		//COUT << "created pointer input: " << beg_ << std::endl;
 	}
+	/**
+	 * STRING input constructor - with allocation
+	 * @param s - pointer to a utf8 encoded input data
+	 * @param ns - set ns true for making the input a new prog sequence
+	 */
 	input(ccs s, bool ns = false) : type_(STRING), newseq(ns),
 		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true)
 	{	//COUT << "created string input *: " << s << std::endl;
 	}
+	/**
+	 * FILE input constructor
+	 * @param f - file name
+	 * @param ns - set ns true for making the input a new prog sequence
+	 */
 	input(std::string f, bool ns = false); // FILE
+	/**
+	 * destructor frees allocated data if any
+	 */
 	~input();
+	/**
+	 * lex scans a lexeme in a data pointer s and iterates it
+	 * @param s - pointer to the input data
+	 * @return scanned lexeme
+	 */
 	lexeme lex(pccs s);
+	/**
+	 * scans input's data for lexemes
+	 * @return scanned lexemes
+	 */
 	lexemes& prog_lex();
-	// is l in this input? if true set l's offset into lr
+	/**
+	 * checks if lexeme is in this input and sets l's offset into lr if true
+	 * @param beg - +offset to the resulting range 
+	 * @param l - lexeme
+	 * @param lr - resulting range if lexeme found 
+	 * @return true if lexeme found
+	 */
 	bool lexeme_pos(const size_t& beg, const lexeme& l, lexeme_range& lr) {
 		if ((l[0] >= beg_ && l[0] < beg_ + size_)
 		 || (l[1] >= beg_ && l[1] < beg_ + size_))
@@ -58,11 +104,32 @@ struct input {
 				lr[1] = l[1] - beg_ + beg, true;
 		return false;
 	}
+	/**
+	 * returns next input or 0 if this is the last one in the fwd list
+	 * @return next input
+	 */
 	input* next() { return next_.get(); }
+	/**
+	 * sets next input when this on is the last one and another one is added
+	 * @param next input
+	 */
 	void set_next(std::unique_ptr<input> ni) { next_ = std::move(ni); }
+	/**
+	 * @return pointer to the beginning of the data
+	 **/
 	ccs begin() { return beg_; }
+	/**
+	 * @return current pointer to the data
+	 **/
 	ccs data() { return data_; }
+	/**
+	 * @return size of the input data
+	 **/
 	size_t size() { return size_; }
+	/**
+	 * sets offset of this input
+	 * @param o offset
+	 **/
 	void set_offset(size_t o) { offset = o; }
 	static int_t get_int_t(ccs from, ccs to);
 	void count_pos(ccs o, long& l, long& ch);

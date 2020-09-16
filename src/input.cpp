@@ -20,9 +20,6 @@
 #include "output.h"
 using namespace std;
 
-/**
- * creates a file (mmap) input
- */
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
 	allocated_(false)
@@ -37,20 +34,12 @@ input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	}
 }
 
-/**
- * destructor - frees the input's data pointer if it was allocated
- */
 input::~input() {
 	//COUT << "destroying input" << (allocated_ ? " freeing *" : "")
 	//	<< " data: " << beg_ << endl;
 	if (allocated_) free((void*)beg_);
 }
 
-/**
- * This function tokenizes the input string
- * @param moving pointer to the string part
- * @return pointer to the beginning and end of lexeme in the string
- */
 lexeme input::lex(pccs s) {
 	while (isspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
@@ -129,10 +118,6 @@ lexeme input::lex(pccs s) {
 	return { t, *s };
 }
 
-/**
- * scans input's data for lexemes
- * @return scanned lexemes
- */
 lexemes& input::prog_lex() {
 	lexeme e;
 	do {
@@ -545,7 +530,7 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 	raw_form_tree * root = NULL;
 	bool isneg = false;
 
-	if (pos == l.size()) return NULL;
+	if (pos == l.size()) return false;
 	if (*l[pos][0] == '~') isneg=true,++pos;
 	if (pos != l.size() && *l[pos][0] == '{') {
 		++pos;

@@ -27,27 +27,26 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.value("BUFFER", output::type_t::BUFFER)
 		.value("NAME",   output::type_t::NAME)
 		;
+	enum_<mmap_mode>("mmap_mode")
+		.value("MMAP_NONE", mmap_mode::MMAP_NONE)
+		.value("MMAP_READ", mmap_mode::MMAP_READ)
+		.value("MMAP_WRITE", mmap_mode::MMAP_WRITE)
+		;
 	class_<bdd>("bdd")
 		.class_function("init", &bdd::init)
 		.class_function("gc", &bdd::gc)
 		;
 	class_<driver>("driver")
 		.constructor<string_t, options>()
-		.class_function("create",
-			optional_override([](string_t s, options o) {
-				return new driver(s, o);
-			}), allow_raw_pointers())
-		.class_function("create",
-			optional_override([](options o) {
-				return new driver(o);
-			}), allow_raw_pointers())
-		.function("out", select_overload<void(emscripten::val)const>
-			(&driver::out), allow_raw_pointers())
+		.function("out", optional_override(
+			[](driver& self, emscripten::val v) {
+				return self.out(v);
+			}
+		))
 		.function("dump", &driver::dump)
-		//.function("save_bdd", &driver::save_bdd)
-		.function("info", &driver::info)
-		.function("list", &driver::list)
-		//.function("add", &driver::add)
+		.function("info", &driver::info<syschar_t>)
+		.function("list", &driver::list<syschar_t>)
+		.function("add", &driver::add, allow_raw_pointers())
 		.function("restart", &driver::restart)
 		.function("run", &driver::run)
 		.function("step", &driver::step)
@@ -55,8 +54,8 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("set_print_step", &driver::set_print_step)
 		.function("set_print_updates", &driver::set_print_updates)
 		.function("set_populate_tml_update", &driver::set_populate_tml_update)
-		.function("out_goals", &driver::out_goals)
-		.function("out_dict", &driver::out_dict)
+		.function("out_goals", &driver::out_goals<syschar_t>)
+		.function("out_dict", &driver::out_dict<syschar_t>)
 		.function("size", &driver::size)
 		.function("load", &driver::load)
 		.function("save", &driver::save)
@@ -67,7 +66,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.property("opts", &driver::opts)
 		;
 	class_<options>("options")
-		.constructor<strings, outputs*>()
+		.constructor<strings, inputs*, outputs*>()
 		.function("parse", select_overload
 			<void(std::vector<std::string>, bool)>
 				(&options::parse), allow_raw_pointers())
@@ -77,17 +76,21 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("get_bool", &options::get_bool)
 		.function("get_string", &options::get_string)
 		.function("to_string", optional_override([](options& o) {
-			ostringstream_t wss; wss << o;
-			return wss.str();
+			ostringstream_t ss; ss << o;
+			return ss.str();
 		}), allow_raw_pointers())
+		;
+	class_<inputs>("inputs")
+		.constructor<>()
+		.class_function("ref", optional_override([](inputs &ii) {
+				return &ii;
+			}), allow_raw_pointers())
 		;
 	class_<output>("output")
 		.function("name", &output::name)
 		.function("type", &output::type)
 		//.function("os", &output::os)
-		.function("target", select_overload<string_t()const>(&output::target), allow_raw_pointers())
-		//.function("set_target", select_overload<type_t(string_t)>(&output::target))
-		//.function("target", &output::target)
+		.function("target", select_overload<std::string()const>(&output::target), allow_raw_pointers())
 		.function("read", &output::read)
 		.function("is_null", &output::is_null)
 		.class_function("create", &output::create)
@@ -99,19 +102,17 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.class_function("ref", optional_override([](outputs &oo) {
 				return &oo;
 			}), allow_raw_pointers())
-		.function("init_defaults", &outputs::init_defaults)
 		.function("use", &outputs::use)
 		.function("add", &outputs::add)
 		.class_function("read", &outputs::read)
-		//.class_function("in_use", &outputs::in_use)
+		.class_function("in_use", &outputs::in_use, allow_raw_pointers())
 		//.class_function("out", &outputs::out)
 		//.class_function("err", &outputs::err)
 		//.class_function("inf", &outputs::inf)
 		//.class_function("dbg", &outputs::dbg)
-		//.class_function("repl", &outputs::repl)
 		//.class_function("ms", &outputs::ms)
 		//.class_function("dump", &outputs::dump)
-		//.class_function("get", &outputs::get)
+		.class_function("get", &outputs::get, allow_raw_pointers())
 		//.class_function("to", &outputs::to)
 		.class_function("exists", &outputs::exists)
 		.class_function("target", &outputs::target)

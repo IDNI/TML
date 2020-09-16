@@ -155,7 +155,6 @@ public:
 		return tbl->get_goals(os); }
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	void save_bdd(std::string filename);
 	size_t size();
 	void load(std::string filename);
 	void save(std::string filename);

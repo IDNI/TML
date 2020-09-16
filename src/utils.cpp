@@ -70,8 +70,8 @@ string temp_filename() {
 #else
 int temp_fileno() { return fileno(tmpfile()); }
 string filename(int fd) {
-        return std::filesystem::read_symlink(
-                        std::filesystem::path("/proc/self/fd") /
+        return filesystem::read_symlink(
+                        filesystem::path("/proc/self/fd") /
                                 to_string(fd));
 }
 #endif
@@ -188,6 +188,31 @@ size_t emit_codepoint(char32_t ch, char_t *s) {
 	} else return 0;
 }
 
+/**
+ * Converts char32_t to a 1-4 char_ts and outputs them into a stream
+ * @param os output stream
+ * @param ch unicode codepoint
+ * @return output stream
+ */
+basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& os,
+	char32_t ch)
+{
+	if (ch < 0x80) return os.put((char_t) ch);
+	else if (ch < 0x800)
+		return os.put((char_t) (0xC0 + (ch >> 6)))
+			.put((char_t) (0x80 + (ch & 0x3F)));
+	else if (ch < 0x10000)
+		return os.put((char_t) (0xE0 + (ch >> 12)))
+			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
+			.put((char_t) (0x80 + (ch & 0x3F)));
+	else if (ch < 0x110000)
+		return os .put((char_t) (0xF0 + (ch >> 18)))
+			.put((char_t) (0x80 + ((ch >> 12) & 0x3F)))
+			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
+			.put((char_t) (0x80 + (ch & 0x3F)));
+	return os;
+}
+
 string_t to_string_t(char32_t ch) {
 	char_t s[4];
 	size_t l = emit_codepoint(ch, s);
@@ -199,9 +224,7 @@ string_t to_string_t(const u32string& str) {
 	basic_ostringstream<char_t> ss;
 	auto it = str.begin();
 	while (it != str.end()) {
-		char_t s[5] = "\0\0\0\0";
-		emit_codepoint(*(it++), s);
-		ss << s;
+		emit_codepoint(ss, *(it++));
 		it++;
 	}
 	return ss.str();
@@ -215,7 +238,7 @@ u32string to_u32string(const string_t& str) {
 	while ((chl = peek_codepoint(s, sl, ch)) > 0) {
 		sl -= chl;
 		s += chl;
-		ss << ch;
+		ss.put(ch);
 	}
 	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
 	return ss.str();
