@@ -1,0 +1,8 @@
+@string str "aabbccdd".
+A => ('a')*.
+
+B => 'b'+.
+C => 'c'*.
+D => 'd''d'.
+
+S => A B C D.

@@ -557,11 +557,14 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 	}
 }
 
-void form::printnode(int lv) {
-	if (r) r->printnode(lv+1);
+void form::printnode(int lv, const tables* tb) {
+	if (r) r->printnode(lv+1, tb);
 	for (int i = 0; i < lv; i++) COUT << '\t';
-	COUT << " " << type << " " << arg << "\n";
-	if (l) l->printnode(lv+1);
+	if( tb && this->tm != NULL)
+		COUT << " " << type << " " << tb->to_raw_term(*tm) << "\n";
+	else
+		COUT << " " << type << " " << arg << "\n";
+	if (l) l->printnode(lv+1, tb);
 }
 
 //---------------------------------------------------------
@@ -919,10 +922,10 @@ bool tables::to_pnf(form *&froot) {
 	changed = impltrans.traverse(froot);
 	changed |= demtrans.traverse(froot);
 	COUT << "\n ........... \n";
-	froot->printnode();
+	froot->printnode(0, this);
 	changed |= pullquant.traverse(froot);
 	COUT << "\n ........... \n";
-	froot->printnode();
+	froot->printnode(0, this);
 
 	return changed;
 
@@ -960,7 +963,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			DBG(COUT << "\n ........... \n";)
 			DBG(r.prft.get()->printTree();)
 			DBG(COUT << "\n ........... \n";)
-			DBG(froot->printnode();)
+			DBG(froot->printnode(0, this);)
 
 			term::textype extype = term::FORM1;
 			if(is_sol) {
@@ -1969,7 +1972,7 @@ bool tables::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
 	}
 	return ret;
 }
-void tables::transform_grammar(vector<production> g, flat_prog& p) {
+void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 	if (g.empty()) return;
 //	o::out()<<"grammar before:"<<endl;
 //	for (production& p : g) o::out() << p << endl;
@@ -2022,6 +2025,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 			p.insert({move(t)});
 			continue;
 		}
+		form *root = NULL;
 		// ref: maps ith sybmol production to resp. terms
 		std::map<size_t, term> refs;
 		DBG(o::dbg()<<x;)
@@ -2040,11 +2044,20 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
 				v.push_back(move(plus1));
 
+				form* curl = new form(form::ATOM, 0, &t );
+				form *curr = new form(form::ATOM, 0, &plus1 );
+				form *cur = new form(form::AND, 0 , NULL, curl, curr );
+				root = 	new form(form::AND, 0 , NULL, root, cur );
 			} else if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
+				if(n) {
+					form *cur = new form(form::ATOM, 0, &t);
+					if(root) root = new form(form::AND, 0 , NULL, root, cur );
+					else root = cur;
+				}
 			} else if (x.p[n].type == elem::CHR) {				
 				unary_string us(sizeof(char32_t)*8);
 				us.buildfrom(u32string(1, x.p[n].ch));
@@ -2061,6 +2074,13 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 					plus1.extype = term::textype::ARITH;
 					plus1.arith_op = t_arith_op::ADD;
 					plus1[0] = -tv, plus1[1] = mknum(1), plus1[2] = -tv-1;
+					
+					form *cur = new form(form::ATOM, 0, &t);
+					if(root) root = 	new form(form::AND, 0 , NULL, root, cur );
+					else root = cur;
+					cur = new form(form::ATOM, 0, &plus1);
+					root = 	new form(form::AND, 0 , NULL, root, cur );
+
 					v.push_back(move(plus1));
 					v.push_back(move(t));
 					// IMPROVE FIX: the symbol index n e.g. in len(i) should refer
@@ -2095,7 +2115,11 @@ void tables::transform_grammar(vector<production> g, flat_prog& p) {
 		
 		// add vars to dictionary to avoid collision with new vars
 		for(int_t i =-1; i >= (int_t)-x.p.size(); i--) 
-			dict.get_var_lexeme_from(i);
+			dict.get_var_lexeme_from(i);		
+		// adding quantifier
+		for(int_t j = 2; j< (int_t)x.p.size();j++)
+			root = new form(form::EXISTS1, -j, NULL, NULL, root);
+		root->printnode(0, this);
 
 		std::set<term> done;
 		bool beqrule = false;
@@ -2275,7 +2299,8 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	syms = dict.nsyms();
 	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
 	for (auto x : strs) load_string(x.first, x.second);
-	transform_grammar(g, m);
+	form *froot;
+	transform_grammar(g, m, froot);
 	get_rules(move(m));
 //	clock_t start, end;
 //	o::dbg()<<"load_string: ";

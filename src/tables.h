@@ -158,6 +158,7 @@ class tables {
 	friend class archive;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
+	friend struct form;
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 private:
@@ -337,7 +338,7 @@ private:
 	
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
 					std::vector<term> &v, std::set<term> &done);
-	void transform_grammar(std::vector<struct production> g, flat_prog& p);
+	void transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
@@ -493,7 +494,7 @@ friend struct transformer;
 		if(r) delete r, r = NULL;
 		if(tm) delete tm, tm = NULL;
 	}
-	void printnode(int lv=0);
+	void printnode(int lv=0, const tables* tb = NULL);
 };
 
 struct transformer {

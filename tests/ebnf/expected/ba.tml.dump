@@ -1,0 +1,15 @@
+a(1).
+a(0).
+d(2).
+str(2 'd').
+str(1 'a').
+str(0 'a').
+str(printable 2 0).
+str(printable 1 0).
+str(printable 0 0).
+str(alnum 2 0).
+str(alnum 1 0).
+str(alnum 0 0).
+str(alpha 2 0).
+str(alpha 1 0).
+str(alpha 0 0).

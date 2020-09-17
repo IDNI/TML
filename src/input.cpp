@@ -684,10 +684,9 @@ void raw_form_tree::printTree( int level) {
 
 	for(int i = 0; i < level; i++) COUT << '\t';
 
-	if (type == elem::NOT ) COUT << '~';
-	else if (this->rt)
-		for(elem &etemp: rt->e) COUT <<lexeme2str(etemp.e).c_str()<<" ";
-	else COUT <<lexeme2str(el->e).c_str()<<" ";
+	if (this->rt)
+		COUT<<rt;
+	else COUT <<el;
 	if (l) l->printTree(level + 1);
 }
 
