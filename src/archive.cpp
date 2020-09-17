@@ -226,7 +226,7 @@ size_t archive::mapsize(const std::map<Key, T>& m) {
 }
 template <typename Key, typename T, typename C>
 size_t archive::mapsize(const std::map<Key, T, C>& m) {
-	return mapsize<Key, T>();
+	return mapsize<Key, T>(m);
 }
 
 template <typename Key, typename T>
@@ -1001,7 +1001,7 @@ archive& archive::add_lexeme_and_map(const dict_t &d, const lexeme& l,bool add){
 		if (it == lmap_.end()) { // not in map
 			if (l[1]-l[0] > 0) // non-0
 				for (ccs c = l[0]; c != l[1]; ++c)
-					ldata_ << *c, ++lpos_, lr[1] = lpos_;
+					ldata_.put(*c), ++lpos_, lr[1] = lpos_;
 			lmap_.insert({ l, lr });
 			if (add) lranges_.push_back({ lr, false });
 		} else if (add) lranges_.push_back({ it->second, false });

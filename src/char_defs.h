@@ -18,7 +18,6 @@
 extern std::wostream wcnull;
 extern std::ostream cnull;
 
-#define WITH_WCHAR
 #ifdef WITH_WCHAR
 typedef wchar_t syschar_t;
 #define CIN   std::wcin
@@ -87,6 +86,8 @@ bool is_mb_codepoint(const char_t str);
 size_t peek_codepoint(ccs s, size_t l, char32_t &ch);
 size_t codepoint_size(char32_t ch);
 size_t emit_codepoint(char32_t ch, char_t *s);
+std::basic_ostream<char_t>& emit_codepoint(std::basic_ostream<char_t>& os,
+	char32_t ch);
 string_t to_string_t(char32_t ch);
 string_t to_string_t(const std::u32string& str);
 std::u32string to_u32string(const string_t& str);

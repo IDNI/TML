@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const tml = require('./tml.js');
 
 const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);
 
-tml.onRuntimeInitialized = _ => {
+require('./tml.js')().then(tml => {
 	// import from tml
-	const { bdd, driver, options, outputs, strings } = tml;
-
-	// initialize bdd database
-	bdd.init();
+	const { bdd, driver, options, inputs, outputs, strings, mmap_mode } = tml;
 
 	// create vector<string> arg_strings from command line args
 	const arg_strings = new strings();
 	args.forEach(arg => arg_strings.push_back(arg));
 
 	// create outputs and parse options
+	const ii = new inputs();
 	const oo = new outputs();
-	const o = new options(arg_strings, outputs.ref(oo));
-	// console.log('args:', o.to_string());
+	const o = new options(arg_strings, inputs.ref(ii), outputs.ref(oo));
+	console.log('args:', o.to_string());
+
+	// initialize bdd database
+	bdd.init(mmap_mode.MMAP_NONE, 10000, "");
 
 	// create a driver and run program
 	const d = new driver(program, o);
@@ -29,6 +29,6 @@ tml.onRuntimeInitialized = _ => {
 	if (!d.result) console.log('unsat');
 	else d.dump();
 
-		// delete created objects
-	d.delete(); o.delete(); oo.delete(); arg_strings.delete();
-};
+	// delete created objects
+	d.delete(); o.delete(); ii.delete(); oo.delete(); arg_strings.delete();
+});
