@@ -1994,11 +1994,11 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
 			if (p.p[n].type == elem::STR) {
-				p.p.erase(p.p.begin() + n);
 				ccs s = p.p[n].e[0]+1;
 				size_t chl, sl = p.p[n].e[1]-1 - s;
 				char32_t ch;
 				bool esc = false;
+				p.p.erase(p.p.begin() + n);
 				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
 					sl -= chl; s += chl;
 					if (ch == U'\\' && !esc) esc = true;
