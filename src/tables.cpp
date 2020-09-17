@@ -1397,7 +1397,8 @@ void tables::transform_bin(flat_prog& p) {
 		}
 		p.insert(move(x)), vars.clear();
 	}
-	if (print_transformed) print(o::out()<<"after transform_bin:"<<endl,p);
+	if (print_transformed) print(o::to("transformed")
+		<< "after transform_bin:" << endl, p);
 }
 
 /*struct cqcdata {
@@ -2205,8 +2206,10 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 		}
 		p.insert(move(v));
 	}
-	DBG(print(o::dbg() << "transformed grammar: " << endl, p);)
-	DBG(print(o::dbg() << "run after transform: " << endl, prog_after_fp);)
+	if (print_transformed) print(print(o::to("transformed")
+		<< "after transform_grammar:\n", p)
+		<< "\nrun after a fixed point:\n", prog_after_fp)
+		<< endl;
 }
 
 void tables::add_prog(const raw_prog& p, const strs_t& strs_) {

@@ -186,9 +186,9 @@ void driver::new_sequence() {
 	raw_prog &p = rp.p[pd.n];
 	for (const string& s : str_bltins) p.builtins.insert(get_lexeme(s));
 	output_pl(p);
-	if (opts.enabled("t")) o::to("transformed")
-		<< "# Transformed program " << pd.n + 1 << ":" << endl
-		<< '{' << endl << p << '}' << endl;
+	//if (opts.enabled("t")) o::to("transformed")
+	//	<< "# Transformed program " << pd.n + 1 << ":" << endl
+	//	<< '{' << endl << p << '}' << endl;
 }
 
 void driver::restart() {
