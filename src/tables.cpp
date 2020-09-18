@@ -2043,12 +2043,12 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 				plus1.extype = term::textype::ARITH;
 				plus1.arith_op = t_arith_op::ADD;
 				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
-				v.push_back(move(plus1));
-
 				form* curl = new form(form::ATOM, 0, &t );
 				form *curr = new form(form::ATOM, 0, &plus1 );
 				form *cur = new form(form::AND, 0 , NULL, curl, curr );
 				root = 	new form(form::AND, 0 , NULL, root, cur );
+				v.push_back(move(plus1));
+				
 			} else if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
