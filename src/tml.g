@@ -30,15 +30,14 @@ directive =>	ws "@string" space ws strdir ws '.' ws |
 		ws "@bwd" ws '.' ws.
 strdir => relname ws fname | relname ws string | relname ws cmdline | relname ws term.
 
-production => relname ws "=>" rexpression '.'. 
-rexpression => alts.
-alts => alt | alt '|' alts.
-alt  => factor | factor  alt.
-factor => 	terminal unot |
-			 nonterminal unot |
-			'{' rexpression '}' |
-			'(' rexpression ')' unot |
-			'[' rexpression ']'.
+production => relname ws "=>" ws alts '.'. 
+alts => ws alt | alt ws '|' alts.
+alt  => ws factor | factor ws alt.
+factor => 	ws terminal ws unot |
+			ws nonterminal ws unot |
+			ws '{' alts ws '}' |
+			ws '(' alts ws ')' unot |
+			ws '[' alts ws ']'.
 unot => '*' |'+' | null.
 
 prefix => "forall" | "exists" | "unique" .

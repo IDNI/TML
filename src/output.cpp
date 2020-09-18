@@ -84,8 +84,8 @@ output::type_t output::target(const string t) {
 			throw 0;
 	}
 	if (open_path_before_finish)
-		file_.open(path_, ofstream::binary | ofstream::app);
-		file_.imbue(locale(""));
+		file_.open(path_, ofstream::binary | ofstream::app),
+		//file_.imbue(locale(""));
 		os(&file_);
 	return type_;
 }
