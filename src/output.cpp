@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include <iostream>
 #include <sstream>
+#include <locale>
 
 #include "input.h"
 #include "output.h"
@@ -83,7 +84,8 @@ output::type_t output::target(const string t) {
 			throw 0;
 	}
 	if (open_path_before_finish)
-		file_.open(path_, ofstream::binary | ofstream::app),
+		file_.open(path_, ofstream::binary | ofstream::app);
+		file_.imbue(locale(""));
 		os(&file_);
 	return type_;
 }
