@@ -38,8 +38,7 @@ factor => 	terminal unot |
 			 nonterminal unot |
 			'{' rexpression '}' |
 			'(' rexpression ')' unot |
-			'[' rexpression ']' |
-			"null" .
+			'[' rexpression ']'.
 unot => '*' |'+' | null.
 
 prefix => "forall" | "exists" | "unique" .

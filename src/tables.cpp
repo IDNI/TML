@@ -1589,7 +1589,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 	
 	unary_string us(sizeof(char32_t)*8);
 	us.buildfrom(s);	
-	DBG(us.toprint(o::dbg()));
+	//DBG(us.toprint(o::dbg()));
 	for( auto it: us.rel ){
 		int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(it.first)));
 		term t; t.resize(1);
@@ -2048,7 +2048,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 				form *cur = new form(form::AND, 0 , NULL, curl, curr );
 				root = 	new form(form::AND, 0 , NULL, root, cur );
 				v.push_back(move(plus1));
-				
+
 			} else if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
@@ -2063,7 +2063,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 				unary_string us(sizeof(char32_t)*8);
 				us.buildfrom(u32string(1, x.p[n].ch));
 				int_t tv=n;
-				DBG(us.toprint(o::dbg()));
+				//DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
 					int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(rl)));
 					term t; t.resize(1);
@@ -2120,7 +2120,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 		// adding quantifier
 		for(int_t j = 2; j< (int_t)x.p.size();j++)
 			root = new form(form::EXISTS1, -j, NULL, NULL, root);
-		root->printnode(0, this);
+		DBG(COUT<<endl; root->printnode(0, this);)
 
 		std::set<term> done;
 		bool beqrule = false;
