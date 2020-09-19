@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        compiler: [clang-9, gcc-9.2]
+        compiler: [clang-9, gcc-9]
         os: [ubuntu-latest, macOS-latest]
 
     steps:
@@ -28,7 +28,7 @@ jobs:
 #      - name: Install compilers for OSX
 #          if: matrix.os == 'macOS-latest'
 #          run: |
-#            if [ "${{ matrix.compiler }}" = "gcc-9.2" ]; then
+#            if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
 #            brew install gcc@9
 #            else
 #            sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
@@ -47,8 +47,8 @@ jobs:
           brew install cppcheck
       - name: Bulding debug version
         run: |
-          if [ "${{ matrix.compiler }}" = "gcc-9.2" ]; then
-            CMAKE_CXX_COMPILER=g++
+          if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
+            CMAKE_CXX_COMPILER=g++-9
           else
             CMAKE_CXX_COMPILER=clang++
           fi
@@ -74,7 +74,7 @@ jobs:
           cd build-Debug
           make -j5 clang-tidy
       - name: Generating coverage report
-        if: success() && matrix.compiler == 'gcc-9.2' && matrix.os == 'ubuntu-latest'
+        if: success() && matrix.compiler == 'gcc-9' && matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get -y install lcov
           lcov -c -d ./build-Debug/src/CMakeFiles -o coverage.info
