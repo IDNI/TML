@@ -25,6 +25,10 @@ jobs:
           sudo add-apt-repository ppa:mhier/libboost-latest
           sudo apt-get update
           sudo apt-get install -y libboost1.70 libboost1.70-dev
+      - name: Installing Gcovr on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y gcovr
 #      - name: Install compilers for OSX
 #          if: matrix.os == 'macOS-latest'
 #          run: |
@@ -41,20 +45,25 @@ jobs:
         if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get install -y clang-tidy-9
+      - name: Installing lcov on macOS
+        if: matrix.compiler == 'clang-9' && matrix.os == 'macOS-latest'
+        run: |
+          brew install lcov
       - name: Installing cppcheck on macOS
         if: matrix.os == 'macOS-latest'
         run: |
           brew install cppcheck
       - name: Bulding debug version
         run: |
-          if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
-            CMAKE_CXX_COMPILER=g++-9
-          else
-            CMAKE_CXX_COMPILER=clang++
-          fi
           mkdir -p build-Debug
           cd build-Debug
-          cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
+            CMAKE_CXX_COMPILER=g++-9
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
+          else
+            CMAKE_CXX_COMPILER=clang++
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          fi
           make -j5
       - name: Running tests
         run: ./build-Debug/tests/test_tml
@@ -76,10 +85,14 @@ jobs:
       - name: Generating coverage report
         if: success() && matrix.compiler == 'gcc-9' && matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get -y install lcov
-          lcov -c -d ./build-Debug/src/CMakeFiles -o coverage.info
-          lcov --remove coverage.info '/usr/*' --output-file coverage.info
-          lcov --list coverage.info # debug info
+          sudo git clone https://github.com/linux-test-project/lcov
+          cd lcov
+          sudo make install
+          cd ../
+          echo `ls`
+          /usr/local/bin/lcov -c -d ./build-Debug/src/CMakeFiles --gcov-tool /usr/bin/gcov-9 -o coverage.info
+          /usr/local/bin/lcov --remove coverage.info '/usr/*' --output-file coverage.info
+          /usr/local/bin/lcov --list coverage.info # debug info
           bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
       - name: TML execution
         run: ./build-Debug/tml -ie "a(1)."
