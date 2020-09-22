@@ -457,6 +457,27 @@ void raw_term::calc_arity(input* in) {
 	if (dep) in->parse_error(e[0].e[0], err_paren, e[0].e);
 }
 
+bool macro::parse(input* in, const raw_prog& prog){
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
+	elem e;
+	if(	!this->def.parse(in,prog) || 
+		pos >= l.size() ||
+		l[pos][0][0] != ':' ||
+		 l[pos][0][1] != '=' )
+		goto fail;
+	
+	++pos;
+	if(!e.parse(in) || !(e.e == "macro")) goto fail;
+
+	for (b.emplace_back(); b.back().parse(in, prog);
+		b.emplace_back(), ++pos) {
+		if (*l[pos][0] == '.') return ++pos, true;
+		else if (*l[pos][0] != ',') break;
+	}
+
+	fail: return pos = curr , false;
+}
 bool raw_rule::parse(input* in, const raw_prog& prog) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
@@ -662,16 +683,10 @@ bool raw_sof::parse(input* in, raw_form_tree *&root) {
 }
 
 void raw_form_tree::printTree( int level) {
-
 	if( r ) r->printTree(level + 1)	;
-
 	COUT << '\n';
-
 	for(int i = 0; i < level; i++) COUT << '\t';
-
-	if (this->rt)
-		COUT<<rt;
-	else COUT <<el;
+	(this->rt)?	COUT<<*rt : (this->el)? COUT <<*el: COUT<<"";
 	if (l) l->printTree(level + 1);
 }
 
@@ -715,17 +730,41 @@ bool production::parse(input *in, const raw_prog& prog) {
 fail:	return pos = curr, false;
 }
 
+
 bool raw_prog::parse(input* in) {
 	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}') {
 		directive x;
 		raw_rule y;
 		production p;
+		macro	m;
 		// TODO: temp. passing prog/context, make parse(s) prog static instead.
-		if (x.parse(in, *this)) d.push_back(x);
+		if( m.parse(in, *this)) vm.emplace_back(m);
+		else if (x.parse(in, *this)) d.push_back(x);
 		else if (y.parse(in, *this)) r.push_back(y);
 		else if (p.parse(in, *this)) g.push_back(p);
-		else return false;
+		else return false; 
 	}
+	if(  vm.empty()) return true;
+	//macro  
+/*
+	for( raw_rule &rr : r )
+		for( vector<raw_term> &vrt :rr.b )
+			for( raw_term rt :vrt )
+					for( macro &mm :vm )
+						if( rt.e.size() >= 1 && mm.def.e.size() == rt.e.size() &&
+							rt.e[0].e == mm.def.e[0].e) {
+								macro instance= mm;
+								for( auto et =rt.e.begin(), auto ed =mm.def.e.begin();
+									et!=rt.e.end, ed!=mm.def.e.end(); 	 et++, ed++)
+									if( et->type == elem::VAR && et->type == ed->type ) {
+										for(auto bt = mm.b.begin(), )
+									}
+									else if (et->type != ed->type) break;
+									
+							}
+								
+	*/							
+
 	return true;
 }
 

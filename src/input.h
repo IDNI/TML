@@ -296,6 +296,12 @@ struct raw_term {
 	}
 };
 
+struct macro {
+	raw_term def;
+	std::vector<raw_term> b;
+	bool parse(input* in, const raw_prog& prog);
+};
+
 struct directive {
 	elem rel;
 	lexeme arg;
@@ -387,9 +393,11 @@ public:
 };
 
 struct raw_prog {
+	std::vector<macro> vm;
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
+
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 	bool parse(input* in);
