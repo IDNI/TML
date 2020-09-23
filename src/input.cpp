@@ -746,25 +746,35 @@ bool raw_prog::parse(input* in) {
 	}
 	if(  vm.empty()) return true;
 	//macro  
-/*
+
 	for( raw_rule &rr : r )
 		for( vector<raw_term> &vrt :rr.b )
-			for( raw_term rt :vrt )
-					for( macro &mm :vm )
-						if( rt.e.size() >= 1 && mm.def.e.size() == rt.e.size() &&
-							rt.e[0].e == mm.def.e[0].e) {
-								macro instance= mm;
-								for( auto et =rt.e.begin(), auto ed =mm.def.e.begin();
-									et!=rt.e.end, ed!=mm.def.e.end(); 	 et++, ed++)
-									if( et->type == elem::VAR && et->type == ed->type ) {
-										for(auto bt = mm.b.begin(), )
-									}
-									else if (et->type != ed->type) break;
-									
-							}
-								
-	*/							
+			for( size_t i=0; i <vrt.size();i++)
+				for( macro &mm :vm )
+					if( vrt[i].e.size() >= 1 && mm.def.e.size() == vrt[i].e.size() &&
+						vrt[i].e[0].e == mm.def.e[0].e) {
+						macro in= mm;
+						macro_expand(in, i, vrt);
+					}								
+	return true;
+}
 
+bool raw_prog::macro_expand(macro &mm, int i, vector<raw_term> &vrt) {
+
+	std::map<elem, elem> chng; 
+	vector<elem>::iterator et = vrt[i].e.begin();
+	vector<elem>::iterator ed = mm.def.e.begin();
+	
+	for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
+		if( et->type == elem::VAR && et->type == ed->type ) chng[*ed] = *et;
+			
+	for ( auto &tt:mm.b )
+		for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
+			if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
+				 *tochng = chng[*tochng];
+				
+	vrt.erase(i+vrt.begin());
+	vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
 	return true;
 }
 

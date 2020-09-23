@@ -401,6 +401,7 @@ struct raw_prog {
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 	bool parse(input* in);
+	bool macro_expand(macro &mm, int i, std::vector<raw_term> &vrt);
 };
 
 struct raw_progs {
