@@ -464,12 +464,10 @@ bool macro::parse(input* in, const raw_prog& prog){
 	if(	!this->def.parse(in,prog) || 
 		pos >= l.size() ||
 		l[pos][0][0] != ':' ||
-		 l[pos][0][1] != '=' )
+		l[pos][0][1] != '=' )
 		goto fail;
 	
 	++pos;
-	if(!e.parse(in) || !(e.e == "macro")) goto fail;
-
 	for (b.emplace_back(); b.back().parse(in, prog);
 		b.emplace_back(), ++pos) {
 		if (*l[pos][0] == '.') return ++pos, true;
@@ -731,7 +729,7 @@ fail:	return pos = curr, false;
 }
 
 
-bool raw_prog::parse(input* in) {
+bool raw_prog::parse(input* in, dict_t &dict) {
 	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}') {
 		directive x;
 		raw_rule y;
@@ -751,30 +749,57 @@ bool raw_prog::parse(input* in) {
 		for( vector<raw_term> &vrt :rr.b )
 			for( size_t i=0; i <vrt.size();i++)
 				for( macro &mm :vm )
-					if( vrt[i].e.size() >= 1 && mm.def.e.size() == vrt[i].e.size() &&
-						vrt[i].e[0].e == mm.def.e[0].e) {
+					for(size_t j = 0; j < vrt[i].e.size(); j++)
+					if( vrt[i].e[j].e == mm.def.e[0].e ) {
 						macro in= mm;
-						macro_expand(in, i, vrt);
+						macro_expand(in, i, j, vrt, dict);
+						break;
 					}								
 	return true;
 }
 
-bool raw_prog::macro_expand(macro &mm, int i, vector<raw_term> &vrt) {
+bool raw_prog::macro_expand(macro &mm, size_t i, size_t j, vector<raw_term> &vrt, dict_t &dict) {
 
 	std::map<elem, elem> chng; 
-	vector<elem>::iterator et = vrt[i].e.begin();
+	vector<elem>::iterator et = vrt[i].e.begin()+j;
 	vector<elem>::iterator ed = mm.def.e.begin();
 	
-	for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-		if( et->type == elem::VAR && et->type == ed->type ) chng[*ed] = *et;
-			
-	for ( auto &tt:mm.b )
-		for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
-			if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
-				 *tochng = chng[*tochng];
+	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
+		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
+			if( et->type == elem::VAR && et->type == ed->type ) chng[*ed] = *et;
 				
-	vrt.erase(i+vrt.begin());
-	vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
+		for ( auto &tt:mm.b )
+			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
+				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
+					*tochng = chng[*tochng];
+					
+
+		vrt.erase(i+vrt.begin());
+		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
+	}
+	// create fresh var and unary case
+	if( j > 0)  {		
+		vector<elem> carg;
+		for( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
+			if(	et->type == elem::VAR ) carg.emplace_back(*et);
+			
+		int counter = 0;
+		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
+			if(ed->type == elem::VAR)  {
+				if(a < carg.size())
+					chng[*ed] = carg[a++];
+				else
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(dict.get_fresh_var(counter++)));
+			}
+		}
+		for( auto &tt:mm.b ) 
+			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
+				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
+					*tochng = chng[*tochng];
+		// TODO		
+		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+1);
+		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
+	}
 	return true;
 }
 
@@ -798,7 +823,7 @@ void raw_progs::parse(input* in, dict_t& dict, bool newseq) {
 				? p.emplace_back() : p.back();
 			//raw_prog x;
 			prepare_builtins(x);
-			if (!x.parse(in))
+			if (!x.parse(in, dict))
 				in->parse_error(l[pos][0],
 					err_rule_dir_prod_expected, l[pos]);
 			//p.push_back(x);
@@ -807,7 +832,7 @@ void raw_progs::parse(input* in, dict_t& dict, bool newseq) {
 			raw_prog& x = p.emplace_back(); // if needed on err: p.pop_back();
 			//raw_prog x;
 			prepare_builtins(x);
-			if (++pos, !x.parse(in))
+			if (++pos, !x.parse(in, dict))
 				in->parse_error(l[pos][0], err_parse, l[pos]);
 			//if (p.push_back(x), pos==l.size() || *l[pos++][0]!='}')
 			if (pos == l.size() || *l[pos++][0] != '}')
