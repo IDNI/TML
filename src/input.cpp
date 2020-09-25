@@ -496,7 +496,7 @@ head:	h.emplace_back();
 	//     syntax revision for formula may be required
 	bool is_form = false;
 	//TODO: check for fault
-	for (size_t x = pos; l[x][0][0] != '.'; x++) {
+	for (size_t x = pos; x != l.size() && l[x][0][0] != '.'; x++) {
 		if (l[x] == "forall" || l[x] == "exists" || l[x] == "unique" ||
 			l[x] == "&&" || l[x] == "||" || l[x] == "|") {
 			is_form = true; break;

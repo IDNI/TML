@@ -112,7 +112,8 @@ int main() {
 	// 30
 		pe("1a",                err_int,              1,  1, "1a"),
 		pe("?(",                err_chr,              1,  2, "("),
-		pe("{{",                err_parse,            1,  2, "{" )
+		pe("{{",                err_parse,            1,  2, "{"),
+		pe("b:-a",              err_eof,              1,  5, "a")
 		// TODO: pe("",         err_term_or_dot,      1,  1, ""),
 	};
 	return run(tests, "parse errors");
