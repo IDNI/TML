@@ -56,11 +56,14 @@ map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
 map<pair<uints, bools>, unordered_map<int_t, int_t>, vec2cmp<uint_t, bool>>
 	memos_perm_ex;
 
+_Pragma("GCC diagnostic push")
+_Pragma("GCC diagnostic ignored \"-Wstrict-overflow\"")
 auto am_cmp = [](int_t x, int_t y) {
 	bool s = x < y;
 	x = abs(x), y = abs(y);
 	return x < y ? true : x == y ? s : false;
 };
+_Pragma("GCC diagnostic pop")
 
 const size_t gclimit = 1e+6;
 
