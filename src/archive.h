@@ -38,6 +38,7 @@ private:
 	std::vector<std::pair<lexeme_range, bool>> lranges_;
 	ccs lexemes_extra_ = 0;
 public:
+	bool error = false;
 	// archive with mmap
 	archive(const std::string& filename, size_t s, bool mm_write)
 		: archive(NONE, filename, s, mm_write) {}

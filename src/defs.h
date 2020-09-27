@@ -45,11 +45,12 @@ typedef size_t nlevel;
 #ifdef DEBUG
 #define DBG(x) x
 #define NDBG(x)
+#define DBGFAIL assert(0)
 #else
 #define DBG(x)
 #define NDBG(x) x
+#define DBGFAIL
 #endif
-#define er(x) o::err() << x << endl, throw std::runtime_error(ws2s(x))
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())

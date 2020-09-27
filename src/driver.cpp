@@ -67,7 +67,7 @@ string_t driver::directive_load(const directive& d) {
 		case directive::STDIN: return move(pd.std_input);
 		default: return unquote(str), str;
 	}
-	throw 0; // unreachable
+	DBGFAIL;
 }
 
 void driver::directives_load(raw_prog& p, lexeme& trel) {
@@ -94,8 +94,8 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		}
 }
 
-void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
-	if (!rp.p.size()) return;
+bool driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
+	if (!rp.p.size()) return true;
 	lexeme trel = { 0, 0 };
 	directives_load(rp.p[n], trel);
 	auto get_vars = [this](const raw_term& t) {
@@ -121,7 +121,8 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 //			transform_string(x.second, rp.p[n], x.first),
 //			transformed_strings.insert(x.first);
 	if (!rp.p[n].g.empty()) //{
-		if (pd.strs.size() > 1) er(err_one_input);
+		if (pd.strs.size() > 1)
+			return throw_runtime_error(err_one_input);
 //		else transform_grammar(rp.p[n], pd.strs.begin()->first,
 //			pd.strs.begin()->second.size());
 //	}
@@ -136,11 +137,12 @@ void driver::transform(raw_progs& rp, size_t n, const strs_t& /*strtrees*/) {
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
 	//o::out()<<rp.p[n]<<endl;
 //	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
+	return true;
 }
 
 void driver::output_pl(const raw_prog& p) const {
 	if (opts.enabled("xsb"))     print_xsb(o::to("xsb"), p);
-	if (opts.enabled("swipl"))   print_swipl(o::to("swipl"),   p);
+	if (opts.enabled("swipl"))   print_swipl(o::to("swipl"), p);
 	if (opts.enabled("souffle")) print_souffle(o::to("souffle"), p);
 }
 
@@ -154,19 +156,20 @@ bool driver::prog_run(raw_progs& rp, size_t n, size_t steps,
 	size_t step = nsteps();
 	measure_time_start();
 	bool fp = tbl->run_prog(rp.p[n], pd.strs, steps, break_on_step);
+	if (tbl->error) error = true;
 	o::ms() << "# elapsed: ";
 	measure_time_end();
 	pd.elapsed_steps = nsteps() - step;
-	//if (pd.elapsed_steps > 0 && steps && pd.elapsed_steps > steps) throw 0;
 //	for (auto x : prog->strtrees_out)
 //		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
 //					x.second, prog->rng.bits));
 	return fp;
 }
 
-void driver::add(input* in) {
-	rp.parse(in, tbl->get_dict(), in->newseq);
+bool driver::add(input* in) {
+	if (!rp.parse(in, tbl->get_dict(), in->newseq)) return error=true,false;
 	if (!in->newseq) transform(rp, pd.n, pd.strs);
+	return true;
 }
 
 template <typename T>
@@ -186,9 +189,6 @@ void driver::new_sequence() {
 	raw_prog &p = rp.p[pd.n];
 	for (const string& s : str_bltins) p.builtins.insert(get_lexeme(s));
 	output_pl(p);
-	//if (opts.enabled("t")) o::to("transformed")
-	//	<< "# Transformed program " << pd.n + 1 << ":" << endl
-	//	<< '{' << endl << p << '}' << endl;
 }
 
 void driver::restart() {
@@ -198,29 +198,24 @@ void driver::restart() {
 }
 
 bool driver::run(size_t steps, size_t break_on_step, bool break_on_fp) {
-	try {
-		if (!rp.p.size()) return true;
-		if (!running) restart();
+	if (!rp.p.size()) return result = true;
+	if (!running) restart();
 next_sequence:
-		if (nsteps() == pd.start_step) new_sequence();
-		if (opts.disabled("run") && opts.disabled("repl"))
-			return true;
-		bool fp = prog_run(rp, pd.n, steps, break_on_step);
-		if (fp) {
-			//DBG(if (opts.enabled("dump")) out(o::dump());)
-			if (pd.n == rp.p.size()-1) // all progs fp
-				return result = true, true;
-			++pd.n;
-			pd.start_step = nsteps();
-			if (steps && steps >= pd.elapsed_steps)
-				if (!(steps -= pd.elapsed_steps)) return false;
-			if ((break_on_step && nsteps() == break_on_step)
-				|| break_on_fp) return false;
-			goto next_sequence;
-		}
-	} catch (unsat_exception& e) {
-		o::out() << e.what() << endl;
-		result = false;
+	if (nsteps() == pd.start_step) new_sequence();
+	if (opts.disabled("run") && opts.disabled("repl"))
+		return true;
+	bool fp = prog_run(rp, pd.n, steps, break_on_step);
+	if (fp) {
+		//DBG(if (opts.enabled("dump")) out(o::dump());)
+		if (pd.n == rp.p.size()-1) // all progs fp
+			return result = true, true;
+		++pd.n;
+		pd.start_step = nsteps();
+		if (steps && steps >= pd.elapsed_steps)
+			if (!(steps -= pd.elapsed_steps)) return false;
+		if ((break_on_step && nsteps() == break_on_step)
+			|| break_on_fp) return false;
+		goto next_sequence;
 	}
 	return false;
 }
@@ -257,15 +252,18 @@ void driver::db_save(std::string filename) {
 }
 
 void driver::load(std::string filename) {
-	if (ii->size()) throw_runtime_error( // TODO
-		"Loading into a running program is not yet supported.");
-	load_archives.emplace_back(archive::type::DRIVER, filename, 0, false);
-	load_archives.back() >> *this;
+	if (!ii->size()) {
+		load_archives.emplace_back(archive::type::DRIVER, filename,0,0);
+		if (!load_archives.back().error) load_archives.back() >> *this;
+		return;
+	}
+	error = true;
+	throw_runtime_error(
+		"Loading into a running program is not yet supported."); // TODO
 }
 
 void driver::save(std::string filename) {
-	archive ar(archive::type::DRIVER, filename, archive::size(*this),
-		true);
+	archive ar(archive::type::DRIVER, filename, archive::size(*this), true);
 	ar << *this;
 }
 
@@ -273,7 +271,7 @@ void driver::read_inputs() {
 	//COUT << "read_inputs() current_input: " << current_input << " next_input: " << (current_input ? current_input->next() : 0) << endl;
 	while (current_input && current_input->next()) {
 		current_input = current_input->next();
-		add(current_input);
+		if (!add(current_input)) return;
 		++current_input_id;
 		//COUT << "current_inputid: " << current_input_id << endl;
 	}
@@ -294,10 +292,10 @@ driver::driver(string s, options o) : rp(), opts(o) {
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
-
 	if (ii) {
 		current_input = ii->first();
-		if (current_input) add(current_input);
+		if (current_input)
+			if (!add(current_input)) return;
 		read_inputs();
 	}
 }

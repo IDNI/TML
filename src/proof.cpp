@@ -23,7 +23,7 @@ vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
 		env m;
 		for (auto z : a->inv)
 			if (!m.emplace(z.second, x[z.first]).second)
-				throw 0;
+				{ DBGFAIL; }
 		r.emplace_back(move(m));
 	}, a->varslen);
 	return r;

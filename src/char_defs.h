@@ -18,9 +18,6 @@
 extern std::wostream wcnull;
 extern std::ostream cnull;
 
-#ifdef BUILD_WITH_WCHAR
-#define WITH_WCHAR
-#endif
 #ifdef WITH_WCHAR
 typedef wchar_t syschar_t;
 #define CIN   std::wcin

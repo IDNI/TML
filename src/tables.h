@@ -25,6 +25,7 @@
 #include "dict.h"
 #include "input.h"
 #include "form.h"
+#include "err.h"
 
 typedef int_t rel_t;
 class archive;
@@ -325,8 +326,10 @@ private:
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
-	void add_prog(flat_prog m, const std::vector<struct production>&,
+	bool add_prog(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
+	bool contradiction_detected();
+	bool infloop_detected();
 	char fwd() noexcept;
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
@@ -338,7 +341,7 @@ private:
 	
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
 					std::vector<term> &v, std::set<term> &done);
-	void transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
+	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
@@ -416,13 +419,14 @@ private:
 	t_arith_op get_bwop(lexeme l);
 	t_arith_op get_pwop(lexeme l);
 
-
+	template <typename T>
+	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false);
 	~tables();
 	size_t step() { return nstep; }
-	void add_prog(const raw_prog& p, const strs_t& strs);
+	bool add_prog(const raw_prog& p, const strs_t& strs);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
@@ -440,6 +444,7 @@ public:
 
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
+	bool error = false;
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
@@ -563,22 +568,22 @@ struct ptransformer{
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 
+#ifdef WITH_EXCEPTIONS
 struct unsat_exception : public std::exception {
 	virtual const char* what() const noexcept { return "unsat."; }
 };
 
 struct contradiction_exception : public unsat_exception {
 	virtual const char* what() const noexcept {
-		return "unsat (contradiction).";
+		return err_contradiction;
 	}
 };
 
 struct infloop_exception : public unsat_exception {
 	virtual const char* what() const noexcept {
-		return "unsat (infinite loop).";
+		return err_infloop;
 	}
 };
-
-
+#endif
 
 //#endif

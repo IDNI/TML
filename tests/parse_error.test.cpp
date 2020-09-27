@@ -40,12 +40,16 @@ test pe(std::string prog, std::string err, long line, long chr, std::string to) 
 		outputs *oldoo = outputs::in_use();
 		outputs oo; oo.use(); oo.init_defaults();
 		inputs ii;
+#ifdef WITH_EXCEPTIONS
 		try {
-			driver d(prog, ::options(strings{ "--error", "@buffer",
+#endif
+		driver d(prog, ::options(strings{ "--error", "@buffer",
 			"--no-output", "--no-debug", "--no-info" }, &ii, &oo));
-		} catch (std::exception& e) {
+#ifdef WITH_EXCEPTIONS
+		} catch (exception& e) {
 			return fail(e.what());
 		}
+#endif
 		syschar_t t[256];
 		istringstream_t is(oo.get("error")->read());
 		is.getline(t, 256);

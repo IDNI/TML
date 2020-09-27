@@ -83,22 +83,22 @@ public:
 		create("souffle",     ".souffle");
 	}
 	static outputs* in_use() { return o_; }
-	static ostream_t& out()  { return o_to(o_->out_);  }
-	static ostream_t& err()  { return o_to(o_->err_);  }
-	static ostream_t& inf()  { return o_to(o_->inf_);  }
-	static ostream_t& dbg()  { return o_to(o_->dbg_);  }
+	static ostream_t& out()  { return o_ ? o_to(o_->out_)  : CNULL; }
+	static ostream_t& err()  { return o_ ? o_to(o_->err_)  : CNULL; }
+	static ostream_t& inf()  { return o_ ? o_to(o_->inf_)  : CNULL; }
+	static ostream_t& dbg()  { return o_ ? o_to(o_->dbg_)  : CNULL; }
 #ifdef WITH_THREADS
-	static ostream_t& repl() { return o_to(o_->repl_); }
+	static ostream_t& repl() { return o_ ? o_to(o_->repl_) : CNULL; }
 #endif
-	static ostream_t& ms()   { return o_to(o_->ms_);   }
-	static ostream_t& dump() { return o_to(o_->dump_); }
-	static output* get(const std::string& n) { return o_->o_get(n); }
+	static ostream_t& ms()   { return o_ ? o_to(o_->ms_)   : CNULL;   }
+	static ostream_t& dump() { return o_ ? o_to(o_->dump_) : CNULL; }
+	static output* get(const std::string& n) { return o_?o_->o_get(n):0; }
 	static ostream_t& to(const std::string& n);
-	static bool exists(const std::string& n) { return o_->o_exists(n); }
+	static bool exists(const std::string& n) { return o_?o_->o_exists(n):0;}
 	static sysstring_t read(const std::string& n) { return get(n)->read();}
 	static void target(const std::string& n, const std::string& t);
-	static void name(std::string n) { o_->name_ = n; }
-	static std::string named() { return o_->name_; }
+	static void name(std::string n) { if (o_) o_->name_ = n; }
+	static std::string named() { return o_?o_->name_:std::string(); }
 private:
 	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0;
 #ifdef WITH_THREADS

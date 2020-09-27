@@ -37,7 +37,7 @@ archive::archive(type typ, const std::string& filename, size_t s, bool mm_write)
 	: type_(typ), mm_(filename, s, bool2mode(mm_write)), data_(mm_.data()),
 	size_(s)
 {
-	if (mm_.error) throw_runtime_error(err_fnf, filename);
+	if (mm_.error) error = true, throw_runtime_error(err_fnf, filename);
 }
 
 unsigned char archive::enc_bools(std::initializer_list<bool> list) {
@@ -321,7 +321,7 @@ archive& archive::operator>>(char& val) {
 archive& archive::operator<<(const lexeme& val) {
 //	//DBG(o::dbg() << "writing lexeme: " << lexeme2str(val) << endl;)
 	auto it = lmap_.find(val);
-	if (it == lmap_.end()) throw 0;
+	DBG(if (it == lmap_.end()) assert(0);)
 	return *this << it->second;
 }
 archive& archive::operator>>(lexeme& r) {
@@ -687,7 +687,7 @@ archive& archive::operator>>(options& opts) {
 				opts.set(to_string(n), to_string(s));
 				//COUT << "string read: " << s << endl;
 				break;
-			default: throw 0;
+			default: DBGFAIL;
 		}
 		//POS("option end")
 	}

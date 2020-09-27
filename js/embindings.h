@@ -10,6 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include "../src/driver.h"
+
 using
 	emscripten::enum_,
 	emscripten::class_,
@@ -119,3 +123,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		;
 	register_vector<std::string>("strings");
 };
+
+EM_JS(void, console_log, (std::string msg), {
+	console.log('console_log(from C++):', msg);
+});

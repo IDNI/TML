@@ -66,7 +66,7 @@ currency(₣).
 currency(₢).
 currency(₡).
 currency(¢).
-currency("$").
 currency(€).
 currency(£).
 currency(¥).
+currency('$').
