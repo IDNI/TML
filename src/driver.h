@@ -119,7 +119,7 @@ class driver {
 	size_t current_input_id = 0;
 	std::vector<archive> load_archives;
 public:
-	bool result = true;
+	bool result = false;
 	bool error = false;
 	options opts;
 	driver(options o);
