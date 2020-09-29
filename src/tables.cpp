@@ -17,7 +17,6 @@
 #include "dict.h"
 #include "input.h"
 #include "output.h"
-#include "err.h"
 using namespace std;
 
 #define mkchr(x) ((((int_t)x)<<2)|1)
@@ -264,7 +263,7 @@ form::ftype transformer::getdual( form::ftype type) {
 		case form::ftype::FORALL2 : return form::ftype::EXISTS2 ;
 		case form::ftype::EXISTS1 : return form::ftype::FORALL1 ;
 		case form::ftype::EXISTS2 : return form::ftype::FORALL2 ;
-		default: throw 0;
+		default: { DBGFAIL; return {}; }
 	}
 }
 
@@ -293,12 +292,12 @@ bool demorgan::push_negation( form *&root) {
 			root->type = getdual(root->type);
 			if( ! push_negation(root->l) ||
 				! push_negation(root->r))
-				throw 0;
+					{ DBGFAIL; }
 			return true;
 	}
 	else if ( allow_neg_move_quant && root->isquantifier()) {
 			root->type = getdual(root->type);
-			if( ! push_negation(root->r) ) throw 0;
+			if( ! push_negation(root->r) ) { DBGFAIL; }
 
 			return true;
 	}
@@ -425,7 +424,7 @@ bool pull_quantifier::apply( form *&root) {
 	if( lprefbeg && rprefbeg ) {
 		if(!dosubstitution(lprefbeg, lprefend) ||
 			!dosubstitution(rprefbeg, rprefend) )
-			throw 0;
+				{ DBGFAIL; }
 		curr->l = lprefend->r;
 		curr->r = rprefend->r;
 		lprefend->r = rprefbeg;
@@ -437,7 +436,7 @@ bool pull_quantifier::apply( form *&root) {
 	}
 	else if(lprefbeg) {
 		if(!dosubstitution(lprefbeg, lprefend))
-			throw 0;
+			{ DBGFAIL; }
 		curr->l = lprefend->r;
 		lprefend->r = curr;
 		root = lprefbeg;
@@ -447,7 +446,7 @@ bool pull_quantifier::apply( form *&root) {
 	}
 	else if (rprefbeg) {
 		if(!dosubstitution(rprefbeg, rprefend))
-			throw 0;
+			{ DBGFAIL; }
 		curr->r = rprefend->r;
 		rprefend->r = curr;
 		root = rprefbeg;
@@ -1046,7 +1045,7 @@ void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
 	tables t(move(tmpdict), false, false, true);
 	//t.dict = dict;
 	t.bcqc = false, t.chars = chars, t.nums = nums;
-	if (!t.run_nums(move(p), r, nsteps)) throw 0;
+	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
 }
 
 void getvars(const term& t, set<int_t>& v) {
@@ -1948,7 +1947,7 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 	else return cur = cur1, false;
 }
 
-bool ptransformer::visit( ) {
+bool ptransformer::visit() {
 	size_t cur = 1;		
 	DBG(COUT<<endl<<p<<endl);
 	bool ret = this->parse_alts( this->p.p, cur);
@@ -1957,7 +1956,8 @@ bool ptransformer::visit( ) {
 	DBG(COUT<<p<<endl);
 	for ( production t : lp )
 		DBG(COUT<<t<<endl);
-	if(!ret) parse_error("Error Production", cur < this->p.p.size()?p.p[cur].e : p.p[0].e );
+	if(!ret) parse_error("Error Production",
+		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e );
 	return ret;
 	
 }
@@ -1967,18 +1967,18 @@ bool tables::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
 	changed = false;
 	for (size_t k = 0; k != g.size();k++) {
 		ptransformer pt(g[k], d);
-		if(!pt.visit()) { ret = false;  continue; }
+		if(!pt.visit()) return error = true, ret = false;
 		g.insert( g.end(), pt.lp.begin(), pt.lp.end() ), 
 		changed |= pt.lp.size()>0;
 	}
 	return ret;
 }
-void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
-	if (g.empty()) return;
+bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
+	if (g.empty()) return true;
 //	o::out()<<"grammar before:"<<endl;
 //	for (production& p : g) o::out() << p << endl;
 	bool changed;
-	if(!transform_ebnf(g, dict, changed )) return;
+	if(!transform_ebnf(g, dict, changed )) return true;
 
 	for (size_t k = 0; k != g.size();) {
 		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
@@ -2108,8 +2108,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 				v.push_back(move(plus1));
 				*/
 
-			} else throw runtime_error(
-				"Unexpected grammar element");
+			} else return er("Unexpected grammar element");
 			v.push_back(move(t));
 			refs[n] = v.back(); 		
 		}
@@ -2163,7 +2162,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 				aritht[2] = oside;
 				//if(!done.insert(aritht).second)
 				if(n == rt.e.size())	v.push_back(aritht);
-				else er(" Only simple binary operation allowed." );
+				else return er("Only simple binary operation allowed.");
 			}
 			else if( n < rt.e.size() && 
 				   (rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
@@ -2198,7 +2197,7 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 						aritht[2] = lopd;
 						//if(!done.insert(aritht).second)
 						if(n == rt.e.size())	v.push_back(aritht);
-						else er("Only simple binary operation allowed.");
+						else return er("Only simple binary operation allowed.");
 		
 				} else parse_error(err_constraint_syntax);
 			}
@@ -2210,9 +2209,10 @@ void tables::transform_grammar(vector<production> g, flat_prog& p, form *&r ) {
 		<< "after transform_grammar:\n", p)
 		<< "\nrun after a fixed point:\n", prog_after_fp)
 		<< endl;
+	return true;
 }
 
-void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
+bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 	strs = strs_;
 	if (!strs.empty())
 		chars = 255,
@@ -2223,7 +2223,7 @@ void tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 		dict.get_sym(dict.get_lexeme("printable"));
 	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
 
-	add_prog(to_terms(p), p.g);
+	return add_prog(to_terms(p), p.g);
 }
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
@@ -2258,7 +2258,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
 	}
 //	DBG(print(o::out()<<"run_nums for:"<<endl, p)<<endl<<"returned:"<<endl;)
-	add_prog(move(p), {});
+	if (!add_prog(move(p), {})) return false;
 	if (!pfp(nsteps)) return false;
 	r = g(decompress());
 	return true;
@@ -2294,7 +2294,8 @@ void tables::init_tml_update() {
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
 
-void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
+bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
+	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (mknums) to_nums(m);
 	if (populate_tml_update) init_tml_update();
@@ -2303,13 +2304,14 @@ void tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	while (max(max(nums, chars), syms) >= (1 << (bits - 2))) add_bit();
 	for (auto x : strs) load_string(x.first, x.second);
 	form *froot;
-	transform_grammar(g, m, froot);
+	if (!transform_grammar(g, m, froot)) return false;
 	get_rules(move(m));
 //	clock_t start, end;
 //	o::dbg()<<"load_string: ";
 //	measure_time_start();
 //	measure_time_end();
 	if (optimize) bdd::gc();
+	return true;
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -2592,7 +2594,23 @@ level tables::get_front() const {
 	return r;
 }
 
+bool tables::contradiction_detected() {
+	error = true, o::err() << err_contradiction << endl;
+#ifdef WITH_EXCEPTIONS
+	throw contradiction_exception();
+#endif
+	return false;
+}
+bool tables::infloop_detected() {
+	error = true, o::err() << err_infloop << endl;
+#ifdef WITH_EXCEPTIONS
+	throw infloop_exception();
+#endif
+	return false;
+}
+
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
+	error = false;
 	if (bproof) levels.emplace_back(get_front());
 	level l;
 	for (;;) {
@@ -2600,15 +2618,15 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 			o::inf() << "# step: " << nstep << endl;
 		++nstep;
 		if (!fwd()) return true; // FP found
-		if (unsat) throw contradiction_exception();
+		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
 		l = get_front();
 		if (!datalog && !fronts.emplace(l).second)
-			throw infloop_exception();
+			return infloop_detected();
 		if (bproof) levels.push_back(move(l));
 	}
-	throw 0;
+	DBGFAIL;
 }
 
 bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
@@ -2617,15 +2635,17 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	clock_t start{}, end;
 	double t;
 	if (optimize) measure_time_start();
-	add_prog(p, strs);
+	if (!add_prog(p, strs)) return false;
 	if (optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
 		o::ms() << "# pfp: ";
 		measure_time_start();
 	}
 	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
-	if (r && prog_after_fp.size())
-		add_prog(move(prog_after_fp), {}, false), r = pfp();
+	if (r && prog_after_fp.size()) {
+		if (!add_prog(move(prog_after_fp), {}, false)) return false;
+		r = pfp();
+	}
 	if (optimize)
 		(o::ms() <<"add_prog: "<<t << " pfp: "),
 		measure_time_end();

@@ -90,7 +90,7 @@ struct option {
 			case STRING: if (s != "") v.set(s);
 				else if (is_output()) v.set("@stdout");
 				break;
-			default: throw 0;
+			default: DBGFAIL;
 		}
 		if (e) e(v);
 	}
@@ -127,7 +127,7 @@ struct option {
 				else if (is_input()) ss << "input";
 				else ss << "string";
 				break;
-			default: throw 0;
+			default: DBGFAIL;
 		}
 		ss << "]";
 		if (desc.size() > 0) {
@@ -157,7 +157,10 @@ public:
 	options(wstrings args, inputs *ii = 0, outputs *oo = 0):
 		ii(ii), oo(oo){ setup(); parse(args); }
 	int argc() const { return args.size(); }
-	std::string argv(int n) const { if (n<argc()) return args[n]; throw 0;}
+	std::string argv(int n) const {
+		if (n<argc()) return args[n];
+		DBGFAIL; return "";
+	}
 	void add(option o);
 	bool get(std::string name, option& o) const;
 	void set(const std::string name, const option o) {

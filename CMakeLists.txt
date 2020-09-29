@@ -17,7 +17,8 @@ endif ()
 ################################################################################
 option(WITH_THREADS "use Threads" TRUE)
 option(WITH_BOOST "use Boost" FALSE)
-option(WITH_WCHAR "use wchar_t for system calls (instead of char)" TRUE)
+option(WITH_WCHAR "use wchar_t for system calls (instead of char)" FALSE)
+option(WITH_EXCEPTIONS "use exceptions" FALSE)
 ################################################################################
 
 ################################################################################
@@ -28,7 +29,6 @@ if (BUILD_JSLIB)
 	set_emscripten_toolchain()
 	set(BUILD_TESTS OFF CACHE STRING "")         # no automated tests
 	set(BUILD_CODE_COVERAGE OFF CACHE STRING "") # no coverage
-	set(WITH_WCHAR OFF CACHE STRING "")          # don't use wchar_t
 endif ()
 ################################################################################
 

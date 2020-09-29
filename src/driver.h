@@ -76,7 +76,7 @@ class driver {
 
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
-	void transform(raw_progs& rp, size_t n, const strs_t& strtrees);
+	bool transform(raw_progs& rp, size_t n, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
@@ -120,6 +120,7 @@ class driver {
 	std::vector<archive> load_archives;
 public:
 	bool result = true;
+	bool error = false;
 	options opts;
 	driver(options o);
 	driver(FILE *f, options o);
@@ -138,7 +139,7 @@ public:
 	void info(std::basic_ostream<T>&);
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
-	void add(input* in);
+	bool add(input* in);
 	void restart();
 	bool run(size_t steps = 0, size_t br_on_step=0, bool br_on_fp = false);
 	bool step(size_t steps = 1, size_t br_on_step=0, bool br_on_fp = false);

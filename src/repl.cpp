@@ -144,19 +144,29 @@ void repl::list(basic_ostream<T>& os, size_t p) {
 template void repl::list(basic_ostream<char>&, size_t);
 template void repl::list(basic_ostream<wchar_t>&, size_t);
 
+/**
+ * parses size_t from a string. if fails returns 0.
+ */
 size_t parse_size_t(string l, string cmd) {
+	int_t r = 0;
+	if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ') {
+#ifdef WITH_EXCEPTIONS
 	try {
-		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
-			return stoi(string(l.begin() + cmd.size() +1, l.end()));
-	} catch (...) { } // TODO FIX
-	return 0;
+#endif
+		string s(l.begin() + cmd.size() +1, l.end());
+		r = stoll(s);
+#ifdef WITH_EXCEPTIONS
+	} catch (...) {}
+#else
+		if (s != to_string_(r)) r = 0;
+#endif
+	}
+	return r;
 }
 
 string parse_string(string l, string cmd) {
-	try {
-		if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
-			return (string(l.begin() + cmd.size() + 1, l.end()));
-	} catch (...) { } // TODO FIX
+	if (l.rfind(cmd, 0) == 0 && l[cmd.size()] == ' ')
+		return (string(l.begin() + cmd.size() + 1, l.end()));
 	return "";
 }
 

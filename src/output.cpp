@@ -80,12 +80,11 @@ output::type_t output::target(const string t) {
 		case FILE:
 			path_ = t, open_path_before_finish = true;
 			break;
-		default:
-			throw 0;
+		default: DBGFAIL;
 	}
 	if (open_path_before_finish)
 		file_.open(path_, ofstream::binary | ofstream::app),
-		//file_.imbue(locale(""));
+		file_.imbue(locale("")),
 		os(&file_);
 	return type_;
 }
@@ -117,16 +116,17 @@ bool outputs::add(sp_output out) {
 
 ostream_t& outputs::to(const string& n) {
 	output* o = get(n);
-	if (!o) throw 0;
-	return o->os();
+	if (o) return o->os();
+	DBGFAIL;
+	return CNULL;
 }
 
 void outputs::target(const string& n, const string& t) {
 	output* o = get(n);
 	if (o) o->target(t);
 	else {
-		CERR << "target does not exist: " << n << endl,
-		throw 0;
+		CERR << "target does not exist: " << n << endl;
+		DBGFAIL;
 	}
 }
 
@@ -221,7 +221,7 @@ basic_ostream<T>& driver::print_term(basic_ostream<T>& os, const term& t) const 
 	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
 		while (t.arity()[ar] == -1) ++ar, os << '(';
 		for (int_t k = 0; k != t.arity()[ar]; ++k) {
-			if (t.arg(n) < 0) throw 0;//os<<dict.get_var(t.args[n]);
+			if (t.arg(n) < 0) DBGFAIL;//os<<dict.get_var(t.args[n]);
 			else if (t.arg(n) & 1) {
 				char_t c = t.arg(n)>>2;
 				if (c == '\r') os << "'\\r'";
@@ -352,7 +352,10 @@ std::string quote_sym(const elem& e) {
 			if (is_mb_codepoint(*s)) {
 				char32_t ch;
 				size_t chl = peek_codepoint(s, e.e[1] - s, ch);
-				if (!chl || chl > 4) throw 0;
+				if (!chl || chl > 4) {
+					DBGFAIL;
+					return "";
+				}
 				for (size_t i = 0; i != chl; ++i) ss.put(*s++);
 			} else {
 				if (!q && !isalnum(*s) && *s != '_')

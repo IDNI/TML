@@ -12,7 +12,7 @@ TEST_SUITE("input processing test") {
         CHECK(in1.l.size() == 0);
         string_t stringWithComment = to_string_t(" /*  ");
 	input in2(stringWithComment.c_str());
-	DOCTEST_CHECK_THROWS(in2.prog_lex());
+	CHECK((in2.prog_lex(), in2.error == true));
         string_t s = to_string_t(
 		"setB(?x ?y ?z) :- e(?x), e(?y), ?x + ?y = ?z. ?x > ?y.");
 	input in3(s.c_str());

@@ -10,7 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __ERR_H__
+#define __ERR_H__
 
+#ifdef WITH_EXCEPTIONS
 struct parse_error_exception : public virtual std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
@@ -18,6 +21,7 @@ struct parse_error_exception : public virtual std::runtime_error {
 struct runtime_error_exception : public virtual std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
+#endif
 
 const char dot_expected[] = "'.' expected.";
 const char sep_expected[] = "Term or ':-' or '.' expected.";
@@ -69,4 +73,7 @@ const char err_eq_expected[] = "Expected =/!= in the middle of term.";
 const char err_leq_expected[] = "Expected <=/> in the middle of term.";
 const char err_3_els_expected[] = "Expected 3 elements in the term.";
 const char err_builtin_expected[] = "Expected builtin name in the beginning of term.";
+const char err_contradiction[] = "unsat (contradiction).";
+const char err_infloop[] = "unsat (infinite loop).";
 
+#endif

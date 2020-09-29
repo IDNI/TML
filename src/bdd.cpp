@@ -56,11 +56,14 @@ map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
 map<pair<uints, bools>, unordered_map<int_t, int_t>, vec2cmp<uint_t, bool>>
 	memos_perm_ex;
 
+_Pragma("GCC diagnostic push")
+_Pragma("GCC diagnostic ignored \"-Wstrict-overflow\"")
 auto am_cmp = [](int_t x, int_t y) {
 	bool s = x < y;
 	x = abs(x), y = abs(y);
 	return x < y ? true : x == y ? s : false;
 };
+_Pragma("GCC diagnostic pop")
 
 const size_t gclimit = 1e+6;
 
@@ -319,7 +322,7 @@ int_t bdd::bdd_and_many(bdds v) {
 		case 1: return AM.emplace(v, res), res;
 		case 2: h = bdd_and_many(move(vh)), l = F; break;
 		case 3: h = F, l = bdd_and_many(move(vl)); break;
-		default: throw 0;
+		default: { DBGFAIL; return 0; }
 	}
 	return AM.emplace(v, bdd::add(m, h, l)).first->second;
 }
@@ -473,7 +476,7 @@ struct sbdd_and_many_ex {
 			case 2: res = bdd::add(m,F,bdd::bdd_and_many(move(vl)));
 				break;
 			case 3: res = F; break;
-			default: throw 0;
+			default: DBGFAIL;
 			}
 		} else {
 			switch (c) {
@@ -488,7 +491,7 @@ struct sbdd_and_many_ex {
 				else res = bdd::add(m, F, (*this)(move(vl)));
 				break;
 			case 3: res = F; break;
-			default: throw 0;
+			default: DBGFAIL;
 			}
 		}
 		return memo.emplace(move(v), res).first->second;
@@ -534,7 +537,7 @@ struct sbdd_and_many_ex_perm {
 			case 2: res = bdd::add(m,F,bdd::bdd_and_many(move(vl)));
 				break;
 			case 3: res = F; break;
-			default: throw 0;
+			default: DBGFAIL;
 			}
 		} else {
 			switch (c) {
@@ -551,7 +554,7 @@ struct sbdd_and_many_ex_perm {
 					(*this)(move(vl)));
 				break;
 			case 3: res = F; break;
-			default: throw 0;
+			default: DBGFAIL;
 			}
 		}
 		return memo.emplace(move(v), res), res;
