@@ -751,14 +751,14 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 				for( macro &mm :vm )
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
 					if( vrt[i].e[j].e == mm.def.e[0].e ) {
-						macro in= mm;
-						macro_expand(in, i, j, vrt, dict);
+						macro m= mm;
+						macro_expand(in, m, i, j, vrt, dict);
 						break;
 					}								
 	return true;
 }
 
-bool raw_prog::macro_expand(macro &mm, size_t i, size_t j, vector<raw_term> &vrt, dict_t &dict) {
+bool raw_prog::macro_expand(input *in, macro &mm, size_t i, size_t &j, vector<raw_term> &vrt, dict_t &dict) {
 
 	std::map<elem, elem> chng; 
 	vector<elem>::iterator et = vrt[i].e.begin()+j;
@@ -773,7 +773,6 @@ bool raw_prog::macro_expand(macro &mm, size_t i, size_t j, vector<raw_term> &vrt
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
 					
-
 		vrt.erase(i+vrt.begin());
 		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
 	}
@@ -784,21 +783,26 @@ bool raw_prog::macro_expand(macro &mm, size_t i, size_t j, vector<raw_term> &vrt
 			if(	et->type == elem::VAR ) carg.emplace_back(*et);
 			
 		int counter = 0;
+		elem ret;
 		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
 			if(ed->type == elem::VAR)  {
 				if(a < carg.size())
 					chng[*ed] = carg[a++];
 				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(dict.get_fresh_var(counter++)));
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(dict.get_fresh_var(counter++))), 
+					ret = chng[*ed];
 			}
 		}
 		for( auto &tt:mm.b ) 
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
-		// TODO		
-		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+1);
+		// TODO
+		DBG(COUT<<carg.size();)	
+		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
+		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
 		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
+		vrt[i].calc_arity(in);
 	}
 	return true;
 }
