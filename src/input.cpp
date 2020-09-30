@@ -767,14 +767,15 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 				for( macro &mm :vm )
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
 					if( vrt[i].e[j].e == mm.def.e[0].e ) {
-						macro m= mm;
-						macro_expand(in, m, i, j, vrt, dict);
-						break;
+						if( !macro_expand(in, mm, i, j, vrt, dict))
+							return false;
+						else break;
 					}								
 	return true;
 }
 
-bool raw_prog::macro_expand(input *in, macro &mm, size_t i, size_t &j, vector<raw_term> &vrt, dict_t &dict) {
+bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
+						vector<raw_term> &vrt, dict_t &dict) {
 
 	std::map<elem, elem> chng; 
 	vector<elem>::iterator et = vrt[i].e.begin()+j;
@@ -791,13 +792,16 @@ bool raw_prog::macro_expand(input *in, macro &mm, size_t i, size_t &j, vector<ra
 					
 		vrt.erase(i+vrt.begin());
 		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
-	}
-	// create fresh var and unary case
-	if( j > 0)  {		
+		return true;
+	
+	} else if( j > 0)  {// create fresh var and unary case
 		vector<elem> carg;
 		for( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
 			if(	et->type == elem::VAR ) carg.emplace_back(*et);
-			
+		if(carg.size() == 0 ) 
+			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e), 
+			false;
+
 		int counter = 0;
 		elem ret;
 		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
@@ -805,7 +809,8 @@ bool raw_prog::macro_expand(input *in, macro &mm, size_t i, size_t &j, vector<ra
 				if(a < carg.size())
 					chng[*ed] = carg[a++];
 				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(dict.get_fresh_var(counter++))), 
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(
+											dict.get_fresh_var(counter++))), 
 					ret = chng[*ed];
 			}
 		}
@@ -817,10 +822,12 @@ bool raw_prog::macro_expand(input *in, macro &mm, size_t i, size_t &j, vector<ra
 		DBG(COUT<<carg.size();)	
 		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
 		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
-		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
 		vrt[i].calc_arity(in);
+		vrt.insert(i+vrt.begin()+1, mm.b.begin(), mm.b.end());
+		return true;
 	}
-	return true;
+	else return in->parse_error(vrt[i].e[0].e[0],"Error macro call",vrt[i].e[0].e),
+			false;	
 }
 
 raw_progs::raw_progs() { } // parse(s); 
