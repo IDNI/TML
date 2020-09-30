@@ -41,7 +41,13 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.class_function("gc", &bdd::gc)
 		;
 	class_<driver>("driver")
-		.constructor<string_t, options>()
+		.constructor<std::string, options>(allow_raw_pointers())
+		.class_function("create",// cptr = WA/HEAP const char* with UTF8 
+			optional_override([](int_t cptr, options o) {
+				const char *prog =
+					reinterpret_cast<const char*>(cptr);
+				return new driver(prog, o);
+			}), allow_raw_pointers())
 		.function("out", optional_override(
 			[](driver& self, emscripten::val v) {
 				return self.out(v);
@@ -67,6 +73,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("db_load", &driver::db_load)
 		.function("db_save", &driver::db_save)
 		.property("result", &driver::result)
+		.property("error", &driver::error)
 		.property("opts", &driver::opts)
 		;
 	class_<options>("options")
