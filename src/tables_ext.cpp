@@ -79,10 +79,11 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm) { //std::vector<body*>
 		// or on a pre fol preparation / or leave get_body as burst after handler_form1
 		if (f->tm->extype == term::REL) {
 			p->b = new body(get_body(*f->tm, vm, vm.size()));
+
 			ex_typebits(p->b->ex,f->tm->size());
 			spbdd_handle q = body_query(*(p->b),0);
-			o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
-			::out(COUT, q)<<endl<<endl;
+			//o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
+			//::out(COUT, q)<<endl<<endl;
 		}
 		else if (f->tm->extype == term::ARITH) {
 			handler_arith(*f->tm, vm, vm.size(), p->cons);
@@ -146,26 +147,32 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm) { //std::vector<body*>
 	}
 	else if (f->type == form::EXISTS1) {
 		//XXX: handle variables used in q's more than once?
-		vm.emplace(f->l->arg, vm.size()); //nvars-1-vm.size());
-		for (auto &v : vm)
-		    v.second = vm.size()-1-v.second;
-		p->vm = vm;
+		auto res = vm.emplace(f->l->arg, vm.size());
+		if (res.second) {
+			for (auto &v : vm) v.second++;
+			vm.at(f->l->arg) = 0;
+		 } else {
+			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
+			vm.at(f->l->arg) = 0;
+		 }
+		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
 		p->quants.emplace(p->quants.begin(), quant_t::EX);
 		handler_form1(p, f->r,vm);
-
-		vm.erase(f->l->arg);
+		//vm.erase(f->l->arg);
 	}
 	else if (f->type == form::FORALL1) {
-		//XXX: just for current iteration until
-		//     syntax, parser & some semantics cleared
-		vm.emplace(f->l->arg, vm.size()); //nvars-1-vm.size());
-		for (auto &v : vm)
-			v.second = vm.size()-1-v.second;
-		p->vm = vm;
+		auto res = vm.emplace(f->l->arg, vm.size());
+		if (res.second) {
+			for (auto &v : vm) v.second++;
+			vm.at(f->l->arg) = 0;
+		 } else {
+			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
+			vm.at(f->l->arg) = 0;
+		 }
+		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
 		p->quants.emplace(p->quants.begin(), quant_t::FA);
 		handler_form1(p, f->r,vm);
-
-		vm.erase(f->l->arg);
+		//vm.erase(f->l->arg);
 	}
 	else if (f->type == form::UNIQUE1) {
 		;//p->quants = bdd_xor_hl(q);
@@ -209,8 +216,6 @@ void tables::form_query(pnf_t *f, bdd_handles &v) {
 	if (f->quants.size() != 0) {
 		//first quant appied to var 0, second to var 1 and so ...
 		q = bdd_qsolve(q, f->quants);
-		//o::dbg() << L" quants ------------------- " << ::bdd_root(q) << L" :\n";
-		//::out(wcout, q)<<endl<<endl;
 	}
 	v.push_back(q);
 }
