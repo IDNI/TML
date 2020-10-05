@@ -112,3 +112,10 @@ lexeme dict_t::get_lexeme(const std::basic_string<char>& s) {
 	ccs w = (ccs) s.c_str();
 	return get_lexeme(w, s.size());
 }
+
+int_t dict_t::get_temp_sym(const lexeme& l) {
+	auto it = temp_syms_dict.find(l);
+	if (it != temp_syms_dict.end()) return it->second;
+	return temp_syms.push_back(l), temp_syms_dict[l] = (temp_syms.size());
+}
+

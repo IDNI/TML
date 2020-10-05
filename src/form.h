@@ -15,24 +15,26 @@
 #define _FORM_H_
 
 #include <vector>
-
 #include "defs.h"
 
 struct pnf_t {
 	size_t varslen;
-	varmap vm;
+	varmap vm, vmh;
 	bools ex;
 	uints perm;
 	uints perm_h;
 	bool neg;
-
 	std::vector<quant_t> quants;
+	std::vector<quant_t> quantsh;
 	std::vector<pnf_t*> matrix;
 
-	body* b;
+	body* b; //TODO make it vector for the disjunctive clause
+	std::pair<int_t, body*> hvar_b = {0,0}; //vector
+
 	spbdd_handle cons;
+
 	pnf_t();
 	~pnf_t();
+	quant_t to_quant_t(form *f);
 };
-
-#endif /* SRCDIR_FORM_H_ */
+#endif

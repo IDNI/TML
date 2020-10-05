@@ -126,7 +126,7 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	pnf_t* f = NULL; //TODO destruct or make it smart
+	pnf_t* f = 0; //TODO make it smart
 	bool operator<(const rule& t) const {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
@@ -289,7 +289,13 @@ private:
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
-	void form_query(pnf_t *f, bdd_handles& v1);
+
+	void fol_query(pnf_t *f, bdd_handles& v);
+	void hol_query(pnf_t *f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
+			std::vector<quant_t> &quantsh, varmap &vmh);
+	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
+	void formula_query(pnf_t *f, bdd_handles& v);
+
 	void alt_query_bltin(alt& a, bdd_handles& v1); //XXX review
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
@@ -316,7 +322,7 @@ private:
 
 	void get_facts(const flat_prog& m);
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
-	void get_form(pnf_t*, const term_set& al, const term& h, std::set<alt>& as);
+	void get_form(pnf_t*, const term_set& al, const term& h);
 	void get_rules(flat_prog m);
 
 	ntable get_table(const sig& s);
@@ -382,7 +388,8 @@ private:
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
 
-	void handler_form1(pnf_t *p, form* f, varmap &vm);
+	void handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh);
+	void handler_formh(pnf_t *p, form* f, varmap &vm, varmap &vmh);
 	bool handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_handle &cons);
 
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,

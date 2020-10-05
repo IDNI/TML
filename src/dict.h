@@ -21,15 +21,15 @@ class archive;
 class dict_t {
 	friend class archive;
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
-	dictmap syms_dict, vars_dict, rels_dict, bltins_dict;
-	std::vector<lexeme> vars, syms, rels, bltins;
+	dictmap syms_dict, vars_dict, rels_dict, bltins_dict, temp_syms_dict;
+	std::vector<lexeme> vars, syms, rels, bltins, temp_syms;
 	std::set<lexeme, lexcmp> strs_extra;
 	std::vector<ccs> strs_allocated;
 	inputs* ii;
 public:
 	dict_t();
 	dict_t(const dict_t& d) : syms_dict(d.syms_dict), vars_dict(d.vars_dict),
-		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), 
+		rels_dict(d.rels_dict), bltins_dict(d.bltins_dict), temp_syms_dict(d.temp_syms_dict),
 		vars(d.vars), syms(d.syms), rels(d.rels), bltins(d.bltins),
 		ii(d.ii), op(d.op), cl(d.cl) { // strs_extra(d.strs_extra), 
 		DBG(assert(false);); // we shouldn't be copying, use move instead
@@ -43,7 +43,7 @@ public:
 			for (ccs c : d.strs_allocated)
 				if (l[0] == c) { // remapped
 					auto it = remap.find(c);
-					DBG(assert(it != remap.end());)
+					if (it == remap.end()) throw 0;
 					ccs r = it->second;
 					size_t s = strlen(r);
 					lexeme lx = { r, r+s };
@@ -51,15 +51,17 @@ public:
 				} else strs_extra.insert(l);
 	}
 	dict_t(dict_t&& d) noexcept : 
-		syms_dict(std::move(d.syms_dict)), 
+		syms_dict(std::move(d.syms_dict)),
 		vars_dict(std::move(d.vars_dict)),
 		rels_dict(std::move(d.rels_dict)), 
 		bltins_dict(std::move(d.bltins_dict)),
+		temp_syms_dict(std::move(d.temp_syms_dict)),
 		//types_dict(std::move(d.types_dict)),
 		vars(std::move(d.vars)), 
 		syms(std::move(d.syms)), 
 		rels(std::move(d.rels)), 
 		bltins(std::move(d.bltins)),
+		temp_syms(std::move(d.temp_syms)),
 		//types(std::move(d.types)), 
 		strs_extra(std::move(d.strs_extra)),
 		strs_allocated(std::move(d.strs_allocated)),
@@ -77,6 +79,7 @@ public:
 	int_t get_var(const lexeme& l);
 	int_t get_rel(const lexeme& l);
 	int_t get_sym(const lexeme& l);
+	int_t get_temp_sym(const lexeme& l);
 	int_t get_bltin(const lexeme& l);
 	int_t get_fresh_sym(int_t old);
 	int_t get_fresh_var(int_t old);
@@ -104,6 +107,7 @@ public:
 			swap(syms, d.syms),
 			swap(rels, d.rels),
 			swap(bltins, d.bltins),
+			swap(temp_syms_dict, d.temp_syms_dict),
 			swap(strs_extra, d.strs_extra),
 			swap(ii, d.ii),
 			swap(op, d.op),

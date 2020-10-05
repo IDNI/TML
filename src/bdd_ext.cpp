@@ -30,8 +30,8 @@ void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
 
 //------------------------------------------------------------------------------
 
-spbdd_handle bdd_qsolve(cr_spbdd_handle x, std::vector<quant_t> &quants) {
-	return bdd_handle::get(bdd::bdd_qsolve(x->b, 0, quants));
+spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants) {
+	return bdd_handle::get(bdd::bdd_quantify(x->b, 0, quants));
 }
 
 spbdd_handle bdd_and_hl(cr_spbdd_handle x) {
@@ -100,7 +100,7 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 
 // ----------------------------------------------------------------------------
 
-int_t bdd::bdd_qsolve(int_t x, int_t bit, std::vector<quant_t> &quants) {
+int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants) {
 
 	if (x == T || x == F || bit == (int_t) quants.size()) return x;
 	bdd c = get(x);
@@ -108,26 +108,31 @@ int_t bdd::bdd_qsolve(int_t x, int_t bit, std::vector<quant_t> &quants) {
 	int_t h,l;
 	if (c.v > bit+1) c.h = x, c.l = x;
 
-	if (quants[bit] == quant_t::FA) {
-		if (c.l == F || c.h == F) return F;
-		h = bdd_qsolve(c.h, bit+1, quants);
-		if (h == F) return F;
-		l =	bdd_qsolve(c.l, bit+1, quants);
-		if (l == F) return F;
-		return x;
-	}
-	if (quants[bit] == quant_t::EX) {
-		if (c.l == F && c.h == F) return F;
-		h = bdd_qsolve(c.h, bit+1, quants);
-		l =	bdd_qsolve(c.l, bit+1, quants);
-		if (l == F && h == F) return F;
-		return x;
-	}
-	if (quants[bit] == quant_t::UN) //XXX: review semantic for i.e unique x0 exists x1
-		if ((c.l == T && c.h == T) || (c.l == F && c.h == F)) {
-			//XXX: complete
-			return F;
+	switch (quants[bit]) {
+		case quant_t::FA: {
+			if (c.l == F || c.h == F) return F;
+			h = bdd_quantify(c.h, bit+1, quants);
+			if (h == F) return F;
+			l =	bdd_quantify(c.l, bit+1, quants);
+			if (l == F) return F;
+			return x;
 		}
+		case quant_t::EX: {
+			if (c.l == F && c.h == F) return F;
+			h = bdd_quantify(c.h, bit+1, quants);
+			l =	bdd_quantify(c.l, bit+1, quants);
+			if (l == F && h == F) return F;
+			return x;
+		}
+		case quant_t::UN: {
+			//TODO: review semantic for i.e unique x0 exists x1
+			if ((c.l == T && c.h == T) || (c.l == F && c.h == F))
+				//TODO: complete
+				return F;
+			break;
+		}
+		default: ;
+	}
 	return F;
 }
 

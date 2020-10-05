@@ -1,0 +1,9 @@
+
+# R satisfying is empty, then so_horn_a0(1) won't sat
+so_horn_a0(1) :- forall P exists R forall ?x { R(?x) -> P(0) }.
+
+U0(1).
+so_horn_a1(1) :- forall P exists R forall ?x { { R(?x) && U0(?x) } -> P(1) }.
+
+U2(0 0).
+so_horn_b0(1) :- forall P exists R forall ?x0 forall ?x1 { {R(?x0 ?x1) && U2(?x0 ?x1) } -> P(0 0) }.

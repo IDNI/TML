@@ -490,15 +490,16 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 
 	form::ftype ft = form::NONE;
 	bool ret =false;
-	form *root = NULL;
-	int_t arg= 0;
+	form *root = 0;
+	int_t arg = 0;
 
 	if(!rfm) return froot=root, true;
 
 	if(rfm->rt) {
 		ft = form::ATOM;
 		term t = from_raw_term(*rfm->rt);
-		root = new form(ft, 0, &t );
+		arg = dict.get_temp_sym(rfm->rt->e[0].e);
+		root = new form(ft, arg, &t );
 		froot = root;
 		if(!root) return false;
 		return true;
@@ -519,7 +520,8 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 				ft = form::ATOM;
 				if( rfm->type == elem::VAR)
 					arg = dict.get_var(rfm->el->e);
-				else arg = dict.get_sym(rfm->el->e);
+				else
+					arg = dict.get_temp_sym(rfm->el->e); //VAR2
 				root = new form(ft, arg);
 				froot = root;
 				if(!root) return false;
@@ -546,13 +548,11 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 			default: return froot= root, false;
 		}
 		root =  new form(ft,0, 0);
-		if( root ) {
-			ret = from_raw_form(rfm->l, root->l, is_sol);
-			if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
-			froot = root;
-			return ret;
-		}
-		return false;
+		ret = from_raw_form(rfm->l, root->l, is_sol);
+		if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
+		froot = root;
+		return ret;
+		//return false;
 	}
 }
 
@@ -958,27 +958,26 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			form* froot = NULL;
 
 			from_raw_form(r.prft.get(), froot, is_sol);
-
+			/*
 			DBG(COUT << "\n ........... \n";)
 			DBG(r.prft.get()->printTree();)
 			DBG(COUT << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
-
-			term::textype extype = term::FORM1;
+			*/
+			term::textype extype;
 			if(is_sol) {
-				DBG(COUT << "\n SOL parsed \n";)
+				//DBG(COUT << "\n SOL parsed \n";)
 				//to_pnf(froot);
 				extype = term::FORM2;
-			}
-			//if(froot->is_sol()) to_pnf(froot), extype = term::FORM2;
-			//else froot->implic_rmoval(), froot->printnode(); //forcing implic removal for FOL here
-			//assert(froot);
 
+			} else {
+				//froot->implic_rmoval();
+				extype = term::FORM1;
+			}
 			t = term(extype, move(froot));
 			v.push_back(t);
 			//align_vars(v);
 			m.insert(move(v));
-			//delete froot;
 		} else  {
 			for (const raw_term& x : r.h)
 				t = from_raw_term(x, true),
@@ -1429,27 +1428,26 @@ void tables::cqc(flat_prog& p) {
 		v.emplace_back(r), cqc_minimize(v.back());
 }*/
 
-void tables::get_form(pnf_t *p, const term_set& al, const term& h,std::set<alt>&
-#ifdef DEBUG
-	as
-#endif
-) {
+void tables::get_form(pnf_t *p, const term_set& al, const term& h) {
 
 	auto t = al.begin();
-	DBG(assert(t->extype == term::FORM1));
-	DBG(assert(as.size() == 0));
+	DBG(assert(t->extype == term::FORM1 || t->extype == term::FORM2));
 
 	const term_set anull;
 	size_t varsh;
-	varmap vm = get_varmap(h, anull, varsh);
-
-	o::dbg()<< "\n FOL preparation ... \n " << endl;
-
+	varmap vm = get_varmap(h, anull, varsh), vmh;
+	varsh = vm.size();
 	form* f = t->qbf;
 	p->vm = vm;
-	handler_form1(p, f, vm);
 
-	// varslen should be provided by from_raw_form
+	if (t->extype == term::FORM1) {
+		//o::dbg()<< "\n FOL preparation ... \n " << endl;
+		handler_form1(p, f, vm, vmh);
+
+	} else { //t->extype == term::FORM2
+		//o::dbg()<<"\n SOL preparation ... \n " << endl;
+	    handler_formh(p, f, vm, vmh);
+	}
 	if (varsh > 0) {
 		auto d = deltail(p->vm.size(), h.size());
 		term t; t.resize(vm.size());
@@ -1458,7 +1456,6 @@ void tables::get_form(pnf_t *p, const term_set& al, const term& h,std::set<alt>&
 		p->perm_h = get_perm(t, p->vm, p->vm.size());
 		p->ex = d.first, p->perm = d.second;
 	}
-
 	/*
 	set<int_t> vs;
 	set<pair<body, term>> b;
@@ -1522,9 +1519,12 @@ void tables::get_rules(flat_prog p) {
 		r.len = t.size();
 
 		for (const term_set& al : x.second)
-			if (al.begin()->extype != term::FORM1)
+			if (al.begin()->extype == term::FORM1)
+				r.f = new(pnf_t), get_form(r.f, al, t);
+			else if (al.begin()->extype == term::FORM2)
+				r.f = new(pnf_t), get_form(r.f, al, t);
+			else
 				get_alt(al, t, as);
-			else r.f = new(pnf_t), get_form(r.f, al, t, as);
 
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
@@ -2515,17 +2515,17 @@ char tables::fwd() noexcept {
 		spbdd_handle x;
 		bdd_handles f; //form
 
-		if (r.f == NULL)
+		if (!r.f)
 			for (size_t n = 0; n != r.size(); ++n)
 				v[n] = alt_query(*r[n], r.len);
 		else {
-			form_query(r.f, f);
+			formula_query(r.f, f);
 			//TODO: complete for any type, only for ints by now
 			append_num_typebits(f[0], r.f->vm.size());
 			f[0] = f[0]^r.f->perm_h;
-			if (r.f->ex.size() != 0 && r.f->perm.size() != 0)
+			if (r.f->ex.size() != 0)
 				v[0] = bdd_and_many_ex_perm(f,r.f->ex, r.f->perm);
-			else v[0] = f[0];
+			else v[0] = f[0] == hfalse ? hfalse : htrue;
 		}
 
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }

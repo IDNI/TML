@@ -45,7 +45,6 @@ void tables::ex_typebits(bools &exvec, size_t nvars) const {
 				exvec[i*nvars+j]=true;
 }
 
-
 void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 	for (size_t j = 0; j< nvars; ++j)
 		s = s && ::from_bit(pos(1, j, nvars),1)
@@ -53,8 +52,33 @@ void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 }
 
 //-----------------------------------------------------------------------------
+void tables::handler_formh(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 
-void tables::handler_form1(pnf_t *p, form* f, varmap &vm) { //std::vector<body*> bs
+	//is_horn = true;
+	switch (f->type) {
+		case form::EXISTS1:
+		case form::FORALL1:
+		case form::UNIQUE1:
+			handler_form1(p, f, vm, vmh); break;
+
+		case form::EXISTS2:
+		case form::FORALL2:
+		case form::UNIQUE2: {
+			//XXX: handle variables used in q's more than once?
+			vmh.emplace(f->l->arg, vmh.size()); //nvars-1-vm.size());
+			for (auto &v : vmh)
+				v.second = vmh.size()-1-v.second;
+			p->vmh = vmh;
+			p->quantsh.emplace(p->quantsh.begin(), p->to_quant_t(f));
+			handler_formh(p, f->r,vm, vmh);
+			//vmh.erase(f->l->arg);
+		} break;
+		default: break;
+	}
+	//is_horn = false;
+}
+
+void tables::handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 
 	assert(f!=NULL);
 
@@ -65,124 +89,127 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm) { //std::vector<body*>
 		   (f->l != NULL && f->r != NULL)));
 
 	if (f->type == form::ATOM) {
-		//TODO: check that all vars in REL are already in map
-		//( by now assumoing non free variables in qbf)
-
-		//XXX: here is possible to get the non quantified variables.
-		//     also possible to check whether were set in header, if not?
-		//     either way, should be placed in vm after first quant (at the tail)
-		//     for further alignment on pnf splits
-
-		DBG(assert(f->arg == 0));
-
-		//XXX: vm.size as varslen wont work for pnf splits. should be provided by parser
-		// or on a pre fol preparation / or leave get_body as burst after handler_form1
+		//assuming no free variables in qbf
+		//NOTE: vm.size as varslen wont work for pnf splits. should be provided by parser
+		// or on a pre fol preparation / leave get_body as burst after handler_form1
+		pnf_t *p0 = new(pnf_t);
 		if (f->tm->extype == term::REL) {
-			p->b = new body(get_body(*f->tm, vm, vm.size()));
-
-			ex_typebits(p->b->ex,f->tm->size());
-			spbdd_handle q = body_query(*(p->b),0);
-			//o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
-			//::out(COUT, q)<<endl<<endl;
+			if ( vmh.find(f->arg) == vmh.end() ) {
+				p0->b = new body(get_body(*f->tm, vm, vm.size()));
+				assert(p0->b->neg == false);
+				ex_typebits(p0->b->ex,f->tm->size());
+				//spbdd_handle q = body_query(*(p0->b),0);
+				//o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
+				//::out(COUT, q)<<endl<<endl;
+			} else {
+				body *aux = new body(get_body(*f->tm, vm, vm.size()));
+				ex_typebits(aux->ex,f->tm->size());
+				std::pair<int_t, body*> hvar = {f->arg, move(aux)};
+				p0->hvar_b = hvar;
+			}
 		}
 		else if (f->tm->extype == term::ARITH) {
-			handler_arith(*f->tm, vm, vm.size(), p->cons);
-			ex_typebits(p->cons, f->tm->size());
+			handler_arith(*f->tm, vm, vm.size(), p0->cons);
+			ex_typebits(p0->cons, f->tm->size());
 		}
 		//TODO: LEQ, EQ etc
 		else {
 			DBG(assert(false));
 		}
+		p->matrix.push_back(p0);
 
 	}
 	else if (f->type == form::IMPLIES) {
-		//XXX: review how to deal with different arity
-		DBG(assert(f->l->arg == 0 && f->r->arg == 0));
-
-		pnf_t *p0 = new(pnf_t);
-		handler_form1(p0, f->l,vm);
-
-		pnf_t *p1 = new(pnf_t);
-		handler_form1(p1, f->r,vm);
-		//if (p1->b) p1->b->neg = true;
-		//else p1->neg = true;
-		p1->neg = true;
-
-		p->matrix.push_back(p0);
-		p->matrix.push_back(p1);
+		if (f->l->type == form::ATOM) {
+			handler_form1(p, f->l,vm,vmh);
+		} else {
+			pnf_t *p0 = new(pnf_t);
+			handler_form1(p0, f->l,vm, vmh);
+			p->matrix.push_back(p0);
+		}
+		if (f->r->type == form::ATOM) {
+			handler_form1(p, f->r,vm,vmh);
+			p->matrix[p->matrix.size()-1]->neg = true;
+		} else {
+			pnf_t *p1 = new(pnf_t);
+			handler_form1(p1, f->r,vm,vmh);
+			p1->neg = true;
+			p->matrix.push_back(p1);
+		}
 		p->neg = true;
-		//o::dbg() << L" implies ------------------- " << ::bdd_root(q) << L" :\n";
-		//::out(wcout, q)<<endl<<endl;
 	}
-	//else if (f->type == form::COIMPLIES) q = bdd_coimpl(handler_form1(f->l), handler_form1(f->l));
+	//else if (f->type == form::COIMPLIES){}
 	else if (f->type == form::AND) {
-		DBG(assert(f->l->arg == 0 && f->r->arg == 0));
-
-		pnf_t *p0 = new(pnf_t);
-		handler_form1(p0, f->l,vm);
-		pnf_t *p1 = new(pnf_t);
-		handler_form1(p1, f->r,vm);
-
-		p->matrix.push_back(p0);
-		p->matrix.push_back(p1);
+		if (f->l->type == form::AND || f->l->type == form::ATOM  || f->l->type == form::NOT) {
+			handler_form1(p, f->l,vm, vmh);
+		} else {
+			pnf_t *p0 = new(pnf_t);
+			handler_form1(p0, f->r,vm, vmh);
+			p->matrix.push_back(p0);
+		}
+		if (f->r->type == form::AND || f->r->type == form::ATOM  || f->r->type == form::NOT) {
+			handler_form1(p, f->r,vm, vmh);
+		} else {
+			pnf_t *p1 = new(pnf_t);
+			handler_form1(p1, f->r,vm, vmh);
+			p->matrix.push_back(p1);
+		}
 	}
 	else if (f->type == form::OR) {
+		//if (!is_horn) {
+		//TODO: review to avoind unecessary nodes
 		pnf_t *p0 = new(pnf_t);
-		handler_form1(p0, f->l,vm);
-		if (p0->b) p0->b->neg = true;
-		else p0->neg = true;
-
+		handler_form1(p0, f->l,vm,vmh);
+		p0->b ? p0->b->neg = true : p0->neg = true;
 		pnf_t *p1 = new(pnf_t);
-		handler_form1(p1, f->r,vm);
-		if (p1->b) p1->b->neg = true;
-		else p1->neg = true;
-
+		handler_form1(p1, f->r,vm,vmh);
+		p1->b ? p1->b->neg = true : p1->neg = true;
 		p->matrix.push_back(p0);
 		p->matrix.push_back(p1);
 		p->neg = true;
+		//}
+		/* TODO: switch mode to dnf for SO HROM?
+		else {
+
+			if (f->l->type == form::OR || f->l->type == form::ATOM  || f->l->type == form::NOT) {
+				handler_form1(p, f->l,vm, vmh);
+			} else {
+				pnf_t *p0 = new(pnf_t);
+				handler_form1(p0, f->r,vm, vmh);
+				p->matrix.push_back(p0);
+			}
+			if (f->r->type == form::OR || f->r->type == form::ATOM  || f->r->type == form::NOT) {
+				handler_form1(p, f->r,vm, vmh);
+			} else {
+				pnf_t *p1 = new(pnf_t);
+				handler_form1(p1, f->r,vm, vmh);
+				p->matrix.push_back(p1);
+			}
+		}
+		*/
 	}
 	else if (f->type == form::NOT) {
-		handler_form1(p, f->l, vm);
-		p->neg = !p->neg;
+		handler_form1(p, f->l, vm,vmh);
+		p->matrix[p->matrix.size()-1]->neg = !p->matrix[p->matrix.size()-1]->neg;
 	}
-	else if (f->type == form::EXISTS1) {
-		//XXX: handle variables used in q's more than once?
+	else if (f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) {
 		auto res = vm.emplace(f->l->arg, vm.size());
 		if (res.second) {
 			for (auto &v : vm) v.second++;
 			vm.at(f->l->arg) = 0;
-		 } else {
+		} else {
 			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
 			vm.at(f->l->arg) = 0;
-		 }
+		}
 		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
-		p->quants.emplace(p->quants.begin(), quant_t::EX);
-		handler_form1(p, f->r,vm);
-		//vm.erase(f->l->arg);
+		p->quants.emplace(p->quants.begin(), p->to_quant_t(f));
+		handler_form1(p, f->r,vm, vmh);
 	}
-	else if (f->type == form::FORALL1) {
-		auto res = vm.emplace(f->l->arg, vm.size());
-		if (res.second) {
-			for (auto &v : vm) v.second++;
-			vm.at(f->l->arg) = 0;
-		 } else {
-			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
-			vm.at(f->l->arg) = 0;
-		 }
-		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
-		p->quants.emplace(p->quants.begin(), quant_t::FA);
-		handler_form1(p, f->r,vm);
-		//vm.erase(f->l->arg);
-	}
-	else if (f->type == form::UNIQUE1) {
-		;//p->quants = bdd_xor_hl(q);
-	}
-
 }
 
 //-----------------------------------------------------------------------------
 
-void tables::form_query(pnf_t *f, bdd_handles &v) {
+void tables::fol_query(pnf_t *f, bdd_handles &v) {
 
 	spbdd_handle q = htrue;
 
@@ -194,31 +221,147 @@ void tables::form_query(pnf_t *f, bdd_handles &v) {
 		if (p->b) {
 			q = body_query(*p->b,0);
 			if (p->neg) q = bdd_not(q);
+			v.push_back(q);
 		}
 		else {
-			form_query(p,v);
+			fol_query(p,v);
 			assert(v.size() == 1);
-			q = v[0]; //from an inner pnf
-			//XXX: realign variables
+			//TODO: realign variables
 		}
-		v.push_back(q);
 	}
-	if( f->b) {
+	/*if( f->b) {
+		assert(false); //should never reach here
 		q = body_query(*f->b,0);
 		v.push_back(q);
-	}
+		return;
+	}*/
 
-	//XXX: feasible place to realign variables by means of bdd_and_many_ex_perm
+	//NOTE: feasible place to realign variables by means of bdd_and_many_ex_perm
 	q = bdd_and_many(move(v));
 
 	if (f->neg) q = bdd_not(q);
 
 	if (f->quants.size() != 0) {
 		//first quant appied to var 0, second to var 1 and so ...
-		q = bdd_qsolve(q, f->quants);
+		q = bdd_quantify(q, f->quants);
 	}
 	v.push_back(q);
 }
+
+//will derprecate?
+void tables::pr(spbdd_handle &q, spbdd_handle &vh, bdd_handles &vm, bool neg) {
+
+	if (!vh) vh =  htrue;
+	spbdd_handle aux = htrue;
+	bdd_handles vmaux(vm);
+
+	/*
+	if (neg)
+		for (size_t i = 0; i< vm.size() ; ++i) {
+			aux	= q && vm[i];
+		}
+	*/
+
+	//foreach subset of q
+	auto it = find (vm.begin(), vm.end(), q);
+	size_t idx = 0;
+
+	if (it == vm.end()) {
+		vm.push_back(q);
+		idx = vm.size()-1;
+	}
+	else
+		idx = it-vm.begin();
+
+	if(neg) {
+		aux = bdd_ite(aux,
+			::from_bit(idx,false),
+			::from_bit(idx,true));
+	}
+	else {
+		aux = bdd_ite(aux,
+			::from_bit(idx,true),
+			::from_bit(idx,false));
+	}
+	vh = vh && aux;
+	o::dbg() << " YYout ------------------- " << ::bdd_root(vh) << " :\n";
+	::out(wcout, vh)<<endl<<endl;
+}
+
+#define sohorn_query hol_query
+//void tables::hol_query(pnf_t *f, bdd_handles &v, bdd_handles &vh,
+//		std::vector<bdd_handles> &hvar_hbdd, std::vector<quant_t> &quantsh, varmap &vmh ) {
+void tables::hol_query(pnf_t *f, bdd_handles &v, bdd_handles &vh,
+		std::vector<bdd_handles> &hvar_hbdd, std::vector<quant_t> &quantsh, varmap &vmh ) {
+
+	spbdd_handle q = htrue;
+	spbdd_handle qh = htrue;
+
+	if (f->cons != bdd_handle::T) {
+		v.push_back(f->cons);
+	}
+
+	for (auto p : f->matrix) {
+		if (p->b) {
+			q = body_query(*p->b,0);
+			if (p->neg) q = bdd_not(q);
+			v.push_back(q);
+		}
+		else if(p->hvar_b.second != 0) {
+			if (quantsh[vmh[p->hvar_b.first]] == EXH) {
+				//basic hbdd:
+				//pr(f->hvar_b.second->q, vh[f->hvar_b.first-1], hvar_hbdd[0], f->neg, bits-2);
+				//in case hvar is set a table:
+				//qh = body_query(*f->hvar_b.second,0);
+				spbdd_handle c = htrue;
+				auto b = *p->hvar_b.second;
+				qh = bdd_and_ex_perm(c, b.q, b.ex, b.perm);
+				if (f->neg) qh = bdd_not(qh);
+				//o::dbg() << "R " << p->neg << " " << ::bdd_root(qh) << " :\n";
+				//::out(wcout, qh)<<endl<<endl;
+				vh.push_back(qh);
+			}
+		}
+		else
+			hol_query(p,v,vh, hvar_hbdd, quantsh,vmh);
+	}
+
+	if (v.size() > 1) {
+		q = bdd_and_many(move(v));
+		if (f->neg) q = bdd_not(q);
+		v.push_back(q);
+	}
+	if (vh.size() > 1) {
+		qh = bdd_and_many(move(vh));
+		if (f->neg) qh = bdd_not(qh);
+		vh.push_back(qh);
+	}
+	return;
+}
+
+void tables::formula_query(pnf_t *f, bdd_handles &v) {
+	if (f->quantsh.size() != 0) {
+		//DBG(COUT << "\n SOHORN query \n";)
+
+		//basic bhdd: bdd_handles vh(f->quantsh.size(), htrue);
+		bdd_handles v1;
+		bdd_handles v2;
+		//for basic hbdd
+		std::vector<bdd_handles> hvar_hbdd(1);
+
+		sohorn_query(f, v1, v2, hvar_hbdd, f->quantsh, f->vmh);
+
+		spbdd_handle q;
+		q = (v2.size()!= 0 ? v2[0] : hfalse) % (v1.size() != 0 ? v1[0] : hfalse);
+		//if (f->neg) q = bdd_not(q);
+		o::dbg() << " so_horn " << ::bdd_root(q) << " :\n";
+		::out(wcout, q)<<endl<<endl;
+		v.push_back(q);
+
+	}
+	else fol_query(f,v);
+}
+
 
 // ----------------------------------------------------------------------------
 // XXX: will deprecate?

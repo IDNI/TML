@@ -273,12 +273,11 @@ struct elem {
 };
 
 struct raw_term {
-	// TODO: enum 'is...' stuff
+
 	bool neg = false;
-	//bool iseq = false, isleq = false, islt = false, isbltin = false;
 	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT } extype = raw_term::REL;
 
-	//XXX we can add FORM1, FORM2 etc to rtextype
+	//NOTE: we can add FORM1, FORM2 etc to rtextype
 	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
 	t_arith_op arith_op = NOP;
 

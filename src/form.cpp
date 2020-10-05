@@ -15,10 +15,25 @@
 #include "tables.h"
 
 pnf_t::pnf_t(){
-		varslen = 0, neg = false, b = NULL, cons = bdd_handle::T;
+		varslen = 0, neg = false, b = 0, cons = bdd_handle::T;
 }
 
 pnf_t::~pnf_t() {
 		if(b) delete b, b = NULL;
 		for (auto p: matrix ) delete p;
+		if (hvar_b.second) delete hvar_b.second;
+}
+
+quant_t pnf_t::to_quant_t(form *f) {
+		quant_t q;
+		switch (f->type) {
+			case form::FORALL1: q = FA; break;
+			case form::EXISTS1: q = EX; break;
+			case form::UNIQUE1: q = UN; break;
+			case form::FORALL2: q = FAH; break;
+			case form::EXISTS2: q = EXH; break;
+			case form::UNIQUE2: q = UNH; break;
+			default: assert(F);
+		}
+		return q;
 }
