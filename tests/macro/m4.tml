@@ -1,0 +1,6 @@
+e(1 2).
+e(2 3).
+e(3 4).
+atc(?a ?b ) :=  e(?a ?b).
+ttc(?x ?y) :- ntc(atc(?x) ?y ).
+ntc(?y ?y).
