@@ -23,6 +23,7 @@ struct pnf_t {
 	varmap vm;
 	bools ex;
 	uints perm;
+	uints perm_h;
 	bool neg;
 
 	std::vector<quant_t> quants;

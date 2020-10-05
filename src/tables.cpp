@@ -1439,28 +1439,24 @@ void tables::get_form(pnf_t *p, const term_set& al, const term& h,std::set<alt>&
 	DBG(assert(t->extype == term::FORM1));
 	DBG(assert(as.size() == 0));
 
-	//XXX: do same that for alts, but for pnf_t formula tree?
-	alt a;
-	a.vm = get_varmap(h, al, a.varslen);
-	a.inv = varmap_inv(a.vm);
+	const term_set anull;
+	size_t varsh;
+	varmap vm = get_varmap(h, anull, varsh);
 
-	o::dbg()<<L"\n FOL preparation ... \n " << endl;
+	o::dbg()<< "\n FOL preparation ... \n " << endl;
 
-	//XXX: check vars in header
-	varmap vm;
 	form* f = t->qbf;
+	p->vm = vm;
 	handler_form1(p, f, vm);
 
-	varmap vmh;
-	size_t varslen;
-	const term_set anull;
-	vmh = get_varmap(h, anull, varslen);
-
-	//**** varslen should be provided by from_raw_form
-	if (vmh.size() > 0) {
-		auto d = deltail(2, h.size());
-		p->ex = d.first;
-		p->perm = get_perm(h, p->vm, p->vm.size());
+	// varslen should be provided by from_raw_form
+	if (varsh > 0) {
+		auto d = deltail(p->vm.size(), h.size());
+		term t; t.resize(vm.size());
+		for (auto &v : vm) t[v.second] = v.first;
+		assert(vm.size() == p->vm.size());
+		p->perm_h = get_perm(t, p->vm, p->vm.size());
+		p->ex = d.first, p->perm = d.second;
 	}
 
 	/*
@@ -2117,9 +2113,15 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		for(int_t i =-1; i >= (int_t)-x.p.size(); i--) 
 			dict.get_var_lexeme_from(i);		
 		// adding quantifier
-		for(int_t j = 2; j< (int_t)x.p.size();j++)
-			root = new form(form::EXISTS1, -j, NULL, NULL, root);
-		DBG(COUT<<endl; root->printnode(0, this);)
+		for(int_t j = 2; j< (int_t)x.p.size();j++) {
+			root = new form(form::EXISTS1, 0,  NULL, new form(form::ATOM, -j), root);
+		}
+		//DBG(COUT<<endl; root->printnode(0, this);)
+		#define GRAMMAR_FOL
+		#ifdef GRAMMAR_FOL
+		v.erase(v.begin()+1,v.end());
+		v.emplace_back(term::FORM1, move(root));
+		#endif
 
 		std::set<term> done;
 		bool beqrule = false;
@@ -2518,10 +2520,10 @@ char tables::fwd() noexcept {
 				v[n] = alt_query(*r[n], r.len);
 		else {
 			form_query(r.f, f);
-			//XXX: wrap up this for any type, working with ints so far
+			//TODO: complete for any type, only for ints by now
 			append_num_typebits(f[0], r.f->vm.size());
-
-			if (r.f->ex.size() != 0 && r.f->perm.size() != 0) //workaround for const header
+			f[0] = f[0]^r.f->perm_h;
+			if (r.f->ex.size() != 0 && r.f->perm.size() != 0)
 				v[0] = bdd_and_many_ex_perm(f,r.f->ex, r.f->perm);
 			else v[0] = f[0];
 		}
