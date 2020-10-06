@@ -268,7 +268,7 @@ while if we had:
 the string `str` would be:
 
     "1245ab"
-    
+
 This relation `str` is then transferred to the next sequenced program, or
 emitted as the output of the program if no sequenced program is present.
 
@@ -375,7 +375,135 @@ by the productions
 # First Order Formulas
 
 It is possible to supply a first order formula which is then transformed into
-a TML program. TBD
+a TML program. The valid symbols are:
+ - quantifiers: forall, exists, unique.
+ - connectives: `&&`, `||`, `->`, `<->` and `~` for negation.
+ - punctuation: balanced `{` , `}` for matrix and sub-formula specification.
+ - variables and relationships.
+ - constraints: `+`, `<`, `=`.  
+
+Attaching a formula to the head of a rule will make true in case of satisfiability otherwise false.
+
+Example 1:
+
+    A(0).
+    A(1).
+    B(0).
+    ALL_B_IS_A(1) :- forall ?x { B(?x) -> A(?x) }.
+
+    will result with:
+    ALL_B_IS_A(1).
+
+Additionally, if variables are set on the head, besides checking satisfiability TML will evaluate the solution for such formula.
+
+Example 2:
+
+    A2(1 0).
+    A2(1 1).
+    B2(1 0).
+    B2(1 1).
+    B2(0 1).
+    AND_B2_A2(?x ?y) :- { B2(?x ?y) && A2(?y ?x) }.
+
+    will result with:
+    AND_B2_A2(1 1).
+    AND_B2_A2(0 1).
+
+Notice that variables in the head of the rule are existentially quantified, so above formula is equivalent to:  
+
+    ALL_B2_IS_A2(?y ?x) :- exists ?x exists ?y { B2(?x ?y) -> A2(?y ?x) }.
+
+TML first order logic also allows to set arithmetic constraints to the variables by a conjunction with an arithmetic expression as below.
+
+Example 3:
+
+    s0(0).
+    s1(1).
+    s2(2).
+    A(?x ?y) :- { s2(?x) && ?x + 1 = ?y } .
+    B(?v1 ?v3) :- exists ?v2 { A(?v2 ?v3) && s1(?v1) && ?v1 + 1 = ?v2 } .
+
+    will result with:
+    A(2 3).
+    B(1 3).
+
+
+# Finitary Arithmetic
+
+TML currently provide support for integer addition and multiplication. It also includes support for bitwise boolean operations (AND, OR, XOR, NOT) and shift operations (SHL, SHR). Additionally the arithmetic primitives are defined in two modes: (1) pre-computed and (2) ad-hoc, according to how they are computed.
+
+1. Pre-computed mode involves the generation of the relationship `?x op ?y = ?z` where `op` can be `+, *, &, |, ^, <<, >>`.
+The range for the arguments is `(0,MAX)` where `MAX` is equal to the maximum number in the program.
+Pre-computed stands for how TML is actually handling the unification of the arithmetic relationship with the values of the arguments; starting with a global relationship for any possible value in the universe it will get constrained depending on the arguments.
+
+Example 1:
+
+    U(4).
+    A(1).
+    A(3).
+    adder_0(?x ?y ?z) :- e(?x), e(?y), ?x + ?y = ?z.
+    adder_1(?x) :- e(?x), ?x + 1 = 3. # unsat
+    adder_2(?x) :- e(?x), ?x + 2 = 3.
+
+    output:
+    adder_0(3 1 4).
+    adder_0(1 3 4).
+    adder_0(1 1 2).
+    adder_2(1).
+
+This mode is the most expressive one, meaning that i.e. allows to solve equations like in rule setting `adder_C` in Example 1. It will be in general the most convenient one for programs involving any operation other than multiplication.
+On the other hand, when doing multiplication with numbers larger than 2^10, pre-computed mode shows a performance bottleneck due a exponential execution time dependence on the number of bits. For this reason, an additional mode for arithmetic support has been developed.
+
+
+2. Ad-hoc mode computes arithmetic operations with alternative strategy. TML will first evaluate the possible values for the input operands and then compute the set of results of the binary operation. It provides reduced capability compared to pre-computed mode, specifically it won't preserve the relationship between the operands but just evaluate the right hand side of the expression. On the other hand it allows  to handle multiplication of larger numbers.
+
+Example 2:
+
+    U(15).
+    A(?x) :- ?x = 5.
+    B(?x) :- ?x <= 2.
+    adhoc_mult(?z) :- A(?x), B(?y), pw_mult(?x ?y ?z).
+
+    will result with:
+    ad_hoc_mult(10).
+    ad_hoc_mult(5).
+    ad_hoc_mult(0).
+
+Table below summarizes current arithmetic operator support:
+
+| Operation | Contractive Mode | Expansive Mode |
+| --------- | ---------------- | -------------- |
+| addition | ?x + ?y = ?z | pw_add(?x ?y ?z) |
+| multiplication | ?x * ?y = ?z | pw_mult(?x ?y ?z) |
+| bitwise AND | ?x & ?y = ?z | bw_and(?x ?y ?z) |
+| bitwise OR | ?x  \| ?y = ?z | bw_or(?x ?y ?z) |
+| bitwise XOR | ?x ^ ?y = ?z | bw_xor(?x ?y ?z) |
+| bitwise NOT | TBD | bw_not(?x ?z) |
+| shift-left | ?x << const = ?z | - |
+| shift-right | ?x >> const = ?z | - |
+
+
+Finally, special attention deserves the precision of the arithmetic operations. By default they will operate modulo 2^n, where n is the number of bits required for MAX (maximum number in the program), this means that any overflow will be discarded.
+
+Example 3:
+
+    U(7).
+    mult_mod8(?x) :- ?x * 2  = 2.
+
+    will result with:
+    mult_mod8(1).
+    mult_mod8(5).
+
+Alternatively, if the user requires extended precision to keep all information on the right side of the equality (the ?z variable in the examples above), both addition and multiplication can be used as below:
+
+    U(15).
+    ext_prec(?zh ?zl) :- ?x = 6, ?y = 4, ?x * ?y = ?zh ?zl.
+
+    will result with:
+    ext_prec(1 8). #notice: 1*2^4 + 8 = 24
+
+where ?zh accounts for the most significant bits (MSBs) of the operation and ?zl for the least significant bits (LSBs).
+
 
 # Misc
 
@@ -389,7 +517,6 @@ TBD
 # Future Work
 
 * Support !=, <, >, min, max.
-* Support finitary arithmetic.
 * Backward chaining and focused goal resolution.
 * More grammar and string builtins.
 * BDD level garbage collection.
