@@ -887,19 +887,18 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 }
 
 void tables::get_facts(const flat_prog& m) {
-	map<ntable, set<spbdd_handle>> f;
+	map<ntable, set<spbdd_handle>> add, del;
 	for (const auto& r : m)
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
-		else f[r[0].tab].insert(from_fact(r[0]));
+		else (r[0].neg ? del : add)[r[0].tab].insert(from_fact(r[0]));
 	clock_t start{}, end;
 	if (optimize) measure_time_start();
 	bdd_handles v;
-	for (auto x : f) {
-		spbdd_handle r = tbls[x.first].t;
-		for (auto y : x.second) r = r || y;
-		tbls[x.first].t = r;
-	}
+	for (auto x : add) for (auto y : x.second)
+		tbls[x.first].t = tbls[x.first].t || y;
+	for (auto x : del) for (auto y : x.second)
+		tbls[x.first].t = tbls[x.first].t % y;
 	if (optimize)
 		(o::ms() << "# get_facts: "),
 		measure_time_end();
