@@ -6,11 +6,8 @@ rm -rf ./build-Debug ./build-Release
 ./build.sh Release $@
 ./build-Release/tests/test_tml
 cd tests
-declare -a dirs=(intro regression macro quantifiers ebnf beyondcfg)
-for testdir in "${dirs[@]}"; do
-	./tests_runner.sh $testdir
+for dir in `find ./regression -maxdepth 1 -type d -not -name "expected"`; do
+	./tests_runner.sh $dir
 done
 ./unit_tests_runner.sh $@
 cd $DIR
-#./checks.sh
-

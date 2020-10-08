@@ -1,0 +1,5 @@
+# bug: negated heads act as positive heads and instead of being deleted they are added
+
+a. ~a.
+b. a(0).
+b(0). ~b(0).
