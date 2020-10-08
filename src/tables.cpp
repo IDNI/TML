@@ -896,7 +896,7 @@ void tables::get_facts(const flat_prog& m) {
 	if (optimize) measure_time_start();
 	bdd_handles v;
 	for (auto x : f) {
-		spbdd_handle r = hfalse;
+		spbdd_handle r = tbls[x.first].t;
 		for (auto y : x.second) r = r || y;
 		tbls[x.first].t = r;
 	}
@@ -2643,10 +2643,18 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		o::ms() << "# pfp: ";
 		measure_time_start();
 	}
+	nlevel begstep = nstep;
 	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
+	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
 		if (!add_prog(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
+	}
+	if (r) for (const raw_prog& np : p.nps) {
+		if (!r && went >= steps) break;
+		steps -= went; begstep = nstep;
+		r |= run_prog(np, strs, steps, break_on_step);
+		went = nstep - begstep;
 	}
 	if (optimize)
 		(o::ms() <<"add_prog: "<<t << " pfp: "),

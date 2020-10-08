@@ -399,6 +399,7 @@ struct raw_prog {
 	std::vector<raw_rule> r;
 
 	std::set<lexeme, lexcmp> builtins;
+	std::vector<raw_prog> nps; // nested progs
 //	int_t delrel = -1;
 	bool parse(input* in, dict_t &dict);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 

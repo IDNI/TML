@@ -745,13 +745,23 @@ fail:	return pos = curr, false;
 
 
 bool raw_prog::parse(input* in, dict_t &dict) {
-	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}') {
+	lexemes& l = in->l;
+	size_t& pos = in->pos;
+	while (pos < l.size() && *l[pos][0] != '}') {
 		directive x;
 		raw_rule y;
 		production p;
 		macro m;
 		// TODO: temp. passing prog/context, make parse(s) prog static instead.
-		if (m.parse(in, *this)) vm.emplace_back(m);
+		if (*l[pos][0] == '{') {
+			++pos;
+			raw_prog& x = nps.emplace_back();
+			if (!x.parse(in, dict)) return in->error?false:
+				in->parse_error(l[pos][0], err_parse, l[pos]);
+			if (pos == l.size() || *l[pos++][0] != '}') return
+				in->error ? false : in->parse_error(l[pos-1][1],
+					err_close_curly, l[pos-1]);
+		} else if (m.parse(in, *this)) vm.emplace_back(m);
 		else if (!in->error && x.parse(in, *this)) d.push_back(x);
 		else if (!in->error && y.parse(in, *this)) r.push_back(y);
 		else if (!in->error && p.parse(in, *this)) g.push_back(p);
