@@ -22,7 +22,7 @@ struct term : public ints {
 	enum textype { REL, EQ, LEQ, BLTIN, ARITH, FORM1 /*QBF1*/, FORM2} extype = term::REL;
 
 	t_arith_op arith_op = NOP;
-	form *qbf = NULL; //froot
+	spform_handle qbf;
 
 	ntable tab = -1;
 	size_t orderid = 0;
@@ -34,7 +34,7 @@ struct term : public ints {
 	term(bool neg, textype extype, t_arith_op arith_op, ntable tab, const ints& args, size_t orderid)
 		: ints(args), neg(neg),extype(extype), arith_op(arith_op), tab(tab), orderid(orderid) {}
 
-	term(textype extype, form *qbf): extype(extype), qbf(qbf) {};
+	term(textype extype, std::shared_ptr<form> qbf): extype(extype), qbf(std::move(qbf)) {};
 
 	// builtins .ctor
 	term(bool neg, ntable tab, const ints& args, size_t orderid, int_t idbltin)

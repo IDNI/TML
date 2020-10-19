@@ -14,17 +14,17 @@
 #include "form.h"
 #include "tables.h"
 
-pnf_t::pnf_t(){
+pnft::pnft(){
 		varslen = 0, neg = false, b = 0, cons = bdd_handle::T;
 }
 
-pnf_t::~pnf_t() {
+pnft::~pnft() {
 		if(b) delete b, b = NULL;
-		for (auto p: matrix ) delete p;
+		//for (auto p: matrix ) delete p;
 		if (hvar_b.second) delete hvar_b.second;
 }
 
-quant_t pnf_t::to_quant_t(form *f) {
+quant_t pnft::to_quant_t(form *f) const {
 		quant_t q;
 		switch (f->type) {
 			case form::FORALL1: q = FA; break;
@@ -36,4 +36,11 @@ quant_t pnf_t::to_quant_t(form *f) {
 			default: assert(F);
 		}
 		return q;
+}
+bool pnft::fp(class tables *s) const {
+
+	for (auto b: bodies)
+		if (!(b->tlast && b->tlast->b == s->tbls[b->tab].t->b))
+			return false;
+	return true;
 }

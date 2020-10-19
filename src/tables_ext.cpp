@@ -52,7 +52,7 @@ void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 }
 
 //-----------------------------------------------------------------------------
-void tables::handler_formh(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
+void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 
 	//is_horn = true;
 	switch (f->type) {
@@ -78,41 +78,47 @@ void tables::handler_formh(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 	//is_horn = false;
 }
 
-void tables::handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
+void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 
-	assert(f!=NULL);
-
-	//NONE, ATOM, FORALL1, EXISTS1, UNIQUE1, AND, OR, NOT, IMPLIES, COIMPLIES
-	//FORALL2, EXISTS2, UNIQUE2
-	DBG(assert((f->type == form::ATOM && f->l == NULL && f->r == NULL) || \
-		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) || \
-		   (f->l != NULL && f->r != NULL)));
+	//DBG(assert((f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
+	//	   (f->type == form::NOT  && f->l != NULL && f->r == NULL)) ||
+	//	   (f->l != NULL && f->r != NULL)
 
 	if (f->type == form::ATOM) {
 		//assuming no free variables in qbf
-		//NOTE: vm.size as varslen wont work for pnf splits. should be provided by parser
-		// or on a pre fol preparation / leave get_body as burst after handler_form1
-		pnf_t *p0 = new(pnf_t);
+		pnft_handle p0(new(pnft));
+
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) {
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				assert(p0->b->neg == false);
-				ex_typebits(p0->b->ex,f->tm->size());
+				ex_typebits(p0->b->ex, f->tm->size());
 				//spbdd_handle q = body_query(*(p0->b),0);
 				//o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
 				//::out(COUT, q)<<endl<<endl;
+				static set<body*, ptrcmp_<body>>::const_iterator bit;
+				if ((bit = p->bodies.find(p0->b)) == p->bodies.end())
+					p->bodies.insert(p0->b);
+
 			} else {
 				body *aux = new body(get_body(*f->tm, vm, vm.size()));
-				ex_typebits(aux->ex,f->tm->size());
+				ex_typebits(aux->ex, f->tm->size());
 				std::pair<int_t, body*> hvar = {f->arg, move(aux)};
 				p0->hvar_b = hvar;
 			}
 		}
 		else if (f->tm->extype == term::ARITH) {
 			handler_arith(*f->tm, vm, vm.size(), p0->cons);
-			ex_typebits(p0->cons, f->tm->size());
+			ex_typebits(p0->cons, vm.size());
 		}
-		//TODO: LEQ, EQ etc
+		else if (f->tm->extype == term::EQ) {
+			handler_eq(*f->tm, vm, vm.size(), p0->cons);
+			ex_typebits(p0->cons, vm.size());
+		}
+		else if (f->tm->extype == term::LEQ) {
+			handler_eq(*f->tm, vm, vm.size(), p0->cons);
+			ex_typebits(p0->cons, vm.size());
+		}
 		else {
 			DBG(assert(false));
 		}
@@ -123,17 +129,19 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 		if (f->l->type == form::ATOM) {
 			handler_form1(p, f->l,vm,vmh);
 		} else {
-			pnf_t *p0 = new(pnf_t);
+			pnft_handle p0(new(pnft));
 			handler_form1(p0, f->l,vm, vmh);
+			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
 			p->matrix.push_back(p0);
 		}
 		if (f->r->type == form::ATOM) {
 			handler_form1(p, f->r,vm,vmh);
 			p->matrix[p->matrix.size()-1]->neg = true;
 		} else {
-			pnf_t *p1 = new(pnf_t);
+			pnft_handle p1(new(pnft));
 			handler_form1(p1, f->r,vm,vmh);
 			p1->neg = true;
+			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 			p->matrix.push_back(p1);
 		}
 		p->neg = true;
@@ -143,32 +151,36 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 		if (f->l->type == form::AND || f->l->type == form::ATOM  || f->l->type == form::NOT) {
 			handler_form1(p, f->l,vm, vmh);
 		} else {
-			pnf_t *p0 = new(pnf_t);
-			handler_form1(p0, f->r,vm, vmh);
+			pnft_handle p0(new(pnft));
+			handler_form1(p0, f->l,vm, vmh);
+			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
 			p->matrix.push_back(p0);
 		}
 		if (f->r->type == form::AND || f->r->type == form::ATOM  || f->r->type == form::NOT) {
 			handler_form1(p, f->r,vm, vmh);
 		} else {
-			pnf_t *p1 = new(pnf_t);
+			pnft_handle p1(new(pnft));
 			handler_form1(p1, f->r,vm, vmh);
+			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 			p->matrix.push_back(p1);
 		}
 	}
 	else if (f->type == form::OR) {
 		//if (!is_horn) {
-		//TODO: review to avoind unecessary nodes
-		pnf_t *p0 = new(pnf_t);
+		//TODO: review to avoid unnecessary nodes, also use vector of bodies
+		pnft_handle p0(new(pnft));
 		handler_form1(p0, f->l,vm,vmh);
 		p0->b ? p0->b->neg = true : p0->neg = true;
-		pnf_t *p1 = new(pnf_t);
+		pnft_handle p1(new(pnft));
 		handler_form1(p1, f->r,vm,vmh);
 		p1->b ? p1->b->neg = true : p1->neg = true;
+		p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
+		p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 		p->matrix.push_back(p0);
 		p->matrix.push_back(p1);
 		p->neg = true;
 		//}
-		/* TODO: switch mode to dnf for SO HROM?
+		/*
 		else {
 
 			if (f->l->type == form::OR || f->l->type == form::ATOM  || f->l->type == form::NOT) {
@@ -203,49 +215,48 @@ void tables::handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh) {
 		}
 		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
 		p->quants.emplace(p->quants.begin(), p->to_quant_t(f));
+
+		//if(!(f->r->type == form::EXISTS1 || f->r->type == form::FORALL1 || f->r->type == form::UNIQUE1)
+
 		handler_form1(p, f->r,vm, vmh);
 	}
 }
 
 //-----------------------------------------------------------------------------
 
-void tables::fol_query(pnf_t *f, bdd_handles &v) {
 
-	spbdd_handle q = htrue;
+void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 
-	if (f->cons != bdd_handle::T) {
-		v.push_back(f->cons);
+	if (f->bodies.size() != 0 && f->fp(this)) {
+		v.push_back(f->last);
+		o::dbg() << " hit memos fol\n" ;
+		return;
 	}
-
+	spbdd_handle q = htrue;
 	for (auto p : f->matrix) {
 		if (p->b) {
 			q = body_query(*p->b,0);
 			if (p->neg) q = bdd_not(q);
 			v.push_back(q);
+		} else if (p->cons != bdd_handle::T) {
+			p->neg ? v.push_back(bdd_not(p->cons)) : v.push_back(p->cons) ;
 		}
 		else {
-			fol_query(p,v);
-			assert(v.size() == 1);
-			//TODO: realign variables
+			bdd_handles vt;
+			fol_query(p,vt);
+			v.insert(v.end(), vt.begin(), vt.end());
 		}
 	}
-	/*if( f->b) {
-		assert(false); //should never reach here
-		q = body_query(*f->b,0);
-		v.push_back(q);
-		return;
-	}*/
 
-	//NOTE: feasible place to realign variables by means of bdd_and_many_ex_perm
+	//if (v.size() > 1)
 	q = bdd_and_many(move(v));
-
 	if (f->neg) q = bdd_not(q);
-
-	if (f->quants.size() != 0) {
-		//first quant appied to var 0, second to var 1 and so ...
+	if (f->quants.size() != 0)
 		q = bdd_quantify(q, f->quants);
-	}
+		//TODO: realign variables
+	f->last = q;
 	v.push_back(q);
+	//}
 }
 
 //will derprecate?
@@ -291,7 +302,7 @@ void tables::pr(spbdd_handle &q, spbdd_handle &vh, bdd_handles &vm, bool neg) {
 #define sohorn_query hol_query
 //void tables::hol_query(pnf_t *f, bdd_handles &v, bdd_handles &vh,
 //		std::vector<bdd_handles> &hvar_hbdd, std::vector<quant_t> &quantsh, varmap &vmh ) {
-void tables::hol_query(pnf_t *f, bdd_handles &v, bdd_handles &vh,
+void tables::hol_query(cr_pnft_handle f, bdd_handles &v, bdd_handles &vh,
 		std::vector<bdd_handles> &hvar_hbdd, std::vector<quant_t> &quantsh, varmap &vmh ) {
 
 	spbdd_handle q = htrue;
@@ -339,7 +350,7 @@ void tables::hol_query(pnf_t *f, bdd_handles &v, bdd_handles &vh,
 	return;
 }
 
-void tables::formula_query(pnf_t *f, bdd_handles &v) {
+void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	if (f->quantsh.size() != 0) {
 		//DBG(COUT << "\n SOHORN query \n";)
 
@@ -396,7 +407,6 @@ void tables::set_constants(const term& t, spbdd_handle &q) const {
 			spbdd_handle aux = from_sym(i, args, t[i]);
 			q = q && aux;
 		}
-
 	bools exvec;
 	for (size_t i = 0; i < bits; ++i) {
 		for (size_t j = 0; j< args; ++j)
@@ -408,7 +418,8 @@ void tables::set_constants(const term& t, spbdd_handle &q) const {
 
 // ----------------------------------------------------------------------------
 
-bool tables::handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_handle &leq) {
+bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
+		spbdd_handle &c) {
 
 	spbdd_handle q = bdd_handle::T;
 
@@ -440,56 +451,48 @@ bool tables::handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_hand
 				q = add_var_eq(bit_0, bit_1, bit_2, a.varslen);
 			}
 			*/
-			//all types of addition handled by add_var
-			//XXX not working for ?x + ?x = 2
+			//TODO: memoizate adder
 			size_t args = 3;
 			q = add_var_eq(0, 1, 2, args);
 			set_constants(t,q);
-			//XXX: var alignment with head
-			uints perm2 = get_perm(t, vm, varslen);
+			//var alignment with head
+			uints perm2 = get_perm(t, vm, vl);
 			q = q^perm2;
 		} break;
 
 		case SHR:
 		{
 			size_t var0 = vm.at(t[0]);
-			assert(t[1] > 0 && "shift value must be a constant");
+			assert(t[1] > 0 && "shift value must be a constant"); //TODO: move check to parser
 			size_t num1 = t[1] >> 2;
 			size_t var2 = vm.at(t[2]);
-			q = shr(var0, num1, var2, varslen);
+			q = shr(var0, num1, var2, vl);
 		} break;
 
 		case SHL:
 		{
 			size_t var0 = vm.at(t[0]);
-			assert(t[1] > 0 && "shift value must be a constant");
+			assert(t[1] > 0 && "shift value must be a constant"); //TODO: move check to parser
 			size_t num1 = t[1] >> 2;
 			size_t var2 = vm.at(t[2]);
-			q = shl(var0, num1, var2, varslen);
+			q = shl(var0, num1, var2, vl);
 		} break;
 
 		case MULT:
 		{
 			size_t args = t.size();
-			if (args == 3) {
-				q = mul_var_eq(0,1,2,3);
-				set_constants(t,q);
-			}
-			//XXX: hook for extended precision
-			//XXX wont run, needs update in parser like ?x0:?x1
-			else if (args == 4) {
-				q = mul_var_eq_ext(0,1,2,3,args);
-				set_constants(t,q);
-			}
-			//XXX: var alignment with head
-			uints perm2 = get_perm(t, vm, varslen);
+			//single precision
+			if (args == 3) q = mul_var_eq(0,1,2,3);
+			else if (args == 4) q = mul_var_eq_ext(0,1,2,3,args);
+			else assert(false); //TODO: move check to parser
+			set_constants(t,q);
+			uints perm2 = get_perm(t, vm, vl);
 			q = q^perm2;
 		} break;
 
 		default: break;
 	};
-
-	leq = leq && q;
+	c = c && q;
 	return true;
 }
 

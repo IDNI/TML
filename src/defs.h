@@ -86,6 +86,8 @@ struct pnf_t;
 typedef enum {EX, UN, FA, EXH, UNH, FAH} quant_t;
 typedef std::map<int_t, size_t> varmap;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
+typedef std::shared_ptr<form> spform_handle;
+typedef const spform_handle& cr_spform_handle;
 
 //#define TRANSFORM_BIN_DRIVER
 #endif

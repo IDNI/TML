@@ -126,7 +126,7 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	pnf_t* f = 0; //TODO make it smart
+	pnft_handle f;
 	bool operator<(const rule& t) const {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
@@ -160,6 +160,7 @@ class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 	friend struct form;
+	friend struct pnft;
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 private:
@@ -290,11 +291,11 @@ private:
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 
-	void fol_query(pnf_t *f, bdd_handles& v);
-	void hol_query(pnf_t *f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
+	void fol_query(cr_pnft_handle f, bdd_handles& v);
+	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
 			std::vector<quant_t> &quantsh, varmap &vmh);
 	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
-	void formula_query(pnf_t *f, bdd_handles& v);
+	void formula_query(cr_pnft_handle f, bdd_handles& v);
 
 	void alt_query_bltin(alt& a, bdd_handles& v1); //XXX review
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
@@ -320,9 +321,14 @@ private:
 	void get_nums(const raw_term& t);
 	flat_prog to_terms(const raw_prog& p);
 
+	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
+			spbdd_handle &c) const;
+	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
+			spbdd_handle &c) const;
+
 	void get_facts(const flat_prog& m);
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
-	void get_form(pnf_t*, const term_set& al, const term& h);
+	void get_form(pnft_handle& f, const term_set& al, const term& h);
 	void get_rules(flat_prog m);
 
 	ntable get_table(const sig& s);
@@ -388,9 +394,10 @@ private:
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
 
-	void handler_form1(pnf_t *p, form* f, varmap &vm, varmap &vmh);
-	void handler_formh(pnf_t *p, form* f, varmap &vm, varmap &vmh);
-	bool handler_arith(const term& t, varmap &vm, size_t varslen, spbdd_handle &cons);
+	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
+	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
+	bool handler_arith(const term& t, const varmap &vm, const size_t vl,
+			spbdd_handle &cons);
 
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
 		size_t bit, spbdd_handle x) const;

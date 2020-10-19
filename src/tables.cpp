@@ -499,7 +499,7 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 		ft = form::ATOM;
 		term t = from_raw_term(*rfm->rt);
 		arg = dict.get_temp_sym(rfm->rt->e[0].e);
-		root = new form(ft, arg, &t );
+		root = new form(ft, arg, &t);
 		froot = root;
 		if(!root) return false;
 		return true;
@@ -547,12 +547,11 @@ bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol)
 			case elem::COIMPLIES: ft= form::COIMPLIES; break;
 			default: return froot= root, false;
 		}
-		root =  new form(ft,0, 0);
+		root =  new form(ft);
 		ret = from_raw_form(rfm->l, root->l, is_sol);
 		if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
 		froot = root;
 		return ret;
-		//return false;
 	}
 }
 
@@ -954,7 +953,7 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			get_nums(x), t = from_raw_term(x, true), v.push_back(t);
 
 			bool is_sol = false;
-			form* froot = NULL;
+			form* froot = 0;
 
 			from_raw_form(r.prft.get(), froot, is_sol);
 			/*
@@ -973,9 +972,9 @@ flat_prog tables::to_terms(const raw_prog& p) {
 				//froot->implic_rmoval();
 				extype = term::FORM1;
 			}
-			t = term(extype, move(froot));
+			spform_handle qbf(froot);
+			t = term(extype, qbf);
 			v.push_back(t);
-			//align_vars(v);
 			m.insert(move(v));
 		} else  {
 			for (const raw_term& x : r.h)
@@ -1199,6 +1198,42 @@ basic_ostream<T>& tables::print_dict(basic_ostream<T>& os) const {
 template basic_ostream<char>& tables::print_dict(basic_ostream<char>&) const;
 template basic_ostream<wchar_t>& tables::print_dict(basic_ostream<wchar_t>&) const;
 
+bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
+		spbdd_handle &c) const {
+	DBG(assert(t.size() == 2););
+	spbdd_handle q = bdd_handle::T;
+	if (t[0] == t[1]) return !(t.neg);
+	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] == t[1]));
+	if (t[0] < 0 && t[1] < 0)
+		q = from_sym_eq(vm.at(t[0]), vm.at(t[1]), vl);
+	else if (t[0] < 0)
+		q = from_sym(vm.at(t[0]), vl, t[1]);
+	else if (t[1] < 0)
+		q = from_sym(vm.at(t[1]), vl, t[0]);
+	c = t.neg ? c % q : (c && q);
+	return true;
+}
+
+bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
+		spbdd_handle &c) const {
+	DBG(assert(t.size() == 2););
+	spbdd_handle q = bdd_handle::T;
+	if (t[0] == t[1]) return !(t.neg);
+	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] <= t[1]));
+	if (t[0] < 0 && t[1] < 0)
+		q = leq_var(vm.at(t[0]), vm.at(t[1]), vl, bits);
+	else if (t[0] < 0)
+		q = leq_const(t[1], vm.at(t[0]), vl, bits);
+	else if (t[1] < 0)
+		// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
+		q = htrue % leq_const(t[0], vm.at(t[1]), vl, bits) ||
+			from_sym(vm.at(t[1]), vl ,t[0]);
+	c = t.neg ? c % q : (c && q);
+	return true;
+}
+
+
+
 void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 	alt a;
 	set<int_t> vs;
@@ -1210,6 +1245,13 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
 			b.insert(lastbody = { get_body(t, a.vm, a.varslen), t });
+		} else if (t.extype == term::EQ) {
+			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
+		} else if (t.extype == term::LEQ) {
+			if (!handler_leq(t, a.vm, a.varslen, leq)) return;
+		} else if (t.extype == term::ARITH) {
+			//arith constraint on leq
+			if (!handler_arith(t,a.vm, a.varslen, leq)) return;
 		} else if (t.extype == term::BLTIN) {
 			//DBG(assert(t.size() >= 2);); // ?v, + could have many vars
 			// TODO: check that last body exists, but should always be present.
@@ -1222,53 +1264,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as) {
 			term& bt = lastbody.second;
 			a.bltinsize = count_if(bt.begin(), bt.end(),
 				[](int i) { return i < 0; });
-		} else if (t.extype == term::EQ) { //.iseq
-			DBG(assert(t.size() == 2););
-			if (t[0] == t[1]) {
-				if (t.neg) return;
-				continue;
-			}
-			if (t[0] >= 0 && t[1] >= 0) {
-				if (t.neg == (t[0] == t[1])) return;
-				continue;
-			}
-			if (t[0] < 0 && t[1] < 0)
-				q = from_sym_eq(a.vm.at(t[0]), a.vm.at(t[1]),
-					a.varslen);
-			else if (t[0] < 0)
-				q = from_sym(a.vm.at(t[0]), a.varslen, t[1]);
-			else if (t[1] < 0)
-				q = from_sym(a.vm.at(t[1]), a.varslen, t[0]);
-			a.eq = t.neg ? a.eq % q : (a.eq && q);
-		} else if (t.extype == term::LEQ) { // .isleq
-			DBG(assert(t.size() == 2););
-			if (t[0] == t[1]) {
-				if (t.neg) return;
-				continue;
-			}
-			if (t[0] >= 0 && t[1] >= 0) {
-				if (t.neg == (t[0] <= t[1])) return;
-				continue;
-			}
-			if (t[0] < 0 && t[1] < 0) {
-				q = leq_var(a.vm.at(t[0]), a.vm.at(t[1]),
-					a.varslen, bits);
-			}
-			else if (t[0] < 0)
-				q = leq_const(t[1], a.vm.at(t[0]), a.varslen, bits);
-			else if (t[1] < 0)
-				// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
-				q = htrue % leq_const(t[0],
-					a.vm.at(t[1]), a.varslen, bits) ||
-					from_sym(a.vm.at(t[1]), a.varslen,t[0]);
-
-			leq = t.neg ? leq % q : (leq && q);
-
-		} else if (t.extype == term::ARITH) {
-			//XXX: returning bdd handler on leq variable
-			if (!handler_arith(t,a.vm, a.varslen,leq)) return;
 		}
-		// we use LT/GEQ <==> LEQ + reversed args + !neg
 	}
 
 	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
@@ -1427,7 +1423,7 @@ void tables::cqc(flat_prog& p) {
 		v.emplace_back(r), cqc_minimize(v.back());
 }*/
 
-void tables::get_form(pnf_t *p, const term_set& al, const term& h) {
+void tables::get_form(pnft_handle& p, const term_set& al, const term& h) {
 
 	auto t = al.begin();
 	DBG(assert(t->extype == term::FORM1 || t->extype == term::FORM2));
@@ -1436,17 +1432,12 @@ void tables::get_form(pnf_t *p, const term_set& al, const term& h) {
 	size_t varsh;
 	varmap vm = get_varmap(h, anull, varsh), vmh;
 	varsh = vm.size();
-	form* f = t->qbf;
 	p->vm = vm;
+	if (t->extype == term::FORM1)
+		handler_form1(p, t->qbf.get(), vm, vmh);
+	else
+		handler_formh(p, t->qbf.get(), vm, vmh);
 
-	if (t->extype == term::FORM1) {
-		//o::dbg()<< "\n FOL preparation ... \n " << endl;
-		handler_form1(p, f, vm, vmh);
-
-	} else { //t->extype == term::FORM2
-		//o::dbg()<<"\n SOL preparation ... \n " << endl;
-	    handler_formh(p, f, vm, vmh);
-	}
 	if (varsh > 0) {
 		auto d = deltail(p->vm.size(), h.size());
 		term t; t.resize(vm.size());
@@ -1455,10 +1446,6 @@ void tables::get_form(pnf_t *p, const term_set& al, const term& h) {
 		p->perm_h = get_perm(t, p->vm, p->vm.size());
 		p->ex = d.first, p->perm = d.second;
 	}
-	/*
-	set<int_t> vs;
-	set<pair<body, term>> b;
-	*/
 	return;
 }
 
@@ -1508,8 +1495,6 @@ void tables::get_rules(flat_prog p) {
 		tbls[t.tab].ext = false;
 		varmap v;
 		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //XXX: review why we replicate t variables in r
-		// D: bltin and a header (moved to table instead, it's what we need)
-		//if (t.extype == term::BLTIN) {}
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
 			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
@@ -1518,10 +1503,9 @@ void tables::get_rules(flat_prog p) {
 		r.len = t.size();
 
 		for (const term_set& al : x.second)
-			if (al.begin()->extype == term::FORM1)
-				r.f = new(pnf_t), get_form(r.f, al, t);
-			else if (al.begin()->extype == term::FORM2)
-				r.f = new(pnf_t), get_form(r.f, al, t);
+			if (al.begin()->extype == term::FORM1 ||
+					al.begin()->extype == term::FORM2)
+				r.f.reset(new(pnft)), get_form(r.f, al, t);
 			else
 				get_alt(al, t, as);
 
@@ -2113,13 +2097,14 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			dict.get_var_lexeme_from(i);		
 		// adding quantifier
 		for(int_t j = 2; j< (int_t)x.p.size();j++) {
-			root = new form(form::EXISTS1, 0,  NULL, new form(form::ATOM, -j), root);
+			root = new form(form::EXISTS1, 0,  0, new form(form::ATOM, -j), root);
 		}
 		//DBG(COUT<<endl; root->printnode(0, this);)
 		#define GRAMMAR_FOL
 		#ifdef GRAMMAR_FOL
 		v.erase(v.begin()+1,v.end());
-		v.emplace_back(term::FORM1, move(root));
+		spform_handle qbf(root);
+		v.emplace_back(term::FORM1, qbf);
 		#endif
 
 		std::set<term> done;
