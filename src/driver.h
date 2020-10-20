@@ -122,12 +122,12 @@ public:
 	bool result = false;
 	bool error = false;
 	options opts;
-	driver(options o);
-	driver(FILE *f, options o);
-	driver(string_t, options o);
-	driver(std::string, options o);
-	driver(const char *s, options o);
-	driver(ccs s, options o);
+	driver(const options& o);
+	driver(FILE *f, const options& o);
+	driver(string_t, const options& o);
+	driver(std::string, const options& o);
+	driver(const char *s, const options& o);
+	driver(ccs s, const options& o);
 	driver(FILE *f);
 	driver(std::string);
 	driver(string_t);

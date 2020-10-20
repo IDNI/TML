@@ -167,7 +167,7 @@ bool driver::prog_run(raw_progs& rp, size_t n, size_t steps,
 }
 
 bool driver::add(input* in) {
-	if (!rp.parse(in, tbl->get_dict(), in->newseq)) return error=true,false;
+	if (!rp.parse(in, tbl->get_dict(), in->newseq)) return !(error = true);
 	if (!in->newseq) transform(rp, pd.n, pd.strs);
 	return true;
 }
@@ -277,7 +277,7 @@ void driver::read_inputs() {
 	}
 }
 
-driver::driver(string s, options o) : rp(), opts(o) {
+driver::driver(string s, const options &o) : rp(), opts(o) {
 	dict_t dict;
 
 	// inject inputs from opts to driver and dict (needed for archiving)
@@ -292,23 +292,22 @@ driver::driver(string s, options o) : rp(), opts(o) {
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
-	if (ii) {
-		current_input = ii->first();
-		if (current_input)
-			if (!add(current_input)) return;
-		read_inputs();
-	}
+	if (!ii) return;
+	current_input = ii->first();
+	if (current_input && !add(current_input)) return;
+	read_inputs();
 }
-driver::driver(FILE *f,    options o)   : driver(input::file_read_text(f), o) {}
-driver::driver(string_t s, options o)   : driver(to_string(s), o) {}
-driver::driver(const char *s,options o) : driver(string(s), o) {}
-driver::driver(ccs   s,    options o)   : driver(string_t(s), o) {}
-driver::driver(options o)               : driver(string(), o) {}
-driver::driver(string s)                : driver(s, options()) {}
-driver::driver(FILE *f)                 : driver(f, options()) {}
-driver::driver(string_t s)              : driver(to_string(s)) {}
-driver::driver(const char *s)           : driver(s, options()) {}
-driver::driver(ccs   s)                 : driver(string_t(s)) {}
+
+driver::driver(FILE *f, const options &o) : driver(input::file_read_text(f),o){}
+driver::driver(string_t s, const options& o)	: driver(to_string(s), o) {}
+driver::driver(const char *s, const options &o)	: driver(string(s), o) {}
+driver::driver(ccs   s, const options &o)	: driver(string_t(s), o) {}
+driver::driver(const options &o)	: driver(string(), o) {}
+driver::driver(string s)		: driver(s, options()) {}
+driver::driver(FILE *f)			: driver(f, options()) {}
+driver::driver(string_t s)		: driver(to_string(s)) {}
+driver::driver(const char *s)		: driver(s, options()) {}
+driver::driver(ccs   s)			: driver(string_t(s)) {}
 
 driver::~driver() {
 	if (tbl) delete tbl;
