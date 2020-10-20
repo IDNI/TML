@@ -1828,7 +1828,7 @@ bool ptransformer::parse_alts( vector<elem> &next, size_t& cur){
 	while(cur < next.size()) {
 		ret = parse_alt(next, cur);
 		if(!ret) return false;
-		if(next[cur].type == elem::ALT ) cur++;
+		if(cur < next.size() && next[cur].type == elem::ALT ) cur++;
 		else break;
 	}
 	return ret;
