@@ -131,6 +131,7 @@ struct rule : public std::vector<alt*> {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
 		if (eq != t.eq) return eq < t.eq;
+		if (f != t.f) return f < t.f;
 		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
 	}
 	bool equals_termwise(const rule& r) const {
