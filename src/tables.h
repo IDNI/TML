@@ -579,6 +579,25 @@ struct ptransformer{
 	bool visit( );
 };
 
+struct graphgrammar {
+	enum mark {
+		NONE,
+		PROGRESS,
+		VISITED
+	};
+	dict_t &dict;
+	std::vector<elem> sort;
+	std::multimap<elem, std::pair<production, mark> > _g;
+	typedef std::multimap<elem, std::pair<production, mark> >::iterator _itg_t;
+	graphgrammar(std::vector<production> &t, dict_t &_d);
+	bool dfs( const elem &s);
+	bool detectcycle();
+	bool iscyclic( const elem &s);
+	std::string getregularexpstr(const elem &p, bool &bhasnull);
+	bool combine_rhs( const elem &s, std::vector<elem> &comb);
+	bool collapsewith();
+};
+
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 

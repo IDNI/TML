@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <random>
 #include <list>
+#include <regex>
 #include "tables.h"
 #include "dict.h"
 #include "input.h"
@@ -1952,24 +1953,115 @@ bool tables::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
 	}
 	return ret;
 }
+
+graphgrammar::graphgrammar(vector<production> &t, dict_t &_d): dict(_d) {
+	for(production &p: t)
+		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
+		else _g.insert({p.p[0],std::make_pair(p, NONE)}); 
+}
+	
+bool graphgrammar::dfs( const elem &s) {
+
+	auto rang = _g.equal_range(s);
+	for( auto sgit = rang.first; sgit != rang.second; sgit++)
+		sgit->second.second = PROGRESS;
+
+	for( auto git = rang.first; git != rang.second; git++)
+		for( auto nxt= git->second.first.p.begin()+ 1; nxt != git->second.first.p.end(); nxt++ ) {
+			if( nxt->type == elem::SYM ) {
+				auto nang = _g.equal_range(*nxt);
+				for( auto nit = nang.first; nit != nang.second; nit++)
+					if( nit->second.second == PROGRESS ) return true;
+					else if( nit->second.second != VISITED)
+						if(  dfs(*nxt)) return true;					
+				for( auto nit = nang.first; nit != nang.second; nit++)
+					nit->second.second = VISITED;
+			}
+		}
+	sort.push_back(s);
+	return false;
+}
+bool graphgrammar::detectcycle() {
+	bool ret =false;
+	for( auto it = _g.begin(); it != _g.end(); it++)
+		if( it->second.second == NONE ) {
+			bool lret=false;
+			auto rang = _g.equal_range(it->first);
+			for( auto sit = rang.first; sit != rang.second; sit++)	
+				if( dfs(it->first) ) ret = lret = true;
+			for( auto sit = rang.first; sit != rang.second; sit++)	
+				sit->second.second = (lret== false)? VISITED: PROGRESS;
+		}
+	return ret;
+}
+
+bool graphgrammar::iscyclic( const elem &s) {
+	auto rang = _g.equal_range(s);
+	for( auto sgit = rang.first; sgit != rang.second; sgit++)
+		if(sgit->second.second != VISITED) return true;
+	return false;
+}
+
+std::string graphgrammar::getregularexpstr(const elem &p, bool &bhasnull) {
+	vector<elem> comb;
+	combine_rhs(p, comb);
+	std::string ret;
+	for(elem e: comb ) {
+		if( e.type == elem::SYM && (e.e == "null") )
+			bhasnull= true;
+		ret.append(e.to_str());
+	}
+	return ret;
+}
+bool graphgrammar::combine_rhs( const elem &s, vector<elem> &comb) {
+	lexeme alt = dict.get_lexeme("|");
+	if( s.type != elem::SYM ) return false;
+	auto rang2 = _g.equal_range(s);
+	for( auto rit = rang2.first; rit != rang2.second; rit++) {
+		production &prodr = rit->second.first;
+		if(comb.size())	comb.push_back(elem(elem::ALT, alt));
+		comb.insert(comb.end(), prodr.p.begin()+1, prodr.p.end());
+		DBG(assert(rit->second.second == VISITED));
+	}
+	return true;	
+}
+
+bool graphgrammar::collapsewith(){
+	if(sort.empty()) return false;
+	/* To reproduce error, uncomment bellow
+	for( _itg_t it = _g.begin(); it != _g.end(); it++){
+		COUT<< it->second.second << ":" << it->second.first.to_str(0);
+	}
+	*/
+	for (elem &e: sort) {
+		DBG(COUT<<e<<endl;)
+		auto rang = _g.equal_range(e);
+		for( auto sit = rang.first; sit != rang.second; sit++){
+		
+			production &prodc = sit->second.first;
+			for( size_t i = 1 ; i < prodc.p.size(); i++) {
+				elem &r = prodc.p[i];
+				if( r.type == elem::SYM && !(r.e == "null") ) {
+					vector<elem> comb;
+					combine_rhs(r, comb);
+					comb.push_back(elem(elem::CLOSEP, dict.get_lexeme(")")));
+					comb.insert(comb.begin(),elem(elem::OPENP, dict.get_lexeme("(")));
+					prodc.p.erase(prodc.p.begin()+i);
+					prodc.p.insert(prodc.p.begin()+i, 
+						comb.begin(), comb.end());
+					i += comb.size() -2; 
+				}
+			}
+		
+		}
+	}
+	return true;
+}
+
+
 bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
 	if (g.empty()) return true;
 //	o::out()<<"grammar before:"<<endl;
-//	for (production& p : g) o::out() << p << endl;
-	bool changed;
-	if(!transform_ebnf(g, dict, changed )) return true;
-
-	for (size_t k = 0; k != g.size();) {
-		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
-		size_t n = 0;
-		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
-		if (n == g[k].p.size()) { ++k; continue; }
-		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
-		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
-		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
-		g.erase(g.begin() + k);
-	}
-//	o::out()<<"grammar after:"<<endl;
 //	for (production& p : g) o::out() << p << endl;
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
@@ -1986,6 +2078,59 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 						elem(ch)), esc = false;
 				}
 			}
+	bool enable_regdetect_matching= false;
+	if( strs.size() && enable_regdetect_matching) {
+
+		string inputstr = to_string(strs.begin()->second);
+		DBG(COUT<<inputstr<<endl);
+		graphgrammar ggraph(g, dict);
+		ggraph.detectcycle();
+		ggraph.collapsewith();
+		auto prod =  g.begin();
+		while(  prod!= g.end() ) {
+			if( ggraph.iscyclic(prod->p[0])) { prod++; continue;}
+			bool bnull =false;
+			string regexp = ggraph.getregularexpstr(prod->p[0],bnull);
+			DBG(COUT<<"Trying"<<regexp<<endl);
+			if(bnull) {	prod++; continue; }
+			regex rgx(regexp);
+			std::smatch sm;
+			term t;
+ 			std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx);
+    		std::sregex_iterator end;
+			bool bmatch=false;
+			for(;iter != end; ++iter) {
+				DBG(COUT << regexp << " match "<< iter->str()<< endl);
+       			DBG(COUT << "size: " << iter->size() << std::endl);
+				DBG(COUT << "len: " << iter->length(0) << std::endl);
+		
+				t.resize(2);
+				t.tab = get_table({dict.get_rel(prod->p[0].e),{2}});
+				t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
+				p.insert({t});
+				bmatch =true;
+   			}		
+			if(bmatch) prod= g.erase(prod);
+			else prod++;
+		}
+	}
+
+	bool changed;
+	if(!transform_ebnf(g, dict, changed )) return true;
+
+	for (size_t k = 0; k != g.size();) {
+		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
+		size_t n = 0;
+		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
+		if (n == g[k].p.size()) { ++k; continue; }
+		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
+		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
+		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
+		g.erase(g.begin() + k);
+	}
+	DBG(o::out()<<"grammar after:"<<endl);
+	DBG(for (production& p : g) o::out() << p << endl;)
+	
 	vector<term> v;
 	static const set<string> b =
 		{ "alpha", "alnum", "digit", "space", "printable" };
@@ -2101,6 +2246,7 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		}
 		//DBG(COUT<<endl; root->printnode(0, this);)
 		#define GRAMMAR_FOL
+//		#undef GRAMMAR_FOL
 		#ifdef GRAMMAR_FOL
 		v.erase(v.begin()+1,v.end());
 		spform_handle qbf(root);

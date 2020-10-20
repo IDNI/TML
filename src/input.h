@@ -26,6 +26,7 @@
 #include "memory_map.h"
 
 class archive;
+#define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
 /**
  * input class contains input data. input can be one of three types: STDIN,
@@ -270,6 +271,11 @@ struct elem {
 		return e == t.e;
 	}
 	bool operator!=(const elem& t) const { return !(*this == t); }
+	std::string to_str(){
+		if (type == NUM) return to_string(to_string_t(num));
+		if (type == CHR) return to_string(to_string_t(ch)); 
+		return to_string(lexeme2str(e));			
+	}
 };
 
 struct raw_term {
@@ -318,6 +324,12 @@ struct production {
 	std::vector<raw_term> c{};   // constraints after production
 	bool parse(input* in, const raw_prog& prog);
 	bool operator<(const production& t) const { return p < t.p && c < t.c; }
+	std::string to_str(size_t i=1 ){
+		std::string ret;
+		for( auto e = p.begin()+i; e != p.end(); e++)
+			ret.append(e->to_str());			
+		return ret;
+	}
 };
 
 bool operator==(const std::vector<raw_term>& x, const std::vector<raw_term>& y);
@@ -446,6 +458,5 @@ bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
 
-#define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
 #endif

@@ -691,7 +691,7 @@ bool raw_sof::parse(input* in, raw_form_tree *&root) {
 	else in->pos++;
 
 	DBG(COUT << "\n cur = " << in->pos << " tot= " << in->l.size() << " \n ";)
-
+	DBG(root->printTree());
 	return ret;
 }
 
