@@ -2146,19 +2146,18 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			t.resize(2);
 			t[0] = t[1] = -1;
 			t.tab = get_table({dict.get_rel(x.p[0].e),{2}});
-			vector<term> v{t, t};
-			v[0].neg = true;
-
+			vector<term> v{t};
+			p.insert(v);
 			#ifdef GRAMMAR_FOL
 			form* root = new form(form::ATOM, 0, &t );
 			spform_handle qbf(root);
 			v.emplace_back(term::FORM1, qbf);
 			DBG(COUT<<endl; root->printnode(0, this);)
 			#endif
-
-			align_vars(v);
-			prog_after_fp.insert(move(v));
-			p.insert({move(t)});
+			vector<term> af{t, t};
+			af[0].neg = true;
+			align_vars(af);
+			prog_after_fp.insert(move(af));
 			continue;
 		}
 		
