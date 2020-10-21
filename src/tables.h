@@ -228,7 +228,7 @@ private:
 	size_t bits = 2;
 	dict_t dict; // dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
-		 bin_transform = false, print_transformed;
+		 bin_transform = false, print_transformed, apply_regexpmatch = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -438,7 +438,8 @@ private:
 	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
-		bool bin_transform = false, bool print_transformed = false);
+		bool bin_transform = false, bool print_transformed = false, 
+		bool apply_regxmatch = false);
 	~tables();
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);

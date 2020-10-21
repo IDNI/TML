@@ -2078,7 +2078,8 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 						elem(ch)), esc = false;
 				}
 			}
-	bool enable_regdetect_matching= false;
+	
+	bool enable_regdetect_matching= apply_regexpmatch;
 	if( strs.size() && enable_regdetect_matching) {
 
 		string inputstr = to_string(strs.begin()->second);
@@ -2110,11 +2111,12 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				p.insert({t});
 				bmatch =true;
    			}		
-			if(bmatch) prod= g.erase(prod);
-			else prod++;
+	//		if(bmatch) prod= g.erase(prod);
+	//		else 
+				prod++;
 		}
 	}
-
+	
 	bool changed;
 	if(!transform_ebnf(g, dict, changed )) return true;
 
@@ -2136,8 +2138,9 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		{ "alpha", "alnum", "digit", "space", "printable" };
 	set<lexeme, lexcmp> builtins;
 	for (const string& s : b) builtins.insert(dict.get_lexeme(s));
-
+	#define GRAMMAR_FOL
 	for (const production& x : g) {
+		form *root = NULL;
 		if (x.p.size() == 2 && x.p[1].e == "null") {
 			term t;
 			t.resize(2);
@@ -2145,12 +2148,20 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			t.tab = get_table({dict.get_rel(x.p[0].e),{2}});
 			vector<term> v{t, t};
 			v[0].neg = true;
+
+			#ifdef GRAMMAR_FOL
+			form* root = new form(form::ATOM, 0, &t );
+			spform_handle qbf(root);
+			v.emplace_back(term::FORM1, qbf);
+			DBG(COUT<<endl; root->printnode(0, this);)
+			#endif
+
 			align_vars(v);
 			prog_after_fp.insert(move(v));
 			p.insert({move(t)});
 			continue;
 		}
-		form *root = NULL;
+		
 		// ref: maps ith sybmol production to resp. terms
 		std::map<size_t, term> refs;
 		DBG(o::dbg()<<x;)
@@ -2244,14 +2255,6 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		for(int_t j = 2; j< (int_t)x.p.size();j++) {
 			root = new form(form::EXISTS1, 0,  0, new form(form::ATOM, -j), root);
 		}
-		//DBG(COUT<<endl; root->printnode(0, this);)
-		#define GRAMMAR_FOL
-//		#undef GRAMMAR_FOL
-		#ifdef GRAMMAR_FOL
-		v.erase(v.begin()+1,v.end());
-		spform_handle qbf(root);
-		v.emplace_back(term::FORM1, qbf);
-		#endif
 
 		std::set<term> done;
 		bool beqrule = false;
@@ -2335,6 +2338,13 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			}
 			else parse_error(err_constraint_syntax, rt.e[n].e);		
 		}
+//		#undef GRAMMAR_FOL
+		#ifdef GRAMMAR_FOL
+		v.erase(v.begin()+1,v.end());
+		spform_handle qbf(root);
+		v.emplace_back(term::FORM1, qbf);
+		DBG(COUT<<endl; root->printnode(0, this);)
+		#endif
 		p.insert(move(v));
 	}
 	if (print_transformed) print(print(o::to("transformed")
@@ -2793,9 +2803,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 }
 
 tables::tables(dict_t dict, bool bproof, bool optimize, bool bin_transform,
-	bool print_transformed) : dict(move(dict)), bproof(bproof),
+	bool print_transformed, bool apply_regexpmatch) : dict(move(dict)), bproof(bproof),
 	optimize(optimize), bin_transform(bin_transform),
-	print_transformed(print_transformed) {} // dict(*new dict_t)
+	print_transformed(print_transformed), apply_regexpmatch(apply_regexpmatch) {} // dict(*new dict_t)
 
 tables::~tables() {
 	//if (optimize) delete &dict;

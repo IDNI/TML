@@ -288,7 +288,7 @@ driver::driver(string s, options o) : rp(), opts(o) {
 	// we don't need the dict any more, tables owns it from now on...
 	tbl = new tables(move(dict), opts.enabled("proof"), 
 		opts.enabled("optimize"), opts.enabled("bin"),
-		opts.enabled("t"));
+		opts.enabled("t"), opts.enabled("regex"));
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));

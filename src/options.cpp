@@ -196,6 +196,7 @@ void options::setup() {
 	add_bool2("print-steps", "ps", "print steps");
 	add_bool2("print-updates", "pu", "print updates");
 	add_bool2("print-dict", "dict", "print internal string dictionary");
+	add_bool2("reg-match", "regex", "applies regular expression matching");
 
 	add_bool("optimize","optimize and show more benchmarks");
 	add(option(option::type::STRING, { "name", "n" },
