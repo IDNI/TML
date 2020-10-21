@@ -21,7 +21,7 @@ template<typename T> struct ptrcmp_ {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
-typedef std::shared_ptr<class pnft> pnft_handle;
+typedef std::shared_ptr<struct pnft> pnft_handle;
 typedef const pnft_handle& cr_pnft_handle;
 
 struct pnft {
