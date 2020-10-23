@@ -1929,11 +1929,11 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 
 bool ptransformer::visit() {
 	size_t cur = 1;		
-	DBG(COUT<<endl<<p<<endl);
+	//DBG(COUT<<endl<<p<<endl);
 	bool ret = this->parse_alts( this->p.p, cur);
 	if( this->p.p.size() > cur ) ret = false;
 
-	DBG(COUT<<p<<endl);
+	//DBG(COUT<<p<<endl);
 	for ( production t : lp )
 		DBG(COUT<<t<<endl);
 	if(!ret) parse_error("Error Production",
@@ -2004,11 +2004,16 @@ bool graphgrammar::iscyclic( const elem &s) {
 
 std::string graphgrammar::getregularexpstr(const elem &p, bool &bhasnull) {
 	vector<elem> comb;
+	set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
+						U')',U'[', U']', U'{', U'}', U'|', U'\\'};
 	combine_rhs(p, comb);
 	std::string ret;
 	for(elem e: comb ) {
 		if( e.type == elem::SYM && (e.e == "null") )
-			bhasnull= true;
+			{bhasnull= true, ret.append("^$"); continue; }
+		if (e.type == elem::CHR && esc.find(e.ch) != esc.end() ) {
+			ret.append("\\");
+		}
 		ret.append(e.to_str());
 	}
 	return ret;
@@ -2091,25 +2096,23 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		while(  prod!= g.end() ) {
 			if( ggraph.iscyclic(prod->p[0])) { prod++; continue;}
 			bool bnull =false;
-			string regexp = ggraph.getregularexpstr(prod->p[0],bnull);
-			DBG(COUT<<"Trying"<<regexp<<endl);
-			if(bnull) {	prod++; continue; }
+			string regexp = ggraph.getregularexpstr(prod->p[0], bnull);
+			DBG(COUT<<"Trying"<<regexp<<"for "<< *prod<<endl);
+			//if(bnull) {	prod++; continue; }
 			regex rgx(regexp);
 			std::smatch sm;
 			term t;
  			std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx);
     		std::sregex_iterator end;
-			bool bmatch=false;
 			for(;iter != end; ++iter) {
 				DBG(COUT << regexp << " match "<< iter->str()<< endl);
        			DBG(COUT << "size: " << iter->size() << std::endl);
 				DBG(COUT << "len: " << iter->length(0) << std::endl);
-		
+				DBG(COUT << "pos: " << iter->position(0) << std::endl);
 				t.resize(2);
 				t.tab = get_table({dict.get_rel(prod->p[0].e),{2}});
 				t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
 				p.insert({t});
-				bmatch =true;
    			}		
 	//		if(bmatch) prod= g.erase(prod);
 	//		else 
@@ -2147,13 +2150,14 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			t[0] = t[1] = -1;
 			t.tab = get_table({dict.get_rel(x.p[0].e),{2}});
 			vector<term> v{t};
-			p.insert(v);
+		
 			#ifdef GRAMMAR_FOL
-			form* root = new form(form::ATOM, 0, &t );
+		/*  	form* root = new form(form::ATOM, 0, &t );
 			spform_handle qbf(root);
 			v.emplace_back(term::FORM1, qbf);
 			DBG(COUT<<endl; root->printnode(0, this);)
-			#endif
+		 */ 	#endif
+			p.insert(v);
 			vector<term> af{t, t};
 			af[0].neg = true;
 			align_vars(af);
@@ -2787,6 +2791,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
 		if (!add_prog(move(prog_after_fp), {}, false)) return false;
+		COUT<<"running"<<endl;
 		r = pfp();
 	}
 	if (r) for (const raw_prog& np : p.nps) {
