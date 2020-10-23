@@ -228,7 +228,8 @@ private:
 	size_t bits = 2;
 	dict_t dict; // dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
-		 bin_transform = false, print_transformed, apply_regexpmatch = false;
+		 bin_transform = false, print_transformed = false,
+		 apply_regexpmatch = false, keep_guards = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -439,7 +440,7 @@ private:
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false, 
-		bool apply_regxmatch = false);
+		bool apply_regxmatch = false, bool keep_guards = false);
 	~tables();
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
@@ -458,6 +459,11 @@ public:
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }
 
+	void __(std::vector<raw_term>& rts,const lexeme& lx,int_t i,bool neg=0);
+	void transform_guards(raw_prog& rp);
+	void transform_facts(raw_prog& rp);
+	void transform_guard_statements(raw_prog& rp);
+	void remove_guards(raw_prog& rp);
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 	bool error = false;

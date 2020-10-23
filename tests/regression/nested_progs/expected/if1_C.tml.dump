@@ -1,0 +1,8 @@
+C().
+U(16).
+no_B().
+exists_C().
+no_A().
+no_AB().
+exists_C_no_AB().
+exists_C_no_A().

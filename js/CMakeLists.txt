@@ -41,6 +41,7 @@ set(JSLIB_SOURCES
 	../src/tables_ext.cpp
 	../src/term.h
 	../src/transform.cpp
+	../src/transform_guards.cpp
 	../src/utils.cpp
 )
 

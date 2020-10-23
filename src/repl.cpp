@@ -78,20 +78,18 @@ template void repl::reset(basic_ostream<char>&);
 template void repl::reset(basic_ostream<wchar_t>&);
 
 template <typename T>
-void repl::run(basic_ostream<T>& os, size_t steps, size_t break_on_step,
-	bool break_on_fp)
+void repl::run(basic_ostream<T>& os, size_t steps, size_t break_on_step)
 {
 	os << "# Running";
 	if (steps) os << " " << steps << " step" << (steps==1?"":"s");
 	if (break_on_step) os << ", break on step: "<<break_on_step;
-	if (break_on_fp) os << ", break on fixed point";
 	os << endl;
 
-	if (!fin) fin = d->run(steps, break_on_step, break_on_fp);
+	if (!fin) fin = d->run(steps, break_on_step);
 	if (ap) d->out(os);
 }
-template void repl::run(basic_ostream<char>&, size_t, size_t, bool);
-template void repl::run(basic_ostream<wchar_t>&, size_t, size_t, bool);
+template void repl::run(basic_ostream<char>&, size_t, size_t);
+template void repl::run(basic_ostream<wchar_t>&, size_t, size_t);
 
 template <typename T>
 void repl::add(basic_ostream<T>& os, string line) {
@@ -216,7 +214,6 @@ bool repl::eval_input(basic_ostream<T>& os, string l) {
 	else if  (size_t p =   parse_size_t(l, "l")) list(os, p);
 	else if  (l == "s")   step(os);
 	else if  (size_t s =   parse_size_t(l, "s")) step(os, s);
-	else if  (l == "b")   break_on_fp(os);
 	else if  (size_t s =   parse_size_t(l, "b")) break_on_step(os, s);
 	else if  ((f = ws2s(parse_string(l, "load"))) != "")
 		d->load(f);

@@ -1,0 +1,2 @@
+A(100).
+if exists ?x { A(?x) } then A_not_empty else A_empty.

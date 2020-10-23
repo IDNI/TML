@@ -949,34 +949,41 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			}
 		}
 		else if(r.prft != NULL) {
+			for (const raw_term& x : r.h) {
+				get_nums(x), t = from_raw_term(x, true),
+				v.push_back(t);
 
-			const raw_term& x = r.h.front();
-			get_nums(x), t = from_raw_term(x, true), v.push_back(t);
+				bool is_sol = false;
+				form* froot = 0;
 
-			bool is_sol = false;
-			form* froot = 0;
+				raw_form_tree *root = // r.prft.get();
+					r.prft->neg ? new raw_form_tree(
+							elem::NOT, NULL, NULL,
+							r.prft.get())
+						: r.prft.get();
 
-			from_raw_form(r.prft.get(), froot, is_sol);
-			/*
-			DBG(COUT << "\n ........... \n";)
-			DBG(r.prft.get()->printTree();)
-			DBG(COUT << "\n ........... \n";)
-			DBG(froot->printnode(0, this);)
-			*/
-			term::textype extype;
-			if(is_sol) {
-				//DBG(COUT << "\n SOL parsed \n";)
-				//to_pnf(froot);
-				extype = term::FORM2;
+				from_raw_form(root, froot, is_sol);
+				/*
+				DBG(COUT << "\n ........... \n";)
+				DBG(r.prft.get()->printTree();)
+				DBG(COUT << "\n ........... \n";)
+				DBG(froot->printnode(0, this);)
+				*/
+				term::textype extype;
+				if(is_sol) {
+					//DBG(COUT << "\n SOL parsed \n";)
+					//to_pnf(froot);
+					extype = term::FORM2;
 
-			} else {
-				//froot->implic_rmoval();
-				extype = term::FORM1;
+				} else {
+					//froot->implic_rmoval();
+					extype = term::FORM1;
+				}
+				spform_handle qbf(froot);
+				t = term(extype, qbf);
+				v.push_back(t);
+				m.insert(move(v));
 			}
-			spform_handle qbf(froot);
-			t = term(extype, qbf);
-			v.push_back(t);
-			m.insert(move(v));
 		} else  {
 			for (const raw_term& x : r.h)
 				t = from_raw_term(x, true),
@@ -2422,7 +2429,9 @@ void tables::add_tml_update(const term& t, bool neg) {
 }
 
 template <typename T>
-basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os, spbdd_handle& x, const rule& r) {
+basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
+	spbdd_handle& x, const rule& r)
+{
 	if (print_updates) print(os << "# ", r) << "\n# \t-> ";
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
@@ -2794,11 +2803,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		COUT<<"running"<<endl;
 		r = pfp();
 	}
-	if (r) for (const raw_prog& np : p.nps) {
-		if (!r && went >= steps) break;
-		steps -= went; begstep = nstep;
-		r |= run_prog(np, strs, steps, break_on_step);
-		went = nstep - begstep;
+	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
+		for (const raw_prog& np : p.nps) {
+			steps -= went; begstep = nstep;
+			r = run_prog(np, strs, steps, break_on_step);
+			went = nstep - begstep;
+			if (!r && went >= steps) break;
+		}
 	}
 	if (optimize)
 		(o::ms() <<"add_prog: "<<t << " pfp: "),
@@ -2807,9 +2818,11 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 }
 
 tables::tables(dict_t dict, bool bproof, bool optimize, bool bin_transform,
-	bool print_transformed, bool apply_regexpmatch) : dict(move(dict)), bproof(bproof),
-	optimize(optimize), bin_transform(bin_transform),
-	print_transformed(print_transformed), apply_regexpmatch(apply_regexpmatch) {} // dict(*new dict_t)
+	bool print_transformed, bool apply_regexpmatch, bool keep_guards) :
+	dict(move(dict)), bproof(bproof), optimize(optimize),
+	bin_transform(bin_transform), print_transformed(print_transformed),
+	apply_regexpmatch(apply_regexpmatch), keep_guards(keep_guards) {}
+	// dict(*new dict_t)
 
 tables::~tables() {
 	//if (optimize) delete &dict;

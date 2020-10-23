@@ -73,18 +73,16 @@ private:
 	template <typename T>
 	void info(std::basic_ostream<T>&);
 	template <typename T>
-	bool toggle(std::basic_ostream<T>&, const std::string& name, bool &setting);
+	bool toggle(std::basic_ostream<T>&, const std::string& name,
+		bool &setting);
 	template <typename T>
 	void add(std::basic_ostream<T>&, std::string line);
 	template <typename T>
-	void run(std::basic_ostream<T>&, size_t steps = 0, size_t break_on_step=0,
-		bool break_on_fp=0);
+	void run(std::basic_ostream<T>&, size_t steps=0,size_t break_on_step=0);
 	template <typename T>
-	void step(std::basic_ostream<T>&, size_t steps = 1)    { run(os, steps); }
+	void step(std::basic_ostream<T>&, size_t steps = 1)   { run(os, steps);}
 	template <typename T>
-	void break_on_fp(std::basic_ostream<T>&)               { run(os, 0, 0, true); }
-	template <typename T>
-	void break_on_step(std::basic_ostream<T>&, size_t brs) { run(os, 0, brs); }
+	void break_on_step(std::basic_ostream<T>&, size_t brs){ run(os,0, brs);}
 	void out_dict(std::wostream& os);
 	void out_dict(std::ostream& os);
 	bool eval_input(const std::string &l) { return eval_input(os, l); }
@@ -100,11 +98,10 @@ private:
 		return toggle(os, name, setting);
 	}
 	void add(const std::string& line) { add(os, line); }
-	void run(size_t steps, size_t break_on_step = 0, bool break_on_fp = 0) {
-		run(os, steps, break_on_step, break_on_fp);
+	void run(size_t steps, size_t break_on_step = 0) {
+		run(os, steps, break_on_step);
 	}
 	void step(size_t steps = 1)                       { run(steps); };
-	void break_on_fp()                                { run(0, 0, true); };
 	void break_on_step(size_t brs)                    { run(0, brs); };
 };
 

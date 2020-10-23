@@ -153,6 +153,23 @@ the same rule). However this is only a performance advice. TML should work
 correctly either way, where variables (implicitly) range over the whole
 universe.
 
+## Fact deletion
+
+It is also possible to use negated facts. These are deleted right after
+non-negated facts are added and right before rules are being executed.
+
+    a(2). b(?x).
+    ~b(1). ~a(?x).
+    a_copy(?x) :- a(?x).
+    b_copy(?x) :- b(?x).
+
+will result with
+
+    b(2).
+    b(0).
+    b_copy(2).
+    b_copy(0).
+
 ## Sequencing
 
 It is possible to sequence programs one after the other using curly brackets.
@@ -181,7 +198,10 @@ More generally, the output of one program is considered the input of the other.
 It is possible to filter the output before passing it to the next program as in
 the section "Queries".
 
-Nested programs are unsupported as they make no difference from flat sequences.
+# Nested programs
+
+It is possible to nest programs (actually whole sequences). Sequence of nested
+programs is run after the current (parent) program reaches its fixed point.
 
 # Trees
 
@@ -587,6 +607,116 @@ Alternatively, if the user requires extended precision to keep all information o
 
 where ?zh accounts for the most significant bits (MSBs) of the operation and ?zl for the least significant bits (LSBs).
 
+# Rule guards
+
+To enable or disable a rule we can use additional term in rule's body. Existence
+of such a term guards execution of the rule.
+
+    guard.                      # guard fact is required for execution of
+    a_copy(?x) :- a(?x), guard. # this rule
+
+Rule guards are used for implementing **if** and **while** statements.
+
+To properly guard execution of nested programs, it is required to transform
+fact adds and fact deletions into rules. Because these happen in a sequence we
+need to transform each nested program into several consecutive states:
+initialization (__init), start (__start), adds (__add), deletions (__del) and
+rules (__rule).
+
+There is also an additional and independent break (__break) state.
+If this state exists it prevents execution of all rules in the current program
+and thus forces a fixed point and ends its execution.
+
+Transformation of a TML program into states is enabled by using -guards (-g)
+command line option. With this option each nested program
+
+    { # with its unique id (let's say id of this nested prog is __1)
+	fact1, fact2.
+	~fact2.
+	rule1 :- fact1.
+    }
+
+becomes
+
+    {
+	__init (__1).
+        __start(__1), ~__init (__1) :-        __init (__1), ~__break(__1). # *
+        __add  (__1), ~__start(__1) :-        __start(__1), ~__break(__1).
+        __del  (__1), ~__add  (__1) :-        __add  (__1), ~__break(__1).
+        __rule (__1), ~__del  (__1) :-        __del  (__1), ~__break(__1).
+
+         fact1, fact2               :-        __add  (__1), ~__break(__1).
+        ~fact2                      :-        __del  (__1), ~__break(__1).
+         rule1                      :- fact1, __rule (__1), ~__break(__1).
+    }
+
+After the program finishes there is run an internal program which removes all
+the guards from the database. If you want to skip this phase and keep the guards  
+use command line option -keep-guards (-kg). It can be very useful for debugging
+since it keeps last state guard of each nested program plus results of guarding
+statements.
+
+# Guarding statements
+
+Guard transformation enables usage of if and while statements.
+First order form is used as a condition. Guarded code is always nested eventhoug
+it does not have to be always surrounded by '{' and '}'.
+
+## if then (else)
+
+Syntax of **if** statement is:
+
+    if FORM then STATEMENT.                   # or
+    if FORM then STATEMENT else STATEMENT.
+
+FORM is a first order form and STATEMENT can be another guarding statement,
+a nested program or a rule (note that STATEMENT is always nested. It is parsed
+as a nested program, ie. as { rule. }).
+
+Example
+
+    A(10).
+    if exists ?x { A(?x) } then A_not_empty. else { A_empty. }
+
+is equivalent to
+
+    A(10).
+    if exists ?x { A(?x) } then { A_not_empty. } else A_empty.
+
+produces
+
+    A(10).
+    A_not_empty.
+
+**if** is implemented by transformation of a condition (FO form) into a rule which
+adds a guard which then enables execution of the true (if then ...) or false
+(else ...) nested program.
+
+For above example such a rule would be (if id of the guard statement is __0)
+
+    __guard(__0) :- exists ?x { A(?x) }.
+
+Each respective (true/false) nested program block gets added a new rule which
+is run in the __init state. Additionally, head of this rule is added into the
+rule which transitions from the __init to the __start state (marked above in
+transform guards example by # *)
+
+    { # true nested program block with id __1
+        __true(__0) :- __guard(__0), __init(__1).  # __1 = id of "true" prog
+	__init(__1).
+        __start(__1), ~__init (__1) :- __init (__1), ~__break(__1), __true(__0).
+        #...
+    }
+    { # false nested program block with id __2
+        __false(__0) :- ~__guard(__0),__init(__2). # __2 = id of "false" prog
+	__init(__2).
+	__start(__2), ~__init (__2) :- __init (__2), ~__break(__2),__false(__0).
+        #...
+    }
+
+## while do
+
+TBD
 
 # Misc
 

@@ -1,0 +1,59 @@
+A. B.
+
+U(16).
+
+if exists ?A { A } then {
+	exists_A.
+	if exists ?B { B } then {
+		exists_B.
+		exists_AB.
+		if exists ?C { C } then {
+			exists_BC.
+			exists_ABC.
+		} else {
+			exists_AB_no_C.
+			exists_B_no_C.
+		}
+	} else {
+		no_B.
+		exists_A_no_B.
+		if exists ?C { C } then {
+			exists_C_no_B.
+			exists_AC_no_B.
+		} else {
+			no_BC.
+			exists_A_no_BC.
+		}
+	}
+	if exists ?C { C } then {
+		exists_C.
+		exists_AC.
+	} else {
+		no_C.
+		exists_A_no_C.
+	}
+} else {
+	no_A.
+	if exists ?B { B } then {
+		exists_B.
+		exists_B_no_A.
+		if exists ?C { C } then {
+			exists_BC.
+			exists_BC_no_A.
+		} else {
+			exists_B.
+			exists_B_no_A.
+			exists_B_no_C.
+			exists_B_no_AC.
+		}
+	} else {
+		no_B.
+		no_AB.
+		if exists ?C { C } then { exists_C_no_AB. }
+		else { no_BC. no_ABC. }
+	}
+	if exists ?C { C } then {
+		exists_C.
+		exists_C_no_A.
+	} else { no_AC. no_C. }
+}
