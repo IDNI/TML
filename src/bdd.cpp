@@ -602,7 +602,7 @@ void bdd::gc() {
 	v1->reserve(bdd_mmap_mode == MMAP_NONE ? S.size() : max_bdd_nodes);
 	for (size_t n = 0; n < V->size(); ++n)
 		if (has(S, n)) p[n] = v1->size(), v1->emplace_back(move((*V)[n]));
-	stats(o::inf())<<endl;
+	stats(o::dbg())<<endl;
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V->size(); ++n) {
@@ -712,7 +712,7 @@ void bdd::gc() {
 				(*V)[n].h, (*V)[n].l), n);
 		else Mp[(*V)[n].v].emplace(bdd_key(hash_pair((*V)[n].h, (*V)[n].l),
 				(*V)[n].h, (*V)[n].l), n);
-	o::inf() <<"AM: " << AM.size() << " C: "<< C.size() << endl;
+	o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;
 }
 
 void bdd_handle::update(const vector<int_t>& p) {

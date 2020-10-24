@@ -949,37 +949,35 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			}
 		}
 		else if(r.prft != NULL) {
+			bool is_sol = false;
+			form* froot = 0;
+			raw_form_tree *root = // r.prft.get();
+				r.prft->neg ? new raw_form_tree(
+						elem::NOT, NULL, NULL,
+						r.prft.get())
+					: r.prft.get();
+
+			from_raw_form(root, froot, is_sol);
+			/*
+			DBG(COUT << "\n ........... \n";)
+			DBG(r.prft.get()->printTree();)
+			DBG(COUT << "\n ........... \n";)
+			DBG(froot->printnode(0, this);)
+			*/
+			term::textype extype;
+			if(is_sol) {
+				//DBG(COUT << "\n SOL parsed \n";)
+				//to_pnf(froot);
+				extype = term::FORM2;
+			} else {
+				//froot->implic_rmoval();
+				extype = term::FORM1;
+			}
+			spform_handle qbf(froot);
+
 			for (const raw_term& x : r.h) {
 				get_nums(x), t = from_raw_term(x, true),
 				v.push_back(t);
-
-				bool is_sol = false;
-				form* froot = 0;
-
-				raw_form_tree *root = // r.prft.get();
-					r.prft->neg ? new raw_form_tree(
-							elem::NOT, NULL, NULL,
-							r.prft.get())
-						: r.prft.get();
-
-				from_raw_form(root, froot, is_sol);
-				/*
-				DBG(COUT << "\n ........... \n";)
-				DBG(r.prft.get()->printTree();)
-				DBG(COUT << "\n ........... \n";)
-				DBG(froot->printnode(0, this);)
-				*/
-				term::textype extype;
-				if(is_sol) {
-					//DBG(COUT << "\n SOL parsed \n";)
-					//to_pnf(froot);
-					extype = term::FORM2;
-
-				} else {
-					//froot->implic_rmoval();
-					extype = term::FORM1;
-				}
-				spform_handle qbf(froot);
 				t = term(extype, qbf);
 				v.push_back(t);
 				m.insert(move(v));

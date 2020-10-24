@@ -627,7 +627,7 @@ There is also an additional and independent break (__break) state.
 If this state exists it prevents execution of all rules in the current program
 and thus forces a fixed point and ends its execution.
 
-Transformation of a TML program into states is enabled by using -guards (-g)
+Transformation of a TML program into states is enabled by using `-guards` (`-g`)
 command line option. With this option each nested program
 
     { # with its unique id (let's say id of this nested prog is __1)
@@ -652,15 +652,18 @@ becomes
 
 After the program finishes there is run an internal program which removes all
 the guards from the database. If you want to skip this phase and keep the guards  
-use command line option -keep-guards (-kg). It can be very useful for debugging
-since it keeps last state guard of each nested program plus results of guarding
-statements.
+use command line option `-keep-guards` (`-kg`). It can be very useful for
+debugging since it keeps last state guard of each nested program plus results
+of guarding statements.
+
+To see transformed program use `-t` comand line option.
 
 # Guarding statements
 
-Guard transformation enables usage of if and while statements.
-First order form is used as a condition. Guarded code is always nested eventhoug
-it does not have to be always surrounded by '{' and '}'.
+Guard transformation enables usage of **if** and **while** statements.
+First order form is used as a condition. Guarded code is always nested
+eventhough it does not have to be surrounded by '{' and '}' if it is just
+a single rule or another guarding statement.
 
 ## if then (else)
 
@@ -671,7 +674,7 @@ Syntax of **if** statement is:
 
 FORM is a first order form and STATEMENT can be another guarding statement,
 a nested program or a rule (note that STATEMENT is always nested. It is parsed
-as a nested program, ie. as { rule. }).
+as a nested program, ie. `rule.` is parsed as `{ rule. }`).
 
 Example
 
@@ -688,9 +691,9 @@ produces
     A(10).
     A_not_empty.
 
-**if** is implemented by transformation of a condition (FO form) into a rule which
-adds a guard which then enables execution of the true (if then ...) or false
-(else ...) nested program.
+**if** is implemented by transformation of a condition (FO formula) into a rule
+which adds a guard which then enables execution of the true (if then ...) or
+false (else ...) nested program.
 
 For above example such a rule would be (if id of the guard statement is __0)
 
@@ -699,24 +702,64 @@ For above example such a rule would be (if id of the guard statement is __0)
 Each respective (true/false) nested program block gets added a new rule which
 is run in the __init state. Additionally, head of this rule is added into the
 rule which transitions from the __init to the __start state (marked above in
-transform guards example by # *)
+Rule guards transformation example by # *)
 
     { # true nested program block with id __1
-        __true(__0) :- __guard(__0), __init(__1).  # __1 = id of "true" prog
-	__init(__1).
-        __start(__1), ~__init (__1) :- __init (__1), ~__break(__1), __true(__0).
+        __true (__0) :- __guard(__0), __init(__1).
+        __init (__1).
+        __start(__1),  ~__init (__1) :-
+		__init(__1), ~__break(__1), __true(__0).
         #...
     }
     { # false nested program block with id __2
-        __false(__0) :- ~__guard(__0),__init(__2). # __2 = id of "false" prog
-	__init(__2).
-	__start(__2), ~__init (__2) :- __init (__2), ~__break(__2),__false(__0).
+        __false(__0) :- ~__guard(__0), __init(__2).
+        __init (__2).
+        __start(__2),   ~__init (__2) :-
+		__init(__2), ~__break(__2), __false(__0).
         #...
     }
 
 ## while do
 
-TBD
+Syntax of **while** statement:
+
+    while FORM do STATEMENT.
+
+FORM is a first order form and STATEMENT can be another guarding statement,
+a nested program or a rule.
+
+Example
+
+    a(0). a(1). a(2). a(3). a(4).
+    i(0).
+    while ~ { b(1) } do {
+        b(?x), i(?x1), ~a(?x), ~i(?x) :-
+                        a(?x),  i(?x), ?x + 1 = ?x1.
+    }
+
+outputs following
+
+    a(4).
+    a(3).
+    i(3).
+    b(2).
+    b(1).
+    b(0).
+
+Note that while the guard creating rule for the **if** statement is executed in
+the parent program and is not checked anymore when it runs the nested true/false
+programs, guard rule for the **while** statement is executed each step of the
+nested program. Anytime such a rule becomes true it creates a __break state
+which disables all rules in the current program reaching the fixed point and
+continuing with execution to nested sequence of programs and then to next
+program in the current sequence.
+
+Also note that for breaking rule we need to negate the formula.
+
+Example of a breaking rule which is added into the **while**'s nested program:
+
+    __break(__0) :- ~ { ~ { b(1) } }.
+
 
 # Misc
 
