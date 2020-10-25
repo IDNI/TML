@@ -1,3 +1,3 @@
-@string str "aaaa".
+@string str "aaaabaabaaa".
 
-S => 'a'+.
+S => 'a'*.

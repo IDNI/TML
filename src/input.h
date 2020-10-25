@@ -271,7 +271,7 @@ struct elem {
 		return e == t.e;
 	}
 	bool operator!=(const elem& t) const { return !(*this == t); }
-	std::string to_str(){
+	std::string to_str() const{
 		if (type == NUM) return to_string(to_string_t(num));
 		if (type == CHR) return to_string(to_string_t(ch)); 
 		return to_string(lexeme2str(e));			

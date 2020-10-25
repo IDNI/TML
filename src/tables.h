@@ -595,7 +595,8 @@ struct graphgrammar {
 	bool dfs( const elem &s);
 	bool detectcycle();
 	bool iscyclic( const elem &s);
-	std::string getregularexpstr(const elem &p, bool &bhasnull);
+	std::string get_regularexpstr(const elem &p, bool &bhasnull);
+	const std::map<lexeme, std::string, lexcmp> & get_builtin_reg();
 	bool combine_rhs( const elem &s, std::vector<elem> &comb);
 	bool collapsewith();
 };

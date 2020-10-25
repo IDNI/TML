@@ -1837,7 +1837,7 @@ bool ptransformer::parse_alts( vector<elem> &next, size_t& cur){
 
 lexeme ptransformer::get_fresh_nonterminal(){
 	static size_t count=0;
-	string fnt = "R" + to_string(count++);
+	string fnt = "_R"+ to_string(lexeme2str(this->p.p[0].e))+ to_string(count++);
 	return d.get_lexeme(fnt);
 }
 
@@ -1957,11 +1957,12 @@ bool tables::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
 graphgrammar::graphgrammar(vector<production> &t, dict_t &_d): dict(_d) {
 	for(production &p: t)
 		if (p.p.size() < 2) parse_error(err_empty_prod, p.p[0].e);
-		else _g.insert({p.p[0],std::make_pair(p, NONE)}); 
+		else _g.insert({p.p[0],std::make_pair(p, NONE)});	
 }
 	
 bool graphgrammar::dfs( const elem &s) {
 
+	// get all occurrences of s and markin progress
 	auto rang = _g.equal_range(s);
 	for( auto sgit = rang.first; sgit != rang.second; sgit++)
 		sgit->second.second = PROGRESS;
@@ -2001,20 +2002,36 @@ bool graphgrammar::iscyclic( const elem &s) {
 		if(sgit->second.second != VISITED) return true;
 	return false;
 }
+ const std::map<lexeme,string,lexcmp>& graphgrammar::get_builtin_reg() {
+	static const map<lexeme,string,lexcmp> b =
+		  { {dict.get_lexeme("alpha"), "[a-zA-Z]"}, 
+		  {dict.get_lexeme("alnum"), "[a-zA-Z0-9]"},
+		  {dict.get_lexeme("digit"), "[0-9]" },
+		  {dict.get_lexeme("space"),  "[^\\S\\r\\n]" },  
+		  {dict.get_lexeme("printable") , "[\\x00-\\x7F]"}
+		};
+		return b;
+}
 
-std::string graphgrammar::getregularexpstr(const elem &p, bool &bhasnull) {
+std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull) {
 	vector<elem> comb;
-	set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
+	static set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
 						U')',U'[', U']', U'{', U'}', U'|', U'\\'};
+	
+	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();  
 	combine_rhs(p, comb);
 	std::string ret;
-	for(elem e: comb ) {
+	for(const elem &e: comb ) {
 		if( e.type == elem::SYM && (e.e == "null") )
-			{bhasnull= true, ret.append("^$"); continue; }
-		if (e.type == elem::CHR && esc.find(e.ch) != esc.end() ) {
-			ret.append("\\");
+			bhasnull = true, ret.append("^$");  
+		else if( b.find(e.e) != b.end())
+			ret.append(b.at(e.e));		
+		else if (e.type == elem::CHR) {
+				if(esc.find(e.ch) != esc.end())
+					  ret.append("\\");
+			ret.append(e.to_str());
 		}
-		ret.append(e.to_str());
+		else ret.append(e.to_str());
 	}
 	return ret;
 }
@@ -2038,6 +2055,7 @@ bool graphgrammar::collapsewith(){
 		COUT<< it->second.second << ":" << it->second.first.to_str(0);
 	}
 	*/
+	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();
 	for (elem &e: sort) {
 		DBG(COUT<<e<<endl;)
 		auto rang = _g.equal_range(e);
@@ -2046,7 +2064,8 @@ bool graphgrammar::collapsewith(){
 			production &prodc = sit->second.first;
 			for( size_t i = 1 ; i < prodc.p.size(); i++) {
 				elem &r = prodc.p[i];
-				if( r.type == elem::SYM && !(r.e == "null") ) {
+				if( r.type == elem::SYM && !(r.e == "null") &&
+					b.find(r.e) == b.end() ) {
 					vector<elem> comb;
 					combine_rhs(r, comb);
 					comb.push_back(elem(elem::CLOSEP, dict.get_lexeme(")")));
@@ -2088,7 +2107,7 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 	if( strs.size() && enable_regdetect_matching) {
 
 		string inputstr = to_string(strs.begin()->second);
-		DBG(COUT<<inputstr<<endl);
+		DBG(COUT<<inputstr<<endl);		
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
 		ggraph.collapsewith();
@@ -2096,14 +2115,15 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		while(  prod!= g.end() ) {
 			if( ggraph.iscyclic(prod->p[0])) { prod++; continue;}
 			bool bnull =false;
-			string regexp = ggraph.getregularexpstr(prod->p[0], bnull);
+			string regexp = ggraph.get_regularexpstr(prod->p[0], bnull);
 			DBG(COUT<<"Trying"<<regexp<<"for "<< *prod<<endl);
-			//if(bnull) {	prod++; continue; }
+			/* if(bnull) {	prod++; continue; } */
 			regex rgx(regexp);
 			std::smatch sm;
 			term t;
  			std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx);
     		std::sregex_iterator end;
+			//bool bmatch=false;
 			for(;iter != end; ++iter) {
 				DBG(COUT << regexp << " match "<< iter->str()<< endl);
        			DBG(COUT << "size: " << iter->size() << std::endl);
@@ -2113,10 +2133,11 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				t.tab = get_table({dict.get_rel(prod->p[0].e),{2}});
 				t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
 				p.insert({t});
+			//	bmatch = true;
    			}		
-	//		if(bmatch) prod= g.erase(prod);
-	//		else 
-				prod++;
+		// 	if(bmatch) prod= g.erase(prod);
+		//	else 
+		 		prod++;
 		}
 	}
 	
@@ -2141,7 +2162,7 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		{ "alpha", "alnum", "digit", "space", "printable" };
 	set<lexeme, lexcmp> builtins;
 	for (const string& s : b) builtins.insert(dict.get_lexeme(s));
-	#define GRAMMAR_FOL
+	//#define GRAMMAR_FOL
 	for (const production& x : g) {
 		form *root = NULL;
 		if (x.p.size() == 2 && x.p[1].e == "null") {
