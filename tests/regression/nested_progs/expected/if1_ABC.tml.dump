@@ -1,0 +1,11 @@
+A().
+B().
+C().
+U(16).
+exists_A().
+exists_B().
+exists_AB().
+exists_BC().
+exists_ABC().
+exists_C().
+exists_AC().

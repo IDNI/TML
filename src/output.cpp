@@ -433,6 +433,19 @@ template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_rule& r) {
+	return print_raw_rule(os, r, 0);
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_rule&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
+
+template <typename T>
+basic_ostream<T>& print_raw_rule(basic_ostream<T>& os, const raw_rule& r,
+	size_t level)
+{
+	bool compact = true;
+	basic_string<T>indent(level, '\t');
+	os << indent;
 	switch (r.type) {
 		case raw_rule::GOAL: os << '!'; break;
 		case raw_rule::TREE: os << "!!"; break;
@@ -440,26 +453,64 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_rule& r) {
 	}
 	for (size_t n = 0; n < r.h.size(); ++n)
 		if ((os << r.h[n]), n != r.h.size() - 1) os << ',';
-	if (!r.b.size()) return os << '.';
-	os << " :- " << endl;
+	if (!r.b.size() && !r.prft.get()) return os << '.';
+	os << " :- ";
+	bool uni = r.b.size() == 1 && r.b[0].size() == 1;
+	bool noendl = !r.b.size() || uni;
+	if (!compact && !noendl) os << endl;
+	if (r.prft.get()) os << r.prft.get();
 	for (size_t n = 0; n < r.b.size(); ++n) {
 		for (size_t k = 0; k < r.b[n].size(); ++k)
-			if ((os << '\t' << r.b[n][k]), k != r.b[n].size() - 1)
-				os << ',' << endl;
+			if (((compact||uni?os<<"":os<<indent<<'\t')<<r.b[n][k]),
+				k != r.b[n].size() - 1)
+					os << ',' << (compact ? " " : "\n");
 		if (n != r.b.size() - 1) os << ';' << endl;
 	}
 	return os << '.';
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_rule&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
+template basic_ostream<char>& print_raw_rule(basic_ostream<char>&,
+	const raw_rule&, size_t level);
+template basic_ostream<wchar_t>& print_raw_rule(basic_ostream<wchar_t>&,
+	const raw_rule&, size_t level);
+
+// TODO this is just a draft printer for raw form tree - not completly correct
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
+	function<basic_ostream<T>&(const raw_form_tree*)>print_node;
+	print_node = [&os, &print_node] (const raw_form_tree* prft)
+		-> basic_ostream<T>&
+	{
+		basic_ostringstream<T> op;
+		bool wrap = prft->type != elem::VAR &&
+			prft->type != elem::SYM &&
+			prft->type != elem::NOT;
+		bool prefop = prft->el && (
+			prft->el->type == elem::FORALL ||
+			prft->el->type == elem::EXISTS ||
+			prft->el->type == elem::UNIQUE);
+		bool prefix = (prft->rt || prefop);
+		if (prft->neg) os << "~ ";
+		if (prft->type == elem::NOT) os << "~ ";
+		else prft->rt ? op << *prft->rt
+			: (prft->el ? op << *prft->el << " " : op << "");
+		os << (wrap ? "{ " : "");
+		if (prefix) os << op.str();
+		if (prft->l) print_node(prft->l);
+		if (!prefix) os << " " << op.str();
+		if (prft->r) print_node(prft->r);
+		os << (wrap ? " }": " ");
+		return os;
+	};
+	return print_node(prft);
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&,
+	const raw_form_tree* prft);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
+	const raw_form_tree* prft);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_prog& p) {
-	for (auto x : p.d) os << x << endl;
-	for (auto x : p.g) os << x << endl;
-	for (auto x : p.r) os << x << endl;
-	return os;
+	return print_raw_prog_tree<T>(os, p, 0);
 }
 template
 basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_prog& p);
@@ -467,10 +518,26 @@ template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& s,const raw_prog& p);
 
 template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_progs& p) {
-	if (p.p.size() == 1) os << p.p[0];
-	else for (auto x : p.p) os << '{' << endl << x << '}' << endl;
+basic_ostream<T>& print_raw_prog_tree(basic_ostream<T>& os, const raw_prog& p,
+	size_t level)
+{
+	basic_string<T> indent(level, '\t');
+	if (p.type != raw_prog::PFP) os << indent << "# "<< (int_t)p.type<<"\n";
+	for (auto x : p.d) os << indent << x << "\n";
+	for (auto x : p.g) os << indent << x << "\n";
+	for (auto x : p.r) print_raw_rule(os, x, level) << "\n";
+	for (auto x : p.nps) print_raw_prog_tree(os << indent << "{\n",
+		x, level+1) << indent << "}\n";
 	return os;
+}
+template basic_ostream<char>& print_raw_prog_tree(basic_ostream<char>& os,
+	const raw_prog& p, size_t level);
+template basic_ostream<wchar_t>& print_raw_prog_tree(basic_ostream<wchar_t>& s,
+	const raw_prog& p, size_t level);
+
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_progs& p) {
+	return os << p.p;
 }
 template
 basic_ostream<char>& operator<<(basic_ostream<char>& os, const raw_progs& p);
@@ -587,6 +654,7 @@ void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 	os << to_raw_term(r.t) << " :- ";
+	if (r.f) os << "(form printing not supported yet)"; // TODO fix transform_bin
 	for (auto it = r.begin(); it != r.end(); ++it)
 		for (size_t n = 0; n != (*it)->t.size(); ++n)
 			os << to_raw_term((*it)->t[n]) << (n==(*it)->t.size()-1

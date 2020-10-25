@@ -1070,7 +1070,9 @@ archive& archive::operator<<(const driver& d) {
 	add_lexemes(*dict_, d.strs_extra);
 	add_lexemes(*dict_, d.rels);
 	add_lexemes(*dict_, d.vars);
-	for (const raw_prog& p : d.rp.p) {
+	//for (const raw_prog& p : d.rp.p) 
+	{ // TODO
+		const raw_prog& p = d.rp.p;
 		for (const lexeme& l : p.builtins)
 			add_lexeme_and_map(dr, l, false);
 		for (const directive& dir : p.d)
@@ -1225,7 +1227,9 @@ size_t archive::dict_and_lexemes_size(const driver& drv) {
 	//SPOS0("driver varsd")
 	for (const lexeme& l : drv.vars)           add_lexeme_size(l);
 	//SPOS0("driver raw prog")
-	for (const raw_prog& p : drv.rp.p) {
+	//for (const raw_prog& p : drv.rp.p)
+	{ // TODO
+		const raw_prog& p = drv.rp.p;
 		//SPOS0("rp builtins")
 		for (const lexeme& l : p.builtins) add_lexeme_size(l);
 		//SPOS0("rp directive args")

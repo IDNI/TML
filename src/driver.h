@@ -76,7 +76,7 @@ class driver {
 
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
-	bool transform(raw_progs& rp, size_t n, const strs_t& strtrees);
+	bool transform(raw_prog& rp, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
@@ -102,8 +102,7 @@ class driver {
 //		const std::map<term, std::vector<term>>&, std::set<term>& done);
 //	sysstring_t get_trees(const term& roots,const db_t& t,size_t bits);
 	void progs_read(cstr s);
-	void new_sequence();
-	bool prog_run(raw_progs& rp, size_t n, nlevel steps=0, size_t brstep=0);
+	bool prog_run(raw_prog& rp, nlevel steps=0, size_t brstep=0);
 	//driver(raw_progs, options o);
 	//driver(raw_progs);
 	size_t load_stdin();
@@ -141,8 +140,8 @@ public:
 	void list(std::basic_ostream<T>& os, size_t p = 0);
 	bool add(input* in);
 	void restart();
-	bool run(size_t steps = 0, size_t br_on_step=0, bool br_on_fp = false);
-	bool step(size_t steps = 1, size_t br_on_step=0, bool br_on_fp = false);
+	bool run(size_t steps = 0, size_t br_on_step=0);
+	bool step(size_t steps = 1, size_t br_on_step=0);
 	size_t nsteps() { return tbl->step(); };
 	template <typename T>
 	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }

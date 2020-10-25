@@ -49,8 +49,7 @@ int main(int argc, char** argv) {
 		if (d.error) goto quit;
 		if (archive_file != "") d.load(archive_file);
 		if (d.error) goto quit;
-		d.run((size_t)o.get_int("steps"), (size_t)o.get_int("break"),
-			o.enabled("break-on-fp"));
+		d.run((size_t)o.get_int("steps"), (size_t)o.get_int("break"));
 		if (d.error) goto quit;
 		archive_file = o.get_string("save");
 		if (archive_file != "") d.save(archive_file);

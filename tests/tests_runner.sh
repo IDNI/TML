@@ -19,6 +19,7 @@ dir_expected="$1/expected"
 save=false
 [[ "$2" == "--save" ]] && echo "saving" && save=true
 status=0
+diropts=""
 
 # saves output ($1) as expected ($2)
 save_output() {
@@ -50,7 +51,8 @@ run() {
 	for output in ${outputs[*]}; do
 		options+=("--$output" "$1.$output")
 	done
-	$tml "${options[@]}"
+	[[ -n "$diropts" ]] && `$tml ${options[@]} $diropts` \
+		|| $tml "${options[@]}"
 }
 
 # save outputs of program ($1) as expected
@@ -83,6 +85,7 @@ clean() {
 # run tests
 for P in $dir/*.tml; do
 	echo -ne "$P: \t"
+	[[ -f "$dir/options" ]] && diropts=`cat $dir/options`
 	run "$P"
 	[[ $save == true ]] \
 		&& save "$P" \

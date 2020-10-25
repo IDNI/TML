@@ -1,0 +1,12 @@
+r1 :- f1.
+{
+	f2.
+	r2 :- f2.
+}
+if exists ?x { r1 } then {
+	f3.
+	r3 :- f3.
+} else {
+	f4.
+	r4 :- f4.
+}

@@ -49,6 +49,7 @@ set(TML_SOURCES
 	tables.cpp
 	tables_ext.cpp
 	transform.cpp
+	transform_guards.cpp
 	utils.cpp
 )
 
