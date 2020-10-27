@@ -580,7 +580,7 @@ struct ptransformer{
 	bool is_firstoffactor(elem &c);
 	bool parse_alts( std::vector<elem> &next, size_t& cur);
 	lexeme get_fresh_nonterminal();
-	bool synth_recur( struct production &np, std::vector<elem>::const_iterator from, 
+	bool synth_recur( std::vector<elem>::const_iterator from, 
 		std::vector<elem>::const_iterator till, bool bnull, bool brecur,
 		bool balt);
 	bool parse_factor( std::vector<elem> &next, size_t& cur);

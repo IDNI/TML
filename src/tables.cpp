@@ -1846,13 +1846,25 @@ lexeme ptransformer::get_fresh_nonterminal(){
 	return d.get_lexeme(fnt);
 }
 
-bool ptransformer::synth_recur( production &np, vector<elem>::const_iterator from, 
+bool ptransformer::synth_recur( vector<elem>::const_iterator from, 
 		vector<elem>::const_iterator till, bool bnull = true, bool brecur =true,
 		bool balt= true ){
 	
+	if(brecur ) { 
+		bool binsidealt =false; // for | to be present inside
+		for( vector<elem>::const_iterator f = from; f!=till; f++) 
+			if(f->type == elem::ALT) {binsidealt =true; break;}
+		if(binsidealt) {
+			synth_recur( from, till, false, false, false);
+			from = lp.back().p.begin();
+			till = lp.back().p.begin()+1;
+		}
+	}
+	lp.emplace_back();
+	production &np = lp.back();
 	elem sym = elem(elem::SYM,  get_fresh_nonterminal());   
-	np.p.push_back( sym);
-	np.p.insert(np.p.end(), from , till);
+	np.p.push_back( sym);	
+	np.p.insert(np.p.end(), from , till);	
 	if(brecur) np.p.push_back( sym);
 	elem alte = elem(elem::ALT, d.get_lexeme( "|" ) );
 	if(balt) np.p.emplace_back(alte);
@@ -1874,8 +1886,8 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 			(next[cur].arith_op == MULT 	||
 				next[cur].arith_op == ADD		)) {  
 		
-			lp.emplace_back(),
-			synth_recur(lp.back(), next.begin()+start, next.begin()+cur,
+			//lp.emplace_back(),
+			synth_recur( next.begin()+start, next.begin()+cur,
 			next[cur].arith_op == MULT),
 			++cur;
 			next.erase( next.begin()+start, next.begin()+cur);
@@ -1890,8 +1902,8 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSESB) return false;			
 		++cur;
-		lp.emplace_back();
-		synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur-1, true, false);
+		//lp.emplace_back();
+		synth_recur( next.begin()+start+1, next.begin()+cur-1, true, false);
 		next.erase( next.begin()+start, next.begin()+cur);
 		next.insert( next.begin()+start, lp.back().p[0]);
 		return cur = start+1, true; 
@@ -1902,15 +1914,16 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSEP) return false;			
 		++cur;
-		lp.emplace_back();
+		//lp.emplace_back();
 		if(next[cur].type == elem::ARITH && 
 			(next[cur].arith_op == MULT 	||
 			next[cur].arith_op == ADD		)) 
-			synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur-1,
+			// include brackets for correctness since it may contain alt
+			synth_recur( next.begin()+start+1, next.begin()+cur-1,
 			next[cur].arith_op == MULT),
 			++cur;			
 		else //making R => ...
-			synth_recur(this->lp.back(), begin(next)+start+1, begin(next)+cur -1,
+			synth_recur( begin(next)+start+1, begin(next)+cur -1,
 			false, false, false);
 		next.erase( next.begin()+start, next.begin()+cur);
 		next.insert( next.begin()+start, this->lp.back().p[0]);
@@ -1922,9 +1935,9 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSEB) return false;			
 		++cur;
-		lp.emplace_back();
+		//lp.emplace_back();
 		// making R => ... R | null 
-		synth_recur(lp.back(), next.begin()+start+1, next.begin()+cur -1);
+		synth_recur( next.begin()+start+1, next.begin()+cur -1);
 		next.erase( next.begin()+start, next.begin()+cur);
 		next.insert( next.begin()+start, lp.back().p[0]);
 		return cur = start+1, true; 
@@ -1952,7 +1965,7 @@ bool tables::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
 	changed = false;
 	for (size_t k = 0; k != g.size();k++) {
 		ptransformer pt(g[k], d);
-		if(!pt.visit()) return error = true, ret = false;
+		if(!pt.visit()) return ret = false;
 		g.insert( g.end(), pt.lp.begin(), pt.lp.end() ), 
 		changed |= pt.lp.size()>0;
 	}
@@ -2013,14 +2026,14 @@ bool graphgrammar::iscyclic( const elem &s) {
 		  {dict.get_lexeme("alnum"), "[a-zA-Z0-9]"},
 		  {dict.get_lexeme("digit"), "[0-9]" },
 		  {dict.get_lexeme("space"),  "[^\\S\\r\\n]" },  
-		  {dict.get_lexeme("printable") , "[\\x00-\\x7F]"}
+		  {dict.get_lexeme("printable") , "[\\x20-\\x7F]"}
 		};
 		return b;
 }
 
 std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull) {
 	vector<elem> comb;
-	static set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
+	static const set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
 						U')',U'[', U']', U'{', U'}', U'|', U'\\'};
 	
 	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();  
@@ -2107,10 +2120,11 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 						elem(ch)), esc = false;
 				}
 			}
-	
+	clock_t start, end;
+	measure_time_start();
 	bool enable_regdetect_matching= apply_regexpmatch;
 	if( strs.size() && enable_regdetect_matching) {
-
+		
 		string inputstr = to_string(strs.begin()->second);
 		DBG(COUT<<inputstr<<endl);		
 		graphgrammar ggraph(g, dict);
@@ -2140,12 +2154,13 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				p.insert({t});
 			//	bmatch = true;
    			}		
-		// 	if(bmatch) prod= g.erase(prod);
-		//	else 
+			//if(bmatch) prod= g.erase(prod);
+			//else 
 		 		prod++;
 		}
 	}
-	
+	COUT<<"REGEX"<<endl;
+	measure_time_end();
 	bool changed;
 	if(!transform_ebnf(g, dict, changed )) return true;
 
