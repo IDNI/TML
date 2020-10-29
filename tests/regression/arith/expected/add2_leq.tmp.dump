@@ -1,0 +1,21 @@
+setA(15).
+setB0(4 8).
+setB0(3 6).
+setB0(2 4).
+setB0(1 2).
+setB0(0 0).
+setB1(5 10).
+setB1(4 8).
+setB1(3 6).
+setB1(2 4).
+setB1(1 2).
+setB1(0 0).
+setB2(10).
+setB2(8).
+setB2(6).
+setB2(4).
+setB2(2).
+setB2(0).
+setB3(2).
+setB4(5).
+setB6(1).

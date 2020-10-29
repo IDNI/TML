@@ -951,14 +951,16 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		else if(r.prft != NULL) {
 			bool is_sol = false;
 			form* froot = 0;
+
 			raw_form_tree *root = // r.prft.get();
 				r.prft->neg ? new raw_form_tree(
 						elem::NOT, NULL, NULL,
 						r.prft.get())
 					: r.prft.get();
-
 			from_raw_form(root, froot, is_sol);
+
 			/*
+
 			DBG(COUT << "\n ........... \n";)
 			DBG(r.prft.get()->printTree();)
 			DBG(COUT << "\n ........... \n";)
@@ -1429,29 +1431,32 @@ void tables::cqc(flat_prog& p) {
 		v.emplace_back(r), cqc_minimize(v.back());
 }*/
 
-void tables::get_form(pnft_handle& p, const term_set& al, const term& h) {
-
+void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	auto t = al.begin();
 	DBG(assert(t->extype == term::FORM1 || t->extype == term::FORM2));
+	alt a;
+	a.f.reset(new(pnft));
 
 	const term_set anull;
 	size_t varsh;
 	varmap vm = get_varmap(h, anull, varsh), vmh;
 	varsh = vm.size();
-	p->vm = vm;
+	a.f->vm = vm;
 	if (t->extype == term::FORM1)
-		handler_form1(p, t->qbf.get(), vm, vmh);
+		handler_form1(a.f, t->qbf.get(), vm, vmh, true);
 	else
-		handler_formh(p, t->qbf.get(), vm, vmh);
+		handler_formh(a.f, t->qbf.get(), vm, vmh);
 
-	if (varsh > 0) {
-		auto d = deltail(p->vm.size(), h.size());
+	if (varsh > 0 && a.f->ex.size() == 0) {
+		auto d = deltail(a.f->vm.size(), h.size(), bits-2);
 		term t; t.resize(vm.size());
 		for (auto &v : vm) t[v.second] = v.first;
-		assert(vm.size() == p->vm.size());
-		p->perm_h = get_perm(t, p->vm, p->vm.size());
-		p->ex = d.first, p->perm = d.second;
+		assert(vm.size() == a.f->vm.size());
+		a.f->perm_h = get_perm(t, a.f->vm, a.f->vm.size(), bits-2);
+		a.f->ex = d.first, a.f->perm = d.second;
 	}
+
+	as.insert(a);
 	return;
 }
 
@@ -1511,7 +1516,7 @@ void tables::get_rules(flat_prog p) {
 		for (const term_set& al : x.second)
 			if (al.begin()->extype == term::FORM1 ||
 					al.begin()->extype == term::FORM2)
-				r.f.reset(new(pnft)), get_form(r.f, al, t);
+				get_form(al, t, as);
 			else
 				get_alt(al, t, as);
 
@@ -2643,6 +2648,17 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	v.push_back(a.rlast = deltail(t && a.rng, a.varslen, len));*/
 	//DBG(bdd::gc();)
+	if (a.f) {
+		bdd_handles f; //form
+		formula_query(a.f, f);
+		//TODO: complete for any type, only for ints by now
+		if (a.f->ex.size() != 0 ) {
+			append_num_typebits(f[0], a.f->vm.size());
+			a.rlast = f[0];
+		}
+		else a.rlast = f[0] == hfalse ? hfalse : htrue;
+		return a.rlast;
+	}
 
 	bdd_handles v1 = { a.rng, a.eq };
 	spbdd_handle x;
@@ -2654,11 +2670,9 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 			return hfalse;
 		} else v1.push_back(x);
 
-
-	//XXX: for over bdd arithmetic (currently handled as a bltin, although may change)
+	//NOTE: for over bdd arithmetic (currently handled as a bltin, although may change)
 	// In case arguments/ATOMS are the same than last iteration,
 	// here is were it should be avoided to recompute.
-
 	if (a.idbltin > -1) alt_query_bltin(a, v1) ;
 
 	sort(v1.begin(), v1.end(), handle_cmp);
@@ -2695,29 +2709,14 @@ bool table::commit(DBG(size_t /*bits*/)) {
 }
 
 char tables::fwd() noexcept {
-//	DBG(out(o::out()<<"db before:"<<endl);)
 	for (rule& r : rules) {
 		bdd_handles v(r.size() == 0 ? 1 : r.size());
 		spbdd_handle x;
-		bdd_handles f; //form
-
-		if (!r.f)
-			for (size_t n = 0; n != r.size(); ++n)
-				v[n] = alt_query(*r[n], r.len);
-		else {
-			formula_query(r.f, f);
-			//TODO: complete for any type, only for ints by now
-			append_num_typebits(f[0], r.f->vm.size());
-			f[0] = f[0]^r.f->perm_h;
-			if (r.f->ex.size() != 0)
-				v[0] = bdd_and_many_ex_perm(f,r.f->ex, r.f->perm);
-			else v[0] = f[0] == hfalse ? hfalse : htrue;
-		}
-
+		for (size_t n = 0; n != r.size(); ++n)
+			v[n] = alt_query(*r[n], r.len);
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
-		// applying the r.eq and or-ing all alt-s
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
-//		DBG(assert(bdd_nvars(x) < r.len*bits);)
+		//DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 		if (print_updates || populate_tml_update)
