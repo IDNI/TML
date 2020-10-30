@@ -43,7 +43,7 @@ public:
 			for (ccs c : d.strs_allocated)
 				if (l[0] == c) { // remapped
 					auto it = remap.find(c);
-					if (it == remap.end()) throw 0;
+					if (it == remap.end()) { DBGFAIL; }
 					ccs r = it->second;
 					size_t s = strlen(r);
 					lexeme lx = { r, r+s };

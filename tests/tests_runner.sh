@@ -85,7 +85,8 @@ clean() {
 # run tests
 for P in $dir/*.tml; do
 	echo -ne "$P: \t"
-	[[ -f "$dir/options" ]] && diropts=`cat $dir/options`
+	[[ -f "$dir/options" ]] && diropts=`cat $dir/options` \
+		|| diropts=""
 	run "$P"
 	[[ $save == true ]] \
 		&& save "$P" \

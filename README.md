@@ -631,15 +631,15 @@ Transformation of a TML program into states is enabled by using `-guards` (`-g`)
 command line option. With this option each nested program
 
     { # with its unique id (let's say id of this nested prog is __1)
-	fact1, fact2.
-	~fact2.
-	rule1 :- fact1.
+        fact1, fact2.
+        ~fact2.
+        rule1 :- fact1.
     }
 
 becomes
 
     {
-	__init (__1).
+        __init (__1).
         __start(__1), ~__init (__1) :-        __init (__1), ~__break(__1). # *
         __add  (__1), ~__start(__1) :-        __start(__1), ~__break(__1).
         __del  (__1), ~__add  (__1) :-        __add  (__1), ~__break(__1).
@@ -650,11 +650,11 @@ becomes
          rule1                      :- fact1, __rule (__1), ~__break(__1).
     }
 
-After the program finishes there is run an internal program which removes all
-the guards from the database. If you want to skip this phase and keep the guards  
-use command line option `-keep-guards` (`-kg`). It can be very useful for
-debugging since it keeps last state guard of each nested program plus results
-of guarding statements.
+An internal program is run after the program finishes. This program removes all
+the guards from the database. If you want to skip this phase and keep the guards
+use command line option `-keep-guards` (`-kg`). It can be  useful for debugging
+since it keeps last state guard of each nested program plus results of guarding
+statements.
 
 To see transformed program use `-t` comand line option.
 
