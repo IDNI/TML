@@ -109,7 +109,7 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		   (f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
 		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
 		   ((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
-		   ((f->type == form::EXISTS1 || f->type == form::FORALL1) && f->r != NULL)
+		   ((f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) && f->r != NULL)
 
 		));
 
@@ -358,8 +358,41 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	q = bdd_and_many(move(v));
 	if (f->neg) q = bdd_not(q);
 
-	if (f->quants.size() != 0)
-		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
+	if (f->quants.size() != 0) {
+		//q = bdd_quantify(q, f->quants, bits-2, f->varslen);
+		spbdd_handle s_ex = htrue, s_fa = htrue, s_un = htrue;
+		bools ex_fa, ex_ex, ex_un;
+		for (size_t i = 0; i < f->varslen; ++i) {
+			for (size_t j = 0; j< bits-2; ++j) {
+				if (j >= f->quants.size()) {
+					ex_ex.push_back(true);
+					ex_fa.push_back(true);
+					ex_un.push_back(true);
+				}
+				else if (f->quants[j] == FA) {
+					ex_fa.push_back(false);
+					ex_ex.push_back(true);
+					ex_un.push_back(true);
+				}
+				else if (f->quants[j] == EX) {
+					ex_fa.push_back(true);
+					ex_ex.push_back(false);
+					ex_un.push_back(true);
+				}
+				else if (f->quants[j] == UN) {
+					ex_fa.push_back(true);
+					ex_ex.push_back(true);
+					ex_un.push_back(false);
+				}
+			}
+		}
+		if (ex_fa.size() != 0) s_fa = q / ex_fa;
+		if (ex_ex.size() != 0) s_ex = q / ex_ex;
+		if (ex_ex.size() != 0) s_ex = q / ex_ex;
+		if (ex_un.size() != 0) s_un =  q / ex_un;
+		//TODO: satcount for s_un
+		if (s_fa != htrue || s_ex == hfalse ) q = hfalse;
+	}
 	//realign variables
 	if (f->perm_h.size()!= 0) {
 		q = q^f->perm_h;

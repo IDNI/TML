@@ -1,0 +1,24 @@
+A0(0 0).
+A0(1 1).
+A0(2 1).
+A0(3 3).
+C0(?x) :- forall ?x exists ?y { A0(?x ?y) }.
+
+A1(0 0).
+A1(0 1).
+A1(0 2).
+A1(0 3).
+A1(1 2).
+A1(1 3).
+A1(2 3).
+C1a(?x) :- forall ?x forall ?y { {?x < ?y} -> {A1(?x ?y)} }.
+C1b(?x) :- forall ?x forall ?y {{A1(?x ?y)} }.
+
+A2(0 1).
+A2(1 2).
+A2(2 3).
+A2(3 0).
+C2(?x) :- forall ?x forall ?y {A2(?x ?y) }.
+
+A3(?x ?y).
+C3(?x) :- forall ?x forall ?y { A3(?x ?y) }.
