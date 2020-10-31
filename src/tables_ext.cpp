@@ -18,6 +18,13 @@
 #include "output.h"
 using namespace std;
 
+//#define L2
+#ifdef L2
+	#define DBG2(x) x
+#else
+	#define DBG2(x) ;
+#endif
+
 typedef tuple<size_t, size_t, size_t, int_t, uint_t, uint_t> alumemo;
 map<alumemo, spbdd_handle> carrymemo;
 map<alumemo, spbdd_handle> addermemo;
@@ -26,6 +33,24 @@ map<alumemo, spbdd_handle> addermemo;
 #define mknum(x) ((((int_t)x)<<2)|2)
 
 extern uints perm_init(size_t n);
+
+pair<bools, uints> tables::deltail(size_t len1, size_t len2, size_t bits) const {
+	bools ex(len1 * bits, false);
+	uints perm = perm_init(len1 * bits);
+	for (size_t n = 0; n != len1; ++n)
+		for (size_t k = 0; k != bits; ++k)
+			if (n >= len2) ex[pos(k, bits, n, len1)] = true;
+			else perm[pos(k,bits,n, len1)] = pos(k,bits, n, len2);
+	return { ex, perm };
+}
+uints tables::get_perm(const term& t, const varmap& m, size_t len, size_t bits) const {
+	uints perm = perm_init(t.size() * bits);
+	for (size_t n = 0, b; n != t.size(); ++n)
+		if (t[n] < 0)
+			for (b = 0; b != bits; ++b)
+				perm[pos(b,bits,n,t.size())] = pos(b,bits,m.at(t[n]),len);
+	return perm;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -59,13 +84,13 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 		case form::EXISTS1:
 		case form::FORALL1:
 		case form::UNIQUE1:
-			handler_form1(p, f, vm, vmh); break;
+			handler_form1(p, f, vm, vmh, true); break;
 
 		case form::EXISTS2:
 		case form::FORALL2:
 		case form::UNIQUE2: {
 			//XXX: handle variables used in q's more than once?
-			vmh.emplace(f->l->arg, vmh.size()); //nvars-1-vm.size());
+			vmh.emplace(f->l->arg, vmh.size());
 			for (auto &v : vmh)
 				v.second = vmh.size()-1-v.second;
 			p->vmh = vmh;
@@ -78,24 +103,33 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 	//is_horn = false;
 }
 
-void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
+void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq) {
 
-	//DBG(assert((f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
-	//	   (f->type == form::NOT  && f->l != NULL && f->r == NULL)) ||
-	//	   (f->l != NULL && f->r != NULL)
+	DBG(assert(
+		   (f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
+		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
+		   ((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
+		   ((f->type == form::EXISTS1 || f->type == form::FORALL1) && f->r != NULL)
+
+		));
 
 	if (f->type == form::ATOM) {
 		//assuming no free variables in qbf
+		//TODO: assert to check free vars
+
 		pnft_handle p0(new(pnft));
 
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) {
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				assert(p0->b->neg == false);
-				ex_typebits(p0->b->ex, f->tm->size());
+
+				//WARNING: IF using this debug resource, disable form memos since i will fault it
 				//spbdd_handle q = body_query(*(p0->b),0);
-				//o::dbg() << " ------------------- " << ::bdd_root(q) << " :\n";
+				//COUT << " ------------------- " << ::bdd_root(q) << " :\n";
 				//::out(COUT, q)<<endl<<endl;
+
+				ex_typebits(p0->b->ex, f->tm->size());
 				static set<body*, ptrcmp_<body>>::const_iterator bit;
 				if ((bit = p->bodies.find(p0->b)) == p->bodies.end())
 					p->bodies.insert(p0->b);
@@ -110,36 +144,81 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 		else if (f->tm->extype == term::ARITH) {
 			handler_arith(*f->tm, vm, vm.size(), p0->cons);
 			ex_typebits(p0->cons, vm.size());
+			DBG(assert(f->tm->neg == false));
 		}
 		else if (f->tm->extype == term::EQ) {
 			handler_eq(*f->tm, vm, vm.size(), p0->cons);
 			ex_typebits(p0->cons, vm.size());
+			//if (f->tm->neg) p0->cons = bdd_not(p0->cons);
 		}
 		else if (f->tm->extype == term::LEQ) {
-			handler_eq(*f->tm, vm, vm.size(), p0->cons);
+			handler_leq(*f->tm, vm, vm.size(), p0->cons);
 			ex_typebits(p0->cons, vm.size());
+			if (f->tm->neg) {
+				//TODO do with get_perm?, otherwise move to function
+				//uints perm1 = get_perm(t, vm, vm.size(), bits-2);
+				//p0->cons = p0->cons^perm1;
+				term aux = *f->tm;
+				size_t n_vars = vm.size();
+				uints perm1;
+				perm1 = perm_init((bits-2)*n_vars);
+				for (size_t i = 0; i < (bits-2); i++) {
+					////perm1[i] = ((bits-2-1-(i/n_vars))*n_vars) + i % n_vars;
+					//perm1[i] = ((i/n_vars)*n_vars) + n_vars - 1 - i % n_vars;
+					bool reg = false;
+					size_t tmp;
+					for (size_t j = 0; j < n_vars; j++) {
+						if (j == vm[aux[0]]) {
+							if (!reg) {
+								tmp = i*n_vars+j;
+								reg = true;
+							}
+							else {
+								uint_t aux = perm1[i*n_vars+j];
+								perm1[i*n_vars+j] = perm1[tmp];
+								perm1[tmp] = aux;
+							}
+						}
+						if (j == vm[aux[1]]) {
+							if (!reg) {
+								tmp = i*n_vars+j;
+								reg = true;
+							}
+							else {
+								uint_t aux = perm1[i*n_vars+j];
+								perm1[i*n_vars+j] = perm1[tmp];
+								perm1[tmp] = aux;
+							}
+						}
+					}
+				}
+				p0->cons= bdd_not(p0->cons^perm1);
+			}
 		}
 		else {
 			DBG(assert(false));
 		}
+		//TODO: intersect consts
 		p->matrix.push_back(p0);
 
 	}
 	else if (f->type == form::IMPLIES) {
 		if (f->l->type == form::ATOM) {
-			handler_form1(p, f->l,vm,vmh);
+			handler_form1(p, f->l,vm,vmh,fq);
 		} else {
 			pnft_handle p0(new(pnft));
-			handler_form1(p0, f->l,vm, vmh);
+			p0->vm = vm;
+			handler_form1(p0, f->l,vm, vmh,fq);
 			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
 			p->matrix.push_back(p0);
 		}
 		if (f->r->type == form::ATOM) {
-			handler_form1(p, f->r,vm,vmh);
+			handler_form1(p, f->r,vm,vmh,fq);
 			p->matrix[p->matrix.size()-1]->neg = true;
 		} else {
 			pnft_handle p1(new(pnft));
-			handler_form1(p1, f->r,vm,vmh);
+			p1->vm = vm;
+			handler_form1(p1, f->r,vm,vmh,fq);
 			p1->neg = true;
 			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 			p->matrix.push_back(p1);
@@ -149,18 +228,20 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 	//else if (f->type == form::COIMPLIES){}
 	else if (f->type == form::AND) {
 		if (f->l->type == form::AND || f->l->type == form::ATOM  || f->l->type == form::NOT) {
-			handler_form1(p, f->l,vm, vmh);
+			handler_form1(p, f->l,vm, vmh,fq);
 		} else {
 			pnft_handle p0(new(pnft));
-			handler_form1(p0, f->l,vm, vmh);
+			p0->vm = vm;
+			handler_form1(p0, f->l,vm, vmh,fq);
 			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
 			p->matrix.push_back(p0);
 		}
 		if (f->r->type == form::AND || f->r->type == form::ATOM  || f->r->type == form::NOT) {
-			handler_form1(p, f->r,vm, vmh);
+			handler_form1(p, f->r,vm, vmh,fq);
 		} else {
 			pnft_handle p1(new(pnft));
-			handler_form1(p1, f->r,vm, vmh);
+			p1->vm = vm;
+			handler_form1(p1, f->r,vm, vmh,fq);
 			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 			p->matrix.push_back(p1);
 		}
@@ -169,10 +250,12 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 		//if (!is_horn) {
 		//TODO: review to avoid unnecessary nodes, also use vector of bodies
 		pnft_handle p0(new(pnft));
-		handler_form1(p0, f->l,vm,vmh);
+		p0->vm = vm;
+		handler_form1(p0, f->l,vm,vmh,fq);
 		p0->b ? p0->b->neg = true : p0->neg = true;
 		pnft_handle p1(new(pnft));
-		handler_form1(p1, f->r,vm,vmh);
+		p1->vm = vm;
+		handler_form1(p1, f->r,vm,vmh,fq);
 		p1->b ? p1->b->neg = true : p1->neg = true;
 		p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
 		p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
@@ -201,10 +284,12 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 		*/
 	}
 	else if (f->type == form::NOT) {
-		handler_form1(p, f->l, vm,vmh);
+		handler_form1(p, f->l, vm,vmh,fq);
 		p->matrix[p->matrix.size()-1]->neg = !p->matrix[p->matrix.size()-1]->neg;
 	}
 	else if (f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) {
+		varmap tmpvm = vm;
+		//varmap tmpvm2 = vm;
 		auto res = vm.emplace(f->l->arg, vm.size());
 		if (res.second) {
 			for (auto &v : vm) v.second++;
@@ -213,12 +298,30 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
 			vm.at(f->l->arg) = 0;
 		}
-		p->vm.emplace(f->l->arg, p->vm.size()); //nvars-1-vm.size());
+		p->vm.emplace(f->l->arg, p->vm.size());
+		//tmpvm2.emplace(f->l->arg, tmpvm2.size());
 		p->quants.emplace(p->quants.begin(), p->to_quant_t(f));
 
-		//if(!(f->r->type == form::EXISTS1 || f->r->type == form::FORALL1 || f->r->type == form::UNIQUE1)
+		if(!(f->r->type == form::EXISTS1 || f->r->type == form::FORALL1 ||
+				f->r->type == form::UNIQUE1)) {
+			handler_form1(p, f->r,vm, vmh, true);
+		} else
+			handler_form1(p, f->r,vm, vmh, false);
 
-		handler_form1(p, f->r,vm, vmh);
+		if(fq) {
+			p->varslen = p->vm.size();
+			if (tmpvm.size() > 0) {
+				auto d = deltail(vm.size(), tmpvm.size(), bits-2);
+				term t; t.resize(vm.size());
+				for (auto &v : vm) t[v.second] = v.first;
+				p->perm_h = get_perm(t, p->vm, p->vm.size(), bits-2);
+				//p->perm_h = get_perm(t, tmpvm2 , tmpvm2.size(), bits-2);
+				p->ex = d.first, p->perm = d.second;
+				vm = tmpvm;
+				p->vm = tmpvm;
+			}
+			//TODO: group all negs, all pos
+		}
 	}
 }
 
@@ -229,7 +332,7 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 
 	if (f->bodies.size() != 0 && f->fp(this)) {
 		v.push_back(f->last);
-		o::dbg() << " hit memos fol\n" ;
+		//DBG(COUT << " hit memos fol\n");
 		return;
 	}
 	spbdd_handle q = htrue;
@@ -239,11 +342,14 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 			if (p->neg) q = bdd_not(q);
 			v.push_back(q);
 		} else if (p->cons != bdd_handle::T) {
-			p->neg ? v.push_back(bdd_not(p->cons)) : v.push_back(p->cons) ;
+			q = p->cons;
+			if (p->neg) q = bdd_not(q);
+			v.push_back(q);
 		}
 		else {
 			bdd_handles vt;
 			fol_query(p,vt);
+			assert(vt.size() == 1);
 			v.insert(v.end(), vt.begin(), vt.end());
 		}
 	}
@@ -251,12 +357,17 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	//if (v.size() > 1)
 	q = bdd_and_many(move(v));
 	if (f->neg) q = bdd_not(q);
+
 	if (f->quants.size() != 0)
-		q = bdd_quantify(q, f->quants);
-		//TODO: realign variables
+		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
+	//realign variables
+	if (f->perm_h.size()!= 0) {
+		q = q^f->perm_h;
+		v.push_back(q);
+		q = bdd_and_many_ex_perm(move(v), f->ex,f->perm);
+	}
 	f->last = q;
 	v.push_back(q);
-	//}
 }
 
 //will derprecate?
@@ -308,33 +419,36 @@ void tables::hol_query(cr_pnft_handle f, bdd_handles &v, bdd_handles &vh,
 	spbdd_handle q = htrue;
 	spbdd_handle qh = htrue;
 
-	if (f->cons != bdd_handle::T) {
-		v.push_back(f->cons);
-	}
-
 	for (auto p : f->matrix) {
-		if (p->b) {
-			q = body_query(*p->b,0);
-			if (p->neg) q = bdd_not(q);
-			v.push_back(q);
-		}
-		else if(p->hvar_b.second != 0) {
-			if (quantsh[vmh[p->hvar_b.first]] == EXH) {
-				//basic hbdd:
-				//pr(f->hvar_b.second->q, vh[f->hvar_b.first-1], hvar_hbdd[0], f->neg, bits-2);
-				//in case hvar is set a table:
-				//qh = body_query(*f->hvar_b.second,0);
-				spbdd_handle c = htrue;
-				auto b = *p->hvar_b.second;
-				qh = bdd_and_ex_perm(c, b.q, b.ex, b.perm);
-				if (f->neg) qh = bdd_not(qh);
-				//o::dbg() << "R " << p->neg << " " << ::bdd_root(qh) << " :\n";
-				//::out(wcout, qh)<<endl<<endl;
-				vh.push_back(qh);
+			if (p->b) {
+				q = body_query(*p->b,0);
+				if (p->neg) q = bdd_not(q);
+				v.push_back(q);
+			} else if (p->cons != bdd_handle::T) {
+				v.push_back(p->cons);
 			}
-		}
-		else
-			hol_query(p,v,vh, hvar_hbdd, quantsh,vmh);
+			else if(p->hvar_b.second != 0) {
+				if (quantsh[vmh[p->hvar_b.first]] == EXH) {
+					//basic hbdd:
+					//pr(f->hvar_b.second->q, vh[f->hvar_b.first-1], hvar_hbdd[0], f->neg, bits-2);
+					//in case hvar is set a table:
+					//qh = body_query(*f->hvar_b.second,0);
+					spbdd_handle c = htrue;
+					auto b = *p->hvar_b.second;
+					qh = bdd_and_ex_perm(c, b.q, b.ex, b.perm);
+					if (f->neg) qh = bdd_not(qh);
+					//COUT << "R " << ::bdd_root(qh) << " :\n";
+					//::out(COUT, qh)<<endl<<endl;
+					vh.push_back(qh);
+				}
+			}
+			else {
+				bdd_handles vt, vth;
+				hol_query(p,vt,vth, hvar_hbdd, quantsh,vmh);
+				assert(vt.size() <= 1 && vt.size() <= 1);
+				v.insert(v.end(), vt.begin(), vt.end());
+				vh.insert(vh.end(), vth.begin(), vth.end());
+			}
 	}
 
 	if (v.size() > 1) {
@@ -352,7 +466,6 @@ void tables::hol_query(cr_pnft_handle f, bdd_handles &v, bdd_handles &vh,
 
 void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	if (f->quantsh.size() != 0) {
-		//DBG(COUT << "\n SOHORN query \n";)
 
 		//basic bhdd: bdd_handles vh(f->quantsh.size(), htrue);
 		bdd_handles v1;
@@ -364,9 +477,8 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 
 		spbdd_handle q;
 		q = (v2.size()!= 0 ? v2[0] : hfalse) % (v1.size() != 0 ? v1[0] : hfalse);
-		//if (f->neg) q = bdd_not(q);
-		o::dbg() << " so_horn " << ::bdd_root(q) << " :\n";
-		::out(wcout, q)<<endl<<endl;
+		//COUT << " so_horn " << ::bdd_root(q) << " :\n";
+		//::out(COUT, q)<<endl<<endl;
 		v.push_back(q);
 
 	}

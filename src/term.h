@@ -45,6 +45,7 @@ struct term : public ints {
 		if (neg != t.neg) return neg;
 		//if (extype != t.extype) return extype < t.extype;
 		if (tab != t.tab) return tab < t.tab;
+		if (qbf != t.qbf) return qbf < t.qbf;
 		if (goal != t.goal) return goal;
 		return (const ints&)*this < t;
 	}

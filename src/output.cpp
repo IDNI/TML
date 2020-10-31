@@ -654,7 +654,7 @@ void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 	os << to_raw_term(r.t) << " :- ";
-	if (r.f) os << "(form printing not supported yet)"; // TODO fix transform_bin
+	//if (r.f) os << "(form printing not supported yet)"; // TODO fix transform_bin
 	for (auto it = r.begin(); it != r.end(); ++it)
 		for (size_t n = 0; n != (*it)->t.size(); ++n)
 			os << to_raw_term((*it)->t[n]) << (n==(*it)->t.size()-1

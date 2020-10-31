@@ -1,0 +1,4 @@
+b(3).
+A(?x) :- ?x = 2.
+B(?x) :- ?x <= 2.
+ad_hoc_mult(?z) :- A(?x), B(?y), pw_mult(?x ?y ?z).

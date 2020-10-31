@@ -96,7 +96,7 @@ struct body {
 
 struct alt : public std::vector<body*> {
 	spbdd_handle rng = htrue, eq = htrue, rlast = hfalse;
-	size_t varslen;
+	size_t varslen = 0;
 	bdd_handles last;
 	std::vector<term> t;
 	bools ex;
@@ -110,11 +110,13 @@ struct alt : public std::vector<body*> {
 	int_t idbltin = -1; //lexeme bltintype;
 	ints bltinargs;
 	size_t bltinsize;
+	pnft_handle f = 0;
 
 	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
 		if (eq != t.eq) return eq < t.eq;
+		if (f != t.f) return f < t.f;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
 };
@@ -126,12 +128,10 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	pnft_handle f;
 	bool operator<(const rule& t) const {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
 		if (eq != t.eq) return eq < t.eq;
-		if (f != t.f) return f < t.f;
 		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
 	}
 	bool equals_termwise(const rule& r) const {
@@ -275,6 +275,7 @@ private:
 
 	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
+	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len);
 	//spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
@@ -288,6 +289,7 @@ private:
 	spbdd_handle from_fact(const term& t);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
+	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
 	uints addtail(size_t len1, size_t len2) const;
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
@@ -330,7 +332,7 @@ private:
 
 	void get_facts(const flat_prog& m);
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
-	void get_form(pnft_handle& f, const term_set& al, const term& h);
+	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	void get_rules(flat_prog m);
 
 	ntable get_table(const sig& s);
@@ -396,7 +398,7 @@ private:
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
 
-	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
+	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq);
 	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
 	bool handler_arith(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &cons);
