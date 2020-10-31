@@ -1992,11 +1992,14 @@ bool graphgrammar::dfs( const elem &s) {
 				for( auto nit = nang.first; nit != nang.second; nit++)
 					if( nit->second.second == PROGRESS ) return true;
 					else if( nit->second.second != VISITED)
-						if(  dfs(*nxt)) return true;					
-				for( auto nit = nang.first; nit != nang.second; nit++)
-					nit->second.second = VISITED;
+						if(  dfs(*nxt)) return true;											
+			//	for( auto nit = nang.first; nit != nang.second; nit++)
+			//		nit->second.second = VISITED;
+			//	sort.push_back(*nxt);			
 			}
-		}
+		}	
+	for( auto sgit = rang.first; sgit != rang.second; sgit++)
+		sgit->second.second = VISITED;
 	sort.push_back(s);
 	return false;
 }
@@ -2004,12 +2007,7 @@ bool graphgrammar::detectcycle() {
 	bool ret =false;
 	for( auto it = _g.begin(); it != _g.end(); it++)
 		if( it->second.second == NONE ) {
-			bool lret=false;
-			auto rang = _g.equal_range(it->first);
-			for( auto sit = rang.first; sit != rang.second; sit++)	
-				if( dfs(it->first) ) ret = lret = true;
-			for( auto sit = rang.first; sit != rang.second; sit++)	
-				sit->second.second = (lret== false)? VISITED: PROGRESS;
+			if( dfs(it->first ) ) ret = true;
 		}
 	return ret;
 }
@@ -2067,12 +2065,11 @@ bool graphgrammar::combine_rhs( const elem &s, vector<elem> &comb) {
 }
 
 bool graphgrammar::collapsewith(){
-	if(sort.empty()) return false;
-	/* To reproduce error, uncomment bellow
 	for( _itg_t it = _g.begin(); it != _g.end(); it++){
-		COUT<< it->second.second << ":" << it->second.first.to_str(0);
+		DBG(COUT<< it->second.second << ":" << it->second.first.to_str(0)<<endl);
 	}
-	*/
+	if(sort.empty()) return false;
+	
 	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();
 	for (elem &e: sort) {
 		DBG(COUT<<e<<endl;)
@@ -2130,12 +2127,15 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
 		ggraph.collapsewith();
-		auto prod =  g.begin();
-		while(  prod!= g.end() ) {
-			if( ggraph.iscyclic(prod->p[0])) { prod++; continue;}
+		//auto prod =  g.begin();
+	
+		for(auto &elem : ggraph.sort) {
+		//while(  prod!= g.end() ) {
+			// auto elem = prod->p[0];
+			//if( ggraph.iscyclic(elem)) { prod++; continue;}
 			bool bnull =false;
-			string regexp = ggraph.get_regularexpstr(prod->p[0], bnull);
-			DBG(COUT<<"Trying"<<regexp<<"for "<< *prod<<endl);
+			string regexp = ggraph.get_regularexpstr(elem, bnull);
+			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
 			/* if(bnull) {	prod++; continue; } */
 			regex rgx(regexp);
 			std::smatch sm;
@@ -2149,14 +2149,14 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				DBG(COUT << "len: " << iter->length(0) << std::endl);
 				DBG(COUT << "pos: " << iter->position(0) << std::endl);
 				t.resize(2);
-				t.tab = get_table({dict.get_rel(prod->p[0].e),{2}});
+				t.tab = get_table({dict.get_rel(elem.e),{2}});
 				t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
 				p.insert({t});
 			//	bmatch = true;
    			}		
 			//if(bmatch) prod= g.erase(prod);
 			//else 
-		 		prod++;
+		 	//	prod++;
 		}
 	}
 	COUT<<"REGEX"<<endl;

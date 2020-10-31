@@ -1,17 +1,16 @@
-@string str <tml.g>.
+@string str <tml.g.reg>.
 
 identifier => sym | var.
 args => (identifier ws)*.
-
 var => '?' chars.
 sym => chars.
 relname => sym.
 chars => ( alpha | '_' )(alnum  | '_' )*.
-ws => (space ws| null )(ws '#' printable_chars eol ws)*.
+ws => (space |'#' printable_chars eol)*.
 terminal => quoted_char | string.
 quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
 		| "'\\t'" | "'\\''" | "''".
-eol => '\r' | '\n' | ''.
+eol => '\r' | '\n'.
 nonterminal => relname.
 fname => '<' printable_chars '>' ws.
 string => '"' printable_chars '"' ws.
