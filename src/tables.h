@@ -359,6 +359,8 @@ private:
 					std::vector<term> &v, std::set<term> &done);
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
+	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v, flat_prog &p, 
+											  std::map<size_t, term> &refs);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
 	bool cqc(const std::vector<term>&, const flat_prog& m) const;

@@ -2101,6 +2101,93 @@ bool graphgrammar::collapsewith(){
 	}
 	return true;
 }
+bool tables::transform_grammar_constraints(const production &x, vector<term> &v, flat_prog &p, 
+											  std::map<size_t, term> &refs) {
+	std::set<term> done;
+	bool beqrule = false;
+	for( raw_term rt : x.c ) {
+		
+		size_t n = 0;
+		if( get_substr_equality(rt, n, refs, v, done)) {
+			// lets add equality rule since substr(i) is being used
+			if(!beqrule) {
+				vector<vector<term>> eqr;
+				beqrule = get_rule_substr_equality(eqr);
+				for( auto vt: eqr) p.insert(vt);
+			} 
+			continue;
+		}
+		//every len constraint raw_term should be :
+		//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
+		// e.g. len(1) + 2 = 5  | len(1) = len(2
+		n = 0;
+		int_t lopd = get_factor(rt, n, refs, v, done);
+		int_t ropd, oside;    
+		if( n < rt.e.size() && rt.e[n].type == elem::ARITH ) {
+			// format : lopd + ropd = oside 
+			term aritht;
+			aritht.resize(3);
+			aritht.tab = -1; 
+			aritht.extype = term::textype::ARITH;
+			aritht.arith_op = rt.e[n].arith_op;
+			n++; // operator
+			
+			int_t ropd = get_factor(rt, n, refs, v, done);
+			
+			if( rt.e[n].type != elem::EQ) 
+				parse_error("Only EQ supported in len constraints. ", rt.e[n].e);
+			n++; // assignment
+
+			aritht[0] = lopd;
+			aritht[1] = ropd;
+			oside = get_factor(rt, n, refs, v, done);
+			aritht[2] = oside;
+			//if(!done.insert(aritht).second)
+			if(n == rt.e.size())	v.push_back(aritht);
+			else return er("Only simple binary operation allowed.");
+		}
+		else if( n < rt.e.size() && 
+				(rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
+			//format: lopd = ropd
+			term equalt;
+			equalt.resize(2);
+			equalt.extype = rt.e[n].type == elem::EQ ? 
+							term::textype::EQ : term::textype::LEQ;
+			
+			equalt[0]= lopd; //TODO: switched order due to bug <= 
+			n++; //equal
+			ropd =  get_factor(rt, n, refs, v, done);
+			equalt[1] = ropd;
+
+			//if(!done.insert(equalt).second )
+			if(n == rt.e.size())	v.push_back(equalt);
+			else if( n < rt.e.size() 
+					&& rt.e[n].type == elem::ARITH
+					&& equalt.extype == term::textype::EQ ) {
+				//format: lopd = ropd + oside 
+					
+					term aritht;
+					aritht.resize(3);
+					aritht.tab = -1; 
+					aritht.extype = term::textype::ARITH;
+					aritht.arith_op = rt.e[n].arith_op;
+					n++; // operator
+					
+					oside = get_factor(rt, n, refs, v, done);
+					aritht[0] = ropd;
+					aritht[1] = oside;
+					aritht[2] = lopd;
+					
+					//if(!done.insert(aritht).second)
+					if(n == rt.e.size())	v.push_back(aritht);
+					else return er("Only simple binary operation allowed.");
+	
+			} else parse_error(err_constraint_syntax);
+		}
+		else parse_error(err_constraint_syntax, rt.e[n].e);		
+	}
+	return true;
+}
 
 
 bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
@@ -2187,22 +2274,15 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		{ "alpha", "alnum", "digit", "space", "printable" };
 	set<lexeme, lexcmp> builtins;
 	for (const string& s : b) builtins.insert(dict.get_lexeme(s));
-	//#define GRAMMAR_FOL
+	
 	for (const production& x : g) {
-		form *root = NULL;
+		
 		if (x.p.size() == 2 && x.p[1].e == "null") {
 			term t;
 			t.resize(2);
 			t[0] = t[1] = -1;
 			t.tab = get_table({dict.get_rel(x.p[0].e),{2}});
 			vector<term> v{t};
-		
-			#ifdef GRAMMAR_FOL
-		/*  	form* root = new form(form::ATOM, 0, &t );
-			spform_handle qbf(root);
-			v.emplace_back(term::FORM1, qbf);
-			DBG(COUT<<endl; root->printnode(0, this);)
-		 */ 	#endif
 			p.insert(v);
 			vector<term> af{t, t};
 			af[0].neg = true;
@@ -2227,10 +2307,6 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				plus1.extype = term::textype::ARITH;
 				plus1.arith_op = t_arith_op::ADD;
 				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
-				form* curl = new form(form::ATOM, 0, &t );
-				form *curr = new form(form::ATOM, 0, &plus1 );
-				form *cur = new form(form::AND, 0 , NULL, curl, curr );
-				root = 	new form(form::AND, 0 , NULL, root, cur );
 				v.push_back(move(plus1));
 
 			} else if (x.p[n].type == elem::SYM) {
@@ -2238,11 +2314,6 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				t.tab = get_table({dict.get_rel(x.p[n].e),{2}});
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
-				if(n) {
-					form *cur = new form(form::ATOM, 0, &t);
-					if(root) root = new form(form::AND, 0 , NULL, root, cur );
-					else root = cur;
-				}
 			} else if (x.p[n].type == elem::CHR) {				
 				unary_string us(sizeof(char32_t)*8);
 				us.buildfrom(u32string(1, x.p[n].ch));
@@ -2260,12 +2331,6 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 					plus1.arith_op = t_arith_op::ADD;
 					plus1[0] = -tv, plus1[1] = mknum(1), plus1[2] = -tv-1;
 					
-					form *cur = new form(form::ATOM, 0, &t);
-					if(root) root = 	new form(form::AND, 0 , NULL, root, cur );
-					else root = cur;
-					cur = new form(form::ATOM, 0, &plus1);
-					root = 	new form(form::AND, 0 , NULL, root, cur );
-
 					v.push_back(move(plus1));
 					v.push_back(move(t));
 					// IMPROVE FIX: the symbol index n e.g. in len(i) should refer
@@ -2275,121 +2340,36 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 					tv++;
 				}
 				continue;
-				/*
-				t.resize(2);
-				if (str_rels.size() > 1) er(err_one_input);
-				if (str_rels.empty()) continue;
-				t.tab = get_table({*str_rels.begin(),{2}});
-				t[0] = -n, //t[2] = -n-1,
-				t[1] = mkchr((unsigned char)(x.p[n].ch));
-				term plus1;
-				plus1.resize(3);
-				//int_t relp = dict.get_rel(dict.get_lexeme("plus1"));
-				plus1.tab = -1; // get_table({relp, {3}});
-				plus1.extype = term::textype::ARITH;
-				plus1.arith_op = t_arith_op::ADD;
-				plus1[0] = -n, plus1[1] = mknum(1), plus1[2] = -n-1;
-				v.push_back(move(plus1));
-				*/
 
 			} else return er("Unexpected grammar element");
 			v.push_back(move(t));
 			refs[n] = v.back(); 		
 		}
-		
 		// add vars to dictionary to avoid collision with new vars
 		for(int_t i =-1; i >= (int_t)-x.p.size(); i--) 
 			dict.get_var_lexeme_from(i);		
-		// adding quantifier
-		for(int_t j = 2; j< (int_t)x.p.size();j++) {
-			root = new form(form::EXISTS1, 0,  0, new form(form::ATOM, -j), root);
-		}
-
-		std::set<term> done;
-		bool beqrule = false;
-		for( raw_term rt : x.c ) {
-			
-			size_t n = 0;
-			if( get_substr_equality(rt, n, refs, v, done)) {
-				// lets add equality rule since substr(i) is being used
-				if(!beqrule) {
-					vector<vector<term>> eqr;
-					beqrule = get_rule_substr_equality(eqr);
-					for( auto vt: eqr) p.insert(vt);
-				} 
-				continue;
-			}
-			//every len constraint raw_term should be :
-			//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
-			// e.g. len(1) + 2 = 5  | len(1) = len(2
-			n = 0;
-			int_t lopd = get_factor(rt, n, refs, v, done);
-			int_t ropd, oside;    
-			if( n < rt.e.size() && rt.e[n].type == elem::ARITH ) {
-				// format : lopd + ropd = oside 
-				term aritht;
-				aritht.resize(3);
-				aritht.tab = -1; 
-				aritht.extype = term::textype::ARITH;
-				aritht.arith_op = rt.e[n].arith_op;
-				n++; // operator
-				
-				int_t ropd = get_factor(rt, n, refs, v, done);
-				
-				if( rt.e[n].type != elem::EQ) 
-					parse_error("Only EQ supported in len constraints. ", rt.e[n].e);
-				n++; // assignment
-
-				aritht[0] = lopd;
-				aritht[1] = ropd;
-				oside = get_factor(rt, n, refs, v, done);
-				aritht[2] = oside;
-				//if(!done.insert(aritht).second)
-				if(n == rt.e.size())	v.push_back(aritht);
-				else return er("Only simple binary operation allowed.");
-			}
-			else if( n < rt.e.size() && 
-				   (rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
-				//format: lopd = ropd
-				term equalt;
-				equalt.resize(2);
-				equalt.extype = rt.e[n].type == elem::EQ ? 
-								term::textype::EQ : term::textype::LEQ;
-				
-				equalt[0]= lopd; //TODO: switched order due to bug <= 
-				n++; //equal
-				ropd =  get_factor(rt, n, refs, v, done);
-				equalt[1] = ropd;
-
-				//if(!done.insert(equalt).second )
-				if(n == rt.e.size())	v.push_back(equalt);
-				else if( n < rt.e.size() 
-						&& rt.e[n].type == elem::ARITH
-						&& equalt.extype == term::textype::EQ ) {
-					//format: lopd = ropd + oside 
-						
-						term aritht;
-						aritht.resize(3);
-						aritht.tab = -1; 
-						aritht.extype = term::textype::ARITH;
-						aritht.arith_op = rt.e[n].arith_op;
-						n++; // operator
-						
-						oside = get_factor(rt, n, refs, v, done);
-						aritht[0] = ropd;
-						aritht[1] = oside;
-						aritht[2] = lopd;
-						//if(!done.insert(aritht).second)
-						if(n == rt.e.size())	v.push_back(aritht);
-						else return er("Only simple binary operation allowed.");
 		
-				} else parse_error(err_constraint_syntax);
-			}
-			else parse_error(err_constraint_syntax, rt.e[n].e);		
-		}
-//		#undef GRAMMAR_FOL
+		transform_grammar_constraints(x, v, p, refs);
+
+		//#define GRAMMAR_FOL
 		#ifdef GRAMMAR_FOL
-		v.erase(v.begin()+1,v.end());
+		form *root = NULL;
+		int_t minc= 0; // to get the minimum var index;
+		for(size_t n=1; n < v.size(); n++) {
+			form *cur = new form(form::ATOM, 0, &v[n]);
+			if(root) root = new form(form::AND, 0 , NULL, root, cur );
+			else root = cur;	
+			for(int var : v[n])
+				minc = min(var, minc);
+		}
+
+		// adding quantifier since var indexes are added incrementally 
+		for(int_t j = -1; j >= minc; j--) {
+			// ignore adding exist for vars for lhs first symbol of production
+			if( v[0][0] == j || v[0][1] == j ) continue;
+			root = new form(form::EXISTS1, 0,  0, new form(form::ATOM, j), root);
+		}
+		v.erase(v.begin()+1, v.end());
 		spform_handle qbf(root);
 		v.emplace_back(term::FORM1, qbf);
 		DBG(COUT<<endl; root->printnode(0, this);)
