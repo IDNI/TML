@@ -272,6 +272,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
+	set_regex_level(opts.get_int("regex-level"));
 	if (!ii) return;
 	current_input = ii->first();
 	if (current_input && !add(current_input)) return;

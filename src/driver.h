@@ -150,6 +150,7 @@ public:
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	void set_regex_level(int val ) { tbl->regex_level = val; }
 	template <typename T>
 	bool out_goals(std::basic_ostream<T>& os) const {
 		return tbl->get_goals(os); }

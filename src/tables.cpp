@@ -2024,7 +2024,7 @@ bool graphgrammar::iscyclic( const elem &s) {
 		if(sgit->second.second != VISITED) return true;
 	return false;
 }
- const std::map<lexeme,string,lexcmp>& graphgrammar::get_builtin_reg() {
+const std::map<lexeme,string,lexcmp>& graphgrammar::get_builtin_reg() {
 	static const map<lexeme,string,lexcmp> b =
 		  { {dict.get_lexeme("alpha"), "[a-zA-Z]"}, 
 		  {dict.get_lexeme("alnum"), "[a-zA-Z0-9]"},
@@ -2035,11 +2035,13 @@ bool graphgrammar::iscyclic( const elem &s) {
 		return b;
 }
 
-std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull) {
+
+std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull, bool dolazy = false) {
 	vector<elem> comb;
 	static const set<char32_t> esc{ U'.', U'+', U'*', U'?', U'^', U'$', U'(', U',',
 						U')',U'[', U']', U'{', U'}', U'|', U'\\'};
-	
+	static const string quantrep = "+*?}";
+
 	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();  
 	combine_rhs(p, comb);
 	std::string ret;
@@ -2053,7 +2055,17 @@ std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull) {
 					  ret.append("\\");
 			ret.append(e.to_str());
 		}
-		else ret.append(e.to_str());
+		else {
+			ret.append(e.to_str());
+			if( dolazy && quantrep.find(ret.back()) != string::npos) 
+				ret.append("?");	
+				/* 
+				| *  -->  *?             
+				| +  -->  +?             
+				| {n} --> {n}?            
+				*/
+				
+		}
 	}
 	return ret;
 }
@@ -2211,48 +2223,70 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				}
 			}
 	clock_t start, end;
+	int statterm=0;
+	set<elem> torem;
 	measure_time_start();
-	bool enable_regdetect_matching= apply_regexpmatch;
-	if( strs.size() && enable_regdetect_matching) {
-		
+	bool enable_regdetect_matching= apply_regexpmatch;	
+	if( strs.size() && enable_regdetect_matching) {	
 		string inputstr = to_string(strs.begin()->second);
 		DBG(COUT<<inputstr<<endl);		
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
 		ggraph.collapsewith();
-		//auto prod =  g.begin();
-	
-		for(auto &elem : ggraph.sort) {
-		//while(  prod!= g.end() ) {
-			// auto elem = prod->p[0];
-			//if( ggraph.iscyclic(elem)) { prod++; continue;}
+		for(auto &elem : ggraph.sort) {			
 			bool bnull =false;
 			string regexp = ggraph.get_regularexpstr(elem, bnull);
 			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
-			/* if(bnull) {	prod++; continue; } */
 			regex rgx(regexp);
-			std::smatch sm;
+			smatch sm;
 			term t;
- 			std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx);
-    		std::sregex_iterator end;
-			//bool bmatch=false;
-			for(;iter != end; ++iter) {
-				DBG(COUT << regexp << " match "<< iter->str()<< endl);
-       			DBG(COUT << "size: " << iter->size() << std::endl);
-				DBG(COUT << "len: " << iter->length(0) << std::endl);
-				DBG(COUT << "pos: " << iter->position(0) << std::endl);
-				t.resize(2);
-				t.tab = get_table({dict.get_rel(elem.e),{2}});
-				t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
-				p.insert({t});
-			//	bmatch = true;
-   			}		
-			//if(bmatch) prod= g.erase(prod);
-			//else 
-		 	//	prod++;
+			bool bmatch=false;
+			if(regex_level > 0) {
+				for( size_t i = 0; i <= inputstr.size(); i++)
+					for( size_t j = i; j <= inputstr.size(); j++)	{					
+						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
+						if( regex_match(ss, sm, rgx)) {
+							DBG(COUT << regexp << " match "<< sm.str() << endl);
+							DBG(COUT << "len: " << sm.length(0) << std::endl);
+							DBG(COUT << "size: " << sm.size() << std::endl);
+							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
+							t.resize(2);
+							t.tab = get_table({dict.get_rel(elem.e),{2}});
+							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
+							p.insert({t});
+							bmatch = true;
+							statterm++;
+						}
+					}
+				if(bmatch) torem.insert(elem);
+			}
+			else if( regex_level == 0) {
+				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
+				std::sregex_iterator end;
+				for(;iter != end; ++iter) {
+					DBG(COUT << regexp << " match "<< iter->str()<< endl);
+					DBG(COUT << "size: " << iter->size() << std::endl);
+					DBG(COUT << "len: " << iter->length(0) << std::endl);
+					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
+					t.resize(2);
+					t.tab = get_table({dict.get_rel(elem.e),{2}});
+					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
+					p.insert({t});
+					statterm++;		
+				}		
+			}
 		}
+		size_t removed = 0;
+		for( auto pit = g.begin(); pit != g.end(); )
+			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
+				o::ms()<<*pit<<endl;
+				pit = g.erase(pit);	
+				removed++;
+			} else pit++;
+		
+		o::ms()<<"REGEX: "<<"terms added:"<<statterm<<" production removed:"
+		<<removed<<" for "<< torem.size()<<endl;	
 	}
-	COUT<<"REGEX"<<endl;
 	measure_time_end();
 	bool changed;
 	if(!transform_ebnf(g, dict, changed )) return true;

@@ -189,6 +189,9 @@ void options::setup() {
 		.description("run N steps"));
 	add(option(option::type::INT, { "break", "b" })
 		.description("break on the N-th step"));
+	add(option(option::type::INT, { "regex-level", "" })
+		.description("aggressive matching with regex with levels 1 and more." 
+		"\n\t 1 - try all substrings - n+1  delete n rules after processing reg matching"));
 	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
 	add_bool2("populate-tml_update", "tml_update",

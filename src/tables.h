@@ -474,6 +474,7 @@ public:
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
+	int  regex_level 		 = 0;
 };
 
 
@@ -605,7 +606,7 @@ struct graphgrammar {
 	bool dfs( const elem &s);
 	bool detectcycle();
 	bool iscyclic( const elem &s);
-	std::string get_regularexpstr(const elem &p, bool &bhasnull);
+	std::string get_regularexpstr(const elem &p, bool &bhasnull, bool islazy);
 	const std::map<lexeme, std::string, lexcmp> & get_builtin_reg();
 	bool combine_rhs( const elem &s, std::vector<elem> &comb);
 	bool collapsewith();
