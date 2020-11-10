@@ -1439,7 +1439,7 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 
 	const term_set anull;
 	size_t varsh;
-	varmap vm = get_varmap(h, anull, varsh), vmh;
+	varmap vm = get_varmap(h, al, varsh), vmh;
 	varsh = vm.size();
 	a.f->vm = vm;
 	if (t->extype == term::FORM1)
@@ -1447,13 +1447,14 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	else
 		handler_formh(a.f, t->qbf.get(), vm, vmh);
 
-	if (varsh > 0 && a.f->ex.size() == 0) {
-		auto d = deltail(a.f->vm.size(), h.size(), bits-2);
-		term t; t.resize(vm.size());
-		for (auto &v : vm) t[v.second] = v.first;
-		assert(vm.size() == a.f->vm.size());
-		a.f->perm_h = get_perm(t, a.f->vm, a.f->vm.size(), bits-2);
-		a.f->ex = d.first, a.f->perm = d.second;
+	 if (varsh > 0 && a.f->ex_h.size() == 0) {
+		 a.f->varslen = vm.size();
+		 a.f->varslen_h = varsh;
+		 auto d = deltail(a.f->varslen, h.size(), bits-2);
+		 a.f->ex_h = d.first, a.f->perm_h = d.second;
+		 term t; t.resize(a.f->varslen);
+		 for (auto &v : vm) t[v.second] = v.first;
+		 a.f->perm = get_perm(t, a.f->vm, a.f->varslen, bits-2);
 	}
 
 	as.insert(a);
@@ -2632,8 +2633,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		bdd_handles f; //form
 		formula_query(a.f, f);
 		//TODO: complete for any type, only for ints by now
-		if (a.f->ex.size() != 0 ) {
-			append_num_typebits(f[0], a.f->vm.size());
+		if (a.f->ex_h.size() != 0 ) {
+			append_num_typebits(f[0], a.f->varslen_h);
 			a.rlast = f[0];
 		}
 		else a.rlast = f[0] == hfalse ? hfalse : htrue;

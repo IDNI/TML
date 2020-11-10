@@ -26,9 +26,9 @@ typedef const pnft_handle& cr_pnft_handle;
 
 struct pnft {
 	size_t varslen;
-	//TODO: replace vm by varslen_h
+	size_t varslen_h;
 	varmap vm, vmh;
-	bools ex;
+	bools ex_h;
 	uints perm;
 	uints perm_h;
 	bool neg;

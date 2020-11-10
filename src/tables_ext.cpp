@@ -288,19 +288,28 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		p->matrix[p->matrix.size()-1]->neg = !p->matrix[p->matrix.size()-1]->neg;
 	}
 	else if (f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) {
-		varmap tmpvm = vm;
-		//varmap tmpvm2 = vm;
-		auto res = vm.emplace(f->l->arg, vm.size());
-		if (res.second) {
-			for (auto &v : vm) v.second++;
-			vm.at(f->l->arg) = 0;
-		} else {
-			for (auto &v : vm) if (v.second < vm.at(f->l->arg)) v.second++;
-			vm.at(f->l->arg) = 0;
+		varmap tmpvm;
+		if (fq) {
+			tmpvm = vm;
+			p->vm = vm;
 		}
-		p->vm.emplace(f->l->arg, p->vm.size());
-		//tmpvm2.emplace(f->l->arg, tmpvm2.size());
-		p->quants.emplace(p->quants.begin(), p->to_quant_t(f));
+		if (p->vm.find(f->l->arg) != p->vm.end()) {
+			for (auto &v : vm)
+				if ( p->vm.find(v.first) != p->vm.end() && v.first != f->l->arg
+						&& v.second == p->quants.size())
+					v.second++;
+			vm.at(f->l->arg) = p->quants.size();
+
+		}
+		else {
+			for (auto &v : vm)
+				if ( p->vm.find(v.first) != p->vm.end() && v.first != f->l->arg
+						&& v.second >= p->quants.size())
+					v.second++;
+			vm.emplace(f->l->arg, p->quants.size());
+		}
+
+		p->quants.push_back(p->to_quant_t(f));
 
 		if(!(f->r->type == form::EXISTS1 || f->r->type == form::FORALL1 ||
 				f->r->type == form::UNIQUE1)) {
@@ -309,16 +318,21 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			handler_form1(p, f->r,vm, vmh, false);
 
 		if(fq) {
-			p->varslen = p->vm.size();
-			if (tmpvm.size() > 0) {
-				auto d = deltail(vm.size(), tmpvm.size(), bits-2);
-				term t; t.resize(vm.size());
+			p->varslen = vm.size();
+			if (tmpvm.size() != 0) {
+				p->varslen_h = tmpvm.size();
+				auto d = deltail(p->varslen, p->varslen_h, bits-2);
+				p->ex_h = d.first, p->perm_h = d.second;
+			}
+
+			if (vm.size() > 0) {
+				for (auto &v : vm) if (p->vm.find(v.first) == p->vm.end())
+					p->vm.emplace(v.first, p->vm.size());
+				term t; t.resize(p->varslen);
 				for (auto &v : vm) t[v.second] = v.first;
-				p->perm_h = get_perm(t, p->vm, p->vm.size(), bits-2);
-				//p->perm_h = get_perm(t, tmpvm2 , tmpvm2.size(), bits-2);
-				p->ex = d.first, p->perm = d.second;
+				p->perm = get_perm(t, p->vm, p->varslen, bits-2);
+				p->vm = vm;
 				vm = tmpvm;
-				p->vm = tmpvm;
 			}
 			//TODO: group all negs, all pos
 		}
@@ -358,13 +372,37 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	q = bdd_and_many(move(v));
 	if (f->neg) q = bdd_not(q);
 
-	if (f->quants.size() != 0)
+	if (f->quants.size() != 0) {
+		//TODO: move perms inits to preparation
+		uints perm1 = perm_init((bits-2)*f->varslen);
+		size_t i = 0;
+		std::set<int_t> k;
+		for (auto& it : f->vm) k.insert(it.first);
+		for (auto& x : k) {
+			for (size_t j = 0; j < bits-2; j++)
+				perm1[i*(bits-2)+j] = j*f->varslen +  f->vm.at(x);
+			i++;
+		}
+		uints perm2 = perm_init((bits-2)*f->varslen);
+		i = 0;
+		for (auto& x : k) {
+			for (size_t j = 0; j < bits-2; j++)
+				perm2[j * f->varslen + f->vm.at(x)] = i*(bits-2)+j;
+			i++;
+		}
+
+		q = q^perm1;
 		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
+		q = q^perm2;
+	}
+
 	//realign variables
-	if (f->perm_h.size()!= 0) {
-		q = q^f->perm_h;
+	if (f->perm.size()!= 0) {
+		q = q^f->perm;
 		v.push_back(q);
-		q = bdd_and_many_ex_perm(move(v), f->ex,f->perm);
+	}
+	if (f->perm_h.size()!= 0) {
+		q = bdd_and_many_ex_perm(move(v), f->ex_h,f->perm_h);
 	}
 	f->last = q;
 	v.push_back(q);
