@@ -46,7 +46,7 @@ clean_output() {
 
 # runs program ($1) and redirect outputs into files
 run() {
-	options=(--regex -i "$1" -no-optimize -no-info -no-benchmarks -no-debug)
+	options=(--regex --regex-level 18 -i "$1" -no-optimize -no-info -no-benchmarks -no-debug)
 	for output in ${outputs[*]}; do
 		options+=("--$output" "$1.$output")
 	done

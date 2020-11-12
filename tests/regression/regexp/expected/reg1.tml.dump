@@ -1,0 +1,57 @@
+a(1).
+a(0).
+b(3).
+b(2).
+c(5).
+c(4).
+d(7).
+d(6).
+str(7 'd').
+str(6 'd').
+str(5 'c').
+str(4 'c').
+str(3 'b').
+str(2 'b').
+str(1 'a').
+str(0 'a').
+str(printable 7 0).
+str(printable 6 0).
+str(printable 5 0).
+str(printable 4 0).
+str(printable 3 0).
+str(printable 2 0).
+str(printable 1 0).
+str(printable 0 0).
+str(alnum 7 0).
+str(alnum 6 0).
+str(alnum 5 0).
+str(alnum 4 0).
+str(alpha 7 0).
+str(alpha 6 0).
+str(alpha 5 0).
+str(alpha 4 0).
+str(alnum 3 0).
+str(alnum 2 0).
+str(alnum 1 0).
+str(alnum 0 0).
+str(alpha 3 0).
+str(alpha 2 0).
+str(alpha 1 0).
+str(alpha 0 0).
+B(3 8).
+B(2 8).
+C(3 8).
+C(2 8).
+L(3 8).
+L(2 8).
+_RB1(3 4).
+_RB1(2 4).
+_RB1(2 3).
+_RB2(5 6).
+_RB2(4 6).
+_RB2(4 5).
+_RS3(1 2).
+_RS3(0 2).
+_RS3(0 1).
+_RB0(3 4).
+_RB0(2 3).

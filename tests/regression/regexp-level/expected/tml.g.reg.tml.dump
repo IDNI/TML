@@ -1,0 +1,3 @@
+printable_chars(0 0).
+ws(0 0).
+unot(0 0).

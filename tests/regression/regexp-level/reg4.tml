@@ -1,0 +1,3 @@
+@string str "1234".
+
+S => digit*.
