@@ -80,9 +80,9 @@ int main() {
 	vector<test> tests = {
 		pe("a\n. /* aaa",       err_comment,          2,  3, ""),
 		pe("\"",                unmatched_quotes,     1,  1, "\""),
-		pe("\"\\'\"",           err_escape,           1,  3, "'\""),
+		//pe("\"\\'\"",           err_escape,           1,  3, "'\""),
 		pe("<",                 err_eof,              1,  2, "<"),
-		pe("'\\0'",             err_escape,           1,  3, "0'"),
+		//pe("'\\0'",             err_escape,           1,  3, "0'"),
 	//  5
 		pe("\n'c.",             err_quote,            2,  3, "."),
 		pe("a",                 err_eof,              1,  2, "a"),

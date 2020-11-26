@@ -1,0 +1,11 @@
+#!/bin/bash
+
+native_integer='s/"\([^"]\+\)"^^<http:\/\/www.w3.org\/2001\/XMLSchema#\(byte|short|int\)>/\1/g'
+
+        st_iri='s/^\s*<\([^>]*\)>\s\+<\([^>]*\)>\s\+<\([^>]*\)>\s*\.\s*$/rdf("\1" "\2" "\3")./g'
+ st_langString='s/^\s*<\([^>]*\)>\s\+<\([^>]*\)>\s\+"\(.*\)"@\([a-z]\+\)\s*\.\s*$/rdf("\1" "\2" langString("\3" \4))./g'
+    st_literal='s/^\s*<\([^>]*\)>\s\+<\([^>]*\)>\s\+"\([^"]\+\)"^^<\([^>]*\)>\s*\.\s*$/rdf("\1" "\2" literal("\3" "\4"))./g'
+     st_string='s/^\s*<\([^>]*\)>\s\+<\([^>]*\)>\s\+"\(.*\)"\s*\.\s*$/rdf("\1" "\2" "\3")./g'
+     st_native='s/^\s*<\([^>]*\)>\s\+<\([^>]*\)>\s\+\([^\s]\+\)\s*\.\s*$/rdf("\1" "\2" \3)./g'
+
+sed "$native_integer; $st_iri; $st_langString; $st_literal; $st_string; $st_native"
