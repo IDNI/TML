@@ -60,8 +60,9 @@ lexeme input::lex(pccs s) {
 	if (**s == '"') {
 		while (*++*s != '"')
 			if (!**s) return PE(parse_error(t, unmatched_quotes));
-			else if (**s == '\\' && !strchr("\\\"", *++*s))
-				return PE(parse_error(*s, err_escape));
+			else if (**s == '\\') ++(*s); // allow any escape seq.
+			//else if (**s == '\\' && !strchr("\\\"", *++*s))
+			//	return PE(parse_error(*s, err_escape));
 		return { t, ++(*s) };
 	}
 
@@ -103,8 +104,9 @@ lexeme input::lex(pccs s) {
 		if (*(*s + 1) == '\'') return { t, ++++*s };
 		if (*(*s + 1) == '\\') {
 			//if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
-			if (!strchr("\\'rnt",*(*s+2)) ||*(*s+3)!='\'')
-				return PE(parse_error((*s+2), err_escape));
+			// allow any escape sequence
+			// if (!strchr("\\'rnt",*(*s+2)) ||*(*s+3)!='\'')
+			// 	return PE(parse_error((*s+2), err_escape));
 			return { t, ++++++++*s };
 		}
 		char32_t ch;
