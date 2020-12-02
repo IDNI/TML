@@ -306,7 +306,7 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
-	std::vector<env> varbdd_to_subs(const alt* a, cr_spbdd_handle v) const;
+	std::vector<env> varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v) const;
 	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);

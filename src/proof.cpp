@@ -16,14 +16,20 @@
 
 using namespace std;
 
-vector<env> tables::varbdd_to_subs(const alt* a, cr_spbdd_handle v)
+vector<env> tables::varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v)
 	const {
 	vector<env> r;
-	decompress(v, 0, [a, &r](const term& x) {
+	decompress(v, 0, [a, &r, this](const term& x) {
 		env m;
-		for (auto z : a->inv)
-			if (!m.emplace(z.second, x[z.first]).second)
+		bool flag =true;
+		for (auto z : a->inv) {
+			int_t arg = x[z.first];
+			if(! this->dict.is_valid_sym(arg)) 
+				{ flag = false; break; }
+			if (!m.emplace(z.second, arg).second)
 				{ DBGFAIL; }
+		}
+		if(flag)
 		r.emplace_back(move(m));
 	}, a->varslen);
 	return r;
@@ -49,7 +55,7 @@ void tables::rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
 	const alt* a;
 	for (size_t n = 0; n != rules[rl].size(); ++n)
 		if (a = rules[rl][n], has(a->levels, level))
-			for (const env& e : varbdd_to_subs(a,
+			for (const env& e : varbdd_to_subs(a, rl, level,
 				addtail(h, rules[rl].t.size(), a->varslen)))
 				f(rl, level, n, move(subs_to_body(a, e)));
 }
@@ -58,7 +64,7 @@ void tables::term_get_grounds(const term& t, size_t level, cb_ground f) {
 	spbdd_handle h = from_fact(t), x;
 	if (!level) f(-1, 0, -1, {t});
 	if (level > 1) {
-		spbdd_handle	x = levels[level-1][t.tab] && h,
+		spbdd_handle x = levels[level-1][t.tab] && h,
 				y = levels[level][t.tab] && h;
 		if (t.neg?(hfalse==x||hfalse!=y):(hfalse!=x||hfalse==y)) return;
 	}

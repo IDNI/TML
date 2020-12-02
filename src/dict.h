@@ -72,6 +72,9 @@ public:
 		//d.strs_extra.clear();
 	}
 	lexeme op, cl;
+	bool is_valid_sym(int_t arg) const {
+		return ( (arg &1) || (arg&2) || (size_t(arg>>2) < syms.size()));
+	}
 	void set_inputs(inputs* ins) { ii = ins; }
 	const lexeme& get_rel(int_t t) const { return rels[t]; }
 	const lexeme& get_bltin(int_t t) const { return bltins[t]; }

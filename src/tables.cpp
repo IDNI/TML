@@ -1536,7 +1536,7 @@ void tables::get_rules(flat_prog p) {
 
 struct unary_string{
 	//IMPROVE: use array [ pos] = rel or unorderedmap instead
-	map< char32_t, set<int_t> > rel;
+	unordered_map< char32_t, set<int_t> > rel;
 	size_t pbsz;
 	uint64_t vmask;
 	vector<char32_t> sort_rel;
@@ -1583,12 +1583,12 @@ void tables::load_string(lexeme r, const string_t& s) {
 	for( auto it: us.rel ){
 		int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(it.first)));
 		term t; t.resize(1);
-		bdd_handles b;
 		ntable tb = get_table({r, {1} });
+		t.tab =tb;
+		bdd_handles b;
 		b.reserve(it.second.size());
 		for( int_t i :it.second)
 			t[0]= mknum(i), b.push_back(from_fact(t));	
-		t.tab =tb;
 		tbls[tb].t = bdd_or_many(b);
 	}
 
@@ -2237,7 +2237,13 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			bool bnull =false;
 			string regexp = ggraph.get_regularexpstr(elem, bnull);
 			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
-			regex rgx(regexp);
+			regex rgx;
+			try {
+			rgx = regexp;
+			} catch( ... ) {
+			  DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
+			  continue;
+			}
 			smatch sm;
 			term t;
 			bool bmatch=false;
@@ -2420,14 +2426,20 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 
 bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 	strs = strs_;
-	if (!strs.empty())
-		chars = 255,
+	if (!strs.empty()) {
+		//chars = 255,
 		dict.get_sym(dict.get_lexeme("space")),
 		dict.get_sym(dict.get_lexeme("alpha")),
 		dict.get_sym(dict.get_lexeme("alnum")),
 		dict.get_sym(dict.get_lexeme("digit")),
 		dict.get_sym(dict.get_lexeme("printable"));
-	for (auto x : strs) nums = max(nums, (int_t)x.second.size()+1);
+		for (auto x : strs) {
+			nums = max(nums, (int_t)x.second.size()+1);
+			unary_string us(32);
+			us.buildfrom(x.second);
+			chars = max(chars, (int_t)us.rel.size());
+		}
+	}
 
 	return add_prog(to_terms(p), p.g);
 }
