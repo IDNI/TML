@@ -944,7 +944,8 @@ flat_prog tables::to_terms(const raw_prog& p) {
 					for (const raw_term& z : y) // term_set(
 						v.push_back(from_raw_term(z, false, i++)),
 						get_nums(z);
-					align_vars(v), m.insert(move(v));
+					align_vars(v);
+					if (!m.insert(move(v)).second) v.clear();
 				}
 			}
 		}
