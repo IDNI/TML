@@ -40,6 +40,13 @@ factor => 	ws terminal ws unot |
 			ws '[' alts ws ']'.
 unot => '*' |'+' | null.
 
+primtype => "int" [ ':' bitsz ] | "char" | "symb".
+bitsz =>  digit+.
+type = primtype | recordtype.
+recorddef => "record" relname '{'  typdecl (',' typedecl)* '}'.
+recordtype => relname .
+typedecl => type (var)+ '.'.
+typestmt => recordef  
 prefix => "forall" | "exists" | "unique" .
 prefixdecl => prefix ws identifier ws prefixdecl | prefix ws identifier ws.
 

@@ -245,7 +245,7 @@ struct elem {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR,
 		EQ, NEQ, LEQ, GT, LT, GEQ, BLTIN, NOT, AND, OR,
 		FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH,
-		OPENB, CLOSEB, OPENSB, CLOSESB,
+		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE,
 	} type;
 	t_arith_op arith_op = NOP;
 	int_t num = 0;
@@ -280,6 +280,87 @@ struct elem {
 		return to_string(lexeme2str(e));			
 	}
 };
+
+struct primtype {
+	elem el;
+	int_t bsz = -1;
+	enum _ptype {
+		NOP, UINT, UCHAR, SYMB
+	} ty = NOP;
+	bool parse(input *in, const raw_prog& prog);
+	size_t get_bitsz(){
+		switch(ty){
+			case UINT: return bsz > 0 ? bsz: 4;
+			case UCHAR: return 4;
+			case SYMB: return 4;
+			default: return 0;
+		}
+	}
+};
+struct structype {
+	elem structname;
+	std::vector<struct typedecl> membdecl;	
+	bool parse(input *in, const raw_prog& prog);
+	size_t get_bitsz(const std::vector<struct typestmt> &);
+};
+struct typedecl {
+	primtype pty;  
+	elem structname; // record type
+	std::vector<elem> vars;
+	bool parse(input *in , const raw_prog& prog);
+};
+struct typestmt {
+	structype rty;
+	elem reln;
+	std::vector<typedecl> typeargs;
+	bool parse(input *in, const raw_prog& prog);
+
+};
+
+struct bit_term;
+struct bit_prog;
+struct bit_rule;
+struct raw_term;
+struct raw_prog;
+struct raw_rule;
+struct bit_elem {
+	bools p;
+	size_t bsz;
+	const elem &e;
+	bit_term &pbt;
+	bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt);
+	size_t pos(size_t bit_from_right /*, size_t arg, size_t args */) const;
+	void to_print() const;
+};
+struct bit_prog {
+	 
+	std::vector<bit_rule> vbr;
+	const raw_prog &rp;
+	std::map<lexeme, size_t, lexcmp > bit_dict;
+	bit_prog( const raw_prog& _rp);
+	void to_print() const;
+};
+
+struct bit_rule {
+	std::vector<bit_term> bh;
+	std::vector<std::vector<bit_term>> bb;
+	const raw_rule &rr;
+	bit_prog &pbp;
+	bit_rule(const raw_rule &_rr, bit_prog &_pbp);
+	void to_print() const;
+};
+
+struct bit_term {
+	int_t rel;
+	std::vector<bit_elem> vbelem;
+	const raw_term &rt;
+	bit_rule &pbr;
+	bit_term(const raw_term &_rt, bit_rule &_pbr); 
+	size_t get_typeinfo(size_t arg, const raw_term &rt);
+	void to_print() const;
+};
+
+
 
 struct raw_term {
 
@@ -430,6 +511,7 @@ struct raw_prog {
 	std::vector<production> g;
 	std::vector<raw_rule> r;
 	std::vector<guard_statement> gs;
+	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
 	guard grd;
 

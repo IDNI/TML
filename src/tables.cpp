@@ -2856,6 +2856,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		o::ms() << "# pfp: ";
 		measure_time_start();
 	}
+	bit_prog b(p);
+	b.to_print();
+	
 	nlevel begstep = nstep;
 	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
 	size_t went = nstep - begstep;

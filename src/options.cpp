@@ -201,6 +201,7 @@ void options::setup() {
 	add_bool2("print-dict", "dict", "print internal string dictionary");
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("guards", "g", "transforms if and while conditions");
+	add_bool2("bitprog", "bpg", "transforms and prints rule in bit universe 2");
 	add_bool2("keep-guards", "kg", "don't delete guards when program ends");
 	add_bool("optimize","optimize and show more benchmarks");
 	add(option(option::type::STRING, { "name", "n" },

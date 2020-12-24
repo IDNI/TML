@@ -18,6 +18,7 @@
 #include "input.h"
 #include "err.h"
 #include "output.h"
+#include "analysis.h"
 using namespace std;
 
 int_t guard_statement::last_id = -1;
@@ -96,8 +97,9 @@ lexeme input::lex(pccs s) {
 	// rule symbol
 	//XXX: ":=" will deprecate
 	if (**s == ':') {
-		if (*++*s=='-' || **s=='=') return ++*s, lexeme{ *s-2, *s };
-		else return PE(parse_error(*s, err_chr));
+		if (*(*s+1)=='-' || *(*s+1)=='=') return *s += 2, lexeme{ *s-2, *s };
+		// : is now a separate lexeme
+		//else return PE(parse_error(*s, err_chr));
 	}
 
 	if (**s == '\'') {
@@ -116,8 +118,7 @@ lexeme input::lex(pccs s) {
 		return { t, (*s += 2 + chl) };
 	}
 
-	if (strchr("!~.,;(){}[]$@=<>|&^+*-", **s)) return ++*s, lexeme{*s-1,*s};
-
+	if (strchr("!~.,;(){}[]$@=<>|&^+*-:", **s)) return ++*s, lexeme{*s-1,*s};
 	if (strchr("?", **s)) ++*s;
 	size_t chl, maxs = size_ - (*s - beg_);
 	if (!is_alnum(*s, maxs, chl) && **s != '_') return 
@@ -828,9 +829,11 @@ bool raw_prog::parse_statement(input* in, dict_t &dict, guard grd) {
 	production p;
 	macro m;
 	guard_statement c;
+	typestmt ts;
 	raw_prog np;
 	//COUT << "\tparsing statement " << l[pos] << endl;
-	if (np.parse_nested(in, dict)) nps.push_back(np), nps.back().grd = grd;
+	if ( ts.parse(in, *this)) vts.push_back(ts);
+	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np), nps.back().grd = grd;
 	else if (!in->error && c.parse(in, dict, *this)) gs.push_back(c);
 	else if (!in->error && m.parse(in, *this)) vm.emplace_back(m);
 	else if (!in->error && x.parse(in, *this)) d.push_back(x);
