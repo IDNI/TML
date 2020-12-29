@@ -34,6 +34,7 @@ public:
 	type_t target(const std::string t);
 	sysstring_t read() {
 		return type_ == BUFFER ? buffer_.str() : sysstring_t(); }
+	void clear() { if (type_ == BUFFER) buffer_.str(""); }
 	bool is_null() const { return type_ == NONE; }
 	template <typename T>
 	output& operator<<(const T& value) { *os_ << value; return *this; }
@@ -96,6 +97,7 @@ public:
 	static ostream_t& to(const std::string& n);
 	static bool exists(const std::string& n) { return o_?o_->o_exists(n):0;}
 	static sysstring_t read(const std::string& n) { return get(n)->read();}
+	static void clear(const std::string& n) { get(n)->clear(); }
 	static void target(const std::string& n, const std::string& t);
 	static void name(std::string n) { if (o_) o_->name_ = n; }
 	static std::string named() { return o_?o_->name_:std::string(); }
