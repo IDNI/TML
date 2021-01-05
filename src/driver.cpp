@@ -144,10 +144,6 @@ void driver::output_pl(const raw_prog& p) const {
 	if (opts.enabled("xsb"))     print_xsb(o::to("xsb"), p);
 	if (opts.enabled("swipl"))   print_swipl(o::to("swipl"), p);
 	if (opts.enabled("souffle")) print_souffle(o::to("souffle"), p);
-	if (opts.enabled("bitprog")) {
-		bit_prog b(p);
-		b.to_print();
-	}
 }
 
 bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {

@@ -10,15 +10,15 @@
 # following 'e' relation:
 
 
-record e {  int:2 ?a. char ?b.}
-record tc {int:3 ?a. int:7 ?b.}
+record e (  int:3 ?a, char ?b)
+record tc ( int:3 ?a, int:7 ?b )
 
-e(1 2).
-e(2 3).
+e(1 '2').
+e(2 2).
 e(3 4).
 e(4 5).
 e(5 1).
-e(8 9).
+e(7 9).
 
 tc(?x ?y) :- e(?x ?y).
 

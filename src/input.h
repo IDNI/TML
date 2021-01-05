@@ -307,7 +307,7 @@ struct typedecl {
 	primtype pty;  
 	elem structname; // record type
 	std::vector<elem> vars;
-	bool parse(input *in , const raw_prog& prog);
+	bool parse(input *in , const raw_prog& prog, bool multivar = true);
 };
 struct typestmt {
 	structype rty;
@@ -317,12 +317,26 @@ struct typestmt {
 
 };
 
+class bit_dict;
 struct bit_term;
 struct bit_prog;
 struct bit_rule;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
+
+class bit_dict {
+	std::map<lexeme, size_t, lexcmp > syms;
+	std::map<lexeme, int_t, lexcmp > vars;
+	public:
+	size_t get_bit_sym(const elem &e) {
+		assert(e.type == elem::SYM);
+		if(syms.find(e.e) == syms.end())
+			syms.insert({e.e, syms.size()+1});
+		return syms[e.e];
+	}
+};
+
 struct bit_elem {
 	bools p;
 	size_t bsz;
@@ -336,7 +350,7 @@ struct bit_prog {
 	 
 	std::vector<bit_rule> vbr;
 	const raw_prog &rp;
-	std::map<lexeme, size_t, lexcmp > bit_dict;
+	bit_dict bdict;
 	bit_prog( const raw_prog& _rp);
 	void to_print() const;
 };

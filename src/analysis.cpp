@@ -20,10 +20,8 @@ bit_elem::bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt): e(_e), bsz(_bsz
 	
 	int_t sval=0;
 	if(e.type == elem::SYM) {
-		auto &d = pbt.pbr.pbp.bit_dict;
-		if(d.find(e.e) == d.end())
-			d.insert({e.e, d.size()+1});
-		sval = d[e.e];
+		auto &d = pbt.pbr.pbp.bdict;
+		sval = d.get_bit_sym(e);
 	}
 	for (size_t k = 0; k != bsz; ++k) {
 		switch(e.type) {
@@ -197,24 +195,30 @@ bool structype::parse(input *in, const raw_prog& prog){
 		if(false == membdecl.back().parse(in, prog)) {
 				in->parse_error(l[pos][0], "Incorrect member declaration", l[pos]);
 				goto FAIL;
-			}		
+			}
+		if( *l[pos][0] == '.') { pos++; }
+		else goto FAIL;
 	}
 	if(*l[pos++][0] == '}') return true;
 
-	FAIL: return pos=curr, false;
+	FAIL: 
+	in->parse_error(l[pos][0], "Incorrect struct declaration", l[pos]);
+	return pos=curr, false;
 }
-bool typedecl::parse( input* in , const raw_prog& prog){
+bool typedecl::parse( input* in , const raw_prog& prog, bool notparam){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
 	if ( pty.parse(in, prog) || (structname.parse(in) && structname.type == elem::SYM) ) {
 		for( ;pos < l.size() ; )  {
 			vars.emplace_back();
 			if( ! vars.back().parse(in) || vars.back().type != elem::VAR ) goto FAIL;
-			if( *l[pos][0] == '.') { pos++; break; }
-			else if (*l[pos++][0] != ',') goto FAIL;
+			if( !notparam) break; // if parameter then only one var for one type
+			if (*l[pos][0] == ',') pos++; else break; 
 		}
 		if(vars.size())	return true;
 	}
+	else if ( !notparam ) return true; // for void parameters in record declarattion
+
 	FAIL:
 	in->parse_error(l[pos][0], "Incorrect var declared ", l[pos]);
 	return pos = curr, false;
@@ -226,12 +230,13 @@ bool typestmt::parse( input* in , const raw_prog& prog){
 	if( strncmp(l[pos][0],"record", 6) == 0 ) {
 		pos++;
 		if( !reln.parse(in) || reln.type != elem::SYM ) goto FAIL;
-		if(*l[pos++][0] != '{') goto FAIL;
-		for( ;pos < l.size() && *l[pos][0] != '}'; ) {
+		if(*l[pos++][0] != '(') goto FAIL;
+		for( ;pos < l.size() && (*l[pos][0] != ')'); ) {
 			typeargs.emplace_back();
-			if( !typeargs.back().parse(in, prog) ) goto FAIL;
+			if( !typeargs.back().parse(in, prog, false) ) goto FAIL;
+			if (*l[pos][0] == ',') pos++; else break; 
 		}
-		if(*l[pos++][0] != '}') goto FAIL;
+		if(*l[pos++][0] != ')') goto FAIL;
 		return true;
 	}
 	else if ( strncmp(l[pos][0],"struct", 6) == 0  ) {

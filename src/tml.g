@@ -42,11 +42,13 @@ unot => '*' |'+' | null.
 
 primtype => "int" [ ':' bitsz ] | "char" | "symb".
 bitsz =>  digit+.
-type = primtype | recordtype.
-recorddef => "record" relname '{'  typdecl (',' typedecl)* '}'.
-recordtype => relname .
-typedecl => type (var)+ '.'.
-typestmt => recordef  
+type = primtype | structype.
+recordef => "record" relname '('  type var (',' type var)* ')'.
+structype => relname .
+structypedef => "struct" structtype '{' typevardecl ('.' typevardecl)* '}'.
+typevardecl => type var (',' var)* '.'.
+typestmt => recordef | structypedef
+
 prefix => "forall" | "exists" | "unique" .
 prefixdecl => prefix ws identifier ws prefixdecl | prefix ws identifier ws.
 
