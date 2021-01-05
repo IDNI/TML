@@ -2239,12 +2239,18 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 			string regexp = ggraph.get_regularexpstr(elem, bnull);
 			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
 			regex rgx;
+#ifdef WITH_EXCEPTIONS
 			try {
-			rgx = regexp;
+#else
+// TODO: check regexp's validity another way?
+#endif
+				rgx = regexp;
+#ifdef WITH_EXCEPTIONS
 			} catch( ... ) {
-			  DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
-			  continue;
+				DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
+				continue;
 			}
+#endif
 			smatch sm;
 			term t;
 			bool bmatch=false;

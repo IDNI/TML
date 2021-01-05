@@ -24,7 +24,7 @@ require('./tml.js')().then(tml => {
 
 	// create a driver and run program
 	const d = new driver(program, o);
-	d.run(0, 0, false);
+	d.run(0, 0);
 
 	if (!d.result) console.log('unsat');
 	else d.dump();

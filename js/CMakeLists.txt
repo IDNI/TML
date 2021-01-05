@@ -11,6 +11,8 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(tml-common)
 
 set(JSLIB_SOURCES
+	../src/analysis.cpp
+	../src/analysis.h
 	../src/archive.cpp
 	../src/archive.h
 	../src/bdd.cpp
@@ -62,6 +64,9 @@ string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_CATCHING=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s 'EXTRA_EXPORTED_RUNTIME_METHODS=[\"lengthBytesUTF8\",\"stringToUTF8\"]'")
 string(APPEND JSLIB_LINK_OPTIONS " -s ASSERTIONS=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s WARN_UNALIGNED=1")
+
+# build mjs module
+# set(CMAKE_EXECUTABLE_SUFFIX ".mjs")
 
 # tml.js library
 add_executable(tml)
