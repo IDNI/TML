@@ -9,15 +9,20 @@
 # Let's have a directed graph represented by
 # following 'e' relation:
 
-record e( int:5 ?a,  int:5 ?b).
-record tc ( int:5 ?a, int:5 ?b).
-
 e(1 2).
-e(2 2).
+e(2 3).
 e(3 4).
 e(4 5).
 e(5 1).
-e(7 9).
+e(8 9).
 
 tc(?x ?y) :- e(?x ?y).
-tc(?x ?y) :- e(?x ?z),tc(?z ?y).
+# Edge from ?x to ?y is a path from ?x to ?y.
+
+tc(?x ?y) :- tc(?x ?z), e(?z ?y).
+# If there is a path from ?x to ?z and there
+# is an edge from ?z to ?y there is path from
+# ?x to ?y
+
+# TML infers all the possible paths in the
+# 'e' graph into 'tc' graph.

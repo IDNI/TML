@@ -1,0 +1,31 @@
+# Recursion is used to traverse through
+# all the entities in a relation.
+# It's a logic programs' alternative to loops.
+
+# We can have a relation of parents.
+parent(Fred Sue).
+parent(Jack Fred).
+parent(Amy Fred).
+parent(Grace Amy).
+parent(Tom Amy).
+
+# Let's say we want to know all the ancestor
+# relations of all the known entities.
+
+# We need to create 2 rules so TML knows,
+# what ancestor means. Ancestor is a parent
+# or a parent of an ancestor.
+
+# 'parent of a child is an ancestor of the
+# child':
+ancestor(?anc ?child) :-
+    parent(?anc ?child).
+
+# 'parent of a child, who is an ancestor of
+# its descendant, is an ancestor of the
+# descendant':
+ancestor(?anc ?desc) :-
+    parent(?anc ?child), ancestor(?child ?desc).
+
+# Notice how ancestor relation is used in both
+# head and body. This is causing the recursion.

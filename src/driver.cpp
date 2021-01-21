@@ -158,11 +158,15 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 		if (opts.enabled("transformed")) o::to("transformed")
 			<< "after transform_guards:\n" << p << endl<<endl;
 	}
-	if (opts.enabled("bitprog")) {
+	bool fp;
+	if(opts.enabled("bitprog")) {
 		bit_prog b(p);
 		b.to_print();
+		raw_prog brp;
+		b.to_raw_prog(brp);
+		fp = tbl->run_prog(brp, pd.strs, steps, break_on_step);
 	}
-	bool fp = tbl->run_prog(p, pd.strs, steps, break_on_step);
+	else fp = tbl->run_prog(p, pd.strs, steps, break_on_step);
 	o::ms() << "# elapsed: ";
 	measure_time_end();
 	if (tbl->error) error = true;

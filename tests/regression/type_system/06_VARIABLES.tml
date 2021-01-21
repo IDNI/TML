@@ -1,0 +1,52 @@
+# Variables are used for substitution of
+# multiple possible entities in rules.
+# If a variable is substituted by an entity
+# in a body it is substituted by the same entity
+# in body's head.
+# Variables begin with '?' character.
+
+bird(Charlie).
+bird(Coco).
+cat(Bella).
+
+canFly(?something) :- bird(?something).
+# If something is a bird, it can fly.
+# TML infers that Charlie and Coco can fly.
+
+beeps(?some) :- bird(?some).
+# If there is some bird, it beeps.
+# TML infers that Charlie and Coco beeps.
+
+meows(?some) :- cat(?some).
+# If there is some cat, it meows.
+# TML infers that Bella meows.
+
+
+employee(Suzi female).
+employee(John male).
+employee(Jane female).
+
+salutation(?Person Madam) :-
+    employee(?Person female).
+# salutation for any employee female is Madam.
+# TML infers that Suzi's and Jane's salutation
+# is Madam.
+
+salutation(?Person Sir) :-
+    employee(?Person male).
+# salutation for any employee male is Sir
+# TML infers that John's salutation is Sir.
+
+
+parent(?x ?y) :- father(?x ?y).
+parent(?x ?y) :- mother(?x ?y).
+father(Coco Charlie).
+mother(Suzi John).
+
+# TML infers that Coco is Charlie's parent.
+# and that Suzi is John's parent.
+
+# Just for fun, let's say, John is a bird:
+bird(John).
+
+# TML infers that John beeps and he can fly.

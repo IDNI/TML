@@ -1,0 +1,17 @@
+# Negation
+#
+# For negation is used a '~' character.
+# You can read it as 'not'.
+
+bird(Coco).
+bird(Charlie).
+wounded(Charlie).
+
+# You can use negation in bodies
+canFly(?X) :- bird(?X), ~wounded(?X).
+# ?X can fly if ?X is bird and is not wounded.
+# or simply: Not wounded bird can fly.
+
+# Coco and Charlie are birds but Charlie is
+# wounded. The only fact TML can infer here
+# is that Coco can fly.

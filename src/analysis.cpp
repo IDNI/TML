@@ -44,6 +44,26 @@ size_t bit_elem::pos(size_t bit_from_right /*, size_t arg, size_t args */) const
 	}
 	*/
 }
+bool bit_elem::to_elem(std::vector<elem> &ve) const{
+	bool ret = true;
+	
+	if(e.type == elem::VAR || e.type == elem::SYM) {
+		int i=0;	
+		for(bool b: this->p){
+			string_t *temp = new string_t( lexeme2str(e.e));
+			temp->append( to_string_t(i++));
+			lexeme l ={temp->c_str(), temp->c_str()+temp->size()};
+			ve.emplace_back(e.type, l);
+		}
+	}
+	else if(e.type == elem::NUM || e.type == elem::CHR) {
+		for(bool b: this->p)
+			ve.emplace_back(b, elem::NUM);
+	}
+	else ve.emplace_back(e);
+	
+	return ret;
+}
 void bit_elem::to_print() const {
 	o::out()<<e<<" ";
 	int i=0;
@@ -57,12 +77,30 @@ void bit_elem::to_print() const {
 bit_prog::bit_prog( const raw_prog& _rp ): rp(_rp)  {
 	for( const raw_rule &rr :rp.r )
 		vbr.emplace_back(bit_rule(rr, *this));
+	for( const raw_prog &rp: _rp.nps)
+		nbp.emplace_back(bit_prog(rp));
+}
+
+bool bit_prog::to_raw_prog(raw_prog &rp) const{
+	bool ret = true;
+	for( const bit_rule& br :vbr)
+		rp.r.emplace_back(),
+		ret &= br.to_raw_rule(rp.r.back());
+	for( const bit_prog& bp : nbp)
+		rp.nps.emplace_back(),
+		ret &= bp.to_raw_prog(rp.nps.back());
+	return ret;
 }
 
 void bit_prog::to_print() const {
 	o::out()<<std::endl;
 	for( const bit_rule& br :vbr)
 		br.to_print(), o::out()<<std::endl;
+	
+	for( const bit_prog& bp : nbp)
+		o::out()<<"{", 
+		bp.to_print(),
+		o::out()<<"}";
 	return;
 }
 
@@ -75,6 +113,22 @@ bit_rule::bit_rule(const raw_rule &_rr, bit_prog &_pbp): rr(_rr), pbp(_pbp) {
 		for( const raw_term &rt: rr.b[i]) 
 			bb.back().emplace_back(bit_term(rt, *this));
 	}
+}
+bool bit_rule::to_raw_rule(raw_rule &rr) const{
+	bool ret = true;
+	
+	for( const bit_term& bt: bh )
+		rr.h.emplace_back(),
+		ret &= bt.to_raw_term(rr.h.back());
+	for( size_t i=0 ; i < bb.size() ; i++) {
+		rr.b.emplace_back();
+		for( const bit_term &bt: bb[i]) 
+			rr.b.back().emplace_back(),
+			ret &= bt.to_raw_term(rr.b.back().back());
+	}
+	
+	return ret;
+
 }		
 void bit_rule::to_print() const {
 	for( const bit_term& bt: bh )
@@ -126,7 +180,23 @@ size_t bit_term::get_typeinfo(size_t n, const raw_term &rt){
 	else return 0; 
 }
 
+bool bit_term::to_raw_term( raw_term& brt ) const {
+	bool ret = true;
+
+	brt.neg = rt.neg;
+	int_t i = 0;
+	for (const bit_elem& be : vbelem) {
+			// for predicate rel name
+			if( i++ == 0) brt.e.emplace_back(rt.e[0]);
+			// for others
+			else ret &= be.to_elem(brt.e);
+	}
+	ret &= brt.calc_arity(0);	
+	return ret;
+}
+
 void bit_term::to_print() const {
+	if ( rt.neg ) COUT<<"~";
 	for (const bit_elem& be : vbelem)
 		be.to_print(), COUT<<" ";
 }
@@ -236,11 +306,12 @@ bool typestmt::parse( input* in , const raw_prog& prog){
 			if( !typeargs.back().parse(in, prog, false) ) goto FAIL;
 			if (*l[pos][0] == ',') pos++; else break; 
 		}
-		if(*l[pos++][0] != ')') goto FAIL;
+		if(*l[pos++][0] != ')' ||  *l[pos++][0] != '.'   ) goto FAIL;
 		return true;
 	}
 	else if ( strncmp(l[pos][0],"struct", 6) == 0  ) {
 		if( rty.parse(in, prog)) return true;
+		if(*l[pos++][0] != '.' ) goto FAIL;
 	}
 	FAIL:
 	return pos=curr, false;

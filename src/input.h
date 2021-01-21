@@ -254,6 +254,13 @@ struct elem {
 	elem() {}
 	elem(int_t num) : type(NUM), num(num) {}
 	elem(char32_t ch) : type(CHR), ch(ch) {}
+	elem(bool b, etype _type): type(_type) {
+		if(type == NUM)
+			num = b;
+		else if(type == CHR)
+			ch = b;
+		else DBG(assert(false));
+	}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
 	}
@@ -344,14 +351,17 @@ struct bit_elem {
 	bit_term &pbt;
 	bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt);
 	size_t pos(size_t bit_from_right /*, size_t arg, size_t args */) const;
+	bool to_elem( std::vector<elem> &) const;
 	void to_print() const;
 };
 struct bit_prog {
 	 
 	std::vector<bit_rule> vbr;
+	std::vector<bit_prog> nbp;
 	const raw_prog &rp;
 	bit_dict bdict;
 	bit_prog( const raw_prog& _rp);
+	bool to_raw_prog(raw_prog &) const;
 	void to_print() const;
 };
 
@@ -361,6 +371,7 @@ struct bit_rule {
 	const raw_rule &rr;
 	bit_prog &pbp;
 	bit_rule(const raw_rule &_rr, bit_prog &_pbp);
+	bool to_raw_rule(raw_rule&) const;
 	void to_print() const;
 };
 
@@ -371,6 +382,7 @@ struct bit_term {
 	bit_rule &pbr;
 	bit_term(const raw_term &_rt, bit_rule &_pbr); 
 	size_t get_typeinfo(size_t arg, const raw_term &rt);
+	bool to_raw_term(raw_term&) const;
 	void to_print() const;
 };
 

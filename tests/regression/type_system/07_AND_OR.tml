@@ -1,0 +1,33 @@
+# When you need multiple conditions in a body
+# separate them by a comma. You can read comma
+# as 'and':
+
+boy(?x) :- child(?x), male(?x).
+# ?x is a boy if ?x is both child and male.
+
+girl(?x) :- child(?x), female(?x).
+# ?x is a girl if ?x is both child and female.
+
+# When you need multiple bodies for the same
+# head, you can have multiple rules with the
+# same head:
+
+human(?x) :- child(?x).
+human(?x) :- adult(?x).
+# ?x is a human if ?x is child or adult.
+
+adult(Amy).
+child(John).
+child(Jack).
+child(Jane).
+child(Suzi).
+male(John).
+male(Jack).
+female(Amy).
+female(Jane).
+female(Suzi).
+
+# TML infers: Jack and John are boys.
+# Jane and Suzi are girls.
+# And Amy, Jack, Jane, John and Suzi are
+# humans.
