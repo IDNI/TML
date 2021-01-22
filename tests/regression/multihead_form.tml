@@ -1,2 +1,0 @@
-a(1).
-existA(?x), existB(?x), existC(?x) :- { exists ?x { a(?x) } }.

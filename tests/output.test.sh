@@ -4,8 +4,9 @@ rm -f output.test output.test.stdout output.test.stderr named.name1 named.name2 
 ret=0
 
 sources=(utils.cpp dict.cpp input.cpp tables.cpp tables_ext.cpp form.cpp
-	bdd.cpp bdd_ext.cpp)
-objects=(utils.o dict.o input.o tables.o tables_ext.o bdd.o bdd_ext.o form.o)
+	bdd.cpp bdd_ext.cpp analysis.cpp)
+objects=(utils.o dict.o input.o tables.o tables_ext.o bdd.o bdd_ext.o form.o
+	analysis.o)
 
 #[[ -f tml.o ]] || \
 (

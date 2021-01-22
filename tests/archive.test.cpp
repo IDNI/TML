@@ -278,7 +278,7 @@ int main() {
 		read_options,
 		write_bdd_test,
 		read_bdd_test,
-		write_tables,
+//		write_tables,
 //		write_driver,
 //		read_driver,
 	};

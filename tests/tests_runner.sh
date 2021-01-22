@@ -49,10 +49,13 @@ clean_output() {
 run() {
 	options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug)
 	for output in ${outputs[*]}; do
-		options+=("--$output" "$1.$output")
+		options+=("--$output" "$1.$output" "-g")
 	done
-	[[ -n "$diropts" ]] && `$tml ${options[@]} $diropts` \
-		|| $tml "${options[@]}"
+	IFS=' ' read -r -a diropts_arr <<< "$diropts"
+	[[ -n "$diropts" ]] && for opt in ${diropts_arr[*]}; do
+		options+=("$opt")
+	done
+	$tml "${options[@]}"
 }
 
 # save outputs of program ($1) as expected
