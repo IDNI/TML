@@ -55,13 +55,13 @@ public:
 		sposl(n, archive::size(v), s);
 	}
 	static void sposl(const std::string& n, size_t l, size_t s) {
-		COUT << "spos: \t" << s << " \t0x" << std::hex << s
+		DBG(o::dbg() << "spos: \t" << s << " \t0x" << std::hex << s
 			<< std::dec << " \t" << n << "\t size: " << l <<
-			std::endl;
+			std::endl;)
 	}
 	archive& pos(const std::string& n) {
-		COUT << "pos: \t" << pos_ << " \t0x" << std::hex <<
-			pos_ << std::dec << " \t" << n << std::endl;
+		DBG(o::dbg() << "pos: \t" << pos_ << " \t0x" << std::hex <<
+			pos_ << std::dec << " \t" << n << std::endl;)
 		return *this;
 	}
 
