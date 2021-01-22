@@ -476,19 +476,27 @@ template basic_ostream<wchar_t>& print_raw_rule(basic_ostream<wchar_t>&,
 // TODO this is just a draft printer for raw form tree - not completly correct
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
-	function<basic_ostream<T>&(const raw_form_tree*)>print_node;
-	print_node = [&os, &print_node] (const raw_form_tree* prft)
-		-> basic_ostream<T>&
+	lexeme guard_lx = prft->guard_lx;
+	auto is_quantifier = [](const raw_form_tree* prft) -> bool {
+		return prft->type == elem::EXISTS ||
+			prft->type == elem::FORALL ||
+			prft->type == elem::UNIQUE;
+	};
+	const raw_form_tree *node = prft;
+	if (guard_lx != lexeme{ 0, 0 }) // find first node after quantifiers
+		while (node && is_quantifier(node)) node = node->r;
+	function<basic_ostream<T>&(const raw_form_tree*)> print_node;
+	print_node = [&os, &print_node, &guard_lx, &node, &is_quantifier]
+		(const raw_form_tree* prft) -> basic_ostream<T>&
 	{
 		basic_ostringstream<T> op;
 		bool wrap = prft->type != elem::VAR &&
 			prft->type != elem::SYM &&
 			prft->type != elem::NOT;
-		bool prefop = prft->el && (
-			prft->el->type == elem::FORALL ||
-			prft->el->type == elem::EXISTS ||
-			prft->el->type == elem::UNIQUE);
+		bool prefop = prft->el && is_quantifier(prft);
 		bool prefix = (prft->rt || prefop);
+		bool is_guarded = prft == node && guard_lx != lexeme{ 0, 0 };
+		if (is_guarded) os<<"{ "<<guard_lx<<" && ";
 		if (prft->neg) os << "~ ";
 		if (prft->type == elem::NOT) os << "~ ";
 		else prft->rt ? op << *prft->rt
@@ -499,6 +507,7 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
 		if (!prefix) os << " " << op.str();
 		if (prft->r) print_node(prft->r);
 		os << (wrap ? " }": " ");
+		if (is_guarded) os << " }";
 		return os;
 	};
 	return print_node(prft);

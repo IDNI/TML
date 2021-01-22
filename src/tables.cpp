@@ -582,11 +582,12 @@ template void tables::out<wchar_t>(wostream& os) const;
 
 void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		out(tbls[tab].t, tab, f);
+		if (tab != fp_tab) out(tbls[tab].t, tab, f);
 }
 
 template <typename T>
 void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
+	if (tab == fp_tab) return; // don't print __fp__ fact.
 	out(x, tab, [&os](const raw_term& rt) { os << rt << '.' << endl; });
 }
 
@@ -952,16 +953,34 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		else if(r.prft != NULL) {
 			bool is_sol = false;
 			form* froot = 0;
-
-			raw_form_tree *root = // r.prft.get();
-				r.prft->neg ? new raw_form_tree(
-						elem::NOT, NULL, NULL,
-						r.prft.get())
-					: r.prft.get();
+			raw_form_tree *root = r.prft->neg // neg transform
+				? new raw_form_tree(elem::NOT, NULL, NULL,
+					r.prft.get())
+				: r.prft.get();
+			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
+				raw_form_tree *parent = 0;
+				raw_form_tree *node = root;
+				raw_term gt;
+				gt.arity = { 0 };
+				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
+				while (node->type == elem::EXISTS ||
+					node->type == elem::FORALL ||
+					node->type == elem::UNIQUE)
+						parent = node, node = node->r;
+				if (parent != 0)
+					parent->r = new raw_form_tree(elem::AND,
+						NULL, NULL, node,
+						new raw_form_tree(elem::NONE,
+							&gt));
+				else
+					root = new raw_form_tree(elem::AND,
+						NULL, NULL, root,
+						new raw_form_tree(elem::NONE,
+							&gt));
+			}
 			from_raw_form(root, froot, is_sol);
 
 			/*
-
 			DBG(COUT << "\n ........... \n";)
 			DBG(r.prft.get()->printTree();)
 			DBG(COUT << "\n ........... \n";)
@@ -1400,7 +1419,7 @@ void tables::transform_bin(flat_prog& p) {
 		p.insert(move(x)), vars.clear();
 	}
 	if (print_transformed) print(o::to("transformed")
-		<< "after transform_bin:" << endl, p);
+		<< "# after transform_bin:" << endl, p);
 }
 
 /*struct cqcdata {
@@ -2115,8 +2134,9 @@ bool graphgrammar::collapsewith(){
 	}
 	return true;
 }
-bool tables::transform_grammar_constraints(const production &x, vector<term> &v, flat_prog &p, 
-											  std::map<size_t, term> &refs) {
+bool tables::transform_grammar_constraints(const production &x, vector<term> &v,
+	flat_prog &p, std::map<size_t, term> &refs)
+{
 	std::set<term> done;
 	bool beqrule = false;
 	for( raw_term rt : x.c ) {
@@ -2425,8 +2445,8 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 		p.insert(move(v));
 	}
 	if (print_transformed) print(print(o::to("transformed")
-		<< "after transform_grammar:\n", p)
-		<< "\nrun after a fixed point:\n", prog_after_fp)
+		<< "# after transform_grammar:\n", p)
+		<< "\n# run after a fixed point:\n", prog_after_fp)
 		<< endl;
 	return true;
 }
@@ -2830,6 +2850,21 @@ bool tables::infloop_detected() {
 	return false;
 }
 
+// adds __fp__ fact and returns true if __fp__ fact does not exist
+bool tables::add_fixed_point_fact() {
+	raw_term rt;
+	rt.arity = { 0 };
+	rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
+	term t = from_raw_term(rt);
+	if (fp_tab != t.tab) fp_tab = t.tab; // remember the tab for filtering
+
+	bool exists = false;
+	decompress(tbls[t.tab].t && from_fact(t), t.tab,
+		[&exists](const term& /*t*/) { exists = true; }, t.size());
+	if (!exists) tbls[t.tab].t = tbls[t.tab].t || from_fact(t); // add if ne
+	return !exists;
+}
+
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
 	if (bproof) levels.emplace_back(get_front());
@@ -2838,7 +2873,9 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		if (print_steps || optimize)
 			o::inf() << "# step: " << nstep << endl;
 		++nstep;
-		if (!fwd()) return true; // FP found
+		if (!fwd()) return fp_step
+			? (add_fixed_point_fact() ? pfp() : true)
+			: true;
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
@@ -2862,14 +2899,15 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		o::ms() << "# pfp: ";
 		measure_time_start();
 	}
-	COUT<<endl<<p<<endl;
+	DBG(o::dbg()<<endl<<p<<endl);
 	
 	nlevel begstep = nstep;
-	bool r = pfp(steps ? nstep + steps : 0, break_on_step);
+	bool r = true;
+	// run program only if there are any rules
+	if (rules.size()) r = pfp(steps ? nstep + steps : 0, break_on_step);
 	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
 		if (!add_prog(move(prog_after_fp), {}, false)) return false;
-		COUT<<"running"<<endl;
 		r = pfp();
 	}
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
@@ -2887,10 +2925,10 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 }
 
 tables::tables(dict_t dict, bool bproof, bool optimize, bool bin_transform,
-	bool print_transformed, bool apply_regexpmatch, bool keep_guards) :
+	bool print_transformed, bool apply_regexpmatch, bool fp_step) :
 	dict(move(dict)), bproof(bproof), optimize(optimize),
 	bin_transform(bin_transform), print_transformed(print_transformed),
-	apply_regexpmatch(apply_regexpmatch), keep_guards(keep_guards) {}
+	apply_regexpmatch(apply_regexpmatch), fp_step(fp_step) {}
 	// dict(*new dict_t)
 
 tables::~tables() {

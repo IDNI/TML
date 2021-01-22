@@ -28,8 +28,6 @@
 class archive;
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
-typedef std::pair<int_t, bool> guard;
-
 /**
  * input class contains input data. input can be one of three types: STDIN,
  * FILE or STRING. STDIN works as a STRING which is read from the standard input
@@ -488,6 +486,7 @@ struct raw_form_tree {
 	raw_form_tree *r;
 
 	bool neg = false;
+	lexeme guard_lx = {0,0};
 
 	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el =NULL,
 		raw_form_tree *_l = NULL, raw_form_tree *_r = NULL)
@@ -524,8 +523,9 @@ struct guard_statement {
 	bool parse_while(input* in, dict_t &dict, raw_prog& rp);
 	bool parse(input* in, dict_t &dict, raw_prog& rp);
 	sprawformtree prft;
-	int_t id = 0;
-	static int_t last_id;
+	int_t rp_id = 0;
+	int_t true_rp_id = 0;
+	int_t false_rp_id = 0;
 };
 
 struct raw_prog {
@@ -539,18 +539,17 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
-	guard grd;
 
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 
 	int_t id = 0;
+	int_t guarded_by = -1;
 	static int_t last_id;
-
-	raw_prog() { id = ++last_id; }
+	static bool require_guards;
 
 	bool parse(input* in, dict_t &dict);
-	bool parse_statement(input* in, dict_t &dict, guard grd = {-1,false});
+	bool parse_statement(input* in, dict_t &dict);
 	bool parse_nested(input* in, dict_t &dict);
 	bool parse_xfp(input* in, dict_t &dict);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 

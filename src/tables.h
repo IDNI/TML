@@ -229,7 +229,7 @@ private:
 	dict_t dict; // dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed = false,
-		 apply_regexpmatch = false, keep_guards = false;
+		 apply_regexpmatch = false, fp_step = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -444,7 +444,7 @@ private:
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false, 
-		bool apply_regxmatch = false, bool keep_guards = false);
+		bool apply_regxmatch = false, bool fp_step = false);
 	~tables();
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
@@ -463,18 +463,26 @@ public:
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }
 
-	void __(std::vector<raw_term>& rts,const lexeme& lx,int_t i,bool neg=0);
+	// transform nested programs
+	ntable fp_tab = -1; // tab id of the __fp__ fact (for filter when out)
+	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+		bool neg = false);
+	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+		int_t i2, bool neg = false);
+	void __(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
+	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 	void transform_guards(raw_prog& rp);
-	void transform_facts(raw_prog& rp);
-	void transform_guard_statements(raw_prog& rp);
-	void remove_guards(raw_prog& rp);
+	void transform_facts(raw_prog& trp, raw_prog& rp, int_t& prev_id);
+	void transform_guard_statements(raw_prog& trp, raw_prog& rp);
+	bool add_fixed_point_fact();
+
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 	bool error = false;
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
-	int  regex_level 		 = 0;
+	int  regex_level         = 0;
 };
 
 

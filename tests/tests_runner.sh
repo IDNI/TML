@@ -49,7 +49,7 @@ clean_output() {
 run() {
 	options=(-i "$1" -no-optimize -no-info -no-benchmarks -no-debug)
 	for output in ${outputs[*]}; do
-		options+=("--$output" "$1.$output" "-g")
+		options+=("--$output" "$1.$output")
 	done
 	IFS=' ' read -r -a diropts_arr <<< "$diropts"
 	[[ -n "$diropts" ]] && for opt in ${diropts_arr[*]}; do
