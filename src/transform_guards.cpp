@@ -45,145 +45,122 @@ void tables::__(vector<raw_term>& rts, const string& lx, int_t id, int_t id2,
 
 // transforms guards = facts into rules, adds state guards, transf. if and while
 void tables::transform_guards(raw_prog& rp) {
-
 	// initiate program by setting the id of the fixed point program to 0
 	int_t prev_id = 0;
 	__(rp.r.emplace_back().h, "fp", prev_id);
-
-	for (auto& np : rp.nps)
-		transform_facts(rp, np, prev_id);
+	for (auto& np : rp.nps)	transform_guards_program(rp, np, prev_id);
 	transform_guard_statements(rp, rp);
-
-	// clean __N__fp__ facts from if true blocks
-	for (int_t i = 0; i != prev_id+1; ++i)
-		__(rp.r.emplace_back().h, "fp", i, true),
-		__(rp.r.back().b.emplace_back(), "fp", i);
-
-	// clean the last fp
-	//__(rp.r.emplace_back().h, "fp", prev_id, true),
-	//__(rp.r.back().b.emplace_back(), "fp", prev_id);
-
 	// remove empty nested programs
 	rp.nps.clear();
 }
 
-// transforms facts into rules = transform all nested programs into start, add,
+// transforms a program program into phases
 // del, rule, true, false, curr and fp states and guard each add/del/rule
 // statement with its state guard
-void tables::transform_facts(raw_prog& trp, raw_prog& rp, int_t& prev_id) {
-	int_t i = rp.id;
-
+void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
+	int_t& prev_id)
+{
+	vector<string> states = {
+		"init", "start", "add", "del", "rule", "cond", "fp", "curr"
+	};
+	int_t id = rp.id;
 	for (auto& rule : rp.r) {
+		DBG(assert(rule.h.size() < 2);)  // is it really only rule.h[0]?
 		bool is_form = rule.is_form();
 		bool is_fact = !rule.b.size() && !is_form;
-		if (is_fact) rule.b.emplace_back();		
-		if (is_form) rule.prft->guard_lx = lx_id("rule", rp.id);
+		if (is_fact) rule.b.emplace_back();
+		if (is_form) rule.prft->guard_lx = lx_id("rule", id);
 		else __(rule.b.back(), is_fact ? (rule.h[0].neg ? "del" : "add")
-			: "rule", rp.id);
+			: "rule", id);
 		trp.r.emplace_back(rule);
-		//o::inf() << "transformed_rule: " << rule << endl;;
-		
-		// just move directives, productions and macros
-		// (they are global so far - TODO)
 	}
-	if (rp.d.size()) trp.d.insert(trp.d.end(), rp.d.begin(), rp.d.end());
-	if (rp.g.size()) trp.g.insert(trp.g.end(), rp.g.begin(), rp.g.end());
-	if (rp.vm.size()) trp.vm.insert(trp.vm.end(), rp.vm.begin(), rp.vm.end());
+	auto next_state = [&rp] (state_value state) -> state_value
+	{
+		switch (state) {
+			case INIT: return START;
+			case START: if(rp.has[ADDS])  {
+				return ADDS; } [[fallthrough]];
+			case ADDS:  if(rp.has[DELS])  {
+				return DELS; } [[fallthrough]];
+			case DELS:  if(rp.has[RULE]) {
+				return RULE; } [[fallthrough]];
+			case RULE:  if(rp.has[COND]) {
+				return COND; } [[fallthrough]];
+			case COND:
+			default:return FP;
+		}
+	};
+	state_value prev_state = rp.has[CURR] ? INIT : START;
+	state_value state      = next_state(prev_state);
+	trp.r.emplace_back();
+	if (rp.guarded_by != -1) {
+		bool is_false_rp = rp.true_rp_id != -1;
+		if (!is_false_rp)
+			__(trp.r.back().h, "guard", rp.guarded_by, id, true);
+		__(trp.r.back().b.emplace_back(), "fp", rp.guarded_by);
+		__(trp.r.back().b.back(), "guard", rp.guarded_by, is_false_rp
+			? rp.true_rp_id : id, is_false_rp);
+	} else
+		__(trp.r.back().h, "fp", prev_id, true),
+		__(trp.r.back().b.emplace_back(), "fp", prev_id);
+	__(trp.r.back().h, states[state], id);
+
+	if (rp.has[CURR]) __(trp.r.back().h, "curr", id);
+	while (state != FP) {
+		prev_state = state;
+		state = next_state(state);
+		trp.r.emplace_back(),
+		__(trp.r.back().h, states[prev_state], id, true);
+		__(trp.r.back().b.emplace_back(), states[prev_state], id);
+		if (prev_state == RULE)
+			__(trp.r.back().h, "fp", -1, true),
+			__(trp.r.back().b.back(), "fp", -1);
+		__(trp.r.back().h, states[state], id);
+	};
+	if (rp.has[CURR]) trp.r.emplace_back(),
+		__(trp.r.back().h, "curr", id, true),
+		__(trp.r.back().b.emplace_back(), "fp", id),
+		__(trp.r.back().b.back(), "curr", id);
+	trp.r.emplace_back(),
+		__(trp.r.back().h, "fp", id, true),
+		__(trp.r.back().b.emplace_back(), "fp", id);
+	prev_id = id;
+	for (auto& prog : rp.nps) transform_guards_program(trp, prog, prev_id);
+	// just move directives, productions and macros (always global scope)
+	if (rp.d.size())  trp.d.insert( trp.d.end(), rp.d.begin(), rp.d.end());
+	if (rp.g.size())  trp.g.insert( trp.g.end(), rp.g.begin(), rp.g.end());
+	if (rp.vm.size()) trp.vm.insert(trp.vm.end(),rp.vm.begin(),rp.vm.end());
 	rp.r.clear();
 	rp.d.clear();
 	rp.g.clear();
 	rp.vm.clear();
-
-	raw_rule& r1 = trp.r.emplace_back();
-	__(r1.h, "start", i);
-	if (rp.guarded_by != -1) {
-		//__(r1.h, "fp", rp.guarded_by, true);
-		__(r1.h, "guard", rp.guarded_by, rp.id, true);
-		__(r1.b.emplace_back(), "fp", rp.guarded_by);
-		__(r1.b.back(), "guard", rp.guarded_by, rp.id);
-	} else {
-		__(r1.h, "fp", prev_id, true);
-		__(r1.b.emplace_back(), "fp", prev_id);
-	}
-
-	raw_rule& r2 = trp.r.emplace_back();
-	__(r2.h, "add", i);
-	__(r2.h, "curr", i);
-	__(r2.h, "start", i, true);
-	__(r2.b.emplace_back(), "start", i);
-
-	raw_rule& r3 = trp.r.emplace_back();
-	__(r3.h, "del", i);
-	__(r3.h, "add", i, true);
-	__(r3.b.emplace_back(), "add", i);
-
-	raw_rule& r4 = trp.r.emplace_back();
-	__(r4.h, "rule", i);
-	__(r4.h, "del", i, true);
-	__(r4.b.emplace_back(), "del", i);
-
-	raw_rule& r5 = trp.r.emplace_back();
-	__(r5.h, "true", i);
-	__(r5.h, "rule", i, true);
-	__(r5.h, "fp", -1, true);
-	__(r5.b.emplace_back(), "rule", i);
-	__(r5.b.back(), "fp", -1);
-
-	raw_rule& r6 = trp.r.emplace_back();
-	__(r6.h, "false", i);
-	__(r6.h, "true", i, true);
-	__(r6.b.emplace_back(), "true", i);
-
-	raw_rule& r7 = trp.r.emplace_back();
-	__(r7.h, "fp", i);
-	__(r7.h, "false", i, true);
-	__(r7.b.emplace_back(), "false", i);
-
-	raw_rule& r8 = trp.r.emplace_back();
-	__(r8.h, "curr", i, true);
-	__(r8.b.emplace_back(), "curr", i);
-	__(r8.b.back(), "fp", i);
-
-	prev_id = i;
-
-	for (auto& prog : rp.nps) {		
-		transform_facts(trp, prog, prev_id);
-	}
-
-	//o::inf() << "\t//transform_facts(trp, rp, prev_id), rp.id = " << i << " prev_id = " << prev_id << endl;
 }
 
 // transforms ifs and whiles
 void tables::transform_guard_statements(raw_prog& trp, raw_prog& rp) {
 	for (auto& c : rp.gs) {
 		if (c.type == guard_statement::IF) {
-			raw_rule& r1 = trp.r.emplace_back();
-			__(r1.h, "guard", c.rp_id, c.true_rp_id),
-			r1.prft = c.prft;
-			r1.prft->guard_lx = lx_id("true", c.rp_id);
-			raw_rule& r2 = trp.r.emplace_back();
-			__(r2.h,                "guard", c.rp_id, c.false_rp_id),
-			__(r2.b.emplace_back(), "guard", c.rp_id, c.true_rp_id, true),
-			__(r2.b.back(),         "false", c.rp_id);
-			 // clean fp states
-			//raw_rule& r3 = trp.r.emplace_back();
-			//__(r3.h,                "fp", c.true_rp_id, true),
-			//__(r3.b.emplace_back(), "fp", c.true_rp_id);
-			//raw_rule& r4 = trp.r.emplace_back();
-			//__(r4.h,                "fp", c.false_rp_id, true),
-			//__(r4.b.emplace_back(), "fp", c.false_rp_id);
+			trp.r.emplace_back();
+			__(trp.r.back().h, "guard", c.rp_id, c.true_rp_id),
+			trp.r.back().prft = c.prft;
+			trp.r.back().prft->guard_lx = lx_id("cond", c.rp_id);
 		} else
 		if (c.type == guard_statement::WHILE) {
-			raw_rule& r = trp.r.emplace_back();
-			__(r.h, "fp", c.rp_id);
-			__(r.h, "start",      c.rp_id, true);
-			__(r.h, "add",        c.rp_id, true);
-			__(r.h, "del",        c.rp_id, true);
-			__(r.h, "rule",       c.rp_id, true);
-			__(r.h, "curr",       c.rp_id, true);
-			r.prft = c.prft;
-			r.prft->guard_lx = lx_id("curr", c.rp_id);
-			r.prft->neg = true;
+			if (!rp.has[ADDS] && !rp.has[DELS] &&
+				!rp.has[RULE]) continue;
+			trp.r.emplace_back();
+			__(trp.r.back().h, "curr",  c.rp_id, true);
+			__(trp.r.back().h, "start", c.rp_id, true);
+			if (c.p_break_rp->has[ADDS])
+				__(trp.r.back().h, "add",   c.rp_id, true);
+			if (c.p_break_rp->has[DELS])
+				__(trp.r.back().h, "del",   c.rp_id, true);
+			if (c.p_break_rp->has[RULE])
+				__(trp.r.back().h, "rule",  c.rp_id, true);
+			__(trp.r.back().h, "fp",    c.rp_id);
+			trp.r.back().prft = c.prft;
+			trp.r.back().prft->guard_lx = lx_id("curr", c.rp_id);
+			trp.r.back().prft->neg = true;
 		}
 	}
 	for (auto& prog : rp.nps) transform_guard_statements(trp, prog);

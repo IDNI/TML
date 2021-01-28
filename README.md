@@ -607,61 +607,134 @@ Alternatively, if the user requires extended precision to keep all information o
 
 where ?zh accounts for the most significant bits (MSBs) of the operation and ?zl for the least significant bits (LSBs).
 
+## Fixed point detection programatically
+
+TML programmer can enable fixed point step by `-fp` (`-fp-step`) command line
+option. This option makes TML interpret to add a `__fp__` fact into program's
+database when it reaches a fixed point and it continues with execution until
+another fixed point. If `__fp__` fact exists in the database already it halts
+the execution.
+
+This way a TML programmer can have a rule depending on the `__fp__` fact.
+To continue execution of the program remove the `__fp__` fact.
+
+This fact is filtered out when printing the database data.
+
 # Rule guards
 
 To enable or disable a rule we can use additional term in rule's body. Existence
 of such a term guards execution of the rule.
 
-    guard.                      # guard fact is required for execution of
-    a_copy(?x) :- a(?x), guard. # this rule
+```
+	guard.                      # guard fact is required for execution of
+	a_copy(?x) :- a(?x), guard. # this rule
+```
 
-Rule guards are used for implementing **if** and **while** statements.
+# Transform guards
 
-To properly guard execution of nested programs, it is required to transform
-fact adds and fact deletions into rules. Because these happen in a sequence we
-need to transform each nested program into several consecutive states:
-initialization (__init), start (__start), adds (__add), deletions (__del) and
-rules (__rule).
+By using `-guards` (`-g`) command line option we can transform a TML program
+containing nested programs or **if** or **while** statements into a single TML
+program which uses rule guards to control execution of each program's state.
 
-There is also an additional and independent break (__break) state.
-If this state exists it prevents execution of all rules in the current program
-and thus forces a fixed point and ends its execution.
+To properly guard execution of nested programs it is required to transform
+all statements into a guarded rule. Because adds, dels, rules execution, and
+**if** and **while** conditions need to happen in a sequence we need to
+transform each program into several consecutive states (`N` is an id of the
+program): start state: `__N__start__`, adds state: `__N__add__`, deletions
+state: `__N__del__`, rules state: `__N__rule__`, conditions state: `__N__cond__`
+and a fixed point state: `__N__fp__`.
 
-Transformation of a TML program into states is enabled by using `-guards` (`-g`)
-command line option. With this option each nested program
+`__N__start` state is the beginning state of the program if it is a **while**
+guarded program, so its execution can be breaken before other states of the 
+program happen. if the program is guarded by **while** it also adds a
+`__N__curr__` fact. This fact guards the breaking condition of the **while**
+command.
 
-    { # with its unique id (let's say id of this nested prog is __1)
-        fact1, fact2.
-        ~fact2.
-        rule1 :- fact1.
-    }
+Not all states are always present in each program.
 
-becomes
+Program containing an adding of a fact will have `__N__add__` state.
+If program contains a deletion of a fact it will have `__N__del__` state.
+Program with at least a rule will have `__N__rule__` state.
+If there is an **if** condition it will have `__N__cond__` state.
+Program guarded by a **while** condition will have `__N__start__` state and it
+will also keep the `__N__curr__` fact existing while the program is running.
+So far only `__N__fp__` is the only state which is always present even in an
+empty program. (It is expected that this state would be optimized out too.)
 
-    {
-        __init (__1).
-        __start(__1), ~__init (__1) :-        __init (__1), ~__break(__1). # *
-        __add  (__1), ~__start(__1) :-        __start(__1), ~__break(__1).
-        __del  (__1), ~__add  (__1) :-        __add  (__1), ~__break(__1).
-        __rule (__1), ~__del  (__1) :-        __del  (__1), ~__break(__1).
+Transitioning from one state to another is done by state transitioning rules:
 
-         fact1, fact2               :-        __add  (__1), ~__break(__1).
-        ~fact2                      :-        __del  (__1), ~__break(__1).
-         rule1                      :- fact1, __rule (__1), ~__break(__1).
-    }
+```
+	~__previous_state__, __new_state__ :- __previous_state__.
+```
 
-An internal program is run after the program finishes. This program removes all
-the guards from the database. If you want to skip this phase and keep the guards
-use command line option `-keep-guards` (`-kg`). It can be  useful for debugging
-since it keeps last state guard of each nested program plus results of guarding
-statements.
+All program states take only a single step of the resulting TML program but the
+`__N__rule__` state. Rules state needs to run until the current program
+(rules guarded by `__N__rule__`) reaches its fixed point.
+To detect a fixed point of the program (in `__N__rule__` state) programatically
+we enable the [fp step](#fixed-point-detection-programatically) (`-g` enables
+`-fp` automatically) feature.
 
-To see transformed program use `-t` comand line option.
+With `__fp__` internal fact we can detect fixed point of a nested program and we
+can end the `__N__rule__` state and continue to the `__N__fp__` state:
+
+```
+	~__1__rule__, __1__fp__, ~__fp__ :- __1__rule__, __fp__.
+```
+
+The last state of the program is `__N__fp__` state. Existence of this fact
+guards execution of the program which follows in the sequence.
+
+Example: a simple program
+ 
+```
+	 fact1, fact2.
+	~fact2.
+	 rule1         :- fact1.
+```
+
+becomes:
+
+```
+	 __0__fp__.   # initial state of a TML program
+	 fact1, fact2                    :- __1__add__.
+	~fact2                           :- __1__del__.
+	 rule1                           :- __1__rule__, fact1.
+	~__0__fp__,   __1__add__         :- __0__fp__.
+	~__1__add__,  __1__del__         :- __1__add__.
+	~__1__del__,  __1__rule__        :- __1__del__.
+	~__1__rule__, __1__fp__, ~__fp__ :- __1__rule__, __fp__.
+	~__1__fp__                       :- __1__fp__.
+```
+
+A nested program:
+
+```
+	{ a(3). { a(2). } a(1). }
+```
+
+transforms into:
+
+```
+	 __0__fp__.
+	~__0__fp__,  __1__fp__  :- __0__fp__.
+	~__1__fp__              :- __1__fp__.
+	 a(3)                   :- __2__add__.
+	 a(1)                   :- __2__add__.
+	~__1__fp__,  __2__add__ :- __1__fp__.
+	~__2__add__, __2__fp__  :- __2__add__.
+	~__2__fp__              :- __2__fp__.
+	 a(2)                   :- __3__add__.
+	~__2__fp__,  __3__add__ :- __2__fp__.
+	~__3__add__, __3__fp__  :- __3__add__.
+	~__3__fp__              :- __3__fp__.
+```
+
+To see the `-g` transformed program use `-t` command line option.
 
 # Guarding statements
 
-Guard transformation enables usage of **if** and **while** statements.
-First order form is used as a condition. Guarded code is always nested
+Guard transformation also enables usage of **if** and **while** statements.
+First order formula is used as a condition. Guarded code is always nested
 eventhough it does not have to be surrounded by '{' and '}' if it is just
 a single rule or another guarding statement.
 
@@ -669,97 +742,135 @@ a single rule or another guarding statement.
 
 Syntax of **if** statement is:
 
-    if FORM then STATEMENT.                   # or
-    if FORM then STATEMENT else STATEMENT.
+```
+	if FORM then STATEMENT.                   # or
+	if FORM then STATEMENT else STATEMENT.
+```
 
-FORM is a first order form and STATEMENT can be another guarding statement,
+FORM is a first order formula and STATEMENT can be another guarding statement,
 a nested program or a rule (note that STATEMENT is always nested. It is parsed
 as a nested program, ie. `rule.` is parsed as `{ rule. }`).
 
-Example
+Example program:
 
-    A(10).
-    if exists ?x { A(?x) } then A_not_empty. else { A_empty. }
+```
+	A(10).
+	if exists ?x { A(?x) } then A_not_empty. else { A_empty. }
+```
 
-is equivalent to
+is equivalent to:
 
-    A(10).
-    if exists ?x { A(?x) } then { A_not_empty. } else A_empty.
+```
+	A(10).
+	if exists ?x { A(?x) } then { A_not_empty. } else A_empty.
+```
 
-produces
+produces result:
 
-    A(10).
-    A_not_empty.
+```
+	A(10).
+	A_not_empty.
+```
 
 **if** is implemented by transformation of a condition (FO formula) into a rule
-which adds a guard which then enables execution of the true (if then ...) or
-false (else ...) nested program.
+which is executed (condition is decided) when fp of the current program is
+reached.
 
-For above example such a rule would be (if id of the guard statement is __0)
+For above example such a rule would be.
 
-    __guard(__0) :- exists ?x { A(?x) }.
+```
+	__1__2__guard__ :- { __1__cond__ && { exists  ?x  { A(?x) } } }.
+```
 
-Each respective (true/false) nested program block gets added a new rule which
-is run in the __init state. Additionally, head of this rule is added into the
-rule which transitions from the __init to the __start state (marked above in
-Rule guards transformation example by # *)
+Execution of each respective (true/false) nested program block is guarded by
+existence or non-existence of the `__1__2__guard`.
 
-    { # true nested program block with id __1
-        __true (__0) :- __guard(__0), __init(__1).
-        __init (__1).
-        __start(__1),  ~__init (__1) :-
-		__init(__1), ~__break(__1), __true(__0).
-        #...
-    }
-    { # false nested program block with id __2
-        __false(__0) :- ~__guard(__0), __init(__2).
-        __init (__2).
-        __start(__2),   ~__init (__2) :-
-		__init(__2), ~__break(__2), __false(__0).
-        #...
-    }
+Full example program transformed:
+
+```
+	 __0__fp__.
+	 A(10)                        :- __1__add__.
+	~__0__fp__,       __1__add__  :- __0__fp__.
+	~__1__add__,      __1__cond__ :- __1__add__.
+	~__1__cond__,     __1__fp__   :- __1__cond__.
+	~__1__fp__                    :- __1__fp__.
+	 A_not_empty                  :- __2__add__.
+	~__1__2__guard__, __2__add__  :- __1__fp__,  __1__2__guard__.
+	~__2__add__,      __2__fp__   :- __2__add__.
+	~__2__fp__                    :- __2__fp__.
+	 A_empty                      :- __3__add__.
+	 __3__add__                   :- __1__fp__, ~__1__2__guard__.
+	~__3__add__,      __3__fp__   :- __3__add__.
+	~__3__fp__                    :- __3__fp__.
+	 __1__2__guard__
+		:- { __1__cond__ && { exists  ?x  { A(?x) } } }.
+```
 
 ## while do
 
 Syntax of **while** statement:
 
-    while FORM do STATEMENT.
+```
+	while FORM do STATEMENT.
+```
 
-FORM is a first order form and STATEMENT can be another guarding statement,
+FORM is a first order formula and STATEMENT can be another guarding statement,
 a nested program or a rule.
 
-Example
+Example program:
 
-    a(0). a(1). a(2). a(3). a(4).
-    i(0).
-    while ~ { b(1) } do {
-        b(?x), i(?x1), ~a(?x), ~i(?x) :-
-                        a(?x),  i(?x), ?x + 1 = ?x1.
-    }
+```
+	a(0). a(1). a(2). a(3). a(4).
+	i(0).
+	while ~ { b(1) } do {
+	        b(?x), i(?x1), ~a(?x), ~i(?x) :-
+	                a(?x),  i(?x), ?x + 1 = ?x1.
+	}
+```
 
 outputs following
 
-    a(4).
-    a(3).
-    i(3).
-    b(2).
-    b(1).
-    b(0).
+```
+	a(4).
+	a(3).
+	i(3).
+	b(2).
+	b(1).
+	b(0).
+```
 
-Note that while the guard creating rule for the **if** statement is executed in
-the parent program and is not checked anymore when it runs the nested true/false
-programs, guard rule for the **while** statement is executed each step of the
-nested program. Anytime such a rule becomes true it creates a __break state
-which disables all rules in the current program reaching the fixed point and
-continuing with execution to nested sequence of programs and then to next
-program in the current sequence.
+Note that while the guard rule for the **if** statement is executed when the
+parent program enters its fixed point state, condition of the **while**
+statement is checked each step of the nested program even before the add state.
 
-Also note that for breaking rule we need to negate the formula.
+**while** condition is negated into a breaking rule. When the rule becomes true
+it breaks the execution of the current program and reaches the fixed point.
 
-Example of a breaking rule which is added into the **while**'s nested program:
+Condition `~ { b(1) }` is transformed into this breaking rule:
 
-    __break(__0) :- ~ { ~ { b(1) } }.
+```
+	~__2__curr__, ~__2__start__, ~__2__rule__, __2__fp__
+	        :- { __2__curr__ && ~ ~ { b(1) }   }.
+```
 
+Full transformation of the above program:
+
+```
+	__0__fp__.
+	a(0), a(1), a(2), a(3), a(4), i(0)            :- __1__add__.
+	~__0__fp__,    __1__add__                     :- __0__fp__.
+	~__1__add__,   __1__fp__                      :- __1__add__.
+	~__1__fp__                                    :- __1__fp__.
+	b(?x), i(?x1), ~a(?x), ~i(?x)
+	        :- a(?x), i(?x), ?x+1=?x1,               __2__rule__.
+	~__1__fp__,    __2__start__, __2__curr__      :- __1__fp__.
+	~__2__start__, __2__rule__                    :- __2__start__.
+	~__2__rule__,  ~__fp__, __2__fp__             :- __2__rule__, __fp__.
+	~__2__curr__                                  :- __2__fp__, __2__curr__.
+	~__2__fp__                                    :- __2__fp__.
+	~__2__curr__, ~__2__start__, ~__2__rule__, __2__fp__
+	        :- { __2__curr__ && ~ ~ { b(1) }   }.
+```
 
 # Misc
 

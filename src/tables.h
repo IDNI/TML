@@ -382,8 +382,8 @@ private:
 	void init_tml_update();
 	void add_tml_update(const term& rt, bool neg);
 	template <typename T>
-	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&, spbdd_handle& x,
-		const rule& r); // decompress for --print-updates and tml_update
+	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
+		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 
 	bool from_raw_form(const raw_form_tree *rs, form *&froot, bool &is_sol);
 	bool to_pnf( form *&froot);
@@ -463,18 +463,24 @@ public:
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }
 
-	// transform nested programs
+	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
+	bool add_fixed_point_fact();
 	ntable fp_tab = -1; // tab id of the __fp__ fact (for filter when out)
+
+	// transform nested programs into a single program controlled by guards
+	void transform_guards(raw_prog& rp);
+	// recursive fn for transformation of a program and its nested programs
+	void transform_guards_program(raw_prog& target_rp, raw_prog& rp,
+		int_t& prev_id);
+	void transform_guard_statements(raw_prog& target_rp, raw_prog& rp);
+
+	// helper functions
 	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
 		bool neg = false);
 	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
 		int_t i2, bool neg = false);
 	void __(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
 	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
-	void transform_guards(raw_prog& rp);
-	void transform_facts(raw_prog& trp, raw_prog& rp, int_t& prev_id);
-	void transform_guard_statements(raw_prog& trp, raw_prog& rp);
-	bool add_fixed_point_fact();
 
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;

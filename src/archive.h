@@ -54,12 +54,14 @@ public:
 	static void spos(const std::string& n, const T& v, size_t s) {
 		sposl(n, archive::size(v), s);
 	}
-	static void sposl(const std::string& n, size_t l, size_t s) {
+	static void sposl(const std::string& DBG(n), size_t DBG(l),
+		size_t DBG(s))
+	{
 		DBG(o::dbg() << "spos: \t" << s << " \t0x" << std::hex << s
 			<< std::dec << " \t" << n << "\t size: " << l <<
 			std::endl;)
 	}
-	archive& pos(const std::string& n) {
+	archive& pos(const std::string& DBG(n)) {
 		DBG(o::dbg() << "pos: \t" << pos_ << " \t0x" << std::hex <<
 			pos_ << std::dec << " \t" << n << std::endl;)
 		return *this;

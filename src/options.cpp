@@ -201,7 +201,7 @@ void options::setup() {
 	add_bool2("print-dict", "dict", "print internal string dictionary");
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step", "fp", "adds __fp__ fact when reaches a fixed point");
-	add(option(option::type::BOOL, { "guards", "g" },
+	add(option(option::type::BOOL, { "guards", "g", "unnest" },
 		[this](const option::value& v) {
 			if (v.get_bool()) this->enable("fp-step");
 		}

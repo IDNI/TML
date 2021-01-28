@@ -20,6 +20,7 @@
 #include <iostream>
 #include <memory>
 #include <sys/stat.h>
+#include <algorithm>
 
 #include "defs.h"
 #include "dict.h"
@@ -27,6 +28,8 @@
 
 class archive;
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
+
+enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
 
 /**
  * input class contains input data. input can be one of three types: STDIN,
@@ -257,7 +260,7 @@ struct elem {
 			num = b;
 		else if(type == CHR)
 			ch = b;
-		else DBG(assert(false));
+		DBG(else assert(false));
 	}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
@@ -459,6 +462,11 @@ struct raw_rule {
 	raw_rule(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
 		if (!_b.empty()) b = {_b};
 	}
+	void update_states(std::array<bool, 8>& has) {
+		if (is_form() || is_rule()) has[RULE] = true;
+		else for (auto hi : h) has[hi.neg ? DELS : ADDS] = true;
+	}
+	inline bool is_rule() { return type == NONE && b.size() > 0; }
 	inline bool is_form() { return prft.get(); }
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
@@ -522,10 +530,11 @@ struct guard_statement {
 	bool parse_if(input* in, dict_t &dict, raw_prog& rp);
 	bool parse_while(input* in, dict_t &dict, raw_prog& rp);
 	bool parse(input* in, dict_t &dict, raw_prog& rp);
-	sprawformtree prft;
-	int_t rp_id = 0;
-	int_t true_rp_id = 0;
-	int_t false_rp_id = 0;
+	sprawformtree prft;       // condition
+	int_t rp_id = 0;          // prog id in which to run the condition
+	int_t true_rp_id  = 0;    // id of a true  prog
+	int_t false_rp_id = 0;    // id of a false prog
+	raw_prog* p_break_rp = 0; // ptr to a prog to break if while cond. true
 };
 
 struct raw_prog {
@@ -545,6 +554,8 @@ struct raw_prog {
 
 	int_t id = 0;
 	int_t guarded_by = -1;
+	int_t true_rp_id = -1;
+	std::array<bool, 8> has = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	static int_t last_id;
 	static bool require_guards;
 

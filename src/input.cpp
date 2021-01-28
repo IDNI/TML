@@ -779,6 +779,7 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 		t_p.id = ++raw_prog::last_id;
 		if (!t_p.r.emplace_back().parse(in, t_p))
 			return --raw_prog::last_id, false;
+		t_p.r.back().update_states(t_p.has);
 	}
 	t_p.guarded_by = rp.id;
 	true_rp_id = t_p.id;
@@ -790,8 +791,10 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 			f_p.id = ++raw_prog::last_id;
 			if (!f_p.r.emplace_back().parse(in, f_p))
 				return --raw_prog::last_id, false;
+			f_p.r.back().update_states(f_p.has);
 		}
 		f_p.guarded_by = rp.id;
+		f_p.true_rp_id = true_rp_id;
 		false_rp_id = f_p.id;
 		rp.nps.push_back(f_p);
 	}
@@ -815,6 +818,7 @@ bool guard_statement::parse_while(input* in, dict_t &dict, raw_prog& rp) {
 	}
 	rp_id = l_p.id;
 	rp.nps.push_back(l_p);
+	p_break_rp = &(rp.nps.back());
 	return true;
 }
 
@@ -845,10 +849,15 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	//COUT << "\tparsing statement " << l[pos] << endl;
 	if ( ts.parse(in, *this)) vts.push_back(ts);
 	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np);
-	else if (!in->error && c.parse(in, dict, *this))  gs.push_back(c);
+	else if (!in->error && c.parse(in, dict, *this)) {
+		if (c.type == guard_statement::IF) has[COND] = true;
+		else c.p_break_rp->has[CURR] = true;
+		gs.push_back(c);
+	}
 	else if (!in->error && m.parse(in, *this)) vm.emplace_back(m);
 	else if (!in->error && x.parse(in, *this)) d.push_back(x);
-	else if (!in->error && y.parse(in, *this)) r.push_back(y);
+	else if (!in->error && y.parse(in, *this)) y.update_states(has),
+		                                   r.push_back(y);
 	else if (!in->error && p.parse(in, *this)) g.push_back(p);
 	else return false;
 	if (!require_guards && gs.size()) require_guards = true;

@@ -958,25 +958,13 @@ flat_prog tables::to_terms(const raw_prog& p) {
 					r.prft.get())
 				: r.prft.get();
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
-				raw_form_tree *parent = 0;
-				raw_form_tree *node = root;
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				while (node->type == elem::EXISTS ||
-					node->type == elem::FORALL ||
-					node->type == elem::UNIQUE)
-						parent = node, node = node->r;
-				if (parent != 0)
-					parent->r = new raw_form_tree(elem::AND,
-						NULL, NULL, node,
-						new raw_form_tree(elem::NONE,
-							&gt));
-				else
-					root = new raw_form_tree(elem::AND,
-						NULL, NULL, root,
-						new raw_form_tree(elem::NONE,
-							&gt));
+				root = new raw_form_tree(elem::AND,
+					NULL, NULL, root,
+					new raw_form_tree(elem::NONE,
+						&gt));
 			}
 			from_raw_form(root, froot, is_sol);
 

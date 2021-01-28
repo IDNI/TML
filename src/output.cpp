@@ -483,8 +483,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
 			prft->type == elem::UNIQUE;
 	};
 	const raw_form_tree *node = prft;
-	if (guard_lx != lexeme{ 0, 0 }) // find first node after quantifiers
-		while (node && is_quantifier(node)) node = node->r;
+	//if (guard_lx != lexeme{ 0, 0 }) // find first node after quantifiers
+	//	while (node && is_quantifier(node)) node = node->r;
 	function<basic_ostream<T>&(const raw_form_tree*)> print_node;
 	print_node = [&os, &print_node, &guard_lx, &node, &is_quantifier]
 		(const raw_form_tree* prft) -> basic_ostream<T>&
