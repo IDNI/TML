@@ -1,0 +1,25 @@
+
+struct sttyp2 {
+    char ?y.
+    sttyp2 ?recursive_not_Allowed.
+}
+struct styp {
+    int:2 ?c, ?z .
+    sttyp2 ?inner, ?in3.
+}
+record father( sym ?b).
+record canFly( sym ?c ).
+record edge (int:3 ?c, int:2 ?c ).
+record night( int ?A).
+record pair(int ?a, char ?b).
+record school ( undeftype ?name,  sttyp2 ?l ).
+
+father(fff wrongargcount).
+#father(Tom Amy).  
+canFly(bird).      
+#canFly("bird").
+edge('c' 1).         # typemismatch
+night(1).             # It's night.
+pair(1 2).         # typemismatch
+edge(?x ?y) :- edge(?x ?z), edge(?z ?y).
+school( notyet notyet).

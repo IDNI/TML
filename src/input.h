@@ -142,6 +142,8 @@ struct input {
 	}
 	bool parse_error(ccs offset, const char* err, ccs close_to);
 	bool parse_error(ccs offset, const char* err, lexeme close_to);
+	bool type_error( const char* err, lexeme l);
+	bool type_error(ccs offset, const char* err, ccs close_to);
 
 	static std::string file_read(std::string fname);
 	static std::string file_read_text(::FILE *f);
@@ -254,12 +256,9 @@ struct elem {
 	elem() {}
 	elem(int_t num) : type(NUM), num(num) {}
 	elem(char32_t ch) : type(CHR), ch(ch) {}
-	elem(bool b, etype _type): type(_type) {
-		if(type == NUM)
-			num = b;
-		else if(type == CHR)
-			ch = b;
-		else DBG(assert(false));
+	elem(bool b) {
+		num = b;
+		type = NUM;
 	}
 	elem(etype type, lexeme e) : type(type), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
@@ -288,13 +287,39 @@ struct elem {
 	}
 };
 
-struct primtype {
+struct utype{
+
+};
+
+struct primtype : utype {
 	elem el;
 	int_t bsz = -1;
 	enum _ptype {
 		NOP, UINT, UCHAR, SYMB
 	} ty = NOP;
 	bool parse(input *in, const raw_prog& prog);
+	bool operator==(const primtype& r) const {
+		return ty == r.ty && bsz == r.bsz;		
+	}
+	bool operator!=(const primtype& r) const {
+		return !(*this == r);		
+	}
+	std::string to_print(){
+		std::string s;
+		switch(ty){
+			case UINT: s.append("int"); break;
+			case UCHAR: s.append("char"); break;
+			case SYMB: s.append("symb"); break;
+			default: return s.append("error_type");break;
+		}
+		if(bsz>0) {
+			std::stringstream ss;
+			ss<<bsz;
+			s.append(":");
+			s.append(ss.str());
+		}
+		return s;
+	}
 	size_t get_bitsz(){
 		switch(ty){
 			case UINT: return bsz > 0 ? bsz: 4;
@@ -304,22 +329,44 @@ struct primtype {
 		}
 	}
 };
-struct structype {
+
+struct structype : utype {
 	elem structname;
 	std::vector<struct typedecl> membdecl;	
 	bool parse(input *in, const raw_prog& prog);
 	size_t get_bitsz(const std::vector<struct typestmt> &);
 };
+
 struct typedecl {
 	primtype pty;  
-	elem structname; // record type
+	elem structname; // struct type
 	std::vector<elem> vars;
+	bool is_primitive(){
+		DBG(assert(structname.e[0] == NULL || pty.ty == primtype::NOP));
+		return pty.ty != primtype::NOP;
+	}
+	bool is_usertype(){
+		DBG(assert(structname.e[0] == NULL || pty.ty == primtype::NOP));
+		return structname.e[0] != NULL;
+	}
+	size_t get_param_count() {
+		return vars.size();
+	}
+
 	bool parse(input *in , const raw_prog& prog, bool multivar = true);
 };
 struct typestmt {
 	structype rty;
 	elem reln;
 	std::vector<typedecl> typeargs;
+	bool is_predicate(){
+		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
+		return reln.e[0] != NULL; 
+	}
+	bool is_typedef(){
+		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
+		return rty.structname.e[0] != NULL; 
+	}
 	bool parse(input *in, const raw_prog& prog);
 
 };
@@ -571,6 +618,8 @@ bool parse_error(ccs o, const char* e, std::string s);
 bool parse_error(ccs o, const char* e);
 bool parse_error(const char* e, lexeme l);
 bool parse_error(const char* e);
+bool type_error(const char* e, lexeme l);
+
 
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const directive& d);

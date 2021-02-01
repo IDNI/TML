@@ -13,7 +13,9 @@
 
 
 #include <algorithm>
+#include <vector>
 #include "input.h"
+#include "analysis.h"
 
 bit_elem::bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt): e(_e), bsz(_bsz), pbt(_pbt) {
 	p.resize(bsz, false);
@@ -48,17 +50,16 @@ bool bit_elem::to_elem(std::vector<elem> &ve) const{
 	bool ret = true;
 	
 	if(e.type == elem::VAR || e.type == elem::SYM) {
-		int i=0;	
-		for(bool b: this->p){
+		for(size_t i=0; i< this->p.size(); i++ ){
 			string_t *temp = new string_t( lexeme2str(e.e));
-			temp->append( to_string_t(i++));
+			temp->append( to_string_t((int_t)i));
 			lexeme l ={temp->c_str(), temp->c_str()+temp->size()};
 			ve.emplace_back(e.type, l);
 		}
 	}
 	else if(e.type == elem::NUM || e.type == elem::CHR) {
 		for(bool b: this->p)
-			ve.emplace_back(b, elem::NUM);
+			ve.emplace_back(b);
 	}
 	else ve.emplace_back(e);
 	
@@ -159,7 +160,7 @@ size_t bit_term::get_typeinfo(size_t n, const raw_term &rt){
 						if( rit.rty.structname == it.typeargs[n-2].structname ){
 							return rit.rty.get_bitsz( pbr.pbp.rp.vts );
 						}
-					o::err()<< "No struct type found : "<<it.typeargs[n-2].structname<<std::endl;
+					o::err()<< "No type found : "<<it.typeargs[n-2].structname<<std::endl;
 					return 0;
 				}	
 			}
@@ -227,7 +228,7 @@ bool primtype::parse( input* in , const raw_prog& prog){
 
 	static const std::map<std::string, _ptype> tym = { {"int", UINT},
 											{"char", UCHAR},
-											{"symb", SYMB}
+											{"sym", SYMB}
 											};	
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
@@ -315,4 +316,120 @@ bool typestmt::parse( input* in , const raw_prog& prog){
 	}
 	FAIL:
 	return pos=curr, false;
+}
+
+bool environment::build_from( std::vector<typestmt> & vts) {
+	
+	for( auto it : vts){
+		if( it.is_predicate()) { // this is predicate declaration
+			if( predtype.find(lexeme2str(it.reln.e)) != predtype.end() )
+				return type_error(" Predicate redefined.", it.reln.e), false;
+			predtype.insert({ lexeme2str(it.reln.e), it.typeargs  });		
+		}
+		else if( it.is_typedef()) { // this is new type definitinon
+			if( usertypedef.find(lexeme2str(it.rty.structname.e)) != usertypedef.end() )
+				return type_error(" Repeated typedef.", it.rty.structname.e), false;
+			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });
+		}
+	}
+	return true;
+}
+
+bool typechecker::tcheck( const raw_prog &rp){
+	bool ret = true;
+	for (auto rr : rp.r)
+		 ret &= tcheck(rr) ;
+	for( auto nrp: rp.nps){
+		typechecker tc(nrp);
+		ret &= tc.tcheck(nrp) ;
+	}
+	return ret;
+}
+
+bool typechecker::tcheck( const raw_term &rt){
+	
+	if( env.contains_pred(lexeme2str(rt.e[0].e))){	
+		std::stringstream ss;
+		auto typeparams = env.lookup_pred(lexeme2str(rt.e[0].e));
+		if( typeparams.size() != size_t(rt.arity[0])) 
+			return 	ss<<"Expected arity for " << rt << " is " <<typeparams.size(),
+					type_error(ss.str().c_str(), rt.e[0].e), false;
+		
+		size_t argc = 2;
+		for( auto typexp: typeparams) {
+			if( typexp.is_primitive() ) {
+				switch ( rt.e[argc].type) {
+					case elem::NUM: 
+						if( typexp.pty.ty != primtype::_ptype::UINT)  
+						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << rt.e[argc].num << " is ",
+							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
+							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
+						else if(rt.e[argc].num > ( (0x1 <<typexp.pty.get_bitsz())-1) )
+							return 	ss<< rt.e[argc].num << " exceeds max size for ",
+							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
+							 		type_error(ss.str().c_str(), rt.e[argc].e), false;	
+						break;
+					case elem::CHR:  
+						if( typexp.pty.ty != primtype::_ptype::UCHAR)  
+						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << (char)rt.e[argc].ch << " is ",
+							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
+							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
+						break;
+					case elem::SYM:   
+						if( typexp.pty.ty != primtype::_ptype::SYMB)  
+		 					return 	ss<<"Expected type for argument "<<argc -1<<":"  << rt.e[argc].e << " is ",
+							 		ss << typexp.pty.to_print() <<"in predicate "<<rt,
+							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
+
+						break;
+					case elem::VAR: {
+							string_t var = lexeme2str(rt.e[argc].e);
+							if( env.contains_prim_var(var) ) {
+								primtype &pt =  env.lookup_prim_var(var);
+								if( typexp.pty != pt ) {
+									ss<< "Type "<<  pt.to_print()<< " of "<<rt.e[argc].e << " does not match expected type "; 
+									ss<< typexp.pty.to_print() << " in predicate " <<rt;
+									return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
+								}
+							}
+							else env.addtocontext(var, typexp.pty );
+						}
+						break;
+					default: break;
+				}
+			}
+			else if ( typexp.is_usertype()) {
+
+				if(!env.contains_typedef(lexeme2str(typexp.structname.e)))
+						return ss << "Type "<<  typexp.structname.e << " of "<<rt.e[argc].e << " is undefined", 
+								type_error(ss.str().c_str(), rt.e[argc].e), false; 
+
+				string_t var = lexeme2str(rt.e[argc].e);
+				if( env.contains_typedef_var(var) ) {
+					structype &st =  env.lookup_typedef_var(var);
+					if( typexp.structname != st.structname ) {
+						ss<< "Type "<<  st.structname.e << " of "<<rt.e[argc].e << " does not match expected type "; 
+						ss<< typexp.structname.e << " in predicate " <<rt;
+						return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
+					}
+				}
+				else env.addtocontext(var, lexeme2str(typexp.structname.e) );
+	
+			}
+			argc++;
+		}
+	}
+	return true;
+}
+
+bool typechecker::tcheck( const raw_rule &rr){
+	env.reset_context();
+	bool ret = true;
+	for (const raw_term &ht : rr.h)
+		ret &= tcheck(ht);
+	for (auto it : rr.b)
+		for (const raw_term &bt : it)
+			ret &= tcheck(bt) ;
+	
+	return ret;
 }

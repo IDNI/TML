@@ -23,6 +23,7 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
+#include "analysis.h"
 
 #define mkchr(x) ((((int_t)x)<<2)|1)
 #define mknum(x) ((((int_t)x)<<2)|2)

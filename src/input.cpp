@@ -1130,6 +1130,13 @@ bool parse_error(ccs offset, const char* err) {
 bool input::parse_error(ccs offset, const char* err, lexeme close_to) {
 	return parse_error(offset, err, close_to[0]);
 }
+bool input::type_error(const char* e, lexeme l) {
+	return type_error(0, e, l[0]);
+}
+bool type_error(const char* e, lexeme l) {
+	input in((void*) 0, (size_t) 0);
+	return in.type_error(0, e, l[0]);
+}
 
 bool input::parse_error(ccs offset, const char* err, ccs close_to) {
 	//DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
@@ -1139,6 +1146,24 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to) {
 	//	<< endl;)
 	error = true;
 	ostringstream msg; msg << "Parse error: \"" << err << '"';
+	ccs p = close_to;
+	while (p && *p && *p != '\n') ++p;
+	if (offset) {
+		long l, ch; count_pos(offset, l, ch);
+		msg << " at " << l << ':' << ch;
+	}
+	if (close_to) msg << " close to \""
+		<< to_string(string_t(close_to, p - close_to)) << '"';
+	o::err() << msg.str() << endl;
+#ifdef WITH_EXCEPTIONS
+	throw parse_error_exception(msg.str());
+#endif
+	return false;
+}
+
+bool input::type_error(ccs offset, const char* err, ccs close_to) {	
+	error = true;
+	ostringstream msg; msg << "Type error: \"" << err << '"';
 	ccs p = close_to;
 	while (p && *p && *p != '\n') ++p;
 	if (offset) {
