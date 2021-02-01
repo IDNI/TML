@@ -5,10 +5,24 @@ redirect each of the TML outputs to stdout, stderr, a file, a string
 buffer (for reading it later programatically) or to a null.
 Outputs are usually configured (targeted) by `options` class.
 
-## creating a new output
+## printing debugging info
 
-Use method `shared_ptr<output> output::create(std::wstring name, std::wstring
-target, std::wstring extension);` where all arguments are wstrings.
+For printing debugging info use a wrapping DBG macro and use `o::dbg()` ostream:
+`DBG(o::dbg()<<"debugging output"<<endl);` This works in Debug build.
+
+If you need to print a debugging info in Release build you can use any other
+output, for example `o::inf()` ostream (is enabled by `--info` option). See
+bellow for the complete list of [default outputs](#default-outputs).
+
+Do not use `std::cout` or `std::wcout`. There is a macro `COUT`, which contains
+`std::cout` or `std::wcout` depending on the `WITH_WCHAR` compile option.
+
+It is highly discouraged to commit such printing into a repository because it
+cannot be disabled by user and it pollutes the Release build.
+
+If you still need to commit a code which requires to print in Release build
+it is adviced to create a dedicated output (disabled by default) and its option
+(how to create both is explained bellow).
 
 ## targets of outputs
 
@@ -86,7 +100,7 @@ For convenience there are methods with quick access to configured wostreams:
 - `o::inf()`
 - `o::dbg()`
 - `o::repl()`,
-- `o::ms()` - this is for **benchmarks** output
+- `o::ms()` - this is output for **benchmarks**
 - `o::dump()`
 
 There is also `o::to(const std::wstring&)` to get output's wostream by its name.
@@ -192,19 +206,20 @@ For execution there are two methods
 
 Example:
 ```
+	inputs ii;
 	outputs oo;
-	wstring program = L"a(2). b(?x) :- a(?x).";
-	vector<wstring> args{
-		L"--dump", "@buffer",
-		L"--error", "@buffer" };
-	driver d(program, options(&oo, args));
+	string program = "a(2). b(?x) :- a(?x).";
+	vector<string> args{
+		"--dump", "@buffer",
+		"--error", "@buffer" };
+	driver d(program, options(args, &ii, &oo));
 	d.run();
-	if (d.result) d.dump();
-	else wcout << L"unsat";
-	wstring err = oo.read(L"error");
-	if (err.size()) wcerr << err;
-	wstring dump = oo.read(L"dump");
-	if (dump.size()) wcout << dump;
+	if (d.unsat) COUT << "unsat";
+	else if (d.result) d.dump();
+	string err = oo.read("error");
+	if (err.size()) COUT << err;
+	string dump = oo.read("dump");
+	if (dump.size()) COUT << dump;
 ```
 
 To extract result there are several functions:

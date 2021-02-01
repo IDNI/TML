@@ -3,7 +3,7 @@ dbpedia - download and convert to TML
 	- un/comment urls in _urllist_ file to specify files to download
 	- run _download.sh_ to download and decompress dbpedia files
 	- optionally edit _convert.sh_ to update path to TML executable (defaults to ../../../build-Release/tml)
-	- run _convert.sh_ to run conversion to TML and execution (optional number of records converted from original ntriples file, defaults to 1000 lines)
+	- run _convert.sh_ to convert decompressed dbpedia files to TML (takes optional argument: number of records converted from original ntriples file, defaults to 1000 lines)
 
 RDF ntriples conversion into TML:
 

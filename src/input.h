@@ -20,6 +20,7 @@
 #include <iostream>
 #include <memory>
 #include <sys/stat.h>
+#include <algorithm>
 
 #include "defs.h"
 #include "dict.h"
@@ -28,7 +29,7 @@
 class archive;
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
-typedef std::pair<int_t, bool> guard;
+enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
 
 /**
  * input class contains input data. input can be one of three types: STDIN,
@@ -508,6 +509,11 @@ struct raw_rule {
 	raw_rule(const raw_term& h, const std::vector<raw_term>& _b) : h({h}) {
 		if (!_b.empty()) b = {_b};
 	}
+	void update_states(std::array<bool, 8>& has) {
+		if (is_form() || is_rule()) has[RULE] = true;
+		else for (auto hi : h) has[hi.neg ? DELS : ADDS] = true;
+	}
+	inline bool is_rule() { return type == NONE && b.size() > 0; }
 	inline bool is_form() { return prft.get(); }
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
@@ -535,6 +541,7 @@ struct raw_form_tree {
 	raw_form_tree *r;
 
 	bool neg = false;
+	lexeme guard_lx = {0,0};
 
 	raw_form_tree (elem::etype _type, raw_term* _rt = NULL, elem *_el =NULL,
 		raw_form_tree *_l = NULL, raw_form_tree *_r = NULL)
@@ -570,9 +577,11 @@ struct guard_statement {
 	bool parse_if(input* in, dict_t &dict, raw_prog& rp);
 	bool parse_while(input* in, dict_t &dict, raw_prog& rp);
 	bool parse(input* in, dict_t &dict, raw_prog& rp);
-	sprawformtree prft;
-	int_t id = 0;
-	static int_t last_id;
+	sprawformtree prft;       // condition
+	int_t rp_id = 0;          // prog id in which to run the condition
+	int_t true_rp_id  = 0;    // id of a true  prog
+	int_t false_rp_id = 0;    // id of a false prog
+	raw_prog* p_break_rp = 0; // ptr to a prog to break if while cond. true
 };
 
 struct raw_prog {
@@ -586,18 +595,19 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
-	guard grd;
 
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
 
 	int_t id = 0;
+	int_t guarded_by = -1;
+	int_t true_rp_id = -1;
+	std::array<bool, 8> has = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	static int_t last_id;
-
-	raw_prog() { id = ++last_id; }
+	static bool require_guards;
 
 	bool parse(input* in, dict_t &dict);
-	bool parse_statement(input* in, dict_t &dict, guard grd = {-1,false});
+	bool parse_statement(input* in, dict_t &dict);
 	bool parse_nested(input* in, dict_t &dict);
 	bool parse_xfp(input* in, dict_t &dict);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 

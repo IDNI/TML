@@ -21,8 +21,8 @@
 #include "analysis.h"
 using namespace std;
 
-int_t guard_statement::last_id = -1;
-int_t raw_prog::last_id = -1;
+int_t raw_prog::last_id = 0;
+bool raw_prog::require_guards = false;
 
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
@@ -574,7 +574,7 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 	bool isneg = false;
 
 	if (pos == l.size()) return false;
-	if (*l[pos][0] == '~') isneg=true,++pos;
+	while (*l[pos][0] == '~') isneg = !isneg, ++pos;
 	if (pos != l.size() && *l[pos][0] == '{') {
 		++pos;
 		if( ! parseform(in, root, 0) ) goto Cleanup;
@@ -760,8 +760,7 @@ bool guard_statement::parse_condition(input* in, raw_prog& np) {
 	raw_sof rsof(np);
 	bool ret = rsof.parse(in, root);
 	prft = sprawformtree(root);
-	id = ++guard_statement::last_id;
-	//COUT << "parsed guard id: " << id << endl;
+	rp_id = np.id;
 	return ret ? true : in->parse_error(in->l[in->pos][0],
 		"Formula has errors", in->l[in->pos]);
 }
@@ -774,22 +773,30 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 	if (!parse_condition(in, rp)) return false;
 	if (!(l[pos] == "then")) return in->parse_error(l[pos][0],
 		"'then' expected.", l[pos]);
-	++pos;
-	//COUT << "parse_statment(IF): " << l[pos][0] << endl;
 	raw_prog t_p;
-	if (!t_p.parse_nested(in, dict) && !in->error)
-		if (!t_p.r.emplace_back().parse(in, t_p)) return false;
-	t_p.grd = { id, false };
+	++pos;
+	if (!t_p.parse_nested(in, dict) && !in->error) {
+		t_p.id = ++raw_prog::last_id;
+		if (!t_p.r.emplace_back().parse(in, t_p))
+			return --raw_prog::last_id, false;
+		t_p.r.back().update_states(t_p.has);
+	}
+	t_p.guarded_by = rp.id;
+	true_rp_id = t_p.id;
 	rp.nps.push_back(t_p);
-		// .rp.nps.push_back(np), nps.back().grd = grd
 	if (pos != l.size() && l[pos] == "else") {
-		++pos;
 		raw_prog f_p;
-		if (!f_p.parse_nested(in, dict) && !in->error)
-			if (!f_p.r.emplace_back().parse(in, f_p)) return false;
-		f_p.grd = { id, true };
+		++pos;
+		if (!f_p.parse_nested(in, dict) && !in->error) {
+			f_p.id = ++raw_prog::last_id;
+			if (!f_p.r.emplace_back().parse(in, f_p))
+				return --raw_prog::last_id, false;
+			f_p.r.back().update_states(f_p.has);
+		}
+		f_p.guarded_by = rp.id;
+		f_p.true_rp_id = true_rp_id;
+		false_rp_id = f_p.id;
 		rp.nps.push_back(f_p);
-		//COUT << "parse_statmenet(ELSE): " << l[pos][0] << endl;
 	}
 	return true;
 }
@@ -803,8 +810,16 @@ bool guard_statement::parse_while(input* in, dict_t &dict, raw_prog& rp) {
 	if (!(l[pos] == "do")) return in->parse_error(l[pos][0],
 		"'do' expected.", l[pos]);
 	++pos;
-	//COUT << "parse_statement: " << l[pos] << endl;
-	return rp.parse_statement(in, dict, { id, false });
+	raw_prog l_p;
+	if (!l_p.parse_nested(in, dict) && !in->error) {
+		l_p.id = ++raw_prog::last_id;
+		if (!l_p.r.emplace_back().parse(in, l_p))
+			return --raw_prog::last_id, false;
+	}
+	rp_id = l_p.id;
+	rp.nps.push_back(l_p);
+	p_break_rp = &(rp.nps.back());
+	return true;
 }
 
 bool guard_statement::parse(input* in, dict_t &dict, raw_prog& rp) {
@@ -816,14 +831,14 @@ bool raw_prog::parse_xfp(input* in, dict_t& dict) {
 	size_t& pos = in->pos;
 	if (*l[pos][0] != '{') return false;
 	++pos;
-	if (!parse(in, dict)) return in->error?false:
+	if (!parse(in, dict)) return in->error ? false :
 		in->parse_error(l[pos][0], err_parse, l[pos]);
 	if (pos == l.size() || *l[pos++][0] != '}') return in->error ? false
 		: in->parse_error(l[pos-1][1], err_close_curly, l[pos-1]);
 	return true;
 }
 
-bool raw_prog::parse_statement(input* in, dict_t &dict, guard grd) {
+bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	directive x;
 	raw_rule y;
 	production p;
@@ -833,14 +848,19 @@ bool raw_prog::parse_statement(input* in, dict_t &dict, guard grd) {
 	raw_prog np;
 	//COUT << "\tparsing statement " << l[pos] << endl;
 	if ( ts.parse(in, *this)) vts.push_back(ts);
-	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np), nps.back().grd = grd;
-	else if (!in->error && c.parse(in, dict, *this)) gs.push_back(c);
+	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np);
+	else if (!in->error && c.parse(in, dict, *this)) {
+		if (c.type == guard_statement::IF) has[COND] = true;
+		else c.p_break_rp->has[CURR] = true;
+		gs.push_back(c);
+	}
 	else if (!in->error && m.parse(in, *this)) vm.emplace_back(m);
 	else if (!in->error && x.parse(in, *this)) d.push_back(x);
-	else if (!in->error && y.parse(in, *this)) r.push_back(y);
-						//,r.back().grd = grd;
+	else if (!in->error && y.parse(in, *this)) y.update_states(has),
+		                                   r.push_back(y);
 	else if (!in->error && p.parse(in, *this)) g.push_back(p);
 	else return false;
+	if (!require_guards && gs.size()) require_guards = true;
 	return !in->error;
 }
 
@@ -860,9 +880,9 @@ bool raw_prog::parse_nested(input* in, dict_t &dict) {
 }
 
 bool raw_prog::parse(input* in, dict_t &dict) {
+	id = ++last_id;
 	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}')
-		if (!parse_statement(in, dict)) return false;
-
+		if (!parse_statement(in, dict)) return --last_id, false;
 	//COUT << "\t\tparsed rp statements:\n" << *this << endl;
 
 	if (vm.empty()) return true;
@@ -875,7 +895,7 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
 					if( vrt[i].e[j].e == mm.def.e[0].e ) {
 						if( !macro_expand(in, mm, i, j, vrt, dict))
-							return false;
+							return --last_id, false;
 						else break;
 					}								
 	return true;
@@ -926,7 +946,7 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
 		// TODO
-		DBG(COUT<<carg.size();)	
+		DBG(o::dbg()<<carg.size();)	
 		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
 		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
 		vrt[i].calc_arity(in);

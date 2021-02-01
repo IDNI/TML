@@ -66,12 +66,12 @@ bool bit_elem::to_elem(std::vector<elem> &ve) const{
 	return ret;
 }
 void bit_elem::to_print() const {
-	o::out()<<e<<" ";
+	o::dbg()<<e<<" ";
 	int i=0;
 	for (bool bit : p)
 		if(e.type != elem::VAR)
-			o::out() << (bit ? 1 : 0); 
-		else o::out()<<e.e<< i++;
+			o::dbg() << (bit ? 1 : 0); 
+		else o::dbg()<<e.e<< i++;
 }
 
 
@@ -94,14 +94,14 @@ bool bit_prog::to_raw_prog(raw_prog &rp) const{
 }
 
 void bit_prog::to_print() const {
-	o::out()<<std::endl;
+	o::dbg()<<std::endl;
 	for( const bit_rule& br :vbr)
-		br.to_print(), o::out()<<std::endl;
+		br.to_print(), o::dbg()<<std::endl;
 	
 	for( const bit_prog& bp : nbp)
-		o::out()<<"{", 
+		o::dbg()<<"{", 
 		bp.to_print(),
-		o::out()<<"}";
+		o::dbg()<<"}";
 	return;
 }
 
@@ -133,12 +133,12 @@ bool bit_rule::to_raw_rule(raw_rule &rr) const{
 }		
 void bit_rule::to_print() const {
 	for( const bit_term& bt: bh )
-		bt.to_print(), o::out()<< " " ;
-	o::out()<< (bb.size()? ":-" : ".");
+		bt.to_print(), o::dbg()<< " " ;
+	o::dbg()<< (bb.size()? ":-" : ".");
 	for( size_t i=0 ; i < bb.size() ; i++)
 		for( const bit_term &bt: bb[i]) 
-			bt.to_print(), o::out()<<" ";
-	o::out()<<std::endl;
+			bt.to_print(), o::dbg()<<" ";
+	o::dbg()<<std::endl;
 }
 
 bit_term::bit_term(const raw_term &_rt,  bit_rule &_pbr): rt(_rt), pbr(_pbr){	
@@ -199,7 +199,7 @@ bool bit_term::to_raw_term( raw_term& brt ) const {
 void bit_term::to_print() const {
 	if ( rt.neg ) COUT<<"~";
 	for (const bit_elem& be : vbelem)
-		be.to_print(), COUT<<" ";
+		be.to_print(), o::dbg()<<" ";
 }
 
 

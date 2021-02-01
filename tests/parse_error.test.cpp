@@ -112,7 +112,7 @@ int main() {
 		pe("a => e1 e2",        err_prod,             1,  6, "e1 e2"),
 		pe(":-a.",        err_rule_dir_prod_expected, 1,  1, ":-a."),
 		pe("{ a(). ",           err_close_curly,      1,  7, ". "),
-		pe(":a",                err_chr,              1,  2, "a"),
+		pe(":a",                err_rule_dir_prod_expected, 1,  1, ":a"),
 	// 30
 		pe("1a",                err_int,              1,  1, "1a"),
 		pe("?(",                err_chr,              1,  2, "("),
