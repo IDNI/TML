@@ -871,6 +871,96 @@ Full transformation of the above program:
 	~__2__curr__, ~__2__start__, ~__2__rule__, __2__fp__
 	        :- { __2__curr__ && ~ ~ { b(1) }   }.
 ```
+# Types and Type checking
+
+One can specify types for arguments of terms and predicates in the program. There are three primitive types **"int", "char" and "sym"** with default size of 4 bits each. The int can be further specialized with bit size like **int:2**, which says it is a type which holds only 2 bits ( possible four values).
+
+The predicates type signature can be specified with keyword **record** preceding relation/predicate name and by including types of the arguments as in example, 
+
+```
+
+record father( sym ?b).
+record edge (int:3 ?c, int:2 ?c ).
+record pair(int ?a, char ?b).
+
+```
+
+Here, father predicate can take argument of type sym, symbols. "edge" takes first argument of type 3 bit size and second as type 2 bits size.
+
+## Running checker for type errors
+The type checking will check for various type errors in the TML program for example. Running following program with "tml --bitprog " option will invoke the typechecking on the TML rules. ( the flage option would be removed in future, though currently specific)
+
+The following program has type mismatch for ?x in first rule. Running it with -bitprog option produces error
+```
+record e( int:5 ?a,  int:5 ?b).
+record tc( int:6 ?a, int:5 ?b).
+e(1 2 ).
+
+tc(?x ?y) :- e(?x ?z), tc(?z ?y).
+tc(?x ?y) :- e(?x ?y).
+
+Type error: "Type int:6 of ?x does not match expected type int:5 in predicate e(?x ?z)" close to "?x ?z), tc(?z ?y)."
+```
+
+Here ?x has expected type of int:6 as per "tc" signature, while int:5 as per "e". This results in type mismatch. 
+
+## Complex types with Struct
+
+One can specify complex types with **struct** key word like. 
+
+```
+struct person {
+    char ?y.
+    int ?age.
+}.
+```
+
+The total size of this person type is now the sum of all primitive types. One can also nest struct within a struct type like this.
+```
+struct address {
+    int ?num
+    person ?p.
+}.
+```
+At the moment, the individual members of struct are not accessible (in future).
+
+## Type Errors
+
+Other examples of type errors are wrong arity, undefined types, exceeding max bit sizes etc. For example, for program below, we get
+```
+struct sttyp2 {
+    char ?y.
+    sttyp2 ?recursive_not_Allowed.
+}
+struct styp {
+    int:2 ?c, ?z .
+    sttyp2 ?inner, ?in3.
+}
+record father( sym ?b).
+record canFly( sym ?c ).
+record edge (int:3 ?c, int:2 ?c ).
+record night( int:2 ?A).
+record pair(int ?a, char ?b).
+record school ( undeftype ?name,  sttyp2 ?l ).
+
+father(fff wrongargcount).
+#father(Tom Amy).  
+canFly(bird).      
+#canFly("bird").
+edge('c' 1).         # typemismatch
+night(4).             # It's night.
+pair(1 2).         # typemismatch
+edge(?x ?y) :- edge(?x ?z), edge(?z ?y).
+school( notyet notyet).
+
+Type error: "Expected arity for father(fff wrongargcount) is 1" close to "father(fff wrongargcount)."
+Type error: "Expected type for argument 1:c is int:3 in predicate edge('c' 1)"
+Type error: "Expected type for argument 2:2 is char in predicate pair(1 2)" close to "2).         # typemismatch"
+Type error: "Type int:2 of ?z does not match expected type int:3 in predicate edge(?z ?y)" close to "?z ?y)."
+Type error: "Type undeftype of notyet is undefined" close to "notyet notyet)."
+Type error: "4 exceeds max size for int:2 in predicate night(4)" close to "4).             # It's night."
+
+```
 
 # Misc
 

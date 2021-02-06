@@ -310,7 +310,7 @@ struct primtype : utype {
 		switch(ty){
 			case UINT: s.append("int"); break;
 			case UCHAR: s.append("char"); break;
-			case SYMB: s.append("symb"); break;
+			case SYMB: s.append("sym"); break;
 			default: return s.append("error_type");break;
 		}
 		if(bsz>0) {
