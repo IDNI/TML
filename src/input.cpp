@@ -974,6 +974,7 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	};
 	raw_prog& rp = p.nps.emplace_back();
 	prepare_builtins(rp);
+	raw_prog::require_guards = false;
 	if (!rp.parse(in, dict))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);

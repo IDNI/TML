@@ -28,5 +28,3 @@ dead(?x) :- mortal(?x), armageddon.
 
 ~mortal(?x)  :- mortal(?x), dead(?x).
 ~being(?x)   :- being(?x), dead(?x).
-
-#died(?entity ?step) :- tml_update(?step add dead ?entity).

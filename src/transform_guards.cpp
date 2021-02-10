@@ -47,7 +47,8 @@ void tables::__(vector<raw_term>& rts, const string& lx, int_t id, int_t id2,
 void tables::transform_guards(raw_prog& rp) {
 	// initiate program by setting the id of the fixed point program to 0
 	int_t prev_id = 0;
-	__(rp.r.emplace_back().h, "fp", prev_id);
+	if (rp.r.size() || rp.nps.size()) // but only if not empty
+		__(rp.r.emplace_back().h, "fp", prev_id);
 	for (auto& np : rp.nps)	transform_guards_program(rp, np, prev_id);
 	transform_guard_statements(rp, rp);
 	// remove empty nested programs

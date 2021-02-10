@@ -597,11 +597,11 @@ void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
 // - set(relation_name, row, col, value) - sets value of the cell of a table
 void tables::out(emscripten::val o) const {
 	out([&o](const raw_term& t) {
-		string_t relation = lexeme2str(t.e[0].e);
+		string relation = to_string(lexeme2str(t.e[0].e));
 		int row = o.call<int>("length", relation);
 		int col = 0;
 		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
-			stringstream es;
+			ostringstream es;
 			while (t.arity[ar] == -1) ++ar, es << '(';
 			if (n >= t.e.size()) break;
 			while (t.e[n].type == elem::OPENP) ++n;

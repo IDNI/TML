@@ -105,8 +105,8 @@ bool outputs::add(sp_output out) {
 	string n = out->name();
 	auto it = find(n);
 	if (it != end()) {
-		CERR << "already exists: " << n << " target: "
-			<< out->target() << endl;
+		//CERR << "already exists: " << n << " target: "
+		//	<< out->target() << endl;
 		it->second->target(out->target());
 		out = it->second;
 	} else emplace(n, out);
