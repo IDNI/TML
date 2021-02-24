@@ -76,7 +76,7 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		switch (d.type) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
-		case directive::DOMAIN: transform_domains(p, d); break;
+		case directive::EDOMAIN: transform_domains(p, d); break;
 		case directive::EVAL: transform_evals(p, d); break;
 		case directive::QUOTE: transform_quotes(p, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
@@ -836,7 +836,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	o::dbg() << "Generating domain for: " << drt << std::endl;
 	dict_t &d = tbl->get_dict();
 	// Ensure that we're working on a DOMAIN directive
-	if(drt.type != directive::DOMAIN) return false;
+	if(drt.type != directive::EDOMAIN) return false;
 	// The relation to contain the evaled relation is the first symbol
 	// between the parentheses
 	elem out_rel = drt.domain_sym;
