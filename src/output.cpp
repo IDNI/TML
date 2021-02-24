@@ -306,7 +306,7 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
 	os << '@';
 	if (d.type == directive::BWD) return os << "bwd.";
 	if (d.type == directive::TRACE) return os << "trace." << endl;
-	if (d.type == directive::DOMAIN)
+	if (d.type == directive::EDOMAIN)
 		return os << "domain " << d.domain_sym << ' ' << d.limit_num << ' '
 			<< d.arity_num << '.';
 	if (d.type == directive::EVAL)

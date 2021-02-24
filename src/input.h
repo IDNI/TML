@@ -577,7 +577,7 @@ struct directive {
 	elem quote_str; // The literal string to be quoted.
 	
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
-		EVAL, QUOTE, DOMAIN, CODEC }type;
+		EVAL, QUOTE, EDOMAIN, CODEC }type;
 	bool parse(input* in, const raw_prog& prog);
 };
 

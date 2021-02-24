@@ -186,7 +186,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 	}
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
-		type = DOMAIN; ++pos;
+		type = EDOMAIN; ++pos;
 		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
 			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
 		if (!limit_num.parse(in) || limit_num.type != elem::NUM)
