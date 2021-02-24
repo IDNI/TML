@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 		archive_file = o.get_string("save");
 		if (archive_file != "") d.save(archive_file);
 		if (o.enabled("dump") && d.result &&
-			!d.out_goals(o::dump())) d.dump();
+			!d.out_goals(o::dump())) d.dump_fixpoint();
 		if (o.enabled("dict")) d.out_dict(o::inf());
 		if (o.enabled("csv")) d.save_csv();
 #ifdef WITH_THREADS

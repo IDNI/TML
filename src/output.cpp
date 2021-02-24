@@ -306,6 +306,18 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
 	os << '@';
 	if (d.type == directive::BWD) return os << "bwd.";
 	if (d.type == directive::TRACE) return os << "trace." << endl;
+	if (d.type == directive::DOMAIN)
+		return os << "domain " << d.domain_sym << ' ' << d.limit_num << ' '
+			<< d.arity_num << '.';
+	if (d.type == directive::EVAL)
+		return os << "eval " << d.eval_sym << ' ' << d.domain_sym << ' '
+			<< d.quote_sym << ' ' << d.timeout_num << '.';
+	if (d.type == directive::QUOTE)
+		return os << "quote " << d.quote_sym << ' ' << d.domain_sym << ' '
+			<< d.quote_str << '.';
+	if (d.type == directive::CODEC)
+		return os << "codec " << d.codec_sym << ' ' << d.domain_sym << ' '
+			<< d.quote_sym << ' ' << d.arity_num << '.';
 	if (d.type == directive::STDOUT) os << "stdout ";
 	else os << "string ";
 	if (d.type == directive::TREE) return os << d.t << '.';
@@ -375,6 +387,48 @@ std::string quote_sym(const elem& e) {
 }
 
 template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree &t) {
+	switch(t.type) {
+		case elem::IMPLIES:
+			os << "{" << *t.l << " -> " << *t.r << "}";
+			break;
+		case elem::COIMPLIES:
+			os << "{" << *t.l << " <-> " << *t.r << "}";
+			break;
+		case elem::AND:
+			os << "{" << *t.l << " && " << *t.r << "}";
+			break;
+		case elem::ALT:
+			os << "{" << *t.l << " || " << *t.r << "}";
+			break;
+		case elem::NOT:
+			os << "~{" << *t.l << "}";
+			break;
+		case elem::EXISTS:
+			os << "exists " << *t.l << " { " << *t.r << " }";
+			break;
+		case elem::UNIQUE:
+			os << "unique " << *t.l << " { " << *t.r << " }";
+			break;
+		case elem::NONE:
+			os << *t.rt;
+			break;
+		case elem::FORALL:
+			os << "forall " << *t.l << " { " << *t.r << " }";
+			break;
+		case elem::SYM: case elem::VAR:
+			os << *t.el;
+			break;
+		default:
+			assert(false); //should never reach here
+	}
+	return os;
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_form_tree &);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_form_tree &);
+
+template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 	if (t.neg) os << '~';
 	
@@ -440,6 +494,37 @@ template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
 
 template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::set<raw_term>& rts) {
+	os << '{';
+	for(std::set<raw_term>::iterator it = rts.begin(); it != rts.end();
+			it++) {
+		if(it != rts.begin()) {
+			os << ", ";
+		}
+		os << *it;
+	}
+	return os << '}';
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&, const std::set<raw_term>&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const std::set<raw_term>&);
+
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::vector<raw_term>& rts) {
+	os << '[';
+	for(size_t i = 0; i < rts.size(); i++) {
+		if(i != 0) {
+			os << ", ";
+		}
+		os << rts[i];
+	}
+	return os << ']';
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&, const std::vector<raw_term>&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const std::vector<raw_term>&);
+
+template <typename T>
 basic_ostream<T>& print_raw_rule(basic_ostream<T>& os, const raw_rule& r,
 	size_t level)
 {
@@ -458,7 +543,7 @@ basic_ostream<T>& print_raw_rule(basic_ostream<T>& os, const raw_rule& r,
 	bool uni = r.b.size() == 1 && r.b[0].size() == 1;
 	bool noendl = !r.b.size() || uni;
 	if (!compact && !noendl) os << endl;
-	if (r.prft.get()) os << r.prft.get();
+	if (r.prft.get()) os << *r.prft;
 	for (size_t n = 0; n < r.b.size(); ++n) {
 		for (size_t k = 0; k < r.b[n].size(); ++k)
 			if (((compact||uni?os<<"":os<<indent<<'\t')<<r.b[n][k]),
@@ -475,19 +560,19 @@ template basic_ostream<wchar_t>& print_raw_rule(basic_ostream<wchar_t>&,
 
 // TODO this is just a draft printer for raw form tree - not completly correct
 template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const sprawformtree prft) {
 	lexeme guard_lx = prft->guard_lx;
-	auto is_quantifier = [](const raw_form_tree* prft) -> bool {
+	auto is_quantifier = [](const sprawformtree prft) -> bool {
 		return prft->type == elem::EXISTS ||
 			prft->type == elem::FORALL ||
 			prft->type == elem::UNIQUE;
 	};
-	const raw_form_tree *node = prft;
+	const sprawformtree node = prft;
 	//if (guard_lx != lexeme{ 0, 0 }) // find first node after quantifiers
 	//	while (node && is_quantifier(node)) node = node->r;
-	function<basic_ostream<T>&(const raw_form_tree*)> print_node;
+	function<basic_ostream<T>&(const sprawformtree)> print_node;
 	print_node = [&os, &print_node, &guard_lx, &node, &is_quantifier]
-		(const raw_form_tree* prft) -> basic_ostream<T>&
+		(const sprawformtree prft) -> basic_ostream<T>&
 	{
 		basic_ostringstream<T> op;
 		bool wrap = prft->type != elem::VAR &&
@@ -513,9 +598,9 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree* prft) {
 	return print_node(prft);
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&,
-	const raw_form_tree* prft);
+	const sprawformtree prft);
 template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
-	const raw_form_tree* prft);
+	const sprawformtree prft);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_prog& p) {

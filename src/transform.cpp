@@ -98,8 +98,7 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 };*/
 
 raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
-	return { false, raw_term::REL, NOP, {
-		v, elem_openp, get_var_elem(v1), get_var_elem(v2), elem_closep}, {2}};
+	return raw_term({v, elem_openp, get_var_elem(v1), get_var_elem(v2), elem_closep});
 }
 
 raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
@@ -121,10 +120,9 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 
 raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string_t& b,
 	int_t v){
-	return { false, raw_term::REL, NOP, {
-		elem(elem::SYM, r),
+	return raw_term({ elem(elem::SYM, r),
 		elem_openp, elem(elem::SYM, get_lexeme(b)),
-		get_var_elem(v), get_var_elem(v+1), elem_closep}, {3}};
+		get_var_elem(v), get_var_elem(v+1), elem_closep});
 }
 
 /*#define from_string_lex(rel, lex, n) raw_rule({ false, { \

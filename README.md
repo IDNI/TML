@@ -962,6 +962,175 @@ Type error: "4 exceeds max size for int:2 in predicate night(4)" close to "4).  
 
 ```
 
+# Conjunctive Query Containment (CQC)
+This section lists the optimizations based on CQC tests that have been
+implemented in the interpreter, what exactly they do to TML source code,
+the command line flags required to enable them, and their potential
+drawbacks. Note that the flag `--3pfp` should be enabled when using any
+of these optimizations because their internals sometimes cause
+alternating fixpoints. Note also that the results of a program obtained
+by applying these optimizations to another should be indistinguishable
+from those of the original.
+
+## Subsumption without Negation
+This pair of optimizations is based on the CQC test as described on
+section 1.1 of "Information Integration Using Logical Views" by Ullman.
+
+The first of the optimization pair tries to identify redundant conjunctive
+rules in a TML codebase. It does this by iterating through all unordered
+pairs of conjunctive rules corresponding to the same relation and formally
+checking whether the facts derived by one rule are necessarily derived by
+the other rule. If this is the case, then it follows that the former rule
+is redundant.
+
+The second of the optimization pair tries to identify redundant terms in
+conjunctive rule bodies by checking whether a rule is contained by one
+obtained by removing a body term. If this is so then the body term can be
+removed to obtain an equivalent rule since this rule's derivation set would
+both be a subset and superset of the original's.
+
+This optimization can be enabled using the flag `--cqc-subsume`.
+## Subsumption with Negation
+This pair of optimizations is based on the Conjunctive Query Containment
+(CQNC) test as described in section 1.2 of "Information Integration Using
+Logical Views" by Ullman.
+
+The details of this optimization pair are the same as those of the
+negation-less case as described above, except this pair additionally works
+on conjunctive rules containing terms with negation. This optimization pair
+is strictly more general than those for the negation-less case, however
+this comes at a cost: this optimization pair is much slower than the one
+for the negation-less case. This can be seen from the Ullman paper where
+the containment checker must iterate through partitions of a given set and
+amongst other operations, iterate through the powerset of the set of terms
+formed by taking the cartesian power of some set of atoms.
+
+This optimization can be enabled using the flag `--cqnc-subsume`.
+## Factorization
+This algorithm shares a similar spirit to the CQC test in that it
+searches for homomorphisms between different rules. The difference here
+though is that rule heads are not included in the homomorphism checks.
+This exclusion allows us to check whether certain body parts of a rule
+are contained by the body parts of another. And when containment is
+verified, we simply create another rule corresponding to the intersection
+of the original rules and make the original rules point to this newly
+created rules.
+
+This optimization can cause the TML program to slowdown so when it
+is desired to increase the speed of a TML program, one should try running
+it both with and without this optimization and proceed accordingly. The
+potential slowdown can be attributed to the fact that additional terms
+and rules are required to correctly sequence the temporary rules in the
+case that the original program used negation.
+
+This optimization can be enabled using the flag `--cqc-factor`.
+
+# Self Interpretation
+This section lists the directives provided to support
+self-interpretation, how to invoke them, and what they do at runtime.
+The flag `--3pfp` should be used in conjunction with these dirrectives
+because their internals sometimes cause alternating fixpoints. Note
+that anything that can be achieved using these directives can also
+be achieved without them in pure TML.
+
+## Domain
+The domain directive creates a domain over which a quoted program can
+be defined and executed. Conceptually it is necessary to allow quoted
+programs to manipulate terms of arbitrary arities without requiring
+changes/extensions to the quotation schema nor the quotation operator
+nor the evaluation operator. Concretely it is required to instantiate
+quotations, evaluators, and codecs.
+
+This directive has the following syntax:
+`@domain <domain_sym> <limit_num> <arity_num>.`. Here `<domain_sym>` is
+the prefix that all relations generated for the domain should have.
+`<limit_num>` is the tuple element domain size. And `<arity_num>` is the
+maximum length of the tuples generated for this domain.
+
+An example of usage:
+```
+@domain dom 7 3.
+```
+
+## Quote
+The quote directive takes a literal TML program and creates a relation
+that when correctly interpreted produces the same facts that would have
+been produced by the literal program. Conceptually it is required to
+enable TML programs to manipulate and inspect other TML programs.
+Concretely it is required to instantiate evaluators.
+
+This directive has the following syntax:
+`@quote <quote_sym> <domain_sym> <quote_str>.` Here `<quote_sym>` is the
+prefix that all relations generated for the quotation should have.
+`<domain_sym>` is the domain over which arbitrary length fragments (like
+terms) in the quotation are defined. Additionally the `<limit_num>` of
+the domain must be more than or equal to the maximum number of distinct
+variables used in a rule of `<quote_str>` because variables are encoded
+as numbers. Also the `<limit_num>` of the domain must be more than the
+largest number occuring in `<quote_str>`. Also, the `<arity_num>` of the
+domain must be more than or equal to the maximum of the term arities
+occuring in `<quote_str>` because term tuples are represented by lists.
+(This setup is what allows us to encode arbitrary arity terms without
+modifications to the schema.) `<quote_str>` is a literal TML program
+surrounded in backquotes to quote.
+
+An example of usage:
+```
+@quote quote dom `
+  u(0).
+  d(0).
+  c() :- forall ?x {u(?x) -> d(?x)}.`.
+```
+
+Currently the quote operator only supports TML programs with facts,
+rules, and formulas utilizing only variables and numbers. There are
+plans to extend this to symbols, arithmetic, and eventually the rest of
+TML.
+## Eval
+The evaluate directive takes a relation containing a quotation and a
+relation containing a domain and creates a relation containing the facts
+that would have been derived by the original program that was quoted.
+Conceptually it is required to see what the program represented by a
+(potentially statically unknown) relation would produce at runtime.
+Concretely it is required to instantiate codecs.
+
+This directive has the following syntax:
+`@eval <eval_sym> <domain_sym> <quote_sym> <timeout_num>.` Here
+`<eval_sym>` is the prefix that all relations generated for the
+interpreter should have. `<domain_sym>` is the relation name of the
+domain representing the universe over which the quoted program should be
+interpreted. `<quote_sym>` is the relation containing the quoted program
+to run. Additionally, the `<arity_num>` of `<domain_sym>` must be more
+than or equal to the maximum number of variables used by a rule in
+`<quote_sym>` because the value of each variable is stored in a list
+during interpretation. `<timeout_num>` is the number of steps of the quoted program
+that should be simulated.
+
+An example of usage:
+```
+@eval out dom quote 50.
+```
+## Codec
+The codec directive takes a relation containing a domain, a relation
+containing an interpreter, and a maximum term arity; and produces a
+relation containing a decoding of the facts produced by the interpreter.
+Conceptually it is necessary because the evaluator's lack of dependence
+on specific arity maximums forces it to produce outputs that are encoded
+and hence are hard to debug/use.
+
+This directive has the following syntax:
+`@codec <codec_sym> <domain_sym> <eval_sym> <arity_num>.` Here
+`<codec_sym>` is the prefix that all relations generated or the codec
+should have. `<domain_sym>` is the relation name of the domain that will
+be used to decode the encoded outputs of an evaluator. `<eval_sym>` is
+the relation name of the evaluator whose outputs are being decoded.
+`<arity_num>` is the maximum arity of the terms being decoded.
+
+An example of usage:
+```
+@codec cdc dom out 3.
+```
+
 # Misc
 
 Comments are either C-style /* \*/ multiline comments, or # to comment till

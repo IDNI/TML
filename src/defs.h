@@ -64,9 +64,38 @@ typedef size_t nlevel;
 #define measure_time(x) measure_time_start(); x; measure_time_end()
 #define elem_openp elem(elem::OPENP, get_lexeme("("))
 #define elem_closep elem(elem::CLOSEP, get_lexeme(")"))
+#define elem_eq elem(elem::EQ, get_lexeme("="))
 #define htrue bdd_handle::T
 #define hfalse bdd_handle::F
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
+		V at_default(const M<K, V, Args ...> &m, const K &k, const V &d) {
+	auto it = m.find(k);
+	if(it != m.end()) {
+		return it->second;
+	} else {
+		return d;
+	}
+}
+
+template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
+		std::optional<V> at_optional(const M<K, V, Args ...> &m, const K &k) {
+	auto it = m.find(k);
+	if(it != m.end()) {
+		return it->second;
+	} else {
+		return std::nullopt;
+	}
+}
+
+template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
+		void insert_optional(M<K, V, Args ...> &m, const K &k, const std::optional<V> &v) {
+  if(v) {
+    m[k] = *v;
+  } else {
+    m.erase(k);
+  }
+}
 
 #ifdef _WIN32
 std::string temp_filename();

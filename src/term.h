@@ -24,6 +24,7 @@ struct term : public ints {
 	t_arith_op arith_op = NOP;
 	spform_handle qbf;
 
+	// The id of the table associated with the fact/rule referenced by this term
 	ntable tab = -1;
 	size_t orderid = 0;
 

@@ -175,6 +175,20 @@ void options::setup() {
 #endif
 	add_bool("sdt",     "sdt transformation");
 	add_bool("bin",     "bin transformation");
+	add_bool("complete-bin",
+		"transformation to make each rule have at most a single conjunction");
+	add_bool("cqc-subsume",
+		"subsume queries into each other using CQC test");
+	add_bool("cqnc-subsume",
+		"subsume queries into each other using CQNC test");
+	add_bool("cqc-factor",
+		"factor out parts of queries using CQC test");
+	add_bool("pure-tml",
+		"convert FOL formulas into pure TML");
+	add_bool("program-gen",
+		"generate C++ code to generate the given TML code");
+	add_bool("3pfp",
+		"run the program under FO(3-PFP) semantics ");
 	add_bool("proof",   "extract proof");
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
