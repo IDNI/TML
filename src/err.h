@@ -75,5 +75,13 @@ const char err_3_els_expected[] = "Expected 3 elements in the term.";
 const char err_builtin_expected[] = "Expected builtin name in the beginning of term.";
 const char err_contradiction[] = "unsat (contradiction).";
 const char err_infloop[] = "unsat (infinite loop).";
+const char err_domain_sym[] = "Expected symbol denoting the relation associated with a domain.";
+const char err_limit_num[] = "Expected number denoting tuple element domain size.";
+const char err_arity_num[] = "Expected number denoting maximum tuple length.";
+const char err_eval_sym[] = "Expected symbol denoting the relation associated with an interpreter.";
+const char err_quote_sym[] = "Expected symbol denoting the relation associated with a quotation.";
+const char err_timeout_num[] = "Expected number denoting number of program steps to simulate.";
+const char err_quote_str[] = "Expected quotation containing a TML program.";
+const char err_codec_sym[] = "Expected symbol denoting the relation associated with a codec.";
 
 #endif

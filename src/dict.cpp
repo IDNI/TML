@@ -119,3 +119,14 @@ int_t dict_t::get_temp_sym(const lexeme& l) {
 	return temp_syms.push_back(l), temp_syms_dict[l] = (temp_syms.size());
 }
 
+int_t dict_t::get_fresh_temp_sym(int_t old) {
+	static int_t counter = 0;
+	std::string fresh = "0tf" + to_string_(++counter) + to_string_(old);
+	int_t fresh_int = get_temp_sym(get_lexeme(fresh));
+	return fresh_int;
+}
+
+lexeme dict_t::get_temp_sym(int_t t) const {
+	return temp_syms[t-1];
+}
+

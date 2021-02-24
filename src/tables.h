@@ -26,6 +26,7 @@
 #include "input.h"
 #include "form.h"
 #include "err.h"
+#include "options.h"
 
 typedef int_t rel_t;
 class archive;
@@ -216,7 +217,7 @@ private:
 	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
-	std::set<level> fronts;
+	std::vector<level> fronts;
 	std::vector<level> levels;
 	std::map<ntable, std::set<ntable>> deps;
 
@@ -229,7 +230,7 @@ private:
 	dict_t dict; // dict_t& dict;
 	bool bproof, datalog, optimize, unsat = false, bcqc = true,
 		 bin_transform = false, print_transformed = false,
-		 apply_regexpmatch = false, fp_step = false;
+		 apply_regexpmatch = false, fp_step = false, pfp3 = false;
 
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
@@ -318,7 +319,6 @@ private:
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	struct elem get_elem(int_t arg) const;
-	raw_term to_raw_term(const term& t) const;
 	template <typename T>
 	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
@@ -357,10 +357,9 @@ private:
 	
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
 					std::vector<term> &v, std::set<term> &done);
-	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v, flat_prog &p, 
-											  std::map<size_t, term> &refs);
+												std::map<size_t, term> &refs);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
 	bool cqc(const std::vector<term>&, const flat_prog& m) const;
@@ -385,7 +384,7 @@ private:
 	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
 		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 
-	bool from_raw_form(const raw_form_tree *rs, form *&froot, bool &is_sol);
+	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	bool to_pnf( form *&froot);
 
 	//-------------------------------------------------------------------------
@@ -444,16 +443,25 @@ private:
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
 		bool bin_transform = false, bool print_transformed = false, 
-		bool apply_regxmatch = false, bool fp_step = false);
+		bool apply_regxmatch = false, bool fp_step = false,
+		bool pfp3 = false);
 	~tables();
+	raw_term to_raw_term(const term& t) const;
+	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
+	static bool run_prog(const raw_prog &rp, dict_t &dict,
+		const options &opts, std::set<raw_term> &results);
+	static bool run_prog(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>&) const;
+	template <typename T>
+	bool out_fixpoint(std::basic_ostream<T>& os);
 	void out(const rt_printer&) const;
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;

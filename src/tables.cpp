@@ -487,7 +487,7 @@ It is caller's responsibility to manage the memory of froot. If the function,
 returns false or the froot is not needed any more, the caller should delete the froot pointer.
 For a null input argument rfm, it returns true and makes froot null as well.
 	*/
-bool tables::from_raw_form(const raw_form_tree *rfm, form *&froot, bool &is_sol) {
+bool tables::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_sol) {
 
 	form::ftype ft = form::NONE;
 	bool ret =false;
@@ -570,15 +570,90 @@ void form::printnode(int lv, const tables* tb) {
 
 template <typename T>
 void tables::out(basic_ostream<T>& os) const {
-	strs_t::const_iterator it;
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+	//strs_t::const_iterator it;
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
 //		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-			out(os, tbls[tab].t, tab);
+				out(os, tbls[tab].t, tab);
 //		else os << it->first << " = \"" << it->second << '"' << endl;
+	}
 }
 
 template void tables::out<char>(ostream& os) const;
 template void tables::out<wchar_t>(wostream& os) const;
+
+/* Print out the fixpoint associated with this sequence of databases and
+ * return true. Return false if this sequence of databases contains no
+ * repeats. */
+
+template <typename T>
+bool tables::out_fixpoint(basic_ostream<T>& os) {
+	if(fronts.size() < 2 ||
+			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
+			fronts.end()-1) {
+		// There cannot be a fixpoint if there are less than two fronts or
+		// if there do not exist two equal fronts
+		return false;
+	} else if(pfp3) {
+		// If FO(3-PFP) semantics are in effect
+		// Determine which facts are true and which are false
+		level trues(tbls.size(), htrue), falses(tbls.size(), htrue);
+		int_t i = fronts.size() - 1;
+		// Loop back to the first repetition of the last front. It is clear
+		// that the set of intervening fronts are periodic
+		do {
+			for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+				// True facts are those for which there exists an I such that
+				// for all i>=I, the fact is a member of front i
+				trues[n] = trues[n] && fronts[i][n];
+				// False facts are those for which there exists an I such that
+				// for all i>=I, the fact is not a member of front i
+				falses[n] = falses[n] % fronts[i][n];
+			}
+		} while(fronts[--i] != fronts.back());
+		// Determine which facts are undefined
+		level undefineds(tbls.size());
+		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+			// Undefined facts are those which are neither true nor false
+			undefineds[n] = htrue % (trues[n] || falses[n]);
+		}
+		// Print out the true points separately
+		os << "true points:" << endl;
+		bool exists_trues = false;
+		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+			decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
+				os << to_raw_term(r) << '.' << endl;
+				exists_trues = true; });
+		}
+		if(!exists_trues) os << "(none)" << std::endl;
+		
+		// Finally print out the undefined points separately
+		os << endl << "undefined points:" << endl;
+		bool exists_undefineds = false;
+		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+			decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
+				os << to_raw_term(r) << '.' << endl;
+				exists_undefineds = true; });
+		}
+		if(!exists_undefineds) os << "(none)" << std::endl;
+		return true;
+	} else if(fronts.back() == fronts[fronts.size() - 2]) {
+		// If FO(PFP) semantics are in effect and the last two fronts are
+		// equal then print them; this is the fixpoint.
+		level &l = fronts.back();
+		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+			decompress(l[n], n, [&os, this](const term& r) {
+				os << to_raw_term(r) << '.' << endl; });
+		}
+		return true;
+	} else {
+		// If FO(PFP) semantics are in effect and two equal fronts are
+		// separated by an unequal front; then the fixpoint is empty.
+		return true;
+	}
+}
+
+template bool tables::out_fixpoint<char>(ostream& os);
+template bool tables::out_fixpoint<wchar_t>(wostream& os);
 
 void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
@@ -953,17 +1028,17 @@ flat_prog tables::to_terms(const raw_prog& p) {
 		else if(r.prft != NULL) {
 			bool is_sol = false;
 			form* froot = 0;
-			raw_form_tree *root = r.prft->neg // neg transform
-				? new raw_form_tree(elem::NOT, NULL, NULL,
-					r.prft.get())
-				: r.prft.get();
+			sprawformtree root = r.prft->neg // neg transform
+				? std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr,
+					r.prft)
+				: r.prft;
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = new raw_form_tree(elem::AND,
-					NULL, NULL, root,
-					new raw_form_tree(elem::NONE,
+				root = std::make_shared<raw_form_tree>(elem::AND,
+					nullptr, nullptr, root,
+					std::make_shared<raw_form_tree>(elem::NONE,
 						&gt));
 			}
 			from_raw_form(root, froot, is_sol);
@@ -1530,9 +1605,7 @@ void tables::get_rules(flat_prog p) {
 				get_alt(al, t, as);
 
 		for (alt x : as)
-			if ((ait = alts.find(&x)) != alts.end())
-				r.push_back(*ait);
-			else	*(aa = new alt) = x,
+			*(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
 		rs.insert(r);
 	}
@@ -2060,7 +2133,7 @@ std::string graphgrammar::get_regularexpstr(const elem &p, bool &bhasnull, bool 
 			ret.append(b.at(e.e));		
 		else if (e.type == elem::CHR) {
 				if(esc.find(e.ch) != esc.end())
-					  ret.append("\\");
+						ret.append("\\");
 			ret.append(e.to_str());
 		}
 		else {
@@ -2855,24 +2928,94 @@ bool tables::add_fixed_point_fact() {
 
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
-	if (bproof) levels.emplace_back(get_front());
-	level l;
+	level l = get_front();
+	fronts.push_back(l);
+	if (bproof) levels.emplace_back(l);
 	for (;;) {
 		if (print_steps || optimize)
 			o::inf() << "# step: " << nstep << endl;
 		++nstep;
-		if (!fwd()) return fp_step
+		bool fwd_ret = fwd();
+		level l = get_front();
+		fronts.push_back(l);
+		if (!fwd_ret) return fp_step
 			? (add_fixed_point_fact() ? pfp() : true)
 			: true;
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
-		l = get_front();
-		if (!datalog && !fronts.emplace(l).second)
-			return infloop_detected();
+		bool is_repeat =
+			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
+		if (!datalog && is_repeat)
+			return pfp3 ? true : infloop_detected();
 		if (bproof) levels.push_back(move(l));
 	}
 	DBGFAIL;
+}
+
+/* Run the given program with the given settings, put the query
+ * results into the given out-parameter, and return true in the case
+ * that it reaches a fixed point. Otherwise just return false. */
+
+bool tables::run_prog(const raw_prog &rp, dict_t &dict,
+		const options &opts, std::set<raw_term> &results) {
+	tables tbl(dict, opts.enabled("proof"), 
+		opts.enabled("optimize"), opts.enabled("bin"),
+		opts.enabled("t"), opts.enabled("regex"));
+	strs_t strs;
+	if(tbl.run_prog(rp, strs)) {
+		for(const term &result : tbl.decompress()) {
+			results.insert(tbl.to_raw_term(result));
+		}
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/* Run the given program on the given extensional database and yield
+ * the derived facts. Returns true or false depending on whether the
+ * given program reaches a fixed point. Useful for query containment
+ * checks. */
+
+bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results) {
+	std::map<elem, elem> freeze_map, unfreeze_map;
+	// Create a duplicate of each rule in the given program under a
+	// generated alias.
+	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
+		for(raw_term &rt : rp.r[i].h) {
+			raw_term rt2 = rt;
+			auto it = freeze_map.find(rt.e[0]);
+			if(it != freeze_map.end()) {
+				rt.e[0] = it->second;
+			} else {
+				elem frozen_elem = elem::fresh_temp_sym(dict);
+				// Store the mapping so that the derived portion of each
+				// relation is stored in exactly one place
+				unfreeze_map[frozen_elem] = rt.e[0];
+				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
+			}
+			rp.r.push_back(raw_rule(rt2, rt));
+		}
+	}
+	// Now add the extensional database to the given program.
+	for(const raw_term &rt : edb) {
+		rp.r.push_back(raw_rule(rt));
+	}
+	// Run the program to obtain the results which we will then filter
+	std::set<raw_term> tmp_results;
+	bool res = run_prog(rp, dict, opts, tmp_results);
+	// Filter out the result terms that are not derived and rename those
+	// that are derived back to their original names.
+	for(raw_term res : tmp_results) {
+		auto jt = unfreeze_map.find(res.e[0]);
+		if(jt != unfreeze_map.end()) {
+			res.e[0] = jt->second;
+			results.insert(res);
+		}
+	}
+	return res;
 }
 
 bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
@@ -2892,7 +3035,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	nlevel begstep = nstep;
 	bool r = true;
 	// run program only if there are any rules
-	if (rules.size()) r = pfp(steps ? nstep + steps : 0, break_on_step);
+	if (rules.size()) {
+		fronts.clear();
+		r = pfp(steps ? nstep + steps : 0, break_on_step);
+	} else {
+		level l = get_front();
+		fronts = {l, l};
+	}
 	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
 		if (!add_prog(move(prog_after_fp), {}, false)) return false;
@@ -2913,10 +3062,11 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 }
 
 tables::tables(dict_t dict, bool bproof, bool optimize, bool bin_transform,
-	bool print_transformed, bool apply_regexpmatch, bool fp_step) :
+	bool print_transformed, bool apply_regexpmatch, bool fp_step,
+	bool pfp3) :
 	dict(move(dict)), bproof(bproof), optimize(optimize),
 	bin_transform(bin_transform), print_transformed(print_transformed),
-	apply_regexpmatch(apply_regexpmatch), fp_step(fp_step) {}
+	apply_regexpmatch(apply_regexpmatch), fp_step(fp_step), pfp3(pfp3) {}
 	// dict(*new dict_t)
 
 tables::~tables() {

@@ -66,6 +66,13 @@ lexeme input::lex(pccs s) {
 			//	return PE(parse_error(*s, err_escape));
 		return { t, ++(*s) };
 	}
+	if (**s == '`') {
+		while (*++*s != '`')
+			if (!**s) return PE(parse_error(t, unmatched_quotes));
+			else if (**s == '\\' && !strchr("\\`", *++*s))
+				return PE(parse_error(*s, err_escape));
+		return { t, ++(*s) };
+	}
 
 	// implication and coimplication
 	if (**s == '-' && *(*s + 1) == '>') {
@@ -177,6 +184,63 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos][0], dot_expected, l[pos]);
 		return ++pos, true;
 	}
+	// Parse @domain <domain_sym> <limit_num> <arity_num>.
+	if (l[pos] == "domain") {
+		type = DOMAIN; ++pos;
+		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
+		if (!limit_num.parse(in) || limit_num.type != elem::NUM)
+			return in->parse_error(l[pos-1][0], err_limit_num, l[pos-1]);
+		if (!arity_num.parse(in) || arity_num.type != elem::NUM)
+			return in->parse_error(l[pos-1][0], err_arity_num, l[pos-1]);
+		if (*l[pos++][0] != '.') return
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+		return true;
+	}
+	// Parse @eval <eval_sym> <domain_sym> <quote_sym> <timeout_num>.
+	if (l[pos] == "eval") {
+		type = EVAL; ++pos;
+		if (!eval_sym.parse(in) || eval_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_eval_sym, l[pos-1]);
+		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
+		if (!quote_sym.parse(in) || quote_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_quote_sym, l[pos-1]);
+		if (!timeout_num.parse(in) || timeout_num.type != elem::NUM)
+			return in->parse_error(l[pos-1][0], err_timeout_num, l[pos-1]);
+		if (*l[pos++][0] != '.') return
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+		return true;
+	}
+	// Parse @quote <quote_sym> <domain_sym> <quote_str>.
+	if (l[pos] == "quote") {
+		type = QUOTE; ++pos;
+		if (!quote_sym.parse(in) || quote_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_quote_sym, l[pos-1]);
+		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
+		if (!quote_str.parse(in) || quote_str.type != elem::STR ||
+				quote_str.e[1] <= quote_str.e[0] || *quote_str.e[0] != '`')
+			return in->parse_error(l[pos-1][0], err_quote_str, l[pos-1]);
+		if (*l[pos++][0] != '.') return
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+		return true;
+	}
+	// Parse @codec <codec_sym> <domain_sym> <eval_str> <arity_num>.
+	if (l[pos] == "codec") {
+		type = CODEC; ++pos;
+		if (!codec_sym.parse(in) || codec_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_codec_sym, l[pos-1]);
+		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
+		if (!eval_sym.parse(in) || eval_sym.type != elem::SYM)
+			return in->parse_error(l[pos-1][0], err_eval_sym, l[pos-1]);
+		if (!arity_num.parse(in) || arity_num.type != elem::NUM)
+			return in->parse_error(l[pos-1][0], err_arity_num, l[pos-1]);
+		if (*l[pos++][0] != '.') return
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+		return true;
+	}
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
 		if (!t.parse(in, prog)) return
@@ -199,7 +263,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 				in->parse_error(l[curr2][1], err_fname);
 		type = FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
 	}
-	else if (*l[pos][0] == '"') type = STR, arg = l[pos++];
+	else if (*l[pos][0] == '"' || *l[pos][0] == '`') type = STR, arg = l[pos++];
 	else if (*l[pos][0] == '$')
 		type=CMDLINE, ++pos, n = in->get_int_t(l[pos][0], l[pos][1]), ++pos;
 	else if (l[pos] == "stdin") type = STDIN;
@@ -297,7 +361,7 @@ bool elem::parse(input* in) {
 	}
 
 	if (!is_alnum(l[pos][0], l[pos][1]-l[pos][0], chl) && *l[pos][0]!='_' &&
-		!strchr("\"'?", *l[pos][0])) return false;
+		!strchr("\"`'?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == '\'') {
 		type = CHR, e = { 0, 0 };
 		if (l[pos][0][1] == '\'') ch = 0;
@@ -323,7 +387,7 @@ bool elem::parse(input* in) {
 			type = UNIQUE;
 		else type = SYM;
 	}
-	else if (*l[pos][0] == '"') type = STR;
+	else if (*l[pos][0] == '"' || *l[pos][0] == '`') type = STR;
 	else type = NUM, num = in->get_int_t(l[pos][0], l[pos][1]);
 	return ++pos, !in->error;
 }
@@ -498,6 +562,33 @@ bool macro::parse(input* in, const raw_prog& prog){
 
 	fail: return pos = curr , false;
 }
+sprawformtree raw_rule::get_prft() const {
+	if(prft) {
+		return prft;
+	} else if(b.empty()) {
+		return std::make_shared<raw_form_tree>(elem::NONE, raw_term::_true());
+	} else {
+		sprawformtree disj =
+			std::make_shared<raw_form_tree>(elem::NONE, raw_term::_false());
+		for(size_t i = 0; i < b.size(); i++) {
+			sprawformtree conj =
+				std::make_shared<raw_form_tree>(elem::NONE, raw_term::_true());
+			for(size_t j = 0; j < b[i].size(); j++) {
+				raw_term entr = b[i][j];
+				bool negated = entr.neg;
+				entr.neg = false;
+				sprawformtree tm =
+					std::make_shared<raw_form_tree>(elem::NONE, entr);
+				if(negated) {
+					tm = std::make_shared<raw_form_tree>(elem::NOT, tm);
+				}
+				conj = std::make_shared<raw_form_tree>(elem::AND, conj, tm);
+			}
+			disj = std::make_shared<raw_form_tree>(elem::ALT, disj, conj);
+		}
+		return raw_form_tree::simplify(disj);
+	}
+}
 bool raw_rule::parse(input* in, const raw_prog& prog) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
@@ -528,7 +619,7 @@ head:	h.emplace_back();
 
 	if(is_form) {
 		raw_sof rsof(prog);
-		raw_form_tree * root = NULL;
+		sprawformtree root = NULL;
 		bool ret = rsof.parse(in, root);
 		sprawformtree temp(root);
 		this->prft = temp;
@@ -539,8 +630,7 @@ head:	h.emplace_back();
 		for (b.back().emplace_back(); b.back().back().parse(in, prog);
 			b.back().emplace_back(), ++pos) {
 			if (*l[pos][0] == '.') return ++pos, true;
-			//XXX: this causes a segfault, why we need semi-colon here?
-			//else if (*l[pos][0] == L';') b.emplace_back();
+			else if (*l[pos][0] == L';') b.emplace_back();
 			else if (*l[pos][0] != ',') return
 				in->parse_error(l[pos][0], err_term_or_dot,l[pos]);
 		}
@@ -566,11 +656,11 @@ bool raw_prefix::parse(input* in) {
 	return true;
 }
 
-bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
+bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;
 	size_t curr = pos;
-	raw_form_tree * root = NULL;
+	sprawformtree root = NULL;
 	bool isneg = false;
 
 	if (pos == l.size()) return false;
@@ -579,7 +669,7 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 		++pos;
 		if( ! parseform(in, root, 0) ) goto Cleanup;
 		if( isneg)
-			root = new raw_form_tree(elem::NOT, NULL, NULL, root);
+			root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
 
 		if( pos == l.size() && *l[pos][0] != '}') goto Cleanup;
 		++pos;
@@ -594,8 +684,8 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 		if(next.type == elem::SYM) {
 			raw_term tm;
 			if( !tm.parse(in, prog, true)) goto Cleanup;
-			root = new raw_form_tree(elem::NONE, &tm);
-			if( isneg ) root = new raw_form_tree(elem::NOT, NULL, NULL, root);
+			root = std::make_shared<raw_form_tree>(elem::NONE, &tm);
+			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
 			matroot = root;
 			return true;
 		}
@@ -603,12 +693,12 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 		else if(next.type == elem::VAR) {
 			raw_term tm;
 			if( !tm.parse(in, prog, false)) goto Cleanup;
-			root = new raw_form_tree(elem::NONE, &tm);
-			if( isneg ) root = new raw_form_tree(elem::NOT, NULL, NULL, root);
+			root = std::make_shared<raw_form_tree>(elem::NONE, &tm);
+			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
 			matroot = root;
 			return true;
 		} else {
-			raw_form_tree *cur = NULL;
+			sprawformtree cur = NULL;
 			while(next.type == elem::FORALL ||
 				next.type == elem::UNIQUE ||
 				next.type == elem::EXISTS )
@@ -617,13 +707,13 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 
 				if( !rpfx.parse(in) ) goto Cleanup;
 
-				if(!cur) root = cur = new raw_form_tree(
-					rpfx.qtype.type, NULL, &rpfx.qtype);
-				else cur->r = new raw_form_tree(
-					rpfx.qtype.type, NULL, &rpfx.qtype),
+				if(!cur) root = cur = std::make_shared<raw_form_tree>(
+					rpfx.qtype.type, nullptr, &rpfx.qtype);
+				else cur->r = std::make_shared<raw_form_tree>(
+					rpfx.qtype.type, nullptr, &rpfx.qtype),
 					cur = cur->r;
-				cur->l = new raw_form_tree(rpfx.ident.type,
-					NULL, &rpfx.ident);
+				cur->l = std::make_shared<raw_form_tree>(rpfx.ident.type,
+					nullptr, &rpfx.ident);
 				next.peek(in);
 			}
 
@@ -636,8 +726,8 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 			if (pos == l.size() || *l[pos][0] != '}') goto Cleanup;
 
 			++pos;
-			if (isneg) root = new raw_form_tree(elem::NOT,
-				NULL, NULL, root);
+			if (isneg) root = std::make_shared<raw_form_tree>(elem::NOT,
+				nullptr, nullptr, root);
 
 			matroot = root;
 			return true;
@@ -649,11 +739,11 @@ bool raw_sof::parsematrix(input* in, raw_form_tree *&matroot) {
 	matroot = root;
 	return pos=curr, false;
 }
-bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
+bool raw_sof::parseform(input* in, sprawformtree &froot, int_t prec ) {
 
 	size_t curr = in->pos;
-	raw_form_tree* root = NULL;
-	raw_form_tree* cur = NULL;
+	sprawformtree root = NULL;
+	sprawformtree cur = NULL;
 
 	bool ret = parsematrix(in, root);
 	elem nxt;
@@ -664,7 +754,7 @@ bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
 		(nxt.type == elem::IMPLIES || nxt.type == elem::COIMPLIES))
 	{
 		nxt.parse(in);
-		cur = new raw_form_tree(nxt.type, NULL, &nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt.type, nullptr, &nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 2)) goto Cleanup ;
 		nxt.peek(in);
@@ -673,7 +763,7 @@ bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
 	nxt.peek(in);
 	while( prec <= 0 && (nxt.type == elem::AND || nxt.type == elem::ALT) ) {
 		nxt.parse(in);
-		cur = new raw_form_tree(nxt.type, NULL, &nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt.type, nullptr, &nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 1) ) goto Cleanup;
 		nxt.peek(in);
@@ -691,7 +781,7 @@ bool raw_sof::parseform(input* in, raw_form_tree *&froot, int_t prec ) {
 	It is caller's responsibility to manage the memory of root. If the parse function,
 	returns false or the root is not needed any more, the caller should delete the root pointer.
 	*/
-bool raw_sof::parse(input* in, raw_form_tree *&root) {
+bool raw_sof::parse(input* in, sprawformtree &root) {
 
 	root = NULL;
 	bool ret = parseform(in, root );
@@ -713,6 +803,54 @@ void raw_form_tree::printTree( int level) {
 	for(int i = 0; i < level; i++) COUT << '\t';
 	(this->rt)?	COUT<<*rt : (this->el)? COUT <<*el: COUT<<"";
 	if (l) l->printTree(level + 1);
+}
+
+sprawformtree raw_form_tree::simplify(sprawformtree &t) {
+	switch(t->type) {
+		case elem::IMPLIES:
+			simplify(t->l);
+			simplify(t->r);
+			break;
+		case elem::COIMPLIES:
+			simplify(t->l);
+			simplify(t->r);
+			break;
+		case elem::AND:
+			simplify(t->l);
+			simplify(t->r);
+			if(t->l->type == elem::NONE && t->l->rt->is_true()) {
+				t = t->r;
+			} else if(t->r->type == elem::NONE && t->r->rt->is_true()) {
+				t = t->l;
+			}
+			break;
+		case elem::ALT:
+			simplify(t->l);
+			simplify(t->r);
+			if(t->l->type == elem::NONE && t->l->rt->is_false()) {
+				t = t->r;
+			} else if(t->r->type == elem::NONE && t->r->rt->is_false()) {
+				t = t->l;
+			}
+			break;
+		case elem::NOT:
+			simplify(t->l);
+			break;
+		case elem::EXISTS: {
+			simplify(t->r);
+			break;
+		} case elem::UNIQUE: {
+			simplify(t->r);
+			break;
+		} case elem::NONE: {
+			break;
+		} case elem::FORALL: {
+			simplify(t->r);
+			break;
+		} default:
+			assert(false); //should never reach here
+	}
+	return t;
 }
 
 bool production::parse(input *in, const raw_prog& prog) {
@@ -756,7 +894,7 @@ fail:	return pos = curr, false;
 }
 
 bool guard_statement::parse_condition(input* in, raw_prog& np) {
-	raw_form_tree* root = 0;
+	sprawformtree root = 0;
 	raw_sof rsof(np);
 	bool ret = rsof.parse(in, root);
 	prft = sprawformtree(root);

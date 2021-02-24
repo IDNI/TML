@@ -13,6 +13,7 @@
 #ifndef __DRIVER_H__
 #define __DRIVER_H__
 #include <map>
+#include <cmath>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -29,6 +30,22 @@
 #define mknum(x) ((((int_t)x)<<2)|2)
 
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
+typedef std::map<elem, elem> var_subs;
+typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
+typedef std::tuple<elem, int_t> rel_info;
+
+#define QFACT 0
+#define QRULE 1
+#define QTERM 2
+#define QEQUALS 3
+#define QFORALL 4
+#define QEXISTS 5
+#define QNOT 6
+#define QAND 7
+#define QALT 8
+#define QIMPLIES 9
+#define QUNIQUE 10
+#define QCOIMPLIES 11
 
 class archive;
 
@@ -91,6 +108,84 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 //	void transform_string(const sysstring_t&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
+	bool transform_evals(raw_prog &rp, const directive &drt);
+	bool transform_quotes(raw_prog &rp, const directive &drt);
+	bool transform_domains(raw_prog &rp, const directive& drt);
+	bool transform_codecs(raw_prog &rp, const directive &drt);
+	void flatten_associative(const elem::etype &tp,
+		const sprawformtree &tree, std::vector<sprawformtree> &tms);
+	bool is_cq(const raw_rule &rr);
+	bool is_cqn(const raw_rule &rr);
+	template<typename F> bool try_minimize(raw_rule &rr, const F &f);
+	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
+	void step_transform(raw_prog &rp,
+		const std::function<void(raw_prog &)> &f);
+	void unary_transform(raw_prog &rp);
+	void binary_transform(raw_prog &rp);
+	void recursive_transform(raw_prog &rp,
+		const std::function<void(raw_prog &)> &f);
+	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
+		dict_t &d);
+	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
+	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
+	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
+	void factor_rules(raw_prog &rp);
+	raw_prog read_prog(elem prog, const raw_prog &rp);
+	void simplify_formulas(raw_prog &rp);
+	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
+		dict_t &d);
+	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
+	elem quote_term(const raw_term &head, const elem &rel_name,
+		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
+		int_t &part_count);
+	elem quote_formula(const sprawformtree &t, const elem &rel_name,
+		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
+		int_t &part_count);
+	std::vector<elem> quote_rule(const raw_rule &rr, const elem &rel_name,
+		const elem &domain_name, raw_prog &rp, int_t &part_count);
+	void quote_prog(const raw_prog nrp, const elem &rel_name,
+		const elem &domain_name, raw_prog &rp);
+	raw_term to_pure_tml(const sprawformtree &t, std::vector<raw_rule> &rp,
+		const std::set<elem> &fv);
+	void collect_vars(const raw_rule &rr, std::set<elem> &vars);
+	void collect_vars(const raw_term &rt, std::set<elem> &vars);
+	template <class InputIterator>
+		void collect_vars(InputIterator first, InputIterator last,
+			std::set<elem> &vars);
+	void to_pure_tml(raw_prog &rp);
+	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
+		std::set<elem> &orig_vars);
+	void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
+		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+	void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
+	std::set<elem> collect_free_vars(const raw_rule &rr);
+	void collect_free_vars(const raw_term &t,
+		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+	std::set<elem> collect_free_vars(const raw_term &t);
+	void collect_free_vars(const sprawformtree &t,
+		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+	std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
+	std::set<elem> collect_free_vars(const sprawformtree &t);
+	raw_term relation_to_term(const rel_info &ri);
+	bool transform_grammar(raw_prog &rp);
+	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
+		const elem &rva, const elem &qvb, const elem &rvb);
+	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
+		const elem &rva);
+	void transform_booleans(raw_prog &rp);
+	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
+	elem concat(const elem &rel, std::string suffix);
+	lexeme concat(const lexeme &rel, std::string suffix);
+	string_t generate_cpp(const elem &e, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const raw_term &rt, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const sprawformtree &prft, string_t &prog_constr,
+		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
@@ -115,6 +210,7 @@ class driver {
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
+	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
 	std::vector<archive> load_archives;
@@ -147,6 +243,9 @@ public:
 	template <typename T>
 	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
 	void dump() { out(o::dump()); }
+	template <typename T>
+	void out_fixpoint(std::basic_ostream<T>& os) const { if (tbl) tbl->out_fixpoint(os); }
+	void dump_fixpoint() { out_fixpoint(o::dump()); }
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
@@ -167,6 +266,7 @@ public:
 	input* get_current_input() const { return current_input; }
 	void set_current_input(input* in) { current_input = in; }
 	void read_inputs();
+	
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
 	emscripten::val to_bin() {
