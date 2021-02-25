@@ -1,0 +1,49 @@
+# Testing transitive closure with more facts
+
+max(10000).
+
+@domain dom 7 3.
+
+@quote q dom `
+  e(0 1).
+  e(1 2).
+  e(2 3).
+  e(3 4).
+  e(4 5).
+  e(5 6).
+  t(?x ?y) :- e(?x ?y).
+  t(?x ?y) :- t(?x ?z), t(?z ?y).`.
+
+@eval r dom q 50.
+
+@codec cdc dom r 2.
+
+# Expected output includes following internal facts
+
+# cdc__decode(t 5 6).
+# cdc__decode(t 4 6).
+# cdc__decode(e 5 6).
+# cdc__decode(t 4 5).
+# cdc__decode(e 4 5).
+# cdc__decode(t 3 6).
+# cdc__decode(t 2 6).
+# cdc__decode(t 3 5).
+# cdc__decode(t 3 4).
+# cdc__decode(t 2 5).
+# cdc__decode(t 2 4).
+# cdc__decode(e 3 4).
+# cdc__decode(t 1 6).
+# cdc__decode(t 0 6).
+# cdc__decode(t 1 5).
+# cdc__decode(t 1 4).
+# cdc__decode(t 0 5).
+# cdc__decode(t 0 4).
+# cdc__decode(t 2 3).
+# cdc__decode(e 2 3).
+# cdc__decode(t 1 3).
+# cdc__decode(t 1 2).
+# cdc__decode(t 0 3).
+# cdc__decode(t 0 2).
+# cdc__decode(e 1 2).
+# cdc__decode(t 0 1).
+# cdc__decode(e 0 1).
