@@ -2937,10 +2937,16 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		++nstep;
 		bool fwd_ret = fwd();
 		level l = get_front();
-		fronts.push_back(l);
-		if (!fwd_ret) return fp_step
-			? (add_fixed_point_fact() ? pfp() : true)
-			: true;
+		if (!fwd_ret) {
+			if(fp_step && add_fixed_point_fact()) {
+				return pfp();
+			} else {
+				fronts.push_back(l);
+				return true;
+			}
+		} else {
+			fronts.push_back(l);
+		}
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
