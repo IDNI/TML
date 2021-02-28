@@ -437,10 +437,10 @@ class bit_dict {
 };
 
 struct bit_elem {
-	bools p;
-	size_t bsz;
 	const elem &e;
+	size_t bsz;
 	bit_term &pbt;
+	bools p;
 	bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt);
 	size_t pos(size_t bit_from_right /*, size_t arg, size_t args */) const;
 	bool to_elem( std::vector<elem> &) const;

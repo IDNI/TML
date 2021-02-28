@@ -16,8 +16,9 @@
 
 using namespace std;
 
-vector<env> tables::varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v)
-	const {
+vector<env> tables::varbdd_to_subs(const alt* a, size_t /*rl*/, size_t/*level*/,
+	cr_spbdd_handle v) const
+{
 	vector<env> r;
 	decompress(v, 0, [a, &r, this](const term& x) {
 		env m;

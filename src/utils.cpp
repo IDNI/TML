@@ -259,5 +259,18 @@ bool is_alpha(ccs s, size_t n, size_t& l) {
 }
 
 bool is_printable(char32_t ch) {
-	return (uint32_t) ch > 31;
+	return ch < 256 ? isprint(ch) : true; // TODO is_printable for ch > 255
+}
+
+int_t hex_to_int_t(ccs str, size_t len) {
+	int_t c = 1, val = 0;
+	for (int_t i = len - 1; i >= 0; --i)
+		if      (str[i] >= '0' && str[i] <= '9')
+			(val += (str[i] - 48) * c), c *= 16;
+		else if (str[i] >= 'A' && str[i] <= 'F')
+			(val += (str[i] - 55) * c), c *= 16;
+		else if (str[i] >= 'a' && str[i] <= 'f')
+			(val += (str[i] - 87) * c), c *= 16;
+		else return -1;
+	return val;
 }

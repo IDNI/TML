@@ -34,13 +34,7 @@ public:
 	type_t target(const std::string t);
 	sysstring_t read() {
 		return type_ == BUFFER ? buffer_.str() : sysstring_t(); }
-	void clear() { if (type_ == BUFFER)
-		#ifdef WITH_WCHAR
-			buffer_.str(s2ws(""));
-		#else
-			buffer_.str(std::string(""));
-		#endif
-	}
+	void clear() { if (type_ == BUFFER) buffer_.str({}); }
 	bool is_null() const { return type_ == NONE; }
 	template <typename T>
 	output& operator<<(const T& value) { *os_ << value; return *this; }

@@ -224,12 +224,13 @@ size_t structype::get_bitsz(const std::vector<typestmt> &rcdtypes){
 	done.erase(this->structname);
 	return bsz;
 }
-bool primtype::parse( input* in , const raw_prog& prog){
+bool primtype::parse( input* in , const raw_prog& /*prog*/) {
 
-	static const std::map<std::string, _ptype> tym = { {"int", UINT},
-											{"char", UCHAR},
-											{"sym", SYMB}
-											};	
+	static const std::map<std::string, _ptype> tym = {
+		{ "int",  UINT  },
+		{ "char", UCHAR },
+		{ "sym",  SYMB  }
+	};	
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
 	
@@ -371,7 +372,7 @@ bool typechecker::tcheck( const raw_term &rt){
 						break;
 					case elem::CHR:  
 						if( typexp.pty.ty != primtype::_ptype::UCHAR)  
-						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << (char)rt.e[argc].ch << " is ",
+						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << to_string(to_string_t(rt.e[argc].ch))<<" is ",
 							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
 							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
 						break;

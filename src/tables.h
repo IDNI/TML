@@ -118,6 +118,9 @@ struct alt : public std::vector<body*> {
 		if (rng != t.rng) return rng < t.rng;
 		if (eq != t.eq) return eq < t.eq;
 		if (f != t.f) return f < t.f;
+		if (idbltin != t.idbltin) return idbltin < t.idbltin;
+		if (bltinsize != t.bltinsize) return bltinsize < t.bltinsize;
+		if (bltinargs != t.bltinargs) return bltinargs < t.bltinargs;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
 };
@@ -154,6 +157,7 @@ struct table {
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize = 0;
+	bool internal = false;
 	bool commit(DBG(size_t));
 };
 
@@ -473,7 +477,6 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-	ntable fp_tab = -1; // tab id of the __fp__ fact (for filter when out)
 
 	// transform nested programs into a single program controlled by guards
 	void transform_guards(raw_prog& rp);

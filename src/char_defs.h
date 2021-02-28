@@ -95,3 +95,5 @@ std::u32string to_u32string(const string_t& str);
 bool is_alnum(ccs s, size_t n, size_t& l);
 bool is_alpha(ccs s, size_t n, size_t& l);
 bool is_printable(char32_t ch);
+
+int_t hex_to_int_t (ccs str, size_t len = 2);

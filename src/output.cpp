@@ -380,9 +380,17 @@ std::string quote_sym(const elem& e) {
 		os << to_string(ss.str());
 		if (q) os.put('"');
 		else if (e.e[0] == e.e[1]) os << "\"\"";
-	} else {
-		os << e; // CHR, OPENP, CLOSEP or NUM = no quotes
-	}
+	}  else if (e.type == elem::CHR) switch (e.ch) {
+		case U'\r': os <<  "'\\r'"; break;
+		case U'\n': os <<  "'\\n'"; break;
+		case U'\t': os <<  "'\\t'"; break;
+		case U'\\': os << "'\\\\'"; break;
+		case U'\'': os <<  "'\\''"; break;
+		default: if (is_printable(e.ch)) os << e;
+			else os << "'\\" << (e.ch < 256?'x':'u') << hex
+				<< setfill('0') << setw(e.ch<256?2:4)
+				<< (unsigned int) e.ch << "'";
+	} else os << e; // OPENP, CLOSEP or NUM = no quotes
 	return ws2s(os.str());
 }
 

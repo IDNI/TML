@@ -1,0 +1,97 @@
+d(17).
+a(9).
+n(7).
+s(2).
+o(2).
+
+(13).
+e(1).
+r(15).
+r(10).
+r(1).
+"(18).
+"(14).
+"(12).
+"(8).
+"(6).
+"(0).
+str(17 'd').
+str(16 'e').
+str(15 'r').
+str(10 'r').
+str(5 's').
+str(3 's').
+str(1 'r').
+str(11 'e').
+str(9 'a').
+str(7 'n').
+str(2 'o').
+str(4 'e').
+str(18 '"').
+str(14 '"').
+str(12 '"').
+str(8 '"').
+str(6 '"').
+str(0 '"').
+str(13 '\n').
+str(printable 18 0).
+str(printable 17 0).
+str(printable 16 0).
+str(alnum 17 0).
+str(alnum 16 0).
+str(alpha 17 0).
+str(alpha 16 0).
+str(printable 15 0).
+str(printable 14 0).
+str(printable 12 0).
+str(printable 11 0).
+str(printable 10 0).
+str(printable 9 0).
+str(printable 8 0).
+str(alnum 15 0).
+str(alpha 15 0).
+str(space 13 0).
+str(alnum 11 0).
+str(alnum 10 0).
+str(alnum 9 0).
+str(alpha 11 0).
+str(alpha 10 0).
+str(alpha 9 0).
+str(printable 7 0).
+str(printable 6 0).
+str(printable 5 0).
+str(printable 4 0).
+str(printable 3 0).
+str(printable 2 0).
+str(printable 1 0).
+str(printable 0 0).
+str(alnum 7 0).
+str(alnum 5 0).
+str(alnum 4 0).
+str(alpha 7 0).
+str(alpha 5 0).
+str(alpha 4 0).
+str(alnum 3 0).
+str(alnum 2 0).
+str(alnum 1 0).
+str(alpha 3 0).
+str(alpha 2 0).
+str(alpha 1 0).
+t(3).
+t(0).
+str2(3 't').
+str2(0 't').
+str2(2 's').
+str2(1 'e').
+str2(printable 3 0).
+str2(printable 2 0).
+str2(printable 1 0).
+str2(printable 0 0).
+str2(alnum 3 0).
+str2(alnum 2 0).
+str2(alnum 1 0).
+str2(alnum 0 0).
+str2(alpha 3 0).
+str2(alpha 2 0).
+str2(alpha 1 0).
+str2(alpha 0 0).

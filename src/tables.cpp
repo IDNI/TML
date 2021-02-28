@@ -573,7 +573,7 @@ void tables::out(basic_ostream<T>& os) const {
 	//strs_t::const_iterator it;
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
 //		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-				out(os, tbls[tab].t, tab);
+		if (!tbls[tab].internal) out(os, tbls[tab].t, tab);
 //		else os << it->first << " = \"" << it->second << '"' << endl;
 	}
 }
@@ -641,8 +641,9 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// equal then print them; this is the fixpoint.
 		level &l = fronts.back();
 		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
-			decompress(l[n], n, [&os, this](const term& r) {
-				os << to_raw_term(r) << '.' << endl; });
+			if (!tbls[n].internal)
+				decompress(l[n], n, [&os, this](const term& r) {
+					os << to_raw_term(r) << '.' << endl; });
 		}
 		return true;
 	} else {
@@ -657,13 +658,13 @@ template bool tables::out_fixpoint<wchar_t>(wostream& os);
 
 void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		if (tab != fp_tab) out(tbls[tab].t, tab, f);
+		if (!tbls[tab].internal) out(tbls[tab].t, tab, f);
 }
 
 template <typename T>
 void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
-	if (tab == fp_tab) return; // don't print __fp__ fact.
-	out(x, tab, [&os](const raw_term& rt) { os << rt << '.' << endl; });
+	if (!tbls[tab].internal) // don't print internal tables.
+		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
 }
 
 #ifdef __EMSCRIPTEN__
@@ -731,13 +732,8 @@ set<term> tables::decompress() {
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
-	if (arg & 1) {
-		const char32_t ch = arg >> 2;
-		if (is_printable(ch)) return elem(ch);
-		return	elem(elem::SYM, rdict().get_lexeme("\"#" +
-			to_string_((int_t) ch) + "\""));
-	}
-	if (arg & 2) return elem((int_t)(arg>>2));
+	if (arg & 1) return elem((char32_t) (arg >> 2));
+	if (arg & 2) return elem((int_t)    (arg >> 2));
 	return elem(elem::SYM, rdict().get_sym(arg));
 }
 
@@ -983,7 +979,7 @@ void tables::get_facts(const flat_prog& m) {
 void tables::get_nums(const raw_term& t) {
 	for (const elem& e : t.e)
 		if (e.type == elem::NUM) nums = max(nums, e.num);
-		else if (e.type == elem::CHR) chars = 255;
+		else if (e.type == elem::CHR) chars = max(chars, (int_t)e.ch);
 }
 
 bool tables::to_pnf(form *&froot) {
@@ -1605,8 +1601,11 @@ void tables::get_rules(flat_prog p) {
 				get_alt(al, t, as);
 
 		for (alt x : as)
-			*(aa = new alt) = x,
+			if ((ait = alts.find(&x)) != alts.end())
+				r.push_back(*ait);
+			else	*(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
+
 		rs.insert(r);
 	}
 	for (rule r : rs)
@@ -1687,6 +1686,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
+		chars = max(chars, t[1]),
 		b1.push_back(from_fact(t));
 		tb[1] = t[0], tb[2] = mknum(0);
 		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
@@ -2299,6 +2299,7 @@ bool tables::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ 
 				p.p.erase(p.p.begin() + n);
 				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
 					sl -= chl; s += chl;
+					chars = max(chars, (int_t) ch);
 					if (ch == U'\\' && !esc) esc = true;
 					else p.p.insert(p.p.begin() + n++,
 						elem(ch)), esc = false;
@@ -2917,12 +2918,11 @@ bool tables::add_fixed_point_fact() {
 	rt.arity = { 0 };
 	rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
 	term t = from_raw_term(rt);
-	if (fp_tab != t.tab) fp_tab = t.tab; // remember the tab for filtering
-
 	bool exists = false;
 	decompress(tbls[t.tab].t && from_fact(t), t.tab,
 		[&exists](const term& /*t*/) { exists = true; }, t.size());
 	if (!exists) tbls[t.tab].t = tbls[t.tab].t || from_fact(t); // add if ne
+	tbls[t.tab].internal = true;
 	return !exists;
 }
 

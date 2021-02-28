@@ -83,5 +83,7 @@ const char err_quote_sym[] = "Expected symbol denoting the relation associated w
 const char err_timeout_num[] = "Expected number denoting number of program steps to simulate.";
 const char err_quote_str[] = "Expected quotation containing a TML program.";
 const char err_codec_sym[] = "Expected symbol denoting the relation associated with a codec.";
+const char err_x_escape[] = "Wrong \\x character escape. Use values between: \\x00 and \\xFF.";
+const char err_u_escape[] = "Wrong \\u character escape. Use values between: \\u0000 and \\uFFFF.";
 
 #endif

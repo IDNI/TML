@@ -122,7 +122,7 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) {
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
-				assert(p0->b->neg == false);
+				DBG(assert(p0->b->neg == false);)
 
 				//WARNING: IF using this debug resource, disable form memos since i will fault it
 				//spbdd_handle q = body_query(*(p0->b),0);
@@ -363,7 +363,7 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		else {
 			bdd_handles vt;
 			fol_query(p,vt);
-			assert(vt.size() == 1);
+			//DBG(assert(vt.size() == 1);) // fails when using IF command
 			v.insert(v.end(), vt.begin(), vt.end());
 		}
 	}
@@ -483,7 +483,7 @@ void tables::hol_query(cr_pnft_handle f, bdd_handles &v, bdd_handles &vh,
 			else {
 				bdd_handles vt, vth;
 				hol_query(p,vt,vth, hvar_hbdd, quantsh,vmh);
-				assert(vt.size() <= 1 && vt.size() <= 1);
+				DBG(assert(vt.size() <= 1 && vt.size() <= 1);)
 				v.insert(v.end(), vt.begin(), vt.end());
 				vh.insert(vh.end(), vth.begin(), vth.end());
 			}
@@ -613,7 +613,7 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 		case SHR:
 		{
 			size_t var0 = vm.at(t[0]);
-			assert(t[1] > 0 && "shift value must be a constant"); //TODO: move check to parser
+			DBG(assert(t[1] > 0 && "shift value must be a constant");) //TODO: move check to parser
 			size_t num1 = t[1] >> 2;
 			size_t var2 = vm.at(t[2]);
 			q = shr(var0, num1, var2, vl);
@@ -622,7 +622,7 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 		case SHL:
 		{
 			size_t var0 = vm.at(t[0]);
-			assert(t[1] > 0 && "shift value must be a constant"); //TODO: move check to parser
+			DBG(assert(t[1] > 0 && "shift value must be a constant");) //TODO: move check to parser
 			size_t num1 = t[1] >> 2;
 			size_t var2 = vm.at(t[2]);
 			q = shl(var0, num1, var2, vl);
@@ -634,7 +634,7 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 			//single precision
 			if (args == 3) q = mul_var_eq(0,1,2,3);
 			else if (args == 4) q = mul_var_eq_ext(0,1,2,3,args);
-			else assert(false); //TODO: move check to parser
+			DBG(else assert(false);) //TODO: move check to parser
 			set_constants(t,q);
 			uints perm2 = get_perm(t, vm, vl);
 			q = q^perm2;
@@ -1020,7 +1020,7 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 			for (size_t j = 0; j < n_vars; ++j) {
 				if (j == var0 )
 					perm1[i*n_vars+j] = perm1[(i+n)*n_vars+j];
-				COUT << i*n_vars+j+1 << "--" << perm1[i*n_vars+j]+1 << endl;
+				//COUT << i*n_vars+j+1 << "--" << perm1[i*n_vars+j]+1 << endl;
 			}
 		s = s^perm1;
 

@@ -112,11 +112,17 @@ lexeme input::lex(pccs s) {
 	if (**s == '\'') {
 		if (*(*s + 1) == '\'') return { t, ++++*s };
 		if (*(*s + 1) == '\\') {
-			//if ((*(*s+2)!=L'\''&&*(*s+2)!=L'\\')
-			// allow any escape sequence
-			// if (!strchr("\\'rnt",*(*s+2)) ||*(*s+3)!='\'')
-			// 	return PE(parse_error((*s+2), err_escape));
-			return { t, ++++++++*s };
+			if (*(*s+2) == 'x') {
+				if (*(*s+5) != '\'') return
+					PE(parse_error(*s, err_x_escape));
+				else return { t, *s += 6 };
+			}
+			if (*(*s+2) == 'u') {
+				if (*(*s+7) != '\'') return
+					PE(parse_error(*s, err_u_escape));
+				else return { t, *s += 8 };
+			}
+			return { t, *s += 4 };
 		}
 		char32_t ch;
 		size_t chl = peek_codepoint(*s+1, size_ - ((*s+1) - beg_), ch);
@@ -288,6 +294,7 @@ bool elem::parse(input* in) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;
 	size_t chl;
+	int_t i;
 	if ('|' == *l[pos][0]) return e = l[pos++],type=ALT,   true;
 	if ('(' == *l[pos][0]) return e = l[pos++],type=OPENP, true;
 	if (')' == *l[pos][0]) return e = l[pos++],type=CLOSEP,true;
@@ -363,16 +370,27 @@ bool elem::parse(input* in) {
 	if (!is_alnum(l[pos][0], l[pos][1]-l[pos][0], chl) && *l[pos][0]!='_' &&
 		!strchr("\"`'?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == '\'') {
-		type = CHR, e = { 0, 0 };
+		type = CHR;
 		if (l[pos][0][1] == '\'') ch = 0;
-		else if (l[pos][0][1] != '\\') chl = peek_codepoint(
-			l[pos][0]+1, l[pos][1]-l[pos][0]-2, ch);
-		else if (l[pos][0][1+chl] == 'r') ch = '\r';
-		else if (l[pos][0][1+chl] == 'n') ch = '\n';
-		else if (l[pos][0][1+chl] == 't') ch = '\t';
-		else if (l[pos][0][1+chl] == '\\') ch = '\\';
-		else if (l[pos][0][1+chl] == '\'') ch = '\'';
-		else { DBGFAIL; }
+		else if (l[pos][0][1] == '\\') switch (l[pos][0][2]) {
+			case 'r': ch = U'\r'; break;
+			case 'n': ch = U'\n'; break;
+			case 't': ch = U'\t'; break;
+			case '\\':ch = U'\\'; break;
+			case '\'':ch = U'\''; break;
+			case 'x': if ((l[pos][0] + 6 != l[pos][1]) ||
+				((i = hex_to_int_t(l[pos][0]+3, 2)) < 0))
+			 		return in->parse_error(l[pos][0] + 4,
+						err_x_escape, l[pos]);
+				  ch = (char32_t) i; break;
+			case 'u': if ((l[pos][0] + 8 != l[pos][1]) ||
+				((i = hex_to_int_t(l[pos][0]+3, 4)) < 0))
+					return in->parse_error(l[pos][0] + 4,
+						err_u_escape, l[pos]);
+				  ch = (char32_t) i; break;
+			default: { DBGFAIL; }
+		}
+		else chl = peek_codepoint(l[pos][0]+1,l[pos][1]-l[pos][0]-2,ch);
 	}
 	else if (*l[pos][0] == '?') type = VAR;
 	else if (is_alpha(l[pos][0], l[pos][1]-l[pos][0], chl) ||
