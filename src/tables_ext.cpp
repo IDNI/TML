@@ -375,22 +375,12 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	if (f->quants.size() != 0) {
 		//TODO: move perms inits to preparation
 		uints perm1 = perm_init((bits-2)*f->varslen);
-		size_t i = 0;
-		std::set<int_t> k;
-		for (auto& it : f->vm) k.insert(it.first);
-		for (auto& x : k) {
-			for (size_t j = 0; j < bits-2; j++)
-				perm1[i*(bits-2)+j] = j*f->varslen +  f->vm.at(x);
-			i++;
-		}
 		uints perm2 = perm_init((bits-2)*f->varslen);
-		i = 0;
-		for (auto& x : k) {
-			for (size_t j = 0; j < bits-2; j++)
-				perm2[j * f->varslen + f->vm.at(x)] = i*(bits-2)+j;
-			i++;
-		}
-
+		for (size_t i = 0; i < f->varslen; i++)
+			for (size_t j = 0; j < bits-2; j++) {
+				perm1[i*(bits-2)+j] = j*f->varslen + i;
+				perm2[j * f->varslen + i] = i*(bits-2)+j;
+			}
 		q = q^perm1;
 		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
 		q = q^perm2;
