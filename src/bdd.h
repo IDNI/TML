@@ -22,11 +22,15 @@
 #include "defs.h"
 #include "memory_map.h"
 
-#define fpairing(x, y) \
-	((((size_t)(x)+(size_t)(y))*((size_t)(x)+(size_t)(y)+1)>>1)+(size_t)(y))
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
+
+inline size_t fpairing(size_t x, size_t y) {
+	size_t z = x + y;
+	z *= z+1;
+	return y+(z>>1);
+}
 
 extern bool onexit;
 

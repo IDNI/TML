@@ -100,15 +100,17 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(leaf(l) || v < abs((*V)[abs(l)].v)););
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
-	static unordered_map<bdd_key, int_t>::const_iterator it;
-	static bdd_key k;
+	unordered_map<bdd_key, int_t>::const_iterator it;
+	bdd_key k;
 	auto &mm = v < 0 ? Mn : Mp;
 	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
 	auto &m = mm[abs(v)];
 	if (l < 0) {
-		k = bdd_key(hash_pair(-h, -l), -h, -l);
+		h = -h;
+		l = -l;
+		k = bdd_key(hash_pair(h, l), h, l);
 		return	(it = m.find(k)) != m.end() ? -it->second :
-			(V->emplace_back(v, -h, -l),
+			(V->emplace_back(v, h, l),
 			m.emplace(move(k), V->size()-1),
 			-V->size()+1);
 	}
