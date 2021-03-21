@@ -148,15 +148,13 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 		bx.h == T || bx.h == F || bx.l == T || bx.l == F ||
 		by.h == T || by.h == F || by.l == T || by.l == F;
 #ifdef MEMO
-	if (!leaf && bx.v == by.v) {
-		auto it = C.find(m);
-		if (it != C.end()) return it->second;
-	}
+	if (!leaf && bx.v == by.v)
+		if (auto it = C.find(m); it != C.end())
+			return it->second;
 #endif
-	int_t r;
 	if (bx.v < by.v) return add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
 	if (bx.v > by.v) return add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
-	r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
+	int_t r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	if (!leaf && C.size() < gclimit) C.emplace(m, r);
 #endif
