@@ -105,7 +105,7 @@ int_t bdd_or_reduce(bdds b);
 size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
-extern std::unique_ptr<bdd_mmap> V;
+extern bdd_mmap V;
 extern size_t max_bdd_nodes;
 extern mmap_mode bdd_mmap_mode;
 
@@ -222,10 +222,10 @@ class bdd {
 
 	inline static bdd get(int_t x) {
 		if (x > 0) {
-			const bdd &y = (*V)[x];
+			const bdd &y = V[x];
 			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
 		}
-		const bdd &y = (*V)[-x];
+		const bdd &y = V[-x];
 		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
@@ -339,16 +339,16 @@ public:
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static int_t hi(int_t x) {
-		return	x < 0 ? (*V)[-x].v < 0 ? -(*V)[-x].l : -(*V)[-x].h
-			: (*V)[x].v < 0 ? (*V)[x].l : (*V)[x].h;
+		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
+			: V[x].v < 0 ? V[x].l : V[x].h;
 	}
 
 	inline static int_t lo(int_t x) {
-		return	x < 0 ? (*V)[-x].v < 0 ? -(*V)[-x].h : -(*V)[-x].l
-			: (*V)[x].v < 0 ? (*V)[x].h : (*V)[x].l;
+		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
+			: V[x].v < 0 ? V[x].h : V[x].l;
 	}
 
-	inline static uint_t var(int_t x) { return abs((*V)[abs(x)].v); }
+	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
 
 	static size_t satcount_perm(int_t x, size_t leafvar);
 	static size_t satcount_perm(const bdd& bx, int_t x, size_t leafvar);
