@@ -721,7 +721,7 @@ struct raw_prog {
 	enum ptype {
 		PFP, LFP, GFP
 	} type = PFP;
-	std::vector<macro> vm;
+	std::vector<macro> macros;
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;

@@ -59,8 +59,7 @@ void tables::transform_guards(raw_prog& rp) {
 // del, rule, true, false, curr and fp states and guard each add/del/rule
 // statement with its state guard
 void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
-	int_t& prev_id)
-{
+	int_t& prev_id) {
 	vector<string> states = {
 		"init", "start", "add", "del", "rule", "cond", "fp", "curr"
 	};
@@ -130,11 +129,10 @@ void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
 	// just move directives, productions and macros (always global scope)
 	if (rp.d.size())  trp.d.insert( trp.d.end(), rp.d.begin(), rp.d.end());
 	if (rp.g.size())  trp.g.insert( trp.g.end(), rp.g.begin(), rp.g.end());
-	if (rp.vm.size()) trp.vm.insert(trp.vm.end(),rp.vm.begin(),rp.vm.end());
-	rp.r.clear();
-	rp.d.clear();
-	rp.g.clear();
-	rp.vm.clear();
+	if (rp.macros.size())
+		trp.macros.insert(trp.macros.end(), rp.macros.begin(),
+		rp.macros.end());
+	rp.r.clear(), rp.d.clear(), rp.g.clear(), rp.macros.clear();
 }
 
 // transforms ifs and whiles

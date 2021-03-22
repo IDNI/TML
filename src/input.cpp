@@ -96,13 +96,13 @@ lexeme input::lex(pccs s) {
 		if (*(*s + 1) == '\'') return { t, ++++*s };
 		if (*(*s + 1) == '\\') {
 			if (*(*s+2) == 'x')
-				if (*(*s+5) != '\'') return
-					PE(parse_error(*s, err_x_escape));
-				else return { t, *s += 6 };
+				return	(*(*s+5) != '\'') ?
+					PE(parse_error(*s, err_x_escape)) :
+					lexeme{ t, *s += 6 };
 			if (*(*s+2) == 'u')
-				if (*(*s+7) != '\'') return
-					PE(parse_error(*s, err_u_escape));
-				else return { t, *s += 8 };
+				return	(*(*s+7) != '\'') ?
+					PE(parse_error(*s, err_u_escape)) :
+					lexeme{ t, *s += 8 };
 			return { t, *s += 4 };
 		}
 		char32_t ch;
@@ -801,13 +801,11 @@ sprawformtree raw_form_tree::simplify(sprawformtree &t) {
 			simplify(t->r);
 			break;
 		case elem::AND:
-			simplify(t->l);
-			simplify(t->r);
-			if(t->l->type == elem::NONE && t->l->rt->is_true()) {
+			simplify(t->l), simplify(t->r);
+			if (t->l->type == elem::NONE && t->l->rt->is_true())
 				t = t->r;
-			} else if(t->r->type == elem::NONE && t->r->rt->is_true()) {
+			else if (t->r->type == elem::NONE && t->r->rt->is_true())
 				t = t->l;
-			}
 			break;
 		case elem::ALT:
 			simplify(t->l);
@@ -821,19 +819,18 @@ sprawformtree raw_form_tree::simplify(sprawformtree &t) {
 		case elem::NOT:
 			simplify(t->l);
 			break;
-		case elem::EXISTS: {
+		case elem::EXISTS:
 			simplify(t->r);
 			break;
-		} case elem::UNIQUE: {
+		case elem::UNIQUE:
 			simplify(t->r);
 			break;
-		} case elem::NONE: {
+		case elem::NONE:
 			break;
-		} case elem::FORALL: {
+		case elem::FORALL:
 			simplify(t->r);
 			break;
-		} default:
-			assert(false); //should never reach here
+		default: throw 0; //should never reach here
 	}
 	return t;
 }
@@ -977,10 +974,10 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 		else c.p_break_rp->has[CURR] = true;
 		gs.push_back(c);
 	}
-	else if (!in->error && m.parse(in, *this)) vm.emplace_back(m);
+	else if (!in->error && m.parse(in, *this)) macros.emplace_back(m);
 	else if (!in->error && x.parse(in, *this)) d.push_back(x);
-	else if (!in->error && y.parse(in, *this)) y.update_states(has),
-		                                   r.push_back(y);
+	else if (!in->error && y.parse(in, *this))
+		y.update_states(has), r.push_back(y);
 	else if (!in->error && p.parse(in, *this)) g.push_back(p);
 	else return false;
 	if (!require_guards && gs.size()) require_guards = true;
@@ -1008,19 +1005,18 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 		if (!parse_statement(in, dict)) return --last_id, false;
 	//COUT << "\t\tparsed rp statements:\n" << *this << endl;
 
-	if (vm.empty()) return true;
-	//macro  
+	if (macros.empty()) return true;
 
-	for( raw_rule &rr : r )
-		for( vector<raw_term> &vrt :rr.b )
-			for( size_t i=0; i <vrt.size();i++)
-				for( macro &mm :vm )
+	for(raw_rule &rr : r)
+		for (vector<raw_term> &vrt : rr.b)
+			for (size_t i = 0; i != vrt.size(); i++)
+				for (macro &mm : macros)
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
-					if( vrt[i].e[j].e == mm.def.e[0].e ) {
-						if( !macro_expand(in, mm, i, j, vrt, dict))
-							return --last_id, false;
-						else break;
-					}								
+						if( vrt[i].e[j].e == mm.def.e[0].e ) {
+							if( !macro_expand(in, mm, i, j, vrt, dict))
+								return --last_id, false;
+							else break;
+						}								
 	return true;
 }
 
