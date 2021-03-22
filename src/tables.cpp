@@ -908,11 +908,11 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 		const term& t = *pt;
 		assert(t.size() >= 3);
 		const int_t v1 = t[0], v2 = t[1], v3 = t[2];
-		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
+		if (v1 < 0 && has(nvars, v1) && !has(pvars, v1))
 			arithvars.insert(v1);
-		if (v2 < 0 && !has(nvars, v2) && !has(pvars, v2))
+		if (v2 < 0 && has(nvars, v2) && !has(pvars, v2))
 			arithvars.insert(v2);
-		if (v3 < 0 && !has(nvars, v3) && !has(pvars, v3))
+		if (v3 < 0 && has(nvars, v3) && !has(pvars, v3))
 			arithvars.insert(v3);
 	}
 
@@ -923,7 +923,7 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	for (int_t i : nvars) range(vm.at(i), len, v);
 	for (int_t i : eqvars) range(vm.at(i), len, v);
 	for (int_t i : leqvars) range(vm.at(i), len, v);
-	for (int_t i : arithvars) range(vm.at(i), len, v);
+//	for (int_t i : arithvars) range(vm.at(i), len, v);
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
