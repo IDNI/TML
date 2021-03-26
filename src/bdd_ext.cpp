@@ -17,7 +17,6 @@
 #include "math.h"
 using namespace std;
 
-
 //------------------------------------------------------------------------------
 // auxiliary functions
 int_t bdd_root(cr_spbdd_handle x) {
@@ -29,22 +28,9 @@ void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
 }
 
 //------------------------------------------------------------------------------
-
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
 	return bdd_handle::get(bdd::bdd_quantify(x->b, 0, quants, bits, n_args));
-}
-
-spbdd_handle bdd_and_hl(cr_spbdd_handle x) {
-	return bdd_handle::get(bdd::bdd_and_hl(x->b));
-}
-
-spbdd_handle bdd_or_hl(cr_spbdd_handle x) {
-	return bdd_handle::get(bdd::bdd_or_hl(x->b));
-}
-
-spbdd_handle bdd_xor_hl(cr_spbdd_handle x) {
-	return bdd_handle::get(bdd::bdd_xor_hl(x->b));
 }
 
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -57,36 +43,32 @@ spbdd_handle bdd_not(cr_spbdd_handle x) {
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::bitwiseAND(x->b,y->b));
+	return bdd_handle::get(bdd::bitwise_and(x->b,y->b));
 }
 
 spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::bitwiseOR(x->b,y->b));
+	return bdd_handle::get(bdd::bitwise_or(x->b,y->b));
 }
 
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::bitwiseXOR(x->b,y->b));
+	return bdd_handle::get(bdd::bitwise_xor(x->b,y->b));
 }
 
 spbdd_handle bdd_bitwise_not(cr_spbdd_handle x) {
-	return bdd_handle::get(bdd::bitwiseNOT(x->b));
+	return bdd_handle::get(bdd::bitwise_not(x->b));
 }
 
-
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::ADDER(x->b,y->b, false, 0));
+	return bdd_handle::get(bdd::adder(x->b,y->b, false, 0));
 }
 
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars ) {
-
 	//bdds
 	int_t *z_aux = new int_t[bits];
 	int_t c = F;
-	bdd::MULT_DFS(x->b, y->b, z_aux, 0, bits, n_vars, c);
-
+	bdd::mult_dfs(x->b, y->b, z_aux, 0, bits, n_vars, c);
 	delete[] z_aux;
-
 	size_t ext_bits = 2*bits;
 	bools exvec;
 	for (size_t i = 0; i < ext_bits*n_vars; ++i) {
@@ -95,12 +77,10 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		else exvec.push_back(false);
 	}
 	c = bdd::bdd_ex(c, exvec);
-
 	return bdd_handle::get(c);
 }
 
 // ----------------------------------------------------------------------------
-
 int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
 
@@ -143,20 +123,6 @@ int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
 	return F;
 }
 
-int_t bdd::bdd_and_hl(int_t x) {
-	bdd b = get(x);
-	return bdd_and(b.h,b.l);
-}
-
-int_t bdd::bdd_or_hl(int_t x) {
-	bdd b = get(x);
-	return bdd_or( b.h, b.l);
-}
-int_t bdd::bdd_xor_hl(int_t x) {
-	bdd b = get(x);
-	return bdd_xor( b.h, b.l);
-}
-
 void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
 	if (!s.emplace(abs(x)).second) return;
 	bdd b = get(x);
@@ -164,126 +130,86 @@ void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
 }
 
 int_t bdd::bdd_xor(int_t x, int_t y) {
-	return bdd_and( bdd_or(x,y), -bdd_and(x,y));
+	//return bdd_and( bdd_or(x,y), -bdd_and(x,y));
+	return bdd_ite(x,-y,y);
 }
 
-// ----------------------------------------------------------------------------
-
-int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
-
+int_t bdd::bitwise_and(int_t a_in, int_t b_in) {
 	bdd a = get(a_in), b = get(b_in);
-
-	if (a_in == T && b_in == T)
-		return(T);
-	else if (a_in == F || b_in == F)
-		return(F);
-	else {
-		uint_t pos = 0;
-		if (a.v > b.v + 1 && b.v != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = b.v+1;
-		} else if (a.v + 2 < b.v && a.v != 0 ) {
-			b.h = b_in, b.l = b_in;
-			pos = a.v + 2;
-		} else if (a.v != 0)
-			pos = a.v+2;
-		else
-			pos = b.v + 1;
-		//o::dbg() << "--- pos = " << pos << "\n";
-
-		int_t c = add(pos,
-					  bitwiseAND(a.h,  b.h ),
-					  bdd_or (bdd_or(bitwiseAND(a.h,  b.l ),
-							  	  	 bitwiseAND(a.l,  b.h )) ,
-							  bitwiseAND(a.l,  b.l )));
-		return c;
-	}
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
+	uint_t pos = 0;
+	if (a.v > b.v + 1 && b.v != 0) {
+		a.h = a_in, a.l = a_in;
+	  	pos = b.v+1;
+	} else if (a.v + 2 < b.v && a.v != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = a.v + 2;
+	} else if (a.v != 0) pos = a.v+2;
+	else pos = b.v + 1;
+	int_t c = add(pos, bitwise_and(a.h, b.h), bdd_or(bdd_or(bitwise_and(a.h,  b.l),
+						bitwise_and(a.l, b.h)), bitwise_and(a.l,  b.l))
+					);
+	return c;
 }
 
-int_t bdd::bitwiseOR(int_t a_in, int_t b_in) {
-
+int_t bdd::bitwise_or(int_t a_in, int_t b_in) {
 	bdd a = get(a_in), b = get(b_in);
-
-	if (a_in == T && b_in == T)
-		return(T);
-	else if (a_in == F || b_in == F)
-		return(F);
-	else {
-		uint_t pos = 0;
-		if (a.v > b.v + 1 && b.v != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = b.v+1;
-		} else if (a.v + 2 < b.v && a.v != 0 ) {
-			b.h = b_in, b.l = b_in;
-			pos = a.v + 2;
-		} else if (a.v != 0)
-			pos = a.v+2;
-		else
-			pos = b.v + 1;
-
-		int_t c = add(pos,
-					  bdd_or( bdd_or(bitwiseOR(a.h, b.l), bitwiseOR(a.l, b.h)),
-							  bitwiseOR(a.h, b.h)) ,
-					  bitwiseOR(a.l, b.l));
-		return c;
-	}
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
+	uint_t pos = 0;
+	if (a.v > b.v + 1 && b.v != 0) {
+		a.h = a_in, a.l = a_in;
+		pos = b.v+1;
+	} else if (a.v + 2 < b.v && a.v != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = a.v + 2;
+	} else if (a.v != 0) pos = a.v+2;
+	else pos = b.v + 1;
+	int_t c = add(pos, bdd_or( bdd_or(bitwise_or(a.h, b.l), bitwise_or(a.l, b.h)),
+						bitwise_or(a.h, b.h)), bitwise_or(a.l, b.l)
+					);
+	return c;
 }
 
-int_t bdd::bitwiseXOR(int_t a_in, int_t b_in) {
-
+int_t bdd::bitwise_xor(int_t a_in, int_t b_in) {
 	bdd a = get(a_in), b = get(b_in);
-
-	if (a_in == T && b_in == T)
-		return(T);
-	else if (a_in == F || b_in == F)
-		return(F);
-	else {
-		uint_t pos = 0;
-		if (a.v > b.v + 1 && b.v != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = b.v + 1;
-		} else if (a.v + 2 < b.v && a.v != 0 ) {
-			b.h = b_in, b.l = b_in;
-			pos = a.v + 2;
-		} else if (a.v != 0)
-			pos = a.v + 2;
-		else
-			pos = b.v + 1;
-		//o::dbg() << "--- pos = " << pos << "\n";
-
-		int_t c = add(pos,
-					  bdd_or(bitwiseXOR(a.h, b.l), bitwiseXOR(a.l, b.h)),
-					  bdd_or(bitwiseXOR(a.h, b.h), bitwiseXOR(a.l, b.l)));
-		return c;
-	}
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
+	uint_t pos = 0;
+	if (a.v > b.v + 1 && b.v != 0) {
+		a.h = a_in, a.l = a_in;
+		pos = b.v + 1;
+	} else if (a.v + 2 < b.v && a.v != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = a.v + 2;
+	} else if (a.v != 0) pos = a.v + 2;
+	else pos = b.v + 1;
+	int_t c = add(pos, bdd_or(bitwise_xor(a.h, b.l), bitwise_xor(a.l, b.h)),
+				  	bdd_or(bitwise_xor(a.h, b.h), bitwise_xor(a.l, b.l))
+					);
+	return c;
 }
 
-int_t bdd::bitwiseNOT(int_t a_in) {
+int_t bdd::bitwise_not(int_t a_in) {
 	//TODO: implement
 	return a_in;
 }
 
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-
-int_t bdd::ADDER(int_t a_in, int_t b_in, bool carry, size_t bit) {
+int_t bdd::adder(int_t a_in, int_t b_in, bool carry, size_t bit) {
 
 	bdd a = get(a_in), b = get(b_in);
 	int_t c = 0;
-
-	// ---------------------------------------------------------------------------
-
 	if (a_in == T && b_in == T)
 		c = T;
 	else if (a_in == F || b_in == F)
 		c = F;
 	else {
-
 		int_t pos = 0;
 		if (a.v > b.v + 1 && b.v != 0) {
 			a.h = a_in, a.l = a_in;
 		  	pos = b.v + 1;
-		} else if (a.v + 2 < b.v && a.v != 0 ) {
+		} else if (a.v + 2 < b.v && a.v != 0) {
 			b.h = b_in, b.l = b_in;
 			pos = a.v + 2;
 		} else if (a.v != 0)
@@ -293,20 +219,19 @@ int_t bdd::ADDER(int_t a_in, int_t b_in, bool carry, size_t bit) {
 
 		if (carry == false)
 			c = add(pos,
-					bdd_or(ADDER(a.h, b.l, false, bit+1), ADDER(a.l, b.h, false, bit+1)),
-					bdd_or(ADDER(a.h, b.h, true,  bit+1), ADDER(a.l, b.l, false, bit+1)));
+					bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
+					bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
 		else
 			c = add(pos,
-					bdd_or(ADDER(a.h, b.h, true, bit+1), ADDER(a.l, b.l, false, bit+1)),
-					bdd_or(ADDER(a.h, b.l, true, bit+1), ADDER(a.l, b.h, true,  bit+1)));
+					bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
+					bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
 	}
-
 	return c;
 }
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
-// Over bdds MULT support
+// Over bdds MULT
 // ----------------------------------------------------------------------------
 
 extern uints perm_init(size_t n);
@@ -318,9 +243,7 @@ template<typename T> struct veccmp {
 	}
 };
 extern map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
-
 // ----------------------------------------------------------------------------
-
 std::map<size_t, int_t> covered_cf;
 std::map<size_t, int_t> covered_ct;
 
@@ -779,15 +702,11 @@ int_t bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t d
 void bdd::satcount_arith(bdd a, size_t bit, size_t bits, size_t factor, size_t n_args,
 		size_t &count) {
 
-	//bdd a = get(a_in);
-	//if (a == F) return;
 	if (a.h == F && a.l == F) return;
-
 	if (a.h == T && a.l == T) {
 		count = count + factor * pow(2, bits-bit); return;
 	}
-
-	if (a.h != F ) {
+	if (a.h != F) {
 		bdd ah = get(a.h);
 		size_t delta = a.h != T ? (ah.v - a.v)/n_args : 1;
 		satcount_arith(ah, bit+delta, bits, factor * delta, n_args,count);
@@ -797,20 +716,17 @@ void bdd::satcount_arith(bdd a, size_t bit, size_t bits, size_t factor, size_t n
 		size_t delta = a.l != T ? (al.v - a.v)/n_args : 1;
 		satcount_arith(al, bit+delta, bits, factor * delta,  n_args,count);
 	}
-
 	return;
-
 }
 
 bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path,
 		size_t bits, size_t n_args) {
 
-	//size_t bit, size_t bits, size_t factor, ,
+	//size_t bit, size_t bits, size_t factor,
 	bool done = false;
 	bool goh = false;
 
 	while (!done) {
-
 		if (path[bit] == U)
 			done = true;
 		else if (path[bit] == L && a[i].h != F) {
@@ -827,7 +743,6 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 		}
 		if(bit < 0)
 			return false;
-
 	}
 
 	if (a[i].h == F && a[i].l == F) {
@@ -836,18 +751,9 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 
 	done = false;
 	while (!done) {
-		/*if (a[i].h == T && a[i].l == T) {
-			done = true;
-			bit = bit-1;
-			i = i-1;
-		}*/
-
 		if (a[i].l != F && !goh) {
-
 			if (a[i].l == T) {
-
 				done = true;
-
 				size_t delta =  bits-bit;
 				path[bit] = L;
 				if (delta > 1)
@@ -860,13 +766,6 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 				path[bit] = L;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
-				/*
-				if (delta == 1)
-					path[bit] = L;
-				else
-					for(int_t j = 0; j < delta; j++) path[bit+j] = X;
-				*/
-
 				i++;
 				bit = bit+delta;
 			}
@@ -874,22 +773,18 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 		else if (a[i].h != F) {
 			goh = false;
 			if (a[i].h == T) {
-
 				done = true;
 				size_t delta =  bits-bit;
 				path[bit] = H;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
-
 			}
 			else {
 				a.push_back(get(a[i].h)); //a[i].l;
-
 				size_t delta = (a[i+1].v - a[i].v)/n_args;
 				path[bit] = H;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
-
 				i++;
 				bit = bit+delta;
 			}
@@ -964,7 +859,7 @@ int_t bdd::balance_paths(t_pathv &next_path_a, t_pathv &next_path_b, size_t bits
 	}
 }
 
-void bdd::ADDER_BE(int_t a_in, int_t b_in, size_t bits, size_t depth,
+void bdd::adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
 		size_t n_args, int_t &c) {
 
 	t_pathv path_a(bits, U);
@@ -1022,24 +917,15 @@ void bdd::ADDER_BE(int_t a_in, int_t b_in, size_t bits, size_t depth,
 				b_path_vld = bdd_next_path(b, b_i, b_bit, path_b, bits, n_args);
 				next_path_b = path_b;
 			}
-
-			//COUT << "##[ C]:" << endl;
-			//out(COUT, aux);
-			//COUT <<endl<<endl;
-
 			c = bdd_or(c, aux);
-
 		}
-
 	}
 	covered_cf.clear();
 	covered_ct.clear();
 	return;
 }
 
-// ----------------------------------------------------------------------------
-
-int_t bdd::SHLx(int_t b_in, size_t x, size_t bits, size_t n_args) {
+int_t bdd::shlx(int_t b_in, size_t x, size_t bits, size_t n_args) {
 
 	uints perm1;
 	size_t tbits = n_args*(bits+x);
@@ -1048,7 +934,6 @@ int_t bdd::SHLx(int_t b_in, size_t x, size_t bits, size_t n_args) {
 	// we get wrong behavior from bdd_permute
 	perm1 = perm_init(tbits);
 	for (size_t i = 0; i < bits ; i++) {
-
 		if (tbits-1 < n_args*(i+x)+1 ) {
 			//COUT << perm1[n_args*i+1]+1 << " --- " << n_args*(i+x)+1+1 << "\n";
 			perm1[n_args*i+1] = n_args*(i+x)+1 ;
@@ -1058,23 +943,18 @@ int_t bdd::SHLx(int_t b_in, size_t x, size_t bits, size_t n_args) {
 			perm1[n_args*i+1] = perm1[n_args*(i+x)+1];
 		}
 	}
-
 	int_t aux = bdd_permute(b_in, perm1, memos_perm[perm1]);
-
 	int_t aux_b = aux;
 	for (size_t i = 0; i < x ; i++) {
 		aux_b = add((n_args*(x-i-1))+2,F,aux_b);
 	}
-
 	return aux_b;
 }
 
-int_t bdd::SHR(int_t a_in, size_t arg, size_t bits, size_t n_args) {
-
+int_t bdd::shr(int_t a_in, size_t arg, size_t bits, size_t n_args) {
 
 	size_t tbits = n_args*bits;
 	size_t base = arg; // identifies which variable is being shifted
-
 	bools exvec;
 	for (size_t i = 0; i < tbits; ++i) {
 		if (i == base)
@@ -1088,25 +968,23 @@ int_t bdd::SHR(int_t a_in, size_t arg, size_t bits, size_t n_args) {
 		perm1[n_args*i+base] = perm1[n_args*i+base]-n_args;
 	}
 	a_in = bdd_permute(a_in, perm1, memos_perm[perm1]);
-
 	size_t pos_z = n_args * (bits-1) + base + 1;
 	int_t aux_bit = add(pos_z,F,T);
 	a_in = bdd_and(a_in, aux_bit);
-
 	return a_in;
 }
 
-int_t bdd::COPY(int_t a_in) {
+int_t bdd::copy(int_t a_in) {
 	 if (a_in == T) return T;
 	 else if (a_in == F) return F;
 	 bdd a = get(a_in);
 	 int_t pos = a.v + 1;
- 	 int_t c = add(pos, COPY(a.h) , COPY(a.l));
+ 	 int_t c = add(pos, copy(a.h) , copy(a.l));
  	 return c;
 }
 
-int_t bdd::COPY_ARG2ARG(int_t a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args) {
-
+int_t bdd::copy_arg2arg(int_t a , size_t arg_a, size_t arg_b, size_t bits,
+	size_t n_args) {
 	int_t b;
 	uints perm = perm_init(bits*n_args);
 	for (size_t i = 0; i < bits; i++) {
@@ -1117,21 +995,17 @@ int_t bdd::COPY_ARG2ARG(int_t a , size_t arg_a, size_t arg_b, size_t bits, size_
 	return b;
 }
 
-int_t bdd::ADDER_ACCS(int_t b_in, int_t acc, size_t depth, size_t bits, size_t n_args) {
-
+int_t bdd::adder_accs(int_t b_in, int_t acc, size_t depth, size_t bits,
+	size_t n_args) {
 
 	size_t ext_bits = bits+depth;
-
 	uints perm1;
 	perm1 = perm_init(ext_bits*n_args);
-
 	for (size_t i = 0; i < ext_bits*n_args; i++) {
-		//COUT << perm1[i]+1 << " --- " << ((ext_bits-1-(i/n_args))*n_args) + i % n_args + 1<< "\n";
 		perm1[i] = ((ext_bits-1-(i/n_args))*n_args) + i % n_args;
 	}
 
 	size_t pos_z;
-	//XXX: use this for Ohad's benchmark
 	//b extended
 	//to concatenate leading '0's (MSB) to b
 	//for depth = 0 (first acc), b ends bits + 2 (i.e bits = 3,  ext_bits = 5)
@@ -1141,11 +1015,10 @@ int_t bdd::ADDER_ACCS(int_t b_in, int_t acc, size_t depth, size_t bits, size_t n
 		aux_ext = bdd_and(aux_ext, add(pos_z, F, T));
 	}
 
-	int_t b_aux = SHLx(b_in, depth, bits, n_args);
+	int_t b_aux = shlx(b_in, depth, bits, n_args);
 	//COUT << "##[baux]:" << endl;
 	//out(COUT, b_aux);
 	//COUT <<endl<<endl;
-
 	aux_ext = T;
 	for (size_t i = bits; i < ext_bits ; i++) {
 		pos_z = n_args * i + 3;
@@ -1155,12 +1028,10 @@ int_t bdd::ADDER_ACCS(int_t b_in, int_t acc, size_t depth, size_t bits, size_t n
 	//COUT << "##[acc_aux]:" << endl;
 	//out(COUT, acc_aux);
 	//COUT <<endl<<endl;
-
 	int_t aux = F;
-
 	//XXX adder_be is returning aux LSB, no need to invert again
 	if (is_zero(acc_aux, ext_bits))
-		aux = COPY_ARG2ARG(b_aux, 1,2,ext_bits, n_args);
+		aux = copy_arg2arg(b_aux, 1,2,ext_bits, n_args);
 	else {
 		b_aux = bdd_permute(b_aux, perm1, memos_perm[perm1]);
 		//COUT << "##[baux inv]:" << endl;
@@ -1170,17 +1041,13 @@ int_t bdd::ADDER_ACCS(int_t b_in, int_t acc, size_t depth, size_t bits, size_t n
 		//COUT << "##[acc_aux inv]:" << endl;
 		//out(COUT, acc_aux);
 		//COUT <<endl<<endl;
-		ADDER_BE(b_aux, acc_aux, ext_bits, depth, n_args, aux);
+		adder_be(b_aux, acc_aux, ext_bits, depth, n_args, aux);
 	}
-
 	//COUT << "##[adder_be]:" << endl;
 	//out(COUT, aux);
 	//COUT <<endl<<endl;
-
 	return aux;
 }
-
-// ----------------------------------------------------------------------------
 
 int_t bdd::zero(size_t arg, size_t bits, size_t n_args) {
 
@@ -1202,215 +1069,30 @@ bool bdd::is_zero(int_t a_in, size_t bits) {
 	return true;
 }
 
-void bdd::MULT_DFS(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits,
+void bdd::mult_dfs(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits,
 	size_t n_args, int_t &c) {
 
 	if (depth == bits) {
 		c = bdd_or(c, accs[depth-1]);
 		return ;
 	}
-
 	int_t pos = n_args * depth + 1;
 	bdd a = get(a_in);
-
 	if (a.v > pos) {a.h = a_in, a.l = a_in;}
-
 	if (a.l != F) {
 		if (depth == 0)
 			accs[depth] = zero(3, bits, n_args);
-		else {
+		else
 			accs[depth] = accs[depth-1];
-		}
-		//COUT << "##[accs " << depth << "]:" << endl;
-		//out(COUT, accs[depth]);
-		//COUT <<endl<<endl;
-
-		MULT_DFS(a.l, b_in, accs, depth+1, bits, n_args, c);
+		mult_dfs(a.l, b_in, accs, depth+1, bits, n_args, c);
 	}
 
 	if (a.h != F) {
-
 		//XXX improve to avoid call to is_zero once it has been false
 		if (depth == 0)
-			accs[depth] = COPY_ARG2ARG(b_in, 1,2,bits, n_args);
+			accs[depth] = copy_arg2arg(b_in, 1,2,bits, n_args);
 		else
-			accs[depth] = ADDER_ACCS(b_in, accs[depth-1], depth, bits, n_args);
-
-		//COUT << "##[accs " << depth << "]:" << endl;
-		//out(COUT, accs[depth]);
-		//COUT <<endl<<endl;
-
-		MULT_DFS(a.h, b_in, accs, depth+1, bits, n_args, c);
+			accs[depth] = adder_accs(b_in, accs[depth-1], depth, bits, n_args);
+		mult_dfs(a.h, b_in, accs, depth+1, bits, n_args, c);
 	}
 }
-
-//XXX: initial proof of concept implementation, can be significantly compacted
-//int_t bdd::bitwiseAND(int_t a_in, int_t b_in) {
-//
-//	  bdd a = get(a_in), b = get(b_in);
-//	  int_t c = 0;
-//	  uint_t pos = 0;
-//
-//	  o::dbg() << " -- a.v = " << a.v << ", b.v = " <<  b.v  << "\n";
-//
-//	  //XXX: assumes var a < var b
-//	  if (a.v > b.v + 1 && b.v != 0) {
-//	    a.h = a_in, a.l = a_in;
-//	    pos = b.v+1;
-//	  }
-//	  else if (a.v + 2 < b.v && a.v != 0 ) {
-//	    b.h = b_in, b.l = b_in;
-//	    pos = a.v + 2;
-//	  } else if (a.v != 0)
-//	    pos = a.v+2;
-//	  else
-//	    pos = b.v + 1;
-//
-//	  o::dbg() << " ------------------- pos = " << pos << "\n";
-//
-//	  // ---------------------------------------------------------------------------
-//
-//	  if (a_in == T && b_in == T)
-//		  c = T;
-//	  else if (a_in == F || b_in == F)
-//		  c = F;
-//	  else if (a_in == T ) {
-//	    //(b.h,b.l) = 0,1 | 1,0 | 0,x | x,0 | 1,x | x,1 | x,x
-//	    if (b.h == F && b.l == T)
-//	      c = add(pos, F, T);
-//	    else if (b.h == T && b.l == F)
-//	      c = T;
-//	    else if (b.h == F)
-//	      c = add(pos, F /*b.h, a.h && b.h*/,  bitwiseAND(T, b.l) );
-//	    else if (b.h == T)
-//   	      c = add(pos, T /*b.h, a.h && b.h*/ , bitwiseAND(T, b.l));
-//	    else if (b.l == F)
-//	      c = add(pos, bitwiseAND(T, b.h), bitwiseAND(T, b.h));
-//	    else if (b.l == T)
-//	      c = T; // === add(pos, T ()   , bitwiseAND(T, b.l));
-//	    else
-//	      c = add(pos, bitwiseAND(T, b.h), bitwiseAND(T, b.l));
-//
-//	  } else if (b_in == T) {
-//  	     //XXX: swap?, idem above
-//		if (a.h == F && a.l == T)
-//		  c = add(pos, F, T);
-//		else if (a.h == T && a.l == F)
-//		  c = T;
-//		else if (a.h == F)
-//		  c = add(pos, F, bitwiseAND(a.l, T));
-//		else if (a.h == T)
-//		  c = add(pos, T , bitwiseAND(a.l, T));
-//		else if (a.l == F)
-//		  c = add(pos, bitwiseAND(a.h, T), bitwiseAND(a.h, T)); // (Verif OK)
-//		else if (a.l == T)
-//		  c = T;
-//		else
-//		  c = add(pos, bitwiseAND(a.h, T), bitwiseAND(a.l, T));
-//
-//	  }
-//	  // ---------------------------------------------------------------------------
-//	  // ---------------------------------------------------------------------------
-//	  // H = 0,0 | 0,1 | 1,0 | 0,x | x,0
-//	  else if (a.h == F || b.h == F) {
-//	    // H = 0,0
-//	    if (a.h == F && b.h == F && a.l != T && b.l != T)
-//	      c = add(pos, F, bitwiseAND(a.l, b.l));
-//	    else if (a.h == F && b.h == F)// && a.l == T && b.l == T)
-//	      c = F;
-//	    // H = 0,1 | 0,x
-//	    else if (a.h == F && b.l == F ) //b.h == T || b.h == x
-//	      c = add(pos, F, bitwiseAND(a.l,  b.h  ));
-//	    else if (a.h == F) //b.l != 0 && b.h != 0
-//	      c = add(pos, F, bdd_or( bitwiseAND(a.l,  b.l ), bitwiseAND(a.l,  b.h ) ) );
-//	    // H = 1,0 | x,0
-//	    else if (b.h == F && a.l == F ) //a.h == T || a.h == x
-//	      c = add(pos, F, bitwiseAND( a.h , b.l ));
-//	    else if (b.h == F) //a.l != 0 && a.h != 0
-//	      c = add(pos, F, bdd_or( bitwiseAND(a.l,  b.l ), bitwiseAND(a.h,  b.l ) ) );
-//	  }
-//	  // ---------------------------------------------------------------------------
-//	  // H = 1,1 | 1,x | x,1 | x,x
-//	  else {
-//	    // H = 1,1
-//	    if (a.h == T && b.h == T) {
-//	      if (a.l == F && b.l == F)
-//	        c = add(pos, T, F);
-//	      else if(a.l == F)
-//	    	c = add(pos, T, bitwiseAND(T, b.l));
-//		  else if(b.l == F)
-//			c = add(pos, T, bitwiseAND(a.l, T));
-//		  else
-//			c = add(pos, T, bitwiseAND(a.l, a.l));
-//	    }
-//
-//		// H = 1,x
-//	    else if (a.h == T) {
-//	      if (a.l == F && b.l == F)
-//	    	c = add(pos, bitwiseAND( T , b.h ), F);
-//	      else if (a.l == F && b.l == T)
-//	    	c = add(pos, bitwiseAND( T , b.h ), T /*bitwiseAND( T , b.l )*/);
-//	      else if (a.l == F)
-//	    	c = add(pos, bitwiseAND( T , b.h ), bitwiseAND( T , b.l ));
-//	      else //a.l = x, b.l = 0 | 1 | x
-//			c = add(pos, bitwiseAND( T , b.h ),
-//					bdd_or(bitwiseAND(a.l , b.h), bitwiseAND(a.l , b.l)));
-//	      	  	  	  //a.h , b.l ??
-//	    }
-//
-//	    // H = x,1
-//	    else if (b.h == T) {
-//	      // L = 0,0 | 1,0 | x,0 | 0,x | 1,x | x,x
-//
-//	      if (a.l == F && b.l == F)
-//	        c = add(pos, bitwiseAND( a.h , T ), F);
-//	      else if (a.l == T && b.l == F)
-//	    	c = add(pos, bitwiseAND( a.h , T ), T /*bitwiseAND(a.l, T)*/);
-//	      else if (b.l == F ) // L = x,0
-//	    	c = add(pos, bitwiseAND( a.h , T ), bitwiseAND( a.l , T ));
-//	      else if (a.l == F)
-//	        c = add(pos,
-//	      	   		bitwiseAND( a.h , T ),
-//					bitwiseAND( a.h , b.l ) );
-//	      else if (a.l == T)
-//	    	c = add(pos,
-//	    			bitwiseAND( a.h , T ),
-//					bitwiseAND( T , b.l ));
-//	      else
-//	    	c = add(pos,
-//	    			bitwiseAND( a.h , T ),
-//	    			bdd_or(bitwiseAND(a.h , b.l), bitwiseAND(a.l , b.l)));
-//	      	  	  	//a.l , b.h ??
-//	    }
-//
-//	    // H = x,x
-//	    else {
-//	      //if (a.l == F && b.l == F)
-//	      //  c = add(pos, bitwiseAND( a.h , b.h ), F);
-//	      if (a.l == F) // b.l =  0, 1 , x
-//	        c = add(pos, bitwiseAND( a.h , b.h ), bitwiseAND( a.h , b.l ));
-//	      else if (b.l == F)
-//	    	c = add(pos, bitwiseAND( a.h , b.h ), bitwiseAND( a.l , b.h ));
-//
-//	      else if (a.l == T || b.l == T)
-//	    	c = add(pos,
-//	    	        bitwiseAND( a.h , b.h ),
-//					bdd_or(bitwiseAND( a.h , b.l ) , bitwiseAND( a.h , b.l )));
-//
-//	      else //(a.l == x & b.l == x)
-//	        c = add(pos, bitwiseAND(a.h,  b.h ),
-//
-//	        		bdd_or ( bdd_or(bitwiseAND(a.h,  b.l ), bitwiseAND(a.l,  b.h )) ,
-//							 				 bitwiseAND(a.l,  b.l )));
-//	    }
-//	  }
-//
-//	  return c;
-//
-//}
-//int_t bdd::bitwiseAND(int_t a_in, int_t b_in, int_t c_out, size_t n_args) {
-//
-//	  return F;
-//
-//}
-

@@ -88,7 +88,7 @@ struct body {
 	}
 	bools init_perm_inv(size_t args) {
 		bools inv(args, false);
-		// only count alt vars that are 'possible permutes' (of a body bit) 
+		// only count alt vars that are 'possible permutes' (of a body bit)
 		for (size_t i = 0; i < perm.size(); ++i)
 			if (!ex[i]) inv[perm[i]] = true;
 		return inv;
@@ -354,15 +354,15 @@ private:
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
-	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);
-	
+
 	bool get_rule_substr_equality(std::vector<std::vector<term>> &eqr);
-	
-	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref, 
+
+	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
-	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v, flat_prog &p, 
+	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v, flat_prog &p,
 												std::map<size_t, term> &refs);
 	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
 //	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
@@ -392,24 +392,19 @@ private:
 	bool to_pnf( form *&froot);
 
 	//-------------------------------------------------------------------------
-	//arithmetic/formulas support
-
+	//arithmetic/fol support
 	void ex_typebits(spbdd_handle &s, size_t nvars) const;
 	void ex_typebits(bools &exvec, size_t nvars) const;
-	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
-	void set_constants(const term& t, spbdd_handle &q) const;
-	uints get_perm_ext(const term& t, const varmap& m, size_t len) const;
 	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
-	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits, size_t n_vars);
+	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
+	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits,
+		size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
-
+	void set_constants(const term& t, spbdd_handle &q) const;
 	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq);
 	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
 	bool handler_arith(const term& t, const varmap &vm, const size_t vl,
-			spbdd_handle &cons);
-
-	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args,
-		size_t bit, spbdd_handle x) const;
+		spbdd_handle &cons);
 	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
 	spbdd_handle full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 		uint_t b, spbdd_handle r) const;
@@ -417,28 +412,18 @@ private:
 		uint_t b) const;
 	spbdd_handle shr(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle shl(size_t var0, size_t n1, size_t var2, size_t n_vars);
-	spbdd_handle full_addder_carry_shift(size_t var0, size_t var1, size_t n_vars,
-		uint_t b, uint_t s, spbdd_handle r) const;
-	spbdd_handle full_adder_shift(size_t var0, size_t var1, size_t n_vars,
-		uint_t b, uint_t s) const;
 	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b,
-		uint_t s);
-	spbdd_handle add_ite_init(size_t var0, size_t var1, size_t args, uint_t b,
 		uint_t s);
 	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args, uint_t b,
 		uint_t s);
 	spbdd_handle mul_var_eq(size_t var0, size_t var1, size_t var2,
-				size_t n_vars);
+		size_t n_vars);
 	spbdd_handle mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 		size_t var3, size_t n_vars);
-	spbdd_handle bdd_test(size_t n_vars);
-	spbdd_handle bdd_add_test(size_t n_vars);
-	spbdd_handle bdd_mult_test(size_t n_vars);
 	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
-			spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
+		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
-			spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
-
+		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	t_arith_op get_bwop(lexeme l);
 	t_arith_op get_pwop(lexeme l);
 
@@ -446,7 +431,7 @@ private:
 	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 public:
 	tables(dict_t dict, bool bproof = false, bool optimize = true,
-		bool bin_transform = false, bool print_transformed = false, 
+		bool bin_transform = false, bool print_transformed = false,
 		bool apply_regxmatch = false, bool fp_step = false,
 		bool pfp3 = false);
 	~tables();
@@ -604,13 +589,13 @@ struct ptransformer{
 	struct production &p;
 	std::vector<struct production> lp;
 	dict_t &d;
-	
+
 	ptransformer(struct production &_p, dict_t &_d ): p(_p), d(_d) { }
 	bool parse_alt( std::vector<elem> &next, size_t& cur);
 	bool is_firstoffactor(elem &c);
 	bool parse_alts( std::vector<elem> &next, size_t& cur);
 	lexeme get_fresh_nonterminal();
-	bool synth_recur( std::vector<elem>::const_iterator from, 
+	bool synth_recur( std::vector<elem>::const_iterator from,
 		std::vector<elem>::const_iterator till, bool bnull, bool brecur,
 		bool balt);
 	bool parse_factor( std::vector<elem> &next, size_t& cur);
