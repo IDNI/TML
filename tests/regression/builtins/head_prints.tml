@@ -1,0 +1,59 @@
+# fact heads
+
+print(1 23 a 'b' "c" '\n').
+print(2 23 a 'b' "c").
+println.
+println(3 23 a 'b' "c").
+
+print_delim('+' 4 23 a 'b' "c" '\n').
+print_delim(", " 5 23 a 'b' "c").
+println_delim('x').
+println_delim(' ' 6 23 a 'b' "c").
+
+print_to(output 7 23 a 'b' "c" '\n').
+print_to(output 8 23 a 'b' "c").
+println_to(output).
+println_to(output 9 23 a 'b' "c").
+
+print_to_delim(dump _ 10 23 a 'b' "c" '\n').
+print_to_delim(dump "" 11 23 a 'b' "c").
+println_to_delim(dump "0").
+println_to_delim(dump '\t' 12 23 a 'b' "c").
+
+
+# rule heads
+
+body. # body fact "runs" the following prints
+
+print(13 23 a 'b' "c" '\n')                       :- body.
+print(14 23 a 'b' "c")                            :- body.
+println                                           :- body.
+println(15 23 a 'b' "c")                          :- body.
+
+print_delim('+' 16 23 a 'b' "c" '\n')             :- body.
+print_delim(", " 17 23 a 'b' "c")                 :- body.
+println_delim('x')                                :- body.
+println_delim(' ' 18 23 a 'b' "c")                :- body.
+
+print_to(output 19 23 a 'b' "c" '\n')             :- body.
+print_to(output 20 23 a 'b' "c")                  :- body.
+println_to(output)                                :- body.
+println_to(output 21 23 a 'b' "c")                :- body.
+
+print_to_delim(dump _ 22 23 a 'b' "c" '\n')       :- body.
+print_to_delim(dump "" 23 23 a 'b' "c")           :- body.
+println_to_delim(dump "0")                        :- body.
+println_to_delim(dump 'x' 24 23 a 'b' "c")        :- body.
+
+
+# variables
+
+data(1 2 3).
+data(a b c).
+delim(", ").
+output(output).
+
+println("data:"),
+println_to_delim(?o ?d ?a ?b ?c)
+	:- data(?a ?b ?c), delim(?d), output(?o).
+

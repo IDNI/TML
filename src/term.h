@@ -30,6 +30,8 @@ struct term : public ints {
 
 	// D: TODO: builtins are very different, handle as a same size union struct?
 	int_t idbltin = -1; // size_t bltinsize;
+	bool forget = false, renew = false;
+
 	term() {}
 
 	term(bool neg, textype extype, t_arith_op arith_op, ntable tab, const ints& args, size_t orderid)
@@ -38,19 +40,26 @@ struct term : public ints {
 	term(textype extype, std::shared_ptr<form> qbf): extype(extype), qbf(std::move(qbf)) {};
 
 	// builtins .ctor
-	term(bool neg, ntable tab, const ints& args, size_t orderid, int_t idbltin)
-		: ints(args), neg(neg), extype(term::BLTIN), tab(tab), orderid(orderid),
-		idbltin(idbltin) {}
+	term(bool neg, ntable tab, const ints& args, size_t orderid,
+		int_t idbltin, bool forget = false, bool renew = false)
+		: ints(args), neg(neg), extype(term::BLTIN), tab(tab),
+		orderid(orderid), idbltin(idbltin), forget(forget), renew(renew)
+		{}
 
 	bool operator<(const term& t) const {
 		if (neg != t.neg) return neg;
-		//if (extype != t.extype) return extype < t.extype;
+		if (extype != t.extype) return extype < t.extype;
 		if (tab != t.tab) return tab < t.tab;
+		if (arith_op != t.arith_op) return arith_op < t.arith_op;
 		if (qbf != t.qbf) return qbf < t.qbf;
 		if (goal != t.goal) return goal;
+		if (idbltin != t.idbltin) return idbltin < t.idbltin;
+		if (forget != t.forget) return forget;
+		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
 	}
 	void replace(const std::map<int_t, int_t>& m);
+	inline bool is_builtin() const { return idbltin > -1; }
 };
 
 template <typename T>

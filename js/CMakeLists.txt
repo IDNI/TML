@@ -18,6 +18,8 @@ set(JSLIB_SOURCES
 	../src/bdd.cpp
 	../src/bdd.h
 	../src/bdd_ext.cpp
+	../src/builtins.cpp
+	../src/builtins.h
 	../src/char_defs.h
 	../src/defs.h
 	../src/dict.cpp
@@ -40,6 +42,7 @@ set(JSLIB_SOURCES
 	../src/save_csv.cpp
 	../src/tables.cpp
 	../src/tables.h
+	../src/tables_builtins.cpp
 	../src/tables_ext.cpp
 	../src/term.h
 	../src/transform.cpp

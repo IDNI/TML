@@ -129,4 +129,7 @@ namespace o { // o:: namespace shortcuts
 	ostream_t& dump();
 }
 
+template <typename T, typename T1, typename T2>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os,
+	const std::map<T1,T2>& m);
 #endif

@@ -1,0 +1,1 @@
+multiple :- print(W), println(X), print(Y), println(Z).

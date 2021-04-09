@@ -238,11 +238,12 @@ struct raw_prog;
 
 bool operator==(const lexeme& x, const lexeme& y);
 
-static const std::set<std::string> str_bltins =
-	{ "alpha", "alnum", "digit", "space", "printable", "count",
-		"rnd", "print", "lprint", "halt", "fail",
-		"bw_and", "bw_or", "bw_xor", "bw_not", "pw_add", "pw_mult"};
-
+// builtin defs moved into tables::init_builtins() in tables_builtins.cpp
+//static const std::set<std::string> str_bltins =
+//	{ "alpha", "alnum", "digit", "space", "printable", "count",
+//		"rnd", "print", "lprint", "halt", "fail",
+//		"bw_and", "bw_or", "bw_xor", "bw_not", "pw_add", "pw_mult"};
+//
 #define STR_TO_LEXEME(str) { (unsigned char *) (str), (unsigned char *) (str) + sizeof(str) - 1 }
 
 struct elem {
@@ -250,10 +251,10 @@ struct elem {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR,
 		EQ, NEQ, LEQ, GT, LT, GEQ, BLTIN, NOT, AND, OR,
 		FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH,
-		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE,
+		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE, BLTINMOD,
 	} type;
 	t_arith_op arith_op = NOP;
-	int_t num = 0;
+	int_t num = 0; // NUM's number or BLTIN's forget/renew bits
 	// The string that represents variants of this element.
 	lexeme e{ 0, 0 };
 	char32_t ch;
@@ -763,6 +764,7 @@ bool parse_error(const char* e, lexeme l);
 bool parse_error(const char* e);
 bool type_error(const char* e, lexeme l);
 
+std::string to_string(const raw_term& rt, std::string delim="", int_t skip=0);
 
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const directive& d);
@@ -775,7 +777,9 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_term& t);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const sprawformtree prts);
 template <typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const std::pair<raw_term, std::string>& p);
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const std::pair<elem, bool>& p);
+template <typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const std::tuple<raw_term, std::string, int_t>& p);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_rule& r);
 template <typename T>
@@ -790,6 +794,16 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const std::set<raw_term>& rts);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const std::vector<raw_term>& rts);
+
+template <typename T, typename VT>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os,
+	const std::vector<VT>& v);
+
+// print elements to an output (and skip args if to or delimited)
+// if to then output name is the first argument (default: @output)
+// if delimited then delimiter string is the next argument (default: "")
+ostream_t& print_to_delimited(const raw_term& rt, bool& error, bool to = false,
+	bool delimited = false);
 
 template <typename T>
 std::basic_ostream<T>& print_raw_prog_tree(std::basic_ostream<T>& os,

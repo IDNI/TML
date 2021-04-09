@@ -372,6 +372,9 @@ bool elem::parse(input* in) {
 			type = EXISTS;
 		else if ( len == 6 && !strncmp(l[pos][0], "unique", len ) )
 			type = UNIQUE;
+		else if ((len == 5 && !strncmp(l[pos][0], "renew",  len )) ||
+			 (len == 6 && !strncmp(l[pos][0], "forget", len )))
+			type = BLTINMOD;
 		else type = SYM;
 	}
 	else if (*l[pos][0] == '"' || *l[pos][0] == '`') type = STR;
@@ -387,7 +390,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	size_t curr = pos;
 	if ((neg = *l[pos][0] == '~')) ++pos;
 	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
-		lt = false, geq = false, bltin = false, arith = false;
+		lt = false, geq = false, bltin = false, arith = false,
+		forget = false, renew = false;
 
 	t_arith_op arith_op_aux = NOP;
 
@@ -404,11 +408,21 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			case elem::GT:  gt    = true; break;
 			case elem::LT:  lt    = true; break;
 			case elem::GEQ: geq   = true; break;
+			case elem::BLTINMOD:
+				if      (el.e == "forget") forget = true;
+				else if (el.e == "renew")  renew = true;
+				break;
 			case elem::SYM:	if (prog.builtins.find(el.e)
 						!= prog.builtins.end())
 				{
 					el.type = elem::BLTIN;
 					bltin = true;
+					el.num = renew << 1 | forget;
+					if (el.num) e.erase(remove_if(e.begin(),
+						e.end(), [] (const elem& el) {
+							return el.type ==
+								elem::BLTINMOD;
+						}), e.end()); // del modifiers
 				}
 				break;
 			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
@@ -419,6 +433,9 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	if (e.empty()) return false;
 	// TODO: provide specific error messages. Also, something better to group?
 
+	// make 'forget' work as a builtin as well and not just a builtin modifier
+	if (forget) bltin = true, e[0].type = elem::BLTIN;
+
 	if (pref_type == rtextype::CONSTRAINT)  {
 		extype = rtextype::CONSTRAINT;		
 		return true;	
@@ -428,10 +445,6 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		// similar as for SYM below (join?) but this format will expand.
 		if (e[0].type != elem::BLTIN) return
 			in->parse_error(l[pos][0], err_builtin_expected, l[pos]);
-		if (e[1].type != elem::OPENP) return
-			in->parse_error(l[pos][0], err_paren_expected, l[pos]);
-		if (e.back().type != elem::CLOSEP) return
-			in->parse_error(e.back().e[0], err_paren, l[pos]);
 		extype = raw_term::BLTIN; // isbltin = true;
 		return calc_arity(in);
 	}
@@ -1000,6 +1013,9 @@ bool raw_prog::parse_nested(input* in, dict_t &dict) {
 }
 
 bool raw_prog::parse(input* in, dict_t &dict) {
+	// BLTINS: insert builtins from dict
+	for (size_t n = 0; n != dict.nbltins(); ++n)
+		builtins.insert(dict.get_bltin(n));
 	id = ++last_id;
 	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}')
 		if (!parse_statement(in, dict)) return --last_id, false;
@@ -1085,14 +1101,7 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	in->prog_lex();
 	if (in->error) return false;
 	if (!l.size()) return true;
-	auto prepare_builtins = [&dict](raw_prog& x) {
-		// BLTINS: prepare builtins (dict)
-		for (const string& s : str_bltins)
-			x.builtins.insert(
-				dict.get_lexeme(s));
-	};
 	raw_prog& rp = p.nps.emplace_back();
-	prepare_builtins(rp);
 	raw_prog::require_guards = false;
 	if (!rp.parse(in, dict))  return in->error?false:
 		in->parse_error(l[pos][0],

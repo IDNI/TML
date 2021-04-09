@@ -458,7 +458,7 @@ spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t
 	spbdd_handle s1 = ex_typebits(in1_varid, in1, n_vars);
 	s0 = perm_from_to(in0_varid, 0, s0, bits-2, n_vars);
 	s1 = perm_from_to(in1_varid, 1, s1, bits-2, n_vars);
-    s0 = perm_bit_reverse(s0, bits-2, n_vars);
+	s0 = perm_bit_reverse(s0, bits-2, n_vars);
 	s1 = perm_bit_reverse(s1, bits-2, n_vars);
 	spbdd_handle x;
 	switch (op) {

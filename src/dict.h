@@ -14,6 +14,7 @@
 #define __DICT_H__
 #include "defs.h"
 #include <map>
+#include <functional>
 
 class inputs;
 class archive;
@@ -99,6 +100,7 @@ public:
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
 	size_t nbltins() const { return bltins.size(); }
+	ints get_rels(std::function<bool(const lexeme&)> filter = nullptr);
 
 	// copy and swap (utilize move)
 	dict_t& operator=(dict_t d) {

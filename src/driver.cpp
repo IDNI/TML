@@ -3315,7 +3315,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	static std::set<raw_prog *> transformed_progs;
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
-		o::dbg() << "Pre-Transformation Program:" << std::endl << std::endl << rp << std::endl;
+		//DBG(o::dbg() << "Pre-Transformation Program:" << std::endl << std::endl << rp << std::endl;)
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
 			string_t rp_generator;
@@ -3466,8 +3466,8 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	if (!running) restart();
 	if (nsteps() == pd.start_step) {
 		//transform(rp.p, pd.strs);
-		for (const string& s : str_bltins)
-			rp.p.builtins.insert(get_lexeme(s));
+		//for (const string& s : str_bltins)
+		//	rp.p.builtins.insert(get_lexeme(s));
 		output_pl(rp.p);
 	}
 	if (opts.disabled("run") && opts.disabled("repl")) return true;
@@ -3533,22 +3533,26 @@ void driver::read_inputs() {
 
 driver::driver(string s, const options &o) : rp(), opts(o) {
 	dict_t dict;
-
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
-
+	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
-
+	tables::options to;
+	to.bproof            = opts.enabled("proof");
+	to.optimize          = opts.enabled("optimize");
+	to.bin_transform     = opts.enabled("bin");
+	to.print_transformed = opts.enabled("t");
+	to.apply_regexpmatch = opts.enabled("regex");
+	to.fp_step           = opts.enabled("fp");
+	to.pfp3              = opts.enabled("3pfp");
 	// we don't need the dict any more, tables owns it from now on...
-	tbl = new tables(move(dict), opts.enabled("proof"), 
-		opts.enabled("optimize"), opts.enabled("bin"),
-		opts.enabled("t"), opts.enabled("regex"), opts.enabled("fp"),
-		opts.enabled("3pfp"));
+	tbl = new tables(move(dict), to);
+	tbl->init_builtins();
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
-	if (!ii) return;
+
 	current_input = ii->first();
 	if (current_input && !add(current_input)) return;
 	read_inputs();

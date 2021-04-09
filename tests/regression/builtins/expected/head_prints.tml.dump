@@ -1,0 +1,11 @@
+10_23_a_b_c_
+1123abc
+12	23	a	b	c
+22_23_a_b_c_
+2323abc
+24x23xaxbxc
+body().
+data(a b c).
+data(1 2 3).
+delim(", ").
+output(output).

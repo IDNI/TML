@@ -20,6 +20,7 @@ set(TML_HEADERS
 	archive.h
 	analysis.h
 	bdd.h
+	builtins.h
 	char_defs.h
 	defs.h
 	dict.h
@@ -38,6 +39,7 @@ set(TML_SOURCES
 	analysis.cpp
 	bdd.cpp
 	bdd_ext.cpp
+	builtins.cpp
 	dict.cpp
 	driver.cpp
 	form.cpp
@@ -49,6 +51,7 @@ set(TML_SOURCES
 	proof.cpp
 	save_csv.cpp
 	tables.cpp
+	tables_builtins.cpp
 	tables_ext.cpp
 	transform.cpp
 	transform_guards.cpp

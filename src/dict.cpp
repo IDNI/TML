@@ -130,3 +130,9 @@ lexeme dict_t::get_temp_sym(int_t t) const {
 	return temp_syms[t-1];
 }
 
+ints dict_t::get_rels(function<bool(const lexeme&)> filter) {
+	ints filtered;
+	for (size_t i = 0; i != rels.size(); ++i)
+		if (!filter || filter(rels[i])) filtered.push_back(i);
+	return filtered;
+}

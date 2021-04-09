@@ -1,0 +1,19 @@
+ p1 :- println(1 23 a 'b' "c").
+ p2 :- print(2 23 a 'b' "c").
+ p3 :- println.
+ p4 :- println(3 23 a 'b' "c").
+
+ p5 :- print_delim('+' 4 23 a 'b' "c" '\n').
+ p6 :- println_delim("+ " 5 23 a 'b' "c").
+ p7 :- println_delim('x').
+ p8 :- println_delim(' ' 6 23 a 'b' "c").
+
+ p9 :- print_to(info 7 23 a 'b' "c" '\n').
+p10 :- print_to(info 8 23 a 'b' "c").
+p11 :- println_to(info).
+p12 :- println_to(info 9 23 a 'b' "c").
+
+p13 :- print_to_delim(dump _ 10 23 a 'b' "c" '\n').
+p14 :- print_to_delim(dump "" 11 23 a 'b' "c").
+p15 :- println_to_delim(dump "0").
+p16 :- println_to_delim(dump '\t' 12 23 a 'b' "c").

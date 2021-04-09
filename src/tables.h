@@ -27,6 +27,7 @@
 #include "form.h"
 #include "err.h"
 #include "options.h"
+#include "builtins.h"
 
 typedef int_t rel_t;
 class archive;
@@ -70,14 +71,12 @@ typedef std::set<term, natcmp> term_set;
 
 struct body {
 	bool neg, ext = false;
-//	struct alt *a = 0;
 	ntable tab;
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
 	// only for count, created on first use (rarely used)
 	bools inv;
-	//	static std::set<body*, ptrcmp<body>> &s;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
@@ -100,17 +99,19 @@ struct alt : public std::vector<body*> {
 	size_t varslen = 0;
 	bdd_handles last;
 	std::vector<term> t;
+	std::vector<term> bltins; // builtins to run during alt_query
 	bools ex;
 	uints perm;
 	varmap vm;
 	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
-//	static std::set<alt*, ptrcmp<alt>> &s;
 
-	//XXX why do we have bltins here
-	int_t idbltin = -1; //lexeme bltintype;
-	ints bltinargs;
-	size_t bltinsize;
+	alt* grnd = 0; // alt for grounding vars
+	std::set<int_t> bltinvars;  // vars to ground
+	std::set<int_t> bltngvars;  // vars to keep ungrounded (ie. count, bw_/pw_)
+	std::set<int_t> bltoutvars; // vars for outputs to compress
+	std::set<std::pair<int_t, body*>> varbodies;
+
 	pnft_handle f = 0;
 
 	bool operator<(const alt& t) const {
@@ -118,9 +119,14 @@ struct alt : public std::vector<body*> {
 		if (rng != t.rng) return rng < t.rng;
 		if (eq != t.eq) return eq < t.eq;
 		if (f != t.f) return f < t.f;
-		if (idbltin != t.idbltin) return idbltin < t.idbltin;
-		if (bltinsize != t.bltinsize) return bltinsize < t.bltinsize;
-		if (bltinargs != t.bltinargs) return bltinargs < t.bltinargs;
+		if (ex != t.ex) return ex < t.ex;
+		if (perm != t.perm) return perm < t.perm;
+		if (bltins != t.bltins) return bltins < t.bltins;
+		if (grnd != t.grnd) return grnd < t.grnd;
+		if (bltinvars != t.bltinvars) return bltinvars < t.bltinvars;
+		if (bltngvars != t.bltngvars) return bltngvars < t.bltngvars;
+		if (bltoutvars != t.bltoutvars) return bltoutvars <t.bltoutvars;
+		if (varbodies != t.varbodies) return varbodies <t.varbodies;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
 	}
 };
@@ -152,13 +158,14 @@ struct table {
 	spbdd_handle t = hfalse;
 	bdd_handles add, del;
 	std::vector<size_t> r;
-	bool ext = true; // extensional
+	//bool ext = true; // extensional
 	bool unsat = false, tmp = false;
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize = 0;
 	bool internal = false;
 	bool commit(DBG(size_t));
+	inline bool is_builtin() const { return idbltin > -1; }
 };
 
 class tables {
@@ -173,7 +180,7 @@ private:
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
-
+	//std::set<alt*, ptrcmp<alt>> grnds;
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -204,18 +211,28 @@ private:
 	template <typename T>
 	void print(std::basic_ostream<T>&, const witness&);
 	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::vector<term>& b)
-		const;
+	std::basic_ostream<T>& print(std::basic_ostream<T>&,
+		const std::vector<term>& b) const;
 	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::set<term>& b) const;
+	std::basic_ostream<T>& print(std::basic_ostream<T>&,
+		const std::set<term>& b) const;
 	template <typename T>
 	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
 		const std::set<term>& b) const;
 	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p) const;
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
+		const;
 	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r) const;
-
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
 	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::set<ntable> tmprels;
@@ -232,10 +249,7 @@ private:
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
 	dict_t dict; // dict_t& dict;
-	bool bproof, datalog, optimize, unsat = false, bcqc = true,
-		 bin_transform = false, print_transformed = false,
-		 apply_regexpmatch = false, fp_step = false, pfp3 = false;
-
+	bool datalog, halt = false, unsat = false, bcqc = true;
 	size_t max_args = 0;
 	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
 
@@ -282,7 +296,8 @@ private:
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
-	static varmap get_varmap(const term& h, const T& b, size_t &len);
+	static varmap get_varmap(const term& h, const T& b, size_t &len,
+		bool blt = false);
 	//spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
 	//		const varmap& vm, size_t len);
 	spbdd_handle get_alt_range(const term& h, const term_set& a,
@@ -306,7 +321,26 @@ private:
 	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
 
-	void alt_query_bltin(alt& a, bdd_handles& v1); //XXX review
+	builtins bltins;
+	bool init_bdd_builtins();
+	bool init_print_builtins();
+	bool init_js_builtins();
+
+	// simple builtin execution from a fact
+	void fact_builtin(const term& b);
+
+	// called when executing builtin in rule's head
+	// @param hs alt_query bdd handles
+	// @param tbl builtin's table
+	// @param tab id of builtin's table
+	void head_builtin(const bdd_handles& hs, const table& tbl, ntable tab);
+
+	// called when executing builtins in body
+	// @param x  result of a var grounding query
+	// @param a  alt
+	// @param hs alt query bdd handles (output is inserted here)
+	void body_builtins(spbdd_handle x, alt* a, bdd_handles& hs);
+
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
@@ -334,10 +368,11 @@ private:
 	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
 
-	void get_facts(const flat_prog& m);
-	void get_alt(const term_set& al, const term& h, std::set<alt>& as);
+	bool get_facts(const flat_prog& m);
+	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
+		bool blt = false);
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
-	void get_rules(flat_prog m);
+	bool get_rules(flat_prog m);
 
 	ntable get_table(const sig& s);
 	void table_increase_priority(ntable t, size_t inc = 1);
@@ -430,19 +465,21 @@ private:
 	template <typename T>
 	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 public:
-	tables(dict_t dict, bool bproof = false, bool optimize = true,
-		bool bin_transform = false, bool print_transformed = false,
-		bool apply_regxmatch = false, bool fp_step = false,
-		bool pfp3 = false);
+	struct options {
+		bool bproof, optimize, bin_transform, print_transformed,
+			apply_regexpmatch, fp_step, pfp3;
+	} opts;
+	tables(dict_t dict, tables::options opts);
 	~tables();
+	bool init_builtins();
 	raw_term to_raw_term(const term& t) const;
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
 	static bool run_prog(const raw_prog &rp, dict_t &dict,
-		const options &opts, std::set<raw_term> &results);
+		const ::options &opts, std::set<raw_term> &results);
 	static bool run_prog(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, std::set<raw_term> &results);
+		dict_t &dict, const ::options &opts, std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
@@ -455,7 +492,7 @@ public:
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
-	void set_proof(bool v) { bproof = v; }
+	void set_proof(bool v) { opts.bproof = v; }
 	template <typename T>
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }
@@ -470,12 +507,12 @@ public:
 		int_t& prev_id);
 	void transform_guard_statements(raw_prog& target_rp, raw_prog& rp);
 
-	// helper functions
-	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+	// helper functions for creating internal ids = __lx__id1__id2__
+	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
 		bool neg = false);
-	void __(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
 		int_t i2, bool neg = false);
-	void __(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
+	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
 	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 
 	template <typename T>

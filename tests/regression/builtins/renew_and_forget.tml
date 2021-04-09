@@ -1,0 +1,32 @@
+# body builtin calls with results are cached by default.
+# this cache is programatically controllable:
+#   use forget modifier to not cache the result.
+#   use renew modifier to not look in the cache.
+#   use forget as a head builtin to clear the cache.
+ 
+      S0.
+S1 :- S0.
+S2 :- S1.
+S3 :- S2.
+S4 :- S3.
+S5 :- S4.
+S6 :- S5.
+
+A1 :-       forget println(A).     # "A\n" is printed every time because it is 
+A2 :-       forget println(A).     #        forgotten.
+A3 :-       forget println(A).     #
+B1 :-              println(B), S1. # "B\n" is printed only once unless there
+B2 :-              println(B), S1. #        isn't a forget builtin call in head.
+B3 :-              println(B), S1. #
+C1 :-              println(C).     # "C\n" is printed two times after start
+C2 :-              println(C).     #        or after forgot bulitin call,
+C3 :- renew        println(C).     #        otherwise prints C only once.
+D1 :- renew forget println(D).     # "D\n" is always printed because does not
+D2 :- renew forget println(D).     #        check cache and also does not cache
+D3 :- renew forget println(D).     #        the call, so it is not remembered.
+D4 :-              println(D), S5. # when step 5, print another "D\n"
+D5 :-              println(D), S5. #        but only once.
+
+# forget builtin in head forgets all the remembered builtin calls
+forget :- S1.
+forget :- S3.

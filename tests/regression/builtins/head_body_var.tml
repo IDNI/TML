@@ -1,0 +1,12 @@
+a(a 13). a(a 25).
+b(b 10). b(b 20). b(b 5).
+c(c 2). d(d 0). z(z).
+
+done(c ?c b ?b a ?a) :-
+		print("record: "),
+		println_delim(", " ?a ?b ?c), 
+	z(z),
+	a(a ?a),
+	b(b ?b),
+	c(c ?c),
+	d(d 0).

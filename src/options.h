@@ -114,10 +114,8 @@ struct option {
 		std::basic_ostringstream<T> ss; ss << "";
 		long pos = ss.tellp();
 		ss << "\t";
-		for (size_t i = 0; i != n.size(); ++i) {
-			if (i) ss << ",";
-			ss << "--" << n[i];
-		}
+		for (size_t i = 0; i != n.size(); ++i)
+			ss << (i ? ", " : "-") << "-" << n[i];
 		ss << " [";
 		switch (t) {
 			case INT: ss << "number"; break;
