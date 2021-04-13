@@ -458,6 +458,33 @@ struct bit_prog {
 	void to_print() const;
 };
 
+struct bit_univ {
+	enum { //should be compatible with typesystem's prim type
+		CHAR_BSZ = 4,
+		INT_BSZ = 4,
+		SYM_BSZ = 4,
+		VAR_BSZ = 4,
+	};
+	size_t char_bsz, int_bsz, sym_bsz, var_bsz;
+
+	bit_univ(size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
+			 size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ){
+				 char_bsz = _cbsz, int_bsz = _ibsz,
+				 sym_bsz = _sbsz, var_bsz = _vbsz;
+			 }
+	// innermost type definition of the nested program
+	std::vector<struct typestmt> * curtinfo = NULL;
+	
+	size_t get_typeinfo(size_t n, const raw_term& rt );
+	inline size_t pos(size_t bsz, size_t bit_from_right /*, size_t arg, size_t args */) const {
+		DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
+		return (bsz - bit_from_right - 1); //* args + arg;
+	}
+	bool btransform( const raw_prog& rpin, raw_prog &rpout );
+	bool btransform( const raw_rule& rrin, raw_rule &rrout );
+	bool btransform( const raw_term& rtin, raw_term &rtout );
+};
+
 struct bit_rule {
 	std::vector<bit_term> bh;
 	std::vector<std::vector<bit_term>> bb;

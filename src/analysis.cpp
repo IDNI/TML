@@ -93,6 +93,18 @@ bool bit_prog::to_raw_prog(raw_prog &rp) const{
 	return ret;
 }
 
+bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
+	bool ret = true;
+	//reset to current prog type definitions
+	this->curtinfo = (std::vector<struct typestmt> *) &rpin.vts;
+
+	for( const raw_rule &rr : rpin.r)
+		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
+	for( const raw_prog rp : rpin.nps)
+		rpout.nps.emplace_back(), ret &= btransform(rp, rpout.nps.back());	
+	return ret;
+}
+
 void bit_prog::to_print() const {
 	o::dbg()<<std::endl;
 	for( const bit_rule& br :vbr)
@@ -130,7 +142,20 @@ bool bit_rule::to_raw_rule(raw_rule &rr) const{
 	
 	return ret;
 
-}		
+}
+
+bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
+	bool ret = true;
+	for( const raw_term &rt : rrin.h )
+		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back());
+	for( const auto &vrt : rrin.b) {
+		rrout.b.emplace_back();
+		for( const raw_term &rt : vrt)
+			rrout.b.back().emplace_back(), 
+			ret &= btransform(rt, rrout.b.back().back());	
+	}
+	return ret;
+}
 void bit_rule::to_print() const {
 	for( const bit_term& bt: bh )
 		bt.to_print(), o::dbg()<< " " ;
@@ -193,6 +218,71 @@ bool bit_term::to_raw_term( raw_term& brt ) const {
 			else ret &= be.to_elem(brt.e);
 	}
 	ret &= brt.calc_arity(0);	
+	return ret;
+}
+
+size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt) {
+	// to use environment class instead to speed up.
+	DBG( assert( curtinfo != NULL));
+	for( auto it : *curtinfo) 
+		if( it.reln == rt.e[0]){
+			if(n>1 && n < rt.e.size()-1) {
+				if( it.typeargs[n-2].pty.ty != primtype::NOP)
+					return it.typeargs[n-2].pty.get_bitsz();
+				else {// struct
+					for( auto rit : *curtinfo)
+						if( rit.rty.structname == it.typeargs[n-2].structname ){
+							return rit.rty.get_bitsz( *curtinfo );
+						}
+					o::err()<< "No type found : "<<it.typeargs[n-2].structname<<std::endl;
+					return 0;
+				}	
+			}
+			else if ( n == 0 ) {
+				//for now, all predicate are 5 bit in bit_prog
+				//to change.
+				return 5;
+			}
+			else  {// for everthing else e.g. paranthesis
+				return 0;
+			}
+		}
+	//when types are not specified, go default 
+	if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
+		rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
+		return INT_BSZ;
+	else return 0;
+}
+
+bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
+	bool ret = true;
+	rtout.neg = rtin.neg;
+	for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
+		const elem& e = rtin.e[n];
+		// for predicate rel name, keep as it is
+		if( n == 0 ) { rtout.e.emplace_back(e); continue; }
+		// get bit size of the given elem and convert to bit representation
+		size_t bsz = get_typeinfo(n, rtin);
+		if( bsz <=0 || elem::STR == e.type ) { rtout.e.emplace_back(e); continue; }
+		std::vector<elem> bitelem(bsz);
+		for (size_t k = 0; k != bsz; ++k) {
+			switch(e.type) {
+				case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
+				case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
+				case elem::VAR:
+				case elem::SYM: { //mem check
+								string_t *temp = new string_t( lexeme2str(e.e));
+								temp->append( to_string_t((int_t)k));
+								lexeme l ={temp->c_str(), temp->c_str()+temp->size()};
+								bitelem[pos(bsz, k)] = {e.type, l};
+								break;
+							}
+				default: DBG( COUT<<e<<std::endl; assert(false)); break; 		
+			}
+		}
+		rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());
+	}
+	ret &= rtout.calc_arity(0);
 	return ret;
 }
 

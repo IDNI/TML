@@ -220,7 +220,8 @@ void options::setup() {
 			if (v.get_bool()) this->enable("fp-step");
 		}
 	).description("transforms nested progs (req. for if and while)"));
-	add_bool2("bitprog", "bpg", "transforms and prints rule in bit universe 2");
+	add_bool2("bitprog", "bpg", "transforms to bit prog first and then runs converted rawrule in bit size 2 universe");
+	add_bool2("bitunv", "buv", "transforms and runs rule directly in bit size 2 universe ");
 	add_bool("optimize","optimize and show more benchmarks");
 	add(option(option::type::STRING, { "name", "n" },
 		[](const option::value& v) {
