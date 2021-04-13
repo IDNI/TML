@@ -171,24 +171,40 @@ bool tables::init_print_builtins() {
 
 bool tables::init_js_builtins() {
 	const bool H = true, B = false;
+	blt_handler h;
 #ifdef __EMSCRIPTEN__
 	bltins.add(H, "js_eval", -1, 0, h = [this](blt_ctx& c) {
-		emscripten_run_script(to_string(to_raw_term(c.g))); });
+		emscripten_run_script(to_string(to_raw_term(c.g)).c_str()); });
 	bltins.add(B, "js_eval", -1, 0, h);
-	bltins.add(B, "js_eval_out", -1, 1, [this](blt_ctx& c) {
-		c.t.pop_back();
-		string r = emscripten_run_script_string(
-			to_string((to_raw_term(c.g))));
-		COUT << "js_eval_str result: " << result << endl;
-	});
+	//bltins.add(B, "js_eval_to_int", -1, 1, [this](blt_ctx& c) {
+	//	term t(c.g);
+	//	t.pop_back(); // remove last argument
+	//	int r = emscripten_run_script_int(
+	//		to_string((to_raw_term(t))).c_str());
+	//	//COUT << "js_eval_to_int result: " << r << endl;
+	//	// TODO check for universe size
+	//	c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(r)));
+	//});
+	//bltins.add(B, "js_eval_to_sym", -1, 1, [this](blt_ctx& c) {
+	//	term t(c.g);
+	//	t.pop_back(); // remove last argument
+	//	string r = emscripten_run_script_string(
+	//		to_string((to_raw_term(t))).c_str());
+	//	//COUT << "js_eval_to_sym result: " << r << endl;
+	//	//size_t nsyms = dict.nsyms();
+	//	int_t sym = dict.get_sym(dict.get_lexeme(r));
+	//	// TODO check for universe size
+	//	// if (sym >= nsyms) DBGFAIL; // new sym in universe!
+	//	c.out(from_sym(c.outvarpos(), c.a->varslen, sym));
+	//});
 #else // TODO embed a JS engine if not in browser?
-	blt_handler h;
 	bltins.add(H, "js_eval", -1, 0, h = [this](blt_ctx) {
 		o::err() << "js_eval is available only in a browser environment"
 			" (ignoring)." << endl;
 	});
 	bltins.add(B, "js_eval", -1, 0, h);
-	bltins.add(B, "js_eval_out", -1, 1, h);
+	//bltins.add(B, "js_eval_to_int", -1, 1, h);
+	//bltins.add(B, "js_eval_to_sym", -1, 1, h);
 #endif
 	return true;
 }

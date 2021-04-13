@@ -968,7 +968,6 @@ bool tables::get_facts(const flat_prog& m) {
 	for (auto x : add) for (auto y : x.second)
 		tbls[x.first].t = tbls[x.first].t || y;
 	for (auto x : del) {
-		DBG(assert(!tbls[x.first].is_builtin());) // negated builtin fail
 		for (auto y : x.second) tbls[x.first].t = tbls[x.first].t % y;
 	}
 	if (opts.optimize)
