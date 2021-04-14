@@ -269,7 +269,9 @@ public:
 	bool operator==(const memory_map_allocator& t) const {                
 		return fn == t.fn && m == t.m && mm == t.mm && nommap==t.nommap;
 	}
-
+	bool operator!=(const memory_map_allocator& t) const {
+		return fn != t.fn || m != t.m || mm != t.mm || nommap!=t.nommap;
+	}
 private:
 	std::string fn;
 	mmap_mode m;

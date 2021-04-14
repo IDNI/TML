@@ -843,7 +843,7 @@ sprawformtree raw_form_tree::simplify(sprawformtree &t) {
 		case elem::FORALL:
 			simplify(t->r);
 			break;
-		default: throw 0; //should never reach here
+		default: DBGFAIL; //should never reach here
 	}
 	return t;
 }
