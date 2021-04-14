@@ -389,7 +389,7 @@ bool typedecl::parse( input* in , const raw_prog& prog, bool notparam){
 bool typestmt::parse( input* in , const raw_prog& prog){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
-	if( strncmp(l[pos][0],"record", 6) == 0 ) {
+	if( strcmp(l[pos][0],"record") == 0 ) {
 		pos++;
 		if( !reln.parse(in) || reln.type != elem::SYM ) goto FAIL;
 		if(*l[pos++][0] != '(') goto FAIL;
@@ -401,7 +401,7 @@ bool typestmt::parse( input* in , const raw_prog& prog){
 		if(*l[pos++][0] != ')' ||  *l[pos++][0] != '.'   ) goto FAIL;
 		return true;
 	}
-	else if ( strncmp(l[pos][0],"struct", 6) == 0  ) {
+	else if ( strcmp(l[pos][0],"struct") == 0  ) {
 		if( rty.parse(in, prog)) return true;
 		if(*l[pos++][0] != '.' ) goto FAIL;
 	}
