@@ -715,7 +715,8 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 	}
 	else if (f->type == form::NOT) {
 		handler_form1(p, f->l, vm,vmh,fq);
-		p->matrix[p->matrix.size()-1]->neg = !p->matrix[p->matrix.size()-1]->neg;
+		if (f->l->type == form::ATOM) p->matrix[p->matrix.size()-1]->neg = true;
+		else if (f->l->type != form::NOT) p->neg = !p->neg;
 	}
 	else if (f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) {
 		varmap tmpvm;
