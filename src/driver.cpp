@@ -3435,7 +3435,7 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 	else if (opts.enabled("bitunv")) {
 		typechecker tc(p);
 		if(tc.tcheck(p)) {
-			bit_univ bu;
+			bit_univ bu(tbl->get_dict());
 			raw_prog brawp;
 			bu.btransform(p, brawp);
 			fp = tbl->run_prog(brawp, pd.strs, steps, break_on_step);

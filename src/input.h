@@ -465,13 +465,12 @@ struct bit_univ {
 		SYM_BSZ = 4,
 		VAR_BSZ = 4,
 	};
+	dict_t &d;
 	size_t char_bsz, int_bsz, sym_bsz, var_bsz;
 
-	bit_univ(size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
-			 size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ){
-				 char_bsz = _cbsz, int_bsz = _ibsz,
-				 sym_bsz = _sbsz, var_bsz = _vbsz;
-			 }
+	bit_univ(dict_t &_d, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
+	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), char_bsz(_cbsz),
+	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
 	// innermost type definition of the nested program
 	std::vector<struct typestmt> * curtinfo = NULL;
 	

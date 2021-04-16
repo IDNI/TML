@@ -16,6 +16,7 @@
 #include <vector>
 #include "input.h"
 #include "analysis.h"
+#include "dict.h"
 
 bit_elem::bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt): e(_e), bsz(_bsz), pbt(_pbt) {
 	p.resize(bsz, false);
@@ -270,14 +271,12 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
 				case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
 				case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
 				case elem::VAR:
-				case elem::SYM: { //mem check
-								string_t *temp = new string_t( lexeme2str(e.e));
-								temp->append( to_string_t((int_t)k));
-								lexeme l ={temp->c_str(), temp->c_str()+temp->size()};
-								bitelem[pos(bsz, k)] = {e.type, l};
-								break;
-							}
-				default: DBG( COUT<<e<<std::endl; assert(false)); break; 		
+				case elem::SYM: { string_t temp = lexeme2str(e.e);
+								// making new bit sym/vars and avoiding conflict 
+								temp.append(to_string_t("__").append(to_string_t((int_t)k)));
+								bitelem[pos(bsz, k)] = {e.type, d.get_lexeme(temp)};
+								break; }
+				default: DBG( COUT<<e<<std::endl; assert(false)); break;
 			}
 		}
 		rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());
