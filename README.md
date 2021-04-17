@@ -574,7 +574,7 @@ Example 2:
 
 Table below summarizes current arithmetic operator support:
 
-| Operation | Contractive Mode | Expansive Mode |
+| Operation | Pre-computed     | Ad-hoc         |
 | --------- | ---------------- | -------------- |
 | addition | ?x + ?y = ?z | pw_add(?x ?y ?z) |
 | multiplication | ?x * ?y = ?z | pw_mult(?x ?y ?z) |
