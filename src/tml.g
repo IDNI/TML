@@ -40,7 +40,7 @@ factor => 	ws terminal ws unot |
 			ws '[' alts ws ']'.
 unot => '*' |'+' | null.
 
-primtype => "int" [ ':' bitsz ] | "char" | "symb".
+primtype => "int" | "int:" bitsz | "char" | "symb".
 bitsz =>  digit+.
 type => primtype | structype .
 recordef => "record" relname '('  type var (',' type var)* ')'.
