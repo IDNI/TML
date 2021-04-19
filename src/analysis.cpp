@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <vector>
-#include "input.h"
 #include "analysis.h"
 #include "dict.h"
 
@@ -97,7 +96,7 @@ bool bit_prog::to_raw_prog(raw_prog &rp) const{
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
 	//reset to current prog type definitions
-	this->curtinfo = (std::vector<struct typestmt> *) &rpin.vts;
+	typenv.build_from ( rpin.vts ); 
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
@@ -223,36 +222,34 @@ bool bit_term::to_raw_term( raw_term& brt ) const {
 }
 
 size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt) {
-	// to use environment class instead to speed up.
-	DBG( assert( curtinfo != NULL));
-	for( auto it : *curtinfo) 
-		if( it.reln == rt.e[0]){
-			if(n>1 && n < rt.e.size()-1) {
-				if( it.typeargs[n-2].pty.ty != primtype::NOP)
-					return it.typeargs[n-2].pty.get_bitsz();
-				else {// struct
-					for( auto rit : *curtinfo)
-						if( rit.rty.structname == it.typeargs[n-2].structname ){
-							return rit.rty.get_bitsz( *curtinfo );
-						}
-					o::err()<< "No type found : "<<it.typeargs[n-2].structname<<std::endl;
-					return 0;
-				}	
+	
+	string_t reln = lexeme2str(rt.e[0].e);
+	if( typenv.contains_pred(reln)) {
+		auto targs = typenv.lookup_pred(reln);	
+		//only for arguments
+		if(n>1 && n < rt.e.size()-1) {
+			if(targs[n-2].is_primitive())
+				return targs[n-2].pty.get_bitsz();
+			else {
+				DBG(assert(targs[n-2].is_usertype()));
+				string_t stn = lexeme2str(targs[n-2].structname.e);
+				if(typenv.contains_typedef( stn)){
+					return typenv.lookup_typedef(stn).get_bitsz(typenv);
+				}
+				o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
 			}
-			else if ( n == 0 ) {
-				//for now, all predicate are 5 bit in bit_prog
-				//to change.
-				return 5;
-			}
-			else  {// for everthing else e.g. paranthesis
-				return 0;
-			}
-		}
-	//when types are not specified, go default 
-	if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
-		rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
-		return INT_BSZ;
-	else return 0;
+		} 
+		//for anything other than args.
+		// TODO:what about +/-* operators as args.
+		return 0;
+	}
+	else {
+		//when types are not specified, go default 
+		if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
+			rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
+			return INT_BSZ;
+		return 0;
+	}
 }
 
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
@@ -273,7 +270,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
 				case elem::VAR:
 				case elem::SYM: { string_t temp = lexeme2str(e.e);
 								// making new bit sym/vars and avoiding conflict 
-								temp.append(to_string_t("__").append(to_string_t((int_t)k)));
+								temp.append(to_string_t("_").append(to_string_t((int_t)k)));
 								bitelem[pos(bsz, k)] = {e.type, d.get_lexeme(temp)};
 								break; }
 				default: DBG( COUT<<e<<std::endl; assert(false)); break;
@@ -292,7 +289,7 @@ void bit_term::to_print() const {
 }
 
 
-size_t structype::get_bitsz(const std::vector<typestmt> &rcdtypes){
+size_t structype::get_bitsz(const std::vector<typestmt> &types){	
 	size_t bsz=0;
 	static std::set<elem> done;
 	if(done.find(structname) != done.end()) { 
@@ -300,18 +297,41 @@ size_t structype::get_bitsz(const std::vector<typestmt> &rcdtypes){
 		return bsz;
 	}
 	done.insert(structname);
-				
+
 	for( auto md : this->membdecl) {
-			if(md.pty.ty != primtype::NOP) 
+			if(md.is_primitive()) 
 				bsz += md.pty.get_bitsz()*md.vars.size();
-			else {	// do for record;
-				for( auto rit : rcdtypes)
+			else {	// do for struct;
+				for( auto rit : types)
 					if( rit.rty.structname == md.structname  )
-						bsz +=  rit.rty.get_bitsz( rcdtypes ) * md.vars.size();
+						bsz +=  rit.rty.get_bitsz( types ) * md.vars.size();
 			}
 		}
 	done.erase(this->structname);
 	return bsz;
+}
+
+size_t structype::get_bitsz(environment &env){
+	static std::set<elem> done;
+	if(bitsz == -1) bitsz = 0; //init
+	else if(done.size() == 0 ) { DBG(COUT<<"optimized") ; return bitsz; } //memoize
+
+	if(done.find(structname) != done.end()) { 
+		o::dbg()<<"Recursive type "<< structname <<" not defined completely" <<std::endl;
+		return bitsz = 0 ;
+	}
+	done.insert(structname);
+	for( auto md : this->membdecl) {
+			if(md.is_primitive()) 
+				bitsz += md.pty.get_bitsz()*md.vars.size();
+			else {	// do for struct;
+					string_t stctnm = lexeme2str(md.structname.e) ;
+					if( env.contains_typedef(stctnm)  ) 
+						bitsz +=  env.lookup_typedef(stctnm).get_bitsz(env) * md.vars.size();
+			}
+		}
+	done.erase(this->structname);
+	return bitsz;
 }
 bool primtype::parse( input* in , const raw_prog& /*prog*/) {
 
@@ -408,8 +428,9 @@ bool typestmt::parse( input* in , const raw_prog& prog){
 	return pos=curr, false;
 }
 
-bool environment::build_from( std::vector<typestmt> & vts) {
+bool environment::build_from( const std::vector<typestmt> & vts) {
 	
+	resetAll();
 	for( auto it : vts){
 		if( it.is_predicate()) { // this is predicate declaration
 			if( predtype.find(lexeme2str(it.reln.e)) != predtype.end() )
@@ -420,6 +441,9 @@ bool environment::build_from( std::vector<typestmt> & vts) {
 			if( usertypedef.find(lexeme2str(it.rty.structname.e)) != usertypedef.end() )
 				return type_error(" Repeated typedef.", it.rty.structname.e), false;
 			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });
+			//init bits for struct
+			size_t b = it.rty.get_bitsz(*this);
+			DBG(COUT<<std::endl<<"The bitsz for "<< it.rty.structname <<" is " << b);
 		}
 	}
 	return true;

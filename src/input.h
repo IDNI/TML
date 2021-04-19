@@ -381,6 +381,9 @@ struct structype : utype {
 	std::vector<struct typedecl> membdecl;	
 	bool parse(input *in, const raw_prog& prog);
 	size_t get_bitsz(const std::vector<struct typestmt> &);
+	size_t get_bitsz(class environment &);
+	private:
+	int_t bitsz = -1;
 };
 
 struct typedecl {
@@ -456,32 +459,6 @@ struct bit_prog {
 	bit_prog( const raw_prog& _rp);
 	bool to_raw_prog(raw_prog &) const;
 	void to_print() const;
-};
-
-struct bit_univ {
-	enum { //should be compatible with typesystem's prim type
-		CHAR_BSZ = 4,
-		INT_BSZ = 4,
-		SYM_BSZ = 4,
-		VAR_BSZ = 4,
-	};
-	dict_t &d;
-	size_t char_bsz, int_bsz, sym_bsz, var_bsz;
-
-	bit_univ(dict_t &_d, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
-	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), char_bsz(_cbsz),
-	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
-	// innermost type definition of the nested program
-	std::vector<struct typestmt> * curtinfo = NULL;
-	
-	size_t get_typeinfo(size_t n, const raw_term& rt );
-	inline size_t pos(size_t bsz, size_t bit_from_right /*, size_t arg, size_t args */) const {
-		DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
-		return (bsz - bit_from_right - 1); //* args + arg;
-	}
-	bool btransform( const raw_prog& rpin, raw_prog &rpout );
-	bool btransform( const raw_rule& rrin, raw_rule &rrout );
-	bool btransform( const raw_term& rtin, raw_term &rtout );
 };
 
 struct bit_rule {
