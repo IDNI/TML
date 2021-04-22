@@ -806,8 +806,8 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		uints perm2 = perm_init((bits-2)*f->varslen);
 		for (size_t i = 0; i < f->varslen; i++)
 			for (size_t j = 0; j < bits-2; j++) {
-				perm1[i*(bits-2)+j] = j*f->varslen + i;
-				perm2[j * f->varslen + i] = i*(bits-2)+j;
+				perm1[j * f->varslen + i] = i*(bits-2)+j;
+				perm2[i*(bits-2)+j] = j*f->varslen + i;
 			}
 		q = q^perm1;
 		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
