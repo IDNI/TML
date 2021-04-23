@@ -289,11 +289,11 @@ void bit_term::to_print() const {
 }
 
 
-size_t structype::get_bitsz(const std::vector<typestmt> &types){	
+size_t structype::calc_bitsz(const std::vector<typestmt> &types){	
 	size_t bsz=0;
 	static std::set<elem> done;
 	if(done.find(structname) != done.end()) { 
-		o::dbg()<<"Recursive type "<< structname <<" not defined completely" <<std::endl;
+		DBG(COUT<<"Recursive type "<< structname <<" not defined completely" <<std::endl);
 		return bsz;
 	}
 	done.insert(structname);
@@ -308,30 +308,31 @@ size_t structype::get_bitsz(const std::vector<typestmt> &types){
 			}
 		}
 	done.erase(this->structname);
+	DBG(COUT<<std::endl<<structname << "calculated bits:"<<bsz);
 	return bsz;
 }
 
-size_t structype::get_bitsz(environment &env){
+size_t structype::calc_bitsz(environment &env){
+	
+	size_t bsz = 0;
 	static std::set<elem> done;
-	if(bitsz == -1) bitsz = 0; //init
-	else if(done.size() == 0 ) { DBG(COUT<<"optimized") ; return bitsz; } //memoize
-
 	if(done.find(structname) != done.end()) { 
-		o::dbg()<<"Recursive type "<< structname <<" not defined completely" <<std::endl;
-		return bitsz = 0 ;
+		DBG(COUT<<"Recursive type "<< structname <<" not defined completely" <<std::endl);
+		return bsz = 0 ;
 	}
 	done.insert(structname);
 	for( auto md : this->membdecl) {
 			if(md.is_primitive()) 
-				bitsz += md.pty.get_bitsz()*md.vars.size();
+				bsz += md.pty.get_bitsz()*md.vars.size();
 			else {	// do for struct;
 					string_t stctnm = lexeme2str(md.structname.e) ;
 					if( env.contains_typedef(stctnm)  ) 
-						bitsz +=  env.lookup_typedef(stctnm).get_bitsz(env) * md.vars.size();
+						bsz +=  env.lookup_typedef(stctnm).get_bitsz(env) * md.vars.size();
 			}
 		}
 	done.erase(this->structname);
-	return bitsz;
+	DBG(COUT<<std::endl<<structname << "calculated bits:"<<bsz);
+	return bsz;
 }
 bool primtype::parse( input* in , const raw_prog& /*prog*/) {
 
@@ -440,11 +441,7 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 		else if( it.is_typedef()) { // this is new type definitinon
 			if( usertypedef.find(lexeme2str(it.rty.structname.e)) != usertypedef.end() )
 				return type_error(" Repeated typedef.", it.rty.structname.e), false;
-			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });
-			//init bits for struct
-			size_t b = it.rty.get_bitsz(*this);
-			DBG(COUT<<std::endl<<"The bitsz for "<< it.rty.structname <<" is " << b);
-		}
+			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });					}
 	}
 	return true;
 }

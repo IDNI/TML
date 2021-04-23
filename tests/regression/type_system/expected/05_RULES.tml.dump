@@ -1,0 +1,7 @@
+rain().
+wet().
+p(0 0 1 0 0 0 0 1).
+p(0 0 0 1 0 1 0 0).
+p(0 0 0 1 0 0 1 0).
+employee(Suzi_3 Suzi_2 Suzi_1 Suzi_0 female_3 female_2 female_1 female_0).
+salutation(Suzi_3 Suzi_2 Suzi_1 Suzi_0 Madam_3 Madam_2 Madam_1 Madam_0).

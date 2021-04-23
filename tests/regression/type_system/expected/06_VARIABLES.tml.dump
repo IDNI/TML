@@ -1,0 +1,21 @@
+bird(John_3 John_2 John_1 John_0).
+bird(Coco_3 Coco_2 Coco_1 Coco_0).
+bird(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
+cat(Bella_3 Bella_2 Bella_1 Bella_0).
+canFly(John_3 John_2 John_1 John_0).
+canFly(Coco_3 Coco_2 Coco_1 Coco_0).
+canFly(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
+beeps(John_3 John_2 John_1 John_0).
+beeps(Coco_3 Coco_2 Coco_1 Coco_0).
+beeps(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
+meows(Bella_3 Bella_2 Bella_1 Bella_0).
+employee(Jane_3 Jane_2 Jane_1 Jane_0 female_3 female_2 female_1 female_0).
+employee(John_3 John_2 John_1 John_0 male_3 male_2 male_1 male_0).
+employee(Suzi_3 Suzi_2 Suzi_1 Suzi_0 female_3 female_2 female_1 female_0).
+salutation(Jane_3 Jane_2 Jane_1 Jane_0 Madam_3 Madam_2 Madam_1 Madam_0).
+salutation(John_3 John_2 John_1 John_0 Sir_3 Sir_2 Sir_1 Sir_0).
+salutation(Suzi_3 Suzi_2 Suzi_1 Suzi_0 Madam_3 Madam_2 Madam_1 Madam_0).
+parent(Suzi_3 Suzi_2 Suzi_1 Suzi_0 John_3 John_2 John_1 John_0).
+parent(Coco_3 Coco_2 Coco_1 Coco_0 Charlie_3 Charlie_2 Charlie_1 Charlie_0).
+father(Coco_3 Coco_2 Coco_1 Coco_0 Charlie_3 Charlie_2 Charlie_1 Charlie_0).
+mother(Suzi_3 Suzi_2 Suzi_1 Suzi_0 John_3 John_2 John_1 John_0).

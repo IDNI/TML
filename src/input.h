@@ -380,10 +380,18 @@ struct structype : utype {
 	elem structname;
 	std::vector<struct typedecl> membdecl;	
 	bool parse(input *in, const raw_prog& prog);
-	size_t get_bitsz(const std::vector<struct typestmt> &);
-	size_t get_bitsz(class environment &);
+	size_t get_bitsz(const std::vector<struct typestmt> & t){
+		DBG(bitsz > -1 ?  COUT<<"optimz" : COUT<<"";)
+		return (bitsz < 0)? bitsz = calc_bitsz(t) :  bitsz;
+	}
+	size_t get_bitsz(class environment &e){
+		DBG(bitsz > -1 ? COUT<<"optimz": COUT<<"";)
+		return (bitsz < 0)? bitsz = calc_bitsz(e) : bitsz;
+	}
 	private:
 	int_t bitsz = -1;
+	size_t calc_bitsz(const std::vector<struct typestmt> &);
+	size_t calc_bitsz(class environment &);
 };
 
 struct typedecl {

@@ -1,0 +1,16 @@
+parent(Tom_3 Tom_2 Tom_1 Tom_0 Amy_3 Amy_2 Amy_1 Amy_0).
+parent(Grace_3 Grace_2 Grace_1 Grace_0 Amy_3 Amy_2 Amy_1 Amy_0).
+parent(Amy_3 Amy_2 Amy_1 Amy_0 Fred_3 Fred_2 Fred_1 Fred_0).
+parent(Jack_3 Jack_2 Jack_1 Jack_0 Fred_3 Fred_2 Fred_1 Fred_0).
+parent(Fred_3 Fred_2 Fred_1 Fred_0 Sue_3 Sue_2 Sue_1 Sue_0).
+ancestor(Tom_3 Tom_2 Tom_1 Tom_0 Amy_3 Amy_2 Amy_1 Amy_0).
+ancestor(Grace_3 Grace_2 Grace_1 Grace_0 Amy_3 Amy_2 Amy_1 Amy_0).
+ancestor(Tom_3 Tom_2 Tom_1 Tom_0 Sue_3 Sue_2 Sue_1 Sue_0).
+ancestor(Tom_3 Tom_2 Tom_1 Tom_0 Fred_3 Fred_2 Fred_1 Fred_0).
+ancestor(Grace_3 Grace_2 Grace_1 Grace_0 Sue_3 Sue_2 Sue_1 Sue_0).
+ancestor(Grace_3 Grace_2 Grace_1 Grace_0 Fred_3 Fred_2 Fred_1 Fred_0).
+ancestor(Amy_3 Amy_2 Amy_1 Amy_0 Sue_3 Sue_2 Sue_1 Sue_0).
+ancestor(Amy_3 Amy_2 Amy_1 Amy_0 Fred_3 Fred_2 Fred_1 Fred_0).
+ancestor(Jack_3 Jack_2 Jack_1 Jack_0 Sue_3 Sue_2 Sue_1 Sue_0).
+ancestor(Jack_3 Jack_2 Jack_1 Jack_0 Fred_3 Fred_2 Fred_1 Fred_0).
+ancestor(Fred_3 Fred_2 Fred_1 Fred_0 Sue_3 Sue_2 Sue_1 Sue_0).
