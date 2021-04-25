@@ -1,0 +1,13 @@
+# create macro which finds ?p, which is a row position * 3 + col positio
+get_pos(?r ?c ?p) := p(?r), p(?c), ?r * 3 = ?r3, ?r3 + ?c = ?p.
+# use the macro with vars as arguments - works fine
+ok_00(?pos) :- get_pos(?r ?c ?pos), ?r = 0, ?c = 0.
+ok_12(?pos) :- get_pos(?r ?c ?pos), ?r = 1, ?c = 2.
+ok_22(?pos) :- get_pos(?r ?c ?pos), ?r = 2, ?c = 2.
+# use the macro with nonvar atoms as arguments - not working before, but now works
+not_ok_00(?pos) :- get_pos(0 0 ?pos).
+not_ok_12(?pos) :- get_pos(1 2 ?pos).
+not_ok_22(?pos) :- get_pos(2 2 ?pos).
+p(0).
+p(1).
+p(2).

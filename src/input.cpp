@@ -1045,7 +1045,8 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 	
 	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
 		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-			if( et->type == elem::VAR && et->type == ed->type ) chng[*ed] = *et;
+			if( (et->type == elem::VAR || et->type == elem::NUM ) && ed->type == elem::VAR) 
+				chng[*ed] = *et;
 				
 		for ( auto &tt:mm.b )
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
