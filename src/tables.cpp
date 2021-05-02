@@ -20,8 +20,11 @@
 #include "output.h"
 using namespace std;
 
-#define mkchr(x) ((((int_t)x)<<2)|1)
-#define mknum(x) ((((int_t)x)<<2)|2)
+#define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
+#define mknum(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|2)))
+
+//#define mkchr(x) ((((int_t)x)))
+//#define mknum(x) ((((int_t)x)))
 
 size_t sig_len(const sig& s) {
 	size_t r = 0;
@@ -733,8 +736,11 @@ set<term> tables::decompress() {
 
 elem tables::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
-	if (arg & 1) return elem((char32_t) (arg >> 2));
-	if (arg & 2) return elem((int_t)    (arg >> 2));
+	if( opts.bitunv == false) {
+		if (arg & 1) return elem((char32_t) (arg >> 2));
+		if (arg & 2) return elem((int_t) (arg >> 2));
+	}
+	else if(arg == 1 || arg == 0) return elem((bool)(arg));
 	return elem(elem::SYM, rdict().get_sym(arg));
 }
 
@@ -797,6 +803,39 @@ raw_term tables::to_raw_term(const term& r) const {
 		rt.insert_parens(dict.op, dict.cl);
 	}
 	DBG(assert(args == r.size());)
+	if( opts.bitunv && typenv.contains_pred(lexeme2str(rt.e[0].e) )) {
+		const std::vector<typedecl> &vt = ((environment*)(&typenv))->lookup_pred(lexeme2str(rt.e[0].e) );
+		int_t bitsz = -1; 
+		int_t val;
+		int_t argc = 0;
+		for(typedecl td: vt ) {
+			if( td.is_primitive() ) {
+				bitsz =  td.pty.get_bitsz();
+				val = 0;
+				DBG(assert(rt.e.size() > (size_t)bitsz ));
+				for( int_t n = 0; n < bitsz; n++)
+						val |= rt.e[argc + n + 2].num << (bitsz-1 -n);
+				
+				rt.e.erase(rt.e.begin()+ 2 + argc, rt.e.begin() + 2 + argc + bitsz);
+				elem el;
+				if( td.pty.ty == primtype::UINT )
+					el = elem(val);
+				else if ( td.pty.ty == primtype::UCHAR ) 
+					el = elem((char_t) val);
+				else if ( td.pty.ty == primtype::SYMB )
+					el = elem(elem::SYM, this->dict.get_sym(val) );
+					
+				rt.e.insert(rt.e.begin() + 2 + argc, el);
+				argc++;
+			}
+			else ; //structtypes userdef
+		}
+		rt.calc_arity(nullptr);
+	}
+	else if( opts.bitunv) {
+		//infer types...
+	}
+	
 	return rt;
 }
 
@@ -1073,10 +1112,12 @@ flat_prog tables::to_terms(const raw_prog& p) {
 	return m;
 }
 
-int_t freeze(vector<term>& v, int_t m = 0) {
+int_t tables::freeze(vector<term>& v, int_t m = 0) {
 	map<int_t, int_t> p;
 	map<int_t, int_t>::const_iterator it;
-	for (const term& t : v) for (int_t i : t) if (i & 2) m = max(m, i >> 2);
+	for (const term& t : v) for (int_t i : t) 
+		if (opts.bitunv && (i ==0 || i == 1 )) m = max(m, i);
+		else if (i & 2) m = max(m, i >> 2);
 	for (term& t : v)
 		for (int_t& i : t)
 			if (i >= 0) continue;
@@ -1105,18 +1146,19 @@ cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
 	return maybe_contained ? BOTH : CONTAINS;
 }
 
-flat_prog& get_canonical_db(vector<term>& x, flat_prog& p) {
+flat_prog& tables::get_canonical_db(vector<term>& x, flat_prog& p) {
 	freeze(x);
 	for (size_t n = 1; n != x.size(); ++n) p.insert({x[n]});
 	return p;
 }
 
-flat_prog& get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
+flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 	int_t m = 0;
 	for (vector<term>& v : x)
 		for (const term& t : v)
 			for (int_t i : t)
-				if (i & 2) m = max(m, i >> 2);
+				if (opts.bitunv && (i == 1 || i == 0) ) m = max(m, i);
+				else if (i & 2) m = max(m, i >> 2);
 	for (vector<term>& t : x) {
 		freeze(t, m);
 		for (size_t n = 1; n != t.size(); ++n) p.insert({t[n]});
@@ -1740,7 +1782,7 @@ ntable tables::get_table(const sig& s) {
 		tbls.push_back(tb), smap.emplace(s,nt), nt;
 }
 
-term to_nums(term t) {
+term tables::to_nums(term t) {
 	for (int_t& i : t)  if (i > 0) i = mknum(i);
 	return t;
 }
@@ -1750,7 +1792,7 @@ term to_nums(term t) {
 //	return t;
 //}
 
-vector<term> to_nums(const vector<term>& v) {
+vector<term> tables::to_nums(const vector<term>& v) {
 	vector<term> r;
 	for (const term& t : v) r.push_back(to_nums(t));
 	return r;
@@ -1762,7 +1804,7 @@ vector<term> to_nums(const vector<term>& v) {
 //	return ss;
 //}
 
-void to_nums(flat_prog& m) {
+void tables::to_nums(flat_prog& m) {
 	flat_prog mm;
 	for (auto x : m) mm.insert(to_nums(x));
 	m = move(mm);
@@ -2930,6 +2972,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
+	if (opts.bitunv) typenv.build_from(p.vts);
 	if (!add_prog(p, strs)) return false;
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;

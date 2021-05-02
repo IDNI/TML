@@ -3544,6 +3544,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	dict_t dict;
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
+	dict.set_bitunv(opts.enabled("bitunv"));
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
 	tables::options to;
@@ -3554,6 +3555,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.pfp3              = opts.enabled("3pfp");
+	to.bitunv			 = opts.enabled("bitunv");
 	// we don't need the dict any more, tables owns it from now on...
 	tbl = new tables(move(dict), to);
 	tbl->init_builtins();

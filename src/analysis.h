@@ -41,7 +41,7 @@ class environment {
         return this->build_from(rp.vts);
     }
     bool build_from( const std::vector<struct typestmt> & );
-    std::vector<typedecl> lookup_pred( string_t k  ){
+    const std::vector<typedecl>& lookup_pred( string_t k  )  {
         return predtype[k];
     }
     structype& lookup_typedef( string_t &k  ){

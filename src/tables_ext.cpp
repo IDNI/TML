@@ -29,8 +29,6 @@ typedef tuple<size_t, size_t, size_t, int_t, uint_t, uint_t> alumemo;
 map<alumemo, spbdd_handle> carrymemo;
 map<alumemo, spbdd_handle> addermemo;
 
-#define mkchr(x) ((((int_t)x)<<2)|1)
-#define mknum(x) ((((int_t)x)<<2)|2)
 
 extern uints perm_init(size_t n);
 

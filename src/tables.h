@@ -28,7 +28,7 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
-
+#include "analysis.h"
 typedef int_t rel_t;
 class archive;
 struct raw_term;
@@ -176,6 +176,7 @@ class tables {
 	friend struct pnft;
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+	environment typenv;
 private:
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
@@ -245,6 +246,12 @@ private:
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
+	int_t freeze(std::vector<term>& v, int_t );
+	std::vector<term> to_nums(const std::vector<term>& v);
+	void to_nums(flat_prog& m);
+	term to_nums(term t);
+	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
+	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
 	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
@@ -467,7 +474,7 @@ private:
 public:
 	struct options {
 		bool bproof, optimize, bin_transform, print_transformed,
-			apply_regexpmatch, fp_step, pfp3;
+			apply_regexpmatch, fp_step, pfp3, bitunv;
 	} opts;
 	tables(dict_t dict, tables::options opts);
 	~tables();

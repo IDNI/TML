@@ -97,6 +97,8 @@ bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
 	//reset to current prog type definitions
 	typenv.build_from ( rpin.vts ); 
+	// copy types to new raw_bit_prog
+	rpout.vts = rpin.vts;
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
@@ -244,7 +246,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt) {
 		return 0;
 	}
 	else {
-		//when types are not specified, go default 
+		//when types are not specified, go default
 		if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
 			rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
 			return INT_BSZ;
@@ -261,18 +263,26 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
 		if( n == 0 ) { rtout.e.emplace_back(e); continue; }
 		// get bit size of the given elem and convert to bit representation
 		size_t bsz = get_typeinfo(n, rtin);
-		if( bsz <=0 || elem::STR == e.type ) { rtout.e.emplace_back(e); continue; }
+		if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
 		std::vector<elem> bitelem(bsz);
+		int_t symbval = 0;
 		for (size_t k = 0; k != bsz; ++k) {
 			switch(e.type) {
 				case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
 				case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
-				case elem::VAR:
-				case elem::SYM: { string_t temp = lexeme2str(e.e);
-								// making new bit sym/vars and avoiding conflict 
-								temp.append(to_string_t("_").append(to_string_t((int_t)k)));
-								bitelem[pos(bsz, k)] = {e.type, d.get_lexeme(temp)};
-								break; }
+				case elem::VAR: { 
+					string_t temp = lexeme2str(e.e);
+					// making new bit vars and avoiding conflict 
+					temp.append(to_string_t("_").append(to_string_t((int_t)k)));
+					bitelem[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
+					break; 
+				}
+				case elem::STR:
+				case elem::SYM: {
+					if( k == 0 ) symbval = d.get_sym(e.e);
+					bitelem[pos(bsz, k)] = bool(symbval & (1<<k)); 
+					break;
+				}
 				default: DBG( COUT<<e<<std::endl; assert(false)); break;
 			}
 		}
