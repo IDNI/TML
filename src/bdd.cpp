@@ -269,6 +269,7 @@ bool subset(const bdds& small, const bdds& big) {
 size_t simps = 0;
 
 bool bdd::am_simplify(bdds& v, const unordered_map<bdds, int_t>& memo) {
+	am_sort(v);
 	for (auto x : memo)
 		if (subset(x.first, v)) {
 			if (x.second == F) return v={F}, true;
