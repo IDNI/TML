@@ -1,0 +1,15 @@
+# Transitive closure (TC)
+# infers e types as NUM.
+
+###record e( int:4 ?a,  int:4 ?b).
+##record tc ( int ?a, int ?b).
+
+e(1 2).
+e(2 2).
+e(3 4).
+e(4 5).
+e(5 1).
+e(7 9).
+
+tc(?x ?y) :- e(?x ?y).
+tc(?x ?y) :- e(?x ?z),tc(?z ?y).

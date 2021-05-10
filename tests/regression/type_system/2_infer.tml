@@ -1,0 +1,27 @@
+#infering types based on input facts.
+
+
+struct sttyp2 {
+    char ?y.
+}
+struct styp {
+    int:2 ?c, ?z .
+    sttyp2 ?inner, ?in3.
+}
+
+#record father( sym ?b).
+#record canFly( sym ?c ).
+#record edge (int:2 ?c, int:2 ?c ).
+#record night( ).
+#record pair(int ?a, int ?b).
+#record school ( styp ?name,  styp ?l ).
+
+father("fff").
+#father(Tom Amy).   # Tom is a father of Amy.
+canFly(bird).      # Bird can fly.
+#canFly("bird").
+edge(3 3).         # Exists an edge from 6 to 3.
+night.             # It's night.
+pair(1 2).         # Exists a pair 1, 2.
+edge(?x ?y) :- edge(?x ?z), edge(?z ?y).
+school( notyet notyet).

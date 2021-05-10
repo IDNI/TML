@@ -176,7 +176,6 @@ class tables {
 	friend struct pnft;
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-	environment typenv;
 private:
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
@@ -476,6 +475,7 @@ public:
 		bool bproof, optimize, bin_transform, print_transformed,
 			apply_regexpmatch, fp_step, pfp3, bitunv;
 	} opts;
+	environment typenv;
 	tables(dict_t dict, tables::options opts);
 	~tables();
 	bool init_builtins();

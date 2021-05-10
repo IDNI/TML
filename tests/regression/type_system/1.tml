@@ -9,8 +9,8 @@
 # Let's have a directed graph represented by
 # following 'e' relation:
 
-record e( int:5 ?a,  int:5 ?b).
-record tc ( int:5 ?a, int:5 ?b).
+record e( int:4 ?a,  int:4 ?b).
+record tc ( int:4 ?a, int:4 ?b).
 
 e(1 2).
 e(2 2).

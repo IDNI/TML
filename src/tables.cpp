@@ -804,7 +804,7 @@ raw_term tables::to_raw_term(const term& r) const {
 	}
 	DBG(assert(args == r.size());)
 	if( opts.bitunv && typenv.contains_pred(lexeme2str(rt.e[0].e) )) {
-		const std::vector<typedecl> &vt = ((environment*)(&typenv))->lookup_pred(lexeme2str(rt.e[0].e) );
+		const std::vector<typedecl> &vt = typenv.lookup_pred(lexeme2str(rt.e[0].e)) ;
 		int_t bitsz = -1; 
 		int_t val;
 		int_t argc = 0;
@@ -828,12 +828,11 @@ raw_term tables::to_raw_term(const term& r) const {
 				rt.e.insert(rt.e.begin() + 2 + argc, el);
 				argc++;
 			}
-			else ; //structtypes userdef
+			else { } //structtypes userdef
 		}
 		rt.calc_arity(nullptr);
 	}
 	else if( opts.bitunv) {
-		//infer types...
 	}
 	
 	return rt;
@@ -2972,7 +2971,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
-	if (opts.bitunv) typenv.build_from(p.vts);
+	if (opts.bitunv) this->typenv = const_cast<raw_prog&>(p).get_typenv();
 	if (!add_prog(p, strs)) return false;
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;

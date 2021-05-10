@@ -15,7 +15,6 @@
 #define _ANALYSIS_H_
 #include "input.h"
 
-struct typestmt;
 class environment {    
     //signatures 
     std::map<string_t, std::vector<typedecl> > predtype;
@@ -37,14 +36,18 @@ class environment {
     bool contains_typedef_var(string_t var) const {
         return context_typedef_var.find(var) != context_typedef_var.end() ;
     }
-    bool build_from( raw_prog &rp  ) {
-        return this->build_from(rp.vts);
+    bool is_init(){
+        return predtype.size()>0;
     }
+    
+    bool build_from( const raw_term &rt, bool infer);
+    bool build_from( const raw_rule &rr);
+    bool build_from( const raw_prog &rp  );
     bool build_from( const std::vector<struct typestmt> & );
-    const std::vector<typedecl>& lookup_pred( string_t k  )  {
-        return predtype[k];
+    const std::vector<typedecl>& lookup_pred( const string_t k  )  const {
+        return predtype.find(k)->second;
     }
-    structype& lookup_typedef( string_t &k  ){
+    structype& lookup_typedef( string_t &k  ) {
         return usertypedef[k];
     }
     bool addtocontext(string_t &var, primtype &pt ) {
@@ -80,31 +83,33 @@ class environment {
 };
 
 class typechecker { 
-    environment env;
+    raw_prog &rp;
+    bool infer; 
+    environment &env;
+
     bool tcheck (const raw_rule& ) ;
     bool tcheck (const raw_term&);
     public:
-    typechecker(raw_prog &p) {
+    typechecker(raw_prog &p, bool _infer = false) : rp(p),infer(_infer), env(p.get_typenv()) {
         env.build_from(p);
-     }
-    bool tcheck (const raw_prog& );
+    }
+    bool tcheck ();
 };
 
 struct bit_univ {
 	enum { //should be compatible with typesystem's prim type
-		CHAR_BSZ = 4,
-		INT_BSZ = 4,
-		SYM_BSZ = 4,
-		VAR_BSZ = 4,
+		CHAR_BSZ = 8,
+		INT_BSZ = 16,
+		SYM_BSZ = 8,
+		VAR_BSZ = 8,
 	};
 	dict_t &d;
-	size_t char_bsz, int_bsz, sym_bsz, var_bsz;
+	environment &typenv;
+    size_t char_bsz, int_bsz, sym_bsz, var_bsz;
 
-	bit_univ(dict_t &_d, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
-	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), char_bsz(_cbsz),
+	bit_univ(dict_t &_d, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
+	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), typenv(_e), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
-	// innermost type definition of the nested program
-	environment typenv;
 	
 	size_t get_typeinfo(size_t n, const raw_term& rt );
 	inline size_t pos(size_t bsz, size_t bit_from_right /*, size_t arg, size_t args */) const {

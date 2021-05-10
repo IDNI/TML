@@ -1035,7 +1035,15 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 						}								
 	return true;
 }
-
+environment& raw_prog::get_typenv() {
+	return typenv.back();
+}
+void raw_prog::set_typenv( const environment &e ) {
+	typenv.back() = e;
+}
+raw_prog::raw_prog() {
+	typenv.emplace_back();
+}
 bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
 						vector<raw_term> &vrt, dict_t &dict) {
 
@@ -1045,7 +1053,9 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 	
 	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
 		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-			if( (et->type == elem::VAR || et->type == elem::NUM ) && ed->type == elem::VAR) 
+			if( (et->type == elem::VAR || et->type == elem::NUM || 
+				et->type == elem::CHR || et->type == elem::SYM || et->type == elem::STR)
+				&& ed->type == elem::VAR) 
 				chng[*ed] = *et;
 				
 		for ( auto &tt:mm.b )

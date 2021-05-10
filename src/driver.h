@@ -24,7 +24,6 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
-#include "analysis.h"
 
 
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;

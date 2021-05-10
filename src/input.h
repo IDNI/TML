@@ -368,9 +368,9 @@ struct primtype : utype {
 	}
 	size_t get_bitsz(){
 		switch(ty){
-			case UINT: return bsz > 0 ? bsz: 4;
-			case UCHAR: return 4;
-			case SYMB: return 4;
+			case UINT: return bsz > 0 && bsz <= 32 ? bsz: 16;
+			case UCHAR: return 8;
+			case SYMB: return 8;
 			default: return 0;
 		}
 	}
@@ -740,6 +740,7 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
+	std::vector<environment> typenv;
 
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;
@@ -757,6 +758,9 @@ struct raw_prog {
 	bool parse_xfp(input* in, dict_t &dict);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 
 				std::vector<raw_term> &vrt, dict_t &dict);
+	environment& get_typenv();
+	void set_typenv(const environment &e);
+	raw_prog();
 };
 
 struct raw_progs {

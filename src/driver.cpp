@@ -3423,7 +3423,7 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 	
 	if(opts.enabled("bitprog")) {
 		typechecker tc(p);
-		if(tc.tcheck(p)) {
+		if(tc.tcheck()) {
 
 			bit_prog b(p);
 			//b.to_print();
@@ -3433,8 +3433,8 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 		}
 	}
 	else if (opts.enabled("bitunv")) {
-		typechecker tc(p);
-		if(tc.tcheck(p)) {
+		typechecker tc(p, true);
+		if(tc.tcheck()) {
 			bit_univ bu(tbl->get_dict());
 			raw_prog brawp;
 			bu.btransform(p, brawp);

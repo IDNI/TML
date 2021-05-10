@@ -95,14 +95,15 @@ bool bit_prog::to_raw_prog(raw_prog &rp) const{
 
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
-	//reset to current prog type definitions
-	typenv.build_from ( rpin.vts ); 
-	// copy types to new raw_bit_prog
-	rpout.vts = rpin.vts;
+
+	typenv = (const_cast<raw_prog&>(rpin)).get_typenv();
+	// set the same environment for the output raw bit prog 
+	rpout.set_typenv(typenv);
+	rpout.g = rpin.g;
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
-	for( const raw_prog rp : rpin.nps)
+	for( const raw_prog &rp : rpin.nps)
 		rpout.nps.emplace_back(), ret &= btransform(rp, rpout.nps.back());	
 	return ret;
 }
@@ -455,14 +456,65 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 	}
 	return true;
 }
+bool environment::build_from( const raw_term &rt, bool infer= false){
+	bool ret = true; 
+	
+	if( this->contains_pred(lexeme2str(rt.e[0].e))) return false; 
 
-bool typechecker::tcheck( const raw_prog &rp){
+	if(rt.extype == rt.REL ) {
+		std::vector<typedecl> targs;
+		bool bknown = true;  // assume all args types are determinable 
+		for( size_t i=2 ; bknown && i< rt.e.size()-1; i++) {
+			switch(rt.e[i].type) {
+				case elem::NUM:  targs.emplace_back(), targs.back().pty.ty = primtype::UINT;break;
+				case elem::CHR:  targs.emplace_back(), targs.back().pty.ty = primtype::UCHAR;break;
+				case elem::SYM: 
+				case elem::STR: targs.emplace_back(), targs.back().pty.ty = primtype::SYMB;break;
+				case elem::VAR:
+								if(infer && this->contains_prim_var(lexeme2str(rt.e[i].e))) {
+									targs.emplace_back(),
+									targs.back().pty = this->lookup_prim_var(lexeme2str(rt.e[i].e));
+								}
+								else bknown = false;
+								break;
+				default: break;
+			}
+		}
+		if(bknown )
+			return predtype.insert( { lexeme2str(rt.e[0].e), targs } ).second;
+		else ret = false;
+	}
+	return ret;
+}
+bool environment::build_from( const raw_rule &rr){
 	bool ret = true;
-	for (auto rr : rp.r)
+	for (const raw_term &ht : rr.h)
+		ret &= build_from(ht);
+	for (auto it : rr.b)
+		for (const raw_term &bt : it)
+			ret &= build_from(bt) ;
+
+	return ret;
+}
+
+bool environment::build_from( const raw_prog &rp  ) {
+	// populate from user declared static types if any
+	bool ret = this->build_from(rp.vts);
+	
+	// infer from rles/terms
+	for (auto &rr : rp.r)
+		ret &= build_from(rr) ;
+
+	return ret;
+}
+
+bool typechecker::tcheck(){
+	bool ret = true;
+	for (auto &rr : rp.r)
 		 ret &= tcheck(rr) ;
-	for( auto nrp: rp.nps){
-		typechecker tc(nrp);
-		ret &= tc.tcheck(nrp) ;
+	for( auto &nrp: rp.nps){
+		typechecker tc(nrp, infer);
+		ret &= tc.tcheck() ;
 	}
 	return ret;
 }
@@ -485,10 +537,13 @@ bool typechecker::tcheck( const raw_term &rt){
 						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << rt.e[argc].num << " is ",
 							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
 							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
-						else if(rt.e[argc].num > ( (0x1 <<typexp.pty.get_bitsz())-1) )
+						else {
+							int_t maxval =  ( ((size_t)0x1 <<typexp.pty.get_bitsz())-1);
+							if( rt.e[argc].num > maxval )
 							return 	ss<< rt.e[argc].num << " exceeds max size for ",
 							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
 							 		type_error(ss.str().c_str(), rt.e[argc].e), false;	
+						}
 						break;
 					case elem::CHR:  
 						if( typexp.pty.ty != primtype::_ptype::UCHAR)  
@@ -548,9 +603,16 @@ bool typechecker::tcheck( const raw_rule &rr){
 	bool ret = true;
 	for (const raw_term &ht : rr.h)
 		ret &= tcheck(ht);
-	for (auto it : rr.b)
+	for (auto &it : rr.b)
 		for (const raw_term &bt : it)
 			ret &= tcheck(bt) ;
 	
+	// infer types 
+	if(ret && infer ) {
+		for (const raw_term &ht : rr.h){
+			if(env.contains_pred(lexeme2str(ht.e[0].e))) continue;
+			env.build_from(ht, infer);
+		}
+	}	
 	return ret;
 }
