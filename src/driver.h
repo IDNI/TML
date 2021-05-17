@@ -14,6 +14,7 @@
 #define __DRIVER_H__
 #include <map>
 #include <cmath>
+#include "z3++.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -127,6 +128,10 @@ class driver {
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void factor_rules(raw_prog &rp);
+    	void qc_z3(raw_prog &rp);
+    	z3::expr body_to_z3(raw_rule &rr, z3::context &c, z3::sort &s,
+			    std::map <raw_term, z3::func_decl> &rel_to_decl,
+			    std::map <elem, z3::expr> &var_to_decl);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,

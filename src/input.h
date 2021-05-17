@@ -540,6 +540,7 @@ struct raw_term {
 	bool parse(input* in, const raw_prog& prog, bool is_form = false,
 		rtextype pref_type = raw_term::REL);
 	bool calc_arity(input* in);
+	int_t get_depth_one_arity () const;
 	void insert_parens(lexeme op, lexeme cl);
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
