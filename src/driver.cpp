@@ -827,7 +827,6 @@ void driver::qc_z3 (raw_prog &raw_p) {
 	z3::sort b = c.bool_sort();
 	// Add all relation symbols and variables of checkable rules to context
 	map<raw_term, z3::func_decl> rel_to_decl;
-	map<elem, z3::expr> var_to_decl;
 	for (const auto &rr : raw_p.r)
 		// TODO: add more general rule check
 		if (is_cqn(rr)) {
@@ -843,18 +842,15 @@ void driver::qc_z3 (raw_prog &raw_p) {
 							rel, c.function(
 						rel.e[0].to_str().c_str(), domain, b))
 						);
-					// Create z3 representation of variable
-					// TODO: use vars attribute
-					for (const auto &el : rel.e)
-						if (el.type == elem::VAR)
-							var_to_decl.emplace(
-								map<elem, z3::expr>::value_type(
-									el, c.constant(
-										el.to_str().c_str(),
-										t)));
 				}
 			}
 		}
+	// Create z3 representation of variable
+	map<lexeme, z3::expr> var_to_decl;
+	for (const auto& var : vars) {
+		var_to_decl.emplace(map<lexeme, z3::expr>::value_type(var,
+			c.constant(to_string(lexeme2str(var)).c_str(), t)));
+	}
 	// Sort rules by head; add only cqn rules
 	std::map<raw_term, vector<raw_rule>> head_to_rule;
 	for (const auto& rr : raw_p.r) {
@@ -878,7 +874,7 @@ void driver::qc_z3 (raw_prog &raw_p) {
 					for (const auto &el : head.e)
 						if (el.type == elem::VAR)
 							bound_vars.push_back(
-								var_to_decl.find(el)->second
+								var_to_decl.find(el.e)->second
 								);
 				s.add( !(z3::forall(bound_vars, z3::implies(rule1, rule2))) );
 				if (s.check() == z3::unsat) {
@@ -916,7 +912,7 @@ void driver::qc_z3 (raw_prog &raw_p) {
 */
 z3::expr driver::body_to_z3(raw_rule &rr, z3::context &c, z3::sort &s,
 			    map<raw_term, z3::func_decl> &rel_to_decl,
-			    map<elem, z3::expr> &var_to_decl) {
+			    map<lexeme, z3::expr> &var_to_decl) {
 	// TODO also treat body of FOL rule
 	set<elem> free_vars;
 	vector<elem> bound_vars;
@@ -928,7 +924,7 @@ z3::expr driver::body_to_z3(raw_rule &rr, z3::context &c, z3::sort &s,
 	collect_free_vars(rr.b, bound_vars, free_vars);
 	z3::expr_vector ex_quant_vars (c);
 	for (const auto& var : free_vars)
-		ex_quant_vars.push_back(var_to_decl.find(var)->second);
+		ex_quant_vars.push_back(var_to_decl.find(var.e)->second);
 
 	z3::expr_vector conjuncts (c);
 	for (const auto& conj : rr.b) {
@@ -938,7 +934,7 @@ z3::expr driver::body_to_z3(raw_rule &rr, z3::context &c, z3::sort &s,
 			z3::expr_vector vars_of_rel (c);
 			for (const auto& el : rel.e)
 				if(el.type == elem::VAR)
-					vars_of_rel.push_back(var_to_decl.find(el)->second);
+					vars_of_rel.push_back(var_to_decl.find(el.e)->second);
 			expr = expr && rel_sym(vars_of_rel);
 		}
 		conjuncts.push_back(expr);
