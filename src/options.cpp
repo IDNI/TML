@@ -179,6 +179,8 @@ void options::setup() {
 		"transformation to make each rule have at most a single conjunction");
 	add_bool("qc_subsume_z3",
 	  	"Enable QC subsumption optimization using theorem prover z3");
+	add_bool("complete-tern",
+		"transformation to make each rule have at most two conjunctions");
 	add_bool("cqc-subsume",
 		"subsume queries into each other using CQC test");
 	add_bool("cqnc-subsume",

@@ -49,7 +49,6 @@ lexeme driver::get_var_lexeme(int_t i) {
 
 #define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
 
-#ifdef TRANSFORM_BIN_DRIVER
 lexeme driver::get_new_var() {
 	static size_t last = 1;
 //	size_t sz = dict.nvars();
@@ -89,7 +88,6 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 	}
 	return s;
 }
-#endif
 /*struct lexemecmp {
 	bool operator()(const lexeme& x, const lexeme& y) const {
 		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
@@ -423,7 +421,6 @@ pass:	//DBG(o::out() << " returned " << res << endl;)
 	return true;
 }*/
 
-#ifdef TRANSFORM_BIN_DRIVER
 typedef pair<raw_term, vector<raw_term>> frule;
 
 struct flat_rules : public vector<frule> {
@@ -452,7 +449,6 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const flat_rules& f
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
 }
-#endif
 /*
 template<typename T> struct nullable {
 	const bool null;
@@ -603,7 +599,7 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	DBG(o::out()<<"sdt transform, output:"<<endl<<r<<endl;)
 	return r;
 }*/
-#ifdef TRANSFORM_BIN_DRIVER
+
 lexeme driver::get_new_rel() {
 	static size_t last = 1;
 	string s = "r";
@@ -639,7 +635,7 @@ void driver::transform_bin(raw_prog& p) {
 				if (has(v, x[k].e[n]))
 					r.h[0].e.push_back(x[k].e[n]),
 					v.erase(x[k].e[n]);
-		return append_closep(r.h[0].e), r.h[0].calc_arity(), r;
+		return append_closep(r.h[0].e), r.h[0].calc_arity(nullptr), r;
 	};
 	for (auto x : f) {
 		while (x.second.size() > 2) {
@@ -662,7 +658,6 @@ void driver::transform_bin(raw_prog& p) {
 	}
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
 }
-#endif
 
 /*raw_prog driver::reify(const raw_prog& p) {
 	set<raw_rule> s;

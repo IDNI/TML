@@ -687,25 +687,29 @@ struct raw_form_tree {
 	bool neg = false;
 	lexeme guard_lx = {0,0};
 
-	raw_form_tree (elem::etype _type, const raw_term &_rt) : type(_type), rt(new raw_term(_rt)) {}
-	raw_form_tree (elem::etype _type, const elem &_el) : type(_type), el(new elem(_el)) {}
-	raw_form_tree (elem::etype _type, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), l(_l), r(_r) {}
-	raw_form_tree (elem::etype _type, const raw_term* _rt = NULL, const elem *_el =NULL,
-		sprawformtree _l = NULL, sprawformtree _r = NULL)
-	{
-		type = _type;
-		if(_rt) rt = new raw_term(*_rt);
-		else rt = NULL;
-		if(_el) el = new elem(*_el);
-		else el = NULL;
-		l = _l, r = _r;
+	raw_form_tree (const raw_term &_rt) {
+		if(_rt.neg) {
+			type = elem::NOT;
+			l = std::make_shared<raw_form_tree>(_rt.negate());
+		} else {
+			type = elem::NONE;
+			rt = new raw_term(_rt);
+		}
 	}
+	raw_form_tree (elem::etype _type, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), l(_l), r(_r) {}
+	raw_form_tree (elem::etype _type, const elem &_el, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), el(new elem(_el)), l(_l), r(_r) {}
 	~raw_form_tree() {
 		if (rt) delete rt, rt = NULL;
 		if (el) delete el, el = NULL;
 	}
 	void printTree(int level =0 );
 	static sprawformtree simplify(sprawformtree &t);
+	bool is_false() const {
+		return type == elem::NONE && rt->is_false();
+	}
+	bool is_true() const {
+		return type == elem::NOT && l->is_false();
+	}
 };
 struct raw_sof {
 	const raw_prog& prog;
