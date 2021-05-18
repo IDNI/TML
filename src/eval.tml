@@ -45,253 +45,255 @@ list(?x) :- dom_nil(?x).
 # Assert that ?out matches ?in, except possibly at index ?idx
 
 unset(?in ?idx ?out) :-
-  ?idx > 0,
-  ?pred + 1 = ?idx,
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  dom_fst(?out ?out_hd), dom_rst(?out ?out_tl),
-  unset(?in_tl ?pred ?out_tl).
+	?idx > 0,
+	?pred + 1 = ?idx,
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	dom_fst(?out ?out_hd), dom_rst(?out ?out_tl),
+	unset(?in_tl ?pred ?out_tl).
 
 unset(?in 0 ?out) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  domaine(?out_hd),
-  dom_fst(?out ?out_hd), dom_rst(?out ?in_tl).
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	domaine(?out_hd),
+	dom_fst(?out ?out_hd), dom_rst(?out ?in_tl).
 
 # Assert that index ?idx of array ?in has value ?val
 
 fix(?in ?idx ?val) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  fix(?in_tl ?pred ?val),
-  ?idx > 0,
-  domaine(?idx),
-  domaine(?val),
-  ?pred + 1 = ?idx.
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	fix(?in_tl ?pred ?val),
+	?idx > 0,
+	domaine(?idx),
+	domaine(?val),
+	?pred + 1 = ?idx.
 
 fix(?in 0 ?val) :-
-  domaine(?val),
-  dom_fst(?in ?val), dom_rst(?in ?in_tl).
+	domaine(?val),
+	dom_fst(?in ?val), dom_rst(?in ?in_tl).
 
 # Same as fix but for equisized arrays of indicies and values
 
 gfix(?lst ?inds ?vals) :-
-  dom_fst(?inds ?inds_hd), dom_rst(?inds ?inds_tl),
-  dom_fst(?vals ?vals_hd), dom_rst(?vals ?vals_tl),
-  fix(?lst ?inds_hd ?vals_hd),
-  gfix(?lst ?inds_tl ?vals_tl).
+	dom_fst(?inds ?inds_hd), dom_rst(?inds ?inds_tl),
+	dom_fst(?vals ?vals_hd), dom_rst(?vals ?vals_tl),
+	fix(?lst ?inds_hd ?vals_hd),
+	gfix(?lst ?inds_tl ?vals_tl).
 
 gfix(?lst ?inds ?vals) :-
-  list(?lst),
-  dom_nil(?inds),
-  dom_nil(?vals).
+	list(?lst),
+	dom_nil(?inds),
+	dom_nil(?vals).
 
 # Assert that ?out is the same as ?in with entries not corresponding to
 # 1s in ?chks removed
 
 select(?in ?chks ?out) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  dom_fst(?chks 1), dom_rst(?chks ?chks_tl),
-  dom_fst(?out ?in_hd), dom_rst(?out ?out_tl),
-  select(?in_tl ?chks_tl ?out_tl).
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	dom_fst(?chks 1), dom_rst(?chks ?chks_tl),
+	dom_fst(?out ?in_hd), dom_rst(?out ?out_tl),
+	select(?in_tl ?chks_tl ?out_tl).
 
 select(?in ?chks ?out) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  dom_fst(?chks 0), dom_rst(?chks ?chks_tl),
-  select(?in_tl ?chks_tl ?out).
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	dom_fst(?chks 0), dom_rst(?chks ?chks_tl),
+	select(?in_tl ?chks_tl ?out).
 
 select(?in ?chks ?out) :-
-  dom_nil(?in),
-  dom_nil(?chks),
-  dom_nil(?out).
+	dom_nil(?in),
+	dom_nil(?chks),
+	dom_nil(?out).
 
 # Assert that ?out is the same as ?in with entries not corresponding to
 # 0s in ?chks removed
 
 deselect(?in ?chks ?out) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  dom_fst(?chks 0), dom_rst(?chks ?chks_tl),
-  dom_fst(?out ?in_hd), dom_rst(?out ?out_tl),
-  deselect(?in_tl ?chks_tl ?out_tl).
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	dom_fst(?chks 0), dom_rst(?chks ?chks_tl),
+	dom_fst(?out ?in_hd), dom_rst(?out ?out_tl),
+	deselect(?in_tl ?chks_tl ?out_tl).
 
 deselect(?in ?chks ?out) :-
-  dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
-  dom_fst(?chks 1), dom_rst(?chks ?chks_tl),
-  deselect(?in_tl ?chks_tl ?out).
+	dom_fst(?in ?in_hd), dom_rst(?in ?in_tl),
+	dom_fst(?chks 1), dom_rst(?chks ?chks_tl),
+	deselect(?in_tl ?chks_tl ?out).
 
 deselect(?in ?chks ?out) :-
-  dom_nil(?in),
-  dom_nil(?chks),
-  dom_nil(?out).
+	dom_nil(?in),
+	dom_nil(?chks),
+	dom_nil(?out).
 
 # Interpreter Tick
 
 ~scratch(?ts ?id ?out), ~databases(?nts ?name ?out), ~fixpoint(?ts ?nts) :-
-  tick().
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 0), # TRUE
-  dom_max(?out),
-  tick().
+	in_time(?ts),
+	quote_type(?id 0), # TRUE
+	dom_max(?out),
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 6), # NOT
-  quote_not_body(?id ?qb),
-  ~scratch(?ts ?qb ?out),
-  dom_max(?out),
-  tick().
+	in_time(?ts),
+	quote_type(?id 6), # NOT
+	quote_not_body(?id ?qb),
+	~scratch(?ts ?qb ?out),
+	dom_max(?out),
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 7), # AND
-  quote_and_left(?id ?ql),
-  quote_and_right(?id ?qr),
-  scratch(?ts ?ql ?out),
-  scratch(?ts ?qr ?out),
-  tick().
+	quote_type(?id 7), # AND
+	quote_and_left(?id ?ql),
+	quote_and_right(?id ?qr),
+	scratch(?ts ?ql ?out),
+	scratch(?ts ?qr ?out),
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 8), # OR
-  quote_or_left(?id ?ql),
-  quote_or_right(?id ?qr),
-  scratch(?ts ?ql ?out),
-  tick().
+	quote_type(?id 8), # OR
+	quote_or_left(?id ?ql),
+	quote_or_right(?id ?qr),
+	scratch(?ts ?ql ?out),
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 8), # OR
-  quote_or_left(?id ?ql),
-  quote_or_right(?id ?qr),
-  scratch(?ts ?qr ?out),
-  tick().
+	quote_type(?id 8), # OR
+	quote_or_left(?id ?ql),
+	quote_or_right(?id ?qr),
+	scratch(?ts ?qr ?out),
+	tick().
 
 scratch0(?ts ?id ?out) :-
-  quote_type(?id 2), # TERM
-  quote_term_relation(?id ?name),
-  quote_term_params(?id ?vars),
-  quote_term_param_types(?id ?chks),
-  databases(?ts ?name ?vals),
-  dom_max(?out),
-  select(?vars ?chks ?vars_s),
-  select(?vals ?chks ?vals_s),
-  gfix(?out ?vars_s ?vals_s),
-  deselect(?vars ?chks ?syms),
-  deselect(?vals ?chks ?syms),
-  tick().
+	quote_type(?id 2), # TERM
+	quote_term_relation(?id ?name),
+	quote_term_params(?id ?vars),
+	quote_term_param_types(?id ?chks),
+	databases(?ts ?name ?vals),
+	dom_max(?out),
+	select(?vars ?chks ?vars_s),
+	select(?vals ?chks ?vals_s),
+	gfix(?out ?vars_s ?vals_s),
+	deselect(?vars ?chks ?syms),
+	deselect(?vals ?chks ?syms),
+	tick().
 
 to_add(?ts ?name ?out) :-
-  quote_type(?id 1), # RULE
-  quote_rule_head(?id ?qh),
-  quote_rule_body(?id ?qb),
-  quote_type(?qh 2 /*TERM*/),
-  quote_term_relation(?qh ?name),
-  quote_term_params(?qh ?vars),
-  quote_term_param_types(?qh ?chks),
-  scratch(?ts ?qb ?vals),
-  select(?vars ?chks ?vars_s),
-  select(?out ?chks ?out_s),
-  gfix(?vals ?vars_s ?out_s),
-  deselect(?vars ?chks ?syms),
-  deselect(?out ?chks ?syms),
-  tick().
+	quote_type(?id 1), # RULE
+	quote_rule_head(?id ?qh),
+	quote_rule_body(?id ?qb),
+	quote_type(?qh 2 /*TERM*/),
+	quote_term_relation(?qh ?name),
+	quote_term_params(?qh ?vars),
+	quote_term_param_types(?qh ?chks),
+	scratch(?ts ?qb ?vals),
+	select(?vars ?chks ?vars_s),
+	select(?out ?chks ?out_s),
+	gfix(?vals ?vars_s ?out_s),
+	deselect(?vars ?chks ?syms),
+	deselect(?out ?chks ?syms),
+	tick().
 
 to_del(?ts ?name ?out) :-
-  quote_type(?id 1), # RULE
-  quote_rule_head(?id ?qnh),
-  quote_rule_body(?id ?qb),
-  quote_type(?qnh 6 /*NOT*/),
-  quote_not_body(?qnh ?qh),
-  quote_type(?qh 2 /*TERM*/),
-  quote_term_relation(?qh ?name),
-  quote_term_params(?qh ?vars),
-  quote_term_param_types(?qh ?chks),
-  scratch(?ts ?qb ?vals),
-  select(?vars ?chks ?vars_s),
-  select(?out ?chks ?out_s),
-  gfix(?vals ?vars_s ?out_s),
-  deselect(?vars ?chks ?syms),
-  deselect(?out ?chks ?syms),
-  tick().
+	quote_type(?id 1), # RULE
+	quote_rule_head(?id ?qnh),
+	quote_rule_body(?id ?qb),
+	quote_type(?qnh 6 /*NOT*/),
+	quote_not_body(?qnh ?qh),
+	quote_type(?qh 2 /*TERM*/),
+	quote_term_relation(?qh ?name),
+	quote_term_params(?qh ?vars),
+	quote_term_param_types(?qh ?chks),
+	scratch(?ts ?qb ?vals),
+	select(?vars ?chks ?vars_s),
+	select(?out ?chks ?out_s),
+	gfix(?vals ?vars_s ?out_s),
+	deselect(?vars ?chks ?syms),
+	deselect(?out ?chks ?syms),
+	tick().
 
 to_carry(?nts ?name ?out) :-
-  databases(?nts ?name ?out),
-  tick().
+	databases(?nts ?name ?out),
+	tick().
 
 # A given time-step pair cannot be a fixed point if between their
 # corresponding databases, there is an entry that is in one but not the
 # other.
 
 not_fixpoint(?ts ?nts) :-
-  ?ts < ?nts,
-  in_time(?ts),
-  in_time(?nts),
-  databases(?ts ?name ?out),
-  ~databases(?nts ?name ?out),
-  tick().
+	?ts < ?nts,
+	in_time(?ts),
+	in_time(?nts),
+	databases(?ts ?name ?out),
+	~databases(?nts ?name ?out),
+	tick().
 
 not_fixpoint(?ts ?nts) :-
-  ?ts < ?nts,
-  in_time(?ts),
-  in_time(?nts),
-  ~databases(?ts ?name ?out),
-  databases(?nts ?name ?out),
-  tick().
+	?ts < ?nts,
+	in_time(?ts),
+	in_time(?nts),
+	~databases(?ts ?name ?out),
+	databases(?nts ?name ?out),
+	tick().
 
 # Interpreter Tock
 
 ~scratch0(?ts ?id ?out), ~to_add(?ts ?name ?out), ~to_del(?ts ?name ?out), ~to_carry(?nts ?name ?out), ~not_fixpoint(?ts ?nts) :-
-  tock().
+	tock().
 
 # Prevents more than the given number of database steps from being
-# derived. The addition of 1 to ?ts forces ?ts to be a number.
+# derived. The addition of 0 to ?ts forces ?ts to be a number.
 
-in_time(?ts) :- 0 <= ?ts, ?ts < 43210, ?ts + 1 = ?tm.
+in_time(?ts) :- 0 <= ?ts, ?ts < 43210, ?ts + 0 = ?ts.
 
 # Add all the facts into the zeroth database
 
 databases(0 ?name ?out) :-
-  quote_type(?id 0), # FACT
-  quote_fact_term(?id ?qt),
-  quote_type(?qt 2 /*TERM*/),
-  quote_term_relation(?qt ?name),
-  quote_term_params(?qt ?vars),
-  quote_term_param_types(?qt ?chks),
-  list(?out),
-  deselect(?vars ?chks ?syms),
-  deselect(?out ?chks ?syms),
-  tock().
+	quote_type(?id 0), # FACT
+	quote_fact_term(?id ?qt),
+	quote_type(?qt 2 /*TERM*/),
+	quote_term_relation(?qt ?name),
+	quote_term_params(?qt ?vars),
+	quote_term_param_types(?qt ?chks),
+	list(?out),
+	deselect(?vars ?chks ?syms),
+	deselect(?out ?chks ?syms),
+	tock().
 
 # Add all the derived insertions into the next database
 
 databases(?nts ?name ?out) :-
-  ?ts + 1 = ?nts,
-  in_time(?ts),
-  to_add(?ts ?name ?out),
-  tock().
+	?ts + 1 = ?nts,
+	in_time(?ts),
+	to_add(?ts ?name ?out),
+	tock().
 
 # Carry over all the undeleted facts from the previous database into the
 # next. The qualifier "undeleted" is important, otherwise deleting
 # existing facts would always cause a contradicition.
 
 databases(?nts ?name ?out) :-
-  ?ts + 1 = ?nts,
-  in_time(?ts),
-  ~to_del(?ts ?name ?out),
-  to_carry(?ts ?name ?out),
-  tock().
+	?ts + 1 = ?nts,
+	in_time(?ts),
+	~to_del(?ts ?name ?out),
+	to_carry(?ts ?name ?out),
+	tock().
 
 # Delete all the derived deletions from the next database
 
 ~databases(?nts ?name ?out) :-
-  ?ts + 1 = ?nts,
-  in_time(?ts),
-  to_del(?ts ?name ?out),
-  tock().
+	?ts + 1 = ?nts,
+	in_time(?ts),
+	to_del(?ts ?name ?out),
+	tock().
 
 scratch(?ts ?id ?out) :-
-  scratch0(?ts ?id ?out),
-  tock().
+	scratch0(?ts ?id ?out),
+	tock().
 
 # A timestep is a fixpoint if it is not not a fixpoint.
 
 fixpoint(?ts ?nts) :-
-  ?ts < ?nts,
-  in_time(?ts),
-  in_time(?nts),
-  ~not_fixpoint(?ts ?nts),
-  tock().
+	?ts < ?nts,
+	in_time(?ts),
+	in_time(?nts),
+	~not_fixpoint(?ts ?nts),
+	tock().

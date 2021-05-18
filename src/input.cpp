@@ -562,23 +562,17 @@ sprawformtree raw_rule::get_prft() const {
 	if(prft) {
 		return prft;
 	} else if(b.empty()) {
-		return std::make_shared<raw_form_tree>(elem::NONE, raw_term::_true());
+		return std::make_shared<raw_form_tree>(raw_term::_true());
 	} else {
 		sprawformtree disj =
-			std::make_shared<raw_form_tree>(elem::NONE, raw_term::_false());
+			std::make_shared<raw_form_tree>(raw_term::_false());
 		for(size_t i = 0; i < b.size(); i++) {
 			sprawformtree conj =
-				std::make_shared<raw_form_tree>(elem::NONE, raw_term::_true());
+				std::make_shared<raw_form_tree>(raw_term::_true());
 			for(size_t j = 0; j < b[i].size(); j++) {
 				raw_term entr = b[i][j];
-				bool negated = entr.neg;
-				entr.neg = false;
-				sprawformtree tm =
-					std::make_shared<raw_form_tree>(elem::NONE, entr);
-				if(negated) {
-					tm = std::make_shared<raw_form_tree>(elem::NOT, tm);
-				}
-				conj = std::make_shared<raw_form_tree>(elem::AND, conj, tm);
+				conj = std::make_shared<raw_form_tree>(elem::AND, conj,
+					std::make_shared<raw_form_tree>(entr));
 			}
 			disj = std::make_shared<raw_form_tree>(elem::ALT, disj, conj);
 		}
@@ -666,7 +660,7 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 		++pos;
 		if( ! parseform(in, root, 0) ) goto Cleanup;
 		if( isneg)
-			root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
+			root = std::make_shared<raw_form_tree>(elem::NOT, root);
 
 		if( pos == l.size() && *l[pos][0] != '}') goto Cleanup;
 		++pos;
@@ -681,8 +675,8 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 		if(next.type == elem::SYM) {
 			raw_term tm;
 			if( !tm.parse(in, prog, true)) goto Cleanup;
-			root = std::make_shared<raw_form_tree>(elem::NONE, &tm);
-			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
+			root = std::make_shared<raw_form_tree>(tm);
+			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, root);
 			matroot = root;
 			return true;
 		}
@@ -690,8 +684,8 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 		else if(next.type == elem::VAR) {
 			raw_term tm;
 			if( !tm.parse(in, prog, false)) goto Cleanup;
-			root = std::make_shared<raw_form_tree>(elem::NONE, &tm);
-			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr, root);
+			root = std::make_shared<raw_form_tree>(tm);
+			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, root);
 			matroot = root;
 			return true;
 		} else {
@@ -705,12 +699,12 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 				if( !rpfx.parse(in) ) goto Cleanup;
 
 				if(!cur) root = cur = std::make_shared<raw_form_tree>(
-					rpfx.qtype.type, nullptr, &rpfx.qtype);
+					rpfx.qtype.type, rpfx.qtype);
 				else cur->r = std::make_shared<raw_form_tree>(
-					rpfx.qtype.type, nullptr, &rpfx.qtype),
+					rpfx.qtype.type, rpfx.qtype),
 					cur = cur->r;
 				cur->l = std::make_shared<raw_form_tree>(rpfx.ident.type,
-					nullptr, &rpfx.ident);
+					rpfx.ident);
 				next.peek(in);
 			}
 
@@ -723,8 +717,7 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 			if (pos == l.size() || *l[pos][0] != '}') goto Cleanup;
 
 			++pos;
-			if (isneg) root = std::make_shared<raw_form_tree>(elem::NOT,
-				nullptr, nullptr, root);
+			if (isneg) root = std::make_shared<raw_form_tree>(elem::NOT, root);
 
 			matroot = root;
 			return true;
@@ -752,7 +745,7 @@ bool raw_sof::parseform(input* in, sprawformtree &froot, int_t prec ) {
 		(nxt.type == elem::IMPLIES || nxt.type == elem::COIMPLIES))
 	{
 		nxt.parse(in);
-		cur = std::make_shared<raw_form_tree>(nxt.type, nullptr, &nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt.type, nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 2)) goto Cleanup ;
 		nxt.peek(in);
@@ -761,7 +754,7 @@ bool raw_sof::parseform(input* in, sprawformtree &froot, int_t prec ) {
 	nxt.peek(in);
 	while( prec <= 0 && (nxt.type == elem::AND || nxt.type == elem::ALT) ) {
 		nxt.parse(in);
-		cur = std::make_shared<raw_form_tree>(nxt.type, nullptr, &nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt.type, nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 1) ) goto Cleanup;
 		nxt.peek(in);
@@ -815,17 +808,18 @@ sprawformtree raw_form_tree::simplify(sprawformtree &t) {
 			break;
 		case elem::AND:
 			simplify(t->l), simplify(t->r);
-			if (t->l->type == elem::NONE && t->l->rt->is_true())
+			if (t->l->is_true()) {
 				t = t->r;
-			else if (t->r->type == elem::NONE && t->r->rt->is_true())
+			} else if (t->r->is_true()) {
 				t = t->l;
+			}
 			break;
 		case elem::ALT:
 			simplify(t->l);
 			simplify(t->r);
-			if(t->l->type == elem::NONE && t->l->rt->is_false()) {
+			if(t->l->is_false()) {
 				t = t->r;
-			} else if(t->r->type == elem::NONE && t->r->rt->is_false()) {
+			} else if(t->r->is_false()) {
 				t = t->l;
 			}
 			break;

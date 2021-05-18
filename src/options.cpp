@@ -175,8 +175,8 @@ void options::setup() {
 #endif
 	add_bool("sdt",     "sdt transformation");
 	add_bool("bin",     "bin transformation");
-	add_bool("complete-bin",
-		"transformation to make each rule have at most a single conjunction");
+	add_bool("complete-tern",
+		"transformation to make each rule have at most two conjunctions");
 	add_bool("cqc-subsume",
 		"subsume queries into each other using CQC test");
 	add_bool("cqnc-subsume",

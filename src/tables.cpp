@@ -1063,17 +1063,14 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			bool is_sol = false;
 			form* froot = 0;
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr,
-					r.prft)
+				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
 				: r.prft;
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = std::make_shared<raw_form_tree>(elem::AND,
-					nullptr, nullptr, root,
-					std::make_shared<raw_form_tree>(elem::NONE,
-						&gt));
+				root = std::make_shared<raw_form_tree>(elem::AND, root,
+					std::make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
 
@@ -1605,9 +1602,7 @@ bool tables::get_rules(flat_prog p) {
 	replace_rel(move(r), p);
 	if (bcqc) print(o::out()<<"after cqc before tbin, "
 		<<p.size()<<" rules."<<endl, p);
-#ifndef TRANSFORM_BIN_DRIVER
 	if (opts.bin_transform) transform_bin(p);
-#endif
 	if (bcqc) print(o::out()<<"before cqc after tbin, "
 		<<p.size()<< " rules."<<endl, p);
 	q = move(p);
