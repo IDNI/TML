@@ -864,9 +864,11 @@ void driver::qc_z3 (raw_prog &raw_p) {
 		for (auto selected = rrs.begin(); selected != rrs.end(); selected++) {
 			for (auto compared = selected + 1; compared != rrs.end(); compared++) {
 				z3::expr rule1 =
-					body_to_z3(*selected, c, t, rel_to_decl, var_to_decl);
+					body_to_z3(*selected, c, rel_to_decl,
+						   var_to_decl);
 				z3::expr rule2 =
-					body_to_z3(*compared, c, t, rel_to_decl, var_to_decl);
+					body_to_z3(*compared, c, rel_to_decl,
+						   var_to_decl);
 				s.push();
 				// Get head variables
 				z3::expr_vector bound_vars (c);
@@ -910,7 +912,7 @@ void driver::qc_z3 (raw_prog &raw_p) {
  * Given a rule, output the body of this rule converted to the corresponding
  * Z3 expression.
 */
-z3::expr driver::body_to_z3(raw_rule &rr, z3::context &c, z3::sort &s,
+z3::expr driver::body_to_z3(raw_rule &rr, z3::context &c,
 			    map<raw_term, z3::func_decl> &rel_to_decl,
 			    map<lexeme, z3::expr> &var_to_decl) {
 	// TODO also treat body of FOL rule
@@ -3449,6 +3451,11 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
 			o::dbg() << "Program Generator:" << std::endl << std::endl
 				<< to_string(rp_generator) << std::endl;
+		}
+		if(opts.enabled("qc_subsume_z3")){
+			o::dbg() << "Query containment subsumption using z3" << endl;
+			qc_z3(rp);
+			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("complete-bin") ||
