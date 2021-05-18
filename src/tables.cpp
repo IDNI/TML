@@ -591,7 +591,8 @@ template void tables::out<wchar_t>(wostream& os) const;
 
 template <typename T>
 bool tables::out_fixpoint(basic_ostream<T>& os) {
-	if(fronts.size() < 2 ||
+	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
+	if(fronts_size < 2 ||
 			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
 			fronts.end()-1) {
 		// There cannot be a fixpoint if there are less than two fronts or
@@ -599,31 +600,36 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		return false;
 	} else if (opts.pfp3) {
 		// If FO(3-PFP) semantics are in effect
-		// Determine which facts are true and which are false
-		level trues(tbls.size(), htrue), falses(tbls.size(), htrue);
-		int_t i = fronts.size() - 1;
+		// Determine which facts are true, false, and undefined
+		level trues(tbls_size), falses(tbls_size), undefineds(tbls_size);
 		// Loop back to the first repetition of the last front. It is clear
 		// that the set of intervening fronts are periodic
-		do {
-			for(ntable n = 0; n < (ntable)tbls.size(); n++) {
-				// True facts are those for which there exists an I such that
-				// for all i>=I, the fact is a member of front i
-				trues[n] = trues[n] && fronts[i][n];
-				// False facts are those for which there exists an I such that
-				// for all i>=I, the fact is not a member of front i
-				falses[n] = falses[n] % fronts[i][n];
+		int_t cycle_start;
+		for(cycle_start = fronts_size - 2;
+			fronts[cycle_start] != fronts.back(); cycle_start--);
+		// Make a buffer to hold the sequence of states a single table
+		// eventually cycles through
+		bdd_handles cycle(fronts_size - 1 - cycle_start);
+		// For each table, compute which facts are true, false, and
+		// undefined respectively
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
+			// Compute the eventual cycle of the current table
+			for(int_t i = cycle_start + 1; i < fronts_size; i++) {
+				cycle[i - cycle_start - 1] = fronts[i][n];
 			}
-		} while(fronts[--i] != fronts.back());
-		// Determine which facts are undefined
-		level undefineds(tbls.size());
-		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+			// True facts are those for which there exists an I such that
+			// for all i>=I, the fact is a member of front i
+			trues[n] = bdd_and_many(cycle);
+			// False facts are those for which there exists an I such that
+			// for all i>=I, the fact is not a member of front i
+			falses[n] = htrue % bdd_or_many(cycle);
 			// Undefined facts are those which are neither true nor false
 			undefineds[n] = htrue % (trues[n] || falses[n]);
 		}
 		// Print out the true points separately
 		os << "true points:" << endl;
 		bool exists_trues = false;
-		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
 			decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
 				os << to_raw_term(r) << '.' << endl;
 				exists_trues = true; });
@@ -633,18 +639,18 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// Finally print out the undefined points separately
 		os << endl << "undefined points:" << endl;
 		bool exists_undefineds = false;
-		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
 			decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
 				os << to_raw_term(r) << '.' << endl;
 				exists_undefineds = true; });
 		}
 		if(!exists_undefineds) os << "(none)" << std::endl;
 		return true;
-	} else if(fronts.back() == fronts[fronts.size() - 2]) {
+	} else if(fronts.back() == fronts[fronts_size - 2]) {
 		// If FO(PFP) semantics are in effect and the last two fronts are
 		// equal then print them; this is the fixpoint.
 		level &l = fronts.back();
-		for(ntable n = 0; n < (ntable)tbls.size(); n++) {
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
 			if (!tbls[n].internal)
 				decompress(l[n], n, [&os, this](const term& r) {
 					os << to_raw_term(r) << '.' << endl; });
@@ -1063,17 +1069,14 @@ flat_prog tables::to_terms(const raw_prog& p) {
 			bool is_sol = false;
 			form* froot = 0;
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, nullptr, nullptr,
-					r.prft)
+				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
 				: r.prft;
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = std::make_shared<raw_form_tree>(elem::AND,
-					nullptr, nullptr, root,
-					std::make_shared<raw_form_tree>(elem::NONE,
-						&gt));
+				root = std::make_shared<raw_form_tree>(elem::AND, root,
+					std::make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
 
@@ -1605,9 +1608,7 @@ bool tables::get_rules(flat_prog p) {
 	replace_rel(move(r), p);
 	if (bcqc) print(o::out()<<"after cqc before tbin, "
 		<<p.size()<<" rules."<<endl, p);
-#ifndef TRANSFORM_BIN_DRIVER
 	if (opts.bin_transform) transform_bin(p);
-#endif
 	if (bcqc) print(o::out()<<"before cqc after tbin, "
 		<<p.size()<< " rules."<<endl, p);
 	q = move(p);

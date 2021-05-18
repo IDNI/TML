@@ -1136,10 +1136,12 @@ size_t hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 
 size_t hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}
 
-size_t hash<bdds>::operator()(const bdds& b) const {
-	size_t r = 0;
-	for (int_t i : b) r ^= i;
-	return r;
+size_t hash<bdds>::operator()(const bdds& vec) const {
+	size_t seed = vec.size();
+	for(auto& i : vec) {
+		seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	return seed;
 }
 
 bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
