@@ -546,13 +546,13 @@ bool raw_term::calc_arity(input* in) {
  * level exists.
  * */
 int_t raw_term::get_depth_one_arity() const {
-	size_t dep = 0;
+	size_t dep = 1;
 	int_t one_arity = -1;
 	for (const int_t& i : arity) {
 		if (i == -1) dep++;
 		if (i == -2) dep--;
 		if (dep == 1 && one_arity < 0) one_arity = 0;
-		if (dep == 1) one_arity++;
+		if (dep == 1) one_arity+=i;
 	}
 	return one_arity;
 }

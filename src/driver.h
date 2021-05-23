@@ -129,8 +129,9 @@ class driver {
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
     	z3::expr body_to_z3(raw_rule &rr, z3::context &c,
-			    std::map <raw_term, z3::func_decl> &rel_to_decl,
-			    std::map <lexeme, z3::expr> &var_to_decl);
+			    std::map <elem, z3::func_decl> &rel_to_decl,
+			    std::map <elem, z3::expr> &var_to_decl,
+			    std::map <elem, elem> &head_rename);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
