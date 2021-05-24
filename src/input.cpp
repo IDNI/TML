@@ -550,9 +550,9 @@ int_t raw_term::get_depth_one_arity() const {
 	int_t one_arity = -1;
 	for (const int_t& i : arity) {
 		if (i == -1) dep++;
-		if (i == -2) dep--;
 		if (dep == 1 && one_arity < 0) one_arity = 0;
 		if (dep == 1) one_arity+=i;
+		if (i == -2) dep--;
 	}
 	return one_arity;
 }

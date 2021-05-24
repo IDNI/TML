@@ -115,6 +115,7 @@ class driver {
 		const sprawformtree &tree, std::vector<sprawformtree> &tms);
 	bool is_cq(const raw_rule &rr);
 	bool is_cqn(const raw_rule &rr);
+	bool is_qc(const raw_rule &rr);
 	template<typename F> bool try_minimize(raw_rule &rr, const F &f);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
