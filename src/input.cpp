@@ -539,22 +539,16 @@ bool raw_term::calc_arity(input* in) {
 	return true;
 }
 
-/* Returns the arity of the raw_term found on the first depth level of
- * parentheses. In particular if extype = raw_term::REL, it returns
- * the arity of the relation.
- * Returns -1 if no parentheses are contained and therefore, no first depth
- * level exists.
- * */
-int_t raw_term::get_depth_one_arity() const {
-	size_t dep = 1;
-	int_t one_arity = -1;
+/* Returns the arity of the raw_term; That is the arity excluding parenthesis.
+ * In particular if extype = raw_term::REL, it returns
+ * the mathematical arity of the relation. */
+
+int_t raw_term::get_formal_arity() const {
+	int_t one_arity = 0;
 	for (const int_t& i : arity) {
-		if (i == -1) dep++;
-		if (dep == 1 && one_arity < 0) one_arity = 0;
-		if (dep == 1) one_arity+=i;
-		if (i == -2) dep--;
-	}
-	return one_arity;
+		if (i == -1 || i == -2) continue;
+		else one_arity+=i;
+	} return one_arity;
 }
 
 bool macro::parse(input* in, const raw_prog& prog){
