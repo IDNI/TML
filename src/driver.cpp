@@ -185,8 +185,8 @@ bool driver::is_cqn(const raw_rule &rr) {
  * or disjunctive with negation */
 
 bool driver::is_qc (const raw_rule &rr) {
-	// Ensure that there are no multiple heads
-	if(rr.h.size() != 1) return false;
+	// Ensure that there are no multiple heads and it is not a fact
+	if(rr.h.size() != 1 || rr.b.empty()) return false;
 	// Ensure that head is positive
 	if(rr.h[0].neg) return false;
 	// Ensure that this rule is a proper rule
@@ -931,6 +931,7 @@ int driver::check_qc_z3(raw_rule &r1, raw_rule &r2, z3::solver &s,
 			z3::context &c,
 			std::map<elem, z3::func_decl> &rel_to_decl,
 			std::map<elem, z3::expr> &var_to_decl) {
+	if (!(is_qc(r1) && is_qc(r2))) return 0;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 	    	r1.h[0].arity == r2.h[0].arity)) return 0;
