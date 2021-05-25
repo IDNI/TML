@@ -20,7 +20,9 @@
 #include <memory>
 #include <functional>
 #include "defs.h"
+#ifndef NOMMAP
 #include "memory_map.h"
+#endif
 
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
@@ -41,7 +43,11 @@ typedef std::vector<int_t> bdds;
 typedef std::vector<spbdd_handle> bdd_handles;
 typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
+#ifdef NOMMAP
+typedef std::vector<class bdd> bdd_mmap;
+#else
 typedef std::vector<class bdd, memory_map_allocator<bdd> >bdd_mmap;
+#endif
 
 struct ite_memo {
 	int_t x, y, z;
@@ -107,7 +113,9 @@ size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
 extern size_t max_bdd_nodes;
+#ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;
+#endif
 
 // template<typename T>
 // struct veccmp {
@@ -317,8 +325,12 @@ public:
 	inline bool operator==(const bdd& b) const {
 		return v == b.v && h == b.h && l == b.l;
 	}
+#ifndef NOMMAP
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
 		const std::string fn="");
+#else
+	static void init();
+#endif
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);

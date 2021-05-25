@@ -13,7 +13,14 @@
 #include <cassert>
 #include <algorithm>
 #include "bdd.h"
+
+#ifndef NOOUTPUTS
 #include "output.h"
+#define OUT(x) x
+#else
+#define OUT(x)
+#endif
+
 using namespace std;
 
 #define MEMO
@@ -38,9 +45,11 @@ template<typename T1, typename T2> struct vec2cmp {
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 bdd_mmap V;
+#ifndef NOMMAP
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
 string bdd_mmap_file = "";
+#endif
 unordered_map<ite_memo, int_t> C;
 map<bools, unordered_map<array<int_t, 2>, int_t>, veccmp<bool>> CX;
 map<pair<bools, uints>, unordered_map<array<int_t, 2>, int_t>,
@@ -67,11 +76,15 @@ _Pragma("GCC diagnostic pop")
 
 const size_t gclimit = 1e+6;
 
+#ifndef NOMMAP
 void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 	bdd_mmap_mode = m;
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
 	V = bdd_mmap(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V.reserve(max_bdd_nodes);
+#else
+void bdd::init() {
+#endif
 	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
 	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
 	//	", max_size: " << max_size << ", fn: " << fn
@@ -83,16 +96,18 @@ void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
+#ifndef NOMMAP
 void bdd::max_bdd_size_check() {
 	//DBG(o::dbg() << "add_check V.size()-1=" << V.size()-1
 	//	<< " max_bdd_nodes=" << max_bdd_nodes << endl;)
 	if (V.size() == max_bdd_nodes)
 		CERR << "Maximum bdd size reached. Increase the limit"
-		" with --bdd-max-size parameter. Exitting." << endl,
+		" with --bdd-max-size parameter. Exiting." << endl,
 		onexit = true,
 		exit(0);
 		// TODO: offer user to remap instead of exit
 }
+#endif
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(h && l && v > 0););
@@ -595,11 +610,16 @@ void bdd::gc() {
 	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
+#ifndef NOMMAP
 	bdd_mmap v1(memory_map_allocator<bdd>("", bdd_mmap_mode));
 	v1.reserve(bdd_mmap_mode == MMAP_NONE ? S.size() : max_bdd_nodes);
+#else
+	bdd_mmap v1;
+	v1.reserve(S.size());
+#endif
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
-	stats(o::dbg())<<endl;
+	OUT(stats(o::dbg())<<endl;)
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V.size(); ++n) {
@@ -709,7 +729,7 @@ void bdd::gc() {
 				V[n].h, V[n].l), n);
 		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
-	o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;
+	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
