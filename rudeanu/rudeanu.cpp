@@ -27,8 +27,10 @@ struct node {
 		while (isspace(*to)) --to;
 		s = string(from, to);
 	}
+	node(const string &s) : s(s) {}
+	node(const string &s, vector<node*> v) : s(s), v(v) {}
 	void add(node* n) { if (n) v.push_back(n); }
-};
+} top("T"), bot("F");
 
 node* parse(ccp *s) {
 	ccp t = *s;
@@ -61,6 +63,57 @@ ostream& operator<<(ostream& os, const node& n) {
 	return os;
 }
 
+node* node_neg(node* n) {
+	if (n == &top) return &bot;
+	if (n == &bot) return &top;
+	return new node("not", {n});
+}
+
+node* node_and(node* x, node *y) {
+	if (x == &bot) return &bot;
+	if (y == &bot) return &bot;
+	if (x == &top) return y;
+	if (y == &top) return x;
+	return new node("and", {x, y});
+}
+
+node* node_xor(node* x, node *y) {
+	if (x == &bot) return y;
+	if (y == &bot) return x;
+	if (x == &top) return node_neg(y);
+	if (y == &top) return node_neg(x);
+	return new node("xor", {x, y});
+}
+
+void normalize_leq(node* n) {
+	if (n->v.size() != 4)
+		throw runtime_error("conditionals take exactly 4 arguments.");
+	n->s = "eq";
+	n->v[0] = node_and(n->v[0], node_neg(n->v[1]));
+	n->v[1] = &bot;
+}
+
+void normalize_lt(node* n) {
+	if (n->v.size() != 4)
+		throw runtime_error("conditionals take exactly 4 arguments.");
+	n->s = "eq";
+	n->v[0] = node_and(n->v[0], node_neg(n->v[1]));
+	n->v[1] = &bot;
+	n->v[2] = new node("neq",
+		{node_and(node_neg(n->v[0]), n->v[1]), &bot, n->v[2], n->v[3]});
+}
+
+void normalize(node* n) {
+	if (!n) return;
+	for (node* k : n->v) normalize(k);
+	if (n->s == "leq") normalize_leq(n);
+	else if (n->s == "geq") swap(n->v[0], n->v[1]), normalize_leq(n);
+	else if (n->s == "lt") normalize_lt(n);
+	else if (n->s == "gt") swap(n->v[0], n->v[1]), normalize_lt(n);
+	else if (n->s == "eq" || n->s == "neq")
+		n->v[0] = node_xor(n->v[0], n->v[1]), n->v[1] = &bot;
+}
+
 spbdd_handle get_bf(const node* n) {
 	if (n->s == "and") {
 		bdd_handles v;
@@ -77,6 +130,11 @@ spbdd_handle get_bf(const node* n) {
 			throw runtime_error("not() takes exactly one argument");
 		return htrue % get_bf(n->v[0]);
 	}
+	if (n->s == "xor") {
+		if (n->v.size() != 2)
+			throw runtime_error("xor() takes exactly two arguments");
+		return bdd_xor(get_bf(n->v[0]), get_bf(n->v[1]));
+	}
 	if (n->s == "T") return htrue;
 	if (n->s == "F") return hfalse;
 	try {
@@ -91,6 +149,8 @@ spbdd_handle get_bf(const node* n) {
 int main() {
 	bdd::init();
 	node *n = parse("and(1,2,or(3,not(4)))");
+	cout << *n << endl << "normalized: " << endl;
+	normalize(n);
 	cout << *n << endl;
-	out<char>(cout, get_bf(n)) << endl;
+	out<char>(cout << "bdd: " << endl, get_bf(n)) << endl;
 }
