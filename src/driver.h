@@ -129,6 +129,13 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
+	z3::solver create_z3_solver(raw_prog &raw_p, z3::context &c,
+				    std::map<elem, z3::func_decl> &rel_to_decl,
+				    std::map<elem, z3::expr> &var_to_decl);
+	int check_qc_z3 (raw_rule& r1, raw_rule& r2, z3::solver& s,
+		  	 z3::context &c,
+		  	 std::map<elem, z3::func_decl> &rel_to_decl,
+			 std::map<elem, z3::expr> &var_to_decl);
     	z3::expr body_to_z3(raw_rule &rr, z3::context &c,
 			    std::map <elem, z3::func_decl> &rel_to_decl,
 			    std::map <elem, z3::expr> &var_to_decl,

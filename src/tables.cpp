@@ -2908,7 +2908,7 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const ::options &opts,
 	to.bin_transform     = opts.enabled("bin");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
-	tables tbl(move(dict), to);
+	tables tbl(dict, to);
 	strs_t strs;
 	if(tbl.run_prog(rp, strs)) {
 		for(const term &result : tbl.decompress()) {
