@@ -61,8 +61,10 @@ std::wstring s2ws(const std::wstring&);
 std::string  ws2s(const std::string&);
 std::string  ws2s(const std::wstring&);
 
+#ifndef NOOUTPUTS
 std::wostream& operator<<(std::wostream& os, const std::string& s);
 std::ostream&  operator<<(std::ostream&  os, const char c);
+#endif
 
 std::string to_string_(int_t v);
 string_t to_string_t(int_t v);
