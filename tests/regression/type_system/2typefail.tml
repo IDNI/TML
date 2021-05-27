@@ -7,12 +7,12 @@ struct styp {
     int:2 ?c, ?z .
     sttyp2 ?inner, ?in3.
 }
-record father( sym ?b).
-record canFly( sym ?c ).
-record edge (int:3 ?c, int:2 ?c ).
-record night( int:2 ?A).
-record pair(int ?a, char ?b).
-record school ( undeftype ?name,  sttyp2 ?l ).
+predtype father( sym ?b).
+predtype canFly( sym ?c ).
+predtype edge (int:3 ?c, int:2 ?c ).
+predtype night( int:2 ?A).
+predtype pair(int ?a, char ?b).
+predtype school ( undeftype ?name,  sttyp2 ?l ).
 
 father(fff wrongargcount).
 #father(Tom Amy).  

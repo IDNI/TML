@@ -43,11 +43,11 @@ unot => '*' |'+' | null.
 primtype => "int" | "int:" bitsz | "char" | "symb".
 bitsz =>  digit+.
 type => primtype | structype .
-recordef => "record" relname '('  type var (',' type var)* ')'.
+predtypedef => "predtype" relname '('  type var (',' type var)* ')'.
 structype => relname .
 structypedef => "struct" structtype '{' typevardecl ('.' typevardecl)* '}'.
 typevardecl => type var (',' var)* '.'.
-typestmt => recordef | structypedef .
+typestmt => predtypedef | structypedef .
 
 prefix => "forall" | "exists" | "unique" .
 prefixdecl => prefix ws identifier ws prefixdecl | prefix ws identifier ws.

@@ -9,12 +9,12 @@ struct styp {
     sttyp2 ?inner, ?in3.
 }
 
-#record father( sym ?b).
-#record canFly( sym ?c ).
-#record edge (int:2 ?c, int:2 ?c ).
-#record night( ).
-#record pair(int ?a, int ?b).
-#record school ( styp ?name,  styp ?l ).
+#predtype father( sym ?b).
+#predtype canFly( sym ?c ).
+#predtype edge (int:2 ?c, int:2 ?c ).
+#predtype night( ).
+#predtype pair(int ?a, int ?b).
+#predtype school ( styp ?name,  styp ?l ).
 
 father("fff").
 #father(Tom Amy).   # Tom is a father of Amy.
