@@ -477,7 +477,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			in->parse_error(l[pos][0], err_leq_expected, l[pos]);
 		// GEQ <==> LEQ + reverse args + !neg
 		swap(e[2], e[0]); // e = { e[2], e[1], e[0] };
-		if (!geq) neg = !neg;
+		if (lt) neg = !neg;
 		extype = raw_term::LEQ;
 		return calc_arity(in);
 	}
@@ -792,7 +792,7 @@ void raw_form_tree::printTree( int level) {
 	if( r ) r->printTree(level + 1)	;
 	COUT << '\n';
 	for(int i = 0; i < level; i++) COUT << '\t';
-	(this->rt)?	COUT<<*rt : (this->el)? COUT <<*el: COUT<<"";
+	(this->rt)?	COUT<<*rt : (this->el)? COUT << *el : (this->type) == elem::NOT ? COUT <<"not" : COUT << "";
 	if (l) l->printTree(level + 1);
 }
 
