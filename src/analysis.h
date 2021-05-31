@@ -33,6 +33,16 @@ struct context {
     bool contains_typedef_var(string_t &var) const {
         return context_typedef_var.find(var) != context_typedef_var.end() ;
     }
+
+    std::string to_print() const {
+        std::string ret;
+        ret.append("\n");
+        for(auto &it: context_prim_var) 
+          ret.append( to_string(it.first)+ ":" + it.second.to_print());
+        for(auto &it: context_typedef_var)
+          ret.append(to_string(it.first) + ":" + to_string(it.second));
+        return ret;
+    }
 };
 
 class environment {    

@@ -548,7 +548,33 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 bool environment::build_from( const raw_term &rt, bool infer=false){
 	string_t str = lexeme2str(rt.e[0].e);
 
-	if( this->contains_pred(str)) return false; 
+	if( this->contains_pred(str)){
+		// know types already, just try to update var context.
+		const std::vector<typedecl> &targs= this->lookup_pred(str);
+		bool updated =false;
+		for( size_t i=2; i < rt.e.size()-1; i++ ){
+			if(rt.e[i].type== elem::VAR ) {
+				str = lexeme2str(rt.e[i].e);
+				//context already knows var types so ..dont do anything
+					if (this->contains_prim_var(str) ){
+						//DBG(assert( this->lookup_prim_var(str) == targs[i-2].pty));
+						// override type definition
+						updated |= this->addtocontext(str, targs[i-2].pty );
+					}
+					else if( this->contains_typedef_var(str)) {
+						//	DBG(assert( this->lookup_typedef_var(str).structname == targs[i-2].structname));
+					}
+				//context does not know..so now populate from signature
+					else if( targs[i-2].is_primitive()){
+						updated |= this->addtocontext(str, targs[i-2].pty);
+					}
+					else if( targs[i-2].is_usertype()){
+						updated |= this->addtocontext(str, lexeme2str(targs[i-2].structname.e));
+					}
+			}
+		}
+		return updated;
+	}
 	std::vector<typedecl> targs;
 	size_t st=0, end=rt.e.size();
 	bool bknown = true;  // assume all args types are determinable 
@@ -716,6 +742,8 @@ bool typechecker::tcheck(){
 		ret &= tc.tcheck() ;
 	}
 	DBG(COUT<<env.to_print());
+	for( size_t i =0 ; i <rp.r.size(); i ++)
+		;//DBG(COUT<<rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():"");
 	return ret;
 }
 
