@@ -29,28 +29,17 @@
 #include "options.h"
 #include "builtins.h"
 #include "analysis.h"
+#include "ir_builder.h"
+
 typedef int_t rel_t;
-class archive;
+typedef bdd_handles level;
+
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
-//struct raw_sof;
 struct raw_form_tree;
+class archive;
 class tables;
-//class dict_t;
-
-typedef std::pair<rel_t, ints> sig;
-//typedef std::map<int_t, size_t> varmap;
-typedef std::map<int_t, int_t> env;
-typedef bdd_handles level;
-typedef std::set<std::vector<term>> flat_prog;
-
-template<typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
-
-template<typename T> struct ptrcmp {
-	bool operator()(const T* x, const T* y) const { return *x < *y; }
-};
 
 typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 	cb_ground;
@@ -67,6 +56,7 @@ struct natcmp {
 		return (const ints&)l < r;
 	}
 };
+
 typedef std::set<term, natcmp> term_set;
 
 struct body {
@@ -158,7 +148,6 @@ struct table {
 	spbdd_handle t = hfalse;
 	bdd_handles add, del;
 	std::vector<size_t> r;
-	//bool ext = true; // extensional
 	bool unsat = false, tmp = false;
 	int_t idbltin = -1;
 	ints bltinargs;
@@ -174,8 +163,14 @@ class tables {
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 	friend struct form;
 	friend struct pnft;
+	friend struct term;
+	friend class ir_builder;
+	friend class driver;
+
+
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+
 private:
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
@@ -202,37 +197,8 @@ private:
 			return b < t.b;
 		}
 	};
-
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof_elem&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const witness&);
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&,
-		const std::vector<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
+
 	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::set<ntable> tmprels;
@@ -252,27 +218,23 @@ private:
 	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
 	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
-	int_t syms = 0, nums = 0, chars = 0;
 	size_t bits = 2;
-	dict_t dict; // dict_t& dict;
-	bool datalog, halt = false, unsat = false, bcqc = true;
+	dict_t& dict;
+	bool datalog, halt = false, unsat = false, bcqc = false;
 	size_t max_args = 0;
-	std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
+		std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
 		return (nbits - bit - 1) * args + arg;
 	}
-
 	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
 		DBG(assert(bit_from_right < bits && arg < args);)
 		return (bits - bit_from_right - 1) * args + arg;
 	}
-
 	size_t arg(size_t v, size_t args) const {
 		return v % args;
 	}
-
 	size_t bit(size_t v, size_t args) const {
 		return bits - 1 - v / args;
 	}
@@ -294,9 +256,6 @@ private:
 	spbdd_handle range(size_t arg, ntable tab);
 	void range_clear_memo() { range_memo.clear(); }
 
-	sig get_sig(const term& t);
-	sig get_sig(const raw_term& t);
-	sig get_sig(const lexeme& rel, const ints& arity);
 
 	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
@@ -313,7 +272,7 @@ private:
 	body get_body(const term& t, const varmap&, size_t len) const;
 //	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
-	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
+
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
 	uints addtail(size_t len1, size_t len2) const;
@@ -362,12 +321,10 @@ private:
 	void create_tmp_head(std::vector<term>& x);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
-	struct elem get_elem(int_t arg) const;
 	template <typename T>
 	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
-	void get_nums(const raw_term& t);
-	flat_prog to_terms(const raw_prog& p);
+
 
 	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
@@ -395,21 +352,12 @@ private:
 	level get_front() const;
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
-	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref,
-					std::vector<term> &v, std::set<term> &done);
 
-	bool get_rule_substr_equality(std::vector<std::vector<term>> &eqr);
-
-	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref,
-					std::vector<term> &v, std::set<term> &done);
-	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
-	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v, flat_prog &p,
-												std::map<size_t, term> &refs);
-	bool cqc(const std::vector<term>& x, std::vector<term> y) const;
-//	flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
-	bool cqc(const std::vector<term>&, const flat_prog& m) const;
+	//bool cqc(const std::vector<term>& x, std::vector<term> y) const;
+	//flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
+	//bool cqc(const std::vector<term>&, const flat_prog& m) const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
-	void cqc_minimize(std::vector<term>&) const;
+	//void cqc_minimize(std::vector<term>&) const;
 	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
 		std::vector<term> x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
@@ -419,7 +367,8 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
-//	std::function<int_t(void)>* get_new_rel;
+
+	//	std::function<int_t(void)>* get_new_rel;
 
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
@@ -427,10 +376,7 @@ private:
 	void add_tml_update(const term& rt, bool neg);
 	template <typename T>
 	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
-
-	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
-	bool to_pnf( form *&froot);
+	spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
@@ -468,27 +414,61 @@ private:
 	t_arith_op get_bwop(lexeme l);
 	t_arith_op get_pwop(lexeme l);
 
+	//-------------------------------------------------------------------------
+	//printer
 	template <typename T>
-	bool er(const T& data) { return error=true, throw_runtime_error(data); }
+	void print(std::basic_ostream<T>&, const proof_elem&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const proof&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const witness&);
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
+
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::vector<term>& b)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
+
 public:
-	struct options {
-		bool bproof, optimize, bin_transform, print_transformed,
-			apply_regexpmatch, fp_step, pfp3, bitunv;
-	} opts;
+
+	rt_options opts;
 	environment typenv;
-	tables(dict_t dict, tables::options opts);
+	ir_builder *ir_handler;
+
+	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
 	bool init_builtins();
-	raw_term to_raw_term(const term& t) const;
-	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
+
 	static bool run_prog(const raw_prog &rp, dict_t &dict,
-		const ::options &opts, std::set<raw_term> &results);
+		const options &opts, ir_builder *ir_handler, std::set<raw_term> &results);
 	static bool run_prog(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const ::options &opts, std::set<raw_term> &results);
+		dict_t &dict, const options &opts, ir_builder *ir_handler,
+		std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
+
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
@@ -522,152 +502,13 @@ public:
 	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
 	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 
-	template <typename T>
-	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
-	bool error = false;
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
-	int  regex_level         = 0;
-};
-
-
-//TODO: we need to put all formula manipulation code in separated
-// sources. For next commit we should refactor this
-
-struct transformer;
-
-//XXX: should define higher level struct?
-// formula { form* root,  type: FOL/SOL/ARITH/ } //CONSTRAINTS
-
-struct form{
-friend struct transformer;
-
-	int_t arg;
-	term *tm;
-	form *l;
-	form *r;
-	enum ftype { NONE, ATOM, FORALL1, EXISTS1, FORALL2, EXISTS2, UNIQUE1, UNIQUE2, AND, OR, NOT, IMPLIES, COIMPLIES
-	} type;
-
-	form(){
-		type = NONE; l = NULL; r = NULL; arg = 0; tm = NULL;
-	}
-
-	form( ftype _type, int_t _arg=0, term *_t=NULL, form *_l= NULL, form *_r=NULL  ) {
-		arg= _arg; tm = _t; type = _type; l = _l; r = _r;
-		if( _t) tm = new term(), *tm = *_t;
-	}
-	bool isquantifier() const {
-		 if( type == form::ftype::FORALL1 ||
-			 type == form::ftype::EXISTS1 ||
-			 type == form::ftype::UNIQUE1 ||
-			 type == form::ftype::EXISTS2 ||
-			 type == form::ftype::UNIQUE2 ||
-			 type == form::ftype::FORALL2 )
-			 return true;
-		return false;
-
-	}
-
-	//evaluation of is_sol,
-	//alternatively from_raw_terms gets it as well by using a new argument
-	bool is_sol();
-	bool implic_rmoval();
-
-	~form() {
-		if(l) delete l, l = NULL;
-		if(r) delete r, r = NULL;
-		if(tm) delete tm, tm = NULL;
-	}
-	void printnode(int lv=0, const tables* tb = NULL);
-};
-
-struct transformer {
-	virtual bool apply(form *&root) = 0;
-	form::ftype getdual( form::ftype type);
-	virtual bool traverse(form *&);
-};
-
-
-struct implic_removal : public transformer {
-
-	 virtual bool apply(form *&root);
-};
-
-struct demorgan : public transformer {
-
-	bool allow_neg_move_quant =false;
-	bool push_negation( form *&root);
-	virtual bool apply( form *&root);
-	demorgan(bool _allow_neg_move_quant =false){
-		allow_neg_move_quant = _allow_neg_move_quant;
-	}
-};
-
-struct pull_quantifier: public transformer {
-	dict_t &dt;
-	pull_quantifier(dict_t &_dt): dt(_dt) {}
-	virtual bool apply( form *&root);
-	virtual bool traverse( form *&root);
-	bool dosubstitution(form * phi, form* end);
-};
-struct substitution: public transformer {
-
-	std::map<int_t, int_t> submap_var;
-	std::map<int_t, int_t> submap_sym;
-
-	void clear() { submap_var.clear(); submap_sym.clear();}
-	void add( int_t oldn, int_t newn) {
-		if(oldn < 0)
-			submap_var[oldn] = newn;
-		else
-			submap_sym[oldn] = newn;
-	}
-
-	virtual bool apply(form *&phi);
+	bool error         = false;
 
 };
 
-struct ptransformer{
-	struct production &p;
-	std::vector<struct production> lp;
-	dict_t &d;
-
-	ptransformer(struct production &_p, dict_t &_d ): p(_p), d(_d) { }
-	bool parse_alt( std::vector<elem> &next, size_t& cur);
-	bool is_firstoffactor(elem &c);
-	bool parse_alts( std::vector<elem> &next, size_t& cur);
-	lexeme get_fresh_nonterminal();
-	bool synth_recur( std::vector<elem>::const_iterator from,
-		std::vector<elem>::const_iterator till, bool bnull, bool brecur,
-		bool balt);
-	bool parse_factor( std::vector<elem> &next, size_t& cur);
-	bool visit( );
-};
-
-struct graphgrammar {
-	enum mark {
-		NONE,
-		PROGRESS,
-		VISITED
-	};
-	dict_t &dict;
-	std::vector<elem> sort;
-	std::multimap<elem, std::pair<production, mark> > _g;
-	typedef std::multimap<elem, std::pair<production, mark> >::iterator _itg_t;
-	graphgrammar(std::vector<production> &t, dict_t &_d);
-	bool dfs( const elem &s);
-	bool detectcycle();
-	bool iscyclic( const elem &s);
-	std::string get_regularexpstr(const elem &p, bool &bhasnull, bool islazy);
-	const std::map<lexeme, std::string, lexcmp> & get_builtin_reg();
-	bool combine_rhs( const elem &s, std::vector<elem> &comb);
-	bool collapsewith();
-};
-
-template <typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 
 #ifdef WITH_EXCEPTIONS
 struct unsat_exception : public std::exception {

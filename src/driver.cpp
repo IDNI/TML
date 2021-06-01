@@ -217,7 +217,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		std::set<raw_term> results;
-		tables::run_prog(edb, nrp, d, opts, results);
+		tables::run_prog(edb, nrp, d, opts, ir, results);
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
@@ -309,7 +309,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		std::set<raw_term> results;
-		if(!tables::run_prog(edb, nrp, d, opts, results)) return false;
+		if(!tables::run_prog(edb, nrp, d, opts, ir, results)) return false;
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
 			// one of the frozen terms), then there is a homomorphism between
@@ -771,7 +771,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog;
 					test_prog.r.push_back(rr2);
 					std::set<raw_term> res;
-					tables::run_prog(ext, test_prog, d, opts, res);
+					tables::run_prog(ext, test_prog, d, opts, ir, res);
 					return res.find(subbed.h[0]) != res.end();
 				});
 		});
@@ -3231,13 +3231,13 @@ bool driver::transform_grammar(raw_prog &rp) {
 	form *tmp_form = nullptr;
 	flat_prog p;
 	
-	if(tbl->transform_grammar(rp.g, p, tmp_form)) {
+	if(ir->transform_grammar(rp.g, p, tmp_form)) {
 		for(const std::vector<term> &rul : p) {
 			std::vector<raw_term> bodie;
 			for(size_t i = 1; i < rul.size(); i++) {
-				bodie.push_back(tbl->to_raw_term(rul[i]));
+				bodie.push_back(ir->to_raw_term(rul[i]));
 			}
-			rp.r.push_back(raw_rule(tbl->to_raw_term(rul[0]), bodie));
+			rp.r.push_back(raw_rule(ir->to_raw_term(rul[0]), bodie));
 		}
 		rp.g.clear();
 		return true;
@@ -3381,7 +3381,7 @@ void driver::output_pl(const raw_prog& p) const {
 
 bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 //	pd.clear();
-	//DBG(o::out() << "original program:"<<endl<<p;)
+//	DBG(o::out() << "original program:"<<endl<<p;)
 //	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
 	clock_t start, end;
 	size_t step = nsteps();
@@ -3517,13 +3517,14 @@ void driver::read_inputs() {
 }
 
 driver::driver(string s, const options &o) : rp(), opts(o) {
-	dict_t dict;
+
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
 	dict.set_bitunv(opts.enabled("bitunv"));
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
-	tables::options to;
+	rt_options to;
+
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
 	to.bin_transform     = opts.enabled("bin");
@@ -3532,9 +3533,13 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.fp_step           = opts.enabled("fp");
 	to.pfp3              = opts.enabled("3pfp");
 	to.bitunv			 = opts.enabled("bitunv");
-	// we don't need the dict any more, tables owns it from now on...
-	tbl = new tables(move(dict), to);
-	tbl->init_builtins();
+
+	//dict belongs to driver and is referenced by ir_builder and tables
+	ir = new ir_builder(dict, to);
+	tbl = new tables(dict, to, ir);
+	ir->dynenv = tbl;
+	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
+
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	set_populate_tml_update(opts.enabled("tml_update"));
@@ -3558,5 +3563,6 @@ driver::driver(ccs s)                           : driver(string_t(s)) {}
 
 driver::~driver() {
 	if (tbl) delete tbl;
+	if (ir) delete ir;
 	for (auto x : strs_allocated) free((char *)x);
 }

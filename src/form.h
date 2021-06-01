@@ -17,17 +17,13 @@
 #include <vector>
 #include "defs.h"
 
-template<typename T> struct ptrcmp_ {
-	bool operator()(const T* x, const T* y) const { return *x < *y; }
-};
-
 typedef std::shared_ptr<struct pnft> pnft_handle;
 typedef const pnft_handle& cr_pnft_handle;
 
 struct pnft {
 	size_t varslen;
 	size_t varslen_h;
-	varmap vm, vmh;
+	varmap vmh;
 	bools ex_h;
 	uints perm;
 	uints perm_h;
@@ -41,7 +37,7 @@ struct pnft {
 
 	spbdd_handle cons;
 	spbdd_handle last;
-	std::set<body*, ptrcmp_<body>> bodies;
+	std::set<body*, ptrcmp<body>> bodies;
 	pnft();
 	~pnft();
 	quant_t to_quant_t(form *f) const;
