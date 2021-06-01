@@ -1287,10 +1287,6 @@ bool input::parse_error(ccs offset, const char* err, lexeme close_to) {
 bool input::type_error(const char* e, lexeme l) {
 	return type_error(0, e, l[0]);
 }
-bool type_error(const char* e, lexeme l) {
-	input in((void*) 0, (size_t) 0);
-	return in.type_error(0, e, l[0]);
-}
 
 bool input::parse_error(ccs offset, const char* err, ccs close_to) {
 	//DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_

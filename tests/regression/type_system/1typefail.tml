@@ -1,7 +1,7 @@
 # Transitive closure (TC)
 
-record e( int:5 ?a,  int:5 ?b).
-record tc( int:6 ?a, int:5 ?b).
+predtype e( int:5 ?a,  int:5 ?b).
+predtype tc( int:6 ?a, int:5 ?b).
 e(1 2 ).
 e(2 2).
 e(3 4).

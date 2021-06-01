@@ -369,8 +369,9 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		DBG(assert(args == r.size());)
-		if( opts.bitunv && dynenv->typenv.contains_pred(lexeme2str(rt.e[0].e) )) {
-			const std::vector<typedecl> &vt = dynenv->typenv.lookup_pred(lexeme2str(rt.e[0].e)) ;
+		string_t str = lexeme2str(rt.e[0].e);
+		if( opts.bitunv && dynenv->typenv.contains_pred(str )) {
+			const std::vector<typedecl> &vt = dynenv->typenv.lookup_pred(str) ;
 			int_t bitsz = -1;
 			int_t val;
 			int_t argc = 0;

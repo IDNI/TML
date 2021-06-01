@@ -338,7 +338,6 @@ set<term> tables::decompress() {
 	return r;
 }
 
-
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
 		f(ir_handler->to_raw_term(r)); });
@@ -503,7 +502,7 @@ bool tables::get_facts(const flat_prog& m) {
 int_t tables::freeze(vector<term>& v, int_t m = 0) {
 	map<int_t, int_t> p;
 	map<int_t, int_t>::const_iterator it;
-	for (const term& t : v) for (int_t i : t) 
+	for (const term& t : v) for (int_t i : t)
 		if (opts.bitunv && (i ==0 || i == 1 )) m = max(m, i);
 		else if (i & 2) m = max(m, i >> 2);
 	for (term& t : v)
