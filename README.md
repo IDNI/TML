@@ -888,12 +888,12 @@ record pair(int ?a, char ?b).
 Here, father predicate can take argument of type sym, symbols. "edge" takes first argument of type 3 bit size and second as type 2 bits size.
 
 ## Running checker for type errors
-The type checking will check for various type errors in the TML program for example. Running following program with "tml --bitprog " option will invoke the typechecking on the TML rules. ( the flage option would be removed in future, though currently specific)
+The type checking will check for various type errors in the TML program for example. Running following program with "tml --bitunv " option will invoke the typechecking on the TML rules. ( the flage option would be removed in future, though currently specific)
 
-The following program has type mismatch for ?x in first rule. Running it with -bitprog option produces error
+The following program has type mismatch for ?x in first rule. Running it with -bitunv option produces error
 ```
-record e( int:5 ?a,  int:5 ?b).
-record tc( int:6 ?a, int:5 ?b).
+predtype e( int:5 ?a,  int:5 ?b).
+predtype tc( int:6 ?a, int:5 ?b).
 e(1 2 ).
 
 tc(?x ?y) :- e(?x ?z), tc(?z ?y).
@@ -936,12 +936,12 @@ struct styp {
     int:2 ?c, ?z .
     sttyp2 ?inner, ?in3.
 }
-record father( sym ?b).
-record canFly( sym ?c ).
-record edge (int:3 ?c, int:2 ?c ).
-record night( int:2 ?A).
-record pair(int ?a, char ?b).
-record school ( undeftype ?name,  sttyp2 ?l ).
+predtype father( sym ?b).
+predtype canFly( sym ?c ).
+predtype edge (int:3 ?c, int:2 ?c ).
+predtype night( int:2 ?A).
+predtype pair(int ?a, char ?b).
+predtype school ( undeftype ?name,  sttyp2 ?l ).
 
 father(fff wrongargcount).
 #father(Tom Amy).  

@@ -442,10 +442,6 @@ struct typestmt {
 
 };
 
-class bit_dict;
-struct bit_term;
-struct bit_prog;
-struct bit_rule;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
@@ -462,47 +458,6 @@ class bit_dict {
 	}
 };
 
-struct bit_elem {
-	const elem &e;
-	size_t bsz;
-	bit_term &pbt;
-	bools p;
-	bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt);
-	size_t pos(size_t bit_from_right /*, size_t arg, size_t args */) const;
-	bool to_elem( std::vector<elem> &) const;
-	void to_print() const;
-};
-struct bit_prog {
-	 
-	std::vector<bit_rule> vbr;
-	std::vector<bit_prog> nbp;
-	const raw_prog &rp;
-	bit_dict bdict;
-	bit_prog( const raw_prog& _rp);
-	bool to_raw_prog(raw_prog &) const;
-	void to_print() const;
-};
-
-struct bit_rule {
-	std::vector<bit_term> bh;
-	std::vector<std::vector<bit_term>> bb;
-	const raw_rule &rr;
-	bit_prog &pbp;
-	bit_rule(const raw_rule &_rr, bit_prog &_pbp);
-	bool to_raw_rule(raw_rule&) const;
-	void to_print() const;
-};
-
-struct bit_term {
-	int_t rel;
-	std::vector<bit_elem> vbelem;
-	const raw_term &rt;
-	bit_rule &pbr;
-	bit_term(const raw_term &_rt, bit_rule &_pbr); 
-	size_t get_typeinfo(size_t arg, const raw_term &rt);
-	bool to_raw_term(raw_term&) const;
-	void to_print() const;
-};
 
 
 /* A raw term is produced from the parsing stage. In TML source code, it

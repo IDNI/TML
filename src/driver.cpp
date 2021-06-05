@@ -3397,18 +3397,8 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 				"-g (-guards) option enabled.");
 	bool fp = false;
 	
-	if(opts.enabled("bitprog")) {
-		typechecker tc(p);
-		if(tc.tcheck()) {
-
-			bit_prog b(p);
-			//b.to_print();
-			raw_prog brp;
-			b.to_raw_prog(brp);
-			fp = tbl->run_prog(brp, pd.strs, steps, break_on_step);
-		}
-	}
-	else if (opts.enabled("bitunv")) {
+	
+	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
 			bit_univ bu(tbl->get_dict());
