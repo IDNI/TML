@@ -879,7 +879,7 @@ template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
 
 void driver::qc_z3 (raw_prog &raw_p) {
 	 z3::context c;
-	 map<elem, z3::func_decl> rel_to_decl;
+	 map<pair<elem,uint_t>, z3::func_decl> rel_to_decl;
 	 map<elem, z3::expr> var_to_decl;
 	 map<uint_t, elem> head_rename;
 	 z3::solver s =
@@ -932,7 +932,7 @@ void driver::qc_z3 (raw_prog &raw_p) {
 
 int driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3::solver &s,
 			z3::context &c,
-			const map<elem, z3::func_decl> &rel_to_decl,
+			const map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
 			const map<elem, z3::expr> &var_to_decl,
 			const map<uint_t, elem> &head_rename) {
 	if (!(is_qc(r1) && is_qc(r2))) return 0;
@@ -955,6 +955,8 @@ int driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3::solver &s,
 				    var_to_decl, head_rename);
 	z3::expr rule2 = body_to_z3(r2, c, rel_to_decl,
 				    var_to_decl, head_rename);
+	cout << "Rule 1: " << rule1 << endl;
+	cout << "Rule 2: " << rule2 << endl;
 	s.push();
 	// Add r1 => r2 to solver
 	if (bound_vars.empty()) s.add(!z3::implies(rule1, rule2));
@@ -969,7 +971,7 @@ int driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3::solver &s,
 }
 
 z3::solver driver::create_z3_solver(const raw_prog &raw_p, z3::context &c,
-				    map<elem, z3::func_decl> &rel_to_decl,
+				    map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
 				    map<elem, z3::expr> &var_to_decl,
 				    map<uint_t, elem> &head_rename) {
 	// Prepare the logical context for the z3 solver instance
@@ -978,45 +980,45 @@ z3::solver driver::create_z3_solver(const raw_prog &raw_p, z3::context &c,
 	// Lambda to create z3 representation of relation
 	auto rel_to_z3 = [&](const raw_term& rt) {
 		const auto &rel = rt.e[0];
-		if (!has(rel_to_decl, rel)) {
-			z3::sort_vector domain(c);
-			for (int_t i = rt.get_formal_arity(); i != 0; --i)
-				domain.push_back(t);
-			rel_to_decl.emplace(map<elem, z3::func_decl>::value_type(
-				rel,c.function(rel.to_str().c_str(), domain, b)
-			));
-		}
+		z3::sort_vector domain(c);
+		for (int_t i = rt.get_formal_arity(); i != 0; --i)
+			domain.push_back(t);
+		rel_to_decl.emplace(map<pair<elem,uint_t>, z3::func_decl>::value_type(
+			make_pair(rel,domain.size()),
+			c.function(rel.to_str().c_str(), domain, b)));
 	};
 	// Lambda to create z3 representation of vars, syms and nums
 	auto arg_to_z3 = [&](const raw_term& rt) {
-		for (const auto& el : rt.e) {
-			if(has(var_to_decl, el)) continue;
-			if (el.type == elem::VAR || el.type == elem::SYM || el.type == elem::NUM)
+		for (auto el = rt.e.begin()+1; el!=rt.e.end(); ++el) {
+			if (el->type == elem::VAR || el->type == elem::SYM || el->type == elem::NUM)
 				var_to_decl.emplace(map<elem, z3::expr>::value_type(
-					el, c.constant(el.to_str().c_str(), t)
+					*el, c.constant(el->to_str().c_str(), t)
 				));
 		}
 	};
 	// Lambda to create z3 representation of head variables for later substitution
 	auto head_to_z3 = [&](const raw_term& h) {
-		int currentPos = 0;
 		for (auto el = h.e.begin()+1; el != h.e.end(); ++el) {
 			if (el->type == elem::VAR || el->type == elem::SYM ||
-			    el->type == elem::NUM) {const auto& new_el = elem::fresh_var(tbl->get_dict());
-				var_to_decl.emplace(map<elem, z3::expr>::value_type(
-					new_el, c.constant(new_el.to_str().c_str(), t)
-				));
+			    el->type == elem::NUM) {
 				var_to_decl.emplace(map<elem, z3::expr>::value_type(
 					*el, c.constant(el->to_str().c_str(), t)
 				));
-				head_rename[currentPos] = new_el;
-				++currentPos;
 			}
+		}
+	};
+	// Lambda to create z3 representation of global head variable names
+	auto globalHead_to_z3 = [&](const uint_t num) {
+		for (uint_t i=0; i<num; ++i) {
+			const auto& new_el = elem::fresh_var(tbl->get_dict());
+			var_to_decl.emplace(map<elem, z3::expr>::value_type(
+				new_el, c.constant(new_el.to_str().c_str(), t)
+			));
+			head_rename[i] = new_el;
 		}
 	};
 	// Add all relation symbols and variables of checkable rules to context
 	// and find max head in terms of arity
-	const raw_term* maxHead = nullptr;
 	uint_t maxHeadNum = 0;
 	for (const auto &rr : raw_p.r)
 		if (is_qc(rr)) {
@@ -1025,14 +1027,14 @@ z3::solver driver::create_z3_solver(const raw_prog &raw_p, z3::context &c,
 					rel_to_z3(rt);
 					arg_to_z3(rt);
 				}
+			head_to_z3 (rr.h[0]);
 			// Check if rules head is maximal
 			const auto h_ary = rr.h[0].get_formal_arity();
 			if ((uint_t)h_ary > maxHeadNum) {
-				maxHead = &rr.h[0];
 				maxHeadNum = h_ary;
 			}
 		}
-	if(maxHead) head_to_z3(*maxHead);
+	globalHead_to_z3(maxHeadNum);
 
 	// Create z3 solver instance and initialize parameters
 	z3::solver s (c);
@@ -1049,7 +1051,7 @@ z3::solver driver::create_z3_solver(const raw_prog &raw_p, z3::context &c,
 * Z3 expression. */
 
 z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
-			    const map<elem, z3::func_decl> &rel_to_decl,
+			    const map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
 			    const map<elem, z3::expr> &var_to_decl,
 			    const map<uint_t, elem> &head_rename) {
 	// Collect bound variables of rule and restrictions from constants in head
@@ -1057,14 +1059,15 @@ z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
 	vector<elem> bound_vars;
 	z3::expr restr (c); restr = c.bool_val(true);
 	for (const auto& head : rr.h)
-		for (auto el = head.e.begin()+1; el != head.e.end(); el++) {
+		for (auto el = head.e.begin()+1; el != head.e.end(); ++el) {
 			if (el->type == elem::VAR)
 				bound_vars.emplace_back(*el);
 			else if (el->type == elem::SYM || el->type == elem::NUM){
 				bound_vars.emplace_back(*el);
 				restr = restr && var_to_decl.find(
 					head_rename.find(
-						bound_vars.size()-1)->second)->second == var_to_decl.find(*el)->second;
+						bound_vars.size()-1)->second)->second
+							== var_to_decl.find(*el)->second;
 			}
 		}
 	collect_free_vars(rr.b, bound_vars, free_vars);
@@ -1098,11 +1101,12 @@ z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
 	for (const auto& conj : rr.b) {
 		z3::expr conjuncts = c.bool_val(true);
 		for (const auto& rel : conj) {
-			auto &rel_sym = rel_to_decl.find(rel.e[0])->second;
 			z3::expr_vector vars_of_rel (c);
 			for (auto el = rel.e.begin()+1; el != rel.e.end(); ++el) {
 				add_var(el, vars_of_rel);
 			}
+			auto &rel_sym = rel_to_decl.find(
+				make_pair(rel.e[0], vars_of_rel.size()))->second;
 			conjuncts = rel.neg ? conjuncts && !rel_sym(vars_of_rel)
 					: conjuncts && rel_sym(vars_of_rel);
 		}
