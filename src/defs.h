@@ -68,6 +68,7 @@ typedef size_t nlevel;
 #define elem_eq elem(elem::EQ, get_lexeme("="))
 #define htrue bdd_handle::T
 #define hfalse bdd_handle::F
+
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
 		V at_default(const M<K, V, Args ...> &m, const K &k, const V &d) {
@@ -105,6 +106,14 @@ int temp_fileno();
 std::string filename(int fd);
 #endif
 
+typedef std::map<int_t, int_t> env;
+
+//runtime options
+typedef struct {
+	bool bproof, optimize, bin_transform, print_transformed,
+		apply_regexpmatch, fp_step, pfp3, bitunv;
+} rt_options;
+
 typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
 } t_arith_op;
@@ -118,5 +127,9 @@ typedef std::map<int_t, size_t> varmap;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef std::shared_ptr<form> spform_handle;
 typedef const spform_handle& cr_spform_handle;
+
+template<typename T> struct ptrcmp {
+	bool operator()(const T* x, const T* y) const { return *x < *y; }
+};
 
 #endif

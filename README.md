@@ -875,11 +875,11 @@ Full transformation of the above program:
 
 One can specify types for arguments of terms and predicates in the program. There are three primitive types **"int", "char" and "sym"** with default size of 4 bits each. The int can be further specialized with bit size like **int:2**, which says it is a type which holds only 2 bits ( possible four values).
 
-The predicates type signature can be specified with keyword **record** preceding relation/predicate name and by including types of the arguments as in example, 
+The predicates type signature can be specified with keyword **predtype** preceding relation/predicate name and by including types of the arguments as in example, 
 
 ```
 
-record father( sym ?b).
+predtype father( sym ?b).
 record edge (int:3 ?c, int:2 ?c ).
 record pair(int ?a, char ?b).
 

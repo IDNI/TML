@@ -10,7 +10,7 @@
 # following 'e' relation:
 
 predtype e( int:4 ?a,  int:4 ?b).
-predtype tc ( int:4 ?a, int:4 ?b).
+#predtype tc ( int:4 ?a, int:4 ?b).
 
 e(1 2).
 e(2 2).
@@ -21,3 +21,4 @@ e(7 9).
 
 tc(?x ?y) :- e(?x ?y).
 tc(?x ?y) :- e(?x ?z),tc(?z ?y).
+kz(?a ?b) :- tc(?a ?b), ?a=?b. 

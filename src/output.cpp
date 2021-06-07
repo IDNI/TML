@@ -445,12 +445,21 @@ template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 	if (t.neg) os << '~';
 	
-	if( t.extype == raw_term::ARITH || 
-		t.extype == raw_term::EQ 	|| 
-		t.extype == raw_term::LEQ 	) {
+	if( t.extype == raw_term::ARITH) {
+		if (t.neg) os << '{';
 		for ( elem el : t.e) 
 			os << el;
-		return os;		
+		if (t.neg) os << '}';
+		return os;
+	}
+	if (t.extype == raw_term::EQ ||
+		t.extype == raw_term::LEQ) {
+		if (t.neg) os << '{';
+		os << t.e[0];
+		t.extype == raw_term::EQ ? os << "==" : os << "<=";
+		os << t.e[2];
+		if (t.neg) os << '}';
+		return os;
 	}
 
 	os << t.e[0];
@@ -694,8 +703,7 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const option& o) {
 	return os;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const option&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const option&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const option&);
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const map<string,option>& opts) {
@@ -722,7 +730,7 @@ template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
 	if (e.rl != (size_t)-1) os << '[' << e.rl << ',' << e.al << "] ";
 	for (const auto& b : e.b)
-		os << b.first << ' ' << to_raw_term(b.second) << ' ';
+		os << b.first << ' ' << ir_handler->to_raw_term(b.second) << ' ';
 	os << endl;
 }
 template
@@ -735,7 +743,7 @@ void tables::print(basic_ostream<T>& os, const tables::proof& p) {
 	for (size_t n = 0; n != p.size(); ++n)
 		for (const auto& x : p[n]) {
 			for (const auto& y : x.second)
-				(os<<n<<' '<<to_raw_term(x.first)<<" :- "),
+				(os<<n<<' '<<ir_handler->to_raw_term(x.first)<<" :- "),
 				print(os, y);
 		}
 }
@@ -747,7 +755,7 @@ void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof&);
 template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::witness& w) {
 	os << '[' << w.rl << ',' << w.al << "] ";
-	for (const term& t : w.b) os << to_raw_term(t) << ", ";
+	for (const term& t : w.b) os << ir_handler->to_raw_term(t) << ", ";
 	os << '.';
 }
 
@@ -767,14 +775,53 @@ void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
 	return os;
 }*/
 
+template <typename T>
+basic_ostream<T>& tables::print(basic_ostream<T>& os, const vector<term>& v) const {
+	os << ir_handler->to_raw_term(v[0]);
+	if (v.size() == 1) return os << '.';
+	os << " :- ";
+	for (size_t n = 1; n != v.size(); ++n) {
+		if (v[n].goal) os << '!';
+		os << ir_handler->to_raw_term(v[n]) << (n == v.size() - 1 ? "." : ", ");
+	}
+	return os;
+}
+template basic_ostream<char>& tables::print(basic_ostream<char>&, const vector<term>&) const;
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const vector<term>&) const;
+
+template <typename T>
+basic_ostream<T>& tables::print(basic_ostream<T>& os, const flat_prog& p) const{
+	for (const auto& x : p)
+		print(os << (x[0].tab == -1 ? 0 : tbls[x[0].tab].priority) <<
+			'\t', x) << endl;
+/*	map<size_t, flat_prog> m;
+	for (const auto& x : p) m[tbls[x[0].tab].priority].insert(x);
+	size_t n = m.rbegin()->first;
+	vector<flat_prog> v(n);
+	for (const auto& x : m) v[n--] = move(x.second);
+	for (n = 0; n != v.size(); ++n)
+		for (const vector<term>& y : v[n])
+			print(os << n << '\t', y) << endl;*/
+	return os;
+}
+template basic_ostream<char>& tables::print(basic_ostream<char>&, const flat_prog&) const;
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const flat_prog&) const;
+
+template <typename T>
+basic_ostream<T>& tables::print_dict(basic_ostream<T>& os) const {
+	return os << dict;
+}
+template basic_ostream<char>& tables::print_dict(basic_ostream<char>&) const;
+template basic_ostream<wchar_t>& tables::print_dict(basic_ostream<wchar_t>&) const;
+
 // rule printer for --print_updates
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
-	os << to_raw_term(r.t) << " :- ";
+	os << ir_handler->to_raw_term(r.t) << " :- ";
 	//if (r.f) os << "(form printing not supported yet)"; // TODO fix transform_bin
 	for (auto it = r.begin(); it != r.end(); ++it) {
 		for (size_t n = 0; n != (*it)->bltins.size(); ++n) {
-			os << to_raw_term((*it)->bltins[n]) <<
+			os << ir_handler->to_raw_term((*it)->bltins[n]) <<
 				(n == (*it)->bltins.size() - 1
 					? it == r.end() - 1 ? "" : "; "
 					: ", ");
@@ -782,7 +829,7 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 		if ((*it)->bltins.size())
 			os << ((*it)->t.size() ? ", " : ".");
 		for (size_t n = 0; n != (*it)->t.size(); ++n) {
-			os << to_raw_term((*it)->t[n]) <<
+			os << ir_handler->to_raw_term((*it)->t[n]) <<
 				(n == (*it)->t.size() - 1
 					? it == r.end()-1 ? "." : "; "
 					: ", ");
@@ -790,7 +837,6 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 	}
 	return os;
 }
-
 template
 basic_ostream<char>& tables::print(basic_ostream<char>&, const rule&) const;
 template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,

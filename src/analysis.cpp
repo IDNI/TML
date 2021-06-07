@@ -150,12 +150,12 @@ bool bit_rule::to_raw_rule(raw_rule &rr) const{
 bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	bool ret = true;
 	for( const raw_term &rt : rrin.h )
-		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back());
+		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back(), rrin, rrout);
 	for( const auto &vrt : rrin.b) {
 		rrout.b.emplace_back();
 		for( const raw_term &rt : vrt)
 			rrout.b.back().emplace_back(), 
-			ret &= btransform(rt, rrout.b.back().back());	
+			ret &= btransform(rt, rrout.b.back().back(), rrin, rrout);	
 	}
 	return ret;
 }
@@ -224,72 +224,154 @@ bool bit_term::to_raw_term( raw_term& brt ) const {
 	return ret;
 }
 
-size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt) {
+size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
-	string_t reln = lexeme2str(rt.e[0].e);
-	if( typenv.contains_pred(reln)) {
-		auto targs = typenv.lookup_pred(reln);	
-		//only for arguments
-		if(n>1 && n < rt.e.size()-1) {
-			if(targs[n-2].is_primitive())
-				return targs[n-2].pty.get_bitsz();
-			else {
-				DBG(assert(targs[n-2].is_usertype()));
-				string_t stn = lexeme2str(targs[n-2].structname.e);
-				if(typenv.contains_typedef( stn)){
-					return typenv.lookup_typedef(stn).get_bitsz(typenv);
-				}
-				o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
-			}
-		} 
-		//for anything other than args.
-		// TODO:what about +/-* operators as args.
-		return 0;
-	}
-	else {
-		//when types are not specified, go default
-		if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
-			rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
-			return INT_BSZ;
-		return 0;
-	}
-}
+	DBG(assert(rt.e.size()>n && n >=0));
 
-bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout){
-	bool ret = true;
-	rtout.neg = rtin.neg;
-	for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
-		const elem& e = rtin.e[n];
-		// for predicate rel name, keep as it is
-		if( n == 0 ) { rtout.e.emplace_back(e); continue; }
-		// get bit size of the given elem and convert to bit representation
-		size_t bsz = get_typeinfo(n, rtin);
-		if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
-		std::vector<elem> bitelem(bsz);
-		int_t symbval = 0;
-		for (size_t k = 0; k != bsz; ++k) {
-			switch(e.type) {
-				case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
-				case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
-				case elem::VAR: { 
-					string_t temp = lexeme2str(e.e);
-					// making new bit vars and avoiding conflict 
-					temp.append(to_string_t("_").append(to_string_t((int_t)k)));
-					bitelem[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
-					break; 
-				}
-				case elem::STR:
-				case elem::SYM: {
-					if( k == 0 ) symbval = d.get_sym(e.e);
-					bitelem[pos(bsz, k)] = bool(symbval & (1<<k)); 
-					break;
-				}
-				default: DBG( COUT<<e<<std::endl; assert(false)); break;
+	if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ) {
+		string_t str = lexeme2str(rt.e[n].e);
+		if( rt.e[n].type == elem::VAR ) {
+			if( rr.varctx.get()->contains_prim_var(str) )
+				return rr.varctx.get()->lookup_prim_var(str).get_bitsz();
+			else if( rr.varctx.get()->contains_typedef_var(str) ) {
+				//todo for struct types.
+				//should struct types ever have arithmetic operation, no!
+				DBG(assert(false));
+				this->typenv.lookup_typedef_var(str).get_bitsz(typenv);
+			}
+			else {
+				//should this case ever happen when ctx does not know the type of var? no.
+				// typecheck should have failed before.
+				DBG(assert(false));
+				return VAR_BSZ;
 			}
 		}
-		rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());
+		else if ( rt.e[n].type == elem::NUM ) {
+			// get the type info based on nearest var
+			int_t i = n;
+			while(i>=0 && i < (int_t)rt.e.size() && 
+				(rt.e[i].type != elem::VAR ||rt.e[(int_t)rt.e.size()-i-1].type != elem::VAR)) i++;
+			if(i>=0 && i < (int_t)rt.e.size())
+				return get_typeinfo(i, rt, rr); 
+		
+			return INT_BSZ;
+		}
 	}
-	ret &= rtout.calc_arity(0);
+	else if( rt.extype == raw_term::REL) {
+		string_t reln = lexeme2str(rt.e[0].e);
+		if( typenv.contains_pred(reln)) {
+			auto targs = typenv.lookup_pred(reln);	
+			//only for arguments
+			if(n>1 && n < rt.e.size()-1) {
+				if(targs[n-2].is_primitive())
+					return targs[n-2].pty.get_bitsz();
+				else {
+					DBG(assert(targs[n-2].is_usertype()));
+					string_t stn = lexeme2str(targs[n-2].structname.e);
+					if(typenv.contains_typedef( stn)){
+						return typenv.lookup_typedef(stn).get_bitsz(typenv);
+					}
+					o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
+				}
+			} 
+			
+		}
+		else {
+			//when types are not specified, go default
+			if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
+				rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
+				return INT_BSZ;
+		}
+	}
+	// for everything else
+	return 0;
+}
+
+bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
+	bool ret = true;
+	rtout.neg = rtin.neg;	
+	if( rtin.extype == raw_term::REL) {
+		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
+			const elem& e = rtin.e[n];
+				// for predicate rel name, keep as it is
+				if( n == 0 ) { rtout.e.emplace_back(e); continue; }
+				// get bit size of the given elem and convert to bit representation
+				size_t bsz = get_typeinfo(n, rtin, rr);
+				if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
+				std::vector<elem> bitelem(bsz);
+				int_t symbval = 0;
+				for (size_t k = 0; k != bsz; ++k) {
+					switch(e.type) {
+						case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
+						case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
+						case elem::VAR: { 
+							string_t temp = lexeme2str(e.e);
+							// making new bit vars and avoiding conflict 
+							temp.append(to_string_t("_").append(to_string_t((int_t)k)));
+							bitelem[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
+							break; 
+						}
+						case elem::STR:
+						case elem::SYM: {
+							if( k == 0 ) symbval = d.get_sym(e.e);
+							bitelem[pos(bsz, k)] = bool(symbval & (1<<k)); 
+							break;
+						}
+						default: DBG( COUT<<e<<std::endl; assert(false)); break;
+					}
+				}
+				rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());	
+		}
+		ret &= rtout.calc_arity(0);
+	}
+	else if ( rtin.extype == raw_term::ARITH || rtin.extype == raw_term::EQ || rtin.extype == raw_term::LEQ) {
+		std::vector<std::vector<elem>> vbit;
+		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
+			const elem& e = rtin.e[n];
+			string_t str = lexeme2str(e.e);
+			size_t bsz = get_typeinfo(n, rtin, rr);
+			switch( e.type ){
+				case elem::VAR: vbit.emplace_back(); 
+								vbit.back().resize(bsz);
+								for( size_t k= 0; k !=bsz ; k++){
+									string_t temp = str;
+									temp.append(to_string_t("_").append(to_string_t((int_t)k)));
+									vbit.back()[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
+								}
+								break;
+				case elem::NUM:
+								vbit.emplace_back(); 
+								vbit.back().resize(bsz);
+								for( size_t k= 0; k !=bsz ; k++)
+									vbit.back()[pos(bsz, k)] = bool(e.num & (1<<k));
+								break;
+				case elem::ARITH:
+				case elem::EQ:
+				case elem::LEQ: // user size of prev var
+								bsz = vbit.back().size();
+								vbit.emplace_back(); 
+								vbit.back().resize(bsz);
+								for( size_t k= 0; k !=bsz ; k++)
+									vbit.back()[pos(bsz, k)] = e;
+								
+								break;
+				default : DBG(assert(false));
+			}	
+		}
+		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
+
+		for( size_t j=0 ; j < vbit[0].size(); j++) {
+			rrout.b.back().emplace_back();
+			for( size_t i =0 ; i< vbit.size(); i++) 
+				rrout.b.back().back().e.push_back(vbit[i][j]);
+			
+			raw_term &out = rrout.b.back().back();
+			out.extype = rtin.extype;
+			if(out.extype == raw_term::EQ || out.extype == raw_term::LEQ)
+				out.arity = {2}; 			
+			DBG(COUT<<std::endl<<out);
+		}
+	}
 	return ret;
 }
 
@@ -410,7 +492,7 @@ bool typedecl::parse( input* in , const raw_prog& prog, bool notparam){
 		}
 		if(vars.size())	return true;
 	}
-	else if ( !notparam ) return true; // for void parameters in record declarattion
+	else if ( !notparam ) return true; // for void parameters in predtype declarattion
 
 	FAIL:
 	in->parse_error(l[pos][0], "Incorrect var declared ", l[pos]);
@@ -420,7 +502,7 @@ bool typedecl::parse( input* in , const raw_prog& prog, bool notparam){
 bool typestmt::parse( input* in , const raw_prog& prog){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
-	if( (l[pos][1]-l[pos][0]) == 6 && strncmp(l[pos][0],"record", 6) == 0 ) {
+	if( (l[pos][1]-l[pos][0]) == 8 && strncmp(l[pos][0],"predtype", 8) == 0 ) {
 		pos++;
 		if( !reln.parse(in) || reln.type != elem::SYM ) goto FAIL;
 		if(*l[pos++][0] != '(') goto FAIL;
@@ -446,173 +528,390 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 	for( auto it : vts){
 		if( it.is_predicate()) { // this is predicate declaration
 			if( predtype.find(lexeme2str(it.reln.e)) != predtype.end() )
-				return type_error(" Predicate redefined.", it.reln.e), false;
+				return input().type_error(" Predicate redefined.", it.reln.e), false;
 			predtype.insert({ lexeme2str(it.reln.e), it.typeargs  });		
 		}
 		else if( it.is_typedef()) { // this is new type definitinon
 			if( usertypedef.find(lexeme2str(it.rty.structname.e)) != usertypedef.end() )
-				return type_error(" Repeated typedef.", it.rty.structname.e), false;
+				return input().type_error(" Repeated typedef.", it.rty.structname.e), false;
 			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });					}
 	}
 	return true;
 }
-bool environment::build_from( const raw_term &rt, bool infer= false){
-	bool ret = true; 
-	
-	if( this->contains_pred(lexeme2str(rt.e[0].e))) return false; 
+// infers from given predicates the type signature of relation while
+// making use of var context and updates only the pred_type of env.
+// returns true if new signature found. Does not update context of vars
+// for arith terms, just ensures that all vars have types and returns true	std::vector<typedecl> targs;
+// option to change return val; (1) either on new signature, or (2) if everything inferrable.
+// currently (2)
 
-	if(rt.extype == rt.REL ) {
-		std::vector<typedecl> targs;
-		bool bknown = true;  // assume all args types are determinable 
-		for( size_t i=2 ; bknown && i< rt.e.size()-1; i++) {
+bool environment::build_from( const raw_term &rt, bool infer=false){
+	string_t str = lexeme2str(rt.e[0].e);
+
+	if( this->contains_pred(str)){
+		// know types already, just try to update var context.
+		const std::vector<typedecl> &targs= this->lookup_pred(str);
+		bool updated =false;
+		for( size_t i=2; i < rt.e.size()-1; i++ ){
+			if(rt.e[i].type== elem::VAR ) {
+				str = lexeme2str(rt.e[i].e);
+				//context already knows var types so ..dont do anything
+					if (this->contains_prim_var(str) ){
+						//DBG(assert( this->lookup_prim_var(str) == targs[i-2].pty));
+						// override type definition
+						updated |= this->addtocontext(str, targs[i-2].pty );
+					}
+					else if( this->contains_typedef_var(str)) {
+						//	DBG(assert( this->lookup_typedef_var(str).structname == targs[i-2].structname));
+					}
+				//context does not know..so now populate from signature
+					else if( targs[i-2].is_primitive()){
+						updated |= this->addtocontext(str, targs[i-2].pty);
+					}
+					else if( targs[i-2].is_usertype()){
+						updated |= this->addtocontext(str, lexeme2str(targs[i-2].structname.e));
+					}
+			}
+		}
+		return updated;
+	}
+	std::vector<typedecl> targs;
+	size_t st=0, end=rt.e.size();
+	bool bknown = true;  // assume all args types are determinable 
+	if(rt.extype == raw_term::REL) st = 2, end = rt.e.size()-1;
+	for( size_t i= st ; bknown && i < end; i++) {
+		str = lexeme2str(rt.e[i].e);
+		if(rt.extype == raw_term::REL) {
 			switch(rt.e[i].type) {
 				case elem::NUM:  targs.emplace_back(), targs.back().pty.ty = primtype::UINT;break;
 				case elem::CHR:  targs.emplace_back(), targs.back().pty.ty = primtype::UCHAR;break;
 				case elem::SYM: 
 				case elem::STR: targs.emplace_back(), targs.back().pty.ty = primtype::SYMB;break;
-				case elem::VAR:
-								if(infer && this->contains_prim_var(lexeme2str(rt.e[i].e))) {
-									targs.emplace_back(),
-									targs.back().pty = this->lookup_prim_var(lexeme2str(rt.e[i].e));
+				case elem::VAR:						
+								if(infer && this->contains_prim_var(str)) {						
+										targs.emplace_back(),
+										targs.back().pty = this->lookup_prim_var(str);
+								}
+								else if( infer && this->contains_typedef_var(str) ){
+										targs.emplace_back(),
+										targs.back().structname = rt.e[i];
 								}
 								else bknown = false;
 								break;
-				default: break;
+				default: break; // all arith/op/ etc
 			}
 		}
-		if(bknown )
-			return predtype.insert( { lexeme2str(rt.e[0].e), targs } ).second;
-		else ret = false;
+		else if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ ||
+												rt.extype == raw_term::LEQ ){ 
+				if(rt.e[i].type== elem::VAR && !(this->contains_prim_var(str) ||
+					this->contains_typedef_var(str) ))	bknown = false;
+		}
+		else DBG(assert(false));
 	}
-	return ret;
-}
-bool environment::build_from( const raw_rule &rr){
-	bool ret = true;
-	for (const raw_term &ht : rr.h)
-		ret &= build_from(ht);
-	for (auto it : rr.b)
-		for (const raw_term &bt : it)
-			ret &= build_from(bt) ;
 
-	return ret;
+	if(bknown){
+			//only insert signature for relations.
+			if( rt.extype == raw_term::REL)
+		 		str = lexeme2str(rt.e[0].e),
+				predtype.insert( { lexeme2str(rt.e[0].e), targs } ).second;
+			//for others, just enough to say types are known
+	}
+	// the context does not have types, try to infer from  nearest vars/operations
+	else {
+		//Todo:
+		if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ ||
+												rt.extype == raw_term::LEQ ){
+			bool lastb = false;
+			primtype lastp;
+			//TOD0: need to have a consistent way of selecting type
+			// without ordering effect, it should be some least abstract
+			// type. For now, pick the first known type and assing to typeless
+			std::vector<string_t> notypv;
+			for( size_t i=0; i < rt.e.size(); i++ )
+				if(rt.e[i].type== elem::VAR ) {
+					str = lexeme2str(rt.e[i].e);
+						if (this->contains_prim_var(str) && !lastb)
+							lastp = this->lookup_prim_var(str), lastb =true;
+						else if( this->contains_typedef_var(str)) ;//TOD): ;
+						else notypv.push_back(str);
+			}
+			for(string_t var: notypv)
+				this->addtocontext(var, lastp);
+			bknown = lastb;
+		}
+	}
+
+	return bknown;
 }
 
 bool environment::build_from( const raw_prog &rp  ) {
-	// populate from user declared static types if any
-	bool ret = this->build_from(rp.vts);
-	
-	// infer from rles/terms
-	for (auto &rr : rp.r)
-		ret &= build_from(rr) ;
-
-	return ret;
+	// populate from user declsared static types if any
+	return this->build_from(rp.vts);
 }
 
+// try to infer from given terms of rules using context
+// returns true if the new signature found
+bool typechecker::tinfer( const raw_rule& rr){
+	
+	bool ret = false;
+	std::stringstream ss;
+	env.get_context() = *(rr.get_context().get());
+	for (const raw_term &ht : rr.h){
+		string_t str = lexeme2str(ht.e[0].e);
+		if(env.contains_pred(str)) continue;
+		if(!env.build_from(ht, infer) ){
+			ss<<"Could not infer types from"<<ht,
+			type_error(ss.str().c_str(), ht.e[0].e );
+			ss.str("");
+		}
+		else ret = true;
+	}
+	for (auto &it : rr.b)
+		for (const raw_term &bt : it) {
+			string_t str = lexeme2str(bt.e[0].e);
+			if(env.contains_pred(str)) continue;
+			if(!env.build_from(bt, infer) ){
+				ss<<"Could not infer types from predicate "<<bt,
+				type_error(ss.str().c_str(), bt.e[0].e );
+				ss.str("");
+				ss.clear();
+			}
+			else ret = true;
+		}
+
+	if(ret) *(rr.get_context().get()) = env.get_context();
+	return ret;
+}
 bool typechecker::tcheck(){
 	bool ret = true;
-	for (auto &rr : rp.r)
-		 ret &= tcheck(rr) ;
+	std::vector<TINFO_STATUS> vrinfo(rp.r.size());
+	//typecheck and build var context for each rule
+	for (size_t i=0; i < rp.r.size(); i++) {
+		if(( tcheck(rp.r[i]))) {	
+			//see if there is any need for inference.		
+			if(std::count_if(verrs.begin(), verrs.end(), [](TINFO_STATUS st){
+				return st == TINFO_UNKNOWN_PRED_TYPE || st == TINFO_UNKNOWN_VAR_TYPE;
+				})){
+					vrinfo[i] = TINFO_UNKNOWN_PRED_TYPE; 
+				}
+			else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS; 
+		}
+		else ret = false, infer = false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL; // type_check fails.
+	}
+	
+	if( ret && infer ) {	
+		// only try inference when typecheck for any rule does not fail
+		_BEG:
+		bool sigupdated = false;
+		if(rp.r.size())	DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");
+		auto lastinfo = vrinfo;
+		for (size_t i=0; i < rp.r.size(); i++) {
+			if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
+				if( tinfer(rp.r[i]) ) { // new signature added probably
+					sigupdated = true;
+				}
+			}
+		}
+		for (size_t i=0; i < rp.r.size() ; i++) {
+			if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
+				if( tcheck(rp.r[i]) ) {	
+					if(std::count_if(verrs.begin(), verrs.end(), [](TINFO_STATUS st){
+						return st == TINFO_UNKNOWN_PRED_TYPE || st == TINFO_UNKNOWN_VAR_TYPE;
+						})){
+								vrinfo[i] = TINFO_UNKNOWN_PRED_TYPE; 
+						}
+					else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS;
+				}
+				else ret =false, infer=false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
+			}
+		}
+		if(lastinfo != vrinfo) { goto _BEG; }
+		else if(rp.r.size()) DBG(COUT<<"converging inference" <<std::endl);
+	}
+	if(ret) {
+		if(std::count_if(vrinfo.begin(), vrinfo.end(), [](TINFO_STATUS st){
+			return st == TINFO_UNKNOWN_PRED_TYPE || st == TINFO_UNKNOWN_VAR_TYPE || 
+					st == TINFO_TYPE_CHECK_FAIL;
+			})){
+					ret = false; 
+			}
+	}
+
 	for( auto &nrp: rp.nps){
 		typechecker tc(nrp, infer);
 		ret &= tc.tcheck() ;
 	}
+	DBG(COUT<<env.to_print());
+	for( size_t i =0 ; i <rp.r.size(); i ++)
+		;//DBG(COUT<<rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():"");
 	return ret;
 }
 
 bool typechecker::tcheck( const raw_term &rt){
-	
-	if( env.contains_pred(lexeme2str(rt.e[0].e))){	
-		std::stringstream ss;
-		auto typeparams = env.lookup_pred(lexeme2str(rt.e[0].e));
-		if( typeparams.size() != size_t(rt.arity[0])) 
-			return 	ss<<"Expected arity for " << rt << " is " <<typeparams.size(),
-					type_error(ss.str().c_str(), rt.e[0].e), false;
-		
-		size_t argc = 2;
-		for( auto typexp: typeparams) {
-			if( typexp.is_primitive() ) {
-				switch ( rt.e[argc].type) {
-					case elem::NUM: 
-						if( typexp.pty.ty != primtype::_ptype::UINT)  
-						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << rt.e[argc].num << " is ",
-							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
-							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
-						else {
-							int_t maxval =  ( ((size_t)0x1 <<typexp.pty.get_bitsz())-1);
-							if( rt.e[argc].num > maxval )
-							return 	ss<< rt.e[argc].num << " exceeds max size for ",
-							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
-							 		type_error(ss.str().c_str(), rt.e[argc].e), false;	
-						}
-						break;
-					case elem::CHR:  
-						if( typexp.pty.ty != primtype::_ptype::UCHAR)  
-						 	return 	ss<<"Expected type for argument "<<argc -1<<":" << to_string(to_string_t(rt.e[argc].ch))<<" is ",
-							 		ss << typexp.pty.to_print() <<" in predicate "<<rt,
-							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
-						break;
-					case elem::SYM:   
-						if( typexp.pty.ty != primtype::_ptype::SYMB)  
-		 					return 	ss<<"Expected type for argument "<<argc -1<<":"  << rt.e[argc].e << " is ",
-							 		ss << typexp.pty.to_print() <<"in predicate "<<rt,
-							 		type_error(ss.str().c_str(), rt.e[argc].e), false;
+	tstat = TINFO_TYPE_CHECK_SUCCESS;
+	string_t str = lexeme2str(rt.e[0].e);
 
-						break;
-					case elem::VAR: {
-							string_t var = lexeme2str(rt.e[argc].e);
-							if( env.contains_prim_var(var) ) {
-								primtype &pt =  env.lookup_prim_var(var);
-								if( typexp.pty != pt ) {
-									ss<< "Type "<<  pt.to_print()<< " of "<<rt.e[argc].e << " does not match expected type "; 
-									ss<< typexp.pty.to_print() << " in predicate " <<rt;
-									return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
-								}
+	std::stringstream ss;
+	if( rt.extype == raw_term::REL ) {
+		if( env.contains_pred(str)){	
+			auto &typeparams = env.lookup_pred(str);
+			if( typeparams.size() != size_t(rt.arity[0])) 
+				return 	ss<<"Expected arity for " << rt << " is " <<typeparams.size(),
+						type_error(ss.str().c_str(), rt.e[0].e), false;
+			
+			size_t argc = 2;
+			for( auto &typexp: typeparams) {
+				if( typexp.is_primitive() ) {
+					switch ( rt.e[argc].type) {
+						case elem::NUM: 
+							if( typexp.pty.ty != primtype::_ptype::UINT)  
+								return 	ss<<"Expected type for argument "<<argc -1<<":" << rt.e[argc].num << " is ",
+										ss << typexp.pty.to_print() <<" in predicate "<<rt,
+										type_error(ss.str().c_str(), rt.e[argc].e), false;
+							else {
+								int_t maxval =  ( ((size_t)0x1 <<typexp.pty.get_bitsz())-1);
+								if( rt.e[argc].num > maxval )
+								return 	ss<< rt.e[argc].num << " exceeds max size for ",
+										ss << typexp.pty.to_print() <<" in predicate "<<rt,
+										type_error(ss.str().c_str(), rt.e[argc].e), false;	
 							}
-							else env.addtocontext(var, typexp.pty );
-						}
-						break;
-					default: break;
-				}
-			}
-			else if ( typexp.is_usertype()) {
+							break;
+						case elem::CHR:  
+							if( typexp.pty.ty != primtype::_ptype::UCHAR)  
+								return 	ss<<"Expected type for argument "<<argc -1<<":" << to_string(to_string_t(rt.e[argc].ch))<<" is ",
+										ss << typexp.pty.to_print() <<" in predicate "<<rt,
+										type_error(ss.str().c_str(), rt.e[argc].e), false;
+							break;
+						case elem::SYM:   
+							if( typexp.pty.ty != primtype::_ptype::SYMB)  
+								return 	ss<<"Expected type for argument "<<argc -1<<":"  << rt.e[argc].e << " is ",
+										ss << typexp.pty.to_print() <<"in predicate "<<rt,
+										type_error(ss.str().c_str(), rt.e[argc].e), false;
 
-				if(!env.contains_typedef(lexeme2str(typexp.structname.e)))
-						return ss << "Type "<<  typexp.structname.e << " of "<<rt.e[argc].e << " is undefined", 
-								type_error(ss.str().c_str(), rt.e[argc].e), false; 
-
-				string_t var = lexeme2str(rt.e[argc].e);
-				if( env.contains_typedef_var(var) ) {
-					structype &st =  env.lookup_typedef_var(var);
-					if( typexp.structname != st.structname ) {
-						ss<< "Type "<<  st.structname.e << " of "<<rt.e[argc].e << " does not match expected type "; 
-						ss<< typexp.structname.e << " in predicate " <<rt;
-						return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
+							break;
+						case elem::VAR: {
+								string_t var = lexeme2str(rt.e[argc].e);
+								if( env.contains_prim_var(var) ) {
+									primtype &pt =  env.lookup_prim_var(var);
+									if( typexp.pty != pt ) {
+										ss<< "Type "<<  pt.to_print()<< " of "<<rt.e[argc].e << " does not match expected type "; 
+										ss<< typexp.pty.to_print() << " in predicate " <<rt;
+										return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
+									}
+								}
+								else env.addtocontext(var, typexp.pty );
+							}
+							break;
+						default: break;
 					}
 				}
-				else env.addtocontext(var, lexeme2str(typexp.structname.e) );
-	
+				else if ( typexp.is_usertype()) {
+					str = lexeme2str(typexp.structname.e);
+					if(!env.contains_typedef(str))
+							return ss << "Type "<<  typexp.structname.e << " of "<<rt.e[argc].e << " is undefined", 
+									type_error(ss.str().c_str(), rt.e[argc].e), false; 
+
+					string_t var = lexeme2str(rt.e[argc].e);
+					if( env.contains_typedef_var(var) ) {
+						structype &st =  env.lookup_typedef_var(var);
+						if( typexp.structname != st.structname ) {
+							ss<< "Type "<<  st.structname.e << " of "<<rt.e[argc].e << " does not match expected type "; 
+							ss<< typexp.structname.e << " in predicate " <<rt;
+							return type_error(ss.str().c_str(), rt.e[argc].e ), false;	
+						}
+					}
+					else env.addtocontext(var, str );
+		
+				}
+				argc++;
 			}
-			argc++;
+		}
+		else { // the predicate signatures are not specified and found
+			ss<< "Type signature for predicate"<<rt<< " not found "; 
+			tstat = TINFO_UNKNOWN_PRED_TYPE;
+			return type_error(ss.str().c_str(), rt.e[0].e ), false;	
+		}
+	}
+	else if ( rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ || rt.extype == raw_term::ARITH ) {
+		// for arith, eq, leq, iterate over vars to ensure same type
+		primtype lastp;
+		bool last =false;
+
+		for( const elem &e : rt.e){
+			str = lexeme2str(e.e);
+			if( e.type == elem::VAR ) {	
+				if( env.contains_prim_var(str) ){
+					if(last == false)
+						lastp = env.lookup_prim_var(str), last = true;
+					else if( lastp != env.lookup_prim_var(str) ) 
+						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " does not match other var type in term " <<rt,
+						type_error(ss.str().c_str(), rt.e[0].e ), false;
+					
+					if( rt.extype == raw_term::ARITH && lastp.ty != primtype::_ptype::UINT )
+						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " cannot be applied to arithmetic terms  " <<rt,
+						type_error(ss.str().c_str(), rt.e[0].e ), false;
+				}
+				else if (env.contains_typedef_var(str) ) {
+					ss<< "Type of complex type var "<<str.c_str()<< " does not work with comparison and arithmetic operator"; 
+					return type_error(ss.str().c_str(), rt.e[0].e ), false;	
+				}
+				else {
+					tstat = TINFO_UNKNOWN_VAR_TYPE;
+					ss<< "Type for var "<<str.c_str()<< " not found or specified "; 
+					return type_error(ss.str().c_str(), rt.e[0].e ), false;	
+				}
+			}
 		}
 	}
 	return true;
 }
 
 bool typechecker::tcheck( const raw_rule &rr){
-	env.reset_context();
-	bool ret = true;
+	std::stringstream ss;
+	if( rr.get_context().get() != nullptr)
+		env.get_context() = *(rr.get_context().get());
+	verrs.clear();
 	for (const raw_term &ht : rr.h)
-		ret &= tcheck(ht);
+		if(!tcheck(ht)) verrs.push_back(tstat);
+	
 	for (auto &it : rr.b)
 		for (const raw_term &bt : it)
-			ret &= tcheck(bt) ;
+			if(! tcheck(bt)) verrs.push_back(tstat);
+	// update newly discovered var context for rule only if no static type errors		
+	if (std::count(verrs.begin(), verrs.end(), TINFO_TYPE_CHECK_FAIL ) == 0)
+		return rr.update_context(std::make_shared<context>(env.get_context())), true;
 	
-	// infer types 
-	if(ret && infer ) {
+	return false;
+		/*
+	if(tryinfer) {
+		// for inference, use prev context for terms whose types are not known yet
+		env.get_context() = *(rr.get_context().get());
 		for (const raw_term &ht : rr.h){
-			if(env.contains_pred(lexeme2str(ht.e[0].e))) continue;
-			env.build_from(ht, infer);
+			string_t str = lexeme2str(ht.e[0].e);
+			if(env.contains_pred(str)) continue;
+			if(!env.build_from(ht, infer) ){
+				ret &= false;
+				ss<<"Could not infer types from"<<ht,
+				type_error(ss.str().c_str(), ht.e[0].e );
+				ss.str("");
+				ss.clear();
+			}
+			else rr.update_context(std::make_shared<context>(env.get_context()));
 		}
-	}	
-	return ret;
+		for (auto &it : rr.b)
+			for (const raw_term &bt : it) {
+				string_t str = lexeme2str(bt.e[0].e);
+				if(env.contains_pred(str)) continue;
+				if(!env.build_from(bt, infer) ){
+					ret &= false;
+					ss<<"Could not infer types from predicate "<<bt,
+					type_error(ss.str().c_str(), bt.e[0].e );
+					ss.str("");
+					ss.clear();
+				}
+				else rr.update_context(std::make_shared<context>(env.get_context()));
+			}
+		return ret;
+	}
+ */
 }

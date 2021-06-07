@@ -1,7 +1,7 @@
 # Transitive closure (TC)
 # infers e types as NUM.
 
-###predtype e( int:4 ?a,  int:4 ?b).
+predtype e( int:4 ?a,  int:4 ?b).
 ##predtype tc ( int ?a, int ?b).
 
 e(1 2).

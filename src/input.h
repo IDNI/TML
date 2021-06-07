@@ -27,6 +27,9 @@
 #include "memory_map.h"
 
 class archive;
+class environment;
+class context;
+
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
 enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
@@ -233,6 +236,8 @@ public:
 
 struct raw_form_tree;
 typedef std::shared_ptr<raw_form_tree> sprawformtree;
+typedef std::shared_ptr<struct context> spenvcontext;
+typedef std::shared_ptr<class environment> spenvironment;
 
 struct raw_prog;
 
@@ -350,7 +355,7 @@ struct primtype : utype {
 	bool operator!=(const primtype& r) const {
 		return !(*this == r);		
 	}
-	std::string to_print(){
+	std::string to_print() const{
 		std::string s;
 		switch(ty){
 			case UINT: s.append("int"); break;
@@ -366,7 +371,7 @@ struct primtype : utype {
 		}
 		return s;
 	}
-	size_t get_bitsz(){
+	size_t get_bitsz() const {
 		switch(ty){
 			case UINT: return bsz > 0 && bsz <= 32 ? bsz: 16;
 			case UCHAR: return 8;
@@ -398,16 +403,25 @@ struct typedecl {
 	primtype pty;  
 	elem structname; // struct type
 	std::vector<elem> vars;
-	bool is_primitive(){
+	bool is_primitive() const{
 		DBG(assert(structname.e[0] == NULL || pty.ty == primtype::NOP));
 		return pty.ty != primtype::NOP;
 	}
-	bool is_usertype(){
+	bool is_usertype() const{
 		DBG(assert(structname.e[0] == NULL || pty.ty == primtype::NOP));
 		return structname.e[0] != NULL;
 	}
-	size_t get_param_count() {
+	size_t get_param_count() const {
 		return vars.size();
+	}
+	std::string to_print() const {
+		std::string ret;
+		if(is_primitive())
+			ret.append(pty.to_print());
+		else ret.append(structname.to_str());
+		for( const elem &e :  vars )
+			ret.append(" "), ret.append(e.to_str());
+		return ret;
 	}
 
 	bool parse(input *in , const raw_prog& prog, bool multivar = true);
@@ -617,8 +631,9 @@ struct raw_rule {
 	// prft != nullptr, otherwise it signifies that this rule is a fact.
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
-	sprawformtree prft = nullptr;
+	sprawformtree prft = nullptr; 
 
+	mutable spenvcontext varctx = nullptr;
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
 	bool guarding = false;
@@ -647,6 +662,12 @@ struct raw_rule {
 	void set_b(const std::vector<std::vector<raw_term>> &_b) {
 		b = _b;
 		prft = nullptr;
+	}
+	void update_context(const spenvcontext &_c) const { 
+		varctx = _c;
+	}
+	spenvcontext get_context() const {
+		return varctx;	
 	}
 	void update_states(std::array<bool, 8>& has) {
 		if (is_form() || is_rule()) has[RULE] = true;
@@ -745,7 +766,7 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
-	std::vector<environment> typenv;
+	std::vector<environment> typenv; // only one item;
 
 	std::set<lexeme, lexcmp> builtins;
 //	int_t delrel = -1;

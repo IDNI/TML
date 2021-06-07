@@ -128,7 +128,7 @@ size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 	if (!level) return 0;
 	if (!--dep) return -1;
 //	DBG(o::out()<<"current p: " << endl; print(o::out(), p);)
-//	DBG(o::out()<<"proving " << to_raw_term(q) << " level "<<level<<endl;)
+//	DBG(o::out()<<"proving " << ir_handler->to_raw_term(q) << " level "<<level<<endl;)
 	while ((s = get_witnesses(q, level)).empty())
 		if (!level--)
 			return 0;
@@ -161,7 +161,7 @@ bool tables::get_goals(std::basic_ostream<T>& os) {
 			[&s](const term& t) { s.insert(t); }, t.size());
 	for (const term& g : s)
 		if (opts.bproof) get_proof(g, p, levels.size() - 1);
-		else os << to_raw_term(g) << '.' << endl;
+		else os << ir_handler->to_raw_term(g) << '.' << endl;
 	if (opts.bproof) print(os, p);
 	return goals.size() || opts.bproof;
 }

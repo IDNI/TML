@@ -132,4 +132,11 @@ namespace o { // o:: namespace shortcuts
 template <typename T, typename T1, typename T2>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os,
 	const std::map<T1,T2>& m);
+
+template<typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
+
+template <typename T>
+std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
+
 #endif
