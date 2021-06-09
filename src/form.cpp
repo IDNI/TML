@@ -15,7 +15,7 @@
 #include "tables.h"
 
 pnft::pnft(){
-		varslen = 0, neg = false, b = 0, cons = bdd_handle::T;
+		varslen = 0, varslen_h = 0, neg = false, b = 0, cons = bdd_handle::T;
 }
 
 pnft::~pnft() {

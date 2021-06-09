@@ -65,7 +65,7 @@ class driver {
 	friend struct pattern;
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
 	friend std::istream& operator>>(std::istream& is, driver& d);
-//	dict_t dict;
+	dict_t dict;
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
 	int_t nums = 0, chars = 0, syms = 0;
@@ -201,6 +201,8 @@ class driver {
 	prog_data pd;
 	std::set<int_t> transformed_strings;
 	tables *tbl = 0;
+	ir_builder *ir = 0;
+
 	void output_pl(const raw_prog& p) const;
 	std::set<lexeme> vars;
 	raw_progs rp;
@@ -246,7 +248,7 @@ public:
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
-	void set_regex_level(int val ) { tbl->regex_level = val; }
+	void set_regex_level(int val ) { ir->regex_level = val; }
 	template <typename T>
 	bool out_goals(std::basic_ostream<T>& os) const {
 		return tbl->get_goals(os); }

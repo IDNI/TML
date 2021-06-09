@@ -10,6 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __TERM__
+#define __TERM__
+
 #include "defs.h"
 
 struct term : public ints {
@@ -58,7 +61,11 @@ struct term : public ints {
 		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
 	}
-	void replace(const std::map<int_t, int_t>& m);
+	void replace(const std::map<int_t, int_t>& m) {
+		auto it = m.end();
+		for (int_t& i : *this) if (m.end() != (it = m.find(i))) i = it->second;
+	}
+
 	inline bool is_builtin() const { return idbltin > -1; }
 };
 
@@ -66,3 +73,5 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const term& t);
 std::vector<term> to_vec(const term& h, const std::set<term>& b);
 template<typename T> std::set<T> vec2set(const std::vector<T>& v, size_t n = 0);
+
+#endif

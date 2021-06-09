@@ -32,6 +32,7 @@ set(TML_HEADERS
 	options.h
 	output.h
 	tables.h
+	ir_builder.h
 )
 
 set(TML_SOURCES
@@ -56,6 +57,7 @@ set(TML_SOURCES
 	transform.cpp
 	transform_guards.cpp
 	utils.cpp
+	ir_builder.cpp
 )
 
 if (WITH_THREADS)
