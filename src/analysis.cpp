@@ -351,7 +351,8 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 				return input().type_error(" Repeated typedef.", it.rty.structname.e), false;
 			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });					}
 	}
-	return true;
+	if( predtype.size() || usertypedef.size()) return true;
+	return false;
 }
 // infers from given predicates the type signature of relation while
 // making use of var context and updates only the pred_type of env.
@@ -370,7 +371,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 		for( size_t i=2; i < rt.e.size()-1; i++ ){
 			if(rt.e[i].type== elem::VAR ) {
 				str = lexeme2str(rt.e[i].e);
-				//context already knows var types so ..dont do anything
+				//context already knows var types
 					if (this->contains_prim_var(str) ){
 						//DBG(assert( this->lookup_prim_var(str) == targs[i-2].pty));
 						// override type definition
@@ -450,8 +451,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 						else if( this->contains_typedef_var(str)) ;//TOD): ;
 						else notypv.push_back(str);
 			}
-			for(string_t var: notypv)
-				this->addtocontext(var, lastp);
+			if(lastb) for(string_t var: notypv)	this->addtocontext(var, lastp);
 			bknown = lastb;
 		}
 	}
@@ -473,7 +473,6 @@ bool typechecker::tinfer( const raw_rule& rr){
 	env.get_context() = *(rr.get_context().get());
 	for (const raw_term &ht : rr.h){
 		string_t str = lexeme2str(ht.e[0].e);
-		if(env.contains_pred(str)) continue;
 		if(!env.build_from(ht, infer) ){
 			ss<<"Could not infer types from"<<ht,
 			type_error(ss.str().c_str(), ht.e[0].e );
@@ -484,7 +483,6 @@ bool typechecker::tinfer( const raw_rule& rr){
 	for (auto &it : rr.b)
 		for (const raw_term &bt : it) {
 			string_t str = lexeme2str(bt.e[0].e);
-			if(env.contains_pred(str)) continue;
 			if(!env.build_from(bt, infer) ){
 				ss<<"Could not infer types from predicate "<<bt,
 				type_error(ss.str().c_str(), bt.e[0].e );
@@ -662,7 +660,7 @@ bool typechecker::tcheck( const raw_term &rt){
 						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " does not match other var type in term " <<rt,
 						type_error(ss.str().c_str(), rt.e[0].e ), false;
 					
-					if( rt.extype == raw_term::ARITH && lastp.ty != primtype::_ptype::UINT )
+					if( rt.extype == raw_term::ARITH && last && lastp.ty != primtype::_ptype::UINT )
 						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " cannot be applied to arithmetic terms  " <<rt,
 						type_error(ss.str().c_str(), rt.e[0].e ), false;
 				}
@@ -685,12 +683,6 @@ bool typechecker::tcheck( const raw_rule &rr){
 	std::stringstream ss;
 	if( rr.get_context().get() != nullptr)
 		env.get_context() = *(rr.get_context().get());
-	else {
-		o::err() << "Context not allocated" << std::endl;
-		#ifdef WITH_EXCEPTIONS
-			throw ;
-		#endif
-	}
 	verrs.clear();
 	for (const raw_term &ht : rr.h)
 		if(!tcheck(ht)) verrs.push_back(tstat);
