@@ -36,7 +36,7 @@ void tables::body_builtins(spbdd_handle x, alt* a, bdd_handles& hs) {
 	if (x == hfalse) return; // return if grounding failed
 	vector<blt_ctx> ctx;
 	for (term bt : a->bltins) // create contexts for each builtin
-		ctx.emplace_back(bt, a); //, ctx.back().a = &a;
+		ctx.emplace_back(bt, a), ctx.back().hs = &hs;
 	if (a->bltinvars.size())	{ // decompress grounded terms
 	    decompress(x,0, [&ctx, this] (const term t) {
 		for (blt_ctx& c : ctx) {
@@ -91,7 +91,8 @@ bool tables::init_builtins() {
 		c.out(from_sym(c.outvarpos(0), c.a->varslen, c.mknum(rnd)));
 	});
 	
-	bltins.add(B, "count", 2, 1, [this](blt_ctx& c) {
+	// old count just for the reference. To be removed soon
+	bltins.add(B, "old_count", 2, 1, [this](blt_ctx& c) {
 		spbdd_handle x = htrue;
 		body* b = 0;		
 		for (auto p : c.a->varbodies)
@@ -103,6 +104,22 @@ bool tables::init_builtins() {
 		//COUT << "count result: " << cnt << endl;
 		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
 	}, 1);
+
+	// count (w/o input parameters)
+	bltins.add(B, "count", 1, 1, [this](blt_ctx& c) {
+		spbdd_handle x = bdd_and_many(*c.hs);
+		int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
+		//COUT << "count1 result: " << cnt1 << endl;
+
+		//TODO: FIX count with perm inv?
+		//bools inv(c.a->varslen * bits, false);
+		//for (size_t i = 0; i < c.a->perm.size(); ++i)
+		//	if (!c.a->ex[i]) inv[c.a->perm[i]] = true;
+		//int_t cnt2 = bdd::satcount(x, inv);
+		//COUT << "count2 result: " << cnt2 << endl;
+
+		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt1)));
+	});
 
 	return  init_bdd_builtins() &&
 		init_print_builtins() &&
@@ -174,7 +191,8 @@ bool tables::init_js_builtins() {
 	blt_handler h;
 #ifdef __EMSCRIPTEN__
 	bltins.add(H, "js_eval", -1, 0, h = [this](blt_ctx& c) {
-		emscripten_run_script(to_string(to_raw_term(c.g)).c_str()); });
+		emscripten_run_script(to_string(
+			ir_handler->to_raw_term(c.g)).c_str()); });
 	bltins.add(B, "js_eval", -1, 0, h);
 	//bltins.add(B, "js_eval_to_int", -1, 1, [this](blt_ctx& c) {
 	//	term t(c.g);

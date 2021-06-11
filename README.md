@@ -607,7 +607,30 @@ Alternatively, if the user requires extended precision to keep all information o
 
 where ?zh accounts for the most significant bits (MSBs) of the operation and ?zl for the least significant bits (LSBs).
 
-## Fixed point detection programatically
+# Counting number of records in relations
+
+For getting number of records in a relation TML provides count builtin. It is
+usable in bodies. It has no input argument and it has one output argument which
+is the number of records matching rule's body.
+
+Result of the count builtin is not accessible in the same rule's body, it can be
+only passed to terms in head. If it is necessary to use the count result in
+a body it has to be stored into the db first (use head term) and then the value
+can be accessed in a body in a next step.
+
+Example:
+```
+	A(1). A(2). A(3).
+
+	# wrong because ?l can be passed only to head
+	len_is_3  :- A(?x), count(?l), ?l = 3. 
+
+	# length of A is stored in A_len and in another rule it is checked
+	A_len(?l) :- A(?x), count(?l).        
+	len_is_3  :- A_len(?l), ?l = 3.
+```
+
+# Fixed point detection programatically
 
 TML programmer can enable fixed point step by `-fp` (`-fp-step`) command line
 option. This option makes TML interpret to add a `__fp__` fact into program's

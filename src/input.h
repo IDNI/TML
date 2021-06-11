@@ -28,7 +28,7 @@
 
 class archive;
 class environment;
-class context;
+struct context;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 

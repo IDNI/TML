@@ -29,6 +29,7 @@ struct blt_ctx {
 	size_t nargs = 0;    // number of args to keep ungrounded
 	alt*       a = 0;    // alt if body builtin
 	dict_t* dict = 0;
+	bdd_handles* hs = 0;
 	// builtin context for head term
 	blt_ctx(term t) : t(t), g(t), args(t.size()), oargs(0) {}
 	// builtin context for body term
