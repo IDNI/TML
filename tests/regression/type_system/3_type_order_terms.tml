@@ -1,2 +1,4 @@
-e(9 8).
+predtype e( int: 2 ?x, int: 2 ?y).
+
+e(2 1).
 tc(?x ?y) :- e(?x ?z), e(?y ?z), ?z+1 = ?y .

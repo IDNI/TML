@@ -48,7 +48,7 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 
 size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
-	DBG(assert(rt.e.size()>n && n >=0));
+	DBG(assert(rt.e.size()>n && (int_t)n >=0));
 
 	if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ) {
 		string_t str = lexeme2str(rt.e[n].e);
@@ -429,7 +429,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 			//only insert signature for relations.
 			if( rt.extype == raw_term::REL)
 		 		str = lexeme2str(rt.e[0].e),
-				predtype.insert( { lexeme2str(rt.e[0].e), targs } ).second;
+				predtype.insert( { lexeme2str(rt.e[0].e), targs } );
 			//for others, just enough to say types are known
 	}
 	// the context does not have types, try to infer from  nearest vars/operations
@@ -538,7 +538,7 @@ bool typechecker::tcheck(){
 				else ret =false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
 			}
 		}
-		if(lastinfo != vrinfo) { goto _BEG; }
+		if(lastinfo != vrinfo || sigupdated ) { sigupdated =false; goto _BEG; }
 		else if(rp.r.size()) DBG(COUT<<"converging inference" <<std::endl);
 	}
 	if(ret) {
@@ -556,7 +556,7 @@ bool typechecker::tcheck(){
 	}
 	DBG(COUT<<env.to_print());
 	for( size_t i =0 ; i <rp.r.size(); i ++)
-		;//DBG(COUT<<rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():"");
+		DBG(COUT<<(rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():""));
 	return ret;
 }
 
