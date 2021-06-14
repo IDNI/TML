@@ -1,10 +1,10 @@
 A(1). A(2). A(3). A(4).
             B(3). B(4). B(5). B(6). B(7).
 
-N_A__0(?c) :- A(?x), count(?x ?c).
-N_B__0(?c) :- B(?x), count(?x ?c).
-N_A__1(?c) :- count(?x ?c), A(?x).
-N_B__1(?c) :- count(?x ?c), B(?x).
-N_AB_0(?c) :- A(?x), B(?x), count(?x ?c).
-N_AB_1(?c) :- A(?x), count(?x ?c), B(?x).
-N_AB_2(?c) :- count(?x ?c), A(?x), B(?x).
+N_A__0(?c) :- A(?x), count(?c).
+N_B__0(?c) :- B(?x), count(?c).
+N_A__1(?c) :- count(?c), A(?x).
+N_B__1(?c) :- count(?c), B(?x).
+N_AB_0(?c) :- A(?x), B(?x), count(?c).
+N_AB_1(?c) :- A(?x), count(?c), B(?x).
+N_AB_2(?c) :- count(?c), A(?x), B(?x).

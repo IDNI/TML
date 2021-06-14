@@ -5,9 +5,9 @@ ret=0
 
 sources=(utils.cpp dict.cpp input.cpp tables.cpp tables_builtins.cpp
 	tables_ext.cpp form.cpp builtins.cpp bdd.cpp bdd_ext.cpp analysis.cpp
-	options.cpp)
+	options.cpp ir_builder.cpp)
 objects=(utils.o dict.o input.o tables.o tables_builtins.o tables_ext.o
-	bdd.o bdd_ext.o form.o builtins.o analysis.o options.o)
+	bdd.o bdd_ext.o form.o builtins.o analysis.o options.o ir_builder.o)
 
 #[[ -f tml.o ]] || \
 (

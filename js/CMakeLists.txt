@@ -31,6 +31,8 @@ set(JSLIB_SOURCES
 	../src/form.h
 	../src/input.cpp
 	../src/input.h
+	../src/ir_builder.cpp
+	../src/ir_builder.h
 	../src/memory_map.h
 	../src/options.cpp
 	../src/options.h
