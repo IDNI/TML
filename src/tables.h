@@ -31,33 +31,11 @@
 #include "analysis.h"
 #include "ir_builder.h"
 
-typedef int_t rel_t;
 typedef bdd_handles level;
 
-struct raw_term;
-struct raw_prog;
-struct raw_rule;
-struct raw_form_tree;
+
 class archive;
 class tables;
-
-typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
-	cb_ground;
-
-struct natcmp {
-	bool operator()(const term& l, const term& r) const {
-		if (l.orderid != r.orderid) return l.orderid < r.orderid;
-		if (l.neg != r.neg) return l.neg;
-		//if (iseq != t.iseq) return iseq;
-		//if (isleq != t.isleq) return isleq;
-		//if (extype != t.extype) return extype < t.extype;
-		//if (l.tab != r.tab) return l.tab < r.tab;
-		if (l.goal != r.goal) return l.goal;
-		return (const ints&)l < r;
-	}
-};
-
-typedef std::set<term, natcmp> term_set;
 
 struct body {
 	bool neg, ext = false;
@@ -167,11 +145,14 @@ class tables {
 	friend class ir_builder;
 	friend class driver;
 
-
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 
 private:
+	typedef int_t rel_t;
+
+	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
+		cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
@@ -263,10 +244,9 @@ private:
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
-	//spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
-	//		const varmap& vm, size_t len);
 	spbdd_handle get_alt_range(const term& h, const term_set& a,
 		const varmap& vm, size_t len);
+
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
@@ -279,32 +259,6 @@ private:
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
-
-	void fol_query(cr_pnft_handle f, bdd_handles& v);
-	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
-			std::vector<quant_t> &quantsh, varmap &vmh);
-	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
-	void formula_query(cr_pnft_handle f, bdd_handles& v);
-
-	builtins bltins;
-	bool init_bdd_builtins();
-	bool init_print_builtins();
-	bool init_js_builtins();
-
-	// simple builtin execution from a fact
-	void fact_builtin(const term& b);
-
-	// called when executing builtin in rule's head
-	// @param hs alt_query bdd handles
-	// @param tbl builtin's table
-	// @param tab id of builtin's table
-	void head_builtin(const bdd_handles& hs, const table& tbl, ntable tab);
-
-	// called when executing builtins in body
-	// @param x  result of a var grounding query
-	// @param a  alt
-	// @param hs alt query bdd handles (output is inserted here)
-	void body_builtins(spbdd_handle x, alt* a, bdd_handles& hs);
 
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
@@ -324,7 +278,6 @@ private:
 	template <typename T>
 	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
 	void out(spbdd_handle, ntable, const rt_printer&) const;
-
 
 	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
@@ -353,17 +306,12 @@ private:
 	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
 	void transform_bin(flat_prog& p);
 
-	//bool cqc(const std::vector<term>& x, std::vector<term> y) const;
-	//flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
-	//bool cqc(const std::vector<term>&, const flat_prog& m) const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
-	//void cqc_minimize(std::vector<term>&) const;
 	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
 		std::vector<term> x);
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-//	std::set<ntable> exts; // extensional
 	strs_t strs;
 	std::set<int_t> str_rels;
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
@@ -377,6 +325,30 @@ private:
 	template <typename T>
 	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
 	spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+
+	//-------------------------------------------------------------------------
+	//builtins
+	builtins bltins;
+
+	bool init_builtins();
+	bool init_print_builtins();
+	bool init_js_builtins();
+	bool init_bdd_builtins();
+
+	// simple builtin execution from a fact
+	void fact_builtin(const term& b);
+
+	// called when executing builtin in rule's head
+	// @param hs alt_query bdd handles
+	// @param tbl builtin's table
+	// @param tab id of builtin's table
+	void head_builtin(const bdd_handles& hs, const table& tbl, ntable tab);
+
+	// called when executing builtins in body
+	// @param x  result of a var grounding query
+	// @param a  alt
+	// @param hs alt query bdd handles (output is inserted here)
+	void body_builtins(spbdd_handle x, alt* a, bdd_handles& hs);
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
@@ -413,6 +385,13 @@ private:
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	t_arith_op get_bwop(lexeme l);
 	t_arith_op get_pwop(lexeme l);
+
+	void fol_query(cr_pnft_handle f, bdd_handles& v);
+	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
+			std::vector<quant_t> &quantsh, varmap &vmh);
+	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
+	void formula_query(cr_pnft_handle f, bdd_handles& v);
+
 
 	//-------------------------------------------------------------------------
 	//printer
@@ -457,7 +436,6 @@ public:
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
-	bool init_builtins();
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
 
