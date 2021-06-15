@@ -820,7 +820,7 @@ template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
 {
-	if (print_updates) print(os << "# ", r) << "\n# \t-> ";
+	if (print_updates) print(os << "#       ", r) << "\n#   ->  ";
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
