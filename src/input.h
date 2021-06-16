@@ -28,7 +28,7 @@
 
 class archive;
 class environment;
-struct context;
+class context;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
@@ -262,8 +262,8 @@ struct elem {
 	int_t num = 0; // NUM's number or BLTIN's forget/renew bits
 	// The string that represents variants of this element.
 	lexeme e{ 0, 0 };
-	char32_t ch;
-	elem() {}
+	char32_t ch = 0;
+	elem() {};
 	elem(int_t num) : type(NUM), num(num) {}
 	elem(char32_t ch) : type(CHR), ch(ch) {}
 	elem(etype type) : type(type) {
@@ -812,6 +812,5 @@ bool operator==(const lexeme& l, const char* s);
 bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
-
 
 #endif

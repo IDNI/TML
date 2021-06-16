@@ -30,6 +30,8 @@ map<ekmemo, spbdd_handle> ememo;
 map<ekmemo, spbdd_handle> leqmemo;
 
 //-----------------------------------------------------------------------------
+//vars
+
 template<typename T>
 varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) {
 	varmap m;
@@ -470,7 +472,8 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
-	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
+	if (opts.bitunv) a.rng = leq;
+	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y;
 	for (auto x : b) {
@@ -843,8 +846,14 @@ bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
 	ir_handler->syms = dict.nsyms();
-	while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
-		add_bit();
+
+	if (opts.bitunv) {
+		bits = 1;
+	} else {
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+			add_bit();
+	}
+
 	for (auto x : strs) load_string(x.first, x.second);
 	form *froot;
 	if (!ir_handler->transform_grammar(g, m, froot)) return false;
@@ -889,8 +898,6 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 }
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
-//	if (b.a) return alt_query(*b.a, 0);
-//	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;

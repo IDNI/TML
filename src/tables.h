@@ -33,12 +33,11 @@
 
 typedef bdd_handles level;
 
-
 class archive;
 class tables;
 
 struct body {
-	bool neg, ext = false;
+	bool neg = false;
 	ntable tab;
 	bools ex;
 	uints perm;
@@ -48,7 +47,6 @@ struct body {
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
-		if (ext != t.ext) return ext;
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
 		return perm < t.perm;
@@ -199,7 +197,7 @@ private:
 	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
 	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
-	size_t bits = 2;
+	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
 	size_t max_args = 0;
