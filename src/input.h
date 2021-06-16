@@ -352,6 +352,7 @@ struct primtype : utype {
 	bool operator==(const primtype& r) const {
 		return ty == r.ty && bsz == r.bsz;		
 	}
+	primtype(_ptype _ty = NOP): ty(_ty){}
 	bool operator!=(const primtype& r) const {
 		return !(*this == r);		
 	}

@@ -79,7 +79,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 			return INT_BSZ;
 		}
 	}
-	else if( rt.extype == raw_term::REL) {
+	else if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) {
 		string_t reln = lexeme2str(rt.e[0].e);
 		if( typenv.contains_pred(reln)) {
 			auto targs = typenv.lookup_pred(reln);	
@@ -112,7 +112,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
 	rtout.neg = rtin.neg;	
-	if( rtin.extype == raw_term::REL) {
+	if( rtin.extype == raw_term::REL || rtin.extype == raw_term::BLTIN) {
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
 				// for predicate rel name, keep as it is
@@ -177,7 +177,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 									vbit.back()[pos(bsz, k)] = e;
 								
 								break;
-				default : DBG(assert(false));
+				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
 		}
 		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
@@ -394,10 +394,10 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 	std::vector<typedecl> targs;
 	size_t st=0, end=rt.e.size();
 	bool bknown = true;  // assume all args types are determinable 
-	if(rt.extype == raw_term::REL) st = 2, end = rt.e.size()-1;
+	if(rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) st = 2, end = rt.e.size()-1;
 	for( size_t i= st ; bknown && i < end; i++) {
 		str = lexeme2str(rt.e[i].e);
-		if(rt.extype == raw_term::REL) {
+		if(rt.extype == raw_term::REL || rt.extype ==raw_term::BLTIN) {
 			switch(rt.e[i].type) {
 				case elem::NUM:  targs.emplace_back(), targs.back().pty.ty = primtype::UINT;break;
 				case elem::CHR:  targs.emplace_back(), targs.back().pty.ty = primtype::UCHAR;break;
@@ -422,12 +422,12 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 				if(rt.e[i].type== elem::VAR && !(this->contains_prim_var(str) ||
 					this->contains_typedef_var(str) ))	bknown = false;
 		}
-		else DBG(assert(false));
+		else { DBG(COUT<<rt<<std::endl; assert(false);)  } 
 	}
 
 	if(bknown){
 			//only insert signature for relations.
-			if( rt.extype == raw_term::REL)
+			if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN)
 		 		str = lexeme2str(rt.e[0].e),
 				predtype.insert( { lexeme2str(rt.e[0].e), targs } );
 			//for others, just enough to say types are known
@@ -443,6 +443,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 			// without ordering effect, it should be some least abstract
 			// type. For now, pick the first known type and assing to typeless
 			std::vector<string_t> notypv;
+			bool hasnum = false;
 			for( size_t i=0; i < rt.e.size(); i++ )
 				if(rt.e[i].type== elem::VAR ) {
 					str = lexeme2str(rt.e[i].e);
@@ -450,9 +451,14 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 							lastp = this->lookup_prim_var(str), lastb =true;
 						else if( this->contains_typedef_var(str)) ;//TOD): ;
 						else notypv.push_back(str);
-			}
+				}
+				else if ( rt.e[i].type == elem::NUM){
+					hasnum = true;
+				}
 			if(lastb) for(string_t var: notypv)	this->addtocontext(var, lastp);
-			bknown = lastb;
+			else if( hasnum) for(string_t var: notypv)	this->addtocontext(var, primtype(primtype::UINT));
+			
+			bknown = lastb | hasnum; 
 		}
 	}
 
@@ -470,7 +476,8 @@ bool typechecker::tinfer( const raw_rule& rr){
 	
 	bool ret = false;
 	std::stringstream ss;
-	env.get_context() = *(rr.get_context().get());
+	context old = *(rr.get_context().get());
+	env.get_context() = old;
 	for (const raw_term &ht : rr.h){
 		string_t str = lexeme2str(ht.e[0].e);
 		if(!env.build_from(ht, infer) ){
@@ -492,8 +499,9 @@ bool typechecker::tinfer( const raw_rule& rr){
 			else ret = true;
 		}
 
-	if(ret) *(rr.get_context().get()) = env.get_context();
-	return ret;
+	if(ret && ( old != env.get_context()))
+		return *(rr.get_context().get()) = env.get_context(), true;
+	else return false;
 }
 bool typechecker::tcheck(){
 	bool ret = true;
@@ -565,7 +573,7 @@ bool typechecker::tcheck( const raw_term &rt){
 	string_t str = lexeme2str(rt.e[0].e);
 
 	std::stringstream ss;
-	if( rt.extype == raw_term::REL ) {
+	if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN ) {
 		if( env.contains_pred(str)){	
 			auto &typeparams = env.lookup_pred(str);
 			if( typeparams.size() != size_t(rt.arity[0])) 

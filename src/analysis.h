@@ -18,7 +18,12 @@
 struct context {
     std::map<string_t, primtype> context_prim_var;
     std::map<string_t, string_t> context_typedef_var;
-    
+    bool operator==(const context& r) const {
+        return context_prim_var == r.context_prim_var && context_typedef_var == r.context_typedef_var;
+    }
+    bool operator!=(const context& r) const {
+        return !(*this == r);
+    }
     primtype& lookup_prim_var( string_t &var ){
         DBG(assert(context_prim_var.count(var)));
         return context_prim_var[var];
