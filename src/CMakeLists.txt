@@ -133,11 +133,8 @@ endif()
 get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 find_library(z3_libz3
 			NAMES libz3.so libz3.dll libz3.dylib
-			PATHS ${PARENT_DIR}/z3/bin)
+			PATHS ENV LD_LIBRARY_PATH)
 add_library(z3_libz3 SHARED IMPORTED)
-set_target_properties(z3_libz3 PROPERTIES
-		INTERFACE_INCLUDE_DIRECTORIES "${PARENT_DIR}/z3/include"
-		)
 set_property(TARGET z3_libz3 APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(z3_libz3 PROPERTIES
 		IMPORTED_LOCATION_RELEASE "${z3_libz3}"
