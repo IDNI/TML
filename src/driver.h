@@ -68,9 +68,27 @@ struct z3_context {
 	std::map<rel_info, z3::func_decl> rel_to_decl;
 	std::vector<z3::expr> head_rename;
 	std::map<elem, z3::expr> var_to_decl;
+	std::map<raw_rule, z3::expr> rule_to_decl;
 	
 	z3_context();
 };
+
+void collect_vars(const raw_rule &rr, std::set<elem> &vars);
+void collect_vars(const raw_term &rt, std::set<elem> &vars);
+template <class InputIterator>
+	void collect_vars(InputIterator first, InputIterator last,
+		std::set<elem> &vars);
+void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const raw_rule &rr);
+void collect_free_vars(const raw_term &t,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const raw_term &t);
+void collect_free_vars(const sprawformtree &t,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
+std::set<elem> collect_free_vars(const sprawformtree &t);
 
 class driver {
 	friend class archive;
@@ -139,7 +157,6 @@ class driver {
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
 	int check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
-	z3::expr body_to_z3(const raw_rule &rr, z3_context &ctx);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
@@ -157,25 +174,9 @@ class driver {
 		const elem &domain_name, raw_prog &rp);
 	raw_term to_pure_tml(const sprawformtree &t, std::vector<raw_rule> &rp,
 		const std::set<elem> &fv);
-	void collect_vars(const raw_rule &rr, std::set<elem> &vars);
-	void collect_vars(const raw_term &rt, std::set<elem> &vars);
-	template <class InputIterator>
-		void collect_vars(InputIterator first, InputIterator last,
-			std::set<elem> &vars);
 	void to_pure_tml(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
-	void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const raw_rule &rr);
-	void collect_free_vars(const raw_term &t,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const raw_term &t);
-	void collect_free_vars(const sprawformtree &t,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
-	std::set<elem> collect_free_vars(const sprawformtree &t);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
