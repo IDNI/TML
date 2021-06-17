@@ -872,7 +872,6 @@ template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
 	rp.r = reduced_rules;
 }
 
-
  /* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
@@ -913,42 +912,53 @@ void driver::qc_z3 (raw_prog &raw_p) {
 	}
 }
 
+z3_context::z3_context() : solver(context),
+		uninterp_sort(context.uninterpreted_sort("Type")),
+		bool_sort(context.bool_sort()), head_rename(context) {
+	// Initialize Z3 solver instance parameters
+	z3::params p(context);
+	p.set(":timeout", 500u);
+	// Enable model based quantifier instantiation since we use quantifiers
+	p.set("mbqi", true);
+	solver.set(p);
+}
+
 /* Function to create z3 representation of relation. */
 
-z3::func_decl rel_to_z3(const raw_term& rt, z3_context &ctx) {
+z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
 	const auto &rel = rt.e[0];
 	const rel_info &rel_sig = get_relation_info(rt);
-	if(auto decl = ctx.rel_to_decl.find(rel_sig); decl != ctx.rel_to_decl.end())
+	if(auto decl = rel_to_decl.find(rel_sig); decl != rel_to_decl.end())
 		return decl->second;
 	else {
-		z3::sort_vector domain(ctx.context);
+		z3::sort_vector domain(context);
 		for (int_t i = rt.get_formal_arity(); i != 0; --i)
-			domain.push_back(ctx.uninterp_sort);
+			domain.push_back(uninterp_sort);
 		z3::func_decl ndecl =
-			ctx.context.function(rel.to_str().c_str(), domain, ctx.bool_sort);
-		ctx.rel_to_decl.emplace(make_pair(rel_sig, ndecl));
+			context.function(rel.to_str().c_str(), domain, bool_sort);
+		rel_to_decl.emplace(make_pair(rel_sig, ndecl));
 		return ndecl;
 	}
 }
 
 /* Function to create Z3 representation of global head variable names */
 
-z3::expr globalHead_to_z3(const int_t pos, z3_context &ctx) {
-	for (int_t i=ctx.head_rename.size(); i<=pos; ++i)
-		ctx.head_rename.push_back(z3::expr(ctx.context,
-			Z3_mk_fresh_const(ctx.context, nullptr, ctx.uninterp_sort)));
-	return ctx.head_rename[pos];
+z3::expr z3_context::globalHead_to_z3(const int_t pos) {
+	for (int_t i=head_rename.size(); i<=pos; ++i)
+		head_rename.push_back(z3::expr(context,
+			Z3_mk_fresh_const(context, nullptr, uninterp_sort)));
+	return head_rename[pos];
 }
 
 /* Function to create Z3 representation of elements. */
 
-z3::expr arg_to_z3(const elem& el, z3_context &ctx) {
-	if(auto decl = ctx.var_to_decl.find(el); decl != ctx.var_to_decl.end())
+z3::expr z3_context::arg_to_z3(const elem& el) {
+	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
 		return decl->second;
 	else {
 		const z3::expr &ndecl =
-			ctx.context.constant(el.to_str().c_str(), ctx.uninterp_sort);
-		ctx.var_to_decl.emplace(make_pair(el, ndecl));
+			context.constant(el.to_str().c_str(), uninterp_sort);
+		var_to_decl.emplace(make_pair(el, ndecl));
 		return ndecl;
 	}
 }
@@ -957,67 +967,67 @@ z3::expr arg_to_z3(const elem& el, z3_context &ctx) {
  * pairwise identical head variables to each other, and the second is to
  * equate literals to their unique Z3 equivalent. */
 
-z3::expr z3_head_constraints(const raw_term &head,
-		map<elem, z3::expr> &body_rename, z3_context &ctx) {
-	z3::expr restr = ctx.context.bool_val(true);
+z3::expr z3_context::z3_head_constraints(const raw_term &head,
+		map<elem, z3::expr> &body_rename) {
+	z3::expr restr = context.bool_val(true);
 	for (size_t i = 0; i < head.e.size() - 3; ++i) {
 		const elem &el = head.e[i + 2];
-		const z3::expr &var = globalHead_to_z3(i, ctx);
+		const z3::expr &var = globalHead_to_z3(i);
 		if(const auto &[it, found] = body_rename.try_emplace(el, var); !found)
 			restr = restr && it->second == var;
 		else if (el.type != elem::VAR)
-			restr = restr && var == arg_to_z3(el, ctx);
+			restr = restr && var == arg_to_z3(el);
 	}
 	return restr;
 }
 
 /* Given a term, output the equivalent Z3 expression. */
 
-z3::expr term_to_z3(const raw_term &rel, map<elem, z3::expr> &body_rename,
-		z3_context &ctx) {
-	z3::expr_vector vars_of_rel (ctx.context);
+z3::expr z3_context::term_to_z3(const raw_term &rel,
+		map<elem, z3::expr> &body_rename) {
+	z3::expr_vector vars_of_rel (context);
 	for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
 		// Lambda for pushing head variables
 		// take head variable renaming into account
 		const auto& re_var = body_rename.find(*el);
 		if (re_var != body_rename.end())
 			vars_of_rel.push_back(re_var->second);
-		else vars_of_rel.push_back(arg_to_z3(*el, ctx));
+		else vars_of_rel.push_back(arg_to_z3(*el));
 	}
-	return rel_to_z3(rel, ctx)(vars_of_rel);
+	return rel_to_z3(rel)(vars_of_rel);
 }
 
 /* Given a rule, output the body of this rule converted to the
  * corresponding Z3 expression. Caches the conversion in the context in
  * case the same rule is needed in future. */
 
-z3::expr rule_to_z3(const raw_rule &rr, z3_context &ctx) {
-	if(auto decl = ctx.rule_to_decl.find(rr); decl != ctx.rule_to_decl.end())
+z3::expr z3_context::rule_to_z3(const raw_rule &rr) {
+	if(auto decl = rule_to_decl.find(rr); decl != rule_to_decl.end())
 		return decl->second;
 	// create map from bound_vars
 	map<elem, z3::expr> body_rename;
-	z3::expr restr = z3_head_constraints(rr.h[0], body_rename, ctx);
+	z3::expr restr = z3_head_constraints(rr.h[0], body_rename);
 	// Collect bound variables of rule and restrictions from constants in head
 	set<elem> free_vars;
 	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
 	collect_free_vars(rr.b, bound_vars, free_vars);
 	// Free variables are existentially quantified
-	z3::expr_vector ex_quant_vars (ctx.context);
+	z3::expr_vector ex_quant_vars (context);
 	for (const auto& var : free_vars)
-		ex_quant_vars.push_back(arg_to_z3(var, ctx));
+		ex_quant_vars.push_back(arg_to_z3(var));
 	// Construct z3 expression from rule
-	z3::expr disjuncts = ctx.context.bool_val(false);
+	z3::expr disjuncts = context.bool_val(false);
 	for (const auto& conj : rr.b) {
-		z3::expr conjuncts = ctx.context.bool_val(true);
+		z3::expr conjuncts = context.bool_val(true);
 		for (const raw_term& rel : conj) {
-			const z3::expr &trm = term_to_z3(rel, body_rename, ctx);
+			const z3::expr &trm = term_to_z3(rel, body_rename);
 			conjuncts = conjuncts && (rel.neg ? !trm : trm);
 		}
 		disjuncts = disjuncts || conjuncts;
 	}
 	z3::expr decl = restr && (ex_quant_vars.empty() ?
 		disjuncts : z3::exists(ex_quant_vars, disjuncts));
-	ctx.rule_to_decl.emplace(make_pair(rr, decl));
+	rule_to_decl.emplace(make_pair(rr, decl));
 	return decl;
 }
 
@@ -1034,11 +1044,11 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	// Get head variables for z3
 	z3::expr_vector bound_vars(ctx.context);
 	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
-		bound_vars.push_back(globalHead_to_z3(i, ctx));
+		bound_vars.push_back(ctx.globalHead_to_z3(i));
 	// Rename head variables on the fly such that they match
 	// on both rules
-	z3::expr rule1 = rule_to_z3(r1, ctx);
-	z3::expr rule2 = rule_to_z3(r2, ctx);
+	z3::expr rule1 = ctx.rule_to_z3(r1);
+	z3::expr rule2 = ctx.rule_to_z3(r2);
 	ctx.solver.push();
 	// Add r1 => r2 to solver
 	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
@@ -1046,17 +1056,6 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	if (ctx.solver.check() == z3::unsat) { ctx.solver.pop(); return true; }
 	ctx.solver.pop();
 	return false;
-}
-
-z3_context::z3_context() : solver(context), uninterp_sort(context.uninterpreted_sort("Type")), bool_sort(context.bool_sort()), head_rename(context) {
-	// Prepare the logical context for the z3 solver instance
-
-	// Create z3 solver instance and initialize parameters
-	z3::params p(context);
-	p.set(":timeout", 500u);
-	// Enable model based quantifier instantiation since we use quantifiers
-	p.set("mbqi", true);
-	solver.set(p);
 }
 
 void driver::simplify_formulas(raw_prog &rp) {
@@ -3512,7 +3511,10 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			transform_booleans(rp);
 			simplify_formulas(rp);
 			to_pure_tml(rp);
-			qc_z3(rp);
+			z3_context z3_ctx;
+			subsume_queries(rp,
+				[&](const raw_rule &rr1, const raw_rule &rr2)
+					{return check_qc_z3(rr1, rr2, z3_ctx);});
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
