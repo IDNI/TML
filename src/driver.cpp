@@ -203,7 +203,7 @@ bool is_qc (const raw_rule &rr) {
  * term. */
 
 rel_info get_relation_info(const raw_term &rt) {
-	return std::make_tuple(rt.e[0], rt.e.size() - 3);
+	return std::make_pair(rt.e[0], rt.e.size() - 3);
 }
 
 /* If rr1 and rr2 are both conjunctive queries, check if there is a
@@ -878,14 +878,8 @@ template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
   and remove subsumed rules. */
 
 void driver::qc_z3 (raw_prog &raw_p) {
-	 z3::context c;
-	 map<pair<elem,uint_t>, z3::func_decl> rel_to_decl;
-	 map<elem, z3::expr> var_to_decl;
-	 vector<z3::expr> head_rename;
-	 z3::solver s =
-		 create_z3_solver(raw_p, c, rel_to_decl, var_to_decl,
-				  head_rename);
-	 // Sort rules by relation name and then by tml arity
+	z3_context ctx;
+	// Sort rules by relation name and then by tml arity
 	auto sort_rp = [](const raw_rule& r1, const raw_rule& r2) {
 		if(r1.h[0].e[0] == r2.h[0].e[0])
 			return r1.h[0].arity < r2.h[0].arity;
@@ -894,35 +888,73 @@ void driver::qc_z3 (raw_prog &raw_p) {
 	sort(raw_p.r.begin(), raw_p.r.end(), sort_rp);
 	// Lambda for checking comparability of rules
 	auto same_cat = [](const raw_rule& r1, const raw_rule& r2) {
-		return r1.h[0].e[0] == r2.h[0].e[0] &&
-			r1.h[0].arity == r2.h[0].arity;
+	return r1.h[0].e[0] == r2.h[0].e[0] &&
+		r1.h[0].arity == r2.h[0].arity;
 	};
 	// Check query containment in comparable rules
-	 for (auto selected = raw_p.r.begin(); selected != raw_p.r.end();) {
-		 for (auto compared = selected + 1; compared != raw_p.r.end();) {
-		 	// Advance selected iterator such that rules are comparable
-		 	bool isEndReached = false;
-		 	while(!isEndReached &&
-		 			!same_cat(*selected, *compared)) {
+	for (auto selected = raw_p.r.begin(); selected != raw_p.r.end();) {
+		for (auto compared = selected + 1; compared != raw_p.r.end();) {
+			// Advance selected iterator such that rules are comparable
+			bool isEndReached = false;
+			while(!isEndReached &&
+					!same_cat(*selected, *compared)) {
 				selected = compared;
 				compared = selected + 1;
 				isEndReached = compared == raw_p.r.end();
-		 	} if (isEndReached) break;
-		 	// Check rules for containment
-		 	switch (check_qc_z3(*selected, *compared,
-					    s, c, rel_to_decl, var_to_decl,
-					    head_rename)) {
+			} if (isEndReached) break;
+			// Check rules for containment
+			switch (check_qc_z3(*selected, *compared, ctx)) {
 				case 1:
 					selected = raw_p.r.erase(selected);
 					continue;
 				case 2:
 					compared = raw_p.r.erase(compared);
 					break;
-		 		default: ++compared;
+				default: ++compared;
 			}
-		 }
-		 ++selected;
-	 }
+		}
+		++selected;
+	}
+}
+
+/* Lambda to create z3 representation of relation */
+
+z3::func_decl rel_to_z3(const raw_term& rt, z3_context &ctx) {
+	const auto &rel = rt.e[0];
+	const pair<elem,uint_t> rel_sig(rel,rt.get_formal_arity());
+	if(auto decl = ctx.rel_to_decl.find(rel_sig); decl != ctx.rel_to_decl.end())
+		return decl->second;
+	else {
+		z3::sort_vector domain(ctx.context);
+		for (int_t i = rt.get_formal_arity(); i != 0; --i)
+			domain.push_back(ctx.uninterp_sort);
+		z3::func_decl ndecl =
+			ctx.context.function(rel.to_str().c_str(), domain, ctx.bool_sort);
+		ctx.rel_to_decl.emplace(make_pair(rel_sig, ndecl));
+		return ndecl;
+	}
+}
+
+/* Lambda to create z3 representation of global head variable names */
+
+z3::expr globalHead_to_z3(const int_t pos, z3_context &ctx) {
+	for (int_t i=ctx.head_rename.size(); i<=pos; ++i)
+		ctx.head_rename.push_back(z3::expr(ctx.context,
+			Z3_mk_fresh_const(ctx.context, nullptr, ctx.uninterp_sort)));
+	return ctx.head_rename[pos];
+}
+
+/* Lambda to create z3 representation of vars, syms and nums */
+
+z3::expr arg_to_z3(const elem& el, z3_context &ctx) {
+	if(auto decl = ctx.var_to_decl.find(el); decl != ctx.var_to_decl.end())
+		return decl->second;
+	else if (el.type == elem::VAR || el.type == elem::SYM || el.type == elem::NUM) {
+		const z3::expr &ndecl =
+			ctx.context.constant(el.to_str().c_str(), ctx.uninterp_sort);
+		ctx.var_to_decl.emplace(make_pair(el, ndecl));
+		return ndecl;
+	}
 }
 
 /* Checks if r1 is contained in r2 or vice versa.
@@ -930,128 +962,64 @@ void driver::qc_z3 (raw_prog &raw_p) {
  * Returns 1 if r1 is contained in r2.
  * Returns 2 if r2 is contained in r1. */
 
-int driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3::solver &s,
-			z3::context &c,
-			const map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-			const map<elem, z3::expr> &var_to_decl,
-			const vector<z3::expr> &head_rename) {
+int driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
+		z3_context &ctx) {
 	if (!(is_qc(r1) && is_qc(r2))) return 0;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 	    	r1.h[0].arity == r2.h[0].arity)) return 0;
 	// Get head variables for z3
-	z3::expr_vector bound_vars(c);
+	z3::expr_vector bound_vars(ctx.context);
 	const auto &rel = r1.h[0].e;
 	uint_t currentPos = 0;
 	for (uint_t i = 1; i != rel.size(); ++i)
 		if (rel[i].type == elem::VAR || rel[i].type == elem::SYM || rel[i].type == elem::NUM)
-			bound_vars.push_back(head_rename[currentPos++]);
+			bound_vars.push_back(globalHead_to_z3(currentPos++, ctx));
 	// Rename head variables on the fly such that they match
 	// on both rules
-	z3::expr rule1 = body_to_z3(r1, c, rel_to_decl,
-				    var_to_decl, head_rename);
-	z3::expr rule2 = body_to_z3(r2, c, rel_to_decl,
-				    var_to_decl, head_rename);
-	s.push();
+	z3::expr rule1 = body_to_z3(r1, ctx);
+	z3::expr rule2 = body_to_z3(r2, ctx);
+	ctx.solver.push();
 	// Add r1 => r2 to solver
-	if (bound_vars.empty()) s.add(!z3::implies(rule1, rule2));
-	else s.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
-	if (s.check() == z3::unsat) { s.pop(); return 1; }
-	s.pop(); s.push();
+	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
+	else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
+	if (ctx.solver.check() == z3::unsat) { ctx.solver.pop(); return 1; }
+	ctx.solver.pop(); ctx.solver.push();
 	// Add r2 => r1 to solver
-	if (bound_vars.empty()) s.add(!z3::implies(rule2, rule1));
-	else s.add(!z3::forall(bound_vars,z3::implies(rule2, rule1)));
-	if (s.check() == z3::unsat) { s.pop(); return 2; }
-	s.pop(); return 0;
+	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule2, rule1));
+	else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule2, rule1)));
+	if (ctx.solver.check() == z3::unsat) { ctx.solver.pop(); return 2; }
+	ctx.solver.pop(); return 0;
 }
 
-/* Lambda to create z3 representation of relation */
-
-void rel_to_z3(const raw_term& rt, z3::context &c, map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl, z3::sort t, z3::sort b) {
-	const auto &rel = rt.e[0];
-	z3::sort_vector domain(c);
-	for (int_t i = rt.get_formal_arity(); i != 0; --i)
-		domain.push_back(t);
-	rel_to_decl.emplace(map<pair<elem,uint_t>, z3::func_decl>::value_type(
-		make_pair(rel,domain.size()),
-		c.function(rel.to_str().c_str(), domain, b)));
-}
-
-/* Lambda to create z3 representation of vars, syms and nums */
-
-void arg_to_z3(const raw_term& rt, z3::context &c, map<elem, z3::expr> &var_to_decl, z3::sort t) {
-	for (auto el = rt.e.begin()+1; el!=rt.e.end(); ++el) {
-		if (el->type == elem::VAR || el->type == elem::SYM || el->type == elem::NUM)
-			var_to_decl.emplace(map<elem, z3::expr>::value_type(
-				*el, c.constant(el->to_str().c_str(), t)
-			));
-	}
-}
-
-/* Lambda to create z3 representation of global head variable names */
-
-void globalHead_to_z3(const raw_term& rt, z3::context &c, vector<z3::expr> &head_rename, z3::sort t) {
-	for (int_t i=head_rename.size(); i<rt.get_formal_arity(); ++i) {
-		head_rename.push_back(z3::expr(c, Z3_mk_fresh_const(c, NULL, t)));
-	}
-}
-
-/* Add all relation symbols and variables of checkable rules to context
- * and find max head in terms of arity */
-
-void rule_to_z3(const raw_rule &rr, z3::context &c, map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl, map<elem, z3::expr> &var_to_decl, vector<z3::expr> &head_rename, z3::sort t, z3::sort b) {
-	if (is_qc(rr)) {
-		for (const auto &conj : rr.b)
-			for (const auto &rt : conj) {
-				rel_to_z3(rt, c, rel_to_decl, t, b);
-				arg_to_z3(rt, c, var_to_decl, t);
-				globalHead_to_z3(rt, c, head_rename, t);
-			}
-		arg_to_z3 (rr.h[0], c, var_to_decl, t);
-	}
-}
-
-z3::solver driver::create_z3_solver(const raw_prog &raw_p, z3::context &c,
-				    map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-				    map<elem, z3::expr> &var_to_decl,
-				    vector<z3::expr> &head_rename) {
+z3_context::z3_context() : solver(context), uninterp_sort(context.uninterpreted_sort("Type")), bool_sort(context.bool_sort()) {
 	// Prepare the logical context for the z3 solver instance
-	z3::sort t = c.uninterpreted_sort("Type");
-	z3::sort b = c.bool_sort();
-	
-	for (const auto &rr : raw_p.r)
-		rule_to_z3(rr, c, rel_to_decl, var_to_decl, head_rename, t, b);
 
 	// Create z3 solver instance and initialize parameters
-	z3::solver s (c);
-	z3::params p(c);
+	z3::params p(context);
 	p.set(":timeout", 500u);
 	// Enable model based quantifier instantiation since we use quantifiers
 	p.set("mbqi", true);
-	s.set(p);
-	return s;
+	solver.set(p);
 }
 
 
 /* Given a rule, output the body of this rule converted to the corresponding
 * Z3 expression. */
 
-z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
-			    const map<pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-			    const map<elem, z3::expr> &var_to_decl,
-			    const vector<z3::expr> &head_rename) {
+z3::expr driver::body_to_z3(const raw_rule &rr, z3_context &ctx) {
 	// Collect bound variables of rule and restrictions from constants in head
 	set<elem> free_vars;
 	vector<elem> bound_vars;
-	z3::expr restr (c); restr = c.bool_val(true);
+	z3::expr restr = ctx.context.bool_val(true);
 	for (const auto& head : rr.h)
 		for (auto el = head.e.begin()+1; el != head.e.end(); ++el) {
 			if (el->type == elem::VAR)
 				bound_vars.emplace_back(*el);
 			else if (el->type == elem::SYM || el->type == elem::NUM){
 				bound_vars.emplace_back(*el);
-				restr = restr && head_rename[bound_vars.size()-1]
-							== var_to_decl.find(*el)->second;
+				restr = restr &&
+					globalHead_to_z3(bound_vars.size()-1, ctx) == arg_to_z3(*el, ctx);
 			}
 		}
 	collect_free_vars(rr.b, bound_vars, free_vars);
@@ -1060,9 +1028,9 @@ z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
 	for (uint_t i=0; i < bound_vars.size(); ++i)
 		body_rename[bound_vars[i]] = i;
 	// Free variables are existentially quantified
-	z3::expr_vector ex_quant_vars (c);
+	z3::expr_vector ex_quant_vars (ctx.context);
 	for (const auto& var : free_vars)
-		ex_quant_vars.push_back(var_to_decl.find(var)->second);
+		ex_quant_vars.push_back(arg_to_z3(var, ctx));
 	// Lambda for pushing head variables
 	auto add_var = [&](const auto& el, auto& vars_of_rel){
 		if (el->type == elem::VAR || el->type == elem::SYM
@@ -1070,22 +1038,21 @@ z3::expr driver::body_to_z3(const raw_rule &rr, z3::context &c,
 			// take head variable renaming into account
 			const auto& re_var = body_rename.find(*el);
 			if (re_var != body_rename.end()) {
-				const auto& re_var_sym = head_rename[re_var->second];
+				const auto& re_var_sym = globalHead_to_z3(re_var->second, ctx);
 				vars_of_rel.push_back(re_var_sym);
-			} else vars_of_rel.push_back(var_to_decl.at(*el));
+			} else vars_of_rel.push_back(arg_to_z3(*el, ctx));
 		}
 	};
 	// Construct z3 expression from rule
-	z3::expr disjuncts (c); disjuncts = c.bool_val(false);
+	z3::expr disjuncts = ctx.context.bool_val(false);
 	for (const auto& conj : rr.b) {
-		z3::expr conjuncts = c.bool_val(true);
+		z3::expr conjuncts = ctx.context.bool_val(true);
 		for (const auto& rel : conj) {
-			z3::expr_vector vars_of_rel (c);
+			z3::expr_vector vars_of_rel (ctx.context);
 			for (auto el = rel.e.begin()+1; el != rel.e.end(); ++el) {
 				add_var(el, vars_of_rel);
 			}
-			auto &rel_sym = rel_to_decl.find(
-				make_pair(rel.e[0], vars_of_rel.size()))->second;
+			const auto &rel_sym = rel_to_z3(rel, ctx);
 			conjuncts = rel.neg ? conjuncts && !rel_sym(vars_of_rel)
 					: conjuncts && rel_sym(vars_of_rel);
 		}

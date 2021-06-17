@@ -30,7 +30,7 @@
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
-typedef std::tuple<elem, int_t> rel_info;
+typedef std::pair<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -58,6 +58,18 @@ struct prog_data {
 	size_t start_step = 0;
 	size_t elapsed_steps = 0;
 	string_t std_input;
+};
+
+struct z3_context {
+	z3::context context;
+	z3::solver solver;
+	z3::sort uninterp_sort;
+	z3::sort bool_sort;
+	std::map<rel_info, z3::func_decl> rel_to_decl;
+	std::vector<z3::expr> head_rename;
+	std::map<elem, z3::expr> var_to_decl;
+	
+	z3_context();
 };
 
 class driver {
@@ -126,19 +138,8 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
-	z3::solver create_z3_solver(const raw_prog &raw_p, z3::context &c,
-				    std::map <std::pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-				    std::map <elem, z3::expr> &var_to_decl,
-				    std::vector<z3::expr> &head_rename);
-	int check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3::solver &s,
-			z3::context &c,
-			const std::map <std::pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-			const std::map <elem, z3::expr> &var_to_decl,
-			const std::vector <z3::expr> &head_rename);
-    	z3::expr body_to_z3(const raw_rule &rr, z3::context &c,
-			    const std::map<std::pair<elem,uint_t>, z3::func_decl> &rel_to_decl,
-			    const std::map<elem, z3::expr> &var_to_decl,
-			    const std::vector<z3::expr> &head_rename);
+	int check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
+	z3::expr body_to_z3(const raw_rule &rr, z3_context &ctx);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
