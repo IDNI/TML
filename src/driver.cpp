@@ -956,58 +956,62 @@ z3::expr arg_to_z3(const elem& el, z3_context &ctx) {
 	}
 }
 
+/* Constrain the head variables in two ways: the first is to equate
+ * pairwise identical head variables to each other, and the second is to
+ * equate literals to their unique Z3 equivalent. */
+
+z3::expr z3_head_constraints(const raw_term &head,
+		map<elem, uint_t> &body_rename, z3_context &ctx) {
+	z3::expr restr = ctx.context.bool_val(true);
+	for (size_t i = 0; i < head.e.size() - 3; ++i) {
+		const elem &el = head.e[i + 2];
+		if(const auto &[it, found] = body_rename.try_emplace(el, i); !found)
+			restr = restr &&
+				globalHead_to_z3(it->second, ctx) == globalHead_to_z3(i, ctx);
+		else if (el.type != elem::VAR)
+			restr = restr && globalHead_to_z3(i, ctx) == arg_to_z3(el, ctx);
+	}
+	return restr;
+}
+
+z3::expr term_to_z3(const raw_term &rel, map<elem, uint_t> &body_rename,
+		z3_context &ctx) {
+	z3::expr_vector vars_of_rel (ctx.context);
+	for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
+		// Lambda for pushing head variables
+		// take head variable renaming into account
+		const auto& re_var = body_rename.find(*el);
+		if (re_var != body_rename.end())
+			vars_of_rel.push_back(globalHead_to_z3(re_var->second, ctx));
+		else vars_of_rel.push_back(arg_to_z3(*el, ctx));
+	}
+	return rel_to_z3(rel, ctx)(vars_of_rel);
+}
+
 /* Given a rule, output the body of this rule converted to the corresponding
 * Z3 expression. */
 
 z3::expr body_to_z3(const raw_rule &rr, z3_context &ctx) {
 	if(auto decl = ctx.rule_to_decl.find(rr); decl != ctx.rule_to_decl.end())
 		return decl->second;
-	// Collect bound variables of rule and restrictions from constants in head
-	set<elem> free_vars;
-	vector<elem> bound_vars;
-	z3::expr restr = ctx.context.bool_val(true);
-	for (const auto& head : rr.h)
-		for (auto el = head.e.begin()+1; el != head.e.end(); ++el) {
-			if (el->type == elem::VAR)
-				bound_vars.emplace_back(*el);
-			else if (el->type == elem::SYM || el->type == elem::NUM){
-				bound_vars.emplace_back(*el);
-				restr = restr &&
-					globalHead_to_z3(bound_vars.size()-1, ctx) == arg_to_z3(*el, ctx);
-			}
-		}
-	collect_free_vars(rr.b, bound_vars, free_vars);
 	// create map from bound_vars
 	map<elem, uint_t> body_rename;
-	for (uint_t i=0; i < bound_vars.size(); ++i)
-		body_rename[bound_vars[i]] = i;
+	z3::expr restr = z3_head_constraints(rr.h[0], body_rename, ctx);
+	// Collect bound variables of rule and restrictions from constants in head
+	set<elem> free_vars;
+	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
+	collect_free_vars(rr.b, bound_vars, free_vars);
 	// Free variables are existentially quantified
 	z3::expr_vector ex_quant_vars (ctx.context);
 	for (const auto& var : free_vars)
 		ex_quant_vars.push_back(arg_to_z3(var, ctx));
-	// Lambda for pushing head variables
-	auto add_var = [&](const auto& el, auto& vars_of_rel){
-		if (el->type == elem::VAR || el->type == elem::SYM
-		    || el->type == elem::NUM) {
-			// take head variable renaming into account
-			const auto& re_var = body_rename.find(*el);
-			if (re_var != body_rename.end())
-				vars_of_rel.push_back(globalHead_to_z3(re_var->second, ctx));
-			else vars_of_rel.push_back(arg_to_z3(*el, ctx));
-		}
-	};
 	// Construct z3 expression from rule
 	z3::expr disjuncts = ctx.context.bool_val(false);
 	for (const auto& conj : rr.b) {
 		z3::expr conjuncts = ctx.context.bool_val(true);
-		for (const auto& rel : conj) {
-			z3::expr_vector vars_of_rel (ctx.context);
-			for (auto el = rel.e.begin()+1; el != rel.e.end(); ++el) {
-				add_var(el, vars_of_rel);
-			}
-			const auto &rel_sym = rel_to_z3(rel, ctx);
-			conjuncts = rel.neg ? conjuncts && !rel_sym(vars_of_rel)
-					: conjuncts && rel_sym(vars_of_rel);
+		for (const raw_term& rel : conj) {
+			const z3::expr &trm = term_to_z3(rel, body_rename, ctx);
+			conjuncts = conjuncts && (rel.neg ? !trm : trm);
 		}
 		disjuncts = disjuncts || conjuncts;
 	}
