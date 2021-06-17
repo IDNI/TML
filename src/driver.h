@@ -66,7 +66,7 @@ struct z3_context {
 	z3::sort uninterp_sort;
 	z3::sort bool_sort;
 	std::map<rel_info, z3::func_decl> rel_to_decl;
-	std::vector<z3::expr> head_rename;
+	z3::expr_vector head_rename;
 	std::map<elem, z3::expr> var_to_decl;
 	std::map<raw_rule, z3::expr> rule_to_decl;
 	
@@ -156,7 +156,7 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
-	int check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
+	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
