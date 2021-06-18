@@ -184,7 +184,7 @@ bool is_cqn(const raw_rule &rr) {
 /* Checks if the body of a given rule is conjunctive
  * or disjunctive with negation */
 
-bool is_qc (const raw_rule &rr) {
+bool is_ucqn (const raw_rule &rr) {
 	// Ensure that there are no multiple heads and it is not a fact
 	if(rr.h.size() != 1 || rr.b.empty()) return false;
 	// Ensure that head is positive
@@ -843,8 +843,7 @@ template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
 	for(raw_rule &rr : rp.r) {
 		bool subsumed = false;
 
-		for(vector<raw_rule>::iterator nrr = reduced_rules.begin();
-				nrr != reduced_rules.end();) {
+		for(auto nrr = reduced_rules.begin(); nrr != reduced_rules.end();) {
 			if(f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
 				// then move onto the next rule in the outer loop
@@ -901,16 +900,20 @@ void driver::qc_z3 (raw_prog &raw_p) {
 				isEndReached = compared == raw_p.r.end();
 			} if (isEndReached) break;
 			// Check rules for containment
-			if (check_qc_z3(*selected, *compared, ctx)) {
+			if (check_ucqn_z3(*selected, *compared, ctx)) {
 				selected = raw_p.r.erase(selected);
 				continue;
-			} else if(check_qc_z3(*compared, *selected, ctx))
+			} else if(check_ucqn_z3(*compared, *selected, ctx))
 				compared = raw_p.r.erase(compared);
 			else ++compared;
 		}
 		++selected;
 	}
 }
+
+/* Initialize an empty context that can then be populated with TML to Z3
+ * conversions. uninterp_sort will be used for all Z3 relation arguments
+ * and bool_sort is the "return" type of all relations. */
 
 z3_context::z3_context() : solver(context),
 		uninterp_sort(context.uninterpreted_sort("Type")),
@@ -923,7 +926,8 @@ z3_context::z3_context() : solver(context),
 	solver.set(p);
 }
 
-/* Function to create z3 representation of relation. */
+/* Function to lookup and create where necessary a Z3 representation of
+ * a relation. */
 
 z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
 	const auto &rel = rt.e[0];
@@ -941,7 +945,9 @@ z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
 	}
 }
 
-/* Function to create Z3 representation of global head variable names */
+/* Function to create Z3 representation of global head variable names.
+ * The nth head variable is always assigned the same Z3 constant in
+ * order to ensure that different rules are comparable. */
 
 z3::expr z3_context::globalHead_to_z3(const int_t pos) {
 	for (int_t i=head_rename.size(); i<=pos; ++i)
@@ -950,7 +956,8 @@ z3::expr z3_context::globalHead_to_z3(const int_t pos) {
 	return head_rename[pos];
 }
 
-/* Function to create Z3 representation of elements. */
+/* Function to lookup and create where necessary a Z3 representation of
+ * elements. */
 
 z3::expr z3_context::arg_to_z3(const elem& el) {
 	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
@@ -963,9 +970,11 @@ z3::expr z3_context::arg_to_z3(const elem& el) {
 	}
 }
 
-/* Constrain the head variables in two ways: the first is to equate
- * pairwise identical head variables to each other, and the second is to
- * equate literals to their unique Z3 equivalent. */
+/* Construct a formula that constrains the head variables. The
+ * constraints are of two sorts: the first equate pairwise identical
+ * head variables to each other, and the second equate literals to their
+ * unique Z3 equivalent. Also exports a mapping of each head element to
+ * the Z3 head variable it has been assigned to. */
 
 z3::expr z3_context::z3_head_constraints(const raw_term &head,
 		map<elem, z3::expr> &body_rename) {
@@ -981,13 +990,15 @@ z3::expr z3_context::z3_head_constraints(const raw_term &head,
 	return restr;
 }
 
-/* Given a term, output the equivalent Z3 expression. */
+/* Given a term, output the equivalent Z3 expression using and updating
+ * the mappings in the context as necessary. The mappings in body_rename
+ * are always prioritized over what is in the context. */
 
 z3::expr z3_context::term_to_z3(const raw_term &rel,
-		map<elem, z3::expr> &body_rename) {
+		const map<elem, z3::expr> &body_rename) {
 	z3::expr_vector vars_of_rel (context);
 	for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
-		// Lambda for pushing head variables
+		// Pushing head variables
 		// take head variable renaming into account
 		const auto& re_var = body_rename.find(*el);
 		if (re_var != body_rename.end())
@@ -1035,9 +1046,9 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr) {
  * Returns false if rules are not comparable or not contained.
  * Returns true if r1 is contained in r2. */
 
-bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
+bool driver::check_ucqn_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx) {
-	if (!(is_qc(r1) && is_qc(r2))) return 0;
+	if (!(is_ucqn(r1) && is_ucqn(r2))) return 0;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 	    	r1.h[0].arity == r2.h[0].arity)) return 0;
@@ -1053,9 +1064,9 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	// Add r1 => r2 to solver
 	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
 	else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
-	if (ctx.solver.check() == z3::unsat) { ctx.solver.pop(); return true; }
+	bool res = ctx.solver.check() == z3::unsat;
 	ctx.solver.pop();
-	return false;
+	return res;
 }
 
 void driver::simplify_formulas(raw_prog &rp) {
@@ -3514,7 +3525,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			z3_context z3_ctx;
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_qc_z3(rr1, rr2, z3_ctx);});
+					{return check_ucqn_z3(rr1, rr2, z3_ctx);});
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
