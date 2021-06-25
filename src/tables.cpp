@@ -379,17 +379,6 @@ void create_head(vector<term>&, ntable) {
 	x.insert(x.begin(), move(h));*/
 }
 
-ntable tables::create_tmp_rel(size_t len) {
-	ntable tab = get_new_tab(dict.get_rel(get_new_rel()), {(int_t)len});
-	return tmprels.insert(tab), tab;
-}
-
-void tables::create_tmp_head(vector<term>& x) {
-	set<int_t> v;
-	getvars(x, v);
-	create_head(x, create_tmp_rel(v.size()));
-}
-
 void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
 	auto it = m.end();
 	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
@@ -501,40 +490,6 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_string_(last));
 	return l;
 }
 
-template<typename T>
-void dag_get_reachable(const map<T, set<T>>& g, const T& t, set<T>& r) {
-	if (has(r, t)) return;
-	auto it = g.find(t);
-	if (it != g.end())
-		for (const T& x : it->second)
-			dag_get_reachable(g, x, r);
-	r.insert(t);
-}
-
-template<typename T>
-set<T> dag_get_reachable(const map<T, set<T>>& g, const T& t) {
-	set<T> r;
-	return dag_get_reachable<T>(g, t, r), r;
-}
-
-void tables::table_increase_priority(ntable t, size_t inc) {
-	for (ntable x : dag_get_reachable(deps, t)) tbls[x].priority += inc;
-}
-
-void tables::set_priorities(const flat_prog& p) {
-	for (table& t : tbls) t.priority = 0;
-	for (const vector<term>& x : p) {
-		set<ntable>& s = deps[x[0].tab];
-		for (size_t n = 1; n != x.size(); ++n)
-			if (has(tmprels, x[n].tab))
-				s.insert(x[n].tab);
-	}
-	for (const auto& x : deps)
-		for (ntable y : x.second)
-			if (has(tmprels, y))
-				table_increase_priority(y);
-}
-
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	auto t0 = al.begin();
 	DBG(assert(t0->extype == term::FORM1 || t0->extype == term::FORM2));
@@ -590,10 +545,9 @@ bool tables::get_rules(flat_prog p) {
 	map<ntable, ntable> r;
 	for (const auto& x : q) prog_add_rule(p, r, x);
 	replace_rel(move(r), p);
-	if (opts.bin_transform) transform_bin(p);
 	q = move(p);
 	for (const auto& x : q) prog_add_rule(p, r, x);
-	replace_rel(move(r), p), set_priorities(p);
+	replace_rel(move(r), p);
 	if (opts.optimize) bdd::gc();
 
 	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
@@ -1408,59 +1362,6 @@ set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
 	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
 		inserter(r, r.begin()));
 	return r;
-}
-
-vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
-	term t;
-	for (size_t k = 0; k != x.size(); ++k)
-		for (size_t n = 0; n != x[k].size(); ++n)
-			if (has(v, x[k][n]))
-				t.push_back(x[k][n]), v.erase(x[k][n]);
-	return t.tab = create_tmp_rel(t.size()), x.insert(x.begin(), t), x;
-}
-
-void tables::transform_bin(flat_prog& p) {
-	const flat_prog q = move(p);
-	vector<set<int_t>> vars;
-	auto getterms = [&vars]
-		(const vector<term>& x) -> vector<size_t> {
-		if (x.size() <= 3) return {};
-		// -- OK to remove?
-		//vector<size_t> e;
-		//for (size_t n = 1; n != x.size(); ++n)
-		//	if (has(exts, x[n].tab)) e.push_back(n);
-		//if (e.size() == x.size() - 1) return { 1, 2 };
-		//if (e.size() > 1) return { e[0], e[1] };
-		// --
-		size_t max = 0, b1 = 0, b2, n;
-		for (size_t i = 2; i != x.size(); ++i)
-			for (size_t j = 1; j != i; ++j)
-				if (max < (n=intersect(vars[i],vars[j]).size()))
-					max = n, b1 = j, b2 = i;
-		if (!b1) b1 = 1, b2 = 2;
-		return { b1, b2 };
-	};
-	vector<term> r;
-	vector<size_t> m;
-	set<int_t> v;
-	for (vector<term> x : q) {
-		if (x[0].goal) { goals.insert(x[0]); continue; }
-			//prog_add_rule(p, x); continue; }
-		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
-		while (!(m = getterms(x)).empty()) {
-			for (size_t i : m) r.push_back(x[i]);
-			for (size_t n = m.size(); n--;)
-				x.erase(x.begin() + m[n]),
-				vars.erase(vars.begin() + m[n]);
-			for (const auto& s : vars) v.insert(s.begin(), s.end());
-			r = interpolate(r, move(v)),
-			x.push_back(r[0]), getvars(r[0], v),
-			vars.push_back(move(v)), p.insert(move(r));
-		}
-		p.insert(move(x)), vars.clear();
-	}
-	if (opts.print_transformed) print(o::to("transformed")
-		<< "# after transform_bin:" << endl, p);
 }
 
 // ----------------------------------------------------------------------------

@@ -724,6 +724,8 @@ struct raw_prog {
 	std::vector<environment> typenv; // only one item;
 
 	std::set<lexeme, lexcmp> builtins;
+	// The relations that should be hidden from the user by default
+	std::set<std::pair<lexeme, ints>> tmprels;
 //	int_t delrel = -1;
 
 	int_t id = 0;
