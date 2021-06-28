@@ -20,22 +20,22 @@ void options::add(option o) {
 	for (auto n : o.names()) alts[n] = o.name();
 }
 
-bool options::get(const string name, option& o) const {
-	auto ait = alts.find(name);        if (ait == alts.end()) return false;
-	auto oit = opts.find(ait->second); if (oit == opts.end()) return false;
-	return o = oit->second, true;
+optional<option> options::get(const string name) const {
+	if (auto ait = alts.find(name); ait == alts.end()) return nullopt;
+	else if (auto oit = opts.find(ait->second); oit == opts.end()) return nullopt;
+	else return oit->second;
 }
 
 int options::get_int(string name) const {
-	option o; return get(name, o) ? o.get_int() : 0;
+	if(auto o = get(name)) return o->get_int(); else return 0;
 }
 
 bool options::get_bool(string name) const {
-	option o; return get(name, o) ? o.get_bool() : false;
+	if(auto o = get(name)) return o->get_bool(); else return false;
 }
 
 string options::get_string(string name) const {
-	option o; return get(name, o) ? o.get_string() : "";
+	if(auto o = get(name)) return o->get_string(); else return "";
 }
 
 void options::parse(int c, char** v, bool internal) {
@@ -63,10 +63,10 @@ void options::parse(strings sargs, bool internal) {
 
 template <typename T>
 void options::set(const string &name, T val) {
-	option o;
-	if (!get(name, o)) return;
-	o.v.set(val);
-	set(name, o);
+	if (auto o = get(name)) {
+		o->v.set(val);
+		set(name, *o);
+	}
 }
 template void options::set<int_t>(const std::string&, int_t);
 template void options::set<std::string>(const std::string&, std::string);
@@ -75,16 +75,16 @@ void options::enable (const string &name) { set(name, true ); }
 void options::disable(const string &name) { set(name, false); }
 
 bool options::enabled(const string &name) const {
-	option o;
-	if (!get(name, o)) return false;
-	switch (o.get_type()) {
-		case option::type::BOOL:   return o.get_bool();
-		case option::type::INT:    return o.get_int() > 0;
-		case option::type::STRING: {
-			output* t = outputs::get(o.name());
-			return t ? !t->is_null() : o.get_string() != "";
+	if (auto o = get(name)) {
+		switch (o->get_type()) {
+			case option::type::BOOL:   return o->get_bool();
+			case option::type::INT:    return o->get_int() > 0;
+			case option::type::STRING: {
+				output* t = outputs::get(o->name());
+				return t ? !t->is_null() : o->get_string() != "";
+			}
+			default: ;
 		}
-		default: ;
 	}
 	return false;
 }
@@ -97,7 +97,6 @@ bool options::is_value(const strings &sargs, const size_t &i) {
 }
 
 bool options::parse_option(const strings &sargs, const size_t &i) {
-	option o;
 	bool disabled = false;
 	bool skip_next = false;
 	size_t pos = 0;
@@ -110,19 +109,19 @@ bool options::parse_option(const strings &sargs, const size_t &i) {
 	if (a.rfind("disable-",   0) == 0) disabled = true, a = a.substr(8);
 	else if (a.rfind("dont-", 0) == 0) disabled = true, a = a.substr(5);
 	else if (a.rfind("no-",   0) == 0) disabled = true, a = a.substr(3);
-	if (!get(a, o)) {
-		if (!i) goto done; // arg[0] is not expected to be an argument
+	if (auto o = get(a)) {
+		if (disabled) o->disable();
+		else if (is_value(sargs, i+1))
+			o->parse_value(sargs[i+1]),
+			skip_next = true;
+		else o->parse_value("");
+		set(o->name(), *o);
+		return skip_next;
+	} else {
+		if (!i) return skip_next; // arg[0] is not expected to be an argument
 		o::err() << "Unknown argument: " << sargs[i]<<endl;
 		return is_value(sargs, i+1);
 	}
-	if (disabled) o.disable();
-	else if (is_value(sargs, i+1))
-		o.parse_value(sargs[i+1]),
-		skip_next = true;
-	else o.parse_value("");
-	set(o.name(), o);
-done:
-	return skip_next;
 }
 
 #define add_bool(n,desc) add(option(option::type::BOOL, {n}).description(desc))
@@ -188,8 +187,8 @@ void options::setup() {
 		"convert FOL formulas into pure TML");
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
-	add_bool("3pfp",
-		"run the program under FO(3-PFP) semantics ");
+	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
+		description("run program under one of the following semantics: 3pfp (default), pfp"));
 	add_bool("proof",   "extract proof");
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
@@ -253,6 +252,7 @@ void options::setup() {
 void options::init_defaults() {
 	parse(strings{
 		"--run",
+		"--semantics",   "3pfp",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",
 		"--error",       "@stderr",

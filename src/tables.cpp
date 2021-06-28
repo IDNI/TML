@@ -1030,7 +1030,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
 		if (!datalog && is_repeat)
-			return opts.pfp3 ? true : infloop_detected();
+			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
 		if (opts.bproof) levels.push_back(move(l));
 	}
 	DBGFAIL;
@@ -1212,7 +1212,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// There cannot be a fixpoint if there are less than two fronts or
 		// if there do not exist two equal fronts
 		return false;
-	} else if (opts.pfp3) {
+	} else if (opts.semantics == semantics::pfp3) {
 		// If FO(3-PFP) semantics are in effect
 		// Determine which facts are true, false, and undefined
 		level trues(tbls_size), falses(tbls_size), undefineds(tbls_size);
@@ -1264,20 +1264,22 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		}
 		if(!exists_undefineds) os << "(none)" << std::endl;
 		return true;
-	} else if(fronts.back() == fronts[fronts_size - 2]) {
-		// If FO(PFP) semantics are in effect and the last two fronts are
-		// equal then print them; this is the fixpoint.
-		level &l = fronts.back();
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if (opts.show_hidden || !(tbls[n].internal || has(tmprels, n)))
-				decompress(l[n], n, [&os, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl; });
+	} else if(opts.semantics == semantics::pfp) {
+		if(fronts.back() == fronts[fronts_size - 2]) {
+			// If FO(PFP) semantics are in effect and the last two fronts are
+			// equal then print them; this is the fixpoint.
+			level &l = fronts.back();
+			for(ntable n = 0; n < (ntable)tbls_size; n++) {
+				if (opts.show_hidden || !(tbls[n].internal || has(tmprels, n)))
+					decompress(l[n], n, [&os, this](const term& r) {
+						os << ir_handler->to_raw_term(r) << '.' << endl; });
+			}
+			return true;
+		} else {
+			// If FO(PFP) semantics are in effect and two equal fronts are
+			// separated by an unequal front; then the fixpoint is empty.
+			return true;
 		}
-		return true;
-	} else {
-		// If FO(PFP) semantics are in effect and two equal fronts are
-		// separated by an unequal front; then the fixpoint is empty.
-		return true;
 	}
 }
 

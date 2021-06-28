@@ -107,10 +107,14 @@ std::string filename(int fd);
 
 typedef std::map<int_t, int_t> env;
 
+// Possible semantics that can be used to run a TML program
+enum semantics { pfp3, pfp };
+
 //runtime options
 typedef struct {
 	bool bproof, optimize, print_transformed, apply_regexpmatch, fp_step,
-		pfp3, bitunv, show_hidden;
+		bitunv, show_hidden;
+	enum semantics semantics;
 } rt_options;
 
 typedef enum  {
