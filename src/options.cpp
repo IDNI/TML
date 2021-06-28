@@ -175,6 +175,7 @@ void options::setup() {
 #endif
 	add_bool("sdt",     "sdt transformation");
 	add_bool("bin",     "bin transformation");
+	add_bool("show-hidden", "show the contents of hidden relations");
 	add_bool("complete-tern",
 		"transformation to make each rule have at most two conjunctions");
 	add_bool("cqc-subsume",

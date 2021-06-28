@@ -3518,11 +3518,11 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
-	to.bin_transform     = opts.enabled("bin");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.pfp3              = opts.enabled("3pfp");
+	to.show_hidden       = opts.enabled("show-hidden");
 	to.bitunv			 = opts.enabled("bitunv");
 
 	//dict belongs to driver and is referenced by ir_builder and tables

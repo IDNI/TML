@@ -109,8 +109,8 @@ typedef std::map<int_t, int_t> env;
 
 //runtime options
 typedef struct {
-	bool bproof, optimize, bin_transform, print_transformed,
-		apply_regexpmatch, fp_step, pfp3, bitunv;
+	bool bproof, optimize, print_transformed, apply_regexpmatch, fp_step,
+		pfp3, bitunv, show_hidden;
 } rt_options;
 
 typedef enum  {

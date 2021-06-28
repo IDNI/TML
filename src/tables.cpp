@@ -366,7 +366,6 @@ flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
 	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
 	rt_options tmpopts(opts);
-	tmpopts.bin_transform = true;
 	tables t(tmpdict, tmpopts, ir_handler);
 	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
 }
@@ -1047,7 +1046,6 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 	rt_options to;
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
-	to.bin_transform     = opts.enabled("bin");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	tables tbl(dict, to, ir_handler);
@@ -1246,7 +1244,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << "true points:" << endl;
 		bool exists_trues = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(!tbls[n].internal && !has(tmprels, n)) {
+			if(opts.show_hidden || !(tbls[n].internal || has(tmprels, n))) {
 				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_trues = true; });
@@ -1258,7 +1256,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << endl << "undefined points:" << endl;
 		bool exists_undefineds = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(!tbls[n].internal && !has(tmprels, n)) {
+			if(opts.show_hidden || !(tbls[n].internal || has(tmprels, n))) {
 				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_undefineds = true; });
@@ -1271,7 +1269,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// equal then print them; this is the fixpoint.
 		level &l = fronts.back();
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if (!tbls[n].internal && !has(tmprels, n))
+			if (opts.show_hidden || !(tbls[n].internal || has(tmprels, n)))
 				decompress(l[n], n, [&os, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl; });
 		}
