@@ -141,7 +141,7 @@ class driver {
 		const elem &domain_name, raw_prog &rp, int_t &part_count);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp);
-	raw_term to_pure_tml(const sprawformtree &t, std::vector<raw_rule> &rp,
+	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 	void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 	void collect_vars(const raw_term &rt, std::set<elem> &vars);

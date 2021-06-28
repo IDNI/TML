@@ -2787,7 +2787,7 @@ std::set<elem> set_intersection(const std::set<elem> &s1,
  * adding temporary relations to the given program. */
 
 raw_term driver::to_pure_tml(const sprawformtree &t,
-		std::vector<raw_rule> &rp, const std::set<elem> &fv) {
+		raw_prog &rp, const std::set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	const elem part_id = elem::fresh_temp_sym(d);
@@ -2821,7 +2821,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			}
 			// Make the representative rule and add to the program
 			raw_rule nr(raw_term(part_id, fv), terms);
-			rp.push_back(nr);
+			rp.r.push_back(nr);
+			// Hide this new auxilliary relation
+			rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			break;
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
@@ -2830,7 +2832,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			for(const sprawformtree &tree : alts) {
 				// Make a separate rule for each disjunct
 				raw_rule nr(raw_term(part_id, fv), to_pure_tml(tree, rp, fv));
-				rp.push_back(nr);
+				rp.r.push_back(nr);
+				// Hide this new auxilliary relation
+				rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			}
 			break;
 		} case elem::NOT: {
@@ -2856,7 +2860,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 				nfv.erase(e);
 			}
 			raw_rule nr(raw_term(part_id, nfv), nrt);
-			rp.push_back(nr);
+			rp.r.push_back(nr);
+			// Hide this new auxilliary relation
+			rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			return raw_term(part_id, nfv);
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
@@ -2903,7 +2909,7 @@ void driver::to_pure_tml(raw_prog &rp) {
 			for(const raw_term &rt : rr.h) {
 				collect_vars(rt, nv);
 			}
-			rr.set_b({{to_pure_tml(rr.prft, rp.r, nv)}});
+			rr.set_b({{to_pure_tml(rr.prft, rp, nv)}});
 		}
 		rp.r[i] = rr;
 	}
