@@ -652,7 +652,7 @@ void driver::transform_bin(raw_prog& p) {
 			x.second.erase(x.second.begin(), x.second.begin() + 2);
 			x.second.insert(x.second.begin(), r.h[0]);
 			// This new relation should be hidden from the user by default
-			p.tmprels.insert({ r.h[0].e[0].e, r.h[0].arity });
+			p.hidden_rels.insert({ r.h[0].e[0].e, r.h[0].arity });
 			p.r.push_back(move(r));
 		}
 		p.r.emplace_back(x.first, x.second);

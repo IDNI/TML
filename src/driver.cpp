@@ -2592,7 +2592,7 @@ void driver::step_transform(raw_prog &rp,
 				unfreeze_map[frozen_elem] = rt.e[0];
 				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
 			}
-			rp.tmprels.insert({ rt.e[0].e, rt.arity });
+			rp.hidden_rels.insert({ rt.e[0].e, rt.arity });
 		}
 		if(rr.is_fact()) {
 			// Separate out program facts as they need to be in database by
@@ -2735,10 +2735,10 @@ void driver::step_transform(raw_prog &rp,
 		rp.r.push_back(raw_rule(stage2, {stage0, stage1.negate()}));
 		
 		// Hide the clock states
-		rp.tmprels.insert({ stage0.e[0].e, stage0.arity });
-		rp.tmprels.insert({ stage1.e[0].e, stage1.arity });
+		rp.hidden_rels.insert({ stage0.e[0].e, stage0.arity });
+		rp.hidden_rels.insert({ stage1.e[0].e, stage1.arity });
 		for(const elem &clock_state : clock_states) {
-			rp.tmprels.insert({ clock_state.e, {0} });
+			rp.hidden_rels.insert({ clock_state.e, {0} });
 		}
 		
 		if(clock_states.size() > 1) {
@@ -2821,7 +2821,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			raw_rule nr(raw_term(part_id, fv), terms);
 			rp.r.push_back(nr);
 			// Hide this new auxilliary relation
-			rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
+			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			break;
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
@@ -2832,7 +2832,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 				raw_rule nr(raw_term(part_id, fv), to_pure_tml(tree, rp, fv));
 				rp.r.push_back(nr);
 				// Hide this new auxilliary relation
-				rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
+				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			}
 			break;
 		} case elem::NOT: {
@@ -2860,7 +2860,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			raw_rule nr(raw_term(part_id, nfv), nrt);
 			rp.r.push_back(nr);
 			// Hide this new auxilliary relation
-			rp.tmprels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
+			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			return raw_term(part_id, nfv);
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead

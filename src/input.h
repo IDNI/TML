@@ -725,7 +725,7 @@ struct raw_prog {
 
 	std::set<lexeme, lexcmp> builtins;
 	// The relations that should be hidden from the user by default
-	std::set<std::pair<lexeme, ints>> tmprels;
+	std::set<std::pair<lexeme, ints>> hidden_rels;
 //	int_t delrel = -1;
 
 	int_t id = 0;

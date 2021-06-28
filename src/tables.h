@@ -128,7 +128,7 @@ struct table {
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize = 0;
-	bool internal = false;
+	bool hidden = false;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };

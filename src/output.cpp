@@ -856,7 +856,7 @@ template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
 
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const table& t) const {
-	print(os << "#\t", t.s) << (t.internal ? "@":"")
+	print(os << "#\t", t.s) << (t.hidden ? "@":"")
 		<< (t.idbltin > -1 ? " builtin" : "")
 		<< endl;
 	for (auto r : t.r) print(os << "#\t\t", rules[r]) << endl;

@@ -821,7 +821,7 @@ bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	ints internal_rels = dict.get_rels(filter_internal_tables);
 	for (auto& tbl : tbls)
 		for (int_t rel : internal_rels)
-			if (rel == tbl.s.first) { tbl.internal = true; break; }
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
 
 	if (opts.optimize) bdd::gc();
 	return true;
@@ -1003,7 +1003,7 @@ bool tables::add_fixed_point_fact() {
 	decompress(tbls[t.tab].t && from_fact(t), t.tab,
 		[&exists](const term& /*t*/) { exists = true; }, t.size());
 	if (!exists) tbls[t.tab].t = tbls[t.tab].t || from_fact(t); // add if ne
-	tbls[t.tab].internal = true;
+	tbls[t.tab].hidden = true;
 	return !exists;
 }
 
@@ -1191,7 +1191,7 @@ void tables::out(basic_ostream<T>& os) const {
 	//strs_t::const_iterator it;
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
 //		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-		if (opts.show_hidden || !tbls[tab].internal) out(os, tbls[tab].t, tab);
+		if (opts.show_hidden || !tbls[tab].hidden) out(os, tbls[tab].t, tab);
 //		else os << it->first << " = \"" << it->second << '"' << endl;
 	}
 }
@@ -1244,7 +1244,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << "true points:" << endl;
 		bool exists_trues = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !tbls[n].internal) {
+			if(opts.show_hidden || !tbls[n].hidden) {
 				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_trues = true; });
@@ -1256,7 +1256,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << endl << "undefined points:" << endl;
 		bool exists_undefineds = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !tbls[n].internal) {
+			if(opts.show_hidden || !tbls[n].hidden) {
 				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_undefineds = true; });
@@ -1270,7 +1270,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 			// equal then print them; this is the fixpoint.
 			level &l = fronts.back();
 			for(ntable n = 0; n < (ntable)tbls_size; n++) {
-				if (opts.show_hidden || !tbls[n].internal)
+				if (opts.show_hidden || !tbls[n].hidden)
 					decompress(l[n], n, [&os, this](const term& r) {
 						os << ir_handler->to_raw_term(r) << '.' << endl; });
 			}
@@ -1288,12 +1288,12 @@ template bool tables::out_fixpoint<wchar_t>(wostream& os);
 
 void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		if (opts.show_hidden || !tbls[tab].internal) out(tbls[tab].t, tab, f);
+		if (opts.show_hidden || !tbls[tab].hidden) out(tbls[tab].t, tab, f);
 }
 
 template <typename T>
 void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
-	if (opts.show_hidden || !tbls[tab].internal) // don't print internal tables.
+	if (opts.show_hidden || !tbls[tab].hidden) // don't print internal tables.
 		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
 }
 
