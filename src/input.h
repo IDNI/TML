@@ -372,9 +372,12 @@ struct primtype : utype {
 		}
 		return s;
 	}
+	int_t get_maxbits() const {
+		return 64;
+	}
 	size_t get_bitsz() const {
 		switch(ty){
-			case UINT: return bsz > 0 && bsz <= 32 ? bsz: 16;
+			case UINT: return bsz > 0 && bsz <= get_maxbits() ? bsz: 8;
 			case UCHAR: return 8;
 			case SYMB: return 8;
 			default: return 0;

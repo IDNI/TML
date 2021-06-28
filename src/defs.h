@@ -111,6 +111,7 @@ typedef std::map<int_t, int_t> env;
 typedef struct {
 	bool bproof, optimize, bin_transform, print_transformed,
 		apply_regexpmatch, fp_step, pfp3, bitunv;
+	size_t bitorder;
 } rt_options;
 
 typedef enum  {

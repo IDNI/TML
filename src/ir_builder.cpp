@@ -16,6 +16,7 @@
 
 #include "ir_builder.h"
 #include "tables.h"
+#include "analysis.h"
 using namespace std;
 
 #define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
@@ -375,13 +376,20 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			int_t bitsz = -1;
 			int_t val;
 			int_t argc = 0;
+			bit_univ bu(dict);
+			// better to move this in bit_unv class
 			for(typedecl td: vt ) {
 				if( td.is_primitive() ) {
 					bitsz =  td.pty.get_bitsz();
 					val = 0;
 					DBG(assert(rt.e.size() > (size_t)bitsz ));
+					bools v;
 					for( int_t n = 0; n < bitsz; n++)
-							val |= rt.e[argc + n + 2].num << (bitsz-1 -n);
+						v.push_back(rt.e[argc + n + 2].num);						
+					
+					bu.permuteorder(v, opts.bitorder, true);
+					for( int_t n = 0; n < bitsz; n++)	
+						val |= v[n] << (bitsz-1 -n);
 
 					rt.e.erase(rt.e.begin()+ 2 + argc, rt.e.begin() + 2 + argc + bitsz);
 					elem el;

@@ -9,15 +9,15 @@
 # Let's have a directed graph represented by
 # following 'e' relation:
 
-predtype e( int:4 ?a,  int:4 ?b).
-predtype tc ( int:4 ?a, int:4 ?b).
+predtype e( int:63?a,  int:63 ?b).
+predtype tc ( int:63 ?a, int:63 ?b).
 
-e(1 2).
-e(2 2).
-e(3 4).
-e(4 5).
-e(5 1).
-e(7 9).
+e(177 2).
+e(2777 2).
+e(37777 433).
+e(4333 533).
+e(57755 1).
+e(77 9).
 
 tc(?x ?y) :- e(?x ?y).
 tc(?x ?y) :- e(?x ?z),tc(?z ?y).

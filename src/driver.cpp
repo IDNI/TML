@@ -3401,7 +3401,7 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			bit_univ bu(tbl->get_dict());
+			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"));
 			raw_prog brawp;
 			bu.btransform(p, brawp);
 			fp = tbl->run_prog(brawp, pd.strs, steps, break_on_step);
@@ -3523,6 +3523,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.fp_step           = opts.enabled("fp");
 	to.pfp3              = opts.enabled("3pfp");
 	to.bitunv			 = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);
