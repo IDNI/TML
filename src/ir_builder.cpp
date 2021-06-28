@@ -145,7 +145,7 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 		}
 	// Note the relations that are marked as tmprel in the raw_prog
 	for(const auto &[functor, arity] : p.tmprels)
-		dynenv->tmprels.insert(dynenv->get_table(get_sig(functor, arity)));
+		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].internal = true;
 	
 	return m;
 }

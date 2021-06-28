@@ -859,8 +859,6 @@ archive& archive::operator<<(const tables& tbls) {
 	*this << tbls.levels;
 	//POS("tables nstep")
 	*this << tbls.nstep;
-	//POS("tables tmprels")
-	*this << tbls.tmprels;
 	//POS("tables max_args")
 	*this << tbls.max_args;
 	//POS("tables range_memo")
@@ -900,8 +898,6 @@ archive& archive::operator>>(tables& tbls) {
 	*this >> tbls.levels;
 	//POS("tables nstep")
 	*this >> tbls.nstep;
-	//POS("tables tmprels")
-	*this >> tbls.tmprels;
 	//POS("tables max_args")
 	*this >> tbls.max_args;
 	//POS("tables range_memo")
@@ -941,8 +937,6 @@ size_t archive::size(const tables& t) {
 	s += size(t.levels);
 	//SPOS("tables nstep", t.nstep)
 	s += size(t.nstep);
-	//SPOS("tables tmprels", t.tmprels)
-	s += size(t.tmprels);
 	//SPOS("tables max_args", t.max_args)
 	s += size(t.max_args);
 	//SPOS("tables range_memo", t.range_memo)

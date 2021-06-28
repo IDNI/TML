@@ -180,7 +180,6 @@ private:
 
 	nlevel nstep = 0;
 	std::vector<table> tbls;
-	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> fronts;

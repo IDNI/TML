@@ -1191,7 +1191,7 @@ void tables::out(basic_ostream<T>& os) const {
 	//strs_t::const_iterator it;
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
 //		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-		if (!tbls[tab].internal) out(os, tbls[tab].t, tab);
+		if (opts.show_hidden || !tbls[tab].internal) out(os, tbls[tab].t, tab);
 //		else os << it->first << " = \"" << it->second << '"' << endl;
 	}
 }
@@ -1244,7 +1244,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << "true points:" << endl;
 		bool exists_trues = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !(tbls[n].internal || has(tmprels, n))) {
+			if(opts.show_hidden || !tbls[n].internal) {
 				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_trues = true; });
@@ -1256,7 +1256,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << endl << "undefined points:" << endl;
 		bool exists_undefineds = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !(tbls[n].internal || has(tmprels, n))) {
+			if(opts.show_hidden || !tbls[n].internal) {
 				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl;
 					exists_undefineds = true; });
@@ -1270,7 +1270,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 			// equal then print them; this is the fixpoint.
 			level &l = fronts.back();
 			for(ntable n = 0; n < (ntable)tbls_size; n++) {
-				if (opts.show_hidden || !(tbls[n].internal || has(tmprels, n)))
+				if (opts.show_hidden || !tbls[n].internal)
 					decompress(l[n], n, [&os, this](const term& r) {
 						os << ir_handler->to_raw_term(r) << '.' << endl; });
 			}
@@ -1288,12 +1288,12 @@ template bool tables::out_fixpoint<wchar_t>(wostream& os);
 
 void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		if (!tbls[tab].internal) out(tbls[tab].t, tab, f);
+		if (opts.show_hidden || !tbls[tab].internal) out(tbls[tab].t, tab, f);
 }
 
 template <typename T>
 void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
-	if (!tbls[tab].internal) // don't print internal tables.
+	if (opts.show_hidden || !tbls[tab].internal) // don't print internal tables.
 		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
 }
 
