@@ -2584,9 +2584,7 @@ void driver::step_transform(raw_prog &rp,
 	// generated alias.
 	for(raw_rule rr : rp.r) {
 		for(raw_term &rt : rr.h) {
-			raw_term rt2 = rt;
-			auto it = freeze_map.find(rt.e[0]);
-			if(it != freeze_map.end()) {
+			if(auto it = freeze_map.find(rt.e[0]); it != freeze_map.end()) {
 				rt.e[0] = it->second;
 			} else {
 				elem frozen_elem = elem::fresh_temp_sym(d);
@@ -2595,6 +2593,7 @@ void driver::step_transform(raw_prog &rp,
 				unfreeze_map[frozen_elem] = rt.e[0];
 				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
 			}
+			rp.tmprels.insert({ rt.e[0].e, rt.arity });
 		}
 		if(rr.is_fact()) {
 			// Separate out program facts as they need to be in database by
@@ -2735,6 +2734,13 @@ void driver::step_transform(raw_prog &rp,
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
 		rp.r.push_back(raw_rule(stage2, {stage0, stage1.negate()}));
+		
+		// Hide the clock states
+		rp.tmprels.insert({ stage0.e[0].e, stage0.arity });
+		rp.tmprels.insert({ stage1.e[0].e, stage1.arity });
+		for(const elem &clock_state : clock_states) {
+			rp.tmprels.insert({ clock_state.e, {0} });
+		}
 		
 		if(clock_states.size() > 1) {
 			// If the previous state is asserted, then de-assert it and assert

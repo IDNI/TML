@@ -1246,9 +1246,11 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << "true points:" << endl;
 		bool exists_trues = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
-				os << ir_handler->to_raw_term(r) << '.' << endl;
-				exists_trues = true; });
+			if(!tbls[n].internal && !has(tmprels, n)) {
+				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl;
+					exists_trues = true; });
+			}
 		}
 		if(!exists_trues) os << "(none)" << std::endl;
 
@@ -1256,9 +1258,11 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		os << endl << "undefined points:" << endl;
 		bool exists_undefineds = false;
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
-				os << ir_handler->to_raw_term(r) << '.' << endl;
-				exists_undefineds = true; });
+			if(!tbls[n].internal && !has(tmprels, n)) {
+				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl;
+					exists_undefineds = true; });
+			}
 		}
 		if(!exists_undefineds) os << "(none)" << std::endl;
 		return true;
@@ -1267,7 +1271,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// equal then print them; this is the fixpoint.
 		level &l = fronts.back();
 		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if (!tbls[n].internal)
+			if (!tbls[n].internal && !has(tmprels, n))
 				decompress(l[n], n, [&os, this](const term& r) {
 					os << ir_handler->to_raw_term(r) << '.' << endl; });
 		}
