@@ -173,10 +173,9 @@ void options::setup() {
 	add_output    ("repl-output", "repl output");
 #endif
 	add_bool("sdt",     "sdt transformation");
-	add_bool("bin",     "bin transformation");
 	add_bool("show-hidden", "show the contents of hidden relations");
-	add_bool("complete-tern",
-		"transformation to make each rule have at most two conjunctions");
+	add_bool("split-rules",
+		"transformation to reduce number of conjunctions in each rule");
 	add_bool("cqc-subsume",
 		"subsume queries into each other using CQC test");
 	add_bool("cqnc-subsume",
@@ -252,6 +251,7 @@ void options::setup() {
 void options::init_defaults() {
 	parse(strings{
 		"--run",
+		"--split-rules",
 		"--semantics",   "3pfp",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",

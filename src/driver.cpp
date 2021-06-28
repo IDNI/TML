@@ -3315,7 +3315,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				<< to_string(rp_generator) << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-				opts.enabled("cqc-factor") || opts.enabled("complete-tern") ||
+				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("pure-tml")) {
 			// The false rule is required to represent logical constants in FOL
 			o::dbg() << "Generating the False Rule ..." << endl << endl;
@@ -3354,7 +3354,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					o::dbg() << "Factorized Program:" << endl << endl << rp
 						<< endl;
 				}
-				if(opts.enabled("complete-tern")) {
+				if(opts.enabled("split-rules")) {
 					// Though this is a binary transformation, rules will become
 					// ternary after timing guards are added
 					o::dbg() << "Converting rules to unary form ..." << endl
