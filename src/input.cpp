@@ -558,17 +558,17 @@ bool macro::parse(input* in, const raw_prog& prog){
 
 	fail: return pos = curr , false;
 }
-sprawformtree raw_rule::get_prft() const {
+sprawformtree raw_rule::get_prft(const raw_term &false_term) const {
 	if(prft) {
 		return prft;
 	} else if(b.empty()) {
-		return std::make_shared<raw_form_tree>(raw_term::_true());
+		return std::make_shared<raw_form_tree>(false_term.negate());
 	} else {
 		sprawformtree disj =
-			std::make_shared<raw_form_tree>(raw_term::_false());
+			std::make_shared<raw_form_tree>(false_term);
 		for(size_t i = 0; i < b.size(); i++) {
 			sprawformtree conj =
-				std::make_shared<raw_form_tree>(raw_term::_true());
+				std::make_shared<raw_form_tree>(false_term.negate());
 			for(size_t j = 0; j < b[i].size(); j++) {
 				raw_term entr = b[i][j];
 				conj = std::make_shared<raw_form_tree>(elem::AND, conj,
@@ -576,7 +576,7 @@ sprawformtree raw_rule::get_prft() const {
 			}
 			disj = std::make_shared<raw_form_tree>(elem::ALT, disj, conj);
 		}
-		return raw_form_tree::simplify(disj);
+		return raw_form_tree::simplify(disj, false_term);
 	}
 }
 
@@ -698,13 +698,10 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 
 				if( !rpfx.parse(in) ) goto Cleanup;
 
-				if(!cur) root = cur = std::make_shared<raw_form_tree>(
-					rpfx.qtype.type, rpfx.qtype);
-				else cur->r = std::make_shared<raw_form_tree>(
-					rpfx.qtype.type, rpfx.qtype),
+				if(!cur) root = cur = std::make_shared<raw_form_tree>(rpfx.qtype);
+				else cur->r = std::make_shared<raw_form_tree>(rpfx.qtype),
 					cur = cur->r;
-				cur->l = std::make_shared<raw_form_tree>(rpfx.ident.type,
-					rpfx.ident);
+				cur->l = std::make_shared<raw_form_tree>(rpfx.ident);
 				next.peek(in);
 			}
 
@@ -745,7 +742,7 @@ bool raw_sof::parseform(input* in, sprawformtree &froot, int_t prec ) {
 		(nxt.type == elem::IMPLIES || nxt.type == elem::COIMPLIES))
 	{
 		nxt.parse(in);
-		cur = std::make_shared<raw_form_tree>(nxt.type, nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 2)) goto Cleanup ;
 		nxt.peek(in);
@@ -754,7 +751,7 @@ bool raw_sof::parseform(input* in, sprawformtree &froot, int_t prec ) {
 	nxt.peek(in);
 	while( prec <= 0 && (nxt.type == elem::AND || nxt.type == elem::ALT) ) {
 		nxt.parse(in);
-		cur = std::make_shared<raw_form_tree>(nxt.type, nxt, root);
+		cur = std::make_shared<raw_form_tree>(nxt, root);
 		root = cur;
 		if (!parseform(in, root->r, 1) ) goto Cleanup;
 		nxt.peek(in);
@@ -796,46 +793,46 @@ void raw_form_tree::printTree( int level) {
 	if (l) l->printTree(level + 1);
 }
 
-sprawformtree raw_form_tree::simplify(sprawformtree &t) {
+sprawformtree raw_form_tree::simplify(sprawformtree &t, const raw_term &false_term) {
 	switch(t->type) {
 		case elem::IMPLIES:
-			simplify(t->l);
-			simplify(t->r);
+			simplify(t->l, false_term);
+			simplify(t->r, false_term);
 			break;
 		case elem::COIMPLIES:
-			simplify(t->l);
-			simplify(t->r);
+			simplify(t->l, false_term);
+			simplify(t->r, false_term);
 			break;
 		case elem::AND:
-			simplify(t->l), simplify(t->r);
-			if (t->l->is_true()) {
+			simplify(t->l, false_term), simplify(t->r, false_term);
+			if (*t->l == false_term.negate()) {
 				t = t->r;
-			} else if (t->r->is_true()) {
+			} else if (*t->r == false_term.negate()) {
 				t = t->l;
 			}
 			break;
 		case elem::ALT:
-			simplify(t->l);
-			simplify(t->r);
-			if(t->l->is_false()) {
+			simplify(t->l, false_term);
+			simplify(t->r, false_term);
+			if(*t->l == false_term) {
 				t = t->r;
-			} else if(t->r->is_false()) {
+			} else if(*t->r == false_term) {
 				t = t->l;
 			}
 			break;
 		case elem::NOT:
-			simplify(t->l);
+			simplify(t->l,false_term);
 			break;
 		case elem::EXISTS:
-			simplify(t->r);
+			simplify(t->r, false_term);
 			break;
 		case elem::UNIQUE:
-			simplify(t->r);
+			simplify(t->r, false_term);
 			break;
 		case elem::NONE:
 			break;
 		case elem::FORALL:
-			simplify(t->r);
+			simplify(t->r, false_term);
 			break;
 		default: DBGFAIL; //should never reach here
 	}

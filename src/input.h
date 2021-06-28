@@ -518,23 +518,6 @@ struct raw_term {
 			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
-	static raw_term _true() {
-		return _false().negate();
-	}
-	static raw_term _false() {
-		return raw_term(raw_term::REL,
-			{elem(elem::SYM, STR_TO_LEXEME("false")), elem(elem::OPENP), elem(elem::CLOSEP)});
-	}
-	bool is_true() const {
-		return extype == raw_term::REL && e.size() == 3 &&
-			e[0].type == elem::SYM && neg &&
-			lexeme2str(e[0].e) == to_string_t("false");
-	}
-	bool is_false() const {
-		return extype == raw_term::REL && e.size() == 3 &&
-			e[0].type == elem::SYM && !neg &&
-			lexeme2str(e[0].e) == to_string_t("false");
-	}
 };
 
 struct macro {
@@ -635,7 +618,7 @@ struct raw_rule {
 	inline bool is_fact() const
 		{ return type == NONE && b.size() == 0 && prft.get() == nullptr; }
 	// If prft not set, convert b to prft, then return prft
-	sprawformtree get_prft() const;
+	sprawformtree get_prft(const raw_term &false_term) const;
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
@@ -662,29 +645,56 @@ struct raw_form_tree {
 	sprawformtree r = nullptr;
 	bool neg = false;
 	lexeme guard_lx = {0,0};
-
+	
+	// Make formula tree representing a single term. Canonize by always
+	// extracting the negation from the term
 	raw_form_tree (const raw_term &_rt) {
 		if(_rt.neg) {
 			type = elem::NOT;
+			el = new elem(elem::NOT);
 			l = std::make_shared<raw_form_tree>(_rt.negate());
 		} else {
 			type = elem::NONE;
 			rt = new raw_term(_rt);
 		}
 	}
-	raw_form_tree (elem::etype _type, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), l(_l), r(_r) {}
-	raw_form_tree (elem::etype _type, const elem &_el, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), el(new elem(_el)), l(_l), r(_r) {}
+	// Make a formula tree with the given element and two children
+	raw_form_tree (const elem &_el, sprawformtree _l = nullptr,
+		sprawformtree _r = nullptr) :
+		type(_el.type), el(new elem(_el)), l(_l), r(_r) {}
 	~raw_form_tree() {
-		if (rt) delete rt, rt = NULL;
-		if (el) delete el, el = NULL;
+		// Fields are deletable because constructors always make heap
+		// allocated copies
+		if (rt) delete rt, rt = nullptr;
+		if (el) delete el, el = nullptr;
 	}
 	void printTree(int level =0 );
-	static sprawformtree simplify(sprawformtree &t);
-	bool is_false() const {
-		return type == elem::NONE && rt->is_false();
+	static sprawformtree simplify(sprawformtree &t, const raw_term &false_term);
+	// Recursively check equality of formula trees
+	bool operator==(const raw_form_tree &pft) {
+		// Types must be equal
+		if(type != pft.type) return false;
+		// Signs must be equal
+		else if(neg != pft.neg) return false;
+		// If formulas are terms, then they must be equal
+		else if(type == elem::NONE) return *rt == *pft.rt;
+		// Either both elements are defined or both are not
+		else if(bool(el) != bool(pft.el)) return false;
+		// Either both elements are undefined or both are equal
+		else if(el != nullptr && *el != *pft.el) return false;
+		// Either both left trees are defined or both are not
+		else if(bool(l) != bool(pft.l)) return false;
+		// Either both left trees are undefined or both are equal
+		else if(l != nullptr && *l != *pft.l) return false;
+		// Either both right trees are defined or both are not
+		else if(bool(r) != bool(pft.r)) return false;
+		// Either both right trees are undefined or both are equal
+		else if(r != nullptr && *r != *pft.r) return false;
+		else return true;
 	}
-	bool is_true() const {
-		return type == elem::NOT && l->is_false();
+	// Check formula tree inequality by checking equality
+	bool operator!=(const raw_form_tree &pft) {
+		return !(*this == pft);
 	}
 };
 struct raw_sof {

@@ -70,7 +70,8 @@ string_t driver::directive_load(const directive& d) {
 	DBGFAIL;
 }
 
-void driver::directives_load(raw_prog& p, lexeme& trel) {
+void driver::directives_load(raw_prog& p, lexeme& trel,
+		const raw_term &false_term) {
 //	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
@@ -78,7 +79,7 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::EDOMAIN: transform_domains(p, d); break;
 		case directive::EVAL: transform_evals(p, d); break;
-		case directive::QUOTE: transform_quotes(p, d); break;
+		case directive::QUOTE: transform_quotes(p, false_term, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
 		case directive::CMDLINE:
 			if (d.n < opts.argc())
@@ -124,9 +125,9 @@ sprawformtree driver::expand_formula_node(const sprawformtree &t) {
 			// following
 			const elem evar = elem::fresh_var(d), qvar = *(t->l->el);
 			return make_shared<raw_form_tree>(elem::EXISTS,
-				make_shared<raw_form_tree>(elem::VAR, evar),
+				make_shared<raw_form_tree>(evar),
 				make_shared<raw_form_tree>(elem::FORALL,
-					make_shared<raw_form_tree>(elem::VAR, qvar),
+					make_shared<raw_form_tree>(qvar),
 					make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
 						make_shared<raw_form_tree>(
 							raw_term(raw_term::EQ, { evar, elem_eq, qvar })))));
@@ -855,11 +856,10 @@ template<typename F>
 	rp.r = reduced_rules;
 }
 
-void driver::simplify_formulas(raw_prog &rp) {
+void driver::simplify_formulas(raw_prog &rp, const raw_term &false_term) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
-			sprawformtree prft = rr.get_prft();
-			rr.set_prft(raw_form_tree::simplify(prft));
+			rr.set_prft(raw_form_tree::simplify(rr.prft, false_term));
 		}
 	}
 }
@@ -1279,7 +1279,7 @@ lexeme driver::concat(const lexeme &rel, string suffix) {
 
 vector<elem> driver::quote_rule(const raw_rule &rr,
 		const elem &rel_name, const elem &domain_name, raw_prog &rp,
-		int_t &part_count) {
+		int_t &part_count, const raw_term &false_term) {
 	// Maintain a list of the variable substitutions:
 	map<elem, elem> variables;
 	vector<elem> rule_ids;
@@ -1299,7 +1299,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 			rule_ids.push_back(rule_id);
 		}
 	} else {
-		const elem body_id = quote_formula(rr.get_prft(), rel_name, domain_name,
+		const elem body_id = quote_formula(rr.get_prft(false_term), rel_name, domain_name,
 			rp, variables, part_count);
 		for(size_t gidx = 0; gidx < rr.h.size(); gidx++) {
 			const elem head_id = quote_term(rr.h[gidx], rel_name, domain_name, rp,
@@ -1321,10 +1321,11 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
  * name in the given program. */
 
 void driver::quote_prog(const raw_prog nrp, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp) {
+		const elem &domain_name, raw_prog &rp, const raw_term &false_term) {
 	int_t part_count = 0;
 	for(size_t ridx = 0; ridx < nrp.r.size(); ridx++) {
-		quote_rule(nrp.r[ridx], rel_name, domain_name, rp, part_count);
+		quote_rule(nrp.r[ridx], rel_name, domain_name, rp, part_count,
+			false_term);
 	}
 }
 
@@ -1337,7 +1338,6 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 	raw_prog nrp;
 	nrp.builtins = rp.builtins;
 	nrp.parse(prog_in, tbl->get_dict());
-	simplify_formulas(nrp);
 	const strs_t strs;
 	transform(nrp, strs);
 	return nrp;
@@ -1347,7 +1347,8 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
  * first argument is the relation into which it should put the quotation
  * it creates, and it's second argument is the program to quote. */
 
-bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
+bool driver::transform_quotes(raw_prog &rp, const raw_term &false_term,
+		const directive &drt) {
 	if(drt.type != directive::QUOTE) return false;
 	o::dbg() << "Generating quotation for: " << drt << endl;
 	// The relation to contain the evaled relation is the first symbol
@@ -1364,7 +1365,7 @@ bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
 			*quote_str.e[0] == '`') {
 		raw_prog nrp = read_prog(quote_str, rp);
 		// Create the quotation relation
-		quote_prog(nrp, out_rel, domain_sym, rp);
+		quote_prog(nrp, out_rel, domain_sym, rp, false_term);
 	}
 	// Indicate success
 	o::dbg() << "Generated quotation for: " << drt << endl;
@@ -2883,8 +2884,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 				make_shared<raw_form_tree>(elem::NOT, current_formula);
 			for(const elem &qvar : qvars) {
 				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
-					make_shared<raw_form_tree>(elem::VAR, qvar),
-					equiv_formula);
+					make_shared<raw_form_tree>(qvar), equiv_formula);
 			}
 			return to_pure_tml(make_shared<raw_form_tree>(elem::NOT,
 				equiv_formula), rp, fv);
@@ -2953,7 +2953,7 @@ void driver::collect_free_vars(const raw_rule &rr,
 		collect_free_vars(rt, bound_vars, free_vars);
 	}
 	if(rr.is_form()) {
-		collect_free_vars(rr.get_prft(), bound_vars, free_vars);
+		collect_free_vars(rr.prft, bound_vars, free_vars);
 	} else {
 		collect_free_vars(rr.b, bound_vars, free_vars);
 	}
@@ -3186,14 +3186,14 @@ string_t driver::generate_cpp(const sprawformtree &t, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
+		map<elem, string_t> &elem_cache, const raw_term &false_term) {
 	vector<string_t> term_names;
 	for(const raw_term &rt : rr.h) {
 		term_names.push_back(
 			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t prft_name =
-		generate_cpp(rr.get_prft(), prog_constr, cid, dict_name, elem_cache);
+	string_t prft_name = generate_cpp(rr.get_prft(false_term),
+		prog_constr, cid, dict_name, elem_cache);
 	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");
 	for(const string_t &tn : term_names) {
@@ -3213,11 +3213,11 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
+		map<elem, string_t> &elem_cache, const raw_term &false_term) {
 	vector<string_t> rule_names;
 	for(const raw_rule &rr : rp.r) {
-		rule_names.push_back(
-			generate_cpp(rr, prog_constr, cid, dict_name, elem_cache));
+		rule_names.push_back(generate_cpp(rr, prog_constr, cid, dict_name,
+			elem_cache, false_term));
 	}
 	string_t prog_name = to_string_t("rp") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_prog ") + prog_name + to_string_t(";\n");
@@ -3254,22 +3254,12 @@ bool driver::transform_grammar(raw_prog &rp) {
 	}
 }
 
-/* Defines false as a nullary relation containing no facts. This is done
- * using the rule ~false() :- ~false(). This way the false relation has
- * a constant value throughout execution. */
-
-void driver::transform_booleans(raw_prog &rp) {
-	dict_t &d = tbl->get_dict();
-	rp.r.push_back(raw_rule(
-		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			vector<elem>{}).negate(),
-		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			vector<elem>{}).negate()));
-}
-
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
+	dict_t &d = tbl->get_dict();
 	lexeme trel = { 0, 0 };
-	directives_load(rp, trel);
+	// The false term is required to represent logical constants in FOL
+	const raw_term false_term(elem::fresh_temp_sym(d), std::vector<elem> {});
+	directives_load(rp, trel, false_term);
 	auto get_vars = [this](const raw_term& t) {
 		for (const elem& e : t.e)
 			if (e.type == elem::VAR)
@@ -3310,19 +3300,16 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			string_t rp_generator;
 			map<elem, string_t> elem_cache;
 			o::dbg() << "Generating Program Generator ..." << endl << endl;
-			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
+			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache,
+				false_term);
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("pure-tml")) {
-			// The false rule is required to represent logical constants in FOL
-			o::dbg() << "Generating the False Rule ..." << endl << endl;
-			transform_booleans(rp);
-			o::dbg() << "Booleaned Program:" << endl << endl << rp << endl;
 			o::dbg() << "Simplifying Program ..." << endl << endl;
-			simplify_formulas(rp);
+			simplify_formulas(rp, false_term);
 			o::dbg() << "Simplified Program:" << endl << endl << rp << endl;
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary

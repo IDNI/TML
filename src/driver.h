@@ -90,7 +90,8 @@ class driver {
 	std::set<raw_term> get_queries(const raw_prog& p);
 
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
+	void directives_load(raw_prog& p, lexeme& trel,
+		const raw_term &false_term);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
@@ -106,7 +107,8 @@ class driver {
 //	void transform_string(const sysstring_t&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	bool transform_evals(raw_prog &rp, const directive &drt);
-	bool transform_quotes(raw_prog &rp, const directive &drt);
+	bool transform_quotes(raw_prog &rp, const raw_term &false_term,
+		const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
 	sprawformtree expand_formula_node(const sprawformtree &t);
@@ -127,7 +129,7 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void factor_rules(raw_prog &rp);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
-	void simplify_formulas(raw_prog &rp);
+	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
@@ -138,9 +140,10 @@ class driver {
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
 	std::vector<elem> quote_rule(const raw_rule &rr, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, int_t &part_count);
+		const elem &domain_name, raw_prog &rp, int_t &part_count,
+		const raw_term &false_term);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp);
+		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
 	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 	void collect_vars(const raw_rule &rr, std::set<elem> &vars);
@@ -168,7 +171,6 @@ class driver {
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	void transform_booleans(raw_prog &rp);
 	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
@@ -179,9 +181,11 @@ class driver {
 	string_t generate_cpp(const sprawformtree &prft, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
+		const raw_term &false_term);
 	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
+		const raw_term &false_term);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
