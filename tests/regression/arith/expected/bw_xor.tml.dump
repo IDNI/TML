@@ -1,3 +1,4 @@
+true points:
 b(15).
 A(5).
 B(2).
@@ -6,3 +7,6 @@ B(0).
 setA(7).
 setA(5).
 setA(4).
+
+undefined points:
+(none)

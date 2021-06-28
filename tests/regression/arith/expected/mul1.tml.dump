@@ -1,4 +1,4 @@
-b(200).
+true points:
 setA(194).
 setA(130).
 setA(66).
@@ -6,3 +6,7 @@ setA(2).
 setB(3).
 setC(129).
 setC(1).
+b(200).
+
+undefined points:
+(none)

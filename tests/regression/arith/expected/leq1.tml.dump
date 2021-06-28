@@ -1,12 +1,15 @@
-leq3(3).
-leq3(2).
-leq3(1).
-leq3(0).
+true points:
 U(7).
 U(6).
 A(8).
 A(6).
 A(4).
+leq3(3).
+leq3(2).
+leq3(1).
+leq3(0).
+gt(8 7).
+gt(8 6).
 lt(6 8).
 lt(4 8).
 lt(4 6).
@@ -14,8 +17,6 @@ leq(6 7).
 leq(6 6).
 leq(4 7).
 leq(4 6).
-gt(8 7).
-gt(8 6).
 geq(8 7).
 geq(8 6).
 geq(6 6).
@@ -24,3 +25,6 @@ neq(8 6).
 neq(6 7).
 neq(4 7).
 neq(4 6).
+
+undefined points:
+(none)
