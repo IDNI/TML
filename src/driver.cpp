@@ -112,23 +112,23 @@ sprawformtree driver::expand_formula_node(const sprawformtree &t) {
 	switch(t->type) {
 		case elem::IMPLIES: {
 			// Implication is logically equivalent to the following
-			return std::make_shared<raw_form_tree>(elem::ALT,
-				std::make_shared<raw_form_tree>(elem::NOT, t->l), t->r);
+			return make_shared<raw_form_tree>(elem::ALT,
+				make_shared<raw_form_tree>(elem::NOT, t->l), t->r);
 		} case elem::COIMPLIES: {
 			// Co-implication is logically equivalent to the following
-			return std::make_shared<raw_form_tree>(elem::AND,
-				std::make_shared<raw_form_tree>(elem::IMPLIES, t->l, t->r),
-				std::make_shared<raw_form_tree>(elem::IMPLIES, t->r, t->l));
+			return make_shared<raw_form_tree>(elem::AND,
+				make_shared<raw_form_tree>(elem::IMPLIES, t->l, t->r),
+				make_shared<raw_form_tree>(elem::IMPLIES, t->r, t->l));
 		} case elem::UNIQUE: {
 			// The uniqueness quantifier is logically equivalent to the
 			// following
 			const elem evar = elem::fresh_var(d), qvar = *(t->l->el);
-			return std::make_shared<raw_form_tree>(elem::EXISTS,
-				std::make_shared<raw_form_tree>(elem::VAR, evar),
-				std::make_shared<raw_form_tree>(elem::FORALL,
-					std::make_shared<raw_form_tree>(elem::VAR, qvar),
-					std::make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
-						std::make_shared<raw_form_tree>(
+			return make_shared<raw_form_tree>(elem::EXISTS,
+				make_shared<raw_form_tree>(elem::VAR, evar),
+				make_shared<raw_form_tree>(elem::FORALL,
+					make_shared<raw_form_tree>(elem::VAR, qvar),
+					make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
+						make_shared<raw_form_tree>(
 							raw_term(raw_term::EQ, { evar, elem_eq, qvar })))));
 		} default: {
 			return t;
@@ -140,7 +140,7 @@ sprawformtree driver::expand_formula_node(const sprawformtree &t) {
  * into a flat list. */
 
 void driver::flatten_associative(const elem::etype &tp,
-		const sprawformtree &tree, std::vector<sprawformtree> &tms) {
+		const sprawformtree &tree, vector<sprawformtree> &tms) {
 	if(tree->type == tp) {
 		flatten_associative(tp, tree->l, tms);
 		flatten_associative(tp, tree->r, tms);
@@ -185,7 +185,7 @@ bool driver::is_cqn(const raw_rule &rr) {
  * term. */
 
 rel_info get_relation_info(const raw_term &rt) {
-	return std::make_tuple(rt.e[0], rt.e.size() - 3);
+	return make_tuple(rt.e[0], rt.e.size() - 3);
 }
 
 /* If rr1 and rr2 are both conjunctive queries, check if there is a
@@ -201,33 +201,33 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
-		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << std::endl;
+		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
 		
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
-		std::map<elem, elem> freeze_map;
+		map<elem, elem> freeze_map;
 		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
 		
 		// Build up the queries necessary to check homomorphism.
-		std::set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
-		o::dbg() << "Canonical Database: " << edb << std::endl;
+		set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
+		o::dbg() << "Canonical Database: " << edb << endl;
 		raw_prog nrp;
 		nrp.r.push_back(rr2);
 		
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		std::set<raw_term> results;
+		set<raw_term> results;
 		tables::run_prog(edb, nrp, d, opts, ir, results);
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
 				// between the two rules.
-				o::dbg() << "True: " << rr1 << " <= " << rr2 << std::endl;
+				o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
 				return true;
 			}
 		}
 		// If no frozen head found, then there is no homomorphism.
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << std::endl;
+		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
 		return false;
 	} else {
 		return false;
@@ -241,7 +241,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
  * off them. */
 
 bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
-		std::set<terms_hom> &homs) {
+		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
 	dict_t d;
@@ -250,22 +250,22 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 	
 	if(is_cq(rr1) && is_cq(rr2)) {
 		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
-			<< " to " << rr1.b[0] << std::endl;
+			<< " to " << rr1.b[0] << endl;
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
 		// Map from variables occuring in rr1 to frozen symbols
-		std::map<elem, elem> freeze_map;
+		map<elem, elem> freeze_map;
 		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
 		// Map from frozen symbols to variables occuring in rr1
-		std::map<elem, elem> unfreeze_map;
+		map<elem, elem> unfreeze_map;
 		for(const auto &[k, v] : freeze_map) {
 			unfreeze_map[v] = k;
 		}
 		
 		// Build up the extensional database necessary to check homomorphism.
-		std::set<raw_term> edb;
+		set<raw_term> edb;
 		// Map from term ids to terms in rr1
-		std::map<elem, raw_term> term_map;
+		map<elem, raw_term> term_map;
 		int j = 0;
 		// First put the frozen terms of rr1 into our containment program
 		for(raw_term &rt : frozen_rr1.b[0]) {
@@ -280,14 +280,14 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 			edb.insert(rt);
 		}
 		
-		o::dbg() << "Canonical Database: " << edb << std::endl;
+		o::dbg() << "Canonical Database: " << edb << endl;
 		
 		// Build up the query that proves the existence of a homomorphism
 		// Make a new head for rr2 that exports all the variables used in
 		// its body + ids of the frozen terms it binds to
-		std::set<elem> rr2_body_vars_set;
+		set<elem> rr2_body_vars_set;
 		collect_vars(rr2.b[0].begin(), rr2.b[0].end(), rr2_body_vars_set);
-		std::vector<elem> rr2_new_head = { elem::fresh_temp_sym(d), elem_openp };
+		vector<elem> rr2_new_head = { elem::fresh_temp_sym(d), elem_openp };
 		rr2_new_head.insert(rr2_new_head.end(), rr2_body_vars_set.begin(),
 			rr2_body_vars_set.end());
 		// Prepend term id variables to rr2's body terms and export the term
@@ -308,7 +308,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		std::set<raw_term> results;
+		set<raw_term> results;
 		if(!tables::run_prog(edb, nrp, d, opts, ir, results)) return false;
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
@@ -317,7 +317,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 			raw_term hd_src = rr2.h[0];
 			if(res.e[0] == hd_src.e[0]) {
 				var_subs var_map;
-				std::set<raw_term> target_terms;
+				set<raw_term> target_terms;
 				// Now we want to express the homomorphism in terms of the
 				// original (non-frozen) variables and terms of rr1.
 				for(size_t i = 2; i < res.e.size() - 1; i++) {
@@ -330,14 +330,14 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 						target_terms.insert(term_map[res.e[i]]);
 					}
 				}
-				homs.insert(std::make_pair(target_terms, var_map));
+				homs.insert(make_pair(target_terms, var_map));
 				// Print the homomorphism found
 				o::dbg() << "Found homomorphism from " << rr2.b[0] << " to "
 					<< target_terms << " under mapping {";
 				for(auto &[k, v] : var_map) {
 					o::dbg() << k << " -> " << v << ", ";
 				}
-				o::dbg() << "}" << std::endl;
+				o::dbg() << "}" << endl;
 			}
 		}
 		// If no results produced, then there is no homomorphism.
@@ -353,33 +353,33 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
  * constraints in the codomain. */
  
 void driver::compute_required_vars(const raw_rule &rr,
-		const terms_hom &hom, std::set<elem> &orig_vars) {
+		const terms_hom &hom, set<elem> &orig_vars) {
 	auto &[rts, vs] = hom;
 	// Get all the terms used by the given rule.
-	std::set<raw_term> aggregate(rr.h.begin(), rr.h.end());
+	set<raw_term> aggregate(rr.h.begin(), rr.h.end());
 	aggregate.insert(rr.b[0].begin(), rr.b[0].end());
 	// Make a vector containing all terms used by the given rule that are
 	// not in homomorphism target.
-	std::vector<raw_term> diff(aggregate.size());
-	auto it = std::set_difference(aggregate.begin(), aggregate.end(),
+	vector<raw_term> diff(aggregate.size());
+	auto it = set_difference(aggregate.begin(), aggregate.end(),
 		rts.begin(), rts.end(), diff.begin());
 	diff.resize(it - diff.begin());
 	// Get variables used outside homomorphism target
-	std::set<elem> diff_vars;
+	set<elem> diff_vars;
 	collect_vars(diff.begin(), diff.end(), diff_vars);
 	// Get variables used inside homomorphism target
-	std::set<elem> rts_vars;
+	set<elem> rts_vars;
 	collect_vars(rts.begin(), rts.end(), rts_vars);
 	// Compute the variables of the homomorphism target that we need to
 	// retain control of
-	std::vector<elem> nonfree_vars(diff_vars.size());
-	auto jt = std::set_intersection(diff_vars.begin(), diff_vars.end(),
+	vector<elem> nonfree_vars(diff_vars.size());
+	auto jt = set_intersection(diff_vars.begin(), diff_vars.end(),
 		rts_vars.begin(), rts_vars.end(), nonfree_vars.begin());
 	nonfree_vars.resize(jt - nonfree_vars.begin());
 	// Trace these variables of the homomorphism target to the
 	// homomorphism source.
 	for(auto &[var, covar] : vs) {
-		if(std::find(nonfree_vars.begin(), nonfree_vars.end(), covar) !=
+		if(find(nonfree_vars.begin(), nonfree_vars.end(), covar) !=
 				nonfree_vars.end()) {
 			orig_vars.insert(var);
 		}
@@ -428,27 +428,27 @@ void driver::factor_rules(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	
-	o::dbg() << "Factorizing rules ..." << std::endl;
+	o::dbg() << "Factorizing rules ..." << endl;
 	
 	// Sort the rules so the biggest come first. Idea is that we want to
 	// reduce total substitutions by doing the biggest factorizations
 	// first. Also prioritizing rules with more arguments to reduce chance
 	// that tmprel with more arguments is created.
-	std::sort(rp.r.rbegin(), rp.r.rend(), rule_smaller);
+	sort(rp.r.rbegin(), rp.r.rend(), rule_smaller);
 	// The place where we temporarily store our temporary rules
-	std::vector<raw_rule> pending_rules;
+	vector<raw_rule> pending_rules;
 	// Go through the rules we want to try substituting into other
 	for(raw_rule &rr2 : rp.r) {
 		// Because we use a conjunctive homomorphism finding rule
 		if(is_cq(rr2) && rr2.b[0].size() > 1) {
 			// The variables of the current rule that we'd need to be able to
 			// constrain/substitute into
-			std::set<elem> needed_vars;
-			std::set<std::tuple<raw_rule *, terms_hom>> agg;
+			set<elem> needed_vars;
+			set<tuple<raw_rule *, terms_hom>> agg;
 			// Now let's look for rules that we can substitute the current
 			// into
 			for(raw_rule &rr1 : rp.r) {
-				std::set<terms_hom> homs;
+				set<terms_hom> homs;
 				// Find all the homomorphisms between outer and inner rule. This
 				// way we can substitute the outer rule into the inner multiple
 				// times.
@@ -460,7 +460,7 @@ void driver::factor_rules(raw_prog &rp) {
 						// replacing a group of terms with a rule utilizing a bigger
 						// group.
 						if(target_terms.size() >= rr2.b[0].size()) {
-							agg.insert(std::make_tuple(&rr1, hom));
+							agg.insert(make_tuple(&rr1, hom));
 							// If we were to substitute the target group of terms with
 							// a single head, what arguments would we need to pass to
 							// it?
@@ -475,8 +475,8 @@ void driver::factor_rules(raw_prog &rp) {
 			// use it directly. This depends on whether the head exports
 			// enough variables.
 			elem target_rel;
-			std::vector<elem> target_args;
-			std::set<elem> exported_vars;
+			vector<elem> target_args;
+			set<elem> exported_vars;
 			collect_vars(rr2.h[0], exported_vars);
 			// Note whether we have created a temporary relation. Important
 			// because we make the current rule depend on the temporary
@@ -507,18 +507,18 @@ void driver::factor_rules(raw_prog &rp) {
 				// outer rule as its definition is irreducible.
 				if(!tmp_rel && rr1 == &rr2) continue;
 				auto &[rts, vs] = hom;
-				std::set<raw_term> rr1_set(rr1->b[0].begin(), rr1->b[0].end());
+				set<raw_term> rr1_set(rr1->b[0].begin(), rr1->b[0].end());
 				// If the target rule still includes the homomorphism target,
 				// then ... . Note that this may not be the case as the targets
 				// of several homomorphisms could overlap.
-				if(std::includes(rr1_set.begin(), rr1_set.end(), rts.begin(),
+				if(includes(rr1_set.begin(), rr1_set.end(), rts.begin(),
 						rts.end())) {
 					// Remove the homomorphism target from the target rule
-					auto it = std::set_difference(rr1_set.begin(), rr1_set.end(),
+					auto it = set_difference(rr1_set.begin(), rr1_set.end(),
 						rts.begin(), rts.end(), rr1->b[0].begin());
 					rr1->b[0].resize(it - rr1->b[0].begin());
 					// And place our chosen head with localized arguments.
-					std::vector<elem> subbed_args;
+					vector<elem> subbed_args;
 					for(const elem &e : target_args) {
 						// If the current parameter of the outer rule is a constant,
 						// then just place it in our new term verbatim
@@ -533,7 +533,7 @@ void driver::factor_rules(raw_prog &rp) {
 	// during potential vector resizing.
 	for(const raw_rule &rr : pending_rules) {
 		rp.r.push_back(rr);
-		o::dbg() << "New Factor Created: " << rr << std::endl;
+		o::dbg() << "New Factor Created: " << rr << endl;
 	}
 }
 
@@ -542,8 +542,8 @@ void driver::factor_rules(raw_prog &rp) {
  * partition. If the supplied function returns false, then the iteration
  * stops. */
 
-template<typename T, typename F> bool partition_iter(std::set<T> &vars,
-		std::vector<std::set<T>> &partition, const F &f) {
+template<typename T, typename F> bool partition_iter(set<T> &vars,
+		vector<set<T>> &partition, const F &f) {
 	if(vars.empty()) {
 		return f(partition);
 	} else {
@@ -556,7 +556,7 @@ template<typename T, typename F> bool partition_iter(std::set<T> &vars,
 			}
 			partition[i].erase(nvar);
 		}
-		std::set<T> npart = { nvar };
+		set<T> npart = { nvar };
 		partition.push_back(npart);
 		if(!partition_iter(vars, partition, f)) {
 			return false;
@@ -572,7 +572,7 @@ template<typename T, typename F> bool partition_iter(std::set<T> &vars,
  * the product and if it returns false, the iteration stops. */
 
 template<typename T, typename F>
-		bool product_iter(const std::set<T> &vars, std::vector<T> &seq,
+		bool product_iter(const set<T> &vars, vector<T> &seq,
 			size_t len, const F &f) {
 	if(len == 0) {
 		return f(seq);
@@ -592,8 +592,8 @@ template<typename T, typename F>
  * supplied function is called with each element of the power set and
  * if it returns false, the iteration stops. */
 
-template<typename T, typename F> bool power_iter(std::set<T> &elts,
-		std::set<T> &subset, const F &f) {
+template<typename T, typename F> bool power_iter(set<T> &elts,
+		set<T> &subset, const F &f) {
 	if(elts.size() == 0) {
 		return f(subset);
 	} else {
@@ -617,7 +617,7 @@ template<typename T, typename F> bool power_iter(std::set<T> &elts,
 
 /* Collect the variables used in the given terms and return. */
 
-void driver::collect_vars(const raw_term &rt, std::set<elem> &vars) {
+void driver::collect_vars(const raw_term &rt, set<elem> &vars) {
 	for(const elem &e : rt.e) {
 		if(e.type == elem::VAR) {
 			vars.insert(e);
@@ -629,7 +629,7 @@ void driver::collect_vars(const raw_term &rt, std::set<elem> &vars) {
 
 template <class InputIterator>
 		void driver::collect_vars(InputIterator first, InputIterator last,
-			std::set<elem> &vars) {
+			set<elem> &vars) {
 	for(; first != last; first++) {
 		collect_vars(*first, vars);
 	}
@@ -638,7 +638,7 @@ template <class InputIterator>
 /* Collect the variables used in the head and the positive terms of the
  * given rule and return. */
 
-void driver::collect_vars(const raw_rule &rr, std::set<elem> &vars) {
+void driver::collect_vars(const raw_rule &rr, set<elem> &vars) {
 	collect_vars(rr.h[0], vars);
 	for(const raw_term &tm : rr.b[0]) {
 		collect_vars(tm, vars);
@@ -653,28 +653,28 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
 		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
 	
-	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << std::endl;
+	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << endl;
 	
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
 	
-	std::set<elem> vars;
+	set<elem> vars;
 	collect_vars(rr1, vars);
-	std::vector<std::set<elem>> partition;
+	vector<set<elem>> partition;
 	
 	// Do the Levy-Sagiv test
 	bool contained = partition_iter(vars, partition,
-		[&](const std::vector<std::set<elem>> &partition) -> bool {
+		[&](const vector<set<elem>> &partition) -> bool {
 			// Print the current partition
 			o::dbg() << "Testing partition: ";
-			for(const std::set<elem> &s : partition) {
+			for(const set<elem> &s : partition) {
 				o::dbg() << "{";
 				for(const elem &e : s) {
 					o::dbg() << e << ", ";
 				}
 				o::dbg() << "}, ";
 			}
-			o::dbg() << std::endl;
+			o::dbg() << endl;
 			
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
@@ -683,15 +683,15 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			d.cl = old_dict.cl;
 			
 			// Map each variable to a fresh symbol according to the partition
-			std::map<elem, elem> subs;
-			for(const std::set<elem> &part : partition) {
+			map<elem, elem> subs;
+			for(const set<elem> &part : partition) {
 				elem pvar = elem::fresh_sym(d);
 				for(const elem &e : part) {
 					subs[e] = pvar;
 				}
 			}
 			raw_rule subbed = freeze_rule(rr1, subs, d);
-			std::set<raw_term> canonical, canonical_negative;
+			set<raw_term> canonical, canonical_negative;
 			// Separate the positive and negative subgoals. Note the symbols
 			// supplied to the subgoals.
 			for(raw_term &rt : subbed.b[0]) {
@@ -708,7 +708,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			for(const raw_term &rt : canonical) {
 				o::dbg() << rt << ", ";
 			}
-			o::dbg() << std::endl;
+			o::dbg() << endl;
 			// Does canonical database make all the subgoals of subbed true?
 			for(raw_term &rt : subbed.b[0]) {
 				if(rt.neg) {
@@ -717,14 +717,14 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					rt.neg = false;
 					if(canonical.find(rt) != canonical.end()) {
 						o::dbg() << "Current canonical database causes its source query to be inconsistent."
-							<< std::endl;
+							<< endl;
 						return true;
 					}
 					rt.neg = true;
 				}
 			}
 			// Collect the symbols/literals from the freeze map
-			std::set<elem> symbol_set;
+			set<elem> symbol_set;
 			for(const auto &[elm, sym] : subs) {
 				symbol_set.insert(sym);
 				// Finer control over elements in the universe is required to
@@ -736,7 +736,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 				}
 			}
 			// Get all the relations used in both queries
-			std::set<rel_info> rels;
+			set<rel_info> rels;
 			for(const raw_term &rt : rr1.b[0]) {
 				rels.insert(get_relation_info(rt));
 			}
@@ -745,12 +745,12 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			}
 			// Now we need to get the largest superset of our canonical
 			// database
-			std::set<raw_term> superset;
+			set<raw_term> superset;
 			for(const rel_info &ri : rels) {
-				std::vector<elem> tuple;
-				product_iter(symbol_set, tuple, std::get<1>(ri),
-					[&](const std::vector<elem> tuple) -> bool {
-						std::vector<elem> nterm_e = { std::get<0>(ri), elem_openp };
+				vector<elem> tuple;
+				product_iter(symbol_set, tuple, get<1>(ri),
+					[&](const vector<elem> tuple) -> bool {
+						vector<elem> nterm_e = { get<0>(ri), elem_openp };
 						for(const elem &e : tuple) {
 							nterm_e.push_back(e);
 						}
@@ -767,20 +767,20 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			// Now need to through all the supersets of our canonical database
 			// and check that they yield the frozen head.
 			return power_iter(superset, canonical,
-				[&](const std::set<raw_term> ext) -> bool {
+				[&](const set<raw_term> ext) -> bool {
 					raw_prog test_prog;
 					test_prog.r.push_back(rr2);
-					std::set<raw_term> res;
+					set<raw_term> res;
 					tables::run_prog(ext, test_prog, d, opts, ir, res);
 					return res.find(subbed.h[0]) != res.end();
 				});
 		});
 	
 	if(contained) {
-		o::dbg() << "True: " << rr1 << " <= " << rr2 << std::endl;
+		o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
 		return true;
 	} else {
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << std::endl;
+		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
 		return false;
 	}
 }
@@ -792,7 +792,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 
 template<typename F> bool driver::try_minimize(raw_rule &rr, const F &f) {
 	if(is_cqn(rr)) {
-		std::vector<raw_term> heads1 = rr.h, bodie1 = rr.b[0],
+		vector<raw_term> heads1 = rr.h, bodie1 = rr.b[0],
 			heads2 = rr.h, bodie2 = rr.b[0];
 		// Let's see if we can remove a body term from the rule without
 		// affecting its behavior
@@ -823,12 +823,11 @@ template<typename F> bool driver::try_minimize(raw_rule &rr, const F &f) {
 
 template<typename F>
 		void driver::subsume_queries(raw_prog &rp, const F &f) {
-	std::vector<raw_rule> reduced_rules;
+	vector<raw_rule> reduced_rules;
 	for(raw_rule &rr : rp.r) {
 		bool subsumed = false;
 		
-		for(std::vector<raw_rule>::iterator nrr = reduced_rules.begin();
-				nrr != reduced_rules.end();) {
+		for(auto nrr = reduced_rules.begin(); nrr != reduced_rules.end();) {
 			if(f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
 				// then move onto the next rule in the outer loop
@@ -871,7 +870,7 @@ void driver::simplify_formulas(raw_prog &rp) {
  * elements, and its third argument is the maximum tuple length. */
 
 bool driver::transform_domains(raw_prog &rp, const directive& drt) {
-	o::dbg() << "Generating domain for: " << drt << std::endl;
+	o::dbg() << "Generating domain for: " << drt << endl;
 	dict_t &d = tbl->get_dict();
 	// Ensure that we're working on a DOMAIN directive
 	if(drt.type != directive::EDOMAIN) return false;
@@ -887,7 +886,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// The number of distinct lists of elements less than gen_limit and
 	// with length less than max_limit
 	int_t max_id = gen_limit == 1 ? max_arity + 1 :
-		(std::pow(gen_limit, max_arity + 1) - 1) / (gen_limit - 1);
+		(pow(gen_limit, max_arity + 1) - 1) / (gen_limit - 1);
 	
 	// Initialize the symbols, variables, and operators used in the
 	// domain creation rule
@@ -911,7 +910,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// multiplying each element by the exponent of some base.
 	// Euclidean division is required to extract list elements from a
 	// given ID.
-	std::vector<raw_term> bodie = {
+	vector<raw_term> bodie = {
 		// 0 < list_id
 		raw_term(raw_term::LEQ, {list_id, leq_elem, elem(0)}).negate(),
 		// list_id < max_id
@@ -982,7 +981,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		elem_openp, current_list, elem_closep });
 	// The body essentially ensures that the given list has the given
 	// number of nodes. Note that node values are ignored here.
-	std::vector<raw_term> max_body;
+	vector<raw_term> max_body;
 	for(int_t i = 0; i < max_arity; i++) {
 		max_body.push_back(raw_term({ concat(out_rel, "_rst"),
 			elem_openp, current_list, next_list, elem_closep }));
@@ -996,7 +995,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// Create the longest list rule.
 	rp.r.push_back(raw_rule(max_head, max_body));
 	// Successfully executed directive
-	o::dbg() << "Generated domain for: " << drt << std::endl;
+	o::dbg() << "Generated domain for: " << drt << endl;
 	return true;
 }
 
@@ -1004,7 +1003,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
  * associated with it and return that. If there is no such association,
  * make one. */
 
-elem driver::quote_elem(const elem &e, std::map<elem, elem> &variables,
+elem driver::quote_elem(const elem &e, map<elem, elem> &variables,
 		dict_t &d) {
 	if(variables.find(e) != variables.end()) {
 		return variables[e];
@@ -1020,7 +1019,7 @@ elem driver::quote_elem(const elem &e, std::map<elem, elem> &variables,
  * make one such that it uses the lowest 0-based index. */
 
 elem driver::numeric_quote_elem(const elem &e,
-		std::map<elem, elem> &variables) {
+		map<elem, elem> &variables) {
 	if(variables.find(e) != variables.end()) {
 		return variables[e];
 	} else {
@@ -1034,7 +1033,7 @@ elem driver::numeric_quote_elem(const elem &e,
  * fresh symbol. */
 
 raw_rule driver::freeze_rule(raw_rule rr,
-		std::map<elem, elem> &freeze_map, dict_t &d) {
+		map<elem, elem> &freeze_map, dict_t &d) {
 	for(raw_term &tm : rr.h) {
 		if(tm.extype == raw_term::REL) {
 			for(size_t i = 2; i < tm.e.size() - 1; i++) {
@@ -1042,7 +1041,7 @@ raw_rule driver::freeze_rule(raw_rule rr,
 			}
 		}
 	}
-	for(std::vector<raw_term> &bodie : rr.b) {
+	for(vector<raw_term> &bodie : rr.b) {
 		for(raw_term &tm : bodie) {
 			if(tm.extype == raw_term::REL) {
 				for(size_t i = 2; i < tm.e.size() - 1; i++) {
@@ -1059,7 +1058,7 @@ raw_rule driver::freeze_rule(raw_rule rr,
  * added to the variables map. */
 
 elem driver::quote_term(const raw_term &head, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
+		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
@@ -1067,7 +1066,7 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
 	if(head.extype == raw_term::REL) {
 		elem elems_id = elem::fresh_var(d), tags_id = elem::fresh_var(d),
 			elems_hid = elems_id, tags_hid = tags_id;
-		std::vector<raw_term> params_body, param_types_body;
+		vector<raw_term> params_body, param_types_body;
 		for(size_t param_idx = 2; param_idx < head.e.size() - 1; param_idx ++) {
 			elem next_elems_id = elem::fresh_var(d),
 				next_tags_id = elem::fresh_var(d);
@@ -1098,7 +1097,7 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
 			elem_openp, term_id, tags_hid, elem_closep }), param_types_body));
 	} else if(head.extype == raw_term::EQ) {
 		// Add metadata to quoted term: term signature, term id, term name
-		std::vector<elem> quoted_term_e = {rel_name, elem_openp, elem(QEQUALS),
+		vector<elem> quoted_term_e = {rel_name, elem_openp, elem(QEQUALS),
 			term_id, numeric_quote_elem(head.e[0], variables),
 			numeric_quote_elem(head.e[2], variables),
 			int_t(head.e[0].type == elem::VAR), int_t(head.e[2].type == elem::VAR),
@@ -1150,7 +1149,7 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
  */
 
 elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
+		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
@@ -1257,7 +1256,7 @@ elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
 /* Returns a symbol formed by concatenating the given string to the
  * given symbol. Used for refering to sub relations. */
 
-elem driver::concat(const elem &rel, std::string suffix) {
+elem driver::concat(const elem &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	// Make lexeme from concatenating rel's lexeme with the given suffix
@@ -1268,7 +1267,7 @@ elem driver::concat(const elem &rel, std::string suffix) {
 /* Returns a lexeme formed by concatenating the given string to the
  * given lexeme. Used for refering to sub relations. */
 
-lexeme driver::concat(const lexeme &rel, std::string suffix) {
+lexeme driver::concat(const lexeme &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	// Make lexeme from concatenating rel's lexeme with the given suffix
@@ -1278,12 +1277,12 @@ lexeme driver::concat(const lexeme &rel, std::string suffix) {
 /* Quote the given rule and put its quotation into the given raw_prog
  * under a relation given by rel_name. */
 
-std::vector<elem> driver::quote_rule(const raw_rule &rr,
+vector<elem> driver::quote_rule(const raw_rule &rr,
 		const elem &rel_name, const elem &domain_name, raw_prog &rp,
 		int_t &part_count) {
 	// Maintain a list of the variable substitutions:
-	std::map<elem, elem> variables;
-	std::vector<elem> rule_ids;
+	map<elem, elem> variables;
+	vector<elem> rule_ids;
 	
 	// Facts and rules have different representations in quotations. This
 	// is because they are interpreted differently: facts are placed in
@@ -1350,7 +1349,7 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 
 bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
 	if(drt.type != directive::QUOTE) return false;
-	o::dbg() << "Generating quotation for: " << drt << std::endl;
+	o::dbg() << "Generating quotation for: " << drt << endl;
 	// The relation to contain the evaled relation is the first symbol
 	// between the parentheses
 	elem out_rel = drt.quote_sym;
@@ -1368,7 +1367,7 @@ bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
 		quote_prog(nrp, out_rel, domain_sym, rp);
 	}
 	// Indicate success
-	o::dbg() << "Generated quotation for: " << drt << std::endl;
+	o::dbg() << "Generated quotation for: " << drt << endl;
 	return true;
 }
 
@@ -1385,7 +1384,7 @@ bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
 
 bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	if(drt.type != directive::CODEC) return false;
-	o::dbg() << "Generating codec for: " << drt << std::endl;
+	o::dbg() << "Generating codec for: " << drt << endl;
 	// The relation to contain the evaled relation is the first symbol
 	// between the parentheses
 	elem codec_rel = drt.codec_sym;
@@ -1419,7 +1418,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 			elem(0), name_var, params_var, elem_closep });
 	
 	// Make variables for each head and tail in a linked list
-	std::vector<elem> params_vars, param_vars;
+	vector<elem> params_vars, param_vars;
 	for(int_t i = 0; i < max_arity; i++) {
 		params_vars.push_back(elem::fresh_var(d));
 		param_vars.push_back(elem::fresh_var(d));
@@ -1428,7 +1427,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// Create rules to decode the contents of the interpreter's
 	// database into a temporary relation on each tick
 	for(int_t i = 0; i <= max_arity; i++) {
-		std::vector<elem> decode_tmp_elems = { decode_tmp_rel,
+		vector<elem> decode_tmp_elems = { decode_tmp_rel,
 			elem_openp, name_var };
 		for(int_t j = 0; j < i; j++) {
 			decode_tmp_elems.push_back(param_vars[j]);
@@ -1467,7 +1466,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	for(int_t i = 0; i <= max_arity; i++) {
 		// Make the terms to capture a temporary decoder relation entry
 		// and to insert a decoder relation entry
-		std::vector<elem>
+		vector<elem>
 			decode_elems = { concat(codec_rel, "_decode"), elem_openp, name_var },
 			decode_tmp_elems = { decode_tmp_rel, elem_openp, name_var };
 		for(int_t j = 0; j < i; j++) {
@@ -1497,7 +1496,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	for(int_t i = 0; i <= max_arity; i++) {
 		// The decoded terms will be coming from a <codec>_encode
 		// relation
-		std::vector<elem> encode_elems = { concat(codec_rel, "_encode"),
+		vector<elem> encode_elems = { concat(codec_rel, "_encode"),
 			elem_openp, name_var };
 		for(int_t j = 0; j < i; j++) {
 			encode_elems.push_back(param_vars[j]);
@@ -1525,7 +1524,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 		rp.r.push_back(encode_rule);
 	}
 	// Indicate success
-	o::dbg() << "Generated codec for: " << drt << std::endl;
+	o::dbg() << "Generated codec for: " << drt << endl;
 	return true;
 }
 
@@ -1542,7 +1541,7 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 
 bool driver::transform_evals(raw_prog &rp, const directive &drt) {
 	if(drt.type != directive::EVAL) return false;
-	o::dbg() << "Generating eval for: " << drt << std::endl;
+	o::dbg() << "Generating eval for: " << drt << endl;
 	// The relation to contain the evaled relation is the first symbol
 	// between the parentheses
 	elem out_rel = drt.eval_sym;
@@ -2490,7 +2489,7 @@ bool driver::transform_evals(raw_prog &rp, const directive &drt) {
 		raw_prog &rp697 = rp;
 		rp697.r.insert(rp697.r.end(), { rr12, rr17, rr22, rr30, rr35, rr40, rr78, rr94, rr119, rr129, rr156, rr166, rr191, rr207, rr217, rr240, rr256, rr266, rr279, rr296, rr319, rr343, rr362, rr378, rr423, rr471, rr522, rr530, rr553, rr574, rr582, rr595, rr628, rr641, rr658, rr671, rr678, rr696, });
 	}
-	o::dbg() << "Generated eval for: " << drt << std::endl;
+	o::dbg() << "Generated eval for: " << drt << endl;
 	return true;
 }
 
@@ -2499,7 +2498,7 @@ bool driver::transform_evals(raw_prog &rp, const directive &drt) {
  * then to the program proper. */
 
 void driver::recursive_transform(raw_prog &rp,
-		const std::function<void(raw_prog &)> &f) {
+		const function<void(raw_prog &)> &f) {
 	for(raw_prog &np : rp.nps) {
 		recursive_transform(np, f);
 	}
@@ -2527,8 +2526,8 @@ raw_term driver::relation_to_term(const rel_info &ri) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	
-	std::vector<elem> els = { std::get<0>(ri), elem_openp };
-	for(int_t i = 0; i < std::get<1>(ri); i++) {
+	vector<elem> els = { get<0>(ri), elem_openp };
+	for(int_t i = 0; i < get<1>(ri); i++) {
 		els.push_back(elem::fresh_var(d));
 	}
 	els.push_back(elem_closep);
@@ -2542,7 +2541,7 @@ raw_rule condition_rule(raw_rule rr, const raw_term &cond) {
 	if(rr.b.empty()) {
 		rr.b.push_back({cond});
 	} else {
-		for(std::vector<raw_term> &bodie : rr.b) {
+		for(vector<raw_term> &bodie : rr.b) {
 			bodie.push_back(cond);
 		}
 	}
@@ -2552,7 +2551,7 @@ raw_rule condition_rule(raw_rule rr, const raw_term &cond) {
 /* Rename the relations in the heads of the given rule to that given by
  * the supplied renaming map. */
 
-raw_rule rename_rule(raw_rule rr, std::map<elem, elem> &rename_map) {
+raw_rule rename_rule(raw_rule rr, map<elem, elem> &rename_map) {
 	for(raw_term &rt : rr.h) {
 		auto jt = rename_map.find(rt.e[0]);
 		if(jt != rename_map.end()) {
@@ -2569,17 +2568,17 @@ raw_rule rename_rule(raw_rule rr, std::map<elem, elem> &rename_map) {
  * execution of the current stage. */
 
 void driver::step_transform(raw_prog &rp,
-		const std::function<void(raw_prog &)> &f) {
+		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	
-	std::map<elem, elem> freeze_map;
-	std::map<elem, elem> unfreeze_map;
+	map<elem, elem> freeze_map;
+	map<elem, elem> unfreeze_map;
 	// Separate the internal rules used to execute the parts of the
 	// transformation from the external rules used to expose the results
 	// of computation.
-	std::vector<raw_rule> int_prog;
-	std::vector<raw_term> fact_prog;
+	vector<raw_rule> int_prog;
+	vector<raw_term> fact_prog;
 	// Create a duplicate of each rule in the given program under a
 	// generated alias.
 	for(raw_rule rr : rp.r) {
@@ -2609,17 +2608,17 @@ void driver::step_transform(raw_prog &rp,
 	f(rp);
 	
 	// Partition the rules by relations
-	typedef std::set<raw_rule> relation;
-	std::map<rel_info, relation> rels;
+	typedef set<raw_rule> relation;
+	map<rel_info, relation> rels;
 	for(const raw_rule &rr : rp.r) {
 		rels[get_relation_info(rr.h[0])].insert(rr);
 	}
-	std::map<const relation *, rel_info> rrels;
+	map<const relation *, rel_info> rrels;
 	for(const auto &[ri, r] : rels) {
 		rrels[&r] = ri;
 	}
 	// Initialize the dependency lists
-	std::map<const relation *, std::set<const relation *>> deps, rdeps;
+	map<const relation *, set<const relation *>> deps, rdeps;
 	for(const auto &[k, v] : rels) {
 		deps[&v] = {};
 		rdeps[&v] = {};
@@ -2627,7 +2626,7 @@ void driver::step_transform(raw_prog &rp,
 	// Make the adjacency lists based on rule dependency
 	for(const auto &[k, v] : rels) {
 		for(const raw_rule &rr : v) {
-			for(const std::vector<raw_term> &bodie : rr.b) {
+			for(const vector<raw_term> &bodie : rr.b) {
 				for(const raw_term &rt : bodie) {
 					rel_info target = get_relation_info(rt);
 					if(rels.find(target) != rels.end()) {
@@ -2641,9 +2640,9 @@ void driver::step_transform(raw_prog &rp,
 		}
 	}
 	// Topologically sort the relations
-	std::vector<std::set<const relation *>> sorted;
+	vector<set<const relation *>> sorted;
 	// Represents the relations that do not depend on other relations
-	std::set<const relation *> current_level;
+	set<const relation *> current_level;
 	for(const auto &[k, v] : rdeps) {
 		if(v.empty()) {
 			current_level.insert(k);
@@ -2652,7 +2651,7 @@ void driver::step_transform(raw_prog &rp,
 	// Kahn's algorithm: start from relations with no dependencies and
 	// work our way up
 	while(!current_level.empty()) {
-		std::set<const relation *> next_level;
+		set<const relation *> next_level;
 		for(const relation *n : current_level) {
 			for(const relation *m : deps[n]) {
 				rdeps[m].erase(n);
@@ -2683,17 +2682,17 @@ void driver::step_transform(raw_prog &rp,
 		}
 		// At each stage of TML execution, exactly one of the nullary facts
 		// in this vector are asserted
-		std::vector<elem> clock_states = { elem::fresh_temp_sym(d) };
+		vector<elem> clock_states = { elem::fresh_temp_sym(d) };
 		// Push the internal rules onto the program using conditioning to
 		// control execution order
-		for(const std::set<const relation *> v : sorted) {
+		for(const set<const relation *> v : sorted) {
 			// Make a new clock state for the current stage
 			const elem clock_state = elem::fresh_temp_sym(d);
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_state, std::vector<elem>{}),
-				raw_term(clock_states.back(), std::vector<elem>{}).negate() },
-				{ raw_term(clock_states.back(), std::vector<elem>{}) }));
+			rp.r.push_back(raw_rule({ raw_term(clock_state, vector<elem>{}),
+				raw_term(clock_states.back(), vector<elem>{}).negate() },
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
 			clock_states.push_back(clock_state);
 			
 			for(const relation *w : v) {
@@ -2703,7 +2702,7 @@ void driver::step_transform(raw_prog &rp,
 				// affect future stages.
 				if(unfreeze_map.find(general_head.e[0]) == unfreeze_map.end()) {
 					rp.r.push_back(raw_rule(general_head.negate(),
-						{ general_head, raw_term(clock_states[0], std::vector<elem>{}) }));
+						{ general_head, raw_term(clock_states[0], vector<elem>{}) }));
 				} else {
 					// Update the external interface during the writeback stage
 					// by copying the contents of the final temporary relation
@@ -2712,25 +2711,25 @@ void driver::step_transform(raw_prog &rp,
 					original_head.e[0] = unfreeze_map[general_head.e[0]];
 					original_head.neg = general_head.neg = true;
 					rp.r.push_back(condition_rule(raw_rule(original_head, general_head),
-						raw_term(clock_states[0], std::vector<elem>{})));
+						raw_term(clock_states[0], vector<elem>{})));
 					original_head.neg = general_head.neg = false;
 					rp.r.push_back(condition_rule(raw_rule(original_head, general_head),
-						raw_term(clock_states[0], std::vector<elem>{})));
+						raw_term(clock_states[0], vector<elem>{})));
 				}
 				for(raw_rule rr : *w) {
 					// Condition everything in the current stage with the same
 					// clock state
 					rp.r.push_back(condition_rule(rr,
-						raw_term(clock_state, std::vector<elem>{})));
+						raw_term(clock_state, vector<elem>{})));
 				}
 			}
 		}
 		// Start the clock ticking by asserting stage0, asserting stage1
 		// if stage0 holds, and asserting the clock if stage0 holds but
 		// stage1 does not.
-		raw_term stage0(elem::fresh_temp_sym(d), std::vector<elem>{});
-		raw_term stage1(elem::fresh_temp_sym(d), std::vector<elem>{});
-		raw_term stage2(clock_states[0], std::vector<elem>{});
+		raw_term stage0(elem::fresh_temp_sym(d), vector<elem>{});
+		raw_term stage1(elem::fresh_temp_sym(d), vector<elem>{});
+		raw_term stage2(clock_states[0], vector<elem>{});
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
 		rp.r.push_back(raw_rule(stage2, {stage0, stage1.negate()}));
@@ -2745,13 +2744,13 @@ void driver::step_transform(raw_prog &rp,
 		if(clock_states.size() > 1) {
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_states[0], std::vector<elem>{}),
-				raw_term(clock_states.back(), std::vector<elem>{}).negate() },
-				{ raw_term(clock_states.back(), std::vector<elem>{}) }));
+			rp.r.push_back(raw_rule({ raw_term(clock_states[0], vector<elem>{}),
+				raw_term(clock_states.back(), vector<elem>{}).negate() },
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
 		}
 	} else {
 		// Add all program facts back
-		rp.r.push_back(raw_rule(fact_prog, std::vector<raw_term>{}));
+		rp.r.push_back(raw_rule(fact_prog, vector<raw_term>{}));
 		// If there are no interdepencies then we can just restore the
 		// original rule names to the transformed program
 		for(raw_rule &rr : rp.r) {
@@ -2763,22 +2762,21 @@ void driver::step_transform(raw_prog &rp,
 /* Returns the difference between the two given sets. I.e. the second
  * set removed with multiplicity from the first. */
 
-std::set<elem> set_difference(const std::multiset<elem> &s1,
-		const std::set<elem> &s2) {
-	std::set<elem> res;
-	std::set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		std::inserter(res, res.end()));
+set<elem> set_difference(const multiset<elem> &s1,
+		const set<elem> &s2) {
+	set<elem> res;
+	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
 	return res;
 }
 
 /* Returns the intersection of the two given sets. I.e. all the elems
  * that occur in both sets. */
 
-std::set<elem> set_intersection(const std::set<elem> &s1,
-		const std::set<elem> &s2) {
-	std::set<elem> res;
-	std::set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		std::inserter(res, res.end()));
+set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
+	set<elem> res;
+	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
 	return res;
 }
 
@@ -2787,7 +2785,7 @@ std::set<elem> set_intersection(const std::set<elem> &s1,
  * adding temporary relations to the given program. */
 
 raw_term driver::to_pure_tml(const sprawformtree &t,
-		raw_prog &rp, const std::set<elem> &fv) {
+		raw_prog &rp, const set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	const elem part_id = elem::fresh_temp_sym(d);
@@ -2801,21 +2799,21 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			return to_pure_tml(expand_formula_node(t), rp, fv);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
-			std::vector<sprawformtree> ands;
+			vector<sprawformtree> ands;
 			flatten_associative(elem::AND, t, ands);
 			// Collect the free variables in each conjunct. The intersection
 			// of variables between one and the rest is what will need to be
 			// exported
-			std::multiset<elem> all_vars(fv.begin(), fv.end());
-			std::map<const sprawformtree, std::set<elem>> fvs;
+			multiset<elem> all_vars(fv.begin(), fv.end());
+			map<const sprawformtree, set<elem>> fvs;
 			for(const sprawformtree &tree : ands) {
 				fvs[tree] = collect_free_vars(tree);
 				all_vars.insert(fvs[tree].begin(), fvs[tree].end());
 			}
-			std::vector<raw_term> terms;
+			vector<raw_term> terms;
 			// And make a pure TML formula listing them
 			for(const sprawformtree &tree : ands) {
-				std::set<elem> nv = set_intersection(fvs[tree],
+				set<elem> nv = set_intersection(fvs[tree],
 					set_difference(all_vars, fvs[tree]));
 				terms.push_back(to_pure_tml(tree, rp, nv));
 			}
@@ -2827,7 +2825,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			break;
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
-			std::vector<sprawformtree> alts;
+			vector<sprawformtree> alts;
 			flatten_associative(elem::ALT, t, alts);
 			for(const sprawformtree &tree : alts) {
 				// Make a separate rule for each disjunct
@@ -2841,9 +2839,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			return to_pure_tml(t->l, rp, fv).negate();
 		} case elem::EXISTS: {
 			// Make the proposition that is being quantified
-			std::set<elem> nfv = fv;
+			set<elem> nfv = fv;
 			sprawformtree current_formula;
-			std::set<elem> qvars;
+			set<elem> qvars;
 			// Get all the quantified variables used in a sequence of
 			// existential quantifiers
 			for(current_formula = t;
@@ -2871,7 +2869,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			return *t->rt;
 		} case elem::FORALL: {
 			sprawformtree current_formula;
-			std::set<elem> qvars;
+			set<elem> qvars;
 			// Get all the quantified variables used in a sequence of
 			// existential quantifiers
 			for(current_formula = t;
@@ -2882,13 +2880,13 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			// The universal quantifier is logically equivalent to the
 			// following (forall ?x forall ?y = ~ exists ?x exists ?y ~)
 			sprawformtree equiv_formula =
-				std::make_shared<raw_form_tree>(elem::NOT, current_formula);
+				make_shared<raw_form_tree>(elem::NOT, current_formula);
 			for(const elem &qvar : qvars) {
-				equiv_formula = std::make_shared<raw_form_tree>(elem::EXISTS,
-					std::make_shared<raw_form_tree>(elem::VAR, qvar),
+				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
+					make_shared<raw_form_tree>(elem::VAR, qvar),
 					equiv_formula);
 			}
-			return to_pure_tml(std::make_shared<raw_form_tree>(elem::NOT,
+			return to_pure_tml(make_shared<raw_form_tree>(elem::NOT,
 				equiv_formula), rp, fv);
 		} default:
 			assert(false); //should never reach here
@@ -2905,7 +2903,7 @@ void driver::to_pure_tml(raw_prog &rp) {
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
-			std::set<elem> nv;
+			set<elem> nv;
 			for(const raw_term &rt : rr.h) {
 				collect_vars(rt, nv);
 			}
@@ -2914,8 +2912,7 @@ void driver::to_pure_tml(raw_prog &rp) {
 		rp.r[i] = rr;
 	}
 	// Split rules with multiple heads and delete those with 0 heads
-	for(std::vector<raw_rule>::iterator it = rp.r.begin();
-			it != rp.r.end();) {
+	for(auto it = rp.r.begin(); it != rp.r.end();) {
 		if(it->h.size() != 1) {
 			// 0 heads are effectively eliminated, and multiple heads are
 			// split up.
@@ -2931,19 +2928,18 @@ void driver::to_pure_tml(raw_prog &rp) {
 	}
 }
 
-void driver::collect_free_vars(const std::vector<std::vector<raw_term>> &b,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars) {
-	for(const std::vector<raw_term> &bodie : b) {
+void driver::collect_free_vars(const vector<vector<raw_term>> &b,
+		vector<elem> &bound_vars, set<elem> &free_vars) {
+	for(const vector<raw_term> &bodie : b) {
 		for(const raw_term &rt : bodie) {
 			collect_free_vars(rt, bound_vars, free_vars);
 		}
 	}
 }
 
-std::set<elem> driver::collect_free_vars
-		(const std::vector<std::vector<raw_term>> &b) {
-	std::vector<elem> bound_vars;
-	std::set<elem> free_vars;
+set<elem> driver::collect_free_vars(const vector<vector<raw_term>> &b) {
+	vector<elem> bound_vars;
+	set<elem> free_vars;
 	collect_free_vars(b, bound_vars, free_vars);
 	return free_vars;
 }
@@ -2951,8 +2947,8 @@ std::set<elem> driver::collect_free_vars
 /* Collect all the variables that are free in the given rule. */
 
 void driver::collect_free_vars(const raw_rule &rr,
-		std::set<elem> &free_vars) {
-	std::vector<elem> bound_vars = {};
+		set<elem> &free_vars) {
+	vector<elem> bound_vars = {};
 	for(const raw_term &rt : rr.h) {
 		collect_free_vars(rt, bound_vars, free_vars);
 	}
@@ -2963,24 +2959,24 @@ void driver::collect_free_vars(const raw_rule &rr,
 	}
 }
 
-std::set<elem> driver::collect_free_vars(const raw_rule &rr) {
-	std::set<elem> free_vars;
+set<elem> driver::collect_free_vars(const raw_rule &rr) {
+	set<elem> free_vars;
 	collect_free_vars(rr, free_vars);
 	return free_vars;
 }
 
 /* Collect all the variables that are free in the given term. */
 
-std::set<elem> driver::collect_free_vars(const raw_term &t) {
-	std::set<elem> free_vars;
-	std::vector<elem> bound_vars = {};
+set<elem> driver::collect_free_vars(const raw_term &t) {
+	set<elem> free_vars;
+	vector<elem> bound_vars = {};
 	collect_free_vars(t, bound_vars, free_vars);
 	return free_vars;
 }
 
 void driver::collect_free_vars(const raw_term &t,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars) {
-	std::set<elem> term_vars;
+		vector<elem> &bound_vars, set<elem> &free_vars) {
+	set<elem> term_vars;
 	// Get all the variables used in t
 	collect_vars(t, term_vars);
 	// If the variable is bound by some quantifier, then it cannot be free
@@ -2991,15 +2987,15 @@ void driver::collect_free_vars(const raw_term &t,
 
 /* Collect all the variables that are free in the given tree. */
 
-std::set<elem> driver::collect_free_vars(const sprawformtree &t) {
-	std::set<elem> free_vars;
-	std::vector<elem> bound_vars = {};
+set<elem> driver::collect_free_vars(const sprawformtree &t) {
+	set<elem> free_vars;
+	vector<elem> bound_vars = {};
 	collect_free_vars(t, bound_vars, free_vars);
 	return free_vars;
 }
 
 void driver::collect_free_vars(const sprawformtree &t,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars) {
+		vector<elem> &bound_vars, set<elem> &free_vars) {
 	switch(t->type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
 		case elem::ALT:
@@ -3034,19 +3030,19 @@ void driver::collect_free_vars(const sprawformtree &t,
 
 string_t driver::generate_cpp(const elem &e, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		std::map<elem, string_t> &elem_cache) {
+		map<elem, string_t> &elem_cache) {
 	if(elem_cache.find(e) != elem_cache.end()) {
 		return elem_cache[e];
 	}
-	string_t e_name = to_string_t("e") + to_string_t(std::to_string(cid++).c_str());
+	string_t e_name = to_string_t("e") + to_string_t(to_string(cid++).c_str());
 	elem_cache[e] = e_name;
 	if(e.type == elem::CHR) {
 		prog_constr += to_string_t("elem ") + e_name +
-			to_string_t("(char32_t(") + to_string_t(std::to_string(e.ch).c_str()) +
+			to_string_t("(char32_t(") + to_string_t(to_string(e.ch).c_str()) +
 			to_string_t("));\n");
 	} else if(e.type == elem::NUM) {
 		prog_constr += to_string_t("elem ") + e_name + to_string_t("(int_t(") +
-			to_string_t(std::to_string(e.num).c_str()) + to_string_t("));\n");
+			to_string_t(to_string(e.num).c_str()) + to_string_t("));\n");
 	} else {
 		prog_constr += to_string_t("elem ") + e_name + to_string_t("(") +
 			to_string_t(
@@ -3100,12 +3096,12 @@ string_t driver::generate_cpp(const elem &e, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_term &rt, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		std::map<elem, string_t> &elem_cache) {
-	std::vector<string_t> elem_names;
+		map<elem, string_t> &elem_cache) {
+	vector<string_t> elem_names;
 	for(const elem &e : rt.e) {
 		elem_names.push_back(generate_cpp(e, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t rt_name = to_string_t("rt") + to_string_t(std::to_string(cid++).c_str());
+	string_t rt_name = to_string_t("rt") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_term ") + rt_name + to_string_t("(") +
 		to_string_t(
 			rt.extype == raw_term::REL ? "raw_term::REL" :
@@ -3138,8 +3134,8 @@ string_t driver::generate_cpp(const raw_term &rt, string_t &prog_constr,
 // Generate the C++ code to generate the raw_form_tree
 
 string_t driver::generate_cpp(const sprawformtree &t, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache) {
-	string_t ft_name = to_string_t("ft") + to_string_t(std::to_string(cid++).c_str());
+		uint_t &cid, const string_t &dict_name, map<elem, string_t> &elem_cache) {
+	string_t ft_name = to_string_t("ft") + to_string_t(to_string(cid++).c_str());
 	switch(t->type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
 		case elem::ALT: case elem::EXISTS: case elem::UNIQUE:
@@ -3190,15 +3186,15 @@ string_t driver::generate_cpp(const sprawformtree &t, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		std::map<elem, string_t> &elem_cache) {
-	std::vector<string_t> term_names;
+		map<elem, string_t> &elem_cache) {
+	vector<string_t> term_names;
 	for(const raw_term &rt : rr.h) {
 		term_names.push_back(
 			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
 	}
 	string_t prft_name =
 		generate_cpp(rr.get_prft(), prog_constr, cid, dict_name, elem_cache);
-	string_t rule_name = to_string_t("rr") + to_string_t(std::to_string(cid++).c_str());
+	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");
 	for(const string_t &tn : term_names) {
 		prog_constr += tn + to_string_t(", ");
@@ -3217,13 +3213,13 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		std::map<elem, string_t> &elem_cache) {
-	std::vector<string_t> rule_names;
+		map<elem, string_t> &elem_cache) {
+	vector<string_t> rule_names;
 	for(const raw_rule &rr : rp.r) {
 		rule_names.push_back(
 			generate_cpp(rr, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t prog_name = to_string_t("rp") + to_string_t(std::to_string(cid++).c_str());
+	string_t prog_name = to_string_t("rp") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_prog ") + prog_name + to_string_t(";\n");
 	prog_constr += prog_name + to_string_t(".r.insert(") + prog_name +
 		to_string_t(".r.end(), { ");
@@ -3244,8 +3240,8 @@ bool driver::transform_grammar(raw_prog &rp) {
 	flat_prog p;
 	
 	if(ir->transform_grammar(rp.g, p, tmp_form)) {
-		for(const std::vector<term> &rul : p) {
-			std::vector<raw_term> bodie;
+		for(const vector<term> &rul : p) {
+			vector<raw_term> bodie;
 			for(size_t i = 1; i < rul.size(); i++) {
 				bodie.push_back(ir->to_raw_term(rul[i]));
 			}
@@ -3266,9 +3262,9 @@ void driver::transform_booleans(raw_prog &rp) {
 	dict_t &d = tbl->get_dict();
 	rp.r.push_back(raw_rule(
 		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			std::vector<elem>{}).negate(),
+			vector<elem>{}).negate(),
 		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			std::vector<elem>{}).negate()));
+			vector<elem>{}).negate()));
 }
 
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
@@ -3305,77 +3301,70 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 //	if (opts.enabled("sdt"))
 //		for (raw_prog& p : rp.p)
 //			p = transform_sdt(move(p));
-	static std::set<raw_prog *> transformed_progs;
+	static set<raw_prog *> transformed_progs;
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
-		DBG(o::dbg() << "Pre-Transformation Program:" << std::endl << std::endl << rp << std::endl;)
+		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
 			string_t rp_generator;
-			std::map<elem, string_t> elem_cache;
-			o::dbg() << "Generating Program Generator ..." << std::endl
-				<< std::endl;
+			map<elem, string_t> elem_cache;
+			o::dbg() << "Generating Program Generator ..." << endl << endl;
 			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
-			o::dbg() << "Program Generator:" << std::endl << std::endl
-				<< to_string(rp_generator) << std::endl;
+			o::dbg() << "Program Generator:" << endl << endl
+				<< to_string(rp_generator) << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("complete-tern") ||
 				opts.enabled("pure-tml")) {
 			// The false rule is required to represent logical constants in FOL
-			o::dbg() << "Generating the False Rule ..." << std::endl << std::endl;
+			o::dbg() << "Generating the False Rule ..." << endl << endl;
 			transform_booleans(rp);
-			o::dbg() << "Booleaned Program:" << std::endl << std::endl << rp
-				<< std::endl;
-			o::dbg() << "Simplifying Program ..." << std::endl << std::endl;
+			o::dbg() << "Booleaned Program:" << endl << endl << rp << endl;
+			o::dbg() << "Simplifying Program ..." << endl << endl;
 			simplify_formulas(rp);
-			o::dbg() << "Simplified Program:" << std::endl << std::endl << rp
-				<< std::endl;
+			o::dbg() << "Simplified Program:" << endl << endl << rp << endl;
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
-				o::dbg() << "Converting to Pure TML ..." << std::endl << std::endl;
+				o::dbg() << "Converting to Pure TML ..." << endl << endl;
 				to_pure_tml(rp);
-				o::dbg() << "Pure TML Program:" << std::endl << std::endl << rp
-					<< std::endl;
+				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
 				
 				if(opts.enabled("cqnc-subsume")) {
-					o::dbg() << "Subsuming using CQNC test ..." << std::endl
-						<< std::endl;
+					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
 							{return cqnc(rr1, rr2);});
-					o::dbg() << "CQNC Subsumed Program:" << std::endl << std::endl
-						<< rp << std::endl;
+					o::dbg() << "CQNC Subsumed Program:" << endl << endl << rp
+						<< endl;
 				}
 				if(opts.enabled("cqc-subsume")) {
-					o::dbg() << "Subsuming using CQC test ..." << std::endl
-						<< std::endl;
+					o::dbg() << "Subsuming using CQC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
 							{return cqc(rr1, rr2);});
-					o::dbg() << "CQC Subsumed Program:" << std::endl << std::endl
-						<< rp << std::endl;
+					o::dbg() << "CQC Subsumed Program:" << endl << endl << rp
+						<< endl;
 				}
 				if(opts.enabled("cqc-factor")) {
-					o::dbg() << "Factoring queries using CQC test ..."
-						<< std::endl << std::endl;
+					o::dbg() << "Factoring queries using CQC test ..." << endl
+						<< endl;
 					factor_rules(rp);
-					o::dbg() << "Factorized Program:" << std::endl << std::endl
-						<< rp << std::endl;
+					o::dbg() << "Factorized Program:" << endl << endl << rp
+						<< endl;
 				}
 				if(opts.enabled("complete-tern")) {
 					// Though this is a binary transformation, rules will become
 					// ternary after timing guards are added
-					o::dbg() << "Converting rules to unary form ..." << std::endl
-						<< std::endl;
+					o::dbg() << "Converting rules to unary form ..." << endl
+						<< endl;
 					transform_bin(rp);
-					o::dbg() << "Binary Program:" << std::endl << std::endl << rp
-						<< std::endl;
+					o::dbg() << "Binary Program:" << endl << endl << rp << endl;
 				}
 			});
-			o::dbg() << "Step Transformed Program:" << std::endl << std::endl
-				<< rp << std::endl;
+			o::dbg() << "Step Transformed Program:" << endl << endl << rp
+				<< endl;
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
