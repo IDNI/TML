@@ -1,11 +1,4 @@
-father(Tony CarolII).
-father(Fred CarolIII).
-father(Jack Fred).
-father(Tom Amy).
-mother(CarolI CarolII).
-mother(CarolII CarolIII).
-mother(Grace Amy).
-mother(Amy Fred).
+true points:
 parent(CarolI CarolII).
 parent(CarolII CarolIII).
 parent(Tony CarolII).
@@ -14,6 +7,14 @@ parent(Fred CarolIII).
 parent(Jack Fred).
 parent(Amy Fred).
 parent(Tom Amy).
+father(Tony CarolII).
+father(Fred CarolIII).
+father(Jack Fred).
+father(Tom Amy).
+mother(CarolI CarolII).
+mother(CarolII CarolIII).
+mother(Grace Amy).
+mother(Amy Fred).
 ancestor(CarolI CarolIII).
 ancestor(CarolI CarolII).
 ancestor(Grace CarolIII).
@@ -30,3 +31,6 @@ ancestor(Jack Fred).
 ancestor(Amy Fred).
 ancestor(Tom Fred).
 ancestor(Tom Amy).
+
+undefined points:
+(none)

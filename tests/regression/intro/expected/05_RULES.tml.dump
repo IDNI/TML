@@ -1,7 +1,11 @@
-rain().
+true points:
 wet().
+rain().
 p(1 4).
 p(2 1).
 p(1 2).
-employee(Suzi female).
 salutation(Suzi Madam).
+employee(Suzi female).
+
+undefined points:
+(none)

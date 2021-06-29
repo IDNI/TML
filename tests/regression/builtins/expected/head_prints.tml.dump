@@ -4,8 +4,12 @@
 22_23_a_b_c_
 2323abc
 24x23xaxbxc
+true points:
 body().
 data(a b c).
 data(1 2 3).
 delim(", ").
 output(output).
+
+undefined points:
+(none)

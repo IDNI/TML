@@ -1,14 +1,18 @@
-universe(100).
+true points:
 bird(Coco).
 bird(Charlie).
-human(Jane).
-human(John).
-armageddon().
 dead(Jane).
 dead(John).
 dead(Coco).
 dead(Charlie).
+human(Jane).
+human(John).
 corpse(Jane).
 corpse(John).
 corpse(Coco).
 corpse(Charlie).
+armageddon().
+universe(100).
+
+undefined points:
+(none)

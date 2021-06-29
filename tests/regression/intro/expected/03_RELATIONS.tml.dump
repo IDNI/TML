@@ -1,3 +1,4 @@
+true points:
 beginsWithJ(Jack).
 beginsWithJ(John).
 beginsWithJ(Jane).
@@ -6,3 +7,6 @@ uncle(Joe Jack).
 uncle(Jim Joe).
 employee(Jane Doe support).
 employee(John Doe sales).
+
+undefined points:
+(none)

@@ -1,3 +1,4 @@
+true points:
 )(19).
 )(18).
 )(17).
@@ -77,3 +78,6 @@ S(2 8).
 S(4 6).
 S(2 6).
 S(2 4).
+
+undefined points:
+(none)

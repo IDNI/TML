@@ -1,4 +1,8 @@
+true points:
+canFly(Coco).
 bird(Charlie).
 bird(Coco).
 wounded(Charlie).
-canFly(Coco).
+
+undefined points:
+(none)
