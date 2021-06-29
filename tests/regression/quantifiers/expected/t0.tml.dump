@@ -1,4 +1,8 @@
+true points:
 A(1).
 A(0).
 B(0).
 ALL_B_IS_A(1).
+
+undefined points:
+(none)

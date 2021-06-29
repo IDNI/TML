@@ -2762,6 +2762,22 @@ void driver::step_transform(raw_prog &rp,
 	}
 }
 
+/* Iterate through the FOL rules and remove the outermost existential
+ * quantifiers. Required because pure TML conversion assumes that
+ * quantifier variables are only visible within their bodies. */
+
+void driver::remove_redundant_exists(raw_prog &rp) {
+	for(raw_rule &rr : rp.r) {
+		if(rr.is_form()) {
+			sprawformtree &prft = rr.prft;
+			// Repeatedly strip outermost existential quantifier
+			while(prft->type == elem::EXISTS) {
+				prft = prft->r;
+			}
+		}
+	}
+}
+
 /* Returns the difference between the two given sets. I.e. the second
  * set removed with multiplicity from the first. */
 
@@ -2905,11 +2921,7 @@ void driver::to_pure_tml(raw_prog &rp) {
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
-			set<elem> nv;
-			for(const raw_term &rt : rr.h) {
-				collect_vars(rt, nv);
-			}
-			rr.set_b({{to_pure_tml(rr.prft, rp, nv)}});
+			rr.set_b({{to_pure_tml(rr.prft, rp, collect_free_vars(rr))}});
 		}
 		rp.r[i] = rr;
 	}
@@ -2977,7 +2989,7 @@ set<elem> driver::collect_free_vars(const raw_term &t) {
 }
 
 void driver::collect_free_vars(const raw_term &t,
-		vector<elem> &bound_vars, set<elem> &free_vars) {
+		const vector<elem> &bound_vars, set<elem> &free_vars) {
 	set<elem> term_vars;
 	// Get all the variables used in t
 	collect_vars(t, term_vars);
@@ -3317,6 +3329,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
+				remove_redundant_exists(rp);
 				to_pure_tml(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
 				

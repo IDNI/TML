@@ -1,3 +1,7 @@
+true points:
+existB(1).
 a(1).
 existA(1).
-existB(1).
+
+undefined points:
+(none)

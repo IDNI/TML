@@ -1,3 +1,4 @@
+true points:
 U(0).
 A(7).
 T0(6 7).
@@ -56,3 +57,6 @@ T1(1 2).
 T1(0 3).
 T1(0 2).
 T1(0 1).
+
+undefined points:
+(none)

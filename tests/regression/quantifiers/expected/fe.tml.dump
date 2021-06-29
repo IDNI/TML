@@ -1,3 +1,4 @@
+true points:
 A4(3 3).
 A4(2 3).
 A4(3 1).
@@ -5,5 +6,8 @@ A4(2 1).
 A4(1 2).
 A4(1 1).
 A4(0 1).
-C4A(1).
 C4D(1).
+C4A(1).
+
+undefined points:
+(none)
