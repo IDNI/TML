@@ -1,3 +1,4 @@
+true points:
 ch(tau3 'τ').
 ch(tau2 'τ').
 ch(tau1 'τ').
@@ -18,3 +19,6 @@ ch(a10 '\n').
 ch(c9 '\t').
 ch(b9 '\t').
 ch(a9 '\t').
+
+undefined points:
+(none)

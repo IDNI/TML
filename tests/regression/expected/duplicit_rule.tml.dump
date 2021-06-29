@@ -1,4 +1,8 @@
-a(2).
-a(1).
+true points:
 b(2).
 b(1).
+a(2).
+a(1).
+
+undefined points:
+(none)
