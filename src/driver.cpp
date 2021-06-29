@@ -2751,7 +2751,9 @@ void driver::step_transform(raw_prog &rp,
 		}
 	} else {
 		// Add all program facts back
-		rp.r.push_back(raw_rule(fact_prog, vector<raw_term>{}));
+		if(fact_prog.size() > 0) {
+			rp.r.push_back(raw_rule(fact_prog, vector<raw_term>{}));
+		}
 		// If there are no interdepencies then we can just restore the
 		// original rule names to the transformed program
 		for(raw_rule &rr : rp.r) {

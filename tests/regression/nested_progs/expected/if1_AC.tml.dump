@@ -1,3 +1,4 @@
+true points:
 A().
 C().
 U(16).
@@ -8,3 +9,6 @@ exists_C_no_B().
 exists_AC_no_B().
 exists_C().
 exists_AC().
+
+undefined points:
+(none)

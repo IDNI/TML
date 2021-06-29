@@ -1,6 +1,4 @@
-e(3 4).
-e(2 3).
-e(1 2).
+true points:
 ttc(3 4).
 ttc(2 3).
 ttc(1 2).
@@ -9,3 +7,9 @@ ntc(3 3).
 ntc(2 2).
 ntc(1 1).
 ntc(0 0).
+e(3 4).
+e(2 3).
+e(1 2).
+
+undefined points:
+(none)

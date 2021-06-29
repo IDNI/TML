@@ -1,3 +1,4 @@
+true points:
 A().
 B().
 C().
@@ -9,3 +10,6 @@ exists_BC().
 exists_ABC().
 exists_C().
 exists_AC().
+
+undefined points:
+(none)

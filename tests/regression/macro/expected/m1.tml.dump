@@ -1,11 +1,15 @@
+true points:
+tc(4 5 1).
+tc(5 1 2).
+tc(3 4 5).
+tc(2 3 4).
+tc(1 2 3).
 e(8 9).
 e(4 5).
 e(5 1).
 e(3 4).
 e(2 3).
 e(1 2).
-tc(4 5 1).
-tc(5 1 2).
-tc(3 4 5).
-tc(2 3 4).
-tc(1 2 3).
+
+undefined points:
+(none)

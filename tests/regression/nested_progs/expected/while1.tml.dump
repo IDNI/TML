@@ -1,6 +1,10 @@
+true points:
 a(4).
 a(3).
 i(3).
 b(2).
 b(1).
 b(0).
+
+undefined points:
+(none)
