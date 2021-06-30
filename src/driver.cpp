@@ -2580,9 +2580,16 @@ void driver::step_transform(raw_prog &rp,
 	// of computation.
 	vector<raw_rule> int_prog;
 	vector<raw_term> fact_prog;
+	vector<raw_term> goal_prog;
 	// Create a duplicate of each rule in the given program under a
 	// generated alias.
 	for(raw_rule rr : rp.r) {
+		if(rr.type == raw_rule::GOAL) {
+			// Separate out program goals as these are applied after
+			// computation
+			goal_prog.insert(goal_prog.end(), rr.h.begin(), rr.h.end());
+			continue;
+		}
 		for(raw_term &rt : rr.h) {
 			if(auto it = freeze_map.find(rt.e[0]); it != freeze_map.end()) {
 				rt.e[0] = it->second;
@@ -2759,6 +2766,12 @@ void driver::step_transform(raw_prog &rp,
 		for(raw_rule &rr : rp.r) {
 			rr = rename_rule(rr, unfreeze_map);
 		}
+	}
+	// Add all program goals back
+	if(goal_prog.size() > 0) {
+		raw_rule gr(goal_prog, vector<raw_term>{});
+		gr.type = raw_rule::GOAL;
+		rp.r.push_back(gr);
 	}
 }
 
