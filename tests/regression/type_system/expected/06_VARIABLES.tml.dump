@@ -1,3 +1,4 @@
+true points:
 bird(John_3 John_2 John_1 John_0).
 bird(Coco_3 Coco_2 Coco_1 Coco_0).
 bird(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
@@ -19,3 +20,6 @@ parent(Suzi_3 Suzi_2 Suzi_1 Suzi_0 John_3 John_2 John_1 John_0).
 parent(Coco_3 Coco_2 Coco_1 Coco_0 Charlie_3 Charlie_2 Charlie_1 Charlie_0).
 father(Coco_3 Coco_2 Coco_1 Coco_0 Charlie_3 Charlie_2 Charlie_1 Charlie_0).
 mother(Suzi_3 Suzi_2 Suzi_1 Suzi_0 John_3 John_2 John_1 John_0).
+
+undefined points:
+(none)

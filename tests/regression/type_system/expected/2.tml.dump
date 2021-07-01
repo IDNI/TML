@@ -1,6 +1,10 @@
+true points:
 father(fff).
 canFly(bird_3 bird_2 bird_1 bird_0).
 edge(1 1 1 1).
 night().
 pair(0 0 0 1 0 0 1 0).
 school(notyet_11 notyet_10 notyet_9 notyet_8 notyet_7 notyet_6 notyet_5 notyet_4 notyet_3 notyet_2 notyet_1 notyet_0 notyet_11 notyet_10 notyet_9 notyet_8 notyet_7 notyet_6 notyet_5 notyet_4 notyet_3 notyet_2 notyet_1 notyet_0).
+
+undefined points:
+(none)

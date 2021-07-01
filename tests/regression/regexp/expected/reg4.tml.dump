@@ -1,3 +1,4 @@
+true points:
 4(3).
 3(2).
 2(1).
@@ -258,3 +259,6 @@ _RS0(1 2).
 _RS0(0 3).
 _RS0(0 2).
 _RS0(0 1).
+
+undefined points:
+(none)

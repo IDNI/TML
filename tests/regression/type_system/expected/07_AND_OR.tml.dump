@@ -1,3 +1,4 @@
+true points:
 boy(Jack_3 Jack_2 Jack_1 Jack_0).
 boy(John_3 John_2 John_1 John_0).
 child(Suzi_3 Suzi_2 Suzi_1 Suzi_0).
@@ -17,3 +18,6 @@ human(Jack_3 Jack_2 Jack_1 Jack_0).
 human(John_3 John_2 John_1 John_0).
 human(Amy_3 Amy_2 Amy_1 Amy_0).
 adult(Amy_3 Amy_2 Amy_1 Amy_0).
+
+undefined points:
+(none)

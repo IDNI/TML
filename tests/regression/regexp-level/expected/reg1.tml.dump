@@ -1,3 +1,4 @@
+true points:
 d(7).
 d(6).
 c(5).
@@ -47,3 +48,6 @@ L(2 8).
 _RS0(1 2).
 _RS0(0 2).
 _RS0(0 1).
+
+undefined points:
+(none)

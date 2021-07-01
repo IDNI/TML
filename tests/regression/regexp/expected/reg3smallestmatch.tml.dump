@@ -1,3 +1,4 @@
+true points:
 b(7).
 b(4).
 a(10).
@@ -502,3 +503,6 @@ _RS0(1 2).
 _RS0(0 3).
 _RS0(0 2).
 _RS0(0 1).
+
+undefined points:
+(none)

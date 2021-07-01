@@ -1,3 +1,4 @@
+true points:
 a(2).
 a(1).
 a(0).
@@ -28,3 +29,6 @@ _RJ0(0 1).
 D(2 3).
 D(1 2).
 D(0 1).
+
+undefined points:
+(none)
