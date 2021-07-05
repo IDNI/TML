@@ -1,4 +1,3 @@
-true points:
 setA(15).
 setB0(4 8).
 setB0(3 6).
@@ -20,6 +19,3 @@ setB2(0).
 setB3(2).
 setB4(5).
 setB6(1).
-
-undefined points:
-(none)

@@ -1,4 +1,3 @@
-true points:
 universe(0 1 0 0).
 bird(Coco_3 Coco_2 Coco_1 Coco_0).
 bird(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
@@ -13,6 +12,3 @@ corpse(Jane_3 Jane_2 Jane_1 Jane_0).
 corpse(John_3 John_2 John_1 John_0).
 corpse(Coco_3 Coco_2 Coco_1 Coco_0).
 corpse(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
-
-undefined points:
-(none)

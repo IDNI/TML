@@ -1,4 +1,3 @@
-true points:
 Jagdſchloß().
 Blåbærsyltetøy().
 på().
@@ -71,6 +70,3 @@ currency(€).
 currency(£).
 currency(¥).
 currency('$').
-
-undefined points:
-(none)

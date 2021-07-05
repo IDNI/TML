@@ -1,4 +1,3 @@
-true points:
 father(Tom Amy).
 canFly(bird).
 edge(6 3).
@@ -7,6 +6,3 @@ pair(1 2).
 direct(London NY).
 triple(3 9 12).
 beginsWithJ(Joe).
-
-undefined points:
-(none)

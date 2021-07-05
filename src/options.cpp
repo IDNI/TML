@@ -187,7 +187,7 @@ void options::setup() {
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
 	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
-		description("run program under one of the following semantics: 3pfp (default), pfp"));
+		description("run program under one of the following semantics: pfp (default), 3pfp"));
 	add_bool("proof",   "extract proof");
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
@@ -251,8 +251,7 @@ void options::setup() {
 void options::init_defaults() {
 	parse(strings{
 		"--run",
-		"--split-rules",
-		"--semantics",   "3pfp",
+		"--semantics",   "pfp",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",
 		"--error",       "@stderr",

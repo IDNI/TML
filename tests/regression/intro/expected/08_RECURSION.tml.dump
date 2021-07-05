@@ -1,4 +1,8 @@
-true points:
+parent(Tom Amy).
+parent(Grace Amy).
+parent(Amy Fred).
+parent(Jack Fred).
+parent(Fred Sue).
 ancestor(Tom Amy).
 ancestor(Grace Amy).
 ancestor(Tom Sue).
@@ -10,11 +14,3 @@ ancestor(Amy Fred).
 ancestor(Jack Sue).
 ancestor(Jack Fred).
 ancestor(Fred Sue).
-parent(Tom Amy).
-parent(Grace Amy).
-parent(Amy Fred).
-parent(Jack Fred).
-parent(Fred Sue).
-
-undefined points:
-(none)

@@ -1,4 +1,3 @@
-true points:
 father(Tom_3 Tom_2 Tom_1 Tom_0 Amy_3 Amy_2 Amy_1 Amy_0).
 canFly(bird_3 bird_2 bird_1 bird_0).
 edge(0 1 1 0 0 0 1 1).
@@ -7,6 +6,3 @@ pair(0 0 0 1 0 0 1 0).
 direct(London_3 London_2 London_1 London_0 NY_3 NY_2 NY_1 NY_0).
 triple(0 0 1 1 1 0 0 1 1 1 0 0).
 beginsWithJ(Joe_3 Joe_2 Joe_1 Joe_0).
-
-undefined points:
-(none)

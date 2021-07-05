@@ -1,7 +1,6 @@
 10_23_a_b_c_
 1123abc
 12	23	a	b	c
-true points:
 p1().
 p2().
 p3().
@@ -18,6 +17,3 @@ p13().
 p14().
 p15().
 p16().
-
-undefined points:
-(none)

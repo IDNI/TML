@@ -1,13 +1,9 @@
-true points:
+ok_00(0).
 p(2).
 p(1).
 p(0).
+ok_12(1).
+ok_22(0).
 not_ok_00(0).
 not_ok_12(1).
 not_ok_22(0).
-ok_00(0).
-ok_12(1).
-ok_22(0).
-
-undefined points:
-(none)

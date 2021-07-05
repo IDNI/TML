@@ -1,25 +1,21 @@
-true points:
-canFly(John).
-canFly(Coco).
-canFly(Charlie).
 bird(John).
 bird(Coco).
 bird(Charlie).
+cat(Bella).
+canFly(John).
+canFly(Coco).
+canFly(Charlie).
 beeps(John).
 beeps(Coco).
 beeps(Charlie).
 meows(Bella).
-cat(Bella).
-salutation(John Sir).
-salutation(Jane Madam).
-salutation(Suzi Madam).
-employee(John male).
 employee(Jane female).
+employee(John male).
 employee(Suzi female).
+salutation(Jane Madam).
+salutation(John Sir).
+salutation(Suzi Madam).
 parent(Suzi John).
 parent(Coco Charlie).
 father(Coco Charlie).
 mother(Suzi John).
-
-undefined points:
-(none)

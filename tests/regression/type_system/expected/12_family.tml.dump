@@ -1,4 +1,3 @@
-true points:
 father(Tony_3 Tony_2 Tony_1 Tony_0 CarolII_3 CarolII_2 CarolII_1 CarolII_0).
 father(Fred_3 Fred_2 Fred_1 Fred_0 CarolIII_3 CarolIII_2 CarolIII_1 CarolIII_0).
 father(Jack_3 Jack_2 Jack_1 Jack_0 Fred_3 Fred_2 Fred_1 Fred_0).
@@ -31,6 +30,3 @@ ancestor(Jack_3 Jack_2 Jack_1 Jack_0 Fred_3 Fred_2 Fred_1 Fred_0).
 ancestor(Amy_3 Amy_2 Amy_1 Amy_0 Fred_3 Fred_2 Fred_1 Fred_0).
 ancestor(Tom_3 Tom_2 Tom_1 Tom_0 Fred_3 Fred_2 Fred_1 Fred_0).
 ancestor(Tom_3 Tom_2 Tom_1 Tom_0 Amy_3 Amy_2 Amy_1 Amy_0).
-
-undefined points:
-(none)

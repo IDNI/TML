@@ -1,8 +1,4 @@
-true points:
 bird(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
 bird(Coco_3 Coco_2 Coco_1 Coco_0).
 wounded(Charlie_3 Charlie_2 Charlie_1 Charlie_0).
 canFly(Coco_3 Coco_2 Coco_1 Coco_0).
-
-undefined points:
-(none)

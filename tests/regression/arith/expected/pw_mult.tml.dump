@@ -1,4 +1,3 @@
-true points:
 b(3).
 A(2).
 B(2).
@@ -6,6 +5,3 @@ B(1).
 B(0).
 ad_hoc_mult(2).
 ad_hoc_mult(0).
-
-undefined points:
-(none)

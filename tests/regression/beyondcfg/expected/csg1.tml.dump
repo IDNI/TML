@@ -1,4 +1,3 @@
-true points:
 c(5).
 c(4).
 b(3).
@@ -35,6 +34,3 @@ C(4 5).
 S(0 6).
 A(0 4).
 A(1 3).
-
-undefined points:
-(none)

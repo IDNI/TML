@@ -1,11 +1,7 @@
-true points:
-r1().
-f1().
 U(4).
-r2().
+f1().
+r1().
 f2().
-r3().
+r2().
 f3().
-
-undefined points:
-(none)
+r3().

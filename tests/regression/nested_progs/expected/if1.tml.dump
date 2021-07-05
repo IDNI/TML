@@ -1,4 +1,3 @@
-true points:
 U(16).
 no_B().
 no_BC().
@@ -7,6 +6,3 @@ no_A().
 no_AB().
 no_ABC().
 no_AC().
-
-undefined points:
-(none)

@@ -1,7 +1,3 @@
-true points:
 a_not_empty().
 a(1).
 a_copy(1).
-
-undefined points:
-(none)
