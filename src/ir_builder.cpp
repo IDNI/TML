@@ -370,15 +370,11 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		DBG(assert(args == r.size());)
-		string_t str = lexeme2str(rt.e[0].e);
 		if( opts.bitunv ) {
 			bit_univ bu(dict, opts.bitorder, dynenv->typenv);
 			if(bu.brev_transform(rt))
 				rt.calc_arity(nullptr);
 		}
-
-
-	
 		return rt;
 }
 
