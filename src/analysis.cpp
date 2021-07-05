@@ -48,7 +48,7 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 
 size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
-	DBG(assert(rt.e.size()>n && (int_t)n >=0));
+	DBG(assert(rt.e.size()>n && (int_t)n >=0 && rr.varctx.get()) );
 
 	if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ) {
 		string_t str = lexeme2str(rt.e[n].e);
@@ -108,6 +108,46 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	// for everything else
 	return 0;
 }
+
+//inplace transformation of bit raw term to normal as per type_env/
+bool bit_univ::brev_transform( raw_term &rbt ){
+	
+	string_t str = lexeme2str(rbt.e[0].e);
+	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
+	if(vt.size() == 0 ) return false;
+	int_t bitsz = -1;
+	int_t val;
+	int_t argc = 0;
+	for(typedecl td: vt ) {
+		if( td.is_primitive() ) {
+			bitsz =  td.pty.get_bitsz();
+			val = 0;
+			DBG(assert(rbt.e.size() > (size_t)bitsz ));
+			bools v;
+			for( int_t n = 0; n < bitsz; n++)
+				v.push_back(rbt.e[argc + n + 2].num);						
+			
+			permuteorder(v, bit_order, true);
+			for( int_t n = 0; n < bitsz; n++)	
+				val |= v[n] << (bitsz-1 -n);
+
+			rbt.e.erase(rbt.e.begin()+ 2 + argc, rbt.e.begin() + 2 + argc + bitsz);
+			elem el;
+			if( td.pty.ty == primtype::UINT )
+				el = elem(val);
+			else if ( td.pty.ty == primtype::UCHAR )
+				el = elem((char_t) val);
+			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
+				el = elem(elem::SYM, this->d.get_sym(val) );
+
+			rbt.e.insert(rbt.e.begin() + 2 + argc, el);
+			argc++;
+		}
+		else { } //structtypes userdef
+	}
+	return true;
+}
+
 
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
@@ -180,6 +220,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
+			permuteorder(vbit.back(), bit_order);
 		}
 		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
 

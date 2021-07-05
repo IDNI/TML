@@ -179,16 +179,19 @@ struct bit_univ {
 		DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
 		return (bsz - bit_from_right - 1); //* args + arg;
 	}
+    bool brev_transform( raw_term& bit_raw_term);
 	bool btransform( const raw_prog& rpin, raw_prog &rpout );
-	bool btransform( const raw_rule& rrin, raw_rule &rrout );
+	private:
+    bool btransform( const raw_rule& rrin, raw_rule &rrout );
 	bool btransform( const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout );
-
+    public:
     template<class T>
     bool permuteorder(std::vector<T> &cont, size_t n, bool backward = false){
         static std::vector<int_t> ord, rord;
-        if ( n == 0 || n > ((1 << cont.size())-1)) return false;
+        if ( n == 0 ) return false;         
         std::vector<T> ocont = cont;
         if(ord.size() != cont.size()) {
+            // should do more memoization,
             ord.resize(cont.size());
             rord.resize(cont.size());
             for( size_t i=0; i < ord.size(); i++)	ord[i] = i;
@@ -199,8 +202,7 @@ struct bit_univ {
         }
             // copy values from old array to cont
         DBG(COUT<< std::endl<<"B:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
-        if(backward) for( size_t i=0; i<rord.size(); i++)	cont[i] = ocont[rord[i]];
-        else for( size_t i=0; i<ord.size(); i++)	cont[i] = ocont[ord[i]];         
+        for(size_t i=0; i<cont.size(); i++)	cont[i] = ocont[!backward ? ord[i]: rord[i]];    
         DBG(COUT<< std::endl<<"A:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
         return true;
     }
