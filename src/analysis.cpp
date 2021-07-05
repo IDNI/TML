@@ -48,7 +48,7 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 
 size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
-	DBG(assert(rt.e.size()>n && (int_t)n >=0));
+	DBG(assert(rt.e.size()>n && (int_t)n >=0 && rr.varctx.get()) );
 
 	if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ) {
 		string_t str = lexeme2str(rt.e[n].e);
@@ -82,7 +82,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	else if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) {
 		string_t reln = lexeme2str(rt.e[0].e);
 		if( typenv.contains_pred(reln)) {
-			auto targs = typenv.lookup_pred(reln);	
+			auto &targs = typenv.lookup_pred(reln);	
 			//only for arguments
 			if(n>1 && n < rt.e.size()-1) {
 				if(targs[n-2].is_primitive())
@@ -108,6 +108,46 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	// for everything else
 	return 0;
 }
+
+//inplace transformation of bit raw term to normal as per type_env/
+bool bit_univ::brev_transform( raw_term &rbt ){
+	
+	string_t str = lexeme2str(rbt.e[0].e);
+	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
+	if(vt.size() == 0 ) return false;
+	int_t bitsz = -1;
+	int_t val;
+	int_t argc = 0;
+	for(typedecl td: vt ) {
+		if( td.is_primitive() ) {
+			bitsz =  td.pty.get_bitsz();
+			val = 0;
+			DBG(assert(rbt.e.size() > (size_t)bitsz ));
+			bools v;
+			for( int_t n = 0; n < bitsz; n++)
+				v.push_back(rbt.e[argc + n + 2].num);						
+			
+			permuteorder(v, bit_order, true);
+			for( int_t n = 0; n < bitsz; n++)	
+				val |= v[n] << (bitsz-1 -n);
+
+			rbt.e.erase(rbt.e.begin()+ 2 + argc, rbt.e.begin() + 2 + argc + bitsz);
+			elem el;
+			if( td.pty.ty == primtype::UINT )
+				el = elem(val);
+			else if ( td.pty.ty == primtype::UCHAR )
+				el = elem((char_t) val);
+			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
+				el = elem(elem::SYM, this->d.get_sym(val) );
+
+			rbt.e.insert(rbt.e.begin() + 2 + argc, el);
+			argc++;
+		}
+		else { } //structtypes userdef
+	}
+	return true;
+}
+
 
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
@@ -142,6 +182,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 						default: DBG( COUT<<e<<std::endl; assert(false)); break;
 					}
 				}
+				permuteorder(bitelem, bit_order);
 				rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());	
 		}
 		ret &= rtout.calc_arity(0);
@@ -179,6 +220,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
+			permuteorder(vbit.back(), bit_order);
 		}
 		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
 
@@ -590,8 +632,8 @@ bool typechecker::tcheck( const raw_term &rt){
 										ss << typexp.pty.to_print() <<" in predicate "<<rt,
 										type_error(ss.str().c_str(), rt.e[argc].e), false;
 							else {
-								int_t maxval =  ( ((size_t)0x1 <<typexp.pty.get_bitsz())-1);
-								if( rt.e[argc].num > maxval )
+								uint64_t maxval =  ( ((uint64_t)0x1 <<typexp.pty.get_bitsz())-1);
+								if( rt.e[argc].num > maxval || typexp.pty.get_maxbits() < (int_t)typexp.pty.get_bitsz())
 								return 	ss<< rt.e[argc].num << " exceeds max size for ",
 										ss << typexp.pty.to_print() <<" in predicate "<<rt,
 										type_error(ss.str().c_str(), rt.e[argc].e), false;	

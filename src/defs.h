@@ -115,6 +115,7 @@ typedef struct {
 	bool bproof, optimize, print_transformed, apply_regexpmatch, fp_step,
 		bitunv, show_hidden;
 	enum semantics semantics;
+	size_t bitorder;
 } rt_options;
 
 typedef enum  {

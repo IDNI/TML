@@ -220,6 +220,9 @@ void options::setup() {
 		}
 	).description("transforms nested progs (req. for if and while)"));
 	add_bool2("bitunv", "buv", "transforms and runs rule directly in bit size 2 universe ");
+	add(option(option::type::INT, { "bitorder", "bod" })
+		.description("specifies the variable ordering permutation (default: 0)"));
+	
 	add_bool("optimize","optimize and show more benchmarks");
 	add(option(option::type::STRING, { "name", "n" },
 		[](const option::value& v) {
