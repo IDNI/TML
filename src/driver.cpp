@@ -2698,8 +2698,9 @@ void driver::step_transform(raw_prog &rp,
 			const elem clock_state = elem::fresh_temp_sym(d);
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_state, vector<elem>{}),
-				raw_term(clock_states.back(), vector<elem>{}).negate() },
+			rp.r.push_back(raw_rule(raw_term(clock_state, vector<elem>{}),
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
+			rp.r.push_back(raw_rule(raw_term(clock_states.back(), vector<elem>{}).negate(),
 				{ raw_term(clock_states.back(), vector<elem>{}) }));
 			clock_states.push_back(clock_state);
 			
@@ -2752,8 +2753,9 @@ void driver::step_transform(raw_prog &rp,
 		if(clock_states.size() > 1) {
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_states[0], vector<elem>{}),
-				raw_term(clock_states.back(), vector<elem>{}).negate() },
+			rp.r.push_back(raw_rule(raw_term(clock_states[0], vector<elem>{}),
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
+			rp.r.push_back(raw_rule(raw_term(clock_states.back(), vector<elem>{}).negate(),
 				{ raw_term(clock_states.back(), vector<elem>{}) }));
 		}
 	} else {
