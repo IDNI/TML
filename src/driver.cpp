@@ -3567,8 +3567,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			});
 			o::dbg() << "Step Transformed Program:" << endl << endl << rp
 				<< endl;
+			o::dbg() << "Eliminating dead variables ..." << endl << endl;
 			eliminate_dead_variables(rp);
-			o::dbg() << "Eliminated TML Program:" << endl << endl << rp << endl;
+			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
