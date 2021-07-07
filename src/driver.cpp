@@ -3064,18 +3064,20 @@ ints calculate_variable_usage(const signature &sig,
  * pending because it may have a contraction after the given signature
  * is done. */
 
-void contract_term(raw_term &rt, const ints &uses, const signature &sig,
-		raw_rule &rr, map<signature, set<raw_rule *>> &dependants,
+void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
+		const signature &sig, raw_rule &rr,
+		map<signature, set<raw_rule *>> &dependants,
 		set<signature> &pending_signatures, const raw_prog &rp) {
-	if(rt.extype == raw_term::REL) {
+	if(rt.extype == raw_term::REL &&
+			find(uses.begin(), uses.end(), 1) != uses.end()) {
 		signature body_signature = get_signature(rt);
 		if(sig == body_signature) {
+			rt.e[0] = new_rel;
 			for(int_t i = uses.size() - 1; i >= 0; i--)
 				if(uses[i] == 1) rt.e.erase(rt.e.begin() + 2 + i);
 			rt.calc_arity(nullptr);
 			dependants[{rt.e[0].e, rt.arity}].insert(&rr);
-		} else if(has(rp.hidden_rels, body_signature) &&
-				find(uses.begin(), uses.end(), 1) != uses.end()) {
+		} else if(has(rp.hidden_rels, body_signature)) {
 			pending_signatures.insert(body_signature);
 		}
 	}
@@ -3086,6 +3088,8 @@ void contract_term(raw_term &rt, const ints &uses, const signature &sig,
  * term conjunction nor are exported to visible relation. */
 
 void driver::eliminate_dead_variables(raw_prog &rp) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
 	// Before we can eliminate relation positions, we need to know what
 	// rules depend on each relation. Knowing the dependants will allow us
 	// to determine whether a certain position is significant, and if so
@@ -3106,8 +3110,9 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 		for(const signature &sig : current_signatures) {
 			// Calculate variable usages so we can know what to eliminate
 			ints uses = calculate_variable_usage(sig, dependants);
-			// Print active variable usages for debugging purposes
+			// Move forward only if there is something to contract
 			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
+				// Print active variable usages for debugging purposes
 				o::dbg() << "Contracting " << sig.first << " using [";
 				const char *sep = "";
 				for(int_t count : uses) {
@@ -3115,13 +3120,21 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 					sep = ", ";
 				}
 				o::dbg() << "]" << endl;
-			}
-			// Now consistently eliminate certain positions and prepare the
-			// next round
-			for(raw_rule *rr : dependants[sig]) {
-				contract_term(rr->h[0], uses, sig, *rr, dependants, pending_signatures, rp);
-				if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
-					contract_term(rt, uses, sig, *rr, dependants, pending_signatures, rp);
+				
+				// Now consistently eliminate certain positions and prepare the
+				// next round. Rename the relation after the eliminations in
+				// case the new signature coincides with an already existing
+				// one.
+				elem new_rel = elem::fresh_temp_sym(d);
+				for(raw_rule *rr : dependants[sig]) {
+					contract_term(rr->h[0], new_rel, uses, sig, *rr, dependants,
+						pending_signatures, rp);
+					if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
+						contract_term(rt, new_rel, uses, sig, *rr, dependants,
+							pending_signatures, rp);
+				}
+				// Old signature is no longer needed
+				dependants.erase(sig);
 			}
 		}
 	}
