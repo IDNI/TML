@@ -30,6 +30,7 @@ typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
 typedef std::tuple<elem, int_t> rel_info;
+typedef std::pair<lexeme, ints> signature;
 
 #define QFACT 0
 #define QRULE 1
@@ -127,6 +128,7 @@ class driver {
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
+	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp, const raw_term &false_term);

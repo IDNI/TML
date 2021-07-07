@@ -2758,8 +2758,8 @@ void driver::step_transform(raw_prog &rp,
 		}
 	} else {
 		// Add all program facts back
-		if(fact_prog.size() > 0) {
-			rp.r.push_back(raw_rule(fact_prog, vector<raw_term>{}));
+		for(const raw_term &rt : fact_prog) {
+			rp.r.push_back(raw_rule(rt));
 		}
 		// If there are no interdepencies then we can just restore the
 		// original rule names to the transformed program
@@ -2768,10 +2768,8 @@ void driver::step_transform(raw_prog &rp,
 		}
 	}
 	// Add all program goals back
-	if(goal_prog.size() > 0) {
-		raw_rule gr(goal_prog, vector<raw_term>{});
-		gr.type = raw_rule::GOAL;
-		rp.r.push_back(gr);
+	for(const raw_term &rt : goal_prog) {
+		rp.r.push_back(raw_rule(raw_rule::GOAL, rt));
 	}
 }
 
@@ -2951,6 +2949,180 @@ void driver::to_pure_tml(raw_prog &rp) {
 		} else {
 			// Leave the single-headed rules alone.
 			it++;
+		}
+	}
+}
+
+signature get_signature(const raw_term &rt) {
+	return {rt.e[0].e, rt.arity};
+}
+
+/* If the given term belongs to a hidden relation, record its relation
+ * in signatures and record the given rule's dependency on this term's
+ * relation. */
+
+void record_hidden_relation(const raw_prog &rp, raw_rule &rr,
+		const raw_term &rt, set<signature> &signatures,
+		map<signature, set<raw_rule *>> &dependants) {
+	if(rt.extype == raw_term::REL) {
+		if(signature sig = get_signature(rt); has(rp.hidden_rels, sig)) {
+			dependants[sig].insert(&rr);
+			signatures.insert(sig);
+		}
+	}
+}
+
+/* Update the variable usage map by 1 (see below) for each distinct
+ * variable occuring in the given term. Record the distinct variables in
+ * the given pointer if it is not null. Note that the update is 2 for
+ * symbols as they are treated as a unique variable with a separate
+ * equality contraint to fix it to a particular symbol. */
+
+void record_variable_usage(const raw_term &rt,
+		map<elem, int_t> &var_usages, set<elem> *relevant_vars) {
+	set<elem> unique_vars;
+	for(const elem &e : rt.e) unique_vars.insert(e);
+	signature body_signature = get_signature(rt);
+	if(relevant_vars)
+		for(const elem &e : rt.e) relevant_vars->insert(e);
+	for(const elem &e : unique_vars)
+		var_usages[e] += e.type == elem::VAR ? 1 : 2;
+}
+
+/* There are four kinds of rules to deal with: those in which the
+ * signature being modified occurs only within the body, those in which
+ * it occurs only within the head, and those within which it occurs in
+ * both. If it only occurs in the head, then the use of each head
+ * variable should be 0/1, as this would allow all the head variables to
+ * be eliminated without affecting computation. If it only occurs in the
+ * body, then the use of each variable occuring in terms of the
+ * signature being modified should be set to the number of separate
+ * terms that use the variable. This way all those variables occuring
+ * only in one term and hence do not affect the satisfiability of the
+ * current rule nor the derived term can be eliminated. If it occurs in
+ * both, then the occurence of variables in the head can be ignored
+ * because this does not affect the rule's satisfiability and because we
+ * want these variables to be eliminatable. However the number of
+ * separate terms the variables occuring in terms corresponding to the
+ * signature under modification should still be recorded as this does
+ * affect satisfiability. */
+
+ints calculate_variable_usage(const signature &sig,
+		const map<signature, set<raw_rule *>> &dependants) {
+	// This variable stores the number of separate terms each
+	// position of the given relation is simultaneously used in.
+	// Important for determining whether a given position is
+	// eliminatable.
+	ints uses(sig.second[0], 1);
+	// The eliminatability of a relation position is entirely
+	// determined by how it is used in the rules that depend on its
+	// relation
+	for(const raw_rule *rr : dependants.at(sig)) {
+		map<elem, int_t> var_usages;
+		// Record the variables occuring in the head if the head
+		// relation is distinct from the one currently being modified.
+		// Variable exportation would prevent us from deleting this
+		// variable in the body.
+		const raw_term &head = rr->h[0];
+		const signature &head_signature = get_signature(head);
+		if(sig != head_signature)
+			record_variable_usage(head, var_usages, nullptr);
+		// The set of all the variables use by terms of this relation
+		// occuring in the body. If no such terms exist, then the term
+		// of this relation must occur in the head, in which case every
+		// position of this relation could be eliminatable.
+		set<elem> relevant_vars;
+		// Now record also the number of separate conjuncts each
+		// variable occurs in whilst populating relevant_vars according
+		// to its specification.
+		if(!rr->b.empty()) for(const raw_term &rt : rr->b[0])
+			record_variable_usage(rt, var_usages,
+				get_signature(rt) == sig ? &relevant_vars : nullptr);
+		// Now eliminate the irrelevant variables. These are the
+		// variables that do not affect the current rule's
+		// satisfiability through terms of the relation currently being
+		// minimized.
+		if(sig == head_signature)
+			for(auto &[var, count] : var_usages)
+				if(!has(relevant_vars, var)) count = 0;
+		// Now assign the most pessimistic variable usages to each position
+		// in the signature under modification.
+		if(head.extype == raw_term::REL && sig == head_signature)
+			for(size_t i = 0; i < head.e.size() - 3; i++)
+				uses[i] = max(uses[i], var_usages[head.e[i+2]]);
+		if(!rr->b.empty()) for(const raw_term &rt : rr->b[0])
+			if(rt.extype == raw_term::REL && sig == make_pair(rt.e[0].e, rt.arity))
+				for(size_t i = 0; i < rt.e.size() - 3; i++)
+					uses[i] = max(uses[i], var_usages[rt.e[i+2]]);
+	}
+	return uses;
+}
+
+/* Delete the elements of the given term that have a usage of equal to
+ * one if the term's signature equals the one supplied. Otherwise if
+ * there is a usage equal to one, then add the term's signature to
+ * pending because it may have a contraction after the given signature
+ * is done. */
+
+void contract_term(raw_term &rt, const ints &uses, const signature &sig,
+		raw_rule &rr, map<signature, set<raw_rule *>> &dependants,
+		set<signature> &pending_signatures, const raw_prog &rp) {
+	if(rt.extype == raw_term::REL) {
+		signature body_signature = get_signature(rt);
+		if(sig == body_signature) {
+			for(int_t i = uses.size() - 1; i >= 0; i--)
+				if(uses[i] == 1) rt.e.erase(rt.e.begin() + 2 + i);
+			rt.calc_arity(nullptr);
+			dependants[{rt.e[0].e, rt.arity}].insert(&rr);
+		} else if(has(rp.hidden_rels, body_signature) &&
+				find(uses.begin(), uses.end(), 1) != uses.end()) {
+			pending_signatures.insert(body_signature);
+		}
+	}
+}
+
+/* Eliminate unused elements of hidden relations. Do these by
+ * identifying those relation elements that neither participate in
+ * term conjunction nor are exported to visible relation. */
+
+void driver::eliminate_dead_variables(raw_prog &rp) {
+	// Before we can eliminate relation positions, we need to know what
+	// rules depend on each relation. Knowing the dependants will allow us
+	// to determine whether a certain position is significant, and if so
+	// correct the call-sites to match the declaration.
+	set<signature> pending_signatures;
+	map<signature, set<raw_rule *>> dependants;
+	for(raw_rule &rr : rp.r) {
+		record_hidden_relation(rp, rr, rr.h[0], pending_signatures, dependants);
+		if(!rr.b.empty()) for(const raw_term &rt : rr.b[0])
+			record_hidden_relation(rp, rr, rt, pending_signatures, dependants);
+	}
+	// While there are still signatures to check for reducibility, grab
+	// the entire set and try to reduce each relation making a note of
+	// affected relations when successful.
+	while(!pending_signatures.empty()) {
+		// Grab pending signatures
+		set<pair<lexeme, ints>> current_signatures = move(pending_signatures);
+		for(const signature &sig : current_signatures) {
+			// Calculate variable usages so we can know what to eliminate
+			ints uses = calculate_variable_usage(sig, dependants);
+			// Print active variable usages for debugging purposes
+			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
+				o::dbg() << "Contracting " << sig.first << " using [";
+				const char *sep = "";
+				for(int_t count : uses) {
+					o::dbg() << sep << count;
+					sep = ", ";
+				}
+				o::dbg() << "]" << endl;
+			}
+			// Now consistently eliminate certain positions and prepare the
+			// next round
+			for(raw_rule *rr : dependants[sig]) {
+				contract_term(rr->h[0], uses, sig, *rr, dependants, pending_signatures, rp);
+				if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
+					contract_term(rt, uses, sig, *rr, dependants, pending_signatures, rp);
+			}
 		}
 	}
 }
@@ -3380,6 +3552,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			});
 			o::dbg() << "Step Transformed Program:" << endl << endl << rp
 				<< endl;
+			eliminate_dead_variables(rp);
+			o::dbg() << "Eliminated TML Program:" << endl << endl << rp << endl;
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
