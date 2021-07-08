@@ -239,6 +239,16 @@ typedef std::shared_ptr<raw_form_tree> sprawformtree;
 typedef std::shared_ptr<struct context> spenvcontext;
 typedef std::shared_ptr<class environment> spenvironment;
 
+// Type that uniquely identifies relations
+typedef std::pair<lexeme, ints> signature;
+
+bool operator<(const signature& m, const signature &n);
+bool operator==(const signature& m, const signature &n);
+template<> struct std::hash<lexeme> {size_t operator()(const lexeme&)const;};
+bool operator<(const lexeme&, const lexeme&);
+template<> struct std::less<lexeme> {bool operator()(const lexeme&, const lexeme&)const;};
+template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
+
 struct raw_prog;
 
 bool operator==(const lexeme& x, const lexeme& y);
@@ -543,9 +553,10 @@ struct directive {
 	elem arity_num; // The maximum length of domain tuples
 	elem timeout_num; // The number of database steps to be simulated
 	elem quote_str; // The literal string to be quoted.
+	raw_term internal_term; // The term whose relation should be made internal
 	
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
-		EVAL, QUOTE, EDOMAIN, CODEC }type;
+		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL }type;
 	bool parse(input* in, const raw_prog& prog);
 };
 
@@ -738,7 +749,7 @@ struct raw_prog {
 
 	std::set<lexeme, lexcmp> builtins;
 	// The relations that should be hidden from the user by default
-	std::set<std::pair<lexeme, ints>> hidden_rels;
+	std::set<signature> hidden_rels;
 //	int_t delrel = -1;
 
 	int_t id = 0;

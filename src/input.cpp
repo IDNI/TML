@@ -168,6 +168,15 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			return in->parse_error(l[pos][0], dot_expected, l[pos]);
 		return ++pos, true;
 	}
+	// Parse @internal <internal_term>.
+	if (l[pos] == "internal") {
+		type = INTERNAL; pos++;
+		if (!internal_term.parse(in, prog))
+			return in->parse_error(l[pos-1][0], err_internal_term, l[pos-1]);
+		if (*l[pos++][0] != '.') return
+			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
+		return true;
+	}
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
 		type = EDOMAIN; ++pos;
@@ -1133,8 +1142,41 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	return true;
 }
 
+/* Compare lexemes by their character content rather than by memory
+ * locations. */
+
 bool operator==(const lexeme& x, const lexeme& y) {
 	return x[1] - x[0] == y[1] - y[0] && !strncmp(x[0], y[0], x[1] - x[0]);
+}
+
+bool less<lexeme>::operator()(const lexeme& m, const lexeme &n) const {
+	return lexeme2str(m) < lexeme2str(n);
+}
+
+bool operator<(const lexeme& m, const lexeme &n) {
+	return less<lexeme>()(m, n);
+}
+
+size_t hash<lexeme>::operator()(const lexeme& m) const {
+	string_t str = lexeme2str(m);
+	return hash<string>()(string(str.begin(), str.end()));
+}
+
+/* Compare signatures in a manner that treats their identifier as a
+ * string rather than a pair of memory locations. */
+
+bool operator==(const signature& m, const signature &n) {
+	return m.first == n.first && m.second == n.second;
+}
+
+bool less<signature>::operator()(const signature& m, const signature &n) const {
+	return less<lexeme>()(m.first, n.first) ||
+		(equal_to<lexeme>()(m.first, n.first) &&
+		less<ints>()(m.second, n.second));
+}
+
+bool operator<(const signature& m, const signature &n) {
+	return less<signature>()(m, n);
 }
 
 bool operator<(const raw_term& x, const raw_term& y) {

@@ -70,6 +70,10 @@ string_t driver::directive_load(const directive& d) {
 	DBGFAIL;
 }
 
+signature get_signature(const raw_term &rt) {
+	return {rt.e[0].e, rt.arity};
+}
+
 void driver::directives_load(raw_prog& p, lexeme& trel,
 		const raw_term &false_term) {
 //	int_t rel;
@@ -81,6 +85,8 @@ void driver::directives_load(raw_prog& p, lexeme& trel,
 		case directive::EVAL: transform_evals(p, d); break;
 		case directive::QUOTE: transform_quotes(p, false_term, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
+		case directive::INTERNAL:
+			p.hidden_rels.insert(get_signature(d.internal_term)); break;
 		case directive::CMDLINE:
 			if (d.n < opts.argc())
 				pd.strs.emplace(d.rel.e,
@@ -2955,10 +2961,6 @@ void driver::to_pure_tml(raw_prog &rp) {
 	}
 }
 
-signature get_signature(const raw_term &rt) {
-	return {rt.e[0].e, rt.arity};
-}
-
 /* If the given term belongs to a hidden relation, record its relation
  * in signatures and record the given rule's dependency on this term's
  * relation. */
@@ -3067,9 +3069,8 @@ ints calculate_variable_usage(const signature &sig,
  * is done. */
 
 void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
-		const signature &sig, raw_rule &rr,
-		map<signature, set<raw_rule *>> &dependants,
-		set<signature> &pending_signatures, const raw_prog &rp) {
+		const signature &sig, set<signature> &pending_signatures,
+		raw_prog &rp) {
 	if(rt.extype == raw_term::REL &&
 			find(uses.begin(), uses.end(), 1) != uses.end()) {
 		signature body_signature = get_signature(rt);
@@ -3078,7 +3079,10 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
 			for(int_t i = uses.size() - 1; i >= 0; i--)
 				if(uses[i] == 1) rt.e.erase(rt.e.begin() + 2 + i);
 			rt.calc_arity(nullptr);
-			dependants[{rt.e[0].e, rt.arity}].insert(&rr);
+			if(auto it = pending_signatures.find(sig); it != pending_signatures.end()) {
+				pending_signatures.erase(it);
+				pending_signatures.insert(get_signature(rt));
+			}
 		} else if(has(rp.hidden_rels, body_signature)) {
 			pending_signatures.insert(body_signature);
 		}
@@ -3112,6 +3116,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 		for(const signature &sig : current_signatures) {
 			// Calculate variable usages so we can know what to eliminate
 			ints uses = calculate_variable_usage(sig, dependants);
+			
 			// Move forward only if there is something to contract
 			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
 				// Print active variable usages for debugging purposes
@@ -3128,18 +3133,22 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 				// case the new signature coincides with an already existing
 				// one.
 				elem new_rel = elem::fresh_temp_sym(d);
-				for(raw_rule *rr : dependants[sig]) {
-					contract_term(rr->h[0], new_rel, uses, sig, *rr, dependants,
-						pending_signatures, rp);
+				for(raw_rule *rr : dependants.at(sig)) {
+					contract_term(rr->h[0], new_rel, uses, sig, pending_signatures, rp);
 					if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
-						contract_term(rt, new_rel, uses, sig, *rr, dependants,
-							pending_signatures, rp);
+						contract_term(rt, new_rel, uses, sig, pending_signatures, rp);
 				}
-				// Old signature is no longer needed
+				// New signature consists of every variable used more than once
+				signature new_sig(new_rel.e,
+					{(int_t) count_if(uses.begin(), uses.end(), [](int_t x) { return x > 1; })});
+				// Update the dependencies
+				dependants[new_sig] = move(dependants.at(sig));
 				dependants.erase(sig);
+				rp.hidden_rels.insert(new_sig);
 			}
 		}
 	}
+	o::dbg() << endl;
 }
 
 void driver::collect_free_vars(const vector<vector<raw_term>> &b,

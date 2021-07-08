@@ -318,6 +318,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
 	if (d.type == directive::CODEC)
 		return os << "codec " << d.codec_sym << ' ' << d.domain_sym << ' '
 			<< d.quote_sym << ' ' << d.arity_num << '.';
+	if (d.type == directive::INTERNAL)
+		return os << "internal " << d.internal_term << '.';
 	if (d.type == directive::STDOUT) os << "stdout ";
 	else os << "string ";
 	if (d.type == directive::TREE) return os << d.t << '.';

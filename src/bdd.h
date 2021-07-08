@@ -72,7 +72,6 @@ template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
 	size_t operator()(const std::array<int_t, 2>&) const;
 };
-template<> struct std::hash<bdds> { size_t operator()(const bdds&) const; };
 
 const int_t T = 1, F = -1;
 

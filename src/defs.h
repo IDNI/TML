@@ -69,6 +69,10 @@ typedef size_t nlevel;
 #define hfalse bdd_handle::F
 
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+
+/* Get the given key from the map and if this fails, return the supplied
+ * default. */
+
 template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
 		V at_default(const M<K, V, Args ...> &m, const K &k, const V &d) {
 	auto it = m.find(k);
@@ -79,23 +83,20 @@ template<template<class, class, class ...> class M, typename K, typename V, type
 	}
 }
 
-template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
-		std::optional<V> at_optional(const M<K, V, Args ...> &m, const K &k) {
-	auto it = m.find(k);
-	if(it != m.end()) {
-		return it->second;
-	} else {
-		return std::nullopt;
-	}
-}
+/* Generically hash vectors using the hasher for the element type. */
 
-template<template<class, class, class ...> class M, typename K, typename V, typename ... Args>
-		void insert_optional(M<K, V, Args ...> &m, const K &k, const std::optional<V> &v) {
-  if(v) {
-    m[k] = *v;
-  } else {
-    m.erase(k);
-  }
+template<typename X> struct std::hash<std::vector<X>> {
+	size_t operator()(const std::vector<X>&) const;
+};
+
+template<typename X> size_t
+		std::hash<std::vector<X>>::operator()(const std::vector<X>& vec) const {
+	std::hash<X> hasher;
+	size_t seed = vec.size();
+	for(auto& i : vec) {
+		seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	return seed;
 }
 
 #ifdef _WIN32
