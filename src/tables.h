@@ -128,7 +128,7 @@ struct table {
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize = 0;
-	bool internal = false;
+	bool hidden = false;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -180,12 +180,10 @@ private:
 
 	nlevel nstep = 0;
 	std::vector<table> tbls;
-	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> fronts;
 	std::vector<level> levels;
-	std::map<ntable, std::set<ntable>> deps;
 
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
@@ -269,8 +267,6 @@ private:
 	std::set<witness> get_witnesses(const term& t, size_t l);
 	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
-	ntable create_tmp_rel(size_t len);
-	void create_tmp_head(std::vector<term>& x);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	template <typename T>
@@ -289,8 +285,6 @@ private:
 	bool get_rules(flat_prog m);
 
 	ntable get_table(const sig& s);
-	void table_increase_priority(ntable t, size_t inc = 1);
-	void set_priorities(const flat_prog&);
 	ntable get_new_tab(int_t x, ints ar);
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const string_t& s);
@@ -301,8 +295,6 @@ private:
 	bool infloop_detected();
 	char fwd() noexcept;
 	level get_front() const;
-	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
-	void transform_bin(flat_prog& p);
 
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,

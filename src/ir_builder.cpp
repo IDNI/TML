@@ -144,7 +144,10 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				t.goal = r.type == raw_rule::GOAL,
 				m.insert({t}), get_nums(x);
 		}
-
+	// Note the relations that are marked as tmprel in the raw_prog
+	for(const auto &[functor, arity] : p.hidden_rels)
+		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
+	
 	return m;
 }
 
