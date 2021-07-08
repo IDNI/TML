@@ -191,16 +191,6 @@ archive& archive::read_map(std::map<Key, T>& m) {
 	} while (--nsize > 0);
 	return *this;
 }
-archive& archive::operator>>(std::map<ntable, std::set<ntable>>& deps) {
-	ntable nt;
-	std::set<ntable> snt;
-	size_t nsize; *this >> nsize;
-	if (nsize) do {
-		*this >> nt >> snt;
-		deps.emplace(nt, snt);
-	} while (--nsize > 0);
-	return *this;
-}
 archive& archive::operator>>(std::map<ntable, std::set<term>>& mhits) {
 	ntable nt;
 	std::set<term> st;
@@ -869,10 +859,6 @@ archive& archive::operator<<(const tables& tbls) {
 	*this << tbls.levels;
 	//POS("tables nstep")
 	*this << tbls.nstep;
-	//POS("tables tmprels")
-	*this << tbls.tmprels;
-	//POS("tables deps")
-	*this << tbls.deps;
 	//POS("tables max_args")
 	*this << tbls.max_args;
 	//POS("tables range_memo")
@@ -912,10 +898,6 @@ archive& archive::operator>>(tables& tbls) {
 	*this >> tbls.levels;
 	//POS("tables nstep")
 	*this >> tbls.nstep;
-	//POS("tables tmprels")
-	*this >> tbls.tmprels;
-	//POS("tables deps")
-	*this >> tbls.deps;
 	//POS("tables max_args")
 	*this >> tbls.max_args;
 	//POS("tables range_memo")
@@ -955,10 +937,6 @@ size_t archive::size(const tables& t) {
 	s += size(t.levels);
 	//SPOS("tables nstep", t.nstep)
 	s += size(t.nstep);
-	//SPOS("tables tmprels", t.tmprels)
-	s += size(t.tmprels);
-	//SPOS("tables deps", t.deps)
-	s += size(t.deps);
 	//SPOS("tables max_args", t.max_args)
 	s += size(t.max_args);
 	//SPOS("tables range_memo", t.range_memo)

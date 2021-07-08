@@ -74,4 +74,17 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const term& t);
 std::vector<term> to_vec(const term& h, const std::set<term>& b);
 template<typename T> std::set<T> vec2set(const std::vector<T>& v, size_t n = 0);
 
+struct natcmp {
+	bool operator()(const term& l, const term& r) const {
+		if (l.orderid != r.orderid) return l.orderid < r.orderid;
+		if (l.neg != r.neg) return l.neg;
+		//if (extype != t.extype) return extype < t.extype;
+		//if (l.tab != r.tab) return l.tab < r.tab;
+		if (l.goal != r.goal) return l.goal;
+		return (const ints&)l < r;
+	}
+};
+
+typedef std::set<term, natcmp> term_set;
+
 #endif

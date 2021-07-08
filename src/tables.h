@@ -31,36 +31,13 @@
 #include "analysis.h"
 #include "ir_builder.h"
 
-typedef int_t rel_t;
 typedef bdd_handles level;
 
-struct raw_term;
-struct raw_prog;
-struct raw_rule;
-struct raw_form_tree;
 class archive;
 class tables;
 
-typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
-	cb_ground;
-
-struct natcmp {
-	bool operator()(const term& l, const term& r) const {
-		if (l.orderid != r.orderid) return l.orderid < r.orderid;
-		if (l.neg != r.neg) return l.neg;
-		//if (iseq != t.iseq) return iseq;
-		//if (isleq != t.isleq) return isleq;
-		//if (extype != t.extype) return extype < t.extype;
-		//if (l.tab != r.tab) return l.tab < r.tab;
-		if (l.goal != r.goal) return l.goal;
-		return (const ints&)l < r;
-	}
-};
-
-typedef std::set<term, natcmp> term_set;
-
 struct body {
-	bool neg, ext = false;
+	bool neg = false;
 	ntable tab;
 	bools ex;
 	uints perm;
@@ -70,7 +47,6 @@ struct body {
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
-		if (ext != t.ext) return ext;
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
 		return perm < t.perm;
@@ -152,7 +128,7 @@ struct table {
 	int_t idbltin = -1;
 	ints bltinargs;
 	size_t bltinsize = 0;
-	bool internal = false;
+	bool hidden = false;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -167,11 +143,14 @@ class tables {
 	friend class ir_builder;
 	friend class driver;
 
-
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 
 private:
+	typedef int_t rel_t;
+
+	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
+		cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
@@ -201,12 +180,10 @@ private:
 
 	nlevel nstep = 0;
 	std::vector<table> tbls;
-	std::set<ntable> tmprels;
 	std::map<sig, ntable> smap;
 	std::vector<rule> rules;
 	std::vector<level> fronts;
 	std::vector<level> levels;
-	std::map<ntable, std::set<ntable>> deps;
 
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
@@ -218,7 +195,7 @@ private:
 	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
 	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
-	size_t bits = 2;
+	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
 	size_t max_args = 0;
@@ -263,10 +240,9 @@ private:
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
-	//spbdd_handle get_alt_range(const term& h, const std::set<term>& a,
-	//		const varmap& vm, size_t len);
 	spbdd_handle get_alt_range(const term& h, const term_set& a,
 		const varmap& vm, size_t len);
+
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
@@ -280,16 +256,74 @@ private:
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 
-	void fol_query(cr_pnft_handle f, bdd_handles& v);
-	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
-			std::vector<quant_t> &quantsh, varmap &vmh);
-	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
-	void formula_query(cr_pnft_handle f, bdd_handles& v);
+	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
+		size_t len = 0, bool allowbltins = false) const;
+	std::set<term> decompress();
+	std::vector<env> varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v) const;
+	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
+		cb_ground f);
+	void term_get_grounds(const term& t, size_t level, cb_ground f);
+	std::set<witness> get_witnesses(const term& t, size_t l);
+	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
+	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
+	void print_env(const env& e, const rule& r) const;
+	void print_env(const env& e) const;
+	template <typename T>
+	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
+	void out(spbdd_handle, ntable, const rt_printer&) const;
 
+	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
+			spbdd_handle &c) const;
+	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
+			spbdd_handle &c) const;
+
+	bool get_facts(const flat_prog& m);
+	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
+		bool blt = false);
+	void get_form(const term_set& al, const term& h, std::set<alt>& as);
+	bool get_rules(flat_prog m);
+
+	ntable get_table(const sig& s);
+	ntable get_new_tab(int_t x, ints ar);
+	lexeme get_new_rel();
+	void load_string(lexeme rel, const string_t& s);
+	lexeme get_var_lexeme(int_t i);
+	bool add_prog(flat_prog m, const std::vector<struct production>&,
+		bool mknums = false);
+	bool contradiction_detected();
+	bool infloop_detected();
+	char fwd() noexcept;
+	level get_front() const;
+
+	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
+	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
+		std::vector<term> x);
+//	std::map<ntable, std::set<spbdd_handle>> goals;
+	std::set<term> goals;
+	std::set<ntable> to_drop;
+	strs_t strs;
+	std::set<int_t> str_rels;
+	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
+
+	//	std::function<int_t(void)>* get_new_rel;
+
+	// tml_update population
+	int_t rel_tml_update, sym_add, sym_del;
+	void init_tml_update();
+	void add_tml_update(const term& rt, bool neg);
+	template <typename T>
+	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
+	spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+
+	//-------------------------------------------------------------------------
+	//builtins
 	builtins bltins;
-	bool init_bdd_builtins();
+
+	bool init_builtins();
 	bool init_print_builtins();
 	bool init_js_builtins();
+	bool init_bdd_builtins();
 
 	// simple builtin execution from a fact
 	void fact_builtin(const term& b);
@@ -305,78 +339,6 @@ private:
 	// @param a  alt
 	// @param hs alt query bdd handles (output is inserted here)
 	void body_builtins(spbdd_handle x, alt* a, bdd_handles& hs);
-
-	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
-	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
-		size_t len = 0, bool allowbltins = false) const;
-	std::set<term> decompress();
-	std::vector<env> varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v) const;
-	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
-		cb_ground f);
-	void term_get_grounds(const term& t, size_t level, cb_ground f);
-	std::set<witness> get_witnesses(const term& t, size_t l);
-	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
-	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
-	ntable create_tmp_rel(size_t len);
-	void create_tmp_head(std::vector<term>& x);
-	void print_env(const env& e, const rule& r) const;
-	void print_env(const env& e) const;
-	template <typename T>
-	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
-	void out(spbdd_handle, ntable, const rt_printer&) const;
-
-
-	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
-			spbdd_handle &c) const;
-	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
-			spbdd_handle &c) const;
-
-	bool get_facts(const flat_prog& m);
-	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
-		bool blt = false);
-	void get_form(const term_set& al, const term& h, std::set<alt>& as);
-	bool get_rules(flat_prog m);
-
-	ntable get_table(const sig& s);
-	void table_increase_priority(ntable t, size_t inc = 1);
-	void set_priorities(const flat_prog&);
-	ntable get_new_tab(int_t x, ints ar);
-	lexeme get_new_rel();
-	void load_string(lexeme rel, const string_t& s);
-	lexeme get_var_lexeme(int_t i);
-	bool add_prog(flat_prog m, const std::vector<struct production>&,
-		bool mknums = false);
-	bool contradiction_detected();
-	bool infloop_detected();
-	char fwd() noexcept;
-	level get_front() const;
-	std::vector<term> interpolate(std::vector<term> x, std::set<int_t> v);
-	void transform_bin(flat_prog& p);
-
-	//bool cqc(const std::vector<term>& x, std::vector<term> y) const;
-	//flat_prog cqc(std::vector<term> x, std::vector<term> y) const;
-	//bool cqc(const std::vector<term>&, const flat_prog& m) const;
-	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
-	//void cqc_minimize(std::vector<term>&) const;
-	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
-		std::vector<term> x);
-//	std::map<ntable, std::set<spbdd_handle>> goals;
-	std::set<term> goals;
-	std::set<ntable> to_drop;
-//	std::set<ntable> exts; // extensional
-	strs_t strs;
-	std::set<int_t> str_rels;
-	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
-
-	//	std::function<int_t(void)>* get_new_rel;
-
-	// tml_update population
-	int_t rel_tml_update, sym_add, sym_del;
-	void init_tml_update();
-	void add_tml_update(const term& rt, bool neg);
-	template <typename T>
-	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-	spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
@@ -413,6 +375,13 @@ private:
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	t_arith_op get_bwop(lexeme l);
 	t_arith_op get_pwop(lexeme l);
+
+	void fol_query(cr_pnft_handle f, bdd_handles& v);
+	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
+			std::vector<quant_t> &quantsh, varmap &vmh);
+	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
+	void formula_query(cr_pnft_handle f, bdd_handles& v);
+
 
 	//-------------------------------------------------------------------------
 	//printer
@@ -457,7 +426,6 @@ public:
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
-	bool init_builtins();
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
 

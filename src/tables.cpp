@@ -29,19 +29,41 @@ map<skmemo, spbdd_handle> smemo;
 map<ekmemo, spbdd_handle> ememo;
 map<ekmemo, spbdd_handle> leqmemo;
 
-#ifdef DEBUG
-vbools tables::allsat(spbdd_handle x, size_t args) const {
-//	const size_t args = siglens[tab];
-	vbools v = ::allsat(x, bits * args), s;
-	for (bools b : v) {
-		s.emplace_back(bits * args);
-		for (size_t n = 0; n != bits; ++n)
-			for (size_t k = 0; k != args; ++k)
-				s.back()[(k+1)*bits-n-1] = b[pos(n, k, args)];
-	}
-	return s;
+//-----------------------------------------------------------------------------
+//vars
+
+template<typename T>
+varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) {
+	varmap m;
+	varslen = h.size();
+	for (size_t n = 0; n != h.size(); ++n)
+		if (h[n] < 0 && !has(m, h[n])) m.emplace(h[n], n);
+	if (blt) return m;
+	for (const term& t : b)
+		for (size_t n = 0; n != t.size(); ++n)
+			if (t[n] < 0 && !has(m, t[n]))
+				m.emplace(t[n], varslen++);
+	return m;
 }
-#endif
+
+map<size_t, int_t> varmap_inv(const varmap& vm) {
+	map<size_t, int_t> inv;
+	for (auto x : vm) {
+		assert(!has(inv, x.second));
+		inv.emplace(x.second, x.first);
+	}
+	return inv;
+}
+
+void getvars(const term& t, set<int_t>& v) {
+	for (int_t i : t) if (i < 0) v.insert(i);
+}
+
+void getvars(const vector<term>& t, set<int_t>& v) {
+	for (const term& x : t) getvars(x, v);
+}
+
+//-----------------------------------------------------------------------------
 
 spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 	const
@@ -176,175 +198,6 @@ spbdd_handle tables::from_fact(const term& t) {
 
 //-----------------------------------------------------------------------------
 
-template <typename T>
-void tables::out(basic_ostream<T>& os) const {
-	//strs_t::const_iterator it;
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
-//		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-		if (!tbls[tab].internal) out(os, tbls[tab].t, tab);
-//		else os << it->first << " = \"" << it->second << '"' << endl;
-	}
-}
-
-template void tables::out<char>(ostream& os) const;
-template void tables::out<wchar_t>(wostream& os) const;
-
-/* Print out the fixpoint associated with this sequence of databases and
- * return true. Return false if this sequence of databases contains no
- * repeats. */
-
-template <typename T>
-bool tables::out_fixpoint(basic_ostream<T>& os) {
-	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
-	if(fronts_size < 2 ||
-			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
-			fronts.end()-1) {
-		// There cannot be a fixpoint if there are less than two fronts or
-		// if there do not exist two equal fronts
-		return false;
-	} else if (opts.pfp3) {
-		// If FO(3-PFP) semantics are in effect
-		// Determine which facts are true, false, and undefined
-		level trues(tbls_size), falses(tbls_size), undefineds(tbls_size);
-		// Loop back to the first repetition of the last front. It is clear
-		// that the set of intervening fronts are periodic
-		int_t cycle_start;
-		for(cycle_start = fronts_size - 2;
-			fronts[cycle_start] != fronts.back(); cycle_start--);
-		// Make a buffer to hold the sequence of states a single table
-		// eventually cycles through
-		bdd_handles cycle(fronts_size - 1 - cycle_start);
-		// For each table, compute which facts are true, false, and
-		// undefined respectively
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			// Compute the eventual cycle of the current table
-			for(int_t i = cycle_start + 1; i < fronts_size; i++) {
-				cycle[i - cycle_start - 1] = fronts[i][n];
-			}
-			// True facts are those for which there exists an I such that
-			// for all i>=I, the fact is a member of front i
-			trues[n] = bdd_and_many(cycle);
-			// False facts are those for which there exists an I such that
-			// for all i>=I, the fact is not a member of front i
-			falses[n] = htrue % bdd_or_many(cycle);
-			// Undefined facts are those which are neither true nor false
-			undefineds[n] = htrue % (trues[n] || falses[n]);
-		}
-		// Print out the true points separately
-		os << "true points:" << endl;
-		bool exists_trues = false;
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
-				os << ir_handler->to_raw_term(r) << '.' << endl;
-				exists_trues = true; });
-		}
-		if(!exists_trues) os << "(none)" << std::endl;
-
-		// Finally print out the undefined points separately
-		os << endl << "undefined points:" << endl;
-		bool exists_undefineds = false;
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
-				os << ir_handler->to_raw_term(r) << '.' << endl;
-				exists_undefineds = true; });
-		}
-		if(!exists_undefineds) os << "(none)" << std::endl;
-		return true;
-	} else if(fronts.back() == fronts[fronts_size - 2]) {
-		// If FO(PFP) semantics are in effect and the last two fronts are
-		// equal then print them; this is the fixpoint.
-		level &l = fronts.back();
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if (!tbls[n].internal)
-				decompress(l[n], n, [&os, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl; });
-		}
-		return true;
-	} else {
-		// If FO(PFP) semantics are in effect and two equal fronts are
-		// separated by an unequal front; then the fixpoint is empty.
-		return true;
-	}
-}
-
-template bool tables::out_fixpoint<char>(ostream& os);
-template bool tables::out_fixpoint<wchar_t>(wostream& os);
-
-void tables::out(const rt_printer& f) const {
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		if (!tbls[tab].internal) out(tbls[tab].t, tab, f);
-}
-
-template <typename T>
-void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
-	if (!tbls[tab].internal) // don't print internal tables.
-		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
-}
-
-#ifdef __EMSCRIPTEN__
-// o is `tabular_collector` - JS object with methods:
-// - length(relation_name) - returns number of rows (or index of next new row)
-// - set(relation_name, row, col, value) - sets value of the cell of a table
-void tables::out(emscripten::val o) const {
-	out([&o](const raw_term& t) {
-		string relation = to_string(lexeme2str(t.e[0].e));
-		int row = o.call<int>("length", relation);
-		int col = 0;
-		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
-			ostringstream es;
-			while (t.arity[ar] == -1) ++ar, es << '(';
-			if (n >= t.e.size()) break;
-			while (t.e[n].type == elem::OPENP) ++n;
-			for (int_t k = 0; k != t.arity[ar];)
-				if ((es<<t.e[n++]),++k!=t.arity[ar]) {
-					o.call<void>("set", relation, row,col++,
-						es.str());
-					es.str("");
-				}
-			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
-			++ar;
-			while (ar < t.arity.size()
-				&& t.arity[ar] == -2) ++ar, es<<')';
-			if (es.str() != "")
-				o.call<void>("set", relation, row, col++,
-					es.str());
-		}
-	});
-}
-#endif
-
-void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
-	size_t len, bool allowbltins) const {
-	table tbl = tbls.at(tab);
-	// D: bltins are special type of REL-s, mostly as any but no decompress.
-	if (!allowbltins && tbl.is_builtin()) return;
-	if (!len) len = tbl.len;
-	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
-		DBG(assert(abs(y) == 1);)
-		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
-		for (size_t n = 0; n != len; ++n)
-			for (size_t k = 0; k != bits; ++k)
-				if (p[pos(k, n, len)])
-					r[n] |= 1 << k;
-		f(r);
-	})();
-}
-
-set<term> tables::decompress() {
-	set<term> r;
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		decompress(tbls[tab].t, tab, [&r](const term& t){r.insert(t);});
-	return r;
-}
-
-void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
-		f(ir_handler->to_raw_term(r)); });
-}
-
-//-----------------------------------------------------------------------------
-
 uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 	uints perm = perm_init(t.size() * bits);
 	for (size_t n = 0, b; n != t.size(); ++n)
@@ -352,20 +205,6 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
 	return perm;
-}
-
-template<typename T>
-varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) {
-	varmap m;
-	varslen = h.size();
-	for (size_t n = 0; n != h.size(); ++n)
-		if (h[n] < 0 && !has(m, h[n])) m.emplace(h[n], n);
-	if (blt) return m;
-	for (const term& t : b)
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] < 0 && !has(m, t[n]))
-				m.emplace(t[n], varslen++);
-	return m;
 }
 
 spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
@@ -452,15 +291,6 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 	return bdd_and_many(v);
 }
 
-map<size_t, int_t> varmap_inv(const varmap& vm) {
-	map<size_t, int_t> inv;
-	for (auto x : vm) {
-		assert(!has(inv, x.second));
-		inv.emplace(x.second, x.first);
-	}
-	return inv;
-}
-
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	body b;
 	b.neg = t.neg, b.tab = t.tab, b.perm = get_perm(t, vm, len),
@@ -536,17 +366,8 @@ flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
 	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
 	rt_options tmpopts(opts);
-	tmpopts.bin_transform = true;
 	tables t(tmpdict, tmpopts, ir_handler);
 	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
-}
-
-void getvars(const term& t, set<int_t>& v) {
-	for (int_t i : t) if (i < 0) v.insert(i);
-}
-
-void getvars(const vector<term>& t, set<int_t>& v) {
-	for (const term& x : t) getvars(x, v);
 }
 
 void create_head(vector<term>&, ntable) {
@@ -555,17 +376,6 @@ void create_head(vector<term>&, ntable) {
 	term h;
 	h.tab = tab, h.insert(h.begin(), vx.begin(), vx.end());
 	x.insert(x.begin(), move(h));*/
-}
-
-ntable tables::create_tmp_rel(size_t len) {
-	ntable tab = get_new_tab(dict.get_rel(get_new_rel()), {(int_t)len});
-	return tmprels.insert(tab), tab;
-}
-
-void tables::create_tmp_head(vector<term>& x) {
-	set<int_t> v;
-	getvars(x, v);
-	create_head(x, create_tmp_rel(v.size()));
 }
 
 void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
@@ -650,7 +460,8 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
-	a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
+	if (opts.bitunv) a.rng = leq;
+	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y;
 	for (auto x : b) {
@@ -676,59 +487,6 @@ retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_string_(last));
 	dict.get_rel(l);
 	if (dict.nrels() == sz) { ++last; goto retry; }
 	return l;
-}
-
-template<typename T>
-void dag_get_reachable(const map<T, set<T>>& g, const T& t, set<T>& r) {
-	if (has(r, t)) return;
-	auto it = g.find(t);
-	if (it != g.end())
-		for (const T& x : it->second)
-			dag_get_reachable(g, x, r);
-	r.insert(t);
-}
-
-template<typename T>
-set<T> dag_get_reachable(const map<T, set<T>>& g, const T& t) {
-	set<T> r;
-	return dag_get_reachable<T>(g, t, r), r;
-}
-
-void tables::table_increase_priority(ntable t, size_t inc) {
-	for (ntable x : dag_get_reachable(deps, t)) tbls[x].priority += inc;
-}
-
-void tables::set_priorities(const flat_prog& p) {
-	for (table& t : tbls) t.priority = 0;
-	for (const vector<term>& x : p) {
-		set<ntable>& s = deps[x[0].tab];
-		for (size_t n = 1; n != x.size(); ++n)
-			if (has(tmprels, x[n].tab))
-				s.insert(x[n].tab);
-	}
-	for (const auto& x : deps)
-		for (ntable y : x.second)
-			if (has(tmprels, y))
-				table_increase_priority(y);
-}
-
-/*set<term> tables::bodies_equiv(vector<term> x, vector<term> y) const {
-//	if (x[0].size() != y[0].size()) return false;
-	x[0].tab = y[0].tab;
-	x.erase(x.begin()), y.erase(y.begin()),
-	create_head(x, x[0].tab), create_head(y, y[0].tab);
-	if (cqc(x, y)) {
-		if (cqc(y, x)) return true;
-	}
-}*/
-
-vector<term> tables::interpolate(vector<term> x, set<int_t> v) {
-	term t;
-	for (size_t k = 0; k != x.size(); ++k)
-		for (size_t n = 0; n != x[k].size(); ++n)
-			if (has(v, x[k][n]))
-				t.push_back(x[k][n]), v.erase(x[k][n]);
-	return t.tab = create_tmp_rel(t.size()), x.insert(x.begin(), t), x;
 }
 
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
@@ -786,10 +544,9 @@ bool tables::get_rules(flat_prog p) {
 	map<ntable, ntable> r;
 	for (const auto& x : q) prog_add_rule(p, r, x);
 	replace_rel(move(r), p);
-	if (opts.bin_transform) transform_bin(p);
 	q = move(p);
 	for (const auto& x : q) prog_add_rule(p, r, x);
-	replace_rel(move(r), p), set_priorities(p);
+	replace_rel(move(r), p);
 	if (opts.optimize) bdd::gc();
 
 	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
@@ -945,8 +702,6 @@ void tables::to_nums(flat_prog& m) {
 
 ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
-
-
 bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 	strs = strs_;
 	if (!strs.empty()) {
@@ -1021,7 +776,7 @@ template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
 {
-	if (print_updates) print(os << "# ", r) << "\n# \t-> ";
+	if (print_updates) print(os << "#       ", r) << "\n#   ->  ";
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
@@ -1044,8 +799,14 @@ bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
 	ir_handler->syms = dict.nsyms();
-	while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
-		add_bit();
+
+	if (opts.bitunv) {
+		bits = 1;
+	} else {
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+			add_bit();
+	}
+
 	for (auto x : strs) load_string(x.first, x.second);
 	form *froot;
 	if (!ir_handler->transform_grammar(g, m, froot)) return false;
@@ -1060,7 +821,7 @@ bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
 	ints internal_rels = dict.get_rels(filter_internal_tables);
 	for (auto& tbl : tbls)
 		for (int_t rel : internal_rels)
-			if (rel == tbl.s.first) { tbl.internal = true; break; }
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
 
 	if (opts.optimize) bdd::gc();
 	return true;
@@ -1090,8 +851,6 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 }
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
-//	if (b.a) return alt_query(*b.a, 0);
-//	if (b.ext) return b.q;
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
 //	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;
@@ -1244,7 +1003,7 @@ bool tables::add_fixed_point_fact() {
 	decompress(tbls[t.tab].t && from_fact(t), t.tab,
 		[&exists](const term& /*t*/) { exists = true; }, t.size());
 	if (!exists) tbls[t.tab].t = tbls[t.tab].t || from_fact(t); // add if ne
-	tbls[t.tab].internal = true;
+	tbls[t.tab].hidden = true;
 	return !exists;
 }
 
@@ -1271,7 +1030,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
 		if (!datalog && is_repeat)
-			return opts.pfp3 ? true : infloop_detected();
+			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
 		if (opts.bproof) levels.push_back(move(l));
 	}
 	DBGFAIL;
@@ -1287,7 +1046,6 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 	rt_options to;
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
-	to.bin_transform     = opts.enabled("bin");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	tables tbl(dict, to, ir_handler);
@@ -1399,7 +1157,6 @@ tables::tables(dict_t& dict, rt_options opts, ir_builder* ir_handler_) :
 }
 
 tables::~tables() {
-	//if (opts.optimize) delete &dict;
 	while (!bodies.empty()) {
 		body *b = *bodies.begin();
 		bodies.erase(bodies.begin());
@@ -1412,7 +1169,198 @@ tables::~tables() {
 	}
 }
 
+//-----------------------------------------------------------------------------
+// decompress - out
+
+#ifdef DEBUG
+vbools tables::allsat(spbdd_handle x, size_t args) const {
+//	const size_t args = siglens[tab];
+	vbools v = ::allsat(x, bits * args), s;
+	for (bools b : v) {
+		s.emplace_back(bits * args);
+		for (size_t n = 0; n != bits; ++n)
+			for (size_t k = 0; k != args; ++k)
+				s.back()[(k+1)*bits-n-1] = b[pos(n, k, args)];
+	}
+	return s;
+}
+#endif
+
+template <typename T>
+void tables::out(basic_ostream<T>& os) const {
+	//strs_t::const_iterator it;
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
+//		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
+		if (opts.show_hidden || !tbls[tab].hidden) out(os, tbls[tab].t, tab);
+//		else os << it->first << " = \"" << it->second << '"' << endl;
+	}
+}
+
+template void tables::out<char>(ostream& os) const;
+template void tables::out<wchar_t>(wostream& os) const;
+
+/* Print out the fixpoint associated with this sequence of databases and
+ * return true. Return false if this sequence of databases contains no
+ * repeats. */
+
+template <typename T>
+bool tables::out_fixpoint(basic_ostream<T>& os) {
+	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
+	if(fronts_size < 2 ||
+			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
+			fronts.end()-1) {
+		// There cannot be a fixpoint if there are less than two fronts or
+		// if there do not exist two equal fronts
+		return false;
+	} else if (opts.semantics == semantics::pfp3) {
+		// If FO(3-PFP) semantics are in effect
+		// Determine which facts are true, false, and undefined
+		level trues(tbls_size), falses(tbls_size), undefineds(tbls_size);
+		// Loop back to the first repetition of the last front. It is clear
+		// that the set of intervening fronts are periodic
+		int_t cycle_start;
+		for(cycle_start = fronts_size - 2;
+			fronts[cycle_start] != fronts.back(); cycle_start--);
+		// Make a buffer to hold the sequence of states a single table
+		// eventually cycles through
+		bdd_handles cycle(fronts_size - 1 - cycle_start);
+		// For each table, compute which facts are true, false, and
+		// undefined respectively
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
+			// Compute the eventual cycle of the current table
+			for(int_t i = cycle_start + 1; i < fronts_size; i++) {
+				cycle[i - cycle_start - 1] = fronts[i][n];
+			}
+			// True facts are those for which there exists an I such that
+			// for all i>=I, the fact is a member of front i
+			trues[n] = bdd_and_many(cycle);
+			// False facts are those for which there exists an I such that
+			// for all i>=I, the fact is not a member of front i
+			falses[n] = htrue % bdd_or_many(cycle);
+			// Undefined facts are those which are neither true nor false
+			undefineds[n] = htrue % (trues[n] || falses[n]);
+		}
+		// Print out the true points separately
+		os << "true points:" << endl;
+		bool exists_trues = false;
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
+			if(opts.show_hidden || !tbls[n].hidden) {
+				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl;
+					exists_trues = true; });
+			}
+		}
+		if(!exists_trues) os << "(none)" << std::endl;
+
+		// Finally print out the undefined points separately
+		os << endl << "undefined points:" << endl;
+		bool exists_undefineds = false;
+		for(ntable n = 0; n < (ntable)tbls_size; n++) {
+			if(opts.show_hidden || !tbls[n].hidden) {
+				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl;
+					exists_undefineds = true; });
+			}
+		}
+		if(!exists_undefineds) os << "(none)" << std::endl;
+		return true;
+	} else if(opts.semantics == semantics::pfp) {
+		if(fronts.back() == fronts[fronts_size - 2]) {
+			// If FO(PFP) semantics are in effect and the last two fronts are
+			// equal then print them; this is the fixpoint.
+			level &l = fronts.back();
+			for(ntable n = 0; n < (ntable)tbls_size; n++) {
+				if (opts.show_hidden || !tbls[n].hidden)
+					decompress(l[n], n, [&os, this](const term& r) {
+						os << ir_handler->to_raw_term(r) << '.' << endl; });
+			}
+			return true;
+		} else {
+			// If FO(PFP) semantics are in effect and two equal fronts are
+			// separated by an unequal front; then the fixpoint is empty.
+			return true;
+		}
+	}
+}
+
+template bool tables::out_fixpoint<char>(ostream& os);
+template bool tables::out_fixpoint<wchar_t>(wostream& os);
+
+void tables::out(const rt_printer& f) const {
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		if (opts.show_hidden || !tbls[tab].hidden) out(tbls[tab].t, tab, f);
+}
+
+template <typename T>
+void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
+	if (opts.show_hidden || !tbls[tab].hidden) // don't print internal tables.
+		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
+}
+
+#ifdef __EMSCRIPTEN__
+// o is `tabular_collector` - JS object with methods:
+// - length(relation_name) - returns number of rows (or index of next new row)
+// - set(relation_name, row, col, value) - sets value of the cell of a table
+void tables::out(emscripten::val o) const {
+	out([&o](const raw_term& t) {
+		string relation = to_string(lexeme2str(t.e[0].e));
+		int row = o.call<int>("length", relation);
+		int col = 0;
+		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
+			ostringstream es;
+			while (t.arity[ar] == -1) ++ar, es << '(';
+			if (n >= t.e.size()) break;
+			while (t.e[n].type == elem::OPENP) ++n;
+			for (int_t k = 0; k != t.arity[ar];)
+				if ((es<<t.e[n++]),++k!=t.arity[ar]) {
+					o.call<void>("set", relation, row,col++,
+						es.str());
+					es.str("");
+				}
+			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
+			++ar;
+			while (ar < t.arity.size()
+				&& t.arity[ar] == -2) ++ar, es<<')';
+			if (es.str() != "")
+				o.call<void>("set", relation, row, col++,
+					es.str());
+		}
+	});
+}
+#endif
+
+void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
+	size_t len, bool allowbltins) const {
+	table tbl = tbls.at(tab);
+	// D: bltins are special type of REL-s, mostly as any but no decompress.
+	if (!allowbltins && tbl.is_builtin()) return;
+	if (!len) len = tbl.len;
+	allsat_cb(x/*&&ts[tab].t*/, len * bits,
+		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
+		DBG(assert(abs(y) == 1);)
+		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
+		for (size_t n = 0; n != len; ++n)
+			for (size_t k = 0; k != bits; ++k)
+				if (p[pos(k, n, len)])
+					r[n] |= 1 << k;
+		f(r);
+	})();
+}
+
+set<term> tables::decompress() {
+	set<term> r;
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		decompress(tbls[tab].t, tab, [&r](const term& t){r.insert(t);});
+	return r;
+}
+
+void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
+	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
+		f(ir_handler->to_raw_term(r)); });
+}
+
 // ----------------------------------------------------------------------------
+// tramsform bin
 set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
 	set<int_t> r;
 	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
@@ -1420,53 +1368,19 @@ set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
 	return r;
 }
 
-void tables::transform_bin(flat_prog& p) {
-	const flat_prog q = move(p);
-	vector<set<int_t>> vars;
-	auto getterms = [&vars]
-		(const vector<term>& x) -> vector<size_t> {
-		if (x.size() <= 3) return {};
-		// -- OK to remove?
-		//vector<size_t> e;
-		//for (size_t n = 1; n != x.size(); ++n)
-		//	if (has(exts, x[n].tab)) e.push_back(n);
-		//if (e.size() == x.size() - 1) return { 1, 2 };
-		//if (e.size() > 1) return { e[0], e[1] };
-		// --
-		size_t max = 0, b1 = 0, b2, n;
-		for (size_t i = 2; i != x.size(); ++i)
-			for (size_t j = 1; j != i; ++j)
-				if (max < (n=intersect(vars[i],vars[j]).size()))
-					max = n, b1 = j, b2 = i;
-		if (!b1) b1 = 1, b2 = 2;
-		return { b1, b2 };
-	};
-	vector<term> r;
-	vector<size_t> m;
-	set<int_t> v;
-	for (vector<term> x : q) {
-		if (x[0].goal) { goals.insert(x[0]); continue; }
-			//prog_add_rule(p, x); continue; }
-		for (const term& t : x) getvars(t, v), vars.push_back(move(v));
-		while (!(m = getterms(x)).empty()) {
-			for (size_t i : m) r.push_back(x[i]);
-			for (size_t n = m.size(); n--;)
-				x.erase(x.begin() + m[n]),
-				vars.erase(vars.begin() + m[n]);
-			for (const auto& s : vars) v.insert(s.begin(), s.end());
-			r = interpolate(r, move(v)),
-			x.push_back(r[0]), getvars(r[0], v),
-			vars.push_back(move(v)), p.insert(move(r));
-		}
-		p.insert(move(x)), vars.clear();
-	}
-	if (opts.print_transformed) print(o::to("transformed")
-		<< "# after transform_bin:" << endl, p);
-}
-
+// ----------------------------------------------------------------------------
 
 /*
-// BACKUP
+// BACKUP CQC
+set<term> tables::bodies_equiv(vector<term> x, vector<term> y) const {
+//	if (x[0].size() != y[0].size()) return false;
+	x[0].tab = y[0].tab;
+	x.erase(x.begin()), y.erase(y.begin()),
+	create_head(x, x[0].tab), create_head(y, y[0].tab);
+	if (cqc(x, y)) {
+		if (cqc(y, x)) return true;
+	}
+}
 
 enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
 

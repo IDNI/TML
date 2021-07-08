@@ -17,81 +17,6 @@
 #include "analysis.h"
 #include "dict.h"
 
-bit_elem::bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt): e(_e), bsz(_bsz), pbt(_pbt) {
-	p.resize(bsz, false);
-	
-	int_t sval=0;
-	if(e.type == elem::SYM) {
-		auto &d = pbt.pbr.pbp.bdict;
-		sval = d.get_bit_sym(e);
-	}
-	for (size_t k = 0; k != bsz; ++k) {
-		switch(e.type) {
-			case elem::NUM : p[pos(k)] = e.num & (1<<k); break;
-			case elem::CHR : p[pos(k)] = e.ch & (1<<k); break;
-			case elem::SYM : p[pos(k)] = sval & (1<<k); break;
-			case elem::VAR : 
-			default:  break;
-		}
-	}
-}
-size_t bit_elem::pos(size_t bit_from_right /*, size_t arg, size_t args */) const {
-	DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
-	return (bsz - bit_from_right - 1); //* args + arg;
-
-	/*
-	size_t pos(size_t bit_from_right, size_t arg, size_t args) const {
-		DBG(assert(bit_from_right < bits && arg < args);)
-		return (bits - bit_from_right - 1) * args + arg;
-	}
-	*/
-}
-bool bit_elem::to_elem(std::vector<elem> &ve) const{
-	bool ret = true;
-	
-	if(e.type == elem::VAR || e.type == elem::SYM) {
-		for(size_t i=0; i< this->p.size(); i++ ){
-			string_t *temp = new string_t( lexeme2str(e.e));
-			temp->append( to_string_t((int_t)i));
-			lexeme l ={temp->c_str(), temp->c_str()+temp->size()};
-			ve.emplace_back(e.type, l);
-		}
-	}
-	else if(e.type == elem::NUM || e.type == elem::CHR) {
-		for(bool b: this->p)
-			ve.emplace_back(b);
-	}
-	else ve.emplace_back(e);
-	
-	return ret;
-}
-void bit_elem::to_print() const {
-	o::dbg()<<e<<" ";
-	int i=0;
-	for (bool bit : p)
-		if(e.type != elem::VAR)
-			o::dbg() << (bit ? 1 : 0); 
-		else o::dbg()<<e.e<< i++;
-}
-
-
-bit_prog::bit_prog( const raw_prog& _rp ): rp(_rp)  {
-	for( const raw_rule &rr :rp.r )
-		vbr.emplace_back(bit_rule(rr, *this));
-	for( const raw_prog &rp: _rp.nps)
-		nbp.emplace_back(bit_prog(rp));
-}
-
-bool bit_prog::to_raw_prog(raw_prog &rp) const{
-	bool ret = true;
-	for( const bit_rule& br :vbr)
-		rp.r.emplace_back(),
-		ret &= br.to_raw_rule(rp.r.back());
-	for( const bit_prog& bp : nbp)
-		rp.nps.emplace_back(),
-		ret &= bp.to_raw_prog(rp.nps.back());
-	return ret;
-}
 
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
@@ -108,45 +33,6 @@ bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	return ret;
 }
 
-void bit_prog::to_print() const {
-	o::dbg()<<std::endl;
-	for( const bit_rule& br :vbr)
-		br.to_print(), o::dbg()<<std::endl;
-	
-	for( const bit_prog& bp : nbp)
-		o::dbg()<<"{", 
-		bp.to_print(),
-		o::dbg()<<"}";
-	return;
-}
-
-
-bit_rule::bit_rule(const raw_rule &_rr, bit_prog &_pbp): rr(_rr), pbp(_pbp) {
-	for( const raw_term &rt: rr.h)
-		bh.emplace_back(bit_term(rt, *this)); 
-	for( size_t i=0 ; i < rr.b.size() ; i++) {
-		bb.emplace_back();
-		for( const raw_term &rt: rr.b[i]) 
-			bb.back().emplace_back(bit_term(rt, *this));
-	}
-}
-bool bit_rule::to_raw_rule(raw_rule &rr) const{
-	bool ret = true;
-	
-	for( const bit_term& bt: bh )
-		rr.h.emplace_back(),
-		ret &= bt.to_raw_term(rr.h.back());
-	for( size_t i=0 ; i < bb.size() ; i++) {
-		rr.b.emplace_back();
-		for( const bit_term &bt: bb[i]) 
-			rr.b.back().emplace_back(),
-			ret &= bt.to_raw_term(rr.b.back().back());
-	}
-	
-	return ret;
-
-}
-
 bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	bool ret = true;
 	for( const raw_term &rt : rrin.h )
@@ -159,74 +45,10 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	}
 	return ret;
 }
-void bit_rule::to_print() const {
-	for( const bit_term& bt: bh )
-		bt.to_print(), o::dbg()<< " " ;
-	o::dbg()<< (bb.size()? ":-" : ".");
-	for( size_t i=0 ; i < bb.size() ; i++)
-		for( const bit_term &bt: bb[i]) 
-			bt.to_print(), o::dbg()<<" ";
-	o::dbg()<<std::endl;
-}
-
-bit_term::bit_term(const raw_term &_rt,  bit_rule &_pbr): rt(_rt), pbr(_pbr){	
-	for(size_t n= 0 ;n < rt.e.size(); n++ ) {
-		int_t bsz ;
-		const elem& e = rt.e[n];
-		bsz = get_typeinfo(n, rt);
-		vbelem.emplace_back(bit_elem(e, bsz, *this));
-	}
-}
-size_t bit_term::get_typeinfo(size_t n, const raw_term &rt){
-	for( auto it : pbr.pbp.rp.vts)
-		if( it.reln == rt.e[0]){
-			if(n>1 && n < rt.e.size()-1) {
-				if( it.typeargs[n-2].pty.ty != primtype::NOP)
-					return it.typeargs[n-2].pty.get_bitsz();
-				else {// struct
-					for( auto rit : pbr.pbp.rp.vts)
-						if( rit.rty.structname == it.typeargs[n-2].structname ){
-							return rit.rty.get_bitsz( pbr.pbp.rp.vts );
-						}
-					o::err()<< "No type found : "<<it.typeargs[n-2].structname<<std::endl;
-					return 0;
-				}	
-			}
-			else if ( n == 0 ) {
-				//for now, all predicate are 5 bit in bit_prog
-				//to change.
-				return 5;
-			}
-			else  {// for everthing else e.g. paranthesis
-				return 0;
-			}
-		}
-
-	//when types are not specified, default to 4
-	if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
-		rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
-		return 4;
-	else return 0; 
-}
-
-bool bit_term::to_raw_term( raw_term& brt ) const {
-	bool ret = true;
-
-	brt.neg = rt.neg;
-	int_t i = 0;
-	for (const bit_elem& be : vbelem) {
-			// for predicate rel name
-			if( i++ == 0) brt.e.emplace_back(rt.e[0]);
-			// for others
-			else ret &= be.to_elem(brt.e);
-	}
-	ret &= brt.calc_arity(0);	
-	return ret;
-}
 
 size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
-	DBG(assert(rt.e.size()>n && n >=0));
+	DBG(assert(rt.e.size()>n && (int_t)n >=0 && rr.varctx.get()) );
 
 	if(rt.extype == raw_term::ARITH || rt.extype == raw_term::EQ || rt.extype == raw_term::LEQ) {
 		string_t str = lexeme2str(rt.e[n].e);
@@ -257,10 +79,10 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 			return INT_BSZ;
 		}
 	}
-	else if( rt.extype == raw_term::REL) {
+	else if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) {
 		string_t reln = lexeme2str(rt.e[0].e);
 		if( typenv.contains_pred(reln)) {
-			auto targs = typenv.lookup_pred(reln);	
+			auto &targs = typenv.lookup_pred(reln);	
 			//only for arguments
 			if(n>1 && n < rt.e.size()-1) {
 				if(targs[n-2].is_primitive())
@@ -287,10 +109,50 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	return 0;
 }
 
+//inplace transformation of bit raw term to normal as per type_env/
+bool bit_univ::brev_transform( raw_term &rbt ){
+	
+	string_t str = lexeme2str(rbt.e[0].e);
+	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
+	if(vt.size() == 0 ) return false;
+	int_t bitsz = -1;
+	int_t val;
+	int_t argc = 0;
+	for(typedecl td: vt ) {
+		if( td.is_primitive() ) {
+			bitsz =  td.pty.get_bitsz();
+			val = 0;
+			DBG(assert(rbt.e.size() > (size_t)bitsz ));
+			bools v;
+			for( int_t n = 0; n < bitsz; n++)
+				v.push_back(rbt.e[argc + n + 2].num);						
+			
+			permuteorder(v, bit_order, true);
+			for( int_t n = 0; n < bitsz; n++)	
+				val |= v[n] << (bitsz-1 -n);
+
+			rbt.e.erase(rbt.e.begin()+ 2 + argc, rbt.e.begin() + 2 + argc + bitsz);
+			elem el;
+			if( td.pty.ty == primtype::UINT )
+				el = elem(val);
+			else if ( td.pty.ty == primtype::UCHAR )
+				el = elem((char_t) val);
+			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
+				el = elem(elem::SYM, this->d.get_sym(val) );
+
+			rbt.e.insert(rbt.e.begin() + 2 + argc, el);
+			argc++;
+		}
+		else { } //structtypes userdef
+	}
+	return true;
+}
+
+
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
 	rtout.neg = rtin.neg;	
-	if( rtin.extype == raw_term::REL) {
+	if( rtin.extype == raw_term::REL || rtin.extype == raw_term::BLTIN) {
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
 				// for predicate rel name, keep as it is
@@ -320,6 +182,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 						default: DBG( COUT<<e<<std::endl; assert(false)); break;
 					}
 				}
+				permuteorder(bitelem, bit_order);
 				rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());	
 		}
 		ret &= rtout.calc_arity(0);
@@ -355,8 +218,9 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 									vbit.back()[pos(bsz, k)] = e;
 								
 								break;
-				default : DBG(assert(false));
+				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
+			permuteorder(vbit.back(), bit_order);
 		}
 		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
 
@@ -374,13 +238,6 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 	}
 	return ret;
 }
-
-void bit_term::to_print() const {
-	if ( rt.neg ) COUT<<"~";
-	for (const bit_elem& be : vbelem)
-		be.to_print(), o::dbg()<<" ";
-}
-
 
 size_t structype::calc_bitsz(const std::vector<typestmt> &types){	
 	size_t bsz=0;
@@ -536,7 +393,8 @@ bool environment::build_from( const std::vector<typestmt> & vts) {
 				return input().type_error(" Repeated typedef.", it.rty.structname.e), false;
 			usertypedef.insert( { lexeme2str(it.rty.structname.e), it.rty });					}
 	}
-	return true;
+	if( predtype.size() || usertypedef.size()) return true;
+	return false;
 }
 // infers from given predicates the type signature of relation while
 // making use of var context and updates only the pred_type of env.
@@ -555,7 +413,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 		for( size_t i=2; i < rt.e.size()-1; i++ ){
 			if(rt.e[i].type== elem::VAR ) {
 				str = lexeme2str(rt.e[i].e);
-				//context already knows var types so ..dont do anything
+				//context already knows var types
 					if (this->contains_prim_var(str) ){
 						//DBG(assert( this->lookup_prim_var(str) == targs[i-2].pty));
 						// override type definition
@@ -578,10 +436,10 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 	std::vector<typedecl> targs;
 	size_t st=0, end=rt.e.size();
 	bool bknown = true;  // assume all args types are determinable 
-	if(rt.extype == raw_term::REL) st = 2, end = rt.e.size()-1;
+	if(rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) st = 2, end = rt.e.size()-1;
 	for( size_t i= st ; bknown && i < end; i++) {
 		str = lexeme2str(rt.e[i].e);
-		if(rt.extype == raw_term::REL) {
+		if(rt.extype == raw_term::REL || rt.extype ==raw_term::BLTIN) {
 			switch(rt.e[i].type) {
 				case elem::NUM:  targs.emplace_back(), targs.back().pty.ty = primtype::UINT;break;
 				case elem::CHR:  targs.emplace_back(), targs.back().pty.ty = primtype::UCHAR;break;
@@ -606,14 +464,14 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 				if(rt.e[i].type== elem::VAR && !(this->contains_prim_var(str) ||
 					this->contains_typedef_var(str) ))	bknown = false;
 		}
-		else DBG(assert(false));
+		else { DBG(COUT<<rt<<std::endl; assert(false);)  } 
 	}
 
 	if(bknown){
 			//only insert signature for relations.
-			if( rt.extype == raw_term::REL)
+			if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN)
 		 		str = lexeme2str(rt.e[0].e),
-				predtype.insert( { lexeme2str(rt.e[0].e), targs } ).second;
+				predtype.insert( { lexeme2str(rt.e[0].e), targs } );
 			//for others, just enough to say types are known
 	}
 	// the context does not have types, try to infer from  nearest vars/operations
@@ -627,6 +485,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 			// without ordering effect, it should be some least abstract
 			// type. For now, pick the first known type and assing to typeless
 			std::vector<string_t> notypv;
+			bool hasnum = false;
 			for( size_t i=0; i < rt.e.size(); i++ )
 				if(rt.e[i].type== elem::VAR ) {
 					str = lexeme2str(rt.e[i].e);
@@ -634,10 +493,14 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 							lastp = this->lookup_prim_var(str), lastb =true;
 						else if( this->contains_typedef_var(str)) ;//TOD): ;
 						else notypv.push_back(str);
-			}
-			for(string_t var: notypv)
-				this->addtocontext(var, lastp);
-			bknown = lastb;
+				}
+				else if ( rt.e[i].type == elem::NUM){
+					hasnum = true;
+				}
+			if(lastb) for(string_t var: notypv)	this->addtocontext(var, lastp);
+			else if( hasnum) for(string_t var: notypv)	this->addtocontext(var, primtype(primtype::UINT));
+			
+			bknown = lastb | hasnum; 
 		}
 	}
 
@@ -655,10 +518,10 @@ bool typechecker::tinfer( const raw_rule& rr){
 	
 	bool ret = false;
 	std::stringstream ss;
-	env.get_context() = *(rr.get_context().get());
+	context old = *(rr.get_context().get());
+	env.get_context() = old;
 	for (const raw_term &ht : rr.h){
 		string_t str = lexeme2str(ht.e[0].e);
-		if(env.contains_pred(str)) continue;
 		if(!env.build_from(ht, infer) ){
 			ss<<"Could not infer types from"<<ht,
 			type_error(ss.str().c_str(), ht.e[0].e );
@@ -669,7 +532,6 @@ bool typechecker::tinfer( const raw_rule& rr){
 	for (auto &it : rr.b)
 		for (const raw_term &bt : it) {
 			string_t str = lexeme2str(bt.e[0].e);
-			if(env.contains_pred(str)) continue;
 			if(!env.build_from(bt, infer) ){
 				ss<<"Could not infer types from predicate "<<bt,
 				type_error(ss.str().c_str(), bt.e[0].e );
@@ -679,8 +541,9 @@ bool typechecker::tinfer( const raw_rule& rr){
 			else ret = true;
 		}
 
-	if(ret) *(rr.get_context().get()) = env.get_context();
-	return ret;
+	if(ret && ( old != env.get_context()))
+		return *(rr.get_context().get()) = env.get_context(), true;
+	else return false;
 }
 bool typechecker::tcheck(){
 	bool ret = true;
@@ -696,7 +559,7 @@ bool typechecker::tcheck(){
 				}
 			else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS; 
 		}
-		else ret = false, infer = false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL; // type_check fails.
+		else ret = false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL; // type_check fails.
 	}
 	
 	if( ret && infer ) {	
@@ -722,10 +585,10 @@ bool typechecker::tcheck(){
 						}
 					else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS;
 				}
-				else ret =false, infer=false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
+				else ret =false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
 			}
 		}
-		if(lastinfo != vrinfo) { goto _BEG; }
+		if(lastinfo != vrinfo || sigupdated ) { sigupdated =false; goto _BEG; }
 		else if(rp.r.size()) DBG(COUT<<"converging inference" <<std::endl);
 	}
 	if(ret) {
@@ -743,7 +606,7 @@ bool typechecker::tcheck(){
 	}
 	DBG(COUT<<env.to_print());
 	for( size_t i =0 ; i <rp.r.size(); i ++)
-		;//DBG(COUT<<rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():"");
+		DBG(COUT<<(rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():""));
 	return ret;
 }
 
@@ -752,7 +615,7 @@ bool typechecker::tcheck( const raw_term &rt){
 	string_t str = lexeme2str(rt.e[0].e);
 
 	std::stringstream ss;
-	if( rt.extype == raw_term::REL ) {
+	if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN ) {
 		if( env.contains_pred(str)){	
 			auto &typeparams = env.lookup_pred(str);
 			if( typeparams.size() != size_t(rt.arity[0])) 
@@ -769,8 +632,8 @@ bool typechecker::tcheck( const raw_term &rt){
 										ss << typexp.pty.to_print() <<" in predicate "<<rt,
 										type_error(ss.str().c_str(), rt.e[argc].e), false;
 							else {
-								int_t maxval =  ( ((size_t)0x1 <<typexp.pty.get_bitsz())-1);
-								if( rt.e[argc].num > maxval )
+								uint64_t maxval =  ( ((uint64_t)0x1 <<typexp.pty.get_bitsz())-1);
+								if( rt.e[argc].num > maxval || typexp.pty.get_maxbits() < (int_t)typexp.pty.get_bitsz())
 								return 	ss<< rt.e[argc].num << " exceeds max size for ",
 										ss << typexp.pty.to_print() <<" in predicate "<<rt,
 										type_error(ss.str().c_str(), rt.e[argc].e), false;	
@@ -847,7 +710,7 @@ bool typechecker::tcheck( const raw_term &rt){
 						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " does not match other var type in term " <<rt,
 						type_error(ss.str().c_str(), rt.e[0].e ), false;
 					
-					if( rt.extype == raw_term::ARITH && lastp.ty != primtype::_ptype::UINT )
+					if( rt.extype == raw_term::ARITH && last && lastp.ty != primtype::_ptype::UINT )
 						return ss<< "Type "<< lastp.to_print()<<" of "<< to_string(str) << " cannot be applied to arithmetic terms  " <<rt,
 						type_error(ss.str().c_str(), rt.e[0].e ), false;
 				}
@@ -882,36 +745,5 @@ bool typechecker::tcheck( const raw_rule &rr){
 		return rr.update_context(std::make_shared<context>(env.get_context())), true;
 	
 	return false;
-		/*
-	if(tryinfer) {
-		// for inference, use prev context for terms whose types are not known yet
-		env.get_context() = *(rr.get_context().get());
-		for (const raw_term &ht : rr.h){
-			string_t str = lexeme2str(ht.e[0].e);
-			if(env.contains_pred(str)) continue;
-			if(!env.build_from(ht, infer) ){
-				ret &= false;
-				ss<<"Could not infer types from"<<ht,
-				type_error(ss.str().c_str(), ht.e[0].e );
-				ss.str("");
-				ss.clear();
-			}
-			else rr.update_context(std::make_shared<context>(env.get_context()));
-		}
-		for (auto &it : rr.b)
-			for (const raw_term &bt : it) {
-				string_t str = lexeme2str(bt.e[0].e);
-				if(env.contains_pred(str)) continue;
-				if(!env.build_from(bt, infer) ){
-					ret &= false;
-					ss<<"Could not infer types from predicate "<<bt,
-					type_error(ss.str().c_str(), bt.e[0].e );
-					ss.str("");
-					ss.clear();
-				}
-				else rr.update_context(std::make_shared<context>(env.get_context()));
-			}
-		return ret;
-	}
- */
+
 }

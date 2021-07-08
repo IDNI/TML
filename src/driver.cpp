@@ -70,7 +70,12 @@ string_t driver::directive_load(const directive& d) {
 	DBGFAIL;
 }
 
-void driver::directives_load(raw_prog& p, lexeme& trel) {
+signature get_signature(const raw_term &rt) {
+	return {rt.e[0].e, rt.arity};
+}
+
+void driver::directives_load(raw_prog& p, lexeme& trel,
+		const raw_term &false_term) {
 //	int_t rel;
 	for (const directive& d : p.d)
 		switch (d.type) {
@@ -78,8 +83,10 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::EDOMAIN: transform_domains(p, d); break;
 		case directive::EVAL: transform_evals(p, d); break;
-		case directive::QUOTE: transform_quotes(p, d); break;
+		case directive::QUOTE: transform_quotes(p, false_term, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
+		case directive::INTERNAL:
+			p.hidden_rels.insert(get_signature(d.internal_term)); break;
 		case directive::CMDLINE:
 			if (d.n < opts.argc())
 				pd.strs.emplace(d.rel.e,
@@ -124,9 +131,9 @@ sprawformtree driver::expand_formula_node(const sprawformtree &t) {
 			// following
 			const elem evar = elem::fresh_var(d), qvar = *(t->l->el);
 			return make_shared<raw_form_tree>(elem::EXISTS,
-				make_shared<raw_form_tree>(elem::VAR, evar),
+				make_shared<raw_form_tree>(evar),
 				make_shared<raw_form_tree>(elem::FORALL,
-					make_shared<raw_form_tree>(elem::VAR, qvar),
+					make_shared<raw_form_tree>(qvar),
 					make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
 						make_shared<raw_form_tree>(
 							raw_term(raw_term::EQ, { evar, elem_eq, qvar })))));
@@ -203,7 +210,7 @@ bool is_ucqn (const raw_rule &rr) {
  * term. */
 
 rel_info get_relation_info(const raw_term &rt) {
-	return make_pair(rt.e[0], rt.e.size() - 3);
+	return make_tuple(rt.e[0], rt.e.size() - 3);
 }
 
 /* If rr1 and rr2 are both conjunctive queries, check if there is a
@@ -220,7 +227,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
 		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
-
+		
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
 		map<elem, elem> freeze_map;
@@ -258,7 +265,8 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
  * turned into a valid substitution for rr2. This function provides all
  * off them. */
 
-bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
+bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
+		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
 	dict_t d;
@@ -296,9 +304,9 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
 			rt.calc_arity(nullptr);
 			edb.insert(rt);
 		}
-
+		
 		o::dbg() << "Canonical Database: " << edb << endl;
-
+		
 		// Build up the query that proves the existence of a homomorphism
 		// Make a new head for rr2 that exports all the variables used in
 		// its body + ids of the frozen terms it binds to
@@ -444,9 +452,9 @@ bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
 void driver::factor_rules(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-
+	
 	o::dbg() << "Factorizing rules ..." << endl;
-
+	
 	// Sort the rules so the biggest come first. Idea is that we want to
 	// reduce total substitutions by doing the biggest factorizations
 	// first. Also prioritizing rules with more arguments to reduce chance
@@ -669,16 +677,16 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Check that rules have correct format
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
 		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
-
+	
 	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << endl;
-
+	
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
-
+	
 	set<elem> vars;
 	collect_vars(rr1, vars);
 	vector<set<elem>> partition;
-
+	
 	// Do the Levy-Sagiv test
 	bool contained = partition_iter(vars, partition,
 		[&](const vector<set<elem>> &partition) -> bool {
@@ -692,7 +700,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 				o::dbg() << "}, ";
 			}
 			o::dbg() << endl;
-
+			
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
 			dict_t d;
@@ -838,11 +846,12 @@ template<typename F> bool driver::try_minimize(raw_rule &rr, const F &f) {
  * reduce time cost of future subsumptions. This function does not
  * respect order, so it should only be used on an unordered stratum. */
 
-template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
+template<typename F>
+		void driver::subsume_queries(raw_prog &rp, const F &f) {
 	vector<raw_rule> reduced_rules;
 	for(raw_rule &rr : rp.r) {
 		bool subsumed = false;
-
+		
 		for(auto nrr = reduced_rules.begin(); nrr != reduced_rules.end();) {
 			if(f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
@@ -871,7 +880,7 @@ template<typename F> void driver::subsume_queries(raw_prog &rp, const F &f) {
 	rp.r = reduced_rules;
 }
 
- /* Check query containment for rules of the given program using theorem prover Z3
+/* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
 void driver::qc_z3 (raw_prog &raw_p) {
@@ -1069,11 +1078,10 @@ bool driver::check_ucqn_z3(const raw_rule &r1, const raw_rule &r2,
 	return res;
 }
 
-void driver::simplify_formulas(raw_prog &rp) {
+void driver::simplify_formulas(raw_prog &rp, const raw_term &false_term) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
-			sprawformtree prft = rr.get_prft();
-			rr.set_prft(raw_form_tree::simplify(prft));
+			rr.set_prft(raw_form_tree::simplify(rr.prft, false_term));
 		}
 	}
 }
@@ -1101,7 +1109,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// with length less than max_limit
 	int_t max_id = gen_limit == 1 ? max_arity + 1 :
 		(pow(gen_limit, max_arity + 1) - 1) / (gen_limit - 1);
-
+	
 	// Initialize the symbols, variables, and operators used in the
 	// domain creation rule
 	elem lt_elem(elem::LT, d.get_lexeme("<")),
@@ -1493,11 +1501,11 @@ lexeme driver::concat(const lexeme &rel, string suffix) {
 
 vector<elem> driver::quote_rule(const raw_rule &rr,
 		const elem &rel_name, const elem &domain_name, raw_prog &rp,
-		int_t &part_count) {
+		int_t &part_count, const raw_term &false_term) {
 	// Maintain a list of the variable substitutions:
 	map<elem, elem> variables;
 	vector<elem> rule_ids;
-
+	
 	// Facts and rules have different representations in quotations. This
 	// is because they are interpreted differently: facts are placed in
 	// the 0th database whilst rules are fired on each iteration.
@@ -1513,7 +1521,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 			rule_ids.push_back(rule_id);
 		}
 	} else {
-		const elem body_id = quote_formula(rr.get_prft(), rel_name, domain_name,
+		const elem body_id = quote_formula(rr.get_prft(false_term), rel_name, domain_name,
 			rp, variables, part_count);
 		for(size_t gidx = 0; gidx < rr.h.size(); gidx++) {
 			const elem head_id = quote_term(rr.h[gidx], rel_name, domain_name, rp,
@@ -1535,10 +1543,11 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
  * name in the given program. */
 
 void driver::quote_prog(const raw_prog nrp, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp) {
+		const elem &domain_name, raw_prog &rp, const raw_term &false_term) {
 	int_t part_count = 0;
 	for(size_t ridx = 0; ridx < nrp.r.size(); ridx++) {
-		quote_rule(nrp.r[ridx], rel_name, domain_name, rp, part_count);
+		quote_rule(nrp.r[ridx], rel_name, domain_name, rp, part_count,
+			false_term);
 	}
 }
 
@@ -1551,7 +1560,6 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 	raw_prog nrp;
 	nrp.builtins = rp.builtins;
 	nrp.parse(prog_in, tbl->get_dict());
-	simplify_formulas(nrp);
 	const strs_t strs;
 	transform(nrp, strs);
 	return nrp;
@@ -1561,7 +1569,8 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
  * first argument is the relation into which it should put the quotation
  * it creates, and it's second argument is the program to quote. */
 
-bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
+bool driver::transform_quotes(raw_prog &rp, const raw_term &false_term,
+		const directive &drt) {
 	if(drt.type != directive::QUOTE) return false;
 	o::dbg() << "Generating quotation for: " << drt << endl;
 	// The relation to contain the evaled relation is the first symbol
@@ -1578,7 +1587,7 @@ bool driver::transform_quotes(raw_prog &rp, const directive &drt) {
 			*quote_str.e[0] == '`') {
 		raw_prog nrp = read_prog(quote_str, rp);
 		// Create the quotation relation
-		quote_prog(nrp, out_rel, domain_sym, rp);
+		quote_prog(nrp, out_rel, domain_sym, rp, false_term);
 	}
 	// Indicate success
 	o::dbg() << "Generated quotation for: " << drt << endl;
@@ -2739,7 +2748,7 @@ bool rule_relation_precedes(const raw_rule &rr1, const raw_rule &rr2) {
 raw_term driver::relation_to_term(const rel_info &ri) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-
+	
 	vector<elem> els = { get<0>(ri), elem_openp };
 	for(int_t i = 0; i < get<1>(ri); i++) {
 		els.push_back(elem::fresh_var(d));
@@ -2785,7 +2794,7 @@ void driver::step_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-
+	
 	map<elem, elem> freeze_map;
 	map<elem, elem> unfreeze_map;
 	// Separate the internal rules used to execute the parts of the
@@ -2793,13 +2802,18 @@ void driver::step_transform(raw_prog &rp,
 	// of computation.
 	vector<raw_rule> int_prog;
 	vector<raw_term> fact_prog;
+	vector<raw_term> goal_prog;
 	// Create a duplicate of each rule in the given program under a
 	// generated alias.
 	for(raw_rule rr : rp.r) {
+		if(rr.type == raw_rule::GOAL) {
+			// Separate out program goals as these are applied after
+			// computation
+			goal_prog.insert(goal_prog.end(), rr.h.begin(), rr.h.end());
+			continue;
+		}
 		for(raw_term &rt : rr.h) {
-			raw_term rt2 = rt;
-			auto it = freeze_map.find(rt.e[0]);
-			if(it != freeze_map.end()) {
+			if(auto it = freeze_map.find(rt.e[0]); it != freeze_map.end()) {
 				rt.e[0] = it->second;
 			} else {
 				elem frozen_elem = elem::fresh_temp_sym(d);
@@ -2808,6 +2822,7 @@ void driver::step_transform(raw_prog &rp,
 				unfreeze_map[frozen_elem] = rt.e[0];
 				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
 			}
+			rp.hidden_rels.insert({ rt.e[0].e, rt.arity });
 		}
 		if(rr.is_fact()) {
 			// Separate out program facts as they need to be in database by
@@ -2905,8 +2920,9 @@ void driver::step_transform(raw_prog &rp,
 			const elem clock_state = elem::fresh_temp_sym(d);
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_state, vector<elem>{}),
-				raw_term(clock_states.back(), vector<elem>{}).negate() },
+			rp.r.push_back(raw_rule(raw_term(clock_state, vector<elem>{}),
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
+			rp.r.push_back(raw_rule(raw_term(clock_states.back(), vector<elem>{}).negate(),
 				{ raw_term(clock_states.back(), vector<elem>{}) }));
 			clock_states.push_back(clock_state);
 
@@ -2948,21 +2964,51 @@ void driver::step_transform(raw_prog &rp,
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
 		rp.r.push_back(raw_rule(stage2, {stage0, stage1.negate()}));
-
+		
+		// Hide the clock states
+		rp.hidden_rels.insert({ stage0.e[0].e, stage0.arity });
+		rp.hidden_rels.insert({ stage1.e[0].e, stage1.arity });
+		for(const elem &clock_state : clock_states) {
+			rp.hidden_rels.insert({ clock_state.e, {0} });
+		}
+		
 		if(clock_states.size() > 1) {
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
-			rp.r.push_back(raw_rule({ raw_term(clock_states[0], vector<elem>{}),
-				raw_term(clock_states.back(), vector<elem>{}).negate() },
+			rp.r.push_back(raw_rule(raw_term(clock_states[0], vector<elem>{}),
+				{ raw_term(clock_states.back(), vector<elem>{}) }));
+			rp.r.push_back(raw_rule(raw_term(clock_states.back(), vector<elem>{}).negate(),
 				{ raw_term(clock_states.back(), vector<elem>{}) }));
 		}
 	} else {
 		// Add all program facts back
-		rp.r.push_back(raw_rule(fact_prog, vector<raw_term>{}));
+		for(const raw_term &rt : fact_prog) {
+			rp.r.push_back(raw_rule(rt));
+		}
 		// If there are no interdepencies then we can just restore the
 		// original rule names to the transformed program
 		for(raw_rule &rr : rp.r) {
 			rr = rename_rule(rr, unfreeze_map);
+		}
+	}
+	// Add all program goals back
+	for(const raw_term &rt : goal_prog) {
+		rp.r.push_back(raw_rule(raw_rule::GOAL, rt));
+	}
+}
+
+/* Iterate through the FOL rules and remove the outermost existential
+ * quantifiers. Required because pure TML conversion assumes that
+ * quantifier variables are only visible within their bodies. */
+
+void driver::remove_redundant_exists(raw_prog &rp) {
+	for(raw_rule &rr : rp.r) {
+		if(rr.is_form()) {
+			sprawformtree &prft = rr.prft;
+			// Repeatedly strip outermost existential quantifier
+			while(prft->type == elem::EXISTS) {
+				prft = prft->r;
+			}
 		}
 	}
 }
@@ -2970,7 +3016,8 @@ void driver::step_transform(raw_prog &rp,
 /* Returns the difference between the two given sets. I.e. the second
  * set removed with multiplicity from the first. */
 
-set<elem> set_difference(const multiset<elem> &s1, const set<elem> &s2) {
+set<elem> set_difference(const multiset<elem> &s1,
+		const set<elem> &s2) {
 	set<elem> res;
 	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
 		inserter(res, res.end()));
@@ -2980,8 +3027,7 @@ set<elem> set_difference(const multiset<elem> &s1, const set<elem> &s2) {
 /* Returns the intersection of the two given sets. I.e. all the elems
  * that occur in both sets. */
 
-set<elem> set_intersection(const set<elem> &s1,
-		const set<elem> &s2) {
+set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
 	set<elem> res;
 	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
 		inserter(res, res.end()));
@@ -2992,8 +3038,8 @@ set<elem> set_intersection(const set<elem> &s1,
  * logic formula with the given bound variables. This might involve
  * adding temporary relations to the given program. */
 
-raw_term driver::to_pure_tml(const sprawformtree &t, vector<raw_rule> &rp,
-		const set<elem> &fv) {
+raw_term driver::to_pure_tml(const sprawformtree &t,
+		raw_prog &rp, const set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	const elem part_id = elem::fresh_temp_sym(d);
@@ -3027,7 +3073,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t, vector<raw_rule> &rp,
 			}
 			// Make the representative rule and add to the program
 			raw_rule nr(raw_term(part_id, fv), terms);
-			rp.push_back(nr);
+			rp.r.push_back(nr);
+			// Hide this new auxilliary relation
+			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			break;
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
@@ -3036,7 +3084,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t, vector<raw_rule> &rp,
 			for(const sprawformtree &tree : alts) {
 				// Make a separate rule for each disjunct
 				raw_rule nr(raw_term(part_id, fv), to_pure_tml(tree, rp, fv));
-				rp.push_back(nr);
+				rp.r.push_back(nr);
+				// Hide this new auxilliary relation
+				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			}
 			break;
 		} case elem::NOT: {
@@ -3062,7 +3112,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t, vector<raw_rule> &rp,
 				nfv.erase(e);
 			}
 			raw_rule nr(raw_term(part_id, nfv), nrt);
-			rp.push_back(nr);
+			rp.r.push_back(nr);
+			// Hide this new auxilliary relation
+			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			return raw_term(part_id, nfv);
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
@@ -3085,8 +3137,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t, vector<raw_rule> &rp,
 				make_shared<raw_form_tree>(elem::NOT, current_formula);
 			for(const elem &qvar : qvars) {
 				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
-					make_shared<raw_form_tree>(elem::VAR, qvar),
-					equiv_formula);
+					make_shared<raw_form_tree>(qvar), equiv_formula);
 			}
 			return to_pure_tml(make_shared<raw_form_tree>(elem::NOT,
 				equiv_formula), rp, fv);
@@ -3105,17 +3156,12 @@ void driver::to_pure_tml(raw_prog &rp) {
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
-			set<elem> nv;
-			for(const raw_term &rt : rr.h) {
-				collect_vars(rt, nv);
-			}
-			rr.set_b({{to_pure_tml(rr.prft, rp.r, nv)}});
+			rr.set_b({{to_pure_tml(rr.prft, rp, collect_free_vars(rr))}});
 		}
 		rp.r[i] = rr;
 	}
 	// Split rules with multiple heads and delete those with 0 heads
-	for(vector<raw_rule>::iterator it = rp.r.begin();
-			it != rp.r.end();) {
+	for(auto it = rp.r.begin(); it != rp.r.end();) {
 		if(it->h.size() != 1) {
 			// 0 heads are effectively eliminated, and multiple heads are
 			// split up.
@@ -3129,6 +3175,196 @@ void driver::to_pure_tml(raw_prog &rp) {
 			it++;
 		}
 	}
+}
+
+/* If the given term belongs to a hidden relation, record its relation
+ * in signatures and record the given rule's dependency on this term's
+ * relation. */
+
+void record_hidden_relation(const raw_prog &rp, raw_rule &rr,
+		const raw_term &rt, set<signature> &signatures,
+		map<signature, set<raw_rule *>> &dependants) {
+	if(rt.extype == raw_term::REL) {
+		if(signature sig = get_signature(rt); has(rp.hidden_rels, sig)) {
+			dependants[sig].insert(&rr);
+			signatures.insert(sig);
+		}
+	}
+}
+
+/* Update the variable usage map by 1 (see below) for each distinct
+ * variable occuring in the given term. Record the distinct variables in
+ * the given pointer if it is not null. Note that the update is 2 for
+ * symbols as they are treated as a unique variable with a separate
+ * equality contraint to fix it to a particular symbol. */
+
+void record_variable_usage(const raw_term &rt,
+		map<elem, int_t> &var_usages, set<elem> *relevant_vars) {
+	set<elem> unique_vars;
+	for(const elem &e : rt.e) unique_vars.insert(e);
+	signature body_signature = get_signature(rt);
+	if(relevant_vars)
+		for(const elem &e : rt.e) relevant_vars->insert(e);
+	for(const elem &e : unique_vars)
+		var_usages[e] += e.type == elem::VAR ? 1 : 2;
+}
+
+/* There are four kinds of rules to deal with: those in which the
+ * signature being modified occurs only within the body, those in which
+ * it occurs only within the head, and those within which it occurs in
+ * both. If it only occurs in the head, then the use of each head
+ * variable should be 0/1, as this would allow all the head variables to
+ * be eliminated without affecting computation. If it only occurs in the
+ * body, then the use of each variable occuring in terms of the
+ * signature being modified should be set to the number of separate
+ * terms that use the variable. This way all those variables occuring
+ * only in one term and hence do not affect the satisfiability of the
+ * current rule nor the derived term can be eliminated. If it occurs in
+ * both, then the occurence of variables in the head can be ignored
+ * because this does not affect the rule's satisfiability and because we
+ * want these variables to be eliminatable. However the number of
+ * separate terms the variables occuring in terms corresponding to the
+ * signature under modification should still be recorded as this does
+ * affect satisfiability. */
+
+ints calculate_variable_usage(const signature &sig,
+		const map<signature, set<raw_rule *>> &dependants) {
+	// This variable stores the number of separate terms each
+	// position of the given relation is simultaneously used in.
+	// Important for determining whether a given position is
+	// eliminatable.
+	ints uses(sig.second[0], 1);
+	// The eliminatability of a relation position is entirely
+	// determined by how it is used in the rules that depend on its
+	// relation
+	for(const raw_rule *rr : dependants.at(sig)) {
+		map<elem, int_t> var_usages;
+		// Record the variables occuring in the head if the head
+		// relation is distinct from the one currently being modified.
+		// Variable exportation would prevent us from deleting this
+		// variable in the body.
+		const raw_term &head = rr->h[0];
+		const signature &head_signature = get_signature(head);
+		if(sig != head_signature)
+			record_variable_usage(head, var_usages, nullptr);
+		// The set of all the variables use by terms of this relation
+		// occuring in the body. If no such terms exist, then the term
+		// of this relation must occur in the head, in which case every
+		// position of this relation could be eliminatable.
+		set<elem> relevant_vars;
+		// Now record also the number of separate conjuncts each
+		// variable occurs in whilst populating relevant_vars according
+		// to its specification.
+		if(!rr->b.empty()) for(const raw_term &rt : rr->b[0])
+			record_variable_usage(rt, var_usages,
+				get_signature(rt) == sig ? &relevant_vars : nullptr);
+		// Now eliminate the irrelevant variables. These are the
+		// variables that do not affect the current rule's
+		// satisfiability through terms of the relation currently being
+		// minimized.
+		if(sig == head_signature)
+			for(auto &[var, count] : var_usages)
+				if(!has(relevant_vars, var)) count = 0;
+		// Now assign the most pessimistic variable usages to each position
+		// in the signature under modification.
+		if(head.extype == raw_term::REL && sig == head_signature)
+			for(size_t i = 0; i < head.e.size() - 3; i++)
+				uses[i] = max(uses[i], var_usages[head.e[i+2]]);
+		if(!rr->b.empty()) for(const raw_term &rt : rr->b[0])
+			if(rt.extype == raw_term::REL && sig == make_pair(rt.e[0].e, rt.arity))
+				for(size_t i = 0; i < rt.e.size() - 3; i++)
+					uses[i] = max(uses[i], var_usages[rt.e[i+2]]);
+	}
+	return uses;
+}
+
+/* Delete the elements of the given term that have a usage of equal to
+ * one if the term's signature equals the one supplied. Otherwise if
+ * there is a usage equal to one, then add the term's signature to
+ * pending because it may have a contraction after the given signature
+ * is done. */
+
+void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
+		const signature &sig, set<signature> &pending_signatures,
+		raw_prog &rp) {
+	if(rt.extype == raw_term::REL &&
+			find(uses.begin(), uses.end(), 1) != uses.end()) {
+		signature body_signature = get_signature(rt);
+		if(sig == body_signature) {
+			rt.e[0] = new_rel;
+			for(int_t i = uses.size() - 1; i >= 0; i--)
+				if(uses[i] == 1) rt.e.erase(rt.e.begin() + 2 + i);
+			rt.calc_arity(nullptr);
+			if(auto it = pending_signatures.find(sig); it != pending_signatures.end()) {
+				pending_signatures.erase(it);
+				pending_signatures.insert(get_signature(rt));
+			}
+		} else if(has(rp.hidden_rels, body_signature)) {
+			pending_signatures.insert(body_signature);
+		}
+	}
+}
+
+/* Eliminate unused elements of hidden relations. Do these by
+ * identifying those relation elements that neither participate in
+ * term conjunction nor are exported to visible relation. */
+
+void driver::eliminate_dead_variables(raw_prog &rp) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	// Before we can eliminate relation positions, we need to know what
+	// rules depend on each relation. Knowing the dependants will allow us
+	// to determine whether a certain position is significant, and if so
+	// correct the call-sites to match the declaration.
+	set<signature> pending_signatures;
+	map<signature, set<raw_rule *>> dependants;
+	for(raw_rule &rr : rp.r) {
+		record_hidden_relation(rp, rr, rr.h[0], pending_signatures, dependants);
+		if(!rr.b.empty()) for(const raw_term &rt : rr.b[0])
+			record_hidden_relation(rp, rr, rt, pending_signatures, dependants);
+	}
+	// While there are still signatures to check for reducibility, grab
+	// the entire set and try to reduce each relation making a note of
+	// affected relations when successful.
+	while(!pending_signatures.empty()) {
+		// Grab pending signatures
+		set<pair<lexeme, ints>> current_signatures = move(pending_signatures);
+		for(const signature &sig : current_signatures) {
+			// Calculate variable usages so we can know what to eliminate
+			ints uses = calculate_variable_usage(sig, dependants);
+			
+			// Move forward only if there is something to contract
+			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
+				// Print active variable usages for debugging purposes
+				o::dbg() << "Contracting " << sig.first << " using [";
+				const char *sep = "";
+				for(int_t count : uses) {
+					o::dbg() << sep << count;
+					sep = ", ";
+				}
+				o::dbg() << "]" << endl;
+				
+				// Now consistently eliminate certain positions and prepare the
+				// next round. Rename the relation after the eliminations in
+				// case the new signature coincides with an already existing
+				// one.
+				elem new_rel = elem::fresh_temp_sym(d);
+				for(raw_rule *rr : dependants.at(sig)) {
+					contract_term(rr->h[0], new_rel, uses, sig, pending_signatures, rp);
+					if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
+						contract_term(rt, new_rel, uses, sig, pending_signatures, rp);
+				}
+				// New signature consists of every variable used more than once
+				signature new_sig(new_rel.e,
+					{(int_t) count_if(uses.begin(), uses.end(), [](int_t x) { return x > 1; })});
+				// Update the dependencies
+				dependants[new_sig] = move(dependants.at(sig));
+				dependants.erase(sig);
+				rp.hidden_rels.insert(new_sig);
+			}
+		}
+	}
+	o::dbg() << endl;
 }
 
 void collect_free_vars(const vector<vector<raw_term>> &b,
@@ -3149,14 +3385,13 @@ set<elem> collect_free_vars(const vector<vector<raw_term>> &b) {
 
 /* Collect all the variables that are free in the given rule. */
 
-void collect_free_vars(const raw_rule &rr,
-		set<elem> &free_vars) {
+void collect_free_vars(const raw_rule &rr, set<elem> &free_vars) {
 	vector<elem> bound_vars = {};
 	for(const raw_term &rt : rr.h) {
 		collect_free_vars(rt, bound_vars, free_vars);
 	}
 	if(rr.is_form()) {
-		collect_free_vars(rr.get_prft(), bound_vars, free_vars);
+		collect_free_vars(rr.prft, bound_vars, free_vars);
 	} else {
 		collect_free_vars(rr.b, bound_vars, free_vars);
 	}
@@ -3177,8 +3412,8 @@ set<elem> collect_free_vars(const raw_term &t) {
 	return free_vars;
 }
 
-void collect_free_vars(const raw_term &t,
-		vector<elem> &bound_vars, set<elem> &free_vars) {
+void collect_free_vars(const raw_term &t, vector<elem> &bound_vars,
+		set<elem> &free_vars) {
 	set<elem> term_vars;
 	// Get all the variables used in t
 	collect_vars(t, term_vars);
@@ -3197,8 +3432,8 @@ set<elem> collect_free_vars(const sprawformtree &t) {
 	return free_vars;
 }
 
-void collect_free_vars(const sprawformtree &t,
-		vector<elem> &bound_vars, set<elem> &free_vars) {
+void collect_free_vars(const sprawformtree &t, vector<elem> &bound_vars,
+		set<elem> &free_vars) {
 	switch(t->type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
 		case elem::ALT:
@@ -3389,14 +3624,14 @@ string_t driver::generate_cpp(const sprawformtree &t, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
+		map<elem, string_t> &elem_cache, const raw_term &false_term) {
 	vector<string_t> term_names;
 	for(const raw_term &rt : rr.h) {
 		term_names.push_back(
 			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t prft_name =
-		generate_cpp(rr.get_prft(), prog_constr, cid, dict_name, elem_cache);
+	string_t prft_name = generate_cpp(rr.get_prft(false_term),
+		prog_constr, cid, dict_name, elem_cache);
 	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");
 	for(const string_t &tn : term_names) {
@@ -3416,11 +3651,11 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 
 string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
+		map<elem, string_t> &elem_cache, const raw_term &false_term) {
 	vector<string_t> rule_names;
 	for(const raw_rule &rr : rp.r) {
-		rule_names.push_back(
-			generate_cpp(rr, prog_constr, cid, dict_name, elem_cache));
+		rule_names.push_back(generate_cpp(rr, prog_constr, cid, dict_name,
+			elem_cache, false_term));
 	}
 	string_t prog_name = to_string_t("rp") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_prog ") + prog_name + to_string_t(";\n");
@@ -3457,22 +3692,12 @@ bool driver::transform_grammar(raw_prog &rp) {
 	}
 }
 
-/* Defines false as a nullary relation containing no facts. This is done
- * using the rule ~false() :- ~false(). This way the false relation has
- * a constant value throughout execution. */
-
-void driver::transform_booleans(raw_prog &rp) {
-	dict_t &d = tbl->get_dict();
-	rp.r.push_back(raw_rule(
-		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			vector<elem>{}).negate(),
-		raw_term(elem(elem::SYM, d.get_lexeme("false")),
-			vector<elem>{}).negate()));
-}
-
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
+	dict_t &d = tbl->get_dict();
 	lexeme trel = { 0, 0 };
-	directives_load(rp, trel);
+	// The false term is required to represent logical constants in FOL
+	const raw_term false_term(elem::fresh_temp_sym(d), std::vector<elem> {});
+	directives_load(rp, trel, false_term);
 	auto get_vars = [this](const raw_term& t) {
 		for (const elem& e : t.e)
 			if (e.type == elem::VAR)
@@ -3513,14 +3738,14 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			string_t rp_generator;
 			map<elem, string_t> elem_cache;
 			o::dbg() << "Generating Program Generator ..." << endl << endl;
-			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
+			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache,
+				false_term);
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		if(opts.enabled("qc_subsume_z3")){
+		if(opts.enabled("cqnc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
-			transform_booleans(rp);
-			simplify_formulas(rp);
+			simplify_formulas(rp, false_term);
 			to_pure_tml(rp);
 			z3_context z3_ctx;
 			subsume_queries(rp,
@@ -3529,50 +3754,56 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-				opts.enabled("cqc-factor") || opts.enabled("complete-tern") ||
+				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("pure-tml")) {
-			// The false rule is required to represent logical constants in FOL
-			o::dbg() << "Generating the False Rule ..." << endl << endl;
-			transform_booleans(rp);
-			o::dbg() << "Booleaned Program:" << endl << endl << rp << endl;
 			o::dbg() << "Simplifying Program ..." << endl << endl;
-			simplify_formulas(rp);
+			simplify_formulas(rp, false_term);
 			o::dbg() << "Simplified Program:" << endl << endl << rp << endl;
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
+				remove_redundant_exists(rp);
 				to_pure_tml(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
-
+				
 				if(opts.enabled("cqnc-subsume")) {
 					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
 							{return cqnc(rr1, rr2);});
-					o::dbg() << "CQNC Subsumed Program:" << endl << endl << rp << endl;
+					o::dbg() << "CQNC Subsumed Program:" << endl << endl << rp
+						<< endl;
 				}
 				if(opts.enabled("cqc-subsume")) {
 					o::dbg() << "Subsuming using CQC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
 							{return cqc(rr1, rr2);});
-					o::dbg() << "CQC Subsumed Program:" << endl << endl << rp << endl;
+					o::dbg() << "CQC Subsumed Program:" << endl << endl << rp
+						<< endl;
 				}
 				if(opts.enabled("cqc-factor")) {
-					o::dbg() << "Factoring queries using CQC test ..." << endl << endl;
+					o::dbg() << "Factoring queries using CQC test ..." << endl
+						<< endl;
 					factor_rules(rp);
-					o::dbg() << "Factorized Program:" << endl << endl << rp << endl;
+					o::dbg() << "Factorized Program:" << endl << endl << rp
+						<< endl;
 				}
-				if(opts.enabled("complete-tern")) {
+				if(opts.enabled("split-rules")) {
 					// Though this is a binary transformation, rules will become
 					// ternary after timing guards are added
-					o::dbg() << "Converting rules to unary form ..." << endl << endl;
+					o::dbg() << "Converting rules to unary form ..." << endl
+						<< endl;
 					transform_bin(rp);
 					o::dbg() << "Binary Program:" << endl << endl << rp << endl;
 				}
 			});
-			o::dbg() << "Step Transformed Program:" << endl << endl << rp << endl;
+			o::dbg() << "Step Transformed Program:" << endl << endl << rp
+				<< endl;
+			o::dbg() << "Eliminating dead variables ..." << endl << endl;
+			eliminate_dead_variables(rp);
+			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
@@ -3605,22 +3836,12 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 			throw_runtime_error("Conditional statements require "
 				"-g (-guards) option enabled.");
 	bool fp = false;
-
-	if(opts.enabled("bitprog")) {
-		typechecker tc(p);
-		if(tc.tcheck()) {
-
-			bit_prog b(p);
-			//b.to_print();
-			raw_prog brp;
-			b.to_raw_prog(brp);
-			fp = tbl->run_prog(brp, pd.strs, steps, break_on_step);
-		}
-	}
-	else if (opts.enabled("bitunv")) {
+	
+	
+	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			bit_univ bu(tbl->get_dict());
+			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"));
 			raw_prog brawp;
 			bu.btransform(p, brawp);
 			fp = tbl->run_prog(brawp, pd.strs, steps, break_on_step);
@@ -3736,12 +3957,15 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
-	to.bin_transform     = opts.enabled("bin");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
-	to.pfp3              = opts.enabled("3pfp");
+	if(auto semantics_opt = opts.get("semantics"))
+		to.semantics = semantics_opt->get_enum(map<string, enum semantics>
+			{{"3pfp", semantics::pfp3}, {"pfp", semantics::pfp}});
+	to.show_hidden       = opts.enabled("show-hidden");
 	to.bitunv			 = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);

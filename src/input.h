@@ -239,6 +239,16 @@ typedef std::shared_ptr<raw_form_tree> sprawformtree;
 typedef std::shared_ptr<struct context> spenvcontext;
 typedef std::shared_ptr<class environment> spenvironment;
 
+// Type that uniquely identifies relations
+typedef std::pair<lexeme, ints> signature;
+
+bool operator<(const signature& m, const signature &n);
+bool operator==(const signature& m, const signature &n);
+template<> struct std::hash<lexeme> {size_t operator()(const lexeme&)const;};
+bool operator<(const lexeme&, const lexeme&);
+template<> struct std::less<lexeme> {bool operator()(const lexeme&, const lexeme&)const;};
+template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
+
 struct raw_prog;
 
 bool operator==(const lexeme& x, const lexeme& y);
@@ -262,8 +272,8 @@ struct elem {
 	int_t num = 0; // NUM's number or BLTIN's forget/renew bits
 	// The string that represents variants of this element.
 	lexeme e{ 0, 0 };
-	char32_t ch;
-	elem() {}
+	char32_t ch = 0;
+	elem() {};
 	elem(int_t num) : type(NUM), num(num) {}
 	elem(char32_t ch) : type(CHR), ch(ch) {}
 	elem(etype type) : type(type) {
@@ -352,6 +362,7 @@ struct primtype : utype {
 	bool operator==(const primtype& r) const {
 		return ty == r.ty && bsz == r.bsz;		
 	}
+	primtype(_ptype _ty = NOP): ty(_ty){}
 	bool operator!=(const primtype& r) const {
 		return !(*this == r);		
 	}
@@ -371,9 +382,12 @@ struct primtype : utype {
 		}
 		return s;
 	}
+	int_t get_maxbits() const {
+		return 64;
+	}
 	size_t get_bitsz() const {
 		switch(ty){
-			case UINT: return bsz > 0 && bsz <= 32 ? bsz: 16;
+			case UINT: return bsz > 0 && bsz <= get_maxbits() ? bsz: 8;
 			case UCHAR: return 8;
 			case SYMB: return 8;
 			default: return 0;
@@ -442,10 +456,6 @@ struct typestmt {
 
 };
 
-class bit_dict;
-struct bit_term;
-struct bit_prog;
-struct bit_rule;
 struct raw_term;
 struct raw_prog;
 struct raw_rule;
@@ -462,47 +472,6 @@ class bit_dict {
 	}
 };
 
-struct bit_elem {
-	const elem &e;
-	size_t bsz;
-	bit_term &pbt;
-	bools p;
-	bit_elem(const elem &_e, size_t _bsz, bit_term &_pbt);
-	size_t pos(size_t bit_from_right /*, size_t arg, size_t args */) const;
-	bool to_elem( std::vector<elem> &) const;
-	void to_print() const;
-};
-struct bit_prog {
-	 
-	std::vector<bit_rule> vbr;
-	std::vector<bit_prog> nbp;
-	const raw_prog &rp;
-	bit_dict bdict;
-	bit_prog( const raw_prog& _rp);
-	bool to_raw_prog(raw_prog &) const;
-	void to_print() const;
-};
-
-struct bit_rule {
-	std::vector<bit_term> bh;
-	std::vector<std::vector<bit_term>> bb;
-	const raw_rule &rr;
-	bit_prog &pbp;
-	bit_rule(const raw_rule &_rr, bit_prog &_pbp);
-	bool to_raw_rule(raw_rule&) const;
-	void to_print() const;
-};
-
-struct bit_term {
-	int_t rel;
-	std::vector<bit_elem> vbelem;
-	const raw_term &rt;
-	bit_rule &pbr;
-	bit_term(const raw_term &_rt, bit_rule &_pbr); 
-	size_t get_typeinfo(size_t arg, const raw_term &rt);
-	bool to_raw_term(raw_term&) const;
-	void to_print() const;
-};
 
 
 /* A raw term is produced from the parsing stage. In TML source code, it
@@ -563,23 +532,6 @@ struct raw_term {
 			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
-	static raw_term _true() {
-		return _false().negate();
-	}
-	static raw_term _false() {
-		return raw_term(raw_term::REL,
-			{elem(elem::SYM, STR_TO_LEXEME("false")), elem(elem::OPENP), elem(elem::CLOSEP)});
-	}
-	bool is_true() const {
-		return extype == raw_term::REL && e.size() == 3 &&
-			e[0].type == elem::SYM && neg &&
-			lexeme2str(e[0].e) == to_string_t("false");
-	}
-	bool is_false() const {
-		return extype == raw_term::REL && e.size() == 3 &&
-			e[0].type == elem::SYM && !neg &&
-			lexeme2str(e[0].e) == to_string_t("false");
-	}
 };
 
 struct macro {
@@ -602,9 +554,10 @@ struct directive {
 	elem arity_num; // The maximum length of domain tuples
 	elem timeout_num; // The number of database steps to be simulated
 	elem quote_str; // The literal string to be quoted.
+	raw_term internal_term; // The term whose relation should be made internal
 	
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
-		EVAL, QUOTE, EDOMAIN, CODEC }type;
+		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL }type;
 	bool parse(input* in, const raw_prog& prog);
 };
 
@@ -680,7 +633,7 @@ struct raw_rule {
 	inline bool is_fact() const
 		{ return type == NONE && b.size() == 0 && prft.get() == nullptr; }
 	// If prft not set, convert b to prft, then return prft
-	sprawformtree get_prft() const;
+	sprawformtree get_prft(const raw_term &false_term) const;
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
@@ -707,29 +660,56 @@ struct raw_form_tree {
 	sprawformtree r = nullptr;
 	bool neg = false;
 	lexeme guard_lx = {0,0};
-
+	
+	// Make formula tree representing a single term. Canonize by always
+	// extracting the negation from the term
 	raw_form_tree (const raw_term &_rt) {
 		if(_rt.neg) {
 			type = elem::NOT;
+			el = new elem(elem::NOT);
 			l = std::make_shared<raw_form_tree>(_rt.negate());
 		} else {
 			type = elem::NONE;
 			rt = new raw_term(_rt);
 		}
 	}
-	raw_form_tree (elem::etype _type, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), l(_l), r(_r) {}
-	raw_form_tree (elem::etype _type, const elem &_el, sprawformtree _l = nullptr, sprawformtree _r = nullptr) : type(_type), el(new elem(_el)), l(_l), r(_r) {}
+	// Make a formula tree with the given element and two children
+	raw_form_tree (const elem &_el, sprawformtree _l = nullptr,
+		sprawformtree _r = nullptr) :
+		type(_el.type), el(new elem(_el)), l(_l), r(_r) {}
 	~raw_form_tree() {
-		if (rt) delete rt, rt = NULL;
-		if (el) delete el, el = NULL;
+		// Fields are deletable because constructors always make heap
+		// allocated copies
+		if (rt) delete rt, rt = nullptr;
+		if (el) delete el, el = nullptr;
 	}
 	void printTree(int level =0 );
-	static sprawformtree simplify(sprawformtree &t);
-	bool is_false() const {
-		return type == elem::NONE && rt->is_false();
+	static sprawformtree simplify(sprawformtree &t, const raw_term &false_term);
+	// Recursively check equality of formula trees
+	bool operator==(const raw_form_tree &pft) {
+		// Types must be equal
+		if(type != pft.type) return false;
+		// Signs must be equal
+		else if(neg != pft.neg) return false;
+		// If formulas are terms, then they must be equal
+		else if(type == elem::NONE) return *rt == *pft.rt;
+		// Either both elements are defined or both are not
+		else if(bool(el) != bool(pft.el)) return false;
+		// Either both elements are undefined or both are equal
+		else if(el != nullptr && *el != *pft.el) return false;
+		// Either both left trees are defined or both are not
+		else if(bool(l) != bool(pft.l)) return false;
+		// Either both left trees are undefined or both are equal
+		else if(l != nullptr && *l != *pft.l) return false;
+		// Either both right trees are defined or both are not
+		else if(bool(r) != bool(pft.r)) return false;
+		// Either both right trees are undefined or both are equal
+		else if(r != nullptr && *r != *pft.r) return false;
+		else return true;
 	}
-	bool is_true() const {
-		return type == elem::NOT && l->is_false();
+	// Check formula tree inequality by checking equality
+	bool operator!=(const raw_form_tree &pft) {
+		return !(*this == pft);
 	}
 };
 struct raw_sof {
@@ -769,6 +749,8 @@ struct raw_prog {
 	std::vector<environment> typenv; // only one item;
 
 	std::set<lexeme, lexcmp> builtins;
+	// The relations that should be hidden from the user by default
+	std::set<signature> hidden_rels;
 //	int_t delrel = -1;
 
 	int_t id = 0;
@@ -858,6 +840,5 @@ bool operator==(const lexeme& l, const char* s);
 bool operator<(const raw_term& x, const raw_term& y);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
-
 
 #endif

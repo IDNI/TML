@@ -318,6 +318,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
 	if (d.type == directive::CODEC)
 		return os << "codec " << d.codec_sym << ' ' << d.domain_sym << ' '
 			<< d.quote_sym << ' ' << d.arity_num << '.';
+	if (d.type == directive::INTERNAL)
+		return os << "internal " << d.internal_term << '.';
 	if (d.type == directive::STDOUT) os << "stdout ";
 	else os << "string ";
 	if (d.type == directive::TREE) return os << d.t << '.';
@@ -856,7 +858,7 @@ template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
 
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const table& t) const {
-	print(os << "#\t", t.s) << (t.internal ? "@":"")
+	print(os << "#\t", t.s) << (t.hidden ? "@":"")
 		<< (t.idbltin > -1 ? " builtin" : "")
 		<< endl;
 	for (auto r : t.r) print(os << "#\t\t", rules[r]) << endl;

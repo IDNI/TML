@@ -22,7 +22,7 @@ class archive;
 
 struct option {
 	friend class archive;
-	enum type { UNDEFINED, INT, BOOL, STRING };
+	enum type { UNDEFINED, INT, BOOL, STRING, ENUM };
 	struct value {
 		friend class archive;
 		value()              : t(UNDEFINED)         {}
@@ -55,6 +55,7 @@ struct option {
 				case INT:       return v_i == ov.get_int();
 				case BOOL:      return v_b == ov.get_bool();
 				case STRING:    return v_s == ov.get_string();
+				default:        DBGFAIL;
 			}
 		}
 	private:
@@ -69,6 +70,8 @@ struct option {
 		: v(v), t(t), n(n), e(e) {}
 	option(type t, strings n, option::value v={})
 		: v(v), t(t), n(n), e(0) {}
+	option(type t, strings n, std::set<std::string> enums, option::value v={})
+		: v(v), t(t), n(n), enumerators(enums), e(0) {}
 	const std::string& name() const { return n[0]; }
 	const strings& names() const { return n; }
 	type get_type() const { return t; }
@@ -78,6 +81,11 @@ struct option {
 	int           get_int   () const { return v.get_int(); };
 	bool          get_bool  () const { return v.get_bool(); };
 	std::string  get_string() const { return v.get_string(); };
+	// Convert an enumeration's string representation to the actual
+	// enumeration using the given map
+	template<typename E> E get_enum(std::map<std::string, E> dec) {
+		return dec[get_string()];
+	}
 	bool operator ==(const value& ov) const { return v == ov; }
 	bool operator ==(const option& o) const { return n == o.names(); }
 	bool operator  <(const option& o) const { return n < o.names(); }
@@ -90,9 +98,23 @@ struct option {
 			case STRING: if (s != "") v.set(s);
 				else if (is_output()) v.set("@stdout");
 				break;
+			case ENUM: parse_enum(s); break;
 			default: DBGFAIL;
 		}
 		if (e) e(v);
+	}
+	void parse_enum(const std::string &s) {
+		if(has(enumerators, s)) v.set(s);
+		else {
+			o::err() << "Wrong enum argument for " << n[0] << ": " << s
+				<< ". Must be one of: ";
+			const char *separator = "";
+			for(std::string enumerator : enumerators) {
+				o::err() << separator << enumerator;
+				separator = ", ";
+			}
+			o::err() << "." << std::endl;
+		}
 	}
 	void parse_bool(const std::string& s) {
 		if (s=="" || s=="true" || s=="t" || s=="1" || s=="on" ||
@@ -125,6 +147,7 @@ struct option {
 				else if (is_input()) ss << "input";
 				else ss << "string";
 				break;
+			case ENUM: ss << "enum"; break;
 			default: DBGFAIL;
 		}
 		ss << "]";
@@ -139,6 +162,7 @@ struct option {
 private:
 	type t;
 	strings n;  // vector of name and alternative names (shortcuts)
+	std::set<std::string> enumerators; // vector of possible enumeration values for ENUM
 	callback e; // callback with value as argument, fired when option parsed
 	std::string desc = "";
 };
@@ -160,7 +184,7 @@ public:
 		DBGFAIL; return "";
 	}
 	void add(option o);
-	bool get(std::string name, option& o) const;
+	std::optional<option> get(std::string name) const;
 	void set(const std::string name, const option o) {
 		opts.insert_or_assign(name, o);
 	}

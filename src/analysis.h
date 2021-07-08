@@ -18,7 +18,12 @@
 struct context {
     std::map<string_t, primtype> context_prim_var;
     std::map<string_t, string_t> context_typedef_var;
-    
+    bool operator==(const context& r) const {
+        return context_prim_var == r.context_prim_var && context_typedef_var == r.context_typedef_var;
+    }
+    bool operator!=(const context& r) const {
+        return !(*this == r);
+    }
     primtype& lookup_prim_var( string_t &var ){
         DBG(assert(context_prim_var.count(var)));
         return context_prim_var[var];
@@ -156,27 +161,51 @@ class typechecker {
 struct bit_univ {
 	enum { //should be compatible with typesystem's prim type
 		CHAR_BSZ = 8,
-		INT_BSZ = 16,
+		INT_BSZ = 8,
 		SYM_BSZ = 8,
 		VAR_BSZ = 8,
 	};
 	dict_t &d;
+    size_t bit_order;
 	environment &typenv;
     size_t char_bsz, int_bsz, sym_bsz, var_bsz;
 
-	bit_univ(dict_t &_d, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
-	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), typenv(_e), char_bsz(_cbsz),
+	bit_univ(dict_t &_d, size_t _bo = 0, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
+	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), typenv(_e), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
-	
+
 	size_t get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
 	inline size_t pos(size_t bsz, size_t bit_from_right /*, size_t arg, size_t args */) const {
 		DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
 		return (bsz - bit_from_right - 1); //* args + arg;
 	}
+    bool brev_transform( raw_term& bit_raw_term);
 	bool btransform( const raw_prog& rpin, raw_prog &rpout );
-	bool btransform( const raw_rule& rrin, raw_rule &rrout );
+	private:
+    bool btransform( const raw_rule& rrin, raw_rule &rrout );
 	bool btransform( const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout );
+    public:
+    template<class T>
+    bool permuteorder(std::vector<T> &cont, size_t n, bool backward = false){
+        static std::vector<int_t> ord, rord;
+        if ( n == 0 ) return false;         
+        std::vector<T> ocont = cont;
+        if(ord.size() != cont.size()) {
+            // should do more memoization,
+            ord.resize(cont.size());
+            rord.resize(cont.size());
+            for( size_t i=0; i < ord.size(); i++)	ord[i] = i;
+            while( n--  &&  std::next_permutation(ord.begin(), ord.end()));
+            for( size_t i=0; i<rord.size(); i++)	rord[ord[i]] = i;
+            DBG(COUT<<std::endl);
+            for(int_t v: ord) { DBG(COUT<< v; ) }
+        }
+            // copy values from old array to cont
+        DBG(COUT<< std::endl<<"B:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
+        for(size_t i=0; i<cont.size(); i++)	cont[i] = ocont[!backward ? ord[i]: rord[i]];    
+        DBG(COUT<< std::endl<<"A:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
+        return true;
+    }
 };
-
 
 #endif

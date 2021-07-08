@@ -607,7 +607,30 @@ Alternatively, if the user requires extended precision to keep all information o
 
 where ?zh accounts for the most significant bits (MSBs) of the operation and ?zl for the least significant bits (LSBs).
 
-## Fixed point detection programatically
+# Counting number of records in relations
+
+For getting number of records in a relation TML provides count builtin. It is
+usable in bodies. It has no input argument and it has one output argument which
+is the number of records matching rule's body.
+
+Result of the count builtin is not accessible in the same rule's body, it can be
+only passed to terms in head. If it is necessary to use the count result in
+a body it has to be stored into the db first (use head term) and then the value
+can be accessed in a body in a next step.
+
+Example:
+```
+	A(1). A(2). A(3).
+
+	# wrong because ?l can be passed only to head
+	len_is_3  :- A(?x), count(?l), ?l = 3. 
+
+	# length of A is stored in A_len and in another rule it is checked
+	A_len(?l) :- A(?x), count(?l).        
+	len_is_3  :- A_len(?l), ?l = 3.
+```
+
+# Fixed point detection programatically
 
 TML programmer can enable fixed point step by `-fp` (`-fp-step`) command line
 option. This option makes TML interpret to add a `__fp__` fact into program's
@@ -888,12 +911,12 @@ record pair(int ?a, char ?b).
 Here, father predicate can take argument of type sym, symbols. "edge" takes first argument of type 3 bit size and second as type 2 bits size.
 
 ## Running checker for type errors
-The type checking will check for various type errors in the TML program for example. Running following program with "tml --bitprog " option will invoke the typechecking on the TML rules. ( the flage option would be removed in future, though currently specific)
+The type checking will check for various type errors in the TML program for example. Running following program with "tml --bitunv " option will invoke the typechecking on the TML rules. ( the flage option would be removed in future, though currently specific)
 
-The following program has type mismatch for ?x in first rule. Running it with -bitprog option produces error
+The following program has type mismatch for ?x in first rule. Running it with -bitunv option produces error
 ```
-record e( int:5 ?a,  int:5 ?b).
-record tc( int:6 ?a, int:5 ?b).
+predtype e( int:5 ?a,  int:5 ?b).
+predtype tc( int:6 ?a, int:5 ?b).
 e(1 2 ).
 
 tc(?x ?y) :- e(?x ?z), tc(?z ?y).
@@ -936,12 +959,12 @@ struct styp {
     int:2 ?c, ?z .
     sttyp2 ?inner, ?in3.
 }
-record father( sym ?b).
-record canFly( sym ?c ).
-record edge (int:3 ?c, int:2 ?c ).
-record night( int:2 ?A).
-record pair(int ?a, char ?b).
-record school ( undeftype ?name,  sttyp2 ?l ).
+predtype father( sym ?b).
+predtype canFly( sym ?c ).
+predtype edge (int:3 ?c, int:2 ?c ).
+predtype night( int:2 ?A).
+predtype pair(int ?a, char ?b).
+predtype school ( undeftype ?name,  sttyp2 ?l ).
 
 father(fff wrongargcount).
 #father(Tom Amy).  

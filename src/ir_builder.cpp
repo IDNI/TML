@@ -16,6 +16,7 @@
 
 #include "ir_builder.h"
 #include "tables.h"
+#include "analysis.h"
 using namespace std;
 
 #define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
@@ -143,7 +144,10 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				t.goal = r.type == raw_rule::GOAL,
 				m.insert({t}), get_nums(x);
 		}
-
+	// Note the relations that are marked as tmprel in the raw_prog
+	for(const auto &[functor, arity] : p.hidden_rels)
+		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
+	
 	return m;
 }
 
@@ -369,39 +373,11 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		DBG(assert(args == r.size());)
-		string_t str = lexeme2str(rt.e[0].e);
-		if( opts.bitunv && dynenv->typenv.contains_pred(str )) {
-			const std::vector<typedecl> &vt = dynenv->typenv.lookup_pred(str) ;
-			int_t bitsz = -1;
-			int_t val;
-			int_t argc = 0;
-			for(typedecl td: vt ) {
-				if( td.is_primitive() ) {
-					bitsz =  td.pty.get_bitsz();
-					val = 0;
-					DBG(assert(rt.e.size() > (size_t)bitsz ));
-					for( int_t n = 0; n < bitsz; n++)
-							val |= rt.e[argc + n + 2].num << (bitsz-1 -n);
-
-					rt.e.erase(rt.e.begin()+ 2 + argc, rt.e.begin() + 2 + argc + bitsz);
-					elem el;
-					if( td.pty.ty == primtype::UINT )
-						el = elem(val);
-					else if ( td.pty.ty == primtype::UCHAR )
-						el = elem((char_t) val);
-					else if ( td.pty.ty == primtype::SYMB )
-						el = elem(elem::SYM, this->dict.get_sym(val) );
-
-					rt.e.insert(rt.e.begin() + 2 + argc, el);
-					argc++;
-				}
-				else { } //structtypes userdef
-			}
-			rt.calc_arity(nullptr);
+		if( opts.bitunv ) {
+			bit_univ bu(dict, opts.bitorder, dynenv->typenv);
+			if(bu.brev_transform(rt))
+				rt.calc_arity(nullptr);
 		}
-		else if( opts.bitunv) {
-		}
-
 		return rt;
 }
 

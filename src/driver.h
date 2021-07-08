@@ -30,7 +30,7 @@
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
-typedef std::pair<elem, int_t> rel_info;
+typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -131,7 +131,8 @@ class driver {
 	std::set<raw_term> get_queries(const raw_prog& p);
 
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
+	void directives_load(raw_prog& p, lexeme& trel,
+		const raw_term &false_term);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
@@ -147,7 +148,8 @@ class driver {
 //	void transform_string(const sysstring_t&, raw_prog&, int_t);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	bool transform_evals(raw_prog &rp, const directive &drt);
-	bool transform_quotes(raw_prog &rp, const directive &drt);
+	bool transform_quotes(raw_prog &rp, const raw_term &false_term,
+		const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
 	sprawformtree expand_formula_node(const sprawformtree &t);
@@ -164,11 +166,12 @@ class driver {
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
+	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
     	void qc_z3(raw_prog &rp);
 	bool check_ucqn_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
-	void simplify_formulas(raw_prog &rp);
+	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
@@ -179,21 +182,22 @@ class driver {
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
 	std::vector<elem> quote_rule(const raw_rule &rr, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, int_t &part_count);
+		const elem &domain_name, raw_prog &rp, int_t &part_count,
+		const raw_term &false_term);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp);
-	raw_term to_pure_tml(const sprawformtree &t, std::vector<raw_rule> &rp,
+		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
+	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 	void to_pure_tml(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
+	void remove_redundant_exists(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	void transform_booleans(raw_prog &rp);
 	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
@@ -204,9 +208,11 @@ class driver {
 	string_t generate_cpp(const sprawformtree &prft, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
+		const raw_term &false_term);
 	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
+		const raw_term &false_term);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
