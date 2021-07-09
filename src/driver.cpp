@@ -112,10 +112,7 @@ void driver::directives_load(raw_prog& p, lexeme& trel,
  * universal and existential quantifications. Useful for avoiding having
  * to separately process these operators. */
 
-sprawformtree driver::expand_formula_node(const sprawformtree &t) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-	
+sprawformtree expand_formula_node(const sprawformtree &t, dict_t &d) {
 	switch(t->type) {
 		case elem::IMPLIES: {
 			// Implication is logically equivalent to the following
@@ -136,7 +133,7 @@ sprawformtree driver::expand_formula_node(const sprawformtree &t) {
 					make_shared<raw_form_tree>(qvar),
 					make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
 						make_shared<raw_form_tree>(
-							raw_term(raw_term::EQ, { evar, elem_eq, qvar })))));
+							raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar })))));
 		} default: {
 			return t;
 		}
@@ -883,7 +880,7 @@ template<typename F>
 /* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
-void driver::qc_z3 (raw_prog &raw_p) {
+void driver::qc_z3 (raw_prog &raw_p, const raw_term &false_term) {
 	z3_context ctx;
 	// Sort rules by relation name and then by tml arity
 	auto sort_rp = [](const raw_rule& r1, const raw_rule& r2) {
@@ -909,10 +906,10 @@ void driver::qc_z3 (raw_prog &raw_p) {
 				isEndReached = compared == raw_p.r.end();
 			} if (isEndReached) break;
 			// Check rules for containment
-			if (check_ucqn_z3(*selected, *compared, ctx)) {
+			if (check_qc_z3(*selected, *compared, false_term, ctx)) {
 				selected = raw_p.r.erase(selected);
 				continue;
-			} else if(check_ucqn_z3(*compared, *selected, ctx))
+			} else if(check_qc_z3(*compared, *selected, false_term, ctx))
 				compared = raw_p.r.erase(compared);
 			else ++compared;
 		}
@@ -960,8 +957,7 @@ z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
 
 z3::expr z3_context::globalHead_to_z3(const int_t pos) {
 	for (int_t i=head_rename.size(); i<=pos; ++i)
-		head_rename.push_back(z3::expr(context,
-			Z3_mk_fresh_const(context, nullptr, uninterp_sort)));
+		head_rename.push_back(z3::expr(context, fresh_constant()));
 	return head_rename[pos];
 }
 
@@ -1003,25 +999,77 @@ z3::expr z3_context::z3_head_constraints(const raw_term &head,
  * the mappings in the context as necessary. The mappings in body_rename
  * are always prioritized over what is in the context. */
 
-z3::expr z3_context::term_to_z3(const raw_term &rel,
-		const map<elem, z3::expr> &body_rename) {
+z3::expr z3_context::term_to_z3(const raw_term &rel) {
 	z3::expr_vector vars_of_rel (context);
 	for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
 		// Pushing head variables
-		// take head variable renaming into account
-		const auto& re_var = body_rename.find(*el);
-		if (re_var != body_rename.end())
-			vars_of_rel.push_back(re_var->second);
-		else vars_of_rel.push_back(arg_to_z3(*el));
+		vars_of_rel.push_back(arg_to_z3(*el));
 	}
 	return rel_to_z3(rel)(vars_of_rel);
+}
+
+/* Make a fresh Z3 constant. */
+
+z3::expr z3_context::fresh_constant() {
+	return z3::expr(context,
+		Z3_mk_fresh_const(context, nullptr, uninterp_sort));
+}
+
+/* Given a formula tree, output the equivalent Z3 expression using and
+ * updating the mappings in the context as necessary. */
+
+z3::expr z3_context::tree_to_z3(const sprawformtree &t,
+		const raw_term &false_term, dict_t &dict) {
+	switch(t->type) {
+		case elem::AND:
+			return tree_to_z3(t->l, false_term, dict) &&
+				tree_to_z3(t->r, false_term, dict);
+		case elem::ALT:
+			return tree_to_z3(t->l, false_term, dict) ||
+				tree_to_z3(t->r, false_term, dict);
+		case elem::NOT:
+			return !tree_to_z3(t->l, false_term, dict);
+		case elem::EXISTS: {
+			const elem &qvar = *t->l->el;
+			// Obtain original Z3 binding this quantified variable
+			z3::expr normal_const = arg_to_z3(qvar);
+			// Use a fresh Z3 binding for this quantified variable
+			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
+			// Make quantified expression
+			z3::expr qexpr = exists(temp_const,
+				tree_to_z3(t->r, false_term, dict));
+			// Restore original binding for quantified variable
+			var_to_decl.at(qvar) = normal_const;
+			return qexpr;
+		} case elem::FORALL: {
+			const elem &qvar = *t->l->el;
+			// Obtain original Z3 binding this quantified variable
+			z3::expr normal_const = arg_to_z3(qvar);
+			// Use a fresh Z3 binding for this quantified variable
+			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
+			// Make quantified expression
+			z3::expr qexpr = forall(temp_const,
+				tree_to_z3(t->r, false_term, dict));
+			// Restore original binding for quantified variable
+			var_to_decl.at(qvar) = normal_const;
+			return qexpr;
+		} case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
+			// Process the expanded formula instead
+			return tree_to_z3(expand_formula_node(t, dict), false_term, dict);
+		case elem::NONE:
+			if(*t == false_term) return context.bool_val(false);
+			else return term_to_z3(*t->rt);
+		default:
+			assert(false); //should never reach here
+	}
 }
 
 /* Given a rule, output the body of this rule converted to the
  * corresponding Z3 expression. Caches the conversion in the context in
  * case the same rule is needed in future. */
 
-z3::expr z3_context::rule_to_z3(const raw_rule &rr) {
+z3::expr z3_context::rule_to_z3(const raw_rule &rr,
+		const raw_term &false_term, dict_t &dict) {
 	if(auto decl = rule_to_decl.find(rr); decl != rule_to_decl.end())
 		return decl->second;
 	// create map from bound_vars
@@ -1030,23 +1078,24 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr) {
 	// Collect bound variables of rule and restrictions from constants in head
 	set<elem> free_vars;
 	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
-	collect_free_vars(rr.b, bound_vars, free_vars);
+	collect_free_vars(rr.get_prft(false_term), bound_vars, free_vars);
 	// Free variables are existentially quantified
 	z3::expr_vector ex_quant_vars (context);
 	for (const auto& var : free_vars)
 		ex_quant_vars.push_back(arg_to_z3(var));
-	// Construct z3 expression from rule
-	z3::expr disjuncts = context.bool_val(false);
-	for (const auto& conj : rr.b) {
-		z3::expr conjuncts = context.bool_val(true);
-		for (const raw_term& rel : conj) {
-			const z3::expr &trm = term_to_z3(rel, body_rename);
-			conjuncts = conjuncts && (rel.neg ? !trm : trm);
-		}
-		disjuncts = disjuncts || conjuncts;
+	map<elem, z3::expr> var_backup;
+	// For the intent of constructing this Z3 expression, replace head
+	// variable expressions with the corresponding global head
+	for(auto &[el, constant] : body_rename) {
+		var_backup.emplace(make_pair(el, arg_to_z3(el)));
+		var_to_decl.at(el) = constant;
 	}
+	// Construct z3 expression from rule
+	z3::expr formula = tree_to_z3(rr.get_prft(false_term), false_term, dict);
+	// Now undo the global head mapping for future constructions
+	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
 	z3::expr decl = restr && (ex_quant_vars.empty() ?
-		disjuncts : z3::exists(ex_quant_vars, disjuncts));
+		formula : z3::exists(ex_quant_vars, formula));
 	rule_to_decl.emplace(make_pair(rr, decl));
 	return decl;
 }
@@ -1055,9 +1104,8 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr) {
  * Returns false if rules are not comparable or not contained.
  * Returns true if r1 is contained in r2. */
 
-bool driver::check_ucqn_z3(const raw_rule &r1, const raw_rule &r2,
-		z3_context &ctx) {
-	if (!(is_ucqn(r1) && is_ucqn(r2))) return 0;
+bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
+		const raw_term &false_term, z3_context &ctx) {
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 	    	r1.h[0].arity == r2.h[0].arity)) return 0;
@@ -1067,8 +1115,9 @@ bool driver::check_ucqn_z3(const raw_rule &r1, const raw_rule &r2,
 		bound_vars.push_back(ctx.globalHead_to_z3(i));
 	// Rename head variables on the fly such that they match
 	// on both rules
-	z3::expr rule1 = ctx.rule_to_z3(r1);
-	z3::expr rule2 = ctx.rule_to_z3(r2);
+	dict_t &dict = tbl->get_dict();
+	z3::expr rule1 = ctx.rule_to_z3(r1, false_term, dict);
+	z3::expr rule2 = ctx.rule_to_z3(r2, false_term, dict);
 	ctx.solver.push();
 	// Add r1 => r2 to solver
 	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
@@ -3045,12 +3094,9 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 	const elem part_id = elem::fresh_temp_sym(d);
 
 	switch(t->type) {
-		case elem::IMPLIES:
+		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
 			// Process the expanded formula instead
-			return to_pure_tml(expand_formula_node(t), rp, fv);
-		case elem::COIMPLIES:
-			// Process the expanded formula instead
-			return to_pure_tml(expand_formula_node(t), rp, fv);
+			return to_pure_tml(expand_formula_node(t, d), rp, fv);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<sprawformtree> ands;
@@ -3116,9 +3162,6 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			// Hide this new auxilliary relation
 			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			return raw_term(part_id, nfv);
-		} case elem::UNIQUE: {
-			// Process the expanded formula instead
-			return to_pure_tml(expand_formula_node(t), rp, fv);
 		} case elem::NONE: {
 			return *t->rt;
 		} case elem::FORALL: {
@@ -3746,11 +3789,11 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(opts.enabled("cqnc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			simplify_formulas(rp, false_term);
-			to_pure_tml(rp);
+			remove_redundant_exists(rp);
 			z3_context z3_ctx;
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_ucqn_z3(rr1, rr2, z3_ctx);});
+					{return check_qc_z3(rr1, rr2, false_term, z3_ctx);});
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
@@ -3758,12 +3801,12 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				opts.enabled("pure-tml")) {
 			o::dbg() << "Simplifying Program ..." << endl << endl;
 			simplify_formulas(rp, false_term);
+			remove_redundant_exists(rp);
 			o::dbg() << "Simplified Program:" << endl << endl << rp << endl;
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
-				remove_redundant_exists(rp);
 				to_pure_tml(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
 				

@@ -75,12 +75,15 @@ struct z3_context {
 	z3_context();
 	z3::func_decl rel_to_z3(const raw_term& rt);
 	z3::expr globalHead_to_z3(const int_t pos);
+	z3::expr fresh_constant();
 	z3::expr arg_to_z3(const elem& el);
 	z3::expr z3_head_constraints(const raw_term &head,
 		std::map<elem, z3::expr> &body_rename);
-	z3::expr term_to_z3(const raw_term &rel,
-		const std::map<elem, z3::expr> &body_rename);
-	z3::expr rule_to_z3(const raw_rule &rr);
+	z3::expr term_to_z3(const raw_term &rel);
+	z3::expr tree_to_z3(const sprawformtree &tree,
+		const raw_term &false_term, dict_t &dict);
+	z3::expr rule_to_z3(const raw_rule &rr, const raw_term &false_term,
+		dict_t &dict);
 };
 
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
@@ -152,7 +155,6 @@ class driver {
 		const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
-	sprawformtree expand_formula_node(const sprawformtree &t);
 	void flatten_associative(const elem::etype &tp,
 		const sprawformtree &tree, std::vector<sprawformtree> &tms);
 	template<typename F> bool try_minimize(raw_rule &rr, const F &f);
@@ -168,8 +170,9 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
-    	void qc_z3(raw_prog &rp);
-	bool check_ucqn_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
+	void qc_z3(raw_prog &rp, const raw_term &false_term);
+	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
+		const raw_term &false_term, z3_context &ctx);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
