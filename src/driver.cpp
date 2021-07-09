@@ -3815,7 +3815,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		if(opts.enabled("cqnc-subsume-z3")){
+		if(opts.enabled("qc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			simplify_formulas(rp, false_term);
 			remove_redundant_exists(rp);
