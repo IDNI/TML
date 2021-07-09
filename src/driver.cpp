@@ -185,21 +185,45 @@ bool is_cqn(const raw_rule &rr) {
 	return true;
 }
 
-/* Checks if the body of a given rule is conjunctive
- * or disjunctive with negation */
+// Recurse through the given formula tree calling the given function
+// with the accumulator
 
-bool is_ucqn (const raw_rule &rr) {
-	// Ensure that there are no multiple heads and it is not a fact
-	if(rr.h.size() != 1 || rr.b.empty()) return false;
+template<typename X, typename F>
+		X fold_tree(const sprawformtree &t, X acc, const F &f) {
+	switch(t->type) {
+		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
+				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
+			// Fold through binary trees by threading accumulator through both
+			// the LHS and RHS
+			return fold_tree(t->r, fold_tree(t->l, f(t, acc), f), f);
+		// Fold though unary trees by threading accumulator through this
+		// node then single child
+		case elem::NOT: return fold_tree(t->l, f(t, acc), f);
+		// Otherwise for leaf nodes like terms and variables, thread
+		// accumulator through just this node
+		default: return f(t, acc);
+	}
+}
+
+/* Checks if the rule has a single head and a body that is either a tree
+ * or a non-empty DNF. Second order quantifications and terms that are
+ * neither relations nor equalities are not supported. */
+
+bool is_query (const raw_rule &rr, const raw_term &false_term) {
+	// Ensure that there are no multiple heads
+	if(rr.h.size() != 1) return false;
 	// Ensure that head is positive
 	if(rr.h[0].neg) return false;
-	// Ensure that this rule is a proper rule
-	if(!rr.is_rule()) return false;
-	// Ensure that each body term is a relation
-	for (const auto& conj : rr.b)
-		for(const raw_term &rt : conj) {
-			if(rt.extype != raw_term::REL) return false;
-		}
+	// Ensure that this rule is either a tree or non-empty DNF
+	if(!(rr.is_rule() || rr.is_form())) return false;
+	// Ensure that all terms in the tree are either relations or
+	// equalities and that there is no second order quantification
+	if(!fold_tree(rr.get_prft(false_term), true,
+			[&](const sprawformtree &t, bool acc) -> bool {
+				return acc && (t->type != elem::NONE ||
+					t->rt->extype == raw_term::REL ||
+					t->rt->extype == raw_term::EQ) && t->type != elem::SYM;}))
+		return false;
 	return true;
 }
 
@@ -996,16 +1020,19 @@ z3::expr z3_context::z3_head_constraints(const raw_term &head,
 }
 
 /* Given a term, output the equivalent Z3 expression using and updating
- * the mappings in the context as necessary. The mappings in body_rename
- * are always prioritized over what is in the context. */
+ * the mappings in the context as necessary. */
 
 z3::expr z3_context::term_to_z3(const raw_term &rel) {
-	z3::expr_vector vars_of_rel (context);
-	for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
-		// Pushing head variables
-		vars_of_rel.push_back(arg_to_z3(*el));
-	}
-	return rel_to_z3(rel)(vars_of_rel);
+	if(rel.extype == raw_term::REL) {
+		z3::expr_vector vars_of_rel (context);
+		for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
+			// Pushing head variables
+			vars_of_rel.push_back(arg_to_z3(*el));
+		}
+		return rel_to_z3(rel)(vars_of_rel);
+	} else if(rel.extype == raw_term::EQ) {
+		return arg_to_z3(rel.e[0]) == arg_to_z3(rel.e[2]);
+	} else assert(false); //should never reach here
 }
 
 /* Make a fresh Z3 constant. */
@@ -1106,6 +1133,8 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr,
 
 bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		const raw_term &false_term, z3_context &ctx) {
+	if (!(is_query(r1, false_term) && is_query(r2, false_term)))
+		return false;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 	    	r1.h[0].arity == r2.h[0].arity)) return 0;

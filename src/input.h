@@ -722,9 +722,9 @@ struct raw_rule {
 		else for (auto hi : h) has[hi.neg ? DELS : ADDS] = true;
 	}
 	inline bool is_rule() const
-		{ return type == NONE && b.size() > 0 && prft.get() == nullptr; }
+		{ return type == NONE && b.size() > 0; }
 	inline bool is_form() const
-		{ return prft.get() != nullptr && b.size() == 0; }
+		{ return type == NONE && prft.get() != nullptr && b.size() == 0; }
 	inline bool is_fact() const
 		{ return type == NONE && b.size() == 0 && prft.get() == nullptr; }
 	// If prft not set, convert b to prft, then return prft
