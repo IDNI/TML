@@ -140,7 +140,6 @@ public:
 	archive& read_map(std::map<Key, T, C>& m);
 	template <typename Key, typename T>
 	archive& read_map(std::map<Key, T>& m);
-	archive& operator>>(std::map<ntable, std::set<ntable>>& deps);
 	archive& operator>>(std::map<ntable, std::set<term>>& mhits);
 
 	template <typename Key, typename T>
