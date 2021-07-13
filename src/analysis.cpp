@@ -25,6 +25,7 @@ bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	// set the same environment for the output raw bit prog 
 	rpout.set_typenv(typenv);
 	rpout.g = rpin.g;
+	get_raw_tables();
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
@@ -116,22 +117,17 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
 	if(vt.size() == 0 ) return false;
 	int_t bitsz = -1;
-	int_t val;
-	int_t argc = 0;
+	int_t val = 0, arg = 0,  args = vt.size();
+	// save bits and clear from rbt
+	std::vector<elem> rbits{ rbt.e.begin()+2, rbt.e.end()-1 };
+	rbt.e.erase(rbt.e.begin()+2, rbt.e.end()-1);
 	for(typedecl td: vt ) {
 		if( td.is_primitive() ) {
 			bitsz =  td.pty.get_bitsz();
-			val = 0;
-			DBG(assert(rbt.e.size() > (size_t)bitsz ));
-			bools v;
-			for( int_t n = 0; n < bitsz; n++)
-				v.push_back(rbt.e[argc + n + 2].num);						
-			
-			permuteorder(v, bit_order, true);
-			for( int_t n = 0; n < bitsz; n++)	
-				val |= v[n] << (bitsz-1 -n);
-
-			rbt.e.erase(rbt.e.begin()+ 2 + argc, rbt.e.begin() + 2 + argc + bitsz);
+			val = 0;				
+			//construct arg value from bits using pos					
+			for( int_t k = 0; k < bitsz; k++)	
+				val |= rbits[pos( bitsz, k, arg, args)].num << k;
 			elem el;
 			if( td.pty.ty == primtype::UINT )
 				el = elem(val);
@@ -140,8 +136,8 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
 				el = elem(elem::SYM, this->d.get_sym(val) );
 
-			rbt.e.insert(rbt.e.begin() + 2 + argc, el);
-			argc++;
+			rbt.e.insert(rbt.e.begin() + 2 + arg, el);
+			arg++;
 		}
 		else { } //structtypes userdef
 	}
@@ -152,39 +148,57 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
 	rtout.neg = rtin.neg;	
-	if( rtin.extype == raw_term::REL || rtin.extype == raw_term::BLTIN) {
+	if( rtin.extype == raw_term::REL || rtin.extype == raw_term::BLTIN) {	
+		int_t args = rtin.e.size() == 1 ? 0: rtin.e.size()-3;	
+		DBG(assert(args == rtin.arity[0]));
+		
+		string_t pname = lexeme2str(rtin.e[0].e);
+		tab_args targs = rtabs.find(pname)->second;
+		// getting total bits for the table/predicate
+		size_t totalsz = 0;
+		for( size_t asz : targs  )	totalsz += asz;
+		std::vector<elem> bitelem(totalsz);
+
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
-				// for predicate rel name, keep as it is
-				if( n == 0 ) { rtout.e.emplace_back(e); continue; }
-				// get bit size of the given elem and convert to bit representation
-				size_t bsz = get_typeinfo(n, rtin, rr);
-				if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
-				std::vector<elem> bitelem(bsz);
-				int_t symbval = 0;
-				for (size_t k = 0; k != bsz; ++k) {
-					switch(e.type) {
-						case elem::NUM: bitelem[pos(bsz, k)] = bool(e.num & (1<<k)); break;
-						case elem::CHR: bitelem[pos(bsz, k)] = bool(e.ch & (1<<k)); break;
-						case elem::VAR: { 
-							string_t temp = lexeme2str(e.e);
-							// making new bit vars and avoiding conflict 
-							temp.append(to_string_t("_").append(to_string_t((int_t)k)));
-							bitelem[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
-							break; 
-						}
-						case elem::STR:
-						case elem::SYM: {
-							if( k == 0 ) symbval = d.get_sym(e.e);
-							bitelem[pos(bsz, k)] = bool(symbval & (1<<k)); 
-							break;
-						}
-						default: DBG( COUT<<e<<std::endl; assert(false)); break;
+			// for predicate rel name, keep as it is
+			if( n == 0 ) { rtout.e.emplace_back(e); continue; }		
+			// get bit size of the given elem and convert to bit representation/
+			size_t bsz = get_typeinfo(n, rtin, rr);
+			if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
+			int_t symbval = 0;
+			for (size_t k = 0; k != bsz; ++k) {
+				// extend bit if required.
+				int_t ps = pos(bsz, k, n-2, args, targs);
+				assert(ps < bitelem.size());
+			/*	//dynamically grow bitsiz
+				if(ps >= bitelem.size()) {
+					int_t incr = ps - bitelem.size() + 1 ;
+					while(incr--) bitelem.emplace_back(false);
+				} */			
+				switch(e.type) {
+					case elem::NUM: bitelem[ps] = bool(e.num & (1<<k)); break;
+					case elem::CHR: bitelem[ps] = bool(e.ch & (1<<k)); break;
+					case elem::VAR: { 
+						string_t temp = lexeme2str(e.e);
+						// making new bit vars and avoiding conflict 
+						temp.append(to_string_t("_").append(to_string_t((int_t)k)));
+						bitelem[ps] = {elem::VAR, d.get_lexeme(temp)};
+						break; 
 					}
+					case elem::STR:
+					case elem::SYM: {
+						if( k == 0 ) symbval = d.get_sym(e.e);
+						bitelem[ps] = bool(symbval & (1<<k)); 
+						break;
+					}
+					default: DBG( COUT<<e<<std::endl; assert(false)); break;
 				}
-				permuteorder(bitelem, bit_order);
-				rtout.e.insert(rtout.e.end(), bitelem.begin(), bitelem.end());	
+			}
+	//		permuteorder(bitelem, bit_order);	
 		}
+		//insert before last enclosing paranthesis
+		if(bitelem.size()) rtout.e.insert(rtout.e.end()-1, bitelem.begin(), bitelem.end());
 		ret &= rtout.calc_arity(0);
 	}
 	else if ( rtin.extype == raw_term::ARITH || rtin.extype == raw_term::EQ || rtin.extype == raw_term::LEQ) {
@@ -199,14 +213,14 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								for( size_t k= 0; k !=bsz ; k++){
 									string_t temp = str;
 									temp.append(to_string_t("_").append(to_string_t((int_t)k)));
-									vbit.back()[pos(bsz, k)] = {elem::VAR, d.get_lexeme(temp)};
+									vbit.back()[k] = {elem::VAR, d.get_lexeme(temp)};
 								}
 								break;
 				case elem::NUM:
 								vbit.emplace_back(); 
 								vbit.back().resize(bsz);
 								for( size_t k= 0; k !=bsz ; k++)
-									vbit.back()[pos(bsz, k)] = bool(e.num & (1<<k));
+									vbit.back()[k] = bool(e.num & (1<<k));
 								break;
 				case elem::ARITH:
 				case elem::EQ:
@@ -215,12 +229,11 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								vbit.emplace_back(); 
 								vbit.back().resize(bsz);
 								for( size_t k= 0; k !=bsz ; k++)
-									vbit.back()[pos(bsz, k)] = e;
+									vbit.back()[k] = e;
 								
 								break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
-			permuteorder(vbit.back(), bit_order);
 		}
 		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
 

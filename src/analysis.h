@@ -58,6 +58,12 @@ class environment {
     //contexts for vars
     context ctx;
     public:
+    std::vector<string_t> get_predicates() {
+        std::vector<string_t> cont;
+        for( auto it :predtype )
+            cont.push_back(it.first);
+        return cont;
+    }
     bool contains_pred(string_t &key) const{
         return predtype.find(key) != predtype.end(); 
     }
@@ -169,15 +175,36 @@ struct bit_univ {
     size_t bit_order;
 	environment &typenv;
     size_t char_bsz, int_bsz, sym_bsz, var_bsz;
-
+    
+    typedef std::vector<size_t> tab_args;
+    typedef std::map<string_t, tab_args>  raw_tables;
+    raw_tables rtabs;
+    
+    bool get_raw_tables(){
+        std::vector<string_t > tabnames = typenv.get_predicates(); 
+        for( string_t &pname: tabnames ) {
+            rtabs.insert({pname, tab_args()});
+            for ( auto &targs: typenv.lookup_pred(pname)) 
+                if(targs.is_primitive())
+                    rtabs[pname].push_back(targs.pty.get_bitsz());
+                else {
+                    string_t sttype = lexeme2str(targs.structname.e);
+                    rtabs[pname].push_back(
+                        typenv.lookup_typedef(sttype).get_bitsz(typenv));
+                }
+        }
+        return true;
+    }
+    
 	bit_univ(dict_t &_d, size_t _bo = 0, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
 	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), typenv(_e), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
-
 	size_t get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
-	inline size_t pos(size_t bsz, size_t bit_from_right /*, size_t arg, size_t args */) const {
-		DBG(assert(bit_from_right < bsz /*&& arg < args*/); )
-		return (bsz - bit_from_right - 1); //* args + arg;
+	inline size_t pos(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab = tab_args() ) const {
+		DBG(assert(bit_from_right < bsz && arg < args); )
+    //    size_t s = 0;
+    //    for(int_t i = 0; i < rtab.size(); i++) s = std::min(s, rtab[i]);
+		return (bsz - bit_from_right - 1)* args + arg;
 	}
     bool brev_transform( raw_term& bit_raw_term);
 	bool btransform( const raw_prog& rpin, raw_prog &rpout );
