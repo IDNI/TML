@@ -14,7 +14,9 @@
 #define __DRIVER_H__
 #include <map>
 #include <cmath>
+#ifdef WITH_Z3
 #include "z3++.h"
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -60,6 +62,8 @@ struct prog_data {
 	string_t std_input;
 };
 
+#ifdef WITH_Z3
+
 /* Provides consistent conversions of TML objects into Z3. */
 
 struct z3_context {
@@ -85,6 +89,8 @@ struct z3_context {
 	z3::expr rule_to_z3(const raw_rule &rr, const raw_term &false_term,
 		dict_t &dict);
 };
+
+#endif
 
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
@@ -170,9 +176,11 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
+#ifdef WITH_Z3
 	void qc_z3(raw_prog &rp, const raw_term &false_term);
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		const raw_term &false_term, z3_context &ctx);
+#endif
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,

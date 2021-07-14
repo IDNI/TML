@@ -901,6 +901,8 @@ template<typename F>
 	rp.r = reduced_rules;
 }
 
+#ifdef WITH_Z3
+
 /* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
@@ -1155,6 +1157,8 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	ctx.solver.pop();
 	return res;
 }
+
+#endif
 
 void driver::simplify_formulas(raw_prog &rp, const raw_term &false_term) {
 	for(raw_rule &rr : rp.r) {
@@ -3815,6 +3819,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
+#ifdef WITH_Z3
 		if(opts.enabled("qc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			simplify_formulas(rp, false_term);
@@ -3825,6 +3830,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					{return check_qc_z3(rr1, rr2, false_term, z3_ctx);});
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
+#endif
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("pure-tml")) {

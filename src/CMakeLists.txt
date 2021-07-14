@@ -129,17 +129,14 @@ endif()
 
 # z3 library
 #############
-
-get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
-find_library(z3_libz3
-			NAMES libz3.so libz3.dll libz3.dylib
-			PATHS ENV LD_LIBRARY_PATH)
-add_library(z3_libz3 SHARED IMPORTED)
-set_property(TARGET z3_libz3 APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
-set_target_properties(z3_libz3 PROPERTIES
-		IMPORTED_LOCATION_RELEASE "${z3_libz3}"
-		)
-set(Z3_LIBRARIES "z3_libz3")
+if (WITH_Z3)
+	find_library(Z3 NAMES z3)
+	add_library(Z3 SHARED IMPORTED)
+	set_target_properties(Z3 PROPERTIES
+		IMPORTED_LOCATION "${Z3}")
+	target_link_libraries(TMLo Z3)
+	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
+endif()
 
 # shared library
 #################
@@ -149,7 +146,7 @@ add_library(TML::TMLso ALIAS TMLso)
 target_setup(TMLso)
 target_compile_options(TMLso     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLso        PRIVATE ${TML_LINK_OPTIONS})
-target_link_libraries(TMLso      TMLo ${Z3_LIBRARIES})
+target_link_libraries(TMLso      TMLo)
 target_include_directories(TMLso PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
@@ -168,7 +165,7 @@ add_library(TML::TMLs ALIAS TMLs)
 target_setup(TMLs)
 target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLs        PRIVATE ${TML_LINK_OPTIONS})
-target_link_libraries(TMLs      TMLo ${Z3_LIBRARIES})
+target_link_libraries(TMLs      TMLo)
 target_include_directories(TMLs PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
