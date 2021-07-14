@@ -173,6 +173,10 @@ void options::setup() {
 	add_output    ("repl-output", "repl output");
 #endif
 	add_bool("sdt",     "sdt transformation");
+#ifdef WITH_Z3
+	add_bool("qc-subsume-z3",
+		"Enable CQNC subsumption optimization using theorem prover Z3");
+#endif
 	add_bool("show-hidden", "show the contents of hidden relations");
 	add_bool("split-rules",
 		"transformation to reduce number of conjunctions in each rule");

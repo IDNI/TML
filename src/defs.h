@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <map>
 #include <memory>
+#include <optional>
 
 #ifndef __EMSCRIPTEN__
 #ifdef __unix__

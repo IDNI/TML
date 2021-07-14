@@ -14,6 +14,9 @@
 #define __DRIVER_H__
 #include <map>
 #include <cmath>
+#ifdef WITH_Z3
+#include "z3++.h"
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -58,6 +61,53 @@ struct prog_data {
 	size_t elapsed_steps = 0;
 	string_t std_input;
 };
+
+#ifdef WITH_Z3
+
+/* Provides consistent conversions of TML objects into Z3. */
+
+struct z3_context {
+	z3::context context;
+	z3::solver solver;
+	z3::sort uninterp_sort;
+	z3::sort bool_sort;
+	std::map<rel_info, z3::func_decl> rel_to_decl;
+	z3::expr_vector head_rename;
+	std::map<elem, z3::expr> var_to_decl;
+	std::map<raw_rule, z3::expr> rule_to_decl;
+	
+	z3_context();
+	z3::func_decl rel_to_z3(const raw_term& rt);
+	z3::expr globalHead_to_z3(const int_t pos);
+	z3::expr fresh_constant();
+	z3::expr arg_to_z3(const elem& el);
+	z3::expr z3_head_constraints(const raw_term &head,
+		std::map<elem, z3::expr> &body_rename);
+	z3::expr term_to_z3(const raw_term &rel);
+	z3::expr tree_to_z3(const sprawformtree &tree,
+		const raw_term &false_term, dict_t &dict);
+	z3::expr rule_to_z3(const raw_rule &rr, const raw_term &false_term,
+		dict_t &dict);
+};
+
+#endif
+
+void collect_vars(const raw_rule &rr, std::set<elem> &vars);
+void collect_vars(const raw_term &rt, std::set<elem> &vars);
+template <class InputIterator>
+	void collect_vars(InputIterator first, InputIterator last,
+		std::set<elem> &vars);
+void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const raw_rule &rr);
+void collect_free_vars(const raw_term &t,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const raw_term &t);
+void collect_free_vars(const sprawformtree &t,
+	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
+std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
+std::set<elem> collect_free_vars(const sprawformtree &t);
 
 class driver {
 	friend class archive;
@@ -111,11 +161,8 @@ class driver {
 		const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
-	sprawformtree expand_formula_node(const sprawformtree &t);
 	void flatten_associative(const elem::etype &tp,
 		const sprawformtree &tree, std::vector<sprawformtree> &tms);
-	bool is_cq(const raw_rule &rr);
-	bool is_cqn(const raw_rule &rr);
 	template<typename F> bool try_minimize(raw_rule &rr, const F &f);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
@@ -129,6 +176,11 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
+#ifdef WITH_Z3
+	void qc_z3(raw_prog &rp, const raw_term &false_term);
+	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
+		const raw_term &false_term, z3_context &ctx);
+#endif
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
@@ -147,25 +199,9 @@ class driver {
 		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
 	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
 		const std::set<elem> &fv);
-	void collect_vars(const raw_rule &rr, std::set<elem> &vars);
-	void collect_vars(const raw_term &rt, std::set<elem> &vars);
-	template <class InputIterator>
-		void collect_vars(InputIterator first, InputIterator last,
-			std::set<elem> &vars);
 	void to_pure_tml(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
-	void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const raw_rule &rr);
-	void collect_free_vars(const raw_term &t,
-		const std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const raw_term &t);
-	void collect_free_vars(const sprawformtree &t,
-		std::vector<elem> &bound_vars, std::set<elem> &free_vars);
-	std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
-	std::set<elem> collect_free_vars(const sprawformtree &t);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
 	void remove_redundant_exists(raw_prog &rp);

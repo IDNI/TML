@@ -548,6 +548,18 @@ bool raw_term::calc_arity(input* in) {
 	return true;
 }
 
+/* Returns the arity of the raw_term; That is the arity excluding parenthesis.
+ * In particular if extype = raw_term::REL, it returns
+ * the mathematical arity of the relation. */
+
+int_t raw_term::get_formal_arity() const {
+	int_t one_arity = 0;
+	for (const int_t& i : arity) {
+		if (i == -1 || i == -2) continue;
+		else one_arity+=i;
+	} return one_arity;
+}
+
 bool macro::parse(input* in, const raw_prog& prog){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
@@ -1197,7 +1209,9 @@ bool operator<(const raw_term& x, const raw_term& y) {
 
 bool operator<(const raw_rule& x, const raw_rule& y) {
 	if (x.h != y.h) return x.h < y.h;
-	if (x.b != y.b) return x.b < y.b;
+	else if (x.is_form() != y.is_form()) return x.is_form() < y.is_form();
+	else if (x.is_form()) return *x.prft < *y.prft;
+	else return x.b < y.b;
 /*	if (x.h.size() != y.h.size())
 		return x.heads().size() < y.heads().size();
 	if (x.bodies().size() != y.bodies().size())
@@ -1206,7 +1220,6 @@ bool operator<(const raw_rule& x, const raw_rule& y) {
 		if (!(x.head(n) == y.h[n])) return x.head(n) < y.head(n);
 	for (size_t n = 0; n != x.bodies().size(); ++n)
 		if (!(x.body(n) == y.body(n))) return x.body(n) < y.body(n);*/
-	return false;
 }
 
 bool operator==(const lexeme& l, const string& s) {
