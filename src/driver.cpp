@@ -3169,16 +3169,27 @@ sprawformtree driver::expand_term(const raw_term &use,
 	if(get_relation_info(head) != get_relation_info(use)) return nullptr;
 	// Where all the mappings for the substitution will be stored
 	map<elem, elem> renames;
+	// Let's try to reduce the number of equality constraints required
+	// by substituting some of the correct variables in the first place.
+	for(size_t i = 2; i < head.e.size() - 1; i++) {
+		if(head.e[i].type == elem::VAR) {
+			renames[head.e[i]] = use.e[i];
+		}
+	}
 	// Deep copy the rule's body because the in-place renaming required
 	// for this expansion should not affect the original
 	sprawformtree subst = def.get_prft(false_term)->clone();
 	rename_variables(subst, renames);
-	// Append equality constraints to the renamed tree to link the logic
-	// back to its context
+	// Append remaining equality constraints to the renamed tree to link
+	// the logic back to its context
 	for(size_t i = 2; i < head.e.size() - 1; i++) {
-		subst = make_shared<raw_form_tree>(elem::AND, subst,
-			make_shared<raw_form_tree>(raw_term(raw_term::EQ,
-				{ use.e[i], elem(elem::EQ), rename_variables(head.e[i], renames) })));
+		// Add equality constraint only if it has not already been captured
+		// in the substitution choice.
+		if(renames[head.e[i]] != use.e[i]) {
+			subst = make_shared<raw_form_tree>(elem::AND, subst,
+				make_shared<raw_form_tree>(raw_term(raw_term::EQ,
+					{ use.e[i], elem(elem::EQ), rename_variables(head.e[i], renames) })));
+		}
 	}
 	return subst;
 }
