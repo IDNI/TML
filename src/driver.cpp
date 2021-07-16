@@ -3185,10 +3185,11 @@ sprawformtree driver::expand_term(const raw_term &use,
 	for(size_t i = 2; i < head.e.size() - 1; i++) {
 		// Add equality constraint only if it has not already been captured
 		// in the substitution choice.
-		if(renames[head.e[i]] != use.e[i]) {
+		elem new_name = rename_variables(head.e[i], renames);
+		if(new_name != use.e[i]) {
 			subst = make_shared<raw_form_tree>(elem::AND, subst,
 				make_shared<raw_form_tree>(raw_term(raw_term::EQ,
-					{ use.e[i], elem(elem::EQ), rename_variables(head.e[i], renames) })));
+					{ use.e[i], elem(elem::EQ), new_name })));
 		}
 	}
 	return subst;
@@ -3423,7 +3424,9 @@ void driver::split_heads(raw_prog &rp) {
 			const raw_rule rr = *it;
 			it = rp.r.erase(it);
 			for(const raw_term &rt : rr.h) {
-				it = rp.r.insert(it, raw_rule(rt, rr.b));
+				raw_rule nr = rr;
+				nr.h = { rt };
+				it = rp.r.insert(it, nr);
 			}
 		} else {
 			// Leave the single-headed rules alone.
