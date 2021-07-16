@@ -203,6 +203,7 @@ class driver {
 		const raw_term &false_term);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
+	void split_heads(raw_prog &rp);
 	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 	void to_pure_tml(raw_prog &rp);

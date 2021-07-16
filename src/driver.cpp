@@ -3398,9 +3398,7 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 	return raw_term(part_id, fv);
 }
 
-/* Convert every rule in the given program to pure TML rules. Rules with
- * multiple heads are also converted to multiple rules with single
- * heads. */
+/* Convert every rule in the given program to pure TML rules. */
 
 void driver::to_pure_tml(raw_prog &rp) {
 	// Convert all FOL formulas to P-DATALOG
@@ -3411,6 +3409,12 @@ void driver::to_pure_tml(raw_prog &rp) {
 		}
 		rp.r[i] = rr;
 	}
+}
+
+/* Rules with multiple heads are also converted to multiple rules with
+ * single heads. */
+
+void driver::split_heads(raw_prog &rp) {
 	// Split rules with multiple heads and delete those with 0 heads
 	for(auto it = rp.r.begin(); it != rp.r.end();) {
 		if(it->h.size() != 1) {
@@ -3996,6 +4000,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 		for(int_t i = 0; i < opts.get_int("iterate"); i++) {
 			o::dbg() << "Squaring Program ..." << endl << endl;
+			split_heads(rp);
 			square_program(rp, false_term);
 			o::dbg() << "Squared Program: " << endl << endl << rp << endl;
 		}
@@ -4023,6 +4028,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				// transformations, hence its more general activation condition.
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
 				to_pure_tml(rp);
+				split_heads(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
 				
 				if(opts.enabled("cqnc-subsume")) {
