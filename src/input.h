@@ -589,8 +589,8 @@ struct raw_prefix {
 
 struct raw_form_tree {
 	elem::etype type;
-	raw_term *rt = nullptr; // elem::NONE is used to identify it
-	elem * el = nullptr;
+	std::optional<raw_term> rt; // elem::NONE is used to identify it
+	std::optional<elem> el;
 
 	sprawformtree l = nullptr;
 	sprawformtree r = nullptr;
@@ -602,23 +602,18 @@ struct raw_form_tree {
 	raw_form_tree (const raw_term &_rt) {
 		if(_rt.neg) {
 			type = elem::NOT;
-			el = new elem(elem::NOT);
+			el = elem(elem::NOT);
 			l = std::make_shared<raw_form_tree>(_rt.negate());
 		} else {
 			type = elem::NONE;
-			rt = new raw_term(_rt);
+			rt = raw_term(_rt);
 		}
 	}
 	// Make a formula tree with the given element and two children
 	raw_form_tree (const elem &_el, sprawformtree _l = nullptr,
 		sprawformtree _r = nullptr) :
-		type(_el.type), el(new elem(_el)), l(_l), r(_r) {}
-	~raw_form_tree() {
-		// Fields are deletable because constructors always make heap
-		// allocated copies
-		if (rt) delete rt, rt = nullptr;
-		if (el) delete el, el = nullptr;
-	}
+		type(_el.type), el(_el), l(_l), r(_r) {}
+	
 	void printTree(int level =0 );
 	static sprawformtree simplify(sprawformtree &t, const raw_term &false_term);
 	// Recursively check equality of formula trees
@@ -632,7 +627,7 @@ struct raw_form_tree {
 		// Either both elements are defined or both are not
 		else if(bool(el) != bool(pft.el)) return false;
 		// Either both elements are undefined or both are equal
-		else if(el != nullptr && *el != *pft.el) return false;
+		else if(el && *el != *pft.el) return false;
 		// Either both left trees are defined or both are not
 		else if(bool(l) != bool(pft.l)) return false;
 		// Either both left trees are undefined or both are equal
@@ -655,7 +650,7 @@ struct raw_form_tree {
 		// Then element definedness next significant
 		else if(bool(el) != bool(pft.el)) return bool(el) < bool(pft.el);
 		// If both defined, then element contents next significant
-		else if(el != nullptr && *el != *pft.el) return *el < *pft.el;
+		else if(el && *el != *pft.el) return *el < *pft.el;
 		// Then left tree definedness next significant
 		else if(bool(l) != bool(pft.l)) return bool(l) < bool(pft.l);
 		// Then left tree contents next significant
@@ -670,6 +665,13 @@ struct raw_form_tree {
 	// Check formula tree inequality by checking equality
 	bool operator!=(const raw_form_tree &pft) {
 		return !(*this == pft);
+	}
+	// Make a deep copy of this formula tree
+	sprawformtree clone() {
+		sprawformtree ntree = std::make_shared<raw_form_tree>(*this);
+		if(ntree->l) ntree->l = ntree->l->clone();
+		if(ntree->r) ntree->r = ntree->r->clone();
+		return ntree;
 	}
 };
 

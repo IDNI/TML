@@ -190,6 +190,8 @@ void options::setup() {
 		"convert FOL formulas into pure TML");
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
+	add(option(option::type::INT, { "iterate" })
+		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
 		description("run program under one of the following semantics: pfp (default), 3pfp"));
 	add_bool("proof",   "extract proof");

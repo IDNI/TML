@@ -14,6 +14,7 @@
 #define __DRIVER_H__
 #include <map>
 #include <cmath>
+#include <variant>
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
@@ -169,6 +170,11 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
+	elem rename_variables(const elem &e, std::map<elem, elem> &renames);
+	void rename_variables(sprawformtree &t, std::map<elem, elem> &renames);
+	sprawformtree expand_term(const raw_term &use, const raw_rule &def,
+		const raw_term &false_term);
+	void square_program(raw_prog &rp, const raw_term &false_term);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);

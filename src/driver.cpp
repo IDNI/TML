@@ -185,20 +185,41 @@ bool is_cqn(const raw_rule &rr) {
 	return true;
 }
 
-// Recurse through the given formula tree calling the given function
-// with the accumulator
+/* Recurse through the given formula tree in pre-order calling the given
+ * function with the accumulator. */
 
 template<typename X, typename F>
-		X fold_tree(const sprawformtree &t, X acc, const F &f) {
+		X prefold_tree(sprawformtree t, X acc, const F &f) {
+	const X &new_acc = f(t, acc);
 	switch(t->type) {
 		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
 				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
 			// Fold through binary trees by threading accumulator through both
 			// the LHS and RHS
-			return fold_tree(t->r, fold_tree(t->l, f(t, acc), f), f);
+			return prefold_tree(t->r, prefold_tree(t->l, new_acc, f), f);
 		// Fold though unary trees by threading accumulator through this
 		// node then single child
-		case elem::NOT: return fold_tree(t->l, f(t, acc), f);
+		case elem::NOT: return prefold_tree(t->l, new_acc, f);
+		// Otherwise for leaf nodes like terms and variables, thread
+		// accumulator through just this node
+		default: return new_acc;
+	}
+}
+
+/* Recurse through the given formula tree in post-order calling the
+ * given function with the accumulator. */
+
+template<typename X, typename F>
+		X postfold_tree(sprawformtree &t, X acc, const F &f) {
+	switch(t->type) {
+		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
+				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
+			// Fold through binary trees by threading accumulator through both
+			// the LHS and RHS
+			return f(t, postfold_tree(t->r, postfold_tree(t->l, acc, f), f));
+		// Fold though unary trees by threading accumulator through the
+		// single child then this node
+		case elem::NOT: return f(t, postfold_tree(t->l, acc, f));
 		// Otherwise for leaf nodes like terms and variables, thread
 		// accumulator through just this node
 		default: return f(t, acc);
@@ -218,7 +239,7 @@ bool is_query (const raw_rule &rr, const raw_term &false_term) {
 	if(!(rr.is_rule() || rr.is_form())) return false;
 	// Ensure that all terms in the tree are either relations or
 	// equalities and that there is no second order quantification
-	if(!fold_tree(rr.get_prft(false_term), true,
+	if(!prefold_tree(rr.get_prft(false_term), true,
 			[&](const sprawformtree &t, bool acc) -> bool {
 				return acc && (t->type != elem::NONE ||
 					t->rt->extype == raw_term::REL ||
@@ -3079,6 +3100,149 @@ void driver::step_transform(raw_prog &rp,
 	}
 }
 
+/* If the given element is a variable, rename it using the relevant
+ * mapping. If the mapping does not exist, then create a new one. */
+
+elem driver::rename_variables(const elem &e, map<elem, elem> &renames) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	if(e.type == elem::VAR) {
+		if(auto it = renames.find(e); it != renames.end()) {
+			return it->second;
+		} else {
+			return renames[e] = elem::fresh_var(d);
+		}
+	} else return e;
+}
+
+/* Rename all the variables in the given formula tree using the given
+ * mappings. Where the mappings do not exist, create them. Note that
+ * variables introduced inside quantifiers are treated as distinct. Note
+ * also that the mappings made for variables introduced inside
+ * quantifiers are not exported. */
+
+void driver::rename_variables(sprawformtree &t, map<elem, elem> &renames) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	switch(t->type) {
+		case elem::NONE: {
+			for(elem &e : t->rt->e) e = rename_variables(e, renames);
+			break;
+		} case elem::NOT: {
+			rename_variables(t->l, renames);
+			break;
+		} case elem::ALT: case elem::AND: case elem::IMPLIES:
+				case elem::COIMPLIES: {
+			rename_variables(t->l, renames);
+			rename_variables(t->r, renames);
+			break;
+		} case elem::FORALL: case elem::EXISTS: case elem::UNIQUE: {
+			// The variable that is being mapped to something else
+			const elem ovar = *t->l->el;
+			// Get what that variable maps to in the outer scope
+			const elem pvar = rename_variables(ovar, renames);
+			// Temporarily replace the outer scope mapping with new inner one
+			*t->l->el = renames[ovar] = elem::fresh_var(d);
+			// Rename body using inner scope mapping
+			rename_variables(t->r, renames);
+			// Now restore the outer scope mapping
+			renames[ovar] = pvar;
+			break;
+		} default:
+			assert(false); //should never reach here
+	}
+}
+
+/* Expand the given term using the given rule whose head unifies with
+ * it. Literally returns the rule's body with its variables replaced by
+ * the arguments of the given term or fresh variables. Fresh variables
+ * are used so that the produced formula tree can be grafted in
+ * anywhere. */
+
+sprawformtree driver::expand_term(const raw_term &use,
+		const raw_rule &def, const raw_term &false_term) {
+	const raw_term &head = def.h[0];
+	// Ensure that the term and head at least have the same relation,
+	// otherwise a substitution would be senseless
+	if(get_relation_info(head) != get_relation_info(use)) return nullptr;
+	// Where all the mappings for the substitution will be stored
+	map<elem, elem> renames;
+	// Deep copy the rule's body because the in-place renaming required
+	// for this expansion should not affect the original
+	sprawformtree subst = def.get_prft(false_term)->clone();
+	rename_variables(subst, renames);
+	// Append equality constraints to the renamed tree to link the logic
+	// back to its context
+	for(size_t i = 2; i < head.e.size() - 1; i++) {
+		subst = make_shared<raw_form_tree>(elem::AND, subst,
+			make_shared<raw_form_tree>(raw_term(raw_term::EQ,
+				{ use.e[i], elem(elem::EQ), rename_variables(head.e[i], renames) })));
+	}
+	return subst;
+}
+
+/* Produces a program where executing a single step is equivalent to
+ * executing two steps of the original program. This is achieved through
+ * inlining where each body term is replaced by the disjunction of the
+ * bodies of the relation that it refers to. For those facts not
+ * computed in the previous step, it is enough to check that they were
+ * derived to steps ago and were not deleted in the previous step. */
+
+void driver::square_program(raw_prog &rp, const raw_term &false_term) {
+	// Partition the rules by relations
+	typedef set<raw_rule> relation;
+	map<rel_info, relation> pos_rels, neg_rels;
+	// Separate the program rules according to the relation they belong
+	// to and their sign. This will simplify lookups during inlining.
+	for(const raw_rule &rr : rp.r)
+		if(!rr.is_fact())
+			(rr.h[0].neg ? neg_rels : pos_rels)
+				[get_relation_info(rr.h[0])].insert(rr);
+	
+	// The place where we will construct the squared program
+	vector<raw_rule> squared_prog;
+	for(const raw_rule &rr : rp.r) {
+		if(rr.is_fact()) {
+			// Leave facts alone as they are not part of the function
+			squared_prog.push_back(rr);
+		} else {
+			// Deep copy so that we can inline out of place. Future terms/
+			// rules may need the original body of this rule
+			sprawformtree nprft = rr.get_prft(false_term)->clone();
+			// Iterate through tree looking for terms
+			postfold_tree(nprft, monostate {},
+				[&](sprawformtree &t, monostate acc) -> monostate {
+					if(t->type == elem::NONE && t->rt->extype == raw_term::REL) {
+						// Replace term according to following rule:
+						// term -> (term && ~del1body && ... && ~delNbody) ||
+						// ins1body || ... || insMbody
+						const raw_term &rt = *t->rt;
+						// Inner conjunction to handle case where fact was derived
+						// before the last step. We just need to make sure that it
+						// was not deleted in the last step.
+						sprawformtree subst = make_shared<raw_form_tree>(rt);
+						for(const raw_rule &rr : neg_rels[get_relation_info(rt)])
+							subst = make_shared<raw_form_tree>(elem::AND, subst,
+								make_shared<raw_form_tree>(elem::NOT,
+									expand_term(rt, rr, false_term)));
+						// Outer disjunction to handle the case where fact derived
+						// exactly in the last step.
+						for(const raw_rule &rr : pos_rels[get_relation_info(rt)])
+							subst = make_shared<raw_form_tree>(elem::ALT, subst,
+								expand_term(rt, rr, false_term));
+						// We can replace the raw_term now that we no longer need it
+						t = subst;
+					}
+					// Just a formality. Nothing is being accumulated.
+					return acc; });
+			squared_prog.push_back(raw_rule(rr.h[0], nprft));
+		}
+	}
+	rp.r = squared_prog;
+}
+
 /* Iterate through the FOL rules and remove the outermost existential
  * quantifiers. Required because pure TML conversion assumes that
  * quantifier variables are only visible within their bodies. */
@@ -3818,6 +3982,11 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				false_term);
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
+		}
+		for(int_t i = 0; i < opts.get_int("iterate"); i++) {
+			o::dbg() << "Squaring Program ..." << endl << endl;
+			square_program(rp, false_term);
+			o::dbg() << "Squared Program: " << endl << endl << rp << endl;
 		}
 #ifdef WITH_Z3
 		if(opts.enabled("qc-subsume-z3")){
