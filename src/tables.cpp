@@ -463,7 +463,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 	if (opts.bitunv) a.rng = leq;
 	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
-	body* y;
+	body* y = 0;
 	for (auto x : b) {
 		a.t.push_back(x.second);
 		if ((bit=bodies.find(&x.first)) != bodies.end())
@@ -933,7 +933,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 
 char tables::fwd() noexcept {
 	for (rule& r : rules) {
-		bdd_handles v(r.size() == 0 ? 1 : r.size());
+		bdd_handles v(r.size());
 		spbdd_handle x;
 		for (size_t n = 0; n != r.size(); ++n)
 			//print(COUT << "rule: ", r) << endl,
