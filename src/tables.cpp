@@ -579,13 +579,14 @@ bool tables::get_rules(flat_prog p) {
 				get_form(al, t, as);
 			else
 				get_alt(al, t, as);
-
+		//if (as.size() == 0) COUT << " with 0 size" << endl;
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
 			else	*(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
-
+		//DBG(o::dbg() << "rule size (n. of alts): " << r.size() << endl;)
+		//if (r.size() == 0) print(COUT << "rule 0: ", r) << endl;
 		rs.insert(r);
 	}
 	for (rule r : rs)
