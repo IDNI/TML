@@ -433,9 +433,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		if (t.extype == term::REL) {
 			b.insert({ get_body(t, a.vm, a.varslen), t });
 		} else if (t.extype == term::EQ) {
-			if (!handler_eq(t, a.vm, a.varslen, a.eq)) a.eq = hfalse;
+			if (!handler_eq(t, a.vm, a.varslen, a.eq)) {a.eq = hfalse; break;}
 		} else if (t.extype == term::LEQ) {
-			if (!handler_leq(t, a.vm, a.varslen, leq)) leq = hfalse;
+			if (!handler_leq(t, a.vm, a.varslen, leq)) {leq = hfalse; break;}
 		} else if (t.extype == term::ARITH) {
 			//arith constraint on leq
 			if (!handler_arith(t,a.vm, a.varslen, leq)) assert(false),leq=hfalse;
