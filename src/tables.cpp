@@ -433,12 +433,12 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		if (t.extype == term::REL) {
 			b.insert({ get_body(t, a.vm, a.varslen), t });
 		} else if (t.extype == term::EQ) {
-			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
+			if (!handler_eq(t, a.vm, a.varslen, a.eq)) a.eq = hfalse;
 		} else if (t.extype == term::LEQ) {
-			if (!handler_leq(t, a.vm, a.varslen, leq)) return;
+			if (!handler_leq(t, a.vm, a.varslen, leq)) leq = hfalse;
 		} else if (t.extype == term::ARITH) {
 			//arith constraint on leq
-			if (!handler_arith(t,a.vm, a.varslen, leq)) return;
+			if (!handler_arith(t,a.vm, a.varslen, leq)) assert(false),leq=hfalse;
 		} else if (!blt && t.extype == term::BLTIN) {
 			bltins.at(t.idbltin).body.getvars(t,
 				a.bltinvars, a.bltngvars, a.bltoutvars);
@@ -575,27 +575,18 @@ bool tables::get_rules(flat_prog p) {
 
 		for (const term_set& al : x.second)
 			if (al.begin()->extype == term::FORM1 ||
-					al.begin()->extype == term::FORM2) {
-				COUT << "form";
+					al.begin()->extype == term::FORM2)
 				get_form(al, t, as);
-			} else {
-				COUT << "alt";
+			else
 				get_alt(al, t, as);
-			}
-		if (as.size() == 0) {
-			COUT << " with 0 size";
-		}
-		COUT << endl;
-
+		//if (as.size() == 0) COUT << " with 0 size" << endl;
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
 			else	*(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
 		//DBG(o::dbg() << "rule size (n. of alts): " << r.size() << endl;)
-		if (r.size() == 0) {
-			print(COUT << "rule 0: ", r) << endl;
-		}
+		//if (r.size() == 0) print(COUT << "rule 0: ", r) << endl;
 		rs.insert(r);
 	}
 	for (rule r : rs)
