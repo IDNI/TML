@@ -174,6 +174,7 @@ class driver {
 	void rename_variables(sprawformtree &t, std::map<elem, elem> &renames);
 	sprawformtree expand_term(const raw_term &use, const raw_rule &def,
 		const raw_term &false_term);
+	void square_root_program(raw_prog &rp, const raw_term &false_term);
 	void square_program(raw_prog &rp, const raw_term &false_term);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);

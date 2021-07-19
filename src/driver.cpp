@@ -1664,7 +1664,6 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 	nrp.builtins = rp.builtins;
 	nrp.parse(prog_in, tbl->get_dict());
 	const strs_t strs;
-	transform(nrp, strs);
 	return nrp;
 }
 
@@ -3255,6 +3254,29 @@ void driver::square_program(raw_prog &rp, const raw_term &false_term) {
 	rp.r = squared_prog;
 }
 
+/* Make the given program execute half as fast, that is, two steps of
+ * the output program will be equivalent to one step of the original.
+ * Useful for debugging the squaring transformation since this is its
+ * inverse. */
+
+void driver::square_root_program(raw_prog &rp, const raw_term &false_term) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	// Only apply this transformation if there are rules to slow down
+	if(!rp.r.empty()) {
+		// Execute program rules only when the clock is in asserted state
+		const raw_term tick(elem::fresh_temp_sym(d), std::vector<elem> {});
+		for(raw_rule &rr : rp.r) {
+			rr.prft = make_shared<raw_form_tree>(elem::AND,
+				rr.get_prft(false_term), make_shared<raw_form_tree>(tick));
+		}
+		// Make the clock alternate between two states
+		rp.r.push_back(raw_rule(tick, tick.negate()));
+		rp.r.push_back(raw_rule(tick.negate(), tick));
+	}
+}
+
 /* Iterate through the FOL rules and remove the outermost existential
  * quantifiers. Required because pure TML conversion assumes that
  * quantifier variables are only visible within their bodies. */
@@ -3426,6 +3448,7 @@ void driver::split_heads(raw_prog &rp) {
 			for(const raw_term &rt : rr.h) {
 				raw_rule nr = rr;
 				nr.h = { rt };
+				if(nr.prft) nr.prft = rr.prft->clone();
 				it = rp.r.insert(it, nr);
 			}
 		} else {
@@ -4001,11 +4024,19 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		for(int_t i = 0; i < opts.get_int("iterate"); i++) {
-			o::dbg() << "Squaring Program ..." << endl << endl;
+		if(int_t iter_num = opts.get_int("iterate")) {
+			// Split heads are a precondition to program squaring
 			split_heads(rp);
-			square_program(rp, false_term);
-			o::dbg() << "Squared Program: " << endl << endl << rp << endl;
+			for(int_t i = 0; i < iter_num; i++) {
+				o::dbg() << "Square Rooting Program ..." << endl << endl;
+				square_root_program(rp, false_term);
+				o::dbg() << "Square Rooted Program: " << endl << endl << rp << endl;
+			}
+			for(int_t i = 0; i < iter_num; i++) {
+				o::dbg() << "Squaring Program ..." << endl << endl;
+				square_program(rp, false_term);
+				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
+			}
 		}
 #ifdef WITH_Z3
 		if(opts.enabled("qc-subsume-z3")){
