@@ -703,6 +703,16 @@ struct raw_rule {
 	}
 	raw_rule(const raw_term& h, const sprawformtree &prft) : h({h}), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(prft) {}
+	raw_rule(const raw_rule &rr) : h(rr.h), b(rr.b), prft(rr.prft ? rr.prft->clone() : nullptr), varctx(rr.varctx), type(rr.type), guarding(rr.guarding) {}
+	raw_rule &operator=(const raw_rule &rr) {
+		h = rr.h;
+		b = rr.b;
+		prft = rr.prft ? rr.prft->clone() : nullptr;
+		varctx = rr.varctx;
+		type = rr.type;
+		guarding = rr.guarding;
+		return *this;
+	}
 	// Clear b and set prft
 	void set_prft(const sprawformtree &_prft) {
 		prft = _prft;

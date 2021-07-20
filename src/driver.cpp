@@ -852,34 +852,103 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	}
 }
 
-/* If the given query is conjunctive, go through its terms and see if
- * removing one of them can produce a query that f determines to be
- * equivalent. If this is the case, modify the input query and indicate
- * that this has happened through the return flag. */
+/* Takes a reference rule, its formula tree, and copies of both and
+ * tries to eliminate redundant subtrees of the former using the latter
+ * as scratch. Generally speaking, boolean algebra guarantees that
+ * eliminating a subtree will produce a formula contained/containing
+ * the original depending on the boolean operator that binds it and the
+ * parity of the number of negation operators containing it. So we need
+ * only apply the supplied query containment procedure for the reverse
+ * direction to establish the equivalence of the entire trees. */
 
-template<typename F> bool driver::try_minimize(raw_rule &rr, const F &f) {
-	if(is_cqn(rr)) {
-		vector<raw_term> heads1 = rr.h, bodie1 = rr.b[0],
-			heads2 = rr.h, bodie2 = rr.b[0];
-		// Let's see if we can remove a body term from the rule without
-		// affecting its behavior
-		for(size_t i = 0; i < bodie1.size(); i++) {
-			// bodie2 is currently equal to bodie1
-			bodie2.erase(bodie2.begin() + i);
-			// bodie2 missing element i, meaning that rule 2 contains rule 1
-			// Construct our candidate replacement rule
-			raw_rule rr2(heads2, bodie2);
-			if(f(rr2, rr)) {
-				// successful if condition implies rule 1 contains rule 2, hence
-				// rule 1 = rule 2
-				rr = rr2;
-				return true;
-			}
-			bodie2.insert(bodie2.begin() + i, bodie1[i]);
-			// bodie2 is currently equal to bodie1
+template<typename F>
+		sprawformtree driver::minimize_aux(const raw_rule &ref_rule,
+			const raw_rule &var_rule, sprawformtree &ref_tree,
+			sprawformtree &var_tree, const F &f, bool ctx_sign) {
+	sprawformtree orig_var = var_tree;
+	typedef initializer_list<pair<sprawformtree, sprawformtree>> bijection;
+	// Minimize different formulas in different ways
+	switch(var_tree->type) {
+		case elem::IMPLIES: {
+			// Minimize the subtrees separately first. Since a -> b is
+			// equivalent to ~a OR b, alter the parity of the first operand
+			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{make_shared<raw_form_tree>(elem::NOT, ref_tree->l),
+						make_shared<raw_form_tree>(elem::NOT, orig_var->l)},
+						{ref_tree->r, orig_var->r}})
+				// Apply the same treatment as for a disjunction since this is
+				// what an implication is equivalent to
+				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
+					return ref_tree = ref_tmp;
+			break;
+		} case elem::ALT: {
+			// Minimize the subtrees separately first
+			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{ref_tree->l, orig_var->l}, {ref_tree->r, orig_var->r}})
+				// If in positive context, eliminating disjunct certainly
+				// produces smaller query, so check only the reverse. Otherwise
+				// vice versa
+				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
+					return ref_tree = ref_tmp;
+			break;
+		} case elem::AND: {
+			// Minimize the subtrees separately first
+			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{ref_tree->l, orig_var->l}, {ref_tree->r, orig_var->r}})
+				// If in positive context, eliminating conjunct certainly
+				// produces bigger query, so check only the reverse. Otherwise
+				// vice versa
+				if(var_tree = var_tmp; ctx_sign ? f(var_rule, ref_rule) : f(ref_rule, var_rule))
+					return ref_tree = ref_tmp;
+			break;
+		} case elem::NOT: {
+			// Minimize the single subtree taking care to update the negation
+			// parity
+			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, !ctx_sign);
+			break;
+		} case elem::EXISTS: case elem::FORALL: {
+			// Existential quantification preserves the containment relation
+			// between two formulas, so just recurse. Universal quantification
+			// is just existential with two negations, hence negation parity
+			// is preserved.
+			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			break;
+		} default: {
+			// Do not bother with co-implication nor uniqueness quantification
+			// as the naive approach would require expanding them to a bigger
+			// formula.
+			break;
 		}
 	}
-	return false;
+	var_tree = orig_var;
+	return ref_tree;
+}
+
+/* Go through the subtrees of the given rule and see which of them can
+ * be removed whilst preserving rule equivalence according to the given
+ * containment testing function. */
+
+template<typename F>
+		void driver::minimize(raw_rule &rr, const F &f,
+			const raw_term &false_term) {
+	// Switch to the formula tree representation of the rule if this has
+	// not yet been done for this is a precondition to minimize_aux
+	rr.prft = rr.get_prft(false_term);
+	rr.b.clear();
+	// Copy the rule to provide scratch for minimize_aux
+	raw_rule var_rule = rr;
+	// Now minimize the formula tree of the given rule using the given
+	// containment testing function
+	minimize_aux(rr, var_rule, rr.prft, var_rule.prft, f);
 }
 
 /* Go through the program and removed those queries that the function f
@@ -889,7 +958,7 @@ template<typename F> bool driver::try_minimize(raw_rule &rr, const F &f) {
  * respect order, so it should only be used on an unordered stratum. */
 
 template<typename F>
-		void driver::subsume_queries(raw_prog &rp, const F &f) {
+		void driver::subsume_queries(raw_prog &rp, const F &f, const raw_term &false_term) {
 	vector<raw_rule> reduced_rules;
 	for(raw_rule &rr : rp.r) {
 		bool subsumed = false;
@@ -913,7 +982,7 @@ template<typename F>
 			// Do the maximal amount of query minimization on the query we are
 			// about to admit. This should reduce the time cost of future
 			// subsumptions.
-			while(try_minimize(rr, f));
+			minimize(rr, f, false_term);
 			// If the current rule has not been subsumed, then it needs to be
 			// represented in the reduced rules.
 			reduced_rules.push_back(rr);
@@ -3448,7 +3517,6 @@ void driver::split_heads(raw_prog &rp) {
 			for(const raw_term &rt : rr.h) {
 				raw_rule nr = rr;
 				nr.h = { rt };
-				if(nr.prft) nr.prft = rr.prft->clone();
 				it = rp.r.insert(it, nr);
 			}
 		} else {
@@ -4046,7 +4114,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			z3_context z3_ctx;
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_qc_z3(rr1, rr2, false_term, z3_ctx);});
+					{return check_qc_z3(rr1, rr2, false_term, z3_ctx);}, false_term);
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 #endif
@@ -4069,7 +4137,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
-							{return cqnc(rr1, rr2);});
+							{return cqnc(rr1, rr2);}, false_term);
 					o::dbg() << "CQNC Subsumed Program:" << endl << endl << rp
 						<< endl;
 				}
@@ -4077,7 +4145,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					o::dbg() << "Subsuming using CQC test ..." << endl << endl;
 					subsume_queries(rp,
 						[this](const raw_rule &rr1, const raw_rule &rr2)
-							{return cqc(rr1, rr2);});
+							{return cqc(rr1, rr2);}, false_term);
 					o::dbg() << "CQC Subsumed Program:" << endl << endl << rp
 						<< endl;
 				}
