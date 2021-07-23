@@ -580,28 +580,38 @@ bool macro::parse(input* in, const raw_prog& prog){
 	fail: return pos = curr , false;
 }
 
-optional<raw_form_tree> raw_rule::get_prft(const raw_term &false_term) const {
-	if(prft || b.empty()) {
-		return prft;
-	} else {
-		raw_form_tree disj(false_term);
-		for(size_t i = 0; i < b.size(); i++) {
-			raw_form_tree conj(false_term.negate());
-			for(size_t j = 0; j < b[i].size(); j++) {
-				raw_term entr = b[i][j];
-				conj = raw_form_tree(elem::AND,
-					make_shared<raw_form_tree>(conj),
-					make_shared<raw_form_tree>(entr));
-			}
+/* Makes a tree representing the given non-empty conjunction. Otherwise
+ * return nullopt. */
+
+optional<raw_form_tree> conj_to_tree(vector<raw_term> conj) {
+	if(conj.empty()) return nullopt;
+	raw_form_tree tree(conj[0]);
+	for(size_t i = 1; i < conj.size(); i++)
+		tree = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(tree),
+				make_shared<raw_form_tree>(conj[i]));
+	return tree;
+}
+
+/* Return the stored formula tree or one equivalent to the body.
+ * Otherwise return nullopt. */
+
+optional<raw_form_tree> raw_rule::get_prft() const {
+	if(prft || b.empty()) return prft;
+	else {
+		raw_form_tree disj = *conj_to_tree(b[0]);
+		for(size_t i = 1; i < b.size(); i++)
 			disj = raw_form_tree(elem::ALT, make_shared<raw_form_tree>(disj),
-				make_shared<raw_form_tree>(conj));
-		}
-		return raw_form_tree::simplify(disj, false_term);
+				make_shared<raw_form_tree>(*conj_to_tree(b[i])));
+		return disj;
 	}
 }
 
-optional<raw_form_tree> &raw_rule::to_prft(const raw_term &false_term) {
-	if(!prft && !b.empty()) set_prft(*get_prft(false_term));
+/* Switch the representation of this rule from DNF vectors to equivalent
+ * tree .*/
+
+optional<raw_form_tree> &raw_rule::to_prft() {
+	if(!prft && !b.empty()) set_prft(*get_prft());
 	return prft;
 }
 

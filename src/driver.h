@@ -164,8 +164,7 @@ class driver {
 	bool transform_codecs(raw_prog &rp, const directive &drt);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
-	template<typename F>
-		void minimize(raw_rule &rr, const F &f, const raw_term &false_term);
+	template<typename F> void minimize(raw_rule &rr, const F &f);
 	template<typename F>
 		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
 		const raw_rule &var_rule, raw_form_tree &ref_tree,

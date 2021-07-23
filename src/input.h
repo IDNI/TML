@@ -741,8 +741,8 @@ struct raw_rule {
 	inline bool is_fact() const
 		{ return type == NONE && b.size() == 0 && !prft; }
 	// If prft not set, convert b to prft, then return prft
-	std::optional<raw_form_tree> get_prft(const raw_term &false_term) const;
-	std::optional<raw_form_tree> &to_prft(const raw_term &false_term);
+	std::optional<raw_form_tree> get_prft() const;
+	std::optional<raw_form_tree> &to_prft();
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;

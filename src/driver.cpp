@@ -239,7 +239,7 @@ bool is_query (const raw_rule &rr, const raw_term &false_term) {
 	if(!(rr.is_rule() || rr.is_form())) return false;
 	// Ensure that all terms in the tree are either relations or
 	// equalities and that there is no second order quantification
-	raw_form_tree prft = *rr.get_prft(false_term);
+	raw_form_tree prft = *rr.get_prft();
 	if(!prefold_tree(prft, true,
 			[&](const raw_form_tree &t, bool acc) -> bool {
 				return acc && (t.type != elem::NONE ||
@@ -939,12 +939,11 @@ template<typename F>
  * containment testing function. */
 
 template<typename F>
-		void driver::minimize(raw_rule &rr, const F &f,
-			const raw_term &false_term) {
+		void driver::minimize(raw_rule &rr, const F &f) {
 	if(rr.is_fact()) return;
 	// Switch to the formula tree representation of the rule if this has
 	// not yet been done for this is a precondition to minimize_aux
-	rr.to_prft(false_term);
+	rr.to_prft();
 	// Copy the rule to provide scratch for minimize_aux
 	raw_rule var_rule = rr;
 	// Now minimize the formula tree of the given rule using the given
@@ -983,7 +982,7 @@ template<typename F>
 			// Do the maximal amount of query minimization on the query we are
 			// about to admit. This should reduce the time cost of future
 			// subsumptions.
-			minimize(rr, f, false_term);
+			minimize(rr, f);
 			// If the current rule has not been subsumed, then it needs to be
 			// represented in the reduced rules.
 			reduced_rules.push_back(rr);
@@ -1198,7 +1197,7 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr,
 	// Collect bound variables of rule and restrictions from constants in head
 	set<elem> free_vars;
 	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
-	collect_free_vars(*rr.get_prft(false_term), bound_vars, free_vars);
+	collect_free_vars(*rr.get_prft(), bound_vars, free_vars);
 	// Free variables are existentially quantified
 	z3::expr_vector ex_quant_vars (context);
 	for (const auto& var : free_vars)
@@ -1211,7 +1210,7 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr,
 		var_to_decl.at(el) = constant;
 	}
 	// Construct z3 expression from rule
-	z3::expr formula = tree_to_z3(*rr.get_prft(false_term), false_term, dict);
+	z3::expr formula = tree_to_z3(*rr.get_prft(), false_term, dict);
 	// Now undo the global head mapping for future constructions
 	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
 	z3::expr decl = restr && (ex_quant_vars.empty() ?
@@ -1694,7 +1693,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 			rule_ids.push_back(rule_id);
 		}
 	} else {
-		const elem body_id = quote_formula(*rr.get_prft(false_term), rel_name, domain_name,
+		const elem body_id = quote_formula(*rr.get_prft(), rel_name, domain_name,
 			rp, variables, part_count);
 		for(size_t gidx = 0; gidx < rr.h.size(); gidx++) {
 			const elem head_id = quote_term(rr.h[gidx], rel_name, domain_name, rp,
@@ -3244,7 +3243,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	}
 	// Deep copy the rule's body because the in-place renaming required
 	// for this expansion should not affect the original
-	raw_form_tree subst = *def.get_prft(false_term);
+	raw_form_tree subst = *def.get_prft();
 	rename_variables(subst, renames);
 	// Append remaining equality constraints to the renamed tree to link
 	// the logic back to its context
@@ -3289,7 +3288,7 @@ void driver::square_program(raw_prog &rp, const raw_term &false_term) {
 		} else {
 			// Deep copy so that we can inline out of place. Future terms/
 			// rules may need the original body of this rule
-			raw_form_tree nprft = *rr.get_prft(false_term);
+			raw_form_tree nprft = *rr.get_prft();
 			// Iterate through tree looking for terms
 			postfold_tree(nprft, monostate {},
 				[&](raw_form_tree &t, monostate acc) -> monostate {
@@ -3340,7 +3339,7 @@ void driver::square_root_program(raw_prog &rp, const raw_term &false_term) {
 		for(raw_rule &rr : rp.r) {
 			if(!rr.is_fact()) {
 				rr.set_prft(raw_form_tree(elem::AND,
-					make_shared<raw_form_tree>(*rr.get_prft(false_term)),
+					make_shared<raw_form_tree>(*rr.get_prft()),
 					make_shared<raw_form_tree>(tick)));
 			}
 		}
@@ -3983,7 +3982,7 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		term_names.push_back(
 			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t prft_name = generate_cpp(*rr.get_prft(false_term),
+	string_t prft_name = generate_cpp(*rr.get_prft(),
 		prog_constr, cid, dict_name, elem_cache);
 	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");
