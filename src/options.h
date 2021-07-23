@@ -203,6 +203,7 @@ public:
 	std::string get_string(std::string name) const;
 	template <typename T> void help(std::basic_ostream<T>&) const;
 	inputs* get_inputs() const { return ii; }
+	std::set<std::string> pu_states = {};
 private:
 	template <typename T> friend std::basic_ostream<T>& operator<<(std::basic_ostream<T>&, const options&);
 	inputs*  ii;

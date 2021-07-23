@@ -4053,6 +4053,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
+	tbl->add_print_updates_states(opts.pu_states);
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 
