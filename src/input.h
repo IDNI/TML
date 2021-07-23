@@ -632,7 +632,6 @@ struct raw_form_tree {
 		return *this;
 	}
 	void printTree(int level =0 );
-	static raw_form_tree &simplify(raw_form_tree &t, const raw_term &false_term);
 	// Recursively check equality of formula trees
 	bool operator==(const raw_form_tree &pft) const {
 		// Types must be equal

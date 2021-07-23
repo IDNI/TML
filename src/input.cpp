@@ -828,52 +828,6 @@ void raw_form_tree::printTree( int level) {
 	if (l) l->printTree(level + 1);
 }
 
-raw_form_tree &raw_form_tree::simplify(raw_form_tree &t, const raw_term &false_term) {
-	switch(t.type) {
-		case elem::IMPLIES:
-			simplify(*t.l, false_term);
-			simplify(*t.r, false_term);
-			break;
-		case elem::COIMPLIES:
-			simplify(*t.l, false_term);
-			simplify(*t.r, false_term);
-			break;
-		case elem::AND:
-			simplify(*t.l, false_term), simplify(*t.r, false_term);
-			if (*t.l == false_term.negate()) {
-				t = *t.r;
-			} else if (*t.r == false_term.negate()) {
-				t = *t.l;
-			}
-			break;
-		case elem::ALT:
-			simplify(*t.l, false_term);
-			simplify(*t.r, false_term);
-			if(*t.l == false_term) {
-				t = *t.r;
-			} else if(*t.r == false_term) {
-				t = *t.l;
-			}
-			break;
-		case elem::NOT:
-			simplify(*t.l, false_term);
-			break;
-		case elem::EXISTS:
-			simplify(*t.r, false_term);
-			break;
-		case elem::UNIQUE:
-			simplify(*t.r, false_term);
-			break;
-		case elem::NONE:
-			break;
-		case elem::FORALL:
-			simplify(*t.r, false_term);
-			break;
-		default: DBGFAIL; //should never reach here
-	}
-	return t;
-}
-
 bool production::parse(input *in, const raw_prog& prog) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;
