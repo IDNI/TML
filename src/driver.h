@@ -85,7 +85,7 @@ struct z3_context {
 	z3::expr z3_head_constraints(const raw_term &head,
 		std::map<elem, z3::expr> &body_rename);
 	z3::expr term_to_z3(const raw_term &rel);
-	z3::expr tree_to_z3(const sprawformtree &tree,
+	z3::expr tree_to_z3(const raw_form_tree &tree,
 		const raw_term &false_term, dict_t &dict);
 	z3::expr rule_to_z3(const raw_rule &rr, const raw_term &false_term,
 		dict_t &dict);
@@ -105,10 +105,10 @@ std::set<elem> collect_free_vars(const raw_rule &rr);
 void collect_free_vars(const raw_term &t,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 std::set<elem> collect_free_vars(const raw_term &t);
-void collect_free_vars(const sprawformtree &t,
+void collect_free_vars(const raw_form_tree &t,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
-std::set<elem> collect_free_vars(const sprawformtree &t);
+std::set<elem> collect_free_vars(const raw_form_tree &t);
 
 class driver {
 	friend class archive;
@@ -163,21 +163,21 @@ class driver {
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
 	void flatten_associative(const elem::etype &tp,
-		const sprawformtree &tree, std::vector<sprawformtree> &tms);
+		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F>
 		void minimize(raw_rule &rr, const F &f, const raw_term &false_term);
 	template<typename F>
-		sprawformtree minimize_aux(const raw_rule &ref_rule,
-		const raw_rule &var_rule, sprawformtree &ref_tree,
-		sprawformtree &var_tree, const F &f, bool ctx_sign = true);
+		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
+		const raw_rule &var_rule, raw_form_tree &ref_tree,
+		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
 	elem rename_variables(const elem &e, std::map<elem, elem> &renames);
-	void rename_variables(sprawformtree &t, std::map<elem, elem> &renames);
-	sprawformtree expand_term(const raw_term &use, const raw_rule &def,
+	void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames);
+	raw_form_tree expand_term(const raw_term &use, const raw_rule &def,
 		const raw_term &false_term);
 	void square_root_program(raw_prog &rp, const raw_term &false_term);
 	void square_program(raw_prog &rp, const raw_term &false_term);
@@ -201,7 +201,7 @@ class driver {
 	elem quote_term(const raw_term &head, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
-	elem quote_formula(const sprawformtree &t, const elem &rel_name,
+	elem quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
 	std::vector<elem> quote_rule(const raw_rule &rr, const elem &rel_name,
@@ -210,7 +210,7 @@ class driver {
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
 	void split_heads(raw_prog &rp);
-	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
+	raw_term to_pure_tml(const raw_form_tree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 	void to_pure_tml(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
@@ -229,7 +229,7 @@ class driver {
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_term &rt, string_t &prog_constr, uint_t &cid,
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const sprawformtree &prft, string_t &prog_constr,
+	string_t generate_cpp(const raw_form_tree &prft, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache,

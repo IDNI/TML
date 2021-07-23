@@ -96,14 +96,15 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				}
 			}
 		}
-		else if(r.prft != NULL) {
+		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
 
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
-				: r.prft;
+				? std::make_shared<raw_form_tree>(elem::NOT,
+						std::make_shared<raw_form_tree>(*r.prft))
+				: std::make_shared<raw_form_tree>(*r.prft);
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };

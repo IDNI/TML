@@ -112,26 +112,26 @@ void driver::directives_load(raw_prog& p, lexeme& trel,
  * universal and existential quantifications. Useful for avoiding having
  * to separately process these operators. */
 
-sprawformtree expand_formula_node(const sprawformtree &t, dict_t &d) {
-	switch(t->type) {
+raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d) {
+	switch(t.type) {
 		case elem::IMPLIES: {
 			// Implication is logically equivalent to the following
-			return make_shared<raw_form_tree>(elem::ALT,
-				make_shared<raw_form_tree>(elem::NOT, t->l), t->r);
+			return raw_form_tree(elem::ALT,
+				make_shared<raw_form_tree>(elem::NOT, t.l), t.r);
 		} case elem::COIMPLIES: {
 			// Co-implication is logically equivalent to the following
-			return make_shared<raw_form_tree>(elem::AND,
-				make_shared<raw_form_tree>(elem::IMPLIES, t->l, t->r),
-				make_shared<raw_form_tree>(elem::IMPLIES, t->r, t->l));
+			return raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(elem::IMPLIES, t.l, t.r),
+				make_shared<raw_form_tree>(elem::IMPLIES, t.r, t.l));
 		} case elem::UNIQUE: {
 			// The uniqueness quantifier is logically equivalent to the
 			// following
-			const elem evar = elem::fresh_var(d), qvar = *(t->l->el);
-			return make_shared<raw_form_tree>(elem::EXISTS,
+			const elem evar = elem::fresh_var(d), qvar = *(t.l->el);
+			return raw_form_tree(elem::EXISTS,
 				make_shared<raw_form_tree>(evar),
 				make_shared<raw_form_tree>(elem::FORALL,
 					make_shared<raw_form_tree>(qvar),
-					make_shared<raw_form_tree>(elem::COIMPLIES, t->r,
+					make_shared<raw_form_tree>(elem::COIMPLIES, t.r,
 						make_shared<raw_form_tree>(
 							raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar })))));
 		} default: {
@@ -144,12 +144,12 @@ sprawformtree expand_formula_node(const sprawformtree &t, dict_t &d) {
  * into a flat list. */
 
 void driver::flatten_associative(const elem::etype &tp,
-		const sprawformtree &tree, vector<sprawformtree> &tms) {
-	if(tree->type == tp) {
-		flatten_associative(tp, tree->l, tms);
-		flatten_associative(tp, tree->r, tms);
+		const raw_form_tree &tree, vector<const raw_form_tree *> &tms) {
+	if(tree.type == tp) {
+		flatten_associative(tp, *tree.l, tms);
+		flatten_associative(tp, *tree.r, tms);
 	} else {
-		tms.push_back(tree);
+		tms.push_back(&tree);
 	}
 }
 
@@ -189,17 +189,17 @@ bool is_cqn(const raw_rule &rr) {
  * function with the accumulator. */
 
 template<typename X, typename F>
-		X prefold_tree(sprawformtree t, X acc, const F &f) {
+		X prefold_tree(raw_form_tree &t, X acc, const F &f) {
 	const X &new_acc = f(t, acc);
-	switch(t->type) {
+	switch(t.type) {
 		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
 				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
 			// Fold through binary trees by threading accumulator through both
 			// the LHS and RHS
-			return prefold_tree(t->r, prefold_tree(t->l, new_acc, f), f);
+			return prefold_tree(*t.r, prefold_tree(*t.l, new_acc, f), f);
 		// Fold though unary trees by threading accumulator through this
 		// node then single child
-		case elem::NOT: return prefold_tree(t->l, new_acc, f);
+		case elem::NOT: return prefold_tree(*t.l, new_acc, f);
 		// Otherwise for leaf nodes like terms and variables, thread
 		// accumulator through just this node
 		default: return new_acc;
@@ -210,16 +210,16 @@ template<typename X, typename F>
  * given function with the accumulator. */
 
 template<typename X, typename F>
-		X postfold_tree(sprawformtree &t, X acc, const F &f) {
-	switch(t->type) {
+		X postfold_tree(raw_form_tree &t, X acc, const F &f) {
+	switch(t.type) {
 		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
 				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
 			// Fold through binary trees by threading accumulator through both
 			// the LHS and RHS
-			return f(t, postfold_tree(t->r, postfold_tree(t->l, acc, f), f));
+			return f(t, postfold_tree(*t.r, postfold_tree(*t.l, acc, f), f));
 		// Fold though unary trees by threading accumulator through the
 		// single child then this node
-		case elem::NOT: return f(t, postfold_tree(t->l, acc, f));
+		case elem::NOT: return f(t, postfold_tree(*t.l, acc, f));
 		// Otherwise for leaf nodes like terms and variables, thread
 		// accumulator through just this node
 		default: return f(t, acc);
@@ -239,11 +239,12 @@ bool is_query (const raw_rule &rr, const raw_term &false_term) {
 	if(!(rr.is_rule() || rr.is_form())) return false;
 	// Ensure that all terms in the tree are either relations or
 	// equalities and that there is no second order quantification
-	if(!prefold_tree(rr.get_prft(false_term), true,
-			[&](const sprawformtree &t, bool acc) -> bool {
-				return acc && (t->type != elem::NONE ||
-					t->rt->extype == raw_term::REL ||
-					t->rt->extype == raw_term::EQ) && t->type != elem::SYM;}))
+	raw_form_tree prft = *rr.get_prft(false_term);
+	if(!prefold_tree(prft, true,
+			[&](const raw_form_tree &t, bool acc) -> bool {
+				return acc && (t.type != elem::NONE ||
+					t.rt->extype == raw_term::REL ||
+					t.rt->extype == raw_term::EQ) && t.type != elem::SYM;}))
 		return false;
 	return true;
 }
@@ -862,23 +863,23 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
  * direction to establish the equivalence of the entire trees. */
 
 template<typename F>
-		sprawformtree driver::minimize_aux(const raw_rule &ref_rule,
-			const raw_rule &var_rule, sprawformtree &ref_tree,
-			sprawformtree &var_tree, const F &f, bool ctx_sign) {
-	sprawformtree orig_var = var_tree;
-	typedef initializer_list<pair<sprawformtree, sprawformtree>> bijection;
+		raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
+			const raw_rule &var_rule, raw_form_tree &ref_tree,
+			raw_form_tree &var_tree, const F &f, bool ctx_sign) {
+	raw_form_tree orig_var = var_tree;
+	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
 	// Minimize different formulas in different ways
-	switch(var_tree->type) {
+	switch(var_tree.type) {
 		case elem::IMPLIES: {
 			// Minimize the subtrees separately first. Since a -> b is
 			// equivalent to ~a OR b, alter the parity of the first operand
-			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, !ctx_sign);
-			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
-					{{make_shared<raw_form_tree>(elem::NOT, ref_tree->l),
-						make_shared<raw_form_tree>(elem::NOT, orig_var->l)},
-						{ref_tree->r, orig_var->r}})
+					{{raw_form_tree(elem::NOT, ref_tree.l),
+						raw_form_tree(elem::NOT, orig_var.l)},
+						{*ref_tree.r, *orig_var.r}})
 				// Apply the same treatment as for a disjunction since this is
 				// what an implication is equivalent to
 				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
@@ -886,11 +887,11 @@ template<typename F>
 			break;
 		} case elem::ALT: {
 			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
-					{{ref_tree->l, orig_var->l}, {ref_tree->r, orig_var->r}})
+					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
 				// If in positive context, eliminating disjunct certainly
 				// produces smaller query, so check only the reverse. Otherwise
 				// vice versa
@@ -899,11 +900,11 @@ template<typename F>
 			break;
 		} case elem::AND: {
 			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
-					{{ref_tree->l, orig_var->l}, {ref_tree->r, orig_var->r}})
+					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
 				// If in positive context, eliminating conjunct certainly
 				// produces bigger query, so check only the reverse. Otherwise
 				// vice versa
@@ -913,14 +914,14 @@ template<typename F>
 		} case elem::NOT: {
 			// Minimize the single subtree taking care to update the negation
 			// parity
-			minimize_aux(ref_rule, var_rule, ref_tree->l, var_tree->l, f, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
 			break;
 		} case elem::EXISTS: case elem::FORALL: {
 			// Existential quantification preserves the containment relation
 			// between two formulas, so just recurse. Universal quantification
 			// is just existential with two negations, hence negation parity
 			// is preserved.
-			minimize_aux(ref_rule, var_rule, ref_tree->r, var_tree->r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
 			break;
 		} default: {
 			// Do not bother with co-implication nor uniqueness quantification
@@ -940,15 +941,15 @@ template<typename F>
 template<typename F>
 		void driver::minimize(raw_rule &rr, const F &f,
 			const raw_term &false_term) {
+	if(rr.is_fact()) return;
 	// Switch to the formula tree representation of the rule if this has
 	// not yet been done for this is a precondition to minimize_aux
-	rr.prft = rr.get_prft(false_term);
-	rr.b.clear();
+	rr.to_prft(false_term);
 	// Copy the rule to provide scratch for minimize_aux
 	raw_rule var_rule = rr;
 	// Now minimize the formula tree of the given rule using the given
 	// containment testing function
-	minimize_aux(rr, var_rule, rr.prft, var_rule.prft, f);
+	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, f);
 }
 
 /* Go through the program and removed those queries that the function f
@@ -1137,38 +1138,38 @@ z3::expr z3_context::fresh_constant() {
 /* Given a formula tree, output the equivalent Z3 expression using and
  * updating the mappings in the context as necessary. */
 
-z3::expr z3_context::tree_to_z3(const sprawformtree &t,
+z3::expr z3_context::tree_to_z3(const raw_form_tree &t,
 		const raw_term &false_term, dict_t &dict) {
-	switch(t->type) {
+	switch(t.type) {
 		case elem::AND:
-			return tree_to_z3(t->l, false_term, dict) &&
-				tree_to_z3(t->r, false_term, dict);
+			return tree_to_z3(*t.l, false_term, dict) &&
+				tree_to_z3(*t.r, false_term, dict);
 		case elem::ALT:
-			return tree_to_z3(t->l, false_term, dict) ||
-				tree_to_z3(t->r, false_term, dict);
+			return tree_to_z3(*t.l, false_term, dict) ||
+				tree_to_z3(*t.r, false_term, dict);
 		case elem::NOT:
-			return !tree_to_z3(t->l, false_term, dict);
+			return !tree_to_z3(*t.l, false_term, dict);
 		case elem::EXISTS: {
-			const elem &qvar = *t->l->el;
+			const elem &qvar = *t.l->el;
 			// Obtain original Z3 binding this quantified variable
 			z3::expr normal_const = arg_to_z3(qvar);
 			// Use a fresh Z3 binding for this quantified variable
 			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
 			// Make quantified expression
 			z3::expr qexpr = exists(temp_const,
-				tree_to_z3(t->r, false_term, dict));
+				tree_to_z3(*t.r, false_term, dict));
 			// Restore original binding for quantified variable
 			var_to_decl.at(qvar) = normal_const;
 			return qexpr;
 		} case elem::FORALL: {
-			const elem &qvar = *t->l->el;
+			const elem &qvar = *t.l->el;
 			// Obtain original Z3 binding this quantified variable
 			z3::expr normal_const = arg_to_z3(qvar);
 			// Use a fresh Z3 binding for this quantified variable
 			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
 			// Make quantified expression
 			z3::expr qexpr = forall(temp_const,
-				tree_to_z3(t->r, false_term, dict));
+				tree_to_z3(*t.r, false_term, dict));
 			// Restore original binding for quantified variable
 			var_to_decl.at(qvar) = normal_const;
 			return qexpr;
@@ -1176,8 +1177,8 @@ z3::expr z3_context::tree_to_z3(const sprawformtree &t,
 			// Process the expanded formula instead
 			return tree_to_z3(expand_formula_node(t, dict), false_term, dict);
 		case elem::NONE:
-			if(*t == false_term) return context.bool_val(false);
-			else return term_to_z3(*t->rt);
+			if(t == false_term) return context.bool_val(false);
+			else return term_to_z3(*t.rt);
 		default:
 			assert(false); //should never reach here
 	}
@@ -1197,7 +1198,7 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr,
 	// Collect bound variables of rule and restrictions from constants in head
 	set<elem> free_vars;
 	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
-	collect_free_vars(rr.get_prft(false_term), bound_vars, free_vars);
+	collect_free_vars(*rr.get_prft(false_term), bound_vars, free_vars);
 	// Free variables are existentially quantified
 	z3::expr_vector ex_quant_vars (context);
 	for (const auto& var : free_vars)
@@ -1210,7 +1211,7 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr,
 		var_to_decl.at(el) = constant;
 	}
 	// Construct z3 expression from rule
-	z3::expr formula = tree_to_z3(rr.get_prft(false_term), false_term, dict);
+	z3::expr formula = tree_to_z3(*rr.get_prft(false_term), false_term, dict);
 	// Now undo the global head mapping for future constructions
 	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
 	z3::expr decl = restr && (ex_quant_vars.empty() ?
@@ -1253,7 +1254,7 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 void driver::simplify_formulas(raw_prog &rp, const raw_term &false_term) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
-			rr.set_prft(raw_form_tree::simplify(rr.prft, false_term));
+			rr.set_prft(raw_form_tree::simplify(*rr.prft, false_term));
 		}
 	}
 }
@@ -1542,23 +1543,23 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
  *  <quote>_fact_term(<node ID> <term ID>).
  */
 
-elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
+elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	const elem part_id = elem(part_count++);
-	switch(t->type) {
+	switch(t.type) {
 		case elem::IMPLIES:
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QIMPLIES), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_implies_left"),
 				elem_openp, part_id,
-				quote_formula(t->l, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.l, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_implies_right"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		case elem::COIMPLIES:
@@ -1566,11 +1567,11 @@ elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
 				elem_openp, part_id, elem(QCOIMPLIES), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_coimplies_left"),
 				elem_openp, part_id,
-				quote_formula(t->l, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.l, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_coimplies_right"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		case elem::AND:
@@ -1578,11 +1579,11 @@ elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
 				elem_openp, part_id, elem(QAND), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_and_left"),
 				elem_openp, part_id,
-				quote_formula(t->l, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.l, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_and_right"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		case elem::ALT:
@@ -1590,11 +1591,11 @@ elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
 				elem_openp, part_id, elem(QALT), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_alt_left"),
 				elem_openp, part_id,
-				quote_formula(t->l, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.l, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_alt_right"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		case elem::NOT:
@@ -1602,43 +1603,43 @@ elem driver::quote_formula(const sprawformtree &t, const elem &rel_name,
 				elem_openp, part_id, elem(QNOT), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_not_body"),
 				elem_openp, part_id,
-				quote_formula(t->l, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.l, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		case elem::EXISTS: {
-			elem qvar = quote_elem(*(t->l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, d);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QEXISTS), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_exists_var"),
 				elem_openp, part_id, qvar, elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_exists_body"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		} case elem::UNIQUE: {
-			elem qvar = quote_elem(*(t->l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, d);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QUNIQUE), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_unique_var"),
 				elem_openp, part_id, qvar, elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_unique_body"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		} case elem::NONE: {
-			return quote_term(*t->rt, rel_name, domain_name, rp, variables, part_count);
+			return quote_term(*t.rt, rel_name, domain_name, rp, variables, part_count);
 			break;
 		} case elem::FORALL: {
-			elem qvar = quote_elem(*(t->l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, d);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QFORALL), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_forall_var"),
 				elem_openp, part_id, qvar, elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_forall_body"),
 				elem_openp, part_id,
-				quote_formula(t->r, rel_name, domain_name, rp, variables, part_count),
+				quote_formula(*t.r, rel_name, domain_name, rp, variables, part_count),
 				elem_closep })));
 			break;
 		} default:
@@ -1693,7 +1694,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 			rule_ids.push_back(rule_id);
 		}
 	} else {
-		const elem body_id = quote_formula(rr.get_prft(false_term), rel_name, domain_name,
+		const elem body_id = quote_formula(*rr.get_prft(false_term), rel_name, domain_name,
 			rp, variables, part_count);
 		for(size_t gidx = 0; gidx < rr.h.size(); gidx++) {
 			const elem head_id = quote_term(rr.h[gidx], rel_name, domain_name, rp,
@@ -3190,31 +3191,31 @@ elem driver::rename_variables(const elem &e, map<elem, elem> &renames) {
  * also that the mappings made for variables introduced inside
  * quantifiers are not exported. */
 
-void driver::rename_variables(sprawformtree &t, map<elem, elem> &renames) {
+void driver::rename_variables(raw_form_tree &t, map<elem, elem> &renames) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	
-	switch(t->type) {
+	switch(t.type) {
 		case elem::NONE: {
-			for(elem &e : t->rt->e) e = rename_variables(e, renames);
+			for(elem &e : t.rt->e) e = rename_variables(e, renames);
 			break;
 		} case elem::NOT: {
-			rename_variables(t->l, renames);
+			rename_variables(*t.l, renames);
 			break;
 		} case elem::ALT: case elem::AND: case elem::IMPLIES:
 				case elem::COIMPLIES: {
-			rename_variables(t->l, renames);
-			rename_variables(t->r, renames);
+			rename_variables(*t.l, renames);
+			rename_variables(*t.r, renames);
 			break;
 		} case elem::FORALL: case elem::EXISTS: case elem::UNIQUE: {
 			// The variable that is being mapped to something else
-			const elem ovar = *t->l->el;
+			const elem ovar = *t.l->el;
 			// Get what that variable maps to in the outer scope
 			const elem pvar = rename_variables(ovar, renames);
 			// Temporarily replace the outer scope mapping with new inner one
-			*t->l->el = renames[ovar] = elem::fresh_var(d);
+			*t.l->el = renames[ovar] = elem::fresh_var(d);
 			// Rename body using inner scope mapping
-			rename_variables(t->r, renames);
+			rename_variables(*t.r, renames);
 			// Now restore the outer scope mapping
 			renames[ovar] = pvar;
 			break;
@@ -3229,12 +3230,9 @@ void driver::rename_variables(sprawformtree &t, map<elem, elem> &renames) {
  * are used so that the produced formula tree can be grafted in
  * anywhere. */
 
-sprawformtree driver::expand_term(const raw_term &use,
+raw_form_tree driver::expand_term(const raw_term &use,
 		const raw_rule &def, const raw_term &false_term) {
 	const raw_term &head = def.h[0];
-	// Ensure that the term and head at least have the same relation,
-	// otherwise a substitution would be senseless
-	if(get_relation_info(head) != get_relation_info(use)) return nullptr;
 	// Where all the mappings for the substitution will be stored
 	map<elem, elem> renames;
 	// Let's try to reduce the number of equality constraints required
@@ -3246,7 +3244,7 @@ sprawformtree driver::expand_term(const raw_term &use,
 	}
 	// Deep copy the rule's body because the in-place renaming required
 	// for this expansion should not affect the original
-	sprawformtree subst = def.get_prft(false_term)->clone();
+	raw_form_tree subst = *def.get_prft(false_term);
 	rename_variables(subst, renames);
 	// Append remaining equality constraints to the renamed tree to link
 	// the logic back to its context
@@ -3255,7 +3253,8 @@ sprawformtree driver::expand_term(const raw_term &use,
 		// in the substitution choice.
 		elem new_name = rename_variables(head.e[i], renames);
 		if(new_name != use.e[i]) {
-			subst = make_shared<raw_form_tree>(elem::AND, subst,
+			subst = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(subst),
 				make_shared<raw_form_tree>(raw_term(raw_term::EQ,
 					{ use.e[i], elem(elem::EQ), new_name })));
 		}
@@ -3290,28 +3289,30 @@ void driver::square_program(raw_prog &rp, const raw_term &false_term) {
 		} else {
 			// Deep copy so that we can inline out of place. Future terms/
 			// rules may need the original body of this rule
-			sprawformtree nprft = rr.get_prft(false_term)->clone();
+			raw_form_tree nprft = *rr.get_prft(false_term);
 			// Iterate through tree looking for terms
 			postfold_tree(nprft, monostate {},
-				[&](sprawformtree &t, monostate acc) -> monostate {
-					if(t->type == elem::NONE && t->rt->extype == raw_term::REL) {
+				[&](raw_form_tree &t, monostate acc) -> monostate {
+					if(t.type == elem::NONE && t.rt->extype == raw_term::REL) {
 						// Replace term according to following rule:
 						// term -> (term && ~del1body && ... && ~delNbody) ||
 						// ins1body || ... || insMbody
-						const raw_term &rt = *t->rt;
+						const raw_term &rt = *t.rt;
 						// Inner conjunction to handle case where fact was derived
 						// before the last step. We just need to make sure that it
 						// was not deleted in the last step.
-						sprawformtree subst = make_shared<raw_form_tree>(rt);
+						raw_form_tree subst(rt);
 						for(const raw_rule &rr : neg_rels[get_relation_info(rt)])
-							subst = make_shared<raw_form_tree>(elem::AND, subst,
+							subst = raw_form_tree(elem::AND,
+								make_shared<raw_form_tree>(subst),
 								make_shared<raw_form_tree>(elem::NOT,
-									expand_term(rt, rr, false_term)));
+									make_shared<raw_form_tree>(expand_term(rt, rr, false_term))));
 						// Outer disjunction to handle the case where fact derived
 						// exactly in the last step.
 						for(const raw_rule &rr : pos_rels[get_relation_info(rt)])
-							subst = make_shared<raw_form_tree>(elem::ALT, subst,
-								expand_term(rt, rr, false_term));
+							subst = raw_form_tree(elem::ALT,
+								make_shared<raw_form_tree>(subst),
+								make_shared<raw_form_tree>(expand_term(rt, rr, false_term)));
 						// We can replace the raw_term now that we no longer need it
 						t = subst;
 					}
@@ -3337,8 +3338,11 @@ void driver::square_root_program(raw_prog &rp, const raw_term &false_term) {
 		// Execute program rules only when the clock is in asserted state
 		const raw_term tick(elem::fresh_temp_sym(d), std::vector<elem> {});
 		for(raw_rule &rr : rp.r) {
-			rr.prft = make_shared<raw_form_tree>(elem::AND,
-				rr.get_prft(false_term), make_shared<raw_form_tree>(tick));
+			if(!rr.is_fact()) {
+				rr.set_prft(raw_form_tree(elem::AND,
+					make_shared<raw_form_tree>(*rr.get_prft(false_term)),
+					make_shared<raw_form_tree>(tick)));
+			}
 		}
 		// Make the clock alternate between two states
 		rp.r.push_back(raw_rule(tick, tick.negate()));
@@ -3353,10 +3357,10 @@ void driver::square_root_program(raw_prog &rp, const raw_term &false_term) {
 void driver::remove_redundant_exists(raw_prog &rp) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
-			sprawformtree &prft = rr.prft;
+			raw_form_tree &prft = *rr.prft;
 			// Repeatedly strip outermost existential quantifier
-			while(prft->type == elem::EXISTS) {
-				prft = prft->r;
+			while(prft.type == elem::EXISTS) {
+				prft = *prft.r;
 			}
 		}
 	}
@@ -3387,35 +3391,35 @@ set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
  * logic formula with the given bound variables. This might involve
  * adding temporary relations to the given program. */
 
-raw_term driver::to_pure_tml(const sprawformtree &t,
+raw_term driver::to_pure_tml(const raw_form_tree &t,
 		raw_prog &rp, const set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
 	const elem part_id = elem::fresh_temp_sym(d);
 
-	switch(t->type) {
+	switch(t.type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
 			// Process the expanded formula instead
 			return to_pure_tml(expand_formula_node(t, d), rp, fv);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
-			vector<sprawformtree> ands;
+			vector<const raw_form_tree *> ands;
 			flatten_associative(elem::AND, t, ands);
 			// Collect the free variables in each conjunct. The intersection
 			// of variables between one and the rest is what will need to be
 			// exported
 			multiset<elem> all_vars(fv.begin(), fv.end());
-			map<const sprawformtree, set<elem>> fvs;
-			for(const sprawformtree &tree : ands) {
-				fvs[tree] = collect_free_vars(tree);
+			map<const raw_form_tree *, set<elem>> fvs;
+			for(const raw_form_tree *tree : ands) {
+				fvs[tree] = collect_free_vars(*tree);
 				all_vars.insert(fvs[tree].begin(), fvs[tree].end());
 			}
 			vector<raw_term> terms;
 			// And make a pure TML formula listing them
-			for(const sprawformtree &tree : ands) {
+			for(const raw_form_tree *tree : ands) {
 				set<elem> nv = set_intersection(fvs[tree],
 					set_difference(all_vars, fvs[tree]));
-				terms.push_back(to_pure_tml(tree, rp, nv));
+				terms.push_back(to_pure_tml(*tree, rp, nv));
 			}
 			// Make the representative rule and add to the program
 			raw_rule nr(raw_term(part_id, fv), terms);
@@ -3425,34 +3429,34 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			break;
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
-			vector<sprawformtree> alts;
+			vector<const raw_form_tree *> alts;
 			flatten_associative(elem::ALT, t, alts);
-			for(const sprawformtree &tree : alts) {
+			for(const raw_form_tree *tree : alts) {
 				// Make a separate rule for each disjunct
-				raw_rule nr(raw_term(part_id, fv), to_pure_tml(tree, rp, fv));
+				raw_rule nr(raw_term(part_id, fv), to_pure_tml(*tree, rp, fv));
 				rp.r.push_back(nr);
 				// Hide this new auxilliary relation
 				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			}
 			break;
 		} case elem::NOT: {
-			return to_pure_tml(t->l, rp, fv).negate();
+			return to_pure_tml(*t.l, rp, fv).negate();
 		} case elem::EXISTS: {
 			// Make the proposition that is being quantified
 			set<elem> nfv = fv;
-			sprawformtree current_formula;
+			const raw_form_tree *current_formula;
 			set<elem> qvars;
 			// Get all the quantified variables used in a sequence of
 			// existential quantifiers
-			for(current_formula = t;
+			for(current_formula = &t;
 					current_formula->type == elem::EXISTS;
-					current_formula = current_formula->r) {
+					current_formula = &*current_formula->r) {
 				qvars.insert(*(current_formula->l->el));
 			}
 			nfv.insert(qvars.begin(), qvars.end());
 			// Convert the body occuring within the nested quantifiers into
 			// pure TML
-			raw_term nrt = to_pure_tml(current_formula, rp, nfv);
+			raw_term nrt = to_pure_tml(*current_formula, rp, nfv);
 			// Make the rule corresponding to this existential formula
 			for(const elem &e : qvars) {
 				nfv.erase(e);
@@ -3463,27 +3467,27 @@ raw_term driver::to_pure_tml(const sprawformtree &t,
 			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			return raw_term(part_id, nfv);
 		} case elem::NONE: {
-			return *t->rt;
+			return *t.rt;
 		} case elem::FORALL: {
-			sprawformtree current_formula;
+			const raw_form_tree *current_formula;
 			set<elem> qvars;
 			// Get all the quantified variables used in a sequence of
 			// existential quantifiers
-			for(current_formula = t;
+			for(current_formula = &t;
 					current_formula->type == elem::FORALL;
-					current_formula = current_formula->r) {
+					current_formula = &*current_formula->r) {
 				qvars.insert(*(current_formula->l->el));
 			}
 			// The universal quantifier is logically equivalent to the
 			// following (forall ?x forall ?y = ~ exists ?x exists ?y ~)
 			sprawformtree equiv_formula =
-				make_shared<raw_form_tree>(elem::NOT, current_formula);
+				make_shared<raw_form_tree>(elem::NOT,
+					make_shared<raw_form_tree>(current_formula));
 			for(const elem &qvar : qvars) {
 				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
 					make_shared<raw_form_tree>(qvar), equiv_formula);
 			}
-			return to_pure_tml(make_shared<raw_form_tree>(elem::NOT,
-				equiv_formula), rp, fv);
+			return to_pure_tml(raw_form_tree(elem::NOT, equiv_formula), rp, fv);
 		} default:
 			assert(false); //should never reach here
 	}
@@ -3497,7 +3501,7 @@ void driver::to_pure_tml(raw_prog &rp) {
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
-			rr.set_b({{to_pure_tml(rr.prft, rp, collect_free_vars(rr))}});
+			rr.set_b({{to_pure_tml(*rr.prft, rp, collect_free_vars(rr))}});
 		}
 		rp.r[i] = rr;
 	}
@@ -3740,7 +3744,7 @@ void collect_free_vars(const raw_rule &rr, set<elem> &free_vars) {
 		collect_free_vars(rt, bound_vars, free_vars);
 	}
 	if(rr.is_form()) {
-		collect_free_vars(rr.prft, bound_vars, free_vars);
+		collect_free_vars(*rr.prft, bound_vars, free_vars);
 	} else {
 		collect_free_vars(rr.b, bound_vars, free_vars);
 	}
@@ -3774,32 +3778,32 @@ void collect_free_vars(const raw_term &t, vector<elem> &bound_vars,
 
 /* Collect all the variables that are free in the given tree. */
 
-set<elem> collect_free_vars(const sprawformtree &t) {
+set<elem> collect_free_vars(const raw_form_tree &t) {
 	set<elem> free_vars;
 	vector<elem> bound_vars = {};
 	collect_free_vars(t, bound_vars, free_vars);
 	return free_vars;
 }
 
-void collect_free_vars(const sprawformtree &t, vector<elem> &bound_vars,
+void collect_free_vars(const raw_form_tree &t, vector<elem> &bound_vars,
 		set<elem> &free_vars) {
-	switch(t->type) {
+	switch(t.type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
 		case elem::ALT:
-			collect_free_vars(t->l, bound_vars, free_vars);
-			collect_free_vars(t->r, bound_vars, free_vars);
+			collect_free_vars(*t.l, bound_vars, free_vars);
+			collect_free_vars(*t.r, bound_vars, free_vars);
 			break;
 		case elem::NOT:
-			collect_free_vars(t->l, bound_vars, free_vars);
+			collect_free_vars(*t.l, bound_vars, free_vars);
 			break;
 		case elem::EXISTS: case elem::UNIQUE: case elem::FORALL: {
-			elem elt = *(t->l->el);
+			elem elt = *(t.l->el);
 			bound_vars.push_back(elt);
-			collect_free_vars(t->r, bound_vars, free_vars);
+			collect_free_vars(*t.r, bound_vars, free_vars);
 			bound_vars.pop_back();
 			break;
 		} case elem::NONE: {
-			collect_free_vars(*t->rt, bound_vars, free_vars);
+			collect_free_vars(*t.rt, bound_vars, free_vars);
 			break;
 		} default:
 			assert(false); //should never reach here
@@ -3920,44 +3924,44 @@ string_t driver::generate_cpp(const raw_term &rt, string_t &prog_constr,
 
 // Generate the C++ code to generate the raw_form_tree
 
-string_t driver::generate_cpp(const sprawformtree &t, string_t &prog_constr,
+string_t driver::generate_cpp(const raw_form_tree &t, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name, map<elem, string_t> &elem_cache) {
 	string_t ft_name = to_string_t("ft") + to_string_t(to_string(cid++).c_str());
-	switch(t->type) {
+	switch(t.type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
 		case elem::ALT: case elem::EXISTS: case elem::UNIQUE:
 		case elem::FORALL: {
 			string_t lft_name =
-				generate_cpp(t->l, prog_constr, cid, dict_name, elem_cache);
-			string_t rft_name = generate_cpp(t->r, prog_constr, cid, dict_name,
+				generate_cpp(*t.l, prog_constr, cid, dict_name, elem_cache);
+			string_t rft_name = generate_cpp(*t.r, prog_constr, cid, dict_name,
 				elem_cache);
 			string_t t_string = to_string_t(
-				t->type == elem::IMPLIES ? "elem::IMPLIES" :
-				t->type == elem::COIMPLIES ? "elem::COIMPLIES" :
-				t->type == elem::AND ? "elem::AND" :
-				t->type == elem::ALT ? "elem::ALT" :
-				t->type == elem::EXISTS ? "elem::EXISTS" :
-				t->type == elem::UNIQUE ? "elem::UNIQUE" :
-				t->type == elem::FORALL ? "elem::FORALL" : "");
+				t.type == elem::IMPLIES ? "elem::IMPLIES" :
+				t.type == elem::COIMPLIES ? "elem::COIMPLIES" :
+				t.type == elem::AND ? "elem::AND" :
+				t.type == elem::ALT ? "elem::ALT" :
+				t.type == elem::EXISTS ? "elem::EXISTS" :
+				t.type == elem::UNIQUE ? "elem::UNIQUE" :
+				t.type == elem::FORALL ? "elem::FORALL" : "");
 			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
 				"std::make_shared<raw_form_tree>(") + t_string + to_string_t(", ") +
 				lft_name + to_string_t(", ") + rft_name + to_string_t(");\n");
 			break;
 		} case elem::NOT: {
-			string_t body_name = generate_cpp(t->l, prog_constr, cid, dict_name,
+			string_t body_name = generate_cpp(*t.l, prog_constr, cid, dict_name,
 				elem_cache);
 			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
 				"std::make_shared<raw_form_tree>(elem::NOT, ") +
 				body_name + to_string_t(");\n");
 			break;
 		} case elem::NONE: {
-			string_t term_name = generate_cpp(*t->rt, prog_constr, cid, dict_name,
+			string_t term_name = generate_cpp(*t.rt, prog_constr, cid, dict_name,
 				elem_cache);
 			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
 				"std::make_shared<raw_form_tree>(") + term_name + to_string_t(");\n");
 			break;
 		} case elem::VAR: {
-			string_t var_name = generate_cpp(*t->el, prog_constr, cid, dict_name,
+			string_t var_name = generate_cpp(*t.el, prog_constr, cid, dict_name,
 				elem_cache);
 			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
 				"std::make_shared<raw_form_tree>(elem::VAR, ") +
@@ -3979,7 +3983,7 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		term_names.push_back(
 			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
 	}
-	string_t prft_name = generate_cpp(rr.get_prft(false_term),
+	string_t prft_name = generate_cpp(*rr.get_prft(false_term),
 		prog_constr, cid, dict_name, elem_cache);
 	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
 	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");

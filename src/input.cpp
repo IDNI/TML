@@ -579,26 +579,30 @@ bool macro::parse(input* in, const raw_prog& prog){
 
 	fail: return pos = curr , false;
 }
-sprawformtree raw_rule::get_prft(const raw_term &false_term) const {
-	if(prft) {
+
+optional<raw_form_tree> raw_rule::get_prft(const raw_term &false_term) const {
+	if(prft || b.empty()) {
 		return prft;
-	} else if(b.empty()) {
-		return std::make_shared<raw_form_tree>(false_term.negate());
 	} else {
-		sprawformtree disj =
-			std::make_shared<raw_form_tree>(false_term);
+		raw_form_tree disj(false_term);
 		for(size_t i = 0; i < b.size(); i++) {
-			sprawformtree conj =
-				std::make_shared<raw_form_tree>(false_term.negate());
+			raw_form_tree conj(false_term.negate());
 			for(size_t j = 0; j < b[i].size(); j++) {
 				raw_term entr = b[i][j];
-				conj = std::make_shared<raw_form_tree>(elem::AND, conj,
-					std::make_shared<raw_form_tree>(entr));
+				conj = raw_form_tree(elem::AND,
+					make_shared<raw_form_tree>(conj),
+					make_shared<raw_form_tree>(entr));
 			}
-			disj = std::make_shared<raw_form_tree>(elem::ALT, disj, conj);
+			disj = raw_form_tree(elem::ALT, make_shared<raw_form_tree>(disj),
+				make_shared<raw_form_tree>(conj));
 		}
 		return raw_form_tree::simplify(disj, false_term);
 	}
+}
+
+optional<raw_form_tree> &raw_rule::to_prft(const raw_term &false_term) {
+	if(!prft && !b.empty()) set_prft(*get_prft(false_term));
+	return prft;
 }
 
 bool raw_rule::parse(input* in, const raw_prog& prog) {
@@ -634,7 +638,7 @@ head:	h.emplace_back();
 		sprawformtree root = NULL;
 		bool ret = rsof.parse(in, root);
 		sprawformtree temp(root);
-		this->prft = temp;
+		if(temp) this->prft = *temp;
 		if(ret) return true;
 		return in->parse_error(l[pos][0], "Formula has errors", l[pos]);
 	} else {
@@ -814,46 +818,46 @@ void raw_form_tree::printTree( int level) {
 	if (l) l->printTree(level + 1);
 }
 
-sprawformtree raw_form_tree::simplify(sprawformtree &t, const raw_term &false_term) {
-	switch(t->type) {
+raw_form_tree &raw_form_tree::simplify(raw_form_tree &t, const raw_term &false_term) {
+	switch(t.type) {
 		case elem::IMPLIES:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
+			simplify(*t.l, false_term);
+			simplify(*t.r, false_term);
 			break;
 		case elem::COIMPLIES:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
+			simplify(*t.l, false_term);
+			simplify(*t.r, false_term);
 			break;
 		case elem::AND:
-			simplify(t->l, false_term), simplify(t->r, false_term);
-			if (*t->l == false_term.negate()) {
-				t = t->r;
-			} else if (*t->r == false_term.negate()) {
-				t = t->l;
+			simplify(*t.l, false_term), simplify(*t.r, false_term);
+			if (*t.l == false_term.negate()) {
+				t = *t.r;
+			} else if (*t.r == false_term.negate()) {
+				t = *t.l;
 			}
 			break;
 		case elem::ALT:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
-			if(*t->l == false_term) {
-				t = t->r;
-			} else if(*t->r == false_term) {
-				t = t->l;
+			simplify(*t.l, false_term);
+			simplify(*t.r, false_term);
+			if(*t.l == false_term) {
+				t = *t.r;
+			} else if(*t.r == false_term) {
+				t = *t.l;
 			}
 			break;
 		case elem::NOT:
-			simplify(t->l,false_term);
+			simplify(*t.l, false_term);
 			break;
 		case elem::EXISTS:
-			simplify(t->r, false_term);
+			simplify(*t.r, false_term);
 			break;
 		case elem::UNIQUE:
-			simplify(t->r, false_term);
+			simplify(*t.r, false_term);
 			break;
 		case elem::NONE:
 			break;
 		case elem::FORALL:
-			simplify(t->r, false_term);
+			simplify(*t.r, false_term);
 			break;
 		default: DBGFAIL; //should never reach here
 	}
@@ -904,7 +908,7 @@ bool guard_statement::parse_condition(input* in, raw_prog& np) {
 	sprawformtree root = 0;
 	raw_sof rsof(np);
 	bool ret = rsof.parse(in, root);
-	prft = sprawformtree(root);
+	if(root) prft = *prft;
 	rp_id = np.id;
 	return ret ? true : in->parse_error(in->l[in->pos][0],
 		"Formula has errors", in->l[in->pos]);
