@@ -620,6 +620,12 @@ struct raw_form_tree {
 		r(rft.r ? std::make_shared<raw_form_tree>(*rft.r) : nullptr), neg(rft.neg),
 		guard_lx(rft.guard_lx) {}
 	
+	// Move the given tree into this
+	raw_form_tree(raw_form_tree &&rft) : type(rft.type), rt(rft.rt),
+			el(rft.el), l(rft.l), r(rft.r), neg(rft.neg), guard_lx(rft.guard_lx) {
+		rft.l = rft.r = nullptr;
+	}
+	
 	// Make a deep copy of the given formula tree
 	raw_form_tree &operator=(const raw_form_tree &rft) {
 		type = rft.type;
@@ -629,6 +635,20 @@ struct raw_form_tree {
 		r = rft.r ? std::make_shared<raw_form_tree>(*rft.r) : nullptr;
 		neg = rft.neg;
 		guard_lx = rft.guard_lx;
+		return *this;
+	}
+	
+	// Move the given tree into this
+	raw_form_tree &operator=(raw_form_tree &&rft) {
+		type = rft.type;
+		rt = rft.rt;
+		el = rft.el;
+		l = rft.l;
+		r = rft.r;
+		neg = rft.neg;
+		guard_lx = rft.guard_lx;
+		
+		rft.l = rft.r = nullptr;
 		return *this;
 	}
 	void printTree(int level =0 );
