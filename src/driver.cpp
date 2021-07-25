@@ -1181,6 +1181,18 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 			case BITWOR: return (arg1 | arg2) == arg3;
 			default: assert(false); //should never reach here
 		}
+	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 6) {
+		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
+			arg3 = arg_to_z3(rel.e[4]), arg4 = arg_to_z3(rel.e[5]);
+		switch(rel.arith_op) {
+			case ADD:
+				return (zext(arg1, value_sort.bv_size()) +
+					zext(arg2, value_sort.bv_size())) == concat(arg3, arg4);
+			case MULT:
+				return (zext(arg1, value_sort.bv_size()) *
+					zext(arg2, value_sort.bv_size())) == concat(arg3, arg4);
+			default: assert(false); //should never reach here
+		}
 	} else assert(false); //should never reach here
 }
 
