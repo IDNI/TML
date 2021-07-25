@@ -612,7 +612,9 @@ struct raw_form_tree {
 	// Make a formula tree with the given element and two children
 	raw_form_tree (const elem &_el, sprawformtree _l = nullptr,
 		sprawformtree _r = nullptr) :
-		type(_el.type), el(_el), l(_l), r(_r) {}
+		type(_el.type), el(_el),
+		l(_l ? std::make_shared<raw_form_tree>(*_l) : nullptr),
+		r(_r ? std::make_shared<raw_form_tree>(*_r) : nullptr) {}
 	
 	// Make a deep copy of the given formula tree
 	raw_form_tree(const raw_form_tree &rft) : type(rft.type), rt(rft.rt),

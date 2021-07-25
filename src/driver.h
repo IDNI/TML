@@ -70,14 +70,14 @@ struct prog_data {
 struct z3_context {
 	z3::context context;
 	z3::solver solver;
-	z3::sort uninterp_sort;
+	z3::sort value_sort;
 	z3::sort bool_sort;
 	std::map<rel_info, z3::func_decl> rel_to_decl;
 	z3::expr_vector head_rename;
 	std::map<elem, z3::expr> var_to_decl;
 	std::map<raw_rule, z3::expr> rule_to_decl;
 	
-	z3_context();
+	z3_context(size_t sz);
 	z3::func_decl rel_to_z3(const raw_term& rt);
 	z3::expr globalHead_to_z3(const int_t pos);
 	z3::expr fresh_constant();
@@ -202,9 +202,9 @@ class driver {
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp);
 	void split_heads(raw_prog &rp);
-	raw_term to_pure_tml(const raw_form_tree &t, raw_prog &rp,
+	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
 		const std::set<elem> &fv);
-	void to_pure_tml(raw_prog &rp);
+	void to_dnf(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);

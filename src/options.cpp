@@ -186,8 +186,8 @@ void options::setup() {
 		"subsume queries into each other using CQNC test");
 	add_bool("cqc-factor",
 		"factor out parts of queries using CQC test");
-	add_bool("pure-tml",
-		"convert FOL formulas into pure TML");
+	add_bool("to-dnf",
+		"convert FOL formulas into to DNF before running program");
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
 	add(option(option::type::INT, { "iterate" })

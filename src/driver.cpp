@@ -226,8 +226,8 @@ template<typename X, typename F>
 }
 
 /* Checks if the rule has a single head and a body that is either a tree
- * or a non-empty DNF. Second order quantifications and terms that are
- * neither relations nor equalities are not supported. */
+ * or a non-empty DNF. Second order quantifications and builtin terms
+ * are not supported. */
 
 bool is_query (const raw_rule &rr) {
 	// Ensure that there are no multiple heads
@@ -236,14 +236,13 @@ bool is_query (const raw_rule &rr) {
 	if(rr.h[0].neg) return false;
 	// Ensure that this rule is either a tree or non-empty DNF
 	if(!(rr.is_rule() || rr.is_form())) return false;
-	// Ensure that all terms in the tree are either relations or
-	// equalities and that there is no second order quantification
+	// Ensure that there is no second order quantification or builtins in
+	// the tree
 	raw_form_tree prft = *rr.get_prft();
 	if(!prefold_tree(prft, true,
 			[&](const raw_form_tree &t, bool acc) -> bool {
 				return acc && (t.type != elem::NONE ||
-					t.rt->extype == raw_term::REL ||
-					t.rt->extype == raw_term::EQ) && t.type != elem::SYM;}))
+					t.rt->extype != raw_term::BLTIN) && t.type != elem::SYM;}))
 		return false;
 	return true;
 }
@@ -865,7 +864,6 @@ template<typename F>
 		raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
 			const raw_rule &var_rule, raw_form_tree &ref_tree,
 			raw_form_tree &var_tree, const F &f, bool ctx_sign) {
-	raw_form_tree orig_var = var_tree;
 	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
 	// Minimize different formulas in different ways
 	switch(var_tree.type) {
@@ -874,6 +872,7 @@ template<typename F>
 			// equivalent to ~a OR b, alter the parity of the first operand
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
 					{{raw_form_tree(elem::NOT, ref_tree.l),
@@ -883,11 +882,13 @@ template<typename F>
 				// what an implication is equivalent to
 				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
 					return ref_tree = ref_tmp;
+			var_tree = orig_var;
 			break;
 		} case elem::ALT: {
 			// Minimize the subtrees separately first
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
 					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
@@ -896,11 +897,13 @@ template<typename F>
 				// vice versa
 				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
 					return ref_tree = ref_tmp;
+			var_tree = orig_var;
 			break;
 		} case elem::AND: {
 			// Minimize the subtrees separately first
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
 					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
@@ -909,6 +912,7 @@ template<typename F>
 				// vice versa
 				if(var_tree = var_tmp; ctx_sign ? f(var_rule, ref_rule) : f(ref_rule, var_rule))
 					return ref_tree = ref_tmp;
+			var_tree = orig_var;
 			break;
 		} case elem::NOT: {
 			// Minimize the single subtree taking care to update the negation
@@ -929,7 +933,6 @@ template<typename F>
 			break;
 		}
 	}
-	var_tree = orig_var;
 	return ref_tree;
 }
 
@@ -990,13 +993,45 @@ template<typename F>
 	rp.r = reduced_rules;
 }
 
+/* Compute the number of bits required to represent the largest integer
+ * in the given program. */
+
+int_t prog_bit_len(const raw_prog &rp) {
+	int_t max_int = 0;
+	for(const raw_rule &rr : rp.r) {
+		// Look for the maximum integer occuring in the heads
+		for(const raw_term &rt : rr.h)
+			for(const elem &el : rt.e)
+				if(el.type == elem::NUM)
+					max_int = max(max_int, el.num);
+		// If this is a rule, look for the maximum integer occuring in the
+		// body
+		if(!rr.is_fact()) {
+			raw_form_tree prft = *rr.get_prft();
+			max_int = prefold_tree(prft, max_int,
+				[&](const raw_form_tree &t, int_t acc) -> int_t {
+					if(t.type == elem::NONE) {
+						for(const elem &el : t.rt->e)
+							if(el.type == elem::NUM)
+								acc = max(acc, el.num);
+						return acc;
+					} else return acc;
+				});
+		}
+	}
+	// Now compute the bit-length of the largest integer found
+	size_t bit_width = 0;
+	for(; max_int; max_int >>= 1, bit_width++);
+	return bit_width;
+}
+
 #ifdef WITH_Z3
 
 /* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
 void driver::qc_z3 (raw_prog &raw_p) {
-	z3_context ctx;
+	z3_context ctx(prog_bit_len(raw_p));
 	// Sort rules by relation name and then by tml arity
 	auto sort_rp = [](const raw_rule& r1, const raw_rule& r2) {
 		if(r1.h[0].e[0] == r2.h[0].e[0])
@@ -1033,11 +1068,13 @@ void driver::qc_z3 (raw_prog &raw_p) {
 }
 
 /* Initialize an empty context that can then be populated with TML to Z3
- * conversions. uninterp_sort will be used for all Z3 relation arguments
- * and bool_sort is the "return" type of all relations. */
+ * conversions. value_sort is either a bit-vector whose width contains
+ * the largest program integer or else it's uninterpreted and will be
+ * used for all Z3 relation arguments and bool_sort is the "return" type
+ * of all relations. */
 
-z3_context::z3_context() : solver(context),
-		uninterp_sort(context.uninterpreted_sort("Type")),
+z3_context::z3_context(size_t sz) : solver(context),
+		value_sort(sz ? context.bv_sort(sz) : context.uninterpreted_sort("Type")),
 		bool_sort(context.bool_sort()), head_rename(context) {
 	// Initialize Z3 solver instance parameters
 	z3::params p(context);
@@ -1058,7 +1095,7 @@ z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
 	else {
 		z3::sort_vector domain(context);
 		for (int_t i = rt.get_formal_arity(); i != 0; --i)
-			domain.push_back(uninterp_sort);
+			domain.push_back(value_sort);
 		z3::func_decl ndecl =
 			context.function(rel.to_str().c_str(), domain, bool_sort);
 		rel_to_decl.emplace(make_pair(rel_sig, ndecl));
@@ -1082,9 +1119,14 @@ z3::expr z3_context::globalHead_to_z3(const int_t pos) {
 z3::expr z3_context::arg_to_z3(const elem& el) {
 	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
 		return decl->second;
-	else {
+	else if(el.type == elem::NUM) {
 		const z3::expr &ndecl =
-			context.constant(el.to_str().c_str(), uninterp_sort);
+			context.bv_val(el.num, value_sort.bv_size());
+		var_to_decl.emplace(make_pair(el, ndecl));
+		return ndecl;
+	} else {
+		const z3::expr &ndecl =
+			context.constant(el.to_str().c_str(), value_sort);
 		var_to_decl.emplace(make_pair(el, ndecl));
 		return ndecl;
 	}
@@ -1123,6 +1165,22 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 		return rel_to_z3(rel)(vars_of_rel);
 	} else if(rel.extype == raw_term::EQ) {
 		return arg_to_z3(rel.e[0]) == arg_to_z3(rel.e[2]);
+	} else if(rel.extype <= raw_term::LEQ) {
+		return arg_to_z3(rel.e[0]) <= arg_to_z3(rel.e[2]);
+	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 5) {
+		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
+			arg3 = arg_to_z3(rel.e[4]);
+		switch(rel.arith_op) {
+			case ADD: return (arg1 + arg2) == arg3;
+			case SUB: return (arg1 - arg2) == arg3;
+			case MULT: return (arg1 * arg2) == arg3;
+			case SHL: return (arg1 << arg2) == arg3;
+			case SHR: return (arg1 >> arg2) == arg3;
+			case BITWAND: return (arg1 & arg2) == arg3;
+			case BITWXOR: return (arg1 ^ arg2) == arg3;
+			case BITWOR: return (arg1 | arg2) == arg3;
+			default: assert(false); //should never reach here
+		}
 	} else assert(false); //should never reach here
 }
 
@@ -1130,7 +1188,7 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 
 z3::expr z3_context::fresh_constant() {
 	return z3::expr(context,
-		Z3_mk_fresh_const(context, nullptr, uninterp_sort));
+		Z3_mk_fresh_const(context, nullptr, value_sort));
 }
 
 /* Given a formula tree, output the equivalent Z3 expression using and
@@ -3373,7 +3431,7 @@ set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
  * logic formula with the given bound variables. This might involve
  * adding temporary relations to the given program. */
 
-raw_term driver::to_pure_tml(const raw_form_tree &t,
+raw_term driver::to_dnf(const raw_form_tree &t,
 		raw_prog &rp, const set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
@@ -3382,7 +3440,7 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 	switch(t.type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
 			// Process the expanded formula instead
-			return to_pure_tml(expand_formula_node(t, d), rp, fv);
+			return to_dnf(expand_formula_node(t, d), rp, fv);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<const raw_form_tree *> ands;
@@ -3401,7 +3459,7 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 			for(const raw_form_tree *tree : ands) {
 				set<elem> nv = set_intersection(fvs[tree],
 					set_difference(all_vars, fvs[tree]));
-				terms.push_back(to_pure_tml(*tree, rp, nv));
+				terms.push_back(to_dnf(*tree, rp, nv));
 			}
 			// Make the representative rule and add to the program
 			raw_rule nr(raw_term(part_id, fv), terms);
@@ -3415,14 +3473,14 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 			flatten_associative(elem::ALT, t, alts);
 			for(const raw_form_tree *tree : alts) {
 				// Make a separate rule for each disjunct
-				raw_rule nr(raw_term(part_id, fv), to_pure_tml(*tree, rp, fv));
+				raw_rule nr(raw_term(part_id, fv), to_dnf(*tree, rp, fv));
 				rp.r.push_back(nr);
 				// Hide this new auxilliary relation
 				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
 			}
 			break;
 		} case elem::NOT: {
-			return to_pure_tml(*t.l, rp, fv).negate();
+			return to_dnf(*t.l, rp, fv).negate();
 		} case elem::EXISTS: {
 			// Make the proposition that is being quantified
 			set<elem> nfv = fv;
@@ -3438,7 +3496,7 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 			nfv.insert(qvars.begin(), qvars.end());
 			// Convert the body occuring within the nested quantifiers into
 			// pure TML
-			raw_term nrt = to_pure_tml(*current_formula, rp, nfv);
+			raw_term nrt = to_dnf(*current_formula, rp, nfv);
 			// Make the rule corresponding to this existential formula
 			for(const elem &e : qvars) {
 				nfv.erase(e);
@@ -3469,7 +3527,7 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
 					make_shared<raw_form_tree>(qvar), equiv_formula);
 			}
-			return to_pure_tml(raw_form_tree(elem::NOT, equiv_formula), rp, fv);
+			return to_dnf(raw_form_tree(elem::NOT, equiv_formula), rp, fv);
 		} default:
 			assert(false); //should never reach here
 	}
@@ -3478,12 +3536,12 @@ raw_term driver::to_pure_tml(const raw_form_tree &t,
 
 /* Convert every rule in the given program to pure TML rules. */
 
-void driver::to_pure_tml(raw_prog &rp) {
+void driver::to_dnf(raw_prog &rp) {
 	// Convert all FOL formulas to P-DATALOG
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
-			rr.set_b({{to_pure_tml(*rr.prft, rp, collect_free_vars(rr))}});
+			rr.set_b({{to_dnf(*rr.prft, rp, collect_free_vars(rr))}});
 		}
 		rp.r[i] = rr;
 	}
@@ -4092,7 +4150,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(opts.enabled("qc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			remove_redundant_exists(rp);
-			z3_context z3_ctx;
+			z3_context z3_ctx(prog_bit_len(rp));
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
 					{return check_qc_z3(rr1, rr2, z3_ctx);});
@@ -4101,7 +4159,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 #endif
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-				opts.enabled("pure-tml")) {
+				opts.enabled("to-dnf")) {
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 			remove_redundant_exists(rp);
 			o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
@@ -4109,7 +4167,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
-				to_pure_tml(rp);
+				to_dnf(rp);
 				split_heads(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
 				
