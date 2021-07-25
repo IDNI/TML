@@ -68,16 +68,18 @@ struct prog_data {
 /* Provides consistent conversions of TML objects into Z3. */
 
 struct z3_context {
+	size_t arith_bit_len;
+	size_t universe_bit_len;
 	z3::context context;
 	z3::solver solver;
-	z3::sort value_sort;
-	z3::sort bool_sort;
-	std::map<rel_info, z3::func_decl> rel_to_decl;
 	z3::expr_vector head_rename;
+	z3::sort bool_sort;
+	z3::sort value_sort;
+	std::map<rel_info, z3::func_decl> rel_to_decl;
 	std::map<elem, z3::expr> var_to_decl;
 	std::map<raw_rule, z3::expr> rule_to_decl;
 	
-	z3_context(size_t sz);
+	z3_context(size_t arith_bit_len, size_t universe_bit_len);
 	z3::func_decl rel_to_z3(const raw_term& rt);
 	z3::expr globalHead_to_z3(const int_t pos);
 	z3::expr fresh_constant();

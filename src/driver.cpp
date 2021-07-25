@@ -993,36 +993,47 @@ template<typename F>
 	rp.r = reduced_rules;
 }
 
-/* Compute the number of bits required to represent the largest integer
- * in the given program. */
+/* Update the number and characters counters as well as the distinct
+ * symbol set to account for the given term. */
 
-int_t prog_bit_len(const raw_prog &rp) {
-	int_t max_int = 0;
+void update_element_counts(const raw_term &rt, set<elem> &distinct_syms,
+		int_t &char_count, int_t &max_int) {
+	for(const elem &el : rt.e)
+		if(el.type == elem::NUM) max_int = max(max_int, el.num);
+		else if(el.type == elem::SYM) distinct_syms.insert(el);
+		else if(el.type == elem::CHR) char_count = 256;
+}
+
+/* Compute the number of bits required to represent first the largest
+ * integer in the given program and second the universe. */
+
+pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
+	int_t max_int = 0, char_count = 0;
+	set<elem> distinct_syms;
+	
 	for(const raw_rule &rr : rp.r) {
-		// Look for the maximum integer occuring in the heads
+		// Updates the counters based on the heads of the current rule
 		for(const raw_term &rt : rr.h)
-			for(const elem &el : rt.e)
-				if(el.type == elem::NUM)
-					max_int = max(max_int, el.num);
-		// If this is a rule, look for the maximum integer occuring in the
-		// body
+			update_element_counts(rt, distinct_syms, char_count, max_int);
+		// If this is a rule, update the counters based on the body
 		if(!rr.is_fact()) {
 			raw_form_tree prft = *rr.get_prft();
-			max_int = prefold_tree(prft, max_int,
-				[&](const raw_form_tree &t, int_t acc) -> int_t {
-					if(t.type == elem::NONE) {
-						for(const elem &el : t.rt->e)
-							if(el.type == elem::NUM)
-								acc = max(acc, el.num);
-						return acc;
-					} else return acc;
+			prefold_tree(prft, monostate {},
+				[&](const raw_form_tree &t, monostate) -> monostate {
+					if(t.type == elem::NONE)
+						update_element_counts(*t.rt, distinct_syms, char_count, max_int);
+					return monostate {};
 				});
 		}
 	}
 	// Now compute the bit-length of the largest integer found
-	size_t bit_width = 0;
-	for(; max_int; max_int >>= 1, bit_width++);
-	return bit_width;
+	size_t int_bit_len = 0, universe_bit_len = 0,
+		max_elt = max_int + char_count + distinct_syms.size();
+	for(; max_int; max_int >>= 1, int_bit_len++);
+	for(; max_elt; max_elt >>= 1, universe_bit_len++);
+	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
+	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
+	return {int_bit_len, universe_bit_len};
 }
 
 #ifdef WITH_Z3
@@ -1031,7 +1042,8 @@ int_t prog_bit_len(const raw_prog &rp) {
   and remove subsumed rules. */
 
 void driver::qc_z3 (raw_prog &raw_p) {
-	z3_context ctx(prog_bit_len(raw_p));
+	const auto &[int_bit_len, universe_bit_len] = prog_bit_len(raw_p);
+	z3_context ctx(int_bit_len, universe_bit_len);
 	// Sort rules by relation name and then by tml arity
 	auto sort_rp = [](const raw_rule& r1, const raw_rule& r2) {
 		if(r1.h[0].e[0] == r2.h[0].e[0])
@@ -1068,14 +1080,15 @@ void driver::qc_z3 (raw_prog &raw_p) {
 }
 
 /* Initialize an empty context that can then be populated with TML to Z3
- * conversions. value_sort is either a bit-vector whose width contains
- * the largest program integer or else it's uninterpreted and will be
- * used for all Z3 relation arguments and bool_sort is the "return" type
- * of all relations. */
+ * conversions. value_sort is either a bit-vector whose width can
+ * contain the enire program universe and will be used for all Z3
+ * relation arguments and bool_sort is the "return" type of all
+ * relations. */
 
-z3_context::z3_context(size_t sz) : solver(context),
-		value_sort(sz ? context.bv_sort(sz) : context.uninterpreted_sort("Type")),
-		bool_sort(context.bool_sort()), head_rename(context) {
+z3_context::z3_context(size_t arith_bit_len, size_t universe_bit_len) :
+		arith_bit_len(arith_bit_len), universe_bit_len(universe_bit_len),
+		solver(context), head_rename(context), bool_sort(context.bool_sort()),
+		value_sort(context.bv_sort(universe_bit_len ? universe_bit_len : 1)) {
 	// Initialize Z3 solver instance parameters
 	z3::params p(context);
 	p.set(":timeout", 500u);
@@ -1168,26 +1181,61 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 	} else if(rel.extype <= raw_term::LEQ) {
 		return arg_to_z3(rel.e[0]) <= arg_to_z3(rel.e[2]);
 	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 5) {
+		// Obtain the Z3 equivalents of TML elements
 		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
 			arg3 = arg_to_z3(rel.e[4]);
+		// The arithmetic universe may be smaller than the entire universe,
+		// so zero the high bits of arithmetic expressions to ensure that
+		// only the lower bits are relevant in comparisons
+		z3::expr embedding = universe_bit_len == arith_bit_len ?
+			context.bool_val(true) :
+			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg3.extract(universe_bit_len-1, arith_bit_len) == 0;
+		// Its possible that the largest integer in TML program is 0. Z3
+		// does not support 0-length bit-vectors, so short-circuit
+		if(arith_bit_len == 0) return embedding;
+		z3::expr arg1_lo = arg1.extract(arith_bit_len-1, 0),
+			arg2_lo = arg2.extract(arith_bit_len-1, 0),
+			arg3_lo = arg3.extract(arith_bit_len-1, 0);
+		// Finally produce the arithmetic constraint based on the low bits
+		// of the operands
 		switch(rel.arith_op) {
-			case ADD: return (arg1 + arg2) == arg3;
-			case SUB: return (arg1 - arg2) == arg3;
-			case MULT: return (arg1 * arg2) == arg3;
-			case SHL: return (arg1 << arg2) == arg3;
-			case SHR: return (arg1 >> arg2) == arg3;
-			case BITWAND: return (arg1 & arg2) == arg3;
-			case BITWXOR: return (arg1 ^ arg2) == arg3;
-			case BITWOR: return (arg1 | arg2) == arg3;
+			case ADD: return (arg1_lo + arg2_lo) == arg3_lo && embedding;
+			case SUB: return (arg1_lo - arg2_lo) == arg3_lo && embedding;
+			case MULT: return (arg1_lo * arg2_lo) == arg3_lo && embedding;
+			case SHL: return (arg1_lo << arg2_lo) == arg3_lo && embedding;
+			case SHR: return (arg1_lo >> arg2_lo) == arg3_lo && embedding;
+			case BITWAND: return (arg1_lo & arg2_lo) == arg3_lo && embedding;
+			case BITWXOR: return (arg1_lo ^ arg2_lo) == arg3_lo && embedding;
+			case BITWOR: return (arg1_lo | arg2_lo) == arg3_lo && embedding;
 			default: assert(false); //should never reach here
 		}
 	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 6) {
-		z3::expr arg1 = zext(arg_to_z3(rel.e[0]), value_sort.bv_size()),
-			arg2 = zext(arg_to_z3(rel.e[2]), value_sort.bv_size()),
-			arg3 = concat(arg_to_z3(rel.e[4]), arg_to_z3(rel.e[5]));
+		// Obtain the Z3 equivalents of TML elements
+		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
+			arg3 = arg_to_z3(rel.e[4]), arg4 = arg_to_z3(rel.e[5]);
+		// The arithmetic universe may be smaller than the entire universe,
+		// so zero the high bits of arithmetic expressions to ensure that
+		// only the lower bits are relevant in comparisons
+		z3::expr embedding = universe_bit_len == arith_bit_len ?
+			context.bool_val(true) :
+			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg3.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg4.extract(universe_bit_len-1, arith_bit_len) == 0;
+		// Its possible that the largest integer in TML program is 0. Z3
+		// does not support 0-length bit-vectors, so short-circuit
+		if(arith_bit_len == 0) return embedding;
+		// Since this is double precision arithmetic, join the 3rd and 4th
+		// operands to form the RHS
+		z3::expr arg1_lo = zext(arg1.extract(arith_bit_len-1, 0), arith_bit_len),
+			arg2_lo = zext(arg2.extract(arith_bit_len-1, 0), arith_bit_len),
+			arg34 = concat(arg3.extract(arith_bit_len-1, 0),
+				arg4.extract(arith_bit_len-1, 0));
 		switch(rel.arith_op) {
-			case ADD: return (arg1 + arg2) == arg3;
-			case MULT: return (arg1 * arg2) == arg3;
+			case ADD: return embedding && (arg1_lo + arg2_lo) == arg34;
+			case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
 			default: assert(false); //should never reach here
 		}
 	} else assert(false); //should never reach here
@@ -3531,7 +3579,7 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 			// following (forall ?x forall ?y = ~ exists ?x exists ?y ~)
 			sprawformtree equiv_formula =
 				make_shared<raw_form_tree>(elem::NOT,
-					make_shared<raw_form_tree>(current_formula));
+					make_shared<raw_form_tree>(*current_formula));
 			for(const elem &qvar : qvars) {
 				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
 					make_shared<raw_form_tree>(qvar), equiv_formula);
@@ -4159,7 +4207,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(opts.enabled("qc-subsume-z3")){
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			remove_redundant_exists(rp);
-			z3_context z3_ctx(prog_bit_len(rp));
+			const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
+			z3_context z3_ctx(int_bit_len, universe_bit_len);
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
 					{return check_qc_z3(rr1, rr2, z3_ctx);});
