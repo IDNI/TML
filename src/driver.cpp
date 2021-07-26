@@ -139,19 +139,6 @@ raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d) {
 	}
 }
 
-/* Puts the formulas parented by a tree of associative binary operators
- * into a flat list. */
-
-void driver::flatten_associative(const elem::etype &tp,
-		const raw_form_tree &tree, vector<const raw_form_tree *> &tms) {
-	if(tree.type == tp) {
-		flatten_associative(tp, *tree.l, tms);
-		flatten_associative(tp, *tree.r, tms);
-	} else {
-		tms.push_back(&tree);
-	}
-}
-
 /* Checks if the body of the given rule is conjunctive. */
 
 bool is_cq(const raw_rule &rr) {
@@ -258,13 +245,15 @@ rel_info get_relation_info(const raw_term &rt) {
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
  * of a homomorphism implies that rr1 is contained by rr2. */
 
-bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
+bool driver::cqc(raw_rule rr1, raw_rule rr2) {
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
 	dict_t d;
 	d.op = old_dict.op;
 	d.cl = old_dict.cl;
-
+	// Convert rules to the DNF required by this check
+	rr1.to_b();
+	rr2.to_b();
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
 		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
@@ -3501,7 +3490,7 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<const raw_form_tree *> ands;
-			flatten_associative(elem::AND, t, ands);
+			t.flatten_associative(elem::AND, ands);
 			// Collect the free variables in each conjunct. The intersection
 			// of variables between one and the rest is what will need to be
 			// exported
@@ -3527,7 +3516,7 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 		} case elem::ALT: {
 			// Collect all the disjuncts within the tree top
 			vector<const raw_form_tree *> alts;
-			flatten_associative(elem::ALT, t, alts);
+			t.flatten_associative(elem::ALT, alts);
 			for(const raw_form_tree *tree : alts) {
 				// Make a separate rule for each disjunct
 				raw_rule nr(raw_term(part_id, fv), to_dnf(*tree, rp, fv));

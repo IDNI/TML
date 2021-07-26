@@ -615,6 +615,47 @@ optional<raw_form_tree> &raw_rule::to_prft() {
 	return prft;
 }
 
+/* Return the stored DNF or one equivalent to the formula tree. If
+ * neither is possible then return nullopt. */
+
+optional<vector<vector<raw_term>>> raw_rule::get_b() const {
+	if(!b.empty() || !prft) return b;
+	else {
+		vector<vector<raw_term>> disjuncts;
+		// Iterate through disjuncts of the given formula
+		for(const raw_form_tree *disj : prft->flatten_associative(elem::ALT)) {
+			vector<raw_term> conjuncts;
+			// Iterate through the conjunctions of the current disjunct
+			for(const raw_form_tree *conj : disj->flatten_associative(elem::AND)) {
+				bool sign = true;
+				// Figure out the effective sign of the current conjunct
+				for(; conj->type == elem::NOT; conj = &*conj->l, sign = !sign);
+				// Note the term at this position. If this is not possible then
+				// the tree does not represent a DNF.
+				if(conj->type == elem::NONE) {
+					raw_term tm = *conj->rt;
+					tm.neg = !sign;
+					conjuncts.push_back(tm);
+				} else return std::nullopt;
+			}
+			disjuncts.push_back(conjuncts);
+		}
+		return disjuncts;
+	}
+}
+
+/* Switch the representation of this rule from a tree to equivalent
+ * DNF vectors.*/
+
+vector<vector<raw_term>> *raw_rule::to_b() {
+	if(!b.empty() || !prft) return &b;
+	else {
+		const optional<vector<vector<raw_term>>> &ob = get_b();
+		if(ob) return &set_b(*ob);
+		else return nullptr;
+	}
+}
+
 bool raw_rule::parse(input* in, const raw_prog& prog) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;

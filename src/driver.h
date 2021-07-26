@@ -179,7 +179,7 @@ class driver {
 	void square_program(raw_prog &rp);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
-	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
+	bool cqc(raw_rule rr1, raw_rule rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);

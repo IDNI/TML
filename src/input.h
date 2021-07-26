@@ -653,6 +653,20 @@ struct raw_form_tree {
 		rft.l = rft.r = nullptr;
 		return *this;
 	}
+	/* Puts the formulas parented by a tree of associative binary operators
+	 * into a flat list. */
+	void flatten_associative(const elem::etype &tp,
+			std::vector<const raw_form_tree *> &tms) const {
+		if(type == tp) {
+			l->flatten_associative(tp, tms);
+			r->flatten_associative(tp, tms);
+		} else tms.push_back(this);
+	}
+	std::vector<const raw_form_tree *> flatten_associative(const elem::etype &tp) const {
+		std::vector<const raw_form_tree *> tms;
+		flatten_associative(tp, tms);
+		return tms;
+	}
 	void printTree(int level =0 );
 	// Recursively check equality of formula trees
 	bool operator==(const raw_form_tree &pft) const {
@@ -735,16 +749,6 @@ struct raw_rule {
 	raw_rule(const raw_term& h, const raw_form_tree &prft) : h({h}), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const raw_form_tree &prft) : h(h), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(*prft) {}
-	// Clear b and set prft
-	raw_form_tree &set_prft(const raw_form_tree &_prft) {
-		b.clear();
-		return *(prft = _prft);
-	}
-	// Clear prft and set b
-	void set_b(const std::vector<std::vector<raw_term>> &_b) {
-		b = _b;
-		prft.reset();
-	}
 	void update_context(const spenvcontext &_c) const { 
 		varctx = _c;
 	}
@@ -764,10 +768,23 @@ struct raw_rule {
 	// If prft not set, convert b to prft, then return prft
 	std::optional<raw_form_tree> get_prft() const;
 	std::optional<raw_form_tree> &to_prft();
+	// Clear b and set prft
+	raw_form_tree &set_prft(const raw_form_tree &_prft) {
+		b.clear();
+		return *(prft = _prft);
+	}
+	// Clear prft and set b
+	std::vector<std::vector<raw_term>>
+			&set_b(const std::vector<std::vector<raw_term>> &_b) {
+		prft.reset();
+		return b = _b;
+	}
+	std::optional<std::vector<std::vector<raw_term>>> get_b() const;
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
 	}
+	std::vector<std::vector<raw_term>> *to_b();
 	bool operator==(const raw_rule& r) const {
 		if(h != r.h) return false;
 		else if(is_form() != r.is_form()) return false;
