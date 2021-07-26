@@ -245,15 +245,13 @@ rel_info get_relation_info(const raw_term &rt) {
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
  * of a homomorphism implies that rr1 is contained by rr2. */
 
-bool driver::cqc(raw_rule rr1, raw_rule rr2) {
+bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
 	dict_t d;
 	d.op = old_dict.op;
 	d.cl = old_dict.cl;
-	// Convert rules to the DNF required by this check
-	rr1.to_b();
-	rr2.to_b();
+	// Check that rules have correct format
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
 		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
@@ -703,10 +701,8 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 /* If rr1 and rr2 are both conjunctive queries with negation, check that
  * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
 
-bool driver::cqnc(raw_rule rr1, raw_rule rr2) {
+bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Check that rules have correct format
-	rr1.to_b();
-	rr2.to_b();
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
 		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
 	
@@ -863,6 +859,7 @@ template<typename F>
 			// equivalent to ~a OR b, alter the parity of the first operand
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
@@ -871,7 +868,7 @@ template<typename F>
 						{*ref_tree.r, *orig_var.r}})
 				// Apply the same treatment as for a disjunction since this is
 				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
+				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
@@ -879,6 +876,7 @@ template<typename F>
 			// Minimize the subtrees separately first
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
@@ -886,7 +884,7 @@ template<typename F>
 				// If in positive context, eliminating disjunct certainly
 				// produces smaller query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule, var_rule) : f(var_rule, ref_rule))
+				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule_b))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
@@ -894,6 +892,7 @@ template<typename F>
 			// Minimize the subtrees separately first
 			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
 			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
 			for(auto &[ref_tmp, var_tmp] : bijection
@@ -901,7 +900,7 @@ template<typename F>
 				// If in positive context, eliminating conjunct certainly
 				// produces bigger query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(var_rule, ref_rule) : f(ref_rule, var_rule))
+				if(var_tree = var_tmp; ctx_sign ? f(var_rule.try_as_b(), ref_rule_b) : f(ref_rule_b, var_rule.try_as_b()))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
@@ -935,13 +934,17 @@ template<typename F>
 		void driver::minimize(raw_rule &rr, const F &f) {
 	if(rr.is_fact()) return;
 	// Switch to the formula tree representation of the rule if this has
-	// not yet been done for this is a precondition to minimize_aux
-	rr.to_prft();
+	// not yet been done for this is a precondition to minimize_aux. Note
+	// the current form so that we can attempt to restore it afterwards.
+	bool orig_form = rr.is_rule();
+	rr = rr.try_as_prft();
 	// Copy the rule to provide scratch for minimize_aux
 	raw_rule var_rule = rr;
 	// Now minimize the formula tree of the given rule using the given
 	// containment testing function
 	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, f);
+	// If the input rule was in DNF, provide the output in DNF
+	if(orig_form) rr = rr.try_as_b();
 }
 
 /* Go through the program and removed those queries that the function f

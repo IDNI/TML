@@ -610,9 +610,10 @@ optional<raw_form_tree> raw_rule::get_prft() const {
 /* Switch the representation of this rule from DNF vectors to equivalent
  * tree .*/
 
-optional<raw_form_tree> &raw_rule::to_prft() {
-	if(!prft && !b.empty()) set_prft(*get_prft());
-	return prft;
+raw_rule raw_rule::try_as_prft() const {
+	raw_rule copy = *this;
+	if(!prft && !b.empty()) copy.set_prft(*get_prft());
+	return copy;
 }
 
 /* Return the stored DNF or one equivalent to the formula tree. If
@@ -647,13 +648,13 @@ optional<vector<vector<raw_term>>> raw_rule::get_b() const {
 /* Switch the representation of this rule from a tree to equivalent
  * DNF vectors.*/
 
-vector<vector<raw_term>> *raw_rule::to_b() {
-	if(!b.empty() || !prft) return &b;
-	else {
+raw_rule raw_rule::try_as_b() const {
+	raw_rule copy = *this;
+	if(b.empty() && prft) {
 		const optional<vector<vector<raw_term>>> &ob = get_b();
-		if(ob) return &set_b(*ob);
-		else return nullptr;
+		if(ob) copy.set_b(*ob);
 	}
+	return copy;
 }
 
 bool raw_rule::parse(input* in, const raw_prog& prog) {

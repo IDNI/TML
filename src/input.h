@@ -767,7 +767,7 @@ struct raw_rule {
 		{ return type == NONE && b.size() == 0 && !prft; }
 	// If prft not set, convert b to prft, then return prft
 	std::optional<raw_form_tree> get_prft() const;
-	std::optional<raw_form_tree> &to_prft();
+	raw_rule try_as_prft() const;
 	// Clear b and set prft
 	raw_form_tree &set_prft(const raw_form_tree &_prft) {
 		b.clear();
@@ -784,7 +784,7 @@ struct raw_rule {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
 	}
-	std::vector<std::vector<raw_term>> *to_b();
+	raw_rule try_as_b() const;
 	bool operator==(const raw_rule& r) const {
 		if(h != r.h) return false;
 		else if(is_form() != r.is_form()) return false;
