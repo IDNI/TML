@@ -272,7 +272,7 @@ bool driver::cqc(raw_rule rr1, raw_rule rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		tables::run_prog(edb, nrp, d, opts, ir, results);
+		tables::run_prog(edb, nrp, d, opts, results);
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
@@ -364,7 +364,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		if(!tables::run_prog(edb, nrp, d, opts, ir, results)) return false;
+		if(!tables::run_prog(edb, nrp, d, opts, results)) return false;
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
 			// one of the frozen terms), then there is a homomorphism between
@@ -703,8 +703,10 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 /* If rr1 and rr2 are both conjunctive queries with negation, check that
  * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
 
-bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
+bool driver::cqnc(raw_rule rr1, raw_rule rr2) {
 	// Check that rules have correct format
+	rr1.to_b();
+	rr2.to_b();
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
 		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
 	
@@ -826,7 +828,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog;
 					test_prog.r.push_back(rr2);
 					set<raw_term> res;
-					tables::run_prog(ext, test_prog, d, opts, ir, res);
+					tables::run_prog(ext, test_prog, d, opts, res);
 					return res.find(subbed.h[0]) != res.end();
 				});
 		});
