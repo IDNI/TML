@@ -173,6 +173,10 @@ void options::setup() {
 	add_output    ("repl-output", "repl output");
 #endif
 	add_bool("sdt",     "sdt transformation");
+#ifdef WITH_Z3
+	add_bool("qc-subsume-z3",
+		"Enable CQNC subsumption optimization using theorem prover Z3");
+#endif
 	add_bool("show-hidden", "show the contents of hidden relations");
 	add_bool("split-rules",
 		"transformation to reduce number of conjunctions in each rule");
@@ -211,6 +215,11 @@ void options::setup() {
 		"populates relation tml_update(N_step add|delete fact).");
 	add_bool2("print-steps", "ps", "print steps");
 	add_bool2("print-updates", "pu", "print updates");
+	add(option(option::type::STRING, { "print-updates-if", "pui" },
+		[this](const option::value& v) {
+			set("print-updates", true);
+			pu_states.insert(v.get_string());
+		}).description("active state to printing updates"));
 	add_bool2("print-dict", "dict", "print internal string dictionary");
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step", "fp", "adds __fp__ fact when reaches a fixed point");
@@ -222,8 +231,11 @@ void options::setup() {
 	add_bool2("bitunv", "buv", "transforms and runs rule directly in bit size 2 universe ");
 	add(option(option::type::INT, { "bitorder", "bod" })
 		.description("specifies the variable ordering permutation (default: 0)"));
-	
-	add_bool("optimize","optimize and show more benchmarks");
+	add(option(option::type::BOOL, { "optimize" },
+		[this](const option::value& v) {
+			if (v.get_bool()) set("print-steps", true);
+		})
+		.description("optimize and show more benchmarks"));
 	add(option(option::type::STRING, { "name", "n" },
 		[](const option::value& v) {
 			outputs::name(v.get_string());

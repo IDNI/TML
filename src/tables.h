@@ -308,6 +308,8 @@ private:
 
 	//	std::function<int_t(void)>* get_new_rel;
 
+	bool print_updates_check();
+
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
 	void init_tml_update();
@@ -470,10 +472,11 @@ public:
 	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
 	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 
+	void add_print_updates_states(const std::set<std::string> &tlist);
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
-	bool error         = false;
+	bool error               = false;
 
 };
 

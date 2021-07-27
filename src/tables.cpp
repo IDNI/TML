@@ -463,7 +463,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 	if (opts.bitunv) a.rng = leq;
 	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
 	static set<body*, ptrcmp<body>>::const_iterator bit;
-	body* y;
+	body* y = 0;
 	for (auto x : b) {
 		a.t.push_back(x.second);
 		if ((bit=bodies.find(&x.first)) != bodies.end())
@@ -579,13 +579,11 @@ bool tables::get_rules(flat_prog p) {
 				get_form(al, t, as);
 			else
 				get_alt(al, t, as);
-
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
 			else	*(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
-
 		rs.insert(r);
 	}
 	for (rule r : rs)
@@ -776,7 +774,15 @@ template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
 {
-	if (print_updates) print(os << "#       ", r) << "\n#   ->  ";
+	nlevel step             = nstep - 1;
+	static bool   printed   = false;
+	static nlevel last_step = step;
+	if (last_step != step) printed = false, last_step = step;
+	if (print_updates) {
+		if (!print_steps && !printed)
+			os << "# step: " << step << endl, printed = true;
+		print(os << "#       ", r) << "\n#   ->  ";
+	}
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
@@ -931,9 +937,22 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
+void tables::add_print_updates_states(const std::set<std::string> &tlist) {
+	for (const std::string& tname : tlist)
+		opts.pu_states.insert(get_table({ dict.get_rel(
+			dict.get_lexeme(tname)), {0}}));
+}
+
+bool tables::print_updates_check() {
+	if (!opts.pu_states.size()) return true;
+	else for (auto tab : opts.pu_states)
+		if (tbls[tab].t == htrue) return true;
+	return false;
+}
+
 char tables::fwd() noexcept {
 	for (rule& r : rules) {
-		bdd_handles v(r.size() == 0 ? 1 : r.size());
+		bdd_handles v(r.size());
 		spbdd_handle x;
 		for (size_t n = 0; n != r.size(); ++n)
 			//print(COUT << "rule: ", r) << endl,
@@ -943,8 +962,8 @@ char tables::fwd() noexcept {
 		//DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
-		if (print_updates || populate_tml_update)
-			decompress_update(o::inf(), x, r);
+		if (populate_tml_update || (print_updates &&
+			print_updates_check())) decompress_update(o::inf(),x,r);
 	}
 	bool b = false;
 	// D: just temp ugly static, move this out of fwd/pass in, or in tables.
@@ -995,16 +1014,19 @@ bool tables::infloop_detected() {
 
 // adds __fp__ fact and returns true if __fp__ fact does not exist
 bool tables::add_fixed_point_fact() {
-	raw_term rt;
-	rt.arity = { 0 };
-	rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
-	term t = ir_handler->from_raw_term(rt);
-	bool exists = false;
-	decompress(tbls[t.tab].t && from_fact(t), t.tab,
-		[&exists](const term& /*t*/) { exists = true; }, t.size());
-	if (!exists) tbls[t.tab].t = tbls[t.tab].t || from_fact(t); // add if ne
-	tbls[t.tab].hidden = true;
-	return !exists;
+	static ntable tab;
+	static spbdd_handle h = 0;
+	if (!h) {
+		raw_term rt;
+		rt.arity = { 0 };
+		rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
+		term t = ir_handler->from_raw_term(rt);
+		tab = t.tab;
+		tbls[tab].hidden = true;
+		h = from_fact(t);
+	}
+	if (tbls[tab].t != htrue) return tbls[tab].t = tbls[tab].t || h, true;
+	return false;
 }
 
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
@@ -1013,8 +1035,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	fronts.push_back(l);
 	if (opts.bproof) levels.emplace_back(l);
 	for (;;) {
-		if (print_steps || opts.optimize)
-			o::inf() << "# step: " << nstep << endl;
+		if (print_steps) o::inf() << "# step: " << nstep << endl;
 		++nstep;
 		bool fwd_ret = fwd();
 		if (halt) return true;

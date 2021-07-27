@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <map>
 #include <memory>
+#include <optional>
 
 #ifndef __EMSCRIPTEN__
 #ifdef __unix__
@@ -117,6 +118,7 @@ typedef struct {
 		bitunv, show_hidden;
 	enum semantics semantics;
 	size_t bitorder;
+	std::set<ntable> pu_states;
 } rt_options;
 
 typedef enum  {

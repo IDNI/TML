@@ -127,6 +127,17 @@ if (WITH_THREADS)
 	find_package(Threads)
 endif()
 
+# z3 library
+#############
+if (WITH_Z3)
+	find_library(Z3 NAMES z3)
+	add_library(Z3 SHARED IMPORTED)
+	set_target_properties(Z3 PROPERTIES
+		IMPORTED_LOCATION "${Z3}")
+	target_link_libraries(TMLo Z3)
+	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
+endif()
+
 # shared library
 #################
 
@@ -159,7 +170,6 @@ target_include_directories(TMLs PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 set_target_properties(TMLs PROPERTIES OUTPUT_NAME "TML")
-
 
 # executable
 #############
