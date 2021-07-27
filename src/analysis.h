@@ -198,14 +198,58 @@ struct bit_univ {
     
 	bit_univ(dict_t &_d, size_t _bo = 0, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
 	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), typenv(_e), char_bsz(_cbsz),
-	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) { }
+	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) {
+
+        if(typenv.is_init()) this->get_raw_tables();
+        this->pos = [this](size_t a, size_t b, size_t c, size_t d, bit_univ::tab_args t)-> size_t{
+					return this->pos_gen(a, b, c, d, t); };
+     }
 	size_t get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
-	inline size_t pos(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab = tab_args() ) const {
+	size_t pos_eqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
-    //    size_t s = 0;
-    //    for(int_t i = 0; i < rtab.size(); i++) s = std::min(s, rtab[i]);
 		return (bsz - bit_from_right - 1)* args + arg;
 	}
+    size_t pos_gen(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+		DBG(assert(bit_from_right < bsz && arg < args); )
+		size_t pos = -1;
+        size_t max_bits=0;
+        for(size_t bits : rtab ) max_bits= std::max(max_bits, bits);
+        for( size_t bit = 0; bit < max_bits; bit++)
+            for( size_t a= 0 ; a<args ; a++) {
+                if(bit < rtab[a]) pos++;
+                if( bit == bit_from_right && arg == a) goto end;
+            }
+        
+        end: return pos;
+	}
+
+    size_t pos_neqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+        DBG(assert(bit_from_right < bsz && arg < args && args == rtab.size() && rtab[arg] == bsz); )
+        DBG(COUT<< arg << " "<<  args << " "<<  bit_from_right << " "<< (bsz - bit_from_right -1) << " " <<bsz << " " );
+        bools szsort(64); //max number of args <=64 in radix sorted form
+
+        size_t skip = 0, cargs  = 0; // # of args with sz less than bit_rom_right;
+        for( size_t i = 0 ; i <rtab.size(); i++) {
+            szsort[rtab[i]] = true;
+            if( (bsz -bit_from_right -1) < rtab[i]  ) cargs++;
+            else if( i <= arg ) skip++;  //to adjust arg to be within carg range
+        }    
+        size_t lastsz=0, base=0,  s = args;
+        for( size_t sz = 0; sz < szsort.size() && sz <= (bsz - bit_from_right -1) ; sz++) 
+            if(szsort[sz])  
+                base = ((sz-lastsz) * s-- ) + base, lastsz = sz;
+
+		return base + (bsz - bit_from_right - 1 - lastsz)*cargs + (arg -skip);
+    
+    }
+    size_t pos_default(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+		DBG(assert(bit_from_right < bsz && arg < args); )
+    	return (bsz - bit_from_right - 1); //* args + arg;
+	}
+
+    typedef std::function< size_t ( size_t , size_t , size_t , size_t, tab_args) > posfunc;
+	posfunc pos;
+    
     bool brev_transform( raw_term& bit_raw_term);
 	bool btransform( const raw_prog& rpin, raw_prog &rpout );
 	private:
