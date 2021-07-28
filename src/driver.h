@@ -170,6 +170,8 @@ class driver {
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
+	void pdatalog_transform(raw_prog &rp,
+		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
 	elem rename_variables(const elem &e, std::map<elem, elem> &renames);

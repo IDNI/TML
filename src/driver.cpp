@@ -1332,7 +1332,8 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	if (!(is_query(r1) && is_query(r2))) return false;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
-	    	r1.h[0].arity == r2.h[0].arity)) return 0;
+				r1.h[0].arity == r2.h[0].arity)) return 0;
+	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << endl;
 	// Get head variables for z3
 	z3::expr_vector bound_vars(ctx.context);
 	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
@@ -2979,6 +2980,129 @@ bool driver::transform_evals(raw_prog &rp, const directive &drt) {
 	return true;
 }
 
+/* Transform the given program into a P-DATALOG program, execute the
+ * given transformation, then transform the program back into TML. Part
+ * of the effect of the transformation into P-DATALOG is to remove
+ * deletion rules and add rules that explicitly carry facts from
+ * previous steps. Part of the effect of the transformation from
+ * P-DATALOG is to remove facts that TML would otherwise persist. */
+
+void driver::pdatalog_transform(raw_prog &rp,
+		const function<void(raw_prog &)> &f) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	// Bypass transformation when there are no rules
+	if(rp.r.empty()) {
+		f(rp);
+		return;
+	}
+	
+	map<rel_info, array<elem, 2>> freeze_map;
+	// First move all additions to a relation to a separate temporary
+	// relation and move all deletions to another separate temporary
+	// relation. Exclude facts from this exercise.
+	for(raw_rule &rr : rp.r) {
+		for(raw_term &rt : rr.h) {
+			rel_info orig_rel = get_relation_info(rt);
+			if(auto it = freeze_map.find(orig_rel); it != freeze_map.end()) {
+				rt.e[0] = rr.is_fact() ? rt.e[0] : it->second[rt.neg];
+			} else {
+				// Make separate relations to separately hold the positive and
+				// negative derivations
+				elem pos_frozen_elem = elem::fresh_temp_sym(d);
+				elem neg_frozen_elem = elem::fresh_temp_sym(d);
+				// Store the mapping so that the derived portion of each
+				// relation is stored in exactly one place
+				freeze_map[orig_rel] = {pos_frozen_elem, neg_frozen_elem};
+				rt.e[0] = rr.is_fact() ? rt.e[0] : freeze_map[orig_rel][rt.neg];
+				// Ensure that these positive and negative part relations are
+				// hidden from the user
+				rp.hidden_rels.insert({ pos_frozen_elem.e, rt.arity });
+				rp.hidden_rels.insert({ neg_frozen_elem.e, rt.arity });
+			}
+			// Ensure that facts are added as opposed to deleted from the
+			// negative and positive part relations
+			if(!rr.is_fact()) rt.neg = false;
+		}
+	}
+	// Now make rules to add/delete facts from the final relation as well
+	// as persist facts from the previous step. This is to simulate TML
+	// using P-DATALOG.
+	for(const auto &[orig_rel, frozen_elems] : freeze_map) {
+		/* The translation is as follows:
+		 * hello(?x) :- A.
+		 * ~hello(?x) :- B.
+		 * TO
+		 * ins_hello(?x) :- A.
+		 * prev_hello(?x) :- hello(?x).
+		 * del_hello(?x) :- B.
+		 * hello(?x) :- ins_hello(?x), ~del_hello(?x).
+		 * hello(?x) :- prev_hello(?x), ~del_hello(?x).
+		 * contradiction() :- ins_hello(?x), del_hello(?x). */
+		raw_term original_head = relation_to_term(orig_rel), ins_head, del_head, prev_head;
+		ins_head = del_head = prev_head = original_head;
+		ins_head.e[0] = frozen_elems[false];
+		del_head.e[0] = frozen_elems[true];
+		prev_head.e[0] = elem::fresh_temp_sym(d);
+		rp.r.push_back(raw_rule(prev_head, original_head));
+		rp.r.push_back(raw_rule(original_head, {ins_head, del_head.negate()}));
+		rp.r.push_back(raw_rule(original_head, {prev_head, del_head.negate()}));
+		rp.hidden_rels.insert({ prev_head.e[0].e, original_head.arity });
+	}
+	// Run the supplied transformation
+	f(rp);
+	const raw_term tick(elem::fresh_temp_sym(d), vector<elem> {});
+	map<rel_info, elem> scratch_map;
+	// Map the program rules to temporary relations and execute them only
+	// when the clock is in low state. A temporary relation is required to
+	// give us time to delete facts not derived in this step.
+	for(raw_rule &rr : rp.r) {
+		if(!rr.is_fact()) {
+			for(raw_term &rt : rr.h) {
+				rel_info orig_rel = get_relation_info(rt);
+				if(auto it = scratch_map.find(orig_rel); it != scratch_map.end()) {
+					rt.e[0] = it->second;
+				} else {
+					elem frozen_elem = elem::fresh_temp_sym(d);
+					// Store the mapping so that everything from this relation is
+					// moved to a single designated relation.
+					rt.e[0] = scratch_map[orig_rel] = frozen_elem;
+					rp.hidden_rels.insert({ frozen_elem.e, rt.arity });
+				}
+			}
+			// Condition the rule to execute only on low states.
+			rr.set_prft(raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(*rr.get_prft()),
+				make_shared<raw_form_tree>(tick.negate())));
+		}
+	}
+	// Now make the rules simulating P-DATALOG in TML. This is essentially
+	// done by clearing the temporary relation after each step and doing
+	// the necessary additions/deletions to make the final relation
+	// reflect this.
+	for(const auto &[orig_rel, scratch] : scratch_map) {
+		/* The translation is as follows:
+		 * hello(?x) :- A.
+		 * TO
+		 * hello_tmp(?x) :- A, ~tick().
+		 * hello(?x) :- hello_tmp(?x), tick().
+		 * ~hello(?x) :- ~hello_tmp(?x), tick().
+		 * ~hello_tmp(?x) :- tick().
+		 * tick() :- ~tick().
+		 * ~tick() :- tick(). */
+		raw_term original_head = relation_to_term(orig_rel), scratch_head;
+		scratch_head = original_head;
+		scratch_head.e[0] = scratch;
+		rp.r.push_back(raw_rule(original_head, { scratch_head, tick }));
+		rp.r.push_back(raw_rule(original_head.negate(), { scratch_head.negate(), tick }));
+		rp.r.push_back(raw_rule(scratch_head.negate(), tick ));
+	}
+	// Make the clock alternate between two states
+	rp.r.push_back(raw_rule(tick, tick.negate()));
+	rp.r.push_back(raw_rule(tick.negate(), tick));
+}
+
 /* Applies the given transformation on the given program in post-order.
  * I.e. the transformation is applied to the nested programs first and
  * then to the program proper. */
@@ -3363,13 +3487,12 @@ raw_form_tree driver::expand_term(const raw_term &use,
 void driver::square_program(raw_prog &rp) {
 	// Partition the rules by relations
 	typedef set<raw_rule> relation;
-	map<rel_info, relation> pos_rels, neg_rels;
+	map<rel_info, relation> rels;
 	// Separate the program rules according to the relation they belong
 	// to and their sign. This will simplify lookups during inlining.
 	for(const raw_rule &rr : rp.r)
 		if(!rr.is_fact())
-			(rr.h[0].neg ? neg_rels : pos_rels)
-				[get_relation_info(rr.h[0])].insert(rr);
+			rels[get_relation_info(rr.h[0])].insert(rr);
 	
 	// The place where we will construct the squared program
 	vector<raw_rule> squared_prog;
@@ -3388,24 +3511,20 @@ void driver::square_program(raw_prog &rp) {
 						// Replace term according to following rule:
 						// term -> (term && ~del1body && ... && ~delNbody) ||
 						// ins1body || ... || insMbody
-						const raw_term &rt = *t.rt;
+						raw_term &rt = *t.rt;
 						// Inner conjunction to handle case where fact was derived
 						// before the last step. We just need to make sure that it
 						// was not deleted in the last step.
-						raw_form_tree subst(rt);
-						for(const raw_rule &rr : neg_rels[get_relation_info(rt)])
-							subst = raw_form_tree(elem::AND,
-								make_shared<raw_form_tree>(subst),
-								make_shared<raw_form_tree>(elem::NOT,
-									make_shared<raw_form_tree>(expand_term(rt, rr))));
+						optional<raw_form_tree> subst;
 						// Outer disjunction to handle the case where fact derived
 						// exactly in the last step.
-						for(const raw_rule &rr : pos_rels[get_relation_info(rt)])
-							subst = raw_form_tree(elem::ALT,
-								make_shared<raw_form_tree>(subst),
-								make_shared<raw_form_tree>(expand_term(rt, rr)));
+						for(const raw_rule &rr : rels[get_relation_info(rt)])
+							subst = !subst ? expand_term(rt, rr) :
+								raw_form_tree(elem::ALT,
+									make_shared<raw_form_tree>(*subst),
+									make_shared<raw_form_tree>(expand_term(rt, rr)));
 						// We can replace the raw_term now that we no longer need it
-						t = subst;
+						if(subst) t = *subst;
 					}
 					// Just a formality. Nothing is being accumulated.
 					return acc; });
@@ -4183,32 +4302,33 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		if(int_t iter_num = opts.get_int("iterate")) {
-			// Split heads are a precondition to program squaring
-			split_heads(rp);
-			for(int_t i = 0; i < iter_num; i++) {
-				o::dbg() << "Square Rooting Program ..." << endl << endl;
-				square_root_program(rp);
-				o::dbg() << "Square Rooted Program: " << endl << endl << rp << endl;
-			}
-			for(int_t i = 0; i < iter_num; i++) {
-				o::dbg() << "Squaring Program ..." << endl << endl;
-				square_program(rp);
-				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-			}
-		}
+		pdatalog_transform(rp, [&](raw_prog &rp) {
+			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp
+				<< endl;
+			if(int_t iter_num = opts.get_int("iterate")) {
+				// Split heads are a precondition to program squaring
+				split_heads(rp);
+				for(int_t i = 0; i < iter_num; i++) {
+					o::dbg() << "Squaring Program ..." << endl << endl;
+					square_program(rp);
+					o::dbg() << "Squared Program: " << endl << endl << rp << endl;
 #ifdef WITH_Z3
-		if(opts.enabled("qc-subsume-z3")){
-			o::dbg() << "Query containment subsumption using z3" << endl;
-			remove_redundant_exists(rp);
-			const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
-			z3_context z3_ctx(int_bit_len, universe_bit_len);
-			subsume_queries(rp,
-				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_qc_z3(rr1, rr2, z3_ctx);});
-			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-		}
+					if(opts.enabled("qc-subsume-z3")){
+						o::dbg() << "Query containment subsumption using z3" << endl;
+						remove_redundant_exists(rp);
+						const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
+						z3_context z3_ctx(int_bit_len, universe_bit_len);
+						subsume_queries(rp,
+							[&](const raw_rule &rr1, const raw_rule &rr2)
+								{return check_qc_z3(rr1, rr2, z3_ctx);});
+						o::dbg() << "Reduced program: " << endl << endl << rp << endl;
+					}
 #endif
+				}
+			}
+		});
+		o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp
+			<< endl;
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("to-dnf")) {
