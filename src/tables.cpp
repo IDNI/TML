@@ -179,12 +179,105 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 	return perm;
 }
 
-// Convert a term to its string representation.
+/* Convert a term to its string representation. */
 
 std::string tables::term_to_str(const term &tm) {
 	ostringstream rt_oss;
 	rt_oss << ir_handler->to_raw_term(tm);
 	return rt_oss.str();
+}
+
+/* Convert a rule to its string representation. */
+
+std::string tables::rule_to_str(const term &tm, const term_set &tms) {
+	ostringstream rt_oss;
+	rt_oss << ir_handler->to_raw_term(tm);
+	if(!tms.empty()) {
+		rt_oss << " :- ";
+		const char *sep = "";
+		for(const term &bodie : tms) {
+			rt_oss << sep << ir_handler->to_raw_term(bodie);
+			sep = ", ";
+		}
+	}
+	rt_oss << ".";
+	return rt_oss.str();
+}
+
+/* Algorithm to check rule safety based on "Safe Database Queries with
+ * Arithmetic Relations" by Rodney Topor. */
+
+bool tables::is_limited(const int_t &var, const term &rt,
+		set<int_t> &wrt, const term_set &scopes) {
+	switch(rt.extype) {
+		case term::REL: case term::ARITH: case term::LEQ: case term::BLTIN: {
+			// If variable is used in atomic or arithmetic formula, then
+			// it is limited because it is a number and all numbers are
+			// less than 2^n
+			for(size_t i = 0; i < rt.size(); i++) {
+				if(rt[i] == var) return true;
+			}
+			return false;
+		} case raw_term::EQ: {
+			const int_t &other = rt[0] == var ? rt[1] : rt[0];
+			if(rt[0] != var && rt[1] != var) {
+				return false;
+			} else if(wrt.find(var) == wrt.end()) {
+				// Handle the finiteness dependencies {1} -> 0 and {0} -> 1
+				wrt.insert(var);
+				bool res = is_limited(other, scopes, wrt);
+				wrt.erase(var);
+				return res;
+			} else {
+				return false;
+			}
+		} default: {
+			return false;
+		}
+	}
+}
+
+/* Check if the given variable is limited in its scope with respect to
+ * the given variable. If the element is not a variable, then it is
+ * automatically limited. */
+
+bool tables::is_limited(const int_t &var, const term_set &t,
+		set<int_t> &wrt) {
+	// Check if var is a variable
+	if(var >= 0) {
+		return true;
+	} else {
+		// var is limited in a && b if var is limited in a or b
+		for(const term &tree : t)
+			if(is_limited(var, tree, wrt, t)) return true;
+		return false;
+	}
+}
+
+/* Collect all the variables occuring in the given term. */
+
+void collect_free_vars(const term &t, set<int_t> &free_vars) {
+	for(const int_t v : t) if(v < 0) free_vars.insert(v);
+}
+
+/* Collect all the variables occuring in the given set of terms. */
+
+void collect_free_vars(const term_set &t, set<int_t> &free_vars) {
+	for(const term &p : t) collect_free_vars(p, free_vars);
+}
+
+/* Check whether the given formula tree is safe and return the offending
+ * variable if not. This means that every free variable in the tree is
+ * limited and that all its quantifiers are limited. */
+
+optional<int_t> tables::is_safe(const term_set &t) {
+	set<int_t> free_vars;
+	collect_free_vars(t, free_vars);
+	for(const int_t &free_var : free_vars) {
+		set<int_t> wrt;
+		if(!is_limited(free_var, t, wrt)) return free_var;
+	}
+	return nullopt;
 }
 
 /* Enforce syntactical constraints on the given rule to ensure its
@@ -193,103 +286,27 @@ std::string tables::term_to_str(const term &tm) {
  * positive terms and that variables occuring in the head must occur in
  * the body. */
 
-void tables::enforce_rule_safety(const term& h, const term_set& a) {
-	// Map variables to the terms that uses them
-	map<int_t, term> src_terms, src_eqterms, src_leqterms;
-	set<int_t> pvars, nvars, eqvars, leqvars, arithvars;
-	vector<const term*> eqterms, leqterms, arithterms;
-	// first pass, just enlist eq terms (that have at least one var)
-	for (const term& t : a) {
-		bool haseq = false, hasleq = false;
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] >= 0) continue;
-			else if (t.extype == term::EQ) {
-				haseq = true; // .iseq
-				src_eqterms[t[n]] = t;
-			} else if (t.extype == term::LEQ) {
-				hasleq = true; // .isleq
-				src_leqterms[t[n]] = t;
-			} else {
-				(t.neg ? nvars : pvars).insert(t[n]);
-				src_terms[t[n]] = t;
-			}
-		// TODO: BLTINS: add term::BLTIN handling
-		// only if iseq and has at least one var
-		if (haseq) eqterms.push_back(&t);
-		else if (hasleq) leqterms.push_back(&t);
+void tables::enforce_rule_safety(const term& hd, const term_set& prft) {
+	set<int_t> free_vars;
+	
+	if(!hd.neg && !hd.goal) {
+		// Only collect the free variables of positive heads because we
+		// can always guard the body of a rule with a negative head with
+		// the negation of the head to obtain an equivalent rule.
+		collect_free_vars(hd, free_vars);
 	}
-	for (const term* pt : eqterms) {
-		const term& t = *pt;
-		bool noeqvars = true;
-		vector<int_t> tvars;
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] >= 0) continue;
-			// nvars add range already, so skip all in that case...
-			// and per 1.3 - if any one is contrained (outside) bail
-			// out
-			else if (has(nvars, t[n])) { noeqvars = false; break; }
-			// if neither pvars has this var it should be ranged
-			else if (!has(pvars, t[n])) tvars.push_back(t[n]);
-			else if (!t.neg) { noeqvars = false; break; }
-			// if is in pvars and == then other var is covered too,
-			// skip. this isn't covered by 1.1-3 (?) but further
-			// optimization.
-		if (noeqvars)
-			for (const int_t tvar : tvars)
-				eqvars.insert(tvar);
-			// 1.3 one is enough (we have one constrained, no need
-			// to do both). but this doesn't work well, we need to
-			// range all that fit.
-			//break;
-	}
-	for (const term* pt : leqterms) {
-	// - for '>' (~(<=)) it's enough if 2nd var is in nvars/pvars.
-		// - for '<=' it's enough if 2nd var is in nvars/pvars.
-		// - if 1st/greater is const, still can't skip, needs to be
-		// ranged.
-		// - if neither var appears elsewhere (nvars nor pvars) => do
-		// both.
-		//   (that is a bit strange, i.e. if appears outside one is
-		//   enough)
-		// ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ
-		// and GT.
-		const term& t = *pt;
-		assert(t.size() == 2);
-		const int_t v1 = t[0], v2 = t[1];
-		if (v1 == v2) {
-			if (!has(nvars, v2)) leqvars.insert(v2);
-			continue;
-		}
-		if (v2 < 0) {
-			if (has(nvars, v2) || has(pvars, v2))
-				continue; // skip both
-			leqvars.insert(v2); // add and continue to 1st
-		}
-		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
-			leqvars.insert(v1);
-	}
-	for (int_t i : pvars) nvars.erase(i);
-	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // arithvars.erase(i);
-	for (int_t i : nvars) {
-		parse_error("Variable used in negative term not also used in positive term",
-			ir_handler->get_elem(i).e, term_to_str(src_terms[i]));
-	}
-	for (int_t i : eqvars) {
-		parse_error("Variable used in equality not also used in positive term",
-			ir_handler->get_elem(i).e, term_to_str(src_eqterms[i]));
-	}
-	for (int_t i : leqvars) {
-		parse_error("Variable used in inequality not also used in positive term",
-			ir_handler->get_elem(i).e, term_to_str(src_leqterms[i]));
-	}
-	if (!h.neg) {
-		set<int_t> hvars;
-		for (int_t i : h) if (i < 0) hvars.insert(i);
-		for (const term& t : a) for (int_t i : t) hvars.erase(i);
-		for (int_t i : hvars) {
-			parse_error("Variable used in head not also used in body terms",
-				ir_handler->get_elem(i).e, term_to_str(h));
+	
+	// Initialize variable scopes, this is needed for the safety checking
+	// algorithm to verify limitations by going through equality terms.
+	collect_free_vars(prft, free_vars);
+	
+	// Ensure that all the head variables and other free variables are
+	// limited in the formula
+	for(const int_t &var : free_vars) {
+		set<int_t> wrt;
+		if(!is_limited(var, prft, wrt)) {
+			parse_error("Variable used unsafely",
+				ir_handler->get_elem(var).e, rule_to_str(hd, prft));
 		}
 	}
 }
@@ -411,18 +428,23 @@ bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
 	DBG(assert(t.size() == 2););
-	spbdd_handle q = bdd_handle::T;
+	spbdd_handle q = bdd_handle::T, numeric_constraint = bdd_handle::T;
 	if (t[0] == t[1]) return !(t.neg);
 	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] <= t[1]));
-	if (t[0] < 0 && t[1] < 0)
+	if (t[0] < 0 && t[1] < 0) {
 		q = leq_var(vm.at(t[0]), vm.at(t[1]), vl, bits);
-	else if (t[0] < 0)
+		numeric_constraint = constrain_to_num(vm.at(t[0]), vl) &&
+			constrain_to_num(vm.at(t[1]), vl);
+	} else if (t[0] < 0) {
 		q = leq_const(t[1], vm.at(t[0]), vl, bits);
-	else if (t[1] < 0)
+		numeric_constraint = constrain_to_num(vm.at(t[0]), vl);
+	} else if (t[1] < 0) {
 		// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 		q = htrue % leq_const(t[0], vm.at(t[1]), vl, bits) ||
 			from_sym(vm.at(t[1]), vl ,t[0]);
-	c = t.neg ? c % q : (c && q);
+		numeric_constraint = constrain_to_num(vm.at(t[1]), vl);
+	}
+	c = (t.neg ? c % q : (c && q)) && numeric_constraint;
 	return true;
 }
 

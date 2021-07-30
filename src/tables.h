@@ -237,6 +237,14 @@ private:
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
 	std::string term_to_str(const term &tm);
+	std::string rule_to_str(const term &tm, const term_set &tms);
+	
+	bool is_limited(const int_t &var, const term &rt, std::set<int_t> &wrt,
+		const term_set &scopes);
+	bool is_limited(const int_t &var, const term_set &t,
+		std::set<int_t> &wrt);
+	std::optional<int_t> is_safe(const term_set &t);
+	
 	void enforce_rule_safety(const term& h, const term_set& a);
 
 	spbdd_handle from_term(const term&, body *b = 0,
@@ -357,7 +365,7 @@ private:
 		uint_t b, spbdd_handle r) const;
 	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
 		uint_t b) const;
-	spbdd_handle constrain_to_num(size_t var, size_t n_vars);
+	spbdd_handle constrain_to_num(size_t var, size_t n_vars) const;
 	spbdd_handle shr(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle shl(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b,

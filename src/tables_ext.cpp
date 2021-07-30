@@ -288,7 +288,7 @@ spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 /* Add the constraint that the given variable is a number to the given
  * BDD. */
 
-spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) {
+spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) const {
 	// Numbers must have their lowest bits be 01.
 	return ::from_bit(pos(1, var, n_vars),true) &&
 		::from_bit(pos(0, var, n_vars),false);
