@@ -288,7 +288,7 @@ optional<int_t> tables::is_safe(const term_set &t) {
  * positive terms and that variables occuring in the head must occur in
  * the body. */
 
-void tables::enforce_rule_safety(const term& hd, const term_set& prft) {
+void tables::enforce_rule_safety(const term& hd, term_set prft) {
 	set<int_t> free_vars;
 	
 	if(!hd.neg && !hd.goal) {
@@ -296,6 +296,12 @@ void tables::enforce_rule_safety(const term& hd, const term_set& prft) {
 		// can always guard the body of a rule with a negative head with
 		// the negation of the head to obtain an equivalent rule.
 		collect_free_vars(hd, free_vars);
+	} else if(hd.neg) {
+		// If there is a negative head, then relevant substitutions must be
+		// those that satisfy the head
+		term nhd = hd;
+		nhd.neg = false;
+		prft.insert(nhd);
 	}
 	
 	// Initialize variable scopes, this is needed for the safety checking

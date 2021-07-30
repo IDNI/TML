@@ -245,7 +245,7 @@ private:
 		std::set<int_t> &wrt);
 	std::optional<int_t> is_safe(const term_set &t);
 	
-	void enforce_rule_safety(const term& h, const term_set& a);
+	void enforce_rule_safety(const term& h, term_set a);
 
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
