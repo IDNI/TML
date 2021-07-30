@@ -209,6 +209,8 @@ std::string tables::rule_to_str(const term &tm, const term_set &tms) {
 
 bool tables::is_limited(const int_t &var, const term &rt,
 		set<int_t> &wrt, const term_set &scopes) {
+	// Negative terms cannot limit variables
+	if(rt.neg) return false;
 	switch(rt.extype) {
 		case term::REL: case term::ARITH: case term::LEQ: case term::BLTIN: {
 			// If variable is used in atomic or arithmetic formula, then
