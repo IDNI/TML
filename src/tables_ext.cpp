@@ -285,6 +285,15 @@ spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 }
 // ----------------------------------------------------------------------------
 
+/* Add the constraint that the given variable is a number to the given
+ * BDD. */
+
+spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) {
+	// Numbers must have their lowest bits be 01.
+	return ::from_bit(pos(1, var, n_vars),true) &&
+		::from_bit(pos(0, var, n_vars),false);
+}
+
 //shr for equality
 spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 
@@ -312,7 +321,8 @@ spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 		for(size_t i = 0; i < bits-2; i++)
 			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
 	}
-	return s;
+	return s && constrain_to_num(var0, n_vars) &&
+		constrain_to_num(var2, n_vars);
 }
 
 //shl for equality
@@ -351,7 +361,8 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 		for(size_t i = 0; i < bits-2; i++)
 		    	s = s && ::from_bit(pos(i+2, var2, n_vars), false);
 	}
-	return s;
+	return s && constrain_to_num(var0, n_vars) &&
+		constrain_to_num(var2, n_vars);
 }
 
 //-----------------------------------------------------------------------------

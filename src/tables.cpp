@@ -101,35 +101,6 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 				leq_var(arg1, arg2, args, bit)));
 }
 
-void tables::range(size_t arg, size_t args, bdd_handles& v) {
-	spbdd_handle	ischar= ::from_bit(pos(0, arg, args), true) &&
-			::from_bit(pos(1, arg, args), false);
-	spbdd_handle	isnum = ::from_bit(pos(0, arg, args), false) &&
-			::from_bit(pos(1, arg, args), true);
-	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
-			::from_bit(pos(1, arg, args), false);
-	// ir_handler->nums is set to max NUM, not universe size. While for ir_handler->syms it's the size.
-	// It worked before because for arity==1 fact(ir_handler->nums) is always negated.
-	bdd_handles r = {ischar || isnum || issym,
-		(!ir_handler->chars	? htrue%ischar : bdd_impl(ischar,
-			leq_const(mkchr(ir_handler->chars-1), arg, args, bits))),
-		(!ir_handler->nums 	? htrue%isnum : bdd_impl(isnum,
-			leq_const(mknum(ir_handler->nums), arg, args, bits))),
-		(!ir_handler->syms 	? htrue%issym : bdd_impl(issym,
-			leq_const(((ir_handler->syms-1)<<2), arg, args, bits)))};
-	v.insert(v.end(), r.begin(), r.end());
-}
-
-spbdd_handle tables::range(size_t arg, ntable tab) {
-	array<int_t, 6> k = { ir_handler->syms, ir_handler->nums, ir_handler->chars, (int_t)tbls[tab].len,
-		(int_t)arg, (int_t)bits };
-	auto it = range_memo.find(k);
-	if (it != range_memo.end()) return it->second;
-	bdd_handles v;
-	return	range(arg, tbls[tab].len, v),
-		range_memo[k] = bdd_and_many(move(v));
-}
-
 uints perm_init(size_t n) {
 	uints p(n);
 	while (n--) p[n] = n;
@@ -148,7 +119,6 @@ spbdd_handle tables::add_bit(spbdd_handle x, size_t args) {
 }
 
 void tables::add_bit() {
-	range_clear_memo();
 	spbdd_handle x = hfalse;
 	bdd_handles v;
 	for (auto& x : tbls)
@@ -191,8 +161,10 @@ spbdd_handle tables::from_fact(const term& t) {
 		if (t[n] >= 0) r = r && from_sym(n, args, t[n]);
 		else if (vs.end() != (it = vs.find(t[n])))
 			r = r && from_sym_eq(n, it->second, args);
-		else if (vs.emplace(t[n], n), !t.neg)
-			r = r && range(n, t.tab);
+		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {
+			parse_error("Fact contains variable",
+				ir_handler->get_elem(t[n]).e, term_to_str(t));
+		}
 	return r;
 }
 
@@ -207,8 +179,23 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 	return perm;
 }
 
-spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
-	const varmap& vm, size_t len) {
+// Convert a term to its string representation.
+
+std::string tables::term_to_str(const term &tm) {
+	ostringstream rt_oss;
+	rt_oss << ir_handler->to_raw_term(tm);
+	return rt_oss.str();
+}
+
+/* Enforce syntactical constraints on the given rule to ensure its
+ * domain independence. Roughly the constraints are that variables
+ * occuring in negative, equality, or inequality terms must occur in
+ * positive terms and that variables occuring in the head must occur in
+ * the body. */
+
+void tables::enforce_rule_safety(const term& h, const term_set& a) {
+	// Map variables to the terms that uses them
+	map<int_t, term> src_terms, src_eqterms, src_leqterms;
 	set<int_t> pvars, nvars, eqvars, leqvars, arithvars;
 	vector<const term*> eqterms, leqterms, arithterms;
 	// first pass, just enlist eq terms (that have at least one var)
@@ -216,9 +203,16 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 		bool haseq = false, hasleq = false;
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) continue;
-			else if (t.extype == term::EQ) haseq = true; // .iseq
-			else if (t.extype == term::LEQ) hasleq = true; // .isleq
-			else (t.neg ? nvars : pvars).insert(t[n]);
+			else if (t.extype == term::EQ) {
+				haseq = true; // .iseq
+				src_eqterms[t[n]] = t;
+			} else if (t.extype == term::LEQ) {
+				hasleq = true; // .isleq
+				src_leqterms[t[n]] = t;
+			} else {
+				(t.neg ? nvars : pvars).insert(t[n]);
+				src_terms[t[n]] = t;
+			}
 		// TODO: BLTINS: add term::BLTIN handling
 		// only if iseq and has at least one var
 		if (haseq) eqterms.push_back(&t);
@@ -274,21 +268,30 @@ spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
 		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
 			leqvars.insert(v1);
 	}
-
 	for (int_t i : pvars) nvars.erase(i);
 	if (h.neg) for (int_t i : h) if (i < 0)
 		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // arithvars.erase(i);
-	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v);
-	for (int_t i : eqvars) range(vm.at(i), len, v);
-	for (int_t i : leqvars) range(vm.at(i), len, v);
+	for (int_t i : nvars) {
+		parse_error("Variable used in negative term not also used in positive term",
+			ir_handler->get_elem(i).e, term_to_str(src_terms[i]));
+	}
+	for (int_t i : eqvars) {
+		parse_error("Variable used in equality not also used in positive term",
+			ir_handler->get_elem(i).e, term_to_str(src_eqterms[i]));
+	}
+	for (int_t i : leqvars) {
+		parse_error("Variable used in inequality not also used in positive term",
+			ir_handler->get_elem(i).e, term_to_str(src_leqterms[i]));
+	}
 	if (!h.neg) {
 		set<int_t> hvars;
 		for (int_t i : h) if (i < 0) hvars.insert(i);
 		for (const term& t : a) for (int_t i : t) hvars.erase(i);
-		for (int_t i : hvars) range(vm.at(i), len, v);
+		for (int_t i : hvars) {
+			parse_error("Variable used in head not also used in body terms",
+				ir_handler->get_elem(i).e, term_to_str(h));
+		}
 	}
-	return bdd_and_many(v);
 }
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
@@ -460,8 +463,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
+	enforce_rule_safety(h, al);
 	if (opts.bitunv) a.rng = leq;
-	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
+	else a.rng = leq;
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y = 0;
 	for (auto x : b) {

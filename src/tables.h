@@ -199,7 +199,6 @@ private:
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
 	size_t max_args = 0;
-		std::map<std::array<int_t, 6>, spbdd_handle> range_memo;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -229,9 +228,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
-	void range(size_t arg, size_t args, bdd_handles& v);
-	spbdd_handle range(size_t arg, ntable tab);
-	void range_clear_memo() { range_memo.clear(); }
 
 
 	ntable add_table(sig s);
@@ -240,8 +236,8 @@ private:
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
-	spbdd_handle get_alt_range(const term& h, const term_set& a,
-		const varmap& vm, size_t len);
+	std::string term_to_str(const term &tm);
+	void enforce_rule_safety(const term& h, const term_set& a);
 
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
@@ -361,6 +357,7 @@ private:
 		uint_t b, spbdd_handle r) const;
 	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
 		uint_t b) const;
+	spbdd_handle constrain_to_num(size_t var, size_t n_vars);
 	spbdd_handle shr(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle shl(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b,
