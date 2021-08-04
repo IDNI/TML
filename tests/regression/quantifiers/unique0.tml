@@ -1,0 +1,11 @@
+U(1).
+#OK sat
+A1(1 0).
+A1(0 1).
+satA1(1) :- forall ?x  unique ?y { A1(?x ?y) }.
+
+# #OK unsat
+A2(0 0).
+A2(0 1).
+A2(1 0).
+satA2(1) :- forall ?x unique ?y { A2(?x ?y) }.
