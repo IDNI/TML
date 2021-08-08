@@ -192,7 +192,7 @@ spbdd_handle tables::from_fact(const term& t) {
 		else if (vs.end() != (it = vs.find(t[n])))
 			r = r && from_sym_eq(n, it->second, args);
 		else if (vs.emplace(t[n], n), !t.neg)
-			r = r && range(n, t.tab);
+			if(!opts.bitunv) r = r && range(n, t.tab);
 	return r;
 }
 
@@ -1353,18 +1353,20 @@ void tables::out(emscripten::val o) const {
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len, bool allowbltins) const {
 	table tbl = tbls.at(tab);
+	bit_univ bu(dict, opts.bitorder, const_cast<environment&>(this->typenv));
 	// D: bltins are special type of REL-s, mostly as any but no decompress.
 	if (!allowbltins && tbl.is_builtin()) return;
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
+		[tab, &f, &bu, &tbl, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
-		f(r);
+
+		if(!opts.bitunv || bu.brev_transform_check(r, tbl) ) f(r);
 	})();
 }
 

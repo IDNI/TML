@@ -196,7 +196,7 @@ struct bit_univ {
         return true;
     }
     
-	bit_univ(dict_t &_d, size_t _bo = 0, environment _e = environment(), size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
+	bit_univ(dict_t &_d, size_t _bo, environment &_e , size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
 	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), typenv(_e), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) {
 
@@ -251,6 +251,7 @@ struct bit_univ {
 	posfunc pos;
     
     bool brev_transform( raw_term& bit_raw_term);
+    bool brev_transform_check(const struct term &t, const struct table &tab);
 	bool btransform( const raw_prog& rpin, raw_prog &rpout );
 	private:
     bool btransform( const raw_rule& rrin, raw_rule &rrout );

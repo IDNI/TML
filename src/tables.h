@@ -142,6 +142,7 @@ class tables {
 	friend struct term;
 	friend class ir_builder;
 	friend class driver;
+	friend class bit_univ;
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;

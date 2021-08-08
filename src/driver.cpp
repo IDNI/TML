@@ -3919,7 +3919,7 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"));
+			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"), p.get_typenv());
 			raw_prog brawp;
 			bu.btransform(p, brawp);
 			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
