@@ -209,28 +209,42 @@ std::string tables::rule_to_str(const term &tm, const term_set &tms) {
 
 bool tables::is_limited(const int_t &var, const term &rt,
 		set<int_t> &wrt, const term_set &scopes) {
-	// Negative terms cannot limit variables
-	if(rt.neg) return false;
 	switch(rt.extype) {
 		case term::REL: case term::ARITH: case term::LEQ: case term::BLTIN: {
-			// If variable is used in atomic or arithmetic formula, then
-			// it is limited because it is a number and all numbers are
-			// less than 2^n
-			for(size_t i = 0; i < rt.size(); i++) {
-				if(rt[i] == var) return true;
+			if(!(rt.extype == term::REL || rt.extype == term::BLTIN) || !rt.neg) {
+				// Safety checking for atoms and builtins is done over the universal
+				// type, so a negation of these cannot limit a variable. Nothing stops
+				// the corresponding BDDs from taking invalid values. However safety
+				// checking for arithmetical operations/inequalities is done over the
+				// integer type. The integer type is always limited, and the BDD type
+				// bit prevents the BDDs from taking invalid values. The latter choice
+				// ensures that ?x<?y is safe iff ?x<=?y is safe given that ?x<?y is
+				// interpreted as ~{?y<?x} and serves to widen the set of safe programs.
+				for(size_t i = 0; i < rt.size(); i++) {
+					if(rt[i] == var) return true;
+				}
 			}
 			return false;
 		} case raw_term::EQ: {
-			const int_t &other = rt[0] == var ? rt[1] : rt[0];
 			if(rt[0] != var && rt[1] != var) {
+				// If this variable is not in the current equality, then the equality
+				// cannot limit the variable
 				return false;
 			} else if(wrt.find(var) == wrt.end()) {
-				// Handle the finiteness dependencies {1} -> 0 and {0} -> 1
+				// Handle the finiteness dependencies {1} -> 0 and {0} -> 1. Here, we
+				// know that our variable is one of the operands of the equality and
+				// have not yet checked that it is limited. Do this by checking whether
+				// the other operand is limited.
 				wrt.insert(var);
+				const int_t &other = rt[0] == var ? rt[1] : rt[0];
 				bool res = is_limited(other, scopes, wrt);
 				wrt.erase(var);
 				return res;
 			} else {
+				// Here, we know that our variable is one pf the operands of the
+				// equality and are already checking whether it is limited. Here we must
+				// conclude that it is not limited, otherwise we will get an infinite
+				// regress.
 				return false;
 			}
 		} default: {
@@ -245,8 +259,8 @@ bool tables::is_limited(const int_t &var, const term &rt,
 
 bool tables::is_limited(const int_t &var, const term_set &t,
 		set<int_t> &wrt) {
-	// Check if var is a variable
 	if(var >= 0) {
+		// Symbols are limited by definition
 		return true;
 	} else {
 		// var is limited in a && b if var is limited in a or b
@@ -269,8 +283,8 @@ void collect_free_vars(const term_set &t, set<int_t> &free_vars) {
 }
 
 /* Check whether the given formula tree is safe and return the offending
- * variable if not. This means that every free variable in the tree is
- * limited and that all its quantifiers are limited. */
+ * variable if not. This means that every free variable in the body is
+ * limited. */
 
 optional<int_t> tables::is_safe(const term_set &t) {
 	set<int_t> free_vars;
@@ -282,11 +296,11 @@ optional<int_t> tables::is_safe(const term_set &t) {
 	return nullopt;
 }
 
-/* Enforce syntactical constraints on the given rule to ensure its
- * domain independence. Roughly the constraints are that variables
- * occuring in negative, equality, or inequality terms must occur in
- * positive terms and that variables occuring in the head must occur in
- * the body. */
+/* Enforce syntactical constraints on the given rule to ensure its BDD safety.
+ * I.e. that it does not cause the corresponding BDDs to contain undefined
+ * values. Roughly the constraints are that variables occuring in negative terms
+ * must occur in positive terms and that variables occuring in the head must
+ * occur in the body. */
 
 void tables::enforce_rule_safety(const term& hd, term_set prft) {
 	set<int_t> free_vars;
@@ -304,8 +318,6 @@ void tables::enforce_rule_safety(const term& hd, term_set prft) {
 		prft.insert(nhd);
 	}
 	
-	// Initialize variable scopes, this is needed for the safety checking
-	// algorithm to verify limitations by going through equality terms.
 	collect_free_vars(prft, free_vars);
 	
 	// Ensure that all the head variables and other free variables are
