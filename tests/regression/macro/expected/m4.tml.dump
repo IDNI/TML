@@ -9,3 +9,8 @@ ntc(3 3).
 ntc(2 2).
 ntc(1 1).
 ntc(0 0).
+domain(4).
+domain(3).
+domain(2).
+domain(1).
+domain(0).
