@@ -20,7 +20,10 @@ using namespace std;
 dict_t::dict_t() :  bitunv(false), op(get_lexeme("(")), cl(get_lexeme(")")) {}
 
 dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
-
+bool dict_t::is_valid_sym_val(int_t t) const { 
+	return bitunv ? (t >=2 && t <= syms.size()-1+2) : 
+					(t>>2 >= 0 && t>>2 < syms.size());
+}
 lexeme dict_t::get_sym(int_t t) const {	
 	if (bitunv == false) {
 		DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
@@ -35,7 +38,10 @@ lexeme dict_t::get_sym(int_t t) const {
 		static char_t str_num[] = { '\'', 'a', '\'' };
 		if (t == 1 || t == 0) { str_num[1] = t; return { str_num, str_num + 3 }; }
 		DBG(assert(syms.size());)
-		return syms[t-2];
+		if( t >=2 && t <= syms.size()-1+2)
+			return syms[t-2]; // all known and valid symbols remain b/w >=2 and syms.size()-2;
+		else return lexeme{(ccs)"BOT",(ccs)"BOT"+3 };
+		//get_temp_sym(const_cast<dict_t*>(this)->get_fresh_temp_sym(t));
 	}
 }
 

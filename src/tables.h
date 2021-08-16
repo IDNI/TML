@@ -142,6 +142,7 @@ class tables {
 	friend struct term;
 	friend class ir_builder;
 	friend class driver;
+	friend class bit_univ;
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
@@ -293,7 +294,7 @@ private:
 	lexeme get_new_rel();
 	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
-	bool add_prog(flat_prog m, const std::vector<struct production>&,
+	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
 	bool contradiction_detected();
 	bool infloop_detected();
@@ -438,10 +439,10 @@ public:
 
 	static bool run_prog(const raw_prog &rp, dict_t &dict,
 		const options &opts, ir_builder *ir_handler, std::set<raw_term> &results);
-	static bool run_prog(const std::set<raw_term> &edb, raw_prog rp,
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, const options &opts, ir_builder *ir_handler,
 		std::set<raw_term> &results);
-	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
+	bool run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 
 	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);

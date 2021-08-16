@@ -763,7 +763,7 @@ bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 		}
 	}
 	flat_prog fp = ir_handler->to_terms(p);
-	return add_prog(fp, p.g);
+	return add_prog_wprod(fp, p.g);
 }
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
@@ -798,7 +798,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
 	}
 //	DBG(print(o::out()<<"run_nums for:"<<endl, p)<<endl<<"returned:"<<endl;)
-	if (!add_prog(move(p), {})) return false;
+	if (!add_prog_wprod(move(p), {})) return false;
 	if (!pfp(nsteps)) return false;
 	r = g(decompress());
 	return true;
@@ -844,7 +844,7 @@ void tables::init_tml_update() {
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
 
-bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
+bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (mknums) to_nums(m);
@@ -1117,7 +1117,7 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 	to.apply_regexpmatch = opts.enabled("regex");
 	tables tbl(dict, to, ir_handler);
 	strs_t strs;
-	if(tbl.run_prog(rp, strs)) {
+	if(tbl.run_prog_wstrs(rp, strs)) {
 		for(const term &result : tbl.decompress()) {
 			results.insert(tbl.ir_handler->to_raw_term(result));
 		}
@@ -1132,7 +1132,7 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
  * given program reaches a fixed point. Useful for query containment
  * checks. */
 
-bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
+bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	dict_t &dict, const ::options &opts, ir_builder *ir_handler,
 	std::set<raw_term> &results)
 {
@@ -1174,7 +1174,7 @@ bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
 	return result;
 }
 
-bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
 	size_t break_on_step)
 {
 	clock_t start{}, end;
@@ -1201,13 +1201,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	}
 	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
-		if (!add_prog(move(prog_after_fp), {}, false)) return false;
+		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
 	}
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
-			r = run_prog(np, strs, steps, break_on_step);
+			r = run_prog_wstrs(np, strs, steps, break_on_step);
 			went = nstep - begstep;
 			if (!r && went >= steps) break;
 		}
@@ -1399,18 +1399,20 @@ void tables::out(emscripten::val o) const {
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len, bool allowbltins) const {
 	table tbl = tbls.at(tab);
+	bit_univ bu(dict, opts.bitorder, const_cast<environment&>(this->typenv));
 	// D: bltins are special type of REL-s, mostly as any but no decompress.
 	if (!allowbltins && tbl.is_builtin()) return;
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
+		[tab, &f, &bu, &tbl, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
-		f(r);
+
+		if(!opts.bitunv || bu.brev_transform_check(r, tbl) ) f(r);
 	})();
 }
 

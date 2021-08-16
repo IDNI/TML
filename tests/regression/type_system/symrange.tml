@@ -1,0 +1,7 @@
+
+etest(c).
+etest(b).
+etest(a).
+etest(d).
+etest(e).
+et(?x ?y) :-etest(?x), etest(?y). 

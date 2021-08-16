@@ -248,7 +248,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
 		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
-		
+
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
 		map<elem, elem> freeze_map;
@@ -263,7 +263,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		tables::run_prog(edb, nrp, d, opts, ir, results);
+		tables::run_prog_wedb(edb, nrp, d, opts, ir, results);
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
@@ -325,9 +325,9 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 			rt.calc_arity(nullptr);
 			edb.insert(rt);
 		}
-		
+
 		o::dbg() << "Canonical Database: " << edb << endl;
-		
+
 		// Build up the query that proves the existence of a homomorphism
 		// Make a new head for rr2 that exports all the variables used in
 		// its body + ids of the frozen terms it binds to
@@ -355,7 +355,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		if(!tables::run_prog(edb, nrp, d, opts, ir, results)) return false;
+		if(!tables::run_prog_wedb(edb, nrp, d, opts, ir, results)) return false;
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
 			// one of the frozen terms), then there is a homomorphism between
@@ -473,9 +473,9 @@ bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
 void driver::factor_rules(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	o::dbg() << "Factorizing rules ..." << endl;
-	
+
 	// Sort the rules so the biggest come first. Idea is that we want to
 	// reduce total substitutions by doing the biggest factorizations
 	// first. Also prioritizing rules with more arguments to reduce chance
@@ -698,16 +698,16 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Check that rules have correct format
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
 		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
-	
+
 	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << endl;
-	
+
 	// Get dictionary for generating fresh symbols
 	dict_t &old_dict = tbl->get_dict();
-	
+
 	set<elem> vars;
 	collect_vars(rr1, vars);
 	vector<set<elem>> partition;
-	
+
 	// Do the Levy-Sagiv test
 	bool contained = partition_iter(vars, partition,
 		[&](const vector<set<elem>> &partition) -> bool {
@@ -721,7 +721,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 				o::dbg() << "}, ";
 			}
 			o::dbg() << endl;
-			
+
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
 			dict_t d;
@@ -817,7 +817,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog;
 					test_prog.r.push_back(rr2);
 					set<raw_term> res;
-					tables::run_prog(ext, test_prog, d, opts, ir, res);
+					tables::run_prog_wedb(ext, test_prog, d, opts, ir, res);
 					return res.find(subbed.h[0]) != res.end();
 				});
 		});
@@ -872,7 +872,7 @@ template<typename F>
 	vector<raw_rule> reduced_rules;
 	for(raw_rule &rr : rp.r) {
 		bool subsumed = false;
-		
+
 		for(auto nrr = reduced_rules.begin(); nrr != reduced_rules.end();) {
 			if(f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
@@ -1191,7 +1191,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// with length less than max_limit
 	int_t max_id = gen_limit == 1 ? max_arity + 1 :
 		(pow(gen_limit, max_arity + 1) - 1) / (gen_limit - 1);
-	
+
 	// Initialize the symbols, variables, and operators used in the
 	// domain creation rule
 	elem lt_elem(elem::LT, d.get_lexeme("<")),
@@ -1587,7 +1587,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 	// Maintain a list of the variable substitutions:
 	map<elem, elem> variables;
 	vector<elem> rule_ids;
-	
+
 	// Facts and rules have different representations in quotations. This
 	// is because they are interpreted differently: facts are placed in
 	// the 0th database whilst rules are fired on each iteration.
@@ -2830,7 +2830,7 @@ bool rule_relation_precedes(const raw_rule &rr1, const raw_rule &rr2) {
 raw_term driver::relation_to_term(const rel_info &ri) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	vector<elem> els = { get<0>(ri), elem_openp };
 	for(int_t i = 0; i < get<1>(ri); i++) {
 		els.push_back(elem::fresh_var(d));
@@ -2876,7 +2876,7 @@ void driver::step_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	map<elem, elem> freeze_map;
 	map<elem, elem> unfreeze_map;
 	// Separate the internal rules used to execute the parts of the
@@ -3046,14 +3046,14 @@ void driver::step_transform(raw_prog &rp,
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
 		rp.r.push_back(raw_rule(stage2, {stage0, stage1.negate()}));
-		
+
 		// Hide the clock states
 		rp.hidden_rels.insert({ stage0.e[0].e, stage0.arity });
 		rp.hidden_rels.insert({ stage1.e[0].e, stage1.arity });
 		for(const elem &clock_state : clock_states) {
 			rp.hidden_rels.insert({ clock_state.e, {0} });
 		}
-		
+
 		if(clock_states.size() > 1) {
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
@@ -3408,7 +3408,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 		for(const signature &sig : current_signatures) {
 			// Calculate variable usages so we can know what to eliminate
 			ints uses = calculate_variable_usage(sig, dependants);
-			
+
 			// Move forward only if there is something to contract
 			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
 				// Print active variable usages for debugging purposes
@@ -3419,7 +3419,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 					sep = ", ";
 				}
 				o::dbg() << "]" << endl;
-				
+
 				// Now consistently eliminate certain positions and prepare the
 				// next round. Rename the relation after the eliminations in
 				// case the new signature coincides with an already existing
@@ -3752,7 +3752,7 @@ string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 bool driver::transform_grammar(raw_prog &rp) {
 	form *tmp_form = nullptr;
 	flat_prog p;
-	
+
 	if(ir->transform_grammar(rp.g, p, tmp_form)) {
 		for(const vector<term> &rul : p) {
 			vector<raw_term> bodie;
@@ -3844,7 +3844,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				o::dbg() << "Converting to Pure TML ..." << endl << endl;
 				to_pure_tml(rp);
 				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
-				
+
 				if(opts.enabled("cqnc-subsume")) {
 					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
 					subsume_queries(rp,
@@ -3914,18 +3914,20 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 			throw_runtime_error("Conditional statements require "
 				"-g (-guards) option enabled.");
 	bool fp = false;
-	
-	
+
+
 	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"));
+			bit_univ bu(tbl->get_dict(), opts.get_int("bitorder"), p.get_typenv());
 			raw_prog brawp;
 			bu.btransform(p, brawp);
-			fp = tbl->run_prog(brawp, pd.strs, steps, break_on_step);
+			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
 		}
 	}
-	else fp = tbl->run_prog(p, pd.strs, steps, break_on_step);
+	//TODO review nested programs since we are forcing two calls to get_rules
+	// one with a program without them.
+	else fp = tbl->run_prog_wstrs(p, pd.strs, steps, break_on_step);
 	o::ms() << "# elapsed: ";
 	measure_time_end();
 	if (tbl->error) error = true;

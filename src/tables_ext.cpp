@@ -556,11 +556,10 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq) {
 
 	DBG(assert(
-		   (f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
-		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
-		   ((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
-		   ((f->type == form::EXISTS1 || f->type == form::FORALL1) && f->r != NULL)
-
+			(f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
+			(f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
+			((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
+			((f->type == form::EXISTS1 || f->type == form::FORALL1) || (f->type == form::UNIQUE1) && f->r != NULL)
 		));
 
 	if (f->type == form::ATOM) {

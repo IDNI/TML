@@ -3,12 +3,14 @@ father(Jack Fred).
 father(Tony CarolII).
 father(Fred CarolIII).
 
+
 mother(Grace Amy).
 mother(Amy Fred).
 mother(CarolI CarolII).
 mother(CarolII CarolIII).
-
-parent(?X ?Y) :- father(?X ?Y).
+a.
+predtype test( sym ?x, sym ?y).
+test(?X ?Y):- a.
 parent(?X ?Y) :- mother(?X ?Y).
 ancestor(?X ?Y) :- parent(?X ?Y).
 ancestor(?X ?Y) :- parent(?X ?Z), ancestor(?Z ?Y).
