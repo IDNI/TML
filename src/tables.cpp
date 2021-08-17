@@ -473,6 +473,9 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 			from_sym(vm.at(t[1]), vl ,t[0]);
 		numeric_constraint = constrain_to_num(vm.at(t[1]), vl);
 	}
+	// Enforce the numeric constraint regardless of whether this term is positive
+	// or negated. This essentially forces any operands to inequalities to be
+	// integers and guarantees that ?a<?b is safe iff ?a<=?b is safe.
 	c = (t.neg ? c % q : (c && q)) && numeric_constraint;
 	return true;
 }
