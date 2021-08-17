@@ -445,6 +445,15 @@ bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
+/* Add the constraint that the given variable is a number to the given
+ * BDD. */
+
+spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) const {
+	// Numbers must have their lowest bits be 01.
+	return ::from_bit(pos(1, var, n_vars),true) &&
+		::from_bit(pos(0, var, n_vars),false);
+}
+
 bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
 	DBG(assert(t.size() == 2););
