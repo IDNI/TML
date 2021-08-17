@@ -1,0 +1,16 @@
+# Unsafe due to a's BDD allowing undefined values
+a(?x).
+# Unsafe due to a's BDD allowing undefined values
+a(?x) :- b().
+# Unsafe due to a's BDD allowing undefined values
+a(?x) :- ~b(?x).
+# Unsafe due to a's BDD allowing undefined values
+a(?x) :- b(?y).
+# Would produce erroneous values for ?y since ?x can take undefined values
+a(?y) :- ~b(?x ?y), c(?y).
+# a(5) could be incorrectly derived due to ?x taking undefined values
+a(5) :- ~b(?x).
+# While a, b, c are limited, a still allows undefined values
+a(?x) :- ?a<?b, ?a=?c.
+# While a, b, c are limited, a still allows undefined values
+a(?x) :- ?a<=?b, ?a=?c.

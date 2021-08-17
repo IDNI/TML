@@ -780,9 +780,18 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 		// making head   equals( i j k n) :-
 		eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP, nt,
 								std::initializer_list<int>{i, j, k, n}, 0 );
-		// making fact equals( i i k k).
-		if( r == 0 ) eqr[r].back().assign({i,i,k,k});
-		else if( r == 1 ) { // inductive case
+		if( r == 0 ) {
+			// making rule equals( i i k k) :- 0<=i, 0<=k. Inequalities are
+			// used to force variables to be integers.
+			// Turn equals( i j k n) into equals( i i k k)
+			eqr[r].back().assign({i,i,k,k});
+			// Add body term 0 <= i, forcing i to be an integer
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+				std::initializer_list<int>{mknum(0), i}, 0 );
+			// Add body term 0 <= k, forcing k to be an integer
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+				std::initializer_list<int>{mknum(0), k}, 0 );
+		} else if( r == 1 ) { // inductive case
 			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
 			// str(i cv) ,str( k, cv)
@@ -1327,7 +1336,14 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 			t.resize(2);
 			t[0] = t[1] = -1;
 			t.tab = dynenv->get_table({dict.get_rel(x.p[0].e),{2}});
-			vector<term> v{t};
+			// Ensure that the index is an integer by asserting that it is >= 0
+			term guard;
+			guard.resize(2);
+			guard.extype = term::LEQ;
+			guard[0] = mknum(0);
+			guard[1] = -1;
+			// Make the rule x(?a ?a) :- 0 <= ?a
+			vector<term> v{t, guard};
 			p.insert(v);
 			vector<term> af{t, t};
 			af[0].neg = true;
