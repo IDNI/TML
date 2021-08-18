@@ -3101,6 +3101,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 	// Make the clock alternate between two states
 	rp.r.push_back(raw_rule(tick, tick.negate()));
 	rp.r.push_back(raw_rule(tick.negate(), tick));
+	rp.hidden_rels.insert({ tick.e[0].e, {0} });
 }
 
 /* Applies the given transformation on the given program in post-order.
@@ -3561,8 +3562,8 @@ void driver::square_root_program(raw_prog &rp) {
 }
 
 /* Iterate through the FOL rules and remove the outermost existential
- * quantifiers. Required because pure TML conversion assumes that
- * quantifier variables are only visible within their bodies. */
+ * quantifiers. Required because TML to DNF conversion assumes that quantifier
+ * variables are only visible within their bodies. */
 
 void driver::remove_redundant_exists(raw_prog &rp) {
 	for(raw_rule &rr : rp.r) {
@@ -4302,12 +4303,25 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		pdatalog_transform(rp, [&](raw_prog &rp) {
-			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp
-				<< endl;
-			if(int_t iter_num = opts.get_int("iterate")) {
-				// Split heads are a precondition to program squaring
+		// Trimmed existentials are a precondition to program optimizations
+		remove_redundant_exists(rp);
+#ifdef WITH_Z3
+		if(opts.enabled("qc-subsume-z3")){
+			o::dbg() << "Query containment subsumption using z3" << endl;
+			const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
+			z3_context z3_ctx(int_bit_len, universe_bit_len);
+			split_heads(rp);
+			subsume_queries(rp,
+				[&](const raw_rule &rr1, const raw_rule &rr2)
+					{return check_qc_z3(rr1, rr2, z3_ctx);});
+			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
+		}
+#endif
+		if(int_t iter_num = opts.get_int("iterate")) {
+			pdatalog_transform(rp, [&](raw_prog &rp) {
+				o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
 				split_heads(rp);
+				// Alternately square and simplify the program iter_num times
 				for(int_t i = 0; i < iter_num; i++) {
 					o::dbg() << "Squaring Program ..." << endl << endl;
 					square_program(rp);
@@ -4325,10 +4339,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					}
 #endif
 				}
-			}
-		});
-		o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp
-			<< endl;
+				o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
+			});
+		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("to-dnf")) {
