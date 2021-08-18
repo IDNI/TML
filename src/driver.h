@@ -154,7 +154,7 @@ class driver {
 		std::set<raw_rule>& s);
 	void transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
-//	void transform_string(const sysstring_t&, raw_prog&, int_t);
+	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	bool transform_evals(raw_prog &rp, const directive &drt);
 	bool transform_quotes(raw_prog &rp, const raw_term &false_term,
@@ -203,7 +203,6 @@ class driver {
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
-	bool transform_grammar(raw_prog &rp);
 	void remove_redundant_exists(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
@@ -241,7 +240,7 @@ class driver {
 	//driver(raw_progs);
 	size_t load_stdin();
 	prog_data pd;
-	std::set<int_t> transformed_strings;
+	std::set<lexeme> transformed_strings;
 	tables *tbl = 0;
 	ir_builder *ir = 0;
 

@@ -3744,30 +3744,6 @@ string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 	return prog_name;
 }
 
-/* Transform all the productions in the given program into pure TML
- * rules. Removes the original productions from the program and leaves
- * their pure TML equivalents behind. This function is only for
- * debugging purposes as the resulting raw_prog will not execute. */
-
-bool driver::transform_grammar(raw_prog &rp) {
-	form *tmp_form = nullptr;
-	flat_prog p;
-
-	if(ir->transform_grammar(rp.g, p, tmp_form)) {
-		for(const vector<term> &rul : p) {
-			vector<raw_term> bodie;
-			for(size_t i = 1; i < rul.size(); i++) {
-				bodie.push_back(ir->to_raw_term(rul[i]));
-			}
-			rp.r.push_back(raw_rule(ir->to_raw_term(rul[0]), bodie));
-		}
-		rp.g.clear();
-		return true;
-	} else {
-		return false;
-	}
-}
-
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	dict_t &d = tbl->get_dict();
 	lexeme trel = { 0, 0 };
@@ -3788,20 +3764,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 	};
 	get_all_vars(rp);
-//	for (auto x : pd.strs)
-//		if (!has(transformed_strings, x.first))
-//			transform_string(x.second, rp.p[n], x.first),
-//			transformed_strings.insert(x.first);
-//	for (auto x : strtrees)
-//		if (!has(transformed_strings, x.first))
-//			transform_string(x.second, rp.p[n], x.first),
-//			transformed_strings.insert(x.first);
-	if (!rp.g.empty()) //{
-		if (pd.strs.size() > 1)
-			return throw_runtime_error(err_one_input);
-//		else transform_grammar(rp.p[n], pd.strs.begin()->first,
-//			pd.strs.begin()->second.size());
-//	}
 //	if (opts.enabled("sdt"))
 //		for (raw_prog& p : rp.p)
 //			p = transform_sdt(move(p));
@@ -3809,6 +3771,19 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
 		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
+		o::dbg() << "Transforming Grammar ..." << endl << endl;
+		for (auto x : pd.strs)
+			if (!has(transformed_strings, x.first))
+				transform_string(x.second, rp, x.first),
+				transformed_strings.insert(x.first);
+		if (!rp.g.empty()) {
+			if (pd.strs.size() > 1)
+				return throw_runtime_error(err_one_input);
+			else transform_grammar(rp, pd.strs.begin()->first,
+				pd.strs.begin()->second.size());
+			rp.g.clear();
+		}
+		o::dbg() << "Transformed Grammar:" << endl << endl << rp << endl;
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
 			string_t rp_generator;
