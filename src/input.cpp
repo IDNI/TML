@@ -914,7 +914,7 @@ bool guard_statement::parse_condition(input* in, raw_prog& np) {
 	sprawformtree root = 0;
 	raw_sof rsof(np);
 	bool ret = rsof.parse(in, root);
-	if(root) prft = *prft;
+	if(root) prft = *root;
 	rp_id = np.id;
 	return ret ? true : in->parse_error(in->l[in->pos][0],
 		"Formula has errors", in->l[in->pos]);
