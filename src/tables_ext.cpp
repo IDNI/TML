@@ -312,7 +312,8 @@ spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 		for(size_t i = 0; i < bits-2; i++)
 			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
 	}
-	return s;
+	return s && constrain_to_num(var0, n_vars) &&
+		constrain_to_num(var2, n_vars);
 }
 
 //shl for equality
@@ -351,7 +352,8 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 		for(size_t i = 0; i < bits-2; i++)
 		    	s = s && ::from_bit(pos(i+2, var2, n_vars), false);
 	}
-	return s;
+	return s && constrain_to_num(var0, n_vars) &&
+		constrain_to_num(var2, n_vars);
 }
 
 //-----------------------------------------------------------------------------
@@ -545,11 +547,10 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq) {
 
 	DBG(assert(
-		   (f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
-		   (f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
-		   ((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
-		   ((f->type == form::EXISTS1 || f->type == form::FORALL1) && f->r != NULL)
-
+			(f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
+			(f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
+			((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
+			((f->type == form::EXISTS1 || f->type == form::FORALL1) || (f->type == form::UNIQUE1) && f->r != NULL)
 		));
 
 	if (f->type == form::ATOM) {

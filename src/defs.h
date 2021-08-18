@@ -118,6 +118,7 @@ typedef struct {
 		bitunv, show_hidden;
 	enum semantics semantics;
 	size_t bitorder;
+	std::set<ntable> pu_states;
 } rt_options;
 
 typedef enum  {

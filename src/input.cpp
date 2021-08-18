@@ -1338,6 +1338,13 @@ bool parse_error(const char* e, std::string s) {
 	return in.parse_error(0, e, (ccs) s.c_str());
 }
 
+// Display an error with the given message, erronous lexeme, and context
+
+bool parse_error(const char* e, lexeme l, std::string u) {
+	input in((void*) 0, (size_t) 0);
+	return in.parse_error(0, e, l[0], (ccs) u.c_str());
+}
+
 bool parse_error(ccs offset, const char* err) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(offset, err, offset);
@@ -1350,7 +1357,10 @@ bool input::type_error(const char* e, lexeme l) {
 	return type_error(0, e, l[0]);
 }
 
-bool input::parse_error(ccs offset, const char* err, ccs close_to) {
+// Display an error with the given location, message, erronous lexeme,
+// and context
+
+bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 	//DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
 	//	<< "' offset: " << &offset << " '" << offset << "' "
 	//	<< " error: '" << err << "' "
@@ -1360,12 +1370,15 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to) {
 	ostringstream msg; msg << "Parse error: \"" << err << '"';
 	ccs p = close_to;
 	while (p && *p && *p != '\n') ++p;
+	ccs q = ctx;
+	while (q && *q && *q != '\n') ++q;
 	if (offset) {
 		long l, ch; count_pos(offset, l, ch);
 		msg << " at " << l << ':' << ch;
 	}
 	if (close_to) msg << " close to \""
 		<< to_string(string_t(close_to, p - close_to)) << '"';
+	if(ctx) msg << " of \"" << to_string(string_t(ctx, q - ctx)) << '"';
 	o::err() << msg.str() << endl;
 #ifdef WITH_EXCEPTIONS
 	throw parse_error_exception(msg.str());

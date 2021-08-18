@@ -144,7 +144,7 @@ struct input {
 	bool parse_error(ccs offset, const char* err) {
 		return parse_error(offset, err, offset);
 	}
-	bool parse_error(ccs offset, const char* err, ccs close_to);
+	bool parse_error(ccs offset, const char* err, ccs close_to, ccs ctx = 0);
 	bool parse_error(ccs offset, const char* err, lexeme close_to);
 	bool type_error( const char* err, lexeme l);
 	bool type_error(ccs offset, const char* err, ccs close_to);
@@ -866,6 +866,7 @@ bool parse_error(const char* o, const char* e, lexeme l);
 bool parse_error(ccs o, const char* e, std::string s);
 bool parse_error(ccs o, const char* e);
 bool parse_error(const char* e, lexeme l);
+bool parse_error(const char* e, lexeme l, std::string s);
 bool parse_error(const char* e);
 bool type_error(const char* e, lexeme l);
 

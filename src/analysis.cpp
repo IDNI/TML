@@ -16,6 +16,8 @@
 #include <vector>
 #include "analysis.h"
 #include "dict.h"
+#include "term.h"
+#include "tables.h"
 
 
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
@@ -109,12 +111,36 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	// for everything else
 	return 0;
 }
+bool bit_univ::brev_transform_check(const term &t, const table &tab){
+
+	const lexeme & pred = d.get_rel(tab.s.first);
+	const std::vector<typedecl> &vt = this->typenv.lookup_pred(lexeme2str(pred));
+	auto rtab = rtabs.find(lexeme2str(pred))->second;
+	int_t val = 0;
+	//for symbols, check if the value is in dict
+	for( int_t arg=0; arg < rtab.size(); arg++)
+		if( vt[arg].is_primitive() && vt[arg].pty == primtype::SYMB) {
+			size_t  bitsz = vt[arg].pty.get_bitsz();
+			val = 0;				
+			//construct arg value from bits using pos					
+			for( int_t k = 0; k < bitsz; k++) {
+				int_t ps = pos( bitsz, k, arg, rtab.size(), rtab);
+				//DBG(COUT<<ps<<std::endl);	
+				DBG(assert(ps < t.size()));
+				val |= t[ps] << k;
+			}
+			if(! d.is_valid_sym_val(val)) return false;
+		}
+		
+	return true;
+}
 
 //inplace transformation of bit raw term to normal as per type_env/
 bool bit_univ::brev_transform( raw_term &rbt ){
 	
 	string_t str = lexeme2str(rbt.e[0].e);
 	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
+	auto rtab = this->rtabs.find(str)->second;
 	if(vt.size() == 0 ) return false;
 	int_t bitsz = -1;
 	int_t val = 0, arg = 0,  args = vt.size();
@@ -126,13 +152,16 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 			bitsz =  td.pty.get_bitsz();
 			val = 0;				
 			//construct arg value from bits using pos					
-			for( int_t k = 0; k < bitsz; k++)	
-				val |= rbits[pos( bitsz, k, arg, args)].num << k;
+			for( int_t k = 0; k < bitsz; k++) {
+				int_t ps = pos( bitsz, k, arg, args, rtab);
+				//DBG(COUT<<ps<<std::endl);	
+				val |= rbits[ps].num << k;
+			}
 			elem el;
 			if( td.pty.ty == primtype::UINT )
 				el = elem(val);
 			else if ( td.pty.ty == primtype::UCHAR )
-				el = elem((char_t) val);
+				el = elem((char32_t) val);
 			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
 				el = elem(elem::SYM, this->d.get_sym(val) );
 
@@ -158,7 +187,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 		size_t totalsz = 0;
 		for( size_t asz : targs  )	totalsz += asz;
 		std::vector<elem> bitelem(totalsz);
-
+		DBG(COUT<<"size for "<<rtin.e[0].e<< "="<<totalsz<<std::endl);
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
 			// for predicate rel name, keep as it is
@@ -168,9 +197,9 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 			if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
 			int_t symbval = 0;
 			for (size_t k = 0; k != bsz; ++k) {
-				// extend bit if required.
+				
 				int_t ps = pos(bsz, k, n-2, args, targs);
-				assert(ps < bitelem.size());
+				DBG(COUT<< ps<<std::endl;assert(ps < bitelem.size()));
 			/*	//dynamically grow bitsiz
 				if(ps >= bitelem.size()) {
 					int_t incr = ps - bitelem.size() + 1 ;
@@ -744,6 +773,7 @@ bool typechecker::tcheck( const raw_term &rt){
 
 bool typechecker::tcheck( const raw_rule &rr){
 	std::stringstream ss;
+	env.reset_context();
 	if( rr.get_context().get() != nullptr)
 		env.get_context() = *(rr.get_context().get());
 	verrs.clear();

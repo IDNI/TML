@@ -84,6 +84,7 @@ public:
 	const lexeme& get_bltin(int_t t) const { return bltins[t]; }
 	bool is_temp_sym(const lexeme& l) const { return temp_syms_dict.find(l) != temp_syms_dict.end(); }
 	lexeme get_sym(int_t t) const;
+	bool is_valid_sym_val(int_t val) const;
 	lexeme get_temp_sym(int_t t) const;
 	int_t get_var(const lexeme& l);
 	int_t get_rel(const lexeme& l);

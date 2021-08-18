@@ -1,0 +1,22 @@
+# Transitive closure (TC)
+#
+# TC of a directed graph is simply another
+# directed graph representing paths
+# in the original graph.
+#
+# This is a classical example of recursion.
+#
+# Let's have a directed graph represented by
+# following 'e' relation:
+
+predtype e2( int:2 ?x,  int:3 ?x).
+predtype e3( int:2 ?x,  int:3 ?b, int:1 ?c).
+predtype e5( int:3 ?x,  int:1 ?b, int:3 ?c, int:1 ?d, int:8 ?e).
+predtype e4eq( int:3 ?x,  int:3 ?b, int:3 ?c, int:3 ?d).
+
+e2(3 4).
+e3(2 3 1).
+e5( 7 1 3 1 5). 
+e4eq(3 4  4 3 ). 
+e5( ?x ?y 1 1 1):- e5( 7 1 3 1 5).
+e2(?x 4):- e2(3 4).

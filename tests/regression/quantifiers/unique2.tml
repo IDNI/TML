@@ -1,0 +1,34 @@
+A4(0 1).
+A4(1 1).
+A4(1 2).
+A4(2 3).
+A4(3 3).
+A4(2 1).
+A4(3 1).
+
+# OK: unsat
+C4A_un(1) :- forall ?x unique ?y { A4(?x ?y) }.
+# OK: unsat
+C4B_un(1) :- forall ?x unique ?y { A4(?y ?x) }.
+# OK: sat, model = C4C_un(0 1).
+C4C_un(?x ?y) :- exists ?x unique ?y { A4(?x ?y) }.
+# OK: sat, model = C4C_un(2 1).
+C4D_un(?x ?y) :- exists ?x unique ?y { A4(?y ?x) }.
+# OK: sat, model = C4C_un(1 2).
+C4E_un(?x ?y) :- exists ?y unique ?x { A4(?x ?y) }.
+# OK: sat, model = C4C_un(1 0).
+C4F_un(?x ?y) :- exists ?y unique ?x { A4(?y ?x) }.
+
+#
+A5(0 1).
+A5(1 1).
+A5(1 2).
+A5(2 3).
+A5(3 3).
+A5(2 1).
+A5(3 1).
+A5(0 2).
+#OK: unsat
+C5C_un(?x ?y) :- exists ?x unique ?y { A5(?x ?y) }.
+#OK: unsat
+C5D_un(?x ?y) :- exists ?x unique ?y { A5(?y ?x) }.
