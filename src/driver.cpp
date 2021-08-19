@@ -1198,8 +1198,8 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 			case ADD: return (arg1_lo + arg2_lo) == arg3_lo && embedding;
 			case SUB: return (arg1_lo - arg2_lo) == arg3_lo && embedding;
 			case MULT: return (arg1_lo * arg2_lo) == arg3_lo && embedding;
-			case SHL: return (arg1_lo << arg2_lo) == arg3_lo && embedding;
-			case SHR: return (arg1_lo >> arg2_lo) == arg3_lo && embedding;
+			case SHL: return shl(arg1_lo, arg2_lo) == arg3_lo && embedding;
+			case SHR: return lshr(arg1_lo, arg2_lo) == arg3_lo && embedding;
 			case BITWAND: return (arg1_lo & arg2_lo) == arg3_lo && embedding;
 			case BITWXOR: return (arg1_lo ^ arg2_lo) == arg3_lo && embedding;
 			case BITWOR: return (arg1_lo | arg2_lo) == arg3_lo && embedding;
