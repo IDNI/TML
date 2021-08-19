@@ -1333,7 +1333,7 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
 				r1.h[0].arity == r2.h[0].arity)) return 0;
-	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << endl;
+	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
 	// Get head variables for z3
 	z3::expr_vector bound_vars(ctx.context);
 	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
@@ -1349,6 +1349,7 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
 	bool res = ctx.solver.check() == z3::unsat;
 	ctx.solver.pop();
+	o::dbg() << res << endl;
 	return res;
 }
 
@@ -3427,13 +3428,14 @@ void driver::rename_variables(raw_form_tree &t, map<elem, elem> &renames) {
 			// The variable that is being mapped to something else
 			const elem ovar = *t.l->el;
 			// Get what that variable maps to in the outer scope
-			const elem pvar = rename_variables(ovar, renames);
+			const auto &ivar = renames.find(ovar);
+			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
 			// Temporarily replace the outer scope mapping with new inner one
 			*t.l->el = renames[ovar] = elem::fresh_var(d);
 			// Rename body using inner scope mapping
 			rename_variables(*t.r, renames);
-			// Now restore the outer scope mapping
-			renames[ovar] = pvar;
+			// Now restore the (possibly non-existent) outer scope mapping
+			if(pvar) renames[ovar] = *pvar; else renames.erase(ovar);
 			break;
 		} default:
 			assert(false); //should never reach here
@@ -3462,6 +3464,15 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	// for this expansion should not affect the original
 	raw_form_tree subst = *def.get_prft();
 	rename_variables(subst, renames);
+	// Take care to existentially quantify the non-exported variables of this
+	// formula in case it is inserted into a negative context
+	for(const auto &[ovar, nvar] : renames) {
+		if(find(use.e.begin() + 2, use.e.end() - 1, nvar) == use.e.end() - 1) {
+			subst = raw_form_tree(elem::EXISTS,
+				make_shared<raw_form_tree>(nvar),
+				make_shared<raw_form_tree>(subst));
+		}
+	}
 	// Append remaining equality constraints to the renamed tree to link
 	// the logic back to its context
 	for(size_t i = 2; i < head.e.size() - 1; i++) {
@@ -4303,10 +4314,11 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Program Generator:" << endl << endl
 				<< to_string(rp_generator) << endl;
 		}
-		// Trimmed existentials are a precondition to program optimizations
-		remove_redundant_exists(rp);
 #ifdef WITH_Z3
 		if(opts.enabled("qc-subsume-z3")){
+			// Trimmed existentials are a precondition to program optimizations
+			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+			remove_redundant_exists(rp);
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
 			z3_context z3_ctx(int_bit_len, universe_bit_len);
@@ -4318,6 +4330,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 #endif
 		if(int_t iter_num = opts.get_int("iterate")) {
+			// Trimmed existentials are a precondition to program optimizations
+			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+			remove_redundant_exists(rp);
 			pdatalog_transform(rp, [&](raw_prog &rp) {
 				o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
 				split_heads(rp);
@@ -4345,6 +4360,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 				opts.enabled("to-dnf")) {
+			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 			remove_redundant_exists(rp);
 			o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
