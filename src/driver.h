@@ -160,6 +160,15 @@ class driver {
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
+	bool is_limited(const elem &var, const raw_form_tree &t,
+		std::set<elem> &wrt, std::map<elem, const raw_form_tree*> &scopes);
+	bool is_limited(const elem &var, std::set<elem> &wrt,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> all_quantifiers_limited(const raw_form_tree &t,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> is_safe(const raw_form_tree &t);
+	std::optional<elem> is_safe(const raw_rule &rr);
+	std::optional<std::pair<elem, raw_rule>> is_safe(const raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F> void minimize(raw_rule &rr, const F &f);
