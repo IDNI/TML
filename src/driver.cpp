@@ -147,7 +147,7 @@ bool is_cq(const raw_rule &rr) {
 	// Ensure that head is positive
 	if(rr.h[0].neg) return false;
 	// Ensure that this rule is a proper rule
-	if(!rr.is_rule()) return false;
+	if(!rr.is_dnf()) return false;
 	// Ensure that each body term is positive and is a relation
 	for(const raw_term &rt : rr.b[0]) {
 		if(rt.neg || rt.extype != raw_term::REL) return false;
@@ -163,7 +163,7 @@ bool is_cqn(const raw_rule &rr) {
 	// Ensure that head is positive
 	if(rr.h[0].neg) return false;
 	// Ensure that this rule is a proper rule
-	if(!rr.is_rule()) return false;
+	if(!rr.is_dnf()) return false;
 	// Ensure that each body term is a relation
 	for(const raw_term &rt : rr.b[0]) {
 		if(rt.extype != raw_term::REL) return false;
@@ -222,7 +222,7 @@ bool is_query (const raw_rule &rr) {
 	// Ensure that head is positive
 	if(rr.h[0].neg) return false;
 	// Ensure that this rule is either a tree or non-empty DNF
-	if(!(rr.is_rule() || rr.is_form())) return false;
+	if(!(rr.is_dnf() || rr.is_form())) return false;
 	// Ensure that there is no second order quantification or builtins in
 	// the tree
 	raw_form_tree prft = *rr.get_prft();
@@ -453,9 +453,9 @@ int_t driver::count_related_rules(const raw_rule &rr1, const raw_prog &rp) {
 	return count;
 }
 
-/* Takes two pure TML rules and returns true if the first is "smaller"
- * than the second. Smaller means less conjuncts in the body, and in the
- * case of a tie means less arguments in the head. */
+/* Takes two DNF rules and returns true if the first is "smaller" than the
+ * second. Smaller means less conjuncts in the body, and in the case of a tie
+ * means less arguments in the head. */
 
 bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
 	if(rr1.b.size() == 1 && rr2.b.size() == 1) {
@@ -932,11 +932,11 @@ template<typename F>
 
 template<typename F>
 		void driver::minimize(raw_rule &rr, const F &f) {
-	if(rr.is_fact()) return;
+	if(rr.is_fact() || rr.is_goal()) return;
 	// Switch to the formula tree representation of the rule if this has
 	// not yet been done for this is a precondition to minimize_aux. Note
 	// the current form so that we can attempt to restore it afterwards.
-	bool orig_form = rr.is_rule();
+	bool orig_form = rr.is_dnf();
 	rr = rr.try_as_prft();
 	// Copy the rule to provide scratch for minimize_aux
 	raw_rule var_rule = rr;
@@ -1010,7 +1010,7 @@ pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
 		for(const raw_term &rt : rr.h)
 			update_element_counts(rt, distinct_syms, char_count, max_int);
 		// If this is a rule, update the counters based on the body
-		if(!rr.is_fact()) {
+		if(rr.is_dnf() || rr.is_form()) {
 			raw_form_tree prft = *rr.get_prft();
 			prefold_tree(prft, monostate {},
 				[&](const raw_form_tree &t, monostate) -> monostate {
@@ -1227,6 +1227,8 @@ z3::expr z3_context::term_to_z3(const raw_term &rel) {
 			arg2_lo = zext(arg2.extract(arith_bit_len-1, 0), arith_bit_len),
 			arg34 = concat(arg3.extract(arith_bit_len-1, 0),
 				arg4.extract(arith_bit_len-1, 0));
+		// Finally produce the arithmetic constraint based on the low bits
+		// of the LHS operands and full bits of the RHS operand
 		switch(rel.arith_op) {
 			case ADD: return embedding && (arg1_lo + arg2_lo) == arg34;
 			case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
@@ -1789,7 +1791,7 @@ vector<elem> driver::quote_rule(const raw_rule &rr,
 				rule_id, term_id, elem_closep })));
 			rule_ids.push_back(rule_id);
 		}
-	} else {
+	} else if(rr.is_dnf() || rr.is_form()) {
 		const elem body_id = quote_formula(*rr.get_prft(), rel_name, domain_name,
 			rp, variables, part_count);
 		for(size_t gidx = 0; gidx < rr.h.size(); gidx++) {
@@ -3007,7 +3009,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 		for(raw_term &rt : rr.h) {
 			rel_info orig_rel = get_relation_info(rt);
 			if(auto it = freeze_map.find(orig_rel); it != freeze_map.end()) {
-				rt.e[0] = rr.is_fact() ? rt.e[0] : it->second[rt.neg];
+				rt.e[0] = (rr.is_fact() || rr.is_goal()) ? rt.e[0] : it->second[rt.neg];
 			} else {
 				// Make separate relations to separately hold the positive and
 				// negative derivations
@@ -3016,7 +3018,8 @@ void driver::pdatalog_transform(raw_prog &rp,
 				// Store the mapping so that the derived portion of each
 				// relation is stored in exactly one place
 				freeze_map[orig_rel] = {pos_frozen_elem, neg_frozen_elem};
-				rt.e[0] = rr.is_fact() ? rt.e[0] : freeze_map[orig_rel][rt.neg];
+				rt.e[0] = (rr.is_fact() || rr.is_goal()) ?
+					rt.e[0] : freeze_map[orig_rel][rt.neg];
 				// Ensure that these positive and negative part relations are
 				// hidden from the user
 				rp.hidden_rels.insert({ pos_frozen_elem.e, rt.arity });
@@ -3024,7 +3027,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 			}
 			// Ensure that facts are added as opposed to deleted from the
 			// negative and positive part relations
-			if(!rr.is_fact()) rt.neg = false;
+			if(!rr.is_fact() && !rr.is_goal()) rt.neg = false;
 		}
 	}
 	// Now make rules to add/delete facts from the final relation as well
@@ -3059,7 +3062,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 	// when the clock is in low state. A temporary relation is required to
 	// give us time to delete facts not derived in this step.
 	for(raw_rule &rr : rp.r) {
-		if(!rr.is_fact()) {
+		if(!rr.is_fact() && !rr.is_goal()) {
 			for(raw_term &rt : rr.h) {
 				rel_info orig_rel = get_relation_info(rt);
 				if(auto it = scratch_map.find(orig_rel); it != scratch_map.end()) {
@@ -3213,7 +3216,7 @@ void driver::step_transform(raw_prog &rp,
 			}
 			rp.hidden_rels.insert({ rt.e[0].e, rt.arity });
 		}
-		if(rr.is_fact()) {
+		if(rr.is_fact() || rr.is_goal()) {
 			// Separate out program facts as they need to be in database by
 			// 0th step
 			fact_prog.insert(fact_prog.end(), rr.h.begin(), rr.h.end());
@@ -3503,13 +3506,13 @@ void driver::square_program(raw_prog &rp) {
 	// Separate the program rules according to the relation they belong
 	// to and their sign. This will simplify lookups during inlining.
 	for(const raw_rule &rr : rp.r)
-		if(!rr.is_fact())
+		if(!rr.is_fact() && !rr.is_goal())
 			rels[get_relation_info(rr.h[0])].insert(rr);
 	
 	// The place where we will construct the squared program
 	vector<raw_rule> squared_prog;
 	for(const raw_rule &rr : rp.r) {
-		if(rr.is_fact()) {
+		if(rr.is_fact() || rr.is_goal()) {
 			// Leave facts alone as they are not part of the function
 			squared_prog.push_back(rr);
 		} else {
@@ -3560,7 +3563,7 @@ void driver::square_root_program(raw_prog &rp) {
 		// Execute program rules only when the clock is in asserted state
 		const raw_term tick(elem::fresh_temp_sym(d), std::vector<elem> {});
 		for(raw_rule &rr : rp.r) {
-			if(!rr.is_fact()) {
+			if(!rr.is_fact() && !rr.is_goal()) {
 				rr.set_prft(raw_form_tree(elem::AND,
 					make_shared<raw_form_tree>(*rr.get_prft()),
 					make_shared<raw_form_tree>(tick)));
@@ -3637,7 +3640,7 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 				all_vars.insert(fvs[tree].begin(), fvs[tree].end());
 			}
 			vector<raw_term> terms;
-			// And make a pure TML formula listing them
+			// And make a DNF rule listing them
 			for(const raw_form_tree *tree : ands) {
 				set<elem> nv = set_intersection(fvs[tree],
 					set_difference(all_vars, fvs[tree]));
@@ -3676,8 +3679,7 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 				qvars.insert(*(current_formula->l->el));
 			}
 			nfv.insert(qvars.begin(), qvars.end());
-			// Convert the body occuring within the nested quantifiers into
-			// pure TML
+			// Convert the body occuring within the nested quantifiers into DNF
 			raw_term nrt = to_dnf(*current_formula, rp, nfv);
 			// Make the rule corresponding to this existential formula
 			for(const elem &e : qvars) {
@@ -3716,10 +3718,10 @@ raw_term driver::to_dnf(const raw_form_tree &t,
 	return raw_term(part_id, fv);
 }
 
-/* Convert every rule in the given program to pure TML rules. */
+/* Convert every rule in the given program to DNF rules. */
 
 void driver::to_dnf(raw_prog &rp) {
-	// Convert all FOL formulas to P-DATALOG
+	// Convert all FOL formulas to DNF
 	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
 		raw_rule rr = rp.r[i];
 		if(rr.is_form()) {
@@ -4213,7 +4215,7 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 		prog_constr += tn + to_string_t(", ");
 	}
 	prog_constr += to_string_t("}, ");
-	if(rr.is_fact()) {
+	if(rr.is_fact() || rr.is_goal()) {
 		prog_constr += to_string_t("std::vector<raw_term> {}");
 	} else {
 		prog_constr += prft_name;
@@ -4367,10 +4369,10 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary
 				// transformations, hence its more general activation condition.
-				o::dbg() << "Converting to Pure TML ..." << endl << endl;
+				o::dbg() << "Converting to DNF format ..." << endl << endl;
 				to_dnf(rp);
 				split_heads(rp);
-				o::dbg() << "Pure TML Program:" << endl << endl << rp << endl;
+				o::dbg() << "DNF Program:" << endl << endl << rp << endl;
 
 				if(opts.enabled("cqnc-subsume")) {
 					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;

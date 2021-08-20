@@ -756,15 +756,17 @@ struct raw_rule {
 		return varctx;	
 	}
 	void update_states(std::array<bool, 8>& has) {
-		if (is_form() || is_rule()) has[RULE] = true;
+		if (is_form() || is_dnf()) has[RULE] = true;
 		else for (auto hi : h) has[hi.neg ? DELS : ADDS] = true;
 	}
-	inline bool is_rule() const
+	inline bool is_dnf() const
 		{ return type == NONE && b.size() > 0; }
 	inline bool is_form() const
 		{ return type == NONE && prft && b.size() == 0; }
 	inline bool is_fact() const
 		{ return type == NONE && b.size() == 0 && !prft; }
+	inline bool is_goal() const
+		{ return type == GOAL && b.size() == 0 && !prft; }
 	// If prft not set, convert b to prft, then return prft
 	std::optional<raw_form_tree> get_prft() const;
 	raw_rule try_as_prft() const;
