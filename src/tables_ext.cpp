@@ -31,6 +31,7 @@ map<alumemo, spbdd_handle> addermemo;
 
 extern uints perm_init(size_t n);
 
+map<term, spbdd_handle> cs_addermemo;
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 // general arithmetic
@@ -58,10 +59,16 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 	switch (t.arith_op) {
 		case ADD:
 		{
-			//TODO: memoizate adder
-			size_t args = 3;
-			q = add_var_eq(0, 1, 2, args);
-			set_constants(t,q);
+			static map<term, spbdd_handle>::const_iterator it;
+			if ((it = cs_addermemo.find(t)) != cs_addermemo.end()) {
+				q = it->second;
+				//still not optimal, t may contain different var id, but result in same adder
+			} else {
+				size_t args = 3;
+				q = add_var_eq(0, 1, 2, args);
+				set_constants(t,q);
+				cs_addermemo.emplace(t,q);
+			}
 			//var alignment with head
 			uints perm2 = get_perm(t, vm, vl);
 			q = q^perm2;
