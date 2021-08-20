@@ -437,11 +437,10 @@ public:
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
 
-	static bool run_prog(const raw_prog &rp, dict_t &dict,
-		const options &opts, ir_builder *ir_handler, std::set<raw_term> &results);
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, ir_builder *ir_handler,
+	static bool run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 		std::set<raw_term> &results);
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 

@@ -96,20 +96,21 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				}
 			}
 		}
-		else if(r.prft != NULL) {
+		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
 
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
-				: r.prft;
+				? make_shared<raw_form_tree>(elem::NOT,
+						make_shared<raw_form_tree>(*r.prft))
+				: make_shared<raw_form_tree>(*r.prft);
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = std::make_shared<raw_form_tree>(elem::AND, root,
-					std::make_shared<raw_form_tree>(gt));
+				root = make_shared<raw_form_tree>(elem::AND, root,
+					make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
 			/*

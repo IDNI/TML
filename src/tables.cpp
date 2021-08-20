@@ -1120,14 +1120,20 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
  * that it reaches a fixed point. Otherwise just return false. */
 
 bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		ir_builder *ir_handler, std::set<raw_term> &results)
+		set<raw_term> &results)
 {
 	rt_options to;
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
-	tables tbl(dict, to, ir_handler);
+	to.fp_step           = opts.enabled("fp");
+	to.bitunv            = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
+	ir_builder ir_handler(dict, to);
+	tables tbl(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl;
+	ir_handler.printer = &tbl;
 	strs_t strs;
 	if(tbl.run_prog_wstrs(rp, strs)) {
 		for(const term &result : tbl.decompress()) {
@@ -1144,9 +1150,8 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
  * given program reaches a fixed point. Useful for query containment
  * checks. */
 
-bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-	dict_t &dict, const ::options &opts, ir_builder *ir_handler,
-	std::set<raw_term> &results)
+bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
+	const ::options &opts, set<raw_term> &results)
 {
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
@@ -1173,7 +1178,7 @@ bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	}
 	// Run the program to obtain the results which we will then filter
 	std::set<raw_term> tmp_results;
-	bool result = run_prog(rp, dict, opts, ir_handler, tmp_results);
+	bool result = run_prog(rp, dict, opts, tmp_results);
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
