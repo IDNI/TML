@@ -242,6 +242,21 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
 						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+				} case elem::NONE: {
+					const raw_term &rt = *t.l->rt;
+					switch(rt.extype) {
+						case raw_term::ARITH: case raw_term::LEQ: {
+							// If variable is used in atomic or arithmetic formula, then
+							// it is limited because it is a number and all numbers are
+							// less than 2^n
+							for(size_t i = 0; i < rt.e.size(); i++) {
+								if(rt.e[i] == var) return true;
+							}
+							return false;
+						} default: {
+							return false;
+						}
+					}
 				} default: {
 					return false;
 				}
