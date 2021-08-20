@@ -3769,11 +3769,15 @@ void record_hidden_relation(const raw_prog &rp, raw_rule &rr,
 	}
 }
 
-/* Update the variable usage map by 1 (see below) for each distinct
- * variable occuring in the given term. Record the distinct variables in
- * the given pointer if it is not null. Note that the update is 2 for
+/* Update the variable usage map by 1 (2) (see below) for each distinct variable
+ * occuring in the given positive (negative) term. Record the distinct variables
+ * in the given pointer if it is not null. Note that the update is 2 for
  * symbols as they are treated as a unique variable with a separate
- * equality contraint to fix it to a particular symbol. */
+ * equality contraint to fix it to a particular symbol. Note also that the
+ * update is 2 for negative terms because its variables may create additional
+ * ways for the given rule to be satisfied. I.e. removing a variable occuring
+ * once in a negative term would cause the nature of the program's solutions to
+ * change. */
 
 void record_variable_usage(const raw_term &rt,
 		map<elem, int_t> &var_usages, set<elem> *relevant_vars) {
@@ -3783,7 +3787,7 @@ void record_variable_usage(const raw_term &rt,
 	if(relevant_vars)
 		for(const elem &e : rt.e) relevant_vars->insert(e);
 	for(const elem &e : unique_vars)
-		var_usages[e] += e.type == elem::VAR ? 1 : 2;
+		var_usages[e] += ((e.type == elem::VAR) && !rt.neg) ? 1 : 2;
 }
 
 /* There are four kinds of rules to deal with: those in which the
@@ -3882,9 +3886,9 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
 	}
 }
 
-/* Eliminate unused elements of hidden relations. Do these by
- * identifying those relation elements that neither participate in
- * term conjunction nor are exported to visible relation. */
+/* Eliminate unused elements of hidden relations. Do this by identifying those
+ * relation elements that neither participate in term conjunction nor are
+ * exported to visible relation nor are used in a negative body term. */
 
 void driver::eliminate_dead_variables(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
@@ -4317,13 +4321,14 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				<< to_string(rp_generator) << endl;
 		}
 #ifdef WITH_Z3
+		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
+		z3_context z3_ctx(int_bit_len, universe_bit_len);
+		
 		if(opts.enabled("qc-subsume-z3")){
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 			remove_redundant_exists(rp);
 			o::dbg() << "Query containment subsumption using z3" << endl;
-			const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
-			z3_context z3_ctx(int_bit_len, universe_bit_len);
 			split_heads(rp);
 			subsume_queries(rp,
 				[&](const raw_rule &rr1, const raw_rule &rr2)
@@ -4347,8 +4352,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					if(opts.enabled("qc-subsume-z3")){
 						o::dbg() << "Query containment subsumption using z3" << endl;
 						remove_redundant_exists(rp);
-						const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
-						z3_context z3_ctx(int_bit_len, universe_bit_len);
 						subsume_queries(rp,
 							[&](const raw_rule &rr1, const raw_rule &rr2)
 								{return check_qc_z3(rr1, rr2, z3_ctx);});
