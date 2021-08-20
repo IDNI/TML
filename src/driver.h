@@ -168,7 +168,7 @@ class driver {
 		std::map<elem, const raw_form_tree*> &scopes);
 	std::optional<elem> is_safe(const raw_form_tree &t);
 	std::optional<elem> is_safe(const raw_rule &rr);
-	std::optional<std::pair<elem, raw_rule>> is_safe(const raw_prog &rp);
+	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F> void minimize(raw_rule &rr, const F &f);

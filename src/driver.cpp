@@ -399,22 +399,28 @@ optional<elem> driver::is_safe(const raw_form_tree &t) {
 	return all_quantifiers_limited(t, scopes);
 }
 
-/* Check whether the given rule is safe and return the offending
- * variable if not. This means that every positive non-goal head's
- * variables are limited in the body and that the body itself is safe. */
+/* Check whether the given rule is safe and return the offending variable if
+ * not. This means that every non-goal head's variables are limited in the body
+ * and that the body itself is safe. Only single heads are allowed to simplify
+ * handling of deletions. */
 
 optional<elem> driver::is_safe(const raw_rule &rr) {
 	set<elem> free_vars;
-	for(const raw_term &hd : rr.h) {
-		if(!hd.neg && rr.type != raw_rule::GOAL) {
-			vector<elem> bound_vars;
-			// Only collect the free variables of positive heads because we
-			// can always guard the body of a rule with a negative head with
-			// the negation of the head to obtain an equivalent rule.
-			collect_free_vars(hd, bound_vars, free_vars);
-		}
+	if(rr.type != raw_rule::GOAL) {
+		vector<elem> bound_vars;
+		// Only collect the free variables of positive heads because we
+		// can always guard the body of a rule with a negative head with
+		// the negation of the head to obtain an equivalent rule.
+		collect_free_vars(rr.h[0], bound_vars, free_vars);
 	}
 	if(optional<raw_form_tree> prft = rr.get_prft()) {
+		// If the head is negative, then treat the head negated as an implicit body
+		// term as it only makes sence to delete a fact that is already present.
+		if(rr.h[0].neg) {
+			prft = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(rr.h[0].negate()),
+				make_shared<raw_form_tree>(*prft));
+		}
 		// Initialize variable scopes, this is needed for the safety checking
 		// algorithm to verify limitations by going through equality terms.
 		vector<elem> bound_vars;
@@ -437,6 +443,8 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 		// limited in their bodies
 		return all_quantifiers_limited(*prft, scopes);
 	} else {
+		// If there free variables in the head but no body, then all of them are not
+		// limited. Any one of them can be a witness
 		return free_vars.empty() ? nullopt : make_optional(*free_vars.begin());
 	}
 }
@@ -444,7 +452,9 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 /* Check whether a given TML program is safe and return the offending
  * variable and rule if not. This means that every rule must be safe. */
 
-optional<pair<elem, raw_rule>> driver::is_safe(const raw_prog &rp) {
+optional<pair<elem, raw_rule>> driver::is_safe(raw_prog rp) {
+	// Split heads are a prerequisite to safety checking
+	split_heads(rp);
 	for(const raw_rule &rr : rp.r) {
 		if(auto unlimited_var = is_safe(rr)) {
 			return make_pair(*unlimited_var, rr);

@@ -161,10 +161,7 @@ spbdd_handle tables::from_fact(const term& t) {
 		if (t[n] >= 0) r = r && from_sym(n, args, t[n]);
 		else if (vs.end() != (it = vs.find(t[n])))
 			r = r && from_sym_eq(n, it->second, args);
-		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {
-			parse_error("Fact contains variable",
-				ir_handler->get_elem(t[n]).e, term_to_str(t));
-		}
+		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {}
 	return r;
 }
 
@@ -177,14 +174,6 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
 	return perm;
-}
-
-/* Convert a term to its string representation. */
-
-std::string tables::term_to_str(const term &tm) {
-	ostringstream rt_oss;
-	rt_oss << ir_handler->to_raw_term(tm);
-	return rt_oss.str();
 }
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
