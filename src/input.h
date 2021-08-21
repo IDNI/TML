@@ -484,7 +484,7 @@ class bit_dict {
 struct raw_term {
 
 	bool neg = false;
-	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT } extype = raw_term::REL;
+	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } extype = raw_term::REL;
 
 	//NOTE: we can add FORM1, FORM2 etc to rtextype
 	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
@@ -667,7 +667,7 @@ struct raw_form_tree {
 		flatten_associative(tp, tms);
 		return tms;
 	}
-	void printTree(int level =0 );
+	void printTree(int level =0 ) const;
 	// Recursively check equality of formula trees
 	bool operator==(const raw_form_tree &pft) const {
 		// Types must be equal

@@ -403,8 +403,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		forget = false, renew = false;
 
 	t_arith_op arith_op_aux = NOP;
-
-	while ((!strchr(".:,;{}",*l[pos][0]) && !is_form && !(l[pos]=="else"))||
+	while ((!strchr(".:,;{}|&",*l[pos][0]) && !is_form &&  !(l[pos]=="else")) ||
 			(!strchr(".:,;{}|&-<", *l[pos][0]) && is_form)) {
 		if (e.emplace_back(), !e.back().parse(in)) return false;
 		else if (pos == l.size()) return
@@ -437,9 +436,15 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
 			default: break;
 		}
-		if (!rel) rel = true;
+		if (!rel && el.type != elem::VAR) rel = true;
 	}
 	if (e.empty()) return false;
+
+	if (e.size() == 1 && e[0].type == elem::VAR) {
+		extype = rtextype::VAR;
+		return true;
+	}
+
 	// TODO: provide specific error messages. Also, something better to group?
 
 	// make 'forget' work as a builtin as well and not just a builtin modifier
@@ -862,7 +867,7 @@ bool raw_sof::parse(input* in, sprawformtree &root) {
 	return ret;
 }
 
-void raw_form_tree::printTree( int level) {
+void raw_form_tree::printTree( int level) const {
 	if( r ) r->printTree(level + 1)	;
 	COUT << '\n';
 	for(int i = 0; i < level; i++) COUT << '\t';

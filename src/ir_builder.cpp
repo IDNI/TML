@@ -115,7 +115,7 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 			from_raw_form(root, froot, is_sol);
 			/*
 			DBG(COUT << "\n ........... \n";)
-			DBG(r.prft.get()->printTree();)
+			DBG(r.prft->printTree();)
 			DBG(COUT << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
 			*/
@@ -223,6 +223,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 //#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
 //#define get_var_lexeme(v) dict.get_lexeme(string("?v") + to_string_(-v))
 #define get_var_lexeme(v) rdict().get_lexeme(to_string_t("?v")+to_string_t(-v))
+
 
 elem ir_builder::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
@@ -352,8 +353,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				rt.e[4] = get_elem(r[2]);
 				rt.extype = raw_term::ARITH;
 				return rt;
-			}
-		else if (r.extype == term::BLTIN) {
+		} else if (r.extype == term::BLTIN) {
 			args = r.size();
 			rt.e.resize(args + 1);
 			rt.e[0] = elem(elem::SYM,
@@ -365,13 +365,19 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		else {
-			args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
-			rt.e[0] = elem(elem::SYM,
-				dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
-			rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
-			for (size_t n = 1; n != args + 1; ++n)
-				rt.e[n] = get_elem(r[n - 1]);
-			rt.insert_parens(dict.op, dict.cl);
+			if (r.tab != -1) {
+				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
+				rt.e[0] = elem(elem::SYM,
+						dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
+				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
+				for (size_t n = 1; n != args + 1; ++n)
+					rt.e[n] = get_elem(r[n - 1]);
+				rt.insert_parens(dict.op, dict.cl);
+			} else {
+				args = 1;
+				rt.e.resize(args);
+				rt.e[0] = get_elem(r[0]);
+			}
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
