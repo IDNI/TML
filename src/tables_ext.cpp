@@ -557,7 +557,7 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			(f->type == form::ATOM && f->l == NULL && f->r == NULL) ||
 			(f->type == form::NOT  && f->l != NULL && f->r == NULL) ||
 			((f->type == form::AND || f->type == form::OR || f->type == form::IMPLIES) && f->l != NULL && f->r != NULL) ||
-			((f->type == form::EXISTS1 || f->type == form::FORALL1) || (f->type == form::UNIQUE1) && f->r != NULL)
+			((f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) && f->r != NULL)
 		));
 
 	if (f->type == form::ATOM) {
@@ -696,14 +696,15 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		varmap tmpvm;
 		if (fq)	tmpvm = vm;
 		if (vm.find(f->l->arg) != vm.end()) {
+			size_t aux = vm.at(f->l->arg);
+			vm.at(f->l->arg) = p->quants.size();
 			for (auto &v : vm)
 				if (v.first != f->l->arg && v.second == p->quants.size())
-					v.second++;
-			vm.at(f->l->arg) = p->quants.size();
+					v.second = aux;
 		}
 		else {
 			for (auto &v : vm)
-				if (v.first != f->l->arg && v.second >= p->quants.size())
+				if (v.second >= p->quants.size())
 					v.second++;
 			vm.emplace(f->l->arg, p->quants.size());
 		}
