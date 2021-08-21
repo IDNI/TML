@@ -566,13 +566,15 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		pnft_handle p0(new(pnft));
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) { /*f->arg <= 0*/
+				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
-				DBG(assert(p0->b->neg == false);)
+				//DBG(assert(p0->b->neg == false);)
 				ex_typebits(p0->b->ex, f->tm->size());
 				static set<body*, ptrcmp<body>>::const_iterator bit;
 				if ((bit = p->bodies.find(p0->b)) == p->bodies.end())
 					p->bodies.insert(p0->b);
 			} else {
+				DBG(assert(f->tm->neg == false);)
 				body *aux = new body(get_body(*f->tm, vm, vm.size()));
 				ex_typebits(aux->ex, f->tm->size());
 				std::pair<int_t, body*> hvar = {f->arg, move(aux)};
@@ -595,7 +597,10 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			ex_typebits(p0->cons, vm.size());
 		}
 		else {
-			DBG(assert(false));
+			p0->cons =  bdd_ite(::from_bit(0,true), bdd_handle::T, bdd_handle::F);
+			uints perm = get_perm(*f->tm, vm, vm.size());
+			p0->cons  = p0->cons^perm;
+			ex_typebits(p0->cons, vm.size());
 		}
 		//TODO: intersect consts
 		p->matrix.push_back(p0);
@@ -616,11 +621,11 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		} else {
 			pnft_handle p1(new(pnft));
 			handler_form1(p1, f->r,vm,vmh,fq);
-			p1->neg = true;
+			p1->neg = !p1->neg;
 			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
 			p->matrix.push_back(p1);
 		}
-		p->neg = true;
+		p->neg = !p->neg;
 	}
 	//else if (f->type == form::COIMPLIES){}
 	else if (f->type == form::AND) {
@@ -642,44 +647,50 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		}
 	}
 	else if (f->type == form::OR) {
-		//if (!is_horn) {
-		//TODO: review to avoid unnecessary nodes, also use vector of bodies
-		pnft_handle p0(new(pnft));
-		handler_form1(p0, f->l,vm,vmh,fq);
-		p0->b ? p0->b->neg = true : p0->neg = true;
-		pnft_handle p1(new(pnft));
-		handler_form1(p1, f->r,vm,vmh,fq);
-		p1->b ? p1->b->neg = true : p1->neg = true;
-		p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
-		p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
-		p->matrix.push_back(p0);
-		p->matrix.push_back(p1);
-		p->neg = true;
-		//}
-		/*
-		else {
-
-			if (f->l->type == form::OR || f->l->type == form::ATOM  || f->l->type == form::NOT) {
-				handler_form1(p, f->l,vm, vmh);
-			} else {
-				pnf_t *p0 = new(pnf_t);
-				handler_form1(p0, f->r,vm, vmh);
-				p->matrix.push_back(p0);
-			}
-			if (f->r->type == form::OR || f->r->type == form::ATOM  || f->r->type == form::NOT) {
-				handler_form1(p, f->r,vm, vmh);
-			} else {
-				pnf_t *p1 = new(pnf_t);
-				handler_form1(p1, f->r,vm, vmh);
-				p->matrix.push_back(p1);
-			}
+		if (f->l->type == form::OR || f->l->type == form::ATOM  || f->l->type == form::NOT) {
+			size_t aux = p->matrix.size();
+			handler_form1(p, f->l,vm, vmh,fq);
+			if (f->l->type != form::OR)
+				p->matrix[aux]->neg = !p->matrix[aux]->neg;
+		} else {
+			pnft_handle p0(new(pnft));
+			handler_form1(p0, f->l,vm, vmh,fq);
+			p0->neg = !p0->neg;
+			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
+			p->matrix.push_back(p0);
 		}
-		*/
+		if (f->r->type == form::OR || f->r->type == form::ATOM  || f->r->type == form::NOT) {
+			size_t aux = p->matrix.size();
+			handler_form1(p, f->r,vm, vmh,fq);
+			if (f->r->type != form::OR)
+				p->matrix[aux]->neg = !p->matrix[aux]->neg;
+		} else {
+			pnft_handle p1(new(pnft));
+			handler_form1(p1, f->r,vm, vmh,fq);
+			p1->neg = !p1->neg;
+			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
+			p->matrix.push_back(p1);
+		}
+		p->neg = true;
 	}
 	else if (f->type == form::NOT) {
-		handler_form1(p, f->l, vm,vmh,fq);
-		if (f->l->type == form::ATOM) p->matrix[p->matrix.size()-1]->neg = true;
-		else if (f->l->type != form::NOT) p->neg = !p->neg;
+		if (f->l->type == form::ATOM || f->l->type == form::NOT) {
+			handler_form1(p, f->l, vm,vmh,fq);
+			if (f->l->type == form::ATOM) p->matrix[p->matrix.size()-1]->neg = !p->matrix[p->matrix.size()-1]->neg;
+			else if (f->l->type == form::NOT) p->neg = !p->neg;
+		} else if (f->l->type == form::AND || f->l->type == form::IMPLIES){
+			pnft_handle p0(new(pnft));
+			p0->neg = true;
+			handler_form1(p0, f->l, vm,vmh,fq);
+			p->matrix.push_back(p0);
+		} else { //is quant/or
+			pnft_handle p0(new(pnft));
+			p0->neg = true;
+			pnft_handle p1(new(pnft));
+			handler_form1(p1, f->l, vm,vmh,fq);
+			p0->matrix.push_back(p1);
+			p->matrix.push_back(p0);
+		}
 	}
 	else if (f->type == form::EXISTS1 || f->type == form::FORALL1 || f->type == form::UNIQUE1) {
 		varmap tmpvm;
