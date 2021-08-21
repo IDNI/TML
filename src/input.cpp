@@ -436,7 +436,6 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
 			default: break;
 		}
-		if (!rel && el.type != elem::VAR) rel = true;
 	}
 	if (e.empty()) return false;
 
@@ -754,9 +753,9 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 		elem next;
 		next.peek(in);
 
-		if(next.type == elem::SYM) {
+		if(next.type == elem::SYM || next.type == elem::NUM) {
 			raw_term tm;
-			if( !tm.parse(in, prog, true)) goto Cleanup;
+			if( !tm.parse(in, prog, next.type == elem::SYM)) goto Cleanup;
 			root = std::make_shared<raw_form_tree>(tm);
 			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, root);
 			matroot = root;
