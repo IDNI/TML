@@ -1,3 +1,7 @@
+domain(3).
+domain(2).
+domain(1).
+domain(0).
 A0(3 3).
 A0(2 1).
 A0(1 1).
@@ -15,10 +19,6 @@ A2(2 3).
 A2(3 0).
 A2(1 2).
 A2(0 1).
-domain(3).
-domain(2).
-domain(1).
-domain(0).
 A3(3 3).
 A3(3 2).
 A3(2 3).

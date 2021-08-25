@@ -1,30 +1,31 @@
+domain(0). domain(1).
 U(1).
 
-sat_and(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ?x && ?y && ?z }.
-sat_or(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || ?y || ?z }.
-sat_nand(?x ?y ?z) :- exists ?x exists ?y exists ?z { ~{ ?x && ?y && ?z } }.
-sat_nor(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ~{ ?x || ?y || ?z } }.
+sat_and(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && ?y && ?z} }.
+sat_or(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || ?y || ?z} }.
+sat_nand(?x ?y ?z) :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && ~{ ?x && ?y && ?z } }.
+sat_nor(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && ~{ ?x || ?y || ?z } }.
 
-sat_and_not1(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ~{?x} && ?y && ?z }.
-sat_and_not2(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ?x && ~{?y} && ?z }.
-sat_and_not3(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ?x && ?y && ~{?z} }.
-sat_and_not12(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ~{?x} && ~{?y} && ?z }.
-sat_and_not23(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ?x && ~{?y} && ~{?z} }.
-sat_and_not13(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ~{?x} && ?y && ~{?z} }.
+sat_and_not1(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} && ?y && ?z }}.
+sat_and_not2(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && ~{?y} && ?z }}.
+sat_and_not3(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && ?y && ~{?z} }}.
+sat_and_not12(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} && ~{?y} && ?z }}.
+sat_and_not23(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && ~{?y} && ~{?z} }}.
+sat_and_not13(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} && ?y && ~{?z} }}.
 
-sat_or_not1(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ~{?x} || ?y || ?z }.
-sat_or_not2(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || ~{?y} || ?z }.
-sat_or_not3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || ?y || ~{?z} }.
-sat_or_not12(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ~{?x} || ~{?y} || ?z }.
-sat_or_not23(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || ~{?y} || ~{?z} }.
-sat_or_not13(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ~{?x} || ?y || ~{?z} }.
+sat_or_not1(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} || ?y || ?z }}.
+sat_or_not2(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || ~{?y} || ?z }}.
+sat_or_not3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || ?y || ~{?z} }}.
+sat_or_not12(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} || ~{?y} || ?z }}.
+sat_or_not23(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || ~{?y} || ~{?z} }}.
+sat_or_not13(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {~{?x} || ?y || ~{?z} }}.
 
-sat_1_and_2or3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x && {?y || ?z} }.
-sat_1_and_2nor3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x && ~{?y || ?z} }.
-sat_1_or_2and3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || {?y && ?z} }.
-sat_1_or_2nand3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { ?x || ~{?y && ?z} }.
+sat_1_and_2or3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && {?y || ?z} }}.
+sat_1_and_2nor3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x && ~{?y || ?z} }}.
+sat_1_or_2and3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || {?y && ?z} }}.
+sat_1_or_2nand3(?x ?y ?z)   :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && {?x || ~{?y && ?z} }}.
 
 
-sat_nand_neg(?x ?y ?z) :- exists ?x exists ?y exists ?z { ~{ ~{?x} && ~{?y} && ~{?z} } }.
-sat_nor_neg(?x ?y ?z)  :- exists ?x exists ?y exists ?z { ~{ ~{?x} || ~{?y} || ~{?z} } }.
+sat_nand_neg(?x ?y ?z) :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && ~{ ~{?x} && ~{?y} && ~{?z} } }.
+sat_nor_neg(?x ?y ?z)  :- exists ?x exists ?y exists ?z { domain(?x) && domain(?y) && domain(?z) && ~{ ~{?x} || ~{?y} || ~{?z} } }.
 

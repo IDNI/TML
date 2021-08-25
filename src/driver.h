@@ -109,6 +109,12 @@ void collect_free_vars(const raw_form_tree &t,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
 std::set<elem> collect_free_vars(const raw_form_tree &t);
+std::function<elem (const elem &)> gen_fresh_var(dict_t &d);
+elem gen_id_var(const elem &var);
+elem rename_variables(const elem &e, std::map<elem, elem> &renames,
+	const std::function<elem (const elem &)> &gen);
+void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
+	const std::function<elem (const elem &)> &gen);
 
 class driver {
 	friend class archive;
@@ -160,6 +166,15 @@ class driver {
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
+	bool is_limited(const elem &var, const raw_form_tree &t,
+		std::set<elem> &wrt, std::map<elem, const raw_form_tree*> &scopes);
+	bool is_limited(const elem &var, std::set<elem> &wrt,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> all_quantifiers_limited(const raw_form_tree &t,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> is_safe(const raw_form_tree &t);
+	std::optional<elem> is_safe(const raw_rule &rr);
+	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F> void minimize(raw_rule &rr, const F &f);
@@ -174,8 +189,6 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
-	elem rename_variables(const elem &e, std::map<elem, elem> &renames);
-	void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);
@@ -213,7 +226,7 @@ class driver {
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
-	void remove_redundant_exists(raw_prog &rp);
+	void export_outer_quantifiers(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,

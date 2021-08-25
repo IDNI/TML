@@ -1,4 +1,8 @@
+domain(3).
+domain(2).
+domain(1).
+domain(0).
 U(3).
 satB0_0().
-satB1_0().
 satB1_2().
+satB1_0().

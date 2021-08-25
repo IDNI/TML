@@ -126,17 +126,348 @@ raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d) {
 			// The uniqueness quantifier is logically equivalent to the
 			// following
 			const elem evar = elem::fresh_var(d), qvar = *(t.l->el);
+			map<elem, elem> renames {{qvar, evar}};
+			raw_form_tree t_copy = *t.r;
+			rename_variables(t_copy, renames, gen_id_var);
 			return raw_form_tree(elem::EXISTS,
-				make_shared<raw_form_tree>(evar),
-				make_shared<raw_form_tree>(elem::FORALL,
-					make_shared<raw_form_tree>(qvar),
-					make_shared<raw_form_tree>(elem::COIMPLIES, t.r,
-						make_shared<raw_form_tree>(
-							raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar })))));
+				make_shared<raw_form_tree>(qvar),
+				make_shared<raw_form_tree>(elem::AND, t.r,
+					make_shared<raw_form_tree>(elem::FORALL,
+						make_shared<raw_form_tree>(evar),
+						make_shared<raw_form_tree>(elem::IMPLIES,
+							make_shared<raw_form_tree>(t_copy),
+							make_shared<raw_form_tree>(
+								raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar }))))));
 		} default: {
 			return t;
 		}
 	}
+}
+
+/* Check if the given variable is limited in its scope with respect to
+ * the given variable. If the element is not a variable, then it is
+ * automatically limited. */
+
+bool driver::is_limited(const elem &var, set<elem> &wrt,
+		map<elem, const raw_form_tree*> &scopes) {
+	if(var.type == elem::VAR) {
+		return is_limited(var, *scopes[var], wrt, scopes);
+	} else {
+		return true;
+	}
+}
+
+/* Algorithm to check rule safety based on "Safe Database Queries with
+ * Arithmetic Relations" by Rodney Topor. */
+
+bool driver::is_limited(const elem &var, const raw_form_tree &t,
+		set<elem> &wrt, map<elem, const raw_form_tree*> &scopes) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	switch(t.type) {
+		case elem::IMPLIES:
+			// Process the expanded formula instead
+			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+		case elem::COIMPLIES:
+			// Process the expanded formula instead
+			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+		case elem::AND: {
+			// var is limited in a && b if var is limited in a or b
+			vector<const raw_form_tree*> ands;
+			// Collect all the conjuncts within the tree top
+			t.flatten_associative(elem::AND, ands);
+			for(const raw_form_tree* &tree : ands) {
+				if(is_limited(var, *tree, wrt, scopes))
+					return true;
+			}
+			return false;
+		} case elem::ALT: {
+			// var is limited in a || b if var is limited in both a and b
+			vector<const raw_form_tree*> alts;
+			// Collect all the disjuncts within the tree top
+			t.flatten_associative(elem::ALT, alts);
+			for(const raw_form_tree* &tree : alts) {
+				if(!is_limited(var, *tree, wrt, scopes)) {
+					return false;
+				}
+			}
+			return true;
+		} case elem::NOT: {
+			switch(t.l->type) {
+				case elem::NOT: {
+					// var is limited in ~~a if var is limited in a
+					return is_limited(var, *t.l->l, wrt, scopes);
+				} case elem::AND: {
+					// var is limited in ~(a && b) if var is limited in both ~a and ~b
+					vector<const raw_form_tree*> ands;
+					// Collect all the conjuncts within the tree top
+					t.l->flatten_associative(elem::AND, ands);
+					for(const raw_form_tree* &tree : ands) {
+						if(!is_limited(var, raw_form_tree(elem::NOT, make_shared<raw_form_tree>(*tree)), wrt, scopes)) {
+							return false;
+						}
+					}
+					return true;
+				} case elem::ALT: {
+					// var is limited in ~(a || b) if var is limited in both ~a or ~b
+					vector<const raw_form_tree*> alts;
+					// Collect all the disjuncts within the tree top
+					t.l->flatten_associative(elem::ALT, alts);
+					for(const raw_form_tree* &tree : alts) {
+						if(is_limited(var, raw_form_tree(elem::NOT, make_shared<raw_form_tree>(*tree)), wrt, scopes)) {
+							return true;
+						}
+					}
+					return false;
+				} case elem::IMPLIES: {
+					// Process the expanded formula instead
+					return is_limited(var, raw_form_tree(elem::NOT,
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+				} case elem::COIMPLIES: {
+					// Process the expanded formula instead
+					return is_limited(var, raw_form_tree(elem::NOT,
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+				} case elem::EXISTS: case elem::FORALL: {
+					const elem &qvar = *t.l->l->el;
+					if(qvar == var) {
+						// In this case, the quantifier's variable shadows the variable,
+						// var, whose limitation we are checking. So var cannot be
+						// limited with respect to this formula.
+						return false;
+					} else {
+						// var is limited in ~exists ?y G if var is limited in ~G
+						// Same for forall
+						map<elem, const raw_form_tree*> new_scopes = scopes;
+						new_scopes[qvar] = &*t.l->r;
+						return is_limited(var,
+							raw_form_tree(elem::NOT, t.l->r), wrt, new_scopes);
+					}
+				} case elem::UNIQUE: {
+					// Process the expanded formula instead
+					return is_limited(var, raw_form_tree(elem::NOT,
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+				} case elem::NONE: {
+					const raw_term &rt = *t.l->rt;
+					switch(rt.extype) {
+						case raw_term::ARITH: case raw_term::LEQ: {
+							// If variable is used in atomic or arithmetic formula, then
+							// it is limited because it is a number and all numbers are
+							// less than 2^n
+							for(size_t i = 0; i < rt.e.size(); i++) {
+								if(rt.e[i] == var) return true;
+							}
+							return false;
+						} default: {
+							return false;
+						}
+					}
+				} default: {
+					return false;
+				}
+			}
+		} case elem::EXISTS: case elem::FORALL: {
+			const elem &qvar = *t.l->el;
+			if(qvar == var) {
+				// In this case, the quantifier's variable shadows the variable,
+				// var, whose limitation we are checking. So var cannot be
+				// limited with respect to this formula.
+				return false;
+			} else {
+				// var is limited in exists ?y G if var is limited in G
+				// Same for forall
+				map<elem, const raw_form_tree*> new_scopes = scopes;
+				new_scopes[qvar] = &*t.r;
+				return is_limited(var, *t.r, wrt, new_scopes);
+			}
+		} case elem::UNIQUE: {
+			// Process the expanded formula instead
+			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+		} case elem::NONE: {
+			const raw_term &rt = *t.rt;
+			switch(rt.extype) {
+				case raw_term::REL: case raw_term::ARITH: case raw_term::LEQ: case raw_term::BLTIN: {
+					// If variable is used in atomic or arithmetic formula, then
+					// it is limited because it is a number and all numbers are
+					// less than 2^n
+					for(size_t i = 0; i < rt.e.size(); i++) {
+						if(rt.e[i] == var) return true;
+					}
+					return false;
+				} case raw_term::EQ: {
+					const elem &other = rt.e[0] == var ? rt.e[2] : rt.e[0];
+					if(rt.e[0] != var && rt.e[2] != var) {
+						return false;
+					} else if(wrt.find(var) == wrt.end()) {
+						// Handle the finiteness dependencies {1} -> 0 and {0} -> 1
+						wrt.insert(var);
+						bool res = is_limited(other, wrt, scopes);
+						wrt.erase(var);
+						return res;
+					} else {
+						return false;
+					}
+				} default: {
+					return false;
+				}
+			}
+		} default:
+			assert(false); //should never reach here
+	}
+}
+
+/* Check whether for every subformula exists ?y G, the variable ?y is
+ * limited in G. Also check whether for every subformula forall ?y G,
+ * the variable ?y is limited in ~G. If not, return the offending
+ * variable. */
+
+optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
+		map<elem, const raw_form_tree*> &scopes) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	switch(t.type) {
+		case elem::IMPLIES:
+			// Process the expanded formula instead
+			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+		case elem::COIMPLIES:
+			// Process the expanded formula instead
+			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+		case elem::AND: {
+			// Collect all the conjuncts within the tree top
+			vector<const raw_form_tree*> ands;
+			t.flatten_associative(elem::AND, ands);
+			for(const raw_form_tree* &tree : ands) {
+				if(auto unlimited_var = all_quantifiers_limited(*tree, scopes)) {
+					return unlimited_var;
+				}
+			}
+			return nullopt;
+		} case elem::ALT: {
+			// Collect all the disjuncts within the tree top
+			vector<const raw_form_tree*> alts;
+			t.flatten_associative(elem::ALT, alts);
+			for(const raw_form_tree* &tree : alts) {
+				if(auto unlimited_var = all_quantifiers_limited(*tree, scopes)) {
+					return unlimited_var;
+				}
+			}
+			return nullopt;
+		} case elem::NOT: {
+			return all_quantifiers_limited(*t.l, scopes);
+		} case elem::EXISTS: {
+			set<elem> wrt;
+			const elem &var = *t.l->el;
+			map<elem, const raw_form_tree*> new_scopes = scopes;
+			new_scopes[var] = &*t.r;
+			if(is_limited(var, *t.r, wrt, new_scopes)) {
+				return all_quantifiers_limited(*t.r, new_scopes);
+			} else {
+				return var;
+			}
+		} case elem::FORALL: {
+			set<elem> wrt;
+			const elem &var = *t.l->el;
+			map<elem, const raw_form_tree*> new_scopes = scopes;
+			new_scopes[var] = &*t.r;
+			if(is_limited(var, raw_form_tree(elem::NOT, t.r), wrt, new_scopes)) {
+				return all_quantifiers_limited(*t.r, new_scopes);
+			} else {
+				return var;
+			}
+		} case elem::UNIQUE: {
+			// Process the expanded formula instead
+			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+		} case elem::NONE: {
+			return nullopt;
+		} default:
+			assert(false); //should never reach here
+	}
+}
+
+/* Check whether the given formula tree is safe and return the offending
+ * variable if not. This means that every free variable in the tree is
+ * limited and that all its quantifiers are limited. */
+
+optional<elem> driver::is_safe(const raw_form_tree &t) {
+	set<elem> free_vars = collect_free_vars(t);
+	map<elem, const raw_form_tree*> scopes;
+	for(const elem &free_var : free_vars) {
+		scopes[free_var] = &t;
+	}
+	for(const elem &free_var : free_vars) {
+		set<elem> wrt;
+		if(!is_limited(free_var, t, wrt, scopes)) {
+			return free_var;
+		}
+	}
+	return all_quantifiers_limited(t, scopes);
+}
+
+/* Check whether the given rule is safe and return the offending variable if
+ * not. This means that every non-goal head's variables are limited in the body
+ * and that the body itself is safe. Only single heads are allowed to simplify
+ * handling of deletions. */
+
+optional<elem> driver::is_safe(const raw_rule &rr) {
+	set<elem> free_vars;
+	if(rr.type != raw_rule::GOAL) {
+		vector<elem> bound_vars;
+		// Only collect the free variables of positive heads because we
+		// can always guard the body of a rule with a negative head with
+		// the negation of the head to obtain an equivalent rule.
+		collect_free_vars(rr.h[0], bound_vars, free_vars);
+	}
+	if(optional<raw_form_tree> prft = rr.get_prft()) {
+		// If the head is negative, then treat the head negated as an implicit body
+		// term as it only makes sence to delete a fact that is already present.
+		if(rr.h[0].neg) {
+			prft = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(rr.h[0].negate()),
+				make_shared<raw_form_tree>(*prft));
+		}
+		// Initialize variable scopes, this is needed for the safety checking
+		// algorithm to verify limitations by going through equality terms.
+		vector<elem> bound_vars;
+		collect_free_vars(*prft, bound_vars, free_vars);
+		// All the formulas free variables have "global" formula scope
+		map<elem, const raw_form_tree*> scopes;
+		for(const elem &free_var : free_vars) {
+			scopes[free_var] = &*prft;
+		}
+		
+		// Ensure that all the head variables and other free variables are
+		// limited in the formula
+		for(const elem &var : free_vars) {
+			set<elem> wrt;
+			if(!is_limited(var, *prft, wrt, scopes)) {
+				return var;
+			}
+		}
+		// Lastly check that all the quantification subformula variables are
+		// limited in their bodies
+		return all_quantifiers_limited(*prft, scopes);
+	} else {
+		// If there free variables in the head but no body, then all of them are not
+		// limited. Any one of them can be a witness
+		return free_vars.empty() ? nullopt : make_optional(*free_vars.begin());
+	}
+}
+
+/* Check whether a given TML program is safe and return the offending
+ * variable and rule if not. This means that every rule must be safe. */
+
+optional<pair<elem, raw_rule>> driver::is_safe(raw_prog rp) {
+	// Ignore the outermost existential quantifiers
+	export_outer_quantifiers(rp);
+	// Split heads are a prerequisite to safety checking
+	split_heads(rp);
+	for(const raw_rule &rr : rp.r) {
+		if(auto unlimited_var = is_safe(rr)) {
+			return make_pair(*unlimited_var, rr);
+		}
+	}
+	return nullopt;
 }
 
 /* Checks if the body of the given rule is conjunctive. */
@@ -3392,15 +3723,13 @@ void driver::step_transform(raw_prog &rp,
 /* If the given element is a variable, rename it using the relevant
  * mapping. If the mapping does not exist, then create a new one. */
 
-elem driver::rename_variables(const elem &e, map<elem, elem> &renames) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-	
+elem rename_variables(const elem &e, map<elem, elem> &renames,
+		const function<elem (const elem &)> &gen) {
 	if(e.type == elem::VAR) {
 		if(auto it = renames.find(e); it != renames.end()) {
 			return it->second;
 		} else {
-			return renames[e] = elem::fresh_var(d);
+			return renames[e] = gen(e);
 		}
 	} else return e;
 }
@@ -3411,21 +3740,19 @@ elem driver::rename_variables(const elem &e, map<elem, elem> &renames) {
  * also that the mappings made for variables introduced inside
  * quantifiers are not exported. */
 
-void driver::rename_variables(raw_form_tree &t, map<elem, elem> &renames) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-	
+void rename_variables(raw_form_tree &t, map<elem, elem> &renames,
+		const function<elem (const elem &)> &gen) {
 	switch(t.type) {
 		case elem::NONE: {
-			for(elem &e : t.rt->e) e = rename_variables(e, renames);
+			for(elem &e : t.rt->e) e = rename_variables(e, renames, gen);
 			break;
 		} case elem::NOT: {
-			rename_variables(*t.l, renames);
+			rename_variables(*t.l, renames, gen);
 			break;
 		} case elem::ALT: case elem::AND: case elem::IMPLIES:
 				case elem::COIMPLIES: {
-			rename_variables(*t.l, renames);
-			rename_variables(*t.r, renames);
+			rename_variables(*t.l, renames, gen);
+			rename_variables(*t.r, renames, gen);
 			break;
 		} case elem::FORALL: case elem::EXISTS: case elem::UNIQUE: {
 			// The variable that is being mapped to something else
@@ -3434,15 +3761,30 @@ void driver::rename_variables(raw_form_tree &t, map<elem, elem> &renames) {
 			const auto &ivar = renames.find(ovar);
 			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
 			// Temporarily replace the outer scope mapping with new inner one
-			*t.l->el = renames[ovar] = elem::fresh_var(d);
+			*t.l->el = renames[ovar] = gen(ovar);
 			// Rename body using inner scope mapping
-			rename_variables(*t.r, renames);
+			rename_variables(*t.r, renames, gen);
 			// Now restore the (possibly non-existent) outer scope mapping
 			if(pvar) renames[ovar] = *pvar; else renames.erase(ovar);
 			break;
 		} default:
 			assert(false); //should never reach here
 	}
+}
+
+/* Useful when copying formula trees whilst trying to ensure that none of its
+ * variables are accidentally captured by the context into which its being
+ * inserted. */
+
+function<elem (const elem &)> gen_fresh_var(dict_t &d) {
+	return [&d](const elem &) {return elem::fresh_var(d);};
+}
+
+/* Useful when copying formula tree whilst only modifying a limited set of
+ * variables. */
+
+elem gen_id_var(const elem &var) {
+	return var;
 }
 
 /* Expand the given term using the given rule whose head unifies with
@@ -3453,6 +3795,9 @@ void driver::rename_variables(raw_form_tree &t, map<elem, elem> &renames) {
 
 raw_form_tree driver::expand_term(const raw_term &use,
 		const raw_rule &def) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
 	const raw_term &head = def.h[0];
 	// Where all the mappings for the substitution will be stored
 	map<elem, elem> renames;
@@ -3466,7 +3811,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	// Deep copy the rule's body because the in-place renaming required
 	// for this expansion should not affect the original
 	raw_form_tree subst = *def.get_prft();
-	rename_variables(subst, renames);
+	rename_variables(subst, renames, gen_fresh_var(d));
 	// Take care to existentially quantify the non-exported variables of this
 	// formula in case it is inserted into a negative context
 	for(const auto &[ovar, nvar] : renames) {
@@ -3481,7 +3826,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	for(size_t i = 2; i < head.e.size() - 1; i++) {
 		// Add equality constraint only if it has not already been captured
 		// in the substitution choice.
-		elem new_name = rename_variables(head.e[i], renames);
+		elem new_name = rename_variables(head.e[i], renames, gen_fresh_var(d));
 		if(new_name != use.e[i]) {
 			subst = raw_form_tree(elem::AND,
 				make_shared<raw_form_tree>(subst),
@@ -3579,13 +3924,36 @@ void driver::square_root_program(raw_prog &rp) {
  * quantifiers. Required because TML to DNF conversion assumes that quantifier
  * variables are only visible within their bodies. */
 
-void driver::remove_redundant_exists(raw_prog &rp) {
+void driver::export_outer_quantifiers(raw_prog &rp) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
 			raw_form_tree &prft = *rr.prft;
 			// Repeatedly strip outermost existential quantifier
 			while(prft.type == elem::EXISTS) {
 				prft = *prft.r;
+			}
+			// Now export the outermost existentially quantified variables if their
+			// values are needed outside the particular quantifications. First
+			// determine if export is required.
+			bool export_required = false;
+			set<elem> used_vars = collect_free_vars({rr.h});
+			raw_form_tree *pprft = &*rr.prft;
+			for(; pprft->type == elem::EXISTS || pprft->type == elem::UNIQUE;
+					pprft = &*pprft->r) {
+				if(used_vars.find(*pprft->l->el) != used_vars.end()) {
+					// Export is required if the quantification variable is used outside
+					// this quantifiers scope
+					export_required = true;
+				} else {
+					used_vars.insert(*pprft->l->el);
+				}
+			}
+			if(export_required) {
+				// Now conjunct the rule formula with a copy of what is inside the
+				// existential quantifiers so that variables can be exported whilst
+				// uniqueness constraints are still being enforced.
+				prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft),
+					make_shared<raw_form_tree>(prft));
 			}
 		}
 	}
@@ -4311,6 +4679,14 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
 		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
+		if(auto res = is_safe(rp)) {
+			ostringstream msg;
+			// The program is unsafe so inform the user of the offending rule
+			// and variable.
+			msg << "The variable " << res->first << " of " << res->second <<
+				" is not limited. Try rewriting the rule to make its safety clearer.";
+			parse_error(msg.str().c_str());
+		}
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
 			string_t rp_generator;
@@ -4327,7 +4703,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(opts.enabled("qc-subsume-z3")){
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			remove_redundant_exists(rp);
+			export_outer_quantifiers(rp);
 			o::dbg() << "Query containment subsumption using z3" << endl;
 			split_heads(rp);
 			subsume_queries(rp,
@@ -4339,7 +4715,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		if(int_t iter_num = opts.get_int("iterate")) {
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			remove_redundant_exists(rp);
+			export_outer_quantifiers(rp);
 			pdatalog_transform(rp, [&](raw_prog &rp) {
 				o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
 				split_heads(rp);
@@ -4351,7 +4727,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 #ifdef WITH_Z3
 					if(opts.enabled("qc-subsume-z3")){
 						o::dbg() << "Query containment subsumption using z3" << endl;
-						remove_redundant_exists(rp);
+						export_outer_quantifiers(rp);
 						subsume_queries(rp,
 							[&](const raw_rule &rr1, const raw_rule &rr2)
 								{return check_qc_z3(rr1, rr2, z3_ctx);});
@@ -4367,7 +4743,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				opts.enabled("to-dnf")) {
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			remove_redundant_exists(rp);
+			export_outer_quantifiers(rp);
 			o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
 			step_transform(rp, [&](raw_prog &rp) {
 				// This transformation is a prerequisite to the CQC and binary
