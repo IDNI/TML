@@ -1,6 +1,6 @@
-
+domain(0). domain(1).
 U(1).
-sat_and(?x ?y)  :- exists ?x exists ?y { ?x && ?y }.
-sat_or(?x ?y)   :- exists ?x exists ?y { ?x || ?y }.
-sat_nand(?x ?y) :- exists ?x exists ?y { ~{ ?x && ?y } }.
-sat_nor(?x ?y)  :- exists ?x exists ?y { ~{ ?x || ?y } }.
+sat_and(?x ?y)  :- exists ?x exists ?y { domain(?x) && domain(?y) && {?x && ?y} }.
+sat_or(?x ?y)   :- exists ?x exists ?y { domain(?x) && domain(?y) && {?x || ?y} }.
+sat_nand(?x ?y) :- exists ?x exists ?y { domain(?x) && domain(?y) && ~{ ?x && ?y } }.
+sat_nor(?x ?y)  :- exists ?x exists ?y { domain(?x) && domain(?y) && ~{ ?x || ?y } }.
