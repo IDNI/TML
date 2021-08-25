@@ -22,7 +22,7 @@ struct term : public ints {
 
 	//FIXME: warning, there is direct assignment between these two enums in from_raw_term
 	// enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT }
-	enum textype { REL, EQ, LEQ, BLTIN, ARITH, FORM1 /*QBF1*/, FORM2} extype = term::REL;
+	enum textype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1 /*QBF1*/, FORM2} extype = term::REL;
 
 	t_arith_op arith_op = NOP;
 	spform_handle qbf;

@@ -463,6 +463,10 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 		if (t.neg) os << '}';
 		return os;
 	}
+	if (t.extype == raw_term::VAR) {
+		os << t.e[0];
+		return os;
+	}
 
 	os << t.e[0];
 	os << '(';
