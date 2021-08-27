@@ -4342,9 +4342,11 @@ void driver::instrument_prog(raw_prog &rp) {
 		rel_info &instr_rel = instrument_map[orig_ri];
 		// Now let's measure what the minimum arity required to store
 		// <orig_rule_args> + <orig_rule_id> + <exist_vars> is.
-		set<elem> instr_elems = collect_free_vars(rr);
-		for(auto it = rr.h[0].e.begin() + 2; it != rr.h[0].e.end() - 1; it++) {
-			instr_elems.insert(*it);
+		vector<elem> instr_elems(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
+		for(const elem &el : collect_free_vars(rr)) {
+			if(find(instr_elems.begin(), instr_elems.end(), el) == instr_elems.end()) {
+				instr_elems.push_back(el);
+			}
 		}
 		get<1>(instr_rel) = max(get<1>(instr_rel), (int_t) instr_elems.size()+1);
 	}

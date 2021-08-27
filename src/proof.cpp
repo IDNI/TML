@@ -233,6 +233,8 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level) {
 bool tables::get_proof(const term& q, proof& p, size_t level) {
 	// Grow the proof object until it can store proof for this level
 	for(; p.size() <= level; p.push_back({}));
+	// Check if this term has not already been proven at the given level
+	if(p[level].find(q) != p[level].end()) return true;
 	// First ensure that this term can actually be proved. That is ensure that it
 	// is present or not present in the relevant step database.
 	int_t result_count = 0;
