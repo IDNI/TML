@@ -122,18 +122,12 @@ const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	return p[level][q];
 }*/
 
-bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
-	// Grow the proof object until it can store proof for this level
-	for(; p.size() <= level; p.push_back({}));
-	// First ensure that this term can actually be proved. That is ensure that it
-	// is present or not present in the relevant step database.
-	int_t result_count = 0;
-	decompress(levels[level][q.tab] && from_fact(q), q.tab, [&](const term& t) {
-		result_count++;
-	}, q.size());
-	// If the fact is negative, then it cannot have and yet is present, then there
-	// cannot be a proof. Same if it is positive but yet is not present.
-	if((q.neg && result_count > 0) || (!q.neg && result_count == 0)) return false;
+/* The carry proof of a term is the one that is implied by its existence in the
+ * previous step. This is as opposed to an explicit derivation by a DNF rule at
+ * the current step. Add the corresponding proof witness if it was there. Return
+ * false if the fact is not actually there in the previous step. */
+
+bool tables::get_carry_proof(const term& q, proof& p, size_t level) {
 	// If the fact is positive and the current level is not the first, then there
 	// is a chance that this fact is carried from the previous level
 	if(level > 0 && !q.neg) {
@@ -146,14 +140,30 @@ bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 		// the current fact's presence
 		if(prev_result_count) {
 			// Prove the previous fact's existence
-			get_proof(q, p, level-1, dep);
+			get_proof(q, p, level-1);
 			// Record this current proof
 			proof_elem carry_proof;
 			carry_proof.rl = carry_proof.al = 0;
 			carry_proof.b = {{level-1, q}};
 			p[level][q].insert(carry_proof);
+			return true;
 		}
 	}
+	// No carry proof
+	return false;
+}
+
+/* Get the proofs of the given term occuring at the given level stemming
+ * directly from a DNF rule head. Do this by querying the corresponding
+ * instrumentation facts. They will tell us which rules derived the given fact
+ * and under which instantiation of the existential quantifiers they were
+ * derived. Note that the instrumented fact may correspond to this fact derived
+ * at a different level, so we do need to check that the facts that it suggests
+ * exist do actually exist at the previous level. Otherwise that proof must be
+ * discarded. */
+
+bool tables::get_dnf_proofs(const term& q, proof& p, size_t level) {
+	int_t proof_count = 0;
 	// Check if the table of the given fact has an instrumentation table
 	if(optional<int_t> instr_tab = tbls[q.tab].instr_tab; instr_tab && !q.neg) {
 		// Convert the fact into an instrumentation fact by switching the table and
@@ -172,8 +182,10 @@ bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 			// the original arguments
 			int_t rule_id = t[q.size()];
 			// Find the rule whose head has the same ID as this instrumentation fact
-			for(const rule &rul : rules) {
-				for(const alt* const &alte : rul) {
+			for(int_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
+				const rule &rul = rules[rule_idx];
+				for(int_t alt_idx = 0; alt_idx < rul.size(); alt_idx++) {
+					const alt* const &alte = rul[alt_idx];
 					if(alte->rule_id == rule_id) {
 						// Now we want to map the variables of the instrumentation rule to
 						// their substitutions
@@ -184,7 +196,8 @@ bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 						// Now we want to substitute the variable instantiations into the
 						// rule body
 						proof_elem body_proof;
-						body_proof.rl = body_proof.al = 0;
+						body_proof.rl = rule_idx;
+						body_proof.al = alt_idx;
 						for(term body_tm : alte->t) {
 							for(int_t &arg : body_tm) {
 								auto var_sub = subs.find(arg);
@@ -198,19 +211,45 @@ bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
 						// under construction must be discarded.
 						bool proof_valid = true;
 						for(auto &[body_level, body_tm] : body_proof.b) {
-							proof_valid = proof_valid && get_proof(body_tm, p, body_level, dep);
+							proof_valid = proof_valid && get_proof(body_tm, p, body_level);
 						}
 						if(proof_valid) {
 							// Add this proof as one of the many possible proving this fact
 							p[level][q].insert(body_proof);
+							proof_count++;
 						}
 					}
 				}
 			}
 		}, fact_aug.size());
 	}
+	return proof_count;
+}
+
+/* Get all the proofs of the given term occuring at the given level and put them
+ * into the given proof object. Return false if the given term does not actually
+ * occur at the given level. */
+
+bool tables::get_proof(const term& q, proof& p, size_t level) {
+	// Grow the proof object until it can store proof for this level
+	for(; p.size() <= level; p.push_back({}));
+	// First ensure that this term can actually be proved. That is ensure that it
+	// is present or not present in the relevant step database.
+	int_t result_count = 0;
+	decompress(levels[level][q.tab] && from_fact(q), q.tab, [&](const term& t) {
+		result_count++;
+	}, q.size());
+	// If the fact is negative, then it cannot have and yet is present, then there
+	// cannot be a proof. Same if it is positive but yet is not present.
+	if((q.neg && result_count > 0) || (!q.neg && result_count == 0)) return false;
+	// The proof for this fact may simply be that it carries from the previous
+	// step. Get that proof.
+	get_carry_proof(q, p, level);
+	// The proof for this fact may stem from a DNF rule's derivation. There may be
+	// a multiplicity of these proofs. Get them.
+	get_dnf_proofs(q, p, level);
 	// Here we know that this fact is valid. Make sure that this fact at least has
-	// empty witness set to represent self-evident
+	// empty witness set to represent self-evidence.
 	p[level][q];
 	return true;
 }
