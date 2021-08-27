@@ -146,7 +146,7 @@ class tables {
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-
+	std::shared_ptr<bit_univ> spbu = nullptr;
 private:
 	typedef int_t rel_t;
 

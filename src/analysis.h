@@ -50,6 +50,7 @@ struct context {
     }
 };
 
+typedef std::shared_ptr<class environment> spenvironment;
 class environment {    
     //type signatures for relations/predicates and user defined
     //complex structures if any 
@@ -57,18 +58,62 @@ class environment {
     std::map<string_t, structype> usertypedef;
     //contexts for vars
     context ctx;
+    // nested scope environmnet
+    // tcheck connects these pointers.
+    spenvironment parent= nullptr;
+    std::vector<spenvironment > nested;
+
     public:
+    environment(): parent(nullptr){}
+
+
     std::vector<string_t> get_predicates() {
         std::vector<string_t> cont;
         for( auto it :predtype )
             cont.push_back(it.first);
         return cont;
     }
+    void set_parent( spenvironment &_e) {
+        parent = _e;
+    }
+    void set_nested( spenvironment &_e) {
+        nested.emplace_back(_e);
+    }
+
+    const std::vector<typedecl>& search_pred(string_t &key, bool &found, int_t insize=-1) {
+        auto it = predtype.find(key);
+
+        if( it != predtype.end() ) {
+            if(insize < 0 ) found = true;
+            else {
+                auto &types = it->second;
+                int_t cursz = 0;
+                for( auto &it : types)
+                    if(it.is_primitive())
+                        cursz += it.pty.get_bitsz();
+                    else {
+                        string_t st = lexeme2str(it.structname.e);
+                        cursz += this->lookup_typedef(st).get_bitsz(*this);
+                    }
+                if(cursz == insize) found = true;
+            }
+        }
+        if( found == false) {
+            for( auto &nest: nested) {
+                auto &ret = nest->search_pred(key, found, insize);
+                if(found) return ret;
+            }
+        }
+        return it->second;
+    }
     bool contains_pred(string_t &key) const{
-        return predtype.find(key) != predtype.end(); 
+        if(predtype.find(key) != predtype.end()) return true;
+        return parent ? parent->contains_pred(key) : false;
     }
     bool contains_typedef(string_t &key) const{
-        return usertypedef.find(key) != usertypedef.end() ; 
+
+        if( usertypedef.find(key) != usertypedef.end() ) return true;
+        return parent ? parent->contains_typedef(key) : false;
     }
     bool contains_prim_var(string_t &var) const {
         return ctx.context_prim_var.find(var) != ctx.context_prim_var.end();
@@ -94,7 +139,13 @@ class environment {
     bool build_from( const raw_prog &rp  );
     bool build_from( const std::vector<struct typestmt> & );
     const std::vector<typedecl>& lookup_pred( const string_t k  )  const {
-        return predtype.find(k)->second;
+        auto it =  predtype.find(k);
+        if( it == predtype.end() ) {
+            if(parent) return parent->lookup_pred(k);
+            else throw_runtime_error("type not found");
+        }
+
+        return it->second;
     }
     structype& lookup_typedef( string_t &k  ) {
         return usertypedef[k];
@@ -173,39 +224,39 @@ struct bit_univ {
 	};
 	dict_t &d;
     size_t bit_order;
-	environment &typenv;
     size_t char_bsz, int_bsz, sym_bsz, var_bsz;
-    
+    spenvironment ptypenv = nullptr;
     typedef std::vector<size_t> tab_args;
-    typedef std::map<string_t, tab_args>  raw_tables;
+    /*
     raw_tables rtabs;
     
     bool get_raw_tables(){
-        std::vector<string_t > tabnames = typenv.get_predicates(); 
+         std::vector<string_t > tabnames = ptypenv->get_predicates();
         for( string_t &pname: tabnames ) {
+
             rtabs.insert({pname, tab_args()});
-            for ( auto &targs: typenv.lookup_pred(pname)) 
+            auto typesig = ptypenv->lookup_pred(pname);
+            for ( auto &targs: typesig )
                 if(targs.is_primitive())
                     rtabs[pname].push_back(targs.pty.get_bitsz());
                 else {
                     string_t sttype = lexeme2str(targs.structname.e);
                     rtabs[pname].push_back(
-                        typenv.lookup_typedef(sttype).get_bitsz(typenv));
+                        ptypenv->lookup_typedef(sttype).get_bitsz(*ptypenv));
                 }
         }
         return true;
     }
-    
-	bit_univ(dict_t &_d, size_t _bo, environment &_e , size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ, 
-	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), typenv(_e), char_bsz(_cbsz),
+    */
+	bit_univ(dict_t &_d, size_t _bo, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ,
+	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) {
 
-        if(typenv.is_init()) this->get_raw_tables();
         this->pos = [this](size_t a, size_t b, size_t c, size_t d, bit_univ::tab_args t)-> size_t{
 					return this->pos_gen(a, b, c, d, t); };
      }
 	size_t get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
-	size_t pos_eqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+	size_t pos_eqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args /*,tab_args rtab */ ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
 		return (bsz - bit_from_right - 1)* args + arg;
 	}
@@ -236,13 +287,13 @@ struct bit_univ {
         }    
         size_t lastsz=0, base=0,  s = args;
         for( size_t sz = 0; sz < szsort.size() && sz <= (bsz - bit_from_right -1) ; sz++) 
-            if(szsort[sz])  
-                base = ((sz-lastsz) * s-- ) + base, lastsz = sz;
+            if(szsort[sz]) {
+                base = ((sz-lastsz) * s-- ) + base, lastsz = sz; }
 
 		return base + (bsz - bit_from_right - 1 - lastsz)*cargs + (arg -skip);
     
     }
-    size_t pos_default(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+    size_t pos_default(size_t bsz, size_t bit_from_right , size_t arg, size_t args /*, tab_args rtab */ ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
     	return (bsz - bit_from_right - 1); //* args + arg;
 	}

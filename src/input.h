@@ -27,7 +27,6 @@
 #include "memory_map.h"
 
 class archive;
-class environment;
 class context;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
@@ -727,7 +726,7 @@ struct raw_rule {
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
 	std::optional<raw_form_tree> prft; 
-
+	// contains the context types of vars used in rule from type inference
 	mutable spenvcontext varctx = nullptr;
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
@@ -830,7 +829,7 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
-	std::vector<environment> typenv; // only one item;
+	spenvironment typenv; // only one item, build by typechecker
 
 	std::set<lexeme, lexcmp> builtins;
 	// The relations that should be hidden from the user by default
