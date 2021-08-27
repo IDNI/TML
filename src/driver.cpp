@@ -4316,6 +4316,12 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 	o::dbg() << endl;
 }
 
+/* Instrument our TML program with additional rules that export the
+ * instantiations of existential variables necessary to derive certain facts.
+ * In addition these instrumentation rules export rule IDs so that it is
+ * possible to easily figure out which rule derived what. This information is
+ * used heavily in proof tree generation. */
+
 void driver::instrument_prog(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
@@ -4357,19 +4363,31 @@ void driver::instrument_prog(raw_prog &rp) {
 			instr_hd_elems.push_back(*it);
 		}
 		rr.h[0].instrument_id = get<0>(instr_rel);
-		// Generate a rule id and add <orig_rule_id>
-		const elem &instr_rule_id = elem::fresh_sym(d);
-		instr_hd_elems.push_back(instr_rule_id);
-		// Add <exist_vars>
-		set<elem> exist_vars = collect_free_vars(rr);
-		for(const elem &var : exist_vars) {
-			if(find(instr_hd_elems.begin(), instr_hd_elems.end(), var) == instr_hd_elems.end()) {
-				instr_hd_elems.push_back(var);
+		optional<elem> instr_rule_id;
+		if(rr.h[0].neg) {
+			// If the current rule is a deletion rule, then we should just delete all
+			// the instrumentation of the affected facts indiscriminately as it would
+			// no longer be useful.
+			for(int_t i = instr_hd_elems.size() - 2; i < get<1>(instr_rel); i++) {
+				instr_hd_elems.push_back(elem::fresh_var(d));
 			}
-		}
-		// Add <filler>
-		for(int_t i = instr_hd_elems.size() - 2; i < get<1>(instr_rel); i++) {
-			instr_hd_elems.push_back(elem(0));
+		} else {
+			// Generate a rule id and add <orig_rule_id>
+			instr_rule_id = elem::fresh_sym(d);
+			instr_hd_elems.push_back(*instr_rule_id);
+			// Add <exist_vars> which will be used in proof tree
+			// generation/explanation
+			set<elem> exist_vars = collect_free_vars(rr);
+			for(const elem &var : exist_vars) {
+				if(find(instr_hd_elems.begin(), instr_hd_elems.end(), var) == instr_hd_elems.end()) {
+					instr_hd_elems.push_back(var);
+				}
+			}
+			// Add <filler> so that all instrumentation for one relation is in one
+			// relation. This simplifies deletions.
+			for(int_t i = instr_hd_elems.size() - 2; i < get<1>(instr_rel); i++) {
+				instr_hd_elems.push_back(elem(0));
+			}
 		}
 		instr_hd_elems.push_back(elem_closep);
 		// Make the instrumentation rule with this and add it to the pendings list
@@ -4810,7 +4828,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-				opts.enabled("to-dnf")) {
+				opts.enabled("to-dnf") || opts.enabled("proof")) {
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 			export_outer_quantifiers(rp);
@@ -4860,9 +4878,11 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Eliminating dead variables ..." << endl << endl;
 			eliminate_dead_variables(rp);
 			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-			o::dbg() << "Instrumenting program ..." << endl << endl;
-			instrument_prog(rp);
-			o::dbg() << "Instrumented TML Program:" << endl << endl << rp << endl;
+			if(opts.enabled("proof")) {
+				o::dbg() << "Instrumenting program ..." << endl << endl;
+				instrument_prog(rp);
+				o::dbg() << "Instrumented TML Program:" << endl << endl << rp << endl;
+			}
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
