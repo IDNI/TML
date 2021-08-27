@@ -122,34 +122,97 @@ const set<proof_elem>& tables::explain(const term& q, proof& p, size_t level) {
 	return p[level][q];
 }*/
 
-size_t tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
-	set<witness> s;
-	proof_elem e;
-	if (!level) return 0;
-	if (!--dep) return -1;
-//	DBG(o::out()<<"current p: " << endl; print(o::out(), p);)
-//	DBG(o::out()<<"proving " << ir_handler->to_raw_term(q) << " level "<<level<<endl;)
-	while ((s = get_witnesses(q, level)).empty())
-		if (!level--)
-			return 0;
-	bool f;
-	for (const witness& w : s) {
-//		DBG(o::out()<<"witness: "; print(o::out(), w); o::out()<<endl;)
-		e.rl = w.rl, e.al = w.al, e.b.clear(), e.b.reserve(w.b.size());
-		for (const term& t : w.b) {
-			f = false;
-			for (size_t n = level; n--;)
-				if (p[n].find(t) != p[n].end()) {
-					f = true;
-					e.b.emplace_back(n, t);
-					break;
-				}
-			if (f) continue;
-			e.b.emplace_back(level?get_proof(t,p,level-1,dep):0, t);
+bool tables::get_proof(const term& q, proof& p, size_t level, size_t dep) {
+	// Grow the proof object until it can store proof for this level
+	for(; p.size() <= level; p.push_back({}));
+	// First ensure that this term can actually be proved. That is ensure that it
+	// is present or not present in the relevant step database.
+	int_t result_count = 0;
+	decompress(levels[level][q.tab] && from_fact(q), q.tab, [&](const term& t) {
+		result_count++;
+	}, q.size());
+	// If the fact is negative, then it cannot have and yet is present, then there
+	// cannot be a proof. Same if it is positive but yet is not present.
+	if((q.neg && result_count > 0) || (!q.neg && result_count == 0)) return false;
+	// If the fact is positive and the current level is not the first, then there
+	// is a chance that this fact is carried from the previous level
+	if(level > 0 && !q.neg) {
+		// Check if the current fact was there in the previous level
+		int_t prev_result_count = 0;
+		decompress(levels[level-1][q.tab] && from_fact(q), q.tab, [&](const term& t) {
+			prev_result_count++;
+		}, q.size());
+		// If the fact was there in the previous level, then that is proof enough of
+		// the current fact's presence
+		if(prev_result_count) {
+			// Prove the previous fact's existence
+			get_proof(q, p, level-1, dep);
+			// Record this current proof
+			proof_elem carry_proof;
+			carry_proof.rl = carry_proof.al = 0;
+			carry_proof.b = {{level-1, q}};
+			p[level][q].insert(carry_proof);
 		}
-		p[level][q].insert(e);
 	}
-	return level;
+	// Check if the table of the given fact has an instrumentation table
+	if(optional<int_t> instr_tab = tbls[q.tab].instr_tab; instr_tab && !q.neg) {
+		// Convert the fact into an instrumentation fact by switching the table and
+		// extending the fact with variables to capture the instrumentation
+		term fact_aug = q;
+		fact_aug.tab = *instr_tab;
+		int_t start_var = 0;
+		for(const int &elt : fact_aug) start_var = min(start_var, elt);
+		for(size_t ext = fact_aug.size(); ext < tbls[fact_aug.tab].len; ext++) {
+			fact_aug.push_back(--start_var);
+		}
+		// Now we capture the instrumented facts that have been derived
+		decompress(levels[level][fact_aug.tab] && from_fact(fact_aug), fact_aug.tab,
+				[&](const term& t) {
+			// In the instrumentation relations we put the rule id immediately after
+			// the original arguments
+			int_t rule_id = t[q.size()];
+			// Find the rule whose head has the same ID as this instrumentation fact
+			for(const rule &rul : rules) {
+				for(const alt* const &alte : rul) {
+					if(alte->rule_id == rule_id) {
+						// Now we want to map the variables of the instrumentation rule to
+						// their substitutions
+						map<int_t, int_t> subs;
+						for(int_t i = 0; i < t.size(); i++) {
+							subs[rul.t[i]] = t[i];
+						}
+						// Now we want to substitute the variable instantiations into the
+						// rule body
+						proof_elem body_proof;
+						body_proof.rl = body_proof.al = 0;
+						for(term body_tm : alte->t) {
+							for(int_t &arg : body_tm) {
+								auto var_sub = subs.find(arg);
+								// Replace argument with substitution if present
+								if(var_sub != subs.end()) arg = var_sub->second;
+							}
+							body_proof.b.push_back({level-1, body_tm});
+						}
+						// Now we want to prove that all the body terms are true using the
+						// levels structure. If we cannot prove them, then the current proof
+						// under construction must be discarded.
+						bool proof_valid = true;
+						for(auto &[body_level, body_tm] : body_proof.b) {
+							proof_valid = proof_valid && get_proof(body_tm, p, body_level, dep);
+						}
+						if(proof_valid) {
+							// Add this proof as one of the many possible proving this fact
+							p[level][q].insert(body_proof);
+						}
+					}
+				}
+			}
+		}, fact_aug.size());
+	}
+	// Here we know that this fact is valid. Make sure that this fact at least has
+	// empty witness set to represent self-evident
+	p[level][q];
+	return true;
 }
 
 template <typename T>

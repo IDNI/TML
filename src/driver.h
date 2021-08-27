@@ -225,6 +225,7 @@ class driver {
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
+	void instrument_prog(raw_prog &rp);
 	bool transform_grammar(raw_prog &rp);
 	void export_outer_quantifiers(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,

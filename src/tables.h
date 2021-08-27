@@ -64,6 +64,7 @@ struct alt : public std::vector<body*> {
 	spbdd_handle rng = htrue, eq = htrue, rlast = hfalse;
 	size_t varslen = 0;
 	bdd_handles last;
+	std::optional<int_t> rule_id;
 	std::vector<term> t;
 	std::vector<term> bltins; // builtins to run during alt_query
 	bools ex;
@@ -129,6 +130,8 @@ struct table {
 	ints bltinargs;
 	size_t bltinsize = 0;
 	bool hidden = false;
+	// The ID of the table that instruments this rule
+	std::optional<int_t> instr_tab;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -260,7 +263,7 @@ private:
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
 	std::set<witness> get_witnesses(const term& t, size_t l);
-	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
+	bool get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;

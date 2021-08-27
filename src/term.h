@@ -30,6 +30,8 @@ struct term : public ints {
 	// The id of the table associated with the fact/rule referenced by this term
 	ntable tab = -1;
 	size_t orderid = 0;
+	// The ID of the rule that this term heads
+	std::optional<int_t> rule_id;
 
 	// D: TODO: builtins are very different, handle as a same size union struct?
 	int_t idbltin = -1; // size_t bltinsize;

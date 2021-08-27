@@ -79,12 +79,20 @@ void align_vars_form(vector<term>& v) {
 flat_prog ir_builder::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
+	map<int_t, lexeme> table_to_instrument;
+	map<lexeme, int_t> instrument_to_table;
 	term t;
 
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x, true),
+				get_nums(x);
+				t = from_raw_term(x, true);
+				// Record how this relation was mapped to a table
+				instrument_to_table[x.e[0].e] = t.tab;
+				// Record how this rule maps to an instrument
+				if(x.instrument_id)
+					table_to_instrument[t.tab] = x.instrument_id->e;
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
@@ -148,6 +156,16 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	// Note the relations that are marked as tmprel in the raw_prog
 	for(const auto &[functor, arity] : p.hidden_rels)
 		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
+	
+	// Note the tables that instrument each rule
+	for(const auto &[tbl, instr_sig] : table_to_instrument) {
+		// Now get the instrument table using the instrument signature if possible
+		auto instrument_table = instrument_to_table.find(instr_sig);
+		if(instrument_table != instrument_to_table.end()) {
+			// Note the instrument relation table in the rule that it instruments
+			dynenv->tbls[tbl].instr_tab = instrument_table->second;
+		}
+	}
 	
 	return m;
 }
@@ -214,7 +232,10 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 		return term(r.neg, tab, t, orderid, idbltin,
 			(bool) (r.e[0].num & 1), (bool) (r.e[0].num & 2));
 	}
-	return term(r.neg, extype, r.arith_op, tab, t, orderid);
+	term trm(r.neg, extype, r.arith_op, tab, t, orderid);
+	// Instrumented rules have IDs, preserve these in the translation
+	if(r.id) trm.rule_id = dict.get_sym(r.id->e);
+	return trm;
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 

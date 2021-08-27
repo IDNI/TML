@@ -4316,6 +4316,76 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 	o::dbg() << endl;
 }
 
+void driver::instrument_prog(raw_prog &rp) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+	
+	map<rel_info, rel_info> instrument_map;
+	// Map each relation to an instrumentation relation and measure the arity
+	// required to store original head + rule id + other existentially quantified
+	// variables used in body. Do not commit to an arity yet because future rules
+	// may use more existentially quantified variables.
+	for(const raw_rule &rr : rp.r) {
+		const rel_info &orig_ri = get_relation_info(rr.h[0]);
+		// Ensure one-to-one correspondence between relations and their
+		// instrumentation by using existing mapping if it has already been made
+		if(instrument_map.find(orig_ri) == instrument_map.end()) {
+			elem instr_sym = elem::fresh_temp_sym(d);
+			instrument_map[orig_ri] = { instr_sym, 0 };
+		}
+		rel_info &instr_rel = instrument_map[orig_ri];
+		// Now let's measure what the minimum arity required to store
+		// <orig_rule_args> + <orig_rule_id> + <exist_vars> is.
+		set<elem> instr_elems = collect_free_vars(rr);
+		for(auto it = rr.h[0].e.begin() + 2; it != rr.h[0].e.end() - 1; it++) {
+			instr_elems.insert(*it);
+		}
+		get<1>(instr_rel) = max(get<1>(instr_rel), (int_t) instr_elems.size()+1);
+	}
+	// Make heads so that facts can be derived in the instrumentation relation in
+	// addition to the original relation. The format used is
+	// <instr_rel>(<orig_rule_args> <orig_rule_id> <exist_vars> <filler>). Also
+	// generate unique identifiers for rules so that instrumented facts can refer
+	// to them.
+	vector<raw_rule> instr_rules;
+	for(raw_rule &rr : rp.r) {
+		rel_info instr_rel = instrument_map[get_relation_info(rr.h[0])];
+		// Make the instrumentation rule head
+		vector<elem> instr_hd_elems { get<0>(instr_rel), elem_openp };
+		// Add <orig_rule_args>
+		for(auto it = rr.h[0].e.begin() + 2; it != rr.h[0].e.end() - 1; it++) {
+			instr_hd_elems.push_back(*it);
+		}
+		rr.h[0].instrument_id = get<0>(instr_rel);
+		// Generate a rule id and add <orig_rule_id>
+		const elem &instr_rule_id = elem::fresh_sym(d);
+		instr_hd_elems.push_back(instr_rule_id);
+		// Add <exist_vars>
+		set<elem> exist_vars = collect_free_vars(rr);
+		for(const elem &var : exist_vars) {
+			if(find(instr_hd_elems.begin(), instr_hd_elems.end(), var) == instr_hd_elems.end()) {
+				instr_hd_elems.push_back(var);
+			}
+		}
+		// Add <filler>
+		for(int_t i = instr_hd_elems.size() - 2; i < get<1>(instr_rel); i++) {
+			instr_hd_elems.push_back(elem(0));
+		}
+		instr_hd_elems.push_back(elem_closep);
+		// Make the instrumentation rule with this and add it to the pendings list
+		// to avoid extending this loop
+		raw_rule instr_rule = rr;
+		instr_rule.h[0] = raw_term(instr_hd_elems);
+		instr_rule.h[0].id = instr_rule_id;
+		instr_rule.h[0].neg = rr.h[0].neg;
+		instr_rules.push_back(instr_rule);
+	}
+	// Now add all the pending instrumentation rules to the program
+	for(const raw_rule &instr_rule : instr_rules) {
+		rp.r.push_back(instr_rule);
+	}
+}
+
 void collect_free_vars(const vector<vector<raw_term>> &b,
 		vector<elem> &bound_vars, set<elem> &free_vars) {
 	for(const vector<raw_term> &bodie : b) {
@@ -4790,6 +4860,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Eliminating dead variables ..." << endl << endl;
 			eliminate_dead_variables(rp);
 			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
+			o::dbg() << "Instrumenting program ..." << endl << endl;
+			instrument_prog(rp);
+			o::dbg() << "Instrumented TML Program:" << endl << endl << rp << endl;
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);

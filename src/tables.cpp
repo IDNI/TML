@@ -327,6 +327,7 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 
 void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 	alt a;
+	a.rule_id = h.rule_id;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
 	a.vm = get_varmap(h, al, a.varslen, blt), a.inv = varmap_inv(a.vm);

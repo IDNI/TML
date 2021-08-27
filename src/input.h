@@ -485,6 +485,10 @@ struct raw_term {
 
 	bool neg = false;
 	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } extype = raw_term::REL;
+	// A unique identifier for this rule
+	std::optional<elem> id;
+	// The name of the relation that instruments this one.
+	std::optional<elem> instrument_id;
 
 	//NOTE: we can add FORM1, FORM2 etc to rtextype
 	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
@@ -726,7 +730,7 @@ struct raw_rule {
 	// prft != nullopt, otherwise it signifies that this rule is a fact.
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
-	std::optional<raw_form_tree> prft; 
+	std::optional<raw_form_tree> prft;
 
 	mutable spenvcontext varctx = nullptr;
 	enum etype { NONE, GOAL, TREE };
