@@ -871,6 +871,9 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 			add_bit();
 	}
 
+	for (auto x : strs) load_string(x.first, x.second);
+	form *froot;
+	if (!ir_handler->transform_grammar(g, m, froot)) return false;
 	if (!get_rules(move(m))) return false;
 
 	// filter for rels starting and ending with __
