@@ -1,6 +1,8 @@
 #symetric closure
 A(1).
-T(?a ?b ?c ?d ?e ?f ) :- {
+domain(0). domain(1). domain(2). domain(3).
+T(?a ?b ?c ?d ?e ?f ) :-
+        { domain(?e) && domain(?f) && domain(?a) && domain(?b) &&
           { {?a = ?d} && {?b = ?c} }  &&
             { {?c = ?d } -> {?e = ?f} }
         }.

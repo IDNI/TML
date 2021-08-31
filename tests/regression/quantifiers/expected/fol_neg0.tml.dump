@@ -1,0 +1,31 @@
+domain(1).
+domain(0).
+A0(1 1).
+A0(0 0).
+satA0_a(1 1 1).
+satA0_a(1 1 0).
+satA0_a(1 0 1).
+satA0_a(1 0 0).
+satA0_a(0 1 1).
+satA0_a(0 1 0).
+satA0_a(0 0 1).
+satA0_a(0 0 0).
+satA0_b(1 1 1).
+satA0_b(1 1 0).
+satA0_b(0 0 1).
+satA0_b(0 0 0).
+A1(1 1).
+A1(0 1).
+A1(0 0).
+satA1__(0 1 0).
+satA1__(0 0 1).
+satA1_a(1 1 1).
+satA1_a(1 1 0).
+satA1_a(1 0 1).
+satA1_a(1 0 0).
+satA1_a(0 1 1).
+satA1_a(0 0 0).
+satA1_b(1 1 1).
+satA1_b(1 1 0).
+satA1_b(0 1 1).
+satA1_b(0 0 0).

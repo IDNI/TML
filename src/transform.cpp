@@ -103,15 +103,10 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	int_t v1, int_t v2) {
 	raw_term t;
 	t.e.emplace_back(elem::SYM, r),
-	t.e.emplace_back(elem_openp), t.e.emplace_back(elem_openp),
 	t.e.emplace_back(elem_openp),
 	t.e.emplace_back(get_var_elem(v1)),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
-	t.e.emplace_back(elem_openp), t.e.emplace_back(c),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_openp),
-	t.e.emplace_back(elem_openp),
+	t.e.emplace_back(c),
 	t.e.emplace_back(get_var_elem(v2)),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
 	t.e.emplace_back(elem_closep);
 	return t.calc_arity(current_input), t;
 }
@@ -134,10 +129,10 @@ void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel)
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
 		r.r.push_back(raw_rule(raw_term({
 			elem(elem::SYM, rel),
-			elem_openp, elem_openp, elem_openp, elem(n),
-			elem_closep, elem_closep, elem_openp, elem((char32_t) s[n]),
-			elem_closep, elem_openp, elem_openp, elem(n+1),
-			elem_closep, elem_closep, elem_closep})));
+			elem_openp, elem(n),
+			elem((char32_t) s[n]),
+			elem(n+1),
+			elem_closep})));
 		if (isspace(s[n]))
 			r.r.push_back(from_string_lex(rel, "space", n));
 		if (isdigit(s[n]))

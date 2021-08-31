@@ -161,10 +161,7 @@ spbdd_handle tables::from_fact(const term& t) {
 		if (t[n] >= 0) r = r && from_sym(n, args, t[n]);
 		else if (vs.end() != (it = vs.find(t[n])))
 			r = r && from_sym_eq(n, it->second, args);
-		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {
-			parse_error("Fact contains variable",
-				ir_handler->get_elem(t[n]).e, term_to_str(t));
-		}
+		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {}
 	return r;
 }
 
@@ -177,158 +174,6 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
 	return perm;
-}
-
-/* Convert a term to its string representation. */
-
-std::string tables::term_to_str(const term &tm) {
-	ostringstream rt_oss;
-	rt_oss << ir_handler->to_raw_term(tm);
-	return rt_oss.str();
-}
-
-/* Convert a rule to its string representation. */
-
-std::string tables::rule_to_str(const term &tm, const term_set &tms) {
-	ostringstream rt_oss;
-	rt_oss << ir_handler->to_raw_term(tm);
-	if(!tms.empty()) {
-		rt_oss << " :- ";
-		const char *sep = "";
-		for(const term &bodie : tms) {
-			rt_oss << sep << ir_handler->to_raw_term(bodie);
-			sep = ", ";
-		}
-	}
-	rt_oss << ".";
-	return rt_oss.str();
-}
-
-/* Algorithm to check rule safety based on "Safe Database Queries with
- * Arithmetic Relations" by Rodney Topor. */
-
-bool tables::is_limited(const int_t &var, const term &rt,
-		set<int_t> &wrt, const term_set &scopes) {
-	switch(rt.extype) {
-		case term::REL: case term::ARITH: case term::LEQ: case term::BLTIN: {
-			if(!(rt.extype == term::REL || rt.extype == term::BLTIN) || !rt.neg) {
-				// Safety checking for atoms and builtins is done over the universal
-				// type, so a negation of these cannot limit a variable. Nothing stops
-				// the corresponding BDDs from taking invalid values. However safety
-				// checking for arithmetical operations/inequalities is done over the
-				// integer type. The integer type is always limited, and the BDD type
-				// bit prevents the BDDs from taking invalid values. The latter choice
-				// ensures that ?x<?y is safe iff ?x<=?y is safe given that ?x<?y is
-				// interpreted as ~{?y<?x} and serves to widen the set of safe programs.
-				for(size_t i = 0; i < rt.size(); i++) {
-					if(rt[i] == var) return true;
-				}
-			}
-			return false;
-		} case raw_term::EQ: {
-			if(rt[0] != var && rt[1] != var) {
-				// If this variable is not in the current equality, then the equality
-				// cannot limit the variable
-				return false;
-			} else if(wrt.find(var) == wrt.end()) {
-				// Handle the finiteness dependencies {1} -> 0 and {0} -> 1. Here, we
-				// know that our variable is one of the operands of the equality and
-				// have not yet checked that it is limited. Do this by checking whether
-				// the other operand is limited.
-				wrt.insert(var);
-				const int_t &other = rt[0] == var ? rt[1] : rt[0];
-				bool res = is_limited(other, scopes, wrt);
-				wrt.erase(var);
-				return res;
-			} else {
-				// Here, we know that our variable is one pf the operands of the
-				// equality and are already checking whether it is limited. Here we must
-				// conclude that it is not limited, otherwise we will get an infinite
-				// regress.
-				return false;
-			}
-		} default: {
-			return false;
-		}
-	}
-}
-
-/* Check if the given variable is limited in its scope with respect to
- * the given variable. If the element is not a variable, then it is
- * automatically limited. */
-
-bool tables::is_limited(const int_t &var, const term_set &t,
-		set<int_t> &wrt) {
-	if(var >= 0) {
-		// Symbols are limited by definition
-		return true;
-	} else {
-		// var is limited in a && b if var is limited in a or b
-		for(const term &tree : t)
-			if(is_limited(var, tree, wrt, t)) return true;
-		return false;
-	}
-}
-
-/* Collect all the variables occuring in the given term. */
-
-void collect_free_vars(const term &t, set<int_t> &free_vars) {
-	for(const int_t v : t) if(v < 0) free_vars.insert(v);
-}
-
-/* Collect all the variables occuring in the given set of terms. */
-
-void collect_free_vars(const term_set &t, set<int_t> &free_vars) {
-	for(const term &p : t) collect_free_vars(p, free_vars);
-}
-
-/* Check whether the given formula tree is safe and return the offending
- * variable if not. This means that every free variable in the body is
- * limited. */
-
-optional<int_t> tables::is_safe(const term_set &t) {
-	set<int_t> free_vars;
-	collect_free_vars(t, free_vars);
-	for(const int_t &free_var : free_vars) {
-		set<int_t> wrt;
-		if(!is_limited(free_var, t, wrt)) return free_var;
-	}
-	return nullopt;
-}
-
-/* Enforce syntactical constraints on the given rule to ensure its BDD safety.
- * I.e. that it does not cause the corresponding BDDs to contain undefined
- * values. Roughly the constraints are that variables occuring in negative terms
- * must occur in positive terms and that variables occuring in the head must
- * occur in the body. */
-
-void tables::enforce_rule_safety(const term& hd, term_set prft) {
-	set<int_t> free_vars;
-	
-	if(!hd.neg && !hd.goal) {
-		// Only collect the free variables of positive heads because we
-		// can always guard the body of a rule with a negative head with
-		// the negation of the head to obtain an equivalent rule.
-		collect_free_vars(hd, free_vars);
-	} else if(hd.neg) {
-		// If there is a negative head, then relevant substitutions must be
-		// those that satisfy the head
-		term nhd = hd;
-		nhd.neg = false;
-		prft.insert(nhd);
-	}
-	
-	collect_free_vars(prft, free_vars);
-	
-	// Ensure that all the head variables and other free variables are
-	// limited in the formula
-	for(const int_t &var : free_vars) {
-		set<int_t> wrt;
-		if(!is_limited(var, prft, wrt)) {
-			parse_error("Variable used unsafely",
-				ir_handler->get_elem(var).e, rule_to_str(hd, prft));
-		}
-	}
 }
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
@@ -517,7 +362,6 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
-	enforce_rule_safety(h, al);
 	if (opts.bitunv) a.rng = leq;
 	else a.rng = leq;
 	static set<body*, ptrcmp<body>>::const_iterator bit;
@@ -1120,14 +964,20 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
  * that it reaches a fixed point. Otherwise just return false. */
 
 bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		ir_builder *ir_handler, std::set<raw_term> &results)
+		set<raw_term> &results)
 {
 	rt_options to;
 	to.bproof            = opts.enabled("proof");
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
-	tables tbl(dict, to, ir_handler);
+	to.fp_step           = opts.enabled("fp");
+	to.bitunv            = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
+	ir_builder ir_handler(dict, to);
+	tables tbl(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl;
+	ir_handler.printer = &tbl;
 	strs_t strs;
 	if(tbl.run_prog_wstrs(rp, strs)) {
 		for(const term &result : tbl.decompress()) {
@@ -1144,9 +994,8 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
  * given program reaches a fixed point. Useful for query containment
  * checks. */
 
-bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-	dict_t &dict, const ::options &opts, ir_builder *ir_handler,
-	std::set<raw_term> &results)
+bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
+	const ::options &opts, set<raw_term> &results)
 {
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
@@ -1173,7 +1022,7 @@ bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	}
 	// Run the program to obtain the results which we will then filter
 	std::set<raw_term> tmp_results;
-	bool result = run_prog(rp, dict, opts, ir_handler, tmp_results);
+	bool result = run_prog(rp, dict, opts, tmp_results);
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {

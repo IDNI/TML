@@ -472,6 +472,7 @@ class bit_dict {
 	}
 };
 
+typedef std::tuple<elem, int_t> rel_info;
 
 
 /* A raw term is produced from the parsing stage. In TML source code, it
@@ -484,7 +485,9 @@ class bit_dict {
 struct raw_term {
 
 	bool neg = false;
-	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT } extype = raw_term::REL;
+	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } extype = raw_term::REL;
+	// The name of the relations that instrument this one.
+	std::set<rel_info> instrument_rels;
 
 	//NOTE: we can add FORM1, FORM2 etc to rtextype
 	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)
@@ -589,8 +592,8 @@ struct raw_prefix {
 
 struct raw_form_tree {
 	elem::etype type;
-	raw_term *rt = nullptr; // elem::NONE is used to identify it
-	elem * el = nullptr;
+	std::optional<raw_term> rt; // elem::NONE is used to identify it
+	std::optional<elem> el;
 
 	sprawformtree l = nullptr;
 	sprawformtree r = nullptr;
@@ -602,27 +605,74 @@ struct raw_form_tree {
 	raw_form_tree (const raw_term &_rt) {
 		if(_rt.neg) {
 			type = elem::NOT;
-			el = new elem(elem::NOT);
+			el = elem(elem::NOT);
 			l = std::make_shared<raw_form_tree>(_rt.negate());
 		} else {
 			type = elem::NONE;
-			rt = new raw_term(_rt);
+			rt = raw_term(_rt);
 		}
 	}
 	// Make a formula tree with the given element and two children
 	raw_form_tree (const elem &_el, sprawformtree _l = nullptr,
 		sprawformtree _r = nullptr) :
-		type(_el.type), el(new elem(_el)), l(_l), r(_r) {}
-	~raw_form_tree() {
-		// Fields are deletable because constructors always make heap
-		// allocated copies
-		if (rt) delete rt, rt = nullptr;
-		if (el) delete el, el = nullptr;
+		type(_el.type), el(_el),
+		l(_l ? std::make_shared<raw_form_tree>(*_l) : nullptr),
+		r(_r ? std::make_shared<raw_form_tree>(*_r) : nullptr) {}
+	
+	// Make a deep copy of the given formula tree
+	raw_form_tree(const raw_form_tree &rft) : type(rft.type), rt(rft.rt),
+		el(rft.el), l(rft.l ? std::make_shared<raw_form_tree>(*rft.l) : nullptr),
+		r(rft.r ? std::make_shared<raw_form_tree>(*rft.r) : nullptr), neg(rft.neg),
+		guard_lx(rft.guard_lx) {}
+	
+	// Move the given tree into this
+	raw_form_tree(raw_form_tree &&rft) : type(rft.type), rt(rft.rt),
+			el(rft.el), l(rft.l), r(rft.r), neg(rft.neg), guard_lx(rft.guard_lx) {
+		rft.l = rft.r = nullptr;
 	}
-	void printTree(int level =0 );
-	static sprawformtree simplify(sprawformtree &t, const raw_term &false_term);
+	
+	// Make a deep copy of the given formula tree
+	raw_form_tree &operator=(const raw_form_tree &rft) {
+		type = rft.type;
+		rt = rft.rt;
+		el = rft.el;
+		l = rft.l ? std::make_shared<raw_form_tree>(*rft.l) : nullptr;
+		r = rft.r ? std::make_shared<raw_form_tree>(*rft.r) : nullptr;
+		neg = rft.neg;
+		guard_lx = rft.guard_lx;
+		return *this;
+	}
+	
+	// Move the given tree into this
+	raw_form_tree &operator=(raw_form_tree &&rft) {
+		type = rft.type;
+		rt = rft.rt;
+		el = rft.el;
+		l = rft.l;
+		r = rft.r;
+		neg = rft.neg;
+		guard_lx = rft.guard_lx;
+		
+		rft.l = rft.r = nullptr;
+		return *this;
+	}
+	/* Puts the formulas parented by a tree of associative binary operators
+	 * into a flat list. */
+	void flatten_associative(const elem::etype &tp,
+			std::vector<const raw_form_tree *> &tms) const {
+		if(type == tp) {
+			l->flatten_associative(tp, tms);
+			r->flatten_associative(tp, tms);
+		} else tms.push_back(this);
+	}
+	std::vector<const raw_form_tree *> flatten_associative(const elem::etype &tp) const {
+		std::vector<const raw_form_tree *> tms;
+		flatten_associative(tp, tms);
+		return tms;
+	}
+	void printTree(int level =0 ) const;
 	// Recursively check equality of formula trees
-	bool operator==(const raw_form_tree &pft) {
+	bool operator==(const raw_form_tree &pft) const {
 		// Types must be equal
 		if(type != pft.type) return false;
 		// Signs must be equal
@@ -632,7 +682,7 @@ struct raw_form_tree {
 		// Either both elements are defined or both are not
 		else if(bool(el) != bool(pft.el)) return false;
 		// Either both elements are undefined or both are equal
-		else if(el != nullptr && *el != *pft.el) return false;
+		else if(el && *el != *pft.el) return false;
 		// Either both left trees are defined or both are not
 		else if(bool(l) != bool(pft.l)) return false;
 		// Either both left trees are undefined or both are equal
@@ -645,7 +695,7 @@ struct raw_form_tree {
 		else return true;
 	}
 	// Recursively check order of formula trees
-	bool operator<(const raw_form_tree &pft) {
+	bool operator<(const raw_form_tree &pft) const {
 		// Types most significant lexicographically
 		if(type != pft.type) return type < pft.type;
 		// Signs next significant
@@ -655,7 +705,7 @@ struct raw_form_tree {
 		// Then element definedness next significant
 		else if(bool(el) != bool(pft.el)) return bool(el) < bool(pft.el);
 		// If both defined, then element contents next significant
-		else if(el != nullptr && *el != *pft.el) return *el < *pft.el;
+		else if(el && *el != *pft.el) return *el < *pft.el;
 		// Then left tree definedness next significant
 		else if(bool(l) != bool(pft.l)) return bool(l) < bool(pft.l);
 		// Then left tree contents next significant
@@ -676,10 +726,10 @@ struct raw_form_tree {
 struct raw_rule {
 	std::vector<raw_term> h;
 	// An empty b signifies the presence of a logical formula in prft if
-	// prft != nullptr, otherwise it signifies that this rule is a fact.
+	// prft != nullopt, otherwise it signifies that this rule is a fact.
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
-	sprawformtree prft = nullptr; 
+	std::optional<raw_form_tree> prft;
 
 	mutable spenvcontext varctx = nullptr;
 	enum etype { NONE, GOAL, TREE };
@@ -699,18 +749,9 @@ struct raw_rule {
 			const std::vector<raw_term>& _b) : h(h) {
 		if (!_b.empty()) b = {_b};
 	}
-	raw_rule(const raw_term& h, const sprawformtree &prft) : h({h}), prft(prft) {}
-	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(prft) {}
-	// Clear b and set prft
-	void set_prft(const sprawformtree &_prft) {
-		prft = _prft;
-		b.clear();
-	}
-	// Clear prft and set b
-	void set_b(const std::vector<std::vector<raw_term>> &_b) {
-		b = _b;
-		prft = nullptr;
-	}
+	raw_rule(const raw_term& h, const raw_form_tree &prft) : h({h}), prft(prft) {}
+	raw_rule(const std::vector<raw_term> &h, const raw_form_tree &prft) : h(h), prft(prft) {}
+	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(*prft) {}
 	void update_context(const spenvcontext &_c) const { 
 		varctx = _c;
 	}
@@ -718,21 +759,37 @@ struct raw_rule {
 		return varctx;	
 	}
 	void update_states(std::array<bool, 8>& has) {
-		if (is_form() || is_rule()) has[RULE] = true;
+		if (is_form() || is_dnf()) has[RULE] = true;
 		else for (auto hi : h) has[hi.neg ? DELS : ADDS] = true;
 	}
-	inline bool is_rule() const
+	inline bool is_dnf() const
 		{ return type == NONE && b.size() > 0; }
 	inline bool is_form() const
-		{ return type == NONE && prft.get() != nullptr && b.size() == 0; }
+		{ return type == NONE && prft && b.size() == 0; }
 	inline bool is_fact() const
-		{ return type == NONE && b.size() == 0 && prft.get() == nullptr; }
+		{ return type == NONE && b.size() == 0 && !prft; }
+	inline bool is_goal() const
+		{ return type == GOAL && b.size() == 0 && !prft; }
 	// If prft not set, convert b to prft, then return prft
-	sprawformtree get_prft(const raw_term &false_term) const;
+	std::optional<raw_form_tree> get_prft() const;
+	raw_rule try_as_prft() const;
+	// Clear b and set prft
+	raw_form_tree &set_prft(const raw_form_tree &_prft) {
+		b.clear();
+		return *(prft = _prft);
+	}
+	// Clear prft and set b
+	std::vector<std::vector<raw_term>>
+			&set_b(const std::vector<std::vector<raw_term>> &_b) {
+		prft.reset();
+		return b = _b;
+	}
+	std::optional<std::vector<std::vector<raw_term>>> get_b() const;
 	static raw_rule getdel(const raw_term& t) {
 		raw_rule r(t, t);
 		return r.h[0].neg = true, r;
 	}
+	raw_rule try_as_b() const;
 	bool operator==(const raw_rule& r) const {
 		if(h != r.h) return false;
 		else if(is_form() != r.is_form()) return false;
@@ -758,7 +815,7 @@ struct guard_statement {
 	bool parse_if(input* in, dict_t &dict, raw_prog& rp);
 	bool parse_while(input* in, dict_t &dict, raw_prog& rp);
 	bool parse(input* in, dict_t &dict, raw_prog& rp);
-	sprawformtree prft;       // condition
+	std::optional<raw_form_tree> prft;       // condition
 	int_t rp_id = 0;          // prog id in which to run the condition
 	int_t true_rp_id  = 0;    // id of a true  prog
 	int_t false_rp_id = 0;    // id of a false prog

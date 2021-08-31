@@ -129,6 +129,8 @@ struct table {
 	ints bltinargs;
 	size_t bltinsize = 0;
 	bool hidden = false;
+	// The ID of the table that instruments this rule
+	std::set<int_t> instr_tabs;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -237,16 +239,6 @@ private:
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
-	std::string term_to_str(const term &tm);
-	std::string rule_to_str(const term &tm, const term_set &tms);
-	
-	bool is_limited(const int_t &var, const term &rt, std::set<int_t> &wrt,
-		const term_set &scopes);
-	bool is_limited(const int_t &var, const term_set &t,
-		std::set<int_t> &wrt);
-	std::optional<int_t> is_safe(const term_set &t);
-	
-	void enforce_rule_safety(const term& h, term_set a);
 
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
@@ -270,7 +262,9 @@ private:
 		cb_ground f);
 	void term_get_grounds(const term& t, size_t level, cb_ground f);
 	std::set<witness> get_witnesses(const term& t, size_t l);
-	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
+	bool get_carry_proof(const term& q, proof& p, size_t level);
+	bool get_dnf_proofs(const term& q, proof& p, size_t level);
+	bool get_proof(const term& q, proof& p, size_t level);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
@@ -437,11 +431,10 @@ public:
 	size_t step() { return nstep; }
 	bool add_prog(const raw_prog& p, const strs_t& strs);
 
-	static bool run_prog(const raw_prog &rp, dict_t &dict,
-		const options &opts, ir_builder *ir_handler, std::set<raw_term> &results);
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, ir_builder *ir_handler,
+	static bool run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 		std::set<raw_term> &results);
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 

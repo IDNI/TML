@@ -1,3 +1,4 @@
+domain(0). domain(1). domain(2). domain(3).
 A4(0 1).
 A4(1 1).
 A4(1 2).
@@ -5,7 +6,7 @@ A4(2 3).
 A4(3 3).
 A4(2 1).
 A4(3 1).
-C4A(1) :- forall ?x exists ?y { A4(?x ?y) }.
-C4B(1) :- forall ?x exists ?y { A4(?y ?x) }.
-C4C(1) :- exists ?x forall ?y { A4(?x ?y) }.
-C4D(1) :- exists ?x forall ?y { A4(?y ?x) }.
+C4A(1) :- forall ?x {domain(?x) -> exists ?y { A4(?x ?y) }}.
+C4B(1) :- forall ?x {domain(?x) -> exists ?y { A4(?y ?x) }}.
+C4C(1) :- exists ?x {domain(?x) && forall ?y { domain(?y) -> A4(?x ?y) }}.
+C4D(1) :- exists ?x {domain(?x) && forall ?y { domain(?y) -> A4(?y ?x) }}.

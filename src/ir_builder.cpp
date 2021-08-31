@@ -79,12 +79,20 @@ void align_vars_form(vector<term>& v) {
 flat_prog ir_builder::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
+	map<int_t, set<lexeme>> table_to_instruments;
+	map<lexeme, int_t> instrument_to_table;
 	term t;
 
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x, true),
+				get_nums(x);
+				t = from_raw_term(x, true);
+				// Record how this relation was mapped to a table
+				instrument_to_table[x.e[0].e] = t.tab;
+				// Record how this rule maps to an instrument
+				for(const rel_info &instr_rel : x.instrument_rels)
+					table_to_instruments[t.tab].insert(get<0>(instr_rel).e);
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
@@ -96,25 +104,26 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				}
 			}
 		}
-		else if(r.prft != NULL) {
+		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
 
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
-				: r.prft;
+				? make_shared<raw_form_tree>(elem::NOT,
+						make_shared<raw_form_tree>(*r.prft))
+				: make_shared<raw_form_tree>(*r.prft);
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = std::make_shared<raw_form_tree>(elem::AND, root,
-					std::make_shared<raw_form_tree>(gt));
+				root = make_shared<raw_form_tree>(elem::AND, root,
+					make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
 			/*
 			DBG(COUT << "\n ........... \n";)
-			DBG(r.prft.get()->printTree();)
+			DBG(r.prft->printTree();)
 			DBG(COUT << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
 			*/
@@ -147,6 +156,18 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	// Note the relations that are marked as tmprel in the raw_prog
 	for(const auto &[functor, arity] : p.hidden_rels)
 		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
+	
+	// Note the tables that instrument each rule
+	for(const auto &[tbl, instr_sigs] : table_to_instruments) {
+		for(const lexeme &instr_sig : instr_sigs) {
+			// Now get the instrument table using the instrument signature if possible
+			auto instrument_table = instrument_to_table.find(instr_sig);
+			if(instrument_table != instrument_to_table.end()) {
+				// Note the instrument relation table in the rule that it instruments
+				dynenv->tbls[tbl].instr_tabs.insert(instrument_table->second);
+			}
+		}
+	}
 	
 	return m;
 }
@@ -222,6 +243,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 //#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
 //#define get_var_lexeme(v) dict.get_lexeme(string("?v") + to_string_(-v))
 #define get_var_lexeme(v) rdict().get_lexeme(to_string_t("?v")+to_string_t(-v))
+
 
 elem ir_builder::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
@@ -351,8 +373,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				rt.e[4] = get_elem(r[2]);
 				rt.extype = raw_term::ARITH;
 				return rt;
-			}
-		else if (r.extype == term::BLTIN) {
+		} else if (r.extype == term::BLTIN) {
 			args = r.size();
 			rt.e.resize(args + 1);
 			rt.e[0] = elem(elem::SYM,
@@ -364,13 +385,19 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		else {
-			args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
-			rt.e[0] = elem(elem::SYM,
-				dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
-			rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
-			for (size_t n = 1; n != args + 1; ++n)
-				rt.e[n] = get_elem(r[n - 1]);
-			rt.insert_parens(dict.op, dict.cl);
+			if (r.tab != -1) {
+				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
+				rt.e[0] = elem(elem::SYM,
+						dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
+				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
+				for (size_t n = 1; n != args + 1; ++n)
+					rt.e[n] = get_elem(r[n - 1]);
+				rt.insert_parens(dict.op, dict.cl);
+			} else {
+				args = 1;
+				rt.e.resize(args);
+				rt.e[0] = get_elem(r[0]);
+			}
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {

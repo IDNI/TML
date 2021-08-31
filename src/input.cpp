@@ -403,8 +403,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		forget = false, renew = false;
 
 	t_arith_op arith_op_aux = NOP;
-
-	while ((!strchr(".:,;{}",*l[pos][0]) && !is_form && !(l[pos]=="else"))||
+	while ((!strchr(".:,;{}|&",*l[pos][0]) && !is_form &&  !(l[pos]=="else")) ||
 			(!strchr(".:,;{}|&-<", *l[pos][0]) && is_form)) {
 		if (e.emplace_back(), !e.back().parse(in)) return false;
 		else if (pos == l.size()) return
@@ -437,9 +436,14 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
 			default: break;
 		}
-		if (!rel) rel = true;
 	}
 	if (e.empty()) return false;
+
+	if (e.size() == 1 && e[0].type == elem::VAR) {
+		extype = rtextype::VAR;
+		return true;
+	}
+
 	// TODO: provide specific error messages. Also, something better to group?
 
 	// make 'forget' work as a builtin as well and not just a builtin modifier
@@ -579,26 +583,82 @@ bool macro::parse(input* in, const raw_prog& prog){
 
 	fail: return pos = curr , false;
 }
-sprawformtree raw_rule::get_prft(const raw_term &false_term) const {
-	if(prft) {
-		return prft;
-	} else if(b.empty()) {
-		return std::make_shared<raw_form_tree>(false_term.negate());
-	} else {
-		sprawformtree disj =
-			std::make_shared<raw_form_tree>(false_term);
-		for(size_t i = 0; i < b.size(); i++) {
-			sprawformtree conj =
-				std::make_shared<raw_form_tree>(false_term.negate());
-			for(size_t j = 0; j < b[i].size(); j++) {
-				raw_term entr = b[i][j];
-				conj = std::make_shared<raw_form_tree>(elem::AND, conj,
-					std::make_shared<raw_form_tree>(entr));
-			}
-			disj = std::make_shared<raw_form_tree>(elem::ALT, disj, conj);
-		}
-		return raw_form_tree::simplify(disj, false_term);
+
+/* Makes a tree representing the given non-empty conjunction. Otherwise
+ * return nullopt. */
+
+optional<raw_form_tree> conj_to_tree(vector<raw_term> conj) {
+	if(conj.empty()) return nullopt;
+	raw_form_tree tree(conj[0]);
+	for(size_t i = 1; i < conj.size(); i++)
+		tree = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(tree),
+				make_shared<raw_form_tree>(conj[i]));
+	return tree;
+}
+
+/* Return the stored formula tree or one equivalent to the body.
+ * Otherwise return nullopt. */
+
+optional<raw_form_tree> raw_rule::get_prft() const {
+	if(prft || b.empty()) return prft;
+	else {
+		raw_form_tree disj = *conj_to_tree(b[0]);
+		for(size_t i = 1; i < b.size(); i++)
+			disj = raw_form_tree(elem::ALT, make_shared<raw_form_tree>(disj),
+				make_shared<raw_form_tree>(*conj_to_tree(b[i])));
+		return disj;
 	}
+}
+
+/* Switch the representation of this rule from DNF vectors to equivalent
+ * tree .*/
+
+raw_rule raw_rule::try_as_prft() const {
+	raw_rule copy = *this;
+	if(!prft && !b.empty()) copy.set_prft(*get_prft());
+	return copy;
+}
+
+/* Return the stored DNF or one equivalent to the formula tree. If
+ * neither is possible then return nullopt. */
+
+optional<vector<vector<raw_term>>> raw_rule::get_b() const {
+	if(!b.empty() || !prft) return b;
+	else {
+		vector<vector<raw_term>> disjuncts;
+		// Iterate through disjuncts of the given formula
+		for(const raw_form_tree *disj : prft->flatten_associative(elem::ALT)) {
+			vector<raw_term> conjuncts;
+			// Iterate through the conjunctions of the current disjunct
+			for(const raw_form_tree *conj : disj->flatten_associative(elem::AND)) {
+				bool sign = true;
+				// Figure out the effective sign of the current conjunct
+				for(; conj->type == elem::NOT; conj = &*conj->l, sign = !sign);
+				// Note the term at this position. If this is not possible then
+				// the tree does not represent a DNF.
+				if(conj->type == elem::NONE) {
+					raw_term tm = *conj->rt;
+					tm.neg = !sign;
+					conjuncts.push_back(tm);
+				} else return std::nullopt;
+			}
+			disjuncts.push_back(conjuncts);
+		}
+		return disjuncts;
+	}
+}
+
+/* Switch the representation of this rule from a tree to equivalent
+ * DNF vectors.*/
+
+raw_rule raw_rule::try_as_b() const {
+	raw_rule copy = *this;
+	if(b.empty() && prft) {
+		const optional<vector<vector<raw_term>>> &ob = get_b();
+		if(ob) copy.set_b(*ob);
+	}
+	return copy;
 }
 
 bool raw_rule::parse(input* in, const raw_prog& prog) {
@@ -634,7 +694,7 @@ head:	h.emplace_back();
 		sprawformtree root = NULL;
 		bool ret = rsof.parse(in, root);
 		sprawformtree temp(root);
-		this->prft = temp;
+		if(temp) this->prft = *temp;
 		if(ret) return true;
 		return in->parse_error(l[pos][0], "Formula has errors", l[pos]);
 	} else {
@@ -693,9 +753,9 @@ bool raw_sof::parsematrix(input* in, sprawformtree &matroot) {
 		elem next;
 		next.peek(in);
 
-		if(next.type == elem::SYM) {
+		if(next.type == elem::SYM || next.type == elem::NUM) {
 			raw_term tm;
-			if( !tm.parse(in, prog, true)) goto Cleanup;
+			if( !tm.parse(in, prog, next.type == elem::SYM)) goto Cleanup;
 			root = std::make_shared<raw_form_tree>(tm);
 			if( isneg ) root = std::make_shared<raw_form_tree>(elem::NOT, root);
 			matroot = root;
@@ -806,58 +866,12 @@ bool raw_sof::parse(input* in, sprawformtree &root) {
 	return ret;
 }
 
-void raw_form_tree::printTree( int level) {
+void raw_form_tree::printTree( int level) const {
 	if( r ) r->printTree(level + 1)	;
 	COUT << '\n';
 	for(int i = 0; i < level; i++) COUT << '\t';
 	(this->rt)?	COUT<<*rt : (this->el)? COUT << *el : (this->type) == elem::NOT ? COUT <<"not" : COUT << "";
 	if (l) l->printTree(level + 1);
-}
-
-sprawformtree raw_form_tree::simplify(sprawformtree &t, const raw_term &false_term) {
-	switch(t->type) {
-		case elem::IMPLIES:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
-			break;
-		case elem::COIMPLIES:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
-			break;
-		case elem::AND:
-			simplify(t->l, false_term), simplify(t->r, false_term);
-			if (*t->l == false_term.negate()) {
-				t = t->r;
-			} else if (*t->r == false_term.negate()) {
-				t = t->l;
-			}
-			break;
-		case elem::ALT:
-			simplify(t->l, false_term);
-			simplify(t->r, false_term);
-			if(*t->l == false_term) {
-				t = t->r;
-			} else if(*t->r == false_term) {
-				t = t->l;
-			}
-			break;
-		case elem::NOT:
-			simplify(t->l,false_term);
-			break;
-		case elem::EXISTS:
-			simplify(t->r, false_term);
-			break;
-		case elem::UNIQUE:
-			simplify(t->r, false_term);
-			break;
-		case elem::NONE:
-			break;
-		case elem::FORALL:
-			simplify(t->r, false_term);
-			break;
-		default: DBGFAIL; //should never reach here
-	}
-	return t;
 }
 
 bool production::parse(input *in, const raw_prog& prog) {
@@ -904,7 +918,7 @@ bool guard_statement::parse_condition(input* in, raw_prog& np) {
 	sprawformtree root = 0;
 	raw_sof rsof(np);
 	bool ret = rsof.parse(in, root);
-	prft = sprawformtree(root);
+	if(root) prft = *root;
 	rp_id = np.id;
 	return ret ? true : in->parse_error(in->l[in->pos][0],
 		"Formula has errors", in->l[in->pos]);

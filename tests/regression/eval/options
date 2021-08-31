@@ -1,2 +1,2 @@
---pure-tml --semantics 3pfp
+--to-dnf --semantics 3pfp
 

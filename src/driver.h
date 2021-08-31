@@ -14,6 +14,7 @@
 #define __DRIVER_H__
 #include <map>
 #include <cmath>
+#include <variant>
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
@@ -32,7 +33,6 @@
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
-typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -67,16 +67,18 @@ struct prog_data {
 /* Provides consistent conversions of TML objects into Z3. */
 
 struct z3_context {
+	size_t arith_bit_len;
+	size_t universe_bit_len;
 	z3::context context;
 	z3::solver solver;
-	z3::sort uninterp_sort;
-	z3::sort bool_sort;
-	std::map<rel_info, z3::func_decl> rel_to_decl;
 	z3::expr_vector head_rename;
+	z3::sort bool_sort;
+	z3::sort value_sort;
+	std::map<rel_info, z3::func_decl> rel_to_decl;
 	std::map<elem, z3::expr> var_to_decl;
 	std::map<raw_rule, z3::expr> rule_to_decl;
 	
-	z3_context();
+	z3_context(size_t arith_bit_len, size_t universe_bit_len);
 	z3::func_decl rel_to_z3(const raw_term& rt);
 	z3::expr globalHead_to_z3(const int_t pos);
 	z3::expr fresh_constant();
@@ -84,10 +86,8 @@ struct z3_context {
 	z3::expr z3_head_constraints(const raw_term &head,
 		std::map<elem, z3::expr> &body_rename);
 	z3::expr term_to_z3(const raw_term &rel);
-	z3::expr tree_to_z3(const sprawformtree &tree,
-		const raw_term &false_term, dict_t &dict);
-	z3::expr rule_to_z3(const raw_rule &rr, const raw_term &false_term,
-		dict_t &dict);
+	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
+	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
 };
 
 #endif
@@ -104,10 +104,16 @@ std::set<elem> collect_free_vars(const raw_rule &rr);
 void collect_free_vars(const raw_term &t,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 std::set<elem> collect_free_vars(const raw_term &t);
-void collect_free_vars(const sprawformtree &t,
+void collect_free_vars(const raw_form_tree &t,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 std::set<elem> collect_free_vars(const std::vector<std::vector<raw_term>> &b);
-std::set<elem> collect_free_vars(const sprawformtree &t);
+std::set<elem> collect_free_vars(const raw_form_tree &t);
+std::function<elem (const elem &)> gen_fresh_var(dict_t &d);
+elem gen_id_var(const elem &var);
+elem rename_variables(const elem &e, std::map<elem, elem> &renames,
+	const std::function<elem (const elem &)> &gen);
+void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
+	const std::function<elem (const elem &)> &gen);
 
 class driver {
 	friend class archive;
@@ -140,8 +146,7 @@ class driver {
 	std::set<raw_term> get_queries(const raw_prog& p);
 
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel,
-		const raw_term &false_term);
+	void directives_load(raw_prog& p, lexeme& trel);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
@@ -157,18 +162,35 @@ class driver {
 	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	bool transform_evals(raw_prog &rp, const directive &drt);
-	bool transform_quotes(raw_prog &rp, const raw_term &false_term,
-		const directive &drt);
+	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
+	bool is_limited(const elem &var, const raw_form_tree &t,
+		std::set<elem> &wrt, std::map<elem, const raw_form_tree*> &scopes);
+	bool is_limited(const elem &var, std::set<elem> &wrt,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> all_quantifiers_limited(const raw_form_tree &t,
+		std::map<elem, const raw_form_tree*> &scopes);
+	std::optional<elem> is_safe(const raw_form_tree &t);
+	std::optional<elem> is_safe(const raw_rule &rr);
+	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
 	void flatten_associative(const elem::etype &tp,
-		const sprawformtree &tree, std::vector<sprawformtree> &tms);
-	template<typename F> bool try_minimize(raw_rule &rr, const F &f);
+		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
+	template<typename F> void minimize(raw_rule &rr, const F &f);
+	template<typename F>
+		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
+		const raw_rule &var_rule, raw_form_tree &ref_tree,
+		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
+	void pdatalog_transform(raw_prog &rp,
+		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
+	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
+	void square_root_program(raw_prog &rp);
+	void square_program(raw_prog &rp);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
@@ -177,33 +199,34 @@ class driver {
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
 #ifdef WITH_Z3
-	void qc_z3(raw_prog &rp, const raw_term &false_term);
+	void qc_z3(raw_prog &rp);
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
-		const raw_term &false_term, z3_context &ctx);
+		z3_context &ctx);
 #endif
 	raw_prog read_prog(elem prog, const raw_prog &rp);
-	void simplify_formulas(raw_prog &rp, const raw_term &false_term);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
 	elem quote_term(const raw_term &head, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
-	elem quote_formula(const sprawformtree &t, const elem &rel_name,
+	elem quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, std::map<elem, elem> &variables,
 		int_t &part_count);
 	std::vector<elem> quote_rule(const raw_rule &rr, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, int_t &part_count,
-		const raw_term &false_term);
+		const elem &domain_name, raw_prog &rp, int_t &part_count);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
-		const elem &domain_name, raw_prog &rp, const raw_term &false_term);
-	raw_term to_pure_tml(const sprawformtree &t, raw_prog &rp,
+		const elem &domain_name, raw_prog &rp);
+	void split_heads(raw_prog &rp);
+	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
 		const std::set<elem> &fv);
-	void to_pure_tml(raw_prog &rp);
+	void to_dnf(raw_prog &rp);
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
-	void remove_redundant_exists(raw_prog &rp);
+	void instrument_prog(raw_prog &rp);
+	bool transform_grammar(raw_prog &rp);
+	void export_outer_quantifiers(raw_prog &rp);
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
@@ -215,14 +238,12 @@ class driver {
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_term &rt, string_t &prog_constr, uint_t &cid,
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const sprawformtree &prft, string_t &prog_constr,
+	string_t generate_cpp(const raw_form_tree &prft, string_t &prog_constr,
 		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
-		const raw_term &false_term);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache,
-		const raw_term &false_term);
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,

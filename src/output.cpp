@@ -463,6 +463,10 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 		if (t.neg) os << '}';
 		return os;
 	}
+	if (t.extype == raw_term::VAR) {
+		os << t.e[0];
+		return os;
+	}
 
 	os << t.e[0];
 	os << '(';
@@ -572,12 +576,12 @@ basic_ostream<T>& print_raw_rule(basic_ostream<T>& os, const raw_rule& r,
 	}
 	for (size_t n = 0; n < r.h.size(); ++n)
 		if ((os << r.h[n]), n != r.h.size() - 1) os << ',';
-	if (!r.b.size() && !r.prft.get()) return os << '.';
+	if (!r.b.size() && !r.prft) return os << '.';
 	os << " :- ";
 	bool uni = r.b.size() == 1 && r.b[0].size() == 1;
 	bool noendl = !r.b.size() || uni;
 	if (!compact && !noendl) os << endl;
-	if (r.prft.get()) os << *r.prft;
+	if (r.prft) os << *r.prft;
 	for (size_t n = 0; n < r.b.size(); ++n) {
 		for (size_t k = 0; k < r.b[n].size(); ++k)
 			if (((compact||uni?os<<"":os<<indent<<'\t')<<r.b[n][k]),
