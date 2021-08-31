@@ -950,11 +950,11 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
+		if (opts.bproof) levels.push_back(move(l));
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
 		if (!datalog && is_repeat)
 			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
-		if (opts.bproof) levels.push_back(move(l));
 	}
 	DBGFAIL;
 }

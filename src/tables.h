@@ -257,14 +257,9 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
-	std::vector<env> varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v) const;
-	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
-		cb_ground f);
-	void term_get_grounds(const term& t, size_t level, cb_ground f);
-	std::set<witness> get_witnesses(const term& t, size_t l);
-	bool get_carry_proof(const term& q, proof& p, size_t level);
-	bool get_dnf_proofs(const term& q, proof& p, size_t level);
-	bool get_proof(const term& q, proof& p, size_t level);
+	bool get_carry_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &memo);
+	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &memo);
+	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &memo);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
