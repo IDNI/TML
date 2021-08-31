@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 	options o(argc, argv, &ii, &oo);
 	string archive_file = o.get_string("load");
 	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
-		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
+		o.get_int("bdd-max-size"), o.get_string("bdd-file"), o.get_bool("gc"));
 	// read from stdin by default if no -i(e), -h, -v and no -repl/udp
 	if (o.disabled("i") && o.disabled("ie")
 #ifdef WITH_THREADS

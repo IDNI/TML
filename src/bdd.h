@@ -326,9 +326,9 @@ public:
 	}
 #ifndef NOMMAP
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
-		const std::string fn="");
+		const std::string fn="", bool gc = true);
 #else
-	static void init();
+	static void init(bool gc = true);
 #endif
 	static void gc();
 	template <typename T>
