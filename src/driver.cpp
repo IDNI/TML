@@ -4334,6 +4334,10 @@ void driver::instrument_prog(raw_prog &rp) {
 	vector<raw_rule> instr_rules;
 	
 	for(const raw_rule &rr : rp.r) {
+		// Ensure that the relation of this rule is recorded in the instrument map.
+		// Used when creating "identity" rules after this loop.
+		const rel_info &orig_ri = get_relation_info(rr.h[0]);
+		instrument_map[orig_ri];
 		if(rr.h[0].neg || !rr.is_dnf()) continue;
 		// Make the instrumentation rule head
 		vector<elem> instr_hd_elems { elem::fresh_temp_sym(d), elem_openp };
@@ -4360,40 +4364,35 @@ void driver::instrument_prog(raw_prog &rp) {
 		
 		// Ensure one-to-many correspondence between relations and their
 		// instrumentationz by using existing mapping if it has already been made
-		const rel_info &orig_ri = get_relation_info(rr.h[0]);
 		instrument_map[orig_ri].insert(get_relation_info(instr_rule.h[0]));
 	}
 	
+	// TML automatically carries facts from previous steps unless there is an
+	// explicit deletion. Make an "identity" instrumentation rule that explains
+	// that a fact came from the previous step. This will be used during proof
+	// extraction for the carry case.
+	
+	for(auto &[orig_rel, instr_rels] : instrument_map) {
+		// Make the elements of a general term with the same arity as a program
+		// relation
+		vector<elem> instr_hd_elems { elem::fresh_temp_sym(d), elem_openp };
+		for(int_t i = 0; i < get<1>(orig_rel); i++) {
+			instr_hd_elems.push_back(elem::fresh_var(d));
+		}
+		instr_hd_elems.push_back(elem_closep);
+		// Now make the actual general term as well as one of the original relation
+		raw_term instr_hd(instr_hd_elems), orig_hd(instr_hd_elems);
+		orig_hd.e[0] = get<0>(orig_rel);
+		// Now make the actual instrumentation rule and record it
+		instr_rules.push_back(raw_rule(instr_hd, orig_hd));
+		instr_rels.insert(get_relation_info(instr_hd));
+	}
+	
 	// Now that we have all the instrumentation relations corresponding to each
-	// original relation, store links to them in the original rules. Also make
-	// sure that corresponding instrumentation relations are deleted whenever the
-	// originals are.
+	// original relation, store links to them in the original rules.
 	
 	for(raw_rule &rr : rp.r) {
 		rr.h[0].instrument_rels = instrument_map[get_relation_info(rr.h[0])];
-		// Only proceed to make deletion rules if present one is also a deletion
-		if(!rr.h[0].neg) continue;
-		for(const rel_info &instr_rel : rr.h[0].instrument_rels) {
-			// Make the instrumentation rule head
-			vector<elem> instr_hd_elems { get<0>(instr_rel), elem_openp };
-			// Add <orig_rule_args>
-			for(auto it = rr.h[0].e.begin() + 2; it != rr.h[0].e.end() - 1; it++) {
-				instr_hd_elems.push_back(*it);
-			}
-			// If the current rule is a deletion rule, then we should just delete all
-			// the instrumentation of the affected facts indiscriminately as it would
-			// no longer be useful.
-			for(int_t i = instr_hd_elems.size() - 2; i < get<1>(instr_rel); i++) {
-				instr_hd_elems.push_back(elem::fresh_var(d));
-			}
-			instr_hd_elems.push_back(elem_closep);
-			// Make the instrumentation rule with this and add it to the pendings list
-			// to avoid extending this loop
-			raw_rule instr_rule = rr;
-			instr_rule.h[0] = raw_term(instr_hd_elems);
-			instr_rule.h[0].neg = rr.h[0].neg;
-			instr_rules.push_back(instr_rule);
-		}
 	}
 	// Now add all the pending instrumentation rules to the program
 	for(const raw_rule &instr_rule : instr_rules) {
