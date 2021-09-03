@@ -79,7 +79,7 @@ void align_vars_form(vector<term>& v) {
 flat_prog ir_builder::to_terms(const raw_prog& p) {
 	flat_prog m;
 	vector<term> v;
-	map<int_t, set<lexeme>> table_to_instruments;
+	map<int_t, map<lexeme, bool>> table_to_instruments;
 	map<lexeme, int_t> instrument_to_table;
 	term t;
 
@@ -91,8 +91,8 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				// Record how this relation was mapped to a table
 				instrument_to_table[x.e[0].e] = t.tab;
 				// Record how this rule maps to an instrument
-				for(const rel_info &instr_rel : x.instrument_rels)
-					table_to_instruments[t.tab].insert(get<0>(instr_rel).e);
+				for(const auto &[instr_rel, rule_neg] : x.instrument_rels)
+					table_to_instruments[t.tab][get<0>(instr_rel).e] = rule_neg;
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
@@ -159,12 +159,12 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	
 	// Note the tables that instrument each rule
 	for(const auto &[tbl, instr_sigs] : table_to_instruments) {
-		for(const lexeme &instr_sig : instr_sigs) {
+		for(const auto &[instr_sig, rule_neg] : instr_sigs) {
 			// Now get the instrument table using the instrument signature if possible
 			auto instrument_table = instrument_to_table.find(instr_sig);
 			if(instrument_table != instrument_to_table.end()) {
 				// Note the instrument relation table in the rule that it instruments
-				dynenv->tbls[tbl].instr_tabs.insert(instrument_table->second);
+				dynenv->tbls[tbl].instr_tabs[instrument_table->second] = rule_neg;
 			}
 		}
 	}

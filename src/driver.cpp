@@ -4330,7 +4330,7 @@ void driver::instrument_prog(raw_prog &rp) {
 	// existentially quantified variables. Record the one to many mapping from
 	// original relations to instrumentation relations.
 	
-	map<rel_info, set<rel_info>> instrument_map;
+	map<rel_info, map<rel_info, bool>> instrument_map;
 	vector<raw_rule> instr_rules;
 	
 	for(const raw_rule &rr : rp.r) {
@@ -4338,7 +4338,7 @@ void driver::instrument_prog(raw_prog &rp) {
 		// Used when creating "identity" rules after this loop.
 		const rel_info &orig_ri = get_relation_info(rr.h[0]);
 		instrument_map[orig_ri];
-		if(rr.h[0].neg || !rr.is_dnf()) continue;
+		if(!rr.is_dnf()) continue;
 		// Make the instrumentation rule head
 		vector<elem> instr_hd_elems { elem::fresh_temp_sym(d), elem_openp };
 		// Add <orig_rule_args>
@@ -4359,12 +4359,12 @@ void driver::instrument_prog(raw_prog &rp) {
 		// to avoid extending this loop
 		raw_rule instr_rule = rr;
 		instr_rule.h[0] = raw_term(instr_hd_elems);
-		instr_rule.h[0].neg = rr.h[0].neg;
+		instr_rule.h[0].neg = false;
 		instr_rules.push_back(instr_rule);
 		
 		// Ensure one-to-many correspondence between relations and their
 		// instrumentationz by using existing mapping if it has already been made
-		instrument_map[orig_ri].insert(get_relation_info(instr_rule.h[0]));
+		instrument_map[orig_ri][get_relation_info(instr_rule.h[0])] = rr.h[0].neg;
 	}
 	
 	// TML automatically carries facts from previous steps unless there is an
@@ -4385,7 +4385,7 @@ void driver::instrument_prog(raw_prog &rp) {
 		orig_hd.e[0] = get<0>(orig_rel);
 		// Now make the actual instrumentation rule and record it
 		instr_rules.push_back(raw_rule(instr_hd, orig_hd));
-		instr_rels.insert(get_relation_info(instr_hd));
+		instr_rels[get_relation_info(instr_hd)] = false;
 	}
 	
 	// Now that we have all the instrumentation relations corresponding to each

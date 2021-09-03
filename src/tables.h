@@ -130,7 +130,7 @@ struct table {
 	size_t bltinsize = 0;
 	bool hidden = false;
 	// The ID of the table that instruments this rule
-	std::set<int_t> instr_tabs;
+	std::map<int_t, bool> instr_tabs;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };

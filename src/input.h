@@ -487,7 +487,7 @@ struct raw_term {
 	bool neg = false;
 	enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } extype = raw_term::REL;
 	// The name of the relations that instrument this one.
-	std::set<rel_info> instrument_rels;
+	std::map<rel_info, bool> instrument_rels;
 
 	//NOTE: we can add FORM1, FORM2 etc to rtextype
 	// and replace t_arith_op by a form (once we do parse for compound arithmetic formulas)

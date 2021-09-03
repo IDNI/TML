@@ -34,7 +34,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 	proof_elem not_exists_proof;
 	not_exists_proof.rl = not_exists_proof.al = 0;
 	// Check if the table of the given fact has an instrumentation table
-	for(const int_t &instr_tab : tbls[q.tab].instr_tabs) {
+	for(const auto &[instr_tab, orig_rule_neg] : tbls[q.tab].instr_tabs) {
 		// Convert the fact into an instrumentation fact by switching the table and
 		// extending the fact with variables to capture the instrumentation
 		term fact_aug = q;
@@ -45,7 +45,9 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 			fact_aug.push_back(--start_var);
 		}
 		// Now we capture the instrumented facts that have been derived
-		decompress((q.neg ? htrue : levels[level][fact_aug.tab]) && from_fact(fact_aug), fact_aug.tab,
+		bool exists_mode = q.neg == orig_rule_neg;
+		spbdd_handle var_domain = exists_mode ? levels[level][fact_aug.tab] : htrue;
+		decompress(var_domain && from_fact(fact_aug), fact_aug.tab,
 				[&](const term& t) {
 			// Ensure that the current variable instantiations are legal. Needed for
 			// proving negative facts by showing that no variable instantiation would
@@ -98,17 +100,19 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					// If we are trying to prove a positive fact, then we need a proof of
 					// each body term. If we are trying to prove a negative fact, we need
 					// a proof of a negation of a body term.
-					if(get_proof(q.neg ? negated_body_tm : body_tm, p, body_level, absent) == q.neg) {
+					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level, absent) != exists_mode) {
 						// If q head positive, then a body proof failed. So there cannot
 						// exist an instantitation of variables in current rule to make head
 						// q.
 						exists_proof_valid = false;
 						// If q head negative, then we have just found a proof that this
 						// variable instantiation cannot work.
-						pair<nlevel, term> counter_example = {level-1, negated_body_tm};
-						// Avoid duplicating counter-examples.
-						if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) == not_exists_proof.b.end()) {
-							not_exists_proof.b.push_back(counter_example);
+						if(!exists_mode) {
+							pair<nlevel, term> counter_example = {level-1, negated_body_tm};
+							// Avoid duplicating counter-examples.
+							if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) == not_exists_proof.b.end()) {
+								not_exists_proof.b.push_back(counter_example);
+							}
 						}
 						break;
 					}
@@ -117,7 +121,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					// The presence of an instantiation is incompatible with the lack of
 					// existence of one.
 					not_exists_proof_valid = false;
-					if(!q.neg) {
+					if(exists_mode) {
 						// Add this proof as one of the many possible proving this positive
 						// fact
 						p[level][q].insert(exists_proof);
@@ -129,8 +133,13 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 	// Now that we have gone through all the rules of the given relation, we are
 	// in a position to fully determine the lack of existence of a variable
 	// instantiation that would derive the positive head.
-	if(not_exists_proof_valid && q.neg) {
-		p[level][q].insert(not_exists_proof);
+	if(not_exists_proof_valid) {
+		set<proof_elem> augmented_witnesses;
+		for(proof_elem witnes : p[level][q]) {
+			witnes.b.insert(witnes.b.end(), not_exists_proof.b.begin(), not_exists_proof.b.end());
+			augmented_witnesses.insert(witnes);
+		}
+		p[level][q] = augmented_witnesses;
 	}
 	return p[level].find(q) != p[level].end();
 }
