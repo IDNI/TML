@@ -4375,17 +4375,20 @@ void driver::instrument_prog(raw_prog &rp) {
 	for(auto &[orig_rel, instr_rels] : instrument_map) {
 		// Make the elements of a general term with the same arity as a program
 		// relation
-		vector<elem> instr_hd_elems { elem::fresh_temp_sym(d), elem_openp };
+		vector<elem> orig_hd_elems { get<0>(orig_rel), elem_openp };
 		for(int_t i = 0; i < get<1>(orig_rel); i++) {
-			instr_hd_elems.push_back(elem::fresh_var(d));
+			orig_hd_elems.push_back(elem::fresh_var(d));
 		}
-		instr_hd_elems.push_back(elem_closep);
+		orig_hd_elems.push_back(elem_closep);
 		// Now make the actual general term as well as one of the original relation
-		raw_term instr_hd(instr_hd_elems), orig_hd(instr_hd_elems);
-		orig_hd.e[0] = get<0>(orig_rel);
+		raw_term pos_instr_hd(orig_hd_elems), neg_instr_hd(orig_hd_elems), orig_hd(orig_hd_elems);
+		pos_instr_hd.e[0] = elem::fresh_temp_sym(d);
+		neg_instr_hd.e[0] = elem::fresh_temp_sym(d);
 		// Now make the actual instrumentation rule and record it
-		instr_rules.push_back(raw_rule(instr_hd, orig_hd));
-		instr_rels[get_relation_info(instr_hd)] = false;
+		instr_rules.push_back(raw_rule(pos_instr_hd, orig_hd));
+		instr_rules.push_back(raw_rule(neg_instr_hd, orig_hd.negate()));
+		instr_rels[get_relation_info(pos_instr_hd)] = false;
+		instr_rels[get_relation_info(neg_instr_hd)] = true;
 	}
 	
 	// Now that we have all the instrumentation relations corresponding to each

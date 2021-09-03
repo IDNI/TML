@@ -26,9 +26,6 @@ using namespace std;
  * discarded. */
 
 bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term, size_t>> &absent) {
-	// Indicates that there is not a legal variable substitution that would derive
-	// q as a head
-	bool not_exists_proof_valid = true;
 	// A set of negative facts that are enough to prevent q from being derived.
 	// Evidence for a negative fact.
 	proof_elem not_exists_proof;
@@ -45,7 +42,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 			fact_aug.push_back(--start_var);
 		}
 		// Now we capture the instrumented facts that have been derived
-		bool exists_mode = q.neg == orig_rule_neg;
+		const bool exists_mode = q.neg == orig_rule_neg;
 		spbdd_handle var_domain = exists_mode ? levels[level][fact_aug.tab] : htrue;
 		decompress(var_domain && from_fact(fact_aug), fact_aug.tab,
 				[&](const term& t) {
@@ -60,7 +57,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					(el & 3) == 3) return;
 			}
 			// Find the single rule corresponding to this instrumentation table
-			for(int_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
+			for(size_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
 				const rule &rul = rules[rule_idx];
 				if(rul.tab != fact_aug.tab) continue;
 				// By construction, each instrumentation relation has only one rule
@@ -69,7 +66,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 				// Now we want to map the variables of the instrumentation rule to
 				// their substitutions
 				map<int_t, int_t> subs;
-				for(int_t i = 0; i < t.size(); i++) {
+				for(size_t i = 0; i < t.size(); i++) {
 					subs[rul.t[i]] = t[i];
 				}
 				// Now we want to substitute the variable instantiations into the
@@ -101,13 +98,14 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					// each body term. If we are trying to prove a negative fact, we need
 					// a proof of a negation of a body term.
 					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level, absent) != exists_mode) {
-						// If q head positive, then a body proof failed. So there cannot
-						// exist an instantitation of variables in current rule to make head
-						// q.
-						exists_proof_valid = false;
-						// If q head negative, then we have just found a proof that this
-						// variable instantiation cannot work.
-						if(!exists_mode) {
+						if(exists_mode) {
+							// If q head positive, then a body proof failed. So there cannot
+							// exist an instantitation of variables in current rule to make
+							// head q.
+							exists_proof_valid = false;
+						} else {
+							// If q head negative, then we have just found a proof that this
+							// variable instantiation cannot work.
 							pair<nlevel, term> counter_example = {level-1, negated_body_tm};
 							// Avoid duplicating counter-examples.
 							if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) == not_exists_proof.b.end()) {
@@ -117,15 +115,10 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 						break;
 					}
 				}
-				if(exists_proof_valid) {
-					// The presence of an instantiation is incompatible with the lack of
-					// existence of one.
-					not_exists_proof_valid = false;
-					if(exists_mode) {
-						// Add this proof as one of the many possible proving this positive
-						// fact
-						p[level][q].insert(exists_proof);
-					}
+				if(exists_proof_valid && exists_mode) {
+					// Add this proof as one of the many possible proving this positive
+					// fact
+					p[level][q].insert(exists_proof);
 				}
 			}
 		}, fact_aug.size());
@@ -133,14 +126,16 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 	// Now that we have gone through all the rules of the given relation, we are
 	// in a position to fully determine the lack of existence of a variable
 	// instantiation that would derive the positive head.
-	if(not_exists_proof_valid) {
-		set<proof_elem> augmented_witnesses;
-		for(proof_elem witnes : p[level][q]) {
-			witnes.b.insert(witnes.b.end(), not_exists_proof.b.begin(), not_exists_proof.b.end());
-			augmented_witnesses.insert(witnes);
+	set<proof_elem> augmented_witnesses;
+	for(proof_elem witnes : p[level][q]) {
+		for(const auto &not_witness : not_exists_proof.b) {
+			if(find(witnes.b.begin(), witnes.b.end(), not_witness) == witnes.b.end()) {
+				witnes.b.push_back(not_witness);
+			}
 		}
-		p[level][q] = augmented_witnesses;
+		augmented_witnesses.insert(witnes);
 	}
+	p[level][q] = augmented_witnesses;
 	return p[level].find(q) != p[level].end();
 }
 
