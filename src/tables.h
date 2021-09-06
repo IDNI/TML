@@ -257,8 +257,8 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
-	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &memo);
-	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &memo);
+	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
+	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;

@@ -25,7 +25,7 @@ using namespace std;
  * exist do actually exist at the previous level. Otherwise that proof must be
  * discarded. */
 
-bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term, size_t>> &absent) {
+bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term, size_t>> &refuted) {
 	// A set of negative facts that are enough to prevent q from being derived.
 	// Evidence for a negative fact.
 	proof_elem not_exists_proof;
@@ -97,7 +97,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					// If we are trying to prove a positive fact, then we need a proof of
 					// each body term. If we are trying to prove a negative fact, we need
 					// a proof of a negation of a body term.
-					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level, absent) != exists_mode) {
+					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level, refuted) != exists_mode) {
 						if(exists_mode) {
 							// If q head positive, then a body proof failed. So there cannot
 							// exist an instantitation of variables in current rule to make
@@ -144,22 +144,23 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
  * and return false if the given term does not actually occur at the given
  * level. */
 
-bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, size_t>> &absent) {
+bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, size_t>> &refuted) {
 	// Grow the proof object until it can store proof for this level
 	for(; p.size() <= level; p.push_back({}));
 	// Check if this term has not already been proven at the given level
 	if(p[level].find(q) != p[level].end()) return true;
 	// Otherwise check if the term has not already been shown absent
-	if(auto it = absent.find({q, level}); it != absent.end()) return false;
+	if(auto it = refuted.find({q, level}); it != refuted.end()) return false;
 	// First ensure that this term can actually be proved. That is ensure that it
 	// is present or not present in the relevant step database.
 	int_t qsat = (levels[level][q.tab] && from_fact(q)) != hfalse;
-	// If the fact is negative, then it cannot have and yet is present, then there
-	// cannot be a proof. Same if it is positive but yet is not present.
-	if(q.neg == qsat) { return false; }
+	// If the fact is negative, then its presence in the database is
+	// contradictory. If it is positive, then its absense from the database is
+	// also contradictory.
+	if(q.neg == qsat) { refuted.insert({ q, level }); return false; }
 	// The proof for this fact may stem from a DNF rule's derivation. There may be
 	// a multiplicity of these proofs. Get them.
-	if(level > 0) get_dnf_proofs(q, p, level, absent);
+	if(level > 0) get_dnf_proofs(q, p, level, refuted);
 	// Here we know that this fact is valid. Make sure that this fact at least has
 	// empty witness set to represent self-evidence.
 	p[level][q];
@@ -176,13 +177,13 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	set<term> s;
 	// Record the facts covered by each goal
 	for (const term& t : goals)
-		decompress(levels[levels.size() - 1][t.tab] && from_fact(t), t.tab,
+		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	// Auxilliary variable for get_proof
-	set<pair<term, size_t>> absent;
+	set<pair<term, size_t>> refuted;
 	// Get all proofs for each covered fact
 	for (const term& g : s)
-		if (opts.bproof) get_proof(g, p, levels.size() - 1, absent);
+		if (opts.bproof) get_proof(g, p, levels.size() - 1, refuted);
 		else os << ir_handler->to_raw_term(g) << '.' << endl;
 	// Print proofs
 	if (opts.bproof) print(os, p);
