@@ -1,0 +1,26 @@
+# every B is A
+A0(0).
+A0(1).
+B0(0).
+ALL_B0_IS_A0(1) :- forall ?x { B0(?x) -> A0(?x) }.
+#NOT_ALL_B0_IS_A0(1) :- ~ALL_B0_IS_A0(1). # negating this way is not working
+
+A1(0).
+B1(1).
+B1(0).
+ALL_B1_IS_A1(1) :- forall ?x { B1(?x) -> A1(?x) }.
+#NOT_ALL_B1_IS_A1(1) :- ~ALL_B1_IS_A1(1).
+
+A2(1 0).
+A2(0 1).
+B2(1 0).
+B2(0 0).
+ALL_B2_IS_A2(1) :- forall ?x { B2(?x 0) -> A2(0 ?x) }.
+#NOT_ALL_B2_IS_A2(1) :- ~ALL_B2_IS_A2(1).
+
+A3(0 0).
+A3(0 1).
+B3(1 0).
+B3(0 0).
+ALL_B3_IS_A3(1) :- forall ?x { B3(?x 0) -> A3(0 ?x) }.
+#NOT_ALL_B3_IS_A3(1) :- ~ALL_B3_IS_A3(1).

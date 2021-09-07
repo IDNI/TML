@@ -1,0 +1,13 @@
+domain(1).
+domain(0).
+A2(1 1).
+A2(1 0).
+B2(1 1).
+B2(1 0).
+B2(0 1).
+ALL_B2_IS_A2(1 1).
+ALL_B2_IS_A2(1 0).
+ALL_B2_IS_A2(0 0).
+AND_B2_A2(1 1).
+AND_B2_A2(0 1).
+AND_B2_A2_cons(0 1).

@@ -164,7 +164,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 		set<elem> &wrt, map<elem, const raw_form_tree*> &scopes) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
@@ -325,7 +325,7 @@ optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 		map<elem, const raw_form_tree*> &scopes) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
@@ -435,7 +435,7 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 		for(const elem &free_var : free_vars) {
 			scopes[free_var] = &*prft;
 		}
-		
+
 		// Ensure that all the head variables and other free variables are
 		// limited in the formula
 		for(const elem &var : free_vars) {
@@ -1335,7 +1335,7 @@ void update_element_counts(const raw_term &rt, set<elem> &distinct_syms,
 pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
 	int_t max_int = 0, char_count = 0;
 	set<elem> distinct_syms;
-	
+
 	for(const raw_rule &rr : rp.r) {
 		// Updates the counters based on the heads of the current rule
 		for(const raw_term &rt : rr.h)
@@ -3325,13 +3325,13 @@ void driver::pdatalog_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	// Bypass transformation when there are no rules
 	if(rp.r.empty()) {
 		f(rp);
 		return;
 	}
-	
+
 	map<rel_info, array<elem, 2>> freeze_map;
 	// First move all additions to a relation to a separate temporary
 	// relation and move all deletions to another separate temporary
@@ -3797,7 +3797,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 		const raw_rule &def) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	const raw_term &head = def.h[0];
 	// Where all the mappings for the substitution will be stored
 	map<elem, elem> renames;
@@ -3853,7 +3853,7 @@ void driver::square_program(raw_prog &rp) {
 	for(const raw_rule &rr : rp.r)
 		if(!rr.is_fact() && !rr.is_goal())
 			rels[get_relation_info(rr.h[0])].insert(rr);
-	
+
 	// The place where we will construct the squared program
 	vector<raw_rule> squared_prog;
 	for(const raw_rule &rr : rp.r) {
@@ -3902,7 +3902,7 @@ void driver::square_program(raw_prog &rp) {
 void driver::square_root_program(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = tbl->get_dict();
-	
+
 	// Only apply this transformation if there are rules to slow down
 	if(!rp.r.empty()) {
 		// Execute program rules only when the clock is in asserted state
@@ -4679,13 +4679,15 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
 		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
-		if(auto res = is_safe(rp)) {
-			ostringstream msg;
-			// The program is unsafe so inform the user of the offending rule
-			// and variable.
-			msg << "The variable " << res->first << " of " << res->second <<
-				" is not limited. Try rewriting the rule to make its safety clearer.";
-			parse_error(msg.str().c_str());
+		if(opts.enabled("safe-check")) {
+			if(auto res = is_safe(rp)) {
+				ostringstream msg;
+				// The program is unsafe so inform the user of the offending rule
+				// and variable.
+				msg << "The variable " << res->first << " of " << res->second <<
+					" is not limited. Try rewriting the rule to make its safety clearer.";
+				parse_error(msg.str().c_str());
+			}
 		}
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
@@ -4699,7 +4701,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 #ifdef WITH_Z3
 		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
 		z3_context z3_ctx(int_bit_len, universe_bit_len);
-		
+
 		if(opts.enabled("qc-subsume-z3")){
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;

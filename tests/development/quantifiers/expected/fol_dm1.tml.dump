@@ -1,0 +1,11 @@
+domain(1).
+domain(0).
+U(1).
+sat_and(1 1).
+sat_or(1 1).
+sat_or(1 0).
+sat_or(0 1).
+sat_nand(1 0).
+sat_nand(0 1).
+sat_nand(0 0).
+sat_nor(0 0).
