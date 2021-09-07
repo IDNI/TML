@@ -121,6 +121,9 @@ typedef struct {
 	std::set<ntable> pu_states;
 } rt_options;
 
+
+typedef enum { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } t_term;
+
 typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
 } t_arith_op;
