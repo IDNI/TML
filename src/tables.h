@@ -129,8 +129,6 @@ struct table {
 	ints bltinargs;
 	size_t bltinsize = 0;
 	bool hidden = false;
-	// The ID of the table that instruments this rule
-	std::map<int_t, bool> instr_tabs;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -257,6 +255,8 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
+	rule get_identity_rule(ntable tab, bool neg);
+	bool is_term_valid(const term &t);
 	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
 	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);

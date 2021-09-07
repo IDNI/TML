@@ -16,6 +16,21 @@
 
 using namespace std;
 
+/* Ensure that the current variable instantiations are legal. Needed for proving
+ * negative facts by showing that no variable instantiation would satisfy rules
+ * of a relation. */
+
+bool tables::is_term_valid(const term &t) {
+	for(const int_t &el : t) {
+		// Use the type bits to determine what the value limits should be
+		if(((el & 3) == 1 && (el >> 2) >= ir_handler->chars) ||
+			((el & 3) == 2 && (el >> 2) > ir_handler->nums) ||
+			((el & 3) == 0 && (el >> 2) >= ir_handler->syms) ||
+			(el & 3) == 3) return false;
+	}
+	return true;
+}
+
 /* Get the proofs of the given term occuring at the given level stemming
  * directly from a DNF rule head. Do this by querying the corresponding
  * instrumentation facts. They will tell us which rules derived the given fact
@@ -30,56 +45,34 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 	// Evidence for a negative fact.
 	proof_elem not_exists_proof;
 	not_exists_proof.rl = not_exists_proof.al = 0;
-	// Check if the table of the given fact has an instrumentation table
-	for(const auto &[instr_tab, orig_rule_neg] : tbls[q.tab].instr_tabs) {
-		// Convert the fact into an instrumentation fact by switching the table and
-		// extending the fact with variables to capture the instrumentation
-		term fact_aug = q;
-		fact_aug.tab = instr_tab;
-		int_t start_var = 0;
-		for(const int &elt : fact_aug) start_var = min(start_var, elt);
-		for(size_t ext = fact_aug.size(); ext < tbls[fact_aug.tab].len; ext++) {
-			fact_aug.push_back(--start_var);
-		}
-		// Now we capture the instrumented facts that have been derived
-		const bool exists_mode = q.neg == orig_rule_neg;
-		spbdd_handle var_domain = exists_mode ? levels[level][fact_aug.tab] : htrue;
-		decompress(var_domain && from_fact(fact_aug), fact_aug.tab,
-				[&](const term& t) {
-			// Ensure that the current variable instantiations are legal. Needed for
-			// proving negative facts by showing that no variable instantiation would
-			// satisfy rules of a relation.
-			for(const int_t &el : t) {
-				// Use the type bits to determine what the value limits should be
-				if(((el & 3) == 1 && (el >> 2) >= ir_handler->chars) ||
-					((el & 3) == 2 && (el >> 2) > ir_handler->nums) ||
-					((el & 3) == 0 && (el >> 2) >= ir_handler->syms) ||
-					(el & 3) == 3) return;
-			}
-			// Find the single rule corresponding to this instrumentation table
-			for(size_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
-				const rule &rul = rules[rule_idx];
-				if(rul.tab != fact_aug.tab) continue;
-				// By construction, each instrumentation relation has only one rule
-				assert(rul.size() == 1);
-				const alt* const &alte = rul[0];
-				// Now we want to map the variables of the instrumentation rule to
-				// their substitutions
-				map<int_t, int_t> subs;
-				for(size_t i = 0; i < t.size(); i++) {
-					subs[rul.t[i]] = t[i];
-				}
+	// Find the rules corresponding to this fact
+	for(size_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
+		rule &rul = rules[rule_idx];
+		if(rul.tab != q.tab) continue;
+		for(size_t alt_idx = 0; alt_idx < rul.size(); alt_idx++) {
+			alt &alte = *rul[alt_idx];
+			// Lookup the variable instantiations of this alternative from its levels
+			// structure if we are trying to prove existence. If not trying to prove
+			// existence, then we need to consider all possible instantiations to prove
+			// that there are no counter-examples.
+			const bool exists_mode = q.neg == rul.neg;
+			spbdd_handle var_domain = exists_mode ? alte.levels[level] : htrue;
+			decompress(addtail(rul.eq && from_fact(q), q.size(), alte.varslen) &&
+					var_domain, q.tab, [&](const term& t) {
+				// Ensure term validity as BDD may contain illegal values
+				if(!is_term_valid(t)) return;
+				
 				// Now we want to substitute the variable instantiations into the
 				// rule body. If all these body terms were true, then we have enough to
 				// prove the fact q.
 				proof_elem exists_proof;
 				exists_proof.rl = rule_idx;
 				exists_proof.al = 0;
-				for(term body_tm : alte->t) {
+				for(term body_tm : alte.t) {
 					for(int_t &arg : body_tm) {
-						auto var_sub = subs.find(arg);
+						auto var_sub = alte.vm.find(arg);
 						// Replace argument with substitution if present
-						if(var_sub != subs.end()) arg = var_sub->second;
+						if(var_sub != alte.vm.end()) arg = t[var_sub->second];
 					}
 					exists_proof.b.push_back({level-1, body_tm});
 				}
@@ -108,7 +101,8 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 							// variable instantiation cannot work.
 							pair<nlevel, term> counter_example = {level-1, negated_body_tm};
 							// Avoid duplicating counter-examples.
-							if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) == not_exists_proof.b.end()) {
+							if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) ==
+									not_exists_proof.b.end()) {
 								not_exists_proof.b.push_back(counter_example);
 							}
 						}
@@ -116,26 +110,33 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					}
 				}
 				if(exists_proof_valid && exists_mode) {
-					// Add this proof as one of the many possible proving this positive
-					// fact
+					// Add this proof as one of the many possible proving this positive fact
 					p[level][q].insert(exists_proof);
 				}
-			}
-		}, fact_aug.size());
+			}, alte.varslen);
+		}
 	}
-	// Now that we have gone through all the rules of the given relation, we are
-	// in a position to fully determine the lack of existence of a variable
-	// instantiation that would derive the positive head.
+	// During the course of positively establishing the given fact, we had to be
+	// proving that its negation could not be proved. These proofs are stored in
+	// not_exists_proof and need to be appended to every positive proof.
 	set<proof_elem> augmented_witnesses;
 	for(proof_elem witnes : p[level][q]) {
+		// For all instantiations that could derive the negation of this fact,
+		// consider the proof one of the body terms could not be satisfied.
 		for(const auto &not_witness : not_exists_proof.b) {
+			// Do not repeat witnesses for the statement that the negation of the main
+			// fact cannot be derived.
 			if(find(witnes.b.begin(), witnes.b.end(), not_witness) == witnes.b.end()) {
 				witnes.b.push_back(not_witness);
 			}
 		}
+		// Construct a new set of proof elements since this current set cannot be
+		// modified on the fly
 		augmented_witnesses.insert(witnes);
 	}
+	// Replace the unaugmented witnesses with augmented ones
 	p[level][q] = augmented_witnesses;
+	// Return true only if we have constructed at least one proof
 	return p[level].find(q) != p[level].end();
 }
 
@@ -167,6 +168,36 @@ bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, siz
 	return true;
 }
 
+/* For the given table and sign, make a rule that positively or negatively
+ * carries all table facts from the previous step to the next step. */
+
+rule tables::get_identity_rule(ntable tab, bool neg) {
+	// Make the identity term
+	term tm;
+	tm.tab = tab;
+	tm.neg = neg;
+	for(int_t i = 0; i < tbls[tab].len; i++) tm.push_back(-i-1);
+	// Make a rule alternative based on the term
+	set<alt> alts;
+	get_alt({ tm }, tm, alts);
+	assert(alts.size() == 1);
+	alt *dyn_alt = new alt;
+	*dyn_alt = *alts.begin();
+	// Populate the alternative's history in order to allow recognition of carrys
+	// in proof tree generation
+	for(size_t lev = 0; lev < levels.size(); lev++)
+		dyn_alt->levels[lev+1] = neg ? (htrue % levels[lev][tab]) : levels[lev][tab];
+	// Make an identity rule based on the alternative
+	rule rul;
+	rul.eq = htrue;
+	rul.t = tm;
+	rul.neg = neg;
+	rul.tab = tab;
+	rul.len = tbls[tab].len;
+	rul.push_back(dyn_alt);
+	return rul;
+}
+
 /* Print proof trees for each goal in the program. Do this by doing a backward
  * chain over the levels structure, which contains the entirity of facts
  * derivable by the given program from the given initial database. */
@@ -179,6 +210,14 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	for (const term& t : goals)
 		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
+	// Explicitly add rules to carry facts between steps so that the proof tree
+	// will capture proofs by carry
+	for(int_t i = 0; i < tbls.size(); i++) {
+		rule pos_rule = get_identity_rule(i, false);
+		rules.push_back(pos_rule);
+		rule neg_rule = get_identity_rule(i, true);
+		rules.push_back(neg_rule);
+	}
 	// Auxilliary variable for get_proof
 	set<pair<term, size_t>> refuted;
 	// Get all proofs for each covered fact

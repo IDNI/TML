@@ -4316,93 +4316,6 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 	o::dbg() << endl;
 }
 
-/* Instrument our TML program with additional rules that export the
- * instantiations of existential variables necessary to derive certain facts.
- * In addition these instrumentation rules export rule IDs so that it is
- * possible to easily figure out which rule derived what. This information is
- * used heavily in proof tree generation. */
-
-void driver::instrument_prog(raw_prog &rp) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-	
-	// Map each rule to an instrumentation rule that also exports the body's
-	// existentially quantified variables. Record the one to many mapping from
-	// original relations to instrumentation relations.
-	
-	map<rel_info, map<rel_info, bool>> instrument_map;
-	vector<raw_rule> instr_rules;
-	
-	for(const raw_rule &rr : rp.r) {
-		// Ensure that the relation of this rule is recorded in the instrument map.
-		// Used when creating "identity" rules after this loop.
-		const rel_info &orig_ri = get_relation_info(rr.h[0]);
-		instrument_map[orig_ri];
-		if(!rr.is_dnf()) continue;
-		// Make the instrumentation rule head
-		vector<elem> instr_hd_elems { elem::fresh_temp_sym(d), elem_openp };
-		// Add <orig_rule_args>
-		instr_hd_elems.insert(instr_hd_elems.end(), rr.h[0].e.begin() + 2,
-			rr.h[0].e.end() - 1);
-		// Add <exist_vars> which will be used in proof tree generation/explanation
-		// set<elem> exist_vars = collect_free_vars(rr);
-		for(const vector<raw_term> &bodie : rr.b)
-			for(const raw_term &rt : bodie)
-				for(const elem &var : rt.e)
-					if(var.type == elem::VAR &&
-							find(instr_hd_elems.begin()+2, instr_hd_elems.end(), var) == instr_hd_elems.end())
-						instr_hd_elems.push_back(var);
-		// Close the instrumentation rule head
-		instr_hd_elems.push_back(elem_closep);
-		
-		// Make the instrumentation rule with this and add it to the pending list
-		// to avoid extending this loop
-		raw_rule instr_rule = rr;
-		instr_rule.h[0] = raw_term(instr_hd_elems);
-		instr_rule.h[0].neg = false;
-		instr_rules.push_back(instr_rule);
-		
-		// Ensure one-to-many correspondence between relations and their
-		// instrumentationz by using existing mapping if it has already been made
-		instrument_map[orig_ri][get_relation_info(instr_rule.h[0])] = rr.h[0].neg;
-	}
-	
-	// TML automatically carries facts from previous steps unless there is an
-	// explicit deletion. Make an "identity" instrumentation rule that explains
-	// that a fact came from the previous step. This will be used during proof
-	// extraction for the carry case.
-	
-	for(auto &[orig_rel, instr_rels] : instrument_map) {
-		// Make the elements of a general term with the same arity as a program
-		// relation
-		vector<elem> orig_hd_elems { get<0>(orig_rel), elem_openp };
-		for(int_t i = 0; i < get<1>(orig_rel); i++) {
-			orig_hd_elems.push_back(elem::fresh_var(d));
-		}
-		orig_hd_elems.push_back(elem_closep);
-		// Now make the actual general term as well as one of the original relation
-		raw_term pos_instr_hd(orig_hd_elems), neg_instr_hd(orig_hd_elems), orig_hd(orig_hd_elems);
-		pos_instr_hd.e[0] = elem::fresh_temp_sym(d);
-		neg_instr_hd.e[0] = elem::fresh_temp_sym(d);
-		// Now make the actual instrumentation rule and record it
-		instr_rules.push_back(raw_rule(pos_instr_hd, orig_hd));
-		instr_rules.push_back(raw_rule(neg_instr_hd, orig_hd.negate()));
-		instr_rels[get_relation_info(pos_instr_hd)] = false;
-		instr_rels[get_relation_info(neg_instr_hd)] = true;
-	}
-	
-	// Now that we have all the instrumentation relations corresponding to each
-	// original relation, store links to them in the original rules.
-	
-	for(raw_rule &rr : rp.r) {
-		rr.h[0].instrument_rels = instrument_map[get_relation_info(rr.h[0])];
-	}
-	// Now add all the pending instrumentation rules to the program
-	for(const raw_rule &instr_rule : instr_rules) {
-		rp.r.push_back(instr_rule);
-	}
-}
-
 void collect_free_vars(const vector<vector<raw_term>> &b,
 		vector<elem> &bound_vars, set<elem> &free_vars) {
 	for(const vector<raw_term> &bodie : b) {
@@ -4805,7 +4718,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-				opts.enabled("to-dnf") || opts.enabled("proof")) {
+				opts.enabled("to-dnf")) {
 			// Trimmed existentials are a precondition to program optimizations
 			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 			export_outer_quantifiers(rp);
@@ -4855,11 +4768,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Eliminating dead variables ..." << endl << endl;
 			eliminate_dead_variables(rp);
 			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-			if(opts.enabled("proof")) {
-				o::dbg() << "Instrumenting program ..." << endl << endl;
-				instrument_prog(rp);
-				o::dbg() << "Instrumented TML Program:" << endl << endl << rp << endl;
-			}
 		}
 	}
 //	if (trel[0]) transform_proofs(rp.p[n], trel);
