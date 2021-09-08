@@ -471,6 +471,7 @@ class bit_dict {
 	}
 };
 
+typedef std::tuple<elem, int_t> rel_info;
 
 
 /* A raw term is produced from the parsing stage. In TML source code, it

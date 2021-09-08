@@ -255,12 +255,12 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
-	std::vector<env> varbdd_to_subs(const alt* a, size_t rl, size_t level, cr_spbdd_handle v) const;
-	void rule_get_grounds(cr_spbdd_handle& h, size_t rl, size_t level,
-		cb_ground f);
-	void term_get_grounds(const term& t, size_t level, cb_ground f);
-	std::set<witness> get_witnesses(const term& t, size_t l);
-	size_t get_proof(const term& q, proof& p, size_t level, size_t dep=-1);
+	rule new_identity_rule(ntable tab, bool neg);
+	bool is_term_valid(const term &t);
+	bool get_dnf_proofs(const term& q, proof& p, size_t level,
+		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
+	bool get_proof(const term& q, proof& p, size_t level,
+		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
@@ -441,7 +441,7 @@ public:
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
-	void set_proof(bool v) { opts.bproof = v; }
+	void set_proof(proof_mode v) { opts.bproof = v; }
 	template <typename T>
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }

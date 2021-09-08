@@ -84,7 +84,8 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x, true),
+				get_nums(x);
+				t = from_raw_term(x, true);
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;

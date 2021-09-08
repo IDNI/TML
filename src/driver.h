@@ -33,7 +33,6 @@
 typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
-typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -160,7 +159,7 @@ class driver {
 		std::set<raw_rule>& s);
 	void transform_bwd(raw_prog& p);
 	void transform_proofs(raw_prog& r, const lexeme& rel);
-//	void transform_string(const sysstring_t&, raw_prog&, int_t);
+	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
 	bool transform_evals(raw_prog &rp, const directive &drt);
 	bool transform_quotes(raw_prog &rp, const directive &drt);
@@ -261,7 +260,7 @@ class driver {
 	//driver(raw_progs);
 	size_t load_stdin();
 	prog_data pd;
-	std::set<int_t> transformed_strings;
+	std::set<lexeme> transformed_strings;
 	tables *tbl = 0;
 	ir_builder *ir = 0;
 

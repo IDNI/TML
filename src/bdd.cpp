@@ -45,6 +45,7 @@ template<typename T1, typename T2> struct vec2cmp {
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 bdd_mmap V;
+bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
@@ -77,18 +78,20 @@ _Pragma("GCC diagnostic pop")
 const size_t gclimit = 1e+6;
 
 #ifndef NOMMAP
-void bdd::init(mmap_mode m, size_t max_size, const string fn) {
+void bdd::init(mmap_mode m, size_t max_size, const string fn, bool gc) {
+	gc_enabled = gc;
 	bdd_mmap_mode = m;
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
 	V = bdd_mmap(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V.reserve(max_bdd_nodes);
 #else
-void bdd::init() {
+void bdd::init(bool gc) {
 #endif
 	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
 	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
 	//	", max_size: " << max_size << ", fn: " << fn
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
+	gc_enabled = gc;
 	S.insert(0), S.insert(1), V.emplace_back(0, 0, 0), // dummy
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
@@ -602,6 +605,7 @@ template basic_ostream<char>& bdd::stats(basic_ostream<char>&);
 template basic_ostream<wchar_t>& bdd::stats(basic_ostream<wchar_t>&);
 
 void bdd::gc() {
+	if(!gc_enabled) return;
 	if (V.empty()) return;
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
