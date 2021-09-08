@@ -444,7 +444,7 @@ public:
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
-	void set_proof(bool v) { opts.bproof = v; }
+	void set_proof(proof_mode v) { opts.bproof = v; }
 	template <typename T>
 	bool get_goals(std::basic_ostream<T>&);
 	dict_t& get_dict() { return dict; }

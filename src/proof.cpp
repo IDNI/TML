@@ -61,6 +61,10 @@ bool tables::get_dnf_proofs(const term& q, proof& p, const size_t level,
 			spbdd_handle var_domain = exists_mode ? alte.levels[level] : htrue;
 			decompress(addtail(rul.eq && from_fact(q), q.size(), alte.varslen) &&
 					var_domain, q.tab, [&](const term& t) {
+				// If we are only generating proof trees and already have a proof of
+				// this fact then do not investigate other proofs.
+				if(exists_mode && opts.bproof == proof_mode::tree &&
+					p[level].find(q) != p[level].end()) return;
 				// Ensure term validity as BDD may contain illegal values
 				if(!is_term_valid(t)) return;
 				
@@ -233,13 +237,13 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	set<pair<term, size_t>> refuted;
 	// Get all proofs for each covered fact
 	for (const term& g : s)
-		if (opts.bproof) get_proof(g, p, levels.size() - 1, refuted, explicit_rule_count);
+		if (opts.bproof != proof_mode::none) get_proof(g, p, levels.size() - 1, refuted, explicit_rule_count);
 		else os << ir_handler->to_raw_term(g) << '.' << endl;
 	// Print proofs
-	if (opts.bproof) print(os, p);
+	if (opts.bproof != proof_mode::none) print(os, p);
 	// Remove the auxilliary rules we created as they are no longer needed
 	rules.resize(explicit_rule_count);
-	return goals.size() || opts.bproof;
+	return goals.size() || opts.bproof != proof_mode::none;
 }
 template bool tables::get_goals(std::basic_ostream<char>&);
 template bool tables::get_goals(std::basic_ostream<wchar_t>&);

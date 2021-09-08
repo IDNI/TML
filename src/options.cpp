@@ -195,7 +195,8 @@ void options::setup() {
 	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
 		description("run program under one of the following semantics: pfp (default), 3pfp"));
 	add_bool("gc",      "enable garbage collection");
-	add_bool("proof",   "extract proof");
+	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest" }).
+		description("control if and how proofs are extracted: none (default), tree, forest"));
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
 
@@ -271,6 +272,7 @@ void options::init_defaults() {
 		"--run",
 		"--gc",
 		"--semantics",   "pfp",
+		"--proof",       "none",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",
 		"--error",       "@stderr",

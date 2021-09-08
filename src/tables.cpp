@@ -797,7 +797,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		if (hfalse == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			// Update the levels structure with the current database for proof trees
-			if (opts.bproof) a.levels.emplace(nstep, hfalse);
+			if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, hfalse);
 			return hfalse;
 		} else v1.push_back(x);
 
@@ -811,16 +811,16 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) {
 		// Update the levels structure with the current database for proof trees
-		if (opts.bproof) a.levels.emplace(nstep, bdd_and_many(a.last));
+		if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, bdd_and_many(a.last));
 		return a.rlast;// { v.push_back(a.rlast); return; }
 	}
-	if (!opts.bproof) {
+	if (opts.bproof == proof_mode::none) {
 		a.last = move(v1);
 		a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
 		return a.rlast;
 	}
 	// Update the levels structure with the current database for proof trees
-	if (opts.bproof) a.levels.emplace(nstep, x = bdd_and_many(v1));
+	if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, x = bdd_and_many(v1));
 //	if ((x = bdd_and_many_ex(a.last, a.ex)) != hfalse)
 //		v.push_back(a.rlast = x ^ a.perm);
 //	bdd_handles v;
@@ -944,7 +944,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
 	level l = get_front();
 	fronts.push_back(l);
-	if (opts.bproof) levels.emplace_back(l);
+	if (opts.bproof != proof_mode::none) levels.emplace_back(l);
 	for (;;) {
 		if (print_steps) o::inf() << "# step: " << nstep << endl;
 		++nstep;
@@ -961,7 +961,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 			(nsteps && nstep == nsteps)) return false; // no FP yet
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
-		if (opts.bproof) levels.push_back(move(l));
+		if (opts.bproof != proof_mode::none) levels.push_back(move(l));
 		if (!datalog && is_repeat)
 			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
 	}
@@ -976,7 +976,7 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
 		set<raw_term> &results)
 {
 	rt_options to;
-	to.bproof            = opts.enabled("proof");
+	to.bproof            = proof_mode::none;
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");

@@ -4920,8 +4920,11 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
 	rt_options to;
-
-	to.bproof            = opts.enabled("proof");
+	
+	if(auto proof_opt = opts.get("proof"))
+		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
+			{{"none", proof_mode::none}, {"tree", proof_mode::tree},
+				{"forest", proof_mode::forest}});
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
