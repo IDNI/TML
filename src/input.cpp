@@ -1062,13 +1062,13 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 	return true;
 }
 environment& raw_prog::get_typenv() {
-	return typenv.back();
+	return *typenv;
 }
 void raw_prog::set_typenv( const environment &e ) {
-	typenv.back() = e;
+	*typenv = e;
 }
-raw_prog::raw_prog() {
-	typenv.emplace_back();
+raw_prog::raw_prog(){
+	 typenv = std::make_shared<environment>();
 }
 bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
 						vector<raw_term> &vrt, dict_t &dict) {

@@ -458,7 +458,9 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 		t.extype == raw_term::LEQ) {
 		if (t.neg) os << '{';
 		os << t.e[0];
-		t.extype == raw_term::EQ ? os << "==" : os << "<=";
+		t.e[1].type == elem::EQ ? os << "=" : t.e[1].type == elem::LEQ ? os << "<=" :
+						t.e[1].type == elem::LT ? os << "<" : t.e[1].type == elem::GEQ ?
+						os << ">=": t.e[1].type == elem::GT ? os << ">": os <<"";
 		os << t.e[2];
 		if (t.neg) os << '}';
 		return os;

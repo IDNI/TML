@@ -525,7 +525,6 @@ void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 }
 //-----------------------------------------------------------------------------
 void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
-	//is_horn = true;
 	switch (f->type) {
 		case form::EXISTS1:
 		case form::FORALL1:
@@ -535,19 +534,13 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 		case form::EXISTS2:
 		case form::FORALL2:
 		case form::UNIQUE2: {
-			//XXX: handle variables used in q's more than once?
 			vmh.emplace(f->l->arg, vmh.size());
-			for (auto &v : vmh)
-				v.second = vmh.size()-1-v.second;
 			p->vmh = vmh;
-			p->quantsh.emplace(p->quantsh.begin(), p->to_quant_t(f));
+			p->quantsh.push_back(p->to_quant_t(f));
 			handler_formh(p, f->r,vm, vmh);
-			//vmh.erase(f->l->arg);
 		} break;
 		default: break;
 	}
-	//is_horn = false;
-	//TODO: create VAR2 structures
 }
 
 
@@ -576,8 +569,13 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			} else {
 				DBG(assert(f->tm->neg == false);)
 				body *aux = new body(get_body(*f->tm, vm, vm.size()));
-				ex_typebits(aux->ex, f->tm->size());
-				std::pair<int_t, body*> hvar = {f->arg, move(aux)};
+				//body.q = T, body.tab =
+				bools exvec(aux->ex.size());
+				ex_typebits(exvec, f->tm->size());
+				//TODO review for T31
+				//aux->q = aux->q ^ aux->perm;
+				aux->q =  aux->q / exvec;
+				std::tuple<int_t, body*, int_t> hvar = {f->arg, move(aux), vm.size()};
 				p0->hvar_b = hvar;
 			}
 		}
@@ -747,10 +745,19 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		if (p->b) {
 			q = body_query(*p->b,0);
 			if (p->neg) q = bdd_not(q);
+			#ifdef FOL_VERBOSE
+			COUT << "fol:body_query\n";
+			::out(COUT, q)<<endl<<endl;
+			#endif
+
 			v.push_back(q);
 		} else if (p->cons != bdd_handle::T) {
 			q = p->cons;
 			if (p->neg) q = bdd_not(q);
+			#ifdef FOL_VERBOSE
+			COUT << "fol:cons\n";
+			::out(COUT, q)<<endl<<endl;
+			#endif
 			v.push_back(q);
 		}
 		else {
@@ -763,8 +770,13 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	//if (v.size() > 1)
 	q = bdd_and_many(move(v));
 	if (f->neg) q = bdd_not(q);
+	#ifdef FOL_VERBOSE
+	COUT << "fol:and_many\n";
+	::out(COUT, q)<<endl<<endl;
+	#endif
 
 	if (f->quants.size() != 0) {
+		/*
 		//TODO: move perms inits to preparation
 		uints perm1 = perm_init((bits-2)*f->varslen);
 		uints perm2 = perm_init((bits-2)*f->varslen);
@@ -776,94 +788,145 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		q = q^perm1;
 		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
 		q = q^perm2;
+		*/
+		f->quantify(q,bits);
 	}
 
-	//realign variables
 	if (f->perm.size()!= 0) {
 		q = q^f->perm;
-		v.push_back(q);
+		if (f->perm_h.size()!= 0) {
+			v.push_back(q);
+			q = bdd_and_many_ex_perm(move(v), f->ex_h,f->perm_h);
+		}
 	}
-	if (f->perm_h.size()!= 0)
-		q = bdd_and_many_ex_perm(move(v), f->ex_h,f->perm_h);
 	f->last = q;
 	v.push_back(q);
 }
 
-// Work in progress
-#define sohorn_query hol_query
-void tables::hol_query(cr_pnft_handle f, bdd_handles &v, bdd_handles &vh,
-		std::vector<bdd_handles> &hvar_hbdd, std::vector<quant_t> &quantsh, varmap &vmh ) {
+//#define SOL_VERBOSE
+void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v) {
 
+	vector<int_t> hvars;
 	spbdd_handle q = htrue;
-	spbdd_handle qh = htrue;
 
 	for (auto p : f->matrix) {
-			if (p->b) {
-				q = body_query(*p->b,0);
-				if (p->neg) q = bdd_not(q);
-				v.push_back(q);
-			} else if (p->cons != bdd_handle::T) {
-				v.push_back(p->cons);
-			}
-			else if(p->hvar_b.second != 0) {
-				if (quantsh[vmh[p->hvar_b.first]] == EXH) {
+		if (p->b) {
+			q = body_query(*p->b,0);
+			if (p->neg) q = bdd_not(q);
+			v.push_back(q);
+		} else if (p->cons != bdd_handle::T) {
+			q = p->cons;
+			if (p->neg) q = bdd_not(q);
+			v.push_back(q);
+		}
+		else if(get<0>(p->hvar_b) != 0) {
+			hvars.push_back(get<0>(p->hvar_b)); //need to use hvars?
+			spbdd_handle qh = get<1>(p->hvar_b)->q;
+			#ifdef SOL_VERBOSE
+			COUT << "var2: " << get<0>(p->hvar_b) << " :\n";
+			::out(COUT, qh)<<endl<<endl;
+			#endif
+			//ex_typebits(qh, get<2>(p->hvar_b));
 
-					//pr(p->hvar_b.second->q, vh[p->hvar_b.first-1], hvar_hbdd[0], p->neg);
-					//in case hvar is set as a table:
-					//qh = body_query(*f->hvar_b.second,0);
-					spbdd_handle c = htrue;
-					auto b = *p->hvar_b.second;
-					//COUT << "R0" << ::bdd_root(b.q) << " :\n";
-					//::out(COUT, b.q)<<endl<<endl;
-					qh = bdd_and_ex_perm(c, b.q, b.ex, b.perm);
-					if (f->neg) qh = bdd_not(qh);
-					//COUT << "R1" << ::bdd_root(qh) << " :\n";
-					//::out(COUT, qh)<<endl<<endl;
-					vh.push_back(qh);
-				}
+			if (p->neg) {
+				v2s.add_cons_neg(get<0>(p->hvar_b), get<1>(p->hvar_b)->q);
+				qh = bdd_not(qh);
+			} else {
+				v2s.add_cons(get<0>(p->hvar_b), get<1>(p->hvar_b)->q);
 			}
-			else {
-				bdd_handles vt, vth;
-				hol_query(p,vt,vth, hvar_hbdd, quantsh,vmh);
-				DBG(assert(vt.size() <= 1 && vt.size() <= 1);)
-				v.insert(v.end(), vt.begin(), vt.end());
-				vh.insert(vh.end(), vth.begin(), vth.end());
-			}
+			#ifdef SOL_VERBOSE
+			COUT << "AFTER VAR2 handle\n";
+			v2s.print();
+			#endif
+
+		}
+		else {
+			bdd_handles vt;
+			var2space v2s_t(v2s.vm);
+			hol_query(p, quantsh, v2s_t, vt);
+			v2s.bf.push_back(v2s_t);
+			#ifdef SOL_VERBOSE
+			COUT << "AFTER RETURN\n";
+			v2s.print();
+			#endif
+			//TODO merge?
+
+		}
+	}
+	#ifdef SOL_VERBOSE
+	COUT << "q_after_and: size=" << v.size() << "\n";
+	#endif
+
+	bool fol_terms = v.size() >= 1;
+	if (fol_terms) {
+			q = bdd_and_many(move(v));
+			#ifdef SOL_VERBOSE
+			COUT << "fol terms: " << endl;
+			::out(COUT, q)<<endl<<endl;
+			#endif
 	}
 
-	if (v.size() > 1) {
-		q = bdd_and_many(move(v));
-		if (f->neg) q = bdd_not(q);
-		v.push_back(q);
+	if (f->neg) {
+		if (v2s.hvars.size() != 0) {
+			v2s.negate_cons();
+			#ifdef SOL_VERBOSE
+			COUT << "AFTER NEGATE \n";
+			v2s.print();
+			#endif
+		}
+		if (fol_terms) {
+			q = bdd_not(q);
+			#ifdef SOL_VERBOSE
+			COUT << "q_after_and_NOT: \n";
+			::out(COUT, q)<<endl<<endl;
+			#endif
+		}
 	}
-	if (vh.size() > 1) {
-		qh = bdd_and_many(move(vh));
-		if (f->neg) qh = bdd_not(qh);
-		//COUT << "R2 " << ::bdd_root(qh) << " :\n";
-		//::out(COUT, qh)<<endl<<endl;
-		vh.push_back(qh);
+
+	if (f->quants.size() != 0) {
+		f->quantify(q,bits);
 	}
+	//v.push_back(q); //Should pass this further?
+
+	if (fol_terms) {
+		v2s.constraint(q);
+		#ifdef SOL_VERBOSE
+		COUT << "AFTER CONSTRAINT\n";
+		v2s.print();
+		#endif
+	}
+
+	//set final constraint for 2ns order vars
+	v2s.merge();
+	#ifdef SOL_VERBOSE
+	COUT << "AFTER MERGE\n";
+	v2s.print();
+	#endif
 	return;
 }
 
 void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	if (f->quantsh.size() != 0) {
-		//for basic hbdd
-		//bdd_handles v1;
-		//bdd_handles v2;
-		//std::vector<bdd_handles> hvar_hbdd(1);
 		bdd_handles v1;
-		bdd_handles v2;
-		bdd_handles vh(f->quantsh.size(), htrue);
-		std::vector<bdd_handles> hvar_hbdd;
-		hvar_hbdd.push_back(vh);
+		bdd_handles aux(1, htrue);
+		std::vector<bdd_handles> hvar_hbdd(f->quantsh.size(),aux);
 
-		sohorn_query(f, v1, v2, hvar_hbdd, f->quantsh, f->vmh);
-		//COUT << " so_horn " << ::bdd_root(v2[0]) << " :\n";
-		//::out(COUT, v2[0])<<endl<<endl;
-		spbdd_handle q;
-		q = (v2.size()!= 0 ? v2[0] : hfalse) % (v1.size() != 0 ? v1[0] : hfalse);
+		var2space v2s(f->vmh);
+		hol_query(f, f->quantsh, v2s, v1);
+
+		//TODO: complete
+		bool out = v2s.quantify(f->quantsh);
+		spbdd_handle q = out ? htrue : hfalse;
+
+
+		if (out) COUT << "## model found\n";
+		else COUT << "## model NOT found\n";
+		#ifndef SOL_VERBOSE
+		v2s.print();
+		#endif
+
 		v.push_back(q);
 	}
 	else fol_query(f,v);
 }
+

@@ -1,0 +1,16 @@
+domain(0). domain(1). domain(2). domain(3).
+U(3).
+# OK: SAT
+satB0_0() :- forall ?x {domain(?x) -> exists ?y { ?x + ?y = 0 }}.
+# OK: UNSAT
+satB0_1() :- forall ?x {domain(?x) -> exists ?y { ?x + ?y = 0 && ?y != 1 }}.
+# OK: SAT
+satB1_0() :- forall ?x {domain(?x) -> unique ?y { { ?x + ?y = 0 } }}.
+# OK: UNSAT
+satB1_1() :- forall ?x {domain(?x) -> unique ?y { ?x + ?y = 0 && ?y != 3 }}.
+# OK: SAT
+satB1_2() :- forall ?x {domain(?x) -> unique ?y { { ?x + ?y = 3 } }}.
+# OK: UNSAT
+satC0() :- forall ?x {domain(?x) -> exists ?y {  ?x + ?y = 0  &&  ?y <= 1  }}.
+# OK: UNSAT
+satC1() :- forall ?x {domain(?x) -> unique ?y { { ?x + ?y = 0 } && { ?y <= 1 } }}.

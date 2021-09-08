@@ -1,0 +1,35 @@
+domain(1).
+domain(0).
+U(1).
+sat_and(1 1).
+sat_or(1 1).
+sat_or(1 0).
+sat_or(0 1).
+sat_nand(1 0).
+sat_nand(0 1).
+sat_nand(0 0).
+sat_nor(0 0).
+sat_and_neg(1 0).
+sat_or_neg(1 1).
+sat_or_neg(1 0).
+sat_or_neg(0 0).
+sat_nand_neg(1 1).
+sat_nand_neg(0 1).
+sat_nand_neg(0 0).
+sat_nor_neg(0 1).
+sat_neg_and(0 1).
+sat_neg_or(1 1).
+sat_neg_or(0 1).
+sat_neg_or(0 0).
+sat_neg_nand(1 1).
+sat_neg_nand(1 0).
+sat_neg_nand(0 0).
+sat_neg_nor(1 0).
+sat_neg_and_neg(0 0).
+sat_neg_or_neg(1 0).
+sat_neg_or_neg(0 1).
+sat_neg_or_neg(0 0).
+sat_neg_nand_neg(1 1).
+sat_neg_nand_neg(1 0).
+sat_neg_nand_neg(0 1).
+sat_neg_nor_neg(1 1).

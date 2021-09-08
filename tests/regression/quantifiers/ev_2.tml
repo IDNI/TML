@@ -1,9 +1,5 @@
 #transitive closure
-domain(0). domain(1). domain(2). domain(3).
 T(?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?y) :- {
-          domain(?a) && domain(?b) && domain(?c) && domain(?d) &&
-          domain(?e) && domain(?f) && domain(?g) && domain(?h) &&
-          domain(?i) && domain(?j) && domain(?y) &&
           { {?d = ?e } -> { {?a = ?c} && {?b = ?f} && {?y = 1} } &&
           { ~{?d = ?e } -> {?y = 0} } } &&
           { {?c = ?d } -> {?g = ?h} } &&

@@ -1,0 +1,10 @@
+#FIXME in quantification
+#UA(0 0).
+#SOLA(1) :- exists P forall ?x0 forall ?x1 { {P(1 ?x1) && UA(?x0 ?x1) }}.
+
+#UB(?x ?y).
+UB(0 0).
+UB(0 1).
+UB(1 0).
+UB(1 1).
+SOLB(1) :- exists P forall ?x0 forall ?x1 { {P(0 ?x1) && UB(?x0 ?x1) }}.

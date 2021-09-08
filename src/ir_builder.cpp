@@ -382,8 +382,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
-			bit_univ bu(dict, opts.bitorder, dynenv->typenv);
-			if(bu.brev_transform(rt))
+			if(dynenv->spbu.get()->brev_transform(rt))
 				rt.calc_arity(nullptr);
 		}
 		return rt;

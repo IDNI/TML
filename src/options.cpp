@@ -190,6 +190,8 @@ void options::setup() {
 		"convert FOL formulas into to DNF before running program");
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
+	add_bool("safecheck",
+		"enable safety check");
 	add(option(option::type::INT, { "iterate" })
 		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
@@ -211,7 +213,7 @@ void options::setup() {
 	add(option(option::type::INT, { "break", "b" })
 		.description("break on the N-th step"));
 	add(option(option::type::INT, { "regex-level", "" })
-		.description("aggressive matching with regex with levels 1 and more." 
+		.description("aggressive matching with regex with levels 1 and more."
 		"\n\t 1 - try all substrings - n+1  delete n rules after processing reg matching"));
 	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
@@ -282,6 +284,7 @@ void options::init_defaults() {
 #endif
 		"--optimize",
 		"--bdd-max-size","134217728", // 128 MB
+		"--safecheck",
 #ifdef WITH_THREADS
 		"--repl-output", "@stdout",
 		"--udp-addr",    "127.0.0.1",

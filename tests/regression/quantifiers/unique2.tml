@@ -1,4 +1,3 @@
-domain(0). domain(1). domain(2). domain(3).
 A4(0 1).
 A4(1 1).
 A4(1 2).
@@ -8,9 +7,9 @@ A4(2 1).
 A4(3 1).
 
 # OK: unsat
-C4A_un(1) :- forall ?x {domain(?x) -> unique ?y { A4(?x ?y) }}.
+C4A_un(1) :- forall ?x unique ?y { A4(?x ?y) }.
 # OK: unsat
-C4B_un(1) :- forall ?x {domain(?x) -> unique ?y { A4(?y ?x) }}.
+C4B_un(1) :- forall ?x unique ?y { A4(?y ?x) }.
 # OK: sat, model = C4C_un(0 1).
 C4C_un(?x ?y) :- exists ?x unique ?y { A4(?x ?y) }.
 # OK: sat, model = C4C_un(2 1).

@@ -1,9 +1,8 @@
-domain(0). domain(1).
 A2(1 0).
 A2(1 1).
 B2(1 0).
 B2(1 1).
 B2(0 1).
-ALL_B2_IS_A2(?y ?x) :- exists ?x exists ?y { domain(?x) && domain(?y) && {B2(?x ?y) -> A2(?y ?x)} }.
+ALL_B2_IS_A2(?y ?x) :- exists ?x exists ?y { B2(?x ?y) -> A2(?y ?x) }.
 AND_B2_A2(?x ?y) :- exists ?x exists ?y { B2(?x ?y) && A2(?y ?x) }.
 AND_B2_A2_cons(?x ?y) :- exists ?x exists ?y { B2(?x ?y) && A2(?y ?x) && ?x + ?y = 1 }.

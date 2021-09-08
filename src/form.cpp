@@ -13,6 +13,9 @@
 
 #include "form.h"
 #include "tables.h"
+using namespace std;
+
+extern uints perm_init(size_t n);
 
 pnft::pnft(){
 		varslen = 0, varslen_h = 0, neg = false, b = 0, cons = bdd_handle::T;
@@ -21,7 +24,7 @@ pnft::pnft(){
 pnft::~pnft() {
 		if(b) delete b, b = NULL;
 		//for (auto p: matrix ) delete p;
-		if (hvar_b.second) delete hvar_b.second;
+		if (auto p = get<1>(hvar_b)) delete p;
 }
 
 quant_t pnft::to_quant_t(form *f) const {
@@ -44,3 +47,162 @@ bool pnft::fp(class tables *s) const {
 			return false;
 	return true;
 }
+
+void pnft::print() const {
+ ;
+}
+
+void pnft::quantify(spbdd_handle &q, size_t bits) const {
+	//TODO: move perms inits to preparation
+	uints perm1 = perm_init((bits-2)*varslen);
+	uints perm2 = perm_init((bits-2)*varslen);
+	for (size_t i = 0; i < varslen; i++)
+		for (size_t j = 0; j < bits-2; j++) {
+			perm1[j * varslen + i] = i*(bits-2)+j;
+			perm2[i*(bits-2)+j] = j*varslen + i;
+		}
+	q = q^perm1;
+	q = bdd_quantify(q, quants, bits-2, varslen);
+	q = q^perm2;
+}
+
+
+//-----------------------------------------------------------------------------
+
+#define DEV
+
+var2space::var2space(varmap &vmh){
+	vm = vmh;
+}
+
+var2space::~var2space(){
+	clear_cons();
+}
+
+void var2space::add_cons(int id, spbdd_handle c) {
+	if (find(hvars.begin(), hvars.end(), id) == hvars.end())
+		hvars.push_back(id);
+	ins[vm.at(id)].push_back(c);
+}
+
+void var2space::add_cons_neg(int id, spbdd_handle c) {
+	if (find(hvars.begin(), hvars.end(), id) == hvars.end())
+		hvars.push_back(id);
+
+	outs[vm.at(id)].push_back(c);
+}
+
+void var2space::negate_cons() {
+	if (nf == C) nf = D;
+	else if (nf == D) nf = C;
+	swap(ins,outs);
+	for (auto &i : bf)
+		i.negate_cons();
+}
+
+void var2space::clear_cons() {
+	hvars.clear();
+	ins.clear();
+	outs.clear();
+}
+
+void var2space::constraint(spbdd_handle q) {
+
+	//TODO review handling of quant unsat
+	if ((q == hfalse && nf == C)) clear_cons();
+	else if ((q == htrue && nf == D)) clear_cons();
+	else if (nf == C) {
+		for (auto& [k, v] : ins) {
+			for(auto & i : v) i = i && q;
+		}
+		for (auto& [k, v] : outs) {
+			for (auto &i : v) i = i && q;
+		}
+	}
+	else {
+		#ifdef DEV
+		COUT << "TODO CONSTRAINT" << endl;
+		#endif
+		;
+	}
+
+}
+
+void var2space::merge() {
+
+	if (nf == C) {
+		for (auto& [k, v] : ins) {
+			if (v.size() > 1) {
+				spbdd_handle x = bdd_or_many(v);
+				v.clear();
+				v.push_back(x);
+			}
+		}
+		for (auto& [k, v] : outs) {
+			if (v.size() > 1) {
+				spbdd_handle x = bdd_or_many(v);
+				v.clear();
+				v.push_back(x);
+			}
+		}
+	}
+
+	else {
+		#ifdef DEV
+		COUT << "TODO MERGE" << endl;
+		#endif
+		;
+	}
+}
+
+void var2space::print(int_t level) const {
+
+	string tab(level*4, ' ');
+	COUT << tab << "<-----------------------" << endl;
+	COUT << tab <<"# var2space cons: l=" << level << ", nf=";
+	if (nf == C) COUT << "C\n";
+	else COUT << "D\n";
+
+	for (auto const& [k, idx]: vm) {
+		COUT << tab << "var2id: " << k << endl;
+		if (ins.find(idx) != ins.end()) {
+			COUT << tab << "ins: \n";
+			for(auto & q : ins.at(idx))
+				::out(COUT << tab, q)<<endl;
+		}
+		if (outs.find(idx) != outs.end()) {
+			COUT << tab << "outs: \n";
+			for(auto & q : outs.at(idx))
+				::out(COUT << tab, q)<<endl;
+		}
+	}
+	COUT << tab << "----------------------->" << endl;
+	for (auto &i : bf)
+		i.print(level+1);
+}
+
+bool var2space::quantify(vector<quant_t> &quantsh) const {
+
+	for (auto &idx : hvars) {
+		//for (auto &i : bf) {
+		//if (i.nf == D) {
+			if (quantsh[vm.at(idx)] == quant_t::EXH) {
+				if (ins.find(vm.at(idx)) != ins.end())
+					if (ins.at(vm.at(idx)).size() > 0)
+						if (ins.at(vm.at(idx))[0] == hfalse) return false ;
+				if (outs.find(vm.at(idx)) != outs.end())
+					if (outs.at(vm.at(idx)).size() > 0)
+						if (outs.at(vm.at(idx))[0]== htrue) return false ;
+			}
+			else if (quantsh[vm.at(idx)] == quant_t::FAH) {
+				if (outs.find(vm.at(idx)) != outs.end())
+					if (outs.at(vm.at(idx)).size() > 0)
+						if (outs.at(vm.at(idx))[0] != hfalse) return false ;
+			}
+			else assert(false);
+		//}
+		// else COUT << "TODO QUATNIFY" << endl;
+	}
+	return true;
+}
+

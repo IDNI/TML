@@ -146,7 +146,7 @@ class tables {
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-
+	std::shared_ptr<bit_univ> spbu = nullptr;
 private:
 	typedef int_t rel_t;
 
@@ -375,11 +375,8 @@ private:
 	t_arith_op get_pwop(lexeme l);
 
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
-	void hol_query(cr_pnft_handle f, bdd_handles& v, bdd_handles &v2, std::vector<bdd_handles> &hvarmap,
-			std::vector<quant_t> &quantsh, varmap &vmh);
-	void pr(spbdd_handle& b, spbdd_handle &vh, bdd_handles &vm, bool neg);
+	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
-
 
 	//-------------------------------------------------------------------------
 	//printer
