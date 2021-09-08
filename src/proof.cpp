@@ -171,22 +171,24 @@ bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, siz
 /* For the given table and sign, make a rule that positively or negatively
  * carries all table facts from the previous step to the next step. */
 
-rule tables::get_identity_rule(ntable tab, bool neg) {
+rule tables::new_identity_rule(ntable tab, bool neg) {
 	// Make the identity term
 	term tm;
 	tm.tab = tab;
 	tm.neg = neg;
 	for(int_t i = 0; i < tbls[tab].len; i++) tm.push_back(-i-1);
 	// Make a rule alternative based on the term
-	set<alt> alts;
-	get_alt({ tm }, tm, alts);
-	assert(alts.size() == 1);
+	set<alt> alts_singleton;
+	get_alt({ tm }, tm, alts_singleton);
+	assert(alts_singleton.size() == 1);
 	alt *dyn_alt = new alt;
-	*dyn_alt = *alts.begin();
+	*dyn_alt = *alts_singleton.begin();
 	// Populate the alternative's history in order to allow recognition of carrys
 	// in proof tree generation
 	for(size_t lev = 0; lev < levels.size(); lev++)
 		dyn_alt->levels[lev+1] = neg ? (htrue % levels[lev][tab]) : levels[lev][tab];
+	// To ensure that this alternative is eventually freed by tables destructor
+	alts.insert(dyn_alt);
 	// Make an identity rule based on the alternative
 	rule rul;
 	rul.eq = htrue;
@@ -213,10 +215,10 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	// Explicitly add rules to carry facts between steps so that the proof tree
 	// will capture proofs by carry
 	for(int_t i = 0; i < tbls.size(); i++) {
-		rule pos_rule = get_identity_rule(i, false);
-		rules.push_back(pos_rule);
-		rule neg_rule = get_identity_rule(i, true);
-		rules.push_back(neg_rule);
+		// Make the positive identity rule for this table
+		rules.push_back(new_identity_rule(i, false));
+		// Make the negative identity rule for this table
+		rules.push_back(new_identity_rule(i, true));
 	}
 	// Auxilliary variable for get_proof
 	set<pair<term, size_t>> refuted;

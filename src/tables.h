@@ -255,7 +255,7 @@ private:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
 	std::set<term> decompress();
-	rule get_identity_rule(ntable tab, bool neg);
+	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
 	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
 	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
