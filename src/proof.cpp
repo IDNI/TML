@@ -38,9 +38,11 @@ bool tables::is_term_valid(const term &t) {
  * derived. Note that the instrumented fact may correspond to this fact derived
  * at a different level, so we do need to check that the facts that it suggests
  * exist do actually exist at the previous level. Otherwise that proof must be
- * discarded. */
+ * discarded. Counter-examples from rules beyond the explicit rule count are
+ * silenced. */
 
-bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term, size_t>> &refuted) {
+bool tables::get_dnf_proofs(const term& q, proof& p, const size_t level,
+		set<pair<term, size_t>> &refuted, const size_t explicit_rule_count) {
 	// A set of negative facts that are enough to prevent q from being derived.
 	// Evidence for a negative fact.
 	proof_elem not_exists_proof;
@@ -90,7 +92,8 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 					// If we are trying to prove a positive fact, then we need a proof of
 					// each body term. If we are trying to prove a negative fact, we need
 					// a proof of a negation of a body term.
-					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level, refuted) != exists_mode) {
+					if(get_proof(exists_mode ? body_tm : negated_body_tm, p, body_level,
+							refuted, explicit_rule_count) != exists_mode) {
 						if(exists_mode) {
 							// If q head positive, then a body proof failed. So there cannot
 							// exist an instantitation of variables in current rule to make
@@ -100,8 +103,10 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 							// If q head negative, then we have just found a proof that this
 							// variable instantiation cannot work.
 							pair<nlevel, term> counter_example = {level-1, negated_body_tm};
-							// Avoid duplicating counter-examples.
-							if(find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) ==
+							// Never present counter-examples from implicit rules and avoid
+							// duplicating counter-examples.
+							if(rule_idx < explicit_rule_count &&
+									find(not_exists_proof.b.begin(), not_exists_proof.b.end(), counter_example) ==
 									not_exists_proof.b.end()) {
 								not_exists_proof.b.push_back(counter_example);
 							}
@@ -143,9 +148,11 @@ bool tables::get_dnf_proofs(const term& q, proof& p, size_t level, set<pair<term
 /* Get all the proofs of the given term occuring at the given level and put them
  * into the given proof object. Record the term and level in the absentee set
  * and return false if the given term does not actually occur at the given
- * level. */
+ * level. Counter-examples from rules beyond the explicit rule count are
+ * silenced. */
 
-bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, size_t>> &refuted) {
+bool tables::get_proof(const term& q, proof& p, const size_t level,
+		set<pair<term, size_t>> &refuted, const size_t explicit_rule_count) {
 	// Grow the proof object until it can store proof for this level
 	for(; p.size() <= level; p.push_back({}));
 	// Check if this term has not already been proven at the given level
@@ -161,7 +168,7 @@ bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, siz
 	if(q.neg == qsat) { refuted.insert({ q, level }); return false; }
 	// The proof for this fact may stem from a DNF rule's derivation. There may be
 	// a multiplicity of these proofs. Get them.
-	if(level > 0) get_dnf_proofs(q, p, level, refuted);
+	if(level > 0) get_dnf_proofs(q, p, level, refuted, explicit_rule_count);
 	// Here we know that this fact is valid. Make sure that this fact at least has
 	// empty witness set to represent self-evidence.
 	p[level][q];
@@ -171,7 +178,7 @@ bool tables::get_proof(const term& q, proof& p, size_t level, set<pair<term, siz
 /* For the given table and sign, make a rule that positively or negatively
  * carries all table facts from the previous step to the next step. */
 
-rule tables::new_identity_rule(ntable tab, bool neg) {
+rule tables::new_identity_rule(const ntable tab, const bool neg) {
 	// Make the identity term
 	term tm;
 	tm.tab = tab;
@@ -213,7 +220,8 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 		decompress(tbls[t.tab].t && from_fact(t), t.tab,
 			[&s](const term& t) { s.insert(t); }, t.size());
 	// Explicitly add rules to carry facts between steps so that the proof tree
-	// will capture proofs by carry
+	// will capture proofs by carry. Record where the implicit rules start to
+	// enable their removal.
 	const size_t explicit_rule_count = rules.size();
 	for(int_t i = 0; i < tbls.size(); i++) {
 		// Make the positive identity rule for this table
@@ -225,7 +233,7 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	set<pair<term, size_t>> refuted;
 	// Get all proofs for each covered fact
 	for (const term& g : s)
-		if (opts.bproof) get_proof(g, p, levels.size() - 1, refuted);
+		if (opts.bproof) get_proof(g, p, levels.size() - 1, refuted, explicit_rule_count);
 		else os << ir_handler->to_raw_term(g) << '.' << endl;
 	// Print proofs
 	if (opts.bproof) print(os, p);

@@ -362,8 +362,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
-	if (opts.bitunv) a.rng = leq;
-	else a.rng = leq;
+	a.rng = leq;
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y = 0;
 	for (auto x : b) {
@@ -798,7 +797,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		if (hfalse == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			// Update the levels structure with the current database for proof trees
-			a.levels.emplace(nstep, hfalse);
+			if (opts.bproof) a.levels.emplace(nstep, hfalse);
 			return hfalse;
 		} else v1.push_back(x);
 
@@ -812,18 +811,18 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	sort(v1.begin(), v1.end(), handle_cmp);
 	if (v1 == a.last) {
 		// Update the levels structure with the current database for proof trees
-		a.levels.emplace(nstep, bdd_and_many(a.last));
+		if (opts.bproof) a.levels.emplace(nstep, bdd_and_many(a.last));
 		return a.rlast;// { v.push_back(a.rlast); return; }
 	}
 	if (!opts.bproof) {
 		a.last = move(v1);
 		// Update the levels structure with the current database for proof trees
-		a.levels.emplace(nstep, bdd_and_many(a.last));
+		if (opts.bproof) a.levels.emplace(nstep, bdd_and_many(a.last));
 		a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
 		return a.rlast;
 	}
 	// Update the levels structure with the current database for proof trees
-	a.levels.emplace(nstep, x = bdd_and_many(v1));
+	if (opts.bproof) a.levels.emplace(nstep, x = bdd_and_many(v1));
 //	if ((x = bdd_and_many_ex(a.last, a.ex)) != hfalse)
 //		v.push_back(a.rlast = x ^ a.perm);
 //	bdd_handles v;

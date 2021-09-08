@@ -257,8 +257,10 @@ private:
 	std::set<term> decompress();
 	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
-	bool get_dnf_proofs(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
-	bool get_proof(const term& q, proof& p, size_t level, std::set<std::pair<term, size_t>> &refuted);
+	bool get_dnf_proofs(const term& q, proof& p, size_t level,
+		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
+	bool get_proof(const term& q, proof& p, size_t level,
+		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
