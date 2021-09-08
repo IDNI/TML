@@ -18,8 +18,6 @@ max(10000).
 
 @codec cdc dom r 2.
 
-!cdc__decode(t 5 6).
-
 # Expected output includes following internal facts
 
 # cdc__decode(t 5 6).

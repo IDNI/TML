@@ -49,7 +49,7 @@ bool tables::get_dnf_proofs(const term& q, proof& p, const size_t level,
 	not_exists_proof.rl = not_exists_proof.al = 0;
 	// Find the rules corresponding to this fact. Loop backwards so that implicit
 	// carry rules are found first. This matters only when generating proof trees.
-	for(int_t rule_idx = rules.size()-1; rule_idx >= 0; rule_idx--) {
+	for(size_t rule_idx = rules.size(); rule_idx-- > 0; ) {
 		rule &rul = rules[rule_idx];
 		if(rul.tab != q.tab) continue;
 		for(size_t alt_idx = 0; alt_idx < rul.size(); alt_idx++) {
@@ -193,7 +193,7 @@ rule tables::new_identity_rule(const ntable tab, const bool neg) {
 	term tm;
 	tm.tab = tab;
 	tm.neg = neg;
-	for(int_t i = 0; i < tbls[tab].len; i++) tm.push_back(-i-1);
+	for(size_t i = 0; i < tbls[tab].len; i++) tm.push_back(-i-1);
 	// Make a rule alternative based on the term
 	set<alt> alts_singleton;
 	get_alt({ tm }, tm, alts_singleton);
@@ -233,7 +233,7 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	// will capture proofs by carry. Record where the implicit rules start to
 	// enable their removal.
 	const size_t explicit_rule_count = rules.size();
-	for(int_t i = 0; i < tbls.size(); i++) {
+	for(size_t i = 0; i < tbls.size(); i++) {
 		// Make the positive identity rule for this table
 		rules.push_back(new_identity_rule(i, false));
 		// Make the negative identity rule for this table
