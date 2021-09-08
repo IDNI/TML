@@ -4924,7 +4924,8 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
 			{{"none", proof_mode::none}, {"tree", proof_mode::tree},
-				{"forest", proof_mode::forest}});
+				{"forest", proof_mode::forest}, {"partial-tree", proof_mode::partial_tree},
+				{"partial-forest", proof_mode::partial_forest}});
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");

@@ -112,7 +112,7 @@ typedef std::map<int_t, int_t> env;
 // Possible semantics that can be used to run a TML program
 enum semantics { pfp3, pfp };
 // Modes in which proof extraction code can be run
-enum proof_mode { none, tree, forest };
+enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 
 //runtime options
 typedef struct {

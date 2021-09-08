@@ -59,12 +59,17 @@ bool tables::get_dnf_proofs(const term& q, proof& p, const size_t level,
 			// existence, then we need to consider all possible instantiations to prove
 			// that there are no counter-examples.
 			const bool exists_mode = q.neg == rul.neg;
+			// If we are in partial mode, do not bother to show that the negation of
+			// this present fact could not have been derived.
+			if(!exists_mode && (opts.bproof == proof_mode::partial_tree ||
+				opts.bproof == proof_mode::partial_forest)) continue;
 			spbdd_handle var_domain = exists_mode ? alte.levels[level] : htrue;
 			decompress(addtail(rul.eq && from_fact(q), q.size(), alte.varslen) &&
 					var_domain, q.tab, [&](const term& t) {
 				// If we are only generating proof trees and already have a proof of
 				// this fact then do not investigate other proofs.
-				if(exists_mode && opts.bproof == proof_mode::tree &&
+				if(exists_mode && (opts.bproof == proof_mode::tree ||
+					opts.bproof == proof_mode::partial_tree) &&
 					p[level].find(q) != p[level].end()) return;
 				// Ensure term validity as BDD may contain illegal values
 				if(!is_term_valid(t)) return;
