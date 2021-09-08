@@ -47,8 +47,9 @@ bool tables::get_dnf_proofs(const term& q, proof& p, const size_t level,
 	// Evidence for a negative fact.
 	proof_elem not_exists_proof;
 	not_exists_proof.rl = not_exists_proof.al = 0;
-	// Find the rules corresponding to this fact
-	for(size_t rule_idx = 0; rule_idx < rules.size(); rule_idx++) {
+	// Find the rules corresponding to this fact. Loop backwards so that implicit
+	// carry rules are found first. This matters only when generating proof trees.
+	for(int_t rule_idx = rules.size()-1; rule_idx >= 0; rule_idx--) {
 		rule &rul = rules[rule_idx];
 		if(rul.tab != q.tab) continue;
 		for(size_t alt_idx = 0; alt_idx < rul.size(); alt_idx++) {
