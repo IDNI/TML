@@ -214,6 +214,7 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 			[&s](const term& t) { s.insert(t); }, t.size());
 	// Explicitly add rules to carry facts between steps so that the proof tree
 	// will capture proofs by carry
+	const size_t explicit_rule_count = rules.size();
 	for(int_t i = 0; i < tbls.size(); i++) {
 		// Make the positive identity rule for this table
 		rules.push_back(new_identity_rule(i, false));
@@ -228,6 +229,8 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 		else os << ir_handler->to_raw_term(g) << '.' << endl;
 	// Print proofs
 	if (opts.bproof) print(os, p);
+	// Remove the auxilliary rules we created as they are no longer needed
+	rules.resize(explicit_rule_count);
 	return goals.size() || opts.bproof;
 }
 template bool tables::get_goals(std::basic_ostream<char>&);
