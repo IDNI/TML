@@ -61,6 +61,12 @@ struct term : public ints {
 		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
 	}
+	bool operator==(const term& t) const {
+		return neg == t.neg && extype == t.extype && tab == t.tab &&
+			arith_op == t.arith_op && qbf == t.qbf && goal == t.goal &&
+			idbltin == t.idbltin && forget == t.forget && renew == t.renew &&
+			(const ints&)*this == t;
+	}
 	void replace(const std::map<int_t, int_t>& m) {
 		auto it = m.end();
 		for (int_t& i : *this) if (m.end() != (it = m.find(i))) i = it->second;
