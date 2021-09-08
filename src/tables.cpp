@@ -816,8 +816,6 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	}
 	if (!opts.bproof) {
 		a.last = move(v1);
-		// Update the levels structure with the current database for proof trees
-		if (opts.bproof) a.levels.emplace(nstep, bdd_and_many(a.last));
 		a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
 		return a.rlast;
 	}
@@ -961,9 +959,9 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
-		if (opts.bproof) levels.push_back(move(l));
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
+		if (opts.bproof) levels.push_back(move(l));
 		if (!datalog && is_repeat)
 			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
 	}
