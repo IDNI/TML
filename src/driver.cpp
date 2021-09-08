@@ -4652,20 +4652,24 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				parse_error(msg.str().c_str());
 			}
 		}
-
-		o::dbg() << "Transforming Grammar ..." << endl << endl;
-		for (auto x : pd.strs)
-			if (!has(transformed_strings, x.first))
-				transform_string(x.second, rp, x.first),
-				transformed_strings.insert(x.first);
-		if (!rp.g.empty()) {
-			if (pd.strs.size() > 1)
-				return throw_runtime_error(err_one_input);
-			else transform_grammar(rp, pd.strs.begin()->first,
-				pd.strs.begin()->second.size());
-			rp.g.clear();
+		
+		// If we want proof trees, then we need to transform the productions into
+		// rules first since only rules are supported by proof trees.
+		if(opts.get_string("proof") != "none") {
+			o::dbg() << "Transforming Grammar ..." << endl << endl;
+			for (auto x : pd.strs)
+				if (!has(transformed_strings, x.first))
+					transform_string(x.second, rp, x.first),
+					transformed_strings.insert(x.first);
+			if (!rp.g.empty()) {
+				if (pd.strs.size() > 1)
+					return throw_runtime_error(err_one_input);
+				else transform_grammar(rp, pd.strs.begin()->first,
+					pd.strs.begin()->second.size());
+				rp.g.clear();
+			}
+			o::dbg() << "Transformed Grammar:" << endl << endl << rp << endl;
 		}
-		o::dbg() << "Transformed Grammar:" << endl << endl << rp << endl;
 
 		if(opts.enabled("program-gen")) {
 			uint_t cid = 0;
