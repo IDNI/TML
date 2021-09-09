@@ -61,9 +61,15 @@ struct body {
 };
 
 struct alt : public std::vector<body*> {
-	spbdd_handle rng = htrue, eq = htrue, rlast = hfalse;
+	spbdd_handle rng = htrue, eq = htrue;
 	size_t varslen = 0;
+	// The last solutions of this alternative's constituent body terms
 	bdd_handles last;
+	// The conjunction of last, eq, and range. Only used when proofs enabled.
+	spbdd_handle unquantified_last = hfalse;
+	// unquantified_last with variables existentially quantified (ex) and permuted
+	// (perm)
+	spbdd_handle rlast = hfalse;
 	std::vector<term> t;
 	std::vector<term> bltins; // builtins to run during alt_query
 	bools ex;

@@ -776,6 +776,12 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
 	return x->b < y->b;
 };
 
+/* Compute the substitutions that satisfy the given alternative in the context
+ * of the tables computed during the previous step. Do this by finding the
+ * intersection (conjunction) of the substitutions satisfying each body term
+ * and existentially quantifying out variables that will not be exported by the
+ * head. */
+
 spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	if (a.f) {
 		bdd_handles f; //form
@@ -784,51 +790,54 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		if (a.f->ex_h.size() != 0 ) {
 			append_num_typebits(f[0], a.f->varslen_h);
 			a.rlast = f[0];
-		}
-		else a.rlast = f[0] == hfalse ? hfalse : htrue;
+		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;
 	}
 
 	bdd_handles v1 = { a.rng, a.eq };
-	spbdd_handle x;
 	//DBG(assert(!a.empty());)
 
-	for (size_t n = 0; n != a.size(); ++n)
-		if (hfalse == (x = body_query(*a[n], a.varslen))) {
+	for (size_t n = 0; n != a.size(); ++n) {
+		spbdd_handle x = body_query(*a[n], a.varslen);
+		if (hfalse == x) {
+			// Move tuhis failing alternative to first position under the assumption
+			// that it is likely to fail again and that we should not have to evaluate
+			// the other bodies to find out.
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
 			// Update the levels structure with the current database for proof trees
 			if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, hfalse);
+			// If this body term is false, no more iterations are required to
+			// determine that this alternative is false
 			return hfalse;
 		} else v1.push_back(x);
+	}
 
-	//NOTE: for over bdd arithmetic (currently handled as a bltin, although may change)
+	// NOTE: for over bdd arithmetic (currently handled as a bltin, although may change)
 	// In case arguments/ATOMS are the same than last iteration,
 	// here is were it should be avoided to recompute.
-	spbdd_handle xg = htrue;
-	if (a.grnd) xg = alt_query(*(a.grnd), 0); // vars grounding query
+	spbdd_handle xg = a.grnd ? alt_query(*(a.grnd), 0) : htrue; // vars grounding query
 	body_builtins(xg, &a, v1);
-
+	// Put subquery results into canonical form to aid in recognizing repetitions
 	sort(v1.begin(), v1.end(), handle_cmp);
+	// Now we must combine the v1 subquery results in order to get an overall
+	// query result
 	if (v1 == a.last) {
-		// Update the levels structure with the current database for proof trees
-		if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, bdd_and_many(a.last));
-		return a.rlast;// { v.push_back(a.rlast); return; }
-	}
-	if (opts.bproof == proof_mode::none) {
+		// The case that conjuncts are exactly the same as last time
+		if(opts.bproof != proof_mode::none)
+			a.levels.emplace(nstep, a.unquantified_last);
+	} else if (opts.bproof == proof_mode::none) {
+		// The case where the conjuncts changed but do not have to produce proof
 		a.last = move(v1);
 		a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
-		return a.rlast;
+	} else {
+		// The case where the conjuncts changed and we will have to produce proof
+		a.last = move(v1);
+		// Following value is needed as it contains all body variable instantiations
+		a.unquantified_last = bdd_and_many(a.last);
+		a.levels.emplace(nstep, a.unquantified_last);
+		a.rlast = bdd_permute_ex(a.unquantified_last, a.ex, a.perm);
 	}
-	// Update the levels structure with the current database for proof trees
-	if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, x = bdd_and_many(v1));
-//	if ((x = bdd_and_many_ex(a.last, a.ex)) != hfalse)
-//		v.push_back(a.rlast = x ^ a.perm);
-//	bdd_handles v;
-	return a.rlast = bdd_permute_ex(x, a.ex, a.perm);
-//	if ((x = bdd_and_many_ex_perm(a.last, a.ex, a.perm)) != hfalse)
-//		v.push_back(a.rlast = x);
-//	return x;
-//	DBG(assert(bdd_nvars(a.rlast) < len*bits);)
+	return a.rlast;
 }
 
 bool table::commit(DBG(size_t /*bits*/)) {
