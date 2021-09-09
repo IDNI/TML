@@ -1173,3 +1173,241 @@ basic_ostream<T>& bdd::out(basic_ostream<T>& os, int_t x) {
 	//return out(out(os << b.v << " ? ", b.h) << " : ", b.l);
 	return out(out(os << b.v << " ? (", b.h) << ") : (", b.l) << ")";
 }
+
+// Return representative of set containing x
+int_t union_find::find(int_t x) {
+	if(auto it = parent.find(x); it != parent.end()) {
+		// the root of the set has itself as parent
+		while(it->first != it->second) {
+			// set parent of node to grandparent
+			auto it_grandpa = parent.find(it->second);
+			it->second = it_grandpa->second;
+			it = it_grandpa;
+		} return it->first;
+	} else { return 0; }
+}
+
+// Perform the union of sets represented by x and y
+void union_find::merge(int_t x, int_t y) {
+	int_t root_x = find(x), root_y = find(y);
+	if(root_x != 0 && root_y != 0) parent[root_y] = root_x;
+}
+
+// Insert a new positive element as disjoint singleton set
+bool union_find::insert(int_t x) {
+	if (auto it = parent.find(x); it != parent.end()) {
+		parent[x] = x; return true;
+	} else return false;
+}
+
+union_find union_find::intersect(union_find &uf1, union_find &uf2) {
+	map<pair<int_t,int_t>, vector<int_t>> eq_class;
+	// Find common nodes in uf1 and uf2
+	auto it_uf1 = uf1.parent.begin();
+	auto it_uf2 = uf2.parent.begin();
+	while (it_uf1 != uf1.parent.end() && it_uf2 != uf2.parent.end()) {
+		if (it_uf1->first < it_uf2->first) ++it_uf1;
+		else if(it_uf2->first < it_uf1->first) ++it_uf2;
+		else {
+			// Found a common node; Associate with equivalence tuple
+			int_t eq_class_uf1 = uf1.find(it_uf1->first);
+			int_t eq_class_uf2 = uf2.find(it_uf1->first);
+			eq_class[{eq_class_uf1,eq_class_uf2}].emplace_back(it_uf1->first);
+			++it_uf1; ++it_uf2;
+		}
+	}
+	// Create resulting union-find data structure
+	union_find uf_res;
+	for (const auto& p : eq_class) {
+		if (p.second.size() > 1) for (const auto& el : p.second) {
+			uf_res.insert(el);
+			uf_res.merge(p.second[0], el);
+		}
+	}
+	return uf_res;
+}
+
+// Create constrains for a node from its high and low nodes
+constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
+	constrains res;
+	// An implication is contained in the merge
+	// if it is compatible in hi and low
+	auto it_hi = hi.imp_var.begin();
+	auto it_lo = lo.imp_var.begin();
+	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
+		if (it_lo == lo.imp_var.end() || it_hi->first < it_lo->first) {
+			if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
+				// Implication is true in lo since antecedent is violated
+				res.imp_var.emplace(it_hi->first, it_hi->second);
+			} else{
+				for (const auto v : it_hi->second){
+					if(lo.true_var.find(v) != lo.true_var.end()) {
+						// Implication is trivially true in lo
+						res.imp_var[it_hi->first].insert(v);
+					}
+					else if (lo.eq_var.in_same_set(it_hi->first, v) ||
+							lo.eq_var.in_same_set(-it_hi->first, -v)) {
+						// Implication is contained in equality of lo
+						res.imp_var[it_hi->first].insert(v);
+					}
+				}
+			}
+			++it_hi;
+		}
+		else if (it_hi == hi.imp_var.end() || it_lo->first < it_hi->first) {
+			if (hi.true_var.find(-it_lo->first) != hi.true_var.end()) {
+				// Implication is true in hi since antecedent is violated
+				res.imp_var.emplace(it_lo->first, it_lo->second);
+			} else {
+				for (const auto v : it_lo->second) {
+					if(hi.true_var.find(v) != hi.true_var.end()) {
+						// Implication is trivially true in hi
+						res.imp_var[it_lo->first].insert(v);
+					}
+					else if (hi.eq_var.in_same_set(it_lo->first, v) ||
+							hi.eq_var.in_same_set(-it_lo->first, -v)) {
+						// Implication is contained in equality of hi
+						res.imp_var[it_lo->first].insert(v);
+					}
+				}
+			}
+			++it_lo;
+		}
+		else {
+			auto it_hi_set = it_hi->second.begin();
+			auto it_lo_set = it_lo->second.begin();
+			while (it_hi_set != it_hi->second.end() || it_lo_set != it_lo->second.end()) {
+				if (it_lo_set == it_lo->second.end() || *it_hi_set < *it_lo_set) {
+					if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
+						// This should not happen
+						// It means that 2CNF in lo is not reduced
+						DBGFAIL;
+					} else {
+						if (lo.true_var.find(*it_hi_set) != lo.true_var.end()) {
+							// Implication is trivially true in lo
+							res.imp_var[it_hi->first].insert(*it_hi_set);
+						}
+						else if (lo.eq_var.in_same_set(it_hi->first, *it_hi_set) ||
+						lo.eq_var.in_same_set(-it_hi->first, -*it_hi_set)) {
+							// Implication is contained in equality of lo
+							res.imp_var[it_hi->first].insert(*it_hi_set);
+						}
+					}
+					++it_hi_set;
+				}
+				else if (it_hi_set == it_hi->second.end() || *it_lo_set < * it_hi_set) {
+					if (hi.true_var.find(-it_lo->first) != hi.true_var.end()) {
+						// This should not happen
+						// It means that 2CNF in hi is not reduced
+						DBGFAIL;
+					} else {
+						if (hi.true_var.find(*it_lo_set) != hi.true_var.end()) {
+							// Implication is trivially true in hi
+							res.imp_var[it_lo->first].insert(*it_lo_set);
+						}
+						else if (hi.eq_var.in_same_set(it_lo->first, *it_lo_set) ||
+						hi.eq_var.in_same_set(-it_lo->first, -*it_lo_set)) {
+							// Implication is contained in equality of hi
+							res.imp_var[it_lo->first].insert(*it_lo_set);
+						}
+					}
+					++it_lo_set;
+				}
+				else {
+					// Implication is contained in both, lo and hi
+					res.imp_var[it_hi->first].insert(*it_hi_set);
+					++it_hi_set; ++ it_lo_set;
+				}
+			}
+		}
+	}
+
+	//TODO: Leave out implications where implied variable is contained in equality
+
+	// New implications arise from the singletons contained in hi xor lo
+	if (auto it = res.imp_var.find(var); it != res.imp_var.end()) {
+		// At this stage this should not happen
+		DBGFAIL;
+	} else {
+		// Add implications of form var -> x, x from singletons (hi \ lo)
+		if (!hi.true_var.empty()) {
+			set<int_t> imp_set_hi;
+			set_difference(hi.true_var.begin(), hi.true_var.end(),
+				       lo.true_var.begin(), lo.true_var.end(),
+				       inserter(imp_set_hi, imp_set_hi.begin()));
+			if(!imp_set_hi.empty())
+				res.imp_var.emplace(var, move(imp_set_hi));
+		}
+	}
+	if (auto it = res.imp_var.find(-var); it != res.imp_var.end()) {
+		// At this stage this should not happen
+		DBGFAIL;
+	} else {
+		// Add implications of form -var -> x, x from singletons (lo \ hi)
+		if (!lo.true_var.empty()) {
+			set<int_t> imp_set_lo;
+			set_difference(lo.true_var.begin(), lo.true_var.end(),
+				       hi.true_var.begin(), hi.true_var.end(),
+				       inserter(imp_set_lo, imp_set_lo.begin()));
+			if(!imp_set_lo.empty())
+				res.imp_var.emplace(-var, move(imp_set_lo));
+		}
+	}
+	// Lifting of true singletons contained in both hi and lo
+	if (!hi.true_var.empty() && !lo.true_var.empty()) {
+		set<int_t> true_set;
+		set_intersection(hi.true_var.begin(), hi.true_var.end(),
+				 lo.true_var.begin(), lo.true_var.end(),
+				 inserter(true_set, true_set.begin()));
+		if (!true_set.empty())
+			res.true_var = move(true_set);
+	}
+
+	//TODO: lifting of implications which are contained in equality
+
+	// Lifting of equalities contained in both hi and lo
+	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
+		res.eq_var = union_find::intersect(hi.eq_var, lo.eq_var);
+	}
+
+
+
+	//TODO:
+	// Further we can say here if a singleton is contained only in hi or in lo
+	// Hence we should do lifting as implications also in here
+	auto it_hi_var = hi.true_var.begin();
+	auto it_lo_var = lo.true_var.begin();
+	while (it_hi_var != hi.true_var.end() && it_lo_var != lo.true_var.end()) {
+		if (*it_hi_var < *it_lo_var) {
+			//Singleton in high but not in lo
+			++it_hi_var;
+		}
+		else if (*it_hi_var > *it_lo_var) {
+			//Singleton in lo but not in high
+			++it_lo_var;
+		} else {
+			//
+			++it_hi_var; ++it_lo_var;
+		}
+	}
+
+	// Infer new equalities and inequalities from singletons in hi and lo
+	auto it_f = hi.true_var.begin();
+	auto it_b = lo.true_var.rbegin();
+	while (it_f != hi.true_var.end() && it_b != lo.true_var.rend()) {
+		if (*it_f < -(*it_b)) {
+			++it_f;
+		}
+		else if (*it_f > -(*it_b)) {
+			++it_b;
+		}
+		else {
+			//Match found
+			res.eq_var.insert(*it_f);
+			res.eq_var.insert(var);
+			res.eq_var.merge(var, *it_f);
+			++it_f; ++it_b;
+		}
+	}
+	return res;
+}

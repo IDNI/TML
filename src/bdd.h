@@ -404,3 +404,29 @@ private:
 	std::set<bools> vp;
 	void sat(int_t x);
 };
+
+// Union-Find data structure with path compression
+class union_find {
+	std::map<int_t,int_t> parent;
+public:
+	int_t find(int_t x);
+	void merge (int_t x, int_t y);
+	bool insert (int_t x);
+	bool in_same_set (int_t x, int_t y) { return find(x) == find(y); }
+	bool empty () const { return parent.empty(); }
+	static union_find intersect (union_find& uf1, union_find& uf2);
+};
+
+// representation for 2-CNFs
+class constrains {
+	std::map<int_t, std::set<int_t>> imp_var;
+	std::set<int_t> true_var; //<- false constants are saved in negated form
+	union_find eq_var;
+	// void updateTC (); <- not needed yet
+public:
+	constrains() = default;
+	explicit constrains(int_t var) { true_var.insert(var); }
+	static constrains merge(int_t var, constrains& hi, constrains& lo);
+};
+
+
