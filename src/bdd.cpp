@@ -1234,8 +1234,7 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2) {
 // Create constrains for a node from its high and low nodes
 constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 	constrains res;
-	// An implication is contained in the merge
-	// if it is compatible in hi and low
+	// Lifting of implications
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
@@ -1326,92 +1325,50 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 		}
 	}
 
-	//TODO: Leave out implications where implied variable is contained in equality
+	// Lifting of singletons
+	auto it_hi_var = hi.true_var.begin();
+	auto it_lo_var = lo.true_var.begin();
+	while (it_hi_var != hi.true_var.end() || it_lo_var != lo.true_var.end()) {
+		if (it_lo_var == lo.true_var.end() || abs(*it_hi_var) < abs(*it_lo_var)) {
+			//Singleton in high but not in lo
+			res.imp_var[var].insert(*it_hi_var);
+			++it_hi_var;
+		}
+		else if (it_hi_var == hi.true_var.end() || abs(*it_hi_var) > abs(*it_lo_var)) {
+			//Singleton in lo but not in high
+			res.imp_var[-var].insert(*it_lo_var);
 
-	// New implications arise from the singletons contained in hi xor lo
-	if (auto it = res.imp_var.find(var); it != res.imp_var.end()) {
-		// At this stage this should not happen
-		DBGFAIL;
-	} else {
-		// Add implications of form var -> x, x from singletons (hi \ lo)
-		if (!hi.true_var.empty()) {
-			set<int_t> imp_set_hi;
-			set_difference(hi.true_var.begin(), hi.true_var.end(),
-				       lo.true_var.begin(), lo.true_var.end(),
-				       inserter(imp_set_hi, imp_set_hi.begin()));
-			if(!imp_set_hi.empty())
-				res.imp_var.emplace(var, move(imp_set_hi));
+			//Implications assuring the transitive closure of resulting constrain
+			for (const auto v : hi.true_var) {
+				if (abs(v) != abs(*it_lo_var))
+					res.imp_var[-*it_lo_var].insert(v);
+			}
+			++it_lo_var;
+		} else {
+			//Absolut value of singletons is equal
+			if (*it_hi_var == *it_lo_var) {
+				// Singleton is lifted
+				res.true_var.emplace(*it_hi_var);
+			} else {
+				// Equality to parent var is inferred
+				res.eq_var.insert(*it_hi_var);
+				res.eq_var.insert(var);
+				res.eq_var.merge(var, *it_hi_var);
+
+				//Implications assuring the transitive closure of resulting constrain
+				for (const auto v : hi.true_var) {
+					if (abs(v) != abs(*it_lo_var))
+						res.imp_var[-*it_lo_var].insert(v);
+				}
+			}
+			++it_hi_var; ++it_lo_var;
 		}
 	}
-	if (auto it = res.imp_var.find(-var); it != res.imp_var.end()) {
-		// At this stage this should not happen
-		DBGFAIL;
-	} else {
-		// Add implications of form -var -> x, x from singletons (lo \ hi)
-		if (!lo.true_var.empty()) {
-			set<int_t> imp_set_lo;
-			set_difference(lo.true_var.begin(), lo.true_var.end(),
-				       hi.true_var.begin(), hi.true_var.end(),
-				       inserter(imp_set_lo, imp_set_lo.begin()));
-			if(!imp_set_lo.empty())
-				res.imp_var.emplace(-var, move(imp_set_lo));
-		}
-	}
-	// Lifting of true singletons contained in both hi and lo
-	if (!hi.true_var.empty() && !lo.true_var.empty()) {
-		set<int_t> true_set;
-		set_intersection(hi.true_var.begin(), hi.true_var.end(),
-				 lo.true_var.begin(), lo.true_var.end(),
-				 inserter(true_set, true_set.begin()));
-		if (!true_set.empty())
-			res.true_var = move(true_set);
-	}
-
-	//TODO: lifting of implications which are contained in equality
 
 	// Lifting of equalities contained in both hi and lo
 	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
 		res.eq_var = union_find::intersect(hi.eq_var, lo.eq_var);
 	}
 
-
-
-	//TODO:
-	// Further we can say here if a singleton is contained only in hi or in lo
-	// Hence we should do lifting as implications also in here
-	auto it_hi_var = hi.true_var.begin();
-	auto it_lo_var = lo.true_var.begin();
-	while (it_hi_var != hi.true_var.end() && it_lo_var != lo.true_var.end()) {
-		if (*it_hi_var < *it_lo_var) {
-			//Singleton in high but not in lo
-			++it_hi_var;
-		}
-		else if (*it_hi_var > *it_lo_var) {
-			//Singleton in lo but not in high
-			++it_lo_var;
-		} else {
-			//
-			++it_hi_var; ++it_lo_var;
-		}
-	}
-
-	// Infer new equalities and inequalities from singletons in hi and lo
-	auto it_f = hi.true_var.begin();
-	auto it_b = lo.true_var.rbegin();
-	while (it_f != hi.true_var.end() && it_b != lo.true_var.rend()) {
-		if (*it_f < -(*it_b)) {
-			++it_f;
-		}
-		else if (*it_f > -(*it_b)) {
-			++it_b;
-		}
-		else {
-			//Match found
-			res.eq_var.insert(*it_f);
-			res.eq_var.insert(var);
-			res.eq_var.merge(var, *it_f);
-			++it_f; ++it_b;
-		}
-	}
 	return res;
 }

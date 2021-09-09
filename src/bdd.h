@@ -419,13 +419,20 @@ public:
 
 // representation for 2-CNFs
 class constrains {
+	static constexpr auto abs_cmp = [](int a, int b) {
+		int abs_a = abs(a), abs_b = abs(b);
+		if (abs_a < abs_b) return true;
+		if (abs_b < abs_a) return false;
+		return a < b;
+	};
+
 	std::map<int_t, std::set<int_t>> imp_var;
-	std::set<int_t> true_var; //<- false constants are saved in negated form
+	std::set<int_t, decltype(abs_cmp)> true_var; //Set is sorted by absolut value
 	union_find eq_var;
 	// void updateTC (); <- not needed yet
 public:
 	constrains() = default;
-	explicit constrains(int_t var) { true_var.insert(var); }
+	constrains(int_t var, bool b) { true_var.insert({var, b}); }
 	static constrains merge(int_t var, constrains& hi, constrains& lo);
 };
 
