@@ -101,35 +101,6 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 				leq_var(arg1, arg2, args, bit)));
 }
 
-void tables::range(size_t arg, size_t args, bdd_handles& v) {
-	spbdd_handle	ischar= ::from_bit(pos(0, arg, args), true) &&
-			::from_bit(pos(1, arg, args), false);
-	spbdd_handle	isnum = ::from_bit(pos(0, arg, args), false) &&
-			::from_bit(pos(1, arg, args), true);
-	spbdd_handle	issym = ::from_bit(pos(0, arg, args), false) &&
-			::from_bit(pos(1, arg, args), false);
-	// ir_handler->nums is set to max NUM, not universe size. While for ir_handler->syms it's the size.
-	// It worked before because for arity==1 fact(ir_handler->nums) is always negated.
-	bdd_handles r = {ischar || isnum || issym,
-		(!ir_handler->chars	? htrue%ischar : bdd_impl(ischar,
-			leq_const(mkchr(ir_handler->chars-1), arg, args, bits))),
-		(!ir_handler->nums 	? htrue%isnum : bdd_impl(isnum,
-			leq_const(mknum(ir_handler->nums), arg, args, bits))),
-		(!ir_handler->syms 	? htrue%issym : bdd_impl(issym,
-			leq_const(((ir_handler->syms-1)<<2), arg, args, bits)))};
-	v.insert(v.end(), r.begin(), r.end());
-}
-
-spbdd_handle tables::range(size_t arg, ntable tab) {
-	array<int_t, 6> k = { ir_handler->syms, ir_handler->nums, ir_handler->chars, (int_t)tbls[tab].len,
-		(int_t)arg, (int_t)bits };
-	auto it = range_memo.find(k);
-	if (it != range_memo.end()) return it->second;
-	bdd_handles v;
-	return	range(arg, tbls[tab].len, v),
-		range_memo[k] = bdd_and_many(move(v));
-}
-
 uints perm_init(size_t n) {
 	uints p(n);
 	while (n--) p[n] = n;
@@ -148,7 +119,6 @@ spbdd_handle tables::add_bit(spbdd_handle x, size_t args) {
 }
 
 void tables::add_bit() {
-	range_clear_memo();
 	spbdd_handle x = hfalse;
 	bdd_handles v;
 	for (auto& x : tbls)
@@ -191,8 +161,7 @@ spbdd_handle tables::from_fact(const term& t) {
 		if (t[n] >= 0) r = r && from_sym(n, args, t[n]);
 		else if (vs.end() != (it = vs.find(t[n])))
 			r = r && from_sym_eq(n, it->second, args);
-		else if (vs.emplace(t[n], n), !t.neg)
-			r = r && range(n, t.tab);
+		else if (vs.emplace(t[n], n), !t.neg && !t.goal) {}
 	return r;
 }
 
@@ -205,90 +174,6 @@ uints tables::get_perm(const term& t, const varmap& m, size_t len) const {
 			for (b = 0; b != bits; ++b)
 				perm[pos(b,n,t.size())] = pos(b,m.at(t[n]),len);
 	return perm;
-}
-
-spbdd_handle tables::get_alt_range(const term& h, const term_set& a,
-	const varmap& vm, size_t len) {
-	set<int_t> pvars, nvars, eqvars, leqvars, arithvars;
-	vector<const term*> eqterms, leqterms, arithterms;
-	// first pass, just enlist eq terms (that have at least one var)
-	for (const term& t : a) {
-		bool haseq = false, hasleq = false;
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] >= 0) continue;
-			else if (t.extype == term::EQ) haseq = true; // .iseq
-			else if (t.extype == term::LEQ) hasleq = true; // .isleq
-			else (t.neg ? nvars : pvars).insert(t[n]);
-		// TODO: BLTINS: add term::BLTIN handling
-		// only if iseq and has at least one var
-		if (haseq) eqterms.push_back(&t);
-		else if (hasleq) leqterms.push_back(&t);
-	}
-	for (const term* pt : eqterms) {
-		const term& t = *pt;
-		bool noeqvars = true;
-		vector<int_t> tvars;
-		for (size_t n = 0; n != t.size(); ++n)
-			if (t[n] >= 0) continue;
-			// nvars add range already, so skip all in that case...
-			// and per 1.3 - if any one is contrained (outside) bail
-			// out
-			else if (has(nvars, t[n])) { noeqvars = false; break; }
-			// if neither pvars has this var it should be ranged
-			else if (!has(pvars, t[n])) tvars.push_back(t[n]);
-			else if (!t.neg) { noeqvars = false; break; }
-			// if is in pvars and == then other var is covered too,
-			// skip. this isn't covered by 1.1-3 (?) but further
-			// optimization.
-		if (noeqvars)
-			for (const int_t tvar : tvars)
-				eqvars.insert(tvar);
-			// 1.3 one is enough (we have one constrained, no need
-			// to do both). but this doesn't work well, we need to
-			// range all that fit.
-			//break;
-	}
-	for (const term* pt : leqterms) {
-	// - for '>' (~(<=)) it's enough if 2nd var is in nvars/pvars.
-		// - for '<=' it's enough if 2nd var is in nvars/pvars.
-		// - if 1st/greater is const, still can't skip, needs to be
-		// ranged.
-		// - if neither var appears elsewhere (nvars nor pvars) => do
-		// both.
-		//   (that is a bit strange, i.e. if appears outside one is
-		//   enough)
-		// ?x > ?y => ~(?x <= ?y) => ?y - 2nd var is limit for both LEQ
-		// and GT.
-		const term& t = *pt;
-		assert(t.size() == 2);
-		const int_t v1 = t[0], v2 = t[1];
-		if (v1 == v2) {
-			if (!has(nvars, v2)) leqvars.insert(v2);
-			continue;
-		}
-		if (v2 < 0) {
-			if (has(nvars, v2) || has(pvars, v2))
-				continue; // skip both
-			leqvars.insert(v2); // add and continue to 1st
-		}
-		if (v1 < 0 && !has(nvars, v1) && !has(pvars, v1))
-			leqvars.insert(v1);
-	}
-
-	for (int_t i : pvars) nvars.erase(i);
-	if (h.neg) for (int_t i : h) if (i < 0)
-		nvars.erase(i), eqvars.erase(i), leqvars.erase(i); // arithvars.erase(i);
-	bdd_handles v;
-	for (int_t i : nvars) range(vm.at(i), len, v);
-	for (int_t i : eqvars) range(vm.at(i), len, v);
-	for (int_t i : leqvars) range(vm.at(i), len, v);
-	if (!h.neg) {
-		set<int_t> hvars;
-		for (int_t i : h) if (i < 0) hvars.insert(i);
-		for (const term& t : a) for (int_t i : t) hvars.erase(i);
-		for (int_t i : hvars) range(vm.at(i), len, v);
-	}
-	return bdd_and_many(v);
 }
 
 body tables::get_body(const term& t, const varmap& vm, size_t len) const {
@@ -405,21 +290,38 @@ bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
+/* Add the constraint that the given variable is a number to the given
+ * BDD. */
+
+spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) const {
+	// Numbers must have their lowest bits be 01.
+	return ::from_bit(pos(1, var, n_vars),true) &&
+		::from_bit(pos(0, var, n_vars),false);
+}
+
 bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
 	DBG(assert(t.size() == 2););
-	spbdd_handle q = bdd_handle::T;
+	spbdd_handle q = bdd_handle::T, numeric_constraint = bdd_handle::T;
 	if (t[0] == t[1]) return !(t.neg);
 	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] <= t[1]));
-	if (t[0] < 0 && t[1] < 0)
+	if (t[0] < 0 && t[1] < 0) {
 		q = leq_var(vm.at(t[0]), vm.at(t[1]), vl, bits);
-	else if (t[0] < 0)
+		numeric_constraint = constrain_to_num(vm.at(t[0]), vl) &&
+			constrain_to_num(vm.at(t[1]), vl);
+	} else if (t[0] < 0) {
 		q = leq_const(t[1], vm.at(t[0]), vl, bits);
-	else if (t[1] < 0)
+		numeric_constraint = constrain_to_num(vm.at(t[0]), vl);
+	} else if (t[1] < 0) {
 		// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 		q = htrue % leq_const(t[0], vm.at(t[1]), vl, bits) ||
 			from_sym(vm.at(t[1]), vl ,t[0]);
-	c = t.neg ? c % q : (c && q);
+		numeric_constraint = constrain_to_num(vm.at(t[1]), vl);
+	}
+	// Enforce the numeric constraint regardless of whether this term is positive
+	// or negated. This essentially forces any operands to inequalities to be
+	// integers and guarantees that ?a<?b is safe iff ?a<=?b is safe.
+	c = (t.neg ? c % q : (c && q)) && numeric_constraint;
 	return true;
 }
 
@@ -460,8 +362,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 		//	else	*(a.grnd = new alt) = x,
 		//		grnds.insert(a.grnd);
 	}
-	if (opts.bitunv) a.rng = leq;
-	else a.rng = bdd_and_many({ get_alt_range(h, al, a.vm, a.varslen), leq });
+	a.rng = leq;
 	static set<body*, ptrcmp<body>>::const_iterator bit;
 	body* y = 0;
 	for (auto x : b) {
@@ -717,7 +618,7 @@ bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
 		}
 	}
 	flat_prog fp = ir_handler->to_terms(p);
-	return add_prog(fp, p.g);
+	return add_prog_wprod(fp, p.g);
 }
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
@@ -752,7 +653,7 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
 	}
 //	DBG(print(o::out()<<"run_nums for:"<<endl, p)<<endl<<"returned:"<<endl;)
-	if (!add_prog(move(p), {})) return false;
+	if (!add_prog_wprod(move(p), {})) return false;
 	if (!pfp(nsteps)) return false;
 	r = g(decompress());
 	return true;
@@ -798,7 +699,7 @@ void tables::init_tml_update() {
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
 
-bool tables::add_prog(flat_prog m, const vector<production>& g, bool mknums) {
+bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	if (mknums) to_nums(m);
@@ -895,6 +796,8 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	for (size_t n = 0; n != a.size(); ++n)
 		if (hfalse == (x = body_query(*a[n], a.varslen))) {
 			a.insert(a.begin(), a[n]), a.erase(a.begin() + n + 1);
+			// Update the levels structure with the current database for proof trees
+			if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, hfalse);
 			return hfalse;
 		} else v1.push_back(x);
 
@@ -906,10 +809,18 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	body_builtins(xg, &a, v1);
 
 	sort(v1.begin(), v1.end(), handle_cmp);
-	if (v1 == a.last) return a.rlast;// { v.push_back(a.rlast); return; }
-	if (!opts.bproof) return a.rlast =
-		bdd_and_many_ex_perm(a.last = move(v1), a.ex, a.perm);
-	a.levels.emplace(nstep, x = bdd_and_many(v1));
+	if (v1 == a.last) {
+		// Update the levels structure with the current database for proof trees
+		if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, bdd_and_many(a.last));
+		return a.rlast;// { v.push_back(a.rlast); return; }
+	}
+	if (opts.bproof == proof_mode::none) {
+		a.last = move(v1);
+		a.rlast = bdd_and_many_ex_perm(a.last, a.ex, a.perm);
+		return a.rlast;
+	}
+	// Update the levels structure with the current database for proof trees
+	if (opts.bproof != proof_mode::none) a.levels.emplace(nstep, x = bdd_and_many(v1));
 //	if ((x = bdd_and_many_ex(a.last, a.ex)) != hfalse)
 //		v.push_back(a.rlast = x ^ a.perm);
 //	bdd_handles v;
@@ -1033,7 +944,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
 	level l = get_front();
 	fronts.push_back(l);
-	if (opts.bproof) levels.emplace_back(l);
+	if (opts.bproof != proof_mode::none) levels.emplace_back(l);
 	for (;;) {
 		if (print_steps) o::inf() << "# step: " << nstep << endl;
 		++nstep;
@@ -1050,9 +961,9 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 			(nsteps && nstep == nsteps)) return false; // no FP yet
 		bool is_repeat =
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
+		if (opts.bproof != proof_mode::none) levels.push_back(move(l));
 		if (!datalog && is_repeat)
 			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
-		if (opts.bproof) levels.push_back(move(l));
 	}
 	DBGFAIL;
 }
@@ -1062,16 +973,22 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
  * that it reaches a fixed point. Otherwise just return false. */
 
 bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		ir_builder *ir_handler, std::set<raw_term> &results)
+		set<raw_term> &results)
 {
 	rt_options to;
-	to.bproof            = opts.enabled("proof");
+	to.bproof            = proof_mode::none;
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
-	tables tbl(dict, to, ir_handler);
+	to.fp_step           = opts.enabled("fp");
+	to.bitunv            = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
+	ir_builder ir_handler(dict, to);
+	tables tbl(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl;
+	ir_handler.printer = &tbl;
 	strs_t strs;
-	if(tbl.run_prog(rp, strs)) {
+	if(tbl.run_prog_wstrs(rp, strs)) {
 		for(const term &result : tbl.decompress()) {
 			results.insert(tbl.ir_handler->to_raw_term(result));
 		}
@@ -1086,9 +1003,8 @@ bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
  * given program reaches a fixed point. Useful for query containment
  * checks. */
 
-bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
-	dict_t &dict, const ::options &opts, ir_builder *ir_handler,
-	std::set<raw_term> &results)
+bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
+	const ::options &opts, set<raw_term> &results)
 {
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
@@ -1115,7 +1031,7 @@ bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
 	}
 	// Run the program to obtain the results which we will then filter
 	std::set<raw_term> tmp_results;
-	bool result = run_prog(rp, dict, opts, ir_handler, tmp_results);
+	bool result = run_prog(rp, dict, opts, tmp_results);
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -1128,13 +1044,12 @@ bool tables::run_prog(const std::set<raw_term> &edb, raw_prog rp,
 	return result;
 }
 
-bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
 	size_t break_on_step)
 {
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
-	if (opts.bitunv) this->typenv = const_cast<raw_prog&>(p).get_typenv();
 	if (!add_prog(p, strs)) return false;
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
@@ -1155,13 +1070,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 	}
 	size_t went = nstep - begstep;
 	if (r && prog_after_fp.size()) {
-		if (!add_prog(move(prog_after_fp), {}, false)) return false;
+		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
 	}
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
-			r = run_prog(np, strs, steps, break_on_step);
+			r = run_prog_wstrs(np, strs, steps, break_on_step);
 			went = nstep - begstep;
 			if (!r && went >= steps) break;
 		}
@@ -1357,14 +1272,15 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	if (!allowbltins && tbl.is_builtin()) return;
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, len, this](const bools& p, int_t DBG(y)) {
+		[tab, &f, &tbl, len, this](const bools& p, int_t DBG(y)) {
 		DBG(assert(abs(y) == 1);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
-		f(r);
+
+		if(!opts.bitunv || spbu.get()->brev_transform_check(r, tbl) ) f(r);
 	})();
 }
 

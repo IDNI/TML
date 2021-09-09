@@ -1,0 +1,347 @@
+# https://dingo.sbs.arizona.edu/~sandiway/sudoku/examples.html
+
+predtype max( int:7 ?x).
+max(81).
+predtype t1().
+predtype t2().
+predtype t3().
+predtype t4().
+predtype t5().
+predtype t6().
+
+t1.  # easy example
+#t2.  # intermediate example
+#t3.  # difficult
+#t4.  # not fun
+#t5.  # z3 example
+# t1
+#   # 0 1 2 3 4 5 6 7 8
+#######################
+# 0 # 0 0 0 2 6 0 7 0 1
+# 1 # 6 8 0 0 7 0 0 9 0
+# 2 # 1 9 0 0 0 4 5 0 0
+# 3 # 8 2 0 1 0 0 0 4 0
+# 4 # 0 0 4 6 0 2 9 0 0
+# 5 # 0 5 0 0 0 3 0 2 8
+# 6 # 0 0 9 3 0 0 0 7 4
+# 7 # 0 4 0 0 5 0 0 3 6
+# 8 # 7 0 3 0 1 8 0 0 0
+
+predtype input ( int:7 ?x , int:7 ?y, int:7 ?z).
+
+input(0 3 2) :- t1.
+input(0 4 6) :- t1.
+input(0 6 7) :- t1.
+input(0 8 1) :- t1.
+input(1 0 6) :- t1.
+input(1 1 8) :- t1.
+input(1 4 7) :- t1.
+input(1 7 9) :- t1.
+input(2 0 1) :- t1.
+input(2 1 9) :- t1.
+input(2 5 4) :- t1.
+input(2 6 5) :- t1.
+input(3 0 8) :- t1.
+input(3 1 2) :- t1.
+input(3 3 1) :- t1.
+input(3 7 4) :- t1.
+input(4 2 4) :- t1.
+input(4 3 6) :- t1.
+input(4 5 2) :- t1.
+input(4 6 9) :- t1.
+input(5 1 5) :- t1.
+input(5 5 3) :- t1.
+input(5 7 2) :- t1.
+input(5 8 8) :- t1.
+input(6 2 9) :- t1.
+input(6 3 3) :- t1.
+input(6 7 7) :- t1.
+input(6 8 4) :- t1.
+input(7 1 4) :- t1.
+input(7 4 5) :- t1.
+input(7 7 3) :- t1.
+input(7 8 6) :- t1.
+input(8 0 7) :- t1.
+input(8 2 3) :- t1.
+input(8 4 1) :- t1.
+input(8 5 8) :- t1.
+# 0 # 0 2 0 6 0 8 0 0 0
+# 1 # 5 8 0 0 0 9 7 0 0
+# 2 # 0 0 0 0 4 0 0 0 0
+# 3 # 3 7 0 0 0 0 5 0 0
+# 4 # 6 0 0 0 0 0 0 0 4
+# 5 # 0 0 8 0 0 0 0 1 3
+# 6 # 0 0 0 0 2 0 0 0 0
+# 7 # 0 0 9 8 0 0 0 3 6
+# 8 # 0 0 0 3 0 6 0 9 0
+input(0 1 2) :- t2.
+input(0 3 6) :- t2.
+input(0 5 8) :- t2.
+input(1 0 5) :- t2.
+input(1 1 8) :- t2.
+input(1 5 9) :- t2.
+input(1 6 7) :- t2.
+input(2 4 4) :- t2.
+input(3 0 3) :- t2.
+input(3 1 7) :- t2.
+input(3 6 5) :- t2.
+input(4 0 6) :- t2.
+input(4 8 4) :- t2.
+input(5 2 8) :- t2.
+input(5 7 1) :- t2.
+input(5 8 3) :- t2.
+input(6 4 2) :- t2.
+input(7 2 9) :- t2.
+input(7 3 8) :- t2.
+input(7 7 3) :- t2.
+input(7 8 6) :- t2.
+input(8 3 3) :- t2.
+input(8 5 6) :- t2.
+input(8 7 9) :- t2.
+# t3
+#   # 0 1 2 3 4 5 6 7 8
+#######################
+# 0 # 0 0 0 6 0 0 4 0 0
+# 1 # 7 0 0 0 0 3 6 0 0
+# 2 # 0 0 0 0 9 1 0 8 0
+# 3 # 0 0 0 0 0 0 0 0 0
+# 4 # 0 5 0 1 8 0 0 0 3
+# 5 # 0 0 0 3 0 6 0 4 5
+# 6 # 0 4 0 2 0 0 0 6 0
+# 7 # 9 0 3 0 0 0 0 0 0
+# 8 # 0 2 0 0 0 0 1 0 0
+input(0 3 6) :- t3.
+input(0 6 4) :- t3.
+input(1 0 7) :- t3.
+input(1 5 3) :- t3.
+input(1 6 6) :- t3.
+input(2 4 9) :- t3.
+input(2 5 1) :- t3.
+input(2 7 8) :- t3.
+input(4 1 5) :- t3.
+input(4 3 1) :- t3.
+input(4 4 8) :- t3.
+input(4 8 3) :- t3.
+input(5 3 3) :- t3.
+input(5 5 6) :- t3.
+input(5 7 4) :- t3.
+input(5 8 5) :- t3.
+input(6 1 4) :- t3.
+input(6 3 2) :- t3.
+input(6 7 6) :- t3.
+input(7 0 9) :- t3.
+input(7 2 3) :- t3.
+input(8 1 2) :- t3.
+input(8 6 1) :- t3.
+# t4
+#   # 0 1 2 3 4 5 6 7 8
+#######################
+# 0 # 0 2 0 0 0 0 0 0 0
+# 1 # 0 0 0 6 0 0 0 0 3
+# 2 # 0 7 4 0 8 0 0 0 0
+# 3 # 0 0 0 0 0 3 0 0 2
+# 4 # 0 8 0 0 4 0 0 1 0
+# 5 # 6 0 0 5 0 0 0 0 0
+# 6 # 0 0 0 0 1 0 7 8 0
+# 7 # 5 0 0 0 0 9 0 0 0
+# 8 # 0 0 0 0 0 0 0 4 0
+input(0 1 2) :- t4.
+input(1 3 6) :- t4.
+input(1 8 3) :- t4.
+input(2 1 7) :- t4.
+input(2 2 4) :- t4.
+input(2 4 8) :- t4.
+input(3 5 3) :- t4.
+input(3 8 2) :- t4.
+input(4 1 8) :- t4.
+input(4 4 4) :- t4.
+input(4 7 1) :- t4.
+input(5 0 6) :- t4.
+input(5 3 5) :- t4.
+input(6 4 1) :- t4.
+input(6 6 7) :- t4.
+input(6 7 8) :- t4.
+input(7 0 5) :- t4.
+input(7 5 9) :- t4.
+input(8 7 4) :- t4.
+# t5 (z3 example)
+#   # 0 1 2 3 4 5 6 7 8
+#######################
+# 0 # 0 0 0 0 9 4 0 3 0
+# 1 # 0 0 0 5 1 0 0 0 7
+# 2 # 0 8 9 0 0 0 0 4 0
+# 3 # 0 0 0 0 0 0 2 0 8
+# 4 # 0 6 0 2 0 1 0 5 0
+# 5 # 1 0 2 0 0 0 0 0 0
+# 6 # 0 7 0 0 0 0 5 2 0
+# 7 # 9 0 0 0 6 5 0 0 0
+# 8 # 0 4 0 9 7 0 0 0 0
+input(0 4 9) :- t5.
+input(0 5 4) :- t5.
+input(0 7 3) :- t5.
+input(1 3 5) :- t5.
+input(1 4 1) :- t5.
+input(1 8 7) :- t5.
+input(2 1 8) :- t5.
+input(2 2 9) :- t5.
+input(2 7 4) :- t5.
+input(3 6 2) :- t5.
+input(3 8 8) :- t5.
+input(4 1 6) :- t5.
+input(4 3 2) :- t5.
+input(4 5 1) :- t5.
+input(4 7 5) :- t5.
+input(5 0 1) :- t5.
+input(5 2 2) :- t5.
+input(6 1 7) :- t5.
+input(6 6 5) :- t5.
+input(6 7 2) :- t5.
+input(7 0 9) :- t5.
+input(7 4 6) :- t5.
+input(7 5 5) :- t5.
+input(8 1 4) :- t5.
+input(8 3 9) :- t5.
+input(8 4 7) :- t5.
+# empty template
+#   # 0 1 2 3 4 5 6 7 8
+#######################
+# 0 # 0 0 0 0 0 0 0 0 0
+# 1 # 0 0 0 0 0 0 0 0 0
+# 2 # 0 0 0 0 0 0 0 0 0
+# 3 # 0 0 0 0 0 0 0 0 0
+# 4 # 0 0 0 0 0 0 0 0 0
+# 5 # 0 0 0 0 0 0 0 0 0
+# 6 # 0 0 0 0 0 0 0 0 0
+# 7 # 0 0 0 0 0 0 0 0 0
+# 8 # 0 0 0 0 0 0 0 0 0
+# initialize
+{
+    predtype n(int:7 ?n).
+    predtype p(int:7 ?pp).
+    predtype s(int:7 ?pp, int:7 ?dd).
+    predtype pos (int:7 ?x, int:7 ?y, int:7 ?z).
+    predtype solved(int:7 ?x).
+    predtype solution (int:7 ?x, int:7 ?y, int:7 ?z).
+ #   predtype input (int:7 ?x, int:7 ?y, int:7 ?z).
+
+    # all possible number values: 1-9
+    n(?n) :- ?n >= 1, ?n <= 9.
+
+
+    # all possible row or col positions: 0-8
+    p(?p) :- ?p >= 0, ?p <= 8.
+
+    # same subsquare positions
+    s(0 1). s(0 2). s(1 2).
+    s(3 4). s(3 5). s(4 5).
+    s(6 7). s(6 8). s(7 8).
+    s(?b ?a) :- s(?a ?b), p(?a), p(?b).
+
+    # precalculate row/col to pos conversion table for each position
+    pos(?r ?c ?p) :- p(?r), p(?c), ?r * 9 = ?r9, ?r9 + ?c = ?p.
+
+    # fill in the input into a solution relation
+    solution(?r ?c ?n) :- input(?r ?c ?n).
+
+    # take input as solved positions
+    solved(?p) :- p(?r), p(?c), pos(?r ?c ?p), input(?r ?c ?n).
+}
+# find empty positions - not solved positions
+{
+    predtype empty(int:7 ?x).
+    predtype solved(int:7 ?p).
+    empty(?p) :- ?p >= 0, ?p <= 80, ~solved(?p).
+}
+{
+    predtype cur_b( int:7 ?x).
+    predtype cur_p( int:7 ?x).
+    predtype cur_n( int:7 ?x).
+    predtype pos (int:7 ?x, int:7 ?y, int:7 ?z).
+    predtype solved(int:7 ?x).
+  #  predtype input (int:7 ?x, int:7 ?y, int:7 ?z).
+    predtype solution (int:7 ?x, int:7 ?y, int:7 ?z).
+    predtype count(int:7 ?x).
+    predtype c( int:7 ?x).
+    predtype done().
+    predtype check().
+    predtype checked().
+    predtype next_p().
+    predtype next_n().
+    predtype filled().
+    predtype skip().
+    predtype recount().
+
+
+
+    cur_b(0).  # set current backtrack position to 0
+    cur_p(0).  # set current position to 0
+    cur_n(1).  # set current number to 1
+
+    # do the check beat if current p is empty
+    check :- cur_p(?p), empty(?p),
+        ~check, ~checked, ~next_p, ~next_n, ~filled, ~skip, ~done.
+    # run the check beat
+    checked, ~check :- check, ~done.
+    recount :- checked, ~done.
+    # clear solved count
+    ~c(?x) :- c(?x), check, ~done.
+    # checking if the current ?n number is invalid in current ?p pos
+    invalid :- # same column
+        check, cur_p(?p), cur_n(?n), pos(?r ?c ?p),
+        solution(?ar ?c ?n), p(?ar), ?ar != ?r.
+    invalid :- # same row
+        check, cur_p(?p), cur_n(?n), pos(?r ?c ?p),
+        solution(?r ?ac ?n), p(?ac), ?ac != ?c.
+    invalid :- # same subsquare
+        check, cur_p(?p), cur_n(?n), pos(?r ?c ?p),
+        solution(?sr ?sc ?n), s(?r ?sr), s(?c ?sc),
+        ?r != ?sr, ?c != ?sc.
+    # if valid n, fill it into solution and save it into backtrack
+    filled, ~checked, back(?b ?p ?n), solution(?r ?c ?n),
+    cur_b(?b1), ~cur_b(?b), cur_n(1) :-
+        checked, ~invalid, pos(?r ?c ?p),
+        cur_n(?n), cur_p(?p), cur_b(?b), ?b + 1 = ?b1, ~done.
+    ~cur_n(?n) :- checked, ~invalid, cur_n(?n), ?n != 1, ~done.
+    # if filled new valid number go to next p
+    next_p, ~filled :- filled, ~done.
+    # if n is invalid do next_n
+    next_n, ~checked, ~invalid :- checked, invalid, pos(?r ?c ?p), cur_p(?p), ~done.
+    # if next_p move to the next position
+    cur_p(?p1), ~cur_p(?p), cur_n(1), ~next_p :-
+              next_p, cur_n(?n), cur_p(?p), ?p + 1 = ?p1, ?p1 <= 80, ~done.
+    ~cur_n(?n) :- next_p, cur_n(?n), ?n != 1, ~done.
+    # skip solved fields
+    next_p :- cur_p(?p), solved(?p), ~next_p, ~done.
+    # if next_n and current number isn't 9 move to the next number
+    cur_n(?n1), ~cur_n(?n), ~next_n, check :-
+        next_n, cur_n(?n), ?n + 1 = ?n1, n(?n1), ?n != 9, ~done.
+
+    # if next_n and cur_n is 9
+    # reset n to n from backtrack and move back.
+    cur_b(?bb), cur_p(?bp), cur_n(?bn),
+    ~cur_b(?b), ~cur_p(?p),
+    ~back(?bb ?bp ?bn), ~solution(?br ?bc ?bn) :-
+        next_n, cur_b(?b), ?bb + 1 = ?b, ?bb >= 0,
+        cur_p(?p), cur_n(?n), ?n = 9,
+        pos(?br ?bc ?bp), back(?bb ?bp ?bn), ~done.
+    ~cur_n(?n) :-
+        next_n, cur_b(?b), ?bb + 1 = ?b, ?bb >= 0,
+        cur_p(?p), cur_n(?n), ?n = 9,
+        pos(?br ?bc ?bp), back(?bb ?bp ?bn),
+        ?n != ?bn, ~done.
+    # if recount, count solved pieces
+    c(?x), ~recount :- recount, solution(?r ?c ?n), count(?x), ~done.
+    # if we have a solution (81 solved pieces)
+    done :- c(81).
+}
+{
+    predtype solution (int:7 ?x, int:7 ?y, int:7 ?z).
+    predtype count(int:7 ?x).
+    predtype c( int:7 ?x).
+    predtype println( sym ?x).
+
+    ~c(?x).
+    c(?x) :- solution(?r ?c ?n), count(?x).
+    println("solution found") :- c(81).
+    !solution(?r ?c ?n).
+}

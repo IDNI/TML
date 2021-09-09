@@ -103,15 +103,10 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 	int_t v1, int_t v2) {
 	raw_term t;
 	t.e.emplace_back(elem::SYM, r),
-	t.e.emplace_back(elem_openp), t.e.emplace_back(elem_openp),
 	t.e.emplace_back(elem_openp),
 	t.e.emplace_back(get_var_elem(v1)),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
-	t.e.emplace_back(elem_openp), t.e.emplace_back(c),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_openp),
-	t.e.emplace_back(elem_openp),
+	t.e.emplace_back(c),
 	t.e.emplace_back(get_var_elem(v2)),
-	t.e.emplace_back(elem_closep), t.e.emplace_back(elem_closep),
 	t.e.emplace_back(elem_closep);
 	return t.calc_arity(current_input), t;
 }
@@ -123,40 +118,33 @@ raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string_t& b,
 		get_var_elem(v), get_var_elem(v+1), elem_closep});
 }
 
-/*#define from_string_lex(rel, lex, n) raw_rule({ false, { \
+#define from_string_lex(rel, lex, n) raw_rule(raw_term({ \
 		elem(elem::SYM, rel), \
 		elem_openp, \
 		elem(elem::SYM, dict.get_lexeme(to_string_t(lex))), \
 		elem(n), elem(n+1), \
-		elem_closep},{3}})
+		elem_closep}))
 
-void driver::transform_string(const wstring& s, raw_prog& r, int_t rel) {
+void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel) {
 	for (int_t n = 0; n < (int_t)s.size(); ++n) {
-		r.r.push_back(raw_rule(raw_term{
-			false, {
-			elem(elem::SYM, dict.get_rel(rel)),
-			elem_openp, elem_openp, elem_openp, elem(n),
-			elem_closep, elem_closep, elem_openp, elem(s[n]),
-			elem_closep, elem_openp, elem_openp, elem(n+1),
-			elem_closep, elem_closep, elem_closep},{}}));
-		r.r.back().h[0].calc_arity();
-		if (ISSPACE(s[n]))
-			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), "space", n));
-		if (ISDIGIT(s[n]))
-			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), "digit", n));
-		if (ISALPHA(s[n]))
-			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), "alpha", n));
-		if (ISALNUM(s[n]))
-			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), "alnum", n));
-		if (ISPRINT(s[n]))
-			r.r.push_back(from_string_lex(
-					dict.get_rel(rel), "printable", n));
+		r.r.push_back(raw_rule(raw_term({
+			elem(elem::SYM, rel),
+			elem_openp, elem(n),
+			elem((char32_t) s[n]),
+			elem(n+1),
+			elem_closep})));
+		if (isspace(s[n]))
+			r.r.push_back(from_string_lex(rel, "space", n));
+		if (isdigit(s[n]))
+			r.r.push_back(from_string_lex(rel, "digit", n));
+		if (isalpha(s[n]))
+			r.r.push_back(from_string_lex(rel, "alpha", n));
+		if (isalnum(s[n]))
+			r.r.push_back(from_string_lex(rel, "alnum", n));
+		if (isprint(s[n]))
+			r.r.push_back(from_string_lex(rel, "printable", n));
 	}
-}*/
+}
 
 #define append_sym_elem(x, s) (x).push_back(elem(elem::SYM, s))
 #define append_openp(x) (x).push_back(elem_openp)
@@ -201,6 +189,9 @@ loop2:	sz = s.size();
 //#define BWD_GRAMMAR
 //#define ELIM_NULLS
 
+/* Transform all the productions in the given program into pure TML
+ * rules. */
+
 void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	if (r.g.empty()) return;
 	static const set<string_t> b = {
@@ -228,7 +219,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 				for (ccs s = l[0]+1; s != l[1]-1; ++s)
 					if (*s == '\\' && !esc) esc=true;
 					else p.p.insert(p.p.begin()+n++,
-						elem(*s)),esc=false;
+						elem((char32_t) *s)),esc=false;
 			}
 	}
 #ifdef ELIM_NULLS

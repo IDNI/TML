@@ -1,0 +1,3 @@
+
+SOL2(1) :- exists R forall ?x  { R(0 ?x) &&  R(1 ?x) }.
+SOL3(1) :- exists R forall ?x  { R(0 0 ?x) &&  R(0 1 ?x) }.

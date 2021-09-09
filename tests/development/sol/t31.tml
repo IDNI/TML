@@ -1,0 +1,13 @@
+
+# FIXME: when arity differs from var2 vs table there is wrong permutation in bits
+#UA(0).
+#SOLA(1) :- exists P forall ?x0 { P(1 1 ?x0) && UA(?x0) }.
+#UB(1).
+#SOLB(1) :- exists P forall ?x0 { P(0 0 ?x0) && UB(?x0) }.
+#UC(1).
+#SOLC(1) :- exists P forall ?x0 { P(0 0 ?x0) || UC(?x0) }.
+
+
+UD(0).
+UD(1).
+SOLD(1) :- exists P forall ?x0 { P(0 1 ?x0) && UD(?x0) }.

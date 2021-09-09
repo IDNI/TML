@@ -1,0 +1,22 @@
+
+#AND, OR, NAND, NOR
+U(1).
+sat_and(?x ?y) :- exists ?x exists ?y { U(?x) && U(?y) }.
+sat_or(?x ?y) :- exists ?x exists ?y { U(?x) || U(?y) }.
+sat_nand(?x ?y) :- exists ?x exists ?y { ~{ U(?x) && U(?y) } }.
+sat_nor(?x ?y) :- exists ?x exists ?y { ~{ U(?x) || U(?y) } } .
+
+sat_and_neg(?x ?y) :- exists ?x exists ?y { U(?x) && ~U(?y) }.
+sat_or_neg(?x ?y) :- exists ?x exists ?y { U(?x) || ~U(?y) }.
+sat_nand_neg(?x ?y) :- exists ?x exists ?y { ~{ U(?x) && ~U(?y) } }.
+sat_nor_neg(?x ?y) :- exists ?x exists ?y { ~{ U(?x) || ~U(?y) } } .
+
+sat_neg_and(?x ?y) :- exists ?x exists ?y { ~U(?x) && U(?y) }.
+sat_neg_or(?x ?y) :- exists ?x exists ?y { ~U(?x) || U(?y) }.
+sat_neg_nand(?x ?y) :- exists ?x exists ?y { ~{ ~U(?x) && U(?y) } }.
+sat_neg_nor(?x ?y) :- exists ?x exists ?y { ~{ ~U(?x) || U(?y) } } .
+
+sat_neg_and_neg(?x ?y) :- exists ?x exists ?y { ~U(?x) && ~U(?y) }.
+sat_neg_or_neg(?x ?y) :- exists ?x exists ?y { ~U(?x) || ~U(?y) }.
+sat_neg_nand_neg(?x ?y) :- exists ?x exists ?y { ~{ ~U(?x) && ~U(?y) } }.
+sat_neg_nor_neg(?x ?y) :- exists ?x exists ?y { ~{ ~U(?x) || ~U(?y) } } .

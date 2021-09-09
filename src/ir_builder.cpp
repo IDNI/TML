@@ -84,7 +84,8 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	for (const raw_rule& r : p.r)
 		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
-				get_nums(x), t = from_raw_term(x, true),
+				get_nums(x);
+				t = from_raw_term(x, true);
 				v.push_back(t);
 				for (const vector<raw_term>& y : r.b) {
 					int i = 0;
@@ -96,25 +97,26 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				}
 			}
 		}
-		else if(r.prft != NULL) {
+		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
 
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
-				? std::make_shared<raw_form_tree>(elem::NOT, r.prft)
-				: r.prft;
+				? make_shared<raw_form_tree>(elem::NOT,
+						make_shared<raw_form_tree>(*r.prft))
+				: make_shared<raw_form_tree>(*r.prft);
 			if (r.prft->guard_lx != lexeme{ 0, 0 }) { // guard transform
 				raw_term gt;
 				gt.arity = { 0 };
 				gt.e.emplace_back(elem::SYM, r.prft->guard_lx);
-				root = std::make_shared<raw_form_tree>(elem::AND, root,
-					std::make_shared<raw_form_tree>(gt));
+				root = make_shared<raw_form_tree>(elem::AND, root,
+					make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
 			/*
 			DBG(COUT << "\n ........... \n";)
-			DBG(r.prft.get()->printTree();)
+			DBG(r.prft->printTree();)
 			DBG(COUT << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
 			*/
@@ -222,6 +224,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 //#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
 //#define get_var_lexeme(v) dict.get_lexeme(string("?v") + to_string_(-v))
 #define get_var_lexeme(v) rdict().get_lexeme(to_string_t("?v")+to_string_t(-v))
+
 
 elem ir_builder::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
@@ -351,8 +354,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				rt.e[4] = get_elem(r[2]);
 				rt.extype = raw_term::ARITH;
 				return rt;
-			}
-		else if (r.extype == term::BLTIN) {
+		} else if (r.extype == term::BLTIN) {
 			args = r.size();
 			rt.e.resize(args + 1);
 			rt.e[0] = elem(elem::SYM,
@@ -364,18 +366,23 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.insert_parens(dict.op, dict.cl);
 		}
 		else {
-			args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
-			rt.e[0] = elem(elem::SYM,
-				dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
-			rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
-			for (size_t n = 1; n != args + 1; ++n)
-				rt.e[n] = get_elem(r[n - 1]);
-			rt.insert_parens(dict.op, dict.cl);
+			if (r.tab != -1) {
+				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
+				rt.e[0] = elem(elem::SYM,
+						dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
+				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
+				for (size_t n = 1; n != args + 1; ++n)
+					rt.e[n] = get_elem(r[n - 1]);
+				rt.insert_parens(dict.op, dict.cl);
+			} else {
+				args = 1;
+				rt.e.resize(args);
+				rt.e[0] = get_elem(r[0]);
+			}
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
-			bit_univ bu(dict, opts.bitorder, dynenv->typenv);
-			if(bu.brev_transform(rt))
+			if(dynenv->spbu.get()->brev_transform(rt))
 				rt.calc_arity(nullptr);
 		}
 		return rt;
@@ -780,9 +787,18 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 		// making head   equals( i j k n) :-
 		eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP, nt,
 								std::initializer_list<int>{i, j, k, n}, 0 );
-		// making fact equals( i i k k).
-		if( r == 0 ) eqr[r].back().assign({i,i,k,k});
-		else if( r == 1 ) { // inductive case
+		if( r == 0 ) {
+			// making rule equals( i i k k) :- 0<=i, 0<=k. Inequalities are
+			// used to force variables to be integers.
+			// Turn equals( i j k n) into equals( i i k k)
+			eqr[r].back().assign({i,i,k,k});
+			// Add body term 0 <= i, forcing i to be an integer
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+				std::initializer_list<int>{mknum(0), i}, 0 );
+			// Add body term 0 <= k, forcing k to be an integer
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+				std::initializer_list<int>{mknum(0), k}, 0 );
+		} else if( r == 1 ) { // inductive case
 			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
 			// str(i cv) ,str( k, cv)
@@ -1327,7 +1343,14 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 			t.resize(2);
 			t[0] = t[1] = -1;
 			t.tab = dynenv->get_table({dict.get_rel(x.p[0].e),{2}});
-			vector<term> v{t};
+			// Ensure that the index is an integer by asserting that it is >= 0
+			term guard;
+			guard.resize(2);
+			guard.extype = term::LEQ;
+			guard[0] = mknum(0);
+			guard[1] = -1;
+			// Make the rule x(?a ?a) :- 0 <= ?a
+			vector<term> v{t, guard};
 			p.insert(v);
 			vector<term> af{t, t};
 			af[0].neg = true;

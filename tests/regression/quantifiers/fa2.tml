@@ -20,5 +20,9 @@ A2(2 3).
 A2(3 0).
 C2(1) :- forall ?x forall ?y {A2(?x ?y) }.
 
-A3(?x ?y).
+domain(0).
+domain(1).
+domain(2).
+domain(3).
+A3(?x ?y) :- domain(?x), domain(?y).
 C3(1) :- forall ?x forall ?y { A3(?x ?y) }.

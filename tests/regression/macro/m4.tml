@@ -3,4 +3,9 @@ e(2 3).
 e(3 4).
 atc(?a ?b ) :=  e(?a ?b).
 ttc(?x ?y) :- ntc(atc(?x) ?y ).
-ntc(?y ?y).
+domain(0).
+domain(1).
+domain(2).
+domain(3).
+domain(4).
+ntc(?y ?y) :- domain(?y).

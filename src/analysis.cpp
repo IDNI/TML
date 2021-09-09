@@ -16,21 +16,21 @@
 #include <vector>
 #include "analysis.h"
 #include "dict.h"
+#include "term.h"
+#include "tables.h"
 
 
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
 
-	typenv = (const_cast<raw_prog&>(rpin)).get_typenv();
+	ptypenv = (const_cast<raw_prog&>(rpin)).typenv;
 	// set the same environment for the output raw bit prog 
-	rpout.set_typenv(typenv);
 	rpout.g = rpin.g;
-	get_raw_tables();
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
 	for( const raw_prog &rp : rpin.nps)
-		rpout.nps.emplace_back(), ret &= btransform(rp, rpout.nps.back());	
+		rpout.nps.emplace_back(), ret &= btransform(rp, rpout.nps.back());
 	return ret;
 }
 
@@ -60,7 +60,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 				//todo for struct types.
 				//should struct types ever have arithmetic operation, no!
 				DBG(assert(false));
-				this->typenv.lookup_typedef_var(str).get_bitsz(typenv);
+				this->ptypenv->lookup_typedef_var(str).get_bitsz(*ptypenv);
 			}
 			else {
 				//should this case ever happen when ctx does not know the type of var? no.
@@ -71,19 +71,22 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 		}
 		else if ( rt.e[n].type == elem::NUM ) {
 			// get the type info based on nearest var
-			int_t i = n;
-			while(i>=0 && i < (int_t)rt.e.size() && 
-				(rt.e[i].type != elem::VAR ||rt.e[(int_t)rt.e.size()-i-1].type != elem::VAR)) i++;
-			if(i>=0 && i < (int_t)rt.e.size())
-				return get_typeinfo(i, rt, rr); 
+			int_t  ni = n, args = rt.e.size();
+			for ( int_t i = n; i>=0 && i < args ; i++ )
+				if ((rt.e[ni = i].type == elem::VAR) || (rt.e[ni = args-i-1].type == elem::VAR))
+					break;
+			DBG(assert(ni!=( int_t)n));
+
+			if (ni>=0 && ni < args)
+				return get_typeinfo(ni, rt, rr);
 		
 			return INT_BSZ;
 		}
 	}
 	else if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) {
 		string_t reln = lexeme2str(rt.e[0].e);
-		if( typenv.contains_pred(reln)) {
-			auto &targs = typenv.lookup_pred(reln);	
+		if( ptypenv->contains_pred(reln)) {
+			auto &targs = ptypenv->lookup_pred(reln);
 			//only for arguments
 			if(n>1 && n < rt.e.size()-1) {
 				if(targs[n-2].is_primitive())
@@ -91,8 +94,8 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 				else {
 					DBG(assert(targs[n-2].is_usertype()));
 					string_t stn = lexeme2str(targs[n-2].structname.e);
-					if(typenv.contains_typedef( stn)){
-						return typenv.lookup_typedef(stn).get_bitsz(typenv);
+					if(ptypenv->contains_typedef( stn)){
+						return ptypenv->lookup_typedef(stn).get_bitsz(*ptypenv);
 					}
 					o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
 				}
@@ -109,30 +112,77 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 	// for everything else
 	return 0;
 }
+bool bit_univ::brev_transform_check(const term &t, const table &tab){
+
+	string_t pred = lexeme2str(d.get_rel(tab.s.first));
+	bool found =false;
+	const std::vector<typedecl> &vt = this->ptypenv->search_pred(pred, found, t.size());
+	if(found == false){
+		DBG(assert(false));
+		return false;
+	}
+	tab_args tabarg;
+	for(typedecl td: vt ) {
+		if( td.is_primitive() )
+			tabarg.emplace_back(td.pty.get_bitsz());
+		else tabarg.emplace_back(); //handle later
+	}
+	//auto rtab = rtabs.find(pred)->second;
+	int_t val = 0;
+	//for symbols, check if the value is in dict
+	for( int_t arg=0; arg < (int_t)vt.size(); arg++)
+		if( vt[arg].is_primitive() && vt[arg].pty == primtype::SYMB) {
+			size_t  bitsz = vt[arg].pty.get_bitsz();
+			val = 0;				
+			//construct arg value from bits using pos					
+			for( size_t k = 0; k < bitsz; k++) {
+				int_t ps = pos( bitsz, k, arg, vt.size(), tabarg);
+				//DBG(COUT<<ps<<std::endl);	
+				DBG(assert(ps < (int_t)t.size()));
+				val |= t[ps] << k;
+			}
+			if(! d.is_valid_sym_val(val)) return false;
+		}
+		
+	return true;
+}
 
 //inplace transformation of bit raw term to normal as per type_env/
 bool bit_univ::brev_transform( raw_term &rbt ){
 	
 	string_t str = lexeme2str(rbt.e[0].e);
-	const std::vector<typedecl> &vt = this->typenv.lookup_pred(str);
-	if(vt.size() == 0 ) return false;
+	bool found = false;
+	const std::vector<typedecl> &vt = this->ptypenv->search_pred(str, found, rbt.get_formal_arity());
+	if(found == false ) return false;
+	//auto rtab = this->rtabs.find(str)->second;
 	int_t bitsz = -1;
 	int_t val = 0, arg = 0,  args = vt.size();
 	// save bits and clear from rbt
 	std::vector<elem> rbits{ rbt.e.begin()+2, rbt.e.end()-1 };
 	rbt.e.erase(rbt.e.begin()+2, rbt.e.end()-1);
+
+	tab_args tabarg;
+	for(typedecl td: vt ) {
+		if( td.is_primitive() )
+			tabarg.emplace_back(td.pty.get_bitsz());
+		else tabarg.emplace_back(); //handle later
+	}
+
 	for(typedecl td: vt ) {
 		if( td.is_primitive() ) {
 			bitsz =  td.pty.get_bitsz();
 			val = 0;				
 			//construct arg value from bits using pos					
-			for( int_t k = 0; k < bitsz; k++)	
-				val |= rbits[pos( bitsz, k, arg, args)].num << k;
+			for( int_t k = 0; k < bitsz; k++) {
+				int_t ps = pos( bitsz, k, arg, args, tabarg);
+				//DBG(COUT<<ps<<std::endl);	
+				val |= rbits[ps].num << k;
+			}
 			elem el;
 			if( td.pty.ty == primtype::UINT )
 				el = elem(val);
 			else if ( td.pty.ty == primtype::UCHAR )
-				el = elem((char_t) val);
+				el = elem((char32_t) val);
 			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
 				el = elem(elem::SYM, this->d.get_sym(val) );
 
@@ -153,12 +203,22 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 		DBG(assert(args == rtin.arity[0]));
 		
 		string_t pname = lexeme2str(rtin.e[0].e);
-		tab_args targs = rtabs.find(pname)->second;
+		auto &predtype = ptypenv->lookup_pred(pname);
+		tab_args targs;
+		// fill table arg size. better to have a separate function.
+		for(typedecl td: predtype ) {
+			if( td.is_primitive() )
+				targs.emplace_back(td.pty.get_bitsz());
+			else {
+				string_t st = lexeme2str(td.structname.e);
+				targs.emplace_back(ptypenv->lookup_typedef(st).get_bitsz(*ptypenv));
+			}
+		}
 		// getting total bits for the table/predicate
 		size_t totalsz = 0;
 		for( size_t asz : targs  )	totalsz += asz;
 		std::vector<elem> bitelem(totalsz);
-
+		DBG(COUT<<"size for "<<rtin.e[0].e<< "="<<totalsz<<std::endl);
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
 			// for predicate rel name, keep as it is
@@ -168,9 +228,9 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 			if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
 			int_t symbval = 0;
 			for (size_t k = 0; k != bsz; ++k) {
-				// extend bit if required.
+				
 				int_t ps = pos(bsz, k, n-2, args, targs);
-				assert(ps < bitelem.size());
+			//	DBG(COUT<< ps<<std::endl;assert(ps < bitelem.size()));
 			/*	//dynamically grow bitsiz
 				if(ps >= bitelem.size()) {
 					int_t incr = ps - bitelem.size() + 1 ;
@@ -224,13 +284,17 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								break;
 				case elem::ARITH:
 				case elem::EQ:
-				case elem::LEQ: // user size of prev var
+				case elem::LEQ:
+				case elem::NEQ:
+				case elem::GEQ:
+				case elem::LT:
+				case elem::GT:
+				 // user size of prev var
 								bsz = vbit.back().size();
 								vbit.emplace_back(); 
 								vbit.back().resize(bsz);
 								for( size_t k= 0; k !=bsz ; k++)
 									vbit.back()[k] = e;
-								
 								break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}	
@@ -612,14 +676,18 @@ bool typechecker::tcheck(){
 					ret = false; 
 			}
 	}
+	if(ret) {
+		DBG(COUT<<env.to_print());
+		for( size_t i =0 ; i <rp.r.size(); i ++)
+		DBG(COUT<<(rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():""));
+	}
 
 	for( auto &nrp: rp.nps){
+		nrp.typenv->set_parent(rp.typenv);
 		typechecker tc(nrp, infer);
 		ret &= tc.tcheck() ;
+		rp.typenv->set_nested(nrp.typenv);
 	}
-	DBG(COUT<<env.to_print());
-	for( size_t i =0 ; i <rp.r.size(); i ++)
-		DBG(COUT<<(rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():""));
 	return ret;
 }
 
@@ -646,7 +714,7 @@ bool typechecker::tcheck( const raw_term &rt){
 										type_error(ss.str().c_str(), rt.e[argc].e), false;
 							else {
 								uint64_t maxval =  ( ((uint64_t)0x1 <<typexp.pty.get_bitsz())-1);
-								if( rt.e[argc].num > maxval || typexp.pty.get_maxbits() < (int_t)typexp.pty.get_bitsz())
+								if( (uint64_t) rt.e[argc].num > maxval || typexp.pty.get_maxbits() < (int_t)typexp.pty.get_bitsz())
 								return 	ss<< rt.e[argc].num << " exceeds max size for ",
 										ss << typexp.pty.to_print() <<" in predicate "<<rt,
 										type_error(ss.str().c_str(), rt.e[argc].e), false;	
@@ -744,6 +812,7 @@ bool typechecker::tcheck( const raw_term &rt){
 
 bool typechecker::tcheck( const raw_rule &rr){
 	std::stringstream ss;
+	env.reset_context();
 	if( rr.get_context().get() != nullptr)
 		env.get_context() = *(rr.get_context().get());
 	verrs.clear();

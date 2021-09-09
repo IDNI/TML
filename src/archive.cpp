@@ -861,8 +861,6 @@ archive& archive::operator<<(const tables& tbls) {
 	*this << tbls.nstep;
 	//POS("tables max_args")
 	*this << tbls.max_args;
-	//POS("tables range_memo")
-	*this << tbls.range_memo;
 	//POS("tables goals")
 	*this << tbls.goals;
 	//POS("tables to_drop")
@@ -900,8 +898,6 @@ archive& archive::operator>>(tables& tbls) {
 	*this >> tbls.nstep;
 	//POS("tables max_args")
 	*this >> tbls.max_args;
-	//POS("tables range_memo")
-	*this >> tbls.range_memo;
 	//POS("tables goals")
 	*this >> tbls.goals;
 	//POS("tables to_drop")
@@ -939,8 +935,6 @@ size_t archive::size(const tables& t) {
 	s += size(t.nstep);
 	//SPOS("tables max_args", t.max_args)
 	s += size(t.max_args);
-	//SPOS("tables range_memo", t.range_memo)
-	s += size(t.range_memo);
 	//SPOS("tables goals", t.goals)
 	s += size(t.goals);
 	//SPOS("tables to_drop", t.to_drop)
@@ -957,7 +951,6 @@ size_t archive::size(const tables& t) {
 	s += sizeof(unsigned char);
 	//SPOS("tables tbls size", t.tbls.size())
 	s += size(t.tbls.size());
-	//for (auto p : t.range_memo) s += size(p.first) + sizeof(int_t);
 	//SPOS("tables tbls", t.tbls)
 	for (size_t i = 0; i != t.tbls.size(); ++i) s += size(t.tbls[i]);
 	//SPOS0("tables end")

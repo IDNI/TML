@@ -1,0 +1,15 @@
+
+# R satisfying is empty, then so_a0(1) won't sat
+so_a0(1) :- forall P exists R forall ?x { R(?x) -> P(0) }.
+
+U0(1).
+so_b0(1) :- forall P exists R forall ?x { { R(?x) && U0(?x) } -> P(1) }.
+so_b1(1) :- forall P exists R forall ?x { ~{ R(?x) && U0(?x) } || P(1) }.
+
+#so_b2(1) :- forall P exists R forall ?x { ~{R(?x)} || ~{U0(?x)} || P(1) }.
+#so_b4(1) :- exists P exists R forall ?x { ~{R(?x)} || ~{U0(?x)} || P(1) }.
+#so_b5(1) :- exists P exists R forall ?x { ~{R(0)} || ~{U0(?x)} || P(1) }.
+#                                          ~{ R(0) &&  U0(?x) && ~P(1) }.
+
+U2(0 0).
+so_c0(1) :- forall P exists R forall ?x0 forall ?x1 { {R(?x0 ?x1) && U2(?x0 ?x1) } -> P(0 0) }.

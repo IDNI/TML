@@ -186,13 +186,19 @@ void options::setup() {
 		"subsume queries into each other using CQNC test");
 	add_bool("cqc-factor",
 		"factor out parts of queries using CQC test");
-	add_bool("pure-tml",
-		"convert FOL formulas into pure TML");
+	add_bool("to-dnf",
+		"convert FOL formulas into to DNF before running program");
 	add_bool("program-gen",
 		"generate C++ code to generate the given TML code");
+	add_bool("safecheck",
+		"enable safety check");
+	add(option(option::type::INT, { "iterate" })
+		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
 		description("run program under one of the following semantics: pfp (default), 3pfp"));
-	add_bool("proof",   "extract proof");
+	add_bool("gc",      "enable garbage collection");
+	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", "partial-tree", "partial-forest" }).
+		description("control if and how proofs are extracted: none (default), tree, forest, partial-tree, partial-forest"));
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
 
@@ -207,7 +213,7 @@ void options::setup() {
 	add(option(option::type::INT, { "break", "b" })
 		.description("break on the N-th step"));
 	add(option(option::type::INT, { "regex-level", "" })
-		.description("aggressive matching with regex with levels 1 and more." 
+		.description("aggressive matching with regex with levels 1 and more."
 		"\n\t 1 - try all substrings - n+1  delete n rules after processing reg matching"));
 	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
@@ -266,7 +272,9 @@ void options::setup() {
 void options::init_defaults() {
 	parse(strings{
 		"--run",
+		"--gc",
 		"--semantics",   "pfp",
+		"--proof",       "none",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",
 		"--error",       "@stderr",
@@ -276,6 +284,7 @@ void options::init_defaults() {
 #endif
 		"--optimize",
 		"--bdd-max-size","134217728", // 128 MB
+		"--safecheck",
 #ifdef WITH_THREADS
 		"--repl-output", "@stdout",
 		"--udp-addr",    "127.0.0.1",

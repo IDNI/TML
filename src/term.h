@@ -22,7 +22,7 @@ struct term : public ints {
 
 	//FIXME: warning, there is direct assignment between these two enums in from_raw_term
 	// enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT }
-	enum textype { REL, EQ, LEQ, BLTIN, ARITH, FORM1 /*QBF1*/, FORM2} extype = term::REL;
+	enum textype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1 /*QBF1*/, FORM2} extype = term::REL;
 
 	t_arith_op arith_op = NOP;
 	spform_handle qbf;
@@ -60,6 +60,12 @@ struct term : public ints {
 		if (forget != t.forget) return forget;
 		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
+	}
+	bool operator==(const term& t) const {
+		return neg == t.neg && extype == t.extype && tab == t.tab &&
+			arith_op == t.arith_op && qbf == t.qbf && goal == t.goal &&
+			idbltin == t.idbltin && forget == t.forget && renew == t.renew &&
+			(const ints&)*this == t;
 	}
 	void replace(const std::map<int_t, int_t>& m) {
 		auto it = m.end();

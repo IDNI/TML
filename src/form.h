@@ -13,12 +13,16 @@
 
 #ifndef _FORM_H_
 #define _FORM_H_
-
+#include <tuple>
 #include <vector>
 #include "defs.h"
 
 typedef std::shared_ptr<struct pnft> pnft_handle;
 typedef const pnft_handle& cr_pnft_handle;
+typedef std::vector<spbdd_handle> bdd_handles;
+
+typedef enum {C, D} t_nf;
+
 
 struct pnft {
 	size_t varslen;
@@ -33,7 +37,7 @@ struct pnft {
 	std::vector<pnft_handle> matrix;
 
 	body* b; //TODO make it vector for the disjunctive clause
-	std::pair<int_t, body*> hvar_b = {0,0}; //vector
+	std::tuple<int_t, body*, int_t > hvar_b = {0,0,0}; //TODO make it vector?
 
 	spbdd_handle cons;
 	spbdd_handle last;
@@ -42,5 +46,27 @@ struct pnft {
 	~pnft();
 	quant_t to_quant_t(form *f) const;
 	bool fp(class tables *s) const;
+	void print() const;
+	void quantify(spbdd_handle &q, size_t bits) const;
 };
+
+struct var2space {
+	varmap vm;
+	t_nf nf = C;
+	std::vector<int_t> hvars;
+	std::map<int_t,bdd_handles> ins;
+	std::map<int_t,bdd_handles> outs;
+	std::vector<var2space> bf;
+	var2space(varmap &vmh);
+	~var2space();
+	void add_cons(int id, spbdd_handle c);
+	void add_cons_neg(int id, spbdd_handle c);
+	void clear_cons();
+	void negate_cons();
+	void merge();
+	void constraint(spbdd_handle q);
+	void print(int_t level = 0) const;
+	bool quantify(std::vector<quant_t> &quantsh) const;
+};
+
 #endif
