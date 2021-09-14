@@ -885,6 +885,18 @@ archive& archive::operator<<(const tables& tbls) {
 	return *this;
 }
 
+archive& archive::operator<<(const bdd_ref& t) {
+	return *this << t.id;
+}
+
+archive& archive::operator>>(bdd_ref& t) {
+	return *this >> t.id;
+}
+
+size_t archive::size(const bdd_ref& t) {
+	return sizeof(int_t);
+}
+
 archive& archive::operator>>(tables& tbls) {
 	unsigned char tmp;
 	size_t nsize;
