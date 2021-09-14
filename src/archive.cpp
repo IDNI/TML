@@ -886,11 +886,11 @@ archive& archive::operator<<(const tables& tbls) {
 }
 
 archive& archive::operator<<(const bdd_ref& t) {
-	return *this << t.id;
+	return *this << t.bdd_id;
 }
 
 archive& archive::operator>>(bdd_ref& t) {
-	return *this >> t.id;
+	return *this >> t.bdd_id;
 }
 
 size_t archive::size(const bdd_ref& t) {

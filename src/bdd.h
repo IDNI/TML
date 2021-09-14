@@ -38,34 +38,25 @@ extern bool onexit;
 
 class bdd_ref {
 	public:
-		int_t id;
-		bdd_ref(int_t id = 0) : id(id) {}
-		bool operator==(const bdd_ref &b) const {
-			return id == b.id;
-		}
-		bool operator<(const bdd_ref &b) const {
-			return id < b.id;
-		}
-		bool operator>(const bdd_ref &b) const {
-			return id > b.id;
-		}
-		bool operator!=(const bdd_ref &b) const {
-			return id != b.id;
-		}
-		bdd_ref operator-() const {
-			return bdd_ref(-id);
-		}
-		bdd_ref abs() const {
-			return bdd_ref(std::abs(id));
-		}
-		int_t fingerprint() const {
-			return id<0 ? (((-id)<<1)+1) : (id<<1);
-		}
+		int_t bdd_id;
+		bdd_ref(int_t bdd_id = 0) : bdd_id(bdd_id) {}
+		bool operator==(const bdd_ref &b) const { return bdd_id == b.bdd_id; }
+		bool operator<(const bdd_ref &b) const { return bdd_id < b.bdd_id; }
+		bool operator>(const bdd_ref &b) const { return bdd_id > b.bdd_id; }
+		bool operator!=(const bdd_ref &b) const { return bdd_id != b.bdd_id; }
+		bdd_ref operator-() const { return bdd_ref(-bdd_id); }
+		int_t sgn() const { return (bdd_id > 0) - (bdd_id < 0); }
+		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id)); }
+		// Gives each distinct reference a distinct fingerprint such that a
+		// reference for a negated BDDs has the opposite sign.
+		int_t sfgpt() const { return bdd_id; }
+		// Gives each distinct reference a distinct unsigned fingerprint
+		size_t ufgpt() const { return (std::abs(bdd_id) << 1) + (bdd_id < 0); }
 };
 
 template<> struct std::hash<bdd_ref> {
 	std::size_t operator()(const bdd_ref &br) const {
-		return br.id;
+		return br.ufgpt();
 	}
 };
 
@@ -86,8 +77,8 @@ struct ite_memo {
 	bdd_ref x, y, z;
 	size_t hash;
 	ite_memo(bdd_ref x, bdd_ref y, bdd_ref z) :
-		x(x), y(y), z(z), hash(hash_tri(x.fingerprint(), y.fingerprint(), z.fingerprint())) {}
-	void rehash() { hash = hash_tri(x.fingerprint(), y.fingerprint(), z.fingerprint()); }
+		x(x), y(y), z(z), hash(hash_tri(x.sfgpt(), y.sfgpt(), z.sfgpt())) {}
+	void rehash() { hash = hash_tri(x.sfgpt(), y.sfgpt(), z.sfgpt()); }
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
 
@@ -258,12 +249,13 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	inline static bdd get(bdd_ref x) {
-		if (x.id > 0) {
-			const bdd &y = V[x.id];
+		if (x.sfgpt() > 0) {
+			const bdd &y = V[x.sfgpt()];
 			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
+		} else {
+			const bdd &y = V[-x.sfgpt()];
+			return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 		}
-		const bdd &y = V[-x.id];
-		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
@@ -307,7 +299,7 @@ class bdd {
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(bdd_ref t) { return t.abs() == T; }
-	inline static bool trueleaf(bdd_ref t) { return t.id > 0; }
+	inline static bool trueleaf(bdd_ref t) { return t.sfgpt() > 0; }
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
 	bdd_ref h, l;
@@ -371,16 +363,18 @@ public:
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static bdd_ref hi(bdd_ref x) {
-		return	x.id < 0 ? V[-x.id].v < 0 ? -V[-x.id].l : -V[-x.id].h
-			: V[x.id].v < 0 ? V[x.id].l : V[x.id].h;
+		bdd &cbdd = V[x.abs().sfgpt()];
+		bdd_ref &nbdd = cbdd.v < 0 ? cbdd.l : cbdd.h;
+		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 
 	inline static bdd_ref lo(bdd_ref x) {
-		return	x.id < 0 ? V[-x.id].v < 0 ? -V[-x.id].h : -V[-x.id].l
-			: V[x.id].v < 0 ? V[x.id].h : V[x.id].l;
+		bdd &cbdd = V[x.abs().sfgpt()];
+		bdd_ref &nbdd = cbdd.v < 0 ? cbdd.h : cbdd.l;
+		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 
-	inline static uint_t var(bdd_ref x) { return abs(V[x.abs().id].v); }
+	inline static uint_t var(bdd_ref x) { return abs(V[x.abs().sfgpt()].v); }
 
 	static size_t satcount_perm(bdd_ref x, size_t leafvar);
 	static size_t satcount_perm(const bdd& bx, bdd_ref x, size_t leafvar);
@@ -405,7 +399,7 @@ public:
 	~bdd_handle() {
 		if (onexit) return;
 		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
-		if (b.abs().id > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
+		if (b.abs().sfgpt() > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
 	}
 };
 
