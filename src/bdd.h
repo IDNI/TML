@@ -38,20 +38,21 @@ extern bool onexit;
 
 class bdd_ref {
 	public:
-		int_t bdd_id;
-		bdd_ref(int_t bdd_id = 0) : bdd_id(bdd_id) {}
+		int_t bdd_id, shift;
+		bdd_ref(int_t bdd_id = 0, int_t shift = 0) : bdd_id(bdd_id), shift(shift) {}
 		bool operator==(const bdd_ref &b) const { return bdd_id == b.bdd_id; }
 		bool operator<(const bdd_ref &b) const { return bdd_id < b.bdd_id; }
 		bool operator>(const bdd_ref &b) const { return bdd_id > b.bdd_id; }
 		bool operator!=(const bdd_ref &b) const { return bdd_id != b.bdd_id; }
-		bdd_ref operator-() const { return bdd_ref(-bdd_id); }
+		bdd_ref operator-() const { return bdd_ref(-bdd_id, shift); }
 		int_t sgn() const { return (bdd_id > 0) - (bdd_id < 0); }
-		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id)); }
+		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id), shift); }
 		// Gives each distinct reference a distinct fingerprint such that a
 		// reference for a negated BDDs has the opposite sign.
 		int_t sfgpt() const { return bdd_id; }
 		// Gives each distinct reference a distinct unsigned fingerprint
 		size_t ufgpt() const { return (std::abs(bdd_id) << 1) + (bdd_id < 0); }
+		bdd_ref shift_var(int delta) const { return bdd_ref(bdd_id, shift + delta); }
 };
 
 template<> struct std::hash<bdd_ref> {
@@ -248,15 +249,15 @@ class bdd {
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
-	inline static bdd get(bdd_ref x) {
+	/*inline static bdd get(bdd_ref x) {
 		if (x.sfgpt() > 0) {
 			const bdd &y = V[x.sfgpt()];
-			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
+			return x.shift > 0 ? y : bdd(-y.v, y.l, y.h);
 		} else {
 			const bdd &y = V[-x.sfgpt()];
-			return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
+			return x.shift > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 		}
-	}
+	}*/
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex);
@@ -303,7 +304,7 @@ class bdd {
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
 	bdd_ref h, l;
-	int_t v;
+	//int_t v;
 
 	//---
 	static void bdd_sz_abs(bdd_ref x, std::set<bdd_ref>& s);
@@ -317,7 +318,7 @@ class bdd {
 	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
-	static bool bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path,
+	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
 			size_t bits, size_t n_args);
 	static int_t balance_paths(t_pathv & next_path_a, t_pathv & next_path_b, size_t bits,
 			std::vector<t_pathv> &aux_path_a, std::vector<t_pathv> &aux_path_b);
@@ -335,7 +336,7 @@ class bdd {
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
 	static bdd_ref merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
-	static void satcount_arith(bdd a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
+	static void satcount_arith(bdd_ref a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
 	static bdd_ref zero(size_t arg, size_t bits, size_t n_args);
 	static bool is_zero(bdd_ref a_in, size_t bits);
 	static void adder_be(bdd_ref a_in, bdd_ref b_in, size_t bits, size_t depth,
@@ -349,9 +350,9 @@ class bdd {
 	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
 
 public:
-	bdd(int_t v, bdd_ref h, bdd_ref l);
+	bdd(bdd_ref h, bdd_ref l);
 	inline bool operator==(const bdd& b) const {
-		return v == b.v && h == b.h && l == b.l;
+		return h == b.h && l == b.l;
 	}
 #ifndef NOMMAP
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
@@ -364,24 +365,23 @@ public:
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static bdd_ref hi(bdd_ref x) {
 		bdd &cbdd = V[x.abs().sfgpt()];
-		bdd_ref &nbdd = cbdd.v < 0 ? cbdd.l : cbdd.h;
+		bdd_ref nbdd = cbdd.h.shift_var(x.shift);
 		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 
 	inline static bdd_ref lo(bdd_ref x) {
 		bdd &cbdd = V[x.abs().sfgpt()];
-		bdd_ref &nbdd = cbdd.v < 0 ? cbdd.h : cbdd.l;
+		bdd_ref nbdd = cbdd.l.shift_var(x.shift);
 		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 
-	inline static uint_t var(bdd_ref x) { return abs(V[x.abs().sfgpt()].v); }
+	inline static uint_t var(bdd_ref x) { return abs(x.shift); }
 
 	static size_t satcount_perm(bdd_ref x, size_t leafvar);
-	static size_t satcount_perm(const bdd& bx, bdd_ref x, size_t leafvar);
 
 	static size_t getvar(bdd_ref h, bdd_ref l, int_t v, bdd_ref x, size_t maxv);
 	static size_t satcount_k(bdd_ref x, const bools& ex, const uints& perm);
-	static size_t satcount_k(const bdd& bx, bdd_ref x, size_t leafvar,
+	static size_t satcount_k(bdd_ref x, size_t leafvar,
 		std::map<int_t, int_t>& mapvars);
 	static size_t satcount(spbdd_handle x, const bools& inv);
 };

@@ -1290,7 +1290,7 @@ archive& archive::read_bdd() {
 	//COUT << "nsize: " << nsize << endl;
 	size_t s = nsize * 3 * sizeof(int_t);
 	//COUT << "loading bdd size: " << nsize << " " << s << endl;
-	V = bdd_mmap(nsize, bdd{0,0,0},
+	V = bdd_mmap(nsize, bdd{0,0},
 		memory_map_allocator<bdd>("", bdd_mmap_mode));
 	read((char *)V.data(), s);
 	//for (size_t i = 0; i != V.size(); ++i) {
