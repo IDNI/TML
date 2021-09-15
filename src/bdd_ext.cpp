@@ -23,7 +23,7 @@ int_t bdd_root(cr_spbdd_handle x) {
 	return (bdd::var(x->b));
 }
 
-void bdd_size(cr_spbdd_handle x,  std::set<bdd_ref>& s) {
+void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
 	bdd::bdd_sz_abs(x->b, s);
 }
 
@@ -121,8 +121,8 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quan
 	return F;
 }
 
-void bdd::bdd_sz_abs(bdd_ref x, set<bdd_ref>& s) {
-	if (!s.emplace(x.abs()).second) return;
+void bdd::bdd_sz_abs(bdd_ref x, set<int_t>& s) {
+	if (!s.emplace(x.abs().bdd_id).second) return;
 	bdd_sz_abs(bdd::hi(x), s), bdd_sz_abs(bdd::lo(x), s);
 }
 

@@ -40,10 +40,14 @@ class bdd_ref {
 	public:
 		int_t bdd_id, shift;
 		bdd_ref(int_t bdd_id = 0, int_t shift = 0) : bdd_id(bdd_id), shift(shift) {}
-		bool operator==(const bdd_ref &b) const { return bdd_id == b.bdd_id; }
-		bool operator<(const bdd_ref &b) const { return bdd_id < b.bdd_id; }
-		bool operator>(const bdd_ref &b) const { return bdd_id > b.bdd_id; }
-		bool operator!=(const bdd_ref &b) const { return bdd_id != b.bdd_id; }
+		bool operator==(const bdd_ref &b) const {
+			return bdd_id == b.bdd_id && shift == b.shift; }
+		bool operator<(const bdd_ref &b) const {
+			return bdd_id < b.bdd_id || (bdd_id == b.bdd_id && shift < b.shift); }
+		bool operator>(const bdd_ref &b) const {
+			return bdd_id > b.bdd_id || (bdd_id == b.bdd_id && shift > b.shift); }
+		bool operator!=(const bdd_ref &b) const {
+			return bdd_id != b.bdd_id || shift != b.shift; }
 		bdd_ref operator-() const { return bdd_ref(-bdd_id, shift); }
 		int_t sgn() const { return (bdd_id > 0) - (bdd_id < 0); }
 		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id), shift); }
@@ -236,7 +240,7 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	template <typename T>
 	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
-	friend void bdd_size(cr_spbdd_handle x,  std::set<bdd_ref>& s);
+	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -249,16 +253,6 @@ class bdd {
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
-	/*inline static bdd get(bdd_ref x) {
-		if (x.sfgpt() > 0) {
-			const bdd &y = V[x.sfgpt()];
-			return x.shift > 0 ? y : bdd(-y.v, y.l, y.h);
-		} else {
-			const bdd &y = V[-x.sfgpt()];
-			return x.shift > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
-		}
-	}*/
-
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
@@ -269,10 +263,6 @@ class bdd {
 	static bdd_ref bdd_ite_var(uint_t x, bdd_ref y, bdd_ref z);
 	static bdd_ref bdd_and_many(bdds v);
 	static bdd_ref bdd_and_many_ex(bdds v, const bools& ex);
-	static bdd_ref bdd_and_many_ex(bdds v, const bools& ex,
-		std::unordered_map<bdds, int_t>& memo,
-		std::unordered_map<int_t, int_t>& m2,
-		std::unordered_map<std::array<int_t, 2>, int_t>& m3);
 	static bdd_ref bdd_ex(bdd_ref x, const bools& b,
 		std::unordered_map<bdd_ref, bdd_ref>& memo, int_t last);
 	static bdd_ref bdd_ex(bdd_ref x, const bools& b);
@@ -304,10 +294,9 @@ class bdd {
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
 	bdd_ref h, l;
-	//int_t v;
 
 	//---
-	static void bdd_sz_abs(bdd_ref x, std::set<bdd_ref>& s);
+	static void bdd_sz_abs(bdd_ref x, std::set<int_t>& s);
 	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);

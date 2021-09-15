@@ -43,7 +43,7 @@ template<typename T1, typename T2> struct vec2cmp {
 	}
 };
 
-vector<unordered_map<bdd_key, int_t>> Mp, Mn;
+unordered_map<bdd_key, int_t> Ma;
 bdd_mmap V;
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
@@ -58,7 +58,7 @@ map<pair<bools, uints>, unordered_map<array<bdd_ref, 2>, bdd_ref>,
 unordered_map<bdds, bdd_ref> AM;
 map<bools, unordered_map<bdds, bdd_ref>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, bdd_ref>, vec2cmp<bool, uint_t>> AMXP;
-unordered_set<bdd_ref> S;
+unordered_set<int_t> S;
 unordered_map<bdd_ref, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle htrue, hfalse;
 map<bools, unordered_map<bdd_ref, bdd_ref>, veccmp<bool>> memos_ex;
@@ -93,9 +93,9 @@ void bdd::init(bool gc) {
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
 	gc_enabled = gc;
 	S.insert(0), S.insert(1), V.emplace_back(0, 0), // dummy
-	V.emplace_back(1, 1), Mp.resize(1),
-	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
-	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
+	V.emplace_back(1, 1),
+	Ma.emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
+	Ma.emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -119,9 +119,7 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	l = l.shift_var(-v);
 	unordered_map<bdd_key, int_t>::const_iterator it;
 	bdd_key k;
-	auto &mm = v < 0 ? Mn : Mp;
-	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
-	auto &m = mm[abs(v)];
+	auto &m = Ma;
 	if (l < 0) {
 		h = -h;
 		l = -l;
@@ -595,8 +593,8 @@ bdd_ref bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p) {
 
 void bdd::mark_all(bdd_ref i) {
 	DBG(assert((size_t)i.abs().bdd_id < V.size());)
-	if ((i = i.abs()).sfgpt() >= 2 && !has(S, i))
-		mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
+	if ((i = i.abs()).sfgpt() >= 2 && !has(S, i.bdd_id))
+		mark_all(hi(i)), mark_all(lo(i)), S.insert(i.bdd_id);
 }
 
 template <typename T>
@@ -610,11 +608,10 @@ template basic_ostream<wchar_t>& bdd::stats(basic_ostream<wchar_t>&);
 void bdd::gc() {
 	if(!gc_enabled) return;
 	if (V.empty()) return;
-	/*S.clear();
+	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V.size() < S.size() << 3) return;
-	const size_t pvars = Mp.size(), nvars = Mn.size();
-	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
+	Ma.clear(), S.insert(0), S.insert(1);
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
 #ifndef NOMMAP
@@ -636,10 +633,10 @@ void bdd::gc() {
 	unordered_map<ite_memo, bdd_ref> c;
 	unordered_map<bdds, bdd_ref> am;
 	for (pair<ite_memo, bdd_ref> x : C)
-		if (	has(S, x.first.x.abs()) &&
-			has(S, x.first.y.abs()) &&
-			has(S, x.first.z.abs()) &&
-			has(S, x.second.abs()))
+		if (	has(S, x.first.x.abs().bdd_id) &&
+			has(S, x.first.y.abs().bdd_id) &&
+			has(S, x.first.z.abs().bdd_id) &&
+			has(S, x.second.abs().bdd_id))
 			f(x.first.x.bdd_id), f(x.first.y.bdd_id), f(x.first.z.bdd_id),
 			x.first.rehash(), c.emplace(x.first, f(x.second.bdd_id));
 	C = move(c);
@@ -647,9 +644,9 @@ void bdd::gc() {
 	unordered_map<array<bdd_ref, 2>, bdd_ref> cc;
 	for (const auto& x : CX) {
 		for (pair<array<bdd_ref, 2>, bdd_ref> y : x.second)
-			if (	has(S, y.first[0].abs()) &&
-				has(S, y.first[1].abs()) &&
-				has(S, y.second.abs()))
+			if (	has(S, y.first[0].abs().bdd_id) &&
+				has(S, y.first[1].abs().bdd_id) &&
+				has(S, y.second.abs().bdd_id))
 				f(y.first[0].bdd_id), f(y.first[1].bdd_id),
 				cc.emplace(y.first, f(y.second.bdd_id));
 		if (!cc.empty()) cx.emplace(x.first, move(cc));
@@ -659,9 +656,9 @@ void bdd::gc() {
 		vec2cmp<bool, uint_t>> cxp;
 	for (const auto& x : CXP) {
 		for (pair<array<bdd_ref, 2>, bdd_ref> y : x.second)
-			if (	has(S, y.first[0].abs()) &&
-				has(S, y.first[1].abs()) &&
-				has(S, y.second.abs()))
+			if (	has(S, y.first[0].abs().bdd_id) &&
+				has(S, y.first[1].abs().bdd_id) &&
+				has(S, y.second.abs().bdd_id))
 				f(y.first[0].bdd_id), f(y.first[1].bdd_id),
 				cc.emplace(y.first, f(y.second.bdd_id));
 		if (!cc.empty()) cxp.emplace(x.first, move(cc));
@@ -671,7 +668,7 @@ void bdd::gc() {
 	map<bools, unordered_map<bdd_ref, bdd_ref>, veccmp<bool>> mex;
 	for (const auto& x : memos_ex) {
 		for (pair<bdd_ref, bdd_ref> y : x.second)
-			if (has(S, y.first.abs()) && has(S, y.second.abs()))
+			if (has(S, y.first.abs().bdd_id) && has(S, y.second.abs().bdd_id))
 				q.emplace(f(y.first.bdd_id), f(y.second.bdd_id));
 		if (!q.empty()) mex.emplace(x.first, move(q));
 	}
@@ -679,7 +676,7 @@ void bdd::gc() {
 	map<uints, unordered_map<bdd_ref, bdd_ref>, veccmp<uint_t>> mp;
 	for (const auto& x : memos_perm) {
 		for (pair<bdd_ref, bdd_ref> y : x.second)
-			if (has(S, y.first.abs()) && has(S, y.second.abs()))
+			if (has(S, y.first.abs().bdd_id) && has(S, y.second.abs().bdd_id))
 				q.emplace(f(y.first.bdd_id), f(y.second.bdd_id));
 		if (!q.empty()) mp.emplace(x.first, move(q));
 	}
@@ -688,7 +685,7 @@ void bdd::gc() {
 		vec2cmp<uint_t, bool>> mpe;
 	for (const auto& x : memos_perm_ex) {
 		for (pair<bdd_ref, bdd_ref> y : x.second)
-			if (has(S, y.first.abs()) && has(S, y.second.abs()))
+			if (has(S, y.first.abs().bdd_id) && has(S, y.second.abs().bdd_id))
 				q.emplace(f(y.first.bdd_id), f(y.second.bdd_id));
 		if (!q.empty()) mpe.emplace(x.first, move(q));
 	}
@@ -699,9 +696,9 @@ void bdd::gc() {
 		for (pair<bdds, bdd_ref> y : x.second) {
 			b = false;
 			for (bdd_ref& i : y.first)
-				if ((b |= !has(S, i.abs()))) break;
+				if ((b |= !has(S, i.abs().bdd_id))) break;
 				else f(i.bdd_id);
-			if (!b && has(S, y.second.abs()))
+			if (!b && has(S, y.second.abs().bdd_id))
 				am.emplace(y.first, f(y.second.bdd_id));
 		}
 		if (!am.empty()) amx.emplace(x.first, move(am));
@@ -713,9 +710,9 @@ void bdd::gc() {
 		for (pair<bdds, bdd_ref> y : x.second) {
 			b = false;
 			for (bdd_ref& i : y.first)
-				if ((b |= !has(S, i.abs()))) break;
+				if ((b |= !has(S, i.abs().bdd_id))) break;
 				else f(i.bdd_id);
-			if (!b && has(S, y.second.abs()))
+			if (!b && has(S, y.second.abs().bdd_id))
 				am.emplace(y.first, f(y.second.bdd_id));
 		}
 		if (!am.empty()) amxp.emplace(x.first, move(am));
@@ -724,28 +721,25 @@ void bdd::gc() {
 	for (pair<bdds, bdd_ref> x : AM) {
 		b = false;
 		for (bdd_ref& i : x.first)
-			if ((b |= !has(S, i.abs()))) break;
+			if ((b |= !has(S, i.abs().bdd_id))) break;
 			else f(i.bdd_id);
-		if (!b&&has(S,x.second.abs())) am.emplace(x.first, f(x.second.bdd_id));
+		if (!b&&has(S,x.second.abs().bdd_id)) am.emplace(x.first, f(x.second.bdd_id));
 	}
-	AM=move(am), bdd_handle::update(p), Mp.resize(pvars), Mn.resize(nvars);
+	AM=move(am), bdd_handle::update(p);
 	p.clear(), S.clear();
 	for (size_t n = 0; n < V.size(); ++n)
-		if (V[n].v < 0)
-			Mn[-V[n].v].emplace(bdd_key(hash_pair(V[n].h.sfgpt(), V[n].l.sfgpt()),
-				V[n].h, V[n].l), n);
-		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h.sfgpt(), V[n].l.sfgpt()),
-				V[n].h, V[n].l), n);
-	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)*/
+		Ma.emplace(bdd_key(hash_pair(V[n].h.sfgpt(), V[n].l.sfgpt()),
+			V[n].h, V[n].l), n);
+	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
 
 void bdd_handle::update(const vector<int_t>& p) {
-	/*unordered_map<bdd_ref, weak_ptr<bdd_handle>> m;
+	unordered_map<bdd_ref, weak_ptr<bdd_handle>> m;
 	for (pair<bdd_ref, weak_ptr<bdd_handle>> x : M)
 		//DBG(assert(!x.second.expired());) // is this needed? cannot load from archive with this
 		if (!x.second.expired())
 			f(x.second.lock()->b.bdd_id), m.emplace(f(x.first.bdd_id), x.second);
-	M = move(m);*/
+	M = move(m);
 }
 #undef f
 
