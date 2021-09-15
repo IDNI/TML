@@ -627,7 +627,7 @@ void bdd::gc() {
 	V = move(v1);
 #define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
 	for (size_t n = 2; n < V.size(); ++n) {
-		DBG(assert(p[V[n].h.abs().id] && p[V[n].l.abs().id] && V[n].v);)
+		DBG(assert(p[V[n].h.abs().bdd_id] && p[V[n].l.abs().bdd_id]);)
 		f(V[n].h.bdd_id), f(V[n].l.bdd_id);
 	}
 	unordered_map<ite_memo, bdd_ref> c;
