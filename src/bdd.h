@@ -37,6 +37,7 @@ inline size_t fpairing(size_t x, size_t y) {
 extern bool onexit;
 
 class bdd;
+class constrains;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
@@ -111,6 +112,8 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
+extern std::vector<constrains> CV;
+extern std::vector<constrains> neg_CV;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;

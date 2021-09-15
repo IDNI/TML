@@ -45,6 +45,8 @@ template<typename T1, typename T2> struct vec2cmp {
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 bdd_mmap V;
+vector<constrains> CV;
+vector<constrains> neg_CV;
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
@@ -1242,7 +1244,7 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 			if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
 				// Implication is true in lo since antecedent is violated
 				res.imp_var.emplace(it_hi->first, it_hi->second);
-			} else{
+			} else {
 				for (const auto v : it_hi->second){
 					if(lo.true_var.find(v) != lo.true_var.end()) {
 						// Implication is trivially true in lo
