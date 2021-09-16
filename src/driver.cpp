@@ -4938,9 +4938,6 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
-	if(auto semantics_opt = opts.get("semantics"))
-		to.semantics = semantics_opt->get_enum(map<string, enum semantics>
-			{{"3pfp", semantics::pfp3}, {"pfp", semantics::pfp}});
 	to.show_hidden       = opts.enabled("show-hidden");
 	to.bitunv			 = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");

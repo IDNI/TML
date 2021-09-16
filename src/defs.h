@@ -109,8 +109,6 @@ std::string filename(int fd);
 
 typedef std::map<int_t, int_t> env;
 
-// Possible semantics that can be used to run a TML program
-enum semantics { pfp3, pfp };
 // Modes in which proof extraction code can be run
 enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 
@@ -118,7 +116,6 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 typedef struct {
 	bool optimize, print_transformed, apply_regexpmatch, fp_step, bitunv,
 		show_hidden;
-	enum semantics semantics;
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;
