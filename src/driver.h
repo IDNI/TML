@@ -241,6 +241,10 @@ class driver {
 		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const lexeme &lex, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
+	string_t generate_cpp(const directive &dir, string_t &prog_constr, uint_t &cid,
+		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
 		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	raw_prog reify(const raw_prog& p);
