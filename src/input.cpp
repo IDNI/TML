@@ -286,6 +286,32 @@ bool directive::parse(input* in, const raw_prog& prog) {
 	return !in->error;
 }
 
+bool directive::operator==(const directive &b) const {
+		if(type != b.type) return false;
+		switch(type) {
+			case directive::STR: return rel == b.rel && arg == b.arg;
+			case directive::FNAME: return rel == b.rel && arg == b.arg;
+			case directive::CMDLINE: return rel == b.rel && n == b.n;
+			case directive::STDIN: return rel == b.rel;
+			case directive::STDOUT: return t == b.t;
+			case directive::TREE: return t == b.t;
+			case directive::TRACE: return rel == b.rel;
+			case directive::BWD: return true;
+			case directive::EVAL: return eval_sym == b.eval_sym &&
+				domain_sym == b.domain_sym && quote_sym == b.quote_sym &&
+				timeout_num == b.timeout_num;
+			case directive::QUOTE: return quote_sym == b.quote_sym &&
+				domain_sym == b.domain_sym && quote_str == b.quote_str;
+			case directive::EDOMAIN: return domain_sym == b.domain_sym &&
+				limit_num == b.limit_num && arity_num == b.arity_num;
+			case directive::CODEC: return codec_sym == b.codec_sym &&
+				domain_sym == b.domain_sym && eval_sym == b.eval_sym &&
+				arity_num == b.arity_num;
+			case directive::INTERNAL: return internal_term == b.internal_term;
+			default: return false;
+		}
+	}
+
 elem::etype elem::peek(input* in) {
 	size_t curr = in->pos;
 	type = NONE;

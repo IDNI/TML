@@ -76,7 +76,16 @@ signature get_signature(const raw_term &rt) {
 
 void driver::directives_load(raw_prog& p, lexeme& trel) {
 //	int_t rel;
-	for (const directive& d : p.d)
+	// The list of directives that have been processed so far
+	vector<directive> processed;
+	// Iterate through the directives that remain in the program
+	while (!p.d.empty()) {
+		const directive d = p.d[0];
+		p.d.erase(p.d.begin());
+		// If this directive has been processed before, then do not repeat
+		// processing
+		if(find(processed.begin(), processed.end(), d) != processed.end()) continue;
+		else processed.push_back(d);
 		switch (d.type) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
@@ -102,6 +111,8 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 			break;*/
 		default: pd.strs.emplace(d.rel.e, directive_load(d));
 		}
+	}
+	p.d.insert(p.d.end(), processed.begin(), processed.end());
 }
 
 
@@ -3407,12 +3418,6 @@ bool driver::transform_evals(raw_prog &rp, const directive &drt) {
 		raw_prog &rp733 = rp;
 		rp733.r.insert(rp733.r.end(), { rr77, rr82, rr87, rr93, rr97, rr102, rr136, rr152, rr175, rr185, rr208, rr218, rr241, rr257, rr267, rr289, rr305, rr315, rr321, rr336, rr359, rr383, rr402, rr418, rr463, rr510, rr560, rr567, rr589, rr610, rr618, rr631, rr664, rr677, rr694, rr707, rr714, rr732, });
 		rp733.d.insert(rp733.d.end(), { dir0, dir5, dir8, dir12, dir15, dir21, dir25, dir31, dir35, dir38, dir43, dir47, dir50, dir54, dir57, dir60, dir63, dir66, });
-	}
-	// Note the hidden relations that were added above
-	for(const directive &dir : rp.d) {
-		if(dir.type == directive::INTERNAL) {
-			rp.hidden_rels.insert(get_signature(dir.internal_term));
-		}
 	}
 	o::dbg() << "Generated eval for: " << drt << endl;
 	return true;
