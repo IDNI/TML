@@ -1,2 +1,2 @@
---to-dnf --semantics 3pfp --proof partial-tree
+--to-dnf --proof partial-tree
 
