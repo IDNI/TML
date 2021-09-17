@@ -1153,12 +1153,10 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 	level trues, falses, undefineds;
 	if(compute_fixpoint(trues, falses, undefineds)) {
 		// Print out the true points
-		bool exists_trues = false;
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
 			if(opts.show_hidden || !tbls[n].hidden) {
-				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl;
-					exists_trues = true; });
+				decompress(trues[n], n, [&os, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl; });
 			}
 		}
 		return true;
