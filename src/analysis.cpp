@@ -262,25 +262,39 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 		ret &= rtout.calc_arity(0);
 	}
 	else if ( rtin.extype == raw_term::ARITH || rtin.extype == raw_term::EQ || rtin.extype == raw_term::LEQ) {
-		std::vector<std::vector<elem>> vbit;
-		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
+		
+		// prepare tab_arg and estimate size of bit elements from the context of the rule, since 
+		// these are arithmetic variables having no specific type signture, but only the context 
+		// based bitsizes as calculated during typeinference.
+		tab_args tag;
+		int_t tsz = 0;
+		for(size_t n = 0 ; n < rtin.e.size(); n++ ) {
+			size_t bsz = get_typeinfo(n, rtin, rr);
+			if(bsz) tag.push_back(bsz), tsz += bsz;
+		}
+
+		//DBG(assert(tag.size() == (size_t)rtin.get_formal_arity()-2));
+		size_t  args = tag.size();
+		std::vector<elem> vbit(tsz);
+		
+		for(size_t bsz, arg = 0, n = 0 ; n < rtin.e.size(); n++ ) {
+			if(n && !(n == 1 || n == 3) ) arg++;  // skip operators in arith or eq term
 			const elem& e = rtin.e[n];
 			string_t str = lexeme2str(e.e);
-			size_t bsz = get_typeinfo(n, rtin, rr);
 			switch( e.type ){
-				case elem::VAR: vbit.emplace_back(); 
-								vbit.back().resize(bsz);
+				case elem::VAR: 
+								bsz = tag[arg];
 								for( size_t k= 0; k !=bsz ; k++){
+									size_t ps = pos(bsz, k, arg, args, tag );
 									string_t temp = str;
 									temp.append(to_string_t("_").append(to_string_t((int_t)k)));
-									vbit.back()[k] = {elem::VAR, d.get_lexeme(temp)};
+									vbit[ps] = {elem::VAR, d.get_lexeme(temp)};
 								}
 								break;
 				case elem::NUM:
-								vbit.emplace_back(); 
-								vbit.back().resize(bsz);
+								bsz = tag[arg];
 								for( size_t k= 0; k !=bsz ; k++)
-									vbit.back()[k] = bool(e.num & (1<<k));
+									vbit[pos(bsz, k, arg, args, tag)] = bool(e.num & (1<<k));
 								break;
 				case elem::ARITH:
 				case elem::EQ:
@@ -289,29 +303,68 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 				case elem::GEQ:
 				case elem::LT:
 				case elem::GT:
-				 // user size of prev var
-								bsz = vbit.back().size();
-								vbit.emplace_back(); 
-								vbit.back().resize(bsz);
-								for( size_t k= 0; k !=bsz ; k++)
-									vbit.back()[k] = e;
 								break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
-			}	
+			}
 		}
-		if( vbit.size()) rrout.b.back().pop_back(); // so that rrout is not there
-
-		for( size_t j=0 ; j < vbit[0].size(); j++) {
-			rrout.b.back().emplace_back();
-			for( size_t i =0 ; i< vbit.size(); i++) 
-				rrout.b.back().back().e.push_back(vbit[i][j]);
+		if(rtin.extype != raw_term::ARITH) {
+			//change to rlation in order to emit for binary comparisons
+			// e.g  _LEQ_(--  -- ) a != b  ----> neq( a  b)
+			rtout.extype = raw_term::REL;
+			rtout.e.emplace_back(elem::SYM, rtin.e[1].e);
+			rtout.e.emplace_back(elem(elem::OPENP));
+			rtout.e.insert(rtout.e.end(), vbit.begin(), vbit.end() );
+			rtout.e.emplace_back(elem(elem::CLOSEP));
+		}
+		else {
+			//change to REL and add new relation in order
+			// to emit ternary e.g. _plus_( 11 1 1  000  ?z0?z1?z2 ),
+			// a + 1 < b  ---->   plus(a 1,z ) , lt ( z , b)
+			// oprd1 operator oprd2 comp_operator oprd3
+			rtout.extype = raw_term::REL;
+			rtout.e.emplace_back(elem::SYM, rtin.e[1].e); // from operator
+			rtout.e.emplace_back(elem(elem::OPENP));
+			rtout.e.insert(rtout.e.end(), vbit.begin(), vbit.end() );
+			rtout.e.emplace_back(elem(elem::CLOSEP));
 			
-			raw_term &out = rrout.b.back().back();
-			out.extype = rtin.extype;
-			if(out.extype == raw_term::EQ || out.extype == raw_term::LEQ)
-				out.arity = {2}; 			
-			DBG(COUT<<std::endl<<out);
+			if( rtin.e[3].type != elem::EQ )  { // when com_operator != =
+				// now we need to replace oprnd3's bit with tmp var z in vbit
+				// reprsenting ternary arith
+				// and put oprnd3's in the new relation along with tmp
+				size_t bsz = tag[2];  // oprnd3 size   
+				tab_args tag2{tag[2], tag[2]}; // for tmp z and oprd3
+				// size of tmp z and oprd3 
+				std::vector<elem> vbit2(tag2[0] + tag[1]);
+				string_t temp = lexeme2str(rtin.e[rtin.e.size()-1].e);
+				DBG(assert((args-1) == tag2.size()));
+				for( size_t k= 0; k != bsz ; k++){
+					//getting prev pos of oprnd3
+					size_t ps = pos(bsz, k, 2, args, tag );
+					//constructing new tmp var
+					temp.append(to_string_t("_tmp_").append(to_string_t((int_t)k)));
+					// get pos of oprnd3 in new relation and place it
+					size_t ps2 = pos(bsz, k, 1, tag2.size(), tag2 );
+					vbit2[ps2] = vbit[ps];
+					// get pos of tmp in new rateion and place it
+					ps2 = pos(bsz, k , 0, tag2.size(), tag2);
+					vbit2[ps2] = {elem::VAR, d.get_lexeme(temp)};
+					// put new tmp vaz z in ternay relation old
+					vbit[ps] = vbit[ps2]; 
+				}
+				// preparing new raw_term for the new relation.
+				raw_term frt;
+				frt.extype = raw_term::REL;
+				frt.e.emplace_back(elem::SYM, rtin.e[3].e); // from comp_operator
+				frt.e.emplace_back(elem(elem::OPENP));
+				frt.e.insert(frt.e.end(),vbit2.begin(), vbit2.end());
+				frt.e.emplace_back(elem(elem::CLOSEP));
+				frt.calc_arity(nullptr);
+				// don't forget to add this new term to body
+				rrout.b.back().push_back(frt);
+			}
+			
 		}
+		ret = rtout.calc_arity(nullptr);
 	}
 	return ret;
 }
