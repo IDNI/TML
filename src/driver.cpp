@@ -4873,7 +4873,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		transformed_progs.insert(&rp);
 		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
 		
-		if(opts.enabled("safe-check")) {
+		if(opts.enabled("safecheck")) {
 			if(auto res = is_safe(rp)) {
 				ostringstream msg;
 				// The program is unsafe so inform the user of the offending rule
