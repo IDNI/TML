@@ -1786,15 +1786,15 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// Finally create the domain rules
 	rp.r.push_back(raw_rule({fst_head, rst_head}, bodie));
 	// Also make the nil list
-	rp.r.push_back(raw_rule(raw_term(
-		{ concat(out_rel, "_nil"), elem_openp, elem(0), elem_closep })));
+	raw_term nil_fact({ concat(out_rel, "_nil"), elem_openp, elem(0), elem_closep });
+	rp.r.push_back(raw_rule(nil_fact));
 	// To prevent spurious (i.e. purely modular) solutions to the
 	// modular equation defining lists, we should artificially
 	// increase the modulus to a number which the arithmetic
 	// operations cannot reach (due to their bounds).
-	rp.r.push_back(raw_rule(raw_term(
-		{ concat(out_rel, "_mod"), elem_openp, elem(gen_limit * max_id),
-			elem_closep })));
+	raw_term mod_fact({ concat(out_rel, "_mod"), elem_openp,
+		elem(gen_limit * max_id), elem_closep });
+	rp.r.push_back(raw_rule(mod_fact));
 
 	// Lists are sometimes used to encode interpreter memory. In this
 	// scenario, it is useful to treat the longest lists as possible
@@ -1822,6 +1822,8 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	rp.hidden_rels.insert(get_signature(fst_head));
 	rp.hidden_rels.insert(get_signature(rst_head));
 	rp.hidden_rels.insert(get_signature(max_head));
+	rp.hidden_rels.insert(get_signature(nil_fact));
+	rp.hidden_rels.insert(get_signature(mod_fact));
 	// Successfully executed directive
 	o::dbg() << "Generated domain for: " << drt << endl;
 	return true;
@@ -4703,8 +4705,7 @@ string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
 
 // Generate the C++ code to generate the given TML lexeme
 
-string_t driver::generate_cpp(const lexeme &lex, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, map<elem, string_t> &elem_cache) {
+string_t driver::generate_cpp(const lexeme &lex) {
 	return to_string_t("STR_TO_LEXEME(") + lexeme2str(lex) + to_string_t(")");
 }
 
@@ -4719,15 +4720,15 @@ string_t driver::generate_cpp(const directive &dir, string_t &prog_constr,
 			prog_constr += dir_name + to_string_t(".type = directive::STR;\n");
 			prog_constr += dir_name + to_string_t(".rel = ") +
 				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arg = ") +
-				generate_cpp(dir.arg, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
+			prog_constr += dir_name + to_string_t(".arg = ") + generate_cpp(dir.arg) +
+				to_string_t(";\n");
 			break;
 		case directive::FNAME:
 			prog_constr += dir_name + to_string_t(".type = directive::FNAME;\n");
 			prog_constr += dir_name + to_string_t(".rel = ") +
 				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arg = ") +
-				generate_cpp(dir.arg, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
+			prog_constr += dir_name + to_string_t(".arg = ") + generate_cpp(dir.arg) +
+				to_string_t(";\n");
 			break;
 		case directive::CMDLINE:
 			prog_constr += dir_name + to_string_t(".type = directive::CMDLINE;\n");
