@@ -28,6 +28,25 @@
 # intermediate relations and commits the intermediate results into the
 # final relation.
 
+@internal tick().
+@internal tock().
+@internal domaine(?x).
+@internal list(?x).
+@internal unset(?in ?idx ?out).
+@internal fix(?in ?idx ?val).
+@internal gfix(?lst ?inds ?vals).
+@internal select(?in ?chks ?out).
+@internal deselect(?in ?chks ?out).
+@internal scratch0(?ts ?id ?out).
+@internal to_add(?ts ?name ?out).
+@internal to_del(?ts ?name ?out).
+@internal to_carry(?nts ?name ?out).
+@internal not_fixpoint(?ts ?nts).
+@internal in_time(?ts).
+@internal databases(?nts ?name ?out).
+@internal scratch(?ts ?id ?out).
+@internal fixpoint(?ts ?nts).
+
 tick() :- ~tick(), ~tock().
 
 tock(), ~tick() :- tick().
