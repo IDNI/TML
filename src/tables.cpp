@@ -418,15 +418,19 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	else
 		handler_formh(a.f, t0->qbf.get(), vm, vmh);
 
+	size_t cbits= 0; 
+	if(opts.bitunv) cbits = bits;
+	else cbits = bits-2 ;
+
 	if (a.f->perm.size() == 0) {
 		term t; t.resize(a.f->varslen);
 		for (auto &v : vm) t[v.second] = v.first;
-		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits-2);
+		a.f->perm = get_perm(t, tmpvm, a.f->varslen, cbits);
 	}
 
 	//todo: review to reach an arity-increment permutation to handle head constants
 	if (a.f->ex_h.size() == 0) {
-		auto d = deltail(a.f->varslen, tmpvm.size(), bits-2);
+		auto d = deltail(a.f->varslen, tmpvm.size(), cbits);
 		a.f->ex_h = d.first, a.f->perm_h = d.second;
 	}
 	a.f->varslen_h = varsh;
@@ -788,7 +792,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		formula_query(a.f, f);
 		//TODO: complete for any type, only for ints by now
 		if (a.f->ex_h.size() != 0 ) {
-			append_num_typebits(f[0], a.f->varslen_h);
+			if(!opts.bitunv) append_num_typebits(f[0], a.f->varslen_h);
 			a.rlast = f[0];
 		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;

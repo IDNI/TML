@@ -204,7 +204,8 @@ class typechecker {
     TINFO_STATUS tstat;
     std::vector<TINFO_STATUS> verrs;
     bool tinfer (const raw_rule&);
-    bool tcheck (const raw_rule&) ;
+    bool tcheck (const raw_rule&);
+    bool tcheck(const raw_form_tree &prft);
     bool tcheck (const raw_term&);
     bool type_error(const char* e, lexeme l) {
         if(tstat == TINFO_TYPE_CHECK_SUCCESS)
@@ -307,6 +308,7 @@ struct bit_univ {
 	private:
     bool btransform( const raw_rule& rrin, raw_rule &rrout );
 	bool btransform( const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout );
+    bool btransform( const raw_form_tree& rfin, raw_form_tree &rfout, const raw_rule& rrin, raw_rule &rrout );
     public:
     template<class T>
     bool permuteorder(std::vector<T> &cont, size_t n, bool backward = false){
