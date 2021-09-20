@@ -1263,14 +1263,14 @@ bool union_find::insert(int_t x) {
 	} else return false;
 }
 
-union_find union_find::intersect(union_find &uf1, union_find &uf2) {
+union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	map<pair<int_t,int_t>, vector<int_t>> eq_class;
 	// Find common nodes in uf1 and uf2
 	auto it_uf1 = uf1.parent.begin();
 	auto it_uf2 = uf2.parent.begin();
 	while (it_uf1 != uf1.parent.end() && it_uf2 != uf2.parent.end()) {
-		if (it_uf1->first < it_uf2->first) ++it_uf1;
-		else if(it_uf2->first < it_uf1->first) ++it_uf2;
+		if (it_uf1->first < it_uf2->first) { pure = false; ++it_uf1; }
+		else if(it_uf2->first < it_uf1->first) { pure = false; ++it_uf2; }
 		else {
 			// Found a common node; Associate with equivalence tuple
 			int_t eq_class_uf1 = uf1.find(it_uf1->first);
@@ -1285,15 +1285,16 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2) {
 		if (p.second.size() > 1) for (const auto& el : p.second) {
 			uf_res.insert(el);
 			uf_res.merge(p.second[0], el);
-		}
+		} else pure = false;
 	}
 	return uf_res;
 }
 
 // Create constrains for a node from its high and low nodes
-//TODO: create is_pure for outputted constrain
 constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 	constrains res;
+	//Check if res can be pure at all - this is revised later
+	if(!hi.is_empty() || !lo.is_empty()) res.is_pure = true;
 	// Lifting of implications
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
@@ -1313,6 +1314,7 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 						// Implication is contained in equality of lo
 						res.imp_var[it_hi->first].insert(v);
 					}
+					else res.is_pure = false;
 				}
 			}
 			++it_hi;
@@ -1332,6 +1334,7 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 						// Implication is contained in equality of hi
 						res.imp_var[it_lo->first].insert(v);
 					}
+					else res.is_pure = false;
 				}
 			}
 			++it_lo;
@@ -1355,6 +1358,7 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 							// Implication is contained in equality of lo
 							res.imp_var[it_hi->first].insert(*it_hi_set);
 						}
+						else res.is_pure = false;
 					}
 					++it_hi_set;
 				}
@@ -1373,6 +1377,7 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 							// Implication is contained in equality of hi
 							res.imp_var[it_lo->first].insert(*it_lo_set);
 						}
+						else res.is_pure = false;
 					}
 					++it_lo_set;
 				}
@@ -1437,7 +1442,8 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 
 	// Lifting of equalities contained in both hi and lo
 	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
-		res.eq_var = union_find::intersect(hi.eq_var, lo.eq_var);
+		res.eq_var =
+			union_find::intersect(hi.eq_var, lo.eq_var, res.is_pure);
 	}
 
 	return res;
@@ -1451,4 +1457,8 @@ constrains constrains::extend_sing(const constrains &c, int_t var, bool b) {
 
 bool constrains::is_singleton() {
 	return imp_var.empty() && eq_var.empty() && !true_var.empty();
+}
+
+bool constrains::is_empty() {
+	return imp_var.empty() && eq_var.empty() && true_var.empty();
 }

@@ -418,7 +418,8 @@ public:
 	bool insert (int_t x);
 	bool in_same_set (int_t x, int_t y) { return find(x) == find(y); }
 	bool empty () const { return parent.empty(); }
-	static union_find intersect (union_find& uf1, union_find& uf2);
+	static union_find
+	intersect(union_find &uf1, union_find &uf2, bool &pure);
 };
 
 // representation for 2-CNFs
@@ -444,6 +445,7 @@ public:
 	static constrains merge(int_t var, constrains& hi, constrains& lo);
 	static constrains extend_sing (const constrains& c, int_t var, bool b);
 	bool is_singleton ();
+	bool is_empty();
 
 	inline static constrains& get (int_t c) {
 		if(c > 0) {
