@@ -271,6 +271,7 @@ class bdd {
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
 	static int_t add(int_t v, int_t h, int_t l);
+	static void extract_constrains(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(int_t t) { return abs(t) == T; }
@@ -432,11 +433,35 @@ class constrains {
 	std::map<int_t, std::set<int_t>> imp_var;
 	std::set<int_t, decltype(abs_cmp)> true_var; //Set is sorted by absolut value
 	union_find eq_var;
+	bool is_pure = false;
 	// void updateTC (); <- not needed yet
 public:
 	constrains() = default;
-	constrains(int_t var, bool b) { true_var.insert({var, b}); }
+	constrains(int_t var, bool b) {
+		b ? true_var.insert(var) : true_var.insert(-var);
+		is_pure = true;
+	}
 	static constrains merge(int_t var, constrains& hi, constrains& lo);
+	static constrains extend_sing (const constrains& c, int_t var, bool b);
+	bool is_singleton ();
+
+	inline static constrains& get (int_t c) {
+		if(c > 0) {
+			constrains &x = CV[c];
+			return x;
+		}
+		constrains &x = neg_CV[-c];
+		return x;
+	}
+
+	inline static constrains& get_neg (int_t c) {
+		if(c > 0) {
+			constrains &x = neg_CV[c];
+			return x;
+		}
+		constrains &x = CV[-c];
+		return x;
+	}
 };
 
 
