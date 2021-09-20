@@ -45,8 +45,8 @@ template<typename T1, typename T2> struct vec2cmp {
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 bdd_mmap V;
-vector<constrains> CV;
-vector<constrains> neg_CV;
+vector<constraints> CV;
+vector<constraints> neg_CV;
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
@@ -98,8 +98,8 @@ void bdd::init(bool gc) {
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
-	CV.emplace_back(), CV.emplace_back(), // adding empty constrains
-	neg_CV.emplace_back(), neg_CV.emplace_back(), // adding empty constrains
+	CV.emplace_back(), CV.emplace_back(), // adding empty constraints
+	neg_CV.emplace_back(), neg_CV.emplace_back(), // adding empty constraints
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -132,19 +132,18 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 		l = -l;
 		k = bdd_key(hash_pair(h, l), h, l);
 		return	(it = m.find(k)) != m.end() ? -it->second :
-			(V.emplace_back(v, h, l),
+			(extract_constraints(v, h, l),
 			m.emplace(move(k), V.size()-1),
-			-V.size()+1);
+			(int_t) -V.size()+1);
 	}
 	k = bdd_key(hash_pair(h, l), h, l);
 	return	(it = m.find(k)) != m.end() ? it->second :
-		(V.emplace_back(v, h, l),
+		(extract_constraints(v, h, l),
 		m.emplace(move(k), V.size()-1),
-		V.size()-1);
+		(int_t) V.size()-1);
 }
 
-void bdd::extract_constrains (int_t v, int_t h, int_t l) {
-	//TODO: Make correct for negated saving
+void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	if(l == F) { // actually this cannot happen, see add
 		DBGFAIL;
 		if (h == T) {
@@ -152,15 +151,17 @@ void bdd::extract_constrains (int_t v, int_t h, int_t l) {
 			V.emplace_back(0,0,0); // dummy bdd node
 			CV.emplace_back(v, true);
 			neg_CV.emplace_back(v, false);
+			return;
 		} else {
 			// extend 2-CNF by v = 1 - no reduction or TC needed here because v is not present in h path yet
 			const bdd bh = get(h);
 			V.emplace_back(bh);
-			CV.emplace_back(constrains::extend_sing(constrains::get(h), v, true));
+			CV.emplace_back(constraints::extend_sing(constraints::get(h), v, true));
 			neg_CV.emplace_back(
-				constrains::merge(
-					v, constrains::get_neg(h), constrains::get_neg(l)
+				constraints::merge(
+					v, constraints::get_neg(h), constraints::get_neg(l)
 					));
+			return;
 		}
 	}
 	if(h == F) {
@@ -169,33 +170,38 @@ void bdd::extract_constrains (int_t v, int_t h, int_t l) {
 			V.emplace_back(0,0,0);
 			CV.emplace_back(v, false);
 			neg_CV.emplace_back(v, true);
+			return;
 		} else {
 			const bdd bl = get(l);
 			V.emplace_back(bl);
-			CV.emplace_back(constrains::extend_sing(constrains::get(l), v, true));
+			CV.emplace_back(constraints::extend_sing(constraints::get(l), v, true));
 			neg_CV.emplace_back(
-				constrains::merge(
-					v, constrains::get_neg(h), constrains::get_neg(l)
+				constraints::merge(
+					v, constraints::get_neg(h), constraints::get_neg(l)
 				));
+			return;
 		}
 	}
 	if(l == T) {
 		// h cannot be F here
-		// We shrink BDD by saving a constrain in neg_CV
+		// We shrink BDD by saving a constraint in neg_CV
 		const bdd bh = get(h);
 		V.emplace_back(bh);
-		CV.emplace_back(constrains::get(h));
-		neg_CV.emplace_back(constrains::extend_sing(constrains::get_neg(h), v, true));
+		CV.emplace_back(constraints::get(h));
+		neg_CV.emplace_back(constraints::extend_sing(constraints::get_neg(h), v, true));
+		return;
 	}
 	if(h == T) {
 		//This case is caught before
 		DBGFAIL;
 	}
 
-	//TODO: Handle pure 2-CNFs
-	V.emplace_back(v,h,l);
-	CV.emplace_back(constrains::merge(v,constrains::get(h), constrains::get(l)));
-	neg_CV.emplace_back(constrains::merge(v, constrains::get_neg(h), constrains::get_neg(l)));
+	constraints c_v = constraints::merge(v,constraints::get(h),constraints::get(l));
+	constraints neg_v = constraints::merge(v, constraints::get_neg(h), constraints::get_neg(l));
+	if (c_v.pure() || neg_v.pure()) V.emplace_back(0,0,0);
+	else 	V.emplace_back(v,h,l);
+	CV.emplace_back(move(c_v));
+	neg_CV.emplace_back(move(neg_v));
 }
 
 int_t bdd::from_bit(uint_t b, bool v) {
@@ -1290,9 +1296,9 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	return uf_res;
 }
 
-// Create constrains for a node from its high and low nodes
-constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
-	constrains res;
+// Create constraints for a node from its high and low nodes
+constraints constraints::merge(int_t var, constraints& hi, constraints& lo) {
+	constraints res;
 	//Check if res can be pure at all - this is revised later
 	if(!hi.is_empty() || !lo.is_empty()) res.is_pure = true;
 	// Lifting of implications
@@ -1449,16 +1455,20 @@ constrains constrains::merge(int_t var, constrains& hi, constrains& lo) {
 	return res;
 }
 
-constrains constrains::extend_sing(const constrains &c, int_t var, bool b) {
-	constrains res = c;
+constraints constraints::extend_sing(const constraints &c, int_t var, bool b) {
+	constraints res = c;
 	b ? res.true_var.insert(var) : res.true_var.insert(-var);
 	return res;
 }
 
-bool constrains::is_singleton() {
+bool constraints::is_singleton() {
 	return imp_var.empty() && eq_var.empty() && !true_var.empty();
 }
 
-bool constrains::is_empty() {
+bool constraints::is_empty() {
 	return imp_var.empty() && eq_var.empty() && true_var.empty();
+}
+
+bool constraints::pure() {
+	return is_pure;
 }

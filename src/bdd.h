@@ -37,7 +37,7 @@ inline size_t fpairing(size_t x, size_t y) {
 extern bool onexit;
 
 class bdd;
-class constrains;
+class constraints;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
@@ -112,8 +112,8 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
-extern std::vector<constrains> CV;
-extern std::vector<constrains> neg_CV;
+extern std::vector<constraints> CV;
+extern std::vector<constraints> neg_CV;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;
@@ -271,7 +271,7 @@ class bdd {
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
 	static int_t add(int_t v, int_t h, int_t l);
-	static void extract_constrains(int_t v, int_t h, int_t l);
+	static void extract_constraints(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(int_t t) { return abs(t) == T; }
@@ -423,7 +423,7 @@ public:
 };
 
 // representation for 2-CNFs
-class constrains {
+class constraints {
 	static constexpr auto abs_cmp = [](int a, int b) {
 		int abs_a = abs(a), abs_b = abs(b);
 		if (abs_a < abs_b) return true;
@@ -437,32 +437,23 @@ class constrains {
 	bool is_pure = false;
 	// void updateTC (); <- not needed yet
 public:
-	constrains() = default;
-	constrains(int_t var, bool b) {
+	constraints() = default;
+	constraints(int_t var, bool b) {
 		b ? true_var.insert(var) : true_var.insert(-var);
 		is_pure = true;
 	}
-	static constrains merge(int_t var, constrains& hi, constrains& lo);
-	static constrains extend_sing (const constrains& c, int_t var, bool b);
+	static constraints merge(int_t var, constraints& hi, constraints& lo);
+	static constraints extend_sing (const constraints& c, int_t var, bool b);
 	bool is_singleton ();
 	bool is_empty();
+	bool pure();
 
-	inline static constrains& get (int_t c) {
-		if(c > 0) {
-			constrains &x = CV[c];
-			return x;
-		}
-		constrains &x = neg_CV[-c];
-		return x;
+	inline static constraints& get (int_t c) {
+		return c > 0 ? CV[c] : neg_CV[-c];
 	}
 
-	inline static constrains& get_neg (int_t c) {
-		if(c > 0) {
-			constrains &x = neg_CV[c];
-			return x;
-		}
-		constrains &x = CV[-c];
-		return x;
+	inline static constraints& get_neg (int_t c) {
+		return c > 0 ? neg_CV[c] : CV[-c];
 	}
 };
 

@@ -1470,7 +1470,7 @@ z3::expr z3_context::arg_to_z3(const elem& el) {
 	}
 }
 
-/* Construct a formula that constrains the head variables. The
+/* Construct a formula that constraints the head variables. The
  * constraints are of two sorts: the first equate pairwise identical
  * head variables to each other, and the second equate literals to their
  * unique Z3 equivalent. Also exports a mapping of each head element to
