@@ -561,6 +561,7 @@ struct directive {
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
 		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL }type;
 	bool parse(input* in, const raw_prog& prog);
+	bool operator==(const directive &b) const;
 };
 
 struct production {

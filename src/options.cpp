@@ -194,8 +194,6 @@ void options::setup() {
 		"enable safety check");
 	add(option(option::type::INT, { "iterate" })
 		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
-	add(option(option::type::ENUM, { "semantics" }, { "3pfp", "pfp" }).
-		description("run program under one of the following semantics: pfp (default), 3pfp"));
 	add_bool("gc",      "enable garbage collection");
 	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", "partial-tree", "partial-forest" }).
 		description("control if and how proofs are extracted: none (default), tree, forest, partial-tree, partial-forest"));
@@ -273,7 +271,6 @@ void options::init_defaults() {
 	parse(strings{
 		"--run",
 		"--gc",
-		"--semantics",   "pfp",
 		"--proof",       "none",
 		"--output",      "@stdout",
 		"--dump",        "@stdout",

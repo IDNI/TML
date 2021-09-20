@@ -418,15 +418,19 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	else
 		handler_formh(a.f, t0->qbf.get(), vm, vmh);
 
+	size_t cbits= 0; 
+	if(opts.bitunv) cbits = bits;
+	else cbits = bits-2 ;
+
 	if (a.f->perm.size() == 0) {
 		term t; t.resize(a.f->varslen);
 		for (auto &v : vm) t[v.second] = v.first;
-		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits-2);
+		a.f->perm = get_perm(t, tmpvm, a.f->varslen, cbits);
 	}
 
 	//todo: review to reach an arity-increment permutation to handle head constants
 	if (a.f->ex_h.size() == 0) {
-		auto d = deltail(a.f->varslen, tmpvm.size(), bits-2);
+		auto d = deltail(a.f->varslen, tmpvm.size(), cbits);
 		a.f->ex_h = d.first, a.f->perm_h = d.second;
 	}
 	a.f->varslen_h = varsh;
@@ -788,7 +792,7 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		formula_query(a.f, f);
 		//TODO: complete for any type, only for ints by now
 		if (a.f->ex_h.size() != 0 ) {
-			append_num_typebits(f[0], a.f->varslen_h);
+			if(!opts.bitunv) append_num_typebits(f[0], a.f->varslen_h);
 			a.rlast = f[0];
 		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;
@@ -972,7 +976,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
 		if (opts.bproof != proof_mode::none) levels.push_back(move(l));
 		if (!datalog && is_repeat)
-			return opts.semantics == semantics::pfp3 ? true : infloop_detected();
+			return is_infloop() ? infloop_detected() : true;
 	}
 	DBGFAIL;
 }
@@ -1144,12 +1148,51 @@ void tables::out(basic_ostream<T>& os) const {
 template void tables::out<char>(ostream& os) const;
 template void tables::out<wchar_t>(wostream& os) const;
 
-/* Print out the fixpoint associated with this sequence of databases and
- * return true. Return false if this sequence of databases contains no
- * repeats. */
+/* If this sequence of databases has a fixpoint, then print it out and return
+ * true. Otherwise return false. */
 
 template <typename T>
 bool tables::out_fixpoint(basic_ostream<T>& os) {
+	// The variables in which the fixpoint will be placed if it exists
+	level trues, falses, undefineds;
+	if(compute_fixpoint(trues, falses, undefineds)) {
+		// Print out the true points
+		for(ntable n = 0; n < (ntable)trues.size(); n++) {
+			if(opts.show_hidden || !tbls[n].hidden) {
+				decompress(trues[n], n, [&os, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl; });
+			}
+		}
+		return true;
+	} else return false;
+}
+
+/* If this sequence of databases has a generalized fixpoint and there are
+ * undefined points in it belonging to a visible relation, then we have an
+ * infloop. */
+
+bool tables::is_infloop() {
+	// The variables in which the fixpoint will be placed if it exists
+	level trues, falses, undefineds;
+	if(compute_fixpoint(trues, falses, undefineds)) {
+		for(ntable n = 0; n < (ntable)undefineds.size(); n++) {
+			// If this relation is visible then existince of undefined parts in it
+			// constitute an infloop
+			if(!tbls[n].hidden && undefineds[n] != bdd_handle::F) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/* If this sequence of databases has a generalized fixpoint, then compute it and
+ * return true, otherwise return false. The true points in the generalized
+ * fixpoint are those that remain true throughout a cycle, those that are false
+ * never occur in the final cycle, and the undefined points comprise the
+ * rest. */
+
+bool tables::compute_fixpoint(level &trues, level &falses, level &undefineds) {
 	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
 	if(fronts_size < 2 ||
 			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
@@ -1157,10 +1200,12 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		// There cannot be a fixpoint if there are less than two fronts or
 		// if there do not exist two equal fronts
 		return false;
-	} else if (opts.semantics == semantics::pfp3) {
+	} else {
 		// If FO(3-PFP) semantics are in effect
 		// Determine which facts are true, false, and undefined
-		level trues(tbls_size), falses(tbls_size), undefineds(tbls_size);
+		trues.resize(tbls_size);
+		falses.resize(tbls_size);
+		undefineds.resize(tbls_size);
 		// Loop back to the first repetition of the last front. It is clear
 		// that the set of intervening fronts are periodic
 		int_t cycle_start;
@@ -1185,46 +1230,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 			// Undefined facts are those which are neither true nor false
 			undefineds[n] = htrue % (trues[n] || falses[n]);
 		}
-		// Print out the true points separately
-		os << "true points:" << endl;
-		bool exists_trues = false;
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !tbls[n].hidden) {
-				decompress(trues[n], n, [&os, &exists_trues, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl;
-					exists_trues = true; });
-			}
-		}
-		if(!exists_trues) os << "(none)" << std::endl;
-
-		// Finally print out the undefined points separately
-		os << endl << "undefined points:" << endl;
-		bool exists_undefineds = false;
-		for(ntable n = 0; n < (ntable)tbls_size; n++) {
-			if(opts.show_hidden || !tbls[n].hidden) {
-				decompress(undefineds[n], n, [&os, &exists_undefineds, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl;
-					exists_undefineds = true; });
-			}
-		}
-		if(!exists_undefineds) os << "(none)" << std::endl;
 		return true;
-	} else if(opts.semantics == semantics::pfp) {
-		if(fronts.back() == fronts[fronts_size - 2]) {
-			// If FO(PFP) semantics are in effect and the last two fronts are
-			// equal then print them; this is the fixpoint.
-			level &l = fronts.back();
-			for(ntable n = 0; n < (ntable)tbls_size; n++) {
-				if (opts.show_hidden || !tbls[n].hidden)
-					decompress(l[n], n, [&os, this](const term& r) {
-						os << ir_handler->to_raw_term(r) << '.' << endl; });
-			}
-			return true;
-		} else {
-			// If FO(PFP) semantics are in effect and two equal fronts are
-			// separated by an unequal front; then the fixpoint is empty.
-			return true;
-		}
 	}
 }
 

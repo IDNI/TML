@@ -1,0 +1,96 @@
+max(10000).
+q_type(26 1).
+q_type(25 2).
+q_type(24 2).
+q_type(22 1).
+q_type(21 2).
+q_type(20 2).
+q_type(18 1).
+q_type(17 2).
+q_type(16 1).
+q_type(15 2).
+q_type(14 2).
+q_type(12 2).
+q_type(10 7).
+q_type(8 2).
+q_type(9 1).
+q_type(7 2).
+q_type(4 2).
+q_type(5 0).
+q_type(2 2).
+q_type(3 0).
+q_type(0 2).
+q_type(1 0).
+q_term_relation(25 reachable_from).
+q_term_relation(24 t).
+q_term_relation(21 reachable_from_2).
+q_term_relation(20 t).
+q_term_relation(17 t).
+q_term_relation(15 t).
+q_term_relation(14 t).
+q_term_relation(12 t).
+q_term_relation(8 t).
+q_term_relation(7 e).
+q_term_relation(4 e).
+q_term_relation(2 e).
+q_term_relation(0 e).
+q_fact_term(5 4).
+q_fact_term(3 2).
+q_fact_term(1 0).
+q_rule_head(26 25).
+q_rule_head(22 21).
+q_rule_head(18 17).
+q_rule_head(16 15).
+q_rule_head(9 8).
+q_rule_body(26 24).
+q_rule_body(22 20).
+q_rule_body(18 10).
+q_rule_body(16 10).
+q_rule_body(9 7).
+q_and_left(10 12).
+q_and_right(10 14).
+cdc_decode(reachable_from_2 4).
+cdc_decode(reachable_from_2 3).
+cdc_decode(reachable_from_2 2).
+cdc_decode(t 4 4).
+cdc_decode(t 4 3).
+cdc_decode(t 4 2).
+cdc_decode(reachable_from 2 4).
+cdc_decode(t 3 4).
+cdc_decode(t 2 4).
+cdc_decode(e 3 4).
+cdc_decode(reachable_from 2 3).
+cdc_decode(reachable_from 2 2).
+cdc_decode(t 3 3).
+cdc_decode(t 3 2).
+cdc_decode(t 2 3).
+cdc_decode(t 2 2).
+cdc_decode(e 2 3).
+cdc_decode(t 0 1).
+cdc_decode(e 0 1).
+q_term_params(25 13).
+q_term_params(24 13).
+q_term_params(20 13).
+q_term_params(17 8).
+q_term_params(21 2).
+q_term_params(15 16).
+q_term_params(14 17).
+q_term_params(4 29).
+q_term_params(2 23).
+q_term_params(12 11).
+q_term_params(8 11).
+q_term_params(7 11).
+q_term_params(0 11).
+q_term_param_types(25 11).
+q_term_param_types(24 11).
+q_term_param_types(20 11).
+q_term_param_types(17 12).
+q_term_param_types(21 2).
+q_term_param_types(15 12).
+q_term_param_types(14 12).
+q_term_param_types(12 12).
+q_term_param_types(8 12).
+q_term_param_types(7 12).
+q_term_param_types(4 6).
+q_term_param_types(2 6).
+q_term_param_types(0 6).

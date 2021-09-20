@@ -441,6 +441,8 @@ public:
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>&) const;
+	bool compute_fixpoint(level &trues, level &falses, level &undefineds);
+	bool is_infloop();
 	template <typename T>
 	bool out_fixpoint(std::basic_ostream<T>& os);
 	void out(const rt_printer&) const;
