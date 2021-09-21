@@ -39,7 +39,8 @@ extern bool onexit;
 class bdd_ref {
 	public:
 		int_t bdd_id, shift;
-		bdd_ref(int_t bdd_id = 0, int_t shift = 0) : bdd_id(bdd_id), shift(shift) {}
+		bdd_ref(int_t bdd_id = 0, int_t shift = 0) :
+			bdd_id(bdd_id), shift(std::abs(bdd_id) == 1 ? 0 : shift) {}
 		bool operator==(const bdd_ref &b) const {
 			return bdd_id == b.bdd_id && shift == b.shift; }
 		bool operator<(const bdd_ref &b) const {
@@ -56,7 +57,8 @@ class bdd_ref {
 		int_t sfgpt() const { return bdd_id; }
 		// Gives each distinct reference a distinct unsigned fingerprint
 		size_t ufgpt() const { return (std::abs(bdd_id) << 1) + (bdd_id < 0); }
-		bdd_ref shift_var(int delta) const { return bdd_ref(bdd_id, shift + delta); }
+		bdd_ref shift_var(int delta) const {
+			return bdd_ref(bdd_id, std::abs(bdd_id) == 1 ? 0 : (shift + delta)); }
 };
 
 template<> struct std::hash<bdd_ref> {
