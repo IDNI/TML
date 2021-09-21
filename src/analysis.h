@@ -204,6 +204,7 @@ class typechecker {
     TINFO_STATUS tstat;
     std::vector<TINFO_STATUS> verrs;
     bool tinfer (const raw_rule&);
+    bool tinfer( const raw_form_tree &);
     bool tcheck (const raw_rule&);
     bool tcheck(const raw_form_tree &prft);
     bool tcheck (const raw_term&);
