@@ -147,10 +147,10 @@ bool bdd::bdd_subsumes(bdd_ref x, bdd_ref y) {
 	if (x == F) return y == F;
 	if (y == T) return false;
 	if (y == F) return true;
-	const bdd_ref bxh = hi(x), bxl = lo(x), byl = lo(y), byh = hi(y);
-	if (x.shift < y.shift) return bdd_subsumes(bxh, y) && bdd_subsumes(bxl, y);
-	if (x.shift > y.shift) return bdd_subsumes(x, byh) && bdd_subsumes(x, byl);
-	return bdd_subsumes(bxh, byh) && bdd_subsumes(bxl, byl);
+	const bdd bx = get(x), by = get(y);
+	if (x.shift < y.shift) return bdd_subsumes(bx.h, y) && bdd_subsumes(bx.l, y);
+	if (x.shift > y.shift) return bdd_subsumes(x, by.h) && bdd_subsumes(x, by.l);
+	return bdd_subsumes(bx.h, by.h) && bdd_subsumes(bx.l, by.l);
 }
 
 bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
@@ -159,19 +159,19 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	if (x == T || x == y) return y;
 	if (y == T) return x;
 	if (x > y) swap(x, y);
-	const bdd_ref bxh = hi(x), bxl = lo(x), byl = lo(y), byh = hi(y);
+	const bdd bx = get(x), by = get(y);
 	ite_memo m = { x, y, F };
 	bool leaf = 
-		bxh == T || bxh == F || bxl == T || bxl == F ||
-		byh == T || byh == F || byl == T || byl == F;
+		bx.h == T || bx.h == F || bx.l == T || bx.l == F ||
+		by.h == T || by.h == F || by.l == T || by.l == F;
 #ifdef MEMO
 	if (!leaf && x.shift == y.shift)
 		if (auto it = C.find(m); it != C.end())
 			return it->second;
 #endif
-	if (x.shift < y.shift) return add(x.shift, bdd_and(bxh, y), bdd_and(bxl, y));
-	if (x.shift > y.shift) return add(y.shift, bdd_and(x, byh), bdd_and(x, byl));
-	bdd_ref r = add(x.shift, bdd_and(bxh, byh), bdd_and(bxl, byl));
+	if (x.shift < y.shift) return add(x.shift, bdd_and(bx.h, y), bdd_and(bx.l, y));
+	if (x.shift > y.shift) return add(y.shift, bdd_and(x, by.h), bdd_and(x, by.l));
+	bdd_ref r = add(x.shift, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	if (!leaf && C.size() < gclimit) C.emplace(m, r);
 #endif
@@ -196,25 +196,25 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref z) {
 	auto it = C.find({x, y, z});
 	if (it != C.end()) return it->second;
 	bdd_ref r;
-	const bdd_ref bxh = hi(x), bxl = lo(x), byl = lo(y), byh = hi(y), bzl = lo(z), bzh = hi(z);
+	const bdd bx = get(x), by = get(y), bz = get(z);
 	const int_t s = min(x.shift, min(y.shift, z.shift));
 	if (x.shift == y.shift && y.shift == z.shift)
-		r =	add(x.shift, bdd_ite(bxh, byh, bzh),
-				bdd_ite(bxl, byl, bzl));
+		r =	add(x.shift, bdd_ite(bx.h, by.h, bz.h),
+				bdd_ite(bx.l, by.l, bz.l));
 	else if (s == x.shift && s == y.shift)
-		r =	add(x.shift, bdd_ite(bxh, byh, z),
-				bdd_ite(bxl, byl, z));
+		r =	add(x.shift, bdd_ite(bx.h, by.h, z),
+				bdd_ite(bx.l, by.l, z));
 	else if (s == y.shift && s == z.shift)
-		r =	add(y.shift, bdd_ite(x, byh, bzh),
-				bdd_ite(x, byl, bzl));
+		r =	add(y.shift, bdd_ite(x, by.h, bz.h),
+				bdd_ite(x, by.l, bz.l));
 	else if (s == x.shift && s == z.shift)
-		r =	add(x.shift, bdd_ite(bxh, y, bzh),
-				bdd_ite(bxl, y, bzl));
+		r =	add(x.shift, bdd_ite(bx.h, y, bz.h),
+				bdd_ite(bx.l, y, bz.l));
 	else if (s == x.shift)
-		r =	add(x.shift, bdd_ite(bxh, y, z), bdd_ite(bxl, y, z));
+		r =	add(x.shift, bdd_ite(bx.h, y, z), bdd_ite(bx.l, y, z));
 	else if (s == y.shift)
-		r =	add(y.shift, bdd_ite(x, byh, z), bdd_ite(x, byl, z));
-	else	r =	add(z.shift, bdd_ite(x, y, bzh), bdd_ite(x, y, bzl));
+		r =	add(y.shift, bdd_ite(x, by.h, z), bdd_ite(x, by.l, z));
+	else	r =	add(z.shift, bdd_ite(x, y, bz.h), bdd_ite(x, y, bz.l));
 	if (C.size() > gclimit) return r;
 	return C.emplace(ite_memo{x, y, z}, r), r;
 }
@@ -353,23 +353,23 @@ bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 	array<bdd_ref, 2> m = {x, y};
 	auto it = memo.find(m);
 	if (it != memo.end()) return it->second;
-	const bdd_ref bxh = hi(x), bxl = lo(x), byl = lo(y), byh = hi(y);
+	const bdd bx = get(x), by = get(y);
 	int_t v;
 	bdd_ref rx, ry, r;
 	if (x.shift > last+1 && y.shift > last+1)
 		return memo.emplace(m, r = bdd_and(x, y)), r;
 	if (x.shift < y.shift)
 		v = x.shift,
-		rx = bdd_and_ex(bxh, y, ex, memo, m2, last),
-		ry = bdd_and_ex(bxl, y, ex, memo, m2, last);
+		rx = bdd_and_ex(bx.h, y, ex, memo, m2, last),
+		ry = bdd_and_ex(bx.l, y, ex, memo, m2, last);
 	else if (x.shift > y.shift)
 		v = y.shift,
-		rx = bdd_and_ex(x, byh, ex, memo, m2, last),
-		ry = bdd_and_ex(x, byl, ex, memo, m2, last);
+		rx = bdd_and_ex(x, by.h, ex, memo, m2, last),
+		ry = bdd_and_ex(x, by.l, ex, memo, m2, last);
 	else
 		v = x.shift,
-		rx = bdd_and_ex(bxh, byh, ex, memo, m2, last),
-		ry = bdd_and_ex(bxl, byl, ex, memo, m2, last);
+		rx = bdd_and_ex(bx.h, by.h, ex, memo, m2, last),
+		ry = bdd_and_ex(bx.l, by.l, ex, memo, m2, last);
 	DBG(assert((size_t)v - 1 < ex.size());)
 	r = ex[v - 1] ? bdd_or(rx, ry) : add(v, rx, ry);
 	return memo.emplace(m, r), r;
@@ -400,16 +400,16 @@ struct sbdd_and_ex_perm {
 		array<bdd_ref, 2> m = {x, y};
 		auto it = memo.find(m);
 		if (it != memo.end()) return it->second;
-		const bdd_ref bxh = bdd::hi(x), bxl = bdd::lo(x), byl = bdd::lo(y), byh = bdd::hi(y);
+		const bdd bx = bdd::get(x), by = bdd::get(y);
 		int_t v;
 		bdd_ref rx, ry, r;
 		if (x.shift > last+1 && y.shift > last+1)
 			return memo.emplace(m, r = bdd::bdd_and(x, y)), r;
 		if (x.shift < y.shift)
-			v = x.shift, rx = (*this)(bxh, y), ry = (*this)(bxl, y);
+			v = x.shift, rx = (*this)(bx.h, y), ry = (*this)(bx.l, y);
 		else if (x.shift > y.shift)
-			v = y.shift, rx = (*this)(x, byh), ry = (*this)(x, byl);
-		else v = x.shift, rx = (*this)(bxh,byh), ry = (*this)(bxl,byl);
+			v = y.shift, rx = (*this)(x, by.h), ry = (*this)(x, by.l);
+		else v = x.shift, rx = (*this)(bx.h,by.h), ry = (*this)(bx.l,by.l);
 		DBG(assert((size_t)v - 1 < ex.size());)
 		r = ex[v - 1] ? bdd::bdd_or(rx, ry) :
 			bdd::bdd_ite_var(p[v-1], rx, ry);
@@ -864,12 +864,12 @@ spbdd_handle bdd_or_many(bdd_handles v) {
 size_t bdd::satcount_perm(bdd_ref x, size_t leafvar) {
 	size_t r = 0;
 	if (leaf(x)) return trueleaf(x) ? 1 : 0;
-	const bdd_ref bxh = hi(x), bxl = lo(x);
-	int_t hivar = leaf(bxh) ? leafvar : bxh.shift;
-	int_t lovar = leaf(bxl) ? leafvar : bxl.shift;
-	r += satcount_perm(bxh, leafvar) *
+	const bdd bx = get(x);
+	int_t hivar = leaf(bx.h) ? leafvar : bx.h.shift;
+	int_t lovar = leaf(bx.l) ? leafvar : bx.l.shift;
+	r += satcount_perm(bx.h, leafvar) *
 		(1 << (hivar - x.shift - 1));
-	r += satcount_perm(bxl, leafvar) *
+	r += satcount_perm(bx.l, leafvar) *
 		(1 << (lovar - x.shift - 1));
 	return r;
 }
@@ -877,8 +877,9 @@ size_t bdd::satcount_perm(bdd_ref x, size_t leafvar) {
 static set<size_t> ourvars;
 size_t bdd::getvar(bdd_ref h, bdd_ref l, int_t v, bdd_ref x, size_t maxv) {
 	if (leaf(x)) return maxv;
-	maxv = leaf(h) ? maxv : max(maxv, getvar(hi(h), lo(h), h.shift, h, maxv));
-	maxv = leaf(l) ? maxv : max(maxv, getvar(hi(l), lo(l), l.shift, l, maxv));
+	const bdd bhi = get(h), blo = get(l);
+	maxv = leaf(h) ? maxv : max(maxv, getvar(bhi.h, bhi.l, h.shift, h, maxv));
+	maxv = leaf(l) ? maxv : max(maxv, getvar(blo.h, blo.l, l.shift, l, maxv));
 	maxv = max(maxv, size_t(v));
 	ourvars.insert(v);
 	return maxv;
@@ -888,8 +889,9 @@ size_t bdd::getvar(bdd_ref h, bdd_ref l, int_t v, bdd_ref x, size_t maxv) {
 // works better with rule(?x ?y ?out) :- headers
 // could be buggy (when bdd is minimized, vars removed, we're only guessing)
 size_t bdd::satcount_k(bdd_ref x, const bools& ex, const uints&) {
+	const bdd bx = get(x);
 	ourvars.clear();
-	size_t leafvar = getvar(hi(x), lo(x), x.shift, x, 0) + 1;
+	size_t leafvar = getvar(bx.h, bx.l, x.shift, x, 0) + 1;
 
 	// this's what's missing, if size is smaller means we don't have the 0-var,
 	// but this might be correct or not, we might be missing one in the middle?
@@ -915,12 +917,12 @@ size_t bdd::satcount_k(bdd_ref x, size_t leafvar,
 	if (leaf(x)) {
 		return trueleaf(x) ? 1 : 0;
 	}
-	const bdd_ref bhi = hi(x), blo = lo(x);
-	int_t hivar = leaf(bhi) ? leafvar : mapvars.at(bhi.shift); // nvars + 1 - x.shift
-	int_t lovar = leaf(blo) ? leafvar : mapvars.at(blo.shift);
-	r += satcount_k(bhi, leafvar, mapvars) *
+	const bdd bx = get(x);
+	int_t hivar = leaf(bx.h) ? leafvar : mapvars.at(bx.h.shift); // nvars + 1 - x.shift
+	int_t lovar = leaf(bx.l) ? leafvar : mapvars.at(bx.l.shift);
+	r += satcount_k(bx.h, leafvar, mapvars) *
 		(1 << (hivar - mapvars.at(x.shift) - 1));
-	r += satcount_k(blo, leafvar, mapvars) *
+	r += satcount_k(bx.l, leafvar, mapvars) *
 		(1 << (lovar - mapvars.at(x.shift) - 1));
 	return r;
 }
@@ -940,14 +942,14 @@ size_t bdd::satcount(spbdd_handle x, const bools& inv) {
 
 void satcount_iter::sat(bdd_ref x) {
 	if (x == F) return;
-	const bdd_ref bxh = bdd::hi(x), bxl = bdd::lo(x);
+	const bdd bx = bdd::get(x);
 	if (!bdd::leaf(x) && v < bdd::var(x)) {
 		DBG(assert(bdd::var(x) <= nvars);)
 			p[++v - 2] = true, sat(x), p[v - 2] = false, sat(x), --v;
 	}
 	else if (v != nvars + 1)
-		p[++v - 2] = true, sat(bxh),
-		p[v - 2] = false, sat(bxl), --v;
+		p[++v - 2] = true, sat(bx.h),
+		p[v - 2] = false, sat(bx.l), --v;
 	else { 
 		//f(p, x); 
 		DBG(assert(x.abs() == T););
@@ -983,13 +985,13 @@ vbools allsat(cr_spbdd_handle x, uint_t nvars) {
 
 void allsat_cb::sat(bdd_ref x) {
 	if (x == F) return;
-	const bdd_ref bxh = bdd::hi(x), bxl = bdd::lo(x);
+	const bdd bx = bdd::get(x);
 	if (!bdd::leaf(x) && v < bdd::var(x)) {
 		DBG(assert(bdd::var(x) <= nvars);)
 		p[++v-2] = true, sat(x), p[v-2] = false, sat(x), --v;
 	} else if (v != nvars + 1)
-		p[++v-2] = true, sat(bxh),
-		p[v-2] = false, sat(bxl), --v;
+		p[++v-2] = true, sat(bx.h),
+		p[v-2] = false, sat(bx.l), --v;
 	else f(p, x);
 }
 

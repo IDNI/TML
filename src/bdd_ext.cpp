@@ -86,7 +86,8 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quan
 		if (quants[idx] == quant_t::UN) return F;
 		return x;
 	}
-	bdd_ref h,l, ch = bdd::hi(x), cl = bdd::lo(x);
+	bdd c = bdd::get(x);
+	bdd_ref h,l;
 	if (x.shift > (int_t) quants.size() * (int_t) bits) return x;
 	if (x.shift > bit+1) {//TODO review for UNIQUE
 		if (quants[idx] == quant_t::UN) return F;
@@ -95,24 +96,24 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quan
 
 	switch (quants[idx]) {
 		case quant_t::FA: {
-			if (cl == F || ch == F) return F;
-			h = bdd_quantify(ch, bit+1, quants, bits, n_args);
+			if (c.l == F || c.h == F) return F;
+			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			if (h == F) return F;
-			l =	bdd_quantify(cl, bit+1, quants, bits, n_args);
+			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F) return F;
 			return x;
 		}
 		case quant_t::EX: {
-			h = bdd_quantify(ch, bit+1, quants, bits, n_args);
-			l =	bdd_quantify(cl, bit+1, quants, bits, n_args);
+			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
+			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F && h == F) return F;
 			if (l == F || h == F) return add(x.shift, h, l);
 			return x;
 		}
 		case quant_t::UN: {
-			if (cl != F && ch != F) return F;
-			h = bdd_quantify(ch, bit+1, quants, bits, n_args);
-			l =	bdd_quantify(cl, bit+1, quants, bits, n_args);
+			if (c.l != F && c.h != F) return F;
+			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
+			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if ((l == F && h == F) || (l == T && h == T)) return F;
 			return x;
 		}
@@ -123,62 +124,63 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quan
 
 void bdd::bdd_sz_abs(bdd_ref x, set<int_t>& s) {
 	if (!s.emplace(x.abs().bdd_id).second) return;
-	bdd_sz_abs(bdd::hi(x), s), bdd_sz_abs(bdd::lo(x), s);
+	bdd b = get(x);
+	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }
 
 bdd_ref bdd::bitwise_and(bdd_ref a_in, bdd_ref b_in) {
-	bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in), bh = bdd::hi(b_in), bl = bdd::lo(b_in);
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
 	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
-		ah = a_in, al = a_in;
+		a.h = a_in, a.l = a_in;
 	  	pos = b_in.shift+1;
 	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
-		bh = b_in, bl = b_in;
+		b.h = b_in, b.l = b_in;
 		pos = a_in.shift + 2;
 	} else if (a_in.shift != 0) pos = a_in.shift+2;
 	else pos = b_in.shift + 1;
-	bdd_ref c = add(pos, bitwise_and(ah, bh), bdd_or(bdd_or(bitwise_and(ah,  bl),
-						bitwise_and(al, bh)), bitwise_and(al,  bl))
+	bdd_ref c = add(pos, bitwise_and(a.h, b.h), bdd_or(bdd_or(bitwise_and(a.h,  b.l),
+						bitwise_and(a.l, b.h)), bitwise_and(a.l,  b.l))
 					);
 	return c;
 }
 
 bdd_ref bdd::bitwise_or(bdd_ref a_in, bdd_ref b_in) {
-	bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in), bh = bdd::hi(b_in), bl = bdd::lo(b_in);
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
 	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
-		ah = a_in, al = a_in;
+		a.h = a_in, a.l = a_in;
 		pos = b_in.shift+1;
 	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
-		bh = b_in, bl = b_in;
+		b.h = b_in, b.l = b_in;
 		pos = a_in.shift + 2;
 	} else if (a_in.shift != 0) pos = a_in.shift+2;
 	else pos = b_in.shift + 1;
-	bdd_ref c = add(pos, bdd_or( bdd_or(bitwise_or(ah, bl), bitwise_or(al, bh)),
-						bitwise_or(ah, bh)), bitwise_or(al, bl)
+	bdd_ref c = add(pos, bdd_or( bdd_or(bitwise_or(a.h, b.l), bitwise_or(a.l, b.h)),
+						bitwise_or(a.h, b.h)), bitwise_or(a.l, b.l)
 					);
 	return c;
 }
 
 bdd_ref bdd::bitwise_xor(bdd_ref a_in, bdd_ref b_in) {
-	bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in), bh = bdd::hi(b_in), bl = bdd::lo(b_in);
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
 	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
-		ah = a_in, al = a_in;
+		a.h = a_in, a.l = a_in;
 		pos = b_in.shift + 1;
 	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
-		bh = b_in, bl = b_in;
+		b.h = b_in, b.l = b_in;
 		pos = a_in.shift + 2;
 	} else if (a_in.shift != 0) pos = a_in.shift + 2;
 	else pos = b_in.shift + 1;
-	bdd_ref c = add(pos, bdd_or(bitwise_xor(ah, bl), bitwise_xor(al, bh)),
-				  	bdd_or(bitwise_xor(ah, bh), bitwise_xor(al, bl))
+	bdd_ref c = add(pos, bdd_or(bitwise_xor(a.h, b.l), bitwise_xor(a.l, b.h)),
+				  	bdd_or(bitwise_xor(a.h, b.h), bitwise_xor(a.l, b.l))
 					);
 	return c;
 }
@@ -189,7 +191,8 @@ bdd_ref bdd::bitwise_not(bdd_ref a_in) {
 }
 
 bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
-	bdd_ref c = 0, ah = bdd::hi(a_in), al = bdd::lo(a_in), bh = bdd::hi(b_in), bl = bdd::lo(b_in);
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
+	bdd_ref c = 0;
 	if (a_in == T && b_in == T)
 		c = T;
 	else if (a_in == F || b_in == F)
@@ -197,10 +200,10 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 	else {
 		int_t pos = 0;
 		if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
-			ah = a_in, al = a_in;
+			a.h = a_in, a.l = a_in;
 		  	pos = b_in.shift + 1;
 		} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
-			bh = b_in, bl = b_in;
+			b.h = b_in, b.l = b_in;
 			pos = a_in.shift + 2;
 		} else if (a_in.shift != 0)
 			pos = a_in.shift + 2;
@@ -209,12 +212,12 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 
 		if (carry == false)
 			c = add(pos,
-					bdd_or(adder(ah, bl, false, bit+1), adder(al, bh, false, bit+1)),
-					bdd_or(adder(ah, bh, true,  bit+1), adder(al, bl, false, bit+1)));
+					bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
+					bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
 		else
 			c = add(pos,
-					bdd_or(adder(ah, bh, true, bit+1), adder(al, bl, false, bit+1)),
-					bdd_or(adder(ah, bl, true, bit+1), adder(al, bh, true,  bit+1)));
+					bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
+					bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
 	}
 	return c;
 }
@@ -691,18 +694,18 @@ bdd_ref bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t
 
 void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor, size_t n_args,
 		size_t &count) {
-	bdd_ref ah = bdd::hi(a), al = bdd::lo(a);
-	if (ah == F && al == F) return;
-	if (ah == T && al == T) {
+	bdd ab = bdd::get(a);
+	if (ab.h == F && ab.l == F) return;
+	if (ab.h == T && ab.l == T) {
 		count = count + factor * pow(2, bits-bit); return;
 	}
-	if (ah != F) {
-		size_t delta = ah != T ? (ah.shift - a.shift)/n_args : 1;
-		satcount_arith(ah, bit+delta, bits, factor * delta, n_args,count);
+	if (ab.h != F) {
+		size_t delta = ab.h != T ? (ab.h.shift - a.shift)/n_args : 1;
+		satcount_arith(ab.h, bit+delta, bits, factor * delta, n_args,count);
 	}
-	if (al != F) {
-		size_t delta = al != T ? (al.shift - a.shift)/n_args : 1;
-		satcount_arith(al, bit+delta, bits, factor * delta,  n_args,count);
+	if (ab.l != F) {
+		size_t delta = ab.l != T ? (ab.l.shift - a.shift)/n_args : 1;
+		satcount_arith(ab.l, bit+delta, bits, factor * delta,  n_args,count);
 	}
 	return;
 }
@@ -965,10 +968,9 @@ bdd_ref bdd::shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args) {
 bdd_ref bdd::copy(bdd_ref a_in) {
 	 if (a_in == T) return T;
 	 else if (a_in == F) return F;
-	 bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in);
+	 bdd a = get(a_in);
 	 int_t pos = a_in.shift + 1;
- 	 bdd_ref c = add(pos, copy(ah) , copy(al));
- 	 return c;
+ 	 return add(pos, copy(a.h) , copy(a.l));
 }
 
 bdd_ref bdd::copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits,
@@ -1049,10 +1051,10 @@ bdd_ref bdd::zero(size_t arg, size_t bits, size_t n_args) {
 }
 
 bool bdd::is_zero(bdd_ref a_in, size_t bits) {
-	bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in);
+	bdd a = bdd::get(a_in);
 	for (size_t i = 0; i < bits; i++) {
-		if (ah != F) return false;
-		a_in = al;
+		if (a.h != F) return false;
+		a_in = a.l;
 	}
 	return true;
 }
@@ -1065,22 +1067,22 @@ void bdd::mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size
 		return ;
 	}
 	int_t pos = n_args * depth + 1;
-	bdd_ref ah = bdd::hi(a_in), al = bdd::lo(a_in);
-	if (a_in.shift > pos) {ah = a_in, al = a_in;}
-	if (al != F) {
+	bdd a = get(a_in);
+	if (a_in.shift > pos) {a.h = a_in, a.l = a_in;}
+	if (a.l != F) {
 		if (depth == 0)
 			accs[depth] = zero(3, bits, n_args);
 		else
 			accs[depth] = accs[depth-1];
-		mult_dfs(al, b_in, accs, depth+1, bits, n_args, c);
+		mult_dfs(a.l, b_in, accs, depth+1, bits, n_args, c);
 	}
 
-	if (ah != F) {
+	if (a.h != F) {
 		//XXX improve to avoid call to is_zero once it has been false
 		if (depth == 0)
 			accs[depth] = copy_arg2arg(b_in, 1,2,bits, n_args);
 		else
 			accs[depth] = adder_accs(b_in, accs[depth-1], depth, bits, n_args);
-		mult_dfs(ah, b_in, accs, depth+1, bits, n_args, c);
+		mult_dfs(a.h, b_in, accs, depth+1, bits, n_args, c);
 	}
 }

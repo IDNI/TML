@@ -261,6 +261,17 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
+	
+	inline static bdd get(const bdd_ref &x) {
+		const bdd &cbdd = V[x.abs().sfgpt()];
+		bdd_ref lo_child, hi_child;
+		if(x.inv_inp) { lo_child = cbdd.h; hi_child = cbdd.l; }
+		else { lo_child = cbdd.l; hi_child = cbdd.h; }
+		lo_child = lo_child.shift_var(x.shift);
+		hi_child = hi_child.shift_var(x.shift);
+		if(x.sgn() < 0) { lo_child = -lo_child; hi_child = -hi_child; }
+		return bdd(hi_child, lo_child);
+	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex);
