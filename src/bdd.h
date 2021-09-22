@@ -40,20 +40,24 @@ class bdd_ref {
 	public:
 		// Terminal node invariant: abs(bdd_id) <= 1 --> shift = 0
 		int_t bdd_id, shift;
+		bool inv_inp;
 		// Ensure that terminal node invariant is preserved
-		bdd_ref(int_t bdd_id = 0, int_t shift = 0) :
-			bdd_id(bdd_id), shift(std::abs(bdd_id) == 1 ? 0 : shift) {}
+		bdd_ref(int_t bdd_id = 0, int_t shift = 0, bool inv_inp = false) :
+			bdd_id(bdd_id), shift(std::abs(bdd_id) == 1 ? 0 : shift),
+			inv_inp(std::abs(bdd_id) == 1 ? 0 : inv_inp) {}
 		bool operator==(const bdd_ref &b) const {
-			return bdd_id == b.bdd_id && shift == b.shift; }
+			return bdd_id == b.bdd_id && shift == b.shift && inv_inp == b.inv_inp; }
 		bool operator<(const bdd_ref &b) const {
-			return bdd_id < b.bdd_id || (bdd_id == b.bdd_id && shift < b.shift); }
+			return bdd_id < b.bdd_id || (bdd_id == b.bdd_id && shift < b.shift) ||
+				(bdd_id == b.bdd_id && shift == b.shift && inv_inp < b.inv_inp); }
 		bool operator>(const bdd_ref &b) const {
-			return bdd_id > b.bdd_id || (bdd_id == b.bdd_id && shift > b.shift); }
+			return bdd_id > b.bdd_id || (bdd_id == b.bdd_id && shift > b.shift) ||
+				(bdd_id == b.bdd_id && shift == b.shift && inv_inp > b.inv_inp); }
 		bool operator!=(const bdd_ref &b) const {
-			return bdd_id != b.bdd_id || shift != b.shift; }
-		bdd_ref operator-() const { return bdd_ref(-bdd_id, shift); }
+			return bdd_id != b.bdd_id || shift != b.shift || inv_inp != b.inv_inp; }
+		bdd_ref operator-() const { return bdd_ref(-bdd_id, shift, inv_inp); }
 		int_t sgn() const { return (bdd_id > 0) - (bdd_id < 0); }
-		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id), shift); }
+		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id), shift, inv_inp); }
 		// Gives each distinct reference a distinct fingerprint such that a
 		// reference for a negated BDDs has the opposite sign.
 		int_t sfgpt() const { return bdd_id; }
@@ -61,7 +65,7 @@ class bdd_ref {
 		size_t ufgpt() const { return (std::abs(bdd_id) << 1) + (bdd_id < 0); }
 		// Ensure that terminal node invariant is preserved
 		bdd_ref shift_var(int delta) const {
-			return bdd_ref(bdd_id, std::abs(bdd_id) == 1 ? 0 : (shift + delta)); }
+			return bdd_ref(bdd_id, std::abs(bdd_id) == 1 ? 0 : (shift + delta), inv_inp); }
 };
 
 template<> struct std::hash<bdd_ref> {
@@ -359,13 +363,15 @@ public:
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static bdd_ref hi(bdd_ref x) {
 		bdd &cbdd = V[x.abs().sfgpt()];
-		bdd_ref nbdd = cbdd.h.shift_var(x.shift);
+		const bdd_ref &child = x.inv_inp ? cbdd.l : cbdd.h;
+		bdd_ref nbdd = child.shift_var(x.shift);
 		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 
 	inline static bdd_ref lo(bdd_ref x) {
 		bdd &cbdd = V[x.abs().sfgpt()];
-		bdd_ref nbdd = cbdd.l.shift_var(x.shift);
+		const bdd_ref &child = x.inv_inp ? cbdd.h : cbdd.l;
+		bdd_ref nbdd = child.shift_var(x.shift);
 		return x.sgn() > 0 ? nbdd : -nbdd;
 	}
 

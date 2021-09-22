@@ -117,6 +117,8 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	if (h == l) return h;
 	h = h.shift_var(-v);
 	l = l.shift_var(-v);
+	const bool inv_inp = h < l;
+	if (inv_inp) swap(h, l);
 	unordered_map<bdd_key, int_t>::const_iterator it;
 	bdd_key k;
 	auto &m = Ma;
@@ -127,13 +129,13 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 		return	bdd_ref((it = m.find(k)) != m.end() ? -it->second :
 			(V.emplace_back(h, l),
 			m.emplace(move(k), V.size()-1),
-			-V.size()+1), v);
+			-V.size()+1), v, inv_inp);
 	}
 	k = bdd_key(hash_pair(h.sfgpt(), l.sfgpt()), h, l);
 	return	bdd_ref((it = m.find(k)) != m.end() ? it->second :
 		(V.emplace_back(h, l),
 		m.emplace(move(k), V.size()-1),
-		V.size()-1), v);
+		V.size()-1), v, inv_inp);
 }
 
 bdd_ref bdd::from_bit(uint_t b, bool v) {
