@@ -1,0 +1,40 @@
+# Testing mixed variables and symbols
+
+max(10000).
+
+@domain dom 5 3.
+
+@quote q dom `
+  e(0 1), e(2 3), e(3 4).
+  t(?x ?y) :- e(?x ?y).
+  t(?x ?y), t(?y ?x) :- t(?x ?z), t(?z ?y).
+  reachable_from_2(?x) :- t(2 ?x).
+  reachable_from(2 ?x) :- t(2 ?x).`.
+
+@eval r dom q 50.
+
+@codec cdc dom r 2.
+
+!cdc_decode(reachable_from_2 4).
+
+# Expected output includes following internal facts
+
+# cdc_decode(reachable_from_2 4).
+# cdc_decode(reachable_from_2 3).
+# cdc_decode(reachable_from_2 2).
+# cdc_decode(t 4 4).
+# cdc_decode(t 4 3).
+# cdc_decode(t 4 2).
+# cdc_decode(reachable_from 2 4).
+# cdc_decode(t 3 4).
+# cdc_decode(t 2 4).
+# cdc_decode(e 3 4).
+# cdc_decode(reachable_from 2 3).
+# cdc_decode(reachable_from 2 2).
+# cdc_decode(t 3 3).
+# cdc_decode(t 3 2).
+# cdc_decode(t 2 3).
+# cdc_decode(t 2 2).
+# cdc_decode(e 2 3).
+# cdc_decode(t 0 1).
+# cdc_decode(e 0 1).

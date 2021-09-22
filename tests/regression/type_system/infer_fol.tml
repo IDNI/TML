@@ -1,0 +1,8 @@
+predtype n(int:3 ?x).
+n(0). n(1). n(2).
+
+#predtype rel(int:3 ?x , int:3 ?z, int:3 ?y).
+rel(?a ?b ?c) :- {
+    n(?a) && n(?b) && n(?c) &&
+    { ?a != ?b } && { ?b != ?c } && { ?a != ?c }
+}.

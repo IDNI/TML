@@ -38,7 +38,7 @@ bool bit_univ::btransform( const raw_form_tree& rfin, raw_form_tree &rfout, cons
 	
 	bool ret= true;
 	if(rfin.type == elem::NONE)
-	 	(*rfout.rt).clear(), btransform(*rfin.rt, *rfout.rt, rrin, rrout );
+	 	(*rfout.rt).clear(), ret &= btransform(*rfin.rt, *rfout.rt, rrin, rrout );
 	if(rfin.l != nullptr) ret &= btransform(*rfin.l, *rfout.l, rrin, rrout );
 	if(rfin.r != nullptr) ret &= btransform(*rfin.r, *rfout.r, rrin, rrout );
 	return ret;
@@ -48,13 +48,12 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	bool ret = true;
 	for( const raw_term &rt : rrin.h )
 		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back(), rrin, rrout);		
-	if( rrin.is_form())	
+	if( rrin.is_form())	{
 		//*rrout.prft = *rrin.prft,
-		rrout.set_prft(*rrin.prft),
-		(*rrout.prft).printTree(),
-		ret = btransform( *rrin.prft, *rrout.prft, rrin, rrout  ),
-		(*rrout.prft).printTree();
-	else {
+		rrout.set_prft(*rrin.prft);
+		ret = btransform( *rrin.prft, *rrout.prft, rrin, rrout  );
+		DBG((*rrout.prft).printTree();)
+	} else {
 		for( const auto &vrt : rrin.b) {
 			rrout.b.emplace_back();
 			for( const raw_term &rt : vrt)
@@ -651,6 +650,25 @@ bool environment::build_from( const raw_prog &rp  ) {
 	return this->build_from(rp.vts);
 }
 
+bool typechecker::tinfer( const raw_form_tree &rft){
+	
+	bool ret = true;
+	if( rft.type == elem::NONE ) {
+		string_t str = lexeme2str(rft.rt->e[0].e);
+		if(!env.build_from(*rft.rt, infer) ){
+			std::stringstream ss;
+			ss<<"Could not infer types from predicate "<<*rft.rt,
+			type_error(ss.str().c_str(), rft.rt->e[0].e );
+			ss.str("");
+			ss.clear();
+			ret = false;
+		}
+	}	
+	if(rft.l != nullptr ) ret &= tcheck(*rft.l);
+	if(rft.r != nullptr ) ret &= tcheck(*rft.r);
+
+	return ret;
+}
 // try to infer from given terms of rules using context
 // returns true if the new signature found
 bool typechecker::tinfer( const raw_rule& rr){
@@ -668,18 +686,20 @@ bool typechecker::tinfer( const raw_rule& rr){
 		}
 		else ret = true;
 	}
-	for (auto &it : rr.b)
-		for (const raw_term &bt : it) {
-			string_t str = lexeme2str(bt.e[0].e);
-			if(!env.build_from(bt, infer) ){
-				ss<<"Could not infer types from predicate "<<bt,
-				type_error(ss.str().c_str(), bt.e[0].e );
-				ss.str("");
-				ss.clear();
+	if( rr.is_form()) ret = tinfer(*rr.prft);
+	else {
+		for (auto &it : rr.b)
+			for (const raw_term &bt : it) {
+				string_t str = lexeme2str(bt.e[0].e);
+				if(!env.build_from(bt, infer) ){
+					ss<<"Could not infer types from predicate "<<bt,
+					type_error(ss.str().c_str(), bt.e[0].e );
+					ss.str("");
+					ss.clear();
+				}
+				else ret = true;
 			}
-			else ret = true;
-		}
-
+	}
 	if(ret && ( old != env.get_context()))
 		return *(rr.get_context().get()) = env.get_context(), true;
 	else return false;
@@ -874,13 +894,15 @@ bool typechecker::tcheck( const raw_term &rt){
 
 bool typechecker::tcheck(const raw_form_tree &rft){
 
-	if( rft.type == elem::NONE && !tcheck(*rft.rt )) 
+	bool ret = true;
+	if( rft.type == elem::NONE && !(ret = tcheck(*rft.rt ))) 
 		this->verrs.push_back(tstat);
 
-	if(rft.l != nullptr ) tcheck(*rft.l);
-	if(rft.r != nullptr ) tcheck(*rft.r);
+	if(rft.l != nullptr ) ret &= tcheck(*rft.l);
+	if(rft.r != nullptr ) ret &= tcheck(*rft.r);
 
-	return false;
+	return ret;
+
 }
 bool typechecker::tcheck( const raw_rule &rr){
 	std::stringstream ss;
