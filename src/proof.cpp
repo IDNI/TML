@@ -226,9 +226,18 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	proof p(levels.size());
 	set<term> s;
 	// Record the facts covered by each goal
-	for (const term& t : goals)
-		decompress(tbls[t.tab].t && from_fact(t), t.tab,
-			[&s](const term& t) { s.insert(t); }, t.size());
+	for (term t : goals) {
+		if(t.neg) {
+			t.neg = false;
+			// Collect all relation facts not matched by goal
+			decompress(htrue % (from_fact(t) && tbls[t.tab].t), t.tab,
+				[&](term t) { t.neg = true; if(is_term_valid(t)) s.insert(t); }, t.size());
+		} else {
+			// Collect all relation facts matched by goal
+			decompress(tbls[t.tab].t && from_fact(t), t.tab,
+				[&s](const term& t) { s.insert(t); }, t.size());
+		}
+	}
 	// Explicitly add rules to carry facts between steps so that the proof tree
 	// will capture proofs by carry. Record where the implicit rules start to
 	// enable their removal.
