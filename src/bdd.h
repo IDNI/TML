@@ -38,39 +38,48 @@ extern bool onexit;
 
 class bdd_ref {
 	public:
-		// Terminal node invariant: abs(bdd_id) <= 1 --> shift = 0
-		int_t bdd_id, shift;
-		bool inv_inp;
+		// Terminal node invariant: bdd_id <= 1 --> shift = 0
+		// Constraints: all attributes must fit into uint_t, all attributes must
+		// have the same type to avoid padding, non-flag bits must be on byte
+		// boundaries to avoid shifts.
+		uint_t bdd_id:31, inv_inp:1, shift:31, inv_out:1;
 		// Ensure that terminal node invariant is preserved
-		bdd_ref(int_t bdd_id = 0, int_t shift = 0, bool inv_inp = false) :
-			bdd_id(bdd_id), shift(std::abs(bdd_id) == 1 ? 0 : shift),
-			inv_inp(std::abs(bdd_id) == 1 ? 0 : inv_inp) {}
+		bdd_ref(uint_t bdd_id = 0, uint_t shift = 0, bool inv_inp = false,
+			bool inv_out = false) : bdd_id(bdd_id), inv_inp(bdd_id <= 1 ? 0 : inv_inp),
+			shift(bdd_id <= 1 ? 0 : shift), inv_out(bdd_id ? inv_out : false) {}
 		bool operator==(const bdd_ref &b) const {
-			return bdd_id == b.bdd_id && shift == b.shift && inv_inp == b.inv_inp; }
+			return bdd_id == b.bdd_id && shift == b.shift && inv_inp == b.inv_inp &&
+				inv_out == b.inv_out; }
 		bool operator<(const bdd_ref &b) const {
-			return bdd_id < b.bdd_id || (bdd_id == b.bdd_id && shift < b.shift) ||
-				(bdd_id == b.bdd_id && shift == b.shift && inv_inp < b.inv_inp); }
+			const int64_t sid1 =
+				int64_t(inv_inp) | (int64_t(shift) << 1) | (int64_t(bdd_id) << 32);
+			const int64_t sid2 =
+				int64_t(b.inv_inp) | (int64_t(b.shift) << 1) | (int64_t(b.bdd_id) << 32);
+			return (inv_out ? -sid1 : sid1) < (b.inv_out ? -sid2 : sid2); }
 		bool operator>(const bdd_ref &b) const {
-			return bdd_id > b.bdd_id || (bdd_id == b.bdd_id && shift > b.shift) ||
-				(bdd_id == b.bdd_id && shift == b.shift && inv_inp > b.inv_inp); }
+			const int64_t sid1 =
+				int64_t(inv_inp) | (int64_t(shift) << 1) | (int64_t(bdd_id) << 32);
+			const int64_t sid2 =
+				int64_t(b.inv_inp) | (int64_t(b.shift) << 1) | (int64_t(b.bdd_id) << 32);
+			return (inv_out ? -sid1 : sid1) > (b.inv_out ? -sid2 : sid2); }
 		bool operator!=(const bdd_ref &b) const {
-			return bdd_id != b.bdd_id || shift != b.shift || inv_inp != b.inv_inp; }
-		bdd_ref operator-() const { return bdd_ref(-bdd_id, shift, inv_inp); }
-		int_t sgn() const { return (bdd_id > 0) - (bdd_id < 0); }
-		bdd_ref abs() const { return bdd_ref(std::abs(bdd_id), shift, inv_inp); }
-		// Gives each distinct reference a distinct fingerprint such that a
-		// reference for a negated BDDs has the opposite sign.
-		int_t sfgpt() const { return bdd_id; }
+			return bdd_id != b.bdd_id || shift != b.shift || inv_inp != b.inv_inp ||
+				inv_out != b.inv_out; }
+		bdd_ref operator-() const {
+				return bdd_ref(bdd_id, shift, inv_inp, bdd_id ? !inv_out : false); }
+		bdd_ref abs() const { return bdd_ref(bdd_id, shift, inv_inp, false); }
 		// Gives each distinct reference a distinct unsigned fingerprint
-		size_t ufgpt() const { return (std::abs(bdd_id) << 1) + (bdd_id < 0); }
+		uint64_t fgpt() const {
+			return uint64_t(bdd_id) | (uint64_t(inv_inp) << 31) |
+				(uint64_t(shift) << 32) | (uint64_t(inv_out) << 63); }
 		// Ensure that terminal node invariant is preserved
 		bdd_ref shift_var(int delta) const {
-			return bdd_ref(bdd_id, std::abs(bdd_id) == 1 ? 0 : (shift + delta), inv_inp); }
+			return bdd_ref(bdd_id, bdd_id <= 1 ? 0 : (shift + delta), inv_inp, inv_out); }
 };
 
 template<> struct std::hash<bdd_ref> {
 	std::size_t operator()(const bdd_ref &br) const {
-		return br.ufgpt();
+		return std::hash<uint64_t>()(br.fgpt());
 	}
 };
 
@@ -91,8 +100,8 @@ struct ite_memo {
 	bdd_ref x, y, z;
 	size_t hash;
 	ite_memo(bdd_ref x, bdd_ref y, bdd_ref z) :
-		x(x), y(y), z(z), hash(hash_tri(x.sfgpt(), y.sfgpt(), z.sfgpt())) {}
-	void rehash() { hash = hash_tri(x.sfgpt(), y.sfgpt(), z.sfgpt()); }
+		x(x), y(y), z(z), hash(hash_tri(x.fgpt(), y.fgpt(), z.fgpt())) {}
+	void rehash() { hash = hash_tri(x.fgpt(), y.fgpt(), z.fgpt()); }
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
 
@@ -114,7 +123,7 @@ template<> struct std::hash<std::array<bdd_ref, 2>>{
 	size_t operator()(const std::array<bdd_ref, 2>&) const;
 };
 
-const bdd_ref T(1), F(-1);
+const bdd_ref T(1, 0, false, false), F(1, 0, false, true);
 
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
@@ -263,13 +272,13 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	
 	inline static bdd get(const bdd_ref &x) {
-		const bdd &cbdd = V[x.abs().sfgpt()];
+		const bdd &cbdd = V[x.bdd_id];
 		bdd_ref lo_child, hi_child;
 		if(x.inv_inp) { lo_child = cbdd.h; hi_child = cbdd.l; }
 		else { lo_child = cbdd.l; hi_child = cbdd.h; }
 		lo_child = lo_child.shift_var(x.shift);
 		hi_child = hi_child.shift_var(x.shift);
-		if(x.sgn() < 0) { lo_child = -lo_child; hi_child = -hi_child; }
+		if(x < 0) { lo_child = -lo_child; hi_child = -hi_child; }
 		return bdd(hi_child, lo_child);
 	}
 
@@ -310,7 +319,7 @@ class bdd {
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(bdd_ref t) { return t.abs() == T; }
-	inline static bool trueleaf(bdd_ref t) { return t.sfgpt() > 0; }
+	inline static bool trueleaf(bdd_ref t) { return t > 0; }
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
 	bdd_ref h, l;
@@ -373,20 +382,20 @@ public:
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 	inline static bdd_ref hi(bdd_ref x) {
-		bdd &cbdd = V[x.abs().sfgpt()];
+		bdd &cbdd = V[x.bdd_id];
 		const bdd_ref &child = x.inv_inp ? cbdd.l : cbdd.h;
 		bdd_ref nbdd = child.shift_var(x.shift);
-		return x.sgn() > 0 ? nbdd : -nbdd;
+		return x > 0 ? nbdd : -nbdd;
 	}
 
 	inline static bdd_ref lo(bdd_ref x) {
-		bdd &cbdd = V[x.abs().sfgpt()];
+		bdd &cbdd = V[x.bdd_id];
 		const bdd_ref &child = x.inv_inp ? cbdd.h : cbdd.l;
 		bdd_ref nbdd = child.shift_var(x.shift);
-		return x.sgn() > 0 ? nbdd : -nbdd;
+		return x > 0 ? nbdd : -nbdd;
 	}
 
-	inline static uint_t var(bdd_ref x) { return abs(x.shift); }
+	inline static uint_t var(bdd_ref x) { return x.shift; }
 
 	static size_t satcount_perm(bdd_ref x, size_t leafvar);
 
@@ -410,7 +419,7 @@ public:
 	~bdd_handle() {
 		if (onexit) return;
 		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
-		if (b.abs().sfgpt() > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
+		if (b.bdd_id > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
 	}
 };
 

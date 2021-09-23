@@ -123,7 +123,7 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quan
 }
 
 void bdd::bdd_sz_abs(bdd_ref x, set<int_t>& s) {
-	if (!s.emplace(x.abs().bdd_id).second) return;
+	if (!s.emplace((uint_t) x.bdd_id).second) return;
 	bdd b = get(x);
 	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }

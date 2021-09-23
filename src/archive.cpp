@@ -890,7 +890,7 @@ archive& archive::operator<<(const bdd_ref& t) {
 }
 
 archive& archive::operator>>(bdd_ref& t) {
-	return *this >> t.bdd_id;
+	//return *this >> t.bdd_id;
 }
 
 size_t archive::size(const bdd_ref& t) {
