@@ -36,13 +36,14 @@ inline size_t fpairing(size_t x, size_t y) {
 
 extern bool onexit;
 
+/* Represents an attributed edge representing input/output inversion and
+ * variable shifting. */
+
 class bdd_ref {
 	public:
-		// Terminal node invariant: bdd_id <= 1 --> shift = 0
-		// Constraints: all attributes must fit into uint_t, all attributes must
-		// have the same type to avoid padding, non-flag bits must be on byte
-		// boundaries to avoid shifts.
-		uint_t bdd_id:31, inv_inp:1, shift:31, inv_out:1;
+		// Terminal node invariants: bdd_id <= 1 --> shift = 0 and
+		// bdd_id <= 1 --> inv_inp = 0 and bdd_id = 0 --> inv_out = 0
+		uint_t bdd_id:31, inv_inp:1, :0, shift:31, inv_out:1;
 		// Ensure that terminal node invariant is preserved
 		bdd_ref(uint_t bdd_id = 0, uint_t shift = 0, bool inv_inp = false,
 			bool inv_out = false) : bdd_id(bdd_id), inv_inp(bdd_id <= 1 ? 0 : inv_inp),
@@ -50,36 +51,45 @@ class bdd_ref {
 		bool operator==(const bdd_ref &b) const {
 			return bdd_id == b.bdd_id && shift == b.shift && inv_inp == b.inv_inp &&
 				inv_out == b.inv_out; }
-		bool operator<(const bdd_ref &b) const {
-			const int64_t sid1 =
-				int64_t(inv_inp) | (int64_t(shift) << 1) | (int64_t(bdd_id) << 32);
-			const int64_t sid2 =
-				int64_t(b.inv_inp) | (int64_t(b.shift) << 1) | (int64_t(b.bdd_id) << 32);
-			return (inv_out ? -sid1 : sid1) < (b.inv_out ? -sid2 : sid2); }
-		bool operator>(const bdd_ref &b) const {
-			const int64_t sid1 =
-				int64_t(inv_inp) | (int64_t(shift) << 1) | (int64_t(bdd_id) << 32);
-			const int64_t sid2 =
-				int64_t(b.inv_inp) | (int64_t(b.shift) << 1) | (int64_t(b.bdd_id) << 32);
-			return (inv_out ? -sid1 : sid1) > (b.inv_out ? -sid2 : sid2); }
 		bool operator!=(const bdd_ref &b) const {
 			return bdd_id != b.bdd_id || shift != b.shift || inv_inp != b.inv_inp ||
 				inv_out != b.inv_out; }
+		// Satisfies the invariant a<b <--> -b<-a
+		bool operator<(const bdd_ref &b) const {
+			if(inv_out != b.inv_out) return inv_out;
+			else if(bdd_id != b.bdd_id) return inv_out ^ (bdd_id < b.bdd_id);
+			else if(shift != b.shift) return inv_out ^ (shift < b.shift);
+			else if(inv_inp != b.inv_inp) return inv_out ^ b.inv_inp;
+			else return false;
+		}
+		// Satisfies the invariant a>b <--> -b>-a
+		bool operator>(const bdd_ref &b) const {
+			if(inv_out != b.inv_out) return b.inv_out;
+			else if(bdd_id != b.bdd_id) return inv_out ^ (bdd_id > b.bdd_id);
+			else if(shift != b.shift) return inv_out ^ (shift > b.shift);
+			else if(inv_inp != b.inv_inp) return inv_out ^ inv_inp;
+			else return false;
+		}
+		// Negate object whilst guarding against negative 0
 		bdd_ref operator-() const {
 				return bdd_ref(bdd_id, shift, inv_inp, bdd_id ? !inv_out : false); }
 		bdd_ref abs() const { return bdd_ref(bdd_id, shift, inv_inp, false); }
-		// Gives each distinct reference a distinct unsigned fingerprint
-		uint64_t fgpt() const {
-			return uint64_t(bdd_id) | (uint64_t(inv_inp) << 31) |
-				(uint64_t(shift) << 32) | (uint64_t(inv_out) << 63); }
 		// Ensure that terminal node invariant is preserved
 		bdd_ref shift_var(int delta) const {
 			return bdd_ref(bdd_id, bdd_id <= 1 ? 0 : (shift + delta), inv_inp, inv_out); }
 };
 
+/* Ensure that edge attributes are packed correctly. */
+
+static_assert(sizeof(bdd_ref) == 8, "bdd_ref must use exactly 8 bytes");
+
+/* Combine the edge attributes and target BDD into a hash. */
+
 template<> struct std::hash<bdd_ref> {
 	std::size_t operator()(const bdd_ref &br) const {
-		return std::hash<uint64_t>()(br.fgpt());
+		uint32_t id1 = br.bdd_id | (uint32_t(br.inv_out) << 31);
+		uint32_t id2 = br.shift | (uint32_t(br.inv_inp) << 31);
+		return id1 ^ (id2 + 0x9e3779b9 + (id1 << 6) + (id1 >> 2));
 	}
 };
 
@@ -99,9 +109,11 @@ typedef std::vector<class bdd, memory_map_allocator<bdd> >bdd_mmap;
 struct ite_memo {
 	bdd_ref x, y, z;
 	size_t hash;
-	ite_memo(bdd_ref x, bdd_ref y, bdd_ref z) :
-		x(x), y(y), z(z), hash(hash_tri(x.fgpt(), y.fgpt(), z.fgpt())) {}
-	void rehash() { hash = hash_tri(x.fgpt(), y.fgpt(), z.fgpt()); }
+	ite_memo(bdd_ref x, bdd_ref y, bdd_ref z) : x(x), y(y), z(z) { rehash(); }
+	void rehash() {
+		std::hash<bdd_ref> hsh;
+		hash = hash_tri(hsh(x), hsh(y), hsh(z));
+	}
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
 
