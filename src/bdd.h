@@ -224,14 +224,7 @@ class bdd {
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
-	inline static bdd get(int_t x) {
-		if (x > 0) {
-			const bdd &y = V[x];
-			return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
-		}
-		const bdd &y = V[-x];
-		return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
-	}
+	static bdd get(int_t x);
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
@@ -435,6 +428,7 @@ class constraints {
 	std::set<int_t, decltype(abs_cmp)> true_var; //Set is sorted by absolut value
 	union_find eq_var;
 	bool is_pure = false;
+
 	// void updateTC (); <- not needed yet
 public:
 	constraints() = default;
@@ -444,14 +438,17 @@ public:
 	}
 	static constraints merge(int_t var, constraints& hi, constraints& lo);
 	static constraints extend_sing (const constraints& c, int_t var, bool b);
-	bool is_singleton ();
-	bool is_empty();
-	bool pure();
-
+	inline bool is_singleton () const{
+		return imp_var.empty() && eq_var.empty() && !true_var.empty();
+	}
+	inline bool is_empty() const {
+		return imp_var.empty() && eq_var.empty() && true_var.empty();
+	}
+	inline bool pure() const { return is_pure; }
+	inline bool set_pure() { is_pure = true; }
 	inline static constraints& get (int_t c) {
 		return c > 0 ? CV[c] : neg_CV[-c];
 	}
-
 	inline static constraints& get_neg (int_t c) {
 		return c > 0 ? neg_CV[c] : CV[-c];
 	}
