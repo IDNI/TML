@@ -109,7 +109,8 @@ typedef std::vector<class bdd, memory_map_allocator<bdd> >bdd_mmap;
 struct ite_memo {
 	bdd_ref x, y, z;
 	size_t hash;
-	ite_memo(bdd_ref x, bdd_ref y, bdd_ref z) : x(x), y(y), z(z) { rehash(); }
+	ite_memo(const bdd_ref &x, const bdd_ref &y, const bdd_ref &z) :
+		x(x), y(y), z(z) { rehash(); }
 	void rehash() {
 		std::hash<bdd_ref> hsh;
 		hash = hash_tri(hsh(x), hsh(y), hsh(z));
@@ -121,7 +122,7 @@ struct bdd_key {
 	uint_t hash;
 	bdd_ref h, l;
 	bdd_key(){}
-	bdd_key(uint_t hash, bdd_ref h, bdd_ref l) :
+	bdd_key(uint_t hash, const bdd_ref &h, const bdd_ref &l) :
 		hash(hash), h(h), l(l) {}
 	bool operator==(const bdd_key& k) const { return h==k.h && l==k.l; }
 };
@@ -295,57 +296,57 @@ class bdd {
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
-	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex);
+	static bdd_ref bdd_and_ex(const bdd_ref &x, const bdd_ref &y, const bools& ex);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 		std::unordered_map<std::array<bdd_ref, 2>, bdd_ref>& memo,
 		std::unordered_map<bdd_ref, bdd_ref>& memo2, int_t last);
-	static bdd_ref bdd_or(bdd_ref x, bdd_ref y) { return -bdd_and(-x, -y); }
-	static bdd_ref bdd_ite(bdd_ref x, bdd_ref y, bdd_ref z);
-	static bdd_ref bdd_ite_var(uint_t x, bdd_ref y, bdd_ref z);
+	static bdd_ref bdd_or(const bdd_ref &x, const bdd_ref &y) { return -bdd_and(-x, -y); }
+	static bdd_ref bdd_ite(const bdd_ref &x, const bdd_ref &y, const bdd_ref &z);
+	static bdd_ref bdd_ite_var(uint_t x, const bdd_ref &y, const bdd_ref &z);
 	static bdd_ref bdd_and_many(bdds v);
 	static bdd_ref bdd_and_many_ex(bdds v, const bools& ex);
-	static bdd_ref bdd_ex(bdd_ref x, const bools& b,
+	static bdd_ref bdd_ex(const bdd_ref &x, const bools& b,
 		std::unordered_map<bdd_ref, bdd_ref>& memo, int_t last);
-	static bdd_ref bdd_ex(bdd_ref x, const bools& b);
+	static bdd_ref bdd_ex(const bdd_ref &x, const bools& b);
 	static bdd_ref bdd_permute(const bdd_ref &x, const uints& m,
 		std::unordered_map<bdd_ref, bdd_ref>& memo);
-	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m,
+	static bdd_ref bdd_permute_ex(const bdd_ref &x, const bools& b, const uints& m,
 		size_t last, std::unordered_map<bdd_ref, bdd_ref>& memo);
-	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m);
-	static bool solve(bdd_ref x, int_t v, bdd_ref& l, bdd_ref& h);
-	static void mark_all(bdd_ref i);
+	static bdd_ref bdd_permute_ex(const bdd_ref &x, const bools& b, const uints& m);
+	static bool solve(const bdd_ref &x, int_t v, bdd_ref& l, bdd_ref& h);
+	static void mark_all(const bdd_ref &i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		int_t &m);
-	static bdd_ref bdd_and_ex_perm(bdd_ref x, bdd_ref y, const bools& ex,
+	static bdd_ref bdd_and_ex_perm(const bdd_ref &x, const bdd_ref &y, const bools& ex,
 		const uints&);
 	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
-	static void sat(uint_t v, uint_t nvars, bdd_ref t, bools& p, vbools& r);
-	static vbools allsat(bdd_ref x, uint_t nvars);
+	static void sat(uint_t v, uint_t nvars, const bdd_ref &t, bools& p, vbools& r);
+	static vbools allsat(const bdd_ref &x, uint_t nvars);
 	static bool am_simplify(bdds& v,const std::unordered_map<bdds, bdd_ref>&);
-	static void bdd_sz(bdd_ref x, std::set<bdd_ref>& s);
-	static void bdd_nvars(bdd_ref x, std::set<int_t>& s);
-	static size_t bdd_nvars(bdd_ref x);
-	static bool bdd_subsumes(bdd_ref x, bdd_ref y);
+	static void bdd_sz(const bdd_ref &x, std::set<bdd_ref>& s);
+	static void bdd_nvars(const bdd_ref &x, std::set<int_t>& s);
+	static size_t bdd_nvars(const bdd_ref &x);
+	static bool bdd_subsumes(const bdd_ref &x, const bdd_ref &y);
 	static bdd_ref add(int_t v, bdd_ref h, bdd_ref l);
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
-	inline static bool leaf(bdd_ref t) { return t.abs() == T; }
-	inline static bool trueleaf(bdd_ref t) { return t > 0; }
+	inline static bool leaf(const bdd_ref &t) { return t.abs() == T; }
+	inline static bool trueleaf(const bdd_ref &t) { return t > 0; }
 	template <typename T>
-	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
+	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, const bdd_ref &x);
 	bdd_ref h, l;
 
 	//---
-	static void bdd_sz_abs(bdd_ref x, std::set<int_t>& s);
-	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
-	static bdd_ref bdd_quantify(bdd_ref x, int_t bit, const std::vector<quant_t> &quants,
+	static void bdd_sz_abs(const bdd_ref &x, std::set<int_t>& s);
+	static bdd_ref bdd_xor(const bdd_ref &x, const bdd_ref &y);
+	static bdd_ref bdd_quantify(const bdd_ref &x, int_t bit, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
-	static bdd_ref bitwise_and(bdd_ref a_in, bdd_ref b_in);
-	static bdd_ref bitwise_or(bdd_ref a_in, bdd_ref b_in);
-	static bdd_ref bitwise_xor(bdd_ref a_in, bdd_ref b_in);
-	static bdd_ref bitwise_not(bdd_ref a_in);
-	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
+	static bdd_ref bitwise_and(const bdd_ref &a_in, const bdd_ref &b_in);
+	static bdd_ref bitwise_or(const bdd_ref &a_in, const bdd_ref &b_in);
+	static bdd_ref bitwise_xor(const bdd_ref &a_in, const bdd_ref &b_in);
+	static bdd_ref bitwise_not(const bdd_ref &a_in);
+	static bdd_ref adder(const bdd_ref &a_in, const bdd_ref &b_in, bool carry, size_t bit);
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
 	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
@@ -366,21 +367,21 @@ class bdd {
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
 	static bdd_ref merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
-	static void satcount_arith(bdd_ref a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
+	static void satcount_arith(const bdd_ref &a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
 	static bdd_ref zero(size_t arg, size_t bits, size_t n_args);
 	static bool is_zero(bdd_ref a_in, size_t bits);
-	static void adder_be(bdd_ref a_in, bdd_ref b_in, size_t bits, size_t depth,
+	static void adder_be(const bdd_ref &a_in, const bdd_ref &b_in, size_t bits, size_t depth,
 			size_t n_args, bdd_ref &c);
-	static bdd_ref adder_accs(bdd_ref b_in, bdd_ref accs, size_t depth, size_t bits, size_t n_args);
-	static void mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size_t bits,
+	static bdd_ref adder_accs(const bdd_ref &b_in, const bdd_ref &accs, size_t depth, size_t bits, size_t n_args);
+	static void mult_dfs(const bdd_ref &a_in, const bdd_ref &b_in, bdd_ref *accs, size_t depth, size_t bits,
 			size_t n_args, bdd_ref &c) ;
-	static bdd_ref copy(bdd_ref a_in);
-	static bdd_ref copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
+	static bdd_ref copy(const bdd_ref &a_in);
+	static bdd_ref copy_arg2arg(const bdd_ref &a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
 	static bdd_ref shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args);
-	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
+	static bdd_ref shlx(const bdd_ref &b_in, size_t x, size_t bits, size_t n_args);
 
 public:
-	bdd(bdd_ref h, bdd_ref l);
+	bdd(const bdd_ref &h, const bdd_ref &l);
 	inline bool operator==(const bdd& b) const {
 		return h == b.h && l == b.l;
 	}
@@ -393,27 +394,27 @@ public:
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
-	inline static bdd_ref hi(bdd_ref x) {
+	inline static bdd_ref hi(const bdd_ref &x) {
 		bdd &cbdd = V[x.bdd_id];
 		const bdd_ref &child = x.inv_inp ? cbdd.l : cbdd.h;
 		bdd_ref nbdd = child.shift_var(x.shift);
 		return x > 0 ? nbdd : -nbdd;
 	}
 
-	inline static bdd_ref lo(bdd_ref x) {
+	inline static bdd_ref lo(const bdd_ref &x) {
 		bdd &cbdd = V[x.bdd_id];
 		const bdd_ref &child = x.inv_inp ? cbdd.h : cbdd.l;
 		bdd_ref nbdd = child.shift_var(x.shift);
 		return x > 0 ? nbdd : -nbdd;
 	}
 
-	inline static uint_t var(bdd_ref x) { return x.shift; }
+	inline static uint_t var(const bdd_ref &x) { return x.shift; }
 
-	static size_t satcount_perm(bdd_ref x, size_t leafvar);
+	static size_t satcount_perm(const bdd_ref &x, size_t leafvar);
 
-	static size_t getvar(bdd_ref h, bdd_ref l, int_t v, bdd_ref x, size_t maxv);
-	static size_t satcount_k(bdd_ref x, const bools& ex, const uints& perm);
-	static size_t satcount_k(bdd_ref x, size_t leafvar,
+	static size_t getvar(const bdd_ref &h, const bdd_ref &l, int_t v, const bdd_ref &x, size_t maxv);
+	static size_t satcount_k(const bdd_ref &x, const bools& ex, const uints& perm);
+	static size_t satcount_k(const bdd_ref &x, size_t leafvar,
 		std::map<int_t, int_t>& mapvars);
 	static size_t satcount(spbdd_handle x, const bools& inv);
 };
@@ -421,12 +422,12 @@ public:
 class bdd_handle {
 	friend class bdd;
 	friend class archive;
-	bdd_handle(bdd_ref b) : b(b) { }//bdd::mark(b); }
+	bdd_handle(const bdd_ref &b) : b(b) { }//bdd::mark(b); }
 	static void update(const std::vector<int_t>& p);
 	static std::unordered_map<bdd_ref, std::weak_ptr<bdd_handle>> M;
 public:
 	bdd_ref b;
-	static spbdd_handle get(bdd_ref b);
+	static spbdd_handle get(const bdd_ref &b);
 	static spbdd_handle T, F;
 	~bdd_handle() {
 		if (onexit) return;
@@ -447,7 +448,7 @@ private:
 	uint_t v = 1;
 	callback f;
 	bools p;
-	void sat(bdd_ref x);
+	void sat(const bdd_ref &x);
 };
 
 class satcount_iter {
@@ -465,5 +466,5 @@ private:
 	bools p;
 	const bools& inv;
 	std::set<bools> vp;
-	void sat(bdd_ref x);
+	void sat(const bdd_ref &x);
 };
