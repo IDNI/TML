@@ -125,7 +125,7 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	const bool inv_out = l < 0;
 	if (inv_out) { h = -h; l = -l; }
 	std::hash<bdd_ref> hsh;
-	k = bdd_key(hash_pair(hsh(h), hsh(l)), h, l);
+	k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
 	return	bdd_ref((it = m.find(k)) != m.end() ? it->second :
 		(V.emplace_back(h, l),
 		m.emplace(move(k), V.size()-1),
@@ -725,7 +725,7 @@ void bdd::gc() {
 	p.clear(), S.clear();
 	std::hash<bdd_ref> hsh;
 	for (size_t n = 0; n < V.size(); ++n)
-		Ma.emplace(bdd_key(hash_pair(hsh(V[n].h), hsh(V[n].l)),
+		Ma.emplace(bdd_key(hash_upair(hsh(V[n].h), hsh(V[n].l)),
 			V[n].h, V[n].l), n);
 	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
@@ -1154,7 +1154,7 @@ size_t hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 
 size_t hash<array<bdd_ref, 2>>::operator()(const array<bdd_ref, 2>& x) const {
 	std::hash<bdd_ref> hsh;
-	return hash_pair(hsh(x[0]), hsh(x[1]));
+	return hash_upair(hsh(x[0]), hsh(x[1]));
 }
 
 size_t hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}

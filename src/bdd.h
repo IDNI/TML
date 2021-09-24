@@ -27,6 +27,8 @@
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
+#define hash_upair(x, y) fpairing(x, y)
+#define hash_utri(x, y, z) fpairing(hash_upair(x, y), z)
 
 inline size_t fpairing(size_t x, size_t y) {
 	size_t z = x + y;
@@ -113,7 +115,7 @@ struct ite_memo {
 		x(x), y(y), z(z) { rehash(); }
 	void rehash() {
 		std::hash<bdd_ref> hsh;
-		hash = hash_tri(hsh(x), hsh(y), hsh(z));
+		hash = hash_utri(hsh(x), hsh(y), hsh(z));
 	}
 	bool operator==(const ite_memo& k) const{return x==k.x&&y==k.y&&z==k.z;}
 };
