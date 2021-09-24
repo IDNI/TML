@@ -281,8 +281,8 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 	else if ( rtin.extype == raw_term::ARITH || rtin.extype == raw_term::EQ || rtin.extype == raw_term::LEQ) {
 		
 		// prepare tab_arg and estimate size of bit elements from the context of the rule, since 
-		// these are arithmetic variables having no specific type signture, but only the context 
-		// based bitsizes as calculated during typeinference.
+		// these are arithmetic variables having no specific type signture, but only the context contains
+		// such bitsizes as calculated during typeinference.
 		tab_args tag;
 		int_t tsz = 0;
 		for(size_t n = 0 ; n < rtin.e.size(); n++ ) {
@@ -293,7 +293,9 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 		//DBG(assert(tag.size() == (size_t)rtin.get_formal_arity()-2));
 		size_t  args = tag.size();
 		std::vector<elem> vbit(tsz);
-		
+		// for gettin operator index
+		lexeme bitrelname[2];
+		size_t opi = 0; 
 		for(size_t bsz, arg = 0, n = 0 ; n < rtin.e.size(); n++ ) {
 			if(n && !(n == 1 || n == 3) ) arg++;  // skip operators in arith or eq term
 			const elem& e = rtin.e[n];
@@ -313,14 +315,28 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 								for( size_t k= 0; k !=bsz ; k++)
 									vbit[pos(bsz, k, arg, args, tag)] = bool(e.num & (1<<k));
 								break;
-				case elem::ARITH:
-				case elem::EQ:
-				case elem::LEQ:
-				case elem::NEQ:
-				case elem::GEQ:
-				case elem::LT:
-				case elem::GT:
-								break;
+				case elem::ARITH: 
+						switch(e.arith_op){
+
+							case t_arith_op::ADD : bitrelname[opi++] = STR_TO_LEXEME("_PLUS_"); break; 
+							case t_arith_op::BITWAND: bitrelname[opi++] = STR_TO_LEXEME("_BAND_");break;
+							case t_arith_op::BITWOR: bitrelname[opi++] = STR_TO_LEXEME("_BOR_");break;
+							case t_arith_op::BITWNOT: bitrelname[opi++] = STR_TO_LEXEME("_BNOT_");break;
+							case t_arith_op::BITWXOR: bitrelname[opi++] = STR_TO_LEXEME("_BXOR_");break;
+							case t_arith_op::MULT: bitrelname[opi++] = STR_TO_LEXEME("_MULT_");break;
+							case t_arith_op::SHL: bitrelname[opi++] = STR_TO_LEXEME("_SHL_");break;
+							case t_arith_op::SHR: bitrelname[opi++] = STR_TO_LEXEME("_SHR_");break;
+							case t_arith_op::SUB: bitrelname[opi++] = STR_TO_LEXEME("_SUB_");break;
+							default: DBG(COUT<<rtin<<std::endl); assert(false); 
+						}
+					break;
+				
+				case elem::EQ: bitrelname[opi++] = STR_TO_LEXEME("_EQ_") ; break;
+				case elem::LEQ: bitrelname[opi++] = STR_TO_LEXEME("_LEQ_"); break;
+				case elem::NEQ:bitrelname[opi++] = STR_TO_LEXEME("_EQ_"); break;
+				case elem::GEQ:bitrelname[opi++] = STR_TO_LEXEME ("_LEQ_"); break;
+				case elem::LT:bitrelname[opi++] = STR_TO_LEXEME("_LT_"); break;
+				case elem::GT:bitrelname[opi++] = STR_TO_LEXEME("_LT_"); break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}
 		}
@@ -332,7 +348,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 		// a + 1 < b  ---->   plus(a 1,z ) , lt ( z , b)
 		// oprd1 operator oprd2 comp_operator oprd3
 		rtout.extype = raw_term::REL;
-		rtout.e.emplace_back(elem::SYM, rtin.e[1].e); // from operator
+		rtout.e.emplace_back(elem::SYM, bitrelname[0] ); // from first operator
 		rtout.e.emplace_back(elem(elem::OPENP));
 		rtout.e.insert(rtout.e.end(), vbit.begin(), vbit.end() );
 		rtout.e.emplace_back(elem(elem::CLOSEP));
@@ -365,7 +381,7 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 			// preparing new raw_term for the new relation.
 			raw_term frt;
 			frt.extype = raw_term::REL;
-			frt.e.emplace_back(elem::SYM, rtin.e[3].e); // from comp_operator
+			frt.e.emplace_back(elem::SYM, bitrelname[1]); // from comp_operator
 			frt.e.emplace_back(elem(elem::OPENP));
 			frt.e.insert(frt.e.end(),vbit2.begin(), vbit2.end());
 			frt.e.emplace_back(elem(elem::CLOSEP));
