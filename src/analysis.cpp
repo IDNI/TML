@@ -48,12 +48,12 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	bool ret = true;
 	for( const raw_term &rt : rrin.h )
 		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back(), rrin, rrout);		
-	if( rrin.is_form())	
+	if( rrin.is_form())	{
 		//*rrout.prft = *rrin.prft,
-		rrout.set_prft(*rrin.prft),
-		ret = btransform( *rrin.prft, *rrout.prft, rrin, rrout  ),
-		DBG((*rrout.prft).printTree());
-	else {
+		rrout.set_prft(*rrin.prft);
+		ret = btransform( *rrin.prft, *rrout.prft, rrin, rrout  );
+		DBG((*rrout.prft).printTree();)
+	} else {
 		for( const auto &vrt : rrin.b) {
 			rrout.b.emplace_back();
 			for( const raw_term &rt : vrt)
