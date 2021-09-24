@@ -124,13 +124,13 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	// First apply the inverse shift since h and l will be attached to v
 	h = h.shift_var(-v);
 	l = l.shift_var(-v);
+	// Apply output inversion invariant that low part must always be negative
+	const bool inv_out = l < 0;
+	if (inv_out) { h = -h; l = -l; }
 	// Now we know what v's child nodes will be, order them to maximize re-use
 	// attaching an input inverter if necessary. Required for canonicity.
 	const bool inv_inp = h < l;
 	if (inv_inp) swap(h, l);
-	// Apply output inversion invariant that low part must always be negative
-	const bool inv_out = l < 0;
-	if (inv_out) { h = -h; l = -l; }
 	std::hash<bdd_ref> hsh;
 	bdd_key k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
 	unordered_map<bdd_key, int_t>::const_iterator it;

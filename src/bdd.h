@@ -297,17 +297,15 @@ class bdd {
 	
 	inline static bdd get(const bdd_ref &x) {
 		// Get the BDD that this reference is attributing
-		const bdd &cbdd = V[x.bdd_id];
-		bdd_ref lo_child, hi_child;
+		bdd cbdd = V[x.bdd_id];
 		// Apply input inversion to the outcome
-		if(x.inv_inp) { lo_child = cbdd.h; hi_child = cbdd.l; }
-		else { lo_child = cbdd.l; hi_child = cbdd.h; }
+		if(x.inv_inp) std::swap(cbdd.h, cbdd.l);
 		// Apply variable shifting to the outcome
-		lo_child = lo_child.shift_var(x.shift);
-		hi_child = hi_child.shift_var(x.shift);
+		cbdd.l = cbdd.l.shift_var(x.shift);
+		cbdd.h = cbdd.h.shift_var(x.shift);
 		// Apply output inversion to the outcome
-		if(x < 0) { lo_child = -lo_child; hi_child = -hi_child; }
-		return bdd(hi_child, lo_child);
+		if(x < 0) { cbdd.l = -cbdd.l; cbdd.h = -cbdd.h; }
+		return cbdd;
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y);
