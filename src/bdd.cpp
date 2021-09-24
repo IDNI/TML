@@ -121,14 +121,13 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	if (inv_inp) swap(h, l);
 	unordered_map<bdd_key, int_t>::const_iterator it;
 	bdd_key k;
-	auto &m = Ma;
 	const bool inv_out = l < 0;
 	if (inv_out) { h = -h; l = -l; }
 	std::hash<bdd_ref> hsh;
 	k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
-	return	bdd_ref((it = m.find(k)) != m.end() ? it->second :
+	return	bdd_ref((it = Ma.find(k)) != Ma.end() ? it->second :
 		(V.emplace_back(h, l),
-		m.emplace(move(k), V.size()-1),
+		Ma.emplace(move(k), V.size()-1),
 		V.size()-1), v, inv_inp, inv_out);
 }
 
