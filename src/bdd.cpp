@@ -112,19 +112,30 @@ void bdd::max_bdd_size_check() {
 }
 #endif
 
+/* Make a BDD reference representing a function f that behaves like the provided
+ * high reference, h, if v is set to 1, otherwise it behaves like the provided
+ * low reference, l. Precondition is that h and l depend only on variables after
+ * v, i.e. their shifts are more than v. */
+
 bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	DBG(assert(h.bdd_id && l.bdd_id && v > 0););
+	// If BDD would not branch on this variable, exclude it to preserve canonicity
 	if (h == l) return h;
+	// First apply the inverse shift since h and l will be attached to v
 	h = h.shift_var(-v);
 	l = l.shift_var(-v);
+	// Now we know what v's child nodes will be, order them to maximize re-use
+	// attaching an input inverter if necessary. Required for canonicity.
 	const bool inv_inp = h < l;
 	if (inv_inp) swap(h, l);
-	unordered_map<bdd_key, int_t>::const_iterator it;
-	bdd_key k;
+	// Apply output inversion invariant that low part must always be negative
 	const bool inv_out = l < 0;
 	if (inv_out) { h = -h; l = -l; }
 	std::hash<bdd_ref> hsh;
-	k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
+	bdd_key k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
+	unordered_map<bdd_key, int_t>::const_iterator it;
+	// Find a BDD with the given high and low parts and make an attributed
+	// reference to it.
 	return	bdd_ref((it = Ma.find(k)) != Ma.end() ? it->second :
 		(V.emplace_back(h, l),
 		Ma.emplace(move(k), V.size()-1),

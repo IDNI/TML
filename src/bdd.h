@@ -230,6 +230,10 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
+/* A BDD is a pair of attributed references to BDDs. Separating out attributes
+ * from BDDs increase the chances that BDDs can be reused in representing
+ * different functions. */
+
 class bdd {
 	friend class archive;
 	friend class bdd_handle;
@@ -286,13 +290,22 @@ class bdd {
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	
+	/* Get the absolute BDD referenced by the given BDD reference. If the given
+	 * BDD reference represents the function f, the low reference of the produced
+	 * BDD represents f with the variable represented by x set to 0, and the high
+	 * reference the function f with this variable set to 1. */
+	
 	inline static bdd get(const bdd_ref &x) {
+		// Get the BDD that this reference is attributing
 		const bdd &cbdd = V[x.bdd_id];
 		bdd_ref lo_child, hi_child;
+		// Apply input inversion to the outcome
 		if(x.inv_inp) { lo_child = cbdd.h; hi_child = cbdd.l; }
 		else { lo_child = cbdd.l; hi_child = cbdd.h; }
+		// Apply variable shifting to the outcome
 		lo_child = lo_child.shift_var(x.shift);
 		hi_child = hi_child.shift_var(x.shift);
+		// Apply output inversion to the outcome
 		if(x < 0) { lo_child = -lo_child; hi_child = -hi_child; }
 		return bdd(hi_child, lo_child);
 	}
@@ -396,19 +409,37 @@ public:
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
+	
+	/* Return the absolute BDD corresponding to the high part of the given BDD
+	 * reference. If x represents a boolean function f, then this function returns
+	 * a reference to a BDD representing the function f with the variable
+	 * corresponding to x set to 1. */
+	
 	inline static bdd_ref hi(const bdd_ref &x) {
+		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[x.bdd_id];
+		// Apply input inversion
 		const bdd_ref &child = x.inv_inp ? cbdd.l : cbdd.h;
+		// Apply variable shifter
 		bdd_ref nbdd = child.shift_var(x.shift);
+		// Apply output inversion
 		return x > 0 ? nbdd : -nbdd;
 	}
+	
+	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
 
 	inline static bdd_ref lo(const bdd_ref &x) {
+		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[x.bdd_id];
+		// Apply input inversion
 		const bdd_ref &child = x.inv_inp ? cbdd.h : cbdd.l;
+		// Apply variable shifter
 		bdd_ref nbdd = child.shift_var(x.shift);
+		// Apply output inversion
 		return x > 0 ? nbdd : -nbdd;
 	}
+	
+	/* The variable of a BDD reference is its root/absolute shift. */
 
 	inline static uint_t var(const bdd_ref &x) { return x.shift; }
 
