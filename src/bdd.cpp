@@ -129,7 +129,7 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	if (inv_out) { h = -h; l = -l; }
 	// Now we know what v's child nodes will be, order them to maximize re-use
 	// attaching an input inverter if necessary. Required for canonicity.
-	const bool inv_inp = h < l;
+	const bool inv_inp = l < h;
 	if (inv_inp) swap(h, l);
 	std::hash<bdd_ref> hsh;
 	bdd_key k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
