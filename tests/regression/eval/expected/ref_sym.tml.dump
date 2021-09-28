@@ -32,6 +32,19 @@ q_rule_head(9 8).
 q_rule_body(17 15).
 q_rule_body(13 11).
 q_rule_body(9 7).
+cdc_decode(t 3 3).
+cdc_decode(t 3 2).
+cdc_decode(t 2 3).
+cdc_decode(t 2 2).
+cdc_decode(e 2 3).
+cdc_decode(t 2 1).
+cdc_decode(t 1 2).
+cdc_decode(e 1 2).
+cdc_decode(t 1 1).
+cdc_decode(t 1 0).
+cdc_decode(t 0 1).
+cdc_decode(t 0 0).
+cdc_decode(e 0 1).
 q_term_params(16 6).
 q_term_params(4 19).
 q_term_params(15 9).
@@ -50,16 +63,3 @@ q_term_param_types(7 10).
 q_term_param_types(4 5).
 q_term_param_types(2 5).
 q_term_param_types(0 5).
-cdc_decode(t 3 3).
-cdc_decode(t 3 2).
-cdc_decode(t 2 3).
-cdc_decode(t 2 2).
-cdc_decode(e 2 3).
-cdc_decode(t 2 1).
-cdc_decode(t 1 2).
-cdc_decode(e 1 2).
-cdc_decode(t 1 1).
-cdc_decode(t 1 0).
-cdc_decode(t 0 1).
-cdc_decode(t 0 0).
-cdc_decode(e 0 1).
