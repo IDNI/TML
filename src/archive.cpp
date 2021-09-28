@@ -886,15 +886,22 @@ archive& archive::operator<<(const tables& tbls) {
 }
 
 archive& archive::operator<<(const bdd_ref& t) {
-	return *this << t.bdd_id;
+	// Raw field is sufficient as it contains all other fields
+	*this << t.raw;
+	return *this;
 }
 
 archive& archive::operator>>(bdd_ref& t) {
-	//return *this >> t.bdd_id;
+	// Raw field is sufficient as it contains all other fields
+	decltype(t.raw)::value_type val;
+	*this >> val;
+	t.raw = val;
+	return *this;
 }
 
 size_t archive::size(const bdd_ref& t) {
-	return sizeof(int_t);
+	// Raw field is sufficient as it contains all other fields
+	return sizeof(t.raw);
 }
 
 archive& archive::operator>>(tables& tbls) {

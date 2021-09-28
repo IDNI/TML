@@ -51,6 +51,8 @@ template<class T, size_t low, size_t high> class bitfield {
 		// Used to clear the bits of the container to overwrite
 		static const T clear = ~(set << low);
 	public:
+		// For accessing the original type
+		typedef T value_type;
 		// For reading this bit-field. Filters out irrelevant container parts
 		operator T() const { return (value >> low) & set; }
 		// Facilitate in-place updates of this bit-field whilst leaving the rest of
@@ -350,14 +352,14 @@ class bdd {
 	static bdd_ref bdd_and_ex(const bdd_ref &x, const bdd_ref &y, const bools& ex);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 		std::unordered_map<std::array<bdd_ref, 2>, bdd_ref>& memo,
-		std::unordered_map<bdd_ref, bdd_ref>& memo2, int_t last);
+		std::unordered_map<bdd_ref, bdd_ref>& memo2, uint_t last);
 	static bdd_ref bdd_or(const bdd_ref &x, const bdd_ref &y) { return -bdd_and(-x, -y); }
 	static bdd_ref bdd_ite(const bdd_ref &x, const bdd_ref &y, const bdd_ref &z);
 	static bdd_ref bdd_ite_var(uint_t x, const bdd_ref &y, const bdd_ref &z);
 	static bdd_ref bdd_and_many(bdds v);
 	static bdd_ref bdd_and_many_ex(bdds v, const bools& ex);
 	static bdd_ref bdd_ex(const bdd_ref &x, const bools& b,
-		std::unordered_map<bdd_ref, bdd_ref>& memo, int_t last);
+		std::unordered_map<bdd_ref, bdd_ref>& memo, uint_t last);
 	static bdd_ref bdd_ex(const bdd_ref &x, const bools& b);
 	static bdd_ref bdd_permute(const bdd_ref &x, const uints& m,
 		std::unordered_map<bdd_ref, bdd_ref>& memo);
@@ -368,7 +370,7 @@ class bdd {
 	static void mark_all(const bdd_ref &i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
-		int_t &m);
+		uint_t &m);
 	static bdd_ref bdd_and_ex_perm(const bdd_ref &x, const bdd_ref &y, const bools& ex,
 		const uints&);
 	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
@@ -391,7 +393,7 @@ class bdd {
 	//---
 	static void bdd_sz_abs(const bdd_ref &x, std::set<int_t>& s);
 	static bdd_ref bdd_xor(const bdd_ref &x, const bdd_ref &y);
-	static bdd_ref bdd_quantify(const bdd_ref &x, int_t bit, const std::vector<quant_t> &quants,
+	static bdd_ref bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
 	static bdd_ref bitwise_and(const bdd_ref &a_in, const bdd_ref &b_in);
 	static bdd_ref bitwise_or(const bdd_ref &a_in, const bdd_ref &b_in);

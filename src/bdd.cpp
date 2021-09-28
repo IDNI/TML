@@ -201,7 +201,7 @@ bdd_ref bdd::bdd_ite(const bdd_ref &x, const bdd_ref &y, const bdd_ref & z) {
 	if (it != C.end()) return it->second;
 	bdd_ref r;
 	const bdd bx = get(x), by = get(y), bz = get(z);
-	const int_t s = min(x.shift, min(y.shift, z.shift));
+	const uint_t s = min(x.shift, min(y.shift, z.shift));
 	if (x.shift == y.shift && y.shift == z.shift)
 		r =	add(x.shift, bdd_ite(bx.h, by.h, bz.h),
 				bdd_ite(bx.l, by.l, bz.l));
@@ -348,7 +348,7 @@ bdd_ref bdd::bdd_and_many(bdds v) {
 
 bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& memo,
-	unordered_map<bdd_ref, bdd_ref>& m2, int_t last) {
+	unordered_map<bdd_ref, bdd_ref>& m2, uint_t last) {
 	DBG(assert(x.bdd_id && y.bdd_id);)
 	if (x == F || y == F || x == -y) return F;
 	if (x == T || x == y) return bdd_ex(y, ex, m2, last);
@@ -358,7 +358,7 @@ bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 	auto it = memo.find(m);
 	if (it != memo.end()) return it->second;
 	const bdd bx = get(x), by = get(y);
-	int_t v;
+	uint_t v;
 	bdd_ref rx, ry, r;
 	if (x.shift > last+1 && y.shift > last+1)
 		return memo.emplace(m, r = bdd_and(x, y)), r;
@@ -384,7 +384,7 @@ struct sbdd_and_ex_perm {
 	const uints& p;
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& memo;
 	unordered_map<bdd_ref, bdd_ref>& m2;
-	int_t last;
+	uint_t last;
 
 	sbdd_and_ex_perm(const bools& ex, const uints& p,
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& memo,
@@ -405,7 +405,7 @@ struct sbdd_and_ex_perm {
 		auto it = memo.find(m);
 		if (it != memo.end()) return it->second;
 		const bdd bx = bdd::get(x), by = bdd::get(y);
-		int_t v;
+		uint_t v;
 		bdd_ref rx, ry, r;
 		if (x.shift > last+1 && y.shift > last+1)
 			return memo.emplace(m, r = bdd::bdd_and(x, y)), r;
@@ -422,7 +422,7 @@ struct sbdd_and_ex_perm {
 };
 
 bdd_ref bdd::bdd_and_ex(const bdd_ref &x, const bdd_ref & y, const bools& ex) {
-	int_t last = 0;
+	uint_t last = 0;
 	for (size_t n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
 	bdd_ref r = bdd_and_ex(x, y, ex, CX[ex], memos_ex[ex], last);
 	DBG(bdd_ref t = bdd_ex(bdd_and(x, y), ex);)
@@ -434,12 +434,12 @@ bdd_ref bdd::bdd_and_ex_perm(const bdd_ref &x, const bdd_ref & y, const bools& e
 	return sbdd_and_ex_perm(ex,p,CXP[{ex,p}],memos_perm_ex[{p,ex}])(x,y);
 }
 
-char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t& m) {
+char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, uint_t& m) {
 	size_t i, sh = 0, sl = 0;
 	bdd *b = (bdd*)alloca(sizeof(bdd) * v.size());
 	for (i = 0; i != v.size(); ++i) b[i] = get(v[i]);
 	m = v[0].shift;//var(v[0]);
-	for (i = 1; i != v.size(); ++i) m = min(m, (int_t) v[i].shift);//var(v[i]));
+	for (i = 1; i != v.size(); ++i) m = min(m, uint_t(v[i].shift));//var(v[i]));
 	bdd_ref *ph = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size()),
 		  *pl = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size());
 	for (i = 0; ph && i != v.size(); ++i)
@@ -469,7 +469,7 @@ struct sbdd_and_many_ex {
 	unordered_map<bdds, bdd_ref>& memo;
 	unordered_map<bdd_ref, bdd_ref>& m2;
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& m3;
-	int_t last;
+	uint_t last;
 
 	sbdd_and_many_ex(const bools& ex, unordered_map<bdds, bdd_ref>& memo,
 		unordered_map<bdd_ref, bdd_ref>& m2,
@@ -485,7 +485,7 @@ struct sbdd_and_many_ex {
 			return bdd::bdd_and_ex(v[0], v[1], ex, m3, m2, last);
 		auto it = memo.find(v);
 		if (it != memo.end()) return it->second;
-		int_t m = 0;
+		uint_t m = 0;
 		bdd_ref res = F, h, l;
 		bdds vh, vl;
 		char c = bdd::bdd_and_many_ex_iter(v, vh, vl, m);
@@ -527,7 +527,7 @@ struct sbdd_and_many_ex_perm {
 	//map<bdds, int_t, veccmp<int_t>>& memo;
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& m2;
 	unordered_map<bdd_ref, bdd_ref>& m3;
-	int_t last;
+	uint_t last;
 	sbdd_and_ex_perm saep;
 
 	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
@@ -547,7 +547,7 @@ struct sbdd_and_many_ex_perm {
 		if (v.size() == 2) return saep(v[0], v[1]);
 		auto it = memo.find(v);
 		if (it != memo.end()) return it->second;
-		int_t m = 0;
+		uint_t m = 0;
 		bdd_ref res = F, h, l;
 		bdds vh, vl;
 		char c = bdd::bdd_and_many_ex_iter(v, vh, vl, m);
@@ -1007,8 +1007,8 @@ spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
 }
 
 bdd_ref bdd::bdd_ex(const bdd_ref &x, const bools& b, unordered_map<bdd_ref, bdd_ref>& memo,
-	int_t last) {
-	if (leaf(x) || (int_t)var(x) > last+1) return x;
+	uint_t last) {
+	if (leaf(x) || var(x) > last+1) return x;
 	auto it = memo.find(x);
 	if (it != memo.end()) return it->second;
 	DBG(assert(var(x)-1 < b.size());)
@@ -1018,7 +1018,7 @@ bdd_ref bdd::bdd_ex(const bdd_ref &x, const bools& b, unordered_map<bdd_ref, bdd
 }
 
 bdd_ref bdd::bdd_ex(const bdd_ref & x, const bools& b) {
-	int_t last = 0;
+	uint_t last = 0;
 	for (size_t n = 0; n != b.size(); ++n) if (b[n]) last = n;
 	return bdd_ex(x, b, memos_ex[b], last);
 }

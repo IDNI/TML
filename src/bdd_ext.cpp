@@ -77,10 +77,10 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 }
 
 // ----------------------------------------------------------------------------
-bdd_ref bdd::bdd_quantify(const bdd_ref &x, int_t bit, const std::vector<quant_t> &quants,
+bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
 	//if (x == T || x == F || bit == (int_t) quants.size() * (int_t) bits) return x;
-	if (bit == (int_t) quants.size() * (int_t) bits) return x;
+	if (bit == quants.size() * bits) return x;
 	size_t idx = bit/bits;
 	if (x == T || x == F) {
 		if (quants[idx] == quant_t::UN) return F;
@@ -88,7 +88,7 @@ bdd_ref bdd::bdd_quantify(const bdd_ref &x, int_t bit, const std::vector<quant_t
 	}
 	bdd c = bdd::get(x);
 	bdd_ref h,l;
-	if (x.shift > (int_t) quants.size() * (int_t) bits) return x;
+	if (x.shift > quants.size() * bits) return x;
 	if (x.shift > bit+1) {//TODO review for UNIQUE
 		if (quants[idx] == quant_t::UN) return F;
 		return bdd_quantify(x, bit+1, quants, bits, n_args);
@@ -1066,7 +1066,7 @@ void bdd::mult_dfs(const bdd_ref &a_in, const bdd_ref &b_in, bdd_ref *accs, size
 		c = bdd_or(c, accs[depth-1]);
 		return ;
 	}
-	int_t pos = n_args * depth + 1;
+	uint_t pos = n_args * depth + 1;
 	bdd a = get(a_in);
 	if (a_in.shift > pos) {a.h = a_in, a.l = a_in;}
 	if (a.l != F) {
