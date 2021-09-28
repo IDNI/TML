@@ -122,11 +122,11 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	// If BDD would not branch on this variable, exclude it to preserve canonicity
 	if (h == l) return h;
 	// First apply the inverse shift since h and l will be attached to v
-	h = h.shift_var(-v);
-	l = l.shift_var(-v);
+	h -= v;
+	l -= v;
 	// Apply output inversion invariant that low part must always be negative
-	const bool inv_out = l < 0;
-	if (inv_out) { h = -h; l = -l; }
+	const bool inv_out = l.inv_out;
+	if (inv_out) { h ^= true; l ^= true; }
 	// Now we know what v's child nodes will be, order them to maximize re-use
 	// attaching an input inverter if necessary. Required for canonicity.
 	const bool inv_inp = l < h;
@@ -189,7 +189,7 @@ bdd_ref bdd::bdd_ite_var(uint_t x, const bdd_ref &y, const bdd_ref &z) {
 
 bdd_ref bdd::bdd_ite(const bdd_ref &x, const bdd_ref &y, const bdd_ref & z) {
 	DBG(assert(x.bdd_id && y.bdd_id && z.bdd_id);)
-	if (x < 0) return bdd_ite(-x, z, y);
+	if (x.inv_out) return bdd_ite(-x, z, y);
 	if (x == F) return z;
 	if (x == T || y == z) return y;
 	if (x == -y || x == z) return F;
@@ -436,20 +436,20 @@ bdd_ref bdd::bdd_and_ex_perm(const bdd_ref &x, const bdd_ref & y, const bools& e
 
 char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, int_t& m) {
 	size_t i, sh = 0, sl = 0;
-	bdd_ref *b = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size());
-	for (i = 0; i != v.size(); ++i) b[i] = v[i];
-	m = b[0].shift;//var(v[0]);
-	for (i = 1; i != v.size(); ++i) m = min(m, (int_t) b[i].shift);//var(v[i]));
+	bdd *b = (bdd*)alloca(sizeof(bdd) * v.size());
+	for (i = 0; i != v.size(); ++i) b[i] = get(v[i]);
+	m = v[0].shift;//var(v[0]);
+	for (i = 1; i != v.size(); ++i) m = min(m, (int_t) v[i].shift);//var(v[i]));
 	bdd_ref *ph = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size()),
 		  *pl = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size());
 	for (i = 0; ph && i != v.size(); ++i)
-		if (b[i].shift != m) ph[sh++] = v[i];
-		else if (hi(b[i]) == F) ph = 0;
-		else if (hi(b[i]) != T) ph[sh++] = hi(b[i]);
+		if (v[i].shift != m) ph[sh++] = v[i];
+		else if (b[i].h == F) ph = 0;
+		else if (b[i].h != T) ph[sh++] = b[i].h;
 	for (i = 0; pl && i != v.size(); ++i)
-		if (b[i].shift != m) pl[sl++] = v[i];
-		else if (lo(b[i]) == F) pl = 0;
-		else if (lo(b[i]) != T) pl[sl++] = lo(b[i]);
+		if (v[i].shift != m) pl[sl++] = v[i];
+		else if (b[i].l == F) pl = 0;
+		else if (b[i].l != T) pl[sl++] = b[i].l;
 	if (ph) {
 		h.resize(sh);
 		while (sh--) h[sh] = ph[sh];

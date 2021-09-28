@@ -19,6 +19,7 @@
 #include <iostream>
 #include <memory>
 #include <functional>
+#include <climits>
 #include "defs.h"
 #ifndef NOMMAP
 #include "memory_map.h"
@@ -38,61 +39,98 @@ inline size_t fpairing(size_t x, size_t y) {
 
 extern bool onexit;
 
+/* Represents a bit-field with the given container type and bit-range, the high
+ * end being exclusive. Intended to be used in unions containing other
+ * bit-fields of the same container type. */
+
+template<class T, size_t low, size_t high> class bitfield {
+		// The value of this bit-field's container
+		T value;
+		// Used to select the required bits of an update
+		static const T set = (~T(0)) >> (low + (CHAR_BIT * sizeof(T)) - high);
+		// Used to clear the bits of the container to overwrite
+		static const T clear = ~(set << low);
+	public:
+		// For reading this bit-field. Filters out irrelevant container parts
+		operator T() const { return (value >> low) & set; }
+		// Facilitate in-place updates of this bit-field whilst leaving the rest of
+		// the container untouched
+		bitfield<T, low, high> &operator=(const T& nvalue) {
+			value = (value & clear) | ((nvalue & set) << low);
+			return *this;
+		}
+		bitfield<T, low, high> &operator+=(const T& nvalue) {
+			value = (value & clear) | (((T(*this) + nvalue) & set) << low);
+			return *this;
+		}
+		bitfield<T, low, high> &operator-=(const T& nvalue) {
+			value = (value & clear) | (((T(*this) - nvalue) & set) << low);
+			return *this;
+		}
+		bitfield<T, low, high> &operator^=(const T& nvalue) {
+			value = (value & clear) | (((T(*this) ^ nvalue) & set) << low);
+			return *this;
+		}
+};
+
 /* Represents an attributed edge representing input/output inversion and
  * variable shifting. */
 
 class bdd_ref {
 	public:
 		// Terminal node invariants: bdd_id <= 1 --> shift = 0 and
-		// bdd_id <= 1 --> inv_inp = 0 and bdd_id = 0 --> inv_out = 0
-		uint_t bdd_id:31, inv_inp:1, :0, shift:31, inv_out:1;
-		// Ensure that terminal node invariant is preserved
-		bdd_ref(uint_t bdd_id = 0, uint_t shift = 0, bool inv_inp = false,
-			bool inv_out = false) : bdd_id(bdd_id), inv_inp(bdd_id <= 1 ? 0 : inv_inp),
-			shift(bdd_id <= 1 ? 0 : shift), inv_out(bdd_id ? inv_out : false) {}
-		bool operator==(const bdd_ref &b) const {
-			return bdd_id == b.bdd_id && shift == b.shift && inv_inp == b.inv_inp &&
-				inv_out == b.inv_out; }
-		bool operator!=(const bdd_ref &b) const {
-			return bdd_id != b.bdd_id || shift != b.shift || inv_inp != b.inv_inp ||
-				inv_out != b.inv_out; }
-		// Satisfies the invariant a<b <--> -b<-a
+		// bdd_id <= 1 --> inv_inp = 0 and bdd_id = 0 --> inv_out = 0. Ensures that
+		// each attributed edge has a unique representation.
+		union {
+			bitfield<uint32_t, 0, 22> bdd_id; // Target BDD ID
+			bitfield<uint32_t, 22, 30> shift; // Variable shifter
+			bitfield<uint32_t, 30, 31> inv_inp; // Invert inputs?
+			bitfield<uint32_t, 31, 32> inv_out; // Invert outputs?
+			bitfield<uint32_t, 0, 32> raw; // Composite value
+		};
+		// Initialize reference while guaranteeing invariant satisfaction
+		bdd_ref(uint_t bdd_id_ = 0, uint_t shift_ = 0, bool inv_inp_ = false,
+				bool inv_out_ = false) {
+			bdd_id = bdd_id_;
+			inv_inp = bdd_id_ <= 1 ? 0 : inv_inp_;
+			shift = bdd_id_ <= 1 ? 0 : shift_;
+			inv_out = bdd_id_ ? inv_out_ : false;
+		}
+		// Compare BDD references using one-to-one correspondence to raw field
+		bool operator==(const bdd_ref &b) const { return raw == b.raw; }
+		bool operator!=(const bdd_ref &b) const { return raw != b.raw; }
+		// Guarantees that output inverted BDDs always less than non-inverted ones
 		bool operator<(const bdd_ref &b) const {
-			if(inv_out != b.inv_out) return inv_out;
-			else if(bdd_id != b.bdd_id) return inv_out ^ (bdd_id < b.bdd_id);
-			else if(shift != b.shift) return inv_out ^ (shift < b.shift);
-			else if(inv_inp != b.inv_inp) return inv_out ^ b.inv_inp;
-			else return false;
-		}
-		// Satisfies the invariant a>b <--> -b>-a
+			int32_t a_val, b_val;
+			memcpy(&a_val, &raw, sizeof(int32_t));
+			memcpy(&b_val, &b.raw, sizeof(int32_t));
+			return a_val < b_val; }
+		// Guarantees that non-output inverted BDDs always more than inverted ones
 		bool operator>(const bdd_ref &b) const {
-			if(inv_out != b.inv_out) return b.inv_out;
-			else if(bdd_id != b.bdd_id) return inv_out ^ (bdd_id > b.bdd_id);
-			else if(shift != b.shift) return inv_out ^ (shift > b.shift);
-			else if(inv_inp != b.inv_inp) return inv_out ^ inv_inp;
-			else return false;
-		}
+			int32_t a_val, b_val;
+			memcpy(&a_val, &raw, sizeof(int32_t));
+			memcpy(&b_val, &b.raw, sizeof(int32_t));
+			return a_val > b_val; }
 		// Negate object whilst guarding against negative 0
 		bdd_ref operator-() const {
-				return bdd_ref(bdd_id, shift, inv_inp, bdd_id ? !inv_out : false); }
+			return bdd_ref(bdd_id, shift, inv_inp, bdd_id ? !inv_out : false); }
+		// Enables in-place negation of object whilst guarding against negative 0
+		bdd_ref &operator ^=(bool b) { if(bdd_id) inv_out ^= b; return *this; }
+		// All boolean functions have a sign, get the corresponding positive one
 		bdd_ref abs() const { return bdd_ref(bdd_id, shift, inv_inp, false); }
 		// Ensure that terminal node invariant is preserved
-		bdd_ref shift_var(int delta) const {
-			return bdd_ref(bdd_id, bdd_id <= 1 ? 0 : (shift + delta), inv_inp, inv_out); }
+		bdd_ref &operator+=(int8_t d) { if(bdd_id > 1) shift += d; return *this; }
+		bdd_ref &operator-=(int8_t d) { if(bdd_id > 1) shift -= d; return *this; }
 };
 
 /* Ensure that edge attributes are packed correctly. */
 
-static_assert(sizeof(bdd_ref) == 8, "bdd_ref must use exactly 8 bytes");
+static_assert(sizeof(bdd_ref) == 4, "bdd_ref must use exactly 4 bytes");
 
 /* Combine the edge attributes and target BDD into a hash. */
 
 template<> struct std::hash<bdd_ref> {
-	std::size_t operator()(const bdd_ref &br) const {
-		uint32_t id1 = br.bdd_id | (uint32_t(br.inv_out) << 31);
-		uint32_t id2 = br.shift | (uint32_t(br.inv_inp) << 31);
-		return id1 ^ (id2 + 0x9e3779b9 + (id1 << 6) + (id1 >> 2));
-	}
+	std::size_t operator()(const bdd_ref &br) const { return br.raw; }
 };
 
 class bdd;
@@ -301,10 +339,10 @@ class bdd {
 		// Apply input inversion to the outcome
 		if(x.inv_inp) std::swap(cbdd.h, cbdd.l);
 		// Apply variable shifting to the outcome
-		cbdd.l = cbdd.l.shift_var(x.shift);
-		cbdd.h = cbdd.h.shift_var(x.shift);
+		cbdd.l += x.shift;
+		cbdd.h += x.shift;
 		// Apply output inversion to the outcome
-		if(x < 0) { cbdd.l = -cbdd.l; cbdd.h = -cbdd.h; }
+		if(x.inv_out) { cbdd.l ^= true; cbdd.h ^= true; }
 		return cbdd;
 	}
 
@@ -345,7 +383,7 @@ class bdd {
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(const bdd_ref &t) { return t.abs() == T; }
-	inline static bool trueleaf(const bdd_ref &t) { return t > 0; }
+	inline static bool trueleaf(const bdd_ref &t) { return !t.inv_out; }
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, const bdd_ref &x);
 	bdd_ref h, l;
@@ -417,11 +455,11 @@ public:
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[x.bdd_id];
 		// Apply input inversion
-		const bdd_ref &child = x.inv_inp ? cbdd.l : cbdd.h;
+		bdd_ref child = x.inv_inp ? cbdd.l : cbdd.h;
 		// Apply variable shifter
-		bdd_ref nbdd = child.shift_var(x.shift);
+		child += x.shift;
 		// Apply output inversion
-		return x > 0 ? nbdd : -nbdd;
+		return x.inv_out ? -child : child;
 	}
 	
 	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
@@ -430,11 +468,11 @@ public:
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[x.bdd_id];
 		// Apply input inversion
-		const bdd_ref &child = x.inv_inp ? cbdd.h : cbdd.l;
+		bdd_ref child = x.inv_inp ? cbdd.h : cbdd.l;
 		// Apply variable shifter
-		bdd_ref nbdd = child.shift_var(x.shift);
+		child += x.shift;
 		// Apply output inversion
-		return x > 0 ? nbdd : -nbdd;
+		return x.inv_out ? -child : child;
 	}
 	
 	/* The variable of a BDD reference is its root/absolute shift. */
