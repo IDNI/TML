@@ -34,10 +34,12 @@ inline size_t fpairing(size_t x, size_t y) {
 	return y+(z>>1);
 }
 
+
 extern bool onexit;
 
 class bdd;
-class constraints;
+class poset;
+class union_find;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
@@ -72,6 +74,16 @@ template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
 	size_t operator()(const std::array<int_t, 2>&) const;
+};
+template<> struct std::hash<poset> {size_t operator()(const poset&)const;};
+template<typename X, typename Y> struct std::hash<std::set<X,Y>> {
+	size_t operator()(const std::set<X,Y>&) const;
+};
+template<typename X, typename Y> struct std::hash<std::map<X,Y>> {
+	size_t operator()(const std::map<X,Y>&) const;
+};
+template<> struct std::hash<union_find>{
+	size_t operator()(const union_find& u)const;
 };
 
 const int_t T = 1, F = -1;
@@ -112,8 +124,8 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
-extern std::vector<constraints> CV;
-extern std::vector<constraints> neg_CV;
+extern std::vector<poset> CV;
+extern std::vector<poset> neg_CV;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;
@@ -413,10 +425,12 @@ public:
 	bool empty () const { return parent.empty(); }
 	static union_find
 	intersect(union_find &uf1, union_find &uf2, bool &pure);
+
+	friend std::hash<union_find>;
 };
 
 // representation for 2-CNFs
-class constraints {
+class poset {
 	static constexpr auto abs_cmp = [](int a, int b) {
 		int abs_a = abs(a), abs_b = abs(b);
 		if (abs_a < abs_b) return true;
@@ -424,20 +438,27 @@ class constraints {
 		return a < b;
 	};
 
+
 	std::map<int_t, std::set<int_t>> imp_var;
 	std::set<int_t, decltype(abs_cmp)> true_var; //Set is sorted by absolut value
 	union_find eq_var;
 	bool is_pure = false;
 
+	uint_t hash;
+
 	// void updateTC (); <- not needed yet
 public:
-	constraints() = default;
-	constraints(int_t var, bool b) {
+	poset() = default;
+	poset(int_t var, bool b) {
 		b ? true_var.insert(var) : true_var.insert(-var);
 		is_pure = true;
 	}
-	static constraints merge(int_t var, constraints& hi, constraints& lo);
-	static constraints extend_sing (const constraints& c, int_t var, bool b);
+
+	void calc_hash();
+	friend std::hash<poset>;
+
+	static poset merge(int_t var, poset& hi, poset& lo);
+	static poset extend_sing (const poset& c, int_t var, bool b);
 	inline bool is_singleton () const{
 		return imp_var.empty() && eq_var.empty() && !true_var.empty();
 	}
@@ -446,10 +467,10 @@ public:
 	}
 	inline bool pure() const { return is_pure; }
 	inline bool set_pure() { is_pure = true; }
-	inline static constraints& get (int_t c) {
+	inline static poset& get (int_t c) {
 		return c > 0 ? CV[c] : neg_CV[-c];
 	}
-	inline static constraints& get_neg (int_t c) {
+	inline static poset& get_neg (int_t c) {
 		return c > 0 ? neg_CV[c] : CV[-c];
 	}
 };

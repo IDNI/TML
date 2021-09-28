@@ -44,9 +44,10 @@ template<typename T1, typename T2> struct vec2cmp {
 };
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
+unordered_map<poset, int_t> Mc;
 bdd_mmap V;
-vector<constraints> CV;
-vector<constraints> neg_CV;
+vector<poset> CV;
+vector<poset> neg_CV;
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
@@ -98,8 +99,8 @@ void bdd::init(bool gc) {
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
-	CV.emplace_back(), CV.emplace_back(), // adding empty constraints
-	neg_CV.emplace_back(), neg_CV.emplace_back(), // adding empty constraints
+	CV.emplace_back(), CV.emplace_back(), // adding empty poset
+	neg_CV.emplace_back(), neg_CV.emplace_back(), // adding empty poset
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -116,12 +117,12 @@ void bdd::max_bdd_size_check() {
 }
 #endif
 
-//TODO: Take constraints into account
+//TODO: Take poset into account
 bdd bdd::get(int_t x) {
 	if (x > 0) {
 		const bdd &y = V[x];
-		const constraints &c = CV[x];
-		const constraints &neg_c = neg_CV[x];
+		const poset &c = CV[x];
+		const poset &neg_c = neg_CV[x];
 
 		if (c.pure()) {
 			// get the highest variable and build high and low
@@ -129,6 +130,7 @@ bdd bdd::get(int_t x) {
 		}
 		if (neg_c.pure()){
 			// get the highest variable and build high and low
+
 		}
 		/*if (c.has_leading_var()) {
 			// highest variable is in constraint
@@ -189,10 +191,10 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		} else {
 			// extend 2-CNF by v = 1 - no reduction or TC needed here because v is not present in h path yet
 			V.emplace_back(0,0,0);
-			CV.emplace_back(constraints::extend_sing(constraints::get(h), v, true));
+			CV.emplace_back(poset::extend_sing(poset::get(h), v, true));
 			neg_CV.emplace_back(
-				constraints::merge(
-					v, constraints::get_neg(h), constraints::get_neg(l)
+				poset::merge(
+					v, poset::get_neg(h), poset::get_neg(l)
 					));
 			return;
 		}*/
@@ -205,9 +207,9 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 			neg_CV.emplace_back(v, true);
 			return;
 		} else {
-			constraints neg_c_l = constraints::get_neg(l);
-			constraints c = constraints::extend_sing(constraints::get(l), v, true);
-			constraints neg_c = constraints::merge(v, constraints::get_neg(h), neg_c_l);
+			poset neg_c_l = poset::get_neg(l);
+			poset c = poset::extend_sing(poset::get(l), v, true);
+			poset neg_c = poset::merge(v, poset::get_neg(h), neg_c_l);
 			if (c.pure()) V.emplace_back(0,0,0);
 			else if (neg_c_l.pure() && neg_c_l.is_singleton()){
 				neg_c.set_pure();
@@ -221,9 +223,9 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	}
 	if(l == T) {
 		// h cannot be F here
-		constraints c_h = constraints::get(h);
-		constraints c = constraints::merge(v, c_h, constraints::get(l));
-		constraints neg_c = constraints::extend_sing(constraints::get_neg(h), v, true);
+		poset c_h = poset::get(h);
+		poset c = poset::merge(v, c_h, poset::get(l));
+		poset neg_c = poset::extend_sing(poset::get_neg(h), v, true);
 		if (c_h.pure() && c_h.is_singleton()) {
 			c.set_pure();
 			V.emplace_back(0, 0, 0); }
@@ -239,8 +241,8 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	}
 
 	// general lifting case
-	constraints c = constraints::merge(v, constraints::get(h), constraints::get(l));
-	constraints neg_v = constraints::merge(v, constraints::get_neg(h), constraints::get_neg(l));
+	poset c = poset::merge(v, poset::get(h), poset::get(l));
+	poset neg_v = poset::merge(v, poset::get_neg(h), poset::get_neg(l));
 	if (c.pure() || neg_v.pure()) V.emplace_back(0, 0, 0);
 	else 	V.emplace_back(v,h,l);
 	CV.emplace_back(move(c));
@@ -1274,6 +1276,34 @@ size_t hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 
 size_t hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}
 
+size_t hash<poset>::operator()(const poset& p) const { return p.hash; }
+
+template<typename X, typename Y> size_t
+hash<set<X,Y>>::operator()(const set<X,Y>& set) const {
+	hash<X> hasher;
+	size_t seed = set.size();
+	for(auto& i : set) {
+		seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	return seed;
+}
+
+template<typename X, typename Y>
+size_t hash<map<X, Y>>::operator()(const map<X, Y> &m) const {
+	hash<X> hash_key;
+	hash<Y> hash_val;
+	size_t seed = m.size();
+	for (const auto& i : m) {
+		seed ^= fpairing(hash_key(i.first), hash_val(i.second))
+			+ 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	return seed;
+}
+
+size_t hash<union_find>::operator()(const union_find &u) const {
+	return hash<decltype(u.parent)>{} (u.parent);
+}
+
 bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
 //	DBG(assert(V.size() < 2 || (v && h && l));)
 }
@@ -1339,9 +1369,9 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	return uf_res;
 }
 
-// Create constraints for a node from its high and low nodes
-constraints constraints::merge(int_t var, constraints& hi, constraints& lo) {
-	constraints res;
+// Create poset for a node from its high and low nodes
+poset poset::merge(int_t var, poset& hi, poset& lo) {
+	poset res;
 	//Check if res can be pure at all - this is revised later
 	if(hi.pure() && lo.pure()) res.is_pure = true;
 	// Lifting of implications
@@ -1499,8 +1529,15 @@ constraints constraints::merge(int_t var, constraints& hi, constraints& lo) {
 }
 
 
-constraints constraints::extend_sing(const constraints &c, int_t var, bool b) {
-	constraints res = c;
+poset poset::extend_sing(const poset &c, int_t var, bool b) {
+	poset res = c;
 	b ? res.true_var.insert(var) : res.true_var.insert(-var);
 	return res;
+}
+
+void poset::calc_hash() {
+	size_t hash_ = std::hash<decltype(imp_var)>{}(imp_var);
+	hash_ ^= std::hash<decltype(true_var)>{}(true_var);
+	hash_ ^= std::hash<decltype(eq_var)>{}(eq_var);
+	hash = hash_;
 }
