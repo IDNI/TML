@@ -1287,7 +1287,7 @@ size_t archive::size(const driver& d) {
 
 archive& archive::write_bdd() {
 	*this << V.size();
-	write(V.data(), V.size() * 3 * sizeof(int_t));
+	write(V.data(), V.size() * sizeof(bdd));
 	return *this;
 }
 archive& archive::read_bdd() {
@@ -1295,7 +1295,7 @@ archive& archive::read_bdd() {
 	//POS("reading bdd size")
 	*this >> nsize;
 	//COUT << "nsize: " << nsize << endl;
-	size_t s = nsize * 3 * sizeof(int_t);
+	size_t s = nsize * sizeof(bdd);
 	//COUT << "loading bdd size: " << nsize << " " << s << endl;
 	V = bdd_mmap(nsize, bdd{0,0},
 		memory_map_allocator<bdd>("", bdd_mmap_mode));
@@ -1310,7 +1310,7 @@ archive& archive::read_bdd() {
 	return *this;
 }
 size_t archive::bdd_size() {
-	size_t s = V.size() * 3 * sizeof(int_t) + sizeof(size_t);
+	size_t s = V.size() * sizeof(bdd) + sizeof(size_t);
 	return s;
 }
 
