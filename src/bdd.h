@@ -483,7 +483,7 @@ public:
 
 	static size_t satcount_perm(const bdd_ref &x, size_t leafvar);
 
-	static size_t getvar(const bdd_ref &h, const bdd_ref &l, int_t v, const bdd_ref &x, size_t maxv);
+	static size_t getvar(const bdd_ref &x);
 	static size_t satcount_k(const bdd_ref &x, const bools& ex, const uints& perm);
 	static size_t satcount_k(const bdd_ref &x, size_t leafvar,
 		std::map<int_t, int_t>& mapvars);

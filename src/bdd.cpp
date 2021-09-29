@@ -760,7 +760,8 @@ spbdd_handle bdd_handle::get(const bdd_ref & b) {
 
 void bdd::bdd_sz(const bdd_ref &x, set<bdd_ref>& s) {
 	if (!s.emplace(x).second) return;
-	bdd_sz(hi(x), s), bdd_sz(lo(x), s);
+	bdd b = get(x);
+	bdd_sz(b.h, s), bdd_sz(b.l, s);
 }
 
 spbdd_handle operator&&(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -880,23 +881,21 @@ size_t bdd::satcount_perm(const bdd_ref & x, size_t leafvar) {
 }
 
 static set<size_t> ourvars;
-size_t bdd::getvar(const bdd_ref &h, const bdd_ref &l, int_t v, const bdd_ref & x, size_t maxv) {
-	if (leaf(x)) return maxv;
-	const bdd bhi = get(h), blo = get(l);
-	maxv = leaf(h) ? maxv : max(maxv, getvar(bhi.h, bhi.l, h.shift, h, maxv));
-	maxv = leaf(l) ? maxv : max(maxv, getvar(blo.h, blo.l, l.shift, l, maxv));
-	maxv = max(maxv, size_t(v));
-	ourvars.insert(v);
-	return maxv;
+size_t bdd::getvar(const bdd_ref & x) {
+	if (leaf(x)) return 0;
+	else {
+		ourvars.insert(x.shift);
+		const bdd b = get(x);
+		return max((size_t) x.shift, max(getvar(b.h), getvar(b.l)));
+	}
 }
 
 // D: this version does a manual 'permute' (in place alligns vars)
 // works better with rule(?x ?y ?out) :- headers
 // could be buggy (when bdd is minimized, vars removed, we're only guessing)
 size_t bdd::satcount_k(const bdd_ref & x, const bools& ex, const uints&) {
-	const bdd bx = get(x);
 	ourvars.clear();
-	size_t leafvar = getvar(bx.h, bx.l, x.shift, x, 0) + 1;
+	size_t leafvar = getvar(x) + 1;
 
 	// this's what's missing, if size is smaller means we don't have the 0-var,
 	// but this might be correct or not, we might be missing one in the middle?
@@ -1176,6 +1175,7 @@ bdd::bdd(const bdd_ref &h, const bdd_ref & l) : h(h), l(l) {
 template <typename T>
 basic_ostream<T>& bdd::out(basic_ostream<T>& os, const bdd_ref & x) {
 	if (leaf(x)) return os << (trueleaf(x) ? 'T' : 'F');
+	const bdd b = get(x);
 	//return out(out(os << b.v << " ? ", b.h) << " : ", b.l);
-	return out(out(os << x.shift << " ? (", hi(x)) << ") : (", lo(x)) << ")";
+	return out(out(os << x.shift << " ? (", b.h) << ") : (", b.l) << ")";
 }

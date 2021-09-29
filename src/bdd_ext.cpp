@@ -1054,7 +1054,7 @@ bool bdd::is_zero(bdd_ref a_in, size_t bits) {
 	bdd a = bdd::get(a_in);
 	for (size_t i = 0; i < bits; i++) {
 		if (a.h != F) return false;
-		a_in = a.l;
+		a = get(a.l);
 	}
 	return true;
 }
