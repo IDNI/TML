@@ -45,6 +45,7 @@ struct pnft {
 	pnft();
 	~pnft();
 	quant_t to_quant_t(form *f) const;
+	bool is_quant(form *f) const;
 	bool fp(class tables *s) const;
 	void print() const;
 	void quantify(spbdd_handle &q, size_t bits) const;
