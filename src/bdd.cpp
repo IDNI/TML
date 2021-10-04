@@ -44,7 +44,7 @@ template<typename T1, typename T2> struct vec2cmp {
 };
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
-unordered_map<poset, int_t> Mc;
+unordered_map<poset, int_t> Mc, Mneg_c;
 bdd_mmap V;
 vector<poset> CV;
 vector<poset> neg_CV;
@@ -117,39 +117,79 @@ void bdd::max_bdd_size_check() {
 }
 #endif
 
-//TODO: Take poset into account
 bdd bdd::get(int_t x) {
 	if (x > 0) {
 		const bdd &y = V[x];
-		const poset &c = CV[x];
-		const poset &neg_c = neg_CV[x];
+		poset &c = CV[x];
+		poset &neg_c = neg_CV[x];
 
-		if (c.pure()) {
-			// get the highest variable and build high and low
-
-		}
-		if (neg_c.pure()){
-			// get the highest variable and build high and low
-
-		}
-		/*if (c.has_leading_var()) {
-			// highest variable is in constraint
-			int_t h = abs(y.h) != 1 ? y.h : y.l;
-			return c.get_leading_var() > 0 ?
-				bdd(c.get_leading_var(), h, F) :
-					bdd(c.get_leading_var(), F, h);
-		}
-		if (neg_c.has_leading_var()) {
-			// highest variable is in negated constraint
-			return c.get_leading_var() > 0 ?
-				bdd(c.get_leading_var(), c.get_bdd(), T) :
-					bdd(c.get_leading_var(), T, c.get_bdd());
-		}*/
-
+		if (c.pure()) return poset_to_bdd(c);
+		else if (neg_c.pure()) return neg_poset_to_bdd(neg_c);
 		return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
 	}
 	const bdd &y = V[-x];
+	poset &c = neg_CV[-x];
+	poset &neg_c = CV[-x];
+
+	if (c.pure()) return poset_to_bdd(c);
+	else if (neg_c.pure()) return neg_poset_to_bdd(neg_c);
 	return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
+}
+
+bdd bdd::neg_poset_to_bdd(poset &p) {
+	// get the highest variable and build high and low
+	int_t v = p.get_high_var();
+	auto l_v = p.eval(-v);
+	auto h_v = p.eval(v);
+	int_t h,l;
+	// Find high 2-CNF in universe
+	unordered_map<poset, int_t>::const_iterator it;
+	if (it = Mneg_c.find(h_v); it != end(Mneg_c)) h = it->second;
+	else {
+		Mneg_c.emplace(h_v, neg_CV.size());
+		V.emplace_back(0,0,0);
+		neg_CV.emplace_back(move(h_v));
+		CV.emplace_back();
+		h = neg_CV.size() - 1;
+	}
+	// Find low 2-CNF in universe
+	if (it = Mneg_c.find(l_v); it != end(Mneg_c)) l = it->second;
+	else {
+		Mneg_c.emplace(l_v, neg_CV.size());
+		V.emplace_back(0,0,0);
+		neg_CV.emplace_back(move(l_v));
+		CV.emplace_back();
+		l = neg_CV.size() - 1;
+	}
+	return bdd(v, -h, -l);
+}
+
+bdd bdd::poset_to_bdd(poset &p) {
+	// get the highest variable and build high and low
+	int_t v = p.get_high_var();
+	auto l_v = p.eval(-v);
+	auto h_v = p.eval(v);
+	int_t h,l;
+	// Find high 2-CNF in universe
+	unordered_map<poset, int_t>::const_iterator it;
+	if (it = Mc.find(h_v); it != end(Mc)) h = it->second;
+	else {
+		Mc.emplace(h_v, CV.size());
+		V.emplace_back(0,0,0);
+		neg_CV.emplace_back();
+		CV.emplace_back(move(h_v));
+		h = CV.size() - 1;
+	}
+	// Find low 2-CNF in universe
+	if (it = Mc.find(l_v); it != end(Mc)) l = it->second;
+	else {
+		Mc.emplace(l_v, CV.size());
+		V.emplace_back(0,0,0);
+		neg_CV.emplace_back();
+		CV.emplace_back(move(l_v));
+		l = CV.size() - 1;
+	}
+	return bdd(v, h, l);
 }
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
@@ -203,17 +243,27 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		if(l == T) {
 			// pure 2-CNF
 			V.emplace_back(0,0,0);
+			poset c = poset(v,false);
+			poset neg_c = poset(v, true);
 			CV.emplace_back(v, false);
+			Mc.emplace(move(c), CV.size()-1);
 			neg_CV.emplace_back(v, true);
+			Mneg_c.emplace(move(neg_c), neg_CV.size()-1);
 			return;
 		} else {
 			poset neg_c_l = poset::get_neg(l);
 			poset c = poset::extend_sing(poset::get(l), v, true);
 			poset neg_c = poset::merge(v, poset::get_neg(h), neg_c_l);
-			if (c.pure()) V.emplace_back(0,0,0);
+			if (c.pure()) {
+				V.emplace_back(0,0,0);
+				Mc.emplace(c, CV.size());
+				if(neg_c.pure())
+					Mneg_c.emplace(neg_c, neg_CV.size());
+			}
 			else if (neg_c_l.pure() && neg_c_l.is_singleton()){
 				neg_c.set_pure();
 				V.emplace_back(0,0,0);
+				Mneg_c.emplace(neg_c, neg_CV.size());
 			}
 			else V.emplace_back(v,h,l);
 			CV.emplace_back(move(c));
@@ -228,8 +278,15 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		poset neg_c = poset::extend_sing(poset::get_neg(h), v, true);
 		if (c_h.pure() && c_h.is_singleton()) {
 			c.set_pure();
-			V.emplace_back(0, 0, 0); }
-		else if (neg_c.pure()) V.emplace_back(0, 0, 0);
+			V.emplace_back(0, 0, 0);
+			Mc.emplace(c, CV.size());
+			if (neg_c.pure())
+				Mneg_c.emplace(neg_c, neg_CV.size());
+		}
+		else if (neg_c.pure()) {
+			V.emplace_back(0, 0, 0);
+			Mneg_c.emplace(neg_c, neg_CV.size());
+		}
 		else V.emplace_back(v, h, l);
 		CV.emplace_back(move(c));
 		neg_CV.emplace_back(move(neg_c));
@@ -242,11 +299,21 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 
 	// general lifting case
 	poset c = poset::merge(v, poset::get(h), poset::get(l));
-	poset neg_v = poset::merge(v, poset::get_neg(h), poset::get_neg(l));
-	if (c.pure() || neg_v.pure()) V.emplace_back(0, 0, 0);
+	poset neg_c = poset::merge(v, poset::get_neg(h), poset::get_neg(l));
+	if (c.pure() && neg_c.pure()) {
+		V.emplace_back(0, 0, 0);
+		Mc.emplace(c, CV.size());
+		Mneg_c.emplace(neg_c, neg_CV.size());
+	} else if (c.pure()) {
+		V.emplace_back(0, 0, 0);
+		Mc.emplace(c, CV.size());
+	} else if (neg_c.pure()){
+		V.emplace_back(0, 0, 0);
+		Mneg_c.emplace(neg_c, neg_CV.size());
+	}
 	else 	V.emplace_back(v,h,l);
 	CV.emplace_back(move(c));
-	neg_CV.emplace_back(move(neg_v));
+	neg_CV.emplace_back(move(neg_c));
 }
 
 int_t bdd::from_bit(uint_t b, bool v) {
@@ -1288,20 +1355,26 @@ hash<set<X,Y>>::operator()(const set<X,Y>& set) const {
 	return seed;
 }
 
-template<typename X, typename Y>
-size_t hash<map<X, Y>>::operator()(const map<X, Y> &m) const {
+template<typename X, typename Y, typename Z>
+size_t hash<map<X, Y, Z>>::operator()(const map<X, Y, Z> &m) const {
 	hash<X> hash_key;
 	hash<Y> hash_val;
 	size_t seed = m.size();
 	for (const auto& i : m) {
-		seed ^= fpairing(hash_key(i.first), hash_val(i.second))
-			+ 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= hash_key(i.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= hash_val(i.second) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 	}
 	return seed;
 }
 
 size_t hash<union_find>::operator()(const union_find &u) const {
-	return hash<decltype(u.parent)>{} (u.parent);
+	hash<int_t> hasher;
+	size_t seed = u.parent.size();
+	for (const auto& i : u.parent) {
+		seed ^= hasher(i.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= hasher(i.second.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	return seed;
 }
 
 bdd::bdd(int_t v, int_t h, int_t l) : h(h), l(l), v(v) {
@@ -1320,9 +1393,9 @@ basic_ostream<T>& bdd::out(basic_ostream<T>& os, int_t x) {
 int_t union_find::find(int_t x) {
 	if(auto it = parent.find(x); it != parent.end()) {
 		// the root of the set has itself as parent
-		while(it->first != it->second) {
+		while(it->first != it->second.first) {
 			// set parent of node to grandparent
-			auto it_grandpa = parent.find(it->second);
+			auto it_grandpa = parent.find(it->second.first);
 			it->second = it_grandpa->second;
 			it = it_grandpa;
 		} return it->first;
@@ -1332,24 +1405,71 @@ int_t union_find::find(int_t x) {
 // Perform the union of sets represented by x and y
 void union_find::merge(int_t x, int_t y) {
 	int_t root_x = find(x), root_y = find(y);
-	if(root_x != 0 && root_y != 0) parent[root_y] = root_x;
+	// we introduce canonicity
+	if(root_x < root_y) {
+		auto tmp = parent[root_y].second;
+		parent[root_y] = make_pair(root_x, parent[root_x].second);
+		parent[root_x].second = tmp;
+		auto link_set = parent[root_x].second;
+		while(root_x != link_set) {
+			parent[link_set].first = root_x;
+			link_set = parent[link_set].second;
+		}
+	}
+	else if(root_x > root_y) {
+		auto tmp = parent[root_x].second;
+		parent[root_x] = make_pair(root_y, parent[root_y].second);
+		parent[root_y].second = tmp;
+		auto link_set = parent[root_y].second;
+		while(root_y != link_set) {
+			parent[link_set].first = root_y;
+			link_set = parent[link_set].second;
+		}
+	}
+
 }
 
 // Insert a new positive element as disjoint singleton set
 bool union_find::insert(int_t x) {
-	if (auto it = parent.find(x); it != parent.end()) {
-		parent[x] = x; return true;
-	} else return false;
+	auto[it, inserted] = parent.try_emplace(x, make_pair(x, x));
+	if (!inserted) return false;
+	else return true;
+}
+
+vector<int_t> union_find::get_set (int_t x) {
+	if(auto it = parent.find(x); it != end(parent)) {
+		vector<int_t> eq{x};
+		int_t link = parent[x].second;
+		while (link != x) {
+			eq.emplace_back(link);
+			link = parent[link].second;
+		}
+		return eq;
+	} else return {};
+}
+
+void union_find::delete_set(int_t x) {
+	if(auto it = parent.find(x); it != end(parent)) {
+		int_t link = parent[x].second;
+		int_t next;
+		parent.erase(x);
+		while (link != x) {
+			next = parent[link].second;
+			parent.erase(link);
+			link = next;
+		}
+	}
 }
 
 union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	map<pair<int_t,int_t>, vector<int_t>> eq_class;
+	abs_cmp comp;
 	// Find common nodes in uf1 and uf2
 	auto it_uf1 = uf1.parent.begin();
 	auto it_uf2 = uf2.parent.begin();
 	while (it_uf1 != uf1.parent.end() && it_uf2 != uf2.parent.end()) {
-		if (it_uf1->first < it_uf2->first) { pure = false; ++it_uf1; }
-		else if(it_uf2->first < it_uf1->first) { pure = false; ++it_uf2; }
+		if (comp(it_uf1->first, it_uf2->first)) { pure = false; ++it_uf1; }
+		else if(comp(it_uf2->first, it_uf1->first)) { pure = false; ++it_uf2; }
 		else {
 			// Found a common node; Associate with equivalence tuple
 			int_t eq_class_uf1 = uf1.find(it_uf1->first);
@@ -1369,16 +1489,29 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	return uf_res;
 }
 
+int_t union_find::get_high_var() const {
+	return parent.begin()->first;
+}
+
+bool union_find::operator==(const union_find &u) const {
+	auto pred = [](auto a, auto b) {
+		a.first == b.first && a.second.first == b.second.first;
+	};
+	return parent.size() == u.parent.size() &&
+		std::equal(parent.begin(), parent.end(), u.parent.begin(), pred);
+}
+
 // Create poset for a node from its high and low nodes
 poset poset::merge(int_t var, poset& hi, poset& lo) {
 	poset res;
+	abs_cmp comp;
 	//Check if res can be pure at all - this is revised later
 	if(hi.pure() && lo.pure()) res.is_pure = true;
 	// Lifting of implications
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
-		if (it_lo == lo.imp_var.end() || it_hi->first < it_lo->first) {
+		if (it_lo == lo.imp_var.end() || comp(it_hi->first,it_lo->first)) {
 			if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
 				// Implication is true in lo since antecedent is violated
 				res.imp_var.emplace(it_hi->first, it_hi->second);
@@ -1398,7 +1531,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			}
 			++it_hi;
 		}
-		else if (it_hi == hi.imp_var.end() || it_lo->first < it_hi->first) {
+		else if (it_hi == hi.imp_var.end() || comp(it_lo->first, it_hi->first)) {
 			if (hi.true_var.find(-it_lo->first) != hi.true_var.end()) {
 				// Implication is true in hi since antecedent is violated
 				res.imp_var.emplace(it_lo->first, it_lo->second);
@@ -1525,14 +1658,14 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			union_find::intersect(hi.eq_var, lo.eq_var, res.is_pure);
 	}
 
-	return res;
+	return res.calc_hash(), res;
 }
 
 
 poset poset::extend_sing(const poset &c, int_t var, bool b) {
 	poset res = c;
 	b ? res.true_var.insert(var) : res.true_var.insert(-var);
-	return res;
+	return res.calc_hash(), res;
 }
 
 void poset::calc_hash() {
@@ -1540,4 +1673,98 @@ void poset::calc_hash() {
 	hash_ ^= std::hash<decltype(true_var)>{}(true_var);
 	hash_ ^= std::hash<decltype(eq_var)>{}(eq_var);
 	hash = hash_;
+}
+
+// Get resulting poset when assigning v
+//TODO: return false
+poset poset::eval(int_t v) {
+	if (has(true_var,v)) {
+		// remove v from true_var
+		// check if poset is empty -> return T
+		// else return *this with v removed
+		poset res;
+		res = *this;
+		res.true_var.erase(v);
+		if(res.is_empty()) res.set_pure();
+		return res;
+	}
+	else if(has(true_var,-v)) {
+		// return F
+		poset res;
+		return res;
+	}
+	poset res;
+	res.true_var = true_var;
+	res.true_var.insert(v); // temporarily insert v
+	res.eq_var = eq_var; // delete used equalities later
+	// Check if v is part of some equality
+	auto eq_set = eq_var.get_set(v);
+	res.eq_var.delete_set(v);
+	if(eq_set.size() > 1) {
+		for(const auto& e : eq_set) res.true_var.insert(e);
+	}
+	// complete true_var set of res, possible due to transitive closure
+	auto imp = begin(imp_var);
+	while(imp != end(imp_var)) {
+		// Antecedent of implication is true
+		if(has(res.true_var, imp->first)) {
+			for(const auto& var : imp->second) {
+				res.true_var.insert(var);
+				// Ensure that equalities are used
+				eq_set = res.eq_var.get_set(var);
+				res.eq_var.delete_set(var);
+				if(eq_set.size()>1)
+					for(const auto& e : eq_set)
+						res.true_var.insert(e);
+			}
+		}
+		// Check if a consequent is already true
+		else {
+			for(const auto& var : imp->second) {
+				if(has(res.true_var, -var)) {
+					res.true_var.insert(-imp->first);
+					// Ensure that equalities are used
+					eq_set = res.eq_var.get_set(-imp->first);
+					res.eq_var.delete_set(-imp->first);
+					if(eq_set.size()>1)
+						for(const auto& e : eq_set)
+							res.true_var.insert(e);
+				}
+			}
+		}
+	}
+	// delete all implications where at least one variable
+	// (in absolute value) appears in true_var
+	imp = begin(imp_var);
+	while(imp != end(imp_var)) {
+		if (!has(res.true_var, imp->first) &&
+			!has(res.true_var, -imp->first)) {
+			auto var = begin(imp->second);
+			while(var != end(imp->second)) {
+				if(has(res.true_var, -*var)) {
+					//This case cannot happen:
+					// negated antecedent is already in true_var
+					DBGFAIL;
+				}
+				if(!has(res.true_var, *var)) {
+					res.imp_var[imp->first].insert(*var);
+				}
+			}
+		}
+
+	}
+	res.true_var.erase(v); // v was only temporarily added
+	return res;
+}
+
+int_t poset::get_high_var() const {
+	auto var1 = abs(imp_var.begin()->first);
+	auto var2 = abs(*true_var.begin());
+	auto var3 = abs(eq_var.get_high_var());
+	return (var1 < var2) ? ( (var1 < var3) ? var1 : var3 ) :
+		( (var2 < var3) ? var2 : var3 );
+}
+
+bool poset::operator==(const poset &p) const {
+	return imp_var == p.imp_var && true_var == p.true_var && eq_var == p.eq_var;
 }

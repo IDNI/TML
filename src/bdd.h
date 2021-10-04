@@ -70,6 +70,15 @@ struct bdd_key {
 	bool operator==(const bdd_key& k) const { return h==k.h && l==k.l; }
 };
 
+struct abs_cmp {
+	bool operator() (int a, int b) const {
+		int abs_a = abs(a), abs_b = abs(b);
+		if (abs_a < abs_b) return true;
+		if (abs_b < abs_a) return false;
+		return a < b;
+	}
+};
+
 template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
@@ -79,8 +88,8 @@ template<> struct std::hash<poset> {size_t operator()(const poset&)const;};
 template<typename X, typename Y> struct std::hash<std::set<X,Y>> {
 	size_t operator()(const std::set<X,Y>&) const;
 };
-template<typename X, typename Y> struct std::hash<std::map<X,Y>> {
-	size_t operator()(const std::map<X,Y>&) const;
+template<typename X, typename Y, typename Z> struct std::hash<std::map<X,Y,Z>> {
+	size_t operator()(const std::map<X,Y,Z>&) const;
 };
 template<> struct std::hash<union_find>{
 	size_t operator()(const union_find& u)const;
@@ -237,6 +246,8 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	static bdd get(int_t x);
+	static bdd neg_poset_to_bdd(poset &p);
+	static bdd poset_to_bdd(poset &p);
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
@@ -416,12 +427,16 @@ private:
 
 // Union-Find data structure with path compression
 class union_find {
-	std::map<int_t,int_t> parent;
+	std::map<int_t, std::pair<int_t,int_t>, abs_cmp> parent;
 public:
+	bool operator==(const union_find& u) const;
 	int_t find(int_t x);
+	int_t get_high_var () const;
 	void merge (int_t x, int_t y);
 	bool insert (int_t x);
 	bool in_same_set (int_t x, int_t y) { return find(x) == find(y); }
+	std::vector<int_t> get_set (int_t x);
+	void delete_set (int_t x);
 	bool empty () const { return parent.empty(); }
 	static union_find
 	intersect(union_find &uf1, union_find &uf2, bool &pure);
@@ -431,16 +446,8 @@ public:
 
 // representation for 2-CNFs
 class poset {
-	static constexpr auto abs_cmp = [](int a, int b) {
-		int abs_a = abs(a), abs_b = abs(b);
-		if (abs_a < abs_b) return true;
-		if (abs_b < abs_a) return false;
-		return a < b;
-	};
-
-
-	std::map<int_t, std::set<int_t>> imp_var;
-	std::set<int_t, decltype(abs_cmp)> true_var; //Set is sorted by absolut value
+	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
+	std::set<int_t, abs_cmp> true_var; //Set is sorted by absolut value
 	union_find eq_var;
 	bool is_pure = false;
 
@@ -452,11 +459,14 @@ public:
 	poset(int_t var, bool b) {
 		b ? true_var.insert(var) : true_var.insert(-var);
 		is_pure = true;
+		calc_hash();
 	}
 
+	bool operator==(const poset& p) const;
 	void calc_hash();
 	friend std::hash<poset>;
 
+	poset eval (int_t v);
 	static poset merge(int_t var, poset& hi, poset& lo);
 	static poset extend_sing (const poset& c, int_t var, bool b);
 	inline bool is_singleton () const{
@@ -467,6 +477,7 @@ public:
 	}
 	inline bool pure() const { return is_pure; }
 	inline bool set_pure() { is_pure = true; }
+	int_t get_high_var () const;
 	inline static poset& get (int_t c) {
 		return c > 0 ? CV[c] : neg_CV[-c];
 	}
