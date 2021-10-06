@@ -289,10 +289,6 @@ public:
 	archive& write_bdd();
 	archive& read_bdd();
 	static size_t bdd_size();
-	
-	archive& operator<<(const bdd_ref&);
-	archive& operator>>(bdd_ref&);
-	static size_t size(const bdd_ref&);
 
 };
 

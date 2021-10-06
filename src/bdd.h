@@ -75,10 +75,27 @@ template<class T, size_t low, size_t high> class bitfield {
 		}
 };
 
+typedef uint32_t bdd_ref;
+#define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
+#define GET32(low, high, x) ((uint32_t(x) & MASK32(low, high)) >> (low))
+#define PLACE32(low, high, x) ((uint32_t(x) << (low)) & MASK32(low, high))
+#define REPL32(low, high, x, y) (((x) & ~MASK32(low, high)) | PLACE32(low, high, y))
+#define BDD_REF(id, shift, inv_inp, inv_out) (PLACE32(0,22,id) | PLACE32(22,30,shift) | PLACE32(30,31,inv_inp) | PLACE32(31,32,inv_out))
+#define GET_BDD_ID(x) GET32(0,22,x)
+#define GET_SHIFT(x) GET32(22,30,x)
+#define GET_INV_INP(x) GET32(30,31,x)
+#define GET_INV_OUT(x) GET32(31,32,x)
+#define SET_BDD_ID(y, x) (y = REPL32(0,22,y,x))
+#define BDD_ABS(x) (uint32_t(x) & (uint32_t(-1) >> 1))
+#define INCR_SHIFT(y, x) (y = REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)))
+#define DECR_SHIFT(y, x) (y = REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)))
+#define SET_FLIP_INV_OUT(x) (x ^= (uint32_t(1) << 31))
+#define FLIP_INV_OUT(x) (x ^ (uint32_t(1) << 31))
+
 /* Represents an attributed edge representing input/output inversion and
  * variable shifting. */
 
-class bdd_ref {
+/*class bdd_ref {
 	public:
 		// Terminal node invariants: bdd_id <= 1 --> shift = 0 and
 		// bdd_id <= 1 --> inv_inp = 0 and bdd_id = 0 --> inv_out = 0. Ensures that
@@ -123,7 +140,7 @@ class bdd_ref {
 		// Ensure that terminal node invariant is preserved
 		bdd_ref &operator+=(int8_t d) { if(bdd_id > 1) shift += d; return *this; }
 		bdd_ref &operator-=(int8_t d) { if(bdd_id > 1) shift -= d; return *this; }
-};
+};*/
 
 /* Ensure that edge attributes are packed correctly. */
 
@@ -131,9 +148,9 @@ static_assert(sizeof(bdd_ref) == 4, "bdd_ref must use exactly 4 bytes");
 
 /* Combine the edge attributes and target BDD into a hash. */
 
-template<> struct std::hash<bdd_ref> {
+/*template<> struct std::hash<bdd_ref> {
 	std::size_t operator()(const bdd_ref &br) const { return br.raw; }
-};
+};*/
 
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
@@ -178,7 +195,7 @@ template<> struct std::hash<std::array<bdd_ref, 2>>{
 	size_t operator()(const std::array<bdd_ref, 2>&) const;
 };
 
-const bdd_ref T(1, 0, false, false), F(1, 0, false, true);
+const bdd_ref T = BDD_REF(1, 0, false, false), F = BDD_REF(1, 0, false, true);
 
 spbdd_handle from_bit(uint_t b, bool v);
 bool leaf(cr_spbdd_handle h);
@@ -337,14 +354,14 @@ class bdd {
 	
 	inline static bdd get(const bdd_ref &x) {
 		// Get the BDD that this reference is attributing
-		bdd cbdd = V[x.bdd_id];
+		bdd cbdd = V[GET_BDD_ID(x)];
 		// Apply input inversion to the outcome
-		if(x.inv_inp) std::swap(cbdd.h, cbdd.l);
+		if(GET_INV_INP(x)) std::swap(cbdd.h, cbdd.l);
 		// Apply variable shifting to the outcome
-		cbdd.l += x.shift;
-		cbdd.h += x.shift;
+		INCR_SHIFT(cbdd.l, GET_SHIFT(x));
+		INCR_SHIFT(cbdd.h, GET_SHIFT(x));
 		// Apply output inversion to the outcome
-		if(x.inv_out) { cbdd.l ^= true; cbdd.h ^= true; }
+		if(GET_INV_OUT(x)) { SET_FLIP_INV_OUT(cbdd.l); SET_FLIP_INV_OUT(cbdd.h); }
 		return cbdd;
 	}
 
@@ -353,7 +370,7 @@ class bdd {
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 		std::unordered_map<std::array<bdd_ref, 2>, bdd_ref>& memo,
 		std::unordered_map<bdd_ref, bdd_ref>& memo2, uint_t last);
-	static bdd_ref bdd_or(const bdd_ref &x, const bdd_ref &y) { return -bdd_and(-x, -y); }
+	static bdd_ref bdd_or(const bdd_ref &x, const bdd_ref &y) { return FLIP_INV_OUT(bdd_and(FLIP_INV_OUT(x), FLIP_INV_OUT(y))); }
 	static bdd_ref bdd_ite(const bdd_ref &x, const bdd_ref &y, const bdd_ref &z);
 	static bdd_ref bdd_ite_var(uint_t x, const bdd_ref &y, const bdd_ref &z);
 	static bdd_ref bdd_and_many(bdds v);
@@ -384,8 +401,8 @@ class bdd {
 	static bdd_ref add(int_t v, bdd_ref h, bdd_ref l);
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
-	inline static bool leaf(const bdd_ref &t) { return t.abs() == T; }
-	inline static bool trueleaf(const bdd_ref &t) { return !t.inv_out; }
+	inline static bool leaf(const bdd_ref &t) { return BDD_ABS(t) == T; }
+	inline static bool trueleaf(const bdd_ref &t) { return !GET_INV_OUT(t); }
 	template <typename T>
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, const bdd_ref &x);
 	bdd_ref h, l;
@@ -455,31 +472,31 @@ public:
 	
 	inline static bdd_ref hi(const bdd_ref &x) {
 		// Get the BDD that this reference is attributing
-		bdd &cbdd = V[x.bdd_id];
+		bdd &cbdd = V[GET_BDD_ID(x)];
 		// Apply input inversion
-		bdd_ref child = x.inv_inp ? cbdd.l : cbdd.h;
+		bdd_ref child = GET_INV_INP(x) ? cbdd.l : cbdd.h;
 		// Apply variable shifter
-		child += x.shift;
+		INCR_SHIFT(child, GET_SHIFT(x));
 		// Apply output inversion
-		return x.inv_out ? -child : child;
+		return GET_INV_OUT(x) ? FLIP_INV_OUT(child) : child;
 	}
 	
 	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
 
 	inline static bdd_ref lo(const bdd_ref &x) {
 		// Get the BDD that this reference is attributing
-		bdd &cbdd = V[x.bdd_id];
+		bdd &cbdd = V[GET_BDD_ID(x)];
 		// Apply input inversion
-		bdd_ref child = x.inv_inp ? cbdd.h : cbdd.l;
+		bdd_ref child = GET_INV_INP(x) ? cbdd.h : cbdd.l;
 		// Apply variable shifter
-		child += x.shift;
+		INCR_SHIFT(child, GET_SHIFT(x));
 		// Apply output inversion
-		return x.inv_out ? -child : child;
+		return GET_INV_OUT(x) ? FLIP_INV_OUT(child) : child;
 	}
 	
 	/* The variable of a BDD reference is its root/absolute shift. */
 
-	inline static uint_t var(const bdd_ref &x) { return x.shift; }
+	inline static uint_t var(const bdd_ref &x) { return GET_SHIFT(x); }
 
 	static size_t satcount_perm(const bdd_ref &x, size_t leafvar);
 
@@ -503,7 +520,7 @@ public:
 	~bdd_handle() {
 		if (onexit) return;
 		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
-		if (b.bdd_id > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
+		if (GET_BDD_ID(b) > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
 	}
 };
 

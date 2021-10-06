@@ -34,7 +34,7 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 }
 
 spbdd_handle bdd_not(cr_spbdd_handle x) {
-	return bdd_handle::get(-x->b);
+	return bdd_handle::get(FLIP_INV_OUT(x->b));
 }
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
@@ -88,8 +88,8 @@ bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_
 	}
 	bdd c = bdd::get(x);
 	bdd_ref h,l;
-	if (x.shift > quants.size() * bits) return x;
-	if (x.shift > bit+1) {//TODO review for UNIQUE
+	if (GET_SHIFT(x) > quants.size() * bits) return x;
+	if (GET_SHIFT(x) > bit+1) {//TODO review for UNIQUE
 		if (quants[idx] == quant_t::UN) return F;
 		return bdd_quantify(x, bit+1, quants, bits, n_args);
 	}
@@ -107,7 +107,7 @@ bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_
 			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F && h == F) return F;
-			if (l == F || h == F) return add(x.shift, h, l);
+			if (l == F || h == F) return add(GET_SHIFT(x), h, l);
 			return x;
 		}
 		case quant_t::UN: {
@@ -123,7 +123,7 @@ bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_
 }
 
 void bdd::bdd_sz_abs(const bdd_ref &x, set<int_t>& s) {
-	if (!s.emplace((uint_t) x.bdd_id).second) return;
+	if (!s.emplace((uint_t) GET_BDD_ID(x)).second) return;
 	bdd b = get(x);
 	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }
@@ -133,14 +133,14 @@ bdd_ref bdd::bitwise_and(const bdd_ref &a_in, const bdd_ref &b_in) {
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
-	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-	  	pos = b_in.shift+1;
-	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
+	  	pos = GET_SHIFT(b_in)+1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a_in.shift + 2;
-	} else if (a_in.shift != 0) pos = a_in.shift+2;
-	else pos = b_in.shift + 1;
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in)+2;
+	else pos = GET_SHIFT(b_in) + 1;
 	bdd_ref c = add(pos, bitwise_and(a.h, b.h), bdd_or(bdd_or(bitwise_and(a.h,  b.l),
 						bitwise_and(a.l, b.h)), bitwise_and(a.l,  b.l))
 					);
@@ -152,14 +152,14 @@ bdd_ref bdd::bitwise_or(const bdd_ref &a_in, const bdd_ref &b_in) {
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
-	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-		pos = b_in.shift+1;
-	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
+		pos = GET_SHIFT(b_in)+1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a_in.shift + 2;
-	} else if (a_in.shift != 0) pos = a_in.shift+2;
-	else pos = b_in.shift + 1;
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in)+2;
+	else pos = GET_SHIFT(b_in) + 1;
 	bdd_ref c = add(pos, bdd_or( bdd_or(bitwise_or(a.h, b.l), bitwise_or(a.l, b.h)),
 						bitwise_or(a.h, b.h)), bitwise_or(a.l, b.l)
 					);
@@ -171,14 +171,14 @@ bdd_ref bdd::bitwise_xor(const bdd_ref &a_in, const bdd_ref &b_in) {
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 	uint_t pos = 0;
-	if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-		pos = b_in.shift + 1;
-	} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
+		pos = GET_SHIFT(b_in) + 1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a_in.shift + 2;
-	} else if (a_in.shift != 0) pos = a_in.shift + 2;
-	else pos = b_in.shift + 1;
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in) + 2;
+	else pos = GET_SHIFT(b_in) + 1;
 	bdd_ref c = add(pos, bdd_or(bitwise_xor(a.h, b.l), bitwise_xor(a.l, b.h)),
 				  	bdd_or(bitwise_xor(a.h, b.h), bitwise_xor(a.l, b.l))
 					);
@@ -199,16 +199,16 @@ bdd_ref bdd::adder(const bdd_ref &a_in, const bdd_ref &b_in, bool carry, size_t 
 		c = F;
 	else {
 		int_t pos = 0;
-		if (a_in.shift > b_in.shift + 1 && b_in.shift != 0) {
+		if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 			a.h = a_in, a.l = a_in;
-		  	pos = b_in.shift + 1;
-		} else if (a_in.shift + 2 < b_in.shift && a_in.shift != 0) {
+		  	pos = GET_SHIFT(b_in) + 1;
+		} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 			b.h = b_in, b.l = b_in;
-			pos = a_in.shift + 2;
-		} else if (a_in.shift != 0)
-			pos = a_in.shift + 2;
+			pos = GET_SHIFT(a_in) + 2;
+		} else if (GET_SHIFT(a_in) != 0)
+			pos = GET_SHIFT(a_in) + 2;
 		else
-			pos = b_in.shift + 1;
+			pos = GET_SHIFT(b_in) + 1;
 
 		if (carry == false)
 			c = add(pos,
@@ -700,11 +700,11 @@ void bdd::satcount_arith(const bdd_ref &a, size_t bit, size_t bits, size_t facto
 		count = count + factor * pow(2, bits-bit); return;
 	}
 	if (ab.h != F) {
-		size_t delta = ab.h != T ? (ab.h.shift - a.shift)/n_args : 1;
+		size_t delta = ab.h != T ? (GET_SHIFT(ab.h) - GET_SHIFT(a))/n_args : 1;
 		satcount_arith(ab.h, bit+delta, bits, factor * delta, n_args,count);
 	}
 	if (ab.l != F) {
-		size_t delta = ab.l != T ? (ab.l.shift - a.shift)/n_args : 1;
+		size_t delta = ab.l != T ? (GET_SHIFT(ab.l) - GET_SHIFT(a))/n_args : 1;
 		satcount_arith(ab.l, bit+delta, bits, factor * delta,  n_args,count);
 	}
 	return;
@@ -753,7 +753,7 @@ bool bdd::bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &
 			else {
 				a.push_back(bdd::lo(a[i])); //bdd::lo(a[i]);
 
-				size_t delta = (a[i+1].shift - a[i].shift)/n_args;
+				size_t delta = (GET_SHIFT(a[i+1]) - GET_SHIFT(a[i]))/n_args;
 				path[bit] = L;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
@@ -772,7 +772,7 @@ bool bdd::bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &
 			}
 			else {
 				a.push_back(bdd::hi(a[i])); //bdd::lo(a[i]);
-				size_t delta = (a[i+1].shift - a[i].shift)/n_args;
+				size_t delta = (GET_SHIFT(a[i+1]) - GET_SHIFT(a[i]))/n_args;
 				path[bit] = H;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
@@ -969,7 +969,7 @@ bdd_ref bdd::copy(const bdd_ref &a_in) {
 	 if (a_in == T) return T;
 	 else if (a_in == F) return F;
 	 bdd a = get(a_in);
-	 int_t pos = a_in.shift + 1;
+	 int_t pos = GET_SHIFT(a_in) + 1;
  	 return add(pos, copy(a.h) , copy(a.l));
 }
 
@@ -1068,7 +1068,7 @@ void bdd::mult_dfs(const bdd_ref &a_in, const bdd_ref &b_in, bdd_ref *accs, size
 	}
 	uint_t pos = n_args * depth + 1;
 	bdd a = get(a_in);
-	if (a_in.shift > pos) {a.h = a_in, a.l = a_in;}
+	if (GET_SHIFT(a_in) > pos) {a.h = a_in, a.l = a_in;}
 	if (a.l != F) {
 		if (depth == 0)
 			accs[depth] = zero(3, bits, n_args);
