@@ -77,7 +77,9 @@ typedef uint32_t bdd_ref;
 // Decrease the shift of the BDD reference
 #define DECR_SHIFT(y, x) (y = REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)))
 // Invert supplied BDD reference
-#define FLIP_INV_OUT(x) (x ^ (uint32_t(1) << 31))
+#define FLIP_INV_OUT(x) ((x) ^ (uint32_t(1) << 31))
+// Compare BDD references in such a way that output inverted ones are <0
+#define BDD_LT(x, y) (int32_t(x) < int32_t(y))
 
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;

@@ -69,7 +69,7 @@ map<pair<uints, bools>, unordered_map<bdd_ref, bdd_ref>, vec2cmp<uint_t, bool>>
 _Pragma("GCC diagnostic push")
 _Pragma("GCC diagnostic ignored \"-Wstrict-overflow\"")
 auto am_cmp = [](bdd_ref x, bdd_ref y) {
-	bool s = int32_t(x) < int32_t(y);
+	bool s = BDD_LT(x, y);
 	x = BDD_ABS(x), y = BDD_ABS(y);
 	return x < y ? true : x == y ? s : false;
 };
@@ -124,12 +124,12 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	// First apply the inverse shift since h and l will be attached to v
 	DECR_SHIFT(h, v);
 	DECR_SHIFT(l, v);
-	// Apply output inversion invariant that low part must always be negative
+	// Apply output inversion invariant that low part can never be inverted
 	const bool inv_out = GET_INV_OUT(l);
 	if (inv_out) { h = FLIP_INV_OUT(h); l = FLIP_INV_OUT(l); }
 	// Now we know what v's child nodes will be, order them to maximize re-use
 	// attaching an input inverter if necessary. Required for canonicity.
-	const bool inv_inp = int32_t(l) < int32_t(h);
+	const bool inv_inp = BDD_LT(l, h);
 	if (inv_inp) swap(h, l);
 	std::hash<bdd_ref> hsh;
 	bdd_key k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
