@@ -77,7 +77,7 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 }
 
 // ----------------------------------------------------------------------------
-bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_t> &quants,
+bdd_ref bdd::bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
 	//if (x == T || x == F || bit == (int_t) quants.size() * (int_t) bits) return x;
 	if (bit == quants.size() * bits) return x;
@@ -122,13 +122,13 @@ bdd_ref bdd::bdd_quantify(const bdd_ref &x, uint_t bit, const std::vector<quant_
 	return F;
 }
 
-void bdd::bdd_sz_abs(const bdd_ref &x, set<int_t>& s) {
+void bdd::bdd_sz_abs(bdd_ref x, set<int_t>& s) {
 	if (!s.emplace((uint_t) GET_BDD_ID(x)).second) return;
 	bdd b = get(x);
 	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }
 
-bdd_ref bdd::bitwise_and(const bdd_ref &a_in, const bdd_ref &b_in) {
+bdd_ref bdd::bitwise_and(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
@@ -147,7 +147,7 @@ bdd_ref bdd::bitwise_and(const bdd_ref &a_in, const bdd_ref &b_in) {
 	return c;
 }
 
-bdd_ref bdd::bitwise_or(const bdd_ref &a_in, const bdd_ref &b_in) {
+bdd_ref bdd::bitwise_or(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
@@ -166,7 +166,7 @@ bdd_ref bdd::bitwise_or(const bdd_ref &a_in, const bdd_ref &b_in) {
 	return c;
 }
 
-bdd_ref bdd::bitwise_xor(const bdd_ref &a_in, const bdd_ref &b_in) {
+bdd_ref bdd::bitwise_xor(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
@@ -185,12 +185,12 @@ bdd_ref bdd::bitwise_xor(const bdd_ref &a_in, const bdd_ref &b_in) {
 	return c;
 }
 
-bdd_ref bdd::bitwise_not(const bdd_ref &a_in) {
+bdd_ref bdd::bitwise_not(bdd_ref a_in) {
 	//TODO: implement
 	return a_in;
 }
 
-bdd_ref bdd::adder(const bdd_ref &a_in, const bdd_ref &b_in, bool carry, size_t bit) {
+bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	bdd_ref c = 0;
 	if (a_in == T && b_in == T)
@@ -692,7 +692,7 @@ bdd_ref bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-void bdd::satcount_arith(const bdd_ref &a, size_t bit, size_t bits, size_t factor, size_t n_args,
+void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor, size_t n_args,
 		size_t &count) {
 	bdd ab = bdd::get(a);
 	if (ab.h == F && ab.l == F) return;
@@ -850,7 +850,7 @@ int_t bdd::balance_paths(t_pathv &next_path_a, t_pathv &next_path_b, size_t bits
 	}
 }
 
-void bdd::adder_be(const bdd_ref &a_in, const bdd_ref &b_in, size_t bits, size_t depth,
+void bdd::adder_be(bdd_ref a_in, bdd_ref b_in, size_t bits, size_t depth,
 		size_t n_args, bdd_ref &c) {
 
 	t_pathv path_a(bits, U);
@@ -916,7 +916,7 @@ void bdd::adder_be(const bdd_ref &a_in, const bdd_ref &b_in, size_t bits, size_t
 	return;
 }
 
-bdd_ref bdd::shlx(const bdd_ref &b_in, size_t x, size_t bits, size_t n_args) {
+bdd_ref bdd::shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args) {
 
 	uints perm1;
 	size_t tbits = n_args*(bits+x);
@@ -965,7 +965,7 @@ bdd_ref bdd::shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args) {
 	return a_in;
 }
 
-bdd_ref bdd::copy(const bdd_ref &a_in) {
+bdd_ref bdd::copy(bdd_ref a_in) {
 	 if (a_in == T) return T;
 	 else if (a_in == F) return F;
 	 bdd a = get(a_in);
@@ -973,7 +973,7 @@ bdd_ref bdd::copy(const bdd_ref &a_in) {
  	 return add(pos, copy(a.h) , copy(a.l));
 }
 
-bdd_ref bdd::copy_arg2arg(const bdd_ref &a , size_t arg_a, size_t arg_b, size_t bits,
+bdd_ref bdd::copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits,
 	size_t n_args) {
 	bdd_ref b;
 	uints perm = perm_init(bits*n_args);
@@ -985,7 +985,7 @@ bdd_ref bdd::copy_arg2arg(const bdd_ref &a , size_t arg_a, size_t arg_b, size_t 
 	return b;
 }
 
-bdd_ref bdd::adder_accs(const bdd_ref &b_in, const bdd_ref &acc, size_t depth, size_t bits,
+bdd_ref bdd::adder_accs(bdd_ref b_in, bdd_ref acc, size_t depth, size_t bits,
 	size_t n_args) {
 
 	size_t ext_bits = bits+depth;
@@ -1059,7 +1059,7 @@ bool bdd::is_zero(bdd_ref a_in, size_t bits) {
 	return true;
 }
 
-void bdd::mult_dfs(const bdd_ref &a_in, const bdd_ref &b_in, bdd_ref *accs, size_t depth, size_t bits,
+void bdd::mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size_t bits,
 	size_t n_args, bdd_ref &c) {
 
 	if (depth == bits) {
