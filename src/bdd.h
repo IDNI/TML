@@ -47,7 +47,10 @@ extern bool onexit;
  * BDD ID: 0-22
  * SHIFT: 22-30
  * INV_INP: 30-31
- * INV_OUT: 31-32. */
+ * INV_OUT: 31-32.
+ * The terminal node invariants are: BDD_ID <= 1 --> SHIFT = 0 and
+ * BDD_ID <= 1 --> INV_INP = 0 and BDD_ID = 0 --> INV_OUT = 0. All these ensure
+ * that each attributed edge has a unique representation. */
 typedef uint32_t bdd_ref;
 // Make a selector for the given bits of a 32-bit unsigned integer
 #define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
@@ -59,7 +62,8 @@ typedef uint32_t bdd_ref;
 #define REPL32(low, high, x, y) (((x) & ~MASK32(low, high)) | PLACE32(low, high, y))
 // Construct a BDD reference with the given ID, shift, and inverters
 #define BDD_REF(id, shift, inv_inp, inv_out) (PLACE32(0,22,id) | \
-	PLACE32(22,30,shift) | PLACE32(30,31,inv_inp) | PLACE32(31,32,inv_out))
+	PLACE32(22,30,(id) <= 1 ? 0 : (shift)) | PLACE32(30,31,(id) <= 1 ? 0 : (inv_inp)) | \
+	PLACE32(31,32,(id) ? (inv_out) : 0))
 // Get the BDD identified by this BDD reference
 #define GET_BDD_ID(x) GET32(0,22,x)
 // Get the shift applied by this BDD reference
@@ -72,12 +76,12 @@ typedef uint32_t bdd_ref;
 #define SET_BDD_ID(y, x) (y = REPL32(0,22,y,x))
 // Remove the output inverter from the BDD reference
 #define BDD_ABS(x) (uint32_t(x) & (uint32_t(-1) >> 1))
-// Increase the shift of the BDD reference
-#define INCR_SHIFT(y, x) (y = REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)))
-// Decrease the shift of the BDD reference
-#define DECR_SHIFT(y, x) (y = REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)))
-// Invert supplied BDD reference
-#define FLIP_INV_OUT(x) ((x) ^ (uint32_t(1) << 31))
+// Increase the shift of the BDD reference, terminal nodes cannot be shifted
+#define INCR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
+// Decrease the shift of the BDD reference, terminal nodes cannot be shifted
+#define DECR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
+// Invert supplied BDD reference, the 0 node cannot be inverted
+#define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint32_t(1) << 31)) : (x))
 // Compare BDD references in such a way that output inverted ones are <0
 #define BDD_LT(x, y) (int32_t(x) < int32_t(y))
 

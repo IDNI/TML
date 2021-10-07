@@ -73,9 +73,9 @@ int main() {
   cout << endl << "Success: Boolean function set closed under chosen operations." << endl;
   // Now ensure that shifts of the same boolean function have the same BDD
   // First construct the set of BDDs corresponding to the set of functions
-  unordered_set<int> func_bdd_set;
+  unordered_set<bdd_ref> func_bdd_set;
   for(const spbdd_handle &func : func_set) {
-    func_bdd_set.insert(func->b.bdd_id);
+    func_bdd_set.insert(GET_BDD_ID(func->b));
   }
   // Now check that the set of boolean functions higher variables are still
   // represented using the same BDD
@@ -84,9 +84,9 @@ int main() {
     unordered_set<spbdd_handle> func_set2;
     generate_functions(arity, func_set2, shift);
     // Now extract the BDDs of this set of higher boolean functions
-    unordered_set<int> func_bdd_set2;
+    unordered_set<bdd_ref> func_bdd_set2;
     for(const spbdd_handle &func : func_set2) {
-      func_bdd_set2.insert(func->b.bdd_id);
+      func_bdd_set2.insert(GET_BDD_ID(func->b));
     }
     // Now ensure that the BDD sets are identical and that the functions are not
     if(func_set == func_set2) {
@@ -105,7 +105,7 @@ int main() {
   map<tuple<int, int, bool>, vector<bool>> func_out_inv_split;
   // Represent the output inversion attribute separately from other attributes
   for(const spbdd_handle &func : func_set) {
-    func_out_inv_split[make_tuple((int) func->b.bdd_id, (int) func->b.shift, (bool) func->b.inv_inp)].push_back(func->b.inv_out);
+    func_out_inv_split[make_tuple((int) GET_BDD_ID(func->b), (int) GET_SHIFT(func->b), (bool) GET_INV_INP(func->b))].push_back(GET_INV_OUT(func->b));
   }
   if(2 * func_out_inv_split.size() != func_set.size()) {
     // Ensure that the function set modulo output inversion is exactly half the original's size
