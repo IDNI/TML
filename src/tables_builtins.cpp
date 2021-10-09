@@ -16,6 +16,8 @@
 
 using namespace std;
 
+extern uints perm_init(size_t n);
+
 void tables::fact_builtin(const term& b) {
 	blt_ctx c(b);
 	bltins.run_head(c);
@@ -91,6 +93,8 @@ bool tables::init_builtins() {
 		c.out(from_sym(c.outvarpos(0), c.a->varslen, c.mknum(rnd)));
 	});
 	
+	/*
+	// TO DEPRECATE
 	// old count just for the reference. To be removed soon
 	bltins.add(B, "old_count", 2, 1, [this](blt_ctx& c) {
 		spbdd_handle x = htrue;
@@ -104,22 +108,55 @@ bool tables::init_builtins() {
 		//COUT << "count result: " << cnt << endl;
 		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
 	}, 1);
+	*/
 
-	// count (w/o input parameters)
-	bltins.add(B, "count", 1, 1, [this](blt_ctx& c) {
+	bltins.add(B, "count", -1, 1, [this](blt_ctx& c) {
+		/*
+		for (auto x : *c.hs) {
+			COUT << "bltin args\n";
+			::out(COUT, x)<<endl<<endl;
+		}
+		*/
 		spbdd_handle x = bdd_and_many(*c.hs);
-		int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
-		//COUT << "count1 result: " << cnt1 << endl;
-
+		/*
+		//int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
 		//TODO: FIX count with perm inv?
 		//bools inv(c.a->varslen * bits, false);
 		//for (size_t i = 0; i < c.a->perm.size(); ++i)
 		//	if (!c.a->ex[i]) inv[c.a->perm[i]] = true;
 		//int_t cnt2 = bdd::satcount(x, inv);
-		//COUT << "count2 result: " << cnt2 << endl;
-
-		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt1)));
-	});
+		//COUT << "count result: " << cnt << endl;
+		//c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
+		 */
+		// -------------------------------------------------------
+		//COUT << "count in\n";
+		//::out(COUT, x)<<endl<<endl;
+		size_t nargs = c.a->vm.size();
+		uints perm = perm_init(nargs * (bits));
+		int_t aux = 0;
+		bools ex;
+		int_t varsout = 0; //counts number of args that are ex
+		for (size_t i = 0; i < bits; ++i)
+			for (size_t j = 0; j< nargs; ++j)
+				if(j == ((size_t)abs(*c.a->bltoutvars.begin())-1) ||
+					(c.a->bltngvars.size() != 0 &&
+					 c.a->bltngvars.find(-(j+1)) == c.a->bltngvars.end())) {
+					ex.push_back(true);
+					if (i == 0) varsout++;
+				}
+				else{
+					perm[i*nargs+j] = aux;
+					aux++;
+					ex.push_back(false);
+				}
+		//x =  x^perm;
+		x = bdd_permute_ex(x,ex,perm);
+		//COUT << "count after ex\n";
+		//::out(COUT, x)<<endl<<endl;
+		size_t cnt2 = satcount(x, (bits) * (c.a->varslen-varsout));
+		//DBG(COUT << "count2 result: " << cnt2 << endl;)
+		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt2)));
+	}, -1);
 
 	return  init_bdd_builtins() &&
 		init_print_builtins() &&

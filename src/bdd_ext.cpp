@@ -27,6 +27,12 @@ void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
 	bdd::bdd_sz_abs(x->b, s);
 }
 
+void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
+	if (!s.emplace(abs(x)).second) return;
+	bdd b = get(x);
+	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
+}
+
 //------------------------------------------------------------------------------
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
@@ -36,6 +42,28 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 spbdd_handle bdd_not(cr_spbdd_handle x) {
 	return bdd_handle::get(-x->b);
 }
+
+size_t satcount(cr_spbdd_handle x, const size_t bits) {
+
+	bdd a = bdd::get(x->b);
+	size_t cnt = 0;
+	size_t factor = x->b != T ? pow(2,a.v-1) : 1;
+	size_t bit = (x->b != T && x->b != F) ? (a.v)-1 : 0;
+	bdd::satcount_arith(a, bit, bits, factor, cnt);
+	return cnt;
+}
+
+/*
+size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex) {
+	//work in progress
+	bdd a = bdd::get(x->b);
+	size_t cnt = 0;
+	size_t factor = x->b != T ? pow(2,a.v-1) : 1;
+	size_t bit = x->b != T ? (a.v)-1 : 0;
+	bdd::satcount_arith_ex(a, bit, bits, factor, ex, cnt);
+	return cnt;
+}
+*/
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -54,6 +82,7 @@ spbdd_handle bdd_bitwise_not(cr_spbdd_handle x) {
 	return bdd_handle::get(bdd::bitwise_not(x->b));
 }
 
+// over bdd arithmetic
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y) {
 	return bdd_handle::get(bdd::adder(x->b,y->b, false, 0));
 }
@@ -122,11 +151,50 @@ int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
 	return F;
 }
 
-void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
-	if (!s.emplace(abs(x)).second) return;
-	bdd b = get(x);
-	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
+// ----------------------------------------------------------------------------
+void bdd::satcount_arith(bdd a, size_t bit, const size_t bits, size_t factor,
+		size_t &count) {
+
+	if (a.h == F && a.l == F) return;
+	if (a.h == T && a.l == T) {
+		count = count + factor * pow(2, bits-bit); return;
+	}
+	if (a.h != F) {
+		bdd ah = get(a.h);
+		size_t delta = a.h != T ? pow(2,(ah.v - a.v)-1) : 1;
+		satcount_arith(ah, a.v, bits, factor * delta, count);
+	}
+	if (a.l != F) {
+		bdd al = get(a.l);
+		size_t delta = a.l != T ? pow(2,(al.v - a.v)-1) : 1;
+		satcount_arith(al, a.v, bits, factor * delta, count);
+	}
+	return;
 }
+
+/*
+void bdd::satcount_arith_ex(bdd a, size_t bit, const size_t bits, size_t factor,
+		const bools &ex, size_t &count) {
+	//work in progress
+	if (a.h == F && a.l == F) return;
+	if (a.h == T && a.l == T) {
+		count = count + factor * pow(2, bits-bit); return;
+	}
+	if (a.h != F) {
+		bdd ah = get(a.h);
+		size_t delta = a.h != T ? pow(2,(ah.v - a.v)-1) : 1;
+		satcount_arith_ex(ah, a.v, bits, factor * delta, ex, count);
+	}
+	if (a.l != F) {
+		bdd al = get(a.l);
+		size_t delta = a.l != T ? pow(2,(al.v - a.v)-1) : 1;
+		satcount_arith_ex(al, a.v, bits, factor * delta, ex, count);
+	}
+	return;
+}
+*/
+
+// ----------------------------------------------------------------------------
 
 int_t bdd::bitwise_and(int_t a_in, int_t b_in) {
 	bdd a = get(a_in), b = get(b_in);
@@ -691,26 +759,6 @@ int_t bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t d
 	//COUT <<endl<<endl;
 
 	return c;
-}
-
-void bdd::satcount_arith(bdd a, size_t bit, size_t bits, size_t factor, size_t n_args,
-		size_t &count) {
-
-	if (a.h == F && a.l == F) return;
-	if (a.h == T && a.l == T) {
-		count = count + factor * pow(2, bits-bit); return;
-	}
-	if (a.h != F) {
-		bdd ah = get(a.h);
-		size_t delta = a.h != T ? (ah.v - a.v)/n_args : 1;
-		satcount_arith(ah, bit+delta, bits, factor * delta, n_args,count);
-	}
-	if (a.l != F) {
-		bdd al = get(a.l);
-		size_t delta = a.l != T ? (al.v - a.v)/n_args : 1;
-		satcount_arith(al, bit+delta, bits, factor * delta,  n_args,count);
-	}
-	return;
 }
 
 bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path,
