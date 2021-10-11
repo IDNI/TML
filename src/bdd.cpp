@@ -48,7 +48,7 @@ unordered_map<poset, int_t> Mc, Mneg_c;
 bdd_mmap V;
 vector<poset> CV;
 vector<poset> neg_CV;
-bool gc_enabled = true; // Controls whether or not garbage collection is enabled
+bool gc_enabled = false; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
@@ -123,79 +123,73 @@ bdd bdd::get(int_t x) {
 		poset &c = CV[x];
 		poset &neg_c = neg_CV[x];
 
-		if (c.pure()) return poset_to_bdd(c);
-		else if (neg_c.pure()) return neg_poset_to_bdd(neg_c);
+		if (c.pure()) return poset_to_bdd(c, true);
+		else if (neg_c.pure()) {
+			bdd v = poset_to_bdd(neg_c, false);
+			return bdd(v.v, -v.h, -v.l);
+		}
 		return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
 	}
 	const bdd &y = V[-x];
 	poset &c = neg_CV[-x];
 	poset &neg_c = CV[-x];
 
-	if (c.pure()) return poset_to_bdd(c);
-	else if (neg_c.pure()) return neg_poset_to_bdd(neg_c);
+	if (c.pure()) return poset_to_bdd(c, false);
+	else if (neg_c.pure()) {
+		bdd v = poset_to_bdd(neg_c, true);
+		return bdd(v.v, -v.h, -v.l);
+	}
 	return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 }
 
-bdd bdd::neg_poset_to_bdd(poset &p) {
+//TODO: Saving evaluated poset positive or negative
+bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
 	// get the highest variable and build high and low
+	DBG(assert(!p.is_empty());)
 	int_t v = p.get_high_var();
 	auto l_v = p.eval(-v);
 	auto h_v = p.eval(v);
 	int_t h,l;
 	// Find high 2-CNF in universe
 	unordered_map<poset, int_t>::const_iterator it;
-	if (it = Mneg_c.find(h_v); it != end(Mneg_c)) h = it->second;
-	else {
-		Mneg_c.emplace(h_v, neg_CV.size());
-		V.emplace_back(0,0,0);
-		neg_CV.emplace_back(move(h_v));
-		CV.emplace_back();
-		h = neg_CV.size() - 1;
-	}
-	// Find low 2-CNF in universe
-	if (it = Mneg_c.find(l_v); it != end(Mneg_c)) l = it->second;
-	else {
-		Mneg_c.emplace(l_v, neg_CV.size());
-		V.emplace_back(0,0,0);
-		neg_CV.emplace_back(move(l_v));
-		CV.emplace_back();
-		l = neg_CV.size() - 1;
-	}
-	return bdd(v, -h, -l);
-}
+	auto &m = posUniverse ? Mc : Mneg_c;
+	auto &neg_m = posUniverse ? Mneg_c : Mc; // This has to be removed later
+	auto &univ = posUniverse ? CV : neg_CV;
+	auto &neg_univ = posUniverse ? neg_CV : CV;
 
-bdd bdd::poset_to_bdd(poset &p) {
-	// get the highest variable and build high and low
-	int_t v = p.get_high_var();
-	auto l_v = p.eval(-v);
-	auto h_v = p.eval(v);
-	int_t h,l;
-	// Find high 2-CNF in universe
-	unordered_map<poset, int_t>::const_iterator it;
-	if (it = Mc.find(h_v); it != end(Mc)) h = it->second;
+	if(h_v.is_false()) h = F;
+	else if (h_v.is_true()) h = T;
+	else if (it = m.find(h_v); it != end(m)) h = posUniverse ? it->second : -it->second;
+	else if (it = neg_m.find(h_v); it != end(neg_m)) h = posUniverse ? -it->second : it->second; // This has to be removed later
 	else {
-		Mc.emplace(h_v, CV.size());
+		m.emplace(h_v, univ.size());
 		V.emplace_back(0,0,0);
-		neg_CV.emplace_back();
-		CV.emplace_back(move(h_v));
-		h = CV.size() - 1;
+		univ.emplace_back(move(h_v));
+		neg_univ.emplace_back();
+		h = univ.size() - 1;
 	}
 	// Find low 2-CNF in universe
-	if (it = Mc.find(l_v); it != end(Mc)) l = it->second;
+	if(l_v.is_false()) l = F;
+	else if (l_v.is_true()) l = T;
+	else if (it = m.find(l_v); it != end(m)) l = posUniverse ? it->second : -it->second;
+	else if (it = neg_m.find(l_v); it != end(neg_m)) l = posUniverse ? -it->second : it->second; // This has to be removed later
 	else {
-		Mc.emplace(l_v, CV.size());
+		m.emplace(l_v, univ.size());
 		V.emplace_back(0,0,0);
-		neg_CV.emplace_back();
-		CV.emplace_back(move(l_v));
-		l = CV.size() - 1;
+		univ.emplace_back(move(l_v));
+		neg_univ.emplace_back();
+		l = univ.size() - 1;
 	}
 	return bdd(v, h, l);
 }
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(h && l && v > 0););
-	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)););
-	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)););
+	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)
+		|| v < CV[abs(h)].get_high_var() || v < neg_CV[abs(h)].get_high_var()););
+	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)
+		|| v < CV[abs(l)].get_high_var() || v < neg_CV[abs(l)].get_high_var()););
+
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
 	unordered_map<bdd_key, int_t>::const_iterator it;
@@ -1396,31 +1390,46 @@ int_t union_find::find(int_t x) {
 		while(it->first != it->second.first) {
 			// set parent of node to grandparent
 			auto it_grandpa = parent.find(it->second.first);
-			it->second = it_grandpa->second;
+			DBG(assert(it->second.first == it_grandpa->second.first);)
+			//it->second.first = it_grandpa->second.first;
 			it = it_grandpa;
 		} return it->first;
-	} else { return 0; }
+	}
+	else if (it = parent.find(-x); it != parent.end()) {
+		// the root of the set has itself as parent
+		while(it->first != it->second.first) {
+			// set parent of node to grandparent
+			auto it_grandpa = parent.find(it->second.first);
+			DBG(assert(
+				it->second.first == it_grandpa->second.first);)
+			//it->second.first = it_grandpa->second.first;
+			it = it_grandpa;
+		} return -it->first;
+	}
+	else { return 0; }
 }
 
+//TODO: Think about -x
 // Perform the union of sets represented by x and y
 void union_find::merge(int_t x, int_t y) {
 	int_t root_x = find(x), root_y = find(y);
-	// we introduce canonicity
-	if(root_x < root_y) {
+	if(abs_cmp()(root_x, root_y)) {
 		auto tmp = parent[root_y].second;
 		parent[root_y] = make_pair(root_x, parent[root_x].second);
 		parent[root_x].second = tmp;
 		auto link_set = parent[root_x].second;
+		// we introduce canonicity
 		while(root_x != link_set) {
 			parent[link_set].first = root_x;
 			link_set = parent[link_set].second;
 		}
 	}
-	else if(root_x > root_y) {
+	else if(abs_cmp()(root_y, root_x)) {
 		auto tmp = parent[root_x].second;
 		parent[root_x] = make_pair(root_y, parent[root_y].second);
 		parent[root_y].second = tmp;
 		auto link_set = parent[root_y].second;
+		// we introduce canonicity
 		while(root_y != link_set) {
 			parent[link_set].first = root_y;
 			link_set = parent[link_set].second;
@@ -1436,6 +1445,7 @@ bool union_find::insert(int_t x) {
 	else return true;
 }
 
+//TODO: also return set of -x
 vector<int_t> union_find::get_set (int_t x) {
 	if(auto it = parent.find(x); it != end(parent)) {
 		vector<int_t> eq{x};
@@ -1445,9 +1455,10 @@ vector<int_t> union_find::get_set (int_t x) {
 			link = parent[link].second;
 		}
 		return eq;
-	} else return {};
+	}else return {};
 }
 
+//TODO: also delete set of -x
 void union_find::delete_set(int_t x) {
 	if(auto it = parent.find(x); it != end(parent)) {
 		int_t link = parent[x].second;
@@ -1495,7 +1506,7 @@ int_t union_find::get_high_var() const {
 
 bool union_find::operator==(const union_find &u) const {
 	auto pred = [](auto a, auto b) {
-		a.first == b.first && a.second.first == b.second.first;
+		return a.first == b.first && a.second.first == b.second.first;
 	};
 	return parent.size() == u.parent.size() &&
 		std::equal(parent.begin(), parent.end(), u.parent.begin(), pred);
@@ -1511,7 +1522,8 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
-		if (it_lo == lo.imp_var.end() || comp(it_hi->first,it_lo->first)) {
+		if (it_lo == lo.imp_var.end() ||
+				(comp(it_hi->first,it_lo->first) && it_hi != end(hi.imp_var))) {
 			if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
 				// Implication is true in lo since antecedent is violated
 				res.imp_var.emplace(it_hi->first, it_hi->second);
@@ -1555,7 +1567,8 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			auto it_hi_set = it_hi->second.begin();
 			auto it_lo_set = it_lo->second.begin();
 			while (it_hi_set != it_hi->second.end() || it_lo_set != it_lo->second.end()) {
-				if (it_lo_set == it_lo->second.end() || *it_hi_set < *it_lo_set) {
+				if (it_lo_set == it_lo->second.end() ||
+						(*it_hi_set < *it_lo_set && it_hi_set != end(it_hi->second) )) {
 					if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
 						// This should not happen
 						// It means that 2CNF in lo is not reduced
@@ -1599,6 +1612,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 					++it_hi_set; ++ it_lo_set;
 				}
 			}
+			++it_hi; ++it_lo;
 		}
 	}
 
@@ -1606,7 +1620,8 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	auto it_hi_var = hi.true_var.begin();
 	auto it_lo_var = lo.true_var.begin();
 	while (it_hi_var != hi.true_var.end() || it_lo_var != lo.true_var.end()) {
-		if (it_lo_var == lo.true_var.end() || abs(*it_hi_var) < abs(*it_lo_var)) {
+		if (it_lo_var == lo.true_var.end() ||
+				(abs(*it_hi_var) < abs(*it_lo_var) && it_hi_var != end(hi.true_var))) {
 			//Singleton in high but not in lo
 			res.imp_var[var].insert(*it_hi_var);
 			++it_hi_var;
@@ -1686,7 +1701,7 @@ poset poset::eval(int_t v) {
 		res = *this;
 		res.true_var.erase(v);
 		if(res.is_empty()) res.set_pure();
-		return res;
+		return res.calc_hash(), res;
 	}
 	else if(has(true_var,-v)) {
 		// return F
@@ -1732,6 +1747,7 @@ poset poset::eval(int_t v) {
 				}
 			}
 		}
+		++imp;
 	}
 	// delete all implications where at least one variable
 	// (in absolute value) appears in true_var
@@ -1749,20 +1765,51 @@ poset poset::eval(int_t v) {
 				if(!has(res.true_var, *var)) {
 					res.imp_var[imp->first].insert(*var);
 				}
+				++var;
 			}
 		}
-
+		++imp;
 	}
 	res.true_var.erase(v); // v was only temporarily added
-	return res;
+	res.set_pure();
+	return res.calc_hash(), res;
 }
 
 int_t poset::get_high_var() const {
-	auto var1 = abs(imp_var.begin()->first);
-	auto var2 = abs(*true_var.begin());
-	auto var3 = abs(eq_var.get_high_var());
-	return (var1 < var2) ? ( (var1 < var3) ? var1 : var3 ) :
-		( (var2 < var3) ? var2 : var3 );
+	if(imp_var.empty() && eq_var.empty()) {
+		if(!true_var.empty()) return abs(*true_var.begin());
+		else return 0;
+	}
+	else if (imp_var.empty()) {
+		//eq_var is non-empty here
+		if(true_var.empty()) return abs(eq_var.get_high_var());
+		else {
+			auto var1 = abs(*true_var.begin());
+			auto var2 = abs(eq_var.get_high_var());
+			return var1 < var2 ? var1 : var2;
+		}
+	}
+	else if (eq_var.empty()) {
+		//imp_var is non-empty
+		if (true_var.empty()) return abs(imp_var.begin()->first);
+		else {
+			auto var1 = abs(*true_var.begin());
+			auto var2 = abs(imp_var.begin()->first);
+			return var1 < var2 ? var1 : var2;
+		}
+	}
+	else if(true_var.empty()) {
+		auto var1 = abs(imp_var.begin()->first);
+		auto var2 = abs(eq_var.get_high_var());
+		return var1 < var2 ? var1 : var2;
+	}
+	else {
+		auto var1 = abs(imp_var.begin()->first);
+		auto var2 = abs(*true_var.begin());
+		auto var3 = abs(eq_var.get_high_var());
+		return (var1 < var2) ? ((var1 < var3) ? var1 : var3) :
+		       ((var2 < var3) ? var2 : var3);
+	}
 }
 
 bool poset::operator==(const poset &p) const {

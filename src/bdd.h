@@ -246,8 +246,8 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	static bdd get(int_t x);
-	static bdd neg_poset_to_bdd(poset &p);
-	static bdd poset_to_bdd(poset &p);
+	static bdd poset_to_bdd(poset &p, bool posUniverse);
+	//static bdd poset_to_bdd(poset &p);
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
@@ -434,7 +434,10 @@ public:
 	int_t get_high_var () const;
 	void merge (int_t x, int_t y);
 	bool insert (int_t x);
-	bool in_same_set (int_t x, int_t y) { return find(x) == find(y); }
+	bool in_same_set (int_t x, int_t y) {
+		int_t x_rep = find(x);
+		return x_rep != 0 && x_rep == find(y);
+	}
 	std::vector<int_t> get_set (int_t x);
 	void delete_set (int_t x);
 	bool empty () const { return parent.empty(); }
@@ -451,7 +454,7 @@ class poset {
 	union_find eq_var;
 	bool is_pure = false;
 
-	uint_t hash;
+	uint_t hash=0;
 
 	// void updateTC (); <- not needed yet
 public:
@@ -476,7 +479,9 @@ public:
 		return imp_var.empty() && eq_var.empty() && true_var.empty();
 	}
 	inline bool pure() const { return is_pure; }
-	inline bool set_pure() { is_pure = true; }
+	inline bool is_false() const {return is_empty() && !is_pure;}
+	inline bool is_true() const {return is_empty() && is_pure;}
+	inline void set_pure() { is_pure = true; }
 	int_t get_high_var () const;
 	inline static poset& get (int_t c) {
 		return c > 0 ? CV[c] : neg_CV[-c];
