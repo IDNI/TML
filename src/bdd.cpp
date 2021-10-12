@@ -121,12 +121,11 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	DBG(assert(GET_BDD_ID(h) && GET_BDD_ID(l) && v > 0););
 	// If BDD would not branch on this variable, exclude it to preserve canonicity
 	if (h == l) return h;
-	// First apply the inverse shift since h and l will be attached to v
-	DECR_SHIFT(h, v);
-	DECR_SHIFT(l, v);
 	// Apply output inversion invariant that low part can never be inverted
 	const bool inv_out = GET_INV_OUT(l);
-	if (inv_out) { h = FLIP_INV_OUT(h); l = FLIP_INV_OUT(l); }
+	// First apply the inverse shift since h and l will be attached to v
+	h = inv_out ? FLIP_INV_OUT(MINUS_SHIFT(h, v)) : MINUS_SHIFT(h, v);
+	l = inv_out ? FLIP_INV_OUT(MINUS_SHIFT(l, v)) : MINUS_SHIFT(l, v);
 	// Now we know what v's child nodes will be, order them to maximize re-use
 	// attaching an input inverter if necessary. Required for canonicity.
 	const bool inv_inp = BDD_LT(l, h);

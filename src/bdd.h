@@ -78,8 +78,10 @@ typedef uint32_t bdd_ref;
 #define BDD_ABS(x) (uint32_t(x) & (uint32_t(-1) >> 1))
 // Increase the shift of the BDD reference, terminal nodes cannot be shifted
 #define INCR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
+#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
 // Decrease the shift of the BDD reference, terminal nodes cannot be shifted
 #define DECR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
+#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
 // Invert supplied BDD reference, the 0 node cannot be inverted
 #define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint32_t(1) << 31)) : (x))
 // Compare BDD references in such a way that output inverted ones are <0
@@ -406,12 +408,8 @@ public:
 	inline static bdd_ref hi(bdd_ref x) {
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[GET_BDD_ID(x)];
-		// Apply input inversion
-		bdd_ref child = GET_INV_INP(x) ? cbdd.l : cbdd.h;
-		// Apply variable shifter
-		INCR_SHIFT(child, GET_SHIFT(x));
 		// Apply output inversion
-		return GET_INV_OUT(x) ? FLIP_INV_OUT(child) : child;
+		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x));
 	}
 	
 	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
@@ -420,11 +418,8 @@ public:
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[GET_BDD_ID(x)];
 		// Apply input inversion
-		bdd_ref child = GET_INV_INP(x) ? cbdd.h : cbdd.l;
-		// Apply variable shifter
-		INCR_SHIFT(child, GET_SHIFT(x));
 		// Apply output inversion
-		return GET_INV_OUT(x) ? FLIP_INV_OUT(child) : child;
+		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x));
 	}
 	
 	/* The variable of a BDD reference is its root/absolute shift. */
