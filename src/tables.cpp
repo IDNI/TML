@@ -570,9 +570,18 @@ ntable tables::get_table(const sig& s) {
 	ntable nt = tbls.size();
 	size_t len = ir_handler->sig_len(s);
 	max_args = max(max_args, len);
+	if( opts.bitunv == true) {
+		bool found = false;
+		string_t relname = lexeme2str(dict.get_rel(s.first));
+		auto & types = spbu->ptypenv->search_pred( relname , found);
+		tab_type.insert({nt, types});
+		DBG( COUT<<std::endl<< "For table "<<nt; );
+		for( auto &t: types )
+			DBG(COUT<<t.to_print());	
+	}
 	table tb;
-	return	tb.t = hfalse, tb.s = s, tb.len = len,
-		tbls.push_back(tb), smap.emplace(s,nt), nt;
+	return	tb.t = hfalse, tb.s = s, tb.len = len, 
+	tbls.push_back(tb), smap.emplace(s,nt), nt;
 }
 
 term tables::to_nums(term t) {

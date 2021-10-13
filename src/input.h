@@ -376,7 +376,7 @@ struct primtype : utype {
 		if(bsz>0) {
 			std::stringstream ss;
 			ss<<bsz;
-			s.append(":");
+			//s.append(":");
 			s.append(ss.str());
 		}
 		return s;

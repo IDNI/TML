@@ -66,7 +66,20 @@ class environment {
     public:
     environment(): parent(nullptr){}
 
-
+    bool add_sig(string_t &predname, std::vector<primtype>& types) {
+        if( contains_pred(predname) )    return false;
+        std::vector<typedecl> instype;
+        for( auto &pt : types) {
+            typedecl  td;
+            td.pty = pt;
+            instype.push_back(td);
+        }   
+        return predtype.insert({predname, instype}).second;
+    }
+    bool add_sig(string_t &predname, std::vector<typedecl>& types) {
+        if( contains_pred(predname) )    return false;   
+        return predtype.insert({predname, types}).second;
+    }
     std::vector<string_t> get_predicates() {
         std::vector<string_t> cont;
         for( auto it :predtype )
@@ -224,40 +237,24 @@ struct bit_univ {
 		SYM_BSZ = 8,
 		VAR_BSZ = 8,
 	};
+    inline static primtype dt_nop;
+	inline static primtype dt_int= primtype(primtype::UINT);
 	dict_t &d;
     size_t bit_order;
     size_t char_bsz, int_bsz, sym_bsz, var_bsz;
     spenvironment ptypenv = nullptr;
     typedef std::vector<size_t> tab_args;
-    /*
-    raw_tables rtabs;
-    
-    bool get_raw_tables(){
-         std::vector<string_t > tabnames = ptypenv->get_predicates();
-        for( string_t &pname: tabnames ) {
-
-            rtabs.insert({pname, tab_args()});
-            auto typesig = ptypenv->lookup_pred(pname);
-            for ( auto &targs: typesig )
-                if(targs.is_primitive())
-                    rtabs[pname].push_back(targs.pty.get_bitsz());
-                else {
-                    string_t sttype = lexeme2str(targs.structname.e);
-                    rtabs[pname].push_back(
-                        ptypenv->lookup_typedef(sttype).get_bitsz(*ptypenv));
-                }
-        }
-        return true;
-    }
-    */
+  
 	bit_univ(dict_t &_d, size_t _bo, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ,
 	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), char_bsz(_cbsz),
 	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) {
 
         this->pos = [this](size_t a, size_t b, size_t c, size_t d, bit_univ::tab_args t)-> size_t{
 					return this->pos_gen(a, b, c, d, t); };
-     }
-	size_t get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
+    }
+    std::vector<primtype> get_arg_types( const raw_term & rt, const raw_rule & rr);
+    void append_types(string_t &, std::vector<primtype>&) ;
+	const primtype& get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
 	size_t pos_eqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args /*,tab_args rtab */ ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
 		return (bsz - bit_from_right - 1)* args + arg;

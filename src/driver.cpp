@@ -5045,8 +5045,8 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
 												opts.get_int("bitorder"));
 			raw_prog brawp;
-			tbl->spbu.get()->btransform(p, brawp);
-			tbl->spbu.get()->ptypenv = p.typenv;
+			tbl->spbu->btransform(p, brawp);
+			tbl->spbu->ptypenv = p.typenv;
 			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
 		}
 	}

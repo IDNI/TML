@@ -188,6 +188,7 @@ private:
 	nlevel nstep = 0;
 	std::vector<table> tbls;
 	std::map<sig, ntable> smap;
+	std::unordered_map<ntable, std::vector<typedecl>> tab_type;
 	std::vector<rule> rules;
 	std::vector<level> fronts;
 	std::vector<level> levels;
@@ -422,7 +423,6 @@ private:
 public:
 
 	rt_options opts;
-	environment typenv;
 	ir_builder *ir_handler;
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
