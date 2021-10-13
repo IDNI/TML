@@ -43,6 +43,10 @@ template<typename T1, typename T2> struct vec2cmp {
 	}
 };
 
+template <typename T> int sgn(T val) {
+	return (T(0) < val) - (val < T(0));
+}
+
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 unordered_map<poset, int_t> Mc, Mneg_c;
 bdd_mmap V;
@@ -119,27 +123,45 @@ void bdd::max_bdd_size_check() {
 
 bdd bdd::get(int_t x) {
 	if (x > 0) {
-		const bdd &y = V[x];
-		poset &c = CV[x];
-		poset &neg_c = neg_CV[x];
-
-		if (c.pure()) return poset_to_bdd(c, true);
-		else if (neg_c.pure()) {
-			bdd v = poset_to_bdd(neg_c, false);
+		if (CV[x].pure()) return poset_to_bdd(CV[x], true);
+		else if (neg_CV[x].pure()) {
+			bdd v = poset_to_bdd(neg_CV[x], false);
 			return bdd(v.v, -v.h, -v.l);
 		}
+		const bdd &y = V[x];
 		return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
 	}
-	const bdd &y = V[-x];
-	poset &c = neg_CV[-x];
-	poset &neg_c = CV[-x];
-
-	if (c.pure()) return poset_to_bdd(c, false);
-	else if (neg_c.pure()) {
-		bdd v = poset_to_bdd(neg_c, true);
+	if (neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x], false);
+	else if (CV[-x].pure()) {
+		bdd v = poset_to_bdd(CV[-x], true);
 		return bdd(v.v, -v.h, -v.l);
 	}
+	const bdd &y = V[-x];
 	return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
+}
+
+int_t bdd::hi(int_t x) {
+	if(x > 0){
+		if(CV[x].pure()) return poset_to_bdd(CV[x], true).h;
+		else if (neg_CV[x].pure()) return -poset_to_bdd(neg_CV[x], false).h;
+		else return V[x].v < 0 ? V[x].l : V[x].h;
+	} else {
+		if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).h;
+		else if (CV[-x].pure()) return -poset_to_bdd(CV[-x], true).h;
+		else return V[-x].v < 0 ? -V[-x].l : -V[-x].h;
+	}
+}
+
+int_t bdd::lo(int_t x) {
+	if(x > 0){
+		if(CV[x].pure()) return poset_to_bdd(CV[x], true).l;
+		else if (neg_CV[x].pure()) return -poset_to_bdd(neg_CV[x], false).l;
+		else return V[x].v < 0 ? V[x].h : V[x].l;
+	} else {
+		if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).l;
+		else if (CV[-x].pure()) return -poset_to_bdd(CV[-x], true).l;
+		else return V[-x].v < 0 ? -V[-x].h : -V[-x].l;
+	}
 }
 
 //TODO: Saving evaluated poset positive or negative
@@ -1384,89 +1406,155 @@ basic_ostream<T>& bdd::out(basic_ostream<T>& os, int_t x) {
 }
 
 // Return representative of set containing x
-int_t union_find::find(int_t x) {
-	if(auto it = parent.find(x); it != parent.end()) {
+pair<int_t,int_t> union_find::find(int_t x) {
+	bool neg_parent = x < 0;
+
+	if(auto it = parent.find(abs(x)); it != parent.end()) {
 		// the root of the set has itself as parent
 		while(it->first != it->second.first) {
 			// set parent of node to grandparent
-			auto it_grandpa = parent.find(it->second.first);
-			DBG(assert(it->second.first == it_grandpa->second.first);)
+			auto it_grandpa = parent.find(abs(it->second.first));
+			neg_parent ^= (it->second.first < 0);
+			DBG(assert(abs(it->second.first) == abs(it_grandpa->second.first));)
 			//it->second.first = it_grandpa->second.first;
 			it = it_grandpa;
-		} return it->first;
+		} return neg_parent ? make_pair(-it->first, it->second.second) : it->second;
 	}
-	else if (it = parent.find(-x); it != parent.end()) {
-		// the root of the set has itself as parent
-		while(it->first != it->second.first) {
-			// set parent of node to grandparent
-			auto it_grandpa = parent.find(it->second.first);
-			DBG(assert(
-				it->second.first == it_grandpa->second.first);)
-			//it->second.first = it_grandpa->second.first;
-			it = it_grandpa;
-		} return -it->first;
-	}
-	else { return 0; }
+	else { return {0,0}; }
 }
 
-//TODO: Think about -x
 // Perform the union of sets represented by x and y
 void union_find::merge(int_t x, int_t y) {
-	int_t root_x = find(x), root_y = find(y);
-	if(abs_cmp()(root_x, root_y)) {
-		auto tmp = parent[root_y].second;
-		parent[root_y] = make_pair(root_x, parent[root_x].second);
-		parent[root_x].second = tmp;
-		auto link_set = parent[root_x].second;
-		// we introduce canonicity
-		while(root_x != link_set) {
-			parent[link_set].first = root_x;
-			link_set = parent[link_set].second;
-		}
+	auto root_x = find(x), root_y = find(y);
+	// Already in same set
+	if (root_x.first == root_y.first) return;
+
+	// Canonical choices for root_x and root_y
+	if(abs(root_x.first) > abs(root_y.first)) swap(root_x, root_y);
+	if(sgn(root_x.first)!=sgn(root_y.first) && root_x.first < 0) {
+		root_x.first = -root_x.first;
+		root_y.first = -root_y.first;
 	}
-	else if(abs_cmp()(root_y, root_x)) {
-		auto tmp = parent[root_x].second;
-		parent[root_x] = make_pair(root_y, parent[root_y].second);
-		parent[root_y].second = tmp;
-		auto link_set = parent[root_y].second;
-		// we introduce canonicity
-		while(root_y != link_set) {
-			parent[link_set].first = root_y;
-			link_set = parent[link_set].second;
-		}
+	if(sgn(root_x.first)==sgn(root_y.first) && sgn(root_x.first)==-1) {
+		root_x.first = -root_x.first;
+		root_y.first = -root_y.first;
 	}
 
+	if(abs_cmp()(root_x.first, root_y.first)) {
+
+		int_t rep_root_x = root_y.first < 0 ? -root_x.first : root_x.first;
+		if (root_y.first < 0) {
+			//Negate all children of root_y
+			auto &link_set_p = parent[abs(root_y.first)].second;
+			if(link_set_p < 0) {
+				link_set_p = -link_set_p;
+				root_y.second = -root_y.second;
+			}
+			int_t link_set = link_set_p;
+			while (abs(link_set) != abs(root_y.first)) {
+				auto &par = parent[abs(link_set)];
+				par.first = -par.first;
+				par.second = -par.second;
+				link_set = par.second;
+			}
+		}
+
+		auto tmp = (root_y.first < 0 && root_y.second == abs(root_y.first)) ?
+					-root_y.second :
+					 root_y.second;
+
+		parent[abs(root_y.first)] = make_pair(rep_root_x, root_x.second);
+		parent[abs(root_x.first)].second = tmp;
+
+		auto link_set = tmp;
+		// we introduce canonicity
+		while(abs(root_x.first) != abs(link_set)) {
+
+			auto &par = parent[abs(link_set)];
+			if (abs(par.first) != abs(root_x.first)) {
+				if(link_set < 0) par.first = -root_x.first;
+				else 		 par.first = root_x.first;
+			}
+			link_set = par.second;
+		}
+	}
+	else if(abs_cmp()(root_y.first, root_x.first)) {
+		//This cannot happen because of swapping above of root_x and root_y
+		DBGFAIL;
+		//bool negate = sgn(root_x.first)!=sgn(root_y.first);
+		//int_t rep_root_y = (negate && root_y.first > 0) ? -root_y.first : root_y.first;
+		//int_t rep_link_root_y = (negate && root_x.second > 0) ? -root_y.second : root_y.second;
+		//auto tmp = (negate && root_x.second > 0) ? -root_x.second : root_x.second;
+
+		bool negate = sgn(root_x.first)!=sgn(root_y.first);
+		if(negate && root_x.first < 0) {
+			root_x.first = -root_x.first;
+			root_x.second = -root_x.second;
+			root_y.first = -root_y.first;
+			root_y.second = -root_y.second;
+		}
+		else if(!negate && sgn(root_x.first) == -1) {
+			root_x.first = -root_x.first;
+			root_x.second = -root_x.second;
+			root_y.first = -root_y.first;
+			root_y.second = -root_y.second;
+		}
+		auto tmp = root_x.second;
+		parent[abs(root_x.first)] = root_y;
+		parent[abs(root_y.first)].second = tmp;
+		auto link_set = parent[abs(root_y.first)].second;
+		// we introduce canonicity
+		while(abs(root_y.first) != abs(link_set)) {
+			auto &par = parent[abs(link_set)];
+			if (abs(par.first) != abs(root_y.first)) {
+				if (negate ^ (par.first < 0)) {
+					par.first = -root_y.first;
+				}
+				else par.first = root_y.first;
+			}
+			//parent[link_set].first = root_y;
+			link_set = parent[abs(link_set)].second;
+		}
+	}
 }
 
 // Insert a new positive element as disjoint singleton set
 bool union_find::insert(int_t x) {
-	auto[it, inserted] = parent.try_emplace(x, make_pair(x, x));
+	auto[it, inserted] = parent.try_emplace(abs(x), make_pair(abs(x), abs(x)));
 	if (!inserted) return false;
 	else return true;
 }
 
-//TODO: also return set of -x
 vector<int_t> union_find::get_set (int_t x) {
-	if(auto it = parent.find(x); it != end(parent)) {
-		vector<int_t> eq{x};
-		int_t link = parent[x].second;
-		while (link != x) {
-			eq.emplace_back(link);
-			link = parent[link].second;
+	if(auto it = parent.find(abs(x)); it != end(parent)) {
+		if((it->second.first < 0) ^ (x < 0)) {
+			vector<int_t> eq{x};
+			int_t link = it->second.second;
+			while (abs(link) != abs(x)) {
+				eq.emplace_back(-link);
+				link = parent[abs(link)].second;
+			}
+			return eq;
+		} else {
+			vector<int_t> eq{x};
+			int_t link = it->second.second;
+			while (abs(link) != abs(x)) {
+				eq.emplace_back(link);
+				link = parent[abs(link)].second;
+			}
+			return eq;
 		}
-		return eq;
 	}else return {};
 }
 
-//TODO: also delete set of -x
 void union_find::delete_set(int_t x) {
-	if(auto it = parent.find(x); it != end(parent)) {
-		int_t link = parent[x].second;
+	if(auto it = parent.find(abs(x)); it != end(parent)) {
+		int_t link = it->second.second;
 		int_t next;
-		parent.erase(x);
-		while (link != x) {
-			next = parent[link].second;
-			parent.erase(link);
+		parent.erase(abs(x));
+		while (abs(link) != abs(x)) {
+			next = parent[abs(link)].second;
+			parent.erase(abs(link));
 			link = next;
 		}
 	}
@@ -1478,20 +1566,25 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 	// Find common nodes in uf1 and uf2
 	auto it_uf1 = uf1.parent.begin();
 	auto it_uf2 = uf2.parent.begin();
+	if(uf1.parent.size() != uf2.parent.size()) pure = false;
 	while (it_uf1 != uf1.parent.end() && it_uf2 != uf2.parent.end()) {
 		if (comp(it_uf1->first, it_uf2->first)) { pure = false; ++it_uf1; }
 		else if(comp(it_uf2->first, it_uf1->first)) { pure = false; ++it_uf2; }
 		else {
 			// Found a common node; Associate with equivalence tuple
-			int_t eq_class_uf1 = uf1.find(it_uf1->first);
-			int_t eq_class_uf2 = uf2.find(it_uf1->first);
-			eq_class[{eq_class_uf1,eq_class_uf2}].emplace_back(it_uf1->first);
+			int_t eq_class_uf1 = uf1.find(it_uf1->first).first;
+			int_t eq_class_uf2 = uf2.find(it_uf1->first).first;
+			if(eq_class_uf1 < 0)
+				eq_class[{abs(eq_class_uf1),abs(eq_class_uf2)}].emplace_back(-it_uf1->first);
+			else
+				eq_class[{abs(eq_class_uf1),abs(eq_class_uf2)}].emplace_back(it_uf1->first);
 			++it_uf1; ++it_uf2;
 		}
 	}
 	// Create resulting union-find data structure
 	union_find uf_res;
 	for (const auto& p : eq_class) {
+		if(p.first.first == 0 || p.first.second == 0) continue;
 		if (p.second.size() > 1) for (const auto& el : p.second) {
 			uf_res.insert(el);
 			uf_res.merge(p.second[0], el);
@@ -1634,7 +1727,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			for (const auto v : hi.true_var) {
 				if (abs(v) != abs(*it_lo_var)) {
 					// Assure canonicity of implications
-					if(abs(*it_lo_var) > abs(v))
+					if(abs(*it_lo_var) < abs(v))
 						res.imp_var[-*it_lo_var].insert(v);
 					else
 						res.imp_var[-v].insert(*it_lo_var);
@@ -1654,9 +1747,9 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 
 				//Implications assuring the transitive closure of resulting constrain
 				for (const auto v : hi.true_var) {
-					if (abs(v) != abs(*it_lo_var)) {
+					if (abs(v) != abs(*it_lo_var) && !has(lo.true_var, v) && !has(lo.true_var, -v)) {
 						// Assure canonicity of implications
-						if (abs(*it_lo_var) > abs(v))
+						if (abs(*it_lo_var) < abs(v))
 							res.imp_var[-*it_lo_var].insert(v);
 						else
 							res.imp_var[-v].insert(*it_lo_var);

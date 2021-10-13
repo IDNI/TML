@@ -189,6 +189,72 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
+// Union-Find data structure with negation
+class union_find {
+	std::map<int_t, std::pair<int_t,int_t>, abs_cmp> parent;
+public:
+	bool operator==(const union_find& u) const;
+	std::pair<int_t,int_t> find(int_t x);
+	int_t get_high_var () const;
+	void merge (int_t x, int_t y);
+	bool insert (int_t x);
+	bool in_same_set (int_t x, int_t y) {
+		auto x_rep = find(x).first;
+		return x_rep != 0 && x_rep == find(y).first;
+	}
+	std::vector<int_t> get_set (int_t x);
+	void delete_set (int_t x);
+	bool empty () const { return parent.empty(); }
+	static union_find
+	intersect(union_find &uf1, union_find &uf2, bool &pure);
+
+	friend std::hash<union_find>;
+};
+
+// representation for 2-CNFs
+class poset {
+	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
+	std::set<int_t, abs_cmp> true_var; //Set is sorted by absolut value
+	union_find eq_var;
+	bool is_pure = false;
+
+	uint_t hash=0;
+
+	// void updateTC (); <- not needed yet
+public:
+	poset() = default;
+	poset(int_t var, bool b) {
+		b ? true_var.insert(var) : true_var.insert(-var);
+		is_pure = true;
+		calc_hash();
+	}
+
+	bool operator==(const poset& p) const;
+	void calc_hash();
+	friend std::hash<poset>;
+
+	poset eval (int_t v);
+	static poset merge(int_t var, poset& hi, poset& lo);
+	static poset extend_sing (const poset& c, int_t var, bool b);
+	inline bool is_singleton () const{
+		return imp_var.empty() && eq_var.empty() && !true_var.empty();
+	}
+	inline bool is_empty() const {
+		return imp_var.empty() && eq_var.empty() && true_var.empty();
+	}
+	inline bool pure() const { return is_pure; }
+	inline bool is_false() const {return is_empty() && !is_pure;}
+	inline bool is_true() const {return is_empty() && is_pure;}
+	inline void set_pure() { is_pure = true; }
+	int_t get_high_var () const;
+	inline static poset& get (int_t c) {
+		return c > 0 ? CV[c] : neg_CV[-c];
+	}
+	inline static poset& get_neg (int_t c) {
+		return c > 0 ? neg_CV[c] : CV[-c];
+	}
+};
+
 class bdd {
 	friend class archive;
 	friend class bdd_handle;
@@ -353,17 +419,14 @@ public:
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
-	inline static int_t hi(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].l : -V[-x].h
-			: V[x].v < 0 ? V[x].l : V[x].h;
-	}
 
-	inline static int_t lo(int_t x) {
-		return	x < 0 ? V[-x].v < 0 ? -V[-x].h : -V[-x].l
-			: V[x].v < 0 ? V[x].h : V[x].l;
+	static int_t hi(int_t x);
+	inline static int_t lo(int_t x);
+	inline static uint_t var(int_t x) {
+		return CV[abs(x)].pure() ? CV[abs(x)].get_high_var() :
+			(neg_CV[abs(x)].pure() ? neg_CV[abs(x)].get_high_var() :
+				abs(V[abs(x)].v));
 	}
-
-	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
 
 	static size_t satcount_perm(int_t x, size_t leafvar);
 	static size_t satcount_perm(const bdd& bx, int_t x, size_t leafvar);
@@ -424,71 +487,3 @@ private:
 	std::set<bools> vp;
 	void sat(int_t x);
 };
-
-// Union-Find data structure with path compression
-class union_find {
-	std::map<int_t, std::pair<int_t,int_t>, abs_cmp> parent;
-public:
-	bool operator==(const union_find& u) const;
-	int_t find(int_t x);
-	int_t get_high_var () const;
-	void merge (int_t x, int_t y);
-	bool insert (int_t x);
-	bool in_same_set (int_t x, int_t y) {
-		int_t x_rep = find(x);
-		return x_rep != 0 && x_rep == find(y);
-	}
-	std::vector<int_t> get_set (int_t x);
-	void delete_set (int_t x);
-	bool empty () const { return parent.empty(); }
-	static union_find
-	intersect(union_find &uf1, union_find &uf2, bool &pure);
-
-	friend std::hash<union_find>;
-};
-
-// representation for 2-CNFs
-class poset {
-	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
-	std::set<int_t, abs_cmp> true_var; //Set is sorted by absolut value
-	union_find eq_var;
-	bool is_pure = false;
-
-	uint_t hash=0;
-
-	// void updateTC (); <- not needed yet
-public:
-	poset() = default;
-	poset(int_t var, bool b) {
-		b ? true_var.insert(var) : true_var.insert(-var);
-		is_pure = true;
-		calc_hash();
-	}
-
-	bool operator==(const poset& p) const;
-	void calc_hash();
-	friend std::hash<poset>;
-
-	poset eval (int_t v);
-	static poset merge(int_t var, poset& hi, poset& lo);
-	static poset extend_sing (const poset& c, int_t var, bool b);
-	inline bool is_singleton () const{
-		return imp_var.empty() && eq_var.empty() && !true_var.empty();
-	}
-	inline bool is_empty() const {
-		return imp_var.empty() && eq_var.empty() && true_var.empty();
-	}
-	inline bool pure() const { return is_pure; }
-	inline bool is_false() const {return is_empty() && !is_pure;}
-	inline bool is_true() const {return is_empty() && is_pure;}
-	inline void set_pure() { is_pure = true; }
-	int_t get_high_var () const;
-	inline static poset& get (int_t c) {
-		return c > 0 ? CV[c] : neg_CV[-c];
-	}
-	inline static poset& get_neg (int_t c) {
-		return c > 0 ? neg_CV[c] : CV[-c];
-	}
-};
-
-
