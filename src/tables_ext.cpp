@@ -554,14 +554,24 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		));
 
 	if (f->type == form::ATOM) {
-		//assuming no free variables in qbf
-		//TODO: assert to check free vars
+
 		pnft_handle p0(new(pnft));
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) { /*f->arg <= 0*/
+				//assuming no free variables in qbf
+				for (auto &v : *f->tm) {
+					assert(
+						(v >= 0 || vm.find(v) != vm.end()) &&
+						"error: Free variable in formula, only closed formulas currently supported"
+					);
+				}
 				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				//DBG(assert(p0->b->neg == false);)
+//				COUT << "handleform1\n";
+//				spbdd_handle auxq = body_query(*p0->b,0);
+//				::out(COUT, auxq)<<endl<<endl;
+
 				ex_typebits(p0->b->ex, f->tm->size());
 				static set<body*, ptrcmp<body>>::const_iterator bit;
 				if ((bit = p->bodies.find(p0->b)) == p->bodies.end())
@@ -610,8 +620,12 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		} else {
 			pnft_handle p0(new(pnft));
 			handler_form1(p0, f->l,vm, vmh,fq);
+			if(!p->is_quant(f->l) && !p0->neg) {
+				p->matrix.insert(p->matrix.begin(),p0->matrix.begin(), p0->matrix.end());
+			} else {
+				p->matrix.push_back(p0);
+			}
 			p->bodies.insert(p0->bodies.begin(), p0->bodies.end());
-			p->matrix.push_back(p0);
 		}
 		if (f->r->type == form::ATOM) {
 			handler_form1(p, f->r,vm,vmh,fq);
@@ -620,8 +634,12 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			pnft_handle p1(new(pnft));
 			handler_form1(p1, f->r,vm,vmh,fq);
 			p1->neg = !p1->neg;
+			if(!p->is_quant(f->r) && !p1->neg) {
+				p->matrix.insert(p->matrix.begin(),p1->matrix.begin(), p1->matrix.end());
+			} else {
+				p->matrix.push_back(p1);
+			}
 			p->bodies.insert(p1->bodies.begin(), p1->bodies.end());
-			p->matrix.push_back(p1);
 		}
 		p->neg = !p->neg;
 	}
@@ -727,12 +745,22 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 				p->perm = get_perm(t, aux, vm.size(), bits-2);
 				vm = tmpvm; //for nested formulas
 			}
+
+			// ---
+			if (p->ex_h.size() == 0) {
+				auto d = deltail(p->varslen, tmpvm.size(), bits-2);
+				p->ex_h = d.first, p->perm_h = d.second;
+			}
+			p->varslen_h = tmpvm.size();
+			// ---
+
 			//TODO: group all negs, all pos
 		}
 	}
 }
 
 //-----------------------------------------------------------------------------
+//#define FOL_VERBOSE
 void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 
 	if (f->bodies.size() != 0 && f->fp(this)) {
@@ -744,12 +772,17 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	for (auto p : f->matrix) {
 		if (p->b) {
 			q = body_query(*p->b,0);
-			if (p->neg) q = bdd_not(q);
 			#ifdef FOL_VERBOSE
 			COUT << "fol:body_query\n";
 			::out(COUT, q)<<endl<<endl;
 			#endif
-
+			if (p->neg) {
+				q = bdd_not(q);
+				#ifdef FOL_VERBOSE
+				COUT << "fol:body_query_NEG\n";
+				::out(COUT, q)<<endl<<endl;
+				#endif
+			}
 			v.push_back(q);
 		} else if (p->cons != bdd_handle::T) {
 			q = p->cons;
@@ -769,34 +802,37 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	}
 	//if (v.size() > 1)
 	q = bdd_and_many(move(v));
-	if (f->neg) q = bdd_not(q);
 	#ifdef FOL_VERBOSE
 	COUT << "fol:and_many\n";
 	::out(COUT, q)<<endl<<endl;
 	#endif
-
-	if (f->quants.size() != 0) {
-		/*
-		//TODO: move perms inits to preparation
-		uints perm1 = perm_init((bits-2)*f->varslen);
-		uints perm2 = perm_init((bits-2)*f->varslen);
-		for (size_t i = 0; i < f->varslen; i++)
-			for (size_t j = 0; j < bits-2; j++) {
-				perm1[j * f->varslen + i] = i*(bits-2)+j;
-				perm2[i*(bits-2)+j] = j*f->varslen + i;
-			}
-		q = q^perm1;
-		q = bdd_quantify(q, f->quants, bits-2, f->varslen);
-		q = q^perm2;
-		*/
-		f->quantify(q,bits);
+	if (f->neg) {
+		q = bdd_not(q);
+		#ifdef FOL_VERBOSE
+		COUT << "fol:and_many_NEG\n";
+		::out(COUT, q)<<endl<<endl;
+		#endif
 	}
+
+	if (f->quants.size() != 0) f->quantify(q,bits);
+	#ifdef FOL_VERBOSE
+	COUT << "fol:quant_out\n";
+	::out(COUT, q)<<endl<<endl;
+	#endif
 
 	if (f->perm.size()!= 0) {
 		q = q^f->perm;
+		#ifdef FOL_VERBOSE
+		COUT << "fol:after_perm\n";
+		::out(COUT, q)<<endl<<endl;
+		#endif
 		if (f->perm_h.size()!= 0) {
 			v.push_back(q);
 			q = bdd_and_many_ex_perm(move(v), f->ex_h,f->perm_h);
+			#ifdef FOL_VERBOSE
+			COUT << "fol:after_perm_H\n";
+			::out(COUT, q)<<endl<<endl;
+			#endif
 		}
 	}
 	f->last = q;

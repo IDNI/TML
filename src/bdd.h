@@ -164,12 +164,14 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars);
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
+size_t satcount(cr_spbdd_handle x, const size_t bits);
+//size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex);
 
 class bdd {
 	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
-	friend class satcount_iter;
+	//friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
 	friend struct sbdd_and_many_ex_perm;
@@ -214,6 +216,8 @@ class bdd {
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
+	friend size_t satcount(cr_spbdd_handle x, const size_t bits);
+	//friend size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools& ex);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -306,7 +310,12 @@ class bdd {
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
 	static int_t merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
-	static void satcount_arith(bdd a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
+
+	static void satcount_arith(bdd a_in, size_t bit, const size_t bits, size_t factor,
+			size_t &count);
+	//static void satcount_arith_ex(bdd a_in, size_t bit, const size_t bits, size_t factor, const bools& ex,
+	//		size_t &count);
+
 	static int_t zero(size_t arg, size_t bits, size_t n_args);
 	static bool is_zero(int_t a_in, size_t bits);
 	static void adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
@@ -345,6 +354,8 @@ public:
 
 	inline static uint_t var(int_t x) { return abs(V[abs(x)].v); }
 
+	/*
+	TO DEPRECATE
 	static size_t satcount_perm(int_t x, size_t leafvar);
 	static size_t satcount_perm(const bdd& bx, int_t x, size_t leafvar);
 
@@ -353,6 +364,7 @@ public:
 	static size_t satcount_k(const bdd& bx, int_t x, size_t leafvar,
 		std::map<int_t, int_t>& mapvars);
 	static size_t satcount(spbdd_handle x, const bools& inv);
+	*/
 };
 
 class bdd_handle {
@@ -387,6 +399,7 @@ private:
 	void sat(int_t x);
 };
 
+/*
 class satcount_iter {
 public:
 	satcount_iter(cr_spbdd_handle r, uint_t nvars, const bools& inv) :
@@ -404,3 +417,4 @@ private:
 	std::set<bools> vp;
 	void sat(int_t x);
 };
+*/

@@ -860,115 +860,6 @@ spbdd_handle bdd_or_many(bdd_handles v) {
 	return bdd_handle::get(-bdd::bdd_and_many(move(b)));*/
 }
 
-#define SATCOUNT
-#ifdef SATCOUNT
-
-size_t bdd::satcount_perm(int_t x, size_t leafvar) {
-	const bdd bx = get(x);
-	return satcount_perm(bx, x, leafvar);
-}
-
-size_t bdd::satcount_perm(const bdd& bx, int_t x, size_t leafvar) {
-	size_t r = 0;
-	if (leaf(x)) return trueleaf(x) ? 1 : 0;
-	const bdd bhi = get(bx.h), blo = get(bx.l);
-	int_t hivar = leaf(bx.h) ? leafvar : bhi.v;
-	int_t lovar = leaf(bx.l) ? leafvar : blo.v;
-	r += satcount_perm(bhi, bx.h, leafvar) *
-		(1 << (hivar - bx.v - 1));
-	r += satcount_perm(blo, bx.l, leafvar) *
-		(1 << (lovar - bx.v - 1));
-	return r;
-}
-
-static set<size_t> ourvars;
-size_t bdd::getvar(int_t h, int_t l, int_t v, int_t x, size_t maxv) {
-	if (leaf(x)) return maxv;
-	const bdd bhi = get(h), blo = get(l);
-	maxv = leaf(h) ? maxv : max(maxv, getvar(bhi.h, bhi.l, bhi.v, h, maxv));
-	maxv = leaf(l) ? maxv : max(maxv, getvar(blo.h, blo.l, blo.v, l, maxv));
-	maxv = max(maxv, size_t(v));
-	ourvars.insert(v);
-	return maxv;
-}
-
-// D: this version does a manual 'permute' (in place alligns vars)
-// works better with rule(?x ?y ?out) :- headers
-// could be buggy (when bdd is minimized, vars removed, we're only guessing)
-size_t bdd::satcount_k(int_t x, const bools& ex, const uints&) {
-	const bdd bx = get(x);
-	ourvars.clear();
-	size_t leafvar = getvar(bx.h, bx.l, bx.v, x, 0) + 1;
-
-	// this's what's missing, if size is smaller means we don't have the 0-var,
-	// but this might be correct or not, we might be missing one in the middle?
-	size_t k = 1;
-	size_t n = count_if(ex.begin(), ex.end(), [](bool isex) { return !isex; });
-	if (ourvars.size() < n)
-		k = 1 << (n - ourvars.size());
-
-	map<int_t, int_t> inv;
-	int_t ivar = 1;
-	for (auto x : ourvars) {
-		//o::dbg() << "satcount: inv: " << x << ", " << ivar << " ." << endl;
-		inv.emplace(x, ivar++);
-	}
-	leafvar = ivar;
-
-	return k * satcount_k(bx, x, leafvar, inv);
-}
-
-size_t bdd::satcount_k(const bdd& bx, int_t x, size_t leafvar,
-	map<int_t, int_t>& mapvars) {
-	size_t r = 0;
-	if (leaf(x)) {
-		return trueleaf(x) ? 1 : 0;
-	}
-	const bdd bhi = get(bx.h), blo = get(bx.l);
-	int_t hivar = leaf(bx.h) ? leafvar : mapvars.at(bhi.v); // nvars + 1 - bx.v
-	int_t lovar = leaf(bx.l) ? leafvar : mapvars.at(blo.v);
-	r += satcount_k(bhi, bx.h, leafvar, mapvars) *
-		(1 << (hivar - mapvars.at(bx.v) - 1));
-	r += satcount_k(blo, bx.l, leafvar, mapvars) *
-		(1 << (lovar - mapvars.at(bx.v) - 1));
-	return r;
-}
-
-size_t bdd::satcount(spbdd_handle x, const bools& inv) {
-	// see: body::init_perm_inv(args)
-	// only count alt vars that are 'possible permutes' (of a body bit) 
-	// all other var/const bits are inconsequential for this count
-	// (so we 'zero' them all to always be the same)
-	// i.e. these are bits possibly 'affected' by this body's bdd
-	// TODO: is it still possible that
-	// a) those bits are affected by something else, not body's bdd?
-	// b) other (unlisted) bits are affected via some bdd conversion?
-
-	return satcount_iter(x, inv.size(), inv).count();
-}
-
-void satcount_iter::sat(int_t x) {
-	if (x == F) return;
-	const bdd bx = bdd::get(x);
-	if (!bdd::leaf(x) && v < bdd::var(x)) {
-		DBG(assert(bdd::var(x) <= nvars);)
-			p[++v - 2] = true, sat(x), p[v - 2] = false, sat(x), --v;
-	}
-	else if (v != nvars + 1)
-		p[++v - 2] = true, sat(bx.h),
-		p[v - 2] = false, sat(bx.l), --v;
-	else { 
-		//f(p, x); 
-		DBG(assert(abs(x) == 1););
-		bools np(p.size());
-		for (size_t i = 0; i < p.size(); ++i)
-			np[i] = !inv[i] ? true : p[i];
-		vp.insert(np);
-	}
-}
-
-#endif
-
 void bdd::sat(uint_t v, uint_t nvars, int_t t, bools& p, vbools& r) {
 	if (t == F) return;
 	if (!leaf(t) && v < var(t))
@@ -1177,3 +1068,115 @@ basic_ostream<T>& bdd::out(basic_ostream<T>& os, int_t x) {
 	//return out(out(os << b.v << " ? ", b.h) << " : ", b.l);
 	return out(out(os << b.v << " ? (", b.h) << ") : (", b.l) << ")";
 }
+
+/*
+//DEPRECATED
+#define SATCOUNT
+#ifdef SATCOUNT
+
+size_t bdd::satcount_perm(int_t x, size_t leafvar) {
+	const bdd bx = get(x);
+	return satcount_perm(bx, x, leafvar);
+}
+
+size_t bdd::satcount_perm(const bdd& bx, int_t x, size_t leafvar) {
+	size_t r = 0;
+	if (leaf(x)) return trueleaf(x) ? 1 : 0;
+	const bdd bhi = get(bx.h), blo = get(bx.l);
+	int_t hivar = leaf(bx.h) ? leafvar : bhi.v;
+	int_t lovar = leaf(bx.l) ? leafvar : blo.v;
+	r += satcount_perm(bhi, bx.h, leafvar) *
+		(1 << (hivar - bx.v - 1));
+	r += satcount_perm(blo, bx.l, leafvar) *
+		(1 << (lovar - bx.v - 1));
+	return r;
+}
+
+static set<size_t> ourvars;
+size_t bdd::getvar(int_t h, int_t l, int_t v, int_t x, size_t maxv) {
+	if (leaf(x)) return maxv;
+	const bdd bhi = get(h), blo = get(l);
+	maxv = leaf(h) ? maxv : max(maxv, getvar(bhi.h, bhi.l, bhi.v, h, maxv));
+	maxv = leaf(l) ? maxv : max(maxv, getvar(blo.h, blo.l, blo.v, l, maxv));
+	maxv = max(maxv, size_t(v));
+	ourvars.insert(v);
+	return maxv;
+}
+
+// D: this version does a manual 'permute' (in place alligns vars)
+// works better with rule(?x ?y ?out) :- headers
+// could be buggy (when bdd is minimized, vars removed, we're only guessing)
+size_t bdd::satcount_k(int_t x, const bools& ex, const uints&) {
+	const bdd bx = get(x);
+	ourvars.clear();
+	size_t leafvar = getvar(bx.h, bx.l, bx.v, x, 0) + 1;
+
+	// this's what's missing, if size is smaller means we don't have the 0-var,
+	// but this might be correct or not, we might be missing one in the middle?
+	size_t k = 1;
+	size_t n = count_if(ex.begin(), ex.end(), [](bool isex) { return !isex; });
+	if (ourvars.size() < n)
+		k = 1 << (n - ourvars.size());
+
+	map<int_t, int_t> inv;
+	int_t ivar = 1;
+	for (auto x : ourvars) {
+		//o::dbg() << "satcount: inv: " << x << ", " << ivar << " ." << endl;
+		inv.emplace(x, ivar++);
+	}
+	leafvar = ivar;
+
+	return k * satcount_k(bx, x, leafvar, inv);
+}
+
+size_t bdd::satcount_k(const bdd& bx, int_t x, size_t leafvar,
+	map<int_t, int_t>& mapvars) {
+	size_t r = 0;
+	if (leaf(x)) {
+		return trueleaf(x) ? 1 : 0;
+	}
+	const bdd bhi = get(bx.h), blo = get(bx.l);
+	int_t hivar = leaf(bx.h) ? leafvar : mapvars.at(bhi.v); // nvars + 1 - bx.v
+	int_t lovar = leaf(bx.l) ? leafvar : mapvars.at(blo.v);
+	r += satcount_k(bhi, bx.h, leafvar, mapvars) *
+		(1 << (hivar - mapvars.at(bx.v) - 1));
+	r += satcount_k(blo, bx.l, leafvar, mapvars) *
+		(1 << (lovar - mapvars.at(bx.v) - 1));
+	return r;
+}
+
+size_t bdd::satcount(spbdd_handle x, const bools& inv) {
+	// see: body::init_perm_inv(args)
+	// only count alt vars that are 'possible permutes' (of a body bit)
+	// all other var/const bits are inconsequential for this count
+	// (so we 'zero' them all to always be the same)
+	// i.e. these are bits possibly 'affected' by this body's bdd
+	// TODO: is it still possible that
+	// a) those bits are affected by something else, not body's bdd?
+	// b) other (unlisted) bits are affected via some bdd conversion?
+
+	return satcount_iter(x, inv.size(), inv).count();
+}
+
+void satcount_iter::sat(int_t x) {
+	if (x == F) return;
+	const bdd bx = bdd::get(x);
+	if (!bdd::leaf(x) && v < bdd::var(x)) {
+		DBG(assert(bdd::var(x) <= nvars);)
+			p[++v - 2] = true, sat(x), p[v - 2] = false, sat(x), --v;
+	}
+	else if (v != nvars + 1)
+		p[++v - 2] = true, sat(bx.h),
+		p[v - 2] = false, sat(bx.l), --v;
+	else {
+		//f(p, x);
+		DBG(assert(abs(x) == 1););
+		bools np(p.size());
+		for (size_t i = 0; i < p.size(); ++i)
+			np[i] = !inv[i] ? true : p[i];
+		vp.insert(np);
+	}
+}
+
+#endif
+*/

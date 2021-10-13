@@ -60,11 +60,22 @@ struct builtin {
 	void getvars(const term& bt, std::set<int_t>& invars,
 		std::set<int_t>& ngvars, std::set<int_t>& outvars) const
 	{
-		int_t l = length(bt), op = l - oargs, np = op - nargs;
-		for (int_t n = 0; n != l; ++n) if (bt[n] < 0) {
-			if (n < np) invars.insert(bt[n]);
-			else if (n < op) ngvars.insert(bt[n]);
-			else outvars.insert(bt[n]);
+		//nargs == -1 encodes:
+		// - builtin has variable number of args, single output
+		// - last one is output
+		// - no input requires "grounding"
+		if (nargs != -1) {
+			int_t l = length(bt), op = l - oargs, np = op - nargs;
+			for (int_t n = 0; n != l; ++n) if (bt[n] < 0) {
+				if (n < np) invars.insert(bt[n]);
+				else if (n < op) ngvars.insert(bt[n]);
+				else outvars.insert(bt[n]);
+			}
+		} else {
+			int_t s = length(bt);
+			for (int_t n = 0; n != s-1; ++n)
+				if (bt[n] < 0) ngvars.insert(bt[n]);
+			outvars.insert(bt[s-1]);
 		}
 	}
 	// call the builtin's handler with the a context
