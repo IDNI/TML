@@ -205,14 +205,15 @@ public:
 	std::vector<int_t> get_set (int_t x);
 	void delete_set (int_t x);
 	bool empty () const { return parent.empty(); }
+	size_t size() const { return parent.size(); }
 	static union_find
-	intersect(union_find &uf1, union_find &uf2, bool &pure);
+	intersect(union_find &uf1, union_find &uf2);
 
 	friend std::hash<union_find>;
 };
 
 // representation for 2-CNFs
-class poset {
+struct poset {
 	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
 	std::set<int_t, abs_cmp> true_var; //Set is sorted by absolut value
 	union_find eq_var;

@@ -184,6 +184,7 @@ bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
 	else if (it = m.find(h_v); it != end(m)) h = posUniverse ? it->second : -it->second;
 	else if (it = neg_m.find(h_v); it != end(neg_m)) h = posUniverse ? -it->second : it->second; // This has to be removed later
 	else {
+		DBG(assert(false););
 		m.emplace(h_v, univ.size());
 		V.emplace_back(0,0,0);
 		univ.emplace_back(move(h_v));
@@ -196,6 +197,7 @@ bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
 	else if (it = m.find(l_v); it != end(m)) l = posUniverse ? it->second : -it->second;
 	else if (it = neg_m.find(l_v); it != end(neg_m)) l = posUniverse ? -it->second : it->second; // This has to be removed later
 	else {
+		DBG(assert(false););
 		m.emplace(l_v, univ.size());
 		V.emplace_back(0,0,0);
 		univ.emplace_back(move(l_v));
@@ -1560,16 +1562,15 @@ void union_find::delete_set(int_t x) {
 	}
 }
 
-union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
+union_find union_find::intersect(union_find &uf1, union_find &uf2) {
 	map<pair<int_t,int_t>, vector<int_t>> eq_class;
 	abs_cmp comp;
 	// Find common nodes in uf1 and uf2
 	auto it_uf1 = uf1.parent.begin();
 	auto it_uf2 = uf2.parent.begin();
-	if(uf1.parent.size() != uf2.parent.size()) pure = false;
 	while (it_uf1 != uf1.parent.end() && it_uf2 != uf2.parent.end()) {
-		if (comp(it_uf1->first, it_uf2->first)) { pure = false; ++it_uf1; }
-		else if(comp(it_uf2->first, it_uf1->first)) { pure = false; ++it_uf2; }
+		if (comp(it_uf1->first, it_uf2->first)) { ++it_uf1; }
+		else if(comp(it_uf2->first, it_uf1->first)) { ++it_uf2; }
 		else {
 			// Found a common node; Associate with equivalence tuple
 			int_t eq_class_uf1 = uf1.find(it_uf1->first).first;
@@ -1588,7 +1589,7 @@ union_find union_find::intersect(union_find &uf1, union_find &uf2, bool &pure) {
 		if (p.second.size() > 1) for (const auto& el : p.second) {
 			uf_res.insert(el);
 			uf_res.merge(p.second[0], el);
-		} else pure = false;
+		}
 	}
 	return uf_res;
 }
@@ -1709,6 +1710,9 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 		}
 	}
 
+	// Collect info about lifting of equality due to singletons on other branch
+	vector<pair<int_t,int_t>> eq_lift_lo;
+	vector<pair<int_t,int_t>> eq_lift_hi;
 	// Lifting of singletons
 	auto it_hi_var = hi.true_var.begin();
 	auto it_lo_var = lo.true_var.begin();
@@ -1716,11 +1720,13 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 		if (it_lo_var == lo.true_var.end() ||
 				(abs(*it_hi_var) < abs(*it_lo_var) && it_hi_var != end(hi.true_var))) {
 			//Singleton in high but not in lo
+			eq_lift_lo.emplace_back(lo.eq_var.find(*it_hi_var).first, *it_hi_var);
 			res.imp_var[var].insert(*it_hi_var);
 			++it_hi_var;
 		}
 		else if (it_hi_var == hi.true_var.end() || abs(*it_hi_var) > abs(*it_lo_var)) {
 			//Singleton in lo but not in high
+			eq_lift_hi.emplace_back(hi.eq_var.find(*it_lo_var).first, *it_lo_var);
 			res.imp_var[-var].insert(*it_lo_var);
 
 			//Implications assuring the transitive closure of resulting constrain
@@ -1763,8 +1769,40 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	// Lifting of equalities contained in both hi and lo
 	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
 		res.eq_var =
-			union_find::intersect(hi.eq_var, lo.eq_var, res.is_pure);
+			union_find::intersect(hi.eq_var, lo.eq_var);
 	}
+
+	// Lifting of equality due to singletons
+	sort(eq_lift_lo.begin(), eq_lift_lo.end(),
+	     [&](pair<int_t,int_t> p1, pair<int_t,int_t> p2){
+			return comp(p1.first,  p2.first);
+	});
+	sort(eq_lift_hi.begin(), eq_lift_hi.end(),
+	     [&](pair<int_t,int_t> p1, pair<int_t,int_t> p2){
+		     return comp(p1.first,  p2.first);
+	     });
+	for(auto i = 0; i < eq_lift_lo.size(); ++i) {
+		if (i+1 < eq_lift_lo.size() && eq_lift_lo[i].first != 0 &&
+				eq_lift_lo[i].first == eq_lift_lo[i+1].first) {
+			res.eq_var.insert(eq_lift_lo[i].second);
+			res.eq_var.insert(eq_lift_lo[i+1].second);
+			res.eq_var.merge(eq_lift_lo[i].second, eq_lift_lo[i+1].second);
+		}
+	}
+
+	for(auto i = 0; i < eq_lift_hi.size(); ++i) {
+		if (i+1 < eq_lift_hi.size() && eq_lift_hi[i].first != 0 &&
+				eq_lift_hi[i].first == eq_lift_hi[i+1].first) {
+			res.eq_var.insert(eq_lift_hi[i].second);
+			res.eq_var.insert(eq_lift_hi[i+1].second);
+			res.eq_var.merge(eq_lift_hi[i].second, eq_lift_hi[i+1].second);
+		}
+	}
+
+	if (!(union_find::intersect(res.eq_var, hi.eq_var) == hi.eq_var))
+		res.is_pure = false;
+	else if (!(union_find::intersect(res.eq_var, lo.eq_var) == lo.eq_var))
+		res.is_pure = false;
 
 	return res.calc_hash(), res;
 }
