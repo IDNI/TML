@@ -1710,6 +1710,12 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 		}
 	}
 
+	// Lifting of equalities contained in both hi and lo
+	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
+		res.eq_var =
+			union_find::intersect(hi.eq_var, lo.eq_var);
+	}
+
 	// Collect info about lifting of equality due to singletons on other branch
 	vector<pair<int_t,int_t>> eq_lift_lo;
 	vector<pair<int_t,int_t>> eq_lift_hi;
@@ -1764,12 +1770,6 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			}
 			++it_hi_var; ++it_lo_var;
 		}
-	}
-
-	// Lifting of equalities contained in both hi and lo
-	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
-		res.eq_var =
-			union_find::intersect(hi.eq_var, lo.eq_var);
 	}
 
 	// Lifting of equality due to singletons
