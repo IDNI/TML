@@ -117,8 +117,8 @@ void bdd::max_bdd_size_check() {
  * low reference, l. Precondition is that h and l depend only on variables after
  * v, i.e. their shifts are more than v. */
 
-bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
-	DBG(assert(GET_BDD_ID(h) && GET_BDD_ID(l) && v > 0););
+bdd_ref bdd::add(uint_t v, bdd_ref h, bdd_ref l) {
+	DBG(assert(GET_BDD_ID(h) && GET_BDD_ID(l)););
 	// If BDD would not branch on this variable, exclude it to preserve canonicity
 	if (h == l) return h;
 	// Apply output inversion invariant that low part can never be inverted
@@ -130,8 +130,7 @@ bdd_ref bdd::add(int_t v, bdd_ref h, bdd_ref l) {
 	// attaching an input inverter if necessary. Required for canonicity.
 	const bool inv_inp = BDD_LT(l, h);
 	if (inv_inp) swap(h, l);
-	std::hash<bdd_ref> hsh;
-	bdd_key k = bdd_key(hash_upair(hsh(h), hsh(l)), h, l);
+	bdd_key k = bdd_key(hash_upair(h, l), h, l);
 	unordered_map<bdd_key, int_t>::const_iterator it;
 	// Find a BDD with the given high and low parts and make an attributed
 	// reference to it.
@@ -1112,7 +1111,7 @@ spbdd_handle from_eq(uint_t x, uint_t y) {
 	return bdd_ite(from_bit(x,true), from_bit(y,true), from_bit(y,false));
 }
 
-bool bdd::solve(bdd_ref x, int_t v, bdd_ref& l, bdd_ref &h) {
+bool bdd::solve(bdd_ref x, uint_t v, bdd_ref& l, bdd_ref &h) {
 	bools b(v, false);
 	b[v-1] = true;
 	bdd_ref r = bdd_or( l = bdd_and_ex(x, from_bit(v, true), b),
@@ -1120,7 +1119,7 @@ bool bdd::solve(bdd_ref x, int_t v, bdd_ref& l, bdd_ref &h) {
 	return leaf(r) && !trueleaf(r);
 }
 
-array<spbdd_handle, 2> solve(spbdd_handle x, int_t v) {
+array<spbdd_handle, 2> solve(spbdd_handle x, uint_t v) {
 	bdd_ref h, l;
 	if (!bdd::solve(x->b, v, h, l)) return { nullptr, nullptr };
 	return { bdd_handle::get(l), bdd_handle::get(h) };

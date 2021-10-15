@@ -55,9 +55,9 @@ typedef uint32_t bdd_ref;
 // Make a selector for the given bits of a 32-bit unsigned integer
 #define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
 // Extract the given bits from the given number
-#define GET32(low, high, x) ((uint32_t(x) & MASK32(low, high)) >> (low))
+#define GET32(low, high, x) ((((uint32_t)(x)) & MASK32(low, high)) >> (low))
 // Place the low bits of x into the given position
-#define PLACE32(low, high, x) ((uint32_t(x) << (low)) & MASK32(low, high))
+#define PLACE32(low, high, x) ((((uint32_t)(x)) << (low)) & MASK32(low, high))
 // Replace the given bits of x with the low bits of y
 #define REPL32(low, high, x, y) (((x) & ~MASK32(low, high)) | PLACE32(low, high, y))
 // Construct a BDD reference with the given ID, shift, and inverters
@@ -75,17 +75,17 @@ typedef uint32_t bdd_ref;
 // Set the BDD identified by this reference
 #define SET_BDD_ID(y, x) (y = REPL32(0,22,y,x))
 // Remove the output inverter from the BDD reference
-#define BDD_ABS(x) (uint32_t(x) & (uint32_t(-1) >> 1))
+#define BDD_ABS(x) (((uint32_t)(x)) & (uint32_t(-1) >> 1))
 // Increase the shift of the BDD reference, terminal nodes cannot be shifted
-#define INCR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
 #define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
+#define INCR_SHIFT(y, x) (y = PLUS_SHIFT(y, x))
 // Decrease the shift of the BDD reference, terminal nodes cannot be shifted
-#define DECR_SHIFT(y, x) (y = GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
 #define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
+#define DECR_SHIFT(y, x) (y = MINUS_SHIFT(y, x))
 // Invert supplied BDD reference, the 0 node cannot be inverted
 #define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint32_t(1) << 31)) : (x))
 // Compare BDD references in such a way that output inverted ones are <0
-#define BDD_LT(x, y) (int32_t(x) < int32_t(y))
+#define BDD_LT(x, y) (((int32_t)(x)) < ((int32_t)(y)))
 
 class bdd;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
@@ -161,7 +161,7 @@ spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
 spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
 spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
 spbdd_handle from_eq(uint_t x, uint_t y);
-std::array<spbdd_handle, 2> solve(spbdd_handle x, int_t v);
+std::array<spbdd_handle, 2> solve(spbdd_handle x, uint_t v);
 bdd_ref bdd_or_reduce(bdds b);
 bdd_ref bdd_or_reduce(bdds b);
 size_t bdd_nvars(spbdd_handle x);
@@ -208,7 +208,7 @@ extern mmap_mode bdd_mmap_mode;
 // extern std::map<std::pair<uints, bools>, std::unordered_map<int_t, int_t>,
 // 	vec2cmp<uint_t, bool>> memos_perm_ex;
 
-void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+void bdd_size(cr_spbdd_handle x,  std::set<uint_t>& s);
 int_t bdd_root(cr_spbdd_handle x);
 spbdd_handle bdd_not(cr_spbdd_handle x);
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -261,7 +261,7 @@ class bdd {
 		const bools& b);
 	friend spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 		const bools&);
-	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, int_t v);
+	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, uint_t v);
 	friend vbools allsat(cr_spbdd_handle x, uint_t nvars);
 	friend spbdd_handle from_bit(uint_t b, bool v);
 	friend size_t bdd_nvars(spbdd_handle x);
@@ -269,7 +269,7 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	template <typename T>
 	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
-	friend void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s);
+	friend void bdd_size(cr_spbdd_handle x,  std::set<uint_t>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -318,7 +318,7 @@ class bdd {
 	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m,
 		size_t last, std::unordered_map<bdd_ref, bdd_ref>& memo);
 	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m);
-	static bool solve(bdd_ref x, int_t v, bdd_ref& l, bdd_ref& h);
+	static bool solve(bdd_ref x, uint_t v, bdd_ref& l, bdd_ref& h);
 	static void mark_all(bdd_ref i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
@@ -333,7 +333,7 @@ class bdd {
 	static void bdd_nvars(bdd_ref x, std::set<int_t>& s);
 	static size_t bdd_nvars(bdd_ref x);
 	static bool bdd_subsumes(bdd_ref x, bdd_ref y);
-	static bdd_ref add(int_t v, bdd_ref h, bdd_ref l);
+	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l);
 	inline static bdd_ref from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(bdd_ref t) { return BDD_ABS(t) == T; }
@@ -343,7 +343,7 @@ class bdd {
 	bdd_ref h, l;
 
 	//---
-	static void bdd_sz_abs(bdd_ref x, std::set<int_t>& s);
+	static void bdd_sz_abs(bdd_ref x, std::set<uint_t>& s);
 	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
