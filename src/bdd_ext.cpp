@@ -965,13 +965,7 @@ bdd_ref bdd::shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args) {
 	return a_in;
 }
 
-bdd_ref bdd::copy(bdd_ref a_in) {
-	 if (a_in == T) return T;
-	 else if (a_in == F) return F;
-	 bdd a = get(a_in);
-	 int_t pos = GET_SHIFT(a_in) + 1;
- 	 return add(pos, copy(a.h) , copy(a.l));
-}
+bdd_ref bdd::bdd_shift(bdd_ref a_in, int_t amt) { return PLUS_SHIFT(a_in, amt); }
 
 bdd_ref bdd::copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits,
 	size_t n_args) {

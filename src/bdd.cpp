@@ -75,23 +75,25 @@ auto am_cmp = [](bdd_ref x, bdd_ref y) {
 };
 _Pragma("GCC diagnostic pop")
 
-const size_t gclimit = 1e+6;
+size_t gclimit = 1e+6;
 
 #ifndef NOMMAP
-void bdd::init(mmap_mode m, size_t max_size, const string fn, bool gc) {
+void bdd::init(mmap_mode m, size_t max_size, const string fn, bool gc, size_t gclimit_) {
 	gc_enabled = gc;
+	gclimit = gclimit_;
 	bdd_mmap_mode = m;
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
 	V = bdd_mmap(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V.reserve(max_bdd_nodes);
 #else
-void bdd::init(bool gc) {
+void bdd::init(bool gc, size_t gclimit_) {
 #endif
 	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
 	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
 	//	", max_size: " << max_size << ", fn: " << fn
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
 	gc_enabled = gc;
+	gclimit = gclimit_;
 	S.insert(0), S.insert(1), V.emplace_back(0, 0), // dummy
 	V.emplace_back(1, 1),
 	Ma.emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
@@ -632,6 +634,8 @@ void bdd::mark_all(bdd_ref  i) {
 		mark_all(hi(i)), mark_all(lo(i)), S.insert(GET_BDD_ID(i));
 }
 
+/* Get the size of the ITE cache. */
+size_t bdd::ite_cache_size() { return C.size(); }
 template <typename T>
 basic_ostream<T>& bdd::stats(basic_ostream<T>& os) {
 	return os << "S: " << S.size() << " V: "<< V.size() <<
@@ -820,6 +824,10 @@ spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z) {
 
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z) {
 	return bdd_handle::get(bdd::bdd_ite_var(x, y->b, z->b));
+}
+
+spbdd_handle bdd_shift(cr_spbdd_handle x, int_t amt) {
+	return bdd_handle::get(bdd::bdd_shift(x->b, amt));
 }
 
 spbdd_handle bdd_and_many(bdd_handles v) {

@@ -31,7 +31,7 @@ void generate_functions(int arity, unordered_set<spbdd_handle> &func_set, int of
 // Test the canonicity of variable shifters
 
 int main() {
-  bdd::init();
+  bdd::init(MMAP_NONE, 10000, "", true, -1U);
   // First generate set of all boolean functions of given arity
   const int arity = 3;
   unordered_set<spbdd_handle> func_set;
@@ -45,6 +45,8 @@ int main() {
     quants.push_back(a_quant);
   }
   cout << "Boolean function count: " << func_set.size() << endl;
+  size_t orig_ite_cache_size = bdd::ite_cache_size();
+  cout << endl << "Info: Cache size before conducting shifted computations is " << orig_ite_cache_size << "." << endl;
   // Now check that the set is closed under boolean operations
   for(const spbdd_handle &func1 : func_set) {
     for(const spbdd_handle &func2 : func_set) {
@@ -78,63 +80,40 @@ int main() {
   }
   // Control flow passing through here implies set is closed under operations
   cout << endl << "Success: Boolean function set closed under chosen operations." << endl;
-  // Now ensure that shifts of the same boolean function have the same BDD
-  // First construct the set of BDDs corresponding to the set of functions
-  unordered_set<bdd_ref> func_bdd_set;
-  for(const spbdd_handle &func : func_set) {
-    func_bdd_set.insert(GET_BDD_ID(func->b));
+  const size_t ite_cache_size = bdd::ite_cache_size();
+  if(ite_cache_size <= orig_ite_cache_size) {
+    cout << endl << "Error: Unshifted BDD computations caused the cache to shrink by " << (orig_ite_cache_size - ite_cache_size) << "." << endl;
+    return 4;
+  } else {
+    cout << endl << "Info: Unshifted BDD computations caused the cache to grow by " << (ite_cache_size - orig_ite_cache_size) << "." << endl;
   }
   // Now check that the set of boolean functions higher variables are still
   // represented using the same BDD
   for(int shift = 1; shift < 10; shift++) {
-    // Generate the set of boolean functions over higher variables
     unordered_set<spbdd_handle> func_set2;
-    generate_functions(arity, func_set2, shift);
-    // Now extract the BDDs of this set of higher boolean functions
-    unordered_set<bdd_ref> func_bdd_set2;
-    for(const spbdd_handle &func : func_set2) {
-      func_bdd_set2.insert(GET_BDD_ID(func->b));
-    }
-    // Now ensure that the BDD sets are identical and that the functions are not
-    if(func_set == func_set2) {
-      cout << endl << "Error: Shifted function set cannot be identical to the original." << endl;
-      return 2;
-    } else if(func_bdd_set != func_bdd_set2) {
-      cout << endl << "Error: Shifted function set should have BDDs identical to the original's." << endl;
-      return 3;
-    }
-  }
-  // Control flow passing through here implies shifts share BDDs
-  cout << endl << "Success: Boolean function set is represented by same BDDs despite variable shifts." << endl;
-  // Now we want to make sure that every BDD combined with an input inverter and
-  // variable shifter represents exactly two functions and that these two
-  // functions are output inverses of each other.
-  map<tuple<int, int, bool>, vector<bool>> func_out_inv_split;
-  // Represent the output inversion attribute separately from other attributes
-  for(const spbdd_handle &func : func_set) {
-    func_out_inv_split[make_tuple((int) GET_BDD_ID(func->b), (int) GET_SHIFT(func->b), (bool) GET_INV_INP(func->b))].push_back(GET_INV_OUT(func->b));
-  }
-  if(2 * func_out_inv_split.size() != func_set.size()) {
-    // Ensure that the function set modulo output inversion is exactly half the original's size
-    cout << endl << "Error: Output inversion attribute does not equipartition function set into two sets." << endl;
-    return 4;
-  } else {
-    // Ensure that each function BDD has its output inverted version in the function set
-    for(const auto &[func_part, inv_outs] : func_out_inv_split) {
-      if(inv_outs.size() < 2) {
-        cout << endl << "Error: At least one function-inverse pair is not represented with the same BDD." << endl;
-        return 5;
-      } else if(inv_outs.size() > 2) {
-        cout << endl << "Error: At least one function is over-represented in the function set." << endl;
-        return 5;
-      } else if (inv_outs[0] == inv_outs[1]) {
-        cout << endl << "Error 1: At least one function-inverse pair is not represented with the same BDD." << endl;
-        cout << endl << "Error 2: At least one function is over-represented in the function set." << endl;
-        return 5;
+    // Now check that the set is closed under boolean operations
+    for(const spbdd_handle &func1 : func_set) {
+      for(const spbdd_handle &func2 : func_set) {
+        // Do BDD operations on shifted elements with intent to study changes to
+        // the cache afterwards
+        func_set2.insert(bdd_shift(func1, shift) && bdd_shift(func2, shift));
+        func_set2.insert(bdd_shift(func1, shift) || bdd_shift(func2, shift));
+        func_set2.insert(bdd_shift(func1, shift) % bdd_shift(func2, shift));
+        for(const spbdd_handle &func3 : func_set) {
+          func_set2.insert(bdd_ite(bdd_shift(func1, shift), bdd_shift(func2, shift), bdd_shift(func3, shift)));
+        }
       }
     }
+    if(func_set.size() != func_set2.size()) {
+      cout << endl << "Error: Boolean function set generated by set shifted by " << shift << " not equinumerous to that generated by original set." << endl;
+      return 2;
+    } else if(bdd::ite_cache_size() != ite_cache_size) {
+      cout << endl << "Error: Cache not being used to short-circuit BDD computations shifted by " << shift << "." << endl;
+      return 3;
+    } else {
+      // Control flow passing through here implies that BDD computations are most-likely short-circuited
+      cout << endl << "Success: BDD computations shifted by " << shift << " were most-likely short-circuited using the cache." << endl;
+    }
   }
-  // Control flow passing through here implies that output inversion equipartitions function set
-  cout << endl << "Success: Boolean function set is equipartitioned into two sets by the output inversion attribute." << endl;
   return 0;
 }

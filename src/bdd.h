@@ -77,10 +77,10 @@ typedef uint32_t bdd_ref;
 // Remove the output inverter from the BDD reference
 #define BDD_ABS(x) (((uint32_t)(x)) & (uint32_t(-1) >> 1))
 // Increase the shift of the BDD reference, terminal nodes cannot be shifted
-#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+uint32_t(x)) : (y))
+#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)+((int32_t)(x))) : (y))
 #define INCR_SHIFT(y, x) (y = PLUS_SHIFT(y, x))
 // Decrease the shift of the BDD reference, terminal nodes cannot be shifted
-#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-uint32_t(x)) : (y))
+#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL32(22,30,y,GET_SHIFT(y)-((int32_t)(x))) : (y))
 #define DECR_SHIFT(y, x) (y = MINUS_SHIFT(y, x))
 // Invert supplied BDD reference, the 0 node cannot be inverted
 #define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint32_t(1) << 31)) : (x))
@@ -147,6 +147,7 @@ spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
 
 bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
+spbdd_handle bdd_shift(cr_spbdd_handle in, int_t amt);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
@@ -281,6 +282,7 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
+	friend spbdd_handle bdd_shift(cr_spbdd_handle x, int_t amt);
 	
 	/* Get the absolute BDD referenced by the given BDD reference. If the given
 	 * BDD reference represents the function f, the low reference of the produced
@@ -385,7 +387,7 @@ class bdd {
 	static bdd_ref adder_accs(bdd_ref b_in, bdd_ref accs, size_t depth, size_t bits, size_t n_args);
 	static void mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size_t bits,
 			size_t n_args, bdd_ref &c) ;
-	static bdd_ref copy(bdd_ref a_in);
+	static bdd_ref bdd_shift(bdd_ref a_in, int_t amt);
 	static bdd_ref copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
 	static bdd_ref shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args);
 	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
@@ -397,13 +399,14 @@ public:
 	}
 #ifndef NOMMAP
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
-		const std::string fn="", bool gc = true);
+		const std::string fn="", bool gc = true, size_t gclimit_ = 1e+6);
 #else
-	static void init(bool gc = true);
+	static void init(bool gc = true, size_t gclimit_ = 1e+6);
 #endif
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
+	static size_t ite_cache_size();
 	
 	/* Return the absolute BDD corresponding to the high part of the given BDD
 	 * reference. If x represents a boolean function f, then this function returns
