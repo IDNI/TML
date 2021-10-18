@@ -305,7 +305,12 @@ class bdd {
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 		std::unordered_map<std::array<bdd_ref, 2>, bdd_ref>& memo,
 		std::unordered_map<bdd_ref, bdd_ref>& memo2, uint_t last);
-	static bdd_ref bdd_or(bdd_ref x, bdd_ref y) { return FLIP_INV_OUT(bdd_and(FLIP_INV_OUT(x), FLIP_INV_OUT(y))); }
+	static bdd_ref bdd_or(bdd_ref x, bdd_ref y) {
+		const bdd_ref and_ref = bdd_and(FLIP_INV_OUT(x), FLIP_INV_OUT(y));
+		// Apply output inversion to constant expression to avoid repeat calls to
+		// bdd_and
+		return FLIP_INV_OUT(and_ref);
+	}
 	static bdd_ref bdd_ite(bdd_ref x, bdd_ref y, bdd_ref z);
 	static bdd_ref bdd_ite_var(uint_t x, bdd_ref y, bdd_ref z);
 	static bdd_ref bdd_and_many(bdds v);

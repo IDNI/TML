@@ -156,12 +156,20 @@ bool bdd::bdd_subsumes(bdd_ref x, bdd_ref y) {
 	return bdd_subsumes(bx.h, by.h) && bdd_subsumes(bx.l, by.l);
 }
 
+/* Compute the conjunction of the given pair of BDDs. */
+
 bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	DBG(assert(GET_BDD_ID(x) && GET_BDD_ID(y));)
 	if (x == F || y == F || x == FLIP_INV_OUT(y)) return F;
 	if (x == T || x == y) return y;
 	if (y == T) return x;
-	if (x > y) swap(x, y);
+	if (BDD_LT(y, x)) swap(x, y);
+	// Downshift the input BDDs by their greatest common shift. Operate on this
+	// reduced form then upshift the result by the aforementioned shift. Intent is
+	// that this canonisation increases cache hits.
+	const uint_t min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
+	DECR_SHIFT(x, min_shift);
+	DECR_SHIFT(y, min_shift);
 	const bdd bx = get(x), by = get(y);
 	ite_memo m = { x, y, F };
 	bool leaf = 
@@ -169,22 +177,35 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 		by.h == T || by.h == F || by.l == T || by.l == F;
 #ifdef MEMO
 	if (!leaf && GET_SHIFT(x) == GET_SHIFT(y))
-		if (auto it = C.find(m); it != C.end())
-			return it->second;
+		if (auto it = C.find(m); it != C.end()) {
+			// Upshift result to obtain answer for pre-downshifted BDDs
+			return PLUS_SHIFT(it->second, min_shift);
+		}
 #endif
-	if (GET_SHIFT(x) < GET_SHIFT(y)) return add(GET_SHIFT(x), bdd_and(bx.h, y), bdd_and(bx.l, y));
-	if (GET_SHIFT(x) > GET_SHIFT(y)) return add(GET_SHIFT(y), bdd_and(x, by.h), bdd_and(x, by.l));
+	if (GET_SHIFT(x) < GET_SHIFT(y)) {
+		const bdd_ref lowest_bdd = add(GET_SHIFT(x), bdd_and(bx.h, y), bdd_and(bx.l, y));
+		// Upshift result to obtain answer for pre-downshifted BDDs
+		return PLUS_SHIFT(lowest_bdd, min_shift);
+	}
+	if (GET_SHIFT(x) > GET_SHIFT(y)) {
+		const bdd_ref lowest_bdd = add(GET_SHIFT(y), bdd_and(x, by.h), bdd_and(x, by.l));
+		// Upshift result to obtain answer for pre-downshifted BDDs
+		return PLUS_SHIFT(lowest_bdd, min_shift);
+	}
 	bdd_ref r = add(GET_SHIFT(x), bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
 	if (!leaf && C.size() < gclimit) C.emplace(m, r);
 #endif
-	return r;
+	// Upshift result to obtain answer for pre-downshifted BDDs
+	return PLUS_SHIFT(r, min_shift);
 }
 
 bdd_ref bdd::bdd_ite_var(uint_t x, bdd_ref y, bdd_ref z) {
 	if (x+1 < var(y) && x+1 < var(z)) return add(x+1, y, z);
 	return bdd_ite(from_bit(x, true), y, z);
 }
+
+/* Compute x -> y, z from the given triple of BDDs. I.e. (x && y) || (~x && y). */
 
 bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	DBG(assert(GET_BDD_ID(x) && GET_BDD_ID(y) && GET_BDD_ID(z));)
@@ -196,8 +217,16 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	if (y == F) return bdd_and(FLIP_INV_OUT(x), z);
 	if (z == F) return bdd_and(x, y);
 	if (z == T) return bdd_or(FLIP_INV_OUT(x), y);
+	// Downshift the input BDDs by their greatest common shift. Operate on this
+	// reduced form then upshift the result by the aforementioned shift. Intent is
+	// that this canonisation increases cache hits.
+	uint_t min_shift = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
+	DECR_SHIFT(x, min_shift);
+	DECR_SHIFT(y, min_shift);
+	DECR_SHIFT(z, min_shift);
 	auto it = C.find({x, y, z});
-	if (it != C.end()) return it->second;
+	// If result in cache then upshift to obtain answer for pre-downshifted BDDs
+	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
 	bdd_ref r;
 	const bdd bx = get(x), by = get(y), bz = get(z);
 	const uint_t s = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
@@ -218,8 +247,9 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	else if (s == GET_SHIFT(y))
 		r =	add(GET_SHIFT(y), bdd_ite(x, by.h, z), bdd_ite(x, by.l, z));
 	else	r =	add(GET_SHIFT(z), bdd_ite(x, y, bz.h), bdd_ite(x, y, bz.l));
-	if (C.size() > gclimit) return r;
-	return C.emplace(ite_memo{x, y, z}, r), r;
+	// Upshift result to obtain answer for pre-downshifted BDDs
+	if (C.size() > gclimit) return PLUS_SHIFT(r, min_shift);
+	return C.emplace(ite_memo{x, y, z}, r), PLUS_SHIFT(r, min_shift);
 }
 
 void am_sort(bdds& b) {
@@ -1114,8 +1144,9 @@ spbdd_handle from_eq(uint_t x, uint_t y) {
 bool bdd::solve(bdd_ref x, uint_t v, bdd_ref& l, bdd_ref &h) {
 	bools b(v, false);
 	b[v-1] = true;
-	bdd_ref r = bdd_or( l = bdd_and_ex(x, from_bit(v, true), b),
-			FLIP_INV_OUT(h = FLIP_INV_OUT(bdd_and_ex(x, from_bit(v, true), b))));
+	bdd_ref h_inv = bdd_and_ex(x, from_bit(v, true), b);
+	bdd_ref r = bdd_or(l = bdd_and_ex(x, from_bit(v, true), b), h_inv);
+	h = FLIP_INV_OUT(h_inv);
 	return leaf(r) && !trueleaf(r);
 }
 
