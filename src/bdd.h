@@ -79,10 +79,10 @@ typedef uint64_t bdd_ref;
 // Remove the output inverter from the BDD reference
 #define BDD_ABS(x) (((uint64_t)(x)) & (uint64_t(-1) >> 1))
 // Increase the shift of the BDD reference, terminal nodes cannot be shifted
-#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)+((int64_t)(x))) : (y))
+#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)+((int32_t)(x))) : (y))
 #define INCR_SHIFT(y, x) (y = PLUS_SHIFT(y, x))
 // Decrease the shift of the BDD reference, terminal nodes cannot be shifted
-#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)-((int64_t)(x))) : (y))
+#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)-((int32_t)(x))) : (y))
 #define DECR_SHIFT(y, x) (y = MINUS_SHIFT(y, x))
 // Invert supplied BDD reference, the 0 node cannot be inverted
 #define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint64_t(1) << 63)) : (x))
