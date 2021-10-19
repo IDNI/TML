@@ -215,17 +215,15 @@ public:
 // representation for 2-CNFs
 struct poset {
 	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
-	std::set<int_t, abs_cmp> true_var; //Set is sorted by absolut value
+	// true_var is sorted by absolute value of variables
+	std::vector<int_t> true_var;
 	union_find eq_var;
 	bool is_pure = false;
-
 	uint_t hash=0;
-
-	// void updateTC (); <- not needed yet
 public:
 	poset() = default;
 	poset(int_t var, bool b) {
-		b ? true_var.insert(var) : true_var.insert(-var);
+		b ? true_var.emplace_back(var) : true_var.emplace_back(-var);
 		is_pure = true;
 		calc_hash();
 	}
@@ -237,6 +235,11 @@ public:
 	poset eval (int_t v);
 	static poset merge(int_t var, poset& hi, poset& lo);
 	static poset extend_sing (const poset& c, int_t var, bool b);
+	inline void insert_true_var(int_t v) {
+		DBG(assert(find(true_var.begin(), true_var.end(), v) == end(true_var));)
+		true_var.emplace_back(v);
+		std::sort(true_var.begin(), true_var.end(), abs_cmp());
+	}
 	inline bool is_singleton () const{
 		return imp_var.empty() && eq_var.empty() && !true_var.empty();
 	}

@@ -1618,12 +1618,12 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
 		if (it_lo == lo.imp_var.end() ||
 				(comp(it_hi->first,it_lo->first) && it_hi != end(hi.imp_var))) {
-			if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
+			if (find(lo.true_var.begin(), lo.true_var.end(), -it_hi->first) != end(lo.true_var)){
 				// Implication is true in lo since antecedent is violated
 				res.imp_var.emplace(it_hi->first, it_hi->second);
 			} else {
 				for (const auto v : it_hi->second){
-					if(lo.true_var.find(v) != lo.true_var.end()) {
+					if(find(lo.true_var.begin(), lo.true_var.end(), v) != end(lo.true_var)){
 						// Implication is trivially true in lo
 						res.imp_var[it_hi->first].insert(v);
 					}
@@ -1638,12 +1638,12 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			++it_hi;
 		}
 		else if (it_hi == hi.imp_var.end() || comp(it_lo->first, it_hi->first)) {
-			if (hi.true_var.find(-it_lo->first) != hi.true_var.end()) {
+			if (find(hi.true_var.begin(), hi.true_var.end(), -it_lo->first) != end(hi.true_var)){
 				// Implication is true in hi since antecedent is violated
 				res.imp_var.emplace(it_lo->first, it_lo->second);
 			} else {
 				for (const auto v : it_lo->second) {
-					if(hi.true_var.find(v) != hi.true_var.end()) {
+					if(find(hi.true_var.begin(), hi.true_var.end(), v) != end(hi.true_var)){
 						// Implication is trivially true in hi
 						res.imp_var[it_lo->first].insert(v);
 					}
@@ -1663,41 +1663,29 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			while (it_hi_set != it_hi->second.end() || it_lo_set != it_lo->second.end()) {
 				if (it_lo_set == it_lo->second.end() ||
 						(*it_hi_set < *it_lo_set && it_hi_set != end(it_hi->second) )) {
-					if (lo.true_var.find(-it_hi->first) != lo.true_var.end()) {
-						// This should not happen
-						// It means that 2CNF in lo is not reduced
-						DBGFAIL;
-					} else {
-						if (lo.true_var.find(*it_hi_set) != lo.true_var.end()) {
-							// Implication is trivially true in lo
-							res.imp_var[it_hi->first].insert(*it_hi_set);
-						}
-						else if (lo.eq_var.in_same_set(it_hi->first, *it_hi_set) ||
-						lo.eq_var.in_same_set(-it_hi->first, -*it_hi_set)) {
-							// Implication is contained in equality of lo
-							res.imp_var[it_hi->first].insert(*it_hi_set);
-						}
-						else res.is_pure = false;
-					}
+					DBG(assert(find(lo.true_var.begin(), lo.true_var.end(), -it_hi->first) == end(lo.true_var));)
+					if (find(lo.true_var.begin(), lo.true_var.end(), *it_hi_set) != end(lo.true_var)){
+						// Implication is trivially true in lo
+						res.imp_var[it_hi->first].insert(*it_hi_set);
+					} else if (lo.eq_var.in_same_set(it_hi->first, *it_hi_set) ||
+						   lo.eq_var.in_same_set(-it_hi->first,-*it_hi_set)) {
+						// Implication is contained in equality of lo
+						res.imp_var[it_hi->first].insert(*it_hi_set);
+					} else res.is_pure = false;
 					++it_hi_set;
 				}
 				else if (it_hi_set == it_hi->second.end() || *it_lo_set < * it_hi_set) {
-					if (hi.true_var.find(-it_lo->first) != hi.true_var.end()) {
-						// This should not happen
-						// It means that 2CNF in hi is not reduced
-						DBGFAIL;
-					} else {
-						if (hi.true_var.find(*it_lo_set) != hi.true_var.end()) {
-							// Implication is trivially true in hi
-							res.imp_var[it_lo->first].insert(*it_lo_set);
-						}
-						else if (hi.eq_var.in_same_set(it_lo->first, *it_lo_set) ||
-						hi.eq_var.in_same_set(-it_lo->first, -*it_lo_set)) {
-							// Implication is contained in equality of hi
-							res.imp_var[it_lo->first].insert(*it_lo_set);
-						}
-						else res.is_pure = false;
+					DBG(assert(find(hi.true_var.begin(), hi.true_var.end(), -it_lo->first) == end(hi.true_var));)
+					if (find(hi.true_var.begin(), hi.true_var.end(), *it_lo_set) != end(hi.true_var)){
+						// Implication is trivially true in hi
+						res.imp_var[it_lo->first].insert(*it_lo_set);
 					}
+					else if (hi.eq_var.in_same_set(it_lo->first, *it_lo_set) ||
+						 hi.eq_var.in_same_set(-it_lo->first, -*it_lo_set)) {
+						// Implication is contained in equality of hi
+						res.imp_var[it_lo->first].insert(*it_lo_set);
+					}
+					else res.is_pure = false;
 					++it_lo_set;
 				}
 				else {
@@ -1737,7 +1725,9 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 
 			//Implications assuring the transitive closure of resulting constrain
 			for (const auto v : hi.true_var) {
-				if (abs(v) != abs(*it_lo_var) && !has(lo.true_var, v) && !has(lo.true_var, -v)) {
+				if (abs(v) != abs(*it_lo_var) &&
+				    find(lo.true_var.begin(), lo.true_var.end(), v) == end(lo.true_var) &&
+				    find(lo.true_var.begin(), lo.true_var.end(), -v) == end(lo.true_var)){
 					// Assure canonicity of implications
 					if(abs(*it_lo_var) < abs(v))
 						res.imp_var[-*it_lo_var].insert(v);
@@ -1750,7 +1740,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			//Absolut value of singletons is equal
 			if (*it_hi_var == *it_lo_var) {
 				// Singleton is lifted
-				res.true_var.emplace(*it_hi_var);
+				res.insert_true_var(*it_hi_var);
 			} else {
 				// Equality to parent var is inferred
 				res.eq_var.insert(*it_hi_var);
@@ -1759,7 +1749,9 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 
 				//Implications assuring the transitive closure of resulting constrain
 				for (const auto v : hi.true_var) {
-					if (abs(v) != abs(*it_lo_var) && !has(lo.true_var, v) && !has(lo.true_var, -v)) {
+					if (abs(v) != abs(*it_lo_var) &&
+					    find(lo.true_var.begin(), lo.true_var.end(), v) == end(lo.true_var) &&
+					    find(lo.true_var.begin(), lo.true_var.end(), -v) == end(lo.true_var)){
 						// Assure canonicity of implications
 						if (abs(*it_lo_var) < abs(v))
 							res.imp_var[-*it_lo_var].insert(v);
@@ -1810,7 +1802,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 
 poset poset::extend_sing(const poset &c, int_t var, bool b) {
 	poset res = c;
-	b ? res.true_var.insert(var) : res.true_var.insert(-var);
+	b ? res.insert_true_var(var) : res.insert_true_var(-var);
 	return res.calc_hash(), res;
 }
 
@@ -1824,57 +1816,57 @@ void poset::calc_hash() {
 // Get resulting poset when assigning v
 //TODO: return false
 poset poset::eval(int_t v) {
-	if (has(true_var,v)) {
+	if (auto it = find(true_var.begin(), true_var.end(), v); it != true_var.end()) {
 		// remove v from true_var
 		// check if poset is empty -> return T
 		// else return *this with v removed
 		poset res;
 		res = *this;
-		res.true_var.erase(v);
+		res.true_var.erase(it);
 		if(res.is_empty()) res.set_pure();
 		return res.calc_hash(), res;
 	}
-	else if(has(true_var,-v)) {
+	else if(it = find(true_var.begin(), true_var.end(), -v); it != true_var.end()) {
 		// return F
 		poset res;
 		return res;
 	}
 	poset res;
 	res.true_var = true_var;
-	res.true_var.insert(v); // temporarily insert v
+	res.insert_true_var(v); // temporarily insert v
 	res.eq_var = eq_var; // delete used equalities later
 	// Check if v is part of some equality
 	auto eq_set = eq_var.get_set(v);
 	res.eq_var.delete_set(v);
 	if(eq_set.size() > 1) {
-		for(const auto& e : eq_set) res.true_var.insert(e);
+		for(const auto& e : eq_set) res.insert_true_var(e);
 	}
 	// complete true_var set of res, possible due to transitive closure
 	auto imp = begin(imp_var);
 	while(imp != end(imp_var)) {
 		// Antecedent of implication is true
-		if(has(res.true_var, imp->first)) {
+		if(find(res.true_var.begin(), res.true_var.end(), imp->first) != end(res.true_var)) {
 			for(const auto& var : imp->second) {
-				res.true_var.insert(var);
+				res.insert_true_var(var);
 				// Ensure that equalities are used
 				eq_set = res.eq_var.get_set(var);
 				res.eq_var.delete_set(var);
 				if(eq_set.size()>1)
 					for(const auto& e : eq_set)
-						res.true_var.insert(e);
+						res.insert_true_var(e);
 			}
 		}
 		// Check if a consequent is already true
 		else {
 			for(const auto& var : imp->second) {
-				if(has(res.true_var, -var)) {
-					res.true_var.insert(-imp->first);
+				if(std::find(res.true_var.begin(), res.true_var.end(), -var) != end(res.true_var)) {
+					res.insert_true_var(-imp->first);
 					// Ensure that equalities are used
 					eq_set = res.eq_var.get_set(-imp->first);
 					res.eq_var.delete_set(-imp->first);
 					if(eq_set.size()>1)
 						for(const auto& e : eq_set)
-							res.true_var.insert(e);
+							res.insert_true_var(e);
 				}
 			}
 		}
@@ -1884,16 +1876,16 @@ poset poset::eval(int_t v) {
 	// (in absolute value) appears in true_var
 	imp = begin(imp_var);
 	while(imp != end(imp_var)) {
-		if (!has(res.true_var, imp->first) &&
-			!has(res.true_var, -imp->first)) {
+		if (find(res.true_var.begin(), res.true_var.end(), imp->first) == end(res.true_var)
+			&& find(res.true_var.begin(), res.true_var.end(), -imp->first) == end(res.true_var)) {
 			auto var = begin(imp->second);
 			while(var != end(imp->second)) {
-				if(has(res.true_var, -*var)) {
+				if(find(res.true_var.begin(), res.true_var.end(), -*var) != end(res.true_var)) {
 					//This case cannot happen:
 					// negated antecedent is already in true_var
 					DBGFAIL;
 				}
-				if(!has(res.true_var, *var)) {
+				if(find(res.true_var.begin(), res.true_var.end(), *var) == end(res.true_var)){
 					res.imp_var[imp->first].insert(*var);
 				}
 				++var;
@@ -1901,7 +1893,8 @@ poset poset::eval(int_t v) {
 		}
 		++imp;
 	}
-	res.true_var.erase(v); // v was only temporarily added
+	// v was only temporarily added
+	res.true_var.erase(remove(res.true_var.begin(), res.true_var.end(), v), res.true_var.end());
 	res.set_pure();
 	return res.calc_hash(), res;
 }
