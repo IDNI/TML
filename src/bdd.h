@@ -53,8 +53,10 @@ extern bool onexit;
  * that each attributed edge has a unique representation. */
 typedef uint64_t bdd_ref;
 // Make a selector for the given bits of a 64-bit unsigned integer
+#define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
 #define MASK64(low, high) ((uint64_t(-1) >> ((low) + 64 - (high))) << (low))
 // Extract the given bits from the given number
+#define GET32(low, high, x) ((((uint32_t)(x)) & MASK32(low, high)) >> (low))
 #define GET64(low, high, x) ((((uint64_t)(x)) & MASK64(low, high)) >> (low))
 // Place the low bits of x into the given position
 #define PLACE64(low, high, x) ((((uint64_t)(x)) << (low)) & MASK64(low, high))
@@ -65,13 +67,13 @@ typedef uint64_t bdd_ref;
 	PLACE64(32,63,(id) <= 1 ? 0 : (shift)) | PLACE64(31,32,(id) <= 1 ? 0 : (inv_inp)) | \
 	PLACE64(63,64,(id) ? (inv_out) : 0))
 // Get the BDD identified by this BDD reference
-#define GET_BDD_ID(x) GET64(0,31,x)
+#define GET_BDD_ID(x) GET32(0,31,((uint32_t)(x)))
 // Get the shift applied by this BDD reference
-#define GET_SHIFT(x) GET64(32,63,x)
+#define GET_SHIFT(x) GET32(0,31,((uint32_t)((x) >> 32)))
 // Is the input of this BDD reference inverted?
-#define GET_INV_INP(x) GET64(31,32,x)
+#define GET_INV_INP(x) GET32(31,32,((uint32_t)(x)))
 // Is the output of this BDD reference inverted?
-#define GET_INV_OUT(x) GET64(63,64,x)
+#define GET_INV_OUT(x) GET32(31,32,((uint32_t)((x) >> 32)))
 // Set the BDD identified by this reference
 #define SET_BDD_ID(y, x) (y = REPL64(0,31,y,x))
 // Remove the output inverter from the BDD reference
