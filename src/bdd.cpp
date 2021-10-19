@@ -1737,7 +1737,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 
 			//Implications assuring the transitive closure of resulting constrain
 			for (const auto v : hi.true_var) {
-				if (abs(v) != abs(*it_lo_var)) {
+				if (abs(v) != abs(*it_lo_var) && !has(lo.true_var, v) && !has(lo.true_var, -v)) {
 					// Assure canonicity of implications
 					if(abs(*it_lo_var) < abs(v))
 						res.imp_var[-*it_lo_var].insert(v);
