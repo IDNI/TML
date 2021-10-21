@@ -52,7 +52,7 @@ unordered_map<poset, int_t> Mc, Mneg_c;
 bdd_mmap V;
 vector<poset> CV;
 vector<poset> neg_CV;
-bool gc_enabled = false; // Controls whether or not garbage collection is enabled
+bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
@@ -787,8 +787,11 @@ int_t bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p) {
 
 void bdd::mark_all(int_t i) {
 	DBG(assert((size_t)abs(i) < V.size());)
-	if ((i = abs(i)) >= 2 && !has(S, i))
-		mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
+	if ((i = abs(i)) >= 2 && !has(S, i)) {
+		//Catch the highest 2CNF
+		if (V[i].v == 0) S.insert(i);
+		else mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
+	}
 }
 
 template <typename T>
@@ -806,7 +809,8 @@ void bdd::gc() {
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V.size() < S.size() << 3) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
-	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
+	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1),
+	Mc.clear(), Mneg_c.clear();
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
 #ifndef NOMMAP
@@ -817,12 +821,20 @@ void bdd::gc() {
 	v1.reserve(S.size());
 #endif
 	for (size_t n = 0; n < V.size(); ++n)
-		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
+		if (has(S, n)) {
+			p[n] = v1.size();
+			CV[v1.size()] = move(CV[n]);
+			neg_CV[v1.size()] = move(neg_CV[n]);
+			v1.emplace_back(move(V[n]));
+		}
+	CV.erase(CV.begin() + v1.size(), CV.end());
+	neg_CV.erase(neg_CV.begin() + v1.size(), neg_CV.end());
 	OUT(stats(o::dbg())<<endl;)
 	V = move(v1);
-#define f(i) (i = (i >= 0 ? p[i] ? p[i] : i : p[-i] ? -p[-i] : i))
+#define f(i) (i = (i >= 0 ? (p[i] ? p[i] : i) : (p[-i] ? -p[-i] : i)))
 	for (size_t n = 2; n < V.size(); ++n) {
-		DBG(assert(p[abs(V[n].h)] && p[abs(V[n].l)] && V[n].v);)
+		DBG(assert((p[abs(V[n].h)] && p[abs(V[n].l)] && V[n].v)
+			|| CV[n].pure() || neg_CV[n].pure());)
 		f(V[n].h), f(V[n].l);
 	}
 	unordered_map<ite_memo, int_t> c;
@@ -926,6 +938,11 @@ void bdd::gc() {
 		if (V[n].v < 0)
 			Mn[-V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
+		else if (V[n].v == 0) {
+			//Emplace pure 2CNF in lookup table
+			if(CV[n].pure()) Mc.emplace(CV[n], n);
+			if(neg_CV[n].pure()) Mneg_c.emplace(neg_CV[n], n);
+		}
 		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
 	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
