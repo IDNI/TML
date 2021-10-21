@@ -57,6 +57,8 @@ typedef size_t nlevel;
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
+#define getbc(x, y, f) binary_search_it(x.begin(), x.end(), y, f)
+#define sortc(x, f) std::sort(x.begin(), x.end(), f)
 #define measure_time_start() start = clock()
 #define measure_time_end() end = clock(), \
 		o::ms() << std::fixed << std::setprecision(2) << \
@@ -70,6 +72,14 @@ typedef size_t nlevel;
 #define hfalse bdd_handle::F
 
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
+
+template<class ForwardIt, class T, class Compare>
+ForwardIt binary_search_it(ForwardIt first, ForwardIt last, const T& value, Compare comp)
+{
+	ForwardIt lb = std::lower_bound(first, last, value, comp);
+	if((lb != last) && !(comp(value, *lb))) return lb;
+	else return last;
+}
 
 /* Get the given key from the map and if this fails, return the supplied
  * default. */

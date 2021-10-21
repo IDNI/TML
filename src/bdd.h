@@ -236,9 +236,9 @@ public:
 	static poset merge(int_t var, poset& hi, poset& lo);
 	static poset extend_sing (const poset& c, int_t var, bool b);
 	inline void insert_true_var(int_t v) {
-		DBG(assert(find(true_var.begin(), true_var.end(), v) == end(true_var));)
+		if(hasbc(true_var, v, abs_cmp())) return;
 		true_var.emplace_back(v);
-		std::sort(true_var.begin(), true_var.end(), abs_cmp());
+		sortc(true_var, abs_cmp());
 	}
 	inline bool is_singleton () const{
 		return imp_var.empty() && eq_var.empty() && !true_var.empty();
