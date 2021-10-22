@@ -75,25 +75,21 @@ auto am_cmp = [](bdd_ref x, bdd_ref y) {
 };
 _Pragma("GCC diagnostic pop")
 
-size_t gclimit = 1e+6;
+size_t gclimit = 1e+7;
 
 #ifndef NOMMAP
-void bdd::init(mmap_mode m, size_t max_size, const string fn, bool gc, size_t gclimit_) {
-	gc_enabled = gc;
-	gclimit = gclimit_;
+void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 	bdd_mmap_mode = m;
 	if ((max_bdd_nodes = max_size / sizeof(bdd)) < 2) max_bdd_nodes = 2;
 	V = bdd_mmap(memory_map_allocator<bdd>(fn, m));
 	if (m != MMAP_NONE) V.reserve(max_bdd_nodes);
 #else
-void bdd::init(bool gc, size_t gclimit_) {
+void bdd::init() {
 #endif
 	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
 	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
 	//	", max_size: " << max_size << ", fn: " << fn
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
-	gc_enabled = gc;
-	gclimit = gclimit_;
 	S.insert(0), S.insert(1), V.emplace_back(0, 0), // dummy
 	V.emplace_back(1, 1),
 	Ma.emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
@@ -172,31 +168,20 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	const uint_t min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
-	const bdd bx = get(x), by = get(y);
+	const uint_t xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
+#ifdef MEMO
 	ite_memo m = { x, y, F };
-	bool leaf = 
-		bx.h == T || bx.h == F || bx.l == T || bx.l == F ||
-		by.h == T || by.h == F || by.l == T || by.l == F;
-#ifdef MEMO
-	if (!leaf && GET_SHIFT(x) == GET_SHIFT(y))
-		if (auto it = C.find(m); it != C.end()) {
-			// Upshift result to obtain answer for pre-downshifted BDDs
-			return PLUS_SHIFT(it->second, min_shift);
-		}
+	auto it = C.find(m);
+	// Upshift result to obtain answer for pre-downshifted BDDs
+	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
 #endif
-	if (GET_SHIFT(x) < GET_SHIFT(y)) {
-		const bdd_ref lowest_bdd = add(GET_SHIFT(x), bdd_and(bx.h, y), bdd_and(bx.l, y));
-		// Upshift result to obtain answer for pre-downshifted BDDs
-		return PLUS_SHIFT(lowest_bdd, min_shift);
-	}
-	if (GET_SHIFT(x) > GET_SHIFT(y)) {
-		const bdd_ref lowest_bdd = add(GET_SHIFT(y), bdd_and(x, by.h), bdd_and(x, by.l));
-		// Upshift result to obtain answer for pre-downshifted BDDs
-		return PLUS_SHIFT(lowest_bdd, min_shift);
-	}
-	bdd_ref r = add(GET_SHIFT(x), bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
+	const bdd bx = get(x), by = get(y);
+	bdd_ref r;
+	if (xshift < yshift) r = add(xshift, bdd_and(bx.h, y), bdd_and(bx.l, y));
+	else if (xshift > yshift) r = add(yshift, bdd_and(x, by.h), bdd_and(x, by.l));
+	else r = add(xshift, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
 #ifdef MEMO
-	if (!leaf && C.size() < gclimit) C.emplace(m, r);
+	if (C.size() < gclimit) C.emplace(m, r);
 #endif
 	// Upshift result to obtain answer for pre-downshifted BDDs
 	return PLUS_SHIFT(r, min_shift);
@@ -318,22 +303,6 @@ bool subset(const bdds& small, const bdds& big) {
 	return true;
 }
 
-size_t simps = 0;
-
-bool bdd::am_simplify(bdds& v, const unordered_map<bdds, bdd_ref>& memo) {
-	am_sort(v);
-	for (auto x : memo)
-		if (subset(x.first, v)) {
-			if (x.second == F) return v={F}, true;
-			for (size_t n = 0; n < v.size();)
-				if (!hasbc(x.first, v[n], am_cmp)) ++n;
-				else v.erase(v.begin() + n);
-			if (!hasbc(v, x.second, am_cmp)) v.push_back(x.second);
-			return true;
-		}
-	return false;
-}
-
 bdd_ref bdd::bdd_and_many(bdds v) {
 #ifdef MEMO
 	static unordered_map<ite_memo, bdd_ref>::const_iterator jt;
@@ -351,11 +320,7 @@ bdd_ref bdd::bdd_and_many(bdds v) {
 #endif
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
-	simps = 0;
-	static bdds v1;
-	do {
-		if (v1=v, am_simplify(v, AM), ++simps, v.size()==1) return v[0];
-	} while (v1 != v);
+	am_sort(v);
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
 	auto it = AM.find(v);
@@ -635,7 +600,12 @@ void bdd::mark_all(bdd_ref  i) {
 }
 
 /* Get the size of the ITE cache. */
-size_t bdd::ite_cache_size() { return C.size(); }
+size_t bdd::get_ite_cache_size() { return C.size(); }
+/* Only trigger the garbage collector when given limit is exceeded */
+void bdd::set_gc_limit(size_t new_gc_limit) { gclimit = new_gc_limit; }
+/* Enable/disable the garbage collector depending on given argument */
+void bdd::set_gc_enabled(bool new_gc_enabled) { gc_enabled = new_gc_enabled; }
+
 template <typename T>
 basic_ostream<T>& bdd::stats(basic_ostream<T>& os) {
 	return os << "S: " << S.size() << " V: "<< V.size() <<

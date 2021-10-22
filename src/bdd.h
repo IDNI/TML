@@ -337,7 +337,6 @@ class bdd {
 	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
 	static void sat(uint_t v, uint_t nvars, bdd_ref t, bools& p, vbools& r);
 	static vbools allsat(bdd_ref x, uint_t nvars);
-	static bool am_simplify(bdds& v,const std::unordered_map<bdds, bdd_ref>&);
 	static void bdd_sz(bdd_ref x, std::set<bdd_ref>& s);
 	static void bdd_nvars(bdd_ref x, std::set<int_t>& s);
 	static size_t bdd_nvars(bdd_ref x);
@@ -401,14 +400,16 @@ public:
 	}
 #ifndef NOMMAP
 	static void init(mmap_mode m = MMAP_NONE, size_t max_size=10000,
-		const std::string fn="", bool gc = true, size_t gclimit_ = 1e+6);
+		const std::string fn="");
 #else
-	static void init(bool gc = true, size_t gclimit_ = 1e+6);
+	static void init();
 #endif
 	static void gc();
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
-	static size_t ite_cache_size();
+	static size_t get_ite_cache_size();
+	static void set_gc_limit(size_t new_gc_limit);
+	static void set_gc_enabled(bool new_gc_enabled);
 	
 	/* Return the absolute BDD corresponding to the high part of the given BDD
 	 * reference. If x represents a boolean function f, then this function returns
