@@ -234,6 +234,13 @@ public:
 
 	poset eval (int_t v);
 	static poset merge(int_t var, poset& hi, poset& lo);
+	static void lift_implications(poset& hi, poset& lo, poset& res);
+	static void lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
+				    std::vector<std::pair<int_t,int_t>>& eq_lift_hi,
+				    std::vector<std::pair<int_t,int_t>>& eq_lift_lo);
+	static void lift_eq_from_sing(poset& res,
+				      std::vector<std::pair<int_t,int_t>>& eq_lift_hi,
+				      std::vector<std::pair<int_t,int_t>>& eq_lift_lo);
 	static poset extend_sing (const poset& c, int_t var, bool b);
 	inline void insert_true_var(int_t v) {
 		if(hasbc(true_var, v, abs_cmp())) return;

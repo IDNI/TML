@@ -238,25 +238,7 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 }
 
 void bdd::extract_constraints (int_t v, int_t h, int_t l) {
-	if(l == F) { // This cannot happen, see add
-		DBGFAIL;
-		/*if (h == T) {
-			// pure 2-CNF
-			V.emplace_back(0,0,0); // dummy bdd node
-			CV.emplace_back(v, true);
-			neg_CV.emplace_back(v, false);
-			return;
-		} else {
-			// extend 2-CNF by v = 1 - no reduction or TC needed here because v is not present in h path yet
-			V.emplace_back(0,0,0);
-			CV.emplace_back(poset::extend_sing(poset::get(h), v, true));
-			neg_CV.emplace_back(
-				poset::merge(
-					v, poset::get_neg(h), poset::get_neg(l)
-					));
-			return;
-		}*/
-	}
+	DBG(assert (l != F);)
 	if(h == F) {
 		if(l == T) {
 			// pure 2-CNF
@@ -310,11 +292,7 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		neg_CV.emplace_back(move(neg_c));
 		return;
 	}
-	if(h == T) {
-		//This case is caught before
-		DBGFAIL;
-	}
-
+	DBG(assert(h!=T);)
 	// general lifting case
 	poset c = poset::merge(v, poset::get(h), poset::get(l));
 	poset neg_c = poset::merge(v, poset::get_neg(h), poset::get_neg(l));
@@ -803,6 +781,7 @@ template basic_ostream<char>& bdd::stats(basic_ostream<char>&);
 template basic_ostream<wchar_t>& bdd::stats(basic_ostream<wchar_t>&);
 
 void bdd::gc() {
+
 	if(!gc_enabled) return;
 	if (V.empty()) return;
 	S.clear();
@@ -1626,22 +1605,45 @@ bool union_find::operator==(const union_find &u) const {
 // Create poset for a node from its high and low nodes
 poset poset::merge(int_t var, poset& hi, poset& lo) {
 	poset res;
-	abs_cmp comp;
 	//Check if res can be pure at all - this is revised later
 	if(hi.pure() && lo.pure()) res.is_pure = true;
-	// Lifting of implications
+
+	lift_implications(hi, lo, res);
+
+	// Lifting of equalities contained in both hi and lo
+	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
+		res.eq_var =
+			union_find::intersect(hi.eq_var, lo.eq_var);
+	}
+	// Collect info about lifting of equality due to singletons on other branch
+	vector<pair<int_t,int_t>> eq_lift_hi;
+	vector<pair<int_t,int_t>> eq_lift_lo;
+	lift_singletons(var, hi, lo, res, eq_lift_hi, eq_lift_lo);
+	// Lifting of equality due to singletons
+	lift_eq_from_sing(res, eq_lift_hi, eq_lift_lo);
+
+	if (!(union_find::intersect(res.eq_var, hi.eq_var) == hi.eq_var))
+		res.is_pure = false;
+	else if (!(union_find::intersect(res.eq_var, lo.eq_var) == lo.eq_var))
+		res.is_pure = false;
+
+	return res.calc_hash(), res;
+}
+
+void poset::lift_implications(poset &hi, poset &lo, poset &res) {
+	abs_cmp comp;
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
 		if (it_lo == lo.imp_var.end() ||
-				(comp(it_hi->first,it_lo->first) && it_hi != end(hi.imp_var))) {
+		    (comp(it_hi->first,it_lo->first) && it_hi != end(hi.imp_var))) {
 			if (hasbc(lo.true_var, -it_hi->first, comp)){
 				// Implication is true in lo since antecedent is violated
 				res.imp_var.emplace(it_hi->first, it_hi->second);
 			} else {
 				for (const auto v : it_hi->second){
 					if (hasbc(lo.true_var, v, comp) ||
-						  lo.eq_var.in_same_set(it_hi->first, v)) {
+					    lo.eq_var.in_same_set(it_hi->first, v)) {
 						// Implication is trivially true in lo or
 						// Implication is contained in equality of lo
 						res.imp_var[it_hi->first].insert(v);
@@ -1657,7 +1659,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			} else {
 				for (const auto v : it_lo->second) {
 					if (hasbc(hi.true_var, v, comp) ||
-						  hi.eq_var.in_same_set(it_lo->first, v)) {
+					    hi.eq_var.in_same_set(it_lo->first, v)) {
 						// Implication is trivially true in hi or
 						// Implication is contained in equality of hi
 						res.imp_var[it_lo->first].insert(v);
@@ -1671,10 +1673,10 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			auto it_lo_set = it_lo->second.begin();
 			while (it_hi_set != it_hi->second.end() || it_lo_set != it_lo->second.end()) {
 				if (it_lo_set == it_lo->second.end() ||
-						(*it_hi_set < *it_lo_set && it_hi_set != end(it_hi->second) )) {
+				    (*it_hi_set < *it_lo_set && it_hi_set != end(it_hi->second) )) {
 					DBG(assert(!hasbc(lo.true_var, -it_hi->first, comp));)
 					if (hasbc(lo.true_var, *it_hi_set, comp) ||
-						lo.eq_var.in_same_set(it_hi->first, *it_hi_set)){
+					    lo.eq_var.in_same_set(it_hi->first, *it_hi_set)){
 						// Implication is trivially true in lo or
 						// Implication is contained in equality of lo
 						res.imp_var[it_hi->first].insert(*it_hi_set);
@@ -1684,7 +1686,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 				else if (it_hi_set == it_hi->second.end() || *it_lo_set < * it_hi_set) {
 					DBG(assert(!hasbc(hi.true_var, -it_lo->first, comp));)
 					if (hasbc(hi.true_var, *it_lo_set, comp) ||
-						hi.eq_var.in_same_set(it_lo->first, *it_lo_set)){
+					    hi.eq_var.in_same_set(it_lo->first, *it_lo_set)){
 						// Implication is trivially true in hi or
 						// Implication is contained in equality of hi
 						res.imp_var[it_lo->first].insert(*it_lo_set);
@@ -1701,20 +1703,17 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			++it_hi; ++it_lo;
 		}
 	}
-	// Lifting of equalities contained in both hi and lo
-	if (!hi.eq_var.empty() && !lo.eq_var.empty()) {
-		res.eq_var =
-			union_find::intersect(hi.eq_var, lo.eq_var);
-	}
-	// Collect info about lifting of equality due to singletons on other branch
-	vector<pair<int_t,int_t>> eq_lift_lo;
-	vector<pair<int_t,int_t>> eq_lift_hi;
-	// Lifting of singletons
+}
+
+void poset::lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
+			    vector<pair<int_t,int_t>>& eq_lift_hi,
+			    vector<pair<int_t,int_t>>& eq_lift_lo) {
+	abs_cmp comp;
 	auto it_hi_var = hi.true_var.begin();
 	auto it_lo_var = lo.true_var.begin();
 	while (it_hi_var != hi.true_var.end() || it_lo_var != lo.true_var.end()) {
 		if (it_lo_var == lo.true_var.end() ||
-				(it_hi_var != end(hi.true_var) && (abs(*it_hi_var) < abs(*it_lo_var)))) {
+		    (it_hi_var != end(hi.true_var) && (abs(*it_hi_var) < abs(*it_lo_var)))) {
 			//Singleton in high but not in lo
 			eq_lift_lo.emplace_back(lo.eq_var.find(*it_hi_var).first, *it_hi_var);
 			res.imp_var[var].insert(*it_hi_var);
@@ -1727,8 +1726,8 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			//Implications assuring the transitive closure of resulting constrain
 			for (const auto v : hi.true_var) {
 				if (abs(v) != abs(*it_lo_var) &&
-					!hasbc(lo.true_var, v, comp) &&
-						!hasbc(lo.true_var, -v, comp)){
+				    !hasbc(lo.true_var, v, comp) &&
+				    !hasbc(lo.true_var, -v, comp)){
 					// Assure canonicity of implications
 					if(abs(*it_lo_var) < abs(v))
 						res.imp_var[-*it_lo_var].insert(v);
@@ -1751,8 +1750,8 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 				//Implications assuring the transitive closure of resulting constrain
 				for (const auto v : hi.true_var) {
 					if (abs(v) != abs(*it_lo_var) &&
-						!hasbc(lo.true_var, v, comp) &&
-							!hasbc(lo.true_var, -v, comp)){
+					    !hasbc(lo.true_var, v, comp) &&
+					    !hasbc(lo.true_var, -v, comp)){
 						// Assure canonicity of implications
 						if (abs(*it_lo_var) < abs(v))
 							res.imp_var[-*it_lo_var].insert(v);
@@ -1764,19 +1763,22 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 			++it_hi_var; ++it_lo_var;
 		}
 	}
+}
 
-	// Lifting of equality due to singletons
+void poset::lift_eq_from_sing(poset& res,
+			      std::vector<std::pair<int_t, int_t>> &eq_lift_hi,
+			      std::vector<std::pair<int_t, int_t>> &eq_lift_lo) {
 	sort(eq_lift_lo.begin(), eq_lift_lo.end(),
 	     [&](pair<int_t,int_t> p1, pair<int_t,int_t> p2){
-			return comp(p1.first,  p2.first);
-	});
+		     return abs_cmp()(p1.first,  p2.first);
+	     });
 	sort(eq_lift_hi.begin(), eq_lift_hi.end(),
 	     [&](pair<int_t,int_t> p1, pair<int_t,int_t> p2){
-		     return comp(p1.first,  p2.first);
+		     return abs_cmp()(p1.first,  p2.first);
 	     });
 	for(auto i = 0; i < eq_lift_lo.size(); ++i) {
 		if (i+1 < eq_lift_lo.size() && eq_lift_lo[i].first != 0 &&
-				eq_lift_lo[i].first == eq_lift_lo[i+1].first) {
+		    eq_lift_lo[i].first == eq_lift_lo[i+1].first) {
 			res.eq_var.insert(eq_lift_lo[i].second);
 			res.eq_var.insert(eq_lift_lo[i+1].second);
 			res.eq_var.merge(eq_lift_lo[i].second, eq_lift_lo[i+1].second);
@@ -1784,21 +1786,13 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	}
 	for(auto i = 0; i < eq_lift_hi.size(); ++i) {
 		if (i+1 < eq_lift_hi.size() && eq_lift_hi[i].first != 0 &&
-				eq_lift_hi[i].first == eq_lift_hi[i+1].first) {
+		    eq_lift_hi[i].first == eq_lift_hi[i+1].first) {
 			res.eq_var.insert(eq_lift_hi[i].second);
 			res.eq_var.insert(eq_lift_hi[i+1].second);
 			res.eq_var.merge(eq_lift_hi[i].second, eq_lift_hi[i+1].second);
 		}
 	}
-
-	if (!(union_find::intersect(res.eq_var, hi.eq_var) == hi.eq_var))
-		res.is_pure = false;
-	else if (!(union_find::intersect(res.eq_var, lo.eq_var) == lo.eq_var))
-		res.is_pure = false;
-
-	return res.calc_hash(), res;
 }
-
 
 poset poset::extend_sing(const poset &c, int_t var, bool b) {
 	poset res = c;
