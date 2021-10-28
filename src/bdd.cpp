@@ -165,10 +165,10 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	// Downshift the input BDDs by their greatest common shift. Operate on this
 	// reduced form then upshift the result by the aforementioned shift. Intent is
 	// that this canonisation increases cache hits.
-	const uint_t min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
+	const bdd_shft min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
-	const uint_t xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
+	const bdd_shft xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
 #ifdef MEMO
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
@@ -207,7 +207,7 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	// Downshift the input BDDs by their greatest common shift. Operate on this
 	// reduced form then upshift the result by the aforementioned shift. Intent is
 	// that this canonisation increases cache hits.
-	uint_t min_shift = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
+	bdd_shft min_shift = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
 	DECR_SHIFT(z, min_shift);
@@ -216,7 +216,7 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
 	bdd_ref r;
 	const bdd bx = get(x), by = get(y), bz = get(z);
-	const uint_t s = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
+	const bdd_shft s = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
 	if (GET_SHIFT(x) == GET_SHIFT(y) && GET_SHIFT(y) == GET_SHIFT(z))
 		r =	add(GET_SHIFT(x), bdd_ite(bx.h, by.h, bz.h),
 				bdd_ite(bx.l, by.l, bz.l));
@@ -344,7 +344,7 @@ bdd_ref bdd::bdd_and_many(bdds v) {
 
 bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& memo,
-	unordered_map<bdd_ref, bdd_ref>& m2, uint_t last) {
+	unordered_map<bdd_ref, bdd_ref>& m2, bdd_shft last) {
 	DBG(assert(GET_BDD_ID(x) && GET_BDD_ID(y));)
 	if (x == F || y == F || x == FLIP_INV_OUT(y)) return F;
 	if (x == T || x == y) return bdd_ex(y, ex, m2, last);
@@ -354,7 +354,7 @@ bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 	auto it = memo.find(m);
 	if (it != memo.end()) return it->second;
 	const bdd bx = get(x), by = get(y);
-	uint_t v;
+	bdd_shft v;
 	bdd_ref rx, ry, r;
 	if (GET_SHIFT(x) > last+1 && GET_SHIFT(y) > last+1)
 		return memo.emplace(m, r = bdd_and(x, y)), r;
@@ -401,7 +401,7 @@ struct sbdd_and_ex_perm {
 		auto it = memo.find(m);
 		if (it != memo.end()) return it->second;
 		const bdd bx = bdd::get(x), by = bdd::get(y);
-		uint_t v;
+		bdd_shft v;
 		bdd_ref rx, ry, r;
 		if (GET_SHIFT(x) > last+1 && GET_SHIFT(y) > last+1)
 			return memo.emplace(m, r = bdd::bdd_and(x, y)), r;
@@ -430,12 +430,12 @@ bdd_ref bdd::bdd_and_ex_perm(bdd_ref x, bdd_ref  y, const bools& ex, const uints
 	return sbdd_and_ex_perm(ex,p,CXP[{ex,p}],memos_perm_ex[{p,ex}])(x,y);
 }
 
-char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, uint_t& m) {
+char bdd::bdd_and_many_ex_iter(const bdds& v, bdds& h, bdds& l, bdd_shft& m) {
 	size_t i, sh = 0, sl = 0;
 	bdd *b = (bdd*)alloca(sizeof(bdd) * v.size());
 	for (i = 0; i != v.size(); ++i) b[i] = get(v[i]);
 	m = GET_SHIFT(v[0]);//var(v[0]);
-	for (i = 1; i != v.size(); ++i) m = min(m, uint_t(GET_SHIFT(v[i])));//var(v[i]));
+	for (i = 1; i != v.size(); ++i) m = min(m, GET_SHIFT(v[i]));//var(v[i]));
 	bdd_ref *ph = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size()),
 		  *pl = (bdd_ref*)alloca(sizeof(bdd_ref) * v.size());
 	for (i = 0; ph && i != v.size(); ++i)
@@ -465,7 +465,7 @@ struct sbdd_and_many_ex {
 	unordered_map<bdds, bdd_ref>& memo;
 	unordered_map<bdd_ref, bdd_ref>& m2;
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& m3;
-	uint_t last;
+	bdd_shft last;
 
 	sbdd_and_many_ex(const bools& ex, unordered_map<bdds, bdd_ref>& memo,
 		unordered_map<bdd_ref, bdd_ref>& m2,
@@ -481,7 +481,7 @@ struct sbdd_and_many_ex {
 			return bdd::bdd_and_ex(v[0], v[1], ex, m3, m2, last);
 		auto it = memo.find(v);
 		if (it != memo.end()) return it->second;
-		uint_t m = 0;
+		bdd_shft m = 0;
 		bdd_ref res = F, h, l;
 		bdds vh, vl;
 		char c = bdd::bdd_and_many_ex_iter(v, vh, vl, m);
@@ -523,7 +523,7 @@ struct sbdd_and_many_ex_perm {
 	//map<bdds, int_t, veccmp<int_t>>& memo;
 	unordered_map<array<bdd_ref, 2>, bdd_ref>& m2;
 	unordered_map<bdd_ref, bdd_ref>& m3;
-	uint_t last;
+	bdd_shft last;
 	sbdd_and_ex_perm saep;
 
 	sbdd_and_many_ex_perm(const bools& ex, const uints& p,
@@ -543,7 +543,7 @@ struct sbdd_and_many_ex_perm {
 		if (v.size() == 2) return saep(v[0], v[1]);
 		auto it = memo.find(v);
 		if (it != memo.end()) return it->second;
-		uint_t m = 0;
+		bdd_shft m = 0;
 		bdd_ref res = F, h, l;
 		bdds vh, vl;
 		char c = bdd::bdd_and_many_ex_iter(v, vh, vl, m);
@@ -874,12 +874,12 @@ spbdd_handle bdd_or_many(bdd_handles v) {
 #define SATCOUNT
 #ifdef SATCOUNT
 
-size_t bdd::satcount_perm(bdd_ref  x, size_t leafvar) {
+size_t bdd::satcount_perm(bdd_ref x, bdd_shft leafvar) {
 	size_t r = 0;
 	if (leaf(x)) return trueleaf(x) ? 1 : 0;
 	const bdd bx = get(x);
-	int_t hivar = leaf(bx.h) ? leafvar : GET_SHIFT(bx.h);
-	int_t lovar = leaf(bx.l) ? leafvar : GET_SHIFT(bx.l);
+	bdd_shft hivar = leaf(bx.h) ? leafvar : GET_SHIFT(bx.h);
+	bdd_shft lovar = leaf(bx.l) ? leafvar : GET_SHIFT(bx.l);
 	r += satcount_perm(bx.h, leafvar) *
 		(1 << (hivar - GET_SHIFT(x) - 1));
 	r += satcount_perm(bx.l, leafvar) *
@@ -887,13 +887,13 @@ size_t bdd::satcount_perm(bdd_ref  x, size_t leafvar) {
 	return r;
 }
 
-static set<size_t> ourvars;
-size_t bdd::getvar(bdd_ref  x) {
+static set<bdd_shft> ourvars;
+bdd_shft bdd::getvar(bdd_ref x) {
 	if (leaf(x)) return 0;
 	else {
 		ourvars.insert(GET_SHIFT(x));
 		const bdd b = get(x);
-		return max((size_t) GET_SHIFT(x), max(getvar(b.h), getvar(b.l)));
+		return max(GET_SHIFT(x), max(getvar(b.h), getvar(b.l)));
 	}
 }
 
@@ -902,7 +902,7 @@ size_t bdd::getvar(bdd_ref  x) {
 // could be buggy (when bdd is minimized, vars removed, we're only guessing)
 size_t bdd::satcount_k(bdd_ref  x, const bools& ex, const uints&) {
 	ourvars.clear();
-	size_t leafvar = getvar(x) + 1;
+	bdd_shft leafvar = getvar(x) + 1;
 
 	// this's what's missing, if size is smaller means we don't have the 0-var,
 	// but this might be correct or not, we might be missing one in the middle?
@@ -911,8 +911,8 @@ size_t bdd::satcount_k(bdd_ref  x, const bools& ex, const uints&) {
 	if (ourvars.size() < n)
 		k = 1 << (n - ourvars.size());
 
-	map<int_t, int_t> inv;
-	int_t ivar = 1;
+	map<bdd_shft, bdd_shft> inv;
+	bdd_shft ivar = 1;
 	for (auto x : ourvars) {
 		//o::dbg() << "satcount: inv: " << x << ", " << ivar << " ." << endl;
 		inv.emplace(x, ivar++);
@@ -922,15 +922,15 @@ size_t bdd::satcount_k(bdd_ref  x, const bools& ex, const uints&) {
 	return k * satcount_k(x, leafvar, inv);
 }
 
-size_t bdd::satcount_k(bdd_ref x, size_t leafvar,
-	map<int_t, int_t>& mapvars) {
+size_t bdd::satcount_k(bdd_ref x, bdd_shft leafvar,
+	map<bdd_shft, bdd_shft>& mapvars) {
 	size_t r = 0;
 	if (leaf(x)) {
 		return trueleaf(x) ? 1 : 0;
 	}
 	const bdd bx = get(x);
-	int_t hivar = leaf(bx.h) ? leafvar : mapvars.at(GET_SHIFT(bx.h)); // nvars + 1 - GET_SHIFT(x)
-	int_t lovar = leaf(bx.l) ? leafvar : mapvars.at(GET_SHIFT(bx.l));
+	bdd_shft hivar = leaf(bx.h) ? leafvar : mapvars.at(GET_SHIFT(bx.h)); // nvars + 1 - GET_SHIFT(x)
+	bdd_shft lovar = leaf(bx.l) ? leafvar : mapvars.at(GET_SHIFT(bx.l));
 	r += satcount_k(bx.h, leafvar, mapvars) *
 		(1 << (hivar - mapvars.at(GET_SHIFT(x)) - 1));
 	r += satcount_k(bx.l, leafvar, mapvars) *

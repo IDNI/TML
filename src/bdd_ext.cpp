@@ -132,7 +132,7 @@ bdd_ref bdd::bitwise_and(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
+	bdd_shft pos = 0;
 	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
 	  	pos = GET_SHIFT(b_in)+1;
@@ -151,7 +151,7 @@ bdd_ref bdd::bitwise_or(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
+	bdd_shft pos = 0;
 	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
 		pos = GET_SHIFT(b_in)+1;
@@ -170,7 +170,7 @@ bdd_ref bdd::bitwise_xor(bdd_ref a_in, bdd_ref b_in) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
+	bdd_shft pos = 0;
 	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
 		pos = GET_SHIFT(b_in) + 1;
@@ -198,7 +198,7 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 	else if (a_in == F || b_in == F)
 		c = F;
 	else {
-		int_t pos = 0;
+		bdd_shft pos = 0;
 		if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 			a.h = a_in, a.l = a_in;
 		  	pos = GET_SHIFT(b_in) + 1;
@@ -1060,7 +1060,7 @@ void bdd::mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size
 		c = bdd_or(c, accs[depth-1]);
 		return ;
 	}
-	uint_t pos = n_args * depth + 1;
+	bdd_shft pos = n_args * depth + 1;
 	bdd a = get(a_in);
 	if (GET_SHIFT(a_in) > pos) {a.h = a_in, a.l = a_in;}
 	if (a.l != F) {

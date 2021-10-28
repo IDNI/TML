@@ -52,6 +52,8 @@ extern bool onexit;
  * BDD_ID <= 1 --> INV_INP = 0 and BDD_ID = 0 --> INV_OUT = 0. All these ensure
  * that each attributed edge has a unique representation. */
 typedef uint64_t bdd_ref;
+typedef uint64_t bdd_id;
+typedef uint64_t bdd_shft;
 // Make a selector for the given bits of a 64-bit unsigned integer
 #define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
 #define MASK64(low, high) ((uint64_t(-1) >> ((low) + 64 - (high))) << (low))
@@ -69,7 +71,7 @@ typedef uint64_t bdd_ref;
 // Get the BDD identified by this BDD reference
 #define GET_BDD_ID(x) GET32(0,31,((uint32_t)(x)))
 // Get the shift applied by this BDD reference
-#define GET_SHIFT(x) GET32(0,31,((uint32_t)((x) >> 32)))
+#define GET_SHIFT(x) ((bdd_shft) GET32(0,31,((uint32_t)((x) >> 32))))
 // Is the input of this BDD reference inverted?
 #define GET_INV_INP(x) GET32(31,32,((uint32_t)(x)))
 // Is the output of this BDD reference inverted?
@@ -308,7 +310,7 @@ class bdd {
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex);
 	static bdd_ref bdd_and_ex(bdd_ref x, bdd_ref y, const bools& ex,
 		std::unordered_map<std::array<bdd_ref, 2>, bdd_ref>& memo,
-		std::unordered_map<bdd_ref, bdd_ref>& memo2, uint_t last);
+		std::unordered_map<bdd_ref, bdd_ref>& memo2, bdd_shft last);
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y) {
 		const bdd_ref and_ref = bdd_and(FLIP_INV_OUT(x), FLIP_INV_OUT(y));
 		// Apply output inversion to constant expression to avoid repeat calls to
@@ -331,7 +333,7 @@ class bdd {
 	static void mark_all(bdd_ref i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
-		uint_t &m);
+		bdd_shft &m);
 	static bdd_ref bdd_and_ex_perm(bdd_ref x, bdd_ref y, const bools& ex,
 		const uints&);
 	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
@@ -435,14 +437,14 @@ public:
 	
 	/* The variable of a BDD reference is its root/absolute shift. */
 
-	inline static uint_t var(bdd_ref x) { return GET_SHIFT(x); }
+	inline static bdd_shft var(bdd_ref x) { return GET_SHIFT(x); }
 
-	static size_t satcount_perm(bdd_ref x, size_t leafvar);
+	static size_t satcount_perm(bdd_ref x, bdd_shft leafvar);
 
-	static size_t getvar(bdd_ref x);
+	static bdd_shft getvar(bdd_ref x);
 	static size_t satcount_k(bdd_ref x, const bools& ex, const uints& perm);
-	static size_t satcount_k(bdd_ref x, size_t leafvar,
-		std::map<int_t, int_t>& mapvars);
+	static size_t satcount_k(bdd_ref x, bdd_shft leafvar,
+		std::map<bdd_shft, bdd_shft>& mapvars);
 	static size_t satcount(spbdd_handle x, const bools& inv);
 };
 
