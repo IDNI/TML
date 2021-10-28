@@ -69,7 +69,7 @@ typedef uint64_t bdd_shft;
 	PLACE64(32,63,(id) <= 1 ? 0 : (shift)) | PLACE64(31,32,(id) <= 1 ? 0 : (inv_inp)) | \
 	PLACE64(63,64,(id) ? (inv_out) : 0))
 // Get the BDD identified by this BDD reference
-#define GET_BDD_ID(x) GET32(0,31,((uint32_t)(x)))
+#define GET_BDD_ID(x) ((bdd_id) GET32(0,31,((uint32_t)(x))))
 // Get the shift applied by this BDD reference
 #define GET_SHIFT(x) ((bdd_shft) GET32(0,31,((uint32_t)((x) >> 32))))
 // Is the input of this BDD reference inverted?
@@ -213,7 +213,7 @@ extern mmap_mode bdd_mmap_mode;
 // extern std::map<std::pair<uints, bools>, std::unordered_map<int_t, int_t>,
 // 	vec2cmp<uint_t, bool>> memos_perm_ex;
 
-void bdd_size(cr_spbdd_handle x,  std::set<uint_t>& s);
+void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s);
 int_t bdd_root(cr_spbdd_handle x);
 spbdd_handle bdd_not(cr_spbdd_handle x);
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -274,7 +274,7 @@ class bdd {
 	friend bool trueleaf(cr_spbdd_handle h);
 	template <typename T>
 	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
-	friend void bdd_size(cr_spbdd_handle x,  std::set<uint_t>& s);
+	friend void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s);
 	friend int_t bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -353,7 +353,7 @@ class bdd {
 	bdd_ref h, l;
 
 	//---
-	static void bdd_sz_abs(bdd_ref x, std::set<uint_t>& s);
+	static void bdd_sz_abs(bdd_ref x, std::set<bdd_id>& s);
 	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
@@ -452,7 +452,7 @@ class bdd_handle {
 	friend class bdd;
 	friend class archive;
 	bdd_handle(bdd_ref b) : b(b) { }//bdd::mark(b); }
-	static void update(const std::vector<int_t>& p);
+	static void update(const std::vector<bdd_id>& p);
 	static std::unordered_map<bdd_ref, std::weak_ptr<bdd_handle>> M;
 public:
 	bdd_ref b;

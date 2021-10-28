@@ -58,7 +58,7 @@ map<pair<bools, uints>, unordered_map<array<bdd_ref, 2>, bdd_ref>,
 unordered_map<bdds, bdd_ref> AM;
 map<bools, unordered_map<bdds, bdd_ref>, veccmp<bool>> AMX;
 map<pair<bools, uints>, unordered_map<bdds, bdd_ref>, vec2cmp<bool, uint_t>> AMXP;
-unordered_set<int_t> S;
+unordered_set<bdd_id> S;
 unordered_map<bdd_ref, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle htrue, hfalse;
 map<bools, unordered_map<bdd_ref, bdd_ref>, veccmp<bool>> memos_ex;
@@ -593,7 +593,7 @@ bdd_ref bdd::bdd_and_many_ex_perm(bdds v, const bools& ex, const uints& p) {
 			memos_perm_ex[{p,ex}])(v);
 }
 
-void bdd::mark_all(bdd_ref  i) {
+void bdd::mark_all(bdd_ref i) {
 	DBG(assert((size_t)GET_BDD_ID(i) < V.size());)
 	if (GET_BDD_ID(i) >= 2 && !has(S, GET_BDD_ID(i)))
 		mark_all(hi(i)), mark_all(lo(i)), S.insert(GET_BDD_ID(i));
@@ -622,7 +622,7 @@ void bdd::gc() {
 //	if (V.size() < S.size() << 3) return;
 	Ma.clear(), S.insert(0), S.insert(1);
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
-	vector<int_t> p(V.size(), 0);
+	vector<bdd_id> p(V.size(), 0);
 #ifndef NOMMAP
 	bdd_mmap v1(memory_map_allocator<bdd>("", bdd_mmap_mode));
 	v1.reserve(bdd_mmap_mode == MMAP_NONE ? S.size() : max_bdd_nodes);
@@ -743,7 +743,7 @@ void bdd::gc() {
 	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
 
-void bdd_handle::update(const vector<int_t>& p) {
+void bdd_handle::update(const vector<bdd_id>& p) {
 	unordered_map<bdd_ref, weak_ptr<bdd_handle>> m;
 	for (pair<bdd_ref, weak_ptr<bdd_handle>> x : M)
 		//DBG(assert(!x.second.expired());) // is this needed? cannot load from archive with this
