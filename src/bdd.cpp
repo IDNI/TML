@@ -43,26 +43,44 @@ template<typename T1, typename T2> struct vec2cmp {
 	}
 };
 
-unordered_map<bdd_key, bdd_id> Ma;
+// Maps a BDD definition its unique ID
+unordered_map<bdd_key, bdd_id> id_map;
+// Maps a BDD ID to its (unique) definition
 bdd_mmap V;
-bool gc_enabled = true; // Controls whether or not garbage collection is enabled
+// Controls whether or not garbage collection is enabled
+bool gc_enabled = true;
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
 mmap_mode bdd_mmap_mode = MMAP_NONE;
 string bdd_mmap_file = "";
 #endif
+// Maps a BDD triple (a,b,c) to the BDD corresponding to (a&b)|(~a&c)
 unordered_map<ite_memo, bdd_ref> C;
+// Maps a BDD pair (a,b) and variable list c to the BDD exists c (a&b)
 map<bools, unordered_map<array<bdd_ref, 2>, bdd_ref>, veccmp<bool>> CX;
+// Maps a BDD pair (a,b), variable list c, and permutation list d to the BDD
+// exists c (a&b) with its variables renamed according d
 map<pair<bools, bdd_shfts>, unordered_map<array<bdd_ref, 2>, bdd_ref>,
 	vec2cmp<bool, bdd_shft>> CXP;
+// Maps a BDD vector a to the BDD corresponding to a_0 & a_1 & ... & a_N
 unordered_map<bdds, bdd_ref> AM;
+// Maps a BDD vector a and variable list b to the BDD exists b (a_0 & ... & a_N)
 map<bools, unordered_map<bdds, bdd_ref>, veccmp<bool>> AMX;
+// Maps a BDD vector a, variable list b, and permutation list c to the BDD
+// exists b (a_0 & ... & a_N) with the variables renamed according c
 map<pair<bools, bdd_shfts>, unordered_map<bdds, bdd_ref>, vec2cmp<bool, bdd_shft>> AMXP;
+// Used to store the marked set in the mark-and-sweep garbage collector
 unordered_set<bdd_id> S;
+// Maps a live BDD to the handle that keeps it alive
 unordered_map<bdd_ref, weak_ptr<bdd_handle>> bdd_handle::M;
 spbdd_handle htrue, hfalse;
+// Maps a BDD a and variable list b to the BDD corresponding to exists b (a)
 map<bools, unordered_map<bdd_ref, bdd_ref>, veccmp<bool>> memos_ex;
+// Maps a BDD a and permutation list b to the BDD a with the variables renamed
+// according to b
 map<bdd_shfts, unordered_map<bdd_ref, bdd_ref>, veccmp<bdd_shft>> memos_perm;
+// Maps a BDD a, variable list b, and permutation list c to the BDD exists b (a)
+// with the variables renamed according to c
 map<pair<bdd_shfts, bools>, unordered_map<bdd_ref, bdd_ref>, vec2cmp<bdd_shft, bool>>
 	memos_perm_ex;
 
@@ -92,8 +110,8 @@ void bdd::init() {
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
 	S.insert(0), S.insert(1), V.emplace_back(0, 0), // dummy
 	V.emplace_back(1, 1),
-	Ma.emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
-	Ma.emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
+	id_map.emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
+	id_map.emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -132,9 +150,9 @@ bdd_ref bdd::add(bdd_shft v, bdd_ref h, bdd_ref l) {
 	unordered_map<bdd_key, bdd_id>::const_iterator it;
 	// Find a BDD with the given high and low parts and make an attributed
 	// reference to it.
-	bdd_id id = (it = Ma.find(k)) != Ma.end() ? it->second :
+	bdd_id id = (it = id_map.find(k)) != id_map.end() ? it->second :
 		(V.emplace_back(h, l),
-		Ma.emplace(move(k), V.size()-1),
+		id_map.emplace(move(k), V.size()-1),
 		V.size()-1);
 	return BDD_REF(id, v, inv_inp, inv_out);
 }
@@ -620,7 +638,7 @@ void bdd::gc() {
 	S.clear();
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V.size() < S.size() << 3) return;
-	Ma.clear(), S.insert(0), S.insert(1);
+	id_map.clear(), S.insert(0), S.insert(1);
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<bdd_id> p(V.size(), 0);
 #ifndef NOMMAP
@@ -738,7 +756,7 @@ void bdd::gc() {
 	p.clear(), S.clear();
 	std::hash<bdd_ref> hsh;
 	for (size_t n = 0; n < V.size(); ++n)
-		Ma.emplace(bdd_key(hash_upair(hsh(V[n].h), hsh(V[n].l)),
+		id_map.emplace(bdd_key(hash_upair(hsh(V[n].h), hsh(V[n].l)),
 			V[n].h, V[n].l), n);
 	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
