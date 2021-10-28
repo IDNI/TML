@@ -168,13 +168,13 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	const bdd_shft min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
-	const bdd_shft xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
 #ifdef MEMO
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
 	// Upshift result to obtain answer for pre-downshifted BDDs
 	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
 #endif
+	const bdd_shft xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
 	const bdd bx = get(x), by = get(y);
 	bdd_ref r;
 	if (xshift < yshift) r = add(xshift, bdd_and(bx.h, y), bdd_and(bx.l, y));
@@ -207,7 +207,7 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	// Downshift the input BDDs by their greatest common shift. Operate on this
 	// reduced form then upshift the result by the aforementioned shift. Intent is
 	// that this canonisation increases cache hits.
-	bdd_shft min_shift = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
+	const bdd_shft min_shift = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
 	DECR_SHIFT(z, min_shift);
@@ -216,24 +216,24 @@ bdd_ref bdd::bdd_ite(bdd_ref x, bdd_ref y, bdd_ref  z) {
 	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
 	bdd_ref r;
 	const bdd bx = get(x), by = get(y), bz = get(z);
-	const bdd_shft s = min(GET_SHIFT(x), min(GET_SHIFT(y), GET_SHIFT(z)));
-	if (GET_SHIFT(x) == GET_SHIFT(y) && GET_SHIFT(y) == GET_SHIFT(z))
-		r =	add(GET_SHIFT(x), bdd_ite(bx.h, by.h, bz.h),
+	const bdd_shft xshift = GET_SHIFT(x), yshift = GET_SHIFT(y), zshift = GET_SHIFT(z);
+	if (xshift == yshift && yshift == zshift)
+		r =	add(xshift, bdd_ite(bx.h, by.h, bz.h),
 				bdd_ite(bx.l, by.l, bz.l));
-	else if (s == GET_SHIFT(x) && s == GET_SHIFT(y))
-		r =	add(GET_SHIFT(x), bdd_ite(bx.h, by.h, z),
+	else if (!xshift && !yshift)
+		r =	add(xshift, bdd_ite(bx.h, by.h, z),
 				bdd_ite(bx.l, by.l, z));
-	else if (s == GET_SHIFT(y) && s == GET_SHIFT(z))
-		r =	add(GET_SHIFT(y), bdd_ite(x, by.h, bz.h),
+	else if (!yshift && !zshift)
+		r =	add(yshift, bdd_ite(x, by.h, bz.h),
 				bdd_ite(x, by.l, bz.l));
-	else if (s == GET_SHIFT(x) && s == GET_SHIFT(z))
-		r =	add(GET_SHIFT(x), bdd_ite(bx.h, y, bz.h),
+	else if (!xshift && !zshift)
+		r =	add(xshift, bdd_ite(bx.h, y, bz.h),
 				bdd_ite(bx.l, y, bz.l));
-	else if (s == GET_SHIFT(x))
-		r =	add(GET_SHIFT(x), bdd_ite(bx.h, y, z), bdd_ite(bx.l, y, z));
-	else if (s == GET_SHIFT(y))
-		r =	add(GET_SHIFT(y), bdd_ite(x, by.h, z), bdd_ite(x, by.l, z));
-	else	r =	add(GET_SHIFT(z), bdd_ite(x, y, bz.h), bdd_ite(x, y, bz.l));
+	else if (!xshift)
+		r =	add(xshift, bdd_ite(bx.h, y, z), bdd_ite(bx.l, y, z));
+	else if (!yshift)
+		r =	add(yshift, bdd_ite(x, by.h, z), bdd_ite(x, by.l, z));
+	else	r =	add(zshift, bdd_ite(x, y, bz.h), bdd_ite(x, y, bz.l));
 	// Upshift result to obtain answer for pre-downshifted BDDs
 	if (C.size() > gclimit) return PLUS_SHIFT(r, min_shift);
 	return C.emplace(ite_memo{x, y, z}, r), PLUS_SHIFT(r, min_shift);

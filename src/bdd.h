@@ -300,8 +300,9 @@ class bdd {
 		// Apply input inversion to the outcome
 		if(GET_INV_INP(x)) std::swap(cbdd.h, cbdd.l);
 		// Apply variable shifting to the outcome
-		INCR_SHIFT(cbdd.l, GET_SHIFT(x));
-		INCR_SHIFT(cbdd.h, GET_SHIFT(x));
+		const bdd_shft xshift = GET_SHIFT(x);
+		INCR_SHIFT(cbdd.l, xshift);
+		INCR_SHIFT(cbdd.h, xshift);
 		// Apply output inversion to the outcome
 		if(GET_INV_OUT(x)) { cbdd.l = FLIP_INV_OUT(cbdd.l); cbdd.h = FLIP_INV_OUT(cbdd.h); }
 		return cbdd;
