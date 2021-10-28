@@ -44,16 +44,16 @@ extern bool onexit;
  * Manipulation" by Minato. The BDD reference as defined below is a
  * manifestation of the attributed edge concept and has the following bit
  * layout:
- * BDD ID: 0-31
- * SHIFT: 32-63
- * INV_INP: 31-32
+ * BDD ID: 0-38
+ * SHIFT: 38-62
+ * INV_INP: 62-63
  * INV_OUT: 63-64.
  * The terminal node invariants are: BDD_ID <= 1 --> SHIFT = 0 and
  * BDD_ID <= 1 --> INV_INP = 0 and BDD_ID = 0 --> INV_OUT = 0. All these ensure
  * that each attributed edge has a unique representation. */
 typedef uint64_t bdd_ref;
 typedef uint64_t bdd_id;
-typedef uint64_t bdd_shft;
+typedef uint32_t bdd_shft;
 // Make a selector for the given bits of a 64-bit unsigned integer
 #define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
 #define MASK64(low, high) ((uint64_t(-1) >> ((low) + 64 - (high))) << (low))
@@ -65,26 +65,26 @@ typedef uint64_t bdd_shft;
 // Replace the given bits of x with the low bits of y
 #define REPL64(low, high, x, y) (((x) & ~MASK64(low, high)) | PLACE64(low, high, y))
 // Construct a BDD reference with the given ID, shift, and inverters
-#define BDD_REF(id, shift, inv_inp, inv_out) (PLACE64(0,31,id) | \
-	PLACE64(32,63,(id) <= 1 ? 0 : (shift)) | PLACE64(31,32,(id) <= 1 ? 0 : (inv_inp)) | \
+#define BDD_REF(id, shift, inv_inp, inv_out) (PLACE64(0,38,id) | \
+	PLACE64(38,62,(id) <= 1 ? 0 : (shift)) | PLACE64(62,63,(id) <= 1 ? 0 : (inv_inp)) | \
 	PLACE64(63,64,(id) ? (inv_out) : 0))
 // Get the BDD identified by this BDD reference
-#define GET_BDD_ID(x) ((bdd_id) GET32(0,31,((uint32_t)(x))))
+#define GET_BDD_ID(x) ((bdd_id) GET64(0,38,x))
 // Get the shift applied by this BDD reference
-#define GET_SHIFT(x) ((bdd_shft) GET32(0,31,((uint32_t)((x) >> 32))))
+#define GET_SHIFT(x) ((bdd_shft) GET32(6,30,((uint32_t)((x) >> 32))))
 // Is the input of this BDD reference inverted?
-#define GET_INV_INP(x) GET32(31,32,((uint32_t)(x)))
+#define GET_INV_INP(x) GET32(30,31,((uint32_t)((x) >> 32)))
 // Is the output of this BDD reference inverted?
 #define GET_INV_OUT(x) GET32(31,32,((uint32_t)((x) >> 32)))
 // Set the BDD identified by this reference
-#define SET_BDD_ID(y, x) (y = REPL64(0,31,y,x))
+#define SET_BDD_ID(y, x) (y = REPL64(0,38,y,x))
 // Remove the output inverter from the BDD reference
 #define BDD_ABS(x) (((uint64_t)(x)) & (uint64_t(-1) >> 1))
 // Increase the shift of the BDD reference, terminal nodes cannot be shifted
-#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)+((int32_t)(x))) : (y))
+#define PLUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(38,62,y,GET_SHIFT(y)+((int32_t)(x))) : (y))
 #define INCR_SHIFT(y, x) (y = PLUS_SHIFT(y, x))
 // Decrease the shift of the BDD reference, terminal nodes cannot be shifted
-#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(32,63,y,GET_SHIFT(y)-((int32_t)(x))) : (y))
+#define MINUS_SHIFT(y, x) (GET_BDD_ID(y) > 1 ? REPL64(38,62,y,GET_SHIFT(y)-((int32_t)(x))) : (y))
 #define DECR_SHIFT(y, x) (y = MINUS_SHIFT(y, x))
 // Invert supplied BDD reference, the 0 node cannot be inverted
 #define FLIP_INV_OUT(x) (GET_BDD_ID(x) ? ((x) ^ (uint64_t(1) << 63)) : (x))
