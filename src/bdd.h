@@ -54,6 +54,7 @@ extern bool onexit;
 typedef uint64_t bdd_ref;
 typedef uint64_t bdd_id;
 typedef uint32_t bdd_shft;
+typedef std::vector<bdd_shft> bdd_shfts;
 // Make a selector for the given bits of a 64-bit unsigned integer
 #define MASK32(low, high) ((uint32_t(-1) >> ((low) + 32 - (high))) << (low))
 #define MASK64(low, high) ((uint64_t(-1) >> ((low) + 64 - (high))) << (low))
@@ -136,7 +137,7 @@ template<> struct std::hash<std::array<bdd_ref, 2>>{
 
 const bdd_ref T = BDD_REF(1, 0, false, false), F = BDD_REF(1, 0, false, true);
 
-spbdd_handle from_bit(uint_t b, bool v);
+spbdd_handle from_bit(bdd_shft b, bool v);
 bool leaf(cr_spbdd_handle h);
 bool trueleaf(cr_spbdd_handle h);
 template <typename T>
@@ -146,32 +147,32 @@ spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
 
 spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
-spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
+spbdd_handle operator^(cr_spbdd_handle x, const bdd_shfts& m);
 
 spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
 
 bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
-spbdd_handle bdd_shift(cr_spbdd_handle in, int_t amt);
+spbdd_handle bdd_shift(cr_spbdd_handle in, bdd_shft amt);
 spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y, cr_spbdd_handle z);
-spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y, cr_spbdd_handle z);
+spbdd_handle bdd_ite_var(bdd_shft x, cr_spbdd_handle y, cr_spbdd_handle z);
 spbdd_handle bdd_and_many(bdd_handles v);
 spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 spbdd_handle bdd_or_many(bdd_handles v);
 spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools& b);
 spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y, const bools&);
 spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b, const uints& m);
+	const bools& b, const bdd_shfts& m);
 spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x, cr_spbdd_handle y,
-	const bools& b, const uints& m);
-spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const uints&);
-spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const uints& m);
-spbdd_handle from_eq(uint_t x, uint_t y);
-std::array<spbdd_handle, 2> solve(spbdd_handle x, uint_t v);
+	const bools& b, const bdd_shfts& m);
+spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b, const bdd_shfts&);
+spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b, const bdd_shfts& m);
+spbdd_handle from_eq(bdd_shft x, bdd_shft y);
+std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
 bdd_ref bdd_or_reduce(bdds b);
 bdd_ref bdd_or_reduce(bdds b);
 size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
-vbools allsat(cr_spbdd_handle x, uint_t nvars);
+vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
 extern bdd_mmap V;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
@@ -204,17 +205,17 @@ extern mmap_mode bdd_mmap_mode;
 // 	vec2cmp<bool,uint_t>> CXP;
 // extern std::unordered_map<bdds, int_t> AM;
 // extern std::map<bools, std::unordered_map<bdds, int_t>, veccmp<bool>> AMX;
-// extern std::map<std::pair<bools,uints>, std::unordered_map<bdds,int_t>,
+// extern std::map<std::pair<bools,bdd_shfts>, std::unordered_map<bdds,int_t>,
 // 	vec2cmp<bool,uint_t>> AMXP;
 // extern std::unordered_set<int_t> S;
 // extern std::map<bools, std::unordered_map<int_t, int_t>, veccmp<bool>> memos_ex;
-// extern std::map<uints, std::unordered_map<int_t, int_t>, veccmp<uint_t>>
+// extern std::map<bdd_shfts, std::unordered_map<int_t, int_t>, veccmp<uint_t>>
 // 	memos_perm;
-// extern std::map<std::pair<uints, bools>, std::unordered_map<int_t, int_t>,
+// extern std::map<std::pair<bdd_shfts, bools>, std::unordered_map<int_t, int_t>,
 // 	vec2cmp<uint_t, bool>> memos_perm_ex;
 
 void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s);
-int_t bdd_root(cr_spbdd_handle x);
+bdd_shft bdd_root(cr_spbdd_handle x);
 spbdd_handle bdd_not(cr_spbdd_handle x);
 spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -243,39 +244,39 @@ class bdd {
 	friend spbdd_handle operator||(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator%(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle operator/(cr_spbdd_handle x, const bools& b);
-	friend spbdd_handle operator^(cr_spbdd_handle x, const uints& m);
+	friend spbdd_handle operator^(cr_spbdd_handle x, const bdd_shfts& m);
 	friend spbdd_handle bdd_impl(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend bool bdd_subsumes(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend bdd_ref bdd_or_reduce(bdds b);
 	friend spbdd_handle bdd_ite(cr_spbdd_handle x, cr_spbdd_handle y,
 		cr_spbdd_handle z);
-	friend spbdd_handle bdd_ite_var(uint_t x, cr_spbdd_handle y,
+	friend spbdd_handle bdd_ite_var(bdd_shft x, cr_spbdd_handle y,
 		cr_spbdd_handle z);
 	friend spbdd_handle bdd_and_many(bdd_handles v);
 	friend spbdd_handle bdd_and_many_ex(bdd_handles v, const bools& ex);
 	friend spbdd_handle bdd_or_many(bdd_handles v);
 	friend spbdd_handle bdd_permute_ex(cr_spbdd_handle x, const bools& b,
-		const uints& m);
+		const bdd_shfts& m);
 	friend spbdd_handle bdd_and_ex_perm(cr_spbdd_handle x, cr_spbdd_handle,
-		const bools& b, const uints& m);
+		const bools& b, const bdd_shfts& m);
 	friend spbdd_handle bdd_and_not_ex_perm(cr_spbdd_handle x,
-		cr_spbdd_handle, const bools& b, const uints& m);
+		cr_spbdd_handle, const bools& b, const bdd_shfts& m);
 	friend spbdd_handle bdd_and_many_ex_perm(bdd_handles v, const bools& b,
-		const uints&);
+		const bdd_shfts&);
 	friend spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 		const bools& b);
 	friend spbdd_handle bdd_and_not_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 		const bools&);
-	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, uint_t v);
-	friend vbools allsat(cr_spbdd_handle x, uint_t nvars);
-	friend spbdd_handle from_bit(uint_t b, bool v);
+	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
+	friend vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
+	friend spbdd_handle from_bit(bdd_shft b, bool v);
 	friend size_t bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
 	template <typename T>
 	friend std::basic_ostream<T>& out(std::basic_ostream<T>& os, cr_spbdd_handle x);
 	friend void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s);
-	friend int_t bdd_root(cr_spbdd_handle x);
+	friend bdd_shft bdd_root(cr_spbdd_handle x);
 	friend spbdd_handle bdd_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
@@ -286,7 +287,7 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
-	friend spbdd_handle bdd_shift(cr_spbdd_handle x, int_t amt);
+	friend spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt);
 	
 	/* Get the absolute BDD referenced by the given BDD reference. If the given
 	 * BDD reference represents the function f, the low reference of the produced
@@ -318,33 +319,33 @@ class bdd {
 		return FLIP_INV_OUT(and_ref);
 	}
 	static bdd_ref bdd_ite(bdd_ref x, bdd_ref y, bdd_ref z);
-	static bdd_ref bdd_ite_var(uint_t x, bdd_ref y, bdd_ref z);
+	static bdd_ref bdd_ite_var(bdd_shft x, bdd_ref y, bdd_ref z);
 	static bdd_ref bdd_and_many(bdds v);
 	static bdd_ref bdd_and_many_ex(bdds v, const bools& ex);
 	static bdd_ref bdd_ex(bdd_ref x, const bools& b,
-		std::unordered_map<bdd_ref, bdd_ref>& memo, uint_t last);
+		std::unordered_map<bdd_ref, bdd_ref>& memo, bdd_shft last);
 	static bdd_ref bdd_ex(bdd_ref x, const bools& b);
-	static bdd_ref bdd_permute(bdd_ref x, const uints& m,
+	static bdd_ref bdd_permute(bdd_ref x, const bdd_shfts& m,
 		std::unordered_map<bdd_ref, bdd_ref>& memo);
-	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m,
-		size_t last, std::unordered_map<bdd_ref, bdd_ref>& memo);
-	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const uints& m);
-	static bool solve(bdd_ref x, uint_t v, bdd_ref& l, bdd_ref& h);
+	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const bdd_shfts& m,
+		bdd_shft last, std::unordered_map<bdd_ref, bdd_ref>& memo);
+	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const bdd_shfts& m);
+	static bool solve(bdd_ref x, bdd_shft v, bdd_ref& l, bdd_ref& h);
 	static void mark_all(bdd_ref i);
 	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		bdd_shft &m);
 	static bdd_ref bdd_and_ex_perm(bdd_ref x, bdd_ref y, const bools& ex,
-		const uints&);
-	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const uints&);
-	static void sat(uint_t v, uint_t nvars, bdd_ref t, bools& p, vbools& r);
-	static vbools allsat(bdd_ref x, uint_t nvars);
+		const bdd_shfts&);
+	static bdd_ref bdd_and_many_ex_perm(bdds v, const bools&, const bdd_shfts&);
+	static void sat(bdd_shft v, bdd_shft nvars, bdd_ref t, bools& p, vbools& r);
+	static vbools allsat(bdd_ref x, bdd_shft nvars);
 	static void bdd_sz(bdd_ref x, std::set<bdd_ref>& s);
-	static void bdd_nvars(bdd_ref x, std::set<int_t>& s);
+	static void bdd_nvars(bdd_ref x, std::set<bdd_shft>& s);
 	static size_t bdd_nvars(bdd_ref x);
 	static bool bdd_subsumes(bdd_ref x, bdd_ref y);
-	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l);
-	inline static bdd_ref from_bit(uint_t b, bool v);
+	static bdd_ref add(bdd_shft v, bdd_ref h, bdd_ref l);
+	inline static bdd_ref from_bit(bdd_shft b, bool v);
 	inline static void max_bdd_size_check();
 	inline static bool leaf(bdd_ref t) { return BDD_ABS(t) == T; }
 	inline static bool trueleaf(bdd_ref t) { return !GET_INV_OUT(t); }
@@ -390,7 +391,7 @@ class bdd {
 	static bdd_ref adder_accs(bdd_ref b_in, bdd_ref accs, size_t depth, size_t bits, size_t n_args);
 	static void mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size_t bits,
 			size_t n_args, bdd_ref &c) ;
-	static bdd_ref bdd_shift(bdd_ref a_in, int_t amt);
+	static bdd_ref bdd_shift(bdd_ref a_in, bdd_shft amt);
 	static bdd_ref copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
 	static bdd_ref shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args);
 	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
@@ -442,7 +443,7 @@ public:
 	static size_t satcount_perm(bdd_ref x, bdd_shft leafvar);
 
 	static bdd_shft getvar(bdd_ref x);
-	static size_t satcount_k(bdd_ref x, const bools& ex, const uints& perm);
+	static size_t satcount_k(bdd_ref x, const bools& ex, const bdd_shfts& perm);
 	static size_t satcount_k(bdd_ref x, bdd_shft leafvar,
 		std::map<bdd_shft, bdd_shft>& mapvars);
 	static size_t satcount(spbdd_handle x, const bools& inv);
@@ -468,13 +469,13 @@ public:
 class allsat_cb {
 public:
 	typedef std::function<void(const bools&, bdd_ref)> callback;
-	allsat_cb(cr_spbdd_handle r, uint_t nvars, callback f) :
+	allsat_cb(cr_spbdd_handle r, bdd_shft nvars, callback f) :
 		r(r->b), nvars(nvars), f(f), p(nvars) {}
 	void operator()() { sat(r); }
 private:
 	bdd_ref r;
-	const uint_t nvars;
-	uint_t v = 1;
+	const bdd_shft nvars;
+	bdd_shft v = 1;
 	callback f;
 	bools p;
 	void sat(bdd_ref x);
@@ -482,7 +483,7 @@ private:
 
 class satcount_iter {
 public:
-	satcount_iter(cr_spbdd_handle r, uint_t nvars, const bools& inv) :
+	satcount_iter(cr_spbdd_handle r, bdd_shft nvars, const bools& inv) :
 		r(r->b), nvars(nvars), p(nvars), inv(inv), vp() {}
 	size_t count() {
 		sat(r);
@@ -490,8 +491,8 @@ public:
 	}
 private:
 	bdd_ref r;
-	const uint_t nvars;
-	uint_t v = 1;
+	const bdd_shft nvars;
+	bdd_shft v = 1;
 	bools p;
 	const bools& inv;
 	std::set<bools> vp;

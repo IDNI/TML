@@ -19,7 +19,7 @@ using namespace std;
 
 //------------------------------------------------------------------------------
 // auxiliary functions
-int_t bdd_root(cr_spbdd_handle x) {
+bdd_shft bdd_root(cr_spbdd_handle x) {
 	return (bdd::var(x->b));
 }
 
@@ -965,7 +965,7 @@ bdd_ref bdd::shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args) {
 	return a_in;
 }
 
-bdd_ref bdd::bdd_shift(bdd_ref a_in, int_t amt) { return PLUS_SHIFT(a_in, amt); }
+bdd_ref bdd::bdd_shift(bdd_ref a_in, bdd_shft amt) { return PLUS_SHIFT(a_in, amt); }
 
 bdd_ref bdd::copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits,
 	size_t n_args) {
