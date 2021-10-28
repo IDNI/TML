@@ -170,8 +170,8 @@ spbdd_handle from_eq(bdd_shft x, bdd_shft y);
 std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
 bdd_ref bdd_or_reduce(bdds b);
 bdd_ref bdd_or_reduce(bdds b);
-size_t bdd_nvars(spbdd_handle x);
-size_t bdd_nvars(bdd_handles x);
+bdd_shft bdd_nvars(spbdd_handle x);
+bdd_shft bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
 extern bdd_mmap V;
 extern size_t max_bdd_nodes;
@@ -270,7 +270,7 @@ class bdd {
 	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
 	friend vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
 	friend spbdd_handle from_bit(bdd_shft b, bool v);
-	friend size_t bdd_nvars(spbdd_handle x);
+	friend bdd_shft bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
 	template <typename T>
@@ -333,7 +333,7 @@ class bdd {
 	static bdd_ref bdd_permute_ex(bdd_ref x, const bools& b, const bdd_shfts& m);
 	static bool solve(bdd_ref x, bdd_shft v, bdd_ref& l, bdd_ref& h);
 	static void mark_all(bdd_ref i);
-	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, size_t&);
+	static size_t bdd_and_many_iter(bdds, bdds&, bdds&, bdd_ref&, bdd_shft&);
 	static char bdd_and_many_ex_iter(const bdds&v, bdds& h, bdds& l,
 		bdd_shft &m);
 	static bdd_ref bdd_and_ex_perm(bdd_ref x, bdd_ref y, const bools& ex,
@@ -343,7 +343,7 @@ class bdd {
 	static vbools allsat(bdd_ref x, bdd_shft nvars);
 	static void bdd_sz(bdd_ref x, std::set<bdd_ref>& s);
 	static void bdd_nvars(bdd_ref x, std::set<bdd_shft>& s);
-	static size_t bdd_nvars(bdd_ref x);
+	static bdd_shft bdd_nvars(bdd_ref x);
 	static bool bdd_subsumes(bdd_ref x, bdd_ref y);
 	static bdd_ref add(bdd_shft v, bdd_ref h, bdd_ref l);
 	inline static bdd_ref from_bit(bdd_shft b, bool v);

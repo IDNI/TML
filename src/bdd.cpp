@@ -268,7 +268,7 @@ void am_sort(bdds& b) {
 		else ++n;
 }
 
-size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, bdd_ref &res, size_t &m){
+size_t bdd::bdd_and_many_iter(bdds v, bdds& h, bdds& l, bdd_ref &res, bdd_shft &m){
 	size_t i;
 	bool flag = false;
 	m = var(v[0]);
@@ -346,7 +346,7 @@ bdd_ref bdd::bdd_and_many(bdds v) {
 	if (v.size() == 2)
 		return AM.emplace(v, bdd_and(v[0], v[1])).first->second;
 	bdd_ref res = F, h, l;
-	size_t m = 0;
+	bdd_shft m = 0;
 	bdds vh, vl;
 	switch (bdd_and_many_iter(v, vh, vl, res, m)) {
 		case 0: l = bdd_and_many(move(vl)),
@@ -437,7 +437,7 @@ struct sbdd_and_ex_perm {
 
 bdd_ref bdd::bdd_and_ex(bdd_ref x, bdd_ref  y, const bools& ex) {
 	bdd_shft last = 0;
-	for (size_t n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
+	for (bdd_shft n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
 	bdd_ref r = bdd_and_ex(x, y, ex, CX[ex], memos_ex[ex], last);
 	DBG(bdd_ref t = bdd_ex(bdd_and(x, y), ex);)
 	DBG(assert(r == t);)
@@ -489,7 +489,7 @@ struct sbdd_and_many_ex {
 		unordered_map<bdd_ref, bdd_ref>& m2,
 		unordered_map<array<bdd_ref, 2>, bdd_ref>& m3) :
 		ex(ex), memo(memo), m2(m2), m3(m3), last(0) {
-		for (size_t n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
+		for (bdd_shft n = 0; n != ex.size(); ++n) if (ex[n]) last = n;
 	}
 
 	bdd_ref operator()(bdds v) {
@@ -564,16 +564,16 @@ struct sbdd_and_many_ex_perm {
 		bdd_shft m = 0;
 		bdd_ref res = F, h, l;
 		bdds vh, vl;
-		char c = bdd::bdd_and_many_ex_iter(v, vh, vl, m);
+		char c = bdd::bdd_and_many_iter(v, vh, vl, res, m);
 		if (m > last+1) {
 			switch (c) {
 			case 0: res = bdd::add(m, bdd::bdd_and_many(move(vh)),
 					bdd::bdd_and_many(move(vl))); break;
-			case 1: res = bdd::add(m,bdd::bdd_and_many(move(vh)),F);
+			case 2: res = bdd::add(m,bdd::bdd_and_many(move(vh)),F);
 				break;
-			case 2: res = bdd::add(m,F,bdd::bdd_and_many(move(vl)));
+			case 3: res = bdd::add(m,F,bdd::bdd_and_many(move(vl)));
 				break;
-			case 3: res = F; break;
+			case 1: res = F; break;
 			default: DBGFAIL;
 			}
 		} else {
@@ -582,15 +582,15 @@ struct sbdd_and_many_ex_perm {
 				if (ex[m - 1]) res = bdd::bdd_or(h, l);
 				else res = bdd::bdd_ite_var(p[m-1],h,l);
 				break;
-			case 1: if (ex[m - 1]) res = (*this)(move(vh));
+			case 2: if (ex[m - 1]) res = (*this)(move(vh));
 				else res = bdd::bdd_ite_var(p[m-1],
 					(*this)(move(vh)), F);
 				break;
-			case 2: if (ex[m - 1]) res = (*this)(move(vl));
+			case 3: if (ex[m - 1]) res = (*this)(move(vl));
 				else res = bdd::bdd_ite_var(p[m-1], F,
 					(*this)(move(vl)));
 				break;
-			case 3: res = F; break;
+			case 1: res = F; break;
 			default: DBGFAIL;
 			}
 		}
@@ -1043,7 +1043,7 @@ bdd_ref bdd::bdd_ex(bdd_ref x, const bools& b, unordered_map<bdd_ref, bdd_ref>& 
 
 bdd_ref bdd::bdd_ex(bdd_ref x, const bools& b) {
 	bdd_shft last = 0;
-	for (size_t n = 0; n != b.size(); ++n) if (b[n]) last = n;
+	for (bdd_shft n = 0; n != b.size(); ++n) if (b[n]) last = n;
 	return bdd_ex(x, b, memos_ex[b], last);
 }
 
@@ -1084,8 +1084,8 @@ bdd_ref bdd::bdd_permute_ex(bdd_ref x, const bools& b, const bdd_shfts& m, bdd_s
 }
 
 bdd_ref bdd::bdd_permute_ex(bdd_ref x, const bools& b, const bdd_shfts& m) {
-	size_t last = 0;
-	for (size_t n = 0; n != b.size(); ++n) if (b[n] || (m[n]!=n)) last = n;
+	bdd_shft last = 0;
+	for (bdd_shft n = 0; n != b.size(); ++n) if (b[n] || (m[n]!=n)) last = n;
 	return bdd_permute_ex(x, b, m, last, memos_perm_ex[{m,b}]);
 }
 
@@ -1156,21 +1156,21 @@ void bdd::bdd_nvars(bdd_ref x, set<bdd_shft>& s) {
 	if (!leaf(x)) s.insert(var(x)-1), bdd_nvars(hi(x),s),bdd_nvars(lo(x),s);
 }
 
-size_t bdd::bdd_nvars(bdd_ref x) {
+bdd_shft bdd::bdd_nvars(bdd_ref x) {
 	if (leaf(x)) return 0;
 	set<bdd_shft> s;
 	bdd_nvars(x, s);
-	size_t r = *s.rbegin();
+	bdd_shft r = *s.rbegin();
 	return r;
 }
 
-size_t bdd_nvars(bdd_handles x) {
-	size_t r = 0;
+bdd_shft bdd_nvars(bdd_handles x) {
+	bdd_shft r = 0;
 	for (auto y : x) r = max(r, bdd_nvars(y));
 	return r;
 }
 
-size_t bdd_nvars(spbdd_handle x) { return bdd::bdd_nvars(x->b); }
+bdd_shft bdd_nvars(spbdd_handle x) { return bdd::bdd_nvars(x->b); }
 bool leaf(cr_spbdd_handle h) { return bdd::leaf(h->b); }
 bool trueleaf(cr_spbdd_handle h) { return bdd::trueleaf(h->b); }
 template <typename T>
