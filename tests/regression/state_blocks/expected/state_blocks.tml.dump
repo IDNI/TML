@@ -1,0 +1,17 @@
+a_ordered(4 2 7).
+a_ordered(1 1 6).
+a_ordered(3 2 3).
+a_ordered(2 2 0).
+a_ordered(0 1 1).
+a_original(2 7).
+a_original(1 6).
+a_original(2 3).
+a_original(2 0).
+a_original(1 1).
+exists_first1(2).
+exists_first1(1).
+exists_first2(7).
+exists_first2(6).
+exists_first2(3).
+exists_first2(1).
+exists_first2(0).

@@ -23,6 +23,8 @@ using namespace std;
 
 int_t raw_prog::last_id = 0;
 bool raw_prog::require_guards = false;
+bool raw_prog::require_state_blocks = false;
+bool raw_term::require_fp_step = false;
 
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
@@ -423,8 +425,9 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	size_t& pos = in->pos;
 	const lexeme &s = l[pos];
 	size_t curr = pos;
+	if (s == "__fp__") require_fp_step = true;
 	if ((neg = *l[pos][0] == '~')) ++pos;
-	bool rel = false, noteq = false, eq = false, leq = false, gt = false,
+	bool noteq = false, eq = false, leq = false, gt = false,
 		lt = false, geq = false, bltin = false, arith = false,
 		forget = false, renew = false;
 
@@ -1011,6 +1014,25 @@ bool guard_statement::parse(input* in, dict_t &dict, raw_prog& rp) {
 	return parse_if(in, dict, rp) || parse_while(in, dict, rp);
 }
 
+bool state_block::parse(input* in, dict_t &dict) {
+	lexemes& l = in->l;
+	size_t& pos = in->pos;
+	size_t bpos = pos;
+	if (*l[pos][0] != '[' || ++pos >= l.size()) return false;
+	label = l[pos];
+	if (++pos >= l.size()) return false;
+	if (*l[pos][0] == '~') ++pos, flip = true;
+	if (pos >= l.size() || *l[pos][0] != ':' || ++pos >= l.size())
+		return false;
+	while (*l[pos][0] != ']' && pos < l.size()) {
+		if (!rp.parse(in, dict)) return false;
+		if (rp.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
+			l[bpos]);
+	}
+	if (*l[pos][0] == ']') return ++pos, true;
+	else return false;
+}
+
 bool raw_prog::parse_xfp(input* in, dict_t& dict) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
@@ -1031,8 +1053,10 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	guard_statement c;
 	typestmt ts;
 	raw_prog np;
-	//COUT << "\tparsing statement " << l[pos] << endl;
-	if ( ts.parse(in, *this)) vts.push_back(ts);
+	state_block sb;
+	//COUT << "\tparsing statement " << in->l[in->pos] << endl;
+	if (sb.parse(in, dict)) sbs.push_back(sb);
+	else if (!in->error && ts.parse(in, *this)) vts.push_back(ts);
 	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np);
 	else if (!in->error && c.parse(in, dict, *this)) {
 		if (c.type == guard_statement::IF) has[COND] = true;
@@ -1046,6 +1070,7 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	else if (!in->error && p.parse(in, *this)) g.push_back(p);
 	else return false;
 	if (!require_guards && gs.size()) require_guards = true;
+	if (!require_state_blocks && sbs.size()) require_state_blocks = true;
 	return !in->error;
 }
 
@@ -1069,7 +1094,9 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 	for (size_t n = 0; n != dict.nbltins(); ++n)
 		builtins.insert(dict.get_bltin(n));
 	id = ++last_id;
-	while (in->pos < in->l.size() && *in->l[in->pos][0] != '}')
+	while (in->pos < in->l.size() &&
+			*in->l[in->pos][0] != '}' &&
+			*in->l[in->pos][0] != ']')
 		if (!parse_statement(in, dict)) return --last_id, false;
 	//COUT << "\t\tparsed rp statements:\n" << *this << endl;
 
@@ -1166,6 +1193,7 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	if (!l.size()) return true;
 	raw_prog& rp = p.nps.emplace_back();
 	raw_prog::require_guards = false;
+	raw_prog::require_state_blocks = false;
 	if (!rp.parse(in, dict))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
