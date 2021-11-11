@@ -1,0 +1,7 @@
+
+@string str "bbb".
+
+S => S S | 'b' .
+
+!S(0 3).
+
