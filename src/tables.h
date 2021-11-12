@@ -124,6 +124,31 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+struct gnode {
+	enum gntype{
+		pack, interm, symbol
+	} type;
+	const term &t;
+	int lev;
+	std::vector<gnode*> next;
+	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level) {
+		type = typ; }
+	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){ 
+		type = interm;
+		this->next.emplace_back(new gnode(lev, t, gnode::gntype::pack));
+		next.back()->next = inter;
+	}
+	bool binarise() {
+		interm2g.clear();
+		visited.clear();
+		return _binarise();
+	}
+	private:
+	static std::set<const gnode*> visited;
+	static std::map<std::set<term>, gnode*> interm2g;
+	bool _binarise();
+};
+
 struct table {
 	sig s;
 	size_t len, priority = 0;
@@ -268,6 +293,9 @@ private:
 		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
 	bool get_proof(const term& q, proof& p, size_t level,
 		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
+	void print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int level = 0);
+	bool build_graph( std::map<term, gnode*> &tg, proof &p, gnode &g);
+	gnode* get_forest(const term& t, proof& p );
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;

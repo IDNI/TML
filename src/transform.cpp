@@ -763,3 +763,29 @@ loop:	sz = qs.size();
 	DBG(o::out()<<"spec:"<<endl<<r;)
 	return r;
 }*/
+
+void driver::transform_state_blocks(raw_prog &rp, set<lexeme> guards) {
+	for (raw_prog& nrp : rp.nps) transform_state_blocks(nrp, guards);
+	for (state_block& sb : rp.sbs) {
+		set<lexeme> grds(guards);
+		grds.insert(sb.label);
+		transform_state_blocks(sb.rp, grds);
+		raw_term rt(elem(elem::SYM, sb.label), vector<elem>{});
+		if (sb.flip) {
+			raw_term h(rt); h.neg = true;
+			rp.r.push_back(raw_rule(h, rt));
+		}
+		for (raw_rule& r : sb.rp.r) {
+			raw_term rt(elem(elem::SYM, sb.label), vector<elem>{});
+			if (r.prft) r.prft = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(rt),
+				make_shared<raw_form_tree>(*r.prft));
+			else {
+				if (r.b.empty()) r.b.emplace_back();
+				for (auto& b : r.b) b.push_back(rt);
+			}
+			rp.r.push_back(move(r));
+		}
+	}
+	rp.sbs.clear();
+}

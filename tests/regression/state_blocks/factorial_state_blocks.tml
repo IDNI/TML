@@ -1,0 +1,32 @@
+maxint(123).
+input(5).
+
+l(0).
+
+x(?i) :- input(?i), ?i != 0.
+x(1) :- input(0).
+
+start, init :- ~init.
+
+[start:
+	S(0 1 1), factorial, ~start :-
+		x(?x).
+]
+
+[factorial:
+	R(?r1), ~factorial :-
+		l(?l),
+		S(?l ?n ?r),
+		x(?x),
+		?n = ?x,
+		?r * ?n = ?r1.
+	~S(?l ?n ?r), S(?l1 ?n1 ?r1),
+	~l(?l), l(?l1) :-
+		l(?l),
+		S(?l ?n ?r),
+		x(?x),
+		?n != ?x,
+		?l + 1 = ?l1,
+		?n + 1 = ?n1,
+		?r * ?n = ?r1.
+]

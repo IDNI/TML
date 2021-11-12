@@ -165,6 +165,7 @@ class driver {
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
+	void transform_state_blocks(raw_prog &rp, std::set<lexeme> guards);
 	bool is_limited(const elem &var, const raw_form_tree &t,
 		std::set<elem> &wrt, std::map<elem, const raw_form_tree*> &scopes);
 	bool is_limited(const elem &var, std::set<elem> &wrt,

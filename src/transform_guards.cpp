@@ -55,22 +55,22 @@ void tables::transform_guards(raw_prog& rp) {
 	rp.nps.clear();
 }
 
-// transforms a program program into phases
+// transforms a program into phases
 // del, rule, true, false, curr and fp states and guard each add/del/rule
 // statement with its state guard
 void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
-	int_t& prev_id) {
+	int_t& prev_id)
+{
 	vector<string> states = {
 		"init", "start", "add", "del", "rule", "cond", "fp", "curr"
 	};
 	int_t id = rp.id;
 	for (auto& rule : rp.r) {
-		DBG(assert(rule.h.size() < 2);)  // is it really only rule.h[0]?
 		bool is_form = rule.is_form();
 		bool is_fact = !rule.b.size() && !is_form;
 		if (is_fact) rule.b.emplace_back();
 		if (is_form) rule.prft->guard_lx = lx_id("rule", id);
-		else iid(rule.b.back(), is_fact ? (rule.h[0].neg ? "del" : "add")
+		else iid(rule.b.back(), is_fact ? (rule.h[0].neg? "del" : "add")
 			: "rule", id);
 		trp.r.emplace_back(rule);
 	}
