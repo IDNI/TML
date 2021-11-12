@@ -262,35 +262,42 @@ int_t bdd::adder(int_t a_in, int_t b_in, bool carry, size_t bit) {
 
 	bdd a = get(a_in), b = get(b_in);
 	int_t c = 0;
-	if (a_in == T && b_in == T)
-		c = T;
-	else if (a_in == F || b_in == F)
-		c = F;
-	else {
-		int_t pos = 0;
-		if (a.v > b.v + 1 && b.v != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = b.v + 1;
-		} else if (a.v + 2 < b.v && a.v != 0) {
-			b.h = b_in, b.l = b_in;
-			pos = a.v + 2;
-		} else if (a.v != 0)
-			pos = a.v + 2;
-		else
-			pos = b.v + 1;
 
-		if (carry == false)
-			c = add(pos,
-					bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
-					bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
-		else
-			c = add(pos,
-					bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
-					bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
+
+	int_t pos = 0;
+	if (a.v > b.v + 1 && b.v != 0) {
+		a.h = a_in, a.l = a_in;
+	  	pos = b.v + 1;
+	} else if (a.v + 2 < b.v && a.v != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = a.v + 2;
+	} else {
+		pos = a.v + 2;
 	}
+
+	if (pos > (bit+1) * 3) {
+		size_t delta = (pos / 3)-1;
+		if (carry)
+			c = add(pos-3, bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)), adder(a_in, b_in,true,delta));
+		else
+			c = add(pos-3,adder(a_in, b_in,false,delta) , bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)));
+		return c;
+	}
+
+
+	if (!carry)
+		c = add(pos,
+				bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
+				bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
+
+	else
+		c = add(pos,
+				bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
+				bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
 	return c;
 }
-
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 // Over bdds MULT

@@ -325,7 +325,36 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
-void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
+void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
+
+	string pred = to_string(lexeme2str(dict.get_rel(t.tab)));
+	//COUT << to_string(pred) << endl;
+	int_t idbltin = -1;
+	term taux(t);
+	if (pred.find("_EQ_") != std::string::npos)
+		idbltin = dict.get_bltin("eq");
+	else if (pred.find("_LEQ_") != string::npos) {
+		idbltin = dict.get_bltin("leq");
+		taux.extype = term::BLTIN;
+		taux.idbltin = idbltin;
+	}
+	else if (pred.find("_PLUS_") != string::npos)
+		idbltin = dict.get_bltin("PW_add");
+	else if (pred.find("_MULT_") != string::npos)
+		idbltin = dict.get_bltin("PW_mult");
+	else {
+		b.insert({ get_body(t, a.vm, a.varslen), t });
+		return;
+	}
+
+	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
+	//todo: check that idbltin is poperly configured in builtins
+	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
+	a.bltins.push_back(taux);
+}
+
+void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) {
+
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
@@ -333,7 +362,8 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
-			b.insert({ get_body(t, a.vm, a.varslen), t });
+			if(opts.bitunv) handler_bitunv(b, t, a);
+			else b.insert({ get_body(t, a.vm, a.varslen), t });
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
@@ -570,14 +600,15 @@ ntable tables::get_table(const sig& s) {
 	ntable nt = tbls.size();
 	size_t len = ir_handler->sig_len(s);
 	max_args = max(max_args, len);
-	if( opts.bitunv == true) {
+	if(opts.bitunv) {
 		bool found = false;
 		string_t relname = lexeme2str(dict.get_rel(s.first));
 		auto & types = spbu->ptypenv->search_pred( relname , found);
 		tab_type.insert({nt, types});
-		DBG( COUT<<std::endl<< "For table "<<nt; );
+		DBG(COUT<< "For table " << nt << " " << to_string(relname) << " < ");
 		for( auto &t: types )
-			DBG(COUT<<t.to_print());	
+			DBG(COUT<<t.to_print()<<" ");
+		DBG(COUT<< ">" << std::endl;);
 	}
 	table tb;
 	return	tb.t = hfalse, tb.s = s, tb.len = len, 

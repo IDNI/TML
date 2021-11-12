@@ -1,0 +1,29 @@
+U(2).
+A0(0).
+A0(1).
+B0(1).
+NAB_and(?c ?x) :- A0(?x), B0(?x), count(?c).
+NAB_prod(?c ?x ?y) :- A0(?x), B0(?y), count(?c).
+
+U(4).
+A1(0).
+A1(1).
+A1(2).
+A1(3).
+A1(4).
+NA(?c ?x) :- A1(?x), count(?c).
+
+U(8).
+A2(5).
+A2(3).
+B2(5).
+B2(2).
+B2(3).
+NAB_prod_A(?x ?y ?c) :- count(?x ?c), A2(?x), B2(?y).
+NAB_prod_B(?x ?y ?c) :- count(?y ?c), A2(?x), B2(?y).
+
+#exceptions
+A3(0).
+NA_0(?c) :- A3(1), count(?c).
+NAB_N(?x ?y ?c) :- count(?z ?c), A0(?x), B0(?y).
+NAB_N(?x ?c) :- count(?z ?c), A0(?x), B0(?x).

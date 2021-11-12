@@ -279,6 +279,7 @@ private:
 			spbdd_handle &c) const;
 	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
+	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
 	bool get_facts(const flat_prog& m);
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
@@ -378,8 +379,6 @@ private:
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
-	t_arith_op get_bwop(lexeme l);
-	t_arith_op get_pwop(lexeme l);
 
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
 	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);
