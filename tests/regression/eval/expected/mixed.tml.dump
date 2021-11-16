@@ -75,6 +75,9 @@ q_term_param_types(7 12).
 q_term_param_types(4 6).
 q_term_param_types(2 6).
 q_term_param_types(0 6).
+cdc_decode(reachable_from_2 4).
+cdc_decode(reachable_from_2 3).
+cdc_decode(reachable_from_2 2).
 cdc_decode(t 4 4).
 cdc_decode(t 4 3).
 cdc_decode(t 4 2).
@@ -91,6 +94,3 @@ cdc_decode(t 2 2).
 cdc_decode(e 2 3).
 cdc_decode(t 0 1).
 cdc_decode(e 0 1).
-cdc_decode(reachable_from_2 4).
-cdc_decode(reachable_from_2 3).
-cdc_decode(reachable_from_2 2).
