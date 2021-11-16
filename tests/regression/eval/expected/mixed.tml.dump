@@ -49,25 +49,6 @@ q_rule_body(16 10).
 q_rule_body(9 7).
 q_and_left(10 12).
 q_and_right(10 14).
-cdc_decode(reachable_from_2 4).
-cdc_decode(reachable_from_2 3).
-cdc_decode(reachable_from_2 2).
-cdc_decode(t 4 4).
-cdc_decode(t 4 3).
-cdc_decode(t 4 2).
-cdc_decode(reachable_from 2 4).
-cdc_decode(t 3 4).
-cdc_decode(t 2 4).
-cdc_decode(e 3 4).
-cdc_decode(reachable_from 2 3).
-cdc_decode(reachable_from 2 2).
-cdc_decode(t 3 3).
-cdc_decode(t 3 2).
-cdc_decode(t 2 3).
-cdc_decode(t 2 2).
-cdc_decode(e 2 3).
-cdc_decode(t 0 1).
-cdc_decode(e 0 1).
 q_term_params(25 13).
 q_term_params(24 13).
 q_term_params(20 13).
@@ -94,3 +75,22 @@ q_term_param_types(7 12).
 q_term_param_types(4 6).
 q_term_param_types(2 6).
 q_term_param_types(0 6).
+cdc_decode(reachable_from_2 4).
+cdc_decode(reachable_from_2 3).
+cdc_decode(reachable_from_2 2).
+cdc_decode(t 4 4).
+cdc_decode(t 4 3).
+cdc_decode(t 4 2).
+cdc_decode(reachable_from 2 4).
+cdc_decode(t 3 4).
+cdc_decode(t 2 4).
+cdc_decode(e 3 4).
+cdc_decode(reachable_from 2 3).
+cdc_decode(reachable_from 2 2).
+cdc_decode(t 3 3).
+cdc_decode(t 3 2).
+cdc_decode(t 2 3).
+cdc_decode(t 2 2).
+cdc_decode(e 2 3).
+cdc_decode(t 0 1).
+cdc_decode(e 0 1).

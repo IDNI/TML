@@ -1327,8 +1327,8 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	if (!allowbltins && tbl.is_builtin()) return;
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, &tbl, len, this](const bools& p, int_t DBG(y)) {
-		DBG(assert(abs(y) == 1);)
+		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
+		DBG(assert(BDD_ABS(y) == T);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)

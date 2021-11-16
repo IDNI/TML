@@ -44,7 +44,7 @@ quant_t pnft::to_quant_t(form *f) const {
 			case form::FORALL2: q = FAH; break;
 			case form::EXISTS2: q = EXH; break;
 			case form::UNIQUE2: q = UNH; break;
-			default: assert(F);
+			default: assert(GET_BDD_ID(F));
 		}
 		return q;
 }

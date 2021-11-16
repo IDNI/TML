@@ -41,15 +41,6 @@ q_term_params(12 5).
 q_term_params(7 9).
 q_term_params(2 14).
 q_term_params(0 9).
-q_term_param_types(16 10).
-q_term_param_types(15 10).
-q_term_param_types(12 10).
-q_term_param_types(11 10).
-q_term_param_types(8 10).
-q_term_param_types(7 10).
-q_term_param_types(4 5).
-q_term_param_types(2 5).
-q_term_param_types(0 5).
 cdc_decode(t 3 3).
 cdc_decode(t 3 2).
 cdc_decode(t 2 3).
@@ -63,3 +54,12 @@ cdc_decode(t 1 0).
 cdc_decode(t 0 1).
 cdc_decode(t 0 0).
 cdc_decode(e 0 1).
+q_term_param_types(16 10).
+q_term_param_types(15 10).
+q_term_param_types(12 10).
+q_term_param_types(11 10).
+q_term_param_types(8 10).
+q_term_param_types(7 10).
+q_term_param_types(4 5).
+q_term_param_types(2 5).
+q_term_param_types(0 5).
