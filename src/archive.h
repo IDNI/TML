@@ -157,41 +157,9 @@ public:
 	archive& read_header();
 	inline static size_t header_size();
 	
-	archive& operator<<(const char&);
-	archive& operator>>(char&);
-	static size_t size(char) { return sizeof(char); }
-
-	archive& operator<<(const int32_t&);
-	archive& operator>>(int32_t&);
-	static size_t size(int32_t) { return sizeof(int32_t); }
-	
-	archive& operator<<(const int64_t&);
-	archive& operator>>(int64_t&);
-	static size_t size(int64_t) { return sizeof(int64_t); }
-
-	archive& operator<<(const int16_t&);
-	archive& operator>>(int16_t&);
-	static size_t size(int16_t) { return sizeof(int16_t); }
-
-	archive& operator<<(const uint64_t&);
-	archive& operator>>(uint64_t&);
-	static size_t size(uint64_t) { return sizeof(uint64_t); }
-
-	archive& operator<<(const uint32_t&);
-	archive& operator>>(uint32_t&);
-	static size_t size(uint32_t) { return sizeof(uint32_t); }
-
-	archive& operator<<(const uint8_t&);
-	archive& operator>>(uint8_t&);
-	static size_t size(uint8_t) { return sizeof(uint8_t); }
-
-	archive& operator<<(const int8_t&);
-	archive& operator>>(int8_t&);
-	static size_t size(int8_t) { return sizeof(int8_t); }
-	
-	archive& operator<<(const uint16_t&);
-	archive& operator>>(uint16_t&);
-	static size_t size(uint16_t) { return sizeof(uint16_t); }
+	template<typename X> archive& operator<<(const X&);
+	template<typename X> archive& operator>>(X&);
+	template<typename X> static size_t size(X) { return sizeof(X); }
 
 	archive& operator<<(const lexeme&);
 	archive& operator>>(lexeme&);
