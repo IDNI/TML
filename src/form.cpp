@@ -27,6 +27,14 @@ pnft::~pnft() {
 		if (auto p = get<1>(hvar_b)) delete p;
 }
 
+bool pnft::is_quant(form *f) const {
+	//TODO: make ftype a typedef so we can pass type as argument directly
+	if ((f->type == form::FORALL1) || (f->type == form::EXISTS1) || (f->type == form::UNIQUE1) ||
+		(f->type == form::FORALL2) || (f->type == form::EXISTS2) || (f->type == form::UNIQUE2))
+		return true;
+	return false;
+}
+
 quant_t pnft::to_quant_t(form *f) const {
 		quant_t q;
 		switch (f->type) {

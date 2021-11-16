@@ -64,7 +64,7 @@ bool bit_univ::btransform( const raw_rule& rrin, raw_rule &rrout ){
 	return ret;
 }
 
-size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
+const primtype& bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) {
 	
 	DBG(assert(rt.e.size()>n && (int_t)n >=0 && rr.varctx.get()) );
 
@@ -72,21 +72,22 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 		string_t str = lexeme2str(rt.e[n].e);
 		if( rt.e[n].type == elem::VAR ) {
 			if( rr.varctx.get()->contains_prim_var(str) )
-				return rr.varctx.get()->lookup_prim_var(str).get_bitsz();
+				return rr.varctx.get()->lookup_prim_var(str);
 			else if( rr.varctx.get()->contains_typedef_var(str) ) {
 				//todo for struct types.
 				//should struct types ever have arithmetic operation, no!
 				DBG(assert(false));
-				this->ptypenv->lookup_typedef_var(str).get_bitsz(*ptypenv);
+				//return this->ptypenv->lookup_typedef_var(str);
+				return dt_nop;
 			}
 			else {
 				//should this case ever happen when ctx does not know the type of var? no.
 				// typecheck should have failed before.
 				DBG(assert(false));
-				return VAR_BSZ;
+				return dt_nop;
 			}
 		}
-		else if ( rt.e[n].type == elem::NUM ) {
+		else if ( rt.e[n].type == elem::NUM ) { 
 			// get the type info based on nearest var
 			int_t  ni = n, args = rt.e.size();
 			for ( int_t i = n; i>=0 && i < args ; i++ )
@@ -97,7 +98,7 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 			if (ni>=0 && ni < args)
 				return get_typeinfo(ni, rt, rr);
 		
-			return INT_BSZ;
+			return dt_int;
 		}
 	}
 	else if( rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN) {
@@ -107,12 +108,15 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 			//only for arguments
 			if(n>1 && n < rt.e.size()-1) {
 				if(targs[n-2].is_primitive())
-					return targs[n-2].pty.get_bitsz();
+					return targs[n-2].pty;
 				else {
 					DBG(assert(targs[n-2].is_usertype()));
 					string_t stn = lexeme2str(targs[n-2].structname.e);
 					if(ptypenv->contains_typedef( stn)){
-						return ptypenv->lookup_typedef(stn).get_bitsz(*ptypenv);
+						return dt_nop; 
+						// not supported
+						//return ptypenv->lookup_typedef(stn);
+						
 					}
 					o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
 				}
@@ -121,13 +125,15 @@ size_t bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_rule &rr) 
 		}
 		else {
 			//when types are not specified, go default
+			// should we ever reach this case? NO
+			DBG(assert(false));
 			if(	rt.e[n].type == elem::SYM || rt.e[n].type == elem::CHR || 
 				rt.e[n].type == elem::VAR || rt.e[n].type == elem::NUM )
-				return INT_BSZ;
+				return dt_int;
 		}
 	}
 	// for everything else
-	return 0;
+	return dt_nop;
 }
 bool bit_univ::brev_transform_check(const term &t, const table &tab){
 
@@ -211,18 +217,41 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 	return true;
 }
 
-
+void bit_univ::append_types( string_t &name, std::vector<primtype>& ty) {
+	for_each( ty.begin(), ty.end(), 
+		[&name](primtype &pt) {
+			 name.append(to_string_t(pt.to_print()));
+	 });
+}
+std::vector<primtype> bit_univ::get_arg_types( const raw_term & rt, const raw_rule & rr){
+	std::vector<primtype> vty;
+	size_t st = 0, end = rt.e.size();
+	if(rt.extype == raw_term::REL || rt.extype == raw_term::BLTIN )
+		st=2, end--;
+	for( ; st < end ; st++){
+		const primtype& pt = get_typeinfo(st, rt, rr);
+		if(end != rt.e.size() || pt.ty != primtype::NOP )  
+			vty.emplace_back(pt);
+	}
+	return vty;
+}
 bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule &rr, raw_rule &rrout){
 	bool ret = true;
 	rtout.neg = rtin.neg;	
+	//getting types for args 
+	std::vector<primtype> types = get_arg_types(rtin, rr);
+	// getting total bits for args table/predicate
+	size_t totalsz = 0;
+	tab_args targs;
+	for( primtype& atp : types )
+		 targs.emplace_back(atp.get_bitsz()), totalsz +=  targs.back();
+
 	if( rtin.extype == raw_term::REL || rtin.extype == raw_term::BLTIN) {	
 		int_t args = rtin.e.size() == 1 ? 0: rtin.e.size()-3;	
 		DBG(assert(args == rtin.arity[0]));
-		
-		string_t pname = lexeme2str(rtin.e[0].e);
-		auto &predtype = ptypenv->lookup_pred(pname);
-		tab_args targs;
+
 		// fill table arg size. better to have a separate function.
+		/*
 		for(typedecl td: predtype ) {
 			if( td.is_primitive() )
 				targs.emplace_back(td.pty.get_bitsz());
@@ -231,18 +260,15 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 				targs.emplace_back(ptypenv->lookup_typedef(st).get_bitsz(*ptypenv));
 			}
 		}
-		// getting total bits for the table/predicate
-		size_t totalsz = 0;
-		for( size_t asz : targs  )	totalsz += asz;
+		*/
 		std::vector<elem> bitelem(totalsz);
 		DBG(COUT<<"size for "<<rtin.e[0].e<< "="<<totalsz<<std::endl);
 		for(size_t n= 0 ;n < rtin.e.size(); n++ ) {
 			const elem& e = rtin.e[n];
-			// for predicate rel name, keep as it is
-			if( n == 0 ) { rtout.e.emplace_back(e); continue; }		
+			// for predicate rel name and (), keep as it is
+			if( n <= 1 || n == rtin.e.size()-1 ) { rtout.e.emplace_back(e); continue; }		
 			// get bit size of the given elem and convert to bit representation/
-			size_t bsz = get_typeinfo(n, rtin, rr);
-			if( bsz <=0 ) { rtout.e.emplace_back(e); continue; }
+			size_t bsz = types[n-2].get_bitsz();
 			int_t symbval = 0;
 			for (size_t k = 0; k != bsz; ++k) {
 				
@@ -272,7 +298,6 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 					default: DBG( COUT<<e<<std::endl; assert(false)); break;
 				}
 			}
-	//		permuteorder(bitelem, bit_order);	
 		}
 		//insert before last enclosing paranthesis
 		if(bitelem.size()) rtout.e.insert(rtout.e.end()-1, bitelem.begin(), bitelem.end());
@@ -281,58 +306,77 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 	else if ( rtin.extype == raw_term::ARITH || rtin.extype == raw_term::EQ || rtin.extype == raw_term::LEQ) {
 		
 		// prepare tab_arg and estimate size of bit elements from the context of the rule, since 
-		// these are arithmetic variables having no specific type signture, but only the context 
-		// based bitsizes as calculated during typeinference.
+		// these are arithmetic variables having no specific type signture, but only the context contains
+		// such bitsizes as calculated during typeinference.
+		/*
 		tab_args tag;
 		int_t tsz = 0;
 		for(size_t n = 0 ; n < rtin.e.size(); n++ ) {
 			size_t bsz = get_typeinfo(n, rtin, rr);
 			if(bsz) tag.push_back(bsz), tsz += bsz;
 		}
-
+		*/
 		//DBG(assert(tag.size() == (size_t)rtin.get_formal_arity()-2));
-		size_t  args = tag.size();
-		std::vector<elem> vbit(tsz);
-		
+		size_t  args = targs.size();
+		std::vector<elem> vbit(totalsz);
+		// for gettin operator index
+		string_t bitrelname[2];
+		size_t opi = 0; 
 		for(size_t bsz, arg = 0, n = 0 ; n < rtin.e.size(); n++ ) {
 			if(n && !(n == 1 || n == 3) ) arg++;  // skip operators in arith or eq term
 			const elem& e = rtin.e[n];
 			string_t str = lexeme2str(e.e);
 			switch( e.type ){
 				case elem::VAR: 
-								bsz = tag[arg];
+								bsz = targs[arg];
 								for( size_t k= 0; k !=bsz ; k++){
-									size_t ps = pos(bsz, k, arg, args, tag );
+									size_t ps = pos(bsz, k, arg, args, targs );
 									string_t temp = str;
 									temp.append(to_string_t("_").append(to_string_t((int_t)k)));
 									vbit[ps] = {elem::VAR, d.get_lexeme(temp)};
 								}
 								break;
 				case elem::NUM:
-								bsz = tag[arg];
+								bsz = targs[arg];
 								for( size_t k= 0; k !=bsz ; k++)
-									vbit[pos(bsz, k, arg, args, tag)] = bool(e.num & (1<<k));
+									vbit[pos(bsz, k, arg, args, targs)] = bool(e.num & (1<<k));
 								break;
-				case elem::ARITH:
-				case elem::EQ:
-				case elem::LEQ:
-				case elem::NEQ:
-				case elem::GEQ:
-				case elem::LT:
-				case elem::GT:
-								break;
+				case elem::ARITH: 
+						switch(e.arith_op){
+
+							case t_arith_op::ADD : bitrelname[opi++] = to_string_t("_PLUS_"); break; 
+							case t_arith_op::BITWAND: bitrelname[opi++] = to_string_t("_BAND_");break;
+							case t_arith_op::BITWOR: bitrelname[opi++] = to_string_t("_BOR_");break;
+							case t_arith_op::BITWNOT: bitrelname[opi++] = to_string_t("_BNOT_");break;
+							case t_arith_op::BITWXOR: bitrelname[opi++] = to_string_t("_BXOR_");break;
+							case t_arith_op::MULT: bitrelname[opi++] = to_string_t("_MULT_");break;
+							case t_arith_op::SHL: bitrelname[opi++] = to_string_t("_SHL_");break;
+							case t_arith_op::SHR: bitrelname[opi++] = to_string_t("_SHR_");break;
+							case t_arith_op::SUB: bitrelname[opi++] = to_string_t("_SUB_");break;
+							default: DBG(COUT<<rtin<<std::endl); assert(false); 
+						}
+					break;
+				
+				case elem::EQ: bitrelname[opi++] = to_string_t("_EQ_") ; break;
+				case elem::LEQ: bitrelname[opi++] = to_string_t("_LEQ_"); break;
+				case elem::NEQ:bitrelname[opi++] = to_string_t("_EQ_"); break;
+				case elem::GEQ:bitrelname[opi++] = to_string_t ("_LEQ_"); break;
+				case elem::LT:bitrelname[opi++] = to_string_t("_LT_"); break;
+				case elem::GT:bitrelname[opi++] = to_string_t("_LT_"); break;
 				default : DBG(COUT<<rtin<<std::endl); assert(false);
 			}
 		}
 		
-		//change to rlation in order to emit for binary comparisons
+		//change to relation in order to emit for binary comparisons
 		// e.g  _LEQ_(--  -- ) a != b  ----> neq( a  b)
 		//change to REL and add new relation in order
 		// to emit for ternary arith e.g. _plus_( 11 1 1  000  ?z0?z1?z2 ),
 		// a + 1 < b  ---->   plus(a 1,z ) , lt ( z , b)
 		// oprd1 operator oprd2 comp_operator oprd3
 		rtout.extype = raw_term::REL;
-		rtout.e.emplace_back(elem::SYM, rtin.e[1].e); // from operator
+		append_types( bitrelname[0] , types);
+		ptypenv->add_sig(bitrelname[0], types);
+		rtout.e.emplace_back(elem(elem::SYM, d.get_lexeme(bitrelname[0])) ); // from first operator
 		rtout.e.emplace_back(elem(elem::OPENP));
 		rtout.e.insert(rtout.e.end(), vbit.begin(), vbit.end() );
 		rtout.e.emplace_back(elem(elem::CLOSEP));
@@ -342,15 +386,16 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 			// now we need to replace oprnd3's bit with tmp var z in vbit
 			// reprsenting ternary arith
 			// and put oprnd3's in the new relation along with tmp
-			size_t bsz = tag[2];  // oprnd3 size   
-			tab_args tag2{tag[2], tag[2]}; // for tmp z and oprd3
+			size_t bsz = targs[2];  // oprnd3 size   
+			std::vector<primtype> types2 { types[2], types[2]};
+			tab_args tag2{targs[2], targs[2]}; // for tmp z and oprd3
 			// size of tmp z and oprd3 
-			std::vector<elem> vbit2(tag2[0] + tag[1]);
+			std::vector<elem> vbit2(tag2[0] + targs[1]);
 			string_t temp = lexeme2str(rtin.e[rtin.e.size()-1].e);
 			DBG(assert((args-1) == tag2.size()));
 			for( size_t k= 0; k != bsz ; k++){
 				//getting prev pos of oprnd3
-				size_t ps = pos(bsz, k, 2, args, tag );
+				size_t ps = pos(bsz, k, 2, args, targs );
 				//constructing new tmp var
 				temp.append(to_string_t("_tmp_").append(to_string_t((int_t)k)));
 				// get pos of oprnd3 in new relation and place it
@@ -365,7 +410,10 @@ bool bit_univ::btransform(const raw_term& rtin, raw_term& rtout, const raw_rule 
 			// preparing new raw_term for the new relation.
 			raw_term frt;
 			frt.extype = raw_term::REL;
-			frt.e.emplace_back(elem::SYM, rtin.e[3].e); // from comp_operator
+			append_types(bitrelname[1],types2);
+			ptypenv->add_sig(bitrelname[1], types2);
+			// from comp_operator
+			frt.e.emplace_back(elem(elem::SYM, d.get_lexeme(bitrelname[1]))); 
 			frt.e.emplace_back(elem(elem::OPENP));
 			frt.e.insert(frt.e.end(),vbit2.begin(), vbit2.end());
 			frt.e.emplace_back(elem(elem::CLOSEP));
@@ -664,8 +712,8 @@ bool typechecker::tinfer( const raw_form_tree &rft){
 			ret = false;
 		}
 	}	
-	if(rft.l != nullptr ) ret &= tcheck(*rft.l);
-	if(rft.r != nullptr ) ret &= tcheck(*rft.r);
+	if(rft.l != nullptr ) ret &= tinfer(*rft.l);
+	if(rft.r != nullptr ) ret &= tinfer(*rft.r);
 
 	return ret;
 }

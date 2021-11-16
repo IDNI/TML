@@ -36,6 +36,16 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 spbdd_handle bdd_not(cr_spbdd_handle x) {
 	return bdd_handle::get(FLIP_INV_OUT(x->b));
 }
+
+size_t satcount(cr_spbdd_handle x, const size_t bits) {
+	bdd_shft av = GET_SHIFT(x->b);
+	size_t cnt = 0;
+	size_t factor = x->b != T ? pow(2,av-1) : 1;
+	size_t bit = (x->b != T && x->b != F) ? (av)-1 : 0;
+	bdd::satcount_arith(x->b, bit, bits, factor, cnt);
+	return cnt;
+}
+
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -54,6 +64,7 @@ spbdd_handle bdd_bitwise_not(cr_spbdd_handle x) {
 	return bdd_handle::get(bdd::bitwise_not(x->b));
 }
 
+// over bdd arithmetic
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y) {
 	return bdd_handle::get(bdd::adder(x->b,y->b, false, 0));
 }
@@ -193,32 +204,40 @@ bdd_ref bdd::bitwise_not(bdd_ref a_in) {
 bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	bdd_ref c = 0;
-	if (a_in == T && b_in == T)
-		c = T;
-	else if (a_in == F || b_in == F)
-		c = F;
-	else {
-		bdd_shft pos = 0;
-		if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = GET_SHIFT(b_in) + 1;
-		} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
-			b.h = b_in, b.l = b_in;
-			pos = GET_SHIFT(a_in) + 2;
-		} else if (GET_SHIFT(a_in) != 0)
-			pos = GET_SHIFT(a_in) + 2;
-		else
-			pos = GET_SHIFT(b_in) + 1;
+	
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
 
-		if (carry == false)
-			c = add(pos,
-					bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
-					bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
-		else
-			c = add(pos,
-					bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
-					bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
+	bdd_shft pos = 0;
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
+		a.h = a_in, a.l = a_in;
+	  	pos = GET_SHIFT(b_in) + 1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = GET_SHIFT(a_in) + 2;
+	} else {
+		pos = GET_SHIFT(a_in) + 2;
 	}
+
+	if (pos > (bit+1) * 3) {
+		size_t delta = (pos / 3)-1;
+		if (carry)
+			c = add(pos-3, bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)), adder(a_in, b_in,true,delta));
+		else
+			c = add(pos-3,adder(a_in, b_in,false,delta) , bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)));
+		return c;
+	}
+
+
+	if (!carry)
+		c = add(pos,
+				bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
+				bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
+
+	else
+		c = add(pos,
+				bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
+				bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
 	return c;
 }
 
@@ -692,7 +711,7 @@ bdd_ref bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor, size_t n_args,
+void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor,
 		size_t &count) {
 	bdd ab = bdd::get(a);
 	if (ab.h == F && ab.l == F) return;
@@ -700,12 +719,12 @@ void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor, size
 		count = count + factor * pow(2, bits-bit); return;
 	}
 	if (ab.h != F) {
-		size_t delta = ab.h != T ? (GET_SHIFT(ab.h) - GET_SHIFT(a))/n_args : 1;
-		satcount_arith(ab.h, bit+delta, bits, factor * delta, n_args,count);
+		size_t delta = ab.h != T ? pow(2, GET_SHIFT(ab.h) - GET_SHIFT(a) - 1) : 1;
+		satcount_arith(ab.h, GET_SHIFT(a), bits, factor * delta, count);
 	}
 	if (ab.l != F) {
-		size_t delta = ab.l != T ? (GET_SHIFT(ab.l) - GET_SHIFT(a))/n_args : 1;
-		satcount_arith(ab.l, bit+delta, bits, factor * delta,  n_args,count);
+		size_t delta = ab.l != T ? pow(2, GET_SHIFT(ab.l) - GET_SHIFT(a) - 1) : 1;
+		satcount_arith(ab.l, GET_SHIFT(a), bits, factor * delta, count);
 	}
 	return;
 }

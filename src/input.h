@@ -376,7 +376,7 @@ struct primtype : utype {
 		if(bsz>0) {
 			std::stringstream ss;
 			ss<<bsz;
-			s.append(":");
+			//s.append(":");
 			s.append(ss.str());
 		}
 		return s;
@@ -495,6 +495,7 @@ struct raw_term {
 	// with -1s, closing parentheses with -2s, and contiguous sequences of elements
 	// with their cardinality.
 	ints arity;
+	static bool require_fp_step;
 	raw_term() {}
 	raw_term(const elem &rel_name, const std::set<elem> &args) {
 		e = { rel_name, elem(elem::OPENP) };
@@ -820,6 +821,8 @@ struct guard_statement {
 	raw_prog* p_break_rp = 0; // ptr to a prog to break if while cond. true
 };
 
+struct state_block;
+
 struct raw_prog {
 	enum ptype {
 		PFP, LFP, GFP
@@ -831,6 +834,7 @@ struct raw_prog {
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
 	std::vector<raw_prog> nps;
+	std::vector<state_block> sbs;
 	spenvironment typenv; // only one item, build by typechecker
 
 	std::set<lexeme, lexcmp> builtins;
@@ -844,6 +848,7 @@ struct raw_prog {
 	std::array<bool, 8> has = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	static int_t last_id;
 	static bool require_guards;
+	static bool require_state_blocks;
 
 	bool parse(input* in, dict_t &dict);
 	bool parse_statement(input* in, dict_t &dict);
@@ -860,6 +865,13 @@ struct raw_progs {
 	raw_prog p;
 	raw_progs();
 	bool parse(input* in, dict_t& dict);
+};
+
+struct state_block {
+	bool flip = false;
+	lexeme label;
+	raw_prog rp;
+	bool parse(input* in, dict_t &dict);
 };
 
 bool throw_runtime_error(std::string err, std::string details = "");

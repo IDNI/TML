@@ -5045,8 +5045,8 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
 												opts.get_int("bitorder"));
 			raw_prog brawp;
-			tbl->spbu.get()->btransform(p, brawp);
-			tbl->spbu.get()->ptypenv = p.typenv;
+			tbl->spbu->btransform(p, brawp);
+			tbl->spbu->ptypenv = p.typenv;
 			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
 		}
 	}
@@ -5065,7 +5065,21 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 
 bool driver::add(input* in) {
 	if (!rp.parse(in, tbl->get_dict())) return !(error = true);
+	//if (opts.enabled("transformed")) o::to("transformed")
+	//	<< "# program before transformation:\n" << rp << endl << endl;
+	if (opts.enabled("state-blocks"))
+		transform_state_blocks(rp.p, {});
+	else if (raw_prog::require_state_blocks)
+		return error = true,
+			throw_runtime_error("State blocks require "
+				"-sb (-state-blocks) option enabled.");
+	if (opts.disabled("fp-step") && raw_term::require_fp_step)
+		return error = true,
+			throw_runtime_error("Usage of the __fp__ term requires "
+				"--fp-step option enabled.");
 	transform(rp.p, pd.strs);
+	if (opts.enabled("transformed")) o::to("transformed")
+		<< "# transformed program:\n" << rp << endl << endl;
 	return true;
 }
 

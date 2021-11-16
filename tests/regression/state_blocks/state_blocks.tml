@@ -1,0 +1,65 @@
+# input
+a(2 3).
+a(1 6).
+a(2 0).
+a(1 1).
+a(2 7).
+
+c(0).
+
+run. # enable run state
+[run:
+	# enable contcheck and running states if not running already
+	contcheck, running :- ~running.
+
+	# go to get_rest state if there are any a(?a1 ?a2) in a db
+	# otherwise do not activate any state
+	[contcheck~:
+		get_rest :- a(?a1 ?a2).
+	]
+
+	# when running and we are in none of req. states, end run/running
+	# and go to fin state.
+	# this happens when contcheck state doesn't go into get_rest state.
+	[running: 
+		fin, ~run, ~running :-
+			~contcheck, ~get_rest, ~get_first, ~process.
+	]
+
+	# get all records greater then the first record
+	# and go to get_first state
+	[get_rest~:
+		get_first.
+		a_rest(?a1 ?a2) :-
+			a(?a1 ?a2), a(?b1 ?b2), ?a1 > ?b1.
+		a_rest(?a1 ?a2) :-
+			a(?a1 ?a2), a(?b1 ?b2), ?a1 = ?b1, ?a2 > ?b2.
+	]
+
+	# get the first record by substracting all the rest records
+	# and go to process state
+	[get_first~:
+		process.
+		a_first(?a1 ?a2) :-
+			a(?a1 ?a2), ~a_rest(?a1 ?a2).
+	]
+
+	# move first to a_ordered and a to a_original, clean first/rest
+	# and go to contcheck state
+	[process~:
+		contcheck.
+		a_ordered(?c ?a1 ?a2), c(?c1),
+		a_original(?a1 ?a2), ~a(?a1 ?a2), ~a_first(?a1 ?a2), ~c(?c) :-
+			a_first(?a1 ?a2), c(?c), ?c + 1 = ?c1.
+		~a_rest(?a1 ?a2) :-
+			a_rest(?a1 ?a2).
+		exists_first1(?a1) :- exists ?a1 exists ?a2 { a_first(?a1 ?a2) }.
+		exists_first2(?a2) :- exists ?a2 exists ?a1 { a_first(?a1 ?a2) }.
+	]
+]
+
+# remove c counter and print it's finished
+[fin~:
+	~c(?x) :- c(?x).
+	println("ordering of `a` finished...").
+]

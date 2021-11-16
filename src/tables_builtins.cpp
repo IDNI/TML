@@ -16,6 +16,8 @@
 
 using namespace std;
 
+extern uints perm_init(size_t n);
+
 void tables::fact_builtin(const term& b) {
 	blt_ctx c(b);
 	bltins.run_head(c);
@@ -91,35 +93,54 @@ bool tables::init_builtins() {
 		c.out(from_sym(c.outvarpos(0), c.a->varslen, c.mknum(rnd)));
 	});
 	
-	// old count just for the reference. To be removed soon
-	bltins.add(B, "old_count", 2, 1, [this](blt_ctx& c) {
-		spbdd_handle x = htrue;
-		body* b = 0;		
-		for (auto p : c.a->varbodies)
-			if (p.first == c.arg(0)) b = p.second,
-				x = b ? x && p.second->rlast : p.second->rlast;
-		if (!b) return;
-		if (b->inv.empty()) b->inv= b->init_perm_inv(c.a->varslen*bits);
-		int_t cnt = bdd::satcount(x, b->inv);
-		//COUT << "count result: " << cnt << endl;
-		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
-	}, 1);
-
-	// count (w/o input parameters)
-	bltins.add(B, "count", 1, 1, [this](blt_ctx& c) {
+	bltins.add(B, "count", -1, 1, [this](blt_ctx& c) {
+		/*
+		for (auto x : *c.hs) {
+			COUT << "bltin args\n";
+			::out(COUT, x)<<endl<<endl;
+		}
+		*/
 		spbdd_handle x = bdd_and_many(*c.hs);
-		int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
-		//COUT << "count1 result: " << cnt1 << endl;
-
+		/*
+		//int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
 		//TODO: FIX count with perm inv?
 		//bools inv(c.a->varslen * bits, false);
 		//for (size_t i = 0; i < c.a->perm.size(); ++i)
 		//	if (!c.a->ex[i]) inv[c.a->perm[i]] = true;
 		//int_t cnt2 = bdd::satcount(x, inv);
-		//COUT << "count2 result: " << cnt2 << endl;
-
-		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt1)));
-	});
+		//COUT << "count result: " << cnt << endl;
+		//c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
+		 */
+		// -------------------------------------------------------
+		//COUT << "count in\n";
+		//::out(COUT, x)<<endl<<endl;
+		size_t nargs = c.a->vm.size();
+		uints perm = perm_init(nargs * (bits));
+		int_t aux = 0;
+		bools ex;
+		int_t varsout = 0; //counts number of args that are ex
+		for (size_t i = 0; i < bits; ++i)
+			for (size_t j = 0; j< nargs; ++j)
+				if(j == ((size_t)abs(*c.a->bltoutvars.begin())-1) ||
+					(c.a->bltngvars.size() != 0 &&
+					 c.a->bltngvars.find(-(j+1)) == c.a->bltngvars.end())) {
+					ex.push_back(true);
+					if (i == 0) varsout++;
+				}
+				else{
+					perm[i*nargs+j] = aux;
+					aux++;
+					ex.push_back(false);
+				}
+		//x =  x/ex;
+		//x =  x^perm;
+		x = bdd_permute_ex(x,ex,perm);
+		//COUT << "count after ex\n";
+		//::out(COUT, x)<<endl<<endl;
+		size_t cnt2 = satcount(x, (bits) * (c.a->varslen-varsout));
+		//DBG(COUT << "count2 result: " << cnt2 << endl;)
+		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt2)));
+	}, -1);
 
 	return  init_bdd_builtins() &&
 		init_print_builtins() &&
@@ -139,6 +160,11 @@ bool tables::init_bdd_builtins() {
 	};
 	auto get_pw_h = [this](t_arith_op op) {
 		return [this, op](blt_ctx& c) {
+			//for (auto x : *c.hs) {
+			//	COUT << "bltin args\n";
+			//	::out(COUT, x)<<endl<<endl;
+			//}
+
 			bdd_handles hs;
 			c.args_bodies(hs);
 			c.out(pairwise_handler(
@@ -146,12 +172,35 @@ bool tables::init_bdd_builtins() {
 				hs[0], hs[1], c.a->varslen, op));
 		};
 	};
+	auto bltin_leq_handler = [this]() {
+		return [this](blt_ctx& c) {
+
+			for (auto x : *c.hs) {
+				COUT << "bltin args\n";
+				::out(COUT, x)<<endl<<endl;
+			}
+
+			bdd_handles hs;
+			c.args_bodies(hs);
+			::out(COUT, hs[0])<<endl<<endl;
+			COUT << "Leq Handler"<< endl;
+			/*c.out(leq_handler(
+				c.varpos(0), c.varpos(1), c.v
+				arpos(2),
+				hs[0], hs[1], c.a->varslen));
+			*/
+		};
+	};
+
 	bltins.add(B, "bw_and",  3, 1, get_bw_h(BITWAND), 2);
 	bltins.add(B, "bw_or",   3, 1, get_bw_h(BITWOR),  2);
 	bltins.add(B, "bw_xor",  3, 1, get_bw_h(BITWXOR), 2);
 	bltins.add(B, "bw_not",  3, 1, get_bw_h(BITWNOT), 2);
 	bltins.add(B, "pw_add",  3, 1, get_pw_h(ADD),     2);
 	bltins.add(B, "pw_mult", 3, 1, get_pw_h(MULT),    2);
+
+	bltins.add(B, "leq", 2, 1, bltin_leq_handler(), 2);
+
 	return true;
 }
 

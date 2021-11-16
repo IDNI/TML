@@ -1,0 +1,10 @@
+
+@string str "abbb".
+
+S => A T | 'a' T .
+A =>  B A | 'a' .
+B => null. 
+T => 'b' 'b' 'b'.
+
+!S(0 4).
+

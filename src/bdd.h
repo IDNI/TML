@@ -228,6 +228,9 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
+size_t satcount(cr_spbdd_handle x, const size_t bits);
+//size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex);
+
 /* A BDD is a pair of attributed references to BDDs. Separating out attributes
  * from BDDs increase the chances that BDDs can be reused in representing
  * different functions. */
@@ -236,7 +239,7 @@ class bdd {
 	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
-	friend class satcount_iter;
+	//friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
 	friend struct sbdd_and_many_ex_perm;
@@ -281,6 +284,8 @@ class bdd {
 	friend spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
+	friend size_t satcount(cr_spbdd_handle x, const size_t bits);
+	//friend size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools& ex);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -384,7 +389,7 @@ class bdd {
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
 	static bdd_ref merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 			t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b);
-	static void satcount_arith(bdd_ref a_in, size_t bit, size_t bits, size_t factor, size_t n_args, size_t &count);
+	static void satcount_arith(bdd_ref a_in, size_t bit, size_t bits, size_t factor, size_t &count);
 	static bdd_ref zero(size_t arg, size_t bits, size_t n_args);
 	static bool is_zero(bdd_ref a_in, size_t bits);
 	static void adder_be(bdd_ref a_in, bdd_ref b_in, size_t bits, size_t depth,
