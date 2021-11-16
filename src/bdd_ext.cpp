@@ -208,15 +208,15 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
 
-	bdd_shft pos = 0;
-	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
+	bdd_shft pos = 0, av = GET_SHIFT(a_in), bv = GET_SHIFT(b_in);
+	if (av > bv + 1 && bv != 0) {
 		a.h = a_in, a.l = a_in;
-	  	pos = GET_SHIFT(b_in) + 1;
-	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
+	  	pos = bv + 1;
+	} else if (av + 2 < bv && av != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = GET_SHIFT(a_in) + 2;
+		pos = av + 2;
 	} else {
-		pos = GET_SHIFT(a_in) + 2;
+		pos = av + 2;
 	}
 
 	if (pos > (bit+1) * 3) {
@@ -714,17 +714,18 @@ bdd_ref bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t
 void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor,
 		size_t &count) {
 	bdd ab = bdd::get(a);
+	bdd_shft av = GET_SHIFT(a);
 	if (ab.h == F && ab.l == F) return;
 	if (ab.h == T && ab.l == T) {
 		count = count + factor * pow(2, bits-bit); return;
 	}
 	if (ab.h != F) {
-		size_t delta = ab.h != T ? pow(2, GET_SHIFT(ab.h) - GET_SHIFT(a) - 1) : 1;
-		satcount_arith(ab.h, GET_SHIFT(a), bits, factor * delta, count);
+		size_t delta = ab.h != T ? pow(2, GET_SHIFT(ab.h) - av - 1) : 1;
+		satcount_arith(ab.h, av, bits, factor * delta, count);
 	}
 	if (ab.l != F) {
-		size_t delta = ab.l != T ? pow(2, GET_SHIFT(ab.l) - GET_SHIFT(a) - 1) : 1;
-		satcount_arith(ab.l, GET_SHIFT(a), bits, factor * delta, count);
+		size_t delta = ab.l != T ? pow(2, GET_SHIFT(ab.l) - av - 1) : 1;
+		satcount_arith(ab.l, av, bits, factor * delta, count);
 	}
 	return;
 }
