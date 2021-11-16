@@ -156,30 +156,42 @@ public:
 	archive& write_header();
 	archive& read_header();
 	inline static size_t header_size();
+	
+	archive& operator<<(const char&);
+	archive& operator>>(char&);
+	static size_t size(char) { return sizeof(char); }
 
-	archive& operator<<(const int_t&);
-	archive& operator>>(int_t&);
-	static size_t size(int_t) { return sizeof(int_t); }
+	archive& operator<<(const int32_t&);
+	archive& operator>>(int32_t&);
+	static size_t size(int32_t) { return sizeof(int32_t); }
+	
+	archive& operator<<(const int64_t&);
+	archive& operator>>(int64_t&);
+	static size_t size(int64_t) { return sizeof(int64_t); }
 
 	archive& operator<<(const int16_t&);
 	archive& operator>>(int16_t&);
 	static size_t size(int16_t) { return sizeof(int16_t); }
 
-	archive& operator<<(const size_t&);
-	archive& operator>>(size_t&);
-	static size_t size(size_t) { return sizeof(size_t); }
+	archive& operator<<(const uint64_t&);
+	archive& operator>>(uint64_t&);
+	static size_t size(uint64_t) { return sizeof(uint64_t); }
 
-	archive& operator<<(const unsigned int&);
-	archive& operator>>(unsigned int&);
-	static size_t size(uint_t) { return sizeof(uint_t); }
+	archive& operator<<(const uint32_t&);
+	archive& operator>>(uint32_t&);
+	static size_t size(uint32_t) { return sizeof(uint32_t); }
 
-	archive& operator<<(const unsigned char&);
-	archive& operator>>(unsigned char&);
-	static size_t size(unsigned char) { return 1; }
+	archive& operator<<(const uint8_t&);
+	archive& operator>>(uint8_t&);
+	static size_t size(uint8_t) { return sizeof(uint8_t); }
 
-	archive& operator<<(const char&);
-	archive& operator>>(char&);
-	static size_t size(char) { return 1; }
+	archive& operator<<(const int8_t&);
+	archive& operator>>(int8_t&);
+	static size_t size(int8_t) { return sizeof(int8_t); }
+	
+	archive& operator<<(const uint16_t&);
+	archive& operator>>(uint16_t&);
+	static size_t size(uint16_t) { return sizeof(uint16_t); }
 
 	archive& operator<<(const lexeme&);
 	archive& operator>>(lexeme&);

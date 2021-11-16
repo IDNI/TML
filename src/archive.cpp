@@ -241,14 +241,14 @@ size_t archive::header_size() {
 	return sizeof(int16_t) + sizeof(size_t);
 }
 
-archive& archive::operator<<(const int_t& val) {
-	//DBG(o::dbg() << "writing int_t: " << val << endl;)
-	write((const char*)&val, sizeof(int_t));
+archive& archive::operator<<(const int8_t& val) {
+	//DBG(o::dbg() << "writing int8_t: " << val << endl;)
+	write((const char*)&val, sizeof(int8_t));
 	return *this;
 }
-archive& archive::operator>>(int_t& val) {
-	read(&val, sizeof(int_t));
-	//DBG(o::dbg() << "reading int_t: " << val << endl;)
+archive& archive::operator>>(int8_t& val) {
+	read(&val, sizeof(int8_t));
+	//DBG(o::dbg() << "reading int8_t: " << val << endl;)
 	return *this;
 }
 
@@ -263,37 +263,71 @@ archive& archive::operator>>(int16_t& val) {
 	return *this;
 }
 
-archive& archive::operator<<(const size_t& val) {
-	// DBG(o::dbg() << "writing size_t: " << val << endl;)
-	write((const char*) &val, sizeof(size_t));
+archive& archive::operator<<(const int32_t& val) {
+	// DBG(o::dbg() << "writing int32_t: " << val << endl;)
+	write((const char*) &val, sizeof(int32_t));
 	return *this;
 }
 
-archive& archive::operator>>(size_t& val) {
-	read((char*) &val, sizeof(size_t));
-	// DBG(o::dbg() << "reading size_t: " << val << endl;)
+archive& archive::operator>>(int32_t& val) {
+	read((char*) &val, sizeof(int32_t));
+	// DBG(o::dbg() << "reading int32_t: " << val << endl;)
 	return *this;
 }
 
-archive& archive::operator<<(const unsigned int& val) {
-	//DBG(o::dbg() << "writing uint: " << val << endl;)
-	write((const char*) &val, sizeof(unsigned int));
-	return *this;
-}
-archive& archive::operator>>(unsigned int& val) {
-	read(&val, sizeof(unsigned int));
-	//DBG(o::dbg() << "reading uint: " << val << endl;)
+archive& archive::operator<<(const int64_t& val) {
+	// DBG(o::dbg() << "writing int64_t: " << val << endl;)
+	write((const char*) &val, sizeof(int64_t));
 	return *this;
 }
 
-archive& archive::operator<<(const unsigned char& val) {
-	// DBG(o::dbg() << "writing char: " << val << endl;)
-	write((const char*) &val, sizeof(unsigned char));
+archive& archive::operator>>(int64_t& val) {
+	read((char*) &val, sizeof(int64_t));
+	// DBG(o::dbg() << "reading int64_t: " << val << endl;)
 	return *this;
 }
-archive& archive::operator>>(unsigned char& val) {
-	read(&val, sizeof(unsigned char));
-	// DBG(o::dbg() << "reading char: " << val << endl;)
+
+archive& archive::operator<<(const uint64_t& val) {
+	//DBG(o::dbg() << "writing uint64_t: " << val << endl;)
+	write((const char*) &val, sizeof(uint64_t));
+	return *this;
+}
+archive& archive::operator>>(uint64_t& val) {
+	read(&val, sizeof(uint64_t));
+	//DBG(o::dbg() << "reading uint64_t: " << val << endl;)
+	return *this;
+}
+
+archive& archive::operator<<(const uint32_t& val) {
+	//DBG(o::dbg() << "writing uint32_t: " << val << endl;)
+	write((const char*) &val, sizeof(uint32_t));
+	return *this;
+}
+archive& archive::operator>>(uint32_t& val) {
+	read(&val, sizeof(uint32_t));
+	//DBG(o::dbg() << "reading uint32_t: " << val << endl;)
+	return *this;
+}
+
+archive& archive::operator<<(const uint16_t& val) {
+	// DBG(o::dbg() << "writing uint16_t: " << val << endl;)
+	write((const char*) &val, sizeof(uint16_t));
+	return *this;
+}
+archive& archive::operator>>(uint16_t& val) {
+	read(&val, sizeof(uint16_t));
+	// DBG(o::dbg() << "reading uint16_t: " << val << endl;)
+	return *this;
+}
+
+archive& archive::operator<<(const uint8_t& val) {
+	// DBG(o::dbg() << "writing uint8_t: " << val << endl;)
+	write((const char*) &val, sizeof(uint8_t));
+	return *this;
+}
+archive& archive::operator>>(uint8_t& val) {
+	read(&val, sizeof(uint8_t));
+	// DBG(o::dbg() << "reading uint8_t: " << val << endl;)
 	return *this;
 }
 
