@@ -20,7 +20,7 @@ void generate_functions(int arity, unordered_set<spbdd_handle> &func_set, int of
     // arity depending on whether current variable is 0 or 1
     for(const spbdd_handle &func1 : func_set) {
       for(const spbdd_handle &func2 : func_set) {
-        pending.insert((from_bit(offset + arity, true) && func1) || (from_bit(offset + arity, false) && func2));
+        pending.insert(bdd_ite_var(offset + arity, func1, func2));
       }
     }
     // Merge in the newly constructed functions
