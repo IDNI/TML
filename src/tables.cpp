@@ -1004,19 +1004,16 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		bool fwd_ret = fwd();
 		if (halt) return true;
 		level l = get_front();
-		if (!fwd_ret) {
-			if(opts.fp_step && add_fixed_point_fact()) return pfp();
-			else return fronts.push_back(l), true;
-		} else  fronts.push_back(l);
+		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp();
+		fronts.push_back(l);
 		if (halt) return true;
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
-		bool is_repeat =
-			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
+		bool is_repeat = (!fwd_ret) ||
+			(std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1);
 		if (opts.bproof != proof_mode::none) levels.push_back(move(l));
-		if (!datalog && is_repeat)
-			return is_infloop() ? infloop_detected() : true;
+		if (is_repeat) return is_infloop() ? infloop_detected() : true;
 	}
 	DBGFAIL;
 }
