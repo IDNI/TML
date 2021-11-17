@@ -16,6 +16,7 @@ endif ()
 
 ################################################################################
 option(WITH_Z3 "use Z3" FALSE)
+option(WITH_EVAL "with eval" FALSE)
 option(WITH_THREADS "use Threads" TRUE)
 option(WITH_BOOST "use Boost" FALSE)
 option(WITH_WCHAR "use wchar_t for system calls (instead of char)" FALSE)
