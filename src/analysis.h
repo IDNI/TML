@@ -259,7 +259,11 @@ struct bit_univ {
 		DBG(assert(bit_from_right < bsz && arg < args); )
 		return (bsz - bit_from_right - 1)* args + arg;
 	}
-    size_t pos_gen(size_t /*bsz*/, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
+    size_t pos_gen(size_t
+#ifdef DEBUG
+	bsz
+#endif
+, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
 		size_t pos = -1;
         size_t max_bits=0;
@@ -292,7 +296,15 @@ struct bit_univ {
 		return base + (bsz - bit_from_right - 1 - lastsz)*cargs + (arg -skip);
     
     }
-    size_t pos_default(size_t bsz, size_t bit_from_right , size_t /*arg*/, size_t /*args*/ /*, tab_args rtab */ ) {
+    size_t pos_default(size_t bsz, size_t bit_from_right , size_t
+#ifdef DEBUG
+    arg
+#endif
+, size_t
+#ifdef DEBUG
+	args
+#endif
+/*, tab_args rtab */ ) {
 		DBG(assert(bit_from_right < bsz && arg < args); )
     	return (bsz - bit_from_right - 1); //* args + arg;
 	}
