@@ -36,7 +36,7 @@ bool pnft::is_quant(form *f) const {
 }
 
 quant_t pnft::to_quant_t(form *f) const {
-		quant_t q;
+		quant_t q = EX;
 		switch (f->type) {
 			case form::FORALL1: q = FA; break;
 			case form::EXISTS1: q = EX; break;

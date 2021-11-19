@@ -57,6 +57,7 @@ struct option {
 				case STRING:    return v_s == ov.get_string();
 				default:        DBGFAIL;
 			}
+			return false;
 		}
 	private:
 		type        t;
@@ -173,11 +174,11 @@ public:
 	options() : options(0, 0) {}
 	options(inputs *ii, outputs *oo) : ii(ii), oo(oo) { setup(); }
 	options(int argc, char** argv, inputs *ii = 0, outputs *oo = 0) :
-		ii(ii), oo(oo) { setup(); parse(argc, argv); }
+		ii(ii), oo(oo) { setup(); error |= !parse(argc, argv); }
 	options(strings args, inputs *ii = 0, outputs *oo = 0):
-		ii(ii), oo(oo){ setup(); parse(args); }
+		ii(ii), oo(oo) { setup(); error |= !parse(args); }
 	options(wstrings args, inputs *ii = 0, outputs *oo = 0):
-		ii(ii), oo(oo){ setup(); parse(args); }
+		ii(ii), oo(oo) { setup(); error |= !parse(args); }
 	int argc() const { return args.size(); }
 	std::string argv(int n) const {
 		if (n<argc()) return args[n];
@@ -191,9 +192,9 @@ public:
 	template <typename T>
 	void set(const std::string &name, T val);
 	void set_outputs(outputs* oo);
-	void parse(int argc, char** argv, bool internal = false);
-	void parse(strings  sargs,    bool internal = false);
-	void parse(wstrings wargs,    bool internal = false);
+	bool parse(int argc, char** argv, bool internal = false);
+	bool parse(strings  sargs,        bool internal = false);
+	bool parse(wstrings wargs,        bool internal = false);
 	void enable(const std::string &arg);
 	void disable(const std::string &arg);
 	bool enabled (const std::string &arg) const;
@@ -204,6 +205,7 @@ public:
 	template <typename T> void help(std::basic_ostream<T>&) const;
 	inputs* get_inputs() const { return ii; }
 	std::set<std::string> pu_states = {};
+	bool error = false;
 private:
 	template <typename T> friend std::basic_ostream<T>& operator<<(std::basic_ostream<T>&, const options&);
 	inputs*  ii;
@@ -212,7 +214,8 @@ private:
 	std::map<std::string, std::string> alts = {};
 	std::vector<std::string> args;
 	std::string input_data = "";
-	bool parse_option(const strings &sargs, const size_t &i);
+	bool parse_option(const strings &sargs, const size_t &i,
+		bool &skip_next);
 	bool is_value(const strings &sargs, const size_t &i);
 	void setup();
 	void init_defaults();

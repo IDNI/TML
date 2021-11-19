@@ -1106,7 +1106,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
 		o::ms() << "# pfp: ";
 		measure_time_start();
 	}
-	DBG(o::dbg()<<endl<<p<<endl);
+	//DBG(o::dbg()<<endl<<p<<endl);
 
 	nlevel begstep = nstep;
 	bool r = true;
@@ -1132,7 +1132,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
 		}
 	}
 	if (opts.optimize)
-		(o::ms() <<"add_prog: "<<t << " pfp: "),
+		(o::ms() <<"# add_prog: "<<t << " pfp: "),
 		measure_time_end();
 	return r;
 }

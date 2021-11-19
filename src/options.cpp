@@ -38,27 +38,29 @@ string options::get_string(string name) const {
 	if(auto o = get(name)) return o->get_string(); else return "";
 }
 
-void options::parse(int c, char** v, bool internal) {
+bool options::parse(int c, char** v, bool internal) {
 	strings sargs = {};
 	for (int i = 0; i < c; ++i)
 		sargs.push_back(string(v[i]));
-	parse(sargs, internal);
+	return parse(sargs, internal);
 }
 
-void options::parse(wstrings wargs, bool internal) {
+bool options::parse(wstrings wargs, bool internal) {
 	strings sargs;
 	for (size_t i=0; i < wargs.size(); ++i) sargs.push_back(ws2s(wargs[i]));
-	parse(sargs, internal);
+	return parse(sargs, internal);
 }
 
-void options::parse(strings sargs, bool internal) {
+bool options::parse(strings sargs, bool internal) {
 	string v;
 	bool skip_next = false;
 	for (size_t i = 0; i < sargs.size(); ++i) {
 		if (!internal) args.push_back(sargs[i]);
 		if (skip_next) skip_next = false;
-		else skip_next = parse_option(sargs, i);
+		else if (!parse_option(sargs, i, skip_next))
+			return false;
 	}
+	return true;
 }
 
 template <typename T>
@@ -96,9 +98,11 @@ bool options::is_value(const strings &sargs, const size_t &i) {
 			sargs[i][0] != '-';
 }
 
-bool options::parse_option(const strings &sargs, const size_t &i) {
+bool options::parse_option(const strings &sargs, const size_t &i,
+	bool& skip_next)
+{
 	bool disabled = false;
-	bool skip_next = false;
+	skip_next = false;
 	size_t pos = 0;
 	const string &arg = sargs[i];
 	//DBG(o::out()<<"parse_option: "<<arg<<' '<<i<<endl;)
@@ -116,11 +120,12 @@ bool options::parse_option(const strings &sargs, const size_t &i) {
 			skip_next = true;
 		else o->parse_value("");
 		set(o->name(), *o);
-		return skip_next;
+		return true;
 	} else {
-		if (!i) return skip_next; // arg[0] is not expected to be an argument
+		if (!i) return true; // arg[0] is not expected to be an argument
 		o::err() << "Unknown argument: " << sargs[i]<<endl;
-		return is_value(sargs, i+1);
+		skip_next = is_value(sargs, i+1);
+		return false;
 	}
 }
 
@@ -269,7 +274,7 @@ void options::setup() {
 #undef add_output_alt
 
 void options::init_defaults() {
-	parse(strings{
+	error |= !parse(strings{
 		"--run",
 		"--gc",
 		"--proof",       "none",
@@ -289,7 +294,7 @@ void options::init_defaults() {
 		"--udp-port",    "6283"
 #endif
 	}, true);
-	DBG(parse(strings{ "--debug", "@stderr" }, true);)
+	DBG(error |= !parse(strings{ "--debug", "@stderr" }, true);)
 }
 
 template <typename T>

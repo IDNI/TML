@@ -626,7 +626,7 @@ void bdd::set_gc_enabled(bool new_gc_enabled) { gc_enabled = new_gc_enabled; }
 
 template <typename T>
 basic_ostream<T>& bdd::stats(basic_ostream<T>& os) {
-	return os << "S: " << S.size() << " V: "<< V.size() <<
+	return os << "# S: " << S.size() << " V: "<< V.size() <<
 		" AM: " << AM.size() << " C: "<< C.size();
 }
 template basic_ostream<char>& bdd::stats(basic_ostream<char>&);
@@ -758,7 +758,7 @@ void bdd::gc() {
 	for (size_t n = 0; n < V.size(); ++n)
 		id_map.emplace(bdd_key(hash_upair(hsh(V[n].h), hsh(V[n].l)),
 			V[n].h, V[n].l), n);
-	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)
+	OUT(o::dbg() <<"# AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
 
 void bdd_handle::update(const vector<bdd_id>& p) {
