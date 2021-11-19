@@ -25,6 +25,10 @@ option(WITH_EXCEPTIONS "use exceptions" FALSE)
 
 ################################################################################
 option(BUILD_JSLIB "Build JS version of TML library" OFF)
+option(BUILD_JSMODULE "Build JS version of TML library (ES6 module)" OFF)
+if (BUILD_JSMODULE)
+	set(BUILD_JSLIB ON CACHE STRING "")
+endif ()
 if (BUILD_JSLIB)
 	list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 	include(emscripten_toolchain)
