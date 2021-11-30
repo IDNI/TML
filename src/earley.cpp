@@ -129,7 +129,6 @@ bool earley::recognize(const char_t* s) {
 				else if (n < len) scan(*it, n, s[n]);
 			}
 		} while (!t.empty());
-#ifdef DEBUG
 		for (auto i : S) {
 			if(!completed(i)) continue;
 			print(cout, i);
@@ -143,11 +142,14 @@ bool earley::recognize(const char_t* s) {
 		for (	auto it = S.lower_bound(item(n, 0, 0, 0));
 			it != S.end() && it->set == n; ++it)
 			print(*it);*/
-#endif
 	}
+	for (const item& i : S) if (completed(i)) citem.emplace(i);
 	for (size_t n : nts[start])
-		if (S.find(item(len, n, 0, G[n].size())) != S.end())
+		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
+			item root = *S.find(item(len, n, 0, G[n].size()));
+			forest({root});
 			return true;
+		}
 	return false;
 }
 /*
@@ -176,7 +178,39 @@ vector<ast> earley::forest() {
 }
 */
 
-bool earley::forest ( pfnode &pfroot) {
+const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt ) {
+	std::vector<item> ret;
+	
+	for(auto it = citem.begin(); it != citem.end(); it++) {
+		if( it->from == xfrom && nts[nt].count(it->prod) )	
+			ret.push_back(*it);
+	}	
+	return ret;
+}
+
+bool earley::forest ( std::vector<item> const &nxtset ) {
+	
+	for(const item &cur: nxtset) {
+		lit cnode  = G[cur.prod][0];
+		cnode.st = cur.from;
+		cnode.en = cur.set;
+		pfgraph[cnode] =  std::initializer_list<std::vector<nidx_t>>({});
+		
+		vector<nidx_t> nxtlits;
+		for(size_t len = 1, xfrom = cur.from ; len < G[cur.prod].size(); len++ ) {
+			lit nxtl = G[cur.prod ][len];
+			if(!nxtl.nt())  nxtl.st = xfrom++, nxtl.en = xfrom;
+			else {
+				auto v = find_all(xfrom, nxtl.n());
+				forest(v);
+				DBG(assert(xfrom == v[0].from));
+				nxtl.st = xfrom;
+				nxtl.en = v[0].set;		
+			}
+			nxtlits.push_back(nxtl);
+		}
+		pfgraph[cnode].insert(nxtlits);
+	}	
 	return true;
 }
 

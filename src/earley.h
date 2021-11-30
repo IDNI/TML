@@ -1,6 +1,8 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <unordered_map>
+#include <list>
 #include <string>
 #include <variant>
 #include <cstring>
@@ -8,7 +10,6 @@
 #include <iostream>
 
 #define DEBUG
-
 
 #ifdef DEBUG
 #define DBG(x) x
@@ -23,6 +24,13 @@ class earley {
 		bool nt() const { return std::holds_alternative<size_t>(*this); }
 		size_t n() const { return std::get<size_t>(*this); }
 		char c() const { return std::get<char>(*this); }
+		size_t st = 0;  // start of span match
+		size_t en = 0;	// end of span match
+		/*bool operator<(const lit& i) const {
+			if (st != i.st) return st < i.st;
+			if (en != i.en) return en < i.en;
+			return false;
+		}*/
 	};
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
 	DBG(friend std::ostream& operator<<(std::ostream& os,
@@ -84,9 +92,10 @@ public:
 			std::string,
 			std::vector<std::vector<std::string>>>>& g);
 	bool recognize(const char_t* s);
-	struct pfnode {
-		item ei;
-		std::set<std::vector<pfnode>> next;
-	};
-	bool forest(pfnode &pfroot);	
+
+	typedef lit nidx_t;
+	std::set<item> citem;
+	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
+	const std::vector<item> find_all( size_t, size_t  );
+	bool forest(std::vector<item> const&);
 };
