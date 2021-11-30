@@ -179,6 +179,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
+#ifdef WITH_EVAL
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
 		type = EDOMAIN; ++pos;
@@ -251,6 +252,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 				l[pos-1]);
 		return true;
 	}
+#endif
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
 		if (!t.parse(in, prog)) return

@@ -91,8 +91,9 @@ public:
 #ifdef WITH_THREADS
 	static ostream_t& repl() { return o_ ? o_to(o_->repl_) : CNULL; }
 #endif
-	static ostream_t& ms()   { return o_ ? o_to(o_->ms_)   : CNULL;   }
+	static ostream_t& ms()   { return o_ ? o_to(o_->ms_)   : CNULL; }
 	static ostream_t& dump() { return o_ ? o_to(o_->dump_) : CNULL; }
+	static ostream_t& transformed() { return o_ ? o_to(o_->trns_) : CNULL; }
 	static output* get(const std::string& n) { return o_?o_->o_get(n):0; }
 	static ostream_t& to(const std::string& n);
 	static bool exists(const std::string& n) { return o_?o_->o_exists(n):0;}
@@ -102,7 +103,7 @@ public:
 	static void name(std::string n) { if (o_) o_->name_ = n; }
 	static std::string named() { return o_?o_->name_:std::string(); }
 private:
-	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0;
+	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0, *trns_=0;
 #ifdef WITH_THREADS
 	output *repl_=0;
 #endif
@@ -127,6 +128,7 @@ namespace o { // o:: namespace shortcuts
 #endif
 	ostream_t& ms();
 	ostream_t& dump();
+	ostream_t& transformed();
 }
 
 template <typename T, typename T1, typename T2>

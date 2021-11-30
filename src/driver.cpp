@@ -324,6 +324,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 			}
 		} default:
 			assert(false); //should never reach here
+			return false;
 	}
 }
 
@@ -393,6 +394,7 @@ optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 			return nullopt;
 		} default:
 			assert(false); //should never reach here
+			return false;
 	}
 }
 
@@ -4871,15 +4873,19 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	static set<raw_prog *> transformed_progs;
 	if(transformed_progs.find(&rp) == transformed_progs.end()) {
 		transformed_progs.insert(&rp);
-		DBG(o::dbg() << "Pre-Transformation Program:" << endl << endl << rp << endl;)
-		
+#ifdef DEBUG
+		if (opts.enabled("transformed")) o::transformed() <<
+			"Pre-Transformation Program:\n\n" << rp << endl;
+#endif
 		if(opts.enabled("safecheck")) {
 			if(auto res = is_safe(rp)) {
 				ostringstream msg;
 				// The program is unsafe so inform the user of the offending rule
 				// and variable.
-				msg << "The variable " << res->first << " of " << res->second <<
-					" is not limited. Try rewriting the rule to make its safety clearer.";
+				msg << "The variable "<< res->first <<" of " <<
+					res->second << " is not limited. "
+					"Try rewriting the rule to make its "
+					"safety clearer.";
 				parse_error(msg.str().c_str());
 			}
 		}
@@ -4887,7 +4893,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		// If we want proof trees, then we need to transform the productions into
 		// rules first since only rules are supported by proof trees.
 		if(opts.get_string("proof") != "none") {
-			o::dbg() << "Transforming Grammar ..." << endl << endl;
+			DBG(o::transformed() <<
+				"Transforming Grammar ...\n" << endl;)
 			for (auto x : pd.strs)
 				if (!has(transformed_strings, x.first))
 					transform_string(x.second, rp, x.first),
@@ -4899,7 +4906,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 					pd.strs.begin()->second.size());
 				rp.g.clear();
 			}
-			o::dbg() << "Transformed Grammar:" << endl << endl << rp << endl;
+			DBG(o::transformed() <<
+				"Transformed Grammar:\n\n" << rp << endl;)
 		}
 
 		if(opts.enabled("program-gen")) {
@@ -5166,6 +5174,8 @@ void driver::read_inputs() {
 }
 
 driver::driver(string s, const options &o) : rp(), opts(o) {
+
+	if (o.error) { error = true; return; }
 
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());

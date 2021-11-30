@@ -46,6 +46,7 @@ namespace o {
 #endif
 	ostream_t& ms()   { return outputs::ms();   }
 	ostream_t& dump() { return outputs::dump(); }
+	ostream_t& transformed() { return outputs::transformed(); }
 }
 
 output::type_t output::get_type(string t) {
@@ -99,6 +100,7 @@ void outputs::update_pointers(const string& n, output* out) {
 #endif
 	else if (n == "benchmarks")  ms_   = out;
 	else if (n == "dump")        dump_ = out;
+	else if (n == "transformed") trns_ = out;
 }
 
 bool outputs::add(sp_output out) {

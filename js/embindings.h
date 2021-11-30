@@ -13,6 +13,8 @@
 #include <emscripten.h>
 #include <emscripten/bind.h>
 #include "../src/driver.h"
+//#include "../src/repl.h"
+//#include "../src/output.h"
 
 using
 	emscripten::enum_,
@@ -76,13 +78,16 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.property("error", &driver::error)
 		.property("opts", &driver::opts)
 		;
+//	class_<repl>("repl")
+//		.constructor<options, ostream_t>(allow_raw_pointers())
+//		;
 	class_<options>("options")
 		.constructor<strings, inputs*, outputs*>()
 		.function("parse", select_overload
-			<void(std::vector<std::string>, bool)>
+			<bool(std::vector<std::string>, bool)>
 				(&options::parse), allow_raw_pointers())
 		.function("enabled", &options::enabled)
-		.function("get", &options::get)
+		//.function("get", &options::get)
 		.function("get_int", &options::get_int)
 		.function("get_bool", &options::get_bool)
 		.function("get_string", &options::get_string)
