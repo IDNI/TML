@@ -894,6 +894,64 @@ Full transformation of the above program:
 	~__2__curr__, ~__2__start__, ~__2__rule__, __2__fp__
 	        :- { __2__curr__ && ~ ~ { b(1) }   }.
 ```
+
+# State blocks
+
+To make TML code more structured and readable for a programmer we provide a structure called `state block`.
+To enable this structure use: `--state-blocks` or `-sb` command line option.
+
+Syntax of this structure is:
+```
+	[state_name:
+		#...code to be executed while state_name is active...
+	]
+```
+State block structure allows to group parts of a program which are supposed to
+run only when some state is active. State blocks can be nested.
+
+This feature is implemented by a simple transformation where every fact or rule
+inside a state block is converted into a rule guarded by the name of the state.
+
+Example:
+```
+	ok.
+	state1.  # enable `state1`
+	[state1:
+		fact_to_be_added_when_state1_is_active.
+		rule_to_be_executed_when_state1_is_active :- ok. 
+	]
+```
+... is transformed into a program:
+```
+	ok.
+	state1.
+	fact_to_be_added_when_state1_is_active    :- state1.
+	rule_to_be_executed_when_state1_is_active :- ok, state1. 
+```
+
+## Flipping state block
+
+Sometimes it is required to have a state which lasts only a single step.
+We can call these states flipping states.
+You can make a flipping state by adding `~` after the state block name.
+This change will cause the state to be disabled right in a next step.
+
+Example:
+```
+	flipping.  # enable state `flipping`
+	[flipping~:
+		this_rule_gets_executed :- only_once.
+	]
+```
+... is transformed into:
+```
+	flipping.
+	~flipping :- flipping.
+	this_rule_gets_executed :- only_once, flipping.
+```
+See more examples of state blocks in [regression tests directory](./tests/regression/state_blocks)
+
+
 # Types and Type checking
 
 One can specify types for arguments of terms and predicates in the program. There are three primitive types **"int", "char" and "sym"** with default size of 4 bits each. The int can be further specialized with bit size like **int:2**, which says it is a type which holds only 2 bits ( possible four values).

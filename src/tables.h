@@ -124,6 +124,31 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+struct gnode {
+	enum gntype{
+		pack, interm, symbol
+	} type;
+	const term &t;
+	int lev;
+	std::vector<gnode*> next;
+	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level) {
+		type = typ; }
+	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){ 
+		type = interm;
+		this->next.emplace_back(new gnode(lev, t, gnode::gntype::pack));
+		next.back()->next = inter;
+	}
+	bool binarise() {
+		interm2g.clear();
+		visited.clear();
+		return _binarise();
+	}
+	private:
+	static std::set<const gnode*> visited;
+	static std::map<std::set<term>, gnode*> interm2g;
+	bool _binarise();
+};
+
 struct table {
 	sig s;
 	size_t len, priority = 0;
@@ -268,6 +293,9 @@ private:
 		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
 	bool get_proof(const term& q, proof& p, size_t level,
 		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
+	void print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int level = 0);
+	bool build_graph( std::map<term, gnode*> &tg, proof &p, gnode &g);
+	gnode* get_forest(const term& t, proof& p );
 	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
@@ -279,6 +307,7 @@ private:
 			spbdd_handle &c) const;
 	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
+	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
 	bool get_facts(const flat_prog& m);
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
@@ -378,8 +407,6 @@ private:
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
-	t_arith_op get_bwop(lexeme l);
-	t_arith_op get_pwop(lexeme l);
 
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
 	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);

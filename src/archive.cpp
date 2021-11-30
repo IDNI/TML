@@ -241,70 +241,14 @@ size_t archive::header_size() {
 	return sizeof(int16_t) + sizeof(size_t);
 }
 
-archive& archive::operator<<(const int_t& val) {
-	//DBG(o::dbg() << "writing int_t: " << val << endl;)
-	write((const char*)&val, sizeof(int_t));
+template<typename X> archive& archive::operator<<(const X& val) {
+	// DBG(o::dbg() << "writing typename X: " << val << endl;)
+	write((const char*) &val, sizeof(X));
 	return *this;
 }
-archive& archive::operator>>(int_t& val) {
-	read(&val, sizeof(int_t));
-	//DBG(o::dbg() << "reading int_t: " << val << endl;)
-	return *this;
-}
-
-archive& archive::operator<<(const int16_t& val) {
-	//DBG(o::dbg() << "writing int16_t: " << val << endl;)
-	write((const char*) &val, sizeof(int16_t));
-	return *this;
-}
-archive& archive::operator>>(int16_t& val) {
-	read(&val, sizeof(int16_t));
-	//DBG(o::dbg() << "reading int16_t: " << val << endl;)
-	return *this;
-}
-
-archive& archive::operator<<(const size_t& val) {
-	// DBG(o::dbg() << "writing size_t: " << val << endl;)
-	write((const char*) &val, sizeof(size_t));
-	return *this;
-}
-
-archive& archive::operator>>(size_t& val) {
-	read((char*) &val, sizeof(size_t));
-	// DBG(o::dbg() << "reading size_t: " << val << endl;)
-	return *this;
-}
-
-archive& archive::operator<<(const unsigned int& val) {
-	//DBG(o::dbg() << "writing uint: " << val << endl;)
-	write((const char*) &val, sizeof(unsigned int));
-	return *this;
-}
-archive& archive::operator>>(unsigned int& val) {
-	read(&val, sizeof(unsigned int));
-	//DBG(o::dbg() << "reading uint: " << val << endl;)
-	return *this;
-}
-
-archive& archive::operator<<(const unsigned char& val) {
-	// DBG(o::dbg() << "writing char: " << val << endl;)
-	write((const char*) &val, sizeof(unsigned char));
-	return *this;
-}
-archive& archive::operator>>(unsigned char& val) {
-	read(&val, sizeof(unsigned char));
-	// DBG(o::dbg() << "reading char: " << val << endl;)
-	return *this;
-}
-
-archive& archive::operator<<(const char& val) {
-	// DBG(o::dbg() << "writing char: " << val << endl;)
-	write((const char*) &val, sizeof(char));
-	return *this;
-}
-archive& archive::operator>>(char& val) {
-	read(&val, sizeof(char));
-	// DBG(o::dbg() << "reading char: " << val << endl;)
+template<typename X> archive& archive::operator>>(X& val) {
+	read(&val, sizeof(X));
+	// DBG(o::dbg() << "reading typename X: " << val << endl;)
 	return *this;
 }
 
@@ -1268,7 +1212,7 @@ size_t archive::size(const driver& d) {
 
 archive& archive::write_bdd() {
 	*this << V.size();
-	write(V.data(), V.size() * 3 * sizeof(int_t));
+	write(V.data(), V.size() * sizeof(bdd));
 	return *this;
 }
 archive& archive::read_bdd() {
@@ -1276,9 +1220,9 @@ archive& archive::read_bdd() {
 	//POS("reading bdd size")
 	*this >> nsize;
 	//COUT << "nsize: " << nsize << endl;
-	size_t s = nsize * 3 * sizeof(int_t);
+	size_t s = nsize * sizeof(bdd);
 	//COUT << "loading bdd size: " << nsize << " " << s << endl;
-	V = bdd_mmap(nsize, bdd{0,0,0},
+	V = bdd_mmap(nsize, bdd{0,0},
 		memory_map_allocator<bdd>("", bdd_mmap_mode));
 	read((char *)V.data(), s);
 	//for (size_t i = 0; i != V.size(); ++i) {
@@ -1291,7 +1235,7 @@ archive& archive::read_bdd() {
 	return *this;
 }
 size_t archive::bdd_size() {
-	size_t s = V.size() * 3 * sizeof(int_t) + sizeof(size_t);
+	size_t s = V.size() * sizeof(bdd) + sizeof(size_t);
 	return s;
 }
 

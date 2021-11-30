@@ -156,30 +156,10 @@ public:
 	archive& write_header();
 	archive& read_header();
 	inline static size_t header_size();
-
-	archive& operator<<(const int_t&);
-	archive& operator>>(int_t&);
-	static size_t size(int_t) { return sizeof(int_t); }
-
-	archive& operator<<(const int16_t&);
-	archive& operator>>(int16_t&);
-	static size_t size(int16_t) { return sizeof(int16_t); }
-
-	archive& operator<<(const size_t&);
-	archive& operator>>(size_t&);
-	static size_t size(size_t) { return sizeof(size_t); }
-
-	archive& operator<<(const unsigned int&);
-	archive& operator>>(unsigned int&);
-	static size_t size(uint_t) { return sizeof(uint_t); }
-
-	archive& operator<<(const unsigned char&);
-	archive& operator>>(unsigned char&);
-	static size_t size(unsigned char) { return 1; }
-
-	archive& operator<<(const char&);
-	archive& operator>>(char&);
-	static size_t size(char) { return 1; }
+	
+	template<typename X> archive& operator<<(const X&);
+	template<typename X> archive& operator>>(X&);
+	template<typename X> static size_t size(X) { return sizeof(X); }
 
 	archive& operator<<(const lexeme&);
 	archive& operator>>(lexeme&);

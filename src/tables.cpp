@@ -325,7 +325,36 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
-void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
+void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
+
+	string pred = to_string(lexeme2str(dict.get_rel(t.tab)));
+	//COUT << to_string(pred) << endl;
+	int_t idbltin = -1;
+	term taux(t);
+	if (pred.find("_EQ_") != std::string::npos)
+		idbltin = dict.get_bltin("eq");
+	else if (pred.find("_LEQ_") != string::npos) {
+		idbltin = dict.get_bltin("leq");
+		taux.extype = term::BLTIN;
+		taux.idbltin = idbltin;
+	}
+	else if (pred.find("_PLUS_") != string::npos)
+		idbltin = dict.get_bltin("PW_add");
+	else if (pred.find("_MULT_") != string::npos)
+		idbltin = dict.get_bltin("PW_mult");
+	else {
+		b.insert({ get_body(t, a.vm, a.varslen), t });
+		return;
+	}
+
+	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
+	//todo: check that idbltin is poperly configured in builtins
+	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
+	a.bltins.push_back(taux);
+}
+
+void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) {
+
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
@@ -333,7 +362,8 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt){
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
-			b.insert({ get_body(t, a.vm, a.varslen), t });
+			if(opts.bitunv) handler_bitunv(b, t, a);
+			else b.insert({ get_body(t, a.vm, a.varslen), t });
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
@@ -570,14 +600,15 @@ ntable tables::get_table(const sig& s) {
 	ntable nt = tbls.size();
 	size_t len = ir_handler->sig_len(s);
 	max_args = max(max_args, len);
-	if( opts.bitunv == true) {
+	if(opts.bitunv) {
 		bool found = false;
 		string_t relname = lexeme2str(dict.get_rel(s.first));
 		auto & types = spbu->ptypenv->search_pred( relname , found);
 		tab_type.insert({nt, types});
-		DBG( COUT<<std::endl<< "For table "<<nt; );
+		DBG(COUT<< "For table " << nt << " " << to_string(relname) << " < ");
 		for( auto &t: types )
-			DBG(COUT<<t.to_print());	
+			DBG(COUT<<t.to_print()<<" ");
+		DBG(COUT<< ">" << std::endl;);
 	}
 	table tb;
 	return	tb.t = hfalse, tb.s = s, tb.len = len, 
@@ -973,19 +1004,16 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		bool fwd_ret = fwd();
 		if (halt) return true;
 		level l = get_front();
-		if (!fwd_ret) {
-			if(opts.fp_step && add_fixed_point_fact()) return pfp();
-			else return fronts.push_back(l), true;
-		} else  fronts.push_back(l);
+		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp();
+		fronts.push_back(l);
 		if (halt) return true;
 		if (unsat) return contradiction_detected();
 		if ((break_on_step && nstep == break_on_step) ||
 			(nsteps && nstep == nsteps)) return false; // no FP yet
-		bool is_repeat =
-			std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1;
+		bool is_repeat = (!fwd_ret) ||
+			(std::find(fronts.begin(), fronts.end() - 1, l) != fronts.end() - 1);
 		if (opts.bproof != proof_mode::none) levels.push_back(move(l));
-		if (!datalog && is_repeat)
-			return is_infloop() ? infloop_detected() : true;
+		if (is_repeat) return is_infloop() ? infloop_detected() : true;
 	}
 	DBGFAIL;
 }
@@ -1296,8 +1324,8 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	if (!allowbltins && tbl.is_builtin()) return;
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, &tbl, len, this](const bools& p, int_t DBG(y)) {
-		DBG(assert(abs(y) == 1);)
+		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
+		DBG(assert(BDD_ABS(y) == T);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
 			for (size_t k = 0; k != bits; ++k)

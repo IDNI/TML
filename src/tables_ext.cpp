@@ -366,26 +366,6 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 // bitwise operators
-t_arith_op tables::get_bwop(lexeme l) {
-	if (l == "bw_and")
-		return BITWAND;
-	else if (l == "bw_or")
-		return BITWOR;
-	else if (l == "bw_xor")
-			return BITWXOR;
-	else if (l == "bw_not")
-		return BITWNOT;
-	else return NOP;
-}
-
-// pairwise operators
-t_arith_op tables::get_pwop(lexeme l) {
-	if (l == "pw_add")
-		return ADD;
-	else if (l == "pw_mult")
-		return MULT;
-	else return NOP;
-}
 
 // remove type bits
 spbdd_handle tables::ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars) {
@@ -467,12 +447,20 @@ spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t
 	s1 = perm_from_to(in1_varid, 1, s1, bits-2, n_vars);
 	s0 = perm_bit_reverse(s0, bits-2, n_vars);
 	s1 = perm_bit_reverse(s1, bits-2, n_vars);
+	//COUT << "a:\n";
+	//::out(COUT, s0) << endl;
+	//COUT << "b:\n";
+	//::out(COUT, s1) << endl;
+
 	spbdd_handle x;
 	switch (op) {
 		case ADD : x = bdd_adder(s0, s1); break;
 		case MULT: x = bdd_mult_dfs(s0, s1, bits-2,3); break;
 		default  : break;
 	}
+	//COUT << "x:\n";
+	//::out(COUT, x) << endl;
+
 	x = perm_bit_reverse( x, bits-2, n_vars);
 	x = perm_from_to(2, out_varid, x, bits-2, n_vars);
 	x = x && ::from_bit(pos(1, out_varid, n_vars),true) &&
@@ -568,9 +556,9 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				//DBG(assert(p0->b->neg == false);)
-//				COUT << "handleform1\n";
-//				spbdd_handle auxq = body_query(*p0->b,0);
-//				::out(COUT, auxq)<<endl<<endl;
+				//COUT << "handleform1\n";
+				//spbdd_handle auxq = body_query(*p0->b,0);
+				//::out(COUT, auxq)<<endl<<endl;
 
 				ex_typebits(p0->b->ex, f->tm->size());
 				static set<body*, ptrcmp<body>>::const_iterator bit;

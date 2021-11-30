@@ -1,0 +1,22 @@
+[init~:
+    run.
+
+    e(1 2).
+    e(2 3).
+    e(3 4).
+    e(4 5).
+    e(5 1).
+    e(8 9).
+]
+
+[run:
+    ~run, finish, ~__fp__ :- __fp__.
+    tc(?x ?y) :- e(?x ?y).
+    tc(?x ?y) :- tc(?x ?z), e(?z ?y).
+]
+
+[finish~:
+    ~e(?x ?y) :- e(?x ?y).
+]
+
+init.

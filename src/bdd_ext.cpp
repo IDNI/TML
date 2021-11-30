@@ -19,18 +19,12 @@ using namespace std;
 
 //------------------------------------------------------------------------------
 // auxiliary functions
-int_t bdd_root(cr_spbdd_handle x) {
+bdd_shft bdd_root(cr_spbdd_handle x) {
 	return (bdd::var(x->b));
 }
 
-void bdd_size(cr_spbdd_handle x,  std::set<int_t>& s) {
+void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s) {
 	bdd::bdd_sz_abs(x->b, s);
-}
-
-void bdd::bdd_sz_abs(int_t x, set<int_t>& s) {
-	if (!s.emplace(abs(x)).second) return;
-	bdd b = get(x);
-	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }
 
 //------------------------------------------------------------------------------
@@ -40,30 +34,18 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 }
 
 spbdd_handle bdd_not(cr_spbdd_handle x) {
-	return bdd_handle::get(-x->b);
+	return bdd_handle::get(FLIP_INV_OUT(x->b));
 }
 
 size_t satcount(cr_spbdd_handle x, const size_t bits) {
-
-	bdd a = bdd::get(x->b);
+	bdd_shft av = GET_SHIFT(x->b);
 	size_t cnt = 0;
-	size_t factor = x->b != T ? pow(2,a.v-1) : 1;
-	size_t bit = (x->b != T && x->b != F) ? (a.v)-1 : 0;
-	bdd::satcount_arith(a, bit, bits, factor, cnt);
+	size_t factor = x->b != T ? pow(2,av-1) : 1;
+	size_t bit = (x->b != T && x->b != F) ? (av)-1 : 0;
+	bdd::satcount_arith(x->b, bit, bits, factor, cnt);
 	return cnt;
 }
 
-/*
-size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex) {
-	//work in progress
-	bdd a = bdd::get(x->b);
-	size_t cnt = 0;
-	size_t factor = x->b != T ? pow(2,a.v-1) : 1;
-	size_t bit = x->b != T ? (a.v)-1 : 0;
-	bdd::satcount_arith_ex(a, bit, bits, factor, ex, cnt);
-	return cnt;
-}
-*/
 //------------------------------------------------------------------------------
 //over bdd bitwise operators
 spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y) {
@@ -90,8 +72,8 @@ spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y) {
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars ) {
 	//bdds
-	int_t *z_aux = new int_t[bits];
-	int_t c = F;
+	bdd_ref *z_aux = new bdd_ref[bits];
+	bdd_ref c = F;
 	bdd::mult_dfs(x->b, y->b, z_aux, 0, bits, n_vars, c);
 	delete[] z_aux;
 	size_t ext_bits = 2*bits;
@@ -106,19 +88,19 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 }
 
 // ----------------------------------------------------------------------------
-int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
+bdd_ref bdd::bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args) {
 	//if (x == T || x == F || bit == (int_t) quants.size() * (int_t) bits) return x;
-	if (bit == (int_t) quants.size() * (int_t) bits) return x;
+	if (bit == quants.size() * bits) return x;
 	size_t idx = bit/bits;
 	if (x == T || x == F) {
 		if (quants[idx] == quant_t::UN) return F;
 		return x;
 	}
-	bdd c = get(x);
-	int_t h,l;
-	if (c.v > (int_t) quants.size() * (int_t) bits) return x;
-	if (c.v > bit+1) {//TODO review for UNIQUE
+	bdd c = bdd::get(x);
+	bdd_ref h,l;
+	if (GET_SHIFT(x) > quants.size() * bits) return x;
+	if (GET_SHIFT(x) > bit+1) {//TODO review for UNIQUE
 		if (quants[idx] == quant_t::UN) return F;
 		return bdd_quantify(x, bit+1, quants, bits, n_args);
 	}
@@ -136,7 +118,7 @@ int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
 			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F && h == F) return F;
-			if (l == F || h == F) return add(c.v, h, l);
+			if (l == F || h == F) return add(GET_SHIFT(x), h, l);
 			return x;
 		}
 		case quant_t::UN: {
@@ -151,143 +133,111 @@ int_t bdd::bdd_quantify(int_t x, int_t bit, const std::vector<quant_t> &quants,
 	return F;
 }
 
-// ----------------------------------------------------------------------------
-void bdd::satcount_arith(bdd a, size_t bit, const size_t bits, size_t factor,
-		size_t &count) {
-
-	if (a.h == F && a.l == F) return;
-	if (a.h == T && a.l == T) {
-		count = count + factor * pow(2, bits-bit); return;
-	}
-	if (a.h != F) {
-		bdd ah = get(a.h);
-		size_t delta = a.h != T ? pow(2,(ah.v - a.v)-1) : 1;
-		satcount_arith(ah, a.v, bits, factor * delta, count);
-	}
-	if (a.l != F) {
-		bdd al = get(a.l);
-		size_t delta = a.l != T ? pow(2,(al.v - a.v)-1) : 1;
-		satcount_arith(al, a.v, bits, factor * delta, count);
-	}
-	return;
+void bdd::bdd_sz_abs(bdd_ref x, set<bdd_id>& s) {
+	if (!s.emplace(GET_BDD_ID(x)).second) return;
+	bdd b = get(x);
+	bdd_sz_abs(b.h, s), bdd_sz_abs(b.l, s);
 }
 
-/*
-void bdd::satcount_arith_ex(bdd a, size_t bit, const size_t bits, size_t factor,
-		const bools &ex, size_t &count) {
-	//work in progress
-	if (a.h == F && a.l == F) return;
-	if (a.h == T && a.l == T) {
-		count = count + factor * pow(2, bits-bit); return;
-	}
-	if (a.h != F) {
-		bdd ah = get(a.h);
-		size_t delta = a.h != T ? pow(2,(ah.v - a.v)-1) : 1;
-		satcount_arith_ex(ah, a.v, bits, factor * delta, ex, count);
-	}
-	if (a.l != F) {
-		bdd al = get(a.l);
-		size_t delta = a.l != T ? pow(2,(al.v - a.v)-1) : 1;
-		satcount_arith_ex(al, a.v, bits, factor * delta, ex, count);
-	}
-	return;
-}
-*/
-
-// ----------------------------------------------------------------------------
-
-int_t bdd::bitwise_and(int_t a_in, int_t b_in) {
-	bdd a = get(a_in), b = get(b_in);
+bdd_ref bdd::bitwise_and(bdd_ref a_in, bdd_ref b_in) {
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
-	if (a.v > b.v + 1 && b.v != 0) {
+	bdd_shft pos = 0;
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-	  	pos = b.v+1;
-	} else if (a.v + 2 < b.v && a.v != 0) {
+	  	pos = GET_SHIFT(b_in)+1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a.v + 2;
-	} else if (a.v != 0) pos = a.v+2;
-	else pos = b.v + 1;
-	int_t c = add(pos, bitwise_and(a.h, b.h), bdd_or(bdd_or(bitwise_and(a.h,  b.l),
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in)+2;
+	else pos = GET_SHIFT(b_in) + 1;
+	bdd_ref c = add(pos, bitwise_and(a.h, b.h), bdd_or(bdd_or(bitwise_and(a.h,  b.l),
 						bitwise_and(a.l, b.h)), bitwise_and(a.l,  b.l))
 					);
 	return c;
 }
 
-int_t bdd::bitwise_or(int_t a_in, int_t b_in) {
-	bdd a = get(a_in), b = get(b_in);
+bdd_ref bdd::bitwise_or(bdd_ref a_in, bdd_ref b_in) {
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
-	if (a.v > b.v + 1 && b.v != 0) {
+	bdd_shft pos = 0;
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-		pos = b.v+1;
-	} else if (a.v + 2 < b.v && a.v != 0) {
+		pos = GET_SHIFT(b_in)+1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a.v + 2;
-	} else if (a.v != 0) pos = a.v+2;
-	else pos = b.v + 1;
-	int_t c = add(pos, bdd_or( bdd_or(bitwise_or(a.h, b.l), bitwise_or(a.l, b.h)),
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in)+2;
+	else pos = GET_SHIFT(b_in) + 1;
+	bdd_ref c = add(pos, bdd_or( bdd_or(bitwise_or(a.h, b.l), bitwise_or(a.l, b.h)),
 						bitwise_or(a.h, b.h)), bitwise_or(a.l, b.l)
 					);
 	return c;
 }
 
-int_t bdd::bitwise_xor(int_t a_in, int_t b_in) {
-	bdd a = get(a_in), b = get(b_in);
+bdd_ref bdd::bitwise_xor(bdd_ref a_in, bdd_ref b_in) {
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
 	if (a_in == T && b_in == T) return T;
 	else if (a_in == F || b_in == F) return F;
-	uint_t pos = 0;
-	if (a.v > b.v + 1 && b.v != 0) {
+	bdd_shft pos = 0;
+	if (GET_SHIFT(a_in) > GET_SHIFT(b_in) + 1 && GET_SHIFT(b_in) != 0) {
 		a.h = a_in, a.l = a_in;
-		pos = b.v + 1;
-	} else if (a.v + 2 < b.v && a.v != 0) {
+		pos = GET_SHIFT(b_in) + 1;
+	} else if (GET_SHIFT(a_in) + 2 < GET_SHIFT(b_in) && GET_SHIFT(a_in) != 0) {
 		b.h = b_in, b.l = b_in;
-		pos = a.v + 2;
-	} else if (a.v != 0) pos = a.v + 2;
-	else pos = b.v + 1;
-	int_t c = add(pos, bdd_or(bitwise_xor(a.h, b.l), bitwise_xor(a.l, b.h)),
+		pos = GET_SHIFT(a_in) + 2;
+	} else if (GET_SHIFT(a_in) != 0) pos = GET_SHIFT(a_in) + 2;
+	else pos = GET_SHIFT(b_in) + 1;
+	bdd_ref c = add(pos, bdd_or(bitwise_xor(a.h, b.l), bitwise_xor(a.l, b.h)),
 				  	bdd_or(bitwise_xor(a.h, b.h), bitwise_xor(a.l, b.l))
 					);
 	return c;
 }
 
-int_t bdd::bitwise_not(int_t a_in) {
+bdd_ref bdd::bitwise_not(bdd_ref a_in) {
 	//TODO: implement
 	return a_in;
 }
 
-int_t bdd::adder(int_t a_in, int_t b_in, bool carry, size_t bit) {
+bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
+	bdd a = bdd::get(a_in), b = bdd::get(b_in);
+	bdd_ref c = 0;
+	
+	if (a_in == T && b_in == T) return T;
+	else if (a_in == F || b_in == F) return F;
 
-	bdd a = get(a_in), b = get(b_in);
-	int_t c = 0;
-	if (a_in == T && b_in == T)
-		c = T;
-	else if (a_in == F || b_in == F)
-		c = F;
-	else {
-		int_t pos = 0;
-		if (a.v > b.v + 1 && b.v != 0) {
-			a.h = a_in, a.l = a_in;
-		  	pos = b.v + 1;
-		} else if (a.v + 2 < b.v && a.v != 0) {
-			b.h = b_in, b.l = b_in;
-			pos = a.v + 2;
-		} else if (a.v != 0)
-			pos = a.v + 2;
-		else
-			pos = b.v + 1;
-
-		if (carry == false)
-			c = add(pos,
-					bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
-					bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
-		else
-			c = add(pos,
-					bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
-					bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
+	bdd_shft pos = 0, av = GET_SHIFT(a_in), bv = GET_SHIFT(b_in);
+	if (av > bv + 1 && bv != 0) {
+		a.h = a_in, a.l = a_in;
+	  	pos = bv + 1;
+	} else if (av + 2 < bv && av != 0) {
+		b.h = b_in, b.l = b_in;
+		pos = av + 2;
+	} else {
+		pos = av + 2;
 	}
+
+	if (pos > (bit+1) * 3) {
+		size_t delta = (pos / 3)-1;
+		if (carry)
+			c = add(pos-3, bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)), adder(a_in, b_in,true,delta));
+		else
+			c = add(pos-3,adder(a_in, b_in,false,delta) , bdd_or(adder(a_in, b_in,true,delta), adder(a_in, b_in,false,delta)));
+		return c;
+	}
+
+
+	if (!carry)
+		c = add(pos,
+				bdd_or(adder(a.h, b.l, false, bit+1), adder(a.l, b.h, false, bit+1)),
+				bdd_or(adder(a.h, b.h, true,  bit+1), adder(a.l, b.l, false, bit+1)));
+
+	else
+		c = add(pos,
+				bdd_or(adder(a.h, b.h, true, bit+1), adder(a.l, b.l, false, bit+1)),
+				bdd_or(adder(a.h, b.l, true, bit+1), adder(a.l, b.h, true,  bit+1)));
 	return c;
 }
 
@@ -304,18 +254,18 @@ template<typename T> struct veccmp {
 		return x < y;
 	}
 };
-extern map<uints, unordered_map<int_t, int_t>, veccmp<uint_t>> memos_perm;
+extern map<uints, unordered_map<bdd_ref, bdd_ref>, veccmp<uint_t>> memos_perm;
 // ----------------------------------------------------------------------------
-std::map<size_t, int_t> covered_cf;
-std::map<size_t, int_t> covered_ct;
+std::map<size_t, bdd_ref> covered_cf;
+std::map<size_t, bdd_ref> covered_ct;
 
-int_t bdd::merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
-	int_t c;
+	bdd_ref c;
 
 	if (!carry) {
-		std::map<size_t,int_t>::iterator it = covered_cf.find(i);
+		std::map<size_t,bdd_ref>::iterator it = covered_cf.find(i);
 		if (it != covered_cf.end() && pathX_a.size() == 0 && pathX_b.size() == 0 ) {
 			c = covered_cf[i];
 		} else {
@@ -323,7 +273,7 @@ int_t bdd::merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t 
 			covered_cf[i] = c;
 		}
 	} else {
-		std::map<size_t,int_t>::iterator it = covered_ct.find(i);
+		std::map<size_t,bdd_ref>::iterator it = covered_ct.find(i);
 		if (it != covered_ct.end() && pathX_a.size() == 0 && pathX_b.size() == 0 ) {
 			c = covered_ct[i];
 		} else {
@@ -334,11 +284,11 @@ int_t bdd::merge_pathX(size_t i, size_t bits, bool carry, size_t n_args, size_t 
 	return c;
 }
 
-int_t bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
 	int_t pos = i * n_args + 3;
-	int_t c = T;
+	bdd_ref c = T;
 
 	if (path_a[bits-i-1] == X && path_b[bits-i-1] == L) {
 
@@ -349,7 +299,7 @@ int_t bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve XL pos = " << pos << "\n";
 			#endif
 			pathX_a.push_back(L);
-			int_t c0;
+			bdd_ref c0;
 			c0 = solve_pathXL(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 
 			pathX_a = aux_pathX_a;
@@ -357,7 +307,7 @@ int_t bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve XL pos = " << pos << "\n";
 			#endif
 			pathX_a.push_back(H);
-			int_t c1;
+			bdd_ref c1;
 			if (!carry) {
 				c1 = solve_pathXL(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 				c = add(pos, c1, c0);
@@ -373,7 +323,7 @@ int_t bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			#ifdef VERBOSE
 			COUT << " ---solve XL pos = " << pos << "\n";
 			#endif
-			int_t c0;
+			bdd_ref c0;
 			if (!carry) {
 				c0 = solve_pathXL(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 				if (aux == L)
@@ -398,11 +348,11 @@ int_t bdd::solve_pathXL(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-int_t bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
 	int_t pos = i * n_args + 3;
-	int_t c = T;
+	bdd_ref c = T;
 
 	if (path_a[bits-i-1] == L && path_b[bits-i-1] == X) {
 		if (pathX_a.size() == 0) {
@@ -413,7 +363,7 @@ int_t bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve LX pos = " << pos << "\n";
 			#endif
 			pathX_b.push_back(L);
-			int_t c0;
+			bdd_ref c0;
 			c0 = solve_pathLX(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 
 			pathX_b = aux_pathX_b;
@@ -421,7 +371,7 @@ int_t bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve LX pos = " << pos << "\n";
 			#endif
 			pathX_b.push_back(H);
-			int_t c1;
+			bdd_ref c1;
 			if (!carry) {
 				c1 = solve_pathLX(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 				c = add(pos, c1, c0);
@@ -436,7 +386,7 @@ int_t bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			#ifdef VERBOSE
 			COUT << " ---solve LX pos = " << pos << "\n";
 			#endif
-			int_t c0;
+			bdd_ref c0;
 			if (!carry) {
 				c0 = solve_pathLX(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 				if (aux == L)
@@ -462,11 +412,11 @@ int_t bdd::solve_pathLX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-int_t bdd::solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
 	int_t pos = i * n_args + 3;
-	int_t c = T;
+	bdd_ref c = T;
 
 	if (path_a[bits-i-1] == X && path_b[bits-i-1] == H) {
 
@@ -477,7 +427,7 @@ int_t bdd::solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve XH pos = " << pos << "\n";
 			#endif
 			pathX_a.push_back(L);
-			int_t c0, c1;
+			bdd_ref c0, c1;
 			if (!carry)
 				c0 = solve_pathXH(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 			else
@@ -504,7 +454,7 @@ int_t bdd::solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			#ifdef VERBOSE
 			COUT << " ---solve XH pos = " << pos << "\n";
 			#endif
-			int_t c0;
+			bdd_ref c0;
 			if (!carry) {
 
 				if (aux == L) {
@@ -532,10 +482,10 @@ int_t bdd::solve_pathXH(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-int_t bdd::solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 	int_t pos = i * n_args + 3;
-	int_t c = T;
+	bdd_ref c = T;
 
 	if (path_a[bits-i-1] == H && path_b[bits-i-1] == X) {
 
@@ -546,7 +496,7 @@ int_t bdd::solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve HX pos = " << pos << "\n";
 			#endif
 			pathX_b.push_back(L);
-			int_t c0, c1;
+			bdd_ref c0, c1;
 			if (!carry)
 				c0 = solve_pathHX(i+1,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 			else
@@ -573,7 +523,7 @@ int_t bdd::solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			#ifdef VERBOSE
 			COUT << " ---solve HX pos = " << pos << "\n";
 			#endif
-			int_t c0;
+			bdd_ref c0;
 			if (!carry) {
 
 				if (aux == L) {
@@ -601,10 +551,10 @@ int_t bdd::solve_pathHX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 	return c;
 }
 
-int_t bdd::solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
-	int_t c = T;
+	bdd_ref c = T;
 	int_t pos = i * n_args + 3;
 
 
@@ -614,9 +564,9 @@ int_t bdd::solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			while (path_a[bits-i-1] == X && path_b[bits-i-1] == X) i++;
 			//t_pathv aux_pathX_a = pathX_a;
 			//t_pathv aux_pathX_b = pathX_b;
-			int_t c0 = solve_path(i,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
+			bdd_ref c0 = solve_path(i,bits, false, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 			//int_t c1 = solve_path(i,bits, true, n_args, depth, path_a, path_b, aux_pathX_a, aux_pathX_b);
-			int_t c1 = solve_path(i,bits, true, n_args, depth, path_a, path_b, pathX_a, pathX_b);
+			bdd_ref c1 = solve_path(i,bits, true, n_args, depth, path_a, path_b, pathX_a, pathX_b);
 			c = add(pos, bdd_or(c0,c1), F);
 		}
 		else {
@@ -624,7 +574,7 @@ int_t bdd::solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 			COUT << " ---solve XX pos = " << pos << "\n";
 			#endif
 			t_path aux;
-			int_t c0,c1,ch = F, cl = F;
+			bdd_ref c0,c1,ch = F, cl = F;
 
 			t_pathv aux_pathX_a = pathX_a;
 			t_pathv aux_pathX_b = pathX_b;
@@ -701,13 +651,13 @@ int_t bdd::solve_pathXX(size_t i, size_t bits, bool carry, size_t n_args, size_t
 
 }
 
-int_t bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
+bdd_ref bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t depth,
 		t_pathv &path_a, t_pathv &path_b, t_pathv &pathX_a, t_pathv &pathX_b) {
 
 	if (i == bits)
 		return T;
 
-	int_t c = T;
+	bdd_ref c = T;
 	int_t pos = i * n_args + 3;
 	#ifdef VERBOSE
 	COUT << " ---solve pos = " << pos << "\n";
@@ -761,7 +711,26 @@ int_t bdd::solve_path(size_t i, size_t bits, bool carry, size_t n_args, size_t d
 	return c;
 }
 
-bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path,
+void bdd::satcount_arith(bdd_ref a, size_t bit, size_t bits, size_t factor,
+		size_t &count) {
+	bdd ab = bdd::get(a);
+	bdd_shft av = GET_SHIFT(a);
+	if (ab.h == F && ab.l == F) return;
+	if (ab.h == T && ab.l == T) {
+		count = count + factor * pow(2, bits-bit); return;
+	}
+	if (ab.h != F) {
+		size_t delta = ab.h != T ? pow(2, GET_SHIFT(ab.h) - av - 1) : 1;
+		satcount_arith(ab.h, av, bits, factor * delta, count);
+	}
+	if (ab.l != F) {
+		size_t delta = ab.l != T ? pow(2, GET_SHIFT(ab.l) - av - 1) : 1;
+		satcount_arith(ab.l, av, bits, factor * delta, count);
+	}
+	return;
+}
+
+bool bdd::bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
 		size_t bits, size_t n_args) {
 
 	//size_t bit, size_t bits, size_t factor,
@@ -771,7 +740,7 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 	while (!done) {
 		if (path[bit] == U)
 			done = true;
-		else if (path[bit] == L && a[i].h != F) {
+		else if (path[bit] == L && bdd::hi(a[i]) != F) {
 			done = true; goh = true;
 		}
 		else if (path[bit] != X) {
@@ -787,14 +756,14 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 			return false;
 	}
 
-	if (a[i].h == F && a[i].l == F) {
+	if (bdd::hi(a[i]) == F && bdd::lo(a[i]) == F) {
 		return false;
 	}
 
 	done = false;
 	while (!done) {
-		if (a[i].l != F && !goh) {
-			if (a[i].l == T) {
+		if (bdd::lo(a[i]) != F && !goh) {
+			if (bdd::lo(a[i]) == T) {
 				done = true;
 				size_t delta =  bits-bit;
 				path[bit] = L;
@@ -802,9 +771,9 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
 			}
 			else {
-				a.push_back(get(a[i].l)); //a[i].l;
+				a.push_back(bdd::lo(a[i])); //bdd::lo(a[i]);
 
-				size_t delta = (a[i+1].v - a[i].v)/n_args;
+				size_t delta = (GET_SHIFT(a[i+1]) - GET_SHIFT(a[i]))/n_args;
 				path[bit] = L;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
@@ -812,9 +781,9 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 				bit = bit+delta;
 			}
 		}
-		else if (a[i].h != F) {
+		else if (bdd::hi(a[i]) != F) {
 			goh = false;
-			if (a[i].h == T) {
+			if (bdd::hi(a[i]) == T) {
 				done = true;
 				size_t delta =  bits-bit;
 				path[bit] = H;
@@ -822,8 +791,8 @@ bool bdd::bdd_next_path(std::vector<bdd> &a, int_t &i, int_t &bit, t_pathv &path
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
 			}
 			else {
-				a.push_back(get(a[i].h)); //a[i].l;
-				size_t delta = (a[i+1].v - a[i].v)/n_args;
+				a.push_back(bdd::hi(a[i])); //bdd::lo(a[i]);
+				size_t delta = (GET_SHIFT(a[i+1]) - GET_SHIFT(a[i]))/n_args;
 				path[bit] = H;
 				if (delta > 1)
 					for(size_t j = 1; j < delta; j++) path[bit+j] = X;
@@ -901,8 +870,8 @@ int_t bdd::balance_paths(t_pathv &next_path_a, t_pathv &next_path_b, size_t bits
 	}
 }
 
-void bdd::adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
-		size_t n_args, int_t &c) {
+void bdd::adder_be(bdd_ref a_in, bdd_ref b_in, size_t bits, size_t depth,
+		size_t n_args, bdd_ref &c) {
 
 	t_pathv path_a(bits, U);
 	t_pathv path_b(bits, U);
@@ -916,10 +885,10 @@ void bdd::adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
 	std::vector<t_pathv> aux_path_a;
 	std::vector<t_pathv> aux_path_b;
 
-	std::vector<bdd> a;
-	std::vector<bdd> b;
-	a.push_back(get(a_in));
-	b.push_back(get(b_in));
+	std::vector<bdd_ref> a;
+	std::vector<bdd_ref> b;
+	a.push_back(a_in);
+	b.push_back(b_in);
 
 	int_t a_i = 0;
 	int_t a_bit = 0;
@@ -929,7 +898,7 @@ void bdd::adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
 	bool a_path_vld = true;
 	bool b_path_vld = true;
 
-	int_t aux;
+	bdd_ref aux;
 
 	a_path_vld = bdd_next_path(a, a_i, a_bit, path_a, bits, n_args);
 	b_path_vld = bdd_next_path(b, b_i, b_bit, path_b, bits, n_args);
@@ -967,7 +936,7 @@ void bdd::adder_be(int_t a_in, int_t b_in, size_t bits, size_t depth,
 	return;
 }
 
-int_t bdd::shlx(int_t b_in, size_t x, size_t bits, size_t n_args) {
+bdd_ref bdd::shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args) {
 
 	uints perm1;
 	size_t tbits = n_args*(bits+x);
@@ -985,15 +954,15 @@ int_t bdd::shlx(int_t b_in, size_t x, size_t bits, size_t n_args) {
 			perm1[n_args*i+1] = perm1[n_args*(i+x)+1];
 		}
 	}
-	int_t aux = bdd_permute(b_in, perm1, memos_perm[perm1]);
-	int_t aux_b = aux;
+	bdd_ref aux = bdd_permute(b_in, perm1, memos_perm[perm1]);
+	bdd_ref aux_b = aux;
 	for (size_t i = 0; i < x ; i++) {
 		aux_b = add((n_args*(x-i-1))+2,F,aux_b);
 	}
 	return aux_b;
 }
 
-int_t bdd::shr(int_t a_in, size_t arg, size_t bits, size_t n_args) {
+bdd_ref bdd::shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args) {
 
 	size_t tbits = n_args*bits;
 	size_t base = arg; // identifies which variable is being shifted
@@ -1011,23 +980,16 @@ int_t bdd::shr(int_t a_in, size_t arg, size_t bits, size_t n_args) {
 	}
 	a_in = bdd_permute(a_in, perm1, memos_perm[perm1]);
 	size_t pos_z = n_args * (bits-1) + base + 1;
-	int_t aux_bit = add(pos_z,F,T);
+	bdd_ref aux_bit = add(pos_z,F,T);
 	a_in = bdd_and(a_in, aux_bit);
 	return a_in;
 }
 
-int_t bdd::copy(int_t a_in) {
-	 if (a_in == T) return T;
-	 else if (a_in == F) return F;
-	 bdd a = get(a_in);
-	 int_t pos = a.v + 1;
- 	 int_t c = add(pos, copy(a.h) , copy(a.l));
- 	 return c;
-}
+bdd_ref bdd::bdd_shift(bdd_ref a_in, bdd_shft amt) { return PLUS_SHIFT(a_in, amt); }
 
-int_t bdd::copy_arg2arg(int_t a , size_t arg_a, size_t arg_b, size_t bits,
+bdd_ref bdd::copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits,
 	size_t n_args) {
-	int_t b;
+	bdd_ref b;
 	uints perm = perm_init(bits*n_args);
 	for (size_t i = 0; i < bits; i++) {
 		//COUT << perm[i*n_args + arg_a]+1 << " --- " << i*n_args + arg_b +1 << "\n";
@@ -1037,7 +999,7 @@ int_t bdd::copy_arg2arg(int_t a , size_t arg_a, size_t arg_b, size_t bits,
 	return b;
 }
 
-int_t bdd::adder_accs(int_t b_in, int_t acc, size_t depth, size_t bits,
+bdd_ref bdd::adder_accs(bdd_ref b_in, bdd_ref acc, size_t depth, size_t bits,
 	size_t n_args) {
 
 	size_t ext_bits = bits+depth;
@@ -1051,13 +1013,13 @@ int_t bdd::adder_accs(int_t b_in, int_t acc, size_t depth, size_t bits,
 	//b extended
 	//to concatenate leading '0's (MSB) to b
 	//for depth = 0 (first acc), b ends bits + 2 (i.e bits = 3,  ext_bits = 5)
-	int_t aux_ext = T;
+	bdd_ref aux_ext = T;
 	for (size_t i = bits; i < ext_bits ; i++) {
 		pos_z = n_args * i + 2; //to update arg b (#2)
 		aux_ext = bdd_and(aux_ext, add(pos_z, F, T));
 	}
 
-	int_t b_aux = shlx(b_in, depth, bits, n_args);
+	bdd_ref b_aux = shlx(b_in, depth, bits, n_args);
 	//COUT << "##[baux]:" << endl;
 	//out(COUT, b_aux);
 	//COUT <<endl<<endl;
@@ -1066,11 +1028,11 @@ int_t bdd::adder_accs(int_t b_in, int_t acc, size_t depth, size_t bits,
 		pos_z = n_args * i + 3;
 		aux_ext = bdd_and(aux_ext, add(pos_z, F, T));
 	}
-	int_t acc_aux = bdd_and(acc,aux_ext);
+	bdd_ref acc_aux = bdd_and(acc,aux_ext);
 	//COUT << "##[acc_aux]:" << endl;
 	//out(COUT, acc_aux);
 	//COUT <<endl<<endl;
-	int_t aux = F;
+	bdd_ref aux = F;
 	//XXX adder_be is returning aux LSB, no need to invert again
 	if (is_zero(acc_aux, ext_bits))
 		aux = copy_arg2arg(b_aux, 1,2,ext_bits, n_args);
@@ -1091,9 +1053,9 @@ int_t bdd::adder_accs(int_t b_in, int_t acc, size_t depth, size_t bits,
 	return aux;
 }
 
-int_t bdd::zero(size_t arg, size_t bits, size_t n_args) {
+bdd_ref bdd::zero(size_t arg, size_t bits, size_t n_args) {
 
-	int_t aux = T;
+	bdd_ref aux = T;
 	int_t pos;
 	for (size_t i = 0; i < bits; i++) {
 		pos = n_args * (bits-1-i) + arg;
@@ -1102,8 +1064,8 @@ int_t bdd::zero(size_t arg, size_t bits, size_t n_args) {
 	return aux;
 }
 
-bool bdd::is_zero(int_t a_in, size_t bits) {
-	bdd a = get(a_in);
+bool bdd::is_zero(bdd_ref a_in, size_t bits) {
+	bdd a = bdd::get(a_in);
 	for (size_t i = 0; i < bits; i++) {
 		if (a.h != F) return false;
 		a = get(a.l);
@@ -1111,16 +1073,16 @@ bool bdd::is_zero(int_t a_in, size_t bits) {
 	return true;
 }
 
-void bdd::mult_dfs(int_t a_in, int_t b_in, int_t *accs, size_t depth, size_t bits,
-	size_t n_args, int_t &c) {
+void bdd::mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size_t bits,
+	size_t n_args, bdd_ref &c) {
 
 	if (depth == bits) {
 		c = bdd_or(c, accs[depth-1]);
 		return ;
 	}
-	int_t pos = n_args * depth + 1;
+	bdd_shft pos = n_args * depth + 1;
 	bdd a = get(a_in);
-	if (a.v > pos) {a.h = a_in, a.l = a_in;}
+	if (GET_SHIFT(a_in) > pos) {a.h = a_in, a.l = a_in;}
 	if (a.l != F) {
 		if (depth == 0)
 			accs[depth] = zero(3, bits, n_args);

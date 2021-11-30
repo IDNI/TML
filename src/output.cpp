@@ -643,6 +643,32 @@ template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
 	const sprawformtree prft);
 
 template <typename T>
+basic_ostream<T>& print_state_block(basic_ostream<T>& os, const state_block& sb,
+	size_t level)
+{
+	basic_string<T> indent(level, '\t');
+	return print_raw_prog_tree(os << indent << '[' << sb.label
+		<< (sb.flip ? "~" : "") << ":\n",
+		sb.rp, level+1) << indent << "]";
+}
+template
+basic_ostream<char>& print_state_block(basic_ostream<char>& os,
+	const state_block& sb, size_t level);
+template
+basic_ostream<wchar_t>& print_state_block(basic_ostream<wchar_t>& s,
+	const state_block& sb, size_t level);
+
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const state_block& sb) {
+	return print_state_block(os, sb, 0);
+}
+template
+basic_ostream<char>& operator<<(basic_ostream<char>& os, const state_block& sb);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& s,
+	const state_block& sb);
+
+template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_prog& p) {
 	return print_raw_prog_tree<T>(os, p, 0);
 }
@@ -660,6 +686,7 @@ basic_ostream<T>& print_raw_prog_tree(basic_ostream<T>& os, const raw_prog& p,
 	for (auto x : p.d) os << indent << x << "\n";
 	for (auto x : p.g) os << indent << x << "\n";
 	for (auto x : p.r) print_raw_rule(os, x, level) << "\n";
+	for (auto x : p.sbs) print_state_block(os, x, level) << "\n";
 	for (auto x : p.nps) print_raw_prog_tree(os << indent << "{\n",
 		x, level+1) << indent << "}\n";
 	return os;
