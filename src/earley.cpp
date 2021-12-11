@@ -1,4 +1,5 @@
 #include "earley.h"
+
 using namespace std;
 
 ostream& operator<<(ostream& os, const vector<string>& v) {
@@ -144,13 +145,16 @@ bool earley::recognize(const char_t* s) {
 			print(*it);*/
 	}
 	for (const item& i : S) if (completed(i)) citem.emplace(i);
+	pfgraph.clear();
+	bool found = false;
 	for (size_t n : nts[start])
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
 			item root = *S.find(item(len, n, 0, G[n].size()));
 			forest({root});
-			return true;
+			found = true;
 		}
-	return false;
+	to_dot();
+	return found;
 }
 /*
 void earley::forest(ast& a, const vector<ast>& v) const {
@@ -178,14 +182,71 @@ vector<ast> earley::forest() {
 }
 */
 
-const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt ) {
+const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt, int end ) {
 	std::vector<item> ret;
 	
 	for(auto it = citem.begin(); it != citem.end(); it++) {
-		if( it->from == xfrom && nts[nt].count(it->prod) )	
-			ret.push_back(*it);
+		if( it->from == xfrom && nts[nt].count(it->prod) ){
+			if( end != -1 && (int)it->set == end ) ret.push_back(*it);
+			else if( end == -1) ret.push_back(*it);
+		}
 	}	
 	return ret;
+}
+bool earley::to_dot() {
+	
+	std::stringstream ss;
+	auto keyfun = [this] (const nidx_t & k){
+		stringstream l;
+		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
+		l <<"_"<<k.st<<"_"<<k.en<<"_";
+		return l.str();
+	};
+	for( auto &it: pfgraph ) {
+		string key = keyfun(it.first);
+		ss << endl<< key << "[label=\""<< key <<"\"];";
+		size_t p=0;
+		stringstream pstr;
+		for( auto &pack : it.second) {
+			pstr<<key<<p++;
+			ss << std::endl<<pstr.str() << "[shape = point,label=\""<< pstr.str() << "\"];";
+			ss << std::endl << key   <<"->" << pstr.str()<<';';
+			for( auto & nn: pack) {
+				string nkey = keyfun(nn);
+				ss  << endl<< nkey << "[label=\""<< nkey<< "\"];",
+				ss << std::endl << pstr.str()   <<"->" << nkey<< ';';
+			}
+			pstr.str("");
+		}
+	}
+
+	static size_t c = 0;
+	stringstream ssf;
+	ssf<<"graph"<<c++ << ".dot";
+	std::ofstream file(ssf.str());
+	file << "digraph {" << endl<< ss.str() << endl<<"}"<<endl;
+	file.close();
+	return true;
+
+}
+
+void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
+
+//	for(size_t len = 1, xfrom = curchd.from ; len < G[curchd.prod].size(); len++ ) {
+
+	if( G[eitem.prod].size() <= curchd.size()+1 )  return ambset.insert(curchd), void();
+
+	lit nxtl = G[eitem.prod ][curchd.size()+1];  // curchd.size() refers to index of cur literal to process in the rhs of production
+	if(!nxtl.nt())  nxtl.st = xfrom, nxtl.en = ++xfrom, curchd.push_back(nxtl), 
+					sbl_chd_forest(eitem, curchd, xfrom, ambset);
+	else {
+		//forest(v);
+		nxtl.st = xfrom;
+		auto &nxtl_froms = find_all(xfrom, nxtl.n());
+		for( auto &v: nxtl_froms  )
+			nxtl.en = v.set, curchd.push_back(nxtl), xfrom = v.set,
+			sbl_chd_forest(eitem, curchd, xfrom, ambset);
+	}
 }
 
 bool earley::forest ( std::vector<item> const &nxtset ) {
@@ -194,25 +255,20 @@ bool earley::forest ( std::vector<item> const &nxtset ) {
 		lit cnode  = G[cur.prod][0];
 		cnode.st = cur.from;
 		cnode.en = cur.set;
-		pfgraph[cnode] =  std::initializer_list<std::vector<nidx_t>>({});
-		
+		if(pfgraph.find(cnode) != pfgraph.end()) continue;
+		std::set<std::vector<nidx_t>> ambset;
 		vector<nidx_t> nxtlits;
-		for(size_t len = 1, xfrom = cur.from ; len < G[cur.prod].size(); len++ ) {
-			lit nxtl = G[cur.prod ][len];
-			if(!nxtl.nt())  nxtl.st = xfrom++, nxtl.en = xfrom;
-			else {
-				auto v = find_all(xfrom, nxtl.n());
-				forest(v);
-				DBG(assert(xfrom == v[0].from));
-				nxtl.st = xfrom;
-				nxtl.en = v[0].set;		
+		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
+		pfgraph[cnode] = ambset;
+		for ( auto aset: ambset )
+			for( lit& nxt: aset) {
+				if(pfgraph.find(nxt) != pfgraph.end()) continue;
+				if(nxt.nt()) forest( find_all(nxt.st, nxt.n(), nxt.en));
 			}
-			nxtlits.push_back(nxtl);
-		}
-		pfgraph[cnode].insert(nxtlits);
 	}	
 	return true;
 }
+
 
 int main() {
 	// S = eps | aSbS
@@ -224,10 +280,11 @@ int main() {
 		});
 //	earley e({{"S", { { "a", "B" }}}, {"B",{{"b"}}}});
 	cout << e.recognize("ab") << endl << endl;
-	cout << e.recognize("aa") << endl << endl;
+	/*cout << e.recognize("aa") << endl << endl;
 	cout << e.recognize("aab") << endl << endl;
 	cout << e.recognize("abb") << endl << endl;
 	cout << e.recognize("aabb") << endl << endl;
 	cout << e.recognize("aabbc") << endl << endl;
+	*/
 	return 0;
 }

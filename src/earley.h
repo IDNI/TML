@@ -8,7 +8,8 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
-
+#include <sstream>
+#include <fstream>
 #define DEBUG
 
 #ifdef DEBUG
@@ -26,11 +27,13 @@ class earley {
 		char c() const { return std::get<char>(*this); }
 		size_t st = 0;  // start of span match
 		size_t en = 0;	// end of span match
-		/*bool operator<(const lit& i) const {
-			if (st != i.st) return st < i.st;
+		bool operator<(const lit& i) const {
+			if(std::variant<size_t, char>(*this) != std::variant<size_t, char>(i) )
+			 	return std::variant<size_t, char>(*this) < std::variant<size_t, char>(i);
+			if(st != i.st) return st < i.st;
 			if (en != i.en) return en < i.en;
 			return false;
-		}*/
+		}
 	};
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
 	DBG(friend std::ostream& operator<<(std::ostream& os,
@@ -51,6 +54,7 @@ class earley {
 			return dot < i.dot;
 		}
 	};
+	
 /*	struct ast {
 		ast() {}
 		ast(const item& i) : i(i) {}
@@ -94,8 +98,10 @@ public:
 	bool recognize(const char_t* s);
 
 	typedef lit nidx_t;
+	bool to_dot();
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
-	const std::vector<item> find_all( size_t, size_t  );
+	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	bool forest(std::vector<item> const&);
+	void sbl_chd_forest(const item &chd, std::vector<nidx_t>& , size_t xfrom, std::set<std::vector<nidx_t>>&);
 };
