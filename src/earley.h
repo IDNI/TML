@@ -28,16 +28,15 @@ class earley {
 		size_t st = 0;  // start of span match
 		size_t en = 0;	// end of span match
 		bool operator<(const lit& i) const {
-			if(std::variant<size_t, char>(*this) != std::variant<size_t, char>(i) )
-			 	return std::variant<size_t, char>(*this) < std::variant<size_t, char>(i);
-			if(st != i.st) return st < i.st;
-			if (en != i.en) return en < i.en;
+			std::variant<size_t, char> tb = *this, ib = i; 
+			if(tb != i )	return tb < i;
+			if(st != i.st) 	return st < i.st;
+			if(en != i.en) 	return en < i.en;
 			return false;
 		}
 	};
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
-	DBG(friend std::ostream& operator<<(std::ostream& os,
-		const std::vector<lit>& v);)
+	DBG(friend std::ostream& operator<<(std::ostream& os, const std::vector<lit>& v);)
 	std::vector<std::vector<lit>> G;
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
@@ -52,6 +51,11 @@ class earley {
 			if (prod != i.prod) return prod < i.prod;
 			if (from != i.from) return from < i.from;
 			return dot < i.dot;
+		}
+		bool operator==(const item& i) const {
+			if (set != i.set || prod != i.prod || from != i.from || dot != i.dot)
+				return false;
+			return true;
 		}
 	};
 	
@@ -96,12 +100,11 @@ public:
 			std::string,
 			std::vector<std::vector<std::string>>>>& g);
 	bool recognize(const char_t* s);
-
 	typedef lit nidx_t;
 	bool to_dot();
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	bool forest(std::vector<item> const&);
-	void sbl_chd_forest(const item &chd, std::vector<nidx_t>& , size_t xfrom, std::set<std::vector<nidx_t>>&);
+	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
 };

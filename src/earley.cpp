@@ -230,12 +230,15 @@ bool earley::to_dot() {
 
 }
 
-void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
+void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
 
 //	for(size_t len = 1, xfrom = curchd.from ; len < G[curchd.prod].size(); len++ ) {
 
-	if( G[eitem.prod].size() <= curchd.size()+1 )  return ambset.insert(curchd), void();
-
+	if( G[eitem.prod].size() <= curchd.size()+1 )  {
+		if(curchd.back().en == eitem.set)
+			 ambset.insert(curchd);
+		return;
+	}
 	lit nxtl = G[eitem.prod ][curchd.size()+1];  // curchd.size() refers to index of cur literal to process in the rhs of production
 	if(!nxtl.nt())  nxtl.st = xfrom, nxtl.en = ++xfrom, curchd.push_back(nxtl), 
 					sbl_chd_forest(eitem, curchd, xfrom, ambset);
@@ -243,9 +246,12 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, siz
 		//forest(v);
 		nxtl.st = xfrom;
 		auto &nxtl_froms = find_all(xfrom, nxtl.n());
-		for( auto &v: nxtl_froms  )
+		for( auto &v: nxtl_froms  ) {
+			if( v == eitem || v.set > eitem.set) continue;		
 			nxtl.en = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
+			curchd.pop_back();
+		}
 	}
 }
 
@@ -273,18 +279,19 @@ bool earley::forest ( std::vector<item> const &nxtset ) {
 int main() {
 	// S = eps | aSbS
 	earley e({
-			{"S", { { "" }, { "a", "S", "b", "S" } } },
+			{"S", { { "b" }, { "S", "S" } } }
+			//{"S", { { "" }, { "a", "S", "b", "S" } } },
 //			{"S", { { "" }, { "A", "S", "B", "S" } } },
 //			{"A", { { "" }, { "A", "a" } } },
 //			{"B", { { "b" }, { "B", "b" } } }
 		});
 //	earley e({{"S", { { "a", "B" }}}, {"B",{{"b"}}}});
-	cout << e.recognize("ab") << endl << endl;
-	/*cout << e.recognize("aa") << endl << endl;
+	cout << e.recognize("bbb") << endl << endl;
+/*	cout << e.recognize("aa") << endl << endl;
 	cout << e.recognize("aab") << endl << endl;
 	cout << e.recognize("abb") << endl << endl;
 	cout << e.recognize("aabb") << endl << endl;
 	cout << e.recognize("aabbc") << endl << endl;
-	*/
+*/
 	return 0;
 }
