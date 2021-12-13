@@ -105,6 +105,6 @@ public:
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
-	bool forest(std::vector<item> const&);
+	bool forest(lit & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
 };

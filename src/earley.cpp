@@ -147,12 +147,15 @@ bool earley::recognize(const char_t* s) {
 	for (const item& i : S) if (completed(i)) citem.emplace(i);
 	pfgraph.clear();
 	bool found = false;
+
 	for (size_t n : nts[start])
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
-			item root = *S.find(item(len, n, 0, G[n].size()));
-			forest({root});
 			found = true;
 		}
+	lit root = start;
+	root.st = 0 ;
+	root.en = len;
+	forest(root);
 	to_dot();
 	return found;
 }
@@ -202,6 +205,8 @@ bool earley::to_dot() {
 		l <<"_"<<k.st<<"_"<<k.en<<"_";
 		return l.str();
 	};
+	ss << endl<< "node" << "[ ordering =\"out\"];";
+	ss << endl<< "graph" << "[ overlap =false, splines = true];";
 	for( auto &it: pfgraph ) {
 		string key = keyfun(it.first);
 		ss << endl<< key << "[label=\""<< key <<"\"];";
@@ -240,14 +245,14 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 		return;
 	}
 	lit nxtl = G[eitem.prod ][curchd.size()+1];  // curchd.size() refers to index of cur literal to process in the rhs of production
-	if(!nxtl.nt())  nxtl.st = xfrom, nxtl.en = ++xfrom, curchd.push_back(nxtl), 
-					sbl_chd_forest(eitem, curchd, xfrom, ambset);
+	if(!nxtl.nt())  nxtl.st = xfrom, nxtl.en = nxtl.c() !='\0' ? ++xfrom: xfrom,
+		curchd.push_back(nxtl), sbl_chd_forest(eitem, curchd, xfrom, ambset);
 	else {
 		//forest(v);
 		nxtl.st = xfrom;
 		auto &nxtl_froms = find_all(xfrom, nxtl.n());
 		for( auto &v: nxtl_froms  ) {
-			if( v == eitem || v.set > eitem.set) continue;		
+			if( v.set > eitem.set) continue;		
 			nxtl.en = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
 			curchd.pop_back();
@@ -255,21 +260,23 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 	}
 }
 
-bool earley::forest ( std::vector<item> const &nxtset ) {
+bool earley::forest ( lit &root ) {
 	
+	if(!root.nt()) return false;
+	if(pfgraph.find(root) != pfgraph.end()) return false;
+
+	auto nxtset = find_all(root.st, root.n(), root.en);
+	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
 		lit cnode  = G[cur.prod][0];
 		cnode.st = cur.from;
-		cnode.en = cur.set;
-		if(pfgraph.find(cnode) != pfgraph.end()) continue;
-		std::set<std::vector<nidx_t>> ambset;
+		cnode.en = cur.set;	
 		vector<nidx_t> nxtlits;
 		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
 		pfgraph[cnode] = ambset;
 		for ( auto aset: ambset )
 			for( lit& nxt: aset) {
-				if(pfgraph.find(nxt) != pfgraph.end()) continue;
-				if(nxt.nt()) forest( find_all(nxt.st, nxt.n(), nxt.en));
+				forest( nxt);
 			}
 	}	
 	return true;
@@ -285,8 +292,17 @@ int main() {
 //			{"A", { { "" }, { "A", "a" } } },
 //			{"B", { { "b" }, { "B", "b" } } }
 		});
-//	earley e({{"S", { { "a", "B" }}}, {"B",{{"b"}}}});
 	cout << e.recognize("bbb") << endl << endl;
+	
+	earley e1({{"S", { { "b" }, {"S"} }}});
+	cout << e1.recognize("b") << endl << endl;
+
+	earley e2({ {"S", { { "a", "X", "X", "c" }, {"S"} }},
+				{"X", { {"X", "b"}, { "" } } },
+
+	});
+	cout << e2.recognize("abbc") << endl << endl;
+
 /*	cout << e.recognize("aa") << endl << endl;
 	cout << e.recognize("aab") << endl << endl;
 	cout << e.recognize("abb") << endl << endl;
