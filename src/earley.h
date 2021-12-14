@@ -41,6 +41,7 @@ class earley {
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
 	std::set<size_t> nullables;
+	std::string inputstr;
 	struct item {
 		item(size_t set, size_t prod, size_t from, size_t dot) :
 			set(set), prod(prod), from(from), dot(dot) {}
@@ -105,6 +106,7 @@ public:
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
+	std::string grammar_text();
 	bool forest(lit & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
 };
