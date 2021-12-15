@@ -154,8 +154,8 @@ bool earley::recognize(const char_t* s) {
 			found = true;
 		}
 	lit root = start;
-	root.st = 0 ;
-	root.en = len;
+	root.from = 0 ;
+	root.to = len;
 	forest(root);
 	to_dot();
 	return found;
@@ -188,7 +188,6 @@ vector<ast> earley::forest() {
 
 const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt, int end ) {
 	std::vector<item> ret;
-	
 	for(auto it = citem.begin(); it != citem.end(); it++) {
 		if( it->from == xfrom && nts[nt].count(it->prod) ){
 			if( end != -1 && (int)it->set == end ) ret.push_back(*it);
@@ -203,8 +202,7 @@ std::string earley::grammar_text(){
 		txt << ("\n\\l");
 		for( const auto &l : p){
 			if(l.nt()) txt << d.get(l.n());
-			else if ( l.c() != '\0')	 
-				txt << l.c();
+			else if ( l.c() != '\0') txt << l.c();
 			else txt << "ε";
 			txt<< " ";
 		}
@@ -218,7 +216,7 @@ bool earley::to_dot() {
 	auto keyfun = [this] (const nidx_t & k){
 		stringstream l;
 		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
-		l <<"_"<<k.st<<"_"<<k.en<<"_";
+		l <<"_"<<k.from<<"_"<<k.to<<"_";
 		return l.str();
 	};
 	ss << "_input_"<<"[label =\""<<inputstr <<"\", shape = rectangle]" ;
@@ -252,48 +250,61 @@ bool earley::to_dot() {
 	return true;
 
 }
-
+// collects all possible variations of the given item's rhs while respecting the span of the item
+// and stores them in the set ambset. 
 void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
 
-//	for(size_t len = 1, xfrom = curchd.from ; len < G[curchd.prod].size(); len++ ) {
-
+	//check if we have reached the end of the rhs of prod
 	if( G[eitem.prod].size() <= curchd.size()+1 )  {
-		if(curchd.back().en == eitem.set)
+		// match the end of the span we are searching in.
+		if(curchd.back().to == eitem.set) 		
 			 ambset.insert(curchd);
 		return;
 	}
-	lit nxtl = G[eitem.prod ][curchd.size()+1];  // curchd.size() refers to index of cur literal to process in the rhs of production
-	if(!nxtl.nt())  nxtl.st = xfrom, nxtl.en = nxtl.c() !='\0' ? ++xfrom: xfrom,
+	// curchd.size() refers to index of cur literal to process in the rhs of production
+	nidx_t nxtl = G[eitem.prod ][curchd.size()+1];
+	// set the span start/end of the terminal symbol 
+	if(!nxtl.nt()) {
+		nxtl.from = xfrom;
+		if( nxtl.c() == '\0') nxtl.to = xfrom;
+		else if (inputstr.at(xfrom) == nxtl.c())  
+			nxtl.to = ++xfrom ;
+		else // not building the correction variation, prune this path quickly 
+			return ;
+		// build from the next in the line
 		curchd.push_back(nxtl), sbl_chd_forest(eitem, curchd, xfrom, ambset);
+	}
 	else {
-		//forest(v);
-		nxtl.st = xfrom;
+		// get the from/to span of all non-terminals in the rhs of production.
+		nxtl.from = xfrom;
 		auto &nxtl_froms = find_all(xfrom, nxtl.n());
 		for( auto &v: nxtl_froms  ) {
-			if( v.set > eitem.set) continue;		
-			nxtl.en = v.set, curchd.push_back(nxtl), xfrom = v.set,
+			// ignore beyond the span
+			if( v.set > eitem.set) continue;
+			// store current and recursively build for next nt	
+			nxtl.to = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
 			curchd.pop_back();
 		}
 	}
 }
 
-bool earley::forest ( lit &root ) {
+bool earley::forest ( nidx_t &root ) {
 	
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
-	auto nxtset = find_all(root.st, root.n(), root.en);
+	auto nxtset = find_all(root.from, root.n(), root.to);
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
-		lit cnode  = G[cur.prod][0];
-		cnode.st = cur.from;
-		cnode.en = cur.set;	
+		nidx_t cnode  = G[cur.prod][0];
+		cnode.from = cur.from;
+		cnode.to = cur.set;	
 		vector<nidx_t> nxtlits;
 		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
 		pfgraph[cnode] = ambset;
 		for ( auto aset: ambset )
-			for( lit& nxt: aset) {
+			for( nidx_t& nxt: aset) {
 				forest( nxt);
 			}
 	}	
@@ -339,6 +350,9 @@ int main() {
 				{"T", { { "b","b","b" } }},
 	});
 	cout << e4.recognize("abbb") << endl << endl;
+
+	earley e5({{"S", { { "b", }, {"S", "S", "S", "S"}, {""} }}});
+	cout << e5.recognize("b") << endl << endl;
 
 /*	cout << e.recognize("aa") << endl << endl;
 	cout << e.recognize("aab") << endl << endl;

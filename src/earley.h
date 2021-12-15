@@ -25,13 +25,13 @@ class earley {
 		bool nt() const { return std::holds_alternative<size_t>(*this); }
 		size_t n() const { return std::get<size_t>(*this); }
 		char c() const { return std::get<char>(*this); }
-		size_t st = 0;  // start of span match
-		size_t en = 0;	// end of span match
+		size_t from = 0;  // start of span match
+		size_t to = 0;	// end of span match
 		bool operator<(const lit& i) const {
-			std::variant<size_t, char> tb = *this, ib = i; 
-			if(tb != i )	return tb < i;
-			if(st != i.st) 	return st < i.st;
-			if(en != i.en) 	return en < i.en;
+			const std::variant<size_t, char> &tb = *this, &ib = i; 
+			if(tb != ib )	return tb < i;
+			if(from != i.from) 	return from < i.from;
+			if(to != i.to) 	return to < i.to;
 			return false;
 		}
 	};
