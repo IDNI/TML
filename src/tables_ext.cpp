@@ -380,7 +380,32 @@ spbdd_handle tables::ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars
 	return out;
 }
 
-// switch between LS and MS bit ordering
+
+// switch between LS and MS bit ordering on non interleaved
+// delta: offset to 1st possible bit for argument / variable
+spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t delta) {
+
+	uints perm1;
+	bools ex;
+	perm1 = perm_init(n_bits+delta);
+	for (size_t i = 0; i < n_bits+delta; i++) {
+		if (i < delta) {
+			perm1[i] = i;
+			ex.push_back(true);
+		}
+		else {
+			perm1[i] = ((n_bits+delta-1-(i-delta)));// + i;
+			ex.push_back(false);
+		}
+	}
+	spbdd_handle x = in^perm1;
+	//spbdd_handle x = bdd_permute_ex(in,ex,perm1);
+
+	return x;
+}
+
+
+// switch between LS and MS bit ordering on interleaved bit ordering
 spbdd_handle tables::perm_bit_reverse(spbdd_handle in, size_t n_bits, size_t n_vars) {
 
 	uints perm1;

@@ -1,0 +1,105 @@
+predtype A(int:2 ?x).
+predtype B(int:2 ?x).
+predtype B0_0(int:2 ?x).
+predtype B1_0(int:2 ?x).
+predtype B0_1(int:2 ?x).
+predtype B1_1(int:2 ?x).
+predtype B0_2(int:2 ?x).
+predtype B1_2(int:2 ?x).
+predtype B0_3(int:2 ?x).
+predtype B1_3(int:2 ?x).
+predtype B0_4(int:2 ?x).
+predtype B1_4(int:2 ?x).
+predtype B0_5(int:2 ?x).
+predtype B1_5(int:2 ?x).
+predtype B0_6(int:2 ?x).
+predtype B1_6(int:2 ?x).
+predtype B0_7(int:2 ?x).
+predtype B1_7(int:2 ?x).
+predtype B0_8(int:2 ?x).
+predtype B1_8(int:2 ?x).
+predtype B0_9(int:2 ?x).
+predtype B1_9(int:2 ?x).
+
+predtype C(int:2 ?x).
+U(3).
+#
+#------ PASS
+B0_0(0).
+B0_0(1).
+B1_0(0).
+B1_0(1).
+B1_0(2).
+A2_0(?x) :- B0_0(?x), B1_0(?y), ?x <= ?y.
+#!A2_0(?x).
+# # ------ PASS
+B0_1(0).
+B0_1(1).
+B1_1(0).
+B1_1(1).
+A2_1(?x) :- B0_1(?x), B1_1(?y), ?x <= ?y.
+#!A2_1(?x).
+#
+# ------ PASS
+B0_3(0).
+B0_3(1).
+B0_3(2).
+B1_3(0).
+A2_3(?x) :- B0_3(?x), B1_3(?y), ?x <= ?y.
+#!A2_3(?x).
+
+# # ----- PASS
+B0_4(0).
+B0_4(1).
+B0_4(2).
+#B1(0).
+B1_4(1).
+#B1(2).
+A2_4(?x) :- B0_4(?x), B1_4(?y), ?x <= ?y.
+#!A2_4(?x).
+
+# ------ PASS
+B0_5(0).
+B0_5(1).
+B1_5(0).
+A2_5(?x) :- B0_5(?x), B1_5(?y), ?x <= ?y.
+#!A2_5(?x).
+
+# ------ PASS
+B0_6(0).
+B0_6(1).
+B0_6(2).
+B1_6(0).
+A2_6(?x) :- B0_6(?x), B1_6(?y), ?x <= ?y.
+#!A2_6(?x).
+
+# ------ PASS
+B0_7(0).
+B0_7(1).
+B0_7(2).
+B0_7(3).
+B1_7(0).
+A2_7(?x) :- B0_7(?x), B1_7(?y), ?x <= ?y.
+#!A2_7(?x).
+# ------ PASS
+B0_8(0).
+#B0_8(1).
+B0_8(2).
+B0_8(3).
+B1_8(3). #1,2,3 PASS
+A2_8(?x) :- B0_8(?x), B1_8(?y), ?x <= ?y.
+#!A2_8(?x).
+# ------ PASS
+B0_9(0).
+B0_9(2).
+B1_9(1).
+B1_9(3).
+A2_9(?x) :- B0_9(?x), B1_9(?y), ?x <= ?y.
+#!A2_9(?x).
+#
+#------ PASS
+B0_2(1).
+B0_2(3).
+B1_2(0).
+B1_2(2).
+A2_2(?x) :- B0_2(?x), B1_2(?y), ?x <= ?y.

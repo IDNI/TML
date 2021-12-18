@@ -222,6 +222,8 @@ spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
+spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
+		size_t x_bitw, size_t y_bitw, size_t x_idx, size_t y_idx);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars);
@@ -290,15 +292,17 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
+	friend spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
+			size_t x_bitw, size_t y_bitw, size_t x_idx, size_t y_idx);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	friend spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt);
-	
+
 	/* Get the absolute BDD referenced by the given BDD reference. If the given
 	 * BDD reference represents the function f, the low reference of the produced
 	 * BDD represents f with the variable represented by x set to 0, and the high
 	 * reference the function f with this variable set to 1. */
-	
+
 	inline static bdd get(bdd_ref x) {
 		// Get the BDD that this reference is attributing
 		bdd cbdd = V[GET_BDD_ID(x)];
@@ -369,6 +373,8 @@ class bdd {
 	static bdd_ref bitwise_xor(bdd_ref a_in, bdd_ref b_in);
 	static bdd_ref bitwise_not(bdd_ref a_in);
 	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
+	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, size_t x_bitw, size_t y_bitw /*, size_t x_idx=0, size_t y_idx=0*/);
+	//static int_t geq(int_t a, int_t b, size_t bit, size_t x_bitw, size_t y_bitw);
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
 	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
@@ -419,19 +425,19 @@ public:
 	static size_t get_ite_cache_size();
 	static void set_gc_limit(size_t new_gc_limit);
 	static void set_gc_enabled(bool new_gc_enabled);
-	
+
 	/* Return the absolute BDD corresponding to the high part of the given BDD
 	 * reference. If x represents a boolean function f, then this function returns
 	 * a reference to a BDD representing the function f with the variable
 	 * corresponding to x set to 1. */
-	
+
 	inline static bdd_ref hi(bdd_ref x) {
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[GET_BDD_ID(x)];
 		// Apply output inversion
 		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x));
 	}
-	
+
 	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
 
 	inline static bdd_ref lo(bdd_ref x) {
@@ -441,7 +447,7 @@ public:
 		// Apply output inversion
 		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x));
 	}
-	
+
 	/* The variable of a BDD reference is its root/absolute shift. */
 
 	inline static bdd_shft var(bdd_ref x) { return GET_SHIFT(x); }

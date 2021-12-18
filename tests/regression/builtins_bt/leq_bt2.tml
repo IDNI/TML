@@ -1,0 +1,68 @@
+predtype A(int:2 ?x).
+predtype B(int:2 ?x).
+predtype B0_0(int:3 ?x).
+predtype B1_0(int:3 ?x).
+predtype B0_1(int:3 ?x).
+predtype B1_1(int:3 ?x).
+predtype B0_2(int:3 ?x).
+predtype B1_2(int:3 ?x).
+predtype B0_3(int:3 ?x).
+predtype B1_3(int:3 ?x).
+predtype B0_4(int:7 ?x).
+predtype B1_4(int:7 ?x).
+
+
+#------ PASS
+B0_0(0).
+B0_0(1).
+B0_0(5).
+B1_0(0).
+B1_0(1).
+B1_0(2).
+B1_0(4).
+A2_0(?x) :- B0_0(?x), B1_0(?y), ?x <= ?y.
+
+#------ PASS
+B0_1(0).
+B0_1(1).
+B0_1(4).
+B0_1(5).
+B1_1(0).
+B1_1(1).
+B1_1(2).
+B1_1(4).
+# bitw 3 3
+A2_1(?x) :- B0_1(?x), B1_1(?y), ?x <= ?y.
+
+
+#------ PASS
+B0_2(1).
+B0_2(3).
+B0_2(7).
+B1_2(0).
+# bitw 3 3
+A2_2(?x) :- B0_2(?x), B1_2(?y), ?x <= ?y.
+
+#------ PASS
+B0_3(0).
+B0_3(1).
+B0_3(2).
+B0_3(4).
+B0_3(5).
+B1_3(1).
+B1_3(3).
+B1_3(4).
+# bitw 3 3
+A2_3(?x) :- B0_3(?x), B1_3(?y), ?x <= ?y.
+
+#------ PASS
+B0_4(0).
+B0_4(1).
+B0_4(39).
+B0_4(127).
+B1_4(1).
+B1_4(3).
+B1_4(64).
+
+# bitw 7 7
+A2_4(?x) :- B0_4(?x), B1_4(?y), ?x <= ?y.

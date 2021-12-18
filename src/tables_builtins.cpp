@@ -174,21 +174,87 @@ bool tables::init_bdd_builtins() {
 	};
 	auto bltin_leq_handler = [this]() {
 		return [this](blt_ctx& c) {
+			spbdd_handle arg0, arg1;
+			size_t i = 0;
+			size_t arg0_w,arg1_w = 0;
+			spbdd_handle const0 = htrue, const1 = htrue;
 
-			for (auto x : *c.hs) {
-				COUT << "bltin args\n";
-				::out(COUT, x)<<endl<<endl;
+			for (auto &x : tab_type.at(c.t.tab)){
+				//COUT << "bits " << x.pty.bsz << endl;
+				if (i == 0) arg0_w = x.pty.bsz;
+				else if (i == 1) arg1_w = x.pty.bsz;
+				i++;
 			}
 
-			bdd_handles hs;
-			c.args_bodies(hs);
-			::out(COUT, hs[0])<<endl<<endl;
-			COUT << "Leq Handler"<< endl;
-			/*c.out(leq_handler(
-				c.varpos(0), c.varpos(1), c.v
-				arpos(2),
-				hs[0], hs[1], c.a->varslen));
-			*/
+			//workaround to get constants
+			if (c.t[0] >= 0 || c.t[1] >= 0) {
+				for (size_t i = 0; i < c.t.size(); ++i) {
+					if (c.t[i] >= 0 && i % 2 == 0)
+						const0 = const0 && ::from_bit(arg0_w-(i>>1) , c.t[i] == 1);
+					else if (c.t[i] >= 0 && i % 2 == 1)
+						const1 = const1 && ::from_bit(arg0_w+arg1_w-(i>>1)-1, c.t[i] == 1);
+				}
+			}
+
+			//bdd_handles hs;
+			//TODO debug why hs[1] is not created
+			//c.args_bodies(hs);
+			//::out(COUT, hs[0])<<endl<<endl;
+			//::out(COUT, hs[1])<<endl<<endl;
+
+			//TODO get output var, ?x or ?y
+			i = 0;
+			bool dual = false;
+			for (auto x : *c.hs) {
+				//COUT << "bltin args\n";
+				//get ordering
+				if(c.t[0] > c.t[1] && c.t[0] < 0) {
+					if (i == 2) arg0 = x;
+					else if (i == 3) arg1 = x;
+				} else {
+					dual = true;
+					if (i == 2) arg1 = x;
+					else if (i == 3) arg0 = x;
+				}
+				i++;
+				//::out(COUT, x)<<endl<<endl;
+			}
+
+			spbdd_handle s0 = const0;
+			if (const0 == htrue)
+				s0 = perm_bit_reverse_bt(arg0, arg0_w, 0);
+			//COUT << "### S0:"<< endl;
+			//::out(COUT, s0)<<endl<<endl;
+
+			spbdd_handle s1 = const1;
+			if (const1 == htrue)
+				s1 = perm_bit_reverse_bt(arg1, arg1_w, arg0_w);
+			//COUT << "### S1:"<< endl;
+			//::out(COUT, s1)<<endl<<endl;
+
+			assert( bdd_root(s0) < bdd_root(s1) && "LEQ_handler: wrong assumed term/argument ordering");
+
+			//COUT << " nvars : " << c.a->varslen;
+			//COUT << ", total bits : " << bits << endl;
+			//COUT << c.varpos(0), c.varpos(1),
+
+			spbdd_handle leq = htrue;
+			if (!dual)
+				leq = bdd_leq(/*hs[0]*/ s0, s1 /*hs[1]*/, arg0_w, arg1_w, 0 , 1/*c.varpos(0), c.varpos(1), c.a->varslen , bits*/);
+			else
+				COUT << "LEQ_handler: DUAL operator GEQ is work in progress\n";
+
+			//spbdd_handle m = bdd_max(s1, arg1_w)
+			//COUT << "Leq Handler output MSB2LSB:"<< endl;
+			//::out(COUT, leq)<<endl<<endl;
+
+			//TODO: arg0_w when ?x in head, arg1_w when ?y in head
+			spbdd_handle s2 = perm_bit_reverse_bt(leq, arg0_w, 0);
+			//COUT << "Leq Handler output:"<< endl;
+			//::out(COUT, s2)<<endl<<endl;
+
+			c.out(s2);
+			//hs.clear();
 		};
 	};
 
@@ -198,9 +264,7 @@ bool tables::init_bdd_builtins() {
 	bltins.add(B, "bw_not",  3, 1, get_bw_h(BITWNOT), 2);
 	bltins.add(B, "pw_add",  3, 1, get_pw_h(ADD),     2);
 	bltins.add(B, "pw_mult", 3, 1, get_pw_h(MULT),    2);
-
 	bltins.add(B, "leq", 2, 1, bltin_leq_handler(), 2);
-
 	return true;
 }
 

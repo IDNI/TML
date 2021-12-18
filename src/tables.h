@@ -382,6 +382,7 @@ private:
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits,
 		size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
+	spbdd_handle perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t delta);
 	void set_constants(const term& t, spbdd_handle &q) const;
 	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq);
 	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
