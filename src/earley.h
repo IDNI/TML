@@ -25,7 +25,7 @@ class earley {
 		bool nt() const { return std::holds_alternative<size_t>(*this); }
 		size_t n() const { return std::get<size_t>(*this); }
 		char c() const { return std::get<char>(*this); }
-		size_t from = 0;  // start of span match
+	/*	size_t from = 0;  // start of span match
 		size_t to = 0;	// end of span match
 		bool operator<(const lit& i) const {
 			const std::variant<size_t, char> &tb = *this, &ib = i; 
@@ -34,7 +34,23 @@ class earley {
 			if(to != i.to) 	return to < i.to;
 			return false;
 		}
+	*/
 	};
+
+	struct pnode: public earley::lit {
+		std::pair<size_t, size_t> span; // start/end of the matched span
+		pnode( const earley::lit _l, const std::pair<size_t, size_t> _span = {0, 0} ): span(_span)
+		 { *this = _l; }
+		
+		bool operator<(const pnode& i) const {
+			const lit &tb = *this, &ib = i; 
+			if(tb != ib )	return tb < i;
+			if(span.first != i.span.first) 	return span.first < i.span.first;
+			if(span.second != i.span.second) return span.second < i.span.second;
+			return false;
+		}
+	};
+
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
 	DBG(friend std::ostream& operator<<(std::ostream& os, const std::vector<lit>& v);)
 	std::vector<std::vector<lit>> G;
@@ -101,12 +117,12 @@ public:
 			std::string,
 			std::vector<std::vector<std::string>>>>& g);
 	bool recognize(const char_t* s);
-	typedef lit nidx_t;
+	typedef pnode nidx_t;
 	bool to_dot();
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	std::string grammar_text();
-	bool forest(lit & );
+	bool forest(nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
 };

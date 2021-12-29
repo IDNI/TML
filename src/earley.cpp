@@ -148,14 +148,11 @@ bool earley::recognize(const char_t* s) {
 	for (const item& i : S) if (completed(i)) citem.emplace(i);
 	pfgraph.clear();
 	bool found = false;
-
 	for (size_t n : nts[start])
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
 			found = true;
 		}
-	lit root = start;
-	root.from = 0 ;
-	root.to = len;
+	nidx_t root(start, {0,len});
 	forest(root);
 	to_dot();
 	return found;
@@ -216,7 +213,7 @@ bool earley::to_dot() {
 	auto keyfun = [this] (const nidx_t & k){
 		stringstream l;
 		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
-		l <<"_"<<k.from<<"_"<<k.to<<"_";
+		l <<"_"<<k.span.first<<"_"<<k.span.second<<"_";
 		return l.str();
 	};
 	ss << "_input_"<<"[label =\""<<inputstr <<"\", shape = rectangle]" ;
@@ -257,7 +254,7 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 	//check if we have reached the end of the rhs of prod
 	if( G[eitem.prod].size() <= curchd.size()+1 )  {
 		// match the end of the span we are searching in.
-		if(curchd.back().to == eitem.set) 		
+		if(curchd.back().span.second == eitem.set) 		
 			 ambset.insert(curchd);
 		return;
 	}
@@ -265,41 +262,42 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 	nidx_t nxtl = G[eitem.prod ][curchd.size()+1];
 	// set the span start/end of the terminal symbol 
 	if(!nxtl.nt()) {
-		nxtl.from = xfrom;
-		if( nxtl.c() == '\0') nxtl.to = xfrom;
+		nxtl.span.first = xfrom;
+		// for empty, use same span edge as from
+		if( nxtl.c() == '\0') nxtl.span.second = xfrom;
+		// ensure well-formed combination (matching input) early
 		else if (inputstr.at(xfrom) == nxtl.c())  
-			nxtl.to = ++xfrom ;
-		else // not building the correction variation, prune this path quickly 
+			nxtl.span.second = ++xfrom ;
+		else // if not building the correction variation, prune this path quickly 
 			return ;
 		// build from the next in the line
 		curchd.push_back(nxtl), sbl_chd_forest(eitem, curchd, xfrom, ambset);
 	}
 	else {
 		// get the from/to span of all non-terminals in the rhs of production.
-		nxtl.from = xfrom;
+		nxtl.span.first = xfrom;
 		auto &nxtl_froms = find_all(xfrom, nxtl.n());
 		for( auto &v: nxtl_froms  ) {
 			// ignore beyond the span
 			if( v.set > eitem.set) continue;
 			// store current and recursively build for next nt	
-			nxtl.to = v.set, curchd.push_back(nxtl), xfrom = v.set,
+			nxtl.span.second = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
 			curchd.pop_back();
 		}
 	}
 }
 
+// builds the forest starting with root
 bool earley::forest ( nidx_t &root ) {
 	
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
-	auto nxtset = find_all(root.from, root.n(), root.to);
+	auto nxtset = find_all(root.span.first, root.n(), root.span.second);
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
-		nidx_t cnode  = G[cur.prod][0];
-		cnode.from = cur.from;
-		cnode.to = cur.set;	
+		nidx_t cnode( G[cur.prod][0], {cur.from, cur.set} );
 		vector<nidx_t> nxtlits;
 		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
 		pfgraph[cnode] = ambset;
@@ -354,6 +352,10 @@ int main() {
 	earley e5({{"S", { { "b", }, {"S", "S", "S", "S"}, {""} }}});
 	cout << e5.recognize("b") << endl << endl;
 
+	earley e6({{"S", { {"n"}, { "S", "X", "S" }}},
+				{"X", { {"p"}, {"m"}}}
+	});
+	cout << e6.recognize("npnmn") << endl;
 /*	cout << e.recognize("aa") << endl << endl;
 	cout << e.recognize("aab") << endl << endl;
 	cout << e.recognize("abb") << endl << endl;
