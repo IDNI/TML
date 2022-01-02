@@ -1,0 +1,80 @@
+digraph {
+_input_[label ="abbc", shape = rectangle]_grammar_[label ="
+\lS a X X c 
+\lS S 
+\lX X b 
+\lX ε ", shape = rectangle]
+node[ ordering ="out"];
+graph[ overlap =false, splines = true];
+S_0_4_[label="S_0_4_"];
+S_0_4_0[shape = point,label="S_0_4_0"];
+S_0_4_->S_0_4_0;
+S_0_4_[label="S_0_4_"];
+S_0_4_0->S_0_4_;
+S_0_4_1[shape = point,label="S_0_4_1"];
+S_0_4_->S_0_4_1;
+a_0_1_[label="a_0_1_"];
+S_0_4_1->a_0_1_;
+X_1_1_[label="X_1_1_"];
+S_0_4_1->X_1_1_;
+X_1_3_[label="X_1_3_"];
+S_0_4_1->X_1_3_;
+c_3_4_[label="c_3_4_"];
+S_0_4_1->c_3_4_;
+S_0_4_2[shape = point,label="S_0_4_2"];
+S_0_4_->S_0_4_2;
+a_0_1_[label="a_0_1_"];
+S_0_4_2->a_0_1_;
+X_1_2_[label="X_1_2_"];
+S_0_4_2->X_1_2_;
+X_2_3_[label="X_2_3_"];
+S_0_4_2->X_2_3_;
+c_3_4_[label="c_3_4_"];
+S_0_4_2->c_3_4_;
+S_0_4_3[shape = point,label="S_0_4_3"];
+S_0_4_->S_0_4_3;
+a_0_1_[label="a_0_1_"];
+S_0_4_3->a_0_1_;
+X_1_3_[label="X_1_3_"];
+S_0_4_3->X_1_3_;
+X_3_3_[label="X_3_3_"];
+S_0_4_3->X_3_3_;
+c_3_4_[label="c_3_4_"];
+S_0_4_3->c_3_4_;
+X_1_1_[label="X_1_1_"];
+X_1_1_0[shape = point,label="X_1_1_0"];
+X_1_1_->X_1_1_0;
+ε_1_1_[label="ε_1_1_"];
+X_1_1_0->ε_1_1_;
+X_1_2_[label="X_1_2_"];
+X_1_2_0[shape = point,label="X_1_2_0"];
+X_1_2_->X_1_2_0;
+X_1_1_[label="X_1_1_"];
+X_1_2_0->X_1_1_;
+b_1_2_[label="b_1_2_"];
+X_1_2_0->b_1_2_;
+X_1_3_[label="X_1_3_"];
+X_1_3_0[shape = point,label="X_1_3_0"];
+X_1_3_->X_1_3_0;
+X_1_2_[label="X_1_2_"];
+X_1_3_0->X_1_2_;
+b_2_3_[label="b_2_3_"];
+X_1_3_0->b_2_3_;
+X_2_2_[label="X_2_2_"];
+X_2_2_0[shape = point,label="X_2_2_0"];
+X_2_2_->X_2_2_0;
+ε_2_2_[label="ε_2_2_"];
+X_2_2_0->ε_2_2_;
+X_2_3_[label="X_2_3_"];
+X_2_3_0[shape = point,label="X_2_3_0"];
+X_2_3_->X_2_3_0;
+X_2_2_[label="X_2_2_"];
+X_2_3_0->X_2_2_;
+b_2_3_[label="b_2_3_"];
+X_2_3_0->b_2_3_;
+X_3_3_[label="X_3_3_"];
+X_3_3_0[shape = point,label="X_3_3_0"];
+X_3_3_->X_3_3_0;
+ε_3_3_[label="ε_3_3_"];
+X_3_3_0->ε_3_3_;
+}

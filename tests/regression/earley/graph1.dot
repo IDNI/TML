@@ -1,0 +1,16 @@
+digraph {
+_input_[label ="b", shape = rectangle]_grammar_[label ="
+\lS b 
+\lS S ", shape = rectangle]
+node[ ordering ="out"];
+graph[ overlap =false, splines = true];
+S_0_1_[label="S_0_1_"];
+S_0_1_0[shape = point,label="S_0_1_0"];
+S_0_1_->S_0_1_0;
+S_0_1_[label="S_0_1_"];
+S_0_1_0->S_0_1_;
+S_0_1_1[shape = point,label="S_0_1_1"];
+S_0_1_->S_0_1_1;
+b_0_1_[label="b_0_1_"];
+S_0_1_1->b_0_1_;
+}

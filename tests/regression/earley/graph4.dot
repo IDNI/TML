@@ -1,0 +1,49 @@
+digraph {
+_input_[label ="abbb", shape = rectangle]_grammar_[label ="
+\lS A T 
+\lS a T 
+\lA a 
+\lA B A 
+\lB ε 
+\lT b b b ", shape = rectangle]
+node[ ordering ="out"];
+graph[ overlap =false, splines = true];
+S_0_4_[label="S_0_4_"];
+S_0_4_0[shape = point,label="S_0_4_0"];
+S_0_4_->S_0_4_0;
+A_0_1_[label="A_0_1_"];
+S_0_4_0->A_0_1_;
+T_1_4_[label="T_1_4_"];
+S_0_4_0->T_1_4_;
+S_0_4_1[shape = point,label="S_0_4_1"];
+S_0_4_->S_0_4_1;
+a_0_1_[label="a_0_1_"];
+S_0_4_1->a_0_1_;
+T_1_4_[label="T_1_4_"];
+S_0_4_1->T_1_4_;
+A_0_1_[label="A_0_1_"];
+A_0_1_0[shape = point,label="A_0_1_0"];
+A_0_1_->A_0_1_0;
+B_0_0_[label="B_0_0_"];
+A_0_1_0->B_0_0_;
+A_0_1_[label="A_0_1_"];
+A_0_1_0->A_0_1_;
+A_0_1_1[shape = point,label="A_0_1_1"];
+A_0_1_->A_0_1_1;
+a_0_1_[label="a_0_1_"];
+A_0_1_1->a_0_1_;
+T_1_4_[label="T_1_4_"];
+T_1_4_0[shape = point,label="T_1_4_0"];
+T_1_4_->T_1_4_0;
+b_1_2_[label="b_1_2_"];
+T_1_4_0->b_1_2_;
+b_2_3_[label="b_2_3_"];
+T_1_4_0->b_2_3_;
+b_3_4_[label="b_3_4_"];
+T_1_4_0->b_3_4_;
+B_0_0_[label="B_0_0_"];
+B_0_0_0[shape = point,label="B_0_0_0"];
+B_0_0_->B_0_0_0;
+ε_0_0_[label="ε_0_0_"];
+B_0_0_0->ε_0_0_;
+}
