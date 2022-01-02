@@ -37,16 +37,19 @@ class earley {
 	*/
 	};
 
-	struct pnode: public earley::lit {
+	struct pnode {
+		earley::lit l;
 		std::pair<size_t, size_t> span; // start/end of the matched span
-		pnode( const earley::lit _l, const std::pair<size_t, size_t> _span = {0, 0} ): span(_span)
-		 { *this = _l; }
+		pnode( const earley::lit _l, const std::pair<size_t, size_t> _span = {0, 0} ): 
+		l(_l),span(_span){}
+		
+		bool nt() const { return l.nt(); }
+		size_t n() const { return l.n(); }
+		char c() const { return l.c(); }
 		
 		bool operator<(const pnode& i) const {
-			const lit &tb = *this, &ib = i; 
-			if(tb != ib )	return tb < i;
-			if(span.first != i.span.first) 	return span.first < i.span.first;
-			if(span.second != i.span.second) return span.second < i.span.second;
+			if(l != i.l )	return l < i.l;
+			if(span != i.span ) return span < i.span;
 			return false;
 		}
 	};
@@ -125,4 +128,5 @@ public:
 	std::string grammar_text();
 	bool forest(nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
+	bool to_facts();
 };

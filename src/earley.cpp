@@ -155,6 +155,7 @@ bool earley::recognize(const char_t* s) {
 	nidx_t root(start, {0,len});
 	forest(root);
 	to_dot();
+	to_facts();
 	return found;
 }
 /*
@@ -206,7 +207,52 @@ std::string earley::grammar_text(){
 	}		
 	return txt.str();
 }
+bool earley::to_facts(){
+	
+	std::stringstream ss;
+	
+	auto strfun = [this] (const nidx_t & k){
+		stringstream l;
+		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
+		l <<"_"<<k.span.first<<"_"<<k.span.second<<"_";
+		return l.str();
+	};
+	map<nidx_t, size_t> nid;
+	size_t id = 0;
+	for( auto &it: pfgraph ){
+		nid[it.first] = id;
+		id += it.second.size(); // ambig node ids;
+		DBG(assert(it.second.size()!= 0));
+		id++;
+	}
+	ss<<std::endl;
+	for( auto &it: pfgraph ) {
+		string ndesc = strfun(it.first);
+		ss << "node" << "("<< nid[it.first] <<",\""<< ndesc <<"\")."<<std::endl;
+		size_t p = 0;
+		for( auto &pack : it.second) { 
+			++p;
+			ss << "edge" <<"(" << nid[it.first] << ","<< nid[it.first] + p << ")."<<std::endl;
+			ss << "node" << "("<< nid[it.first] + p <<",\"\")."<<std::endl;
+			for( auto & nn: pack) {
+				if(nid.find(nn) == nid.end()) nid[nn] = id++;
+				string nndesc = strfun(nn);
+				ss << "node" << "("<< nid[nn] <<",\""<< nndesc <<"\")."<<std::endl;
+				ss << "edge" <<"(" << nid[it.first] + p << ","<< nid[nn]  << ")."<<std::endl;
+			}
+		}
+	}
 
+	static size_t c = 0;
+	stringstream ssf;
+	ssf<<"parse_graph"<<c++ << ".tml";
+	std::ofstream file(ssf.str());
+	file << ss.str();
+	file.close();
+	return true;
+
+
+}
 bool earley::to_dot() {
 	
 	std::stringstream ss;
@@ -245,7 +291,6 @@ bool earley::to_dot() {
 	file << "digraph {" << endl<< ss.str() << endl<<"}"<<endl;
 	file.close();
 	return true;
-
 }
 // collects all possible variations of the given item's rhs while respecting the span of the item
 // and stores them in the set ambset. 
