@@ -129,4 +129,7 @@ public:
 	bool forest(nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
 	bool to_facts();
+	bool to_tml_rule() const;
+	std::string to_tml_rule(const nidx_t nd) const;
+
 };

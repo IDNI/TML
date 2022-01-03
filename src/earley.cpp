@@ -156,6 +156,7 @@ bool earley::recognize(const char_t* s) {
 	forest(root);
 	to_dot();
 	to_facts();
+	to_tml_rule();
 	return found;
 }
 /*
@@ -251,6 +252,45 @@ bool earley::to_facts(){
 	file.close();
 	return true;
 
+
+}
+
+string earley::to_tml_rule(const nidx_t nd) const {
+	
+	std::stringstream ss;
+	if(nd.l.nt())	ss << d.get( nd.l.n());
+	else if( nd.l.c() =='\0' ) ss <<"ε";
+	else  ss << nd.l.c();
+
+	ss <<"(" <<nd.span.first<< ","<< nd.span.second <<")";
+	return ss.str();
+}
+bool earley::to_tml_rule() const{
+	stringstream ss;
+	set<string> terminals;
+
+	for( auto &it: pfgraph ) {
+		for( auto &pack : it.second) { 
+			ss <<to_tml_rule(it.first)<< ":-";
+			for( size_t i=0; i< pack.size(); i++) {
+				// if terminal
+				if(pfgraph.find(pack[i]) == pfgraph.end()) terminals.insert(to_tml_rule(pack[i]));
+				ss << to_tml_rule(pack[i]) << (i == pack.size()-1 ? ".":",");
+			};
+			ss << std::endl;
+		}
+	}
+
+	for( auto &t: terminals)
+		ss << t <<"." << std::endl;
+
+	static size_t c = 0;
+	stringstream ssf;
+	ssf<<"parse_rules"<<c++ << ".tml";
+	std::ofstream file(ssf.str());
+	file << ss.str();
+	file.close();
+	return true;
 
 }
 bool earley::to_dot() {
