@@ -261,9 +261,6 @@ void options::setup() {
 	add_output    ("debug",       "debug output");
 	add_output    ("benchmarks",  "benchmarking results (@null by default)");
 	add_output_alt("transformed", "t",  "transformation into clauses");
-	add_output("xsb",     "attempt to translate program into XSB");
-	add_output("swipl",   "attempt to translate program into SWI-Prolog");
-	add_output("souffle", "attempt to translate program into Souffle");
 
 	init_defaults();
 }

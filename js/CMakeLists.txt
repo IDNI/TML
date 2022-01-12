@@ -38,8 +38,6 @@ set(JSLIB_SOURCES
 	../src/options.h
 	../src/output.cpp
 	../src/output.h
-	../src/print_prolog.cpp
-	../src/print_souffle.cpp
 	../src/proof.cpp
 	../src/save_csv.cpp
 	../src/tables.cpp

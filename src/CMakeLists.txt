@@ -45,8 +45,6 @@ set(TML_SOURCES
 	input.cpp
 	options.cpp
 	output.cpp
-	print_prolog.cpp
-	print_souffle.cpp
 	proof.cpp
 	save_csv.cpp
 	tables.cpp

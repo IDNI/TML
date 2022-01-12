@@ -30,7 +30,6 @@
 #include "options.h"
 
 
-typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
 
@@ -265,7 +264,6 @@ class driver {
 	tables *tbl = 0;
 	ir_builder *ir = 0;
 
-	void output_pl(const raw_prog& p) const;
 	std::set<lexeme> vars;
 	raw_progs rp;
 	bool running = false;
@@ -343,18 +341,6 @@ public:
 //		const prefix&) const;
 //	std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, spbdd t, size_t bits,
 //		const prefix&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_prolog(std::basic_ostream<T>& os,
-		const raw_prog&, prolog_dialect) const;
-	template <typename T>
-	std::basic_ostream<T>& print_xsb(std::basic_ostream<T>& os,
-		const raw_prog&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_swipl(std::basic_ostream<T>& os,
-		const raw_prog&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_souffle(std::basic_ostream<T>& os,
-		const raw_prog&) const;
 	void save_csv() const;
 };
 

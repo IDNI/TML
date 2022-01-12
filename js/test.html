@@ -51,15 +51,6 @@
 	<h2>--transformed, --t [TARGET=@null]</h2>
 	<pre id="transformed"></pre>
 
-	<h2>--xsb [TARGET=@null]</h2>
-	<pre id="xsb"></pre>
-
-	<h2>--pl [TARGET=@null]</h2>
-	<pre id="swipl"></pre>
-
-	<h2>--souffle [TARGET=@null]</h2>
-	<pre id="souffle"></pre>
-
 	<h2>TARGET</h2>
 	can be optionally path to a file or one of:
 	<ul>
@@ -79,7 +70,7 @@ const program = document.getElementById("program").innerText;
 
 // names of TML output streams
 const stream_names = [
-	"dump", "transformed", "xsb", "swipl", "souffle"
+	"dump", "transformed"
 ];
 
 // create args array and add argfor each stream to buffer data

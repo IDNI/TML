@@ -5021,12 +5021,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	return true;
 }
 
-void driver::output_pl(const raw_prog& p) const {
-	if (opts.enabled("xsb"))     print_xsb(o::to("xsb"), p);
-	if (opts.enabled("swipl"))   print_swipl(o::to("swipl"), p);
-	if (opts.enabled("souffle")) print_souffle(o::to("souffle"), p);
-}
-
 bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 //	pd.clear();
 //	DBG(o::out() << "original program:"<<endl<<p;)
@@ -5105,12 +5099,11 @@ void driver::restart() {
 
 bool driver::run(size_t steps, size_t break_on_step) {
 	if (!running) restart();
-	if (nsteps() == pd.start_step) {
+	//if (nsteps() == pd.start_step) {
 		//transform(rp.p, pd.strs);
 		//for (const string& s : str_bltins)
 		//	rp.p.builtins.insert(get_lexeme(s));
-		output_pl(rp.p);
-	}
+	//}
 	if (opts.disabled("run") && opts.disabled("repl")) return true;
 	bool fp = prog_run(rp.p, steps, break_on_step);
 	if (fp) result = true;
