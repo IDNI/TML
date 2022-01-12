@@ -15,8 +15,6 @@ include(tml-common)
 set(JSLIB_SOURCES
 	../src/analysis.cpp
 	../src/analysis.h
-	../src/archive.cpp
-	../src/archive.h
 	../src/bdd.cpp
 	../src/bdd.h
 	../src/bdd_ext.cpp

@@ -24,7 +24,6 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
-#include "archive.h"
 
 #ifdef __EMSCRIPTEN__
 #include "../js/embindings.h"
@@ -5132,36 +5131,6 @@ void driver::info(std::basic_ostream<T>& os) {
 }
 template void driver::info(std::basic_ostream<char>&);
 template void driver::info(std::basic_ostream<wchar_t>&);
-
-size_t driver::size() {
-	return archive::size(*this);
-}
-
-void driver::db_load(std::string filename) {
-	load_archives.emplace_back(archive::type::BDD, filename, 0, false);
-	load_archives.back() >> *this;
-}
-
-void driver::db_save(std::string filename) {
-	archive ar(archive::type::BDD, filename, archive::size(*this), true);
-	ar << *this;
-}
-
-void driver::load(std::string filename) {
-	if (!ii->size()) {
-		load_archives.emplace_back(archive::type::DRIVER, filename,0,0);
-		if (!load_archives.back().error) load_archives.back() >> *this;
-		return;
-	}
-	error = true;
-	throw_runtime_error(
-		"Loading into a running program is not yet supported."); // TODO
-}
-
-void driver::save(std::string filename) {
-	archive ar(archive::type::DRIVER, filename, archive::size(*this), true);
-	ar << *this;
-}
 
 void driver::read_inputs() {
 	//COUT << "read_inputs() current_input: " << current_input << " next_input: " << (current_input ? current_input->next() : 0) << endl;

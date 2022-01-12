@@ -238,7 +238,6 @@ size_t satcount(cr_spbdd_handle x, const size_t bits);
  * different functions. */
 
 class bdd {
-	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
 	//friend class satcount_iter;
@@ -463,7 +462,6 @@ public:
 
 class bdd_handle {
 	friend class bdd;
-	friend class archive;
 	bdd_handle(bdd_ref b) : b(b) { }//bdd::mark(b); }
 	static void update(const std::vector<bdd_id>& p);
 	static std::unordered_map<bdd_ref, std::weak_ptr<bdd_handle>> M;

@@ -764,7 +764,7 @@ void bdd::gc() {
 void bdd_handle::update(const vector<bdd_id>& p) {
 	unordered_map<bdd_ref, weak_ptr<bdd_handle>> m;
 	for (pair<bdd_ref, weak_ptr<bdd_handle>> x : M)
-		//DBG(assert(!x.second.expired());) // is this needed? cannot load from archive with this
+		//DBG(assert(!x.second.expired());) // is this needed?
 		if (!x.second.expired())
 			f(x.second.lock()->b), m.emplace(f(x.first), x.second);
 	M = move(m);

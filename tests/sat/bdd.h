@@ -158,7 +158,6 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
 class bdd {
-	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
 	friend class satcount_iter;
@@ -358,7 +357,6 @@ public:
 
 class bdd_handle {
 	friend class bdd;
-	friend class archive;
 	bdd_handle(int_t b) : b(b) { }//bdd::mark(b); }
 	static void update(const std::vector<int_t>& p);
 	static std::unordered_map<int_t, std::weak_ptr<bdd_handle>> M;

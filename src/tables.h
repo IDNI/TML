@@ -33,7 +33,6 @@
 
 typedef bdd_handles level;
 
-class archive;
 class tables;
 
 struct body {
@@ -165,7 +164,6 @@ struct table {
 };
 
 class tables {
-	friend class archive;
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 	friend struct form;

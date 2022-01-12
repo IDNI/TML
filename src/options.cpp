@@ -250,10 +250,10 @@ void options::setup() {
 		[](const option::value& v) {
 			outputs::name(v.get_string());
 		}).description("name used for @name output"));
-	add(option(option::type::STRING, { "load", "l" })
-		.description("load database from file before start"));
-	add(option(option::type::STRING, { "save", "s" })
-		.description("save database to file after finish"));
+	//add(option(option::type::STRING, { "load", "l" })
+	//	.description("load database from file before start"));
+	//add(option(option::type::STRING, { "save", "s" })
+	//	.description("save database to file after finish"));
 	add_output    ("dump",        "dump output     (@stdout by default)");
 	add_output_alt("output", "o","standard output (@stdout by default)");
 	add_output    ("error",       "errors          (@stderr by default)");

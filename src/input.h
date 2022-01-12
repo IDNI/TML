@@ -26,7 +26,6 @@
 #include "dict.h"
 #include "memory_map.h"
 
-class archive;
 struct context;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
@@ -42,7 +41,6 @@ enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
  * STRING inputs loaded from archives are pointed to file's mmap. 
  */
 struct input {
-	friend class archive;
 	enum type { STDIN, FILE, STRING } type_; // input type
 	bool newseq = false; // input is understood as a new prog sequence
 	size_t offset = 0;   // offset of this input from the beginning
@@ -170,8 +168,7 @@ private:
 	}
 };
 
-class inputs { 
-	friend class archive;
+class inputs {
 	std::unique_ptr<input> first_ = 0;
 	struct input *last_ = 0;
 	size_t size_ = 0;

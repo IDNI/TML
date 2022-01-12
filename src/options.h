@@ -18,13 +18,9 @@
 #include "input.h"
 #include "output.h"
 
-class archive;
-
 struct option {
-	friend class archive;
 	enum type { UNDEFINED, INT, BOOL, STRING, ENUM };
 	struct value {
-		friend class archive;
 		value()              : t(UNDEFINED)         {}
 		value(int i)         : t(INT),      v_i(i)  {}
 		value(bool b)        : t(BOOL),     v_b(b)  {}
@@ -169,7 +165,6 @@ private:
 };
 
 class options {
-	friend class archive;
 public:
 	options() : options(0, 0) {}
 	options(inputs *ii, outputs *oo) : ii(ii), oo(oo) { setup(); }

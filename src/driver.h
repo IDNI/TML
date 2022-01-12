@@ -47,8 +47,6 @@ typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
 #define QUNIQUE 10
 #define QCOIMPLIES 11
 
-class archive;
-
 struct prog_data {
 	strs_t strs;
 //	std::unordered_map<int_t, term> strtrees;
@@ -116,7 +114,6 @@ void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
 
 class driver {
-	friend class archive;
 	friend struct flat_rules;
 	friend struct pattern;
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
@@ -276,7 +273,6 @@ class driver {
 	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
-	std::vector<archive> load_archives;
 public:
 	bool result = false;
 	bool error = false;
@@ -319,12 +315,12 @@ public:
 		return tbl->get_goals(os); }
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	size_t size();
-	void load(std::string filename);
-	void save(std::string filename);
-	size_t db_size();
-	void db_load(std::string filename);
-	void db_save(std::string filename);
+	//size_t size();
+	//void load(std::string filename);
+	//void save(std::string filename);
+	//size_t db_size();
+	//void db_load(std::string filename);
+	//void db_save(std::string filename);
 	inputs* get_inputs() const { return ii; }
 	input* get_current_input() const { return current_input; }
 	void set_current_input(input* in) { current_input = in; }

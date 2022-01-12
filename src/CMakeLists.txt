@@ -17,7 +17,6 @@ include(tml-common)
 
 set(TML_HEADERS
 	TML.h
-	archive.h
 	analysis.h
 	bdd.h
 	builtins.h
@@ -36,7 +35,6 @@ set(TML_HEADERS
 )
 
 set(TML_SOURCES
-	archive.cpp
 	analysis.cpp
 	bdd.cpp
 	bdd_ext.cpp

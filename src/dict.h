@@ -17,10 +17,7 @@
 #include <functional>
 
 class inputs;
-class archive;
-
 class dict_t {
-	friend class archive;
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
 	dictmap syms_dict, vars_dict, rels_dict, bltins_dict, temp_syms_dict;
 	std::vector<lexeme> vars, syms, rels, bltins, temp_syms;
