@@ -138,4 +138,8 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
 
+struct elem;
+
+std::string quote_sym(const elem& e);
+
 #endif

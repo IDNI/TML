@@ -33,8 +33,8 @@ void driver::save_csv() const {
 			if (n >= t.e.size()) break;
 			while (t.e[n].type == elem::OPENP) ++n;
 			for (int_t k = 0; k != t.arity[ar];)
-				if ((os<<to_string(elem2str(t.e[n++]))),
-					++k!=t.arity[ar]) os<<'\t';
+				if ((os<<quote_sym(t.e[n++]),
+					++k!=t.arity[ar])) os<<'\t';
 			while (n<t.e.size() && t.e[n].type == elem::CLOSEP) ++n;
 			++ar;
 			while (ar < t.arity.size() && t.arity[ar] == -2) ++ar;
