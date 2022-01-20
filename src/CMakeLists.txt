@@ -33,7 +33,7 @@ set(TML_HEADERS
 	output.h
 	tables.h
 	ir_builder.h
-	#earley.h
+	earley.h
 )
 
 set(TML_SOURCES
@@ -59,7 +59,7 @@ set(TML_SOURCES
 	transform_guards.cpp
 	utils.cpp
 	ir_builder.cpp
-	#earley.cpp
+	earley.cpp
 )
 
 if (WITH_THREADS)
@@ -181,18 +181,6 @@ set_target_properties(TMLs PROPERTIES OUTPUT_NAME "TML")
 
 # executable
 #############
-
-set(EARLEY
-earley.cpp
-earley.h
-)
-
-add_executable(earley ${EARLEY})
-
-target_compile_features(earley PRIVATE cxx_std_17)
-target_compile_options(earley PRIVATE "-Wall" "-Wno-deprecated")
-
-#add_custom_target(earley COMMAND earley DEPENDS earley)
 
 add_executable(tml)
 target_setup(tml)

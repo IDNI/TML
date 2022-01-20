@@ -13,10 +13,11 @@
 
 #include <vector>
 #include <regex>
-
+#include <variant>
 #include "ir_builder.h"
 #include "tables.h"
 #include "analysis.h"
+#include "earley.h"
 using namespace std;
 
 #define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
@@ -1329,6 +1330,37 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	}
 	DBG(o::out()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::out() << p << endl;)
+	
+	#define ONLY_EARLEY
+	#ifdef ONLY_EARLEY
+	
+	earley parser(g);
+	parser.recognize( to_string( dynenv->strs.begin()->second).c_str() );
+	vector<earley::arg_t> facts = parser.get_parse_graph_facts();
+	vector<raw_term> rts;
+	for( earley::arg_t &af: facts) {
+		vector<elem> e;
+		e.emplace_back(elem::STR, dict.get_lexeme(std::get<std::string>(af[0])) );
+		e.emplace_back(elem::OPENP);
+		e.emplace_back(int_t(std::get<size_t>(af[1])));
+		for( size_t i=2; i < af.size(); i++) 
+			if(std::holds_alternative<size_t>(af[i]))
+				e.emplace_back(int_t(std::get<size_t>(af[i])));
+			else	
+				e.emplace_back(elem::STR, dict.get_lexeme(std::get<string>(af[i])));
+		e.emplace_back(elem(elem::CLOSEP));
+
+		rts.emplace_back(raw_term::REL, e);
+		
+		//DBG(COUT<<rts.back()<<endl);
+	}
+	for(auto rt: rts) p.insert({from_raw_term(rt)});
+	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
+		<< "# after transform_grammar:\n", p)
+		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
+		<< endl;
+	return true;
+	#endif
 
 	vector<term> v;
 	static const set<string> b =
@@ -1418,7 +1450,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 			dict.get_var_lexeme_from(i);
 
 		transform_grammar_constraints(x, v, p, refs);
-
 		//#define GRAMMAR_FOL
 		#ifdef GRAMMAR_FOL
 		form *root = NULL;

@@ -27,6 +27,34 @@ bool earley::all_nulls(const vector<lit>& p) const {
 	return true;
 }
 
+earley::earley(const vector<production> &g) {
+	set<string> nt;
+	for (const auto &x : g) nt.insert(x.p[0].to_str());
+	for (const auto &x : g) {
+		G.emplace_back();
+		for (auto &y : x.p) {
+			if (nt.find(y.to_str()) != nt.end())
+				G.back().emplace_back(d.get(y.to_str()));
+			else if (x.p.size() == 2 && y.to_str() =="null" )
+				G.back().emplace_back('\0');
+			else for (char c : y.to_str())
+				G.back().emplace_back(c);
+		}
+	}
+	start = lit(d.get("S"));
+	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
+	size_t k;
+	do {
+		k = nullables.size();
+		for (const auto& p : G)
+			if (all_nulls(p))
+				nullables.insert(p[0].n());
+	} while (k != nullables.size());
+#ifdef DEBUG
+	for (auto x : G) cout << x << endl;
+	for (auto x : d.m) cout << x.first << ' '<< x.second << endl;
+#endif
+}
 earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
 	set<string> nt;
 	for (const auto &x : g) nt.insert(x.first);
@@ -38,7 +66,7 @@ earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
 					G.back().emplace_back(d.get(s));
 				else if (s.size() == 0)
 					G.back().emplace_back('\0');
-				else for (char_t c : s)
+				else for (char c : s)
 					G.back().emplace_back(c);
 
 	}
@@ -111,7 +139,7 @@ void earley::scan(const item& i, size_t n, char ch) {
 	DBG(print(cout << "scanned " << ch << " and added ", j) << endl;)
 }
 
-bool earley::recognize(const char_t* s) {
+bool earley::recognize(const char* s) {
 	cout << "recognizing: " << s << endl;
 	inputstr = s;
 	size_t len = strlen(s);
@@ -133,12 +161,12 @@ bool earley::recognize(const char_t* s) {
 		} while (!t.empty());
 		for (auto i : S) {
 			if(!completed(i)) continue;
-			print(cout, i);
+			DBG(print(cout, i);)
 			for( auto &a : i.advancers)
-				cout<< " adv by ", print(cout, a);
+				{ DBG(cout<< " adv by ") ; DBG(print(cout, a)); }
 			for( auto &c : i.completers)
-				cout<< " cmplete by ", print(cout, c);
-			cout<<endl;
+				{ DBG(cout<< " cmplete by ") ; DBG(print(cout, c)); }
+			DBG(cout<<endl;)
 		}
 /*		cout << "set: " << n << endl;
 		for (	auto it = S.lower_bound(item(n, 0, 0, 0));
@@ -155,7 +183,7 @@ bool earley::recognize(const char_t* s) {
 	nidx_t root(start, {0,len});
 	forest(root);
 	to_dot();
-	to_facts();
+	to_tml_facts();
 	to_tml_rule();
 	return found;
 }
@@ -208,41 +236,17 @@ std::string earley::grammar_text(){
 	}		
 	return txt.str();
 }
-bool earley::to_facts(){
-	
-	std::stringstream ss;
-	
-	auto strfun = [this] (const nidx_t & k){
-		stringstream l;
-		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
-		l <<"_"<<k.span.first<<"_"<<k.span.second<<"_";
-		return l.str();
+bool earley::to_tml_facts() const { 
+	stringstream ss;
+	auto str_rel_output = [&ss] ( string rel, size_t id, vector<variant<size_t, string>> args){
+	ss << rel << "("<< id;
+	for(auto &a : args) 
+		if( std::holds_alternative<size_t>(a)) ss << " "<< std::get<size_t>(a);
+		else ss <<" "<<std::get<string>(a);
+	ss << ")."<<std::endl;
 	};
-	map<nidx_t, size_t> nid;
-	size_t id = 0;
-	for( auto &it: pfgraph ){
-		nid[it.first] = id;
-		id += it.second.size(); // ambig node ids;
-		DBG(assert(it.second.size()!= 0));
-		id++;
-	}
-	ss<<std::endl;
-	for( auto &it: pfgraph ) {
-		string ndesc = strfun(it.first);
-		ss << "node" << "("<< nid[it.first] <<",\""<< ndesc <<"\")."<<std::endl;
-		size_t p = 0;
-		for( auto &pack : it.second) { 
-			++p;
-			ss << "edge" <<"(" << nid[it.first] << ","<< nid[it.first] + p << ")."<<std::endl;
-			ss << "node" << "("<< nid[it.first] + p <<",\"\")."<<std::endl;
-			for( auto & nn: pack) {
-				if(nid.find(nn) == nid.end()) nid[nn] = id++;
-				string nndesc = strfun(nn);
-				ss << "node" << "("<< nid[nn] <<",\""<< nndesc <<"\")."<<std::endl;
-				ss << "edge" <<"(" << nid[it.first] + p << ","<< nid[nn]  << ")."<<std::endl;
-			}
-		}
-	}
+
+	visit_forest(str_rel_output);
 
 	static size_t c = 0;
 	stringstream ssf;
@@ -252,9 +256,60 @@ bool earley::to_facts(){
 	file.close();
 	return true;
 
-
 }
+template<typename T>
+bool earley::visit_forest(T out_rel) const {
+//bool earley::visit_forest(std::function<void(std::string,size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const{
+	std::stringstream ss;
+	auto get_args = [this] (const nidx_t & k ){
+		arg_t args;
+		if(k.nt()) args.emplace_back("\""+d.get( k.n())+ "\"");
+		else if (k.c() =='\0' )  args.emplace_back("ε");
+		else args.emplace_back(string({'\"', k.c(), '\"'}));
+		args.emplace_back(k.span.first);
+		args.emplace_back(k.span.second);
+		return args;
+	};
 
+	map<nidx_t, size_t> nid;
+	size_t id = 0;
+	for( auto &it: pfgraph ){
+		nid[it.first] = id;
+		// skip ids for one child ambig node
+		id += it.second.size()==1? 0:it.second.size(); // ambig node ids;
+		DBG(assert(it.second.size()!= 0));
+		id++;
+	}
+	ss<<std::endl;
+	for( auto &it: pfgraph ) {
+		arg_t ndesc = get_args(it.first);
+		out_rel("node", nid[it.first], ndesc);
+		size_t p = 0;
+		for( auto &pack : it.second) {
+			if( it.second.size()>1) {  //skipping if only one ambigous node, an optimization
+				++p;
+				out_rel("edge", nid[it.first], { nid[it.first] + p } );
+				out_rel("node", nid[it.first] + p, {} );
+			}
+			for( auto & nn: pack) {
+				if(nid.find(nn) == nid.end()) nid[nn] = id++; // for terminals, not seen before
+				arg_t nndesc = get_args(nn);
+				out_rel("node", nid[nn], nndesc );
+				out_rel("edge", nid[it.first]+p, {nid[nn]} );
+			}
+		}
+	}
+	return true;
+}
+vector<earley::arg_t> earley::get_parse_graph_facts(){
+	vector<arg_t> rts;
+	auto rt_rel_output = [&rts] ( string rel, size_t id, vector<variant<size_t, string>> args){
+		args.insert(args.begin(), {rel, id });
+		rts.emplace_back(args);
+	};
+	visit_forest(rt_rel_output);
+	return rts;
+}
 string earley::to_tml_rule(const nidx_t nd) const {
 	
 	std::stringstream ss;
@@ -262,7 +317,7 @@ string earley::to_tml_rule(const nidx_t nd) const {
 	else if( nd.l.c() =='\0' ) ss <<"ε";
 	else  ss << nd.l.c();
 
-	ss <<"(" <<nd.span.first<< ","<< nd.span.second <<")";
+	ss <<"(" <<nd.span.first<< " "<< nd.span.second <<")";
 	return ss.str();
 }
 bool earley::to_tml_rule() const{
@@ -394,58 +449,3 @@ bool earley::forest ( nidx_t &root ) {
 	return true;
 }
 
-
-int main() {
-	using namespace std;
-	
-	// Using Elizbeth Scott paper example 2, pg 64
-	earley e({
-			{"S", { { "b" }, { "S", "S" } } }
-			//{"S", { { "" }, { "a", "S", "b", "S" } } },
-//			{"S", { { "" }, { "A", "S", "B", "S" } } },
-//			{"A", { { "" }, { "A", "a" } } },
-//			{"B", { { "b" }, { "B", "b" } } }
-		});
-	cout << e.recognize("bbb") << endl << endl;
-	
-	// infinite ambiguous grammar, advanced parsing pdf, pg 86
-	// will capture cycles
-	earley e1({{"S", { { "b" }, {"S"} }}});
-	cout << e1.recognize("b") << endl << endl;
-
-	// another ambigous grammar
-	earley e2({ {"S", { { "a", "X", "X", "c" }, {"S"} }},
-				{"X", { {"X", "b"}, { "" } } },
-
-	});
-	cout << e2.recognize("abbc") << endl << endl;
-
-	// highly ambigous grammar, advanced parsing pdf, pg 89
-	earley e3({ {"S", { { "S", "S" }, {"a"} }}
-	});
-	cout << e3.recognize("aaaaa") << endl << endl;
-
-
-	//using Elizabeth sott paper, example 3, pg 64.
-	earley e4({{"S", { { "A", "T" }, {"a","T"} }},
-				{"A", { { "a" }, {"B","A"} }},
-				{"B", { { ""} }},
-				{"T", { { "b","b","b" } }},
-	});
-	cout << e4.recognize("abbb") << endl << endl;
-
-	earley e5({{"S", { { "b", }, {"S", "S", "S", "S"}, {""} }}});
-	cout << e5.recognize("b") << endl << endl;
-
-	earley e6({{"S", { {"n"}, { "S", "X", "S" }}},
-				{"X", { {"p"}, {"m"}}}
-	});
-	cout << e6.recognize("npnmn") << endl;
-/*	cout << e.recognize("aa") << endl << endl;
-	cout << e.recognize("aab") << endl << endl;
-	cout << e.recognize("abb") << endl << endl;
-	cout << e.recognize("aabb") << endl << endl;
-	cout << e.recognize("aabbc") << endl << endl;
-*/
-	return 0;
-}

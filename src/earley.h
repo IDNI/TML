@@ -10,14 +10,16 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#define DEBUG
+#include <functional>
+
+#include "input.h"
 
 #ifdef DEBUG
 #define DBG(x) x
 #else
 #define DBG(x)
 #endif
-typedef char char_t;
+//typedef char char_t;
 
 class earley {
 	struct lit : public std::variant<size_t, char> {
@@ -115,12 +117,16 @@ class earley {
 		std::string get(size_t n) const { return v[n]; }
 	} d;
 public:
+	typedef pnode nidx_t;
+	typedef std::vector<std::variant<size_t, std::string>> arg_t;
 	earley(const std::vector<
 		std::pair<
 			std::string,
 			std::vector<std::vector<std::string>>>>& g);
-	bool recognize(const char_t* s);
-	typedef pnode nidx_t;
+	earley(const std::vector<production>& g);
+	bool recognize(const char* s);
+	std::vector<arg_t> get_parse_graph_facts();
+private:
 	bool to_dot();
 	std::set<item> citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
@@ -128,7 +134,13 @@ public:
 	std::string grammar_text();
 	bool forest(nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
-	bool to_facts();
+	template<typename T>
+	bool visit_forest(T) const;
+	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
+	
+	// only store graph as facts
+	bool to_tml_facts() const;
+	//make parse forest grammar
 	bool to_tml_rule() const;
 	std::string to_tml_rule(const nidx_t nd) const;
 
