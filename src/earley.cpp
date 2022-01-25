@@ -1,5 +1,5 @@
 #include "earley.h"
-
+#include <utility>
 using namespace std;
 
 ostream& operator<<(ostream& os, const vector<string>& v) {
@@ -227,11 +227,13 @@ std::string earley::grammar_text(){
 	stringstream txt;
 	for (const auto &p : G) {
 		txt << ("\n\\l");
+		size_t i=0;
 		for( const auto &l : p){
 			if(l.nt()) txt << d.get(l.n());
 			else if ( l.c() != '\0') txt << l.c();
 			else txt << "ε";
 			txt<< " ";
+			if( i++ == 0) txt <<"-> ";
 		}
 	}		
 	return txt.str();
@@ -355,25 +357,28 @@ bool earley::to_dot() {
 		stringstream l;
 		k.nt()?l <<d.get( k.n()): k.c() =='\0' ? l<<"ε" : l<<k.c();
 		l <<"_"<<k.span.first<<"_"<<k.span.second<<"_";
-		return l.str();
+		string desc = l.str();
+		
+		return std::pair<size_t, string>(std::hash<string>()(desc), desc);
 	};
 	ss << "_input_"<<"[label =\""<<inputstr <<"\", shape = rectangle]" ;
 	ss << "_grammar_"<<"[label =\""<<grammar_text() <<"\", shape = rectangle]" ;
 	ss << endl<< "node" << "[ ordering =\"out\"];";
 	ss << endl<< "graph" << "[ overlap =false, splines = true];";
 	for( auto &it: pfgraph ) {
-		string key = keyfun(it.first);
-		ss << endl<< key << "[label=\""<< key <<"\"];";
+		auto key = keyfun(it.first);
+		ss << endl<< key.first << "[label=\""<< key.second <<"\"];";
 		size_t p=0;
 		stringstream pstr;
 		for( auto &pack : it.second) {
-			pstr<<key<<p++;
-			ss << std::endl<<pstr.str() << "[shape = point,label=\""<< pstr.str() << "\"];";
-			ss << std::endl << key   <<"->" << pstr.str()<<';';
+			pstr<<key.second<<p++;
+			auto ambkey = std::hash<string>()(pstr.str());
+			ss << std::endl<<ambkey << "[shape = point,label=\""<< pstr.str() << "\"];";
+			ss << std::endl << key.first   <<"->" << ambkey<<';';
 			for( auto & nn: pack) {
-				string nkey = keyfun(nn);
-				ss  << endl<< nkey << "[label=\""<< nkey<< "\"];",
-				ss << std::endl << pstr.str()   <<"->" << nkey<< ';';
+				auto nkey = keyfun(nn);
+				ss  << endl<< nkey.first << "[label=\""<< nkey.second<< "\"];",
+				ss << std::endl << ambkey   <<"->" << nkey.first<< ';';
 			}
 			pstr.str("");
 		}

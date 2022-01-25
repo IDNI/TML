@@ -1,0 +1,15 @@
+@string str "1+3*2".
+
+# terminals
+number   => '1' | '2' | '3'.
+plus     => '+'.
+minus    => '-'.
+multiply => '*'.
+divide   => '/'.
+lparen   => '('.
+rparen   => ')'.
+
+operation  => plus | minus | multiply | divide.
+expression => number | expression operation expression | lparen expression rparen.
+
+S => expression.
