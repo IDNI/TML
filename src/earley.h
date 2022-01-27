@@ -11,7 +11,6 @@
 #include <sstream>
 #include <fstream>
 #include <functional>
-
 #include "input.h"
 
 #ifdef DEBUG
@@ -21,6 +20,9 @@
 #endif
 //typedef char char_t;
 
+#define emeasure_time_start() clock_t end, start = clock()
+#define emeasure_time_end() end = clock(), std::cout << std::fixed << std::setprecision(2) \
+								 << (double(end - start) / CLOCKS_PER_SEC) * 1000 << " ms"
 class earley {
 	struct lit : public std::variant<size_t, char> {
 		using std::variant<size_t, char>::variant;
@@ -129,6 +131,9 @@ public:
 private:
 	bool to_dot();
 	std::set<item> citem;
+	std::unordered_map< size_t, 
+		std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
+
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	std::string grammar_text();

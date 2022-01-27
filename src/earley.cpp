@@ -173,15 +173,19 @@ bool earley::recognize(const char* s) {
 			it != S.end() && it->set == n; ++it)
 			print(*it);*/
 	}
-	for (const item& i : S) if (completed(i)) citem.emplace(i);
-	pfgraph.clear();
 	bool found = false;
 	for (size_t n : nts[start])
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
 			found = true;
 		}
 	nidx_t root(start, {0,len});
+	pfgraph.clear();	
+	emeasure_time_start();
+	for (const item& i : S) 
+		if (completed(i)) //citem.emplace(i);
+			sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	forest(root);
+	(emeasure_time_end(), COUT<<":: forest time "<<endl) ;
 	to_dot();
 	to_tml_facts();
 	to_tml_rule();
@@ -215,6 +219,15 @@ vector<ast> earley::forest() {
 
 const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt, int end ) {
 	std::vector<item> ret;
+	if(end == -1)
+		return sorted_citem[nt][xfrom];
+	else {
+		auto v = sorted_citem[nt][xfrom];
+		for(  auto &it :v )
+			if( (int)it.set == end ) ret.push_back(it);
+		return ret;
+	}	
+	/*
 	for(auto it = citem.begin(); it != citem.end(); it++) {
 		if( it->from == xfrom && nts[nt].count(it->prod) ){
 			if( end != -1 && (int)it->set == end ) ret.push_back(*it);
@@ -222,6 +235,7 @@ const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt, int e
 		}
 	}	
 	return ret;
+	*/
 }
 std::string earley::grammar_text(){
 	stringstream txt;
@@ -288,7 +302,7 @@ bool earley::visit_forest(T out_rel) const {
 		out_rel("node", nid[it.first], ndesc);
 		size_t p = 0;
 		for( auto &pack : it.second) {
-			if( it.second.size()>1) {  //skipping if only one ambigous node, an optimization
+			if(it.second.size() > 1) {  //skipping if only one ambigous node, an optimization
 				++p;
 				out_rel("edge", nid[it.first], { nid[it.first] + p } );
 				out_rel("node", nid[it.first] + p, {} );
@@ -297,7 +311,7 @@ bool earley::visit_forest(T out_rel) const {
 				if(nid.find(nn) == nid.end()) nid[nn] = id++; // for terminals, not seen before
 				arg_t nndesc = get_args(nn);
 				out_rel("node", nid[nn], nndesc );
-				out_rel("edge", nid[it.first]+p, {nid[nn]} );
+				out_rel("edge", nid[it.first] + p, {nid[nn]} );
 			}
 		}
 	}
@@ -435,7 +449,6 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 
 // builds the forest starting with root
 bool earley::forest ( nidx_t &root ) {
-	
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
