@@ -20,8 +20,8 @@
 #endif
 //typedef char char_t;
 
-#define emeasure_time_start() clock_t end, start = clock()
-#define emeasure_time_end() end = clock(), std::cout << std::fixed << std::setprecision(2) \
+#define emeasure_time_start( start, end ) clock_t end, start = clock()
+#define emeasure_time_end( start, end ) end = clock(), std::cout << std::fixed << std::setprecision(2) \
 								 << (double(end - start) / CLOCKS_PER_SEC) * 1000 << " ms"
 class earley {
 	struct lit : public std::variant<size_t, char> {
