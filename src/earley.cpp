@@ -137,6 +137,11 @@ void earley::scan(const item& i, size_t n, char ch) {
 	S.insert(j).first->advancers.insert(i);
 	DBG(print(cout, i) << ' ';)
 	DBG(print(cout << "scanned " << ch << " and added ", j) << endl;)
+	/*
+	stringstream ss;
+	ss<<" encountered '"<<ch <<"' at position "<< n <<", try '"<<get_lit(i).c() << "' instead";
+	parse_error( 0, ss.str().c_str() );	
+	*/
 }
 
 bool earley::recognize(const char* s) {
@@ -427,7 +432,7 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 		// for empty, use same span edge as from
 		if( nxtl.c() == '\0') nxtl.span.second = xfrom;
 		// ensure well-formed combination (matching input) early
-		else if (inputstr.at(xfrom) == nxtl.c())  
+		else if (xfrom < inputstr.size() && inputstr.at(xfrom) == nxtl.c())  
 			nxtl.span.second = ++xfrom ;
 		else // if not building the correction variation, prune this path quickly 
 			return ;
