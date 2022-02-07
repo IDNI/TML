@@ -138,7 +138,7 @@ private:
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	std::string grammar_text();
 	bool forest(nidx_t & );
-	void sbl_chd_forest(const item&, std::vector<nidx_t>, size_t, std::set<std::vector<nidx_t>>&);
+	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t, std::set<std::vector<nidx_t>>&);
 	template<typename T>
 	bool visit_forest(T) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;

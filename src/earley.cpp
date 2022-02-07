@@ -415,7 +415,7 @@ bool earley::to_dot() {
 }
 // collects all possible variations of the given item's rhs while respecting the span of the item
 // and stores them in the set ambset. 
-void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
+void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, size_t xfrom, std::set<std::vector<nidx_t>> &ambset  ) {
 
 	//check if we have reached the end of the rhs of prod
 	if( G[eitem.prod].size() <= curchd.size()+1 )  {
@@ -437,7 +437,9 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 		else // if not building the correction variation, prune this path quickly 
 			return ;
 		// build from the next in the line
+		size_t lastpos = curchd.size();
 		curchd.push_back(nxtl), sbl_chd_forest(eitem, curchd, xfrom, ambset);
+		curchd.erase(curchd.begin() + lastpos, curchd.end());
 	}
 	else {
 		// get the from/to span of all non-terminals in the rhs of production.
@@ -447,10 +449,11 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> curchd, size
 		for( auto &v: nxtl_froms  ) {
 			// ignore beyond the span
 			if( v.set > eitem.set) continue;
-			// store current and recursively build for next nt	
+			// store current and recursively build for next nt
+			size_t lastpos = curchd.size();	
 			nxtl.span.second = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
-			curchd.pop_back();
+			curchd.erase(curchd.begin() + lastpos, curchd.end());
 		}
 	}
 }

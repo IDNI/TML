@@ -1217,117 +1217,16 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 	return true;
 }
 
+
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
 	if (g.empty()) return true;
 //	o::out()<<"grammar before:"<<endl;
 //	for (production& p : g) o::out() << p << endl;
-	for (production& p : g)
-		for (size_t n = 0; n < p.p.size(); ++n)
-			if (p.p[n].type == elem::STR) {
-				ccs s = p.p[n].e[0]+1;
-				size_t chl, sl = p.p[n].e[1]-1 - s;
-				char32_t ch;
-				bool esc = false;
-				p.p.erase(p.p.begin() + n);
-				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
-					sl -= chl; s += chl;
-					chars = max(chars, (int_t) ch);
-					if (ch == U'\\' && !esc) esc = true;
-					else p.p.insert(p.p.begin() + n++,
-						elem(ch)), esc = false;
-				}
-			}
-	clock_t start, end;
-	int statterm=0;
-	set<elem> torem;
-	measure_time_start();
-	bool enable_regdetect_matching = opts.apply_regexpmatch;
-	if (dynenv->strs.size() && enable_regdetect_matching) {
-		string inputstr = to_string(dynenv->strs.begin()->second);
-		DBG(COUT<<inputstr<<endl);
-		graphgrammar ggraph(g, dict);
-		ggraph.detectcycle();
-		ggraph.collapsewith();
-		for(auto &elem : ggraph.sort) {
-			bool bnull =false;
-			string regexp = ggraph.get_regularexpstr(elem, bnull);
-			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
-			regex rgx;
-#ifdef WITH_EXCEPTIONS
-			try {
-#else
-// TODO: check regexp's validity another way?
-#endif
-				rgx = regexp;
-#ifdef WITH_EXCEPTIONS
-			} catch( ... ) {
-				DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
-				continue;
-			}
-#endif
-			smatch sm;
-			term t;
-			bool bmatch=false;
-			if(regex_level > 0) {
-				for( size_t i = 0; i <= inputstr.size(); i++)
-					for( size_t j = i; j <= inputstr.size(); j++)	{
-						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
-						if( regex_match(ss, sm, rgx)) {
-							DBG(COUT << regexp << " match "<< sm.str() << endl);
-							DBG(COUT << "len: " << sm.length(0) << std::endl);
-							DBG(COUT << "size: " << sm.size() << std::endl);
-							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
-							t.resize(2);
-							t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
-							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
-							p.insert({t});
-							bmatch = true;
-							statterm++;
-						}
-					}
-				if(bmatch) torem.insert(elem);
-			}
-			else if( regex_level == 0) {
-				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
-				std::sregex_iterator end;
-				for(;iter != end; ++iter) {
-					DBG(COUT << regexp << " match "<< iter->str()<< endl);
-					DBG(COUT << "size: " << iter->size() << std::endl);
-					DBG(COUT << "len: " << iter->length(0) << std::endl);
-					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
-					t.resize(2);
-					t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
-					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
-					p.insert({t});
-					statterm++;
-				}
-			}
-		}
-		size_t removed = 0;
-		for( auto pit = g.begin(); pit != g.end(); )
-			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
-				o::ms()<<*pit<<endl;
-				pit = g.erase(pit);
-				removed++;
-			} else pit++;
-
-		o::ms()<<"REGEX: "<<"terms added:"<<statterm<<" production removed:"
-		<<removed<<" for "<< torem.size()<<endl;
-	}
-	measure_time_end();
 	bool changed;
+	transform_strsplit(g);
+	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
-
-	for (size_t k = 0; k != g.size();) {
-		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
-		size_t n = 0;
-		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
-		if (n == g[k].p.size()) { ++k; continue; }
-		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
-		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
-		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
-		g.erase(g.begin() + k);
-	}
+	transform_alts(g);
 	DBG(o::out()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::out() << p << endl;)
 	
@@ -1480,4 +1379,125 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
 	return true;
+}
+
+bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_prog &p ){
+	clock_t start, end;
+	int statterm=0;
+	set<elem> torem;
+	measure_time_start();
+	bool enable_regdetect_matching = opts.apply_regexpmatch;
+	if (dynenv->strs.size() && enable_regdetect_matching) {
+		string inputstr = to_string(dynenv->strs.begin()->second);
+		DBG(COUT<<inputstr<<endl);
+		graphgrammar ggraph(g, dict);
+		ggraph.detectcycle();
+		ggraph.collapsewith();
+		for(auto &elem : ggraph.sort) {
+			bool bnull =false;
+			string regexp = ggraph.get_regularexpstr(elem, bnull);
+			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
+			regex rgx;
+#ifdef WITH_EXCEPTIONS
+			try {
+#else
+// TODO: check regexp's validity another way?
+#endif
+				rgx = regexp;
+#ifdef WITH_EXCEPTIONS
+			} catch( ... ) {
+				DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
+				continue;
+			}
+#endif
+			smatch sm;
+			term t;
+			bool bmatch=false;
+			if(regex_level > 0) {
+				for( size_t i = 0; i <= inputstr.size(); i++)
+					for( size_t j = i; j <= inputstr.size(); j++)	{
+						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
+						if( regex_match(ss, sm, rgx)) {
+							DBG(COUT << regexp << " match "<< sm.str() << endl);
+							DBG(COUT << "len: " << sm.length(0) << std::endl);
+							DBG(COUT << "size: " << sm.size() << std::endl);
+							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
+							t.resize(2);
+							t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
+							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
+							p.insert({t});
+							bmatch = true;
+							statterm++;
+						}
+					}
+				if(bmatch) torem.insert(elem);
+			}
+			else if( regex_level == 0) {
+				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
+				std::sregex_iterator end;
+				for(;iter != end; ++iter) {
+					DBG(COUT << regexp << " match "<< iter->str()<< endl);
+					DBG(COUT << "size: " << iter->size() << std::endl);
+					DBG(COUT << "len: " << iter->length(0) << std::endl);
+					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
+					t.resize(2);
+					t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
+					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
+					p.insert({t});
+					statterm++;
+				}
+			}
+		}
+		size_t removed = 0;
+		for( auto pit = g.begin(); pit != g.end(); )
+			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
+				o::ms()<<*pit<<endl;
+				pit = g.erase(pit);
+				removed++;
+			} else pit++;
+
+		o::ms()<<"REGEX: "<<"terms added:"<<statterm<<" production removed:"
+		<<removed<<" for "<< torem.size()<<endl;
+	}
+	measure_time_end();
+	return statterm != 0; 
+}
+
+bool ir_builder::transform_alts( vector<production> &g){
+	bool changed = false;
+	for (size_t k = 0; k != g.size();) {
+		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
+		size_t n = 0;
+		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
+		if (n == g[k].p.size()) { ++k; continue; }
+		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
+		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
+		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
+		g.erase(g.begin() + k);
+		changed = true;
+	}
+	return changed;
+}
+
+bool ir_builder::transform_strsplit(vector<production> &g){
+
+	bool changed = false;
+	for (production& p : g)
+		for (size_t n = 0; n < p.p.size(); ++n)
+			if (p.p[n].type == elem::STR) {
+				ccs s = p.p[n].e[0]+1;
+				size_t chl, sl = p.p[n].e[1]-1 - s;
+				char32_t ch;
+				bool esc = false;
+				p.p.erase(p.p.begin() + n);
+				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+					sl -= chl; s += chl;
+					chars = max(chars, (int_t) ch);
+					if (ch == U'\\' && !esc) esc = true;
+					else p.p.insert(p.p.begin() + n++,
+						elem(ch)), esc = false;
+				}
+				changed = true;
+			}
+	return changed;		
 }

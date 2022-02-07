@@ -66,6 +66,9 @@ public:
 					std::vector<term> &v, std::set<term> &done);
 
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
+	bool transform_apply_regex(std::vector<struct production> &g,  flat_prog& p);
+	bool transform_alts( std::vector<struct production> &g);
+	bool transform_strsplit(std::vector<struct production> &g);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v,
 			flat_prog &p,std::map<size_t, term> &refs);
