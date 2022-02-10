@@ -113,7 +113,7 @@ lexeme input::lex(pccs s) {
 		return { t, (*s += 2 + chl) };
 	}
 
-	if (strchr("!~.,;(){}[]$@=<>|&^+*-:", **s)) return ++*s,lexeme{*s-1,*s};
+	if (strchr("!~.,;(){}[]$@=<>|&^+*-:/", **s)) return ++*s,lexeme{*s-1,*s};
 	if (strchr("?", **s)) ++*s;
 	size_t chl, maxs = size_ - (*s - beg_);
 	if (!is_alnum(*s, maxs, chl) && **s != '_')

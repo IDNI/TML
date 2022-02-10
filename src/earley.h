@@ -121,6 +121,7 @@ class earley {
 public:
 	typedef pnode nidx_t;
 	typedef std::vector<std::variant<size_t, std::string>> arg_t;
+	typedef std::vector<std::pair<std::string, const nidx_t>> node_children;
 	earley(const std::vector<
 		std::pair<
 			std::string,
@@ -128,6 +129,7 @@ public:
 	earley(const std::vector<production>& g);
 	bool recognize(const char* s);
 	std::vector<arg_t> get_parse_graph_facts();
+	raw_progs get_raw_progs(dict_t* dict);
 private:
 	bool to_dot();
 	std::set<item> citem;
@@ -149,4 +151,17 @@ private:
 	bool to_tml_rule() const;
 	std::string to_tml_rule(const nidx_t nd) const;
 
+	// following is used by get_raw_progs()
+	dict_t* dict;
+	node_children get_children(const nidx_t nd, bool all) const;
+	std::string flatten(std::string label, const nidx_t nd);
+	raw_term pred_to_raw_term(const nidx_t nd);
+	raw_term to_raw_term(const nidx_t nd);
+	raw_prog to_raw_prog(const nidx_t nd);
+	void preds_to_raw_rule(raw_rule &rr, bool head, const nidx_t p);
+	void args_to_raw_term(raw_term& rt, const nidx_t p);
+	void elem_to_raw_term(raw_term& rt, const nidx_t p);
+	void add_fact(raw_prog &rp, const nidx_t p);
+	void add_rule(raw_prog &rp, const nidx_t p);
+	void add_statements(raw_prog &rp, const nidx_t p);
 };

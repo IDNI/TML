@@ -278,7 +278,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		r.r.push_back(l);
 	}
 	raw_term t;
-	append_sym_elem(t.e, get_lexeme("S")), append_openp(t.e),
+	append_sym_elem(t.e, get_lexeme("start")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity(current_input);
 	raw_rule rr;

@@ -1227,14 +1227,18 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
 	transform_alts(g);
-	DBG(o::out()<<"grammar after:"<<endl);
-	DBG(for (production& p : g) o::out() << p << endl;)
+	DBG(o::dbg()<<"grammar after:"<<endl);
+	DBG(for (production& p : g) o::dbg() << p << endl;)
 	
 	#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
 	
 	earley parser(g);
 	parser.recognize( to_string( dynenv->strs.begin()->second).c_str() );
+
+	raw_progs rps = parser.get_raw_progs(&dict);
+	o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
+
 	vector<earley::arg_t> facts = parser.get_parse_graph_facts();
 	vector<raw_term> rts;
 	for( earley::arg_t &af: facts) {

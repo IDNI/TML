@@ -41,7 +41,7 @@ earley::earley(const vector<production> &g) {
 				G.back().emplace_back(c);
 		}
 	}
-	start = lit(d.get("S"));
+	start = lit(d.get("start"));
 	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
 	size_t k;
 	do {
@@ -51,8 +51,8 @@ earley::earley(const vector<production> &g) {
 				nullables.insert(p[0].n());
 	} while (k != nullables.size());
 #ifdef DEBUG
-	for (auto x : G) cout << x << endl;
-	for (auto x : d.m) cout << x.first << ' '<< x.second << endl;
+	for (auto x : G) o::dbg() << x << endl;
+	for (auto x : d.m) o::dbg() << x.first << ' '<< x.second << endl;
 #endif
 }
 earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
@@ -70,7 +70,7 @@ earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
 					G.back().emplace_back(c);
 
 	}
-	start = lit(d.get("S"));
+	start = lit(d.get("start"));
 	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
 	size_t k;
 	do {
@@ -82,9 +82,9 @@ earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
 #ifdef DEBUG
 	for (auto x : g)
 		for (auto y : x.second)
-			cout << x.first << '=' << y << endl;
-	for (auto x : G) cout << x << endl;
-	for (auto x : d.m) cout << x.first << ' '<< x.second << endl;
+			o::dbg() << x.first << '=' << y << endl;
+	for (auto x : G) o::dbg() << x << endl;
+	for (auto x : d.m) o::dbg() << x.first << ' '<< x.second << endl;
 #endif
 }
 
@@ -101,7 +101,7 @@ ostream& earley::print(ostream& os, const item& i) const {
 }
 
 set<earley::item>::iterator earley::add(set<item>& t, const item& i) {
-	DBG(print(cout << "adding ", i) << endl;)
+	DBG(print(o::dbg() << "adding ", i) << endl;)
 	set<item>::iterator it = S.find(i);
 	if (it != S.end()) return it;
 	if ((it = t.find(i)) != t.end()) return it;
@@ -113,7 +113,7 @@ set<earley::item>::iterator earley::add(set<item>& t, const item& i) {
 }
 
 void earley::complete(const item& i, set<item>& t) {
-	DBG(print(cout << "completing ", i) << endl;)
+	DBG(print(o::dbg() << "completing ", i) << endl;)
 	for (	auto it = S.lower_bound(item(i.from, 0, 0, 0));
 		it != S.end() && it->set == i.from; ++it)
 		if (	G[it->prod].size() > it->dot &&
@@ -123,11 +123,11 @@ void earley::complete(const item& i, set<item>& t) {
 }
 
 void earley::predict(const item& i, set<item>& t) {
-	DBG(print(cout << "predicting ", i) << endl;)
+	DBG(print(o::dbg() << "predicting ", i) << endl;)
 	for (size_t p : nts[get_lit(i)]) {
 		item j(i.set, p, i.set, 1);
 		add(t, j)->advancers.insert(i);
-		DBG(print(cout << "predicting added ", j) << endl;)
+		DBG(print(o::dbg() << "predicting added ", j) << endl;)
 	}
 }
 
@@ -135,8 +135,8 @@ void earley::scan(const item& i, size_t n, char ch) {
 	if (ch != get_lit(i).c()) return;
 	item j(n + 1, i.prod, i.from, i.dot + 1);
 	S.insert(j).first->advancers.insert(i);
-	DBG(print(cout, i) << ' ';)
-	DBG(print(cout << "scanned " << ch << " and added ", j) << endl;)
+	DBG(print(o::dbg(), i) << ' ';)
+	DBG(print(o::dbg() << "scanned " << ch << " and added ", j) << endl;)
 	/*
 	stringstream ss;
 	ss<<" encountered '"<<ch <<"' at position "<< n <<", try '"<<get_lit(i).c() << "' instead";
@@ -145,35 +145,38 @@ void earley::scan(const item& i, size_t n, char ch) {
 }
 
 bool earley::recognize(const char* s) {
-	cout << "recognizing: " << s << endl;
+	DBG(o::dbg() << "recognizing: " << s << endl;)
 	inputstr = s;
 	size_t len = strlen(s);
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
 	for (size_t n : nts[start]) S.emplace(0, n, 0, 1);
 	set<item> t;
 	for (size_t n = 0; n != len + 1; ++n) {
-		DBG(cout << "pos " << n << endl;)
+		DBG(o::dbg() << "pos " << n << endl;)
 		do {
 			S.insert(t.begin(), t.end());
 			t.clear();
 			for (	auto it = S.lower_bound(item(n, 0, 0, 0));
 				it != S.end() && it->set == n; ++it) {
-				DBG(print(cout << "processing ", *it) << endl;)
+				DBG(print(o::dbg() << "processing ", *it) << endl;)
 				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).nt()) predict(*it, t);
 				else if (n < len) scan(*it, n, s[n]);
 			}
 		} while (!t.empty());
+/*
+#ifdef DEBUG
 		for (auto i : S) {
 			if(!completed(i)) continue;
-			DBG(print(cout, i);)
+			DBG(print(o::dbg(), i);)
 			for( auto &a : i.advancers)
-				{ DBG(cout<< " adv by ") ; DBG(print(cout, a)); }
+				{ DBG(o::dbg()<< " adv by ") ; DBG(print(o::dbg(), a)); }
 			for( auto &c : i.completers)
-				{ DBG(cout<< " cmplete by ") ; DBG(print(cout, c)); }
-			DBG(cout<<endl;)
-		}
-/*		cout << "set: " << n << endl;
+				{ DBG(o::dbg()<< " cmplete by ") ; DBG(print(o::dbg(), c)); }
+			DBG(o::dbg()<<endl;)
+#endif
+*/
+/*		DBG(o::dbg() << "set: " << n << endl;)
 		for (	auto it = S.lower_bound(item(n, 0, 0, 0));
 			it != S.end() && it->set == n; ++it)
 			print(*it);*/
@@ -191,8 +194,8 @@ bool earley::recognize(const char* s) {
 			sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	emeasure_time_start( ts1, te1 );
 	forest(root);
-	emeasure_time_end( ts1, te1 );
-	(emeasure_time_end( ts0, te0 ), COUT<<":: forest time "<<endl) ;
+	(emeasure_time_end( ts1, te1 ), o::inf()<<"\n");
+	(emeasure_time_end( ts0, te0 ), o::inf()<<" :: forest time "<<endl) ;
 	to_dot();
 	to_tml_facts();
 	to_tml_rule();
@@ -286,9 +289,9 @@ bool earley::visit_forest(T out_rel) const {
 	std::stringstream ss;
 	auto get_args = [this] (const nidx_t & k ){
 		arg_t args;
-		if(k.nt()) args.emplace_back("\""+d.get( k.n())+ "\"");
-		else if (k.c() =='\0' )  args.emplace_back("ε");
-		else args.emplace_back(string({'\"', k.c(), '\"'}));
+		if (k.nt()) args.emplace_back("\"" + d.get(k.n()) + "\"");
+		else if (k.c() == '\0' )  args.emplace_back("ε");
+		else args.emplace_back(string({'"', k.c(), '"'}));
 		args.emplace_back(k.span.first);
 		args.emplace_back(k.span.second);
 		return args;
@@ -480,3 +483,160 @@ bool earley::forest ( nidx_t &root ) {
 	return true;
 }
 
+earley::node_children earley::get_children(const nidx_t nd, bool all=0) const {
+	node_children nc;
+	auto label = [this](const nidx_t p, bool all=1) {
+		return p.nt() ? d.get(p.n()) : (all ? string{ p.c() } : "");
+	};
+	auto it = pfgraph.find(nd);
+	if (it == pfgraph.end()) return nc;
+	auto &packset = it->second;
+	bool amb = packset.size() > 1;
+	size_t c = 0;
+	if (amb) o::inf() << "\n'" << label(nd) <<"' is ambiguous:";
+	bool picked = false;
+	for (auto &pack : packset) {
+		if (amb) o::inf() << "\n\tpack " << ++c << ":\t";
+		for (auto &p : pack) {
+			if (!picked) nc.push_back(std::pair<std::string, const nidx_t>(
+				p.nt() ? d.get(p.n())
+					: (all ? string{ p.c() } : ""), p));
+			if (amb) o::inf() << "'" << (p.nt() ? d.get(p.n())
+				: string{ p.c() }) << "' ";
+		}
+		picked = true;
+	}
+	return nc;
+}
+
+std::string earley::flatten(std::string label, const nidx_t p) {
+	stringstream ss;
+	node_children nc = get_children(p, true);
+	if (nc.size())
+		for (auto &c : nc) ss << flatten(c.first, c.second);
+	else if (label.size()) ss << label;
+	return ss.str();
+}
+
+void earley::elem_to_raw_term(raw_term& rt, const nidx_t p) {
+	for (auto &c : get_children(p, true)) {
+		elem::etype t = elem::NONE;
+		if      (c.first == "sym")         t = elem::SYM;
+		else if (c.first == "number")      t = elem::NUM;
+		else if (c.first == "var")         t = elem::VAR;
+		else if (c.first == "quoted_char") t = elem::CHR;
+		else if (c.first == "string")      t = elem::STR;
+		std::string f = flatten("", c.second);
+		if (t == elem::NUM) {
+			int_t r = stoll(f);
+			if (to_string_(r) != f) { DBGFAIL; } // number reading parse error
+			rt.e.emplace_back(r);
+		} else if (t == elem::CHR) {
+			char32_t ch = f[0];
+			if (ch == '\\' && f.size() > 1) switch (f[1]) {
+				case 'r': ch = U'\r'; break;
+				case 'n': ch = U'\n'; break;
+				case 't': ch = U'\t'; break;
+				case '\\':ch = U'\\'; break;
+				case '\'':ch = U'\''; break;
+			}
+			rt.e.emplace_back(ch);
+		} else
+			rt.e.emplace_back(t, dict->get_lexeme(flatten("", c.second)));
+	}
+}
+
+void earley::args_to_raw_term(raw_term& rt, const nidx_t p) {
+	for (auto &c : get_children(p, true))
+		if (c.first == "args1" || c.first == "args")
+			args_to_raw_term(rt, c.second);
+		else if (c.first == "(") rt.e.emplace_back(elem::OPENP); 
+		else if (c.first == ")") rt.e.emplace_back(elem::CLOSEP);
+		else if (c.first == "elem") elem_to_raw_term(rt, c.second);
+}
+
+raw_term earley::to_raw_term(const nidx_t p) {
+	raw_term rt;
+	for (auto &c : get_children(p))
+		if (c.first == "relname") {
+			std::string relname = flatten("", c.second);
+			rt.e.emplace_back(elem::SYM, dict->get_lexeme(relname));
+		} else if (c.first == "args")
+			args_to_raw_term(rt, c.second);
+	rt.calc_arity(0);
+	return rt;
+}
+
+raw_term earley::pred_to_raw_term(const nidx_t p) {
+	raw_term rt;
+	for (auto c : get_children(p)) {
+		if (c.first == "term") rt = to_raw_term(c.second);
+		else if (c.first == "negative_term") {
+			rt = pred_to_raw_term(c.second);
+			rt.neg = true;
+		}
+	}
+	return rt;
+}
+
+void earley::add_fact(raw_prog &rp, const nidx_t p) {
+	for (auto c : get_children(p))
+		if (c.first == "pred")
+			rp.r.push_back(raw_rule(pred_to_raw_term(c.second)));	
+}
+
+void earley::preds_to_raw_rule(raw_rule &rr, bool h, const nidx_t p) {
+	for (auto c : get_children(p)) {
+		if (c.first == "preds_rest") preds_to_raw_rule(rr, h, c.second);
+		else if (c.first == "pred") {
+			raw_term rt = pred_to_raw_term(c.second);
+			if (h) rr.h.push_back(rt);
+			else {
+				if (rr.b.empty()) rr.b.emplace_back();
+				rr.b.back().push_back(rt);
+			}
+		}
+	}
+}
+
+void earley::add_rule(raw_prog &rp, const nidx_t p) {
+	raw_rule rr;
+	bool head = true;
+	for (auto c : get_children(p))
+		if (c.first == "preds")
+			preds_to_raw_rule(rr, head, c.second),
+			head = false;
+	rp.r.push_back(rr);
+}
+
+void earley::add_statements(raw_prog &rp, const nidx_t p) {
+	for (auto c : get_children(p))
+		if (c.first == "statements" || c.first == "statement")
+			add_statements(rp, c.second);
+		else if (c.first == "rule") add_rule(rp, c.second);
+		else if (c.first == "fact") add_fact(rp, c.second);
+}
+
+raw_prog earley::to_raw_prog(const nidx_t nd) {
+	raw_prog rp;
+	add_statements(rp, nd);
+	return rp;
+}
+
+raw_progs earley::get_raw_progs(dict_t* dct) {
+	dict = dct;
+	raw_progs rps;
+	// find 'start' node
+	auto it = pfgraph.begin();
+	for ( ; it != pfgraph.end() &&
+		!(it->first.nt() && d.get(it->first.n()) == "start"); ++it) ;
+	if (it != pfgraph.end()) {
+		node_children nc = get_children(it->first);
+		for (auto c : get_children(it->first))
+			if (c.first == "prog") {
+				raw_prog rp = to_raw_prog(c.second);
+				rps.p.nps.push_back(rp);
+			}
+	}
+	return rps;
+}
