@@ -548,8 +548,10 @@ void earley::elem_to_raw_term(raw_term& rt, const nidx_t p) {
 
 void earley::args_to_raw_term(raw_term& rt, const nidx_t p) {
 	for (auto &c : get_children(p, true))
-		if (c.first == "args1" || c.first == "args")
-			args_to_raw_term(rt, c.second);
+		if     (c.first == "args" ||
+			c.first == "elems" ||
+			c.first == "elems_rest")
+				args_to_raw_term(rt, c.second);
 		else if (c.first == "(") rt.e.emplace_back(elem::OPENP); 
 		else if (c.first == ")") rt.e.emplace_back(elem::CLOSEP);
 		else if (c.first == "elem") elem_to_raw_term(rt, c.second);
