@@ -5,9 +5,9 @@ int main() {
 	
 	// Using Elizbeth Scott paper example 2, pg 64
 	earley e({
-			{"S", { { "b" }, { "S", "S" } } }
-			//{"S", { { "" }, { "a", "S", "b", "S" } } },
-//			{"S", { { "" }, { "A", "S", "B", "S" } } },
+			{"start", { { "b" }, { "start", "start" } } }
+			//{"start", { { "" }, { "a", "start", "b", "start" } } },
+//			{"start", { { "" }, { "A", "start", "B", "start" } } },
 //			{"A", { { "" }, { "A", "a" } } },
 //			{"B", { { "b" }, { "B", "b" } } }
 		});
@@ -15,34 +15,34 @@ int main() {
 	
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
 	// will capture cycles
-	earley e1({{"S", { { "b" }, {"S"} }}});
+	earley e1({{"start", { { "b" }, {"start"} }}});
 	cout << e1.recognize("b") << endl << endl;
 
 	// another ambigous grammar
-	earley e2({ {"S", { { "a", "X", "X", "c" }, {"S"} }},
+	earley e2({ {"start", { { "a", "X", "X", "c" }, {"start"} }},
 				{"X", { {"X", "b"}, { "" } } },
 
 	});
 	cout << e2.recognize("abbc") << endl << endl;
 
 	// highly ambigous grammar, advanced parsing pdf, pg 89
-	earley e3({ {"S", { { "S", "S" }, {"a"} }}
+	earley e3({ {"start", { { "start", "start" }, {"a"} }}
 	});
 	cout << e3.recognize("aaaaa") << endl << endl;
 
 
 	//using Elizabeth sott paper, example 3, pg 64.
-	earley e4({{"S", { { "A", "T" }, {"a","T"} }},
+	earley e4({{"start", { { "A", "T" }, {"a","T"} }},
 				{"A", { { "a" }, {"B","A"} }},
 				{"B", { { ""} }},
 				{"T", { { "b","b","b" } }},
 	});
 	cout << e4.recognize("abbb") << endl << endl;
 
-	earley e5({{"S", { { "b", }, {"S", "S", "S", "S"}, {""} }}});
+	earley e5({{"start", { { "b", }, {"start", "start", "start", "start"}, {""} }}});
 	cout << e5.recognize("b") << endl << endl;
 
-	earley e6({{"S", { {"n"}, { "S", "X", "S" }}},
+	earley e6({{"start", { {"n"}, { "start", "X", "start" }}},
 				{"X", { {"p"}, {"m"}}}
 	});
 	cout << e6.recognize("npnmn") << endl;

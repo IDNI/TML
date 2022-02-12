@@ -389,6 +389,8 @@ bool earley::to_dot() {
 	ss << "_grammar_"<<"[label =\""<<grammar_text() <<"\", shape = rectangle]" ;
 	ss << endl<< "node" << "[ ordering =\"out\"];";
 	ss << endl<< "graph" << "[ overlap =false, splines = true];";
+	static set<pair<size_t, size_t>> edgedone;
+	edgedone.clear();
 	for( auto &it: pfgraph ) {
 		auto key = keyfun(it.first);
 		ss << endl<< key.first << "[label=\""<< key.second <<"\"];";
@@ -398,11 +400,13 @@ bool earley::to_dot() {
 			pstr<<key.second<<p++;
 			auto ambkey = std::hash<string>()(pstr.str());
 			ss << std::endl<<ambkey << "[shape = point,label=\""<< pstr.str() << "\"];";
-			ss << std::endl << key.first   <<"->" << ambkey<<';';
+			if(edgedone.insert({key.first, ambkey}).second )
+				ss << std::endl << key.first   <<"->" << ambkey<<';';
 			for( auto & nn: pack) {
 				auto nkey = keyfun(nn);
-				ss  << endl<< nkey.first << "[label=\""<< nkey.second<< "\"];",
-				ss << std::endl << ambkey   <<"->" << nkey.first<< ';';
+				ss  << endl<< nkey.first << "[label=\""<< nkey.second<< "\"];";
+				if(edgedone.insert({ambkey, nkey.first}).second )
+					ss << std::endl << ambkey   <<"->" << nkey.first<< ';';
 			}
 			pstr.str("");
 		}
@@ -453,7 +457,7 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, siz
 			// ignore beyond the span
 			if( v.set > eitem.set) continue;
 			// store current and recursively build for next nt
-			size_t lastpos = curchd.size();	
+			size_t lastpos = curchd.size(); 
 			nxtl.span.second = v.set, curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
 			curchd.erase(curchd.begin() + lastpos, curchd.end());
@@ -462,7 +466,7 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, siz
 }
 
 // builds the forest starting with root
-bool earley::forest ( nidx_t &root ) {
+bool earley::forest ( const nidx_t &root ) {
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
@@ -475,8 +479,8 @@ bool earley::forest ( nidx_t &root ) {
 		vector<nidx_t> nxtlits;
 		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
 		pfgraph[cnode] = ambset;
-		for ( auto aset: ambset )
-			for( nidx_t& nxt: aset) {
+		for ( auto &aset: ambset )
+			for( const nidx_t& nxt: aset) {
 				forest( nxt);
 			}
 	}	

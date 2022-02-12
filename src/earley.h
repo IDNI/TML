@@ -139,7 +139,7 @@ private:
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
 	std::string grammar_text();
-	bool forest(nidx_t & );
+	bool forest(const nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t, std::set<std::vector<nidx_t>>&);
 	template<typename T>
 	bool visit_forest(T) const;
