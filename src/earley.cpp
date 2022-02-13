@@ -1,5 +1,6 @@
 #include "earley.h"
 #include <utility>
+#include <unordered_set>
 using namespace std;
 
 ostream& operator<<(ostream& os, const vector<string>& v) {
@@ -14,7 +15,8 @@ ostream& operator<<(ostream& os, const earley::lit& l) {
 }
 
 ostream& operator<<(ostream& os, const vector<earley::lit>& v) {
-	for (auto &l : v) os << l << ' ';
+	int i = 0;
+	for (auto &l : v) os << l, i++ == 0 ? os << "->": os <<' ';
 	return os;
 }
 #endif
@@ -33,7 +35,7 @@ earley::earley(const vector<production> &g) {
 	for (const auto &x : g) {
 		G.emplace_back();
 		for (auto &y : x.p) {
-			if (nt.find(y.to_str()) != nt.end())
+			if (y.type == elem::SYM && nt.find(y.to_str()) != nt.end())
 				G.back().emplace_back(d.get(y.to_str()));
 			else if (x.p.size() == 2 && y.to_str() =="null" )
 				G.back().emplace_back('\0');
@@ -51,8 +53,12 @@ earley::earley(const vector<production> &g) {
 				nullables.insert(p[0].n());
 	} while (k != nullables.size());
 #ifdef DEBUG
+	o::dbg() << endl << "grammar begin" << endl;
 	for (auto x : G) o::dbg() << x << endl;
+	o::dbg() << endl << "grammar end" << endl;
+	o::dbg() << endl << "dictionary start" << endl;
 	for (auto x : d.m) o::dbg() << x.first << ' '<< x.second << endl;
+	o::dbg() << endl << "dictionary end " << endl;
 #endif
 }
 earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
@@ -118,15 +124,15 @@ void earley::complete(const item& i, set<item>& t) {
 		it != S.end() && it->set == i.from; ++it)
 		if (	G[it->prod].size() > it->dot &&
 			get_lit(*it) == get_nt(i))
-			add(t, item(i.set, it->prod, it->from, it->dot + 1))->
-				completers.insert(i);
+			add(t, item(i.set, it->prod, it->from, it->dot + 1));
+				//completers.insert(i);
 }
 
 void earley::predict(const item& i, set<item>& t) {
 	DBG(print(o::dbg() << "predicting ", i) << endl;)
 	for (size_t p : nts[get_lit(i)]) {
 		item j(i.set, p, i.set, 1);
-		add(t, j)->advancers.insert(i);
+		add(t, j); //->advancers.insert(i);
 		DBG(print(o::dbg() << "predicting added ", j) << endl;)
 	}
 }
@@ -134,7 +140,7 @@ void earley::predict(const item& i, set<item>& t) {
 void earley::scan(const item& i, size_t n, char ch) {
 	if (ch != get_lit(i).c()) return;
 	item j(n + 1, i.prod, i.from, i.dot + 1);
-	S.insert(j).first->advancers.insert(i);
+	S.insert(j);//first->advancers.insert(i);
 	DBG(print(o::dbg(), i) << ' ';)
 	DBG(print(o::dbg() << "scanned " << ch << " and added ", j) << endl;)
 	/*
@@ -389,7 +395,12 @@ bool earley::to_dot() {
 	ss << "_grammar_"<<"[label =\""<<grammar_text() <<"\", shape = rectangle]" ;
 	ss << endl<< "node" << "[ ordering =\"out\"];";
 	ss << endl<< "graph" << "[ overlap =false, splines = true];";
-	static set<pair<size_t, size_t>> edgedone;
+	auto pair_hash = [](const std::pair<size_t, size_t> &p){ 
+		static std::hash<size_t> inthash;
+		return inthash(p.first) ^ inthash(p.second);
+	};
+	std::unordered_set<std::pair<size_t,size_t>, decltype(pair_hash)> edgedone(8, pair_hash);
+
 	edgedone.clear();
 	for( auto &it: pfgraph ) {
 		auto key = keyfun(it.first);
