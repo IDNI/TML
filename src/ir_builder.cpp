@@ -1234,8 +1234,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	#ifdef ONLY_EARLEY
 	
 	earley parser(g);
-	parser.recognize( to_string( dynenv->strs.begin()->second).c_str() );
-
+	bool success = parser.recognize( to_string( dynenv->strs.begin()->second).c_str() );
+	o::inf() << "\n### parser.recognize() : " << success << "<###\n" << endl;
 	raw_progs rps = parser.get_raw_progs(&dict);
 	o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
 
@@ -1249,7 +1249,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		for( size_t i=2; i < af.size(); i++) 
 			if(std::holds_alternative<size_t>(af[i]))
 				e.emplace_back(int_t(std::get<size_t>(af[i])));
-			else	
+			else 
 				e.emplace_back(elem::STR, dict.get_lexeme(std::get<string>(af[i])));
 		e.emplace_back(elem(elem::CLOSEP));
 
@@ -1257,7 +1257,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		
 		//DBG(COUT<<rts.back()<<endl);
 	}
-	for(auto rt: rts) p.insert({from_raw_term(rt)});
+	for(auto rt: rts) o::inf()<<rt<<endl, p.insert({from_raw_term(rt)});
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
 		<< "# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)

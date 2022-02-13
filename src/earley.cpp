@@ -152,6 +152,7 @@ void earley::scan(const item& i, size_t n, char ch) {
 
 bool earley::recognize(const char* s) {
 	DBG(o::dbg() << "recognizing: " << s << endl;)
+	emeasure_time_start( tsr, ter );
 	inputstr = s;
 	size_t len = strlen(s);
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
@@ -192,6 +193,7 @@ bool earley::recognize(const char* s) {
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
 			found = true;
 		}
+	emeasure_time_end( tsr, ter ), o::inf()<<"parse time" <<endl;
 	nidx_t root(start, {0,len});
 	pfgraph.clear();	
 	emeasure_time_start( ts0, te0 );
