@@ -60,6 +60,13 @@ size_t driver::load_stdin() {
 void unquote(string_t& str);
 
 string_t driver::directive_load(const directive& d) {
+	if (d.type == directive::CMDLINEFILE) {
+		int_t a = d.n - 1;
+		if (a >= 0 && a < opts.pargc())
+			return to_string_t(input::file_read(opts.pargv(a)));
+		else parse_error(err_num_cmdline);
+		return {};
+	}
 	string_t str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
 	switch (d.type) {
 		case directive::FNAME:
@@ -77,6 +84,7 @@ signature get_signature(const raw_term &rt) {
 void driver::directives_load(raw_prog& p, lexeme& trel) {
 //	int_t rel;
 	// The list of directives that have been processed so far
+	int_t a;
 	vector<directive> processed;
 	// Iterate through the directives that remain in the program
 	while (!p.d.empty()) {
@@ -96,9 +104,9 @@ void driver::directives_load(raw_prog& p, lexeme& trel) {
 		case directive::INTERNAL:
 			p.hidden_rels.insert(get_signature(d.internal_term)); break;
 		case directive::CMDLINE:
-			if (d.n < opts.argc())
-				pd.strs.emplace(d.rel.e,
-					to_string_t(opts.argv(d.n)));
+			a = d.n - 1;
+			if (a >= 0 && a < opts.pargc()) pd.strs
+				.emplace(d.rel.e, to_string_t(opts.pargv(a)));
 			else parse_error(err_num_cmdline);
 			break;
 /*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
@@ -4739,6 +4747,13 @@ string_t driver::generate_cpp(const directive &dir, string_t &prog_constr,
 			break;
 		case directive::CMDLINE:
 			prog_constr += dir_name + to_string_t(".type = directive::CMDLINE;\n");
+			prog_constr += dir_name + to_string_t(".rel = ") +
+				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
+			prog_constr += dir_name + to_string_t(".n = ") +
+				to_string_t(to_string(dir.n).c_str()) + to_string_t(";\n");
+			break;
+		case directive::CMDLINEFILE:
+			prog_constr += dir_name + to_string_t(".type = directive::CMDLINEFILE;\n");
 			prog_constr += dir_name + to_string_t(".rel = ") +
 				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
 			prog_constr += dir_name + to_string_t(".n = ") +

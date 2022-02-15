@@ -271,7 +271,10 @@ bool directive::parse(input* in, const raw_prog& prog) {
 		while (*l[pos++][0] != '>')
 			if (!(pos < l.size())) return
 				in->parse_error(l[curr2][1], err_fname);
-		type = FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
+		if (curr2+2 < pos && *l[curr2+1][0] == '$')
+			type = CMDLINEFILE,
+			n = in->get_int_t(l[curr2+2][0], l[curr2+2][1]);
+		else type= FNAME, arg = lexeme{ l[curr2][0], l[pos-1][1] };
 	}
 	else if (*l[pos][0] == '"' || *l[pos][0] == '`')
 		type = STR, arg = l[pos++];

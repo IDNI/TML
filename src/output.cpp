@@ -45,8 +45,10 @@ namespace o {
 	ostream_t& repl() { return outputs::repl(); }
 #endif
 	ostream_t& ms()   { return outputs::ms();   }
+	ostream_t& pms()  { return outputs::pms();  }
 	ostream_t& dump() { return outputs::dump(); }
 	ostream_t& transformed() { return outputs::transformed(); }
+	bool enabled(std::string n) { return outputs::enabled(n); }
 }
 
 output::type_t output::get_type(string t) {
@@ -91,16 +93,17 @@ output::type_t output::target(const string t) {
 }
 
 void outputs::update_pointers(const string& n, output* out) {
-	if      (n == "output")      out_  = out;
-	else if (n == "error")       err_  = out;
-	else if (n == "info")        inf_  = out;
-	else if (n == "debug")       dbg_  = out;
+	if      (n == "output")            out_  = out;
+	else if (n == "error")             err_  = out;
+	else if (n == "info")              inf_  = out;
+	else if (n == "debug")             dbg_  = out;
 #ifdef WITH_THREADS
-	else if (n == "repl-output") repl_ = out;
+	else if (n == "repl-output")       repl_ = out;
 #endif
-	else if (n == "benchmarks")  ms_   = out;
-	else if (n == "dump")        dump_ = out;
-	else if (n == "transformed") trns_ = out;
+	else if (n == "benchmarks")        ms_   = out;
+	else if (n == "dump")              dump_ = out;
+	else if (n == "transformed")       trns_ = out;
+	else if (n == "parser-benchmarks") pms_  = out;
 }
 
 bool outputs::add(sp_output out) {

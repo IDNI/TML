@@ -180,8 +180,13 @@ public:
 	options(wstrings args, inputs *ii = 0, outputs *oo = 0):
 		ii(ii), oo(oo) { setup(); error |= !parse(args); }
 	int argc() const { return args.size(); }
+	int pargc() const { return pargs.size(); }
 	std::string argv(int n) const {
 		if (n<argc()) return args[n];
+		DBGFAIL; return "";
+	}
+	std::string pargv(int n) const {
+		if (n<pargc()) return pargs[n];
 		DBGFAIL; return "";
 	}
 	void add(option o);
@@ -212,8 +217,10 @@ private:
 	outputs* oo;
 	std::map<std::string, option> opts = {};
 	std::map<std::string, std::string> alts = {};
-	std::vector<std::string> args;
 	std::string input_data = "";
+	std::vector<std::string> args;
+	std::vector<std::string> pargs;
+	bool program_arguments = false;
 	bool parse_option(const strings &sargs, const size_t &i,
 		bool &skip_next);
 	bool is_value(const strings &sargs, const size_t &i);

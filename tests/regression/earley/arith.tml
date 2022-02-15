@@ -1,0 +1,233 @@
+# Example of TML transforming a parsed forest
+
+# requires --state-blocks CLI option
+# if you want to see just the printed output and you don't need the database
+# dump, use --no-dump CLI option
+
+@string str "1+3*2/4-1".
+
+number   => digit+.
+plus     => '+'.
+minus    => '-'.
+multiply => '*'.
+divide   => '/'.
+
+operation  => plus | minus | multiply | divide.
+expression => number | expression operation expression.
+
+start => expression.
+
+max(127).
+
+{ # precedence table (lower = higher priority)
+	prec(divide   10).
+	prec(multiply 11).
+	prec(plus     20).
+	prec(minus    21).
+	{ # print precedence table
+		init.
+		[init~:
+			get_rest.
+			print("precedence of operators: "
+				"                          ").
+			p(?o ?p) :- prec(?o ?p).
+		]
+		[get_rest~:
+			print_first.
+			rest(?o ?p) :-
+				p(?o ?p), p(?ao ?ap), ?o != ?ao, ?p > ?ap.
+		]
+		[print_first~:
+			loop_check.
+			print(' ' ?o '(' ?p ')'), ~p(?o ?p) :-
+				p(?o ?p), ~rest(?o ?p).
+		]
+		[loop_check~:
+			get_rest, ~rest(?o ?p) :- rest(?o ?p).
+		]
+	}
+	{ println. }
+}
+
+{ # extract input data into multiple relations with short names 
+	n(?N),       # set of nodes' indexes
+	nl(?N ?L),   # set of lit ?L of node ?N
+	ns(?N ?s ?e) # set of span ?s -> ?e of node ?N
+	  :- node(?N ?L ?s ?e).
+	n(?N),
+	nl(?N ""),
+	ns(?N ?N ?N),
+	m(?N)        # m is set of tree splitting nodes (parse forest)
+	  :- node(?N).
+	e(?N1 ?N2) :- edge(?N1 ?N2). # copy edges to e relation
+}
+
+{ # remove input data because we don't need it anymore
+	~node(?N)          :- node(?N).
+	~node(?N ?L ?s ?e) :- node(?N ?L ?s ?e).
+	~edge(?N1 ?N2)     :- edge(?N1 ?N2).
+}
+
+{ # mark trees having wrong precedence for removal
+	remove(?M2) :- # remove M2 subtree if prec of M2 < then prec of M1
+		n(?N), nl(?N expression), # find expression
+		e(?N ?M1), m(?M1),        # with multiple parse subtrees
+		e(?N ?M2), m(?M2),
+		?M1 != ?M2,
+
+		e(?M1 ?M1E1), nl(?M1E1 expression),   # in the first subtree
+		e(?M1 ?M1O),  nl(?M1O operation),     # find operation
+		e(?M1 ?M1E2), nl(?M1E2 expression),
+		e(?M1O ?M1Oo), nl(?M1Oo ?operation1),
+		prec(?operation1 ?prec1),             # and its precedence
+
+		e(?M2 ?M2E1), nl(?M2E1 expression),   # in the second subtree
+		e(?M2 ?M2O),  nl(?M2O operation),     # find operation
+		e(?M2 ?M2E2), nl(?M2E2 expression),
+		e(?M2O ?M2Oo), nl(?M2Oo ?operation2),
+		prec(?operation2 ?prec2),             # and its precedence
+
+		?prec1 > ?prec2.
+}
+
+{ # removal of nodes marked for removal
+	rem.
+	[rem~:
+		get_notremove.
+		~n(?N1)         :- remove(?N1), n(?N1).
+		~m(?N1)         :- remove(?N1), m(?N1).
+		~nl(?N1 ?any)   :- remove(?N1), nl(?N1 ?any).
+		~ns(?N1 ?s ?e)  :- remove(?N1), ns(?N1 ?s ?e).
+		~e(?N1 ?N2)     :- remove(?N1), e(?N1 ?N2).
+		~e(?N0 ?N1)     :- remove(?N1), e(?N0 ?N1).
+		~remove(?N1)    :- remove(?N1).
+	]
+	[get_notremove~:
+		get_remove.
+		notremove(?N)   :- n(?N), e(?aN ?N).
+	]
+	[get_remove~:
+		clean_remove.
+		remove(?N)      :- n(?N), ~notremove(?N), ~nl(?N start).
+	]
+	[clean_remove~:
+		loop_check.
+		~notremove(?N)  :- notremove(?N).
+	]
+	[loop_check~:
+		rem             :- remove(?N).
+	]
+}
+
+{ # get terminals (leafs)
+	{ # get nonterminals
+		nonterminal(?N) :- n(?N), e(?N ?anything).
+	}{ # diff into terminal
+		terminal(?N) :- n(?N), ~nonterminal(?N).
+	}{ # clear nonterminals
+		~nonterminal(?N) :- nonterminal(?N).
+		t(?N) :- terminal(?N).
+	}
+}
+
+# this is just to print terminals ordered by their occurance in the source text
+# is faster than traversing but there is no access to the structure
+{
+	print("simple print of terminals in a correct order:       ").
+	{ # print terminals
+		get_rest.
+		[get_rest~:
+			print_first.
+			rest(?N) :-
+				t(?N), t(?aN),
+				ns(?N ?s ?e), ns(?aN ?as ?ae), ?s > ?as.
+		]
+		[print_first~:
+			loop_check.
+			print(?L), ~t(?N) :-
+				t(?N), nl(?N ?L), ~rest(?N).
+		]
+		[loop_check~:
+			get_rest, ~rest(?N) :- rest(?N).
+		]
+	}
+}
+{ println. println. }
+
+# traverse the parse tree and wrap expressions with operators into parenthesis
+{ # init
+	# roots() is a stack of path to the current subtree roots (parents)
+	print("traversed printing with parenthesis for precedence: "),
+	current_root(0), roots(0 ?N) :-
+		nl(?N start).
+}
+{
+	get_children.
+	[get_children~:        # get children of the current root
+		wrap_parens.
+		ch(?cr ?CN) :- current_root(?cr), roots(?cr ?N), e(?N ?CN).
+	]
+	[wrap_parens~:         # if there is an operation node in the children
+		get_rest.      # then start wrapping the expression
+		print('('), wrapping(?cr) :-
+			current_root(?cr), ch(?cr ?CN), nl(?CN operation).
+	]
+	[get_rest~:
+		get_first.     # get rest but first children
+		rest(?cr ?CN), r1 :-
+			current_root(?cr),
+			ch(?cr ?CN),  ns(?CN  ?sCN  ?eCN),
+			ch(?cr ?aCN), ns(?aCN ?saCN ?eaCN),
+			?sCN > ?saCN.
+	]
+	[get_first~:           # get first form diffing rest and children
+		process_first.
+		first(?cr ?N) :- 
+			current_root(?cr), ch(?cr ?N), ~rest(?cr ?N).
+		# if the first has children then its going to be the new root
+		new_root(?N)  :-
+			current_root(?cr), ch(?cr ?N), ~rest(?cr ?N), e(?N ?any).
+	]
+	[process_first~:      # decide if we print the first
+		print_first   :- n(?N), ~new_root(?N).
+		~rest(?cr ?N) :- current_root(?cr), rest(?cr ?N).
+	]
+	[print_first~:        # print the 1st child & decide whether going down
+		decide1.
+		decided_to_go_down :- new_root(?N).
+		print(?L) :-
+			current_root(?cr), first(?cr ?N),
+			nl(?N ?L), ns(?N ?s ?e), terminal(?N).
+		~first(?cr ?N), ~ch(?cr ?N) :- current_root(?cr), first(?cr ?N).
+	]
+	[decide1~:            # decide wheter getting rest of children again
+		decide2.
+		decided_to_get_rest :-
+			~decided_to_go_down,
+			current_root(?cr), ch(?cr ?N), n(?N).
+	]
+	[decide2~:            # decide wheter going up and go
+		go_down,  ~decided_to_go_down  :- decided_to_go_down.
+		get_rest, ~decided_to_get_rest :- decided_to_get_rest.
+		go_up,    ~roots(?cr ?r)    :-
+			current_root(?cr), roots(?cr ?r),
+			~go_down, ~get_rest,
+			~decided_to_go_down, ~decided_to_get_rest.
+	]
+	[go_down~:            # going down the tree into the new_root
+		get_children, roots(?cr1 ?N),
+		~current_root(?cr), current_root(?cr1) :-
+			current_root(?cr), ?cr + 1 = ?cr1, new_root(?N).
+		~new_root(?N) :- new_root(?N).
+	]
+	[go_up~:              # going back up the tree one level
+		get_rest.
+		~current_root(?cr1), current_root(?cr) :-
+			current_root(?cr1), ?cr1 > 0, ?cr + 1 = ?cr1.
+		# if we are wrapping this level close parenthesis
+		print(')'), ~wrapping(?cr)  :- current_root(?cr), wrapping(?cr).
+	]
+}
+{
+	println.
+}

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# temporary file
+TMPFILE="tmp.parsed_rules.tml"
+
+# empty the temporary file
+echo -n > $TMPFILE
+
+# run early parser with file to parse as a first argument
+../../../build-Release/tml -i ./tml_earley.g --no-dump --info --parser-to-rules $TMPFILE --args $@
+
+# print duplicit nodes.
+cat $TMPFILE | grep ':-' | sed 's/\:-.*//g' | sort | uniq -d
+
+# remove the temporary file
+# rm $TMPFILE

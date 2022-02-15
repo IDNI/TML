@@ -31,7 +31,8 @@ ir_builder::~ir_builder() {
 
 void unquote(string_t& str) {
 	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
+		if (str[i] == (unsigned char) '\\' && str.size() > 1)
+			str.erase(str.begin() + i);
 }
 
 string_t _unquote(string_t str) { unquote(str); return str; }
@@ -116,14 +117,14 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 			}
 			from_raw_form(root, froot, is_sol);
 			/*
-			DBG(COUT << "\n ........... \n";)
+			DBG(o::dbg() << "\n ........... \n";)
 			DBG(r.prft->printTree();)
-			DBG(COUT << "\n ........... \n";)
+			DBG(o::dbg() << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
 			*/
 			term::textype extype;
 			if(is_sol) {
-				//DBG(COUT << "\n SOL parsed \n";)
+				//DBG(o::dbg() << "\n SOL parsed \n";)
 				//to_pnf(froot);
 				extype = term::FORM2;
 			} else {
@@ -438,10 +439,10 @@ bool ir_builder::to_pnf(form *&froot) {
 	bool changed = false;
 	changed = impltrans.traverse(froot);
 	changed |= demtrans.traverse(froot);
-	COUT << "\n ........... \n";
+	DBG(o::dbg() << "\n ........... \n";)
 	froot->printnode(0, this);
 	changed |= pullquant.traverse(froot);
-	COUT << "\n ........... \n";
+	DBG(o::dbg() << "\n ........... \n";)
 	froot->printnode(0, this);
 
 	return changed;
@@ -592,7 +593,7 @@ bool pull_quantifier::dosubstitution(form *phi, form * prefend){
 
 		subst.add( temp->l->arg, fresh_int );
 
-		COUT << "\nNew fresh: "<<temp->l->arg<<" --> "<<fresh_int;
+		DBG(o::dbg()<<"\nNew fresh: "<<temp->l->arg<<" --> "<<fresh_int;)
 		if( temp == prefend) break;
 		else temp = temp->r;
 	}
@@ -621,8 +622,9 @@ bool pull_quantifier::apply( form *&root) {
 		rprefend->r = curr;
 		root = lprefbeg;
 		changed = true;
-		COUT<<"\nPulled both: "<<lprefbeg->type<<" "<<lprefbeg->arg<<
-			" , "<< rprefbeg->type << " " << rprefbeg->arg<< "\n";
+		DBG(o::dbg()<<"\nPulled both: "<<lprefbeg->type<<" "<<
+			lprefbeg->arg<<" , "<< rprefbeg->type << " " <<
+			rprefbeg->arg<< "\n";)
 	}
 	else if(lprefbeg) {
 		if(!dosubstitution(lprefbeg, lprefend))
@@ -631,8 +633,8 @@ bool pull_quantifier::apply( form *&root) {
 		lprefend->r = curr;
 		root = lprefbeg;
 		changed = true;
-		COUT<<"\nPulled left: "<<lprefbeg->type<<" "<<lprefbeg->arg<<
-			"\n";
+		DBG(o::dbg()<<"\nPulled left: "<<lprefbeg->type<<" "<<
+			lprefbeg->arg<<"\n";)
 	}
 	else if (rprefbeg) {
 		if(!dosubstitution(rprefbeg, rprefend))
@@ -641,8 +643,8 @@ bool pull_quantifier::apply( form *&root) {
 		rprefend->r = curr;
 		root = rprefbeg;
 		changed = true;
-		COUT <<"\nPulled right: "<<rprefbeg->type<<" "<<rprefbeg->arg<<
-			"\n";
+		DBG(o::dbg() <<"\nPulled right: "<<rprefbeg->type<<" "<<
+			rprefbeg->arg<<"\n";)
 	}
 	return changed;
 }
@@ -671,11 +673,11 @@ bool transformer::traverse(form *&root ) {
 
 void form::printnode(int lv, const ir_builder* tb) {
 	if (r) r->printnode(lv+1, tb);
-	for (int i = 0; i < lv; i++) COUT << '\t';
+	for (int i = 0; i < lv; i++) o::dbg() << '\t';
 	if( tb && this->tm != NULL)
-		COUT << " " << type << " " << tb->to_raw_term(*tm) << "\n";
+		o::dbg() << " " << type << " " << tb->to_raw_term(*tm) << "\n";
 	else
-		COUT << " " << type << " " << arg << "\n";
+		o::dbg() << " " << type << " " << arg << "\n";
 	if (l) l->printnode(lv+1, tb);
 }
 
@@ -964,13 +966,13 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 
 bool ptransformer::visit() {
 	size_t cur = 1;
-	//DBG(COUT<<endl<<p<<endl);
+	//DBG(o::dbg()<<endl<<p<<endl);
 	bool ret = this->parse_alts( this->p.p, cur);
 	if( this->p.p.size() > cur ) ret = false;
 
-	//DBG(COUT<<p<<endl);
+	//DBG(o::dbg()<<p<<endl);
 	for ( production t : lp )
-		DBG(COUT<<t<<endl);
+		DBG(o::dbg()<<t<<endl);
 	if(!ret) parse_error("Error Production",
 		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e );
 	return ret;
@@ -1096,14 +1098,15 @@ bool graphgrammar::combine_rhs( const elem &s, vector<elem> &comb) {
 }
 
 bool graphgrammar::collapsewith(){
-	for( _itg_t it = _g.begin(); it != _g.end(); it++){
-		DBG(COUT<< it->second.second << ":" << it->second.first.to_str(0)<<endl);
-	}
+#ifdef DEBUG
+	for( _itg_t it = _g.begin(); it != _g.end(); it++) o::dbg()
+		<< it->second.second << ":" << it->second.first.to_str(0)<<endl;
+#endif
 	if(sort.empty()) return false;
 
 	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();
 	for (elem &e: sort) {
-		DBG(COUT<<e<<endl;)
+		DBG(o::dbg()<<e<<endl;)
 		auto rang = _g.equal_range(e);
 		for( auto sit = rang.first; sit != rang.second; sit++){
 
@@ -1220,8 +1223,8 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
 	if (g.empty()) return true;
-//	o::out()<<"grammar before:"<<endl;
-//	for (production& p : g) o::out() << p << endl;
+	//DBG(o::dbg()<<"grammar before:"<<endl;)
+	//DBG(for (production& p : g) o::dbg() << p << endl;)
 	bool changed;
 	transform_strsplit(g);
 	transform_apply_regex(g, p);
@@ -1234,10 +1237,13 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	#ifdef ONLY_EARLEY
 	
 	earley parser(g);
-	bool success = parser.recognize( to_string( dynenv->strs.begin()->second).c_str() );
-	o::inf() << "\n### parser.recognize() : " << success << "<###\n" << endl;
-	raw_progs rps = parser.get_raw_progs(&dict);
-	o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
+	bool success = parser.recognize(
+		to_string(dynenv->strs.begin()->second).c_str());
+	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
+		" <###\n" << endl;
+
+	//raw_progs rps = parser.get_raw_progs(&dict);
+	//o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
 
 	vector<earley::arg_t> facts = parser.get_parse_graph_facts();
 	vector<raw_term> rts;
@@ -1255,9 +1261,9 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 
 		rts.emplace_back(raw_term::REL, e);
 		
-		//DBG(COUT<<rts.back()<<endl);
+		//DBG(o::dbg()<<rts.back()<<endl);
 	}
-	for(auto rt: rts) o::inf()<<rt<<endl, p.insert({from_raw_term(rt)});
+	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
 		<< "# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
@@ -1374,7 +1380,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		v.erase(v.begin()+1, v.end());
 		spform_handle qbf(root);
 		v.emplace_back(term::FORM1, qbf);
-		DBG(COUT<<endl; root->printnode(0, this);)
+		DBG(o::dbg()<<endl; root->printnode(0, this);)
 		#endif
 		p.insert(move(v));
 	}
@@ -1393,14 +1399,14 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 	bool enable_regdetect_matching = opts.apply_regexpmatch;
 	if (dynenv->strs.size() && enable_regdetect_matching) {
 		string inputstr = to_string(dynenv->strs.begin()->second);
-		DBG(COUT<<inputstr<<endl);
+		DBG(o::dbg()<<inputstr<<endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
 		ggraph.collapsewith();
 		for(auto &elem : ggraph.sort) {
 			bool bnull =false;
 			string regexp = ggraph.get_regularexpstr(elem, bnull);
-			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
+			DBG(o::dbg()<<"Trying"<<regexp<<"for "<< elem<<endl);
 			regex rgx;
 #ifdef WITH_EXCEPTIONS
 			try {
@@ -1410,7 +1416,7 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 				rgx = regexp;
 #ifdef WITH_EXCEPTIONS
 			} catch( ... ) {
-				DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
+				DBG(o::dbg()<<"Ignoring Invalid regular expression"<<regexp);
 				continue;
 			}
 #endif
@@ -1422,10 +1428,10 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 					for( size_t j = i; j <= inputstr.size(); j++)	{
 						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
 						if( regex_match(ss, sm, rgx)) {
-							DBG(COUT << regexp << " match "<< sm.str() << endl);
-							DBG(COUT << "len: " << sm.length(0) << std::endl);
-							DBG(COUT << "size: " << sm.size() << std::endl);
-							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
+							DBG(o::dbg() << regexp << " match "<< sm.str() << endl);
+							DBG(o::dbg() << "len: " << sm.length(0) << std::endl);
+							DBG(o::dbg() << "size: " << sm.size() << std::endl);
+							DBG(o::dbg() << "posa: " << i + sm.position(0) << std::endl);
 							t.resize(2);
 							t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
 							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
@@ -1440,10 +1446,10 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
 				std::sregex_iterator end;
 				for(;iter != end; ++iter) {
-					DBG(COUT << regexp << " match "<< iter->str()<< endl);
-					DBG(COUT << "size: " << iter->size() << std::endl);
-					DBG(COUT << "len: " << iter->length(0) << std::endl);
-					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
+					DBG(o::dbg() << regexp << " match "<< iter->str()<< endl);
+					DBG(o::dbg() << "size: " << iter->size() << std::endl);
+					DBG(o::dbg() << "len: " << iter->length(0) << std::endl);
+					DBG(o::dbg() << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
 					t.resize(2);
 					t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
 					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));

@@ -20,13 +20,14 @@
 #endif
 //typedef char char_t;
 
-#define emeasure_time_start( start, end ) clock_t end, start = clock()
-#define emeasure_time_end( start, end ) end = clock(), std::cout << std::fixed << std::setprecision(2) \
-								 << (double(end - start) / CLOCKS_PER_SEC) * 1000 << " ms"
+#define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
+#define emeasure_time_start(start, end) clock_t end, start = clock()
+#define emeasure_time_end(start, end) end = clock(), o::pms() << std::fixed << \
+	std::setprecision(2) << tdiff(start, end) << " ms"
 class earley {
 	struct lit : public std::variant<size_t, char> {
 		using std::variant<size_t, char>::variant;
-		bool nt() const { return std::holds_alternative<size_t>(*this); }
+		bool nt() const { return std::holds_alternative<size_t>(*this);}
 		size_t n() const { return std::get<size_t>(*this); }
 		char c() const { return std::get<char>(*this); }
 	/*	size_t from = 0;  // start of span match
@@ -44,7 +45,8 @@ class earley {
 	struct pnode {
 		earley::lit l;
 		std::pair<size_t, size_t> span; // start/end of the matched span
-		pnode( const earley::lit _l, const std::pair<size_t, size_t> _span = {0, 0} ): 
+		pnode(const earley::lit _l,
+			const std::pair<size_t, size_t> _span = {0, 0} ): 
 		l(_l),span(_span){}
 		
 		bool nt() const { return l.nt(); }
@@ -59,7 +61,8 @@ class earley {
 	};
 
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
-	DBG(friend std::ostream& operator<<(std::ostream& os, const std::vector<lit>& v);)
+	DBG(friend std::ostream& operator<<(std::ostream& os,
+		const std::vector<lit>& v);)
 	std::vector<std::vector<lit>> G;
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
@@ -77,8 +80,9 @@ class earley {
 			return dot < i.dot;
 		}
 		bool operator==(const item& i) const {
-			if (set != i.set || prod != i.prod || from != i.from || dot != i.dot)
-				return false;
+			if (set != i.set || prod != i.prod ||
+				from != i.from || dot != i.dot)
+					return false;
 			return true;
 		}
 	};
@@ -105,6 +109,7 @@ class earley {
 			nullables.end()) ||
 			(!get_lit(i).nt() && get_lit(i).c() == '\0'));
 	}
+	std::set<std::string> init_char_builtins();
 	std::set<item> S;
 
 	struct {
@@ -131,24 +136,26 @@ public:
 	std::vector<arg_t> get_parse_graph_facts();
 	raw_progs get_raw_progs(dict_t* dict);
 private:
-	bool to_dot();
+	bool to_dot(ostream_t& os);
+	std::string to_dot_safestring(const std::string& s) const;
 	std::set<item> citem;
 	std::unordered_map< size_t, 
 		std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
 
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
-	const std::vector<item> find_all( size_t xfrom, size_t nt, int end = -1  );
+	const std::vector<item> find_all(size_t xfrom, size_t nt, int end = -1);
 	std::string grammar_text();
 	bool forest(const nidx_t & );
-	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t, std::set<std::vector<nidx_t>>&);
+	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
+		std::set<std::vector<nidx_t>>&);
 	template<typename T>
 	bool visit_forest(T) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
 	
 	// only store graph as facts
-	bool to_tml_facts() const;
+	bool to_tml_facts(ostream_t& os) const;
 	//make parse forest grammar
-	bool to_tml_rule() const;
+	bool to_tml_rule(ostream_t& os) const;
 	std::string to_tml_rule(const nidx_t nd) const;
 
 	// following is used by get_raw_progs()
