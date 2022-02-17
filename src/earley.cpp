@@ -237,11 +237,12 @@ bool earley::recognize(const char* s) {
 	nidx_t root(start, {0,len});
 	pfgraph.clear();
 	emeasure_time_start(tspfo, tepfo);
+	int count = 0;
 	for (const item& i : S) 
-		if (completed(i)) 
-			sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
-			//sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i);
-	(emeasure_time_end(tspfo,tepfo) <<" :: pre forest optimizations,"<< "size "<< sorted_citem.size() <<" \n");
+		if (completed(i)) count++,
+			//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
+			sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i);
+	(emeasure_time_end(tspfo, tepfo) <<" :: pre forest optimizations,"<< "size "<< count++ <<" \n");
 	emeasure_time_start(tsf, tef);
 	forest(root);
 	(emeasure_time_end(tsf, tef) <<" :: forest time "<<endl) ;
@@ -470,9 +471,9 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, siz
 	else {
 		// get the from/to span of all non-terminals in the rhs of production.
 		nxtl.span.first = xfrom;
-		//auto &nxtl_froms = find_all(xfrom, nxtl.n());
-		auto &nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		//auto &nxtl_froms = sorted_citem[{nxtl.n(),xfrom}];
+		
+		//auto &nxtl_froms = sorted_citem[nxtl.n()][xfrom];
+		auto &nxtl_froms = sorted_citem[{nxtl.n(),xfrom}];
 		for( auto &v: nxtl_froms  ) {
 			// ignore beyond the span
 			if( v.set > eitem.set) continue;
@@ -490,9 +491,8 @@ bool earley::forest ( const nidx_t &root ) {
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
-	//auto nxtset = find_all(root.span.first, root.n(), root.span.second);
-	auto &nxtset = sorted_citem[root.n()][root.span.first];
-	//auto &nxtset = sorted_citem[{root.n(),root.span.first}];
+	//auto &nxtset = sorted_citem[root.n()][root.span.first];
+	auto &nxtset = sorted_citem[{root.n(),root.span.first}];
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
 		if(cur.set != root.span.second) continue;

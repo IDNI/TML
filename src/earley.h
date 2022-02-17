@@ -30,16 +30,6 @@ class earley {
 		bool nt() const { return std::holds_alternative<size_t>(*this);}
 		size_t n() const { return std::get<size_t>(*this); }
 		char c() const { return std::get<char>(*this); }
-	/*	size_t from = 0;  // start of span match
-		size_t to = 0;	// end of span match
-		bool operator<(const lit& i) const {
-			const std::variant<size_t, char> &tb = *this, &ib = i; 
-			if(tb != ib )	return tb < i;
-			if(from != i.from) 	return from < i.from;
-			if(to != i.to) 	return to < i.to;
-			return false;
-		}
-	*/
 	};
 
 	struct pnode {
@@ -57,6 +47,10 @@ class earley {
 			if(l != i.l )	return l < i.l;
 			if(span != i.span ) return span < i.span;
 			return false;
+		}
+		bool operator==(const pnode& rhs) const {
+			if(l == rhs.l && span == rhs.span ) return true;
+			else return false;
 		}
 	};
 
@@ -139,18 +133,29 @@ private:
 	bool to_dot(ostream_t& os);
 	std::string to_dot_safestring(const std::string& s) const;
 	struct hasher_t{
+		size_t hash_size_t(const size_t &val) const{
+			return std::hash<size_t>()(val)  + 0x9e3779b9 + (val << 6) + (val >> 2);
+		}
 		size_t operator()(const std::pair<size_t, size_t> &k) const {
 			// lets substitute with better if possible.
 			std::size_t h = 0;
-			h ^= std::hash<int>()(k.first)  + 0x9e3779b9 + (h << 6) + (h >> 2); 
-			h ^= std::hash<int>()(k.second)  + 0x9e3779b9 + (h << 6) + (h >> 2);
+			h ^= hash_size_t(k.first); 
+			h ^= hash_size_t(k.second);
+			return h;
+		}
+		size_t operator()(const nidx_t &k) const {
+			// lets substitute with better if possible.
+			std::size_t h = 0;
+			h ^= hash_size_t(k.span.first); 
+			h ^= hash_size_t(k.span.second);
+			h ^= hash_size_t(size_t(k.l.nt()?k.l.n():k.c()));
 			return h;
 		}
 
 	};
-	std::unordered_map< size_t, 
-		std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
-	//std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem;
+	//std::unordered_map< size_t, 
+	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
+	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	std::string grammar_text();
 	bool forest(const nidx_t & );
