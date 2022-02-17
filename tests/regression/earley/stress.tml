@@ -1,6 +1,6 @@
-@string str "abcdefgh".
+@string str "abcdef".
 
-start => A B C D E F G H A B C D E F G H.
+start => A B C D E F G H A B C D E F G H start | null.
 
 A => 'a'| A | null.
 B => 'b'| B | null.

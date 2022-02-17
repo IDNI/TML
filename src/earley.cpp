@@ -238,15 +238,22 @@ bool earley::recognize(const char* s) {
 	pfgraph.clear();
 	emeasure_time_start(tspfo, tepfo);
 	for (const item& i : S) 
-		if (completed(i)) //citem.emplace(i);
+		if (completed(i)) 
 			sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
-	(emeasure_time_end(tspfo,tepfo) <<" :: pre forest optimizations\n");
+			//sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i);
+	(emeasure_time_end(tspfo,tepfo) <<" :: pre forest optimizations,"<< "size "<< sorted_citem.size() <<" \n");
 	emeasure_time_start(tsf, tef);
 	forest(root);
 	(emeasure_time_end(tsf, tef) <<" :: forest time "<<endl) ;
-	if (o::enabled("parser-to-dot"))  to_dot(o::to("parser-to-dot"));
-	if (o::enabled("parser-to-tml"))  to_tml_facts(o::to("parser-to-tml"));
-	if (o::enabled("parser-to-rules"))to_tml_rule(o::to("parser-to-rules"));
+	emeasure_time_start(tsf1, tef1);
+	if (o::enabled("parser-to-dot"))	to_dot(o::to("parser-to-dot")),
+										emeasure_time_end(tsf1, tef1) << ":: to dot time\n";
+	emeasure_time_start(tsf2, tef2);
+	if (o::enabled("parser-to-tml"))	to_tml_facts(o::to("parser-to-tml")),
+										emeasure_time_end(tsf2, tef2) << ":: to tml time\n";
+	emeasure_time_start(tsf3, tef3);
+	if (o::enabled("parser-to-rules"))	to_tml_rule(o::to("parser-to-rules")),
+										emeasure_time_end(tsf3, tef3) << ":: to rules time\n";
 	return found;
 }
 /*
@@ -275,26 +282,6 @@ vector<ast> earley::forest() {
 }
 */
 
-const std::vector<earley::item> earley::find_all( size_t xfrom, size_t nt, int end ) {
-	std::vector<item> ret;
-	if(end == -1)
-		return sorted_citem[nt][xfrom];
-	else {
-		auto v = sorted_citem[nt][xfrom];
-		for(  auto &it :v )
-			if( (int)it.set == end ) ret.push_back(it);
-		return ret;
-	}	
-	/*
-	for(auto it = citem.begin(); it != citem.end(); it++) {
-		if( it->from == xfrom && nts[nt].count(it->prod) ){
-			if( end != -1 && (int)it->set == end ) ret.push_back(*it);
-			else if( end == -1) ret.push_back(*it);
-		}
-	}	
-	return ret;
-	*/
-}
 std::string earley::grammar_text() {
 	stringstream txt;
 	for (const auto &p : G) {
@@ -407,9 +394,7 @@ bool earley::to_tml_rule(ostream_t& ss) const{
 }
 
 string earley::to_dot_safestring(const string &s) const {
-	stringstream ss;
-	for (auto &c : s) ss << (isalpha(c) ? c : '-');
-	return ss.str();
+	return s;
 }
 
 bool earley::to_dot(ostream_t& ss) {
@@ -427,11 +412,8 @@ bool earley::to_dot(ostream_t& ss) {
 		"\", shape = rectangle]" ;
 	ss << endl<< "node" << "[ ordering =\"out\"];";
 	ss << endl<< "graph" << "[ overlap =false, splines = true];";
-	auto pair_hash = [](const std::pair<size_t, size_t> &p){ 
-		static std::hash<size_t> inthash;
-		return inthash(p.first) ^ inthash(p.second);
-	};
-	std::unordered_set<std::pair<size_t,size_t>, decltype(pair_hash)> edgedone(8, pair_hash);
+
+	std::unordered_set<std::pair<size_t,size_t>, hasher_t> edgedone;
 
 	edgedone.clear();
 	for( auto &it: pfgraph ) {
@@ -490,6 +472,7 @@ void earley::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curchd, siz
 		nxtl.span.first = xfrom;
 		//auto &nxtl_froms = find_all(xfrom, nxtl.n());
 		auto &nxtl_froms = sorted_citem[nxtl.n()][xfrom];
+		//auto &nxtl_froms = sorted_citem[{nxtl.n(),xfrom}];
 		for( auto &v: nxtl_froms  ) {
 			// ignore beyond the span
 			if( v.set > eitem.set) continue;
@@ -509,6 +492,7 @@ bool earley::forest ( const nidx_t &root ) {
 
 	//auto nxtset = find_all(root.span.first, root.n(), root.span.second);
 	auto &nxtset = sorted_citem[root.n()][root.span.first];
+	//auto &nxtset = sorted_citem[{root.n(),root.span.first}];
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
 		if(cur.set != root.span.second) continue;

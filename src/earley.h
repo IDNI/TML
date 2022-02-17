@@ -138,12 +138,20 @@ public:
 private:
 	bool to_dot(ostream_t& os);
 	std::string to_dot_safestring(const std::string& s) const;
-	std::set<item> citem;
+	struct hasher_t{
+		size_t operator()(const std::pair<size_t, size_t> &k) const {
+			// lets substitute with better if possible.
+			std::size_t h = 0;
+			h ^= std::hash<int>()(k.first)  + 0x9e3779b9 + (h << 6) + (h >> 2); 
+			h ^= std::hash<int>()(k.second)  + 0x9e3779b9 + (h << 6) + (h >> 2);
+			return h;
+		}
+
+	};
 	std::unordered_map< size_t, 
 		std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
-
+	//std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
-	const std::vector<item> find_all(size_t xfrom, size_t nt, int end = -1);
 	std::string grammar_text();
 	bool forest(const nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
@@ -157,7 +165,7 @@ private:
 	//make parse forest grammar
 	bool to_tml_rule(ostream_t& os) const;
 	std::string to_tml_rule(const nidx_t nd) const;
-
+	friend int test_out(int c, earley &e);
 	// following is used by get_raw_progs()
 	dict_t* dict;
 	node_children get_children(const nidx_t nd, bool all) const;
