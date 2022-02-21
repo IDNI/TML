@@ -1220,6 +1220,21 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 	return true;
 }
 
+void ir_builder::add_character_builtins(std::vector<struct production> &g)const{
+	auto init = [this, &g](string n, function<bool(int_t)> fn) {
+		production p;
+		p.p.emplace_back(elem::SYM, dict.get_lexeme(n));
+		p.p.emplace_back((char32_t) 0);
+		for (int_t c = 0; c != 255; ++c) if (fn(c))
+			p.p.back() = (char32_t) c,
+			g.push_back(p);
+	};
+	init("digit",     [](int_t c) { return isdigit(c); });
+	init("alpha",     [](int_t c) { return isalpha(c); });
+	init("alnum",     [](int_t c) { return isalnum(c); });
+	init("space",     [](int_t c) { return isspace(c); });
+	init("printable", [](int_t c) { return isprint(c); });
+}
 
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
 	if (g.empty()) return true;
@@ -1230,6 +1245,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
 	transform_alts(g);
+	add_character_builtins(g);
 	DBG(o::dbg()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::dbg() << p << endl;)
 	

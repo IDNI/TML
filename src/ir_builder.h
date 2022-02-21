@@ -65,6 +65,7 @@ public:
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);
 
+	void add_character_builtins(std::vector<struct production> &g) const;
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p, form *&root);
 	bool transform_apply_regex(std::vector<struct production> &g,  flat_prog& p);
 	bool transform_alts( std::vector<struct production> &g);

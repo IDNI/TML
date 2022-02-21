@@ -103,7 +103,6 @@ class earley {
 			nullables.end()) ||
 			(!get_lit(i).nt() && get_lit(i).c() == '\0'));
 	}
-	std::set<std::string> init_char_builtins();
 	std::set<item> S;
 
 	struct {

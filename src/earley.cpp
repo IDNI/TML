@@ -29,27 +29,8 @@ bool earley::all_nulls(const vector<lit>& p) const {
 	return true;
 }
 
-set<string> earley::init_char_builtins() {
-	set<string> nt;
-	map<size_t, function<bool(int)>> m;
-	auto init = [this, &nt, &m](string n, function<bool(int)> fn) {
-		nt.insert(n);
-		m.emplace(d.get(n), fn); 
-	};
-	init("digit",     [this](char c) { return isdigit(c); });
-	init("alpha",     [this](char c) { return isalpha(c); });
-	init("alnum",     [this](char c) { return isalnum(c); });
-	init("space",     [this](char c) { return isspace(c); });
-	init("printable", [this](char c) { return isprint(c); });
-	for (int_t c = 0; c != 255; ++c)
-		for (auto &it : m) if (it.second(c))
-			G.emplace_back().emplace_back(it.first),
-			G.back().emplace_back((char) c);
-	return nt;
-}
-
 earley::earley(const vector<production> &g) {
-	set<string> nt = init_char_builtins();
+	set<string> nt;
 	for (const auto &x : g) nt.insert(x.p[0].to_str());
 	for (const auto &x : g) {
 		G.emplace_back();
@@ -86,7 +67,7 @@ earley::earley(const vector<production> &g) {
 #endif
 }
 earley::earley(const vector<pair<string, vector<vector<string>>>>& g) {
-	set<string> nt = init_char_builtins();
+	set<string> nt;
 	for (const auto &x : g) nt.insert(x.first);
 	for (const auto &x : g)
 		for (auto &y : x.second) {
