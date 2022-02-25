@@ -13,6 +13,9 @@
 #include <algorithm>
 #include <random>
 #include <list>
+#include <algorithm>
+#include <variant>
+#include <memory>
 
 #include "tables.h"
 #include "dict.h"
@@ -193,25 +196,70 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 }
 
 bool tables::get_facts(const flat_prog& m) {
-	map<ntable, set<spbdd_handle>> add, del;
-	for (const auto& r : m)
+	map<ntable, std::set<spbdd_handle>> add, del;
+	map<ntable, std::vector<const term*>> delayed_add, delayed_del;
+	for (const auto& r : m) 
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else if (r[0].is_builtin()) fact_builtin(r[0]);
+		else if (is_delayable_fact(r[0])) (r[0].neg ? delayed_del : delayed_add)[r[0].tab].push_back(std::addressof(r[0]));
 		else (r[0].neg ? del : add)[r[0].tab].insert(from_fact(r[0]));
 	if (unsat || halt) return false;
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
 	bdd_handles v;
+	for (auto x: from_delayed_facts(delayed_add)) 
+		tbls[x.first].t = tbls[x.first].t || x.second; 
+	for (auto x: from_delayed_facts(delayed_del)) 
+		tbls[x.first].t = tbls[x.first].t % x.second; 
 	for (auto x : add) for (auto y : x.second)
 		tbls[x.first].t = tbls[x.first].t || y;
-	for (auto x : del) {
-		for (auto y : x.second) tbls[x.first].t = tbls[x.first].t % y;
-	}
+	for (auto x : del) for (auto y : x.second) 
+		tbls[x.first].t = tbls[x.first].t % y;
+	
 	if (opts.optimize)
 		(o::ms() << "# get_facts: "),
 		measure_time_end();
 	return true;
+}
+bool tables::is_delayable_fact(const term& t) {
+	auto it = std::find_if_not(t.begin(), t.end(), [](size_t e) -> bool { return e >= 0;});
+	return it == t.end();
+}
+	
+map<ntable, spbdd_handle> tables::from_delayed_facts(std::map<ntable, std::vector<const term*>>& pending) {
+	map<ntable, spbdd_handle> p;
+	for (auto t: pending) 
+		p[t.first] = from_delayed_facts(t.second);
+	return p;
+}
+spbdd_handle tables::from_delayed_facts(std::vector<const term*>& pending) {
+	if (pending.size() == 0) return htrue;
+	return from_delayed_facts(pending, pending.begin(), pending.end(), 0);
+}
+spbdd_handle tables::from_delayed_facts(std::vector<const term*>& terms, std::vector<const term*>::iterator left, std::vector<const term*>::iterator right, size_t pos){
+	size_t max = max_pos(*left);
+	if (pos == max) {
+		return from_bit(left);
+	}
+	auto it = std::partition(left, right, [this, pos](const term* t) -> bool { return !bit(pos, t); });
+
+	if (left == it) {
+		return from_high(pos, from_delayed_facts(terms, it, right, pos +1) -> b);
+	}
+	if (right == it) {
+		return from_low(pos, from_delayed_facts(terms, left, it, pos + 1) -> b);
+	}
+	return from_high_and_low(pos,
+		from_delayed_facts(terms, it, right, pos + 1) -> b,
+		from_delayed_facts(terms, left, it, pos + 1) -> b);
+}
+spbdd_handle tables::from_bit(std::vector<const term*>::iterator t){
+	size_t a = args(*t);
+	size_t max = max_pos(*t);
+	size_t i = _arg(max, a);
+	size_t b = _bit(max, a);
+	return from_bit(b, i, a, (*t)->at(i));
 }
 
 int_t tables::freeze(vector<term>& v, int_t m = 0) {
