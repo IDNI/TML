@@ -71,10 +71,18 @@ save() {
 # checks outputs of executed program ($1) if they're same as expected
 check() {
 	filename="$(basename -- "$1")"
+	atleast_one_file=false
 	for output in ${outputs[*]}; do
 		check_output "$1.$output" "$dir_expected/$filename.$output" \
 			|| return 1
+		if [ -f "$dir_expected/$filename.$output" ]; then
+	    atleast_one_file=true
+		fi
 	done
+	if [ $atleast_one_file = false ];	then
+		echo "missing expected file"
+		return 1
+	fi
 	return 0
 }
 
