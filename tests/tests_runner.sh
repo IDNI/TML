@@ -35,6 +35,7 @@ check_expected_failed() {
 
 # checks output ($1) if it's same as expected ($2)
 check_output() {
+	! [[ -s "$1" ]] && [[ -s "$2" ]] && return 1
 	[[ -s "$1" ]] && [[ -f "$2" ]] \
 		&& check_expected_failed "$1" "$2" && return 1
 	return 0
