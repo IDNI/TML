@@ -46,15 +46,6 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) 
 	return m;
 }
 
-map<size_t, int_t> varmap_inv(const varmap& vm) {
-	map<size_t, int_t> inv;
-	for (auto x : vm) {
-		assert(!has(inv, x.second));
-		inv.emplace(x.second, x.first);
-	}
-	return inv;
-}
-
 void getvars(const term& t, set<int_t>& v) {
 	for (int_t i : t) if (i < 0) v.insert(i);
 }
@@ -248,21 +239,6 @@ flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 	return p;
 }
 
-void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
-	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
-	rt_options tmpopts(opts);
-	tables t(tmpdict, tmpopts, ir_handler);
-	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
-}
-
-void create_head(vector<term>&, ntable) {
-/*	set<int_t> v;
-	getvars(x, v);
-	term h;
-	h.tab = tab, h.insert(h.begin(), vx.begin(), vx.end());
-	x.insert(x.begin(), move(h));*/
-}
-
 void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
 	auto it = m.end();
 	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
@@ -358,7 +334,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
-	a.vm = get_varmap(h, al, a.varslen, blt), a.inv = varmap_inv(a.vm);
+	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
@@ -407,17 +383,6 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	}
 	auto d = deltail(a.varslen, h.size());
 	a.ex = d.first, a.perm = d.second, as.insert(a);
-}
-
-lexeme tables::get_new_rel() {
-	static size_t last = 1;
-	string s = "r";
-	size_t sz;
-	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_string_(last));
-	dict.get_rel(l);
-	if (dict.nrels() == sz) { ++last; goto retry; }
-	return l;
 }
 
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
@@ -580,11 +545,6 @@ void tables::load_string(lexeme r, const string_t& s) {
 	tbls[stb].t = bdd_or_many(move(b2));
 	if (opts.optimize) measure_time_end();
 }
-
-/*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
-	for (const T& t : small) if (!has(big, t)) return false;
-	return true;
-}*/
 
 void tables::get_var_ex(size_t arg, size_t args, bools& b) const {
 	for (size_t k = 0; k != bits; ++k) b[pos(k, arg, args)] = true;

@@ -71,6 +71,13 @@ void lp::get_trees() {
 	}
 }
 
+/*
+ *
+//	template <typename T>
+//	void get_trees(std::basic_ostream<T>& os, const term& root,
+//		const std::map<term, std::vector<term>>&, std::set<term>& done);
+//	sysstring_t get_trees(const term& roots,const db_t& t,size_t bits);
+
 void driver::get_trees(wostream& os, const term& root,
 	const map<term, vector<term>>& m, set<term>& done) {
 	if (!done.emplace(root).second) return;
@@ -99,3 +106,4 @@ wstring driver::get_trees(const term& root, const db_t& t, size_t bits) {
 	return get_trees(ss, root, m, done), ss.str();
 //	o::out() << "get_trees: " << ss.str() << endl;
 }
+*/

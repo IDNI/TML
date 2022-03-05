@@ -74,7 +74,6 @@ struct alt : public std::vector<body*> {
 	bools ex;
 	uints perm;
 	varmap vm;
-	std::map<size_t, int_t> inv;
 	std::map<size_t, spbdd_handle> levels;
 
 	alt* grnd = 0; // alt for grounding vars
@@ -294,7 +293,7 @@ private:
 	void print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int level = 0);
 	bool build_graph( std::map<term, gnode*> &tg, proof &p, gnode &g);
 	gnode* get_forest(const term& t, proof& p );
-	void run_internal_prog(flat_prog p, std::set<term>& r, size_t nsteps=0);
+
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	template <typename T>
@@ -315,7 +314,6 @@ private:
 
 	ntable get_table(const sig& s);
 	ntable get_new_tab(int_t x, ints ar);
-	lexeme get_new_rel();
 	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,
@@ -335,17 +333,14 @@ private:
 	std::set<int_t> str_rels;
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
-	//	std::function<int_t(void)>* get_new_rel;
-
-	bool print_updates_check();
-
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
 	void init_tml_update();
 	void add_tml_update(const term& rt, bool neg);
 	template <typename T>
 	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-	spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+			spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+	bool print_updates_check();
 
 	//-------------------------------------------------------------------------
 	//builtins
@@ -482,7 +477,6 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-
 	// transform nested programs into a single program controlled by guards
 	void transform_guards(raw_prog& rp);
 	// recursive fn for transformation of a program and its nested programs
@@ -503,7 +497,6 @@ public:
 	bool print_updates       = false;
 	bool print_steps         = false;
 	bool error               = false;
-
 };
 
 
@@ -525,4 +518,3 @@ struct infloop_exception : public unsat_exception {
 };
 #endif
 
-//#endif

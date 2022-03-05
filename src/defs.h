@@ -42,7 +42,6 @@ typedef size_t nlevel;
 
 #include "char_defs.h"
 
-//#define DEEPDEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #define NDBG(x)
@@ -52,6 +51,7 @@ typedef size_t nlevel;
 #define NDBG(x) x
 #define DBGFAIL
 #endif
+
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())

@@ -1184,8 +1184,6 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 			false;	
 }
 
-raw_progs::raw_progs() { } // parse(s); 
-
 bool raw_progs::parse(input* in, dict_t& dict) {
 	if (!in->data()) return true;
 	lexemes& l = in->l;

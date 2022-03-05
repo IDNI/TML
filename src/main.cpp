@@ -22,8 +22,6 @@
 #endif
 using namespace std;
 
-//void print_memos_len();
-
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	inputs ii;
@@ -57,6 +55,5 @@ int main(int argc, char** argv) {
 #endif
 quit:
 	onexit = true;
-//	print_memos_len();
 	return 0;
 }

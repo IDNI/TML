@@ -50,12 +50,6 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 		}
 }
 
-size_t driver::load_stdin() {
-	ostringstream_t ss; ss << CIN.rdbuf();
-	pd.std_input = to_string_t(ws2s(ss.str()));
-	return pd.std_input.size();
-}
-
 void unquote(string_t& str);
 
 string_t driver::directive_load(const directive& d) {
@@ -2178,7 +2172,6 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 	raw_prog nrp;
 	nrp.builtins = rp.builtins;
 	nrp.parse(prog_in, tbl->get_dict());
-	const strs_t strs;
 	return nrp;
 }
 
@@ -5021,50 +5014,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	return true;
 }
 
-bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
-//	pd.clear();
-//	DBG(o::out() << "original program:"<<endl<<p;)
-//	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
-	clock_t start, end;
-	size_t step = nsteps();
-	raw_prog::last_id = 0; // reset rp id counter;
-	measure_time_start();
-	if (opts.enabled("guards")) {
-		tbl->transform_guards(p);
-		if (opts.enabled("transformed")) o::to("transformed")
-			<< "# after transform_guards:\n" << p << endl << endl;
-	} else if (raw_prog::require_guards)
-		return error = true,
-			throw_runtime_error("Conditional statements require "
-				"-g (-guards) option enabled.");
-	bool fp = false;
-
-
-	if (opts.enabled("bitunv")) {
-		typechecker tc(p, true);
-		if(tc.tcheck()) {
-			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
-												opts.get_int("bitorder"));
-			raw_prog brawp;
-			tbl->spbu->btransform(p, brawp);
-			tbl->spbu->ptypenv = p.typenv;
-			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
-		}
-	}
-	//TODO review nested programs since we are forcing two calls to get_rules
-	// one with a program without them.
-	else fp = tbl->run_prog_wstrs(p, pd.strs, steps, break_on_step);
-	o::ms() << "# elapsed: ";
-	measure_time_end();
-	if (tbl->error) error = true;
-	pd.elapsed_steps = nsteps() - step;
-//	for (auto x : prog->strtrees_out)
-//		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
-//					x.second, prog->rng.bits));
-	return fp;
-}
-
 bool driver::add(input* in) {
+
 	if (!rp.parse(in, tbl->get_dict())) return !(error = true);
 	//if (opts.enabled("transformed")) o::to("transformed")
 	//	<< "# program before transformation:\n" << rp << endl << endl;
@@ -5074,22 +5025,58 @@ bool driver::add(input* in) {
 		return error = true,
 			throw_runtime_error("State blocks require "
 				"-sb (-state-blocks) option enabled.");
+
 	if (opts.disabled("fp-step") && raw_term::require_fp_step)
 		return error = true,
 			throw_runtime_error("Usage of the __fp__ term requires "
 				"--fp-step option enabled.");
+
+	//TODO review nested programs since we are forcing
+	// unecesary call to transforms / add_prog / get_facts with an empty programm
+
 	transform(rp.p, pd.strs);
+	#ifdef NPR
+	for (auto& np : rp.p.nps) {
+		if (!transform(np, pd.strs))
+			return false;
+	}
+	#endif
+
+	if (opts.enabled("guards")) {
+		tbl->transform_guards(rp.p);
+		if (opts.enabled("transformed")) o::to("transformed")
+			<< "# after transform_guards:\n" << rp.p << endl << endl;
+	} else if (raw_prog::require_guards)
+		return error = true,
+			throw_runtime_error("Conditional statements require "
+				"-g (-guards) option enabled.");
+
+	if (opts.enabled("bitunv")) {
+		#ifdef NPR
+		bool aux = true;
+		for(auto &nrp: p.nps){
+			nrp.typenv->set_parent(p.typenv);
+			typechecker tc(nrp, true);
+			aux &= tc.tcheck() ;
+			p.typenv->set_nested(nrp.typenv);
+		}
+		if(aux) {
+		#else
+		typechecker tc(rp.p, true);
+		if(tc.tcheck()) {
+		#endif
+			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
+												opts.get_int("bitorder"));
+			raw_prog brawp;
+			tbl->spbu->btransform(rp.p, brawp);
+			rp.p = brawp;
+			tbl->spbu->ptypenv = rp.p.typenv;
+		}
+	}
 	if (opts.enabled("transformed")) o::to("transformed")
-		<< "# transformed program:\n" << rp << endl << endl;
+		<< "# transformed program:\n" << rp.p << endl << endl;
 	return true;
 }
-
-template <typename T>
-void driver::list(std::basic_ostream<T>& os, size_t /*n*/) {
-	os << rp.p << endl;
-}
-template void driver::list(std::basic_ostream<char>&, size_t);
-template void driver::list(std::basic_ostream<wchar_t>&, size_t);
 
 void driver::restart() {
 	pd.n = 0;
@@ -5097,48 +5084,40 @@ void driver::restart() {
 	running = true;
 }
 
-bool driver::run(size_t steps, size_t break_on_step) {
-	if (!running) restart();
-	//if (nsteps() == pd.start_step) {
-		//transform(rp.p, pd.strs);
-		//for (const string& s : str_bltins)
-		//	rp.p.builtins.insert(get_lexeme(s));
-	//}
-	if (opts.disabled("run") && opts.disabled("repl")) return true;
-	bool fp = prog_run(rp.p, steps, break_on_step);
-	if (fp) result = true;
-	return fp;
-}
-
 bool driver::step(size_t steps, size_t break_on_step) {
 	return run(steps, break_on_step);
 }
 
-template <typename T>
-void driver::info(std::basic_ostream<T>& os) {
-	os<<"# step:      \t" << nsteps() <<" - " << pd.start_step <<" = "
-		<< (nsteps() - pd.start_step) << " ("
-		<< (running ? "" : "not ") << "running)" << endl;
-	bdd::stats(os<<"# bdds:     \t")<<endl;
-	//DBG(os<<"# opts:    \t" << opts << endl;)
+bool driver::run(size_t steps, size_t break_on_step) {
+	if (!running) restart();
+	if (opts.disabled("run") && opts.disabled("repl")) return true;
+
+	size_t step = nsteps();
+	raw_prog::last_id = 0; // reset rp id counter;
+
+	clock_t start, end;
+	measure_time_start();
+	result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
+	o::ms() << "# elapsed: ", measure_time_end();
+
+	if (tbl->error) error = true;
+	pd.elapsed_steps = nsteps() - step;
+	return result;
 }
-template void driver::info(std::basic_ostream<char>&);
-template void driver::info(std::basic_ostream<wchar_t>&);
 
 void driver::read_inputs() {
-	//COUT << "read_inputs() current_input: " << current_input << " next_input: " << (current_input ? current_input->next() : 0) << endl;
+	current_input = ii->first();
+	if (current_input && !add(current_input)) return;
 	while (current_input && current_input->next()) {
 		current_input = current_input->next();
 		if (!add(current_input)) return;
 		++current_input_id;
-		//COUT << "current_inputid: " << current_input_id << endl;
 	}
 }
 
 driver::driver(string s, const options &o) : rp(), opts(o) {
 
 	if (o.error) { error = true; return; }
-
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
 	dict.set_bitunv(opts.enabled("bitunv"));
@@ -5171,8 +5150,6 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 
-	current_input = ii->first();
-	if (current_input && !add(current_input)) return;
 	read_inputs();
 }
 
@@ -5192,3 +5169,20 @@ driver::~driver() {
 	if (ir) delete ir;
 	for (auto x : strs_allocated) free((char *)x);
 }
+// ----------------------------------------------------------------------------
+template <typename T>
+void driver::list(std::basic_ostream<T>& os, size_t /*n*/) {
+	os << rp.p << endl;
+}
+template void driver::list(std::basic_ostream<char>&, size_t);
+template void driver::list(std::basic_ostream<wchar_t>&, size_t);
+
+template <typename T>
+void driver::info(std::basic_ostream<T>& os) {
+	os<<"# step:      \t" << nsteps() <<" - " << pd.start_step <<" = "
+		<< (nsteps() - pd.start_step) << " ("
+		<< (running ? "" : "not ") << "running)" << endl;
+	bdd::stats(os<<"# bdds:     \t")<<endl;
+}
+template void driver::info(std::basic_ostream<char>&);
+template void driver::info(std::basic_ostream<wchar_t>&);
