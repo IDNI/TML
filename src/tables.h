@@ -41,21 +41,12 @@ struct body {
 	bools ex;
 	uints perm;
 	spbdd_handle q, tlast, rlast;
-	// only for count, created on first use (rarely used)
-	bools inv;
 	bool operator<(const body& t) const {
 		if (q != t.q) return q < t.q;
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
 		if (ex != t.ex) return ex < t.ex;
 		return perm < t.perm;
-	}
-	bools init_perm_inv(size_t args) {
-		bools inv(args, false);
-		// only count alt vars that are 'possible permutes' (of a body bit)
-		for (size_t i = 0; i < perm.size(); ++i)
-			if (!ex[i]) inv[perm[i]] = true;
-		return inv;
 	}
 };
 

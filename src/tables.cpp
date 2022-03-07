@@ -1304,12 +1304,3 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 }
 
 // ----------------------------------------------------------------------------
-// tramsform bin
-set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
-	set<int_t> r;
-	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
-		inserter(r, r.begin()));
-	return r;
-}
-
-// ----------------------------------------------------------------------------

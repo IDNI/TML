@@ -27,6 +27,7 @@
 #include "memory_map.h"
 
 struct context;
+class environment;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 

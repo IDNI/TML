@@ -16,7 +16,6 @@ list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
 
 set(TML_HEADERS
-	TML.h
 	analysis.h
 	bdd.h
 	builtins.h
