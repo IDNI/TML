@@ -324,7 +324,7 @@ private:
 	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
 	bool get_facts(const flat_prog& m);
-	bool is_fact(const term& t);
+	bool is_optimizable_fact(const term& t);
 	std::map<ntable, spbdd_handle> from_facts(
 		std::map<ntable, std::vector<const term*>>& pending,
 		std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> inverses);

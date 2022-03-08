@@ -198,7 +198,7 @@ bool tables::get_facts(const flat_prog& m) {
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else if (r[0].is_builtin()) fact_builtin(r[0]);
-		else if (is_fact(r[0]))
+		else if (is_optimizable_fact(r[0]))
 			(r[0].neg ? del: add)[r[0].tab].push_back(std::addressof(r[0])),
 			invert[r[0].tab] = r[0].size();
 	if (unsat || halt) return false;
@@ -217,7 +217,7 @@ bool tables::get_facts(const flat_prog& m) {
 		measure_time_end();
 	return true;
 }
-bool tables::is_fact(const term& t) {
+bool tables::is_optimizable_fact(const term& t) {
 	// For example: a. a(1 2 3). ~b. ~b(4 5 6).
 	return t.size() == 0 || (t.size() >0 && t[0] >= 0);
 }
