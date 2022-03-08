@@ -60,9 +60,7 @@ struct prog_data {
 };
 
 #ifdef WITH_Z3
-
 /* Provides consistent conversions of TML objects into Z3. */
-
 struct z3_context {
 	size_t arith_bit_len;
 	size_t universe_bit_len;
@@ -121,7 +119,6 @@ class driver {
 	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
 	int_t nums = 0, chars = 0, syms = 0;
-//	bool mult = false;
 
 	std::set<lexeme, lexcmp> strs_extra, rels;
 	std::vector<ccs> strs_allocated;
@@ -140,7 +137,6 @@ class driver {
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
 	std::set<raw_term> get_queries(const raw_prog& p);
-
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p, lexeme& trel);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
@@ -250,15 +246,7 @@ class driver {
 	raw_term from_grammar_elem_builtin(const lexeme& r, const string_t&b,
 		int_t v);
 	raw_term prepend_arg(const raw_term& t, lexeme s);
-//	template <typename T>
-//	void get_trees(std::basic_ostream<T>& os, const term& root,
-//		const std::map<term, std::vector<term>>&, std::set<term>& done);
-//	sysstring_t get_trees(const term& roots,const db_t& t,size_t bits);
-	void progs_read(cstr s);
-	bool prog_run(raw_prog& rp, nlevel steps=0, size_t brstep=0);
-	//driver(raw_progs, options o);
-	//driver(raw_progs);
-	size_t load_stdin();
+
 	prog_data pd;
 	std::set<lexeme> transformed_strings;
 	tables *tbl = 0;
@@ -271,6 +259,8 @@ class driver {
 	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
+	size_t nsteps() { return tbl->step(); };
+
 public:
 	bool result = false;
 	bool error = false;
@@ -288,41 +278,41 @@ public:
 	driver(ccs s);
 	~driver();
 
-	template <typename T>
-	void info(std::basic_ostream<T>&);
-	template <typename T>
-	void list(std::basic_ostream<T>& os, size_t p = 0);
+	void read_inputs();
 	bool add(input* in);
 	void restart();
-	bool run(size_t steps = 0, size_t br_on_step=0);
 	bool step(size_t steps = 1, size_t br_on_step=0);
-	size_t nsteps() { return tbl->step(); };
-	template <typename T>
-	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
-	void dump() { out(o::dump()); }
-	template <typename T>
-	void out_fixpoint(std::basic_ostream<T>& os) const { if (tbl) tbl->out_fixpoint(os); }
-	void dump_fixpoint() { out_fixpoint(o::dump()); }
-	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
+	bool run(size_t steps = 0, size_t br_on_step=0);
+
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
 	void set_regex_level(int val ) { ir->regex_level = val; }
+
+	inputs* get_inputs() const { return ii; }
+	input* get_current_input() const { return current_input; }
+	void set_current_input(input* in) { current_input = in; }
+
+	template <typename T>
+	void info(std::basic_ostream<T>&);
+	template <typename T>
+	void list(std::basic_ostream<T>& os, size_t p = 0);
+	template <typename T>
+	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
+	template <typename T>
+	void out_fixpoint(std::basic_ostream<T>& os) const {
+		if (tbl) tbl->out_fixpoint(os); }
 	template <typename T>
 	bool out_goals(std::basic_ostream<T>& os) const {
 		return tbl->get_goals(os); }
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	//size_t size();
-	//void load(std::string filename);
-	//void save(std::string filename);
-	//size_t db_size();
-	//void db_load(std::string filename);
-	//void db_save(std::string filename);
-	inputs* get_inputs() const { return ii; }
-	input* get_current_input() const { return current_input; }
-	void set_current_input(input* in) { current_input = in; }
-	void read_inputs();
+
+	void dump() { out(o::dump()); }
+	void dump_fixpoint() { out_fixpoint(o::dump()); }
+	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
+
+	void save_csv() const;
 	
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
@@ -337,11 +327,6 @@ public:
 	}
 #endif
 
-//	std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, spbdd t, size_t bits,
-//		const prefix&) const;
-//	std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, spbdd t, size_t bits,
-//		const prefix&) const;
-	void save_csv() const;
 };
 
 template void driver::out<char>(std::ostream&) const;
@@ -365,5 +350,5 @@ std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
 //std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
-string_t _unquote(string_t str);
+
 #endif

@@ -228,7 +228,7 @@ spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
-		size_t x_bitw, size_t y_bitw, size_t x_idx, size_t y_idx);
+		const size_t x_bitw, const size_t y_bitw/*, size_t x_idx, size_t y_idx*/);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars);
@@ -245,7 +245,6 @@ size_t satcount(cr_spbdd_handle x, const size_t bits);
 class bdd {
 	friend class bdd_handle;
 	friend class allsat_cb;
-	//friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
 	friend struct sbdd_and_many_ex_perm;
@@ -302,7 +301,7 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
-			size_t x_bitw, size_t y_bitw, size_t x_idx, size_t y_idx);
+			const size_t x_bitw, const size_t y_bitw /*, size_t x_idx, size_t y_idx*/);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	friend spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt);
@@ -382,7 +381,8 @@ class bdd {
 	static bdd_ref bitwise_xor(bdd_ref a_in, bdd_ref b_in);
 	static bdd_ref bitwise_not(bdd_ref a_in);
 	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
-	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, size_t x_bitw, size_t y_bitw /*, size_t x_idx=0, size_t y_idx=0*/);
+	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, const size_t x_bitw,
+			const size_t y_bitw /*, const size_t x_idx=0, const size_t y_idx=0*/);
 	//static int_t geq(int_t a, int_t b, size_t bit, size_t x_bitw, size_t y_bitw);
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
@@ -458,16 +458,8 @@ public:
 	}
 
 	/* The variable of a BDD reference is its root/absolute shift. */
-
 	inline static bdd_shft var(bdd_ref x) { return GET_SHIFT(x); }
-
-	static size_t satcount_perm(bdd_ref x, bdd_shft leafvar);
-
 	static bdd_shft getvar(bdd_ref x);
-	static size_t satcount_k(bdd_ref x, const bools& ex, const bdd_shfts& perm);
-	static size_t satcount_k(bdd_ref x, bdd_shft leafvar,
-		std::map<bdd_shft, bdd_shft>& mapvars);
-	static size_t satcount(spbdd_handle x, const bools& inv);
 };
 
 class bdd_handle {
@@ -501,20 +493,4 @@ private:
 	void sat(bdd_ref x);
 };
 
-class satcount_iter {
-public:
-	satcount_iter(cr_spbdd_handle r, bdd_shft nvars, const bools& inv) :
-		r(r->b), nvars(nvars), p(nvars), inv(inv), vp() {}
-	size_t count() {
-		sat(r);
-		return vp.size();
-	}
-private:
-	bdd_ref r;
-	const bdd_shft nvars;
-	bdd_shft v = 1;
-	bools p;
-	const bools& inv;
-	std::set<bools> vp;
-	void sat(bdd_ref x);
-};
+

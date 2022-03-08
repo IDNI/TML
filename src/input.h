@@ -27,6 +27,7 @@
 #include "memory_map.h"
 
 struct context;
+class environment;
 
 #define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
 
@@ -828,9 +829,12 @@ struct raw_prog {
 	std::vector<directive> d;
 	std::vector<production> g;
 	std::vector<raw_rule> r;
+
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
+
 	std::vector<raw_prog> nps;
+
 	std::vector<state_block> sbs;
 	spenvironment typenv; // only one item, build by typechecker
 
@@ -860,7 +864,7 @@ struct raw_prog {
 
 struct raw_progs {
 	raw_prog p;
-	raw_progs();
+	//raw_progs();
 	bool parse(input* in, dict_t& dict);
 };
 

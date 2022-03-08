@@ -10,10 +10,10 @@ A(4).
 lt(6 8).
 lt(4 8).
 lt(4 6).
-leq(6 7).
-leq(6 6).
-leq(4 7).
-leq(4 6).
+leq_xy(6 7).
+leq_xy(6 6).
+leq_xy(4 7).
+leq_xy(4 6).
 gt(8 7).
 gt(8 6).
 geq(8 7).

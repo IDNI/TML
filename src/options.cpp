@@ -218,7 +218,6 @@ void options::setup() {
 	add(option(option::type::INT, { "regex-level", "" })
 		.description("aggressive matching with regex with levels 1 and more."
 		"\n\t 1 - try all substrings - n+1  delete n rules after processing reg matching"));
-	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
 	add_bool2("populate-tml_update", "tml_update",
 		"populates relation tml_update(N_step add|delete fact).");
@@ -232,6 +231,7 @@ void options::setup() {
 	add_bool2("print-dict", "dict", "print internal string dictionary");
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step", "fp", "adds __fp__ fact when reaches a fixed point");
+	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 	add(option(option::type::BOOL, { "guards", "g", "unnest" },
 		[this](const option::value& v) {
 			if (v.get_bool()) this->enable("fp-step");

@@ -66,7 +66,7 @@ spbdd_handle bdd_bitwise_not(cr_spbdd_handle x) {
 
 // over bdd arithmetic
 spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
-		size_t x_bitw, size_t y_bitw, size_t x_idx, size_t y_idx) {
+		const size_t x_bitw, const size_t y_bitw/*, size_t x_idx, size_t y_idx*/) {
 	return bdd_handle::get(bdd::leq(x->b,y->b, 0, x_bitw, y_bitw/*, x_idx, y_idx*/));
 }
 
@@ -201,7 +201,8 @@ if (a.v > b.v + 1 && b.v != 0) {
 }
 */
 
-bdd_ref bdd::leq(bdd_ref a_in, bdd_ref b_in, size_t bit, size_t x_bitw, size_t y_bitw/*, size_t x_idx = 0, size_t y_idx = 0*/) {
+bdd_ref bdd::leq(bdd_ref a_in, bdd_ref b_in, size_t bit, const size_t x_bitw,
+		const size_t y_bitw /*, size_t x_idx = 0, size_t y_idx = 0*/) {
 
 	bdd_ref c = T;
 	//COUT << " ... bdd leq handler ...  " << "\n";

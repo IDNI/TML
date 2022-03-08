@@ -50,12 +50,6 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 		}
 }
 
-size_t driver::load_stdin() {
-	ostringstream_t ss; ss << CIN.rdbuf();
-	pd.std_input = to_string_t(ws2s(ss.str()));
-	return pd.std_input.size();
-}
-
 void unquote(string_t& str);
 
 string_t driver::directive_load(const directive& d) {
@@ -2178,7 +2172,6 @@ raw_prog driver::read_prog(elem prog, const raw_prog &rp) {
 	raw_prog nrp;
 	nrp.builtins = rp.builtins;
 	nrp.parse(prog_in, tbl->get_dict());
-	const strs_t strs;
 	return nrp;
 }
 
@@ -4037,11 +4030,9 @@ void driver::square_root_program(raw_prog &rp) {
 void driver::export_outer_quantifiers(raw_prog &rp) {
 	for(raw_rule &rr : rp.r) {
 		if(rr.is_form()) {
-			raw_form_tree &prft = *rr.prft;
+			sprawformtree prft = make_shared<raw_form_tree>(*rr.prft);
 			// Repeatedly strip outermost existential quantifier
-			while(prft.type == elem::EXISTS) {
-				prft = *prft.r;
-			}
+			while (prft->type == elem::EXISTS) prft = prft->r;
 			// Now export the outermost existentially quantified variables if their
 			// values are needed outside the particular quantifications. First
 			// determine if export is required.
@@ -4062,8 +4053,7 @@ void driver::export_outer_quantifiers(raw_prog &rp) {
 				// Now conjunct the rule formula with a copy of what is inside the
 				// existential quantifiers so that variables can be exported whilst
 				// uniqueness constraints are still being enforced.
-				prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft),
-					make_shared<raw_form_tree>(prft));
+				*rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
 			}
 		}
 	}
@@ -4850,6 +4840,7 @@ string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 }
 
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
+
 	lexeme trel = { 0, 0 };
 	directives_load(rp, trel);
 	auto get_vars = [this](const raw_term& t) {
@@ -4866,58 +4857,61 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		}
 	};
 	get_all_vars(rp);
-//	if (opts.enabled("sdt"))
-//		for (raw_prog& p : rp.p)
-//			p = transform_sdt(move(p));
-	static set<raw_prog *> transformed_progs;
-	if(transformed_progs.find(&rp) == transformed_progs.end()) {
-		transformed_progs.insert(&rp);
-#ifdef DEBUG
-		if (opts.enabled("transformed")) o::transformed() <<
-			"Pre-Transformation Program:\n\n" << rp << endl;
-#endif
-		if(opts.enabled("safecheck")) {
-			if(auto res = is_safe(rp)) {
-				ostringstream msg;
-				// The program is unsafe so inform the user of the offending rule
-				// and variable.
-				msg << "The variable "<< res->first <<" of " <<
-					res->second << " is not limited. "
-					"Try rewriting the rule to make its "
-					"safety clearer.";
-				parse_error(msg.str().c_str());
-			}
-		}
-		
-		// If we want proof trees, then we need to transform the productions into
-		// rules first since only rules are supported by proof trees.
-		if(opts.get_string("proof") != "none") {
-			DBG(o::transformed() <<
-				"Transforming Grammar ...\n" << endl;)
-			for (auto x : pd.strs)
-				if (!has(transformed_strings, x.first))
-					transform_string(x.second, rp, x.first),
-					transformed_strings.insert(x.first);
-			if (!rp.g.empty()) {
-				if (pd.strs.size() > 1)
-					return throw_runtime_error(err_one_input);
-				else transform_grammar(rp, pd.strs.begin()->first,
-					pd.strs.begin()->second.size());
-				rp.g.clear();
-			}
-			DBG(o::transformed() <<
-				"Transformed Grammar:\n\n" << rp << endl;)
-		}
 
-		if(opts.enabled("program-gen")) {
-			uint_t cid = 0;
-			string_t rp_generator;
-			map<elem, string_t> elem_cache;
-			o::dbg() << "Generating Program Generator ..." << endl << endl;
-			generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
-			o::dbg() << "Program Generator:" << endl << endl
-				<< to_string(rp_generator) << endl;
+#ifdef DEBUG
+	if (opts.enabled("transformed")) o::transformed() <<
+		"Pre-Transformation Program:\n\n" << rp << endl;
+#endif
+
+	//TODO: this is sort of cache to not optimize same program twice
+	// but this situation might become evident earlier, i.e is same file is
+	// passed as input twice.
+	static set<raw_prog *> transformed_progs;
+	if(transformed_progs.find(&rp) != transformed_progs.end()) return true;
+	transformed_progs.insert(&rp);
+
+	if(opts.enabled("safecheck")) {
+		if(auto res = is_safe(rp)) {
+			ostringstream msg;
+			// The program is unsafe so inform the user of the offending rule
+			// and variable.
+			msg << "The variable "<< res->first <<" of " <<
+				res->second << " is not limited. "
+				"Try rewriting the rule to make its "
+				"safety clearer.";
+			parse_error(msg.str().c_str());
 		}
+	}
+		
+	// If we want proof trees, then we need to transform the productions into
+	// rules first since only rules are supported by proof trees.
+	if(opts.get_string("proof") != "none") {
+		DBG(o::transformed() <<
+			"Transforming Grammar ...\n" << endl;)
+		for (auto x : pd.strs)
+			if (!has(transformed_strings, x.first))
+				transform_string(x.second, rp, x.first),
+				transformed_strings.insert(x.first);
+		if (!rp.g.empty()) {
+			if (pd.strs.size() > 1)
+				return throw_runtime_error(err_one_input);
+			else transform_grammar(rp, pd.strs.begin()->first,
+				pd.strs.begin()->second.size());
+			rp.g.clear();
+		}
+		DBG(o::transformed() <<
+			"Transformed Grammar:\n\n" << rp << endl;)
+	}
+
+	if(opts.enabled("program-gen")) {
+		uint_t cid = 0;
+		string_t rp_generator;
+		map<elem, string_t> elem_cache;
+		o::dbg() << "Generating Program Generator ..." << endl << endl;
+		generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
+		o::dbg() << "Program Generator:" << endl << endl
+			<< to_string(rp_generator) << endl;
+	}
 #ifdef WITH_Z3
 		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
 		z3_context z3_ctx(int_bit_len, universe_bit_len);
@@ -4934,137 +4928,91 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
 		}
 #endif
-		if(int_t iter_num = opts.get_int("iterate")) {
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			export_outer_quantifiers(rp);
-			pdatalog_transform(rp, [&](raw_prog &rp) {
-				o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
-				split_heads(rp);
-				// Alternately square and simplify the program iter_num times
-				for(int_t i = 0; i < iter_num; i++) {
-					o::dbg() << "Squaring Program ..." << endl << endl;
-					square_program(rp);
-					o::dbg() << "Squared Program: " << endl << endl << rp << endl;
+
+	if(int_t iter_num = opts.get_int("iterate")) {
+		// Trimmed existentials are a precondition to program optimizations
+		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+		export_outer_quantifiers(rp);
+
+		pdatalog_transform(rp, [&](raw_prog &rp) {
+			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
+			split_heads(rp);
+			// Alternately square and simplify the program iter_num times
+			for(int_t i = 0; i < iter_num; i++) {
+				o::dbg() << "Squaring Program ..." << endl << endl;
+				square_program(rp);
+				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
 #ifdef WITH_Z3
-					if(opts.enabled("qc-subsume-z3")){
-						o::dbg() << "Query containment subsumption using z3" << endl;
-						export_outer_quantifiers(rp);
-						subsume_queries(rp,
-							[&](const raw_rule &rr1, const raw_rule &rr2)
-								{return check_qc_z3(rr1, rr2, z3_ctx);});
-						o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-					}
+				if(opts.enabled("qc-subsume-z3")){
+					o::dbg() << "Query containment subsumption using z3" << endl;
+					export_outer_quantifiers(rp);
+					subsume_queries(rp,
+						[&](const raw_rule &rr1, const raw_rule &rr2)
+							{return check_qc_z3(rr1, rr2, z3_ctx);});
+					o::dbg() << "Reduced program: " << endl << endl << rp << endl;
+				}
 #endif
 				}
-				o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
-			});
+			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
+		});
 		}
-		if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-				opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-				opts.enabled("to-dnf")) {
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			export_outer_quantifiers(rp);
-			o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
-			step_transform(rp, [&](raw_prog &rp) {
-				// This transformation is a prerequisite to the CQC and binary
-				// transformations, hence its more general activation condition.
-				o::dbg() << "Converting to DNF format ..." << endl << endl;
-				to_dnf(rp);
-				split_heads(rp);
-				o::dbg() << "DNF Program:" << endl << endl << rp << endl;
 
-				if(opts.enabled("cqnc-subsume")) {
-					o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
-					subsume_queries(rp,
-						[this](const raw_rule &rr1, const raw_rule &rr2)
-							{return cqnc(rr1, rr2);});
-					o::dbg() << "CQNC Subsumed Program:" << endl << endl << rp
-						<< endl;
-				}
-				if(opts.enabled("cqc-subsume")) {
-					o::dbg() << "Subsuming using CQC test ..." << endl << endl;
-					subsume_queries(rp,
-						[this](const raw_rule &rr1, const raw_rule &rr2)
-							{return cqc(rr1, rr2);});
-					o::dbg() << "CQC Subsumed Program:" << endl << endl << rp
-						<< endl;
-				}
-				if(opts.enabled("cqc-factor")) {
-					o::dbg() << "Factoring queries using CQC test ..." << endl
-						<< endl;
-					factor_rules(rp);
-					o::dbg() << "Factorized Program:" << endl << endl << rp
-						<< endl;
-				}
-				if(opts.enabled("split-rules")) {
-					// Though this is a binary transformation, rules will become
-					// ternary after timing guards are added
-					o::dbg() << "Converting rules to unary form ..." << endl
-						<< endl;
-					transform_bin(rp);
-					o::dbg() << "Binary Program:" << endl << endl << rp << endl;
-				}
-			});
-			o::dbg() << "Step Transformed Program:" << endl << endl << rp
-				<< endl;
-			o::dbg() << "Eliminating dead variables ..." << endl << endl;
-			eliminate_dead_variables(rp);
-			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-		}
+	if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
+			opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
+			opts.enabled("to-dnf")) {
+		// Trimmed existentials are a precondition to program optimizations
+		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+		export_outer_quantifiers(rp);
+		o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
+
+		step_transform(rp, [&](raw_prog &rp) {
+			// This transformation is a prerequisite to the CQC and binary
+			// transformations, hence its more general activation condition.
+			o::dbg() << "Converting to DNF format ..." << endl << endl;
+			to_dnf(rp);
+			split_heads(rp);
+			o::dbg() << "DNF Program:" << endl << endl << rp << endl;
+
+			if(opts.enabled("cqnc-subsume")) {
+				o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
+				subsume_queries(rp,
+					[this](const raw_rule &rr1, const raw_rule &rr2)
+						{return cqnc(rr1, rr2);});
+				o::dbg() << "CQNC Subsumed Program:" << endl << rp << endl;
+			}
+			if(opts.enabled("cqc-subsume")) {
+				o::dbg() << "Subsuming using CQC test ..." << endl << endl;
+				subsume_queries(rp,
+					[this](const raw_rule &rr1, const raw_rule &rr2)
+						{return cqc(rr1, rr2);});
+				o::dbg() << "CQC Subsumed Program:" << endl << rp << endl;
+			}
+			if(opts.enabled("cqc-factor")) {
+				o::dbg() << "Factoring queries using CQC test ..." << endl;
+				factor_rules(rp);
+				o::dbg() << "Factorized Program:" << endl << rp	<< endl;
+			}
+
+			if(opts.enabled("split-rules")) {
+				// Though this is a binary transformation, rules will become
+				// ternary after timing guards are added
+				o::dbg() << "Converting rules to unary form ..." << endl;
+				transform_bin(rp);
+				o::dbg() << "Binary Program:" << endl << rp << endl;
+			}
+		});
+
+		o::dbg() << "Step Transformed Program:" << endl << rp << endl;
+		o::dbg() << "Eliminating dead variables ..." << endl << endl;
+		eliminate_dead_variables(rp);
+		o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
 	}
-//	if (trel[0]) transform_proofs(rp.p[n], trel);
-	//o::out()<<rp.p[n]<<endl;
-//	if (pd.bwd) rp.p.push_back(transform_bwd(rp.p[n]));
-	for (auto& np : rp.nps) if (!transform(np, pd.strs)) return false;
+
 	return true;
 }
 
-bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
-//	pd.clear();
-//	DBG(o::out() << "original program:"<<endl<<p;)
-//	strtrees.clear(), get_dict_stats(rp.p[n]), add_rules(rp.p[n]);
-	clock_t start, end;
-	size_t step = nsteps();
-	raw_prog::last_id = 0; // reset rp id counter;
-	measure_time_start();
-	if (opts.enabled("guards")) {
-		tbl->transform_guards(p);
-		if (opts.enabled("transformed")) o::to("transformed")
-			<< "# after transform_guards:\n" << p << endl << endl;
-	} else if (raw_prog::require_guards)
-		return error = true,
-			throw_runtime_error("Conditional statements require "
-				"-g (-guards) option enabled.");
-	bool fp = false;
-
-
-	if (opts.enabled("bitunv")) {
-		typechecker tc(p, true);
-		if(tc.tcheck()) {
-			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
-												opts.get_int("bitorder"));
-			raw_prog brawp;
-			tbl->spbu->btransform(p, brawp);
-			tbl->spbu->ptypenv = p.typenv;
-			fp = tbl->run_prog_wstrs(brawp, pd.strs, steps, break_on_step);
-		}
-	}
-	//TODO review nested programs since we are forcing two calls to get_rules
-	// one with a program without them.
-	else fp = tbl->run_prog_wstrs(p, pd.strs, steps, break_on_step);
-	o::ms() << "# elapsed: ";
-	measure_time_end();
-	if (tbl->error) error = true;
-	pd.elapsed_steps = nsteps() - step;
-//	for (auto x : prog->strtrees_out)
-//		strtrees.emplace(x.first, get_trees(prog->pd.strtrees[x.first],
-//					x.second, prog->rng.bits));
-	return fp;
-}
-
 bool driver::add(input* in) {
+
 	if (!rp.parse(in, tbl->get_dict())) return !(error = true);
 	//if (opts.enabled("transformed")) o::to("transformed")
 	//	<< "# program before transformation:\n" << rp << endl << endl;
@@ -5074,22 +5022,53 @@ bool driver::add(input* in) {
 		return error = true,
 			throw_runtime_error("State blocks require "
 				"-sb (-state-blocks) option enabled.");
+
 	if (opts.disabled("fp-step") && raw_term::require_fp_step)
 		return error = true,
 			throw_runtime_error("Usage of the __fp__ term requires "
 				"--fp-step option enabled.");
-	transform(rp.p, pd.strs);
+
+	//TODO review nested programs since we are forcing
+	// unnecessary call to add_prog / get_facts with an empty programm
+	//transform(rp.p, pd.strs);
+	for (auto& np : rp.p.nps)
+		if (!transform(np, pd.strs)) return false;
+
+	if (opts.enabled("guards")) {
+		tbl->transform_guards(rp.p);
+		if (opts.enabled("transformed")) o::to("transformed")
+			<< "# after transform_guards:\n" << rp.p << endl << endl;
+	} else if (raw_prog::require_guards)
+		return error = true,
+			throw_runtime_error("Conditional statements require "
+				"-g (-guards) option enabled.");
+
+	if (opts.enabled("bitunv")) {
+		#ifdef NPR
+		bool aux = true;
+		for(auto &nrp: p.nps){
+			nrp.typenv->set_parent(p.typenv);
+			typechecker tc(nrp, true);
+			aux &= tc.tcheck() ;
+			p.typenv->set_nested(nrp.typenv);
+		}
+		if(aux) {
+		#else
+		typechecker tc(rp.p, true);
+		if(tc.tcheck()) {
+		#endif
+			tbl->spbu  = make_shared<bit_univ>(tbl->get_dict(),
+												opts.get_int("bitorder"));
+			raw_prog brawp;
+			tbl->spbu->btransform(rp.p, brawp);
+			rp.p = brawp;
+			tbl->spbu->ptypenv = rp.p.typenv;
+		}
+	}
 	if (opts.enabled("transformed")) o::to("transformed")
-		<< "# transformed program:\n" << rp << endl << endl;
+		<< "# transformed program:\n" << rp.p << endl << endl;
 	return true;
 }
-
-template <typename T>
-void driver::list(std::basic_ostream<T>& os, size_t /*n*/) {
-	os << rp.p << endl;
-}
-template void driver::list(std::basic_ostream<char>&, size_t);
-template void driver::list(std::basic_ostream<wchar_t>&, size_t);
 
 void driver::restart() {
 	pd.n = 0;
@@ -5097,48 +5076,40 @@ void driver::restart() {
 	running = true;
 }
 
-bool driver::run(size_t steps, size_t break_on_step) {
-	if (!running) restart();
-	//if (nsteps() == pd.start_step) {
-		//transform(rp.p, pd.strs);
-		//for (const string& s : str_bltins)
-		//	rp.p.builtins.insert(get_lexeme(s));
-	//}
-	if (opts.disabled("run") && opts.disabled("repl")) return true;
-	bool fp = prog_run(rp.p, steps, break_on_step);
-	if (fp) result = true;
-	return fp;
-}
-
 bool driver::step(size_t steps, size_t break_on_step) {
 	return run(steps, break_on_step);
 }
 
-template <typename T>
-void driver::info(std::basic_ostream<T>& os) {
-	os<<"# step:      \t" << nsteps() <<" - " << pd.start_step <<" = "
-		<< (nsteps() - pd.start_step) << " ("
-		<< (running ? "" : "not ") << "running)" << endl;
-	bdd::stats(os<<"# bdds:     \t")<<endl;
-	//DBG(os<<"# opts:    \t" << opts << endl;)
+bool driver::run(size_t steps, size_t break_on_step) {
+	if (!running) restart();
+	if (opts.disabled("run") && opts.disabled("repl")) return true;
+
+	size_t step = nsteps();
+	raw_prog::last_id = 0; // reset rp id counter;
+
+	clock_t start, end;
+	measure_time_start();
+	result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
+	o::ms() << "# elapsed: ", measure_time_end();
+
+	if (tbl->error) error = true;
+	pd.elapsed_steps = nsteps() - step;
+	return result;
 }
-template void driver::info(std::basic_ostream<char>&);
-template void driver::info(std::basic_ostream<wchar_t>&);
 
 void driver::read_inputs() {
-	//COUT << "read_inputs() current_input: " << current_input << " next_input: " << (current_input ? current_input->next() : 0) << endl;
+	current_input = ii->first();
+	if (current_input && !add(current_input)) return;
 	while (current_input && current_input->next()) {
 		current_input = current_input->next();
 		if (!add(current_input)) return;
 		++current_input_id;
-		//COUT << "current_inputid: " << current_input_id << endl;
 	}
 }
 
-driver::driver(string s, const options &o) : rp(), opts(o) {
+driver::driver(string s, const options &o) : opts(o) {
 
 	if (o.error) { error = true; return; }
-
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
 	dict.set_bitunv(opts.enabled("bitunv"));
@@ -5171,8 +5142,6 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 
-	current_input = ii->first();
-	if (current_input && !add(current_input)) return;
 	read_inputs();
 }
 
@@ -5192,3 +5161,20 @@ driver::~driver() {
 	if (ir) delete ir;
 	for (auto x : strs_allocated) free((char *)x);
 }
+// ----------------------------------------------------------------------------
+template <typename T>
+void driver::list(std::basic_ostream<T>& os, size_t /*n*/) {
+	os << rp.p << endl;
+}
+template void driver::list(std::basic_ostream<char>&, size_t);
+template void driver::list(std::basic_ostream<wchar_t>&, size_t);
+
+template <typename T>
+void driver::info(std::basic_ostream<T>& os) {
+	os<<"# step:      \t" << nsteps() <<" - " << pd.start_step <<" = "
+		<< (nsteps() - pd.start_step) << " ("
+		<< (running ? "" : "not ") << "running)" << endl;
+	bdd::stats(os<<"# bdds:     \t")<<endl;
+}
+template void driver::info(std::basic_ostream<char>&);
+template void driver::info(std::basic_ostream<wchar_t>&);

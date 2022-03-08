@@ -101,16 +101,7 @@ bool tables::init_builtins() {
 		}
 		*/
 		spbdd_handle x = bdd_and_many(*c.hs);
-		/*
-		//int_t cnt1 = bdd::satcount_k(x->b, c.a->ex, c.a->perm);
-		//TODO: FIX count with perm inv?
-		//bools inv(c.a->varslen * bits, false);
-		//for (size_t i = 0; i < c.a->perm.size(); ++i)
-		//	if (!c.a->ex[i]) inv[c.a->perm[i]] = true;
-		//int_t cnt2 = bdd::satcount(x, inv);
-		//COUT << "count result: " << cnt << endl;
-		//c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt)));
-		 */
+
 		// -------------------------------------------------------
 		//COUT << "count in\n";
 		//::out(COUT, x)<<endl<<endl;
@@ -240,7 +231,8 @@ bool tables::init_bdd_builtins() {
 
 			spbdd_handle leq = htrue;
 			if (!dual)
-				leq = bdd_leq(/*hs[0]*/ s0, s1 /*hs[1]*/, arg0_w, arg1_w, 0 , 1/*c.varpos(0), c.varpos(1), c.a->varslen , bits*/);
+				leq = bdd_leq(/*hs[0]*/ s0, s1 /*hs[1]*/, arg0_w, arg1_w
+						/*, c.varpos(0), c.varpos(1), c.a->varslen , bits*/);
 			else
 				COUT << "LEQ_handler: DUAL operator GEQ is work in progress\n";
 

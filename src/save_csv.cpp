@@ -26,7 +26,7 @@ void driver::save_csv() const {
 			it = files.find(t.e[0]);
 		}
 		std::ostream& os = it->second;
-		auto elem2str = [](const elem&e) { return lexeme2str(e.e); };
+		//auto elem2str = [](const elem&e) { return lexeme2str(e.e); };
 		if (t.neg) os << '~';
 		for (size_t ar = 0, n = 1; ar != t.arity.size();) {
 			while (t.arity[ar] == -1) ++ar;

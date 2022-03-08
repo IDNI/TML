@@ -49,15 +49,6 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) 
 	return m;
 }
 
-map<size_t, int_t> varmap_inv(const varmap& vm) {
-	map<size_t, int_t> inv;
-	for (auto x : vm) {
-		assert(!has(inv, x.second));
-		inv.emplace(x.second, x.first);
-	}
-	return inv;
-}
-
 void getvars(const term& t, set<int_t>& v) {
 	for (int_t i : t) if (i < 0) v.insert(i);
 }
@@ -315,21 +306,6 @@ flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
 	return p;
 }
 
-void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
-	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
-	rt_options tmpopts(opts);
-	tables t(tmpdict, tmpopts, ir_handler);
-	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
-}
-
-void create_head(vector<term>&, ntable) {
-/*	set<int_t> v;
-	getvars(x, v);
-	term h;
-	h.tab = tab, h.insert(h.begin(), vx.begin(), vx.end());
-	x.insert(x.begin(), move(h));*/
-}
-
 void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
 	auto it = m.end();
 	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
@@ -425,7 +401,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
-	a.vm = get_varmap(h, al, a.varslen, blt), a.inv = varmap_inv(a.vm);
+	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
@@ -474,17 +450,6 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	}
 	auto d = deltail(a.varslen, h.size());
 	a.ex = d.first, a.perm = d.second, as.insert(a);
-}
-
-lexeme tables::get_new_rel() {
-	static size_t last = 1;
-	string s = "r";
-	size_t sz;
-	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_string_(last));
-	dict.get_rel(l);
-	if (dict.nrels() == sz) { ++last; goto retry; }
-	return l;
 }
 
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
@@ -648,11 +613,6 @@ void tables::load_string(lexeme r, const string_t& s) {
 	if (opts.optimize) measure_time_end();
 }
 
-/*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
-	for (const T& t : small) if (!has(big, t)) return false;
-	return true;
-}*/
-
 void tables::get_var_ex(size_t arg, size_t args, bools& b) const {
 	for (size_t k = 0; k != bits; ++k) b[pos(k, arg, args)] = true;
 }
@@ -670,12 +630,8 @@ ntable tables::get_table(const sig& s) {
 	if(opts.bitunv) {
 		bool found = false;
 		string_t relname = lexeme2str(dict.get_rel(s.first));
-		auto & types = spbu->ptypenv->search_pred( relname , found);
+		auto & types = spbu->ptypenv->search_pred(relname, found);
 		tab_type.insert({nt, types});
-		DBG(COUT<< "For table " << nt << " " << to_string(relname) << " < ");
-		for( auto &t: types )
-			DBG(COUT<<t.to_print()<<" ");
-		DBG(COUT<< ">" << std::endl;);
 	}
 	table tb;
 	return	tb.t = hfalse, tb.s = s, tb.len = len, 
@@ -1170,10 +1126,9 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
 	if (!add_prog(p, strs)) return false;
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		o::ms() << "# pfp: ";
+		o::ms() << "# pfp: " << endl;
 		measure_time_start();
 	}
-	//DBG(o::dbg()<<endl<<p<<endl);
 
 	nlevel begstep = nstep;
 	bool r = true;
@@ -1416,161 +1371,3 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 }
 
 // ----------------------------------------------------------------------------
-// tramsform bin
-set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
-	set<int_t> r;
-	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
-		inserter(r, r.begin()));
-	return r;
-}
-
-// ----------------------------------------------------------------------------
-
-/*
-// BACKUP CQC
-set<term> tables::bodies_equiv(vector<term> x, vector<term> y) const {
-//	if (x[0].size() != y[0].size()) return false;
-	x[0].tab = y[0].tab;
-	x.erase(x.begin()), y.erase(y.begin()),
-	create_head(x, x[0].tab), create_head(y, y[0].tab);
-	if (cqc(x, y)) {
-		if (cqc(y, x)) return true;
-	}
-}
-
-enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
-
-cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
-	if (x.size() == 1 || y.size() == 1) return NONE;
-	set<ntable> tx, ty;
-	for (size_t n = 1; n != x.size(); ++n)
-		if (x[n].neg) return NONE; else tx.insert(x[n].tab);
-	for (size_t n = 1; n != y.size(); ++n)
-		if (y[n].neg) return NONE; else ty.insert(y[n].tab);
-	bool maybe_contained, maybe_contains;
-	if ((maybe_contained = tx.size() < ty.size()))
-		for (ntable n : tx)
-			if (!has(ty, n)) { maybe_contained = false; break; }
-	if ((maybe_contains = tx.size() > ty.size()))
-		for (ntable n : ty)
-			if (!has(tx, n))
-				return maybe_contained ? CONTAINED : NONE;
-	return maybe_contained ? BOTH : CONTAINS;
-}
-*/
-/*struct cqcdata {
-	vector<term> r;
-	size_t from;
-	set<int_t> vars;
-	set<ntable> tabs;
-	cqcdata() {}
-	cqcdata(const vector<term>& r) : r(r) {
-		from = r.size();
-		if (from == 1) return;
-		sort(r.begin(), r.end());
-		for (size_t n = 1; n < from;)
-			if (tabs.insert(find(r[n].tab).second) ++n;
-			else r.push_back(r[n]), r.erase(r.begin() + n), --from;
-		for (size_t n = from; n != r.size(); ++n) getvars(r[n], vars);
-		for (size_t n = 1, k; n != from; ++n)
-			for (k = 0; k != r[n].size(); ++k)
-				if (r[n][k] < 0) vars.erase(r[n][k]);
-		align_vars(r);
-	}
-};
-void tables::cqc_minimize(cqcdata& d) {
-	if (d.from != d.r.size()) return;
-}
-void tables::cqc(flat_prog& p) {
-	vector<cqcdata> v;
-	for (const vector<term>& r : p)
-		v.emplace_back(r), cqc_minimize(v.back());
-}*/
-
-/*
-ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
-	vector<term> x) {
-	return p.emplace(x), x[0].tab;
-
-//	if (!bcqc || x.size() == 1) return p.emplace(x), x[0].tab;
-//	for (const vector<term>& y : p)
-//		if (x == y || y.size() == 1) continue;
-//		else if (bodies_equiv(x, y)) {
-//			if (has(tmprels, x[0].tab) && has(tmprels, y[0].tab)) {
-//
-//			}
-//			return y[0].tab;
-//		}
-//	if (has(tmprels, x[0][0])) {
-//		for (const vector<term>& y : p)
-//			if (has(tmprels, y[0].tab) && cqc(x, y) && cqc(y, x))
-//				return (tbls[x[0].tab].priority >
-//					tbls[y[0].tab].priority ? x : y)[0].tab;
-//		return x[0].tab;
-//	}
-//	if (x.size() > 3) cqc_minimize(x);
-//	if (!cqc(x, p)) p.emplace(x);
-//	return x[0].tab;
-//
-}
-*/
-
-//set<body*, ptrcmp<body>> body::s;
-//set<alt*, ptrcmp<alt>> alt::s;
-
-/*flat_prog tables::cqc(vector<term> x, vector<term> y) const {
-	if (x == y) return {x};
-	cqc_res r = maybe_contains(x, y), r1;
-	if (r == NONE) return { x, y };
-	const vector<term> xx = x, yy = y;
-	flat_prog p;
-	if (x[0].tab == y[0].tab) {
-		if (r == BOTH) get_canonical_db({x, y}, p = { x, y });
-		else if (r == CONTAINED) get_canonical_db({x}, p = { y });
-		else get_canonical_db({y}, p = { x });
-	}
-	term f[2];
-	f[0] = x[0], f[1] = y[0], x.erase(x.begin()), y.erase(y.begin());
-	set<int_t> vx, vy;
-	getvars(x, vx), getvars(y, vy);
-	bool b;
-	term hx, hy;
-	if ((b = vx.size() == vy.size())) // TODO: support otherwise
-		create_tmp_head(x), create_head(y, x[0].tab),
-		hx = x[0], hy = y[0],
-		get_canonical_db({ x, y }, p), p.insert(x), p.insert(y);
-	run_internal_prog(p, r);
-	if (has(r, f[0])) return has(r, f[1]) ? { x } : { y };
-	if (has(r, f[1])) return { x };
-	if (!b) return { x, y };
-	if (has(r, x[0])) {
-		if (has(r, y[0]))
-			return	x[0] = hx, y[0] = hy,
-				{ x, { xx[0], x[0] }, y, { yy[0], y[0] } };
-		if (has(tmprels, x) && has(tmprels, y)) return { y };
-	} else if (has(r, y[0]) && has(tmprels, x) && has(tmprels, y))
-		return { x };
-	return { x, y };
-//	if (has(r, y[0]))
-//		return print(print(o::out(),x)<<" is a generalization of ",yy),
-//		       true;
-//	return false;
-}*/
-
-/*bool tables::cqc(const vector<term>& v, const flat_prog& m) const {
-	for (const vector<term>& x : m) if (cqc(x, v)) return true;
-	return false;
-}
-
-void tables::cqc_minimize(vector<term>& v) const {
-	if (v.size() < 2) return;
-	const vector<term> v1 = v;
-	term t;
-	for (size_t n = 1; n != v.size(); ++n) {
-		t = move(v[n]), v.erase(v.begin() + n);
-		if (!cqc(v1, v)) v.insert(v.begin() + n, t);
-	}
-	DBG(if (v.size() != v1.size())
-		print(print(o::err()<<"Rule\t\t", v)<<endl<<"minimized into\t"
-		, v1)<<endl;)
-}*/

@@ -1184,8 +1184,6 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 			false;	
 }
 
-raw_progs::raw_progs() { } // parse(s); 
-
 bool raw_progs::parse(input* in, dict_t& dict) {
 	if (!in->data()) return true;
 	lexemes& l = in->l;
@@ -1199,28 +1197,7 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	if (!rp.parse(in, dict))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
-	//}
-	//if (*l[pos][0] != '{') {
-	//	raw_prog& x = !p.size() || newseq
-	//		? p.emplace_back() : p.back();
-	//	//raw_prog x;
-	//	prepare_builtins(x);
-	//	if (!x.parse(in, dict)) return in->error?false:
-	//		in->parse_error(l[pos][0],
-	//			err_rule_dir_prod_expected, l[pos]);
-	//	//p.push_back(x);
-	//} else do {
-	//	// emplace to avoid copying dict etc. (or handle to avoid issues)
-	//	raw_prog& x = p.emplace_back(); // if needed on err: p.pop_back();
-	//	//raw_prog x;
-	//	prepare_builtins(x);
-	//	if (++pos, !x.parse(in, dict)) return in->error?false:
-	//		in->parse_error(l[pos][0], err_parse, l[pos]);
-	//	//if (p.push_back(x), pos==l.size() || *l[pos++][0]!='}')
-	//	if (pos == l.size() || *l[pos++][0] != '}') return
-	//		in->error?false: in->parse_error(l[pos-1][1],
-	//			err_close_curly, l[pos-1]);
-	//} while (pos < l.size());
+
 	return true;
 }
 
