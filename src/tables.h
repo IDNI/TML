@@ -247,45 +247,32 @@ private:
 	size_t bit(size_t v, size_t args) const {
 		return bits - 1 - v / args;
 	}
-	size_t _arg(size_t v, size_t args) const {
-		static std::vector<std::vector<size_t>> cache;
-		
-		if (args < cache.size() && !cache[args].empty()) return cache[args][v];
-		if (args >= cache.size()) cache.resize(args + 1);
-
-		cache[args].resize(max_pos(args) + 1);
-		for (size_t arg = 0; arg < args; ++arg) for (size_t bit = 0; bit < bits; ++bit)
-			cache[args][pos(bit, arg, args)] = arg;
-		return cache[args][v];
+	std::pair<std::vector<size_t>, std::vector<size_t>> _inverse(
+			size_t bits, 
+			size_t args) const {
+		std::vector<size_t> _args(bits * args);
+		std::vector<size_t> _bits(bits * args);
+		for (size_t arg = 0; arg < args; ++arg) 
+			for (size_t bit = 0; bit < bits; ++bit)
+				_args[pos(bit, arg, args)] = arg, 
+				_bits[pos(bit, arg, args)] = bit;
+		std::pair<std::vector<size_t>, std::vector<size_t>> i(_bits, _args);
+		return i;
 	}
-	size_t _bit(size_t v, size_t args) const {
-		static std::vector<std::vector<size_t>> cache;
-		
-		if (args < cache.size() && !cache[args].empty()) return cache[args][v];
-		if (args >= cache.size()) cache.resize(args + 1);
-
-		cache[args].resize(max_pos(args) + 1);
-		for (size_t arg = 0; arg < args; ++arg) for (size_t bit = 0; bit < bits; ++bit)
-			cache[args][pos(bit, arg, args)] = bit;
-		return cache[args][v];
-	}
-	size_t args(const term* t) const {
+	size_t _args(const term* t) const {
 		return t->size();
 	}
-	size_t bit(size_t v, const term* t) const {
-		size_t a = args(t);
-		size_t b = _bit(v, a);
-		size_t i = _arg(v, a);
+	size_t bit(size_t v, const term* t, std::vector<size_t> _args,
+			std::vector<size_t> _bits) const {
+		size_t b = _bits[v];
+		size_t i = _args[v];
 		return t->at(i) & (1 << b);	
 	}
 	size_t max_pos(const term* t) const {
-		return args(t) * bits -1;
-	}
-	size_t max_pos(size_t args) const {
-		return args * bits -1;
+		return _args(t) * bits -1;
 	}
 
-	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
+	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
@@ -347,11 +334,19 @@ private:
 	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
 	bool get_facts(const flat_prog& m);
-	bool is_delayable_fact(const term& t);
-	std::map<ntable, spbdd_handle> from_delayed_facts(std::map<ntable, std::vector<const term*>>& pending);
-	spbdd_handle from_delayed_facts(std::vector<const term*>& pending);
-	spbdd_handle from_delayed_facts(std::vector<const term*>& terms, std::vector<const term*>::iterator left, std::vector<const term*>::iterator right, size_t pos);
-	spbdd_handle from_bit(std::vector<const term*>::iterator current);
+	bool is_fact(const term& t);
+	std::map<ntable, spbdd_handle> from_facts(
+		std::map<ntable, std::vector<const term*>>& pending,
+		std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> inverses);
+	spbdd_handle from_facts(std::vector<const term*>& pending, 
+		std::pair<std::vector<size_t>, std::vector<size_t>> inverse);
+	spbdd_handle from_facts(std::vector<const term*>& terms, 
+		std::vector<const term*>::iterator left, 
+		std::vector<const term*>::iterator right, 
+		size_t pos, std::pair<std::vector<size_t>, 
+		std::vector<size_t>> inverse);
+	spbdd_handle from_bit(std::vector<const term*>::iterator current,
+		std::pair<std::vector<size_t>, std::vector<size_t>> inverse);
 
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
