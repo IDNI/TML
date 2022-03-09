@@ -252,8 +252,8 @@ private:
 	size_t _args(const term* t) const {
 		return t->size();
 	}
-	size_t bit(size_t v, const term* t, std::vector<size_t> _args,
-			std::vector<size_t> _bits) const {
+	size_t bit(size_t v, const term* t, const std::vector<size_t>& _args,
+			const std::vector<size_t>& _bits) const {
 		size_t b = _bits[v];
 		size_t i = _args[v];
 		return t->at(i) & (1 << b);	
@@ -323,20 +323,20 @@ private:
 			spbdd_handle &c) const;
 	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
-	bool get_facts(const flat_prog& m);
-	bool is_optimizable_fact(const term& t);
+	bool get_facts(const flat_prog& m) ;
+	bool is_optimizable_fact(const term& t) const;
 	std::map<ntable, spbdd_handle> from_facts(
 		std::map<ntable, std::vector<const term*>>& pending,
-		std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> inverses);
+		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> &inverses) const;
 	spbdd_handle from_facts(std::vector<const term*>& pending, 
-		std::pair<std::vector<size_t>, std::vector<size_t>> inverse);
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
 	spbdd_handle from_facts(std::vector<const term*>& terms, 
 		std::vector<const term*>::iterator left, 
 		std::vector<const term*>::iterator right, 
-		size_t pos, std::pair<std::vector<size_t>, 
-		std::vector<size_t>> inverse);
-	spbdd_handle from_bit(std::vector<const term*>::iterator current,
-		std::pair<std::vector<size_t>, std::vector<size_t>> inverse);
+		const size_t& pos, 
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+	spbdd_handle from_bit(const std::vector<const term*>::iterator& current,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
 
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);

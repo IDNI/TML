@@ -217,23 +217,23 @@ bool tables::get_facts(const flat_prog& m) {
 		measure_time_end();
 	return true;
 }
-bool tables::is_optimizable_fact(const term& t) {
+bool tables::is_optimizable_fact(const term& t) const {
 	// For example: a. a(1 2 3). ~b. ~b(4 5 6).
 	return t.size() == 0 || (t.size() >0 && t[0] >= 0);
 }
 	
 map<ntable, spbdd_handle> tables::from_facts(
 		std::map<ntable, std::vector<const term*>>& pending,
-		std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> inverses) {
+		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>>& inverses) const {
 	std::map<ntable, spbdd_handle> p;
 	for (auto t: pending) 
 		if (t.second.size()) continue;
-		else p[t.first] = from_facts(t.second, inverses[t.first]);
+		else p[t.first] = from_facts(t.second, inverses.at(t.first));
 	return p;
 }
 spbdd_handle tables::from_facts(
 		std::vector<const term*>& pending,
-		std::pair<std::vector<size_t>, std::vector<size_t>> inverse) {
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
 	if (pending.size() == 0) return htrue;
 	// If the facts have no arguments, we return htrue regardless if
 	// they correspond to a del or and call. They will be process 
@@ -243,12 +243,11 @@ spbdd_handle tables::from_facts(
 	// the bdd.
 	return from_facts(pending, pending.begin(), pending.end(), 0, inverse);
 }
-spbdd_handle tables::from_facts(
-		std::vector<const term*>& terms, 
+spbdd_handle tables::from_facts(std::vector<const term*>& terms, 
 		std::vector<const term*>::iterator left, 
 		std::vector<const term*>::iterator right, 
-		size_t pos, 
-		std::pair<std::vector<size_t>, std::vector<size_t>> inverse){
+		const size_t& pos, 
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
 	size_t max = max_pos(*left);
 	if (pos == max) return from_bit(left, inverse);
 	auto it = std::partition(left, right, 
@@ -263,13 +262,13 @@ spbdd_handle tables::from_facts(
 		from_facts(terms, left, it, pos + 1, inverse) -> b);
 }
 spbdd_handle tables::from_bit(
-		std::vector<const term*>::iterator t,
-		std::pair<std::vector<size_t>, std::vector<size_t>> inverse) {
-	size_t max = max_pos(*t);
-	size_t a = (*t)->size();
+		const std::vector<const term*>::iterator& current,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
+	size_t max = max_pos(*current);
+	size_t a = (*current)->size();
 	size_t i = inverse.second.at(max);
 	size_t b = inverse.first.at(max);
-	return from_bit(b, i, a, (*t)->at(i));
+	return from_bit(b, i, a, (*current)->at(i));
 }
 
 int_t tables::freeze(vector<term>& v, int_t m = 0) {
