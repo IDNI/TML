@@ -252,8 +252,8 @@ private:
 	size_t _args(const term* t) const {
 		return t->size();
 	}
-	size_t bit(size_t v, const term* t, const std::vector<size_t>& _args,
-			const std::vector<size_t>& _bits) const {
+	size_t bit(size_t v, const term* t, const std::vector<size_t>& _bits,
+			const std::vector<size_t>& _args) const {
 		size_t b = _bits[v];
 		size_t i = _args[v];
 		return t->at(i) & (1 << b);	

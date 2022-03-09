@@ -227,7 +227,7 @@ map<ntable, spbdd_handle> tables::from_facts(
 		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>>& inverses) const {
 	std::map<ntable, spbdd_handle> p;
 	for (auto t: pending) 
-		if (t.second.size()) continue;
+		if (t.second.size() == 0) continue;
 		else p[t.first] = from_facts(t.second, inverses.at(t.first));
 	return p;
 }
