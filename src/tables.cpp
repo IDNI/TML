@@ -190,9 +190,9 @@ bool tables::get_facts(const flat_prog& m) {
 	// TODO: Ee need add and del in order to deal with negations in heads.
 	// A couple of regression tests use negation in heads.
 	// We should check whether this is a desirable feature.
-	map<ntable, std::vector<const term*>> add, del;
-	std::map<ntable, size_t> invert;
-	map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> inverses;
+	map<ntable, vector<const term*>> add, del;
+	map<ntable, size_t> invert;
+	map<ntable, pair<vector<size_t>, vector<size_t>>> inverses;
 	// get facts by table
 	for (const auto& r : m) 
 		if (r.size() != 1) continue;
@@ -223,17 +223,17 @@ bool tables::is_optimizable_fact(const term& t) const {
 }
 	
 map<ntable, spbdd_handle> tables::from_facts(
-		std::map<ntable, std::vector<const term*>>& pending,
-		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>>& inverses) const {
-	std::map<ntable, spbdd_handle> p;
+		map<ntable, vector<const term*>>& pending,
+		const map<ntable, pair<vector<size_t>, vector<size_t>>>& inverses) const {
+	map<ntable, spbdd_handle> p;
 	for (auto t: pending) 
 		if (t.second.size() == 0) continue;
 		else p[t.first] = from_facts(t.second, inverses.at(t.first));
 	return p;
 }
 spbdd_handle tables::from_facts(
-		std::vector<const term*>& pending,
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
+		vector<const term*>& pending,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
 	if (pending.size() == 0) return htrue;
 	// If the facts have no arguments, we return htrue regardless if
 	// they correspond to a del or and call. They will be process 
@@ -243,14 +243,14 @@ spbdd_handle tables::from_facts(
 	// the bdd.
 	return from_facts(pending, pending.begin(), pending.end(), 0, inverse);
 }
-spbdd_handle tables::from_facts(std::vector<const term*>& terms, 
-		std::vector<const term*>::iterator left, 
-		std::vector<const term*>::iterator right, 
+spbdd_handle tables::from_facts(vector<const term*>& terms, 
+		vector<const term*>::iterator left, 
+		vector<const term*>::iterator right, 
 		const size_t& pos, 
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
 	size_t max = max_pos(*left);
 	if (pos == max) return from_bit(left, inverse);
-	auto it = std::partition(left, right, 
+	auto it = partition(left, right, 
 		[this, pos, inverse](const term* t) -> bool { 
 			return !bit(pos, t, inverse.first, inverse.second); });
 	if (left == it)	return from_high(pos, 
@@ -262,8 +262,8 @@ spbdd_handle tables::from_facts(std::vector<const term*>& terms,
 		from_facts(terms, left, it, pos + 1, inverse) -> b);
 }
 spbdd_handle tables::from_bit(
-		const std::vector<const term*>::iterator& current,
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const {
+		const vector<const term*>::iterator& current,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
 	size_t max = max_pos(*current);
 	size_t a = (*current)->size();
 	size_t i = inverse.second.at(max);
