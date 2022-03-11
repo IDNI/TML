@@ -3,7 +3,7 @@
 Looking_At(A B).
 Looking_At(B C).
 Married(A).
-~Married(C). # This line is not necessary
+#~Married(C). # This line is not necessary
 # Make B alternate between married and unmarried
 Married(B) :- ~Married(B).
 ~Married(B) :- Married(B).
