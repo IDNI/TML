@@ -702,7 +702,11 @@ bool raw_rule::parse(input* in, const raw_prog& prog) {
 head:	h.emplace_back();
 	if (!h.back().parse(in, prog)) return pos = curr, false;
 	if (l[pos] == "else") return true;
-	if (*l[pos][0] == '.') return ++pos, true;
+	if (*l[pos][0] == '.') {
+		return h [0].neg && (h[0].extype == REL) && (h[0].arith_op == NOP)
+			? in->parse_error(l[pos][0], err_neg_fact, l[pos])
+			: ++pos, true;
+	}
 	if (*l[pos][0] == ',') { ++pos; goto head; }
 	if (*l[pos][0] != ':' || (l[pos][0][1] != '-' && l[pos][0][1] != '=' ))
 		return in->parse_error(l[pos][0], err_head, l[pos]);
