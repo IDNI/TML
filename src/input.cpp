@@ -703,7 +703,8 @@ head:	h.emplace_back();
 	if (!h.back().parse(in, prog)) return pos = curr, false;
 	if (l[pos] == "else") return true;
 	if (*l[pos][0] == '.') {
-		return h [0].neg && (h[0].extype == REL) && (h[0].arith_op == NOP)
+		// if h is a negated fact return a parsing error
+		return h[0].neg && (h[0].extype == REL) && (h[0].arith_op == NOP)
 			? in->parse_error(l[pos][0], err_neg_fact, l[pos])
 			: ++pos, true;
 	}
