@@ -938,7 +938,6 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 }
 
 //-----------------------------------------------------------------------------
-//#define rdict() ((dict_t&)dict)
 void tables::load_string(lexeme r, const string_t& s) {
 
 	unary_string us(sizeof(char32_t)*8);

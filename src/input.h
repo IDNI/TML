@@ -859,9 +859,10 @@ struct raw_prog {
 };
 
 struct raw_progs {
+	dict_t &dict;
 	raw_prog p;
-	bool parse(input* in, dict_t& dict);
-	raw_progs(dict_t &dict_) : p(raw_prog(dict_)) {};
+	bool parse(input* in);
+	raw_progs(dict_t &dict_) : dict(dict_), p(raw_prog(dict_)) { };
 };
 
 struct state_block {

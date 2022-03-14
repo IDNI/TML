@@ -180,7 +180,8 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
-#ifdef WITH_EVAL
+//TODO: review what to with these directive
+#ifdef WITH_EVAL_DIRECTIVES
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
 		type = EDOMAIN; ++pos;
@@ -254,6 +255,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 		return true;
 	}
 #endif
+
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
 		if (!t.parse(in, prog)) return
@@ -1184,13 +1186,13 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 			false;
 }
 
-bool raw_progs::parse(input* in, dict_t& dict) {
-	if (!in->data()) return true;
+bool raw_progs::parse(input* in) {
+	if (!in->data()) return false;
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	in->prog_lex();
 	if (in->error) return false;
-	if (!l.size()) return true;
+	if (!l.size()) return false;
 	raw_prog rp(dict); //raw_prog& rp = p.nps.emplace_back(raw_prog(dict));
 	raw_prog::require_guards = false;
 	raw_prog::require_state_blocks = false;

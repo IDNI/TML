@@ -117,6 +117,9 @@ class driver {
 	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
 
+	bool transform_handler(raw_prog &p);
+	bool transform(raw_prog& rp, const strs_t& strtrees);
+
 	//int_t nums = 0, chars = 0, syms = 0;
 	std::set<lexeme, lexcmp>  rels;
 	lexeme get_new_rel();
@@ -128,7 +131,7 @@ class driver {
 	std::set<raw_term> get_queries(const raw_prog& p);
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p);
-	bool transform(raw_prog& rp, const strs_t& strtrees);
+	
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
@@ -141,9 +144,6 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
-#ifdef WITH_EVAL
-	bool transform_evals(raw_prog &rp, const directive &drt);
-#endif
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
@@ -170,7 +170,7 @@ class driver {
 	void pdatalog_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp
-		,const std::function<void(raw_prog &)> &f);
+	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);

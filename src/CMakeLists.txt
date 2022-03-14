@@ -133,11 +133,6 @@ if (WITH_Z3)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
 endif()
 
-# enable eval
-#############
-if (WITH_EVAL)
-	target_compile_definitions(TMLo PRIVATE "-DWITH_EVAL")
-endif()
 
 # shared library
 #################
