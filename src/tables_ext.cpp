@@ -572,12 +572,10 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) { /*f->arg <= 0*/
 				//assuming no free variables in qbf
-				for (auto &v : *f->tm) {
-					assert(
-						(v >= 0 || vm.find(v) != vm.end()) &&
-						"error: Free variable in formula, only closed formulas currently supported"
-					);
-				}
+				for (auto &v : *f->tm)
+					if (v >= 0 || vm.find(v) != vm.end())
+						assert ( false && "error: Free variable in formula, only \
+							closed formulas currently supported");
 				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				//DBG(assert(p0->b->neg == false);)
@@ -978,4 +976,3 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	}
 	else fol_query(f,v);
 }
-

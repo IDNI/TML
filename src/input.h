@@ -39,7 +39,7 @@ enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
  * FILE uses system's memory mapping to access file data.
  * STDIN and STRING inputs from command line options and repl queries are
  * allocated and are freed when input is deconstructed.
- * STRING inputs loaded from archives are pointed to file's mmap. 
+ * STRING inputs loaded from archives are pointed to file's mmap.
  */
 struct input {
 	enum type { STDIN, FILE, STRING } type_; // input type
@@ -98,9 +98,9 @@ struct input {
 	lexemes& prog_lex();
 	/**
 	 * checks if lexeme is in this input and sets l's offset into lr if true
-	 * @param beg - +offset to the resulting range 
+	 * @param beg - +offset to the resulting range
 	 * @param l - lexeme
-	 * @param lr - resulting range if lexeme found 
+	 * @param lr - resulting range if lexeme found
 	 * @return true if lexeme found
 	 */
 	bool lexeme_pos(const size_t& beg, const lexeme& l, lexeme_range& lr) {
@@ -264,7 +264,7 @@ struct elem {
 		EQ, NEQ, LEQ, GT, LT, GEQ, BLTIN, NOT, AND, OR,
 		FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH,
 		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE, BLTINMOD,
-	} type;
+	} type = NONE;
 	t_arith_op arith_op = NOP;
 	int_t num = 0; // NUM's number or BLTIN's forget/renew bits
 	// The string that represents variants of this element.
@@ -328,28 +328,24 @@ struct elem {
 	bool operator!=(const elem& t) const { return !(*this == t); }
 	// Generate a fresh variable with respect to given dictionary.
 	static elem fresh_var(dict_t &d) {
-		return elem(elem::VAR, d.get_var_lexeme_from(d.get_fresh_var(0)));
+		return elem(elem::VAR, d.get_var_lexeme(d.get_fresh_var()));
 	}
 	// Generate a fresh symbol with respect to given dictionary.
 	static elem fresh_sym(dict_t &d) {
-		return elem(elem::SYM, d.get_sym(d.get_fresh_sym(0)));
+		return elem(elem::SYM, d.get_sym(d.get_fresh_sym()));
 	}
 	// Generate a fresh symbol with respect to given dictionary.
 	static elem fresh_temp_sym(dict_t &d) {
-		return elem(elem::SYM, d.get_temp_sym(d.get_fresh_temp_sym(0)));
+		return elem(elem::SYM, d.get_temp_sym(d.get_fresh_temp_sym()));
 	}
 	std::string to_str() const{
 		if (type == NUM) return to_string(to_string_t(num));
-		if (type == CHR) return to_string(to_string_t(ch)); 
-		return to_string(lexeme2str(e));			
+		if (type == CHR) return to_string(to_string_t(ch));
+		return to_string(lexeme2str(e));
 	}
 };
 
-struct utype{
-
-};
-
-struct primtype : utype {
+struct primtype {
 	elem el;
 	int_t bsz = -1;
 	enum _ptype {
@@ -357,11 +353,11 @@ struct primtype : utype {
 	} ty = NOP;
 	bool parse(input *in, const raw_prog& prog);
 	bool operator==(const primtype& r) const {
-		return ty == r.ty && bsz == r.bsz;		
+		return ty == r.ty && bsz == r.bsz;
 	}
 	primtype(_ptype _ty = NOP): ty(_ty){}
 	bool operator!=(const primtype& r) const {
-		return !(*this == r);		
+		return !(*this == r);
 	}
 	std::string to_print() const{
 		std::string s;
@@ -392,9 +388,9 @@ struct primtype : utype {
 	}
 };
 
-struct structype : utype {
+struct structype {
 	elem structname;
-	std::vector<struct typedecl> membdecl;	
+	std::vector<struct typedecl> membdecl;
 	bool parse(input *in, const raw_prog& prog);
 	size_t get_bitsz(const std::vector<struct typestmt> & t){
 		DBG(bitsz > -1 ?  COUT<<"optimz" : COUT<<"";)
@@ -411,7 +407,7 @@ struct structype : utype {
 };
 
 struct typedecl {
-	primtype pty;  
+	primtype pty;
 	elem structname; // struct type
 	std::vector<elem> vars;
 	bool is_primitive() const{
@@ -443,11 +439,11 @@ struct typestmt {
 	std::vector<typedecl> typeargs;
 	bool is_predicate(){
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
-		return reln.e[0] != NULL; 
+		return reln.e[0] != NULL;
 	}
 	bool is_typedef(){
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
-		return rty.structname.e[0] != NULL; 
+		return rty.structname.e[0] != NULL;
 	}
 	bool parse(input *in, const raw_prog& prog);
 
@@ -523,7 +519,7 @@ struct raw_term {
 		rtextype pref_type = raw_term::REL);
 	bool calc_arity(input* in);
 	int_t get_formal_arity () const;
-	void insert_parens(lexeme op, lexeme cl);
+	void add_parenthesis();
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
 		return neg == t.neg && e == t.e && arity == t.arity &&
@@ -546,7 +542,7 @@ struct directive {
 	lexeme arg;
 	raw_term t;
 	int_t n;
-	
+
 	elem domain_sym; // Formal name of a relation containing a domain
 	elem eval_sym; // Formal name of a relation containing an interpreter
 	elem codec_sym; // Formal name of a relation containing a codec
@@ -556,7 +552,7 @@ struct directive {
 	elem timeout_num; // The number of database steps to be simulated
 	elem quote_str; // The literal string to be quoted.
 	raw_term internal_term; // The term whose relation should be made internal
-	
+
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
 		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL }type;
 	bool parse(input* in, const raw_prog& prog);
@@ -573,7 +569,7 @@ struct production {
 	std::string to_str(size_t i=1 ){
 		std::string ret;
 		for( auto e = p.begin()+i; e != p.end(); e++)
-			ret.append(e->to_str());			
+			ret.append(e->to_str());
 		return ret;
 	}
 };
@@ -596,7 +592,7 @@ struct raw_form_tree {
 	sprawformtree r = nullptr;
 	bool neg = false;
 	lexeme guard_lx = {0,0};
-	
+
 	// Make formula tree representing a single term. Canonize by always
 	// extracting the negation from the term
 	raw_form_tree (const raw_term &_rt) {
@@ -615,19 +611,19 @@ struct raw_form_tree {
 		type(_el.type), el(_el),
 		l(_l ? std::make_shared<raw_form_tree>(*_l) : nullptr),
 		r(_r ? std::make_shared<raw_form_tree>(*_r) : nullptr) {}
-	
+
 	// Make a deep copy of the given formula tree
 	raw_form_tree(const raw_form_tree &rft) : type(rft.type), rt(rft.rt),
 		el(rft.el), l(rft.l ? std::make_shared<raw_form_tree>(*rft.l) : nullptr),
 		r(rft.r ? std::make_shared<raw_form_tree>(*rft.r) : nullptr), neg(rft.neg),
 		guard_lx(rft.guard_lx) {}
-	
+
 	// Move the given tree into this
 	raw_form_tree(raw_form_tree &&rft) : type(rft.type), rt(rft.rt),
 			el(rft.el), l(rft.l), r(rft.r), neg(rft.neg), guard_lx(rft.guard_lx) {
 		rft.l = rft.r = nullptr;
 	}
-	
+
 	// Make a deep copy of the given formula tree
 	raw_form_tree &operator=(const raw_form_tree &rft) {
 		type = rft.type;
@@ -639,7 +635,7 @@ struct raw_form_tree {
 		guard_lx = rft.guard_lx;
 		return *this;
 	}
-	
+
 	// Move the given tree into this
 	raw_form_tree &operator=(raw_form_tree &&rft) {
 		type = rft.type;
@@ -649,7 +645,7 @@ struct raw_form_tree {
 		r = rft.r;
 		neg = rft.neg;
 		guard_lx = rft.guard_lx;
-		
+
 		rft.l = rft.r = nullptr;
 		return *this;
 	}
@@ -726,7 +722,7 @@ struct raw_rule {
 	// prft != nullopt, otherwise it signifies that this rule is a fact.
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
-	std::optional<raw_form_tree> prft; 
+	std::optional<raw_form_tree> prft;
 	// contains the context types of vars used in rule from type inference
 	mutable spenvcontext varctx = nullptr;
 	enum etype { NONE, GOAL, TREE };
@@ -749,11 +745,11 @@ struct raw_rule {
 	raw_rule(const raw_term& h, const raw_form_tree &prft) : h({h}), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const raw_form_tree &prft) : h(h), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(*prft) {}
-	void update_context(const spenvcontext &_c) const { 
+	void update_context(const spenvcontext &_c) const {
 		varctx = _c;
 	}
 	spenvcontext get_context() const {
-		return varctx;	
+		return varctx;
 	}
 	void update_states(std::array<bool, 8>& has) {
 		if (is_form() || is_dnf()) has[RULE] = true;
@@ -825,6 +821,7 @@ struct raw_prog {
 	enum ptype {
 		PFP, LFP, GFP
 	} type = PFP;
+	dict_t &dict;
 	std::vector<macro> macros;
 	std::vector<directive> d;
 	std::vector<production> g;
@@ -838,7 +835,6 @@ struct raw_prog {
 	std::vector<state_block> sbs;
 	spenvironment typenv; // only one item, build by typechecker
 
-	std::set<lexeme, lexcmp> builtins;
 	// The relations that should be hidden from the user by default
 	std::set<signature> hidden_rels;
 //	int_t delrel = -1;
@@ -851,28 +847,29 @@ struct raw_prog {
 	static bool require_guards;
 	static bool require_state_blocks;
 
-	bool parse(input* in, dict_t &dict);
-	bool parse_statement(input* in, dict_t &dict);
-	bool parse_nested(input* in, dict_t &dict);
-	bool parse_xfp(input* in, dict_t &dict);
-	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 
-				std::vector<raw_term> &vrt, dict_t &dict);
+	bool parse(input* in);
+	bool parse_statement(input* in);
+	bool parse_nested(input* in);
+	bool parse_xfp(input* in);
+	bool macro_expand(input *in , macro mm, const size_t i, const size_t j,
+				std::vector<raw_term> &vrt);
 	environment& get_typenv();
 	void set_typenv(const environment &e);
-	raw_prog();
+	raw_prog(dict_t &dict_);
 };
 
 struct raw_progs {
 	raw_prog p;
-	//raw_progs();
 	bool parse(input* in, dict_t& dict);
+	raw_progs(dict_t &dict_) : p(raw_prog(dict_)) {};
 };
 
 struct state_block {
 	bool flip = false;
 	lexeme label;
 	raw_prog rp;
-	bool parse(input* in, dict_t &dict);
+	state_block(dict_t &dict_) : rp(raw_prog(dict_)) {};
+	bool parse(input* in);
 };
 
 bool throw_runtime_error(std::string err, std::string details = "");

@@ -219,21 +219,14 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
-// D: TODO: just a quick & dirty fix, get_elem, to_raw_term (out etc.) is const
-#define rdict() ((dict_t&)dict)
-//#define get_var_lexeme(v) rdict().get_var_lexeme_from(v)
-//#define get_var_lexeme(v) dict.get_lexeme(string("?v") + to_string_(-v))
-#define get_var_lexeme(v) rdict().get_lexeme(to_string_t("?v")+to_string_t(-v))
-
-
 elem ir_builder::get_elem(int_t arg) const {
-	if (arg < 0) return elem(elem::VAR, get_var_lexeme(arg));
+	if (arg < 0) return elem(elem::VAR, dict.get_var_lexeme(arg));
 	if( opts.bitunv == false) {
 		if (arg & 1) return elem((char32_t) (arg >> 2));
 		if (arg & 2) return elem((int_t) (arg >> 2));
 	}
 	else if(arg == 1 || arg == 0) return elem((bool)(arg));
-	return elem(elem::SYM, rdict().get_sym(arg));
+	return elem(elem::SYM, dict.get_sym(arg));
 }
 
 void ir_builder::get_nums(const raw_term& t) {
@@ -324,12 +317,12 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 		size_t args;
 		if (r.extype == term::EQ) {//r.iseq)
 			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, rdict().get_lexeme(r.neg ? "!=" : "=")),
+			rt.e[1] = elem(elem::SYM, dict.get_lexeme(r.neg ? "!=" : "=")),
 			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::EQ;
 			return rt;
 		} else if (r.extype == term::LEQ) {//r.isleq)
 			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, rdict().get_lexeme("<=")),
+			rt.e[1] = elem(elem::SYM, dict.get_lexeme("<=")),
 			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::LEQ;
 			return rt;
 		} else if( r.tab == -1 && r.extype == term::ARITH ) {
@@ -338,14 +331,14 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				elp.arith_op = r.arith_op;
 				elp.type = elem::ARITH;
 				switch ( r.arith_op ) {
-					case t_arith_op::ADD: elp.e = rdict().get_lexeme("+");break;
-					case t_arith_op::MULT: elp.e = rdict().get_lexeme("*");break;
-					case t_arith_op::SUB: elp.e = rdict().get_lexeme("-");break;
+					case t_arith_op::ADD: elp.e = dict.get_lexeme("+");break;
+					case t_arith_op::MULT: elp.e = dict.get_lexeme("*");break;
+					case t_arith_op::SUB: elp.e = dict.get_lexeme("-");break;
 					default: __throw_runtime_error( "to_raw_term to support other operator ");
 				}
 				elem elq;
 				elq.type = elem::EQ;
-				elq.e = rdict().get_lexeme("=");
+				elq.e = dict.get_lexeme("=");
 
 				rt.e[0] = get_elem(r[0]);
 				rt.e[1] = elp;
@@ -363,7 +356,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			rt.arity = { (int_t) args };
 			for (size_t n = 1; n != args + 1; ++n)
 				rt.e[n] = get_elem(r[n - 1]);
-			rt.insert_parens(dict.op, dict.cl);
+			rt.add_parenthesis();
 		}
 		else {
 			if (r.tab != -1) {
@@ -373,7 +366,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
-				rt.insert_parens(dict.op, dict.cl);
+				rt.add_parenthesis();
 			} else {
 				args = 1;
 				rt.e.resize(args);
@@ -585,9 +578,9 @@ bool pull_quantifier::dosubstitution(form *phi, form * prefend){
 			temp->type == form::EXISTS1 ||
 			temp->type == form::UNIQUE1 )
 
-			fresh_int = dt.get_fresh_var(temp->l->arg);
+			fresh_int = dt.get_fresh_var();
 		else
-			fresh_int = dt.get_fresh_sym(temp->l->arg);
+			fresh_int = dt.get_fresh_sym();
 
 		subst.add( temp->l->arg, fresh_int );
 
@@ -793,10 +786,10 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 			// Turn equals( i j k n) into equals( i i k k)
 			eqr[r].back().assign({i,i,k,k});
 			// Add body term 0 <= i, forcing i to be an integer
-			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1,
 				std::initializer_list<int>{mknum(0), i}, 0 );
 			// Add body term 0 <= k, forcing k to be an integer
-			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1, 
+			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1,
 				std::initializer_list<int>{mknum(0), k}, 0 );
 		} else if( r == 1 ) { // inductive case
 			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
@@ -1388,7 +1381,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 				int_t tv=n;
 				//DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
-					int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(rl)));
+					int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(rl)));
 					term t; t.resize(1);
 					t.tab= dynenv->get_table({r, {1}});
 					t[0] = -tv;
@@ -1415,33 +1408,10 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		}
 		// add vars to dictionary to avoid collision with new vars
 		for(int_t i =-1; i >= (int_t)-x.p.size(); i--)
-			dict.get_var_lexeme_from(i);
+			dict.get_var_lexeme(dict.get_fresh_var());
 
 		transform_grammar_constraints(x, v, p, refs);
 
-		//#define GRAMMAR_FOL
-		#ifdef GRAMMAR_FOL
-		form *root = NULL;
-		int_t minc= 0; // to get the minimum var index;
-		for(size_t n=1; n < v.size(); n++) {
-			form *cur = new form(form::ATOM, 0, &v[n]);
-			if(root) root = new form(form::AND, 0 , NULL, root, cur );
-			else root = cur;
-			for(int var : v[n])
-				minc = min(var, minc);
-		}
-
-		// adding quantifier since var indexes are added incrementally
-		for(int_t j = -1; j >= minc; j--) {
-			// ignore adding exist for vars for lhs first symbol of production
-			if( v[0][0] == j || v[0][1] == j ) continue;
-			root = new form(form::EXISTS1, 0,  0, new form(form::ATOM, j), root);
-		}
-		v.erase(v.begin()+1, v.end());
-		spform_handle qbf(root);
-		v.emplace_back(term::FORM1, qbf);
-		DBG(COUT<<endl; root->printnode(0, this);)
-		#endif
 		p.insert(move(v));
 	}
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")

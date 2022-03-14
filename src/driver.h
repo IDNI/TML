@@ -153,7 +153,9 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
+#ifdef WITH_EVAL
 	bool transform_evals(raw_prog &rp, const directive &drt);
+#endif
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
@@ -196,7 +198,7 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
-	raw_prog read_prog(elem prog, const raw_prog &rp);
+	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
@@ -253,6 +255,7 @@ class driver {
 	ir_builder *ir = 0;
 
 	std::set<lexeme> vars;
+	options opts;
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
@@ -264,7 +267,6 @@ class driver {
 public:
 	bool result = false;
 	bool error = false;
-	options opts;
 	driver(const options& o);
 	driver(FILE *f, const options& o);
 	driver(string_t, const options& o);

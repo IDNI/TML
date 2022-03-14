@@ -451,9 +451,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 				if      (el.e == "forget") forget = true;
 				else if (el.e == "renew")  renew = true;
 				break;
-			case elem::SYM:	if (prog.builtins.find(el.e)
-						!= prog.builtins.end())
-				{
+			case elem::SYM:	if (prog.dict.is_bltin(el.e)) {
 					el.type = elem::BLTIN;
 					bltin = true;
 					el.num = renew << 1 | forget;
@@ -481,8 +479,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	if (forget) bltin = true, e[0].type = elem::BLTIN;
 
 	if (pref_type == rtextype::CONSTRAINT)  {
-		extype = rtextype::CONSTRAINT;		
-		return true;	
+		extype = rtextype::CONSTRAINT;
+		return true;
 	}
 
 	if (bltin) {
@@ -544,7 +542,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		//return calc_arity(in), true;
 		return true;
 	}
-	
+
 	if (e[0].type != elem::SYM)
 		return in->parse_error(l[curr][0], err_relsym_expected,l[curr]);
 	if (e.size() == 1) return calc_arity(in), true;
@@ -555,8 +553,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	return calc_arity(in);
 }
 
-void raw_term::insert_parens(lexeme op, lexeme cl) {
-	elem o = elem(elem::OPENP, op), c = elem(elem::CLOSEP, cl);
+void raw_term::add_parenthesis() {
+	elem o = elem(elem::OPENP), c = elem(elem::CLOSEP);
 	e.insert(e.begin() + 1, o), e.push_back(c);
 	for (size_t n = 0, k = 2; n != arity.size(); ++n)
 		if (arity[n] == -1) e.insert(e.begin() + k++, o);
@@ -599,12 +597,12 @@ bool macro::parse(input* in, const raw_prog& prog){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
 	elem e;
-	if(	!this->def.parse(in,prog) || 
+	if(	!this->def.parse(in,prog) ||
 		pos >= l.size() ||
 		l[pos][0][0] != ':' ||
 		l[pos][0][1] != '=' )
 		goto fail;
-	
+
 	++pos;
 	for (b.emplace_back(); b.back().parse(in, prog);
 		b.emplace_back(), ++pos) {
@@ -927,9 +925,9 @@ bool production::parse(input *in, const raw_prog& prog) {
 		if (*l[pos][0] == ',') {
 
 			if(p.size() < 2 ) goto fail;  // prod rhs atleast one non-terminal
-			
-			for (;*l[pos][0] == L','; ) { 
-				++pos;	
+
+			for (;*l[pos][0] == L','; ) {
+				++pos;
 				raw_term rt;
 				if (!rt.parse(in, prog, 0,raw_term::CONSTRAINT))
 					goto fail;
@@ -937,7 +935,7 @@ bool production::parse(input *in, const raw_prog& prog) {
 			}
 			if (*l[pos][0] != '.') goto fail;
 			return ++pos, true;
-		}		
+		}
 		if (!e.parse(in)) goto fail;
 		p.push_back(e);
 	}
@@ -963,9 +961,9 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 	if (!parse_condition(in, rp)) return false;
 	if (!(l[pos] == "then")) return in->parse_error(l[pos][0],
 		"'then' expected.", l[pos]);
-	raw_prog t_p;
+	raw_prog t_p(dict);
 	++pos;
-	if (!t_p.parse_nested(in, dict) && !in->error) {
+	if (!t_p.parse_nested(in) && !in->error) {
 		t_p.id = ++raw_prog::last_id;
 		if (!t_p.r.emplace_back().parse(in, t_p))
 			return --raw_prog::last_id, false;
@@ -975,9 +973,9 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 	true_rp_id = t_p.id;
 	rp.nps.push_back(t_p);
 	if (pos != l.size() && l[pos] == "else") {
-		raw_prog f_p;
+		raw_prog f_p(dict);
 		++pos;
-		if (!f_p.parse_nested(in, dict) && !in->error) {
+		if (!f_p.parse_nested(in) && !in->error) {
 			f_p.id = ++raw_prog::last_id;
 			if (!f_p.r.emplace_back().parse(in, f_p))
 				return --raw_prog::last_id, false;
@@ -1000,8 +998,8 @@ bool guard_statement::parse_while(input* in, dict_t &dict, raw_prog& rp) {
 	if (!(l[pos] == "do")) return in->parse_error(l[pos][0],
 		"'do' expected.", l[pos]);
 	++pos;
-	raw_prog l_p;
-	if (!l_p.parse_nested(in, dict) && !in->error) {
+	raw_prog l_p(dict);
+	if (!l_p.parse_nested(in) && !in->error) {
 		l_p.id = ++raw_prog::last_id;
 		if (!l_p.r.emplace_back().parse(in, l_p))
 			return --raw_prog::last_id, false;
@@ -1016,7 +1014,7 @@ bool guard_statement::parse(input* in, dict_t &dict, raw_prog& rp) {
 	return parse_if(in, dict, rp) || parse_while(in, dict, rp);
 }
 
-bool state_block::parse(input* in, dict_t &dict) {
+bool state_block::parse(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	size_t bpos = pos;
@@ -1027,7 +1025,7 @@ bool state_block::parse(input* in, dict_t &dict) {
 	if (pos >= l.size() || *l[pos][0] != ':' || ++pos >= l.size())
 		return false;
 	while (*l[pos][0] != ']' && pos < l.size()) {
-		if (!rp.parse(in, dict)) return false;
+		if (!rp.parse(in)) return false;
 		if (rp.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
 			l[bpos]);
 	}
@@ -1035,31 +1033,31 @@ bool state_block::parse(input* in, dict_t &dict) {
 	else return false;
 }
 
-bool raw_prog::parse_xfp(input* in, dict_t& dict) {
+bool raw_prog::parse_xfp(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	if (*l[pos][0] != '{') return false;
 	++pos;
-	if (!parse(in, dict)) return in->error ? false :
+	if (!parse(in)) return in->error ? false :
 		in->parse_error(l[pos][0], err_parse, l[pos]);
 	if (pos == l.size() || *l[pos++][0] != '}') return in->error ? false
 		: in->parse_error(l[pos-1][1], err_close_curly, l[pos-1]);
 	return true;
 }
 
-bool raw_prog::parse_statement(input* in, dict_t &dict) {
+bool raw_prog::parse_statement(input* in) {
 	directive x;
 	raw_rule y;
 	production p;
 	macro m;
 	guard_statement c;
 	typestmt ts;
-	raw_prog np;
-	state_block sb;
+	raw_prog np(dict);
+	state_block sb(dict);
 	//COUT << "\tparsing statement " << in->l[in->pos] << endl;
-	if (sb.parse(in, dict)) sbs.push_back(sb);
+	if (sb.parse(in)) sbs.push_back(sb);
 	else if (!in->error && ts.parse(in, *this)) vts.push_back(ts);
-	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np);
+	else if (!in->error && np.parse_nested(in)) nps.push_back(np);
 	else if (!in->error && c.parse(in, dict, *this)) {
 		if (c.type == guard_statement::IF) has[COND] = true;
 		else c.p_break_rp->has[CURR] = true;
@@ -1076,7 +1074,7 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	return !in->error;
 }
 
-bool raw_prog::parse_nested(input* in, dict_t &dict) {
+bool raw_prog::parse_nested(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	type = PFP;
@@ -1088,18 +1086,18 @@ bool raw_prog::parse_nested(input* in, dict_t &dict) {
 	}
 	if (pos >= l.size() || *l[pos][0] != '{') return in->parse_error(
 		l[pos][0], "unexpected end of nested", l[pos]);
-	return parse_xfp(in, dict);
+	return parse_xfp(in);
 }
 
-bool raw_prog::parse(input* in, dict_t &dict) {
+bool raw_prog::parse(input* in) {
 	// BLTINS: insert builtins from dict
 	for (size_t n = 0; n != dict.nbltins(); ++n)
-		builtins.insert(dict.get_bltin(n));
+		dict.get_bltin(n);
 	id = ++last_id;
 	while (in->pos < in->l.size() &&
 			*in->l[in->pos][0] != '}' &&
 			*in->l[in->pos][0] != ']')
-		if (!parse_statement(in, dict)) return --last_id, false;
+		if (!parse_statement(in)) return --last_id, false;
 	//COUT << "\t\tparsed rp statements:\n" << *this << endl;
 
 	if (macros.empty()) return true;
@@ -1110,10 +1108,10 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 				for (macro &mm : macros)
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
 						if( vrt[i].e[j].e == mm.def.e[0].e ) {
-							if( !macro_expand(in, mm, i, j, vrt, dict))
+							if( !macro_expand(in, mm, i, j, vrt))
 								return --last_id, false;
 							else break;
-						}								
+						}
 	return true;
 }
 environment& raw_prog::get_typenv() {
@@ -1122,58 +1120,59 @@ environment& raw_prog::get_typenv() {
 void raw_prog::set_typenv( const environment &e ) {
 	*typenv = e;
 }
-raw_prog::raw_prog(){
-	 typenv = std::make_shared<environment>();
-}
-bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
-						vector<raw_term> &vrt, dict_t &dict) {
 
-	std::map<elem, elem> chng; 
+raw_prog::raw_prog(dict_t &dict_) : dict(dict_) {
+	//TODO: review pointer here
+	typenv = std::make_shared<environment>();
+}
+
+bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
+						vector<raw_term> &vrt) {
+
+	std::map<elem, elem> chng;
 	vector<elem>::iterator et = vrt[i].e.begin()+j;
 	vector<elem>::iterator ed = mm.def.e.begin();
-	
+
 	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
 		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-			if( (et->type == elem::VAR || et->type == elem::NUM || 
+			if( (et->type == elem::VAR || et->type == elem::NUM ||
 				et->type == elem::CHR || et->type == elem::SYM || et->type == elem::STR)
-				&& ed->type == elem::VAR) 
+				&& ed->type == elem::VAR)
 				chng[*ed] = *et;
-				
+
 		for ( auto &tt:mm.b )
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
-					
+
 		vrt.erase(i+vrt.begin());
 		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
 		return true;
-	
+
 	} else if( j > 0)  {// create fresh var and unary case
 		vector<elem> carg;
 		for( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
 			if(	et->type == elem::VAR ) carg.emplace_back(*et);
-		if(carg.size() == 0 ) 
-			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e), 
+		if(carg.size() == 0 )
+			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e),
 			false;
 
-		int counter = 0;
 		elem ret;
 		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
 			if(ed->type == elem::VAR)  {
 				if(a < carg.size())
 					chng[*ed] = carg[a++];
 				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(
-											dict.get_fresh_var(counter++))), 
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme(dict.get_fresh_var())),
 					ret = chng[*ed];
 			}
 		}
-		for( auto &tt:mm.b ) 
+		for( auto &tt:mm.b )
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
 		// TODO
-		DBG(o::dbg()<<carg.size();)	
+		DBG(o::dbg()<<carg.size();)
 		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
 		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
 		vrt[i].calc_arity(in);
@@ -1181,7 +1180,7 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 		return true;
 	}
 	else return in->parse_error(vrt[i].e[0].e[0],"Error macro call",vrt[i].e[0].e),
-			false;	
+			false;
 }
 
 bool raw_progs::parse(input* in, dict_t& dict) {
@@ -1191,13 +1190,14 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	in->prog_lex();
 	if (in->error) return false;
 	if (!l.size()) return true;
-	raw_prog& rp = p.nps.emplace_back();
+	raw_prog rp(dict); //raw_prog& rp = p.nps.emplace_back(raw_prog(dict));
 	raw_prog::require_guards = false;
 	raw_prog::require_state_blocks = false;
-	if (!rp.parse(in, dict))  return in->error?false:
+	if (!rp.parse(in))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
 
+ 	p.nps.push_back(rp);
 	return true;
 }
 
@@ -1423,7 +1423,7 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 	return false;
 }
 
-bool input::type_error(ccs offset, const char* err, ccs close_to) {	
+bool input::type_error(ccs offset, const char* err, ccs close_to) {
 	error = true;
 	ostringstream msg; msg << "Type error: \"" << err << '"';
 	ccs p = close_to;
