@@ -651,7 +651,7 @@ basic_ostream<T>& print_state_block(basic_ostream<T>& os, const state_block& sb,
 	basic_string<T> indent(level, '\t');
 	return print_raw_prog_tree(os << indent << '[' << sb.label
 		<< (sb.flip ? "~" : "") << ":\n",
-		sb.rp, level+1) << indent << "]";
+		sb.p, level+1) << indent << "]";
 }
 template
 basic_ostream<char>& print_state_block(basic_ostream<char>& os,

@@ -19,7 +19,6 @@
 #include "term.h"
 #include "tables.h"
 
-
 bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 	bool ret = true;
 
@@ -29,8 +28,10 @@ bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
+	#ifdef BIT_TRANSFORM
 	for( const raw_prog &rp : rpin.nps)
-		rpout.nps.emplace_back(), ret &= btransform(rp, rpout.nps.back());
+		rpout.nps.emplace_back(d), ret &= btransform(rp, rpout.nps.back());
+	#endif
 	return ret;
 }
 
@@ -773,7 +774,7 @@ bool typechecker::tcheck(){
 		// only try inference when typecheck for any rule does not fail
 		_BEG:
 		bool sigupdated = false;
-		if(rp.r.size())	DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");
+		if(rp.r.size())	{DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");}
 		auto lastinfo = vrinfo;
 		for (size_t i=0; i < rp.r.size(); i++) {
 			if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
@@ -796,7 +797,7 @@ bool typechecker::tcheck(){
 			}
 		}
 		if(lastinfo != vrinfo || sigupdated ) { sigupdated =false; goto _BEG; }
-		else if(rp.r.size()) DBG(COUT<<"converging inference" <<std::endl);
+		else if(rp.r.size()) {DBG(COUT<<"converging inference" <<std::endl);}
 	}
 	if(ret) {
 		if(std::count_if(vrinfo.begin(), vrinfo.end(), [](TINFO_STATUS st){

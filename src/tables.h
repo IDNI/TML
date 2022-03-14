@@ -31,8 +31,6 @@
 #include "analysis.h"
 #include "ir_builder.h"
 
-typedef bdd_handles level;
-
 class tables;
 
 struct body {
@@ -203,8 +201,8 @@ private:
 	std::map<sig, ntable> smap;
 	std::unordered_map<ntable, std::vector<typedecl>> tab_type;
 	std::vector<rule> rules;
-	std::vector<level> fronts;
-	std::vector<level> levels;
+	std::vector<bdd_handles> fronts;
+	std::vector<bdd_handles> levels;
 
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
@@ -249,7 +247,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
-
 
 	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
@@ -312,7 +309,7 @@ private:
 	bool contradiction_detected();
 	bool infloop_detected();
 	char fwd() noexcept;
-	level get_front() const;
+	bdd_handles get_front() const;
 
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
@@ -335,7 +332,6 @@ private:
 
 	//-------------------------------------------------------------------------
 	//builtins
-	builtins bltins;
 
 	bool init_builtins();
 	bool init_print_builtins();
@@ -436,6 +432,8 @@ public:
 
 	rt_options opts;
 	ir_builder *ir_handler;
+	builtins bltins;
+
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
@@ -453,7 +451,7 @@ public:
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>&) const;
-	bool compute_fixpoint(level &trues, level &falses, level &undefineds);
+	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
 	template <typename T>
 	bool out_fixpoint(std::basic_ostream<T>& os);
@@ -468,20 +466,6 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-	// transform nested programs into a single program controlled by guards
-	void transform_guards(raw_prog& rp);
-	// recursive fn for transformation of a program and its nested programs
-	void transform_guards_program(raw_prog& target_rp, raw_prog& rp,
-		int_t& prev_id);
-	void transform_guard_statements(raw_prog& target_rp, raw_prog& rp);
-
-	// helper functions for creating internal ids = __lx__id1__id2__
-	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
-		bool neg = false);
-	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
-		int_t i2, bool neg = false);
-	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
-	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 
 	void add_print_updates_states(const std::set<std::string> &tlist);
 	bool populate_tml_update = false;

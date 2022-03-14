@@ -229,6 +229,9 @@ void options::setup() {
 			pu_states.insert(v.get_string());
 		}).description("active state to printing updates"));
 	add_bool2("print-dict", "dict", "print internal string dictionary");
+
+	add_bool("strgrammar", "...");
+
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step", "fp", "adds __fp__ fact when reaches a fixed point");
 	add_bool2("break-on-fp", "bfp", "break on a fixed point");

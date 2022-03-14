@@ -67,8 +67,9 @@ signature get_signature(const raw_term &rt) {
 	return {rt.e[0].e, rt.arity};
 }
 
-void driver::directives_load(raw_prog& p, lexeme& trel) {
-//	int_t rel;
+void driver::directives_load(raw_prog& p) {
+
+	lexeme trel = null_lexeme;
 	// The list of directives that have been processed so far
 	vector<directive> processed;
 	// Iterate through the directives that remain in the program
@@ -3531,18 +3532,6 @@ void driver::pdatalog_transform(raw_prog &rp,
 	rp.hidden_rels.insert({ tick.e[0].e, {0} });
 }
 
-/* Applies the given transformation on the given program in post-order.
- * I.e. the transformation is applied to the nested programs first and
- * then to the program proper. */
-
-void driver::recursive_transform(raw_prog &rp,
-		const function<void(raw_prog &)> &f) {
-	for(raw_prog &np : rp.nps) {
-		recursive_transform(np, f);
-	}
-	f(rp);
-}
-
 /* Checks if the relation the first rule belongs to precedes the
  * relation that the second rule belongs to. A relation precedes another
  * relation if its name precedes the other relation's name. In the case
@@ -4830,8 +4819,7 @@ string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
 
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
-	lexeme trel = { 0, 0 };
-	directives_load(rp, trel);
+	directives_load(rp);
 	auto get_vars = [this](const raw_term& t) {
 		for (const elem& e : t.e)
 			if (e.type == elem::VAR)
@@ -5024,7 +5012,7 @@ bool driver::add(input* in) {
 		if (!transform(np, pd.strs)) return false;
 
 	if (opts.enabled("guards")) {
-		tbl->transform_guards(rp.p);
+		ir->transform_guards(rp.p);
 		if (opts.enabled("transformed")) o::to("transformed")
 			<< "# after transform_guards:\n" << rp.p << endl << endl;
 	} else if (raw_prog::require_guards)
@@ -5060,6 +5048,20 @@ bool driver::add(input* in) {
 		<< "# transformed program:\n" << rp.p << endl << endl;
 	return true;
 }
+
+/* Applies the given transformation on the given program in post-order.
+ * I.e. the transformation is applied to the nested programs first and
+ * then to the program proper. */
+
+void driver::recursive_transform(raw_prog &rp,
+		const function<void(raw_prog &)> &f) {
+	for(raw_prog &np : rp.nps) {
+		recursive_transform(np, f);
+	}
+	f(rp);
+}
+
+//------------------------------------------------------------------------------
 
 void driver::restart() {
 	pd.n = 0;
@@ -5150,7 +5152,6 @@ driver::driver(ccs s)                           : driver(string_t(s)) {}
 driver::~driver() {
 	if (tbl) delete tbl;
 	if (ir) delete ir;
-	for (auto x : strs_allocated) free((char *)x);
 }
 // ----------------------------------------------------------------------------
 template <typename T>

@@ -249,7 +249,6 @@ void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
 	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
 }
 
-
 bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
 	DBG(assert(t.size() == 2););
@@ -303,10 +302,12 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 
+	
 	string pred = to_string(lexeme2str(dict.get_rel(t.tab)));
 	//COUT << to_string(pred) << endl;
 	int_t idbltin = -1;
 	term taux(t);
+#ifdef BIT_TRANSFORM
 	if (pred.find("_EQ_") != std::string::npos)
 		idbltin = dict.get_bltin("eq");
 	else if (pred.find("_LEQ_") != string::npos) {
@@ -322,7 +323,11 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 		b.insert({ get_body(t, a.vm, a.varslen), t });
 		return;
 	}
-
+#else
+	b.insert({ get_body(t, a.vm, a.varslen), t });
+	return;
+#endif
+	
 	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
 	//todo: check that idbltin is poperly configured in builtins
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
@@ -482,7 +487,7 @@ bool tables::get_rules(flat_prog p) {
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
-			else	*(aa = new alt) = x,
+			else *(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
 		rs.insert(r);
 	}
@@ -491,59 +496,6 @@ bool tables::get_rules(flat_prog p) {
 	sort(rules.begin(), rules.end(), [this](const rule& x, const rule& y) {
 			return tbls[x.tab].priority > tbls[y.tab].priority; });
 	return true;
-}
-
-#define rdict() ((dict_t&)dict)
-void tables::load_string(lexeme r, const string_t& s) {
-
-	unary_string us(sizeof(char32_t)*8);
-	us.buildfrom(s);
-	//DBG(us.toprint(o::dbg()));
-	for( auto it: us.rel ){
-		int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(it.first)));
-		term t; t.resize(1);
-		ntable tb = get_table({r, {1} });
-		t.tab =tb;
-		bdd_handles b;
-		b.reserve(it.second.size());
-		for( int_t i :it.second)
-			t[0]= mknum(i), b.push_back(from_fact(t));
-		tbls[tb].t = bdd_or_many(b);
-	}
-
-	int_t rel = dict.get_rel(r);
-	str_rels.insert(rel);
-
-//	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
-	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
-		salpha = dict.get_sym(dict.get_lexeme("alpha")),
-		salnum = dict.get_sym(dict.get_lexeme("alnum")),
-		sdigit = dict.get_sym(dict.get_lexeme("digit")),
-		sprint = dict.get_sym(dict.get_lexeme("printable"));
-	term t,tb;
-	bdd_handles b1, b2;
-	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
-	for (int_t n = 0; n != (int_t)s.size(); ++n) {
-		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
-		ir_handler->chars = max(ir_handler->chars, t[1]),
-		b1.push_back(from_fact(t));
-		tb[1] = t[0], tb[2] = mknum(0);
-		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
-		if (isdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
-		if (isalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
-		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
-		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
-	}
-	clock_t start{}, end;
-	if (opts.optimize)
-		(o::ms()<<"# load_string or_many: "),
-		measure_time_start();
-	ntable st = get_table({rel, {2}}); // str(pos char)
-	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
-
-	tbls[st].t = bdd_or_many(move(b1));
-	tbls[stb].t = bdd_or_many(move(b2));
-	if (opts.optimize) measure_time_end();
 }
 
 void tables::get_var_ex(size_t arg, size_t args, bools& b) const {
@@ -576,22 +528,11 @@ term tables::to_nums(term t) {
 	return t;
 }
 
-//term from_nums(term t) {
-//	for (int_t& i : t)  if (i > 0) i >>= 2;
-//	return t;
-//}
-
 vector<term> tables::to_nums(const vector<term>& v) {
 	vector<term> r;
 	for (const term& t : v) r.push_back(to_nums(t));
 	return r;
 }
-
-//set<term> from_nums(const set<term>& s) {
-//	set<term> ss;
-//	for (const term& t : s) ss.insert(from_nums(t));
-//	return ss;
-//}
 
 void tables::to_nums(flat_prog& m) {
 	flat_prog mm;
@@ -600,26 +541,6 @@ void tables::to_nums(flat_prog& m) {
 }
 
 ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
-
-bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
-	strs = strs_;
-	if (!strs.empty()) {
-		//ir_handler->chars = 255,
-		dict.get_sym(dict.get_lexeme("space")),
-		dict.get_sym(dict.get_lexeme("alpha")),
-		dict.get_sym(dict.get_lexeme("alnum")),
-		dict.get_sym(dict.get_lexeme("digit")),
-		dict.get_sym(dict.get_lexeme("printable"));
-		for (auto x : strs) {
-			ir_handler->nums = max(ir_handler->nums, (int_t)x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
-		}
-	}
-	flat_prog fp = ir_handler->to_terms(p);
-	return add_prog_wprod(fp, p.g);
-}
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	map<ntable, ntable> m1, m2;
@@ -697,41 +618,6 @@ void tables::init_tml_update() {
 	rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
 	sym_add = dict.get_sym(dict.get_lexeme("add"));
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
-}
-
-bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
-	error = false;
-	smemo.clear(), ememo.clear(), leqmemo.clear();
-	if (mknums) to_nums(m);
-	if (populate_tml_update) init_tml_update();
-	rules.clear(), datalog = true;
-	ir_handler->syms = dict.nsyms();
-
-	if (opts.bitunv) {
-		bits = 1;
-	} else {
-		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
-			add_bit();
-	}
-
-	for (auto x : strs) load_string(x.first, x.second);
-	form *froot;
-	if (!ir_handler->transform_grammar(g, m, froot)) return false;
-	if (!get_rules(move(m))) return false;
-
-	// filter for rels starting and ending with __
-	auto filter_internal_tables = [] (const lexeme& l) {
-		size_t len = l[1] - l[0];
-		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
-				  '_' == l[0][len-2] && '_' == l[0][len-1];
-	};
-	ints internal_rels = dict.get_rels(filter_internal_tables);
-	for (auto& tbl : tbls)
-		for (int_t rel : internal_rels)
-			if (rel == tbl.s.first) { tbl.hidden = true; break; }
-
-	if (opts.optimize) bdd::gc();
-	return true;
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -911,8 +797,8 @@ char tables::fwd() noexcept {
 	return b;*/
 }
 
-level tables::get_front() const {
-	level r(tbls.size());
+bdd_handles tables::get_front() const {
+	bdd_handles r(tbls.size());
 	for (ntable n = 0; n != (ntable)tbls.size(); ++n) r[n] = tbls.at(n).t;
 	return r;
 }
@@ -924,6 +810,7 @@ bool tables::contradiction_detected() {
 #endif
 	return false;
 }
+
 bool tables::infloop_detected() {
 	error = true, o::err() << err_infloop << endl;
 #ifdef WITH_EXCEPTIONS
@@ -951,7 +838,7 @@ bool tables::add_fixed_point_fact() {
 
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
-	level l = get_front();
+	bdd_handles l = get_front();
 	fronts.push_back(l);
 	if (opts.bproof != proof_mode::none) levels.emplace_back(l);
 	for (;;) {
@@ -959,7 +846,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		++nstep;
 		bool fwd_ret = fwd();
 		if (halt) return true;
-		level l = get_front();
+		bdd_handles l = get_front();
 		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp();
 		fronts.push_back(l);
 		if (halt) return true;
@@ -1050,51 +937,178 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	return result;
 }
 
-bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
+//-----------------------------------------------------------------------------
+//#define rdict() ((dict_t&)dict)
+void tables::load_string(lexeme r, const string_t& s) {
+
+	unary_string us(sizeof(char32_t)*8);
+	us.buildfrom(s);
+
+	for( auto it: us.rel ){
+		int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(it.first)));
+		term t; t.resize(1);
+		ntable tb = get_table({r, {1} });
+		t.tab =tb;
+		bdd_handles b;
+		b.reserve(it.second.size());
+		for( int_t i :it.second)
+			t[0]= mknum(i), b.push_back(from_fact(t));
+		tbls[tb].t = bdd_or_many(b);
+	}
+
+	int_t rel = dict.get_rel(r);
+	str_rels.insert(rel);
+
+	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
+		salpha = dict.get_sym(dict.get_lexeme("alpha")),
+		salnum = dict.get_sym(dict.get_lexeme("alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme("digit")),
+		sprint = dict.get_sym(dict.get_lexeme("printable"));
+	term t,tb;
+	bdd_handles b1, b2;
+	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
+		ir_handler->chars = max(ir_handler->chars, t[1]),
+		b1.push_back(from_fact(t));
+		tb[1] = t[0], tb[2] = mknum(0);
+		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
+		if (isdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
+		if (isalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
+		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
+		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
+	}
+	clock_t start{}, end;
+	if (opts.optimize)
+		(o::ms()<<"# load_string or_many: "),
+		measure_time_start();
+	ntable st = get_table({rel, {2}}); // str(pos char)
+	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
+
+	tbls[st].t = bdd_or_many(move(b1));
+	tbls[stb].t = bdd_or_many(move(b2));
+	if (opts.optimize) measure_time_end();
+}
+
+bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
+
+	DBG(COUT <<  "add_prog_wprod" << endl;);
+	error = false;
+	smemo.clear(), ememo.clear(), leqmemo.clear();
+	if (mknums) to_nums(m);
+	if (populate_tml_update) init_tml_update();
+	rules.clear(), datalog = true;
+	ir_handler->syms = dict.nsyms();
+
+	if (opts.bitunv) {
+		bits = 1;
+	} else {
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+			add_bit();
+	}
+
+	for (auto x : strs) load_string(x.first, x.second);
+
+	form *froot;
+	if (!ir_handler->transform_grammar(g, m, froot)) return false;
+	if (!get_rules(move(m))) return false;
+
+	// filter for rels starting and ending with __
+	auto filter_internal_tables = [] (const lexeme& l) {
+		size_t len = l[1] - l[0];
+		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
+				  '_' == l[0][len-2] && '_' == l[0][len-1];
+	};
+	ints internal_rels = dict.get_rels(filter_internal_tables);
+	for (auto& tbl : tbls)
+		for (int_t rel : internal_rels)
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
+
+	if (opts.optimize) bdd::gc();
+	return true;
+}
+
+
+bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
+	DBG(COUT << "run_prog_wstrs" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
-	if (!add_prog(p, strs)) return false;
-	if (opts.optimize) {
-		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		o::ms() << "# pfp: " << endl;
-		measure_time_start();
+
+	strs = strs_in;
+
+	if (!strs.empty()) {
+		dict.get_sym(dict.get_lexeme("space")),
+		dict.get_sym(dict.get_lexeme("alpha")),
+		dict.get_sym(dict.get_lexeme("alnum")),
+		dict.get_sym(dict.get_lexeme("digit")),
+		dict.get_sym(dict.get_lexeme("printable"));
+		for (auto x : strs) {
+			ir_handler->nums = max(ir_handler->nums, (int_t)x.second.size()+1);
+			unary_string us(32);
+			us.buildfrom(x.second);
+			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
+		}
 	}
 
+	flat_prog fp = ir_handler->to_terms(p);
+	if (!add_prog_wprod(fp, p.g)) return false;;
+
+	//----------------------------------------------------------
+	//----------------------------------------------------------
+	if (opts.optimize) {
+		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
+		o::ms() << "# pfp: " << endl; measure_time_start();
+	}
+
+	#define NPS_ATRUNTIME
+	#ifdef NPS_ATRUNTIME
 	nlevel begstep = nstep;
+	#endif
+
 	bool r = true;
 	// run program only if there are any rules
 	if (rules.size()) {
 		fronts.clear();
 		r = pfp(steps ? nstep + steps : 0, break_on_step);
 	} else {
-		level l = get_front();
+		bdd_handles l = get_front();
 		fronts = {l, l};
 	}
-	size_t went = nstep - begstep;
+	//----------------------------------------------------------
+	//TODO: prog_after_fp is required for grammar/str recognition,
+	// but it should be restructured
 	if (r && prog_after_fp.size()) {
 		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
 	}
+
+	#ifdef NPS_ATRUNTIME
+	size_t went = nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
 			r = run_prog_wstrs(np, strs, steps, break_on_step);
 			went = nstep - begstep;
-			if (!r && went >= steps) break;
+			if (!r && went >= steps) {
+				assert(false && "!r && went >= steps");
+				break;
+			}
 		}
 	}
+	#endif
+
 	if (opts.optimize)
 		(o::ms() <<"# add_prog: "<<t << " pfp: "),
 		measure_time_end();
 	return r;
 }
 
-tables::tables(dict_t& dict, rt_options opts, ir_builder* ir_handler_) :
-	dict(dict), opts(opts), ir_handler(ir_handler_) {
-	init_builtins();
+tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
+	dict(dict_), opts(opts_), ir_handler(ir_handler_)/*, bltins(dict_) */{
+		init_builtins();
 }
 
 tables::~tables() {
@@ -1146,7 +1160,7 @@ template void tables::out<wchar_t>(wostream& os) const;
 template <typename T>
 bool tables::out_fixpoint(basic_ostream<T>& os) {
 	// The variables in which the fixpoint will be placed if it exists
-	level trues, falses, undefineds;
+	bdd_handles trues, falses, undefineds;
 	if(compute_fixpoint(trues, falses, undefineds)) {
 		// Print out the true points
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
@@ -1165,7 +1179,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 
 bool tables::is_infloop() {
 	// The variables in which the fixpoint will be placed if it exists
-	level trues, falses, undefineds;
+	bdd_handles trues, falses, undefineds;
 	if(compute_fixpoint(trues, falses, undefineds)) {
 		for(ntable n = 0; n < (ntable)undefineds.size(); n++) {
 			// If this relation is visible then existince of undefined parts in it
@@ -1184,7 +1198,7 @@ bool tables::is_infloop() {
  * never occur in the final cycle, and the undefined points comprise the
  * rest. */
 
-bool tables::compute_fixpoint(level &trues, level &falses, level &undefineds) {
+bool tables::compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds) {
 	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
 	if(fronts_size < 2 ||
 			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==

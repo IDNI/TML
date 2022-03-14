@@ -37,6 +37,7 @@ input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	if (mm_.error) {
 		//CERR << "error: " << mm_.error_message <<endl;
 		throw_runtime_error(err_fnf, f);
+		error = true;
 	}
 }
 
@@ -1025,8 +1026,8 @@ bool state_block::parse(input* in) {
 	if (pos >= l.size() || *l[pos][0] != ':' || ++pos >= l.size())
 		return false;
 	while (*l[pos][0] != ']' && pos < l.size()) {
-		if (!rp.parse(in)) return false;
-		if (rp.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
+		if (!p.parse(in)) return false;
+		if (p.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
 			l[bpos]);
 	}
 	if (*l[pos][0] == ']') return ++pos, true;
@@ -1196,7 +1197,8 @@ bool raw_progs::parse(input* in, dict_t& dict) {
 	if (!rp.parse(in))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
-
+	
+	//FIXME: guards needs ROOT_EMPTY
  	p.nps.push_back(rp);
 	return true;
 }

@@ -59,6 +59,18 @@ int_t dict_t::get_fresh_sym() {
 	int_t fresh_int = get_sym(get_lexeme(fresh));
 	return fresh_int;
 }
+/*
+lexeme driver::get_new_rel() {
+	static int_t last = 0;
+	string s = "r";
+	size_t sz;
+	lexeme l;
+retry:	sz = rels.size(), l = get_lexeme(s + to_string_(last));
+	rels.insert(l);
+	if (rels.size() == sz) { ++last; goto retry; }
+	return l;
+}
+*/
 int_t dict_t::get_var(const lexeme& l) {
 	//DBG(assert(*l[0] == '?');)
 	auto it = vars_dict.find(l);

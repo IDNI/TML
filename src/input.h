@@ -867,8 +867,8 @@ struct raw_progs {
 struct state_block {
 	bool flip = false;
 	lexeme label;
-	raw_prog rp;
-	state_block(dict_t &dict_) : rp(raw_prog(dict_)) {};
+	raw_prog p;
+	state_block(dict_t &dict_) : p(raw_prog(dict_)) {};
 	bool parse(input* in);
 };
 

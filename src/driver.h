@@ -116,36 +116,24 @@ class driver {
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
 	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
-	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
-	int_t nums = 0, chars = 0, syms = 0;
-
-	std::set<lexeme, lexcmp> strs_extra, rels;
-	std::vector<ccs> strs_allocated;
-	lexeme get_var_lexeme(int_t i);
-	lexeme get_new_var();
-	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
-	lexeme get_lexeme(const std::basic_string<char>& s);
-	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
+	//int_t nums = 0, chars = 0, syms = 0;
+	std::set<lexeme, lexcmp>  rels;
 	lexeme get_new_rel();
-//	std::function<int_t(void)> *fget_new_rel;
-//	lexeme get_num_lexeme(int_t i);
-//	lexeme get_char_lexeme(char_t i);
-//	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
+	
 	std::set<raw_term> get_queries(const raw_prog& p);
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
+	void directives_load(raw_prog& p);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
-//	raw_prog transform_bwd(raw_prog& p);
 	raw_term get_try_pred(const raw_term& x);
 	void transform_bwd(const raw_term& h, const std::vector<raw_term>& b,
 		std::set<raw_rule>& s);
@@ -181,8 +169,8 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void pdatalog_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
-	void recursive_transform(raw_prog &rp,
-		const std::function<void(raw_prog &)> &f);
+	void recursive_transform(raw_prog &rp
+		,const std::function<void(raw_prog &)> &f);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);

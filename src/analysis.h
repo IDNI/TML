@@ -51,6 +51,7 @@ struct context {
 };
 
 typedef std::shared_ptr<class environment> spenvironment;
+
 class environment {    
     //type signatures for relations/predicates and user defined
     //complex structures if any 
@@ -73,7 +74,7 @@ class environment {
             typedecl  td;
             td.pty = pt;
             instype.push_back(td);
-        }   
+        }
         return predtype.insert({predname, instype}).second;
     }
     bool add_sig(string_t &predname, std::vector<typedecl>& types) {
@@ -139,11 +140,13 @@ class environment {
     }
     std::string to_print() const{ 
         std::string ret;
-        for( auto &it : predtype){
-            ret.append(to_string(it.first) + " (");
+        for(auto &it : predtype){
+        	ret.append("Signature for table ");
+            ret.append(to_string(it.first) + " < ");
             for( auto &s: it.second)
-                ret.append(s.to_print()+", ");
-            ret.append(")\n");    
+                ret.append(s.to_print()+" ");
+            ret.append(">");
+            ret.append("\n");
         }
         return ret;
     }
@@ -196,6 +199,7 @@ class environment {
         return usertypedef[ctx.lookup_typedef_var(var)];
     }
 };
+
 class typechecker { 
     public:
     typechecker(raw_prog &p, bool _infer = false) : rp(p),infer(_infer), env(p.get_typenv()) {

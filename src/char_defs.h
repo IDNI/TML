@@ -50,6 +50,7 @@ typedef const char_t* ccs;
 typedef ccs* pccs;
 typedef std::array<ccs, 2> ccs_range;
 typedef ccs_range lexeme;
+const lexeme null_lexeme {0,0};
 typedef std::vector<lexeme> lexemes;
 typedef std::array<size_t, 2> lexeme_range;
 

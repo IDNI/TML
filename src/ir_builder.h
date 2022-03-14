@@ -20,9 +20,8 @@
 #include "analysis.h"
 
 typedef std::set<std::vector<term>> flat_prog;
+typedef std::pair<int_t, ints> sig;
 
-typedef int_t rel_t;
-typedef std::pair<rel_t, ints> sig;
 class tables;
 
 class ir_builder {
@@ -73,14 +72,20 @@ public:
 	template <typename T>
 	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 
-/*  //TODO: make ir_builder component
 	// transform nested programs into a single program controlled by guards
 	void transform_guards(raw_prog& rp);
 	// recursive fn for transformation of a program and its nested programs
 	void transform_guards_program(raw_prog& target_rp, raw_prog& rp,
 		int_t& prev_id);
 	void transform_guard_statements(raw_prog& target_rp, raw_prog& rp);
-*/
+
+	// helper functions for creating internal ids = __lx__id1__id2__
+	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+		bool neg = false);
+	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
+		int_t i2, bool neg = false);
+	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
+	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 };
 
 struct unary_string{

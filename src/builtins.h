@@ -112,14 +112,12 @@ struct builtins : std::map<int_t, builtins_pair> {
 		blt_handler h, int_t nargs = 0)
 	{
 		int_t id = dict->get_bltin(name);
-		//COUT << "adding builtin id: " << id  << " ishead? " << ishead << std::endl;
 		auto it = find(id);
 		if (it == end()) it = emplace(id, builtins_pair{}).first;
 		builtins_pair& bp = it->second;
-		if (ishead) bp.has_head = true,
-			bp.head = builtin{ args, oargs, nargs, h};
-		else        bp.has_body = true,
-			bp.body = builtin{ args, oargs, nargs, h};
+		if (ishead) 
+		bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
+		else bp.has_body = true, bp.body = builtin{ args, oargs, nargs, h};
 		return true;
 	}
 	void run_head(blt_ctx& c) { run(c, true);  }
