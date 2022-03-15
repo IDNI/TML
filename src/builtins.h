@@ -38,9 +38,6 @@ struct blt_ctx {
 	size_t varpos(size_t arg) const;
 	inline int_t arg(size_t arg) const { return g[arg]; }
 	inline int_t arg_as_int(size_t arg) const { return int_t(g[arg] >> 2); }
-	std::string arg_as_string(size_t arg) const;
-	int_t mkchr(size_t arg) const { return (((int_t)arg) << 2)|1; }
-	int_t mknum(size_t arg) const { return (((int_t)arg) << 2)|2; }
 	int_t outvarpos(size_t oarg = 0) const;
 	void args_bodies(bdd_handles& hs, size_t len = 0);
 	void out(spbdd_handle x) { outs.push_back(x); }

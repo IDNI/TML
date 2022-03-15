@@ -1093,9 +1093,6 @@ bool raw_prog::parse_nested(input* in) {
 }
 
 bool raw_prog::parse(input* in) {
-	// BLTINS: insert builtins from dict
-	for (size_t n = 0; n != dict.nbltins(); ++n)
-		dict.get_bltin(n);
 	id = ++last_id;
 	while (in->pos < in->l.size() &&
 			*in->l[in->pos][0] != '}' &&
@@ -1166,7 +1163,7 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 				if(a < carg.size())
 					chng[*ed] = carg[a++];
 				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme(dict.get_fresh_var())),
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme(dict.get_new_var())),
 					ret = chng[*ed];
 			}
 		}

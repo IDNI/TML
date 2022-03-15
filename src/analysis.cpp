@@ -28,10 +28,10 @@ bool bit_univ::btransform( const raw_prog& rpin, raw_prog &rpout ){
 
 	for( const raw_rule &rr : rpin.r)
 		rpout.r.emplace_back(), ret &= btransform(rr, rpout.r.back());
-	#ifdef BIT_TRANSFORM
+
 	for( const raw_prog &rp : rpin.nps)
 		rpout.nps.emplace_back(d), ret &= btransform(rp, rpout.nps.back());
-	#endif
+
 	return ret;
 }
 
@@ -138,10 +138,10 @@ const primtype& bit_univ::get_typeinfo(size_t n, const raw_term &rt, const raw_r
 }
 bool bit_univ::brev_transform_check(const term &t, const table &tab){
 
-	string_t pred = lexeme2str(d.get_rel(tab.s.first));
-	bool found =false;
+	string_t pred = lexeme2str(d.get_rel_lexeme(tab.s.first));
+	bool found = false;
 	const std::vector<typedecl> &vt = this->ptypenv->search_pred(pred, found, t.size());
-	if(found == false){
+	if(!found){
 		DBG(assert(false));
 		return false;
 	}
@@ -208,7 +208,7 @@ bool bit_univ::brev_transform( raw_term &rbt ){
 			else if ( td.pty.ty == primtype::UCHAR )
 				el = elem((char32_t) val);
 			else if ( td.pty.ty == primtype::SYMB )   // should differentiate from STR
-				el = elem(elem::SYM, this->d.get_sym(val) );
+				el = elem(elem::SYM, this->d.get_sym_lexeme(val) );
 
 			rbt.e.insert(rbt.e.begin() + 2 + arg, el);
 			arg++;
@@ -902,7 +902,7 @@ bool typechecker::tcheck( const raw_term &rt){
 			}
 		}
 		else { // the predicate signatures are not specified and found
-			ss<< "Type signature for predicate"<<rt<< " not found "; 
+			DBG(ss<< "Type signature for predicate"<<rt<< " not found ";);
 			tstat = TINFO_UNKNOWN_PRED_TYPE;
 			return type_error(ss.str().c_str(), rt.e[0].e ), false;	
 		}

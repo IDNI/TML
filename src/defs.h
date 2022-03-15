@@ -141,4 +141,15 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
+//#define BIT_TRANSFORM  //work in progress, use it with --bitunv option
+#ifdef BIT_TRANSFORM
+#define mkchr(x) ((int_t) x )
+#define mknum(x) ((int_t) x )
+#define mksym(x) ((int_t) x )
+#else
+#define mkchr(x) ((int_t) ((x) << 2) | 1)
+#define mknum(x) ((int_t) ((x) << 2) | 2)
+#define mksym(x) ((int_t) ((x) << 2) )
+#endif
+
 #endif

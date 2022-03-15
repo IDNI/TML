@@ -543,18 +543,6 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	return r;
 }*/
 
-//TODO: move to dict
-lexeme driver::get_new_rel() {
-	static size_t last = 1;
-	string s = "r";
-	size_t sz;
-	lexeme l;
-retry:	sz = rels.size(), l = dict.get_lexeme(s + to_string_(last));
-	rels.insert(l);
-	if (rels.size() == sz) { ++last; goto retry; }
-	return l;
-}
-
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
 	for (const frule& r : f) {
@@ -572,7 +560,7 @@ void driver::transform_bin(raw_prog& p) {
 		const vector<raw_term>& x, set<elem> v) {
 		raw_rule r;
 		r.b = {x}, r.h.emplace_back();
-		r.h[0].e.emplace_back(elem::SYM, get_new_rel());
+		r.h[0].e.emplace_back(elem::SYM, dict.get_rel_lexeme(dict.get_new_rel()));
 		append_openp(r.h[0].e);
 		for (size_t k = 0; k != x.size(); ++k)
 			for (size_t n = 0; n != x[k].e.size(); ++n)

@@ -19,9 +19,6 @@
 #include "analysis.h"
 using namespace std;
 
-#define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
-#define mknum(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|2)))
-
 ir_builder::ir_builder(dict_t& dict_, rt_options& opts_/*, environment& env_*/) :
 		dict(dict_), opts(opts_) /*, typenv(env_),*/ /*dynenv(0)*/ {
 }
@@ -172,14 +169,11 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 	size_t nvars = 0;
 
 	//FIXME: this is too error prone.
-	// D: make sure enums match (should be the same), cast is just to warn.
 	term::textype extype = (term::textype)r.extype;
-
-	// D: header builtin is treated as rel, but differentiated later (decomp.)
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
 	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
-	bool isrel = realrel || extype == term::BLTIN;
-	for (size_t n = !isrel ? 0 : 1; n < r.e.size(); ++n)
+	//bool isrel = realrel || extype == term::BLTIN;
+	for (size_t n = !realrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM:
 				t.push_back(mknum(r.e[n].num)); break;
@@ -188,17 +182,20 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 				++nvars;
 				t.push_back(dict.get_var(r.e[n].e));
 				break;
-			case elem::STR:
+			case elem::STR: {
 				l = r.e[n].e;
 				++l[0], --l[1];
-				t.push_back(dict.get_sym(dict.get_lexeme(
-					_unquote(lexeme2str(l)))));
+				int_t s = dict.get_sym(dict.get_lexeme(_unquote(lexeme2str(l))));
+				t.push_back(mksym(s));
 				break;
+			}
 			//case elem::BLTIN: // no longer used, check and remove...
 			//	DBG(assert(false););
 			//	t.push_back(dict.get_bltin(r.e[n].e)); break;
-			case elem::SYM: t.push_back(dict.get_sym(r.e[n].e)); break;
-			default: ;
+			case elem::SYM:
+				t.push_back(mksym(dict.get_sym(r.e[n].e)));
+				break;
+			default: break;
 		}
 	// stronger 'realrel' condition for tables, only REL and header BLTIN
 	ntable tab = realrel ? dynenv->get_table(get_sig(r)) : -1;
@@ -221,18 +218,22 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 
 elem ir_builder::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, dict.get_var_lexeme(arg));
-	if( opts.bitunv == false) {
+	if(!opts.bitunv) {
 		if (arg & 1) return elem((char32_t) (arg >> 2));
 		if (arg & 2) return elem((int_t) (arg >> 2));
+		return elem(elem::SYM, dict.get_sym_lexeme(arg >> 2));
 	}
-	else if(arg == 1 || arg == 0) return elem((bool)(arg));
-	return elem(elem::SYM, dict.get_sym(arg));
+	else {
+		if(arg == 1 || arg == 0) return elem((bool)(arg));
+		return elem(elem::SYM, dict.get_sym_lexeme(arg));
+	}
 }
 
 void ir_builder::get_nums(const raw_term& t) {
 	for (const elem& e : t.e)
 		if (e.type == elem::NUM) nums = max(nums, e.num);
 		else if (e.type == elem::CHR) chars = max(chars, (int_t)e.ch);
+		else if (e.type == elem::SYM) syms = max(syms, e.num);
 }
 
 //---------------------------------------------------------
@@ -351,7 +352,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			args = r.size();
 			rt.e.resize(args + 1);
 			rt.e[0] = elem(elem::SYM,
-				dict.get_bltin(r.idbltin));
+				dict.get_bltin_lexeme(r.idbltin));
 			rt.e[0].num = r.renew << 1 | r.forget;
 			rt.arity = { (int_t) args };
 			for (size_t n = 1; n != args + 1; ++n)
@@ -362,7 +363,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 			if (r.tab != -1) {
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
 				rt.e[0] = elem(elem::SYM,
-						dict.get_rel(get<0>(dynenv->tbls.at(r.tab).s)));
+						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
 				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
@@ -578,9 +579,9 @@ bool pull_quantifier::dosubstitution(form *phi, form * prefend){
 			temp->type == form::EXISTS1 ||
 			temp->type == form::UNIQUE1 )
 
-			fresh_int = dt.get_fresh_var();
+			fresh_int = dt.get_new_var();
 		else
-			fresh_int = dt.get_fresh_sym();
+			fresh_int = dt.get_new_sym();
 
 		subst.add( temp->l->arg, fresh_int );
 
@@ -795,10 +796,13 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
 			// str(i cv) ,str( k, cv)
-			for( int vi=0; vi<2; vi++)
+			for( int vi=0; vi<2; vi++) {
+				//work in progress
+				//DBG(COUT << "get_rule_substr_equality" << endl);
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
 									dynenv->get_table({*dynenv->str_rels.begin(),{2}}),
 									std::initializer_list<int>{eqr[r][0][2*vi], cv} , 0);
+			}
 
 			eqr[r].emplace_back( false, term::ARITH, t_arith_op::ADD, -1,
 								 std::initializer_list<int>{i, mknum(1), j}, 0);
@@ -1209,10 +1213,9 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 	return true;
 }
 
-bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
+bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return true;
-//	o::out()<<"grammar before:"<<endl;
-//	for (production& p : g) o::out() << p << endl;
+
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
 			if (p.p[n].type == elem::STR) {
@@ -1324,10 +1327,14 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	DBG(for (production& p : g) o::out() << p << endl;)
 
 	vector<term> v;
+
+	#define GRAMMAR_BLTINS
+	#ifdef GRAMMAR_BLTINS
 	static const set<string> b =
 		{ "alpha", "alnum", "digit", "space", "printable" };
 	set<lexeme, lexcmp> builtins;
 	for (const string& s : b) builtins.insert(dict.get_lexeme(s));
+	#endif
 
 	for (const production& x : g) {
 
@@ -1357,11 +1364,12 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		DBG(o::dbg()<<x;)
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
+			#ifdef GRAMMAR_BLTINS
 			if (builtins.find(x.p[n].e) != builtins.end()) {
 				t.tab = dynenv->get_table({*dynenv->str_rels.begin(), {3}});
-				t.resize(3), t[0] = dict.get_sym(x.p[n].e),
+				//TODO: REVIEW usage of get sym here
+				t.resize(3), t[0] = mksym(dict.get_sym(x.p[n].e)),
 				t[1] = -n, t[2] = mknum(0);
-
 				term plus1;
 				plus1.tab = -1;
 				plus1.resize(3);
@@ -1369,8 +1377,9 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 				plus1.arith_op = t_arith_op::ADD;
 				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
 				v.push_back(move(plus1));
-
-			} else if (x.p[n].type == elem::SYM) {
+			} else
+			#endif
+			if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				t.tab = dynenv->get_table({dict.get_rel(x.p[n].e),{2}});
 				if (n) t[0] = -n, t[1] = -n-1;
@@ -1408,7 +1417,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		}
 		// add vars to dictionary to avoid collision with new vars
 		for(int_t i =-1; i >= (int_t)-x.p.size(); i--)
-			dict.get_var_lexeme(dict.get_fresh_var());
+			dict.get_var_lexeme(dict.get_new_var());
 
 		transform_grammar_constraints(x, v, p, refs);
 

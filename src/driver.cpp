@@ -3965,11 +3965,14 @@ bool driver::transform_handler(raw_prog &p) {
 	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			tbl->spbu = make_shared<bit_univ>(tbl->get_dict(), opts.get_int("bitorder"));
+			tbl->spbu = make_shared<bit_univ>(dict, opts.get_int("bitorder"));
 			raw_prog brawp(dict);
 			tbl->spbu->btransform(p, brawp);
-			//FIXME:rp = brawp;
+			//FIXME: type env is being created in p, but program that must be executed
+			// is brawp. Also, it might be needed to copy brawp onto p, but transform
+			// should operate on p, as i.e guards
 			tbl->spbu->ptypenv = p.typenv;
+			result = tbl->run_prog_wstrs(brawp, pd.strs, 0, 0);
 		}
 	}
 
@@ -4007,9 +4010,15 @@ bool driver::run(size_t steps, size_t break_on_step) {
 
 	clock_t start, end;
 	measure_time_start();
+
+	//Work in progress
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
 		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
+	else if (opts.enabled("bitunv"))
+		//FIXME: bitunv is called still from transform handler
+		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
+		;
 	else {
 		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
 		//FIXME: calling run as bleo leads to double call to get_rules but 
@@ -4028,6 +4037,7 @@ bool driver::run(size_t steps, size_t break_on_step) {
 
 bool driver::add(input* in) {
 	//TODO: handle earlier errors on the input arguments
+	//TODO: lex here
 	if (in->error | !rp.parse(in)) return !(error = true);
 	return true;
 }
@@ -4047,7 +4057,6 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
-	dict.set_bitunv(opts.enabled("bitunv"));
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
 	rt_options to;

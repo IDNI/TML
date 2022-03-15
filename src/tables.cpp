@@ -20,9 +20,6 @@
 #include "output.h"
 using namespace std;
 
-#define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
-#define mknum(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|2)))
-
 typedef tuple<size_t, size_t, size_t, int_t> skmemo;
 typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
 map<skmemo, spbdd_handle> smemo;
@@ -302,12 +299,12 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 
-	
-	string pred = to_string(lexeme2str(dict.get_rel(t.tab)));
+	//FIXME: cannot be comparing strings at FWD
+	string pred = to_string(lexeme2str(dict.get_rel_lexeme(t.tab)));
 	//COUT << to_string(pred) << endl;
 	int_t idbltin = -1;
 	term taux(t);
-#ifdef BIT_TRANSFORM
+
 	if (pred.find("_EQ_") != std::string::npos)
 		idbltin = dict.get_bltin("eq");
 	else if (pred.find("_LEQ_") != string::npos) {
@@ -323,13 +320,9 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 		b.insert({ get_body(t, a.vm, a.varslen), t });
 		return;
 	}
-#else
-	b.insert({ get_body(t, a.vm, a.varslen), t });
-	return;
-#endif
 	
 	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
-	//todo: check that idbltin is poperly configured in builtins
+	//todo: check that idbltin is properly configured in builtins
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
 	a.bltins.push_back(taux);
 }
@@ -514,7 +507,7 @@ ntable tables::get_table(const sig& s) {
 	max_args = max(max_args, len);
 	if(opts.bitunv) {
 		bool found = false;
-		string_t relname = lexeme2str(dict.get_rel(s.first));
+		string_t relname = lexeme2str(dict.get_rel_lexeme(s.first));
 		auto & types = spbu->ptypenv->search_pred(relname, found);
 		tab_type.insert({nt, types});
 	}
@@ -587,7 +580,7 @@ void tables::add_tml_update(const term& t, bool neg) {
 	arity[0] += 3;
 	ntable tab = get_table({ rel_tml_update, arity });
 	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
-		dict.get_sym(dict.get_rel(tbls[t.tab].s.first)) };
+		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
 	args.insert(args.end(), t.begin(), t.end());
 	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
 }
@@ -940,14 +933,15 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 //-----------------------------------------------------------------------------
 void tables::load_string(lexeme r, const string_t& s) {
 
+
+	//FIXME: this will be loadaed by get new get facts
 	unary_string us(sizeof(char32_t)*8);
 	us.buildfrom(s);
-
 	for( auto it: us.rel ){
 		int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(it.first)));
 		term t; t.resize(1);
 		ntable tb = get_table({r, {1} });
-		t.tab =tb;
+		t.tab = tb;
 		bdd_handles b;
 		b.reserve(it.second.size());
 		for( int_t i :it.second)
@@ -955,9 +949,9 @@ void tables::load_string(lexeme r, const string_t& s) {
 		tbls[tb].t = bdd_or_many(b);
 	}
 
+	//FIXME: this will be loadaed by get new get facts
 	int_t rel = dict.get_rel(r);
 	str_rels.insert(rel);
-
 	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
 		salpha = dict.get_sym(dict.get_lexeme("alpha")),
 		salnum = dict.get_sym(dict.get_lexeme("alnum")),
@@ -971,22 +965,19 @@ void tables::load_string(lexeme r, const string_t& s) {
 		ir_handler->chars = max(ir_handler->chars, t[1]),
 		b1.push_back(from_fact(t));
 		tb[1] = t[0], tb[2] = mknum(0);
-		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
-		if (isdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
-		if (isalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
-		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
-		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
+		if (isspace(s[n])) tb[0] = mksym(sspace), b2.push_back(from_fact(tb));
+		if (isdigit(s[n])) tb[0] = mksym(sdigit), b2.push_back(from_fact(tb));
+		if (isalpha(s[n])) tb[0] = mksym(salpha), b2.push_back(from_fact(tb));
+		if (isalnum(s[n])) tb[0] = mksym(salnum), b2.push_back(from_fact(tb));
+		if (isprint(s[n])) tb[0] = mksym(sprint), b2.push_back(from_fact(tb));
 	}
-	clock_t start{}, end;
-	if (opts.optimize)
-		(o::ms()<<"# load_string or_many: "),
-		measure_time_start();
 	ntable st = get_table({rel, {2}}); // str(pos char)
 	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
 
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
-	if (opts.optimize) measure_time_end();
+
+
 }
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
@@ -1008,8 +999,8 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 
 	for (auto x : strs) load_string(x.first, x.second);
 
-	form *froot;
-	if (!ir_handler->transform_grammar(g, m, froot)) return false;
+	if (!ir_handler->transform_grammar(g, m)) return false;
+
 	if (!get_rules(move(m))) return false;
 
 	// filter for rels starting and ending with __

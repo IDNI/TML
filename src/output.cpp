@@ -882,7 +882,7 @@ template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const sig& s) const {
 	bool sep = false;
-	os << dict.get_rel(s.first) << "/";
+	os << dict.get_rel_lexeme(s.first) << "/";
 	for (auto i : s.second) os << (sep?",":(sep=true,"")) << i;
 	return os;
 }
@@ -918,22 +918,21 @@ template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
 	os <<   "# nrels:   " << d.nrels() << '\t' << flush;
 	for (size_t i = 0; i != d.nrels(); ++i)
-		os << i << ":" << d.get_rel(i)
+		os << i << ":" << d.get_rel_lexeme(i)
 			<< (i != d.nrels() - 1 ? ", " : "");
 	os << "\n# nsyms:   " << d.nsyms() << '\t' << flush;
 	for (size_t i = 0; i != d.nsyms(); ++i)
-		os << i << ":" << d.get_sym(i<<2)
+		os << i << ":" << d.get_sym_lexeme(i)
 			<< (i != d.nsyms() - 1 ? ", " : "");
 	os << "\n# nvars:   " << d.nvars() << '\t';
 	os << "\n# nbltins: " << d.nbltins() << '\t' << flush;
 	for (size_t i = 0; i != d.nbltins(); ++i)
-		os << i << ":" << d.get_bltin(i)
+		os << i << ":" << d.get_bltin_lexeme(i)
 			<< (i != d.nbltins() - 1 ? ", " : "");
 	return os << "\n# -" << endl;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const dict_t&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
 
 template <typename T, typename VT>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::vector<VT>& hs) {

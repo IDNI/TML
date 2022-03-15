@@ -24,32 +24,34 @@ class dict_t {
 	std::set<lexeme, lexcmp> strs_extra;
 	std::vector<ccs> strs_allocated;
 	inputs* ii = 0;
-	bool bitunv = false;
 public:
 	dict_t();
 	~dict_t();
 	void set_inputs(inputs* ins) { ii = ins; }
-	void set_bitunv(bool bu) { bitunv = bu; }
 
 	int_t get_sym(const lexeme& l);
 	int_t get_var(const lexeme& l);
 	int_t get_rel(const lexeme& l);
 	int_t get_bltin(const lexeme& l);
-	int_t get_temp_sym(const lexeme& l);
-
-	const lexeme& get_var_lexeme(int_t r) const { return vars[-r -1]; };
-	const lexeme& get_rel(int_t t) const { return rels[t]; }
-	const lexeme& get_bltin(int_t t) const { return bltins[t]; }
-
-	int_t get_rel(const std::string& s) { return get_rel(get_lexeme(s)); }
-	int_t get_bltin(const std::string& s) { return get_bltin(get_lexeme(s)); }
-	lexeme get_lexeme(const std::basic_string<char>& s);
-	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
-
+	const lexeme& get_sym_lexeme(int_t t) const  { return syms[t]; } ;
+	const lexeme& get_var_lexeme(int_t r) const { return vars[-r-1]; };
+	const lexeme& get_rel_lexeme(int_t t) const { return rels[t]; }
+	const lexeme& get_bltin_lexeme(int_t t) const { return bltins[t]; }
 	size_t nsyms() const { return syms.size(); }
 	size_t nvars() const { return vars_dict.size(); }
 	size_t nrels() const { return rels.size(); }
 	size_t nbltins() const { return bltins.size(); }
+
+
+	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
+	lexeme get_lexeme(const std::basic_string<char>& s);
+	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
+	int_t get_rel(const std::string& s) { return get_rel(get_lexeme(s)); }
+	int_t get_bltin(const std::string& s) { return get_bltin(get_lexeme(s)); }
+
+	int_t get_new_sym();
+	int_t get_new_var();
+	int_t get_new_rel();
 
 	bool is_bltin(const lexeme& l) const {
 		auto it = bltins_dict.find(l);
@@ -57,22 +59,14 @@ public:
 		return false;
 	}
 
-
-	// < --
-	bool is_temp_sym(const lexeme& l) const { return temp_syms_dict.find(l) != temp_syms_dict.end(); }
-	lexeme get_sym(int_t t) const;
-	bool is_valid_sym_val(int_t val) const;
-	lexeme get_temp_sym(int_t t) const;
-	int_t get_fresh_sym();
-	int_t get_fresh_temp_sym();
-	int_t get_fresh_var();
-
-	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
-
 	ints get_rels(std::function<bool(const lexeme&)> filter = nullptr);
-	bool is_valid_sym(int_t arg) const {
-		return bitunv == false ? ((arg &1) || (arg&2) || (size_t(arg>>2) < syms.size())):
-				(arg > 1 && (size_t(arg-2) < syms.size()));
+
+	// < -- to be deprecated
+	int_t get_temp_sym(const lexeme& l);
+	lexeme get_temp_sym(int_t t) const;
+	int_t get_fresh_temp_sym();
+	bool is_valid_sym_val(int_t t) const {
+		return (t>>2 >= 0 && t>>2 < (int_t) syms.size());
 	}
 	// -->
 };

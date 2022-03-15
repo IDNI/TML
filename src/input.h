@@ -171,7 +171,7 @@ private:
 
 class inputs {
 	std::unique_ptr<input> first_ = 0;
-	struct input *last_ = 0;
+	input *last_ = 0;
 	size_t size_ = 0;
 public:
 	void add(std::unique_ptr<input> in) {
@@ -328,11 +328,11 @@ struct elem {
 	bool operator!=(const elem& t) const { return !(*this == t); }
 	// Generate a fresh variable with respect to given dictionary.
 	static elem fresh_var(dict_t &d) {
-		return elem(elem::VAR, d.get_var_lexeme(d.get_fresh_var()));
+		return elem(elem::VAR, d.get_var_lexeme(d.get_new_var()));
 	}
 	// Generate a fresh symbol with respect to given dictionary.
 	static elem fresh_sym(dict_t &d) {
-		return elem(elem::SYM, d.get_sym(d.get_fresh_sym()));
+		return elem(elem::SYM, d.get_sym_lexeme(d.get_new_sym()));
 	}
 	// Generate a fresh symbol with respect to given dictionary.
 	static elem fresh_temp_sym(dict_t &d) {
@@ -837,7 +837,6 @@ struct raw_prog {
 
 	// The relations that should be hidden from the user by default
 	std::set<signature> hidden_rels;
-//	int_t delrel = -1;
 
 	int_t id = 0;
 	int_t guarded_by = -1;
