@@ -191,20 +191,20 @@ struct substitution: public transformer {
 };
 
 struct ptransformer{
-	struct production &p;
-	std::vector<struct production> lp;
+	production &p;
+	std::vector<production> lp;
 	dict_t &d;
+	ptransformer(production &_p, dict_t &_d ): p(_p), d(_d) { }
 
-	ptransformer(struct production &_p, dict_t &_d ): p(_p), d(_d) { }
-	bool parse_alt( std::vector<elem> &next, size_t& cur);
+	bool parse_alt(std::vector<elem> &next, size_t& cur);
 	bool is_firstoffactor(elem &c);
-	bool parse_alts( std::vector<elem> &next, size_t& cur);
+	bool parse_alts(std::vector<elem> &next, size_t& cur);
 	lexeme get_fresh_nonterminal();
-	bool synth_recur( std::vector<elem>::const_iterator from,
+	bool synth_recur(std::vector<elem>::const_iterator from,
 		std::vector<elem>::const_iterator till, bool bnull, bool brecur,
 		bool balt);
-	bool parse_factor( std::vector<elem> &next, size_t& cur);
-	bool visit( );
+	bool parse_factor(std::vector<elem> &next, size_t& cur);
+	bool visit();
 };
 
 struct graphgrammar {

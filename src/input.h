@@ -263,7 +263,7 @@ struct elem {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR,
 		EQ, NEQ, LEQ, GT, LT, GEQ, BLTIN, NOT, AND, OR,
 		FORALL, EXISTS, UNIQUE, IMPLIES, COIMPLIES, ARITH,
-		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE, BLTINMOD,
+		OPENB, CLOSEB, OPENSB, CLOSESB, UTYPE, BLTINMOD
 	} type = NONE;
 	t_arith_op arith_op = NOP;
 	int_t num = 0; // NUM's number or BLTIN's forget/renew bits

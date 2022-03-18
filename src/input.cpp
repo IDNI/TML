@@ -501,7 +501,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			in->parse_error(l[pos][0], err_eq_expected, l[pos]);
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
-		extype = raw_term::EQ; // iseq = true;
+		extype = raw_term::EQ;
 		return calc_arity(in);
 	}
 	if ((leq || gt) && !arith) {

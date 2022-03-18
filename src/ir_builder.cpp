@@ -314,17 +314,18 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 
 raw_term ir_builder::to_raw_term(const term& r) const {
 		raw_term rt;
-		rt.neg = r.neg;
 		size_t args;
-		if (r.extype == term::EQ) {//r.iseq)
-			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, dict.get_lexeme(r.neg ? "!=" : "=")),
-			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::EQ;
+		rt.neg = r.neg;
+		//understand raw_term::parse before touching this
+		if (r.extype == term::EQ) {
+			args = 2, rt.e.resize(args + 1), rt.arity = {2};
+			rt.extype = raw_term::EQ;
+			rt.e[0] = get_elem(r[0]), rt.e[1] = elem::EQ, rt.e[2] = get_elem(r[1]);
 			return rt;
-		} else if (r.extype == term::LEQ) {//r.isleq)
-			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, dict.get_lexeme("<=")),
-			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::LEQ;
+		} else if (r.extype == term::LEQ) {
+			rt.extype = raw_term::LEQ;
+			args = 2, rt.e.resize(args + 1), rt.arity = {2};
+			rt.e[0] = get_elem(r[0]), rt.e[1] = elem::LEQ; rt.e[2] = get_elem(r[1]);
 			return rt;
 		} else if( r.tab == -1 && r.extype == term::ARITH ) {
 				rt.e.resize(5);
@@ -859,15 +860,15 @@ lexeme ptransformer::get_fresh_nonterminal(){
 	return d.get_lexeme(fnt);
 }
 
-bool ptransformer::synth_recur( vector<elem>::const_iterator from,
-		vector<elem>::const_iterator till, bool bnull = true, bool brecur =true,
-		bool balt= true ){
+bool ptransformer::synth_recur(vector<elem>::const_iterator from,
+		vector<elem>::const_iterator till, bool bnull = true, bool brecur = true,
+		bool balt = true) {
 
-	if(brecur ) {
+	if (brecur) {
 		bool binsidealt =false; // for | to be present inside
 		for( vector<elem>::const_iterator f = from; f!=till; f++)
-			if(f->type == elem::ALT) {binsidealt =true; break;}
-		if(binsidealt) {
+			if(f->type == elem::ALT) {binsidealt = true; break;}
+		if (binsidealt) {
 			synth_recur( from, till, false, false, false);
 			from = lp.back().p.begin();
 			till = lp.back().p.begin()+1;
@@ -875,41 +876,46 @@ bool ptransformer::synth_recur( vector<elem>::const_iterator from,
 	}
 	lp.emplace_back();
 	production &np = lp.back();
-	elem sym = elem(elem::SYM,  get_fresh_nonterminal());
-	np.p.push_back( sym);
+	elem sym = elem(elem::SYM, get_fresh_nonterminal());
+	np.p.push_back(sym);
 	np.p.insert(np.p.end(), from , till);
-	if(brecur) np.p.push_back( sym);
-	elem alte = elem(elem::ALT, d.get_lexeme( "|" ) );
-	if(balt) np.p.emplace_back(alte);
-	if( balt && bnull )	np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
-	else if(balt) np.p.insert(np.p.end(), from, till);
+	if(brecur) np.p.push_back(sym);
+	elem alte = elem(elem::ALT, d.get_lexeme("|"));
+	if (balt) np.p.emplace_back(alte);
+	if (balt && bnull) {
+		#ifdef NNULL_KLEENE
+			np.p.insert(np.p.end(), from , till);
+			np.p.emplace_back(elem::SYM, d.get_lexeme("_null_tg_"));
+		#else
+			np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
+		#endif
+	}
+	else if (balt) np.p.insert(np.p.end(), from, till);
 	return true;
 }
 
 bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 	size_t cur1 = cur;
-	if(cur >= next.size()) return false;
-	if( next[cur].type ==  elem::SYM ||
-		next[cur].type ==  elem::STR ||
-		next[cur].type ==  elem::CHR ) {
+	if (cur >= next.size()) return false;
+	if (next[cur].type == elem::SYM ||
+		next[cur].type == elem::STR ||
+		next[cur].type == elem::CHR) {
 		size_t start = cur;
 		++cur;
-		if( next.size() > cur 				&&
-			next[cur].type == elem::ARITH 	&&
-			(next[cur].arith_op == MULT 	||
-				next[cur].arith_op == ADD		)) {
-
+		if ((next.size() > cur) &&
+			(next[cur].type == elem::ARITH) &&
+			(next[cur].arith_op == MULT || next[cur].arith_op == ADD)) {
 			//lp.emplace_back(),
 			synth_recur( next.begin()+start, next.begin()+cur,
 			next[cur].arith_op == MULT),
 			++cur;
-			next.erase( next.begin()+start, next.begin()+cur);
-			next.insert( next.begin()+start, lp.back().p[0]);
+			next.erase(next.begin()+start, next.begin()+cur);
+			next.insert(next.begin()+start, lp.back().p[0]);
 			return cur = start+1, true;
 		}
 		return true;
 	}
-	if( next[cur].type == elem::OPENSB ) {
+	if (next[cur].type == elem::OPENSB) {
 		size_t start = cur;
 		++cur;
 		if( !parse_alts(next, cur)) return cur = cur1, false;
@@ -960,17 +966,12 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 
 bool ptransformer::visit() {
 	size_t cur = 1;
-	//DBG(COUT<<endl<<p<<endl);
-	bool ret = this->parse_alts( this->p.p, cur);
-	if( this->p.p.size() > cur ) ret = false;
-
-	//DBG(COUT<<p<<endl);
-	for ( production t : lp )
-		DBG(COUT<<t<<endl);
+	bool ret = this->parse_alts(this->p.p, cur);
+	if (this->p.p.size() > cur) ret = false;
+	//DBG(COUT << "transform_ebnf:visit" << endl << lp <<endl);
 	if(!ret) parse_error("Error Production",
-		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e );
+		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e);
 	return ret;
-
 }
 
 bool ir_builder::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
@@ -1359,9 +1360,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			continue;
 		}
 
-		// ref: maps ith sybmol production to resp. terms
-		std::map<size_t, term> refs;
-		DBG(o::dbg()<<x;)
+		std::map<size_t, term> refs; //refs: maps ith prod. symbol to terms
+
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
 			#ifdef GRAMMAR_BLTINS
@@ -1424,7 +1424,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		p.insert(move(v));
 	}
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
-		<< "# after transform_grammar:\n", p)
+		<< "\n# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
 	return true;

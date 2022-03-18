@@ -165,14 +165,14 @@ public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 	std::shared_ptr<bit_univ> spbu = nullptr;
 private:
-	typedef int_t rel_t;
 
 	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 		cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
+
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
-	//std::set<alt*, ptrcmp<alt>> grnds;
+
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -207,12 +207,10 @@ private:
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
-	int_t freeze(std::vector<term>& v, int_t );
+
 	std::vector<term> to_nums(const std::vector<term>& v);
 	void to_nums(flat_prog& m);
 	term to_nums(term t);
-	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
-	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
 	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
 	dict_t& dict;
@@ -433,7 +431,6 @@ public:
 	rt_options opts;
 	ir_builder *ir_handler;
 	builtins bltins;
-
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();

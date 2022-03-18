@@ -202,50 +202,6 @@ bool tables::get_facts(const flat_prog& m) {
 	return true;
 }
 
-int_t tables::freeze(vector<term>& v, int_t m = 0) {
-	map<int_t, int_t> p;
-	map<int_t, int_t>::const_iterator it;
-	for (const term& t : v) for (int_t i : t)
-		if (opts.bitunv && (i ==0 || i == 1 )) m = max(m, i);
-		else if (i & 2) m = max(m, i >> 2);
-	for (term& t : v)
-		for (int_t& i : t)
-			if (i >= 0) continue;
-			else if ((it = p.find(i)) != p.end()) i = it->second;
-			else p.emplace(i, mknum(m)), i = mknum(m++);
-	return m;
-}
-
-flat_prog& tables::get_canonical_db(vector<term>& x, flat_prog& p) {
-	freeze(x);
-	for (size_t n = 1; n != x.size(); ++n) p.insert({x[n]});
-	return p;
-}
-
-flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
-	int_t m = 0;
-	for (vector<term>& v : x)
-		for (const term& t : v)
-			for (int_t i : t)
-				if (opts.bitunv && (i == 1 || i == 0) ) m = max(m, i);
-				else if (i & 2) m = max(m, i >> 2);
-	for (vector<term>& t : x) {
-		freeze(t, m);
-		for (size_t n = 1; n != t.size(); ++n) p.insert({t[n]});
-	}
-	return p;
-}
-
-void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
-	auto it = m.end();
-	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
-}
-
-void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
-	flat_prog q(move(p));
-	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
-}
-
 bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
 	DBG(assert(t.size() == 2););
@@ -431,13 +387,27 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	return;
 }
 
+//review
+void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
+	auto it = m.end();
+	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
+}
+
+void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
+	flat_prog q(move(p));
+	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
+}
+
 ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
 	vector<term> x) {
 	return p.emplace(x), x[0].tab;
 }
 
 bool tables::get_rules(flat_prog p) {
+
 	if (!get_facts(p)) return false;
+
+	// <-- review
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
 	for (const auto& x : q) prog_add_rule(p, r, x);
@@ -445,13 +415,15 @@ bool tables::get_rules(flat_prog p) {
 	q = move(p);
 	for (const auto& x : q) prog_add_rule(p, r, x);
 	replace_rel(move(r), p);
+	// -->
+
 	if (opts.optimize) bdd::gc();
 
-	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
 	map<term, set<term_set>> m;
 	for (const auto& x : p)
 		if (x.size() == 1) m[x[0]] = {};
 		else m[x[0]].insert(term_set(x.begin() + 1, x.end()));
+
 	set<rule> rs;
 	varmap::const_iterator it;
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
@@ -463,7 +435,7 @@ bool tables::get_rules(flat_prog p) {
 		rule r;
 		if (t.neg) datalog = false;
 		varmap v;
-		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //XXX: review why we replicate t variables in r
+		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //TODO: review why we replicate t variables in r
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
 			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
@@ -854,6 +826,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	DBGFAIL;
 }
 
+
 /* Run the given program with the given settings, put the query
  * results into the given out-parameter, and return true in the case
  * that it reaches a fixed point. Otherwise just return false. */
@@ -933,7 +906,6 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 //-----------------------------------------------------------------------------
 void tables::load_string(lexeme r, const string_t& s) {
 
-
 	//FIXME: this will be loadaed by get new get facts
 	unary_string us(sizeof(char32_t)*8);
 	us.buildfrom(s);
@@ -973,11 +945,8 @@ void tables::load_string(lexeme r, const string_t& s) {
 	}
 	ntable st = get_table({rel, {2}}); // str(pos char)
 	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
-
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
-
-
 }
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
@@ -1028,13 +997,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	if (opts.optimize) measure_time_start();
 
 	strs = strs_in;
-
 	if (!strs.empty()) {
-		dict.get_sym(dict.get_lexeme("space")),
-		dict.get_sym(dict.get_lexeme("alpha")),
-		dict.get_sym(dict.get_lexeme("alnum")),
-		dict.get_sym(dict.get_lexeme("digit")),
-		dict.get_sym(dict.get_lexeme("printable"));
 		for (auto x : strs) {
 			ir_handler->nums = max(ir_handler->nums, (int_t)x.second.size()+1);
 			unary_string us(32);
@@ -1070,6 +1033,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	//----------------------------------------------------------
 	//TODO: prog_after_fp is required for grammar/str recognition,
 	// but it should be restructured
+
 	if (r && prog_after_fp.size()) {
 		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
@@ -1083,7 +1047,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 			r = run_prog_wstrs(np, strs, steps, break_on_step);
 			went = nstep - begstep;
 			if (!r && went >= steps) {
-				assert(false && "!r && went >= steps");
+				//assert(false && "!r && went >= steps");
 				break;
 			}
 		}

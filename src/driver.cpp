@@ -3917,10 +3917,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 bool driver::transform_handler(raw_prog &p) {
 
-	#ifdef DEBUG
-	if (opts.enabled("transformed")) o::transformed() <<
-			"Pre-Transformation Program:\n\n" << p << endl;
-	#endif
+	DBG(if (opts.enabled("transformed"))
+		o::transformed() << "Pre-Transforms Prog:\n" << p << endl;);
 
 	if(opts.enabled("safecheck")) {
 		if(auto res = is_safe(p)) {
@@ -3976,10 +3974,9 @@ bool driver::transform_handler(raw_prog &p) {
 		}
 	}
 
-	#ifdef DEBUG
-	if (opts.enabled("transformed")) o::to("transformed")
-		<< "# transformed program:\n" << p << endl << endl;
-	#endif
+	DBG(if (opts.enabled("transformed"))
+		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);
+
 	return true;
 }
 
