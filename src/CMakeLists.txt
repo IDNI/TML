@@ -51,6 +51,7 @@ set(TML_SOURCES
 	tables_ext.cpp
 	transform.cpp
 	transform_guards.cpp
+	transform_cqc.cpp
 	utils.cpp
 	ir_builder.cpp
 )

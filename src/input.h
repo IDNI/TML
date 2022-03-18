@@ -14,6 +14,7 @@
 #define __INPUT_H__
 
 #include <vector>
+#include <tuple>
 #include <set>
 #include <array>
 #include <cstring>
@@ -465,9 +466,6 @@ class bit_dict {
 	}
 };
 
-typedef std::tuple<elem, int_t> rel_info;
-
-
 /* A raw term is produced from the parsing stage. In TML source code, it
  * takes the following form: <rel>(<arg1> <arg2> ... <argN>). A raw term can
  * occur in both heads and bodies. For example, rel(a(b(c)d e)f) is a raw
@@ -528,6 +526,13 @@ struct raw_term {
 		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
+
+typedef std::tuple<elem, int_t> rel_info;
+
+/* Convenience function for getting relation name and arity from
+ * term. */
+
+rel_info get_relation_info(const raw_term &rt);
 
 bool operator<(const raw_term& x, const raw_term& y);
 

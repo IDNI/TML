@@ -26,6 +26,13 @@ bool raw_prog::require_guards = false;
 bool raw_prog::require_state_blocks = false;
 bool raw_term::require_fp_step = false;
 
+/* Convenience function for getting relation name and arity from
+ * term. */
+
+rel_info get_relation_info(const raw_term &rt) {
+	return std::make_tuple(rt.e[0], rt.e.size() - 3);
+}
+
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
 	allocated_(false)

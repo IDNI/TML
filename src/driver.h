@@ -159,11 +159,6 @@ class driver {
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
-	template<typename F> void minimize(raw_rule &rr, const F &f);
-	template<typename F>
-		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
-		const raw_rule &var_rule, raw_form_tree &ref_tree,
-		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -213,7 +208,9 @@ class driver {
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
+	void subsume_queries_cqc(raw_prog &rp);
+	void subsume_queries_cqnc(raw_prog &rp);
+	void subsume_queries_z3(raw_prog &rp);
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
 	string_t generate_cpp(const elem &e, string_t &prog_constr, uint_t &cid,
