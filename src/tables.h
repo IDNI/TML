@@ -163,7 +163,7 @@ class tables {
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-	std::shared_ptr<bit_univ> spbu = nullptr;
+
 private:
 
 	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
@@ -197,9 +197,8 @@ private:
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 
 	nlevel nstep = 0;
+
 	std::vector<table> tbls;
-	std::map<sig, ntable> smap;
-	std::unordered_map<ntable, std::vector<typedecl>> tab_type;
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -215,7 +214,6 @@ private:
 	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
-	size_t max_args = 0;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -245,8 +243,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
-
-	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
@@ -298,8 +294,6 @@ private:
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	bool get_rules(flat_prog m);
 
-	ntable get_table(const sig& s);
-	ntable get_new_tab(int_t x, ints ar);
 	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,

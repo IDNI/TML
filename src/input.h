@@ -236,26 +236,20 @@ typedef std::shared_ptr<raw_form_tree> sprawformtree;
 typedef std::shared_ptr<struct context> spenvcontext;
 typedef std::shared_ptr<class environment> spenvironment;
 
+// <-- This will be deprecated
 // Type that uniquely identifies relations
 typedef std::pair<lexeme, ints> signature;
-
 bool operator<(const signature& m, const signature &n);
 bool operator==(const signature& m, const signature &n);
 template<> struct std::hash<lexeme> {size_t operator()(const lexeme&)const;};
 bool operator<(const lexeme&, const lexeme&);
 template<> struct std::less<lexeme> {bool operator()(const lexeme&, const lexeme&)const;};
 template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
+// -->
 
 struct raw_prog;
 
 bool operator==(const lexeme& x, const lexeme& y);
-
-// builtin defs moved into tables::init_builtins() in tables_builtins.cpp
-//static const std::set<std::string> str_bltins =
-//	{ "alpha", "alnum", "digit", "space", "printable", "count",
-//		"rnd", "print", "lprint", "halt", "fail",
-//		"bw_and", "bw_or", "bw_xor", "bw_not", "pw_add", "pw_mult"};
-//
 #define STR_TO_LEXEME(str) { (unsigned char *) (str), (unsigned char *) (str) + sizeof(str) - 1 }
 
 struct elem {
@@ -524,8 +518,6 @@ struct raw_term {
 	bool operator==(const raw_term& t) const {
 		return neg == t.neg && e == t.e && arity == t.arity &&
 			extype == t.extype;
-			//iseq == t.iseq && isleq == t.isleq && islt == t.islt;
-		//return neg == t.neg && e == t.e && arity == t.arity;
 	}
 };
 
@@ -829,9 +821,7 @@ struct raw_prog {
 
 	std::vector<guard_statement> gs;
 	std::vector<struct typestmt> vts;
-
 	std::vector<raw_prog> nps;
-
 	std::vector<state_block> sbs;
 	spenvironment typenv; // only one item, build by typechecker
 

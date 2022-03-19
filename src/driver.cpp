@@ -464,7 +464,7 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 /* Check whether a given TML program is safe and return the offending
  * variable and rule if not. This means that every rule must be safe. */
 
-optional<pair<elem, raw_rule>> driver::is_safe(raw_prog rp) {
+optional<pair<elem, raw_rule>> driver::is_safe(raw_prog &rp) {
 	// Ignore the outermost existential quantifiers
 	export_outer_quantifiers(rp);
 	// Split heads are a prerequisite to safety checking
@@ -3917,11 +3917,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 bool driver::transform_handler(raw_prog &p) {
 
-	DBG(if (opts.enabled("transformed"))
-		o::transformed() << "Pre-Transforms Prog:\n" << p << endl;);
-
 	if(opts.enabled("safecheck")) {
-		if(auto res = is_safe(p)) {
+		raw_prog temp_rp(p); //temporary fix to safecheck
+		if(auto res = is_safe(temp_rp.nps[0])) {
 			ostringstream msg;
 			// The program is unsafe so inform the user of the offending rule
 			// and variable.
@@ -3932,6 +3930,9 @@ bool driver::transform_handler(raw_prog &p) {
 			parse_error(msg.str().c_str());
 		}
 	}
+
+	DBG(if (opts.enabled("transformed"))
+		o::transformed() << "Pre-Transforms Prog:\n" << p << endl;);
 
 	if (!transform(p, pd.strs)) return false;
 	for (auto& np : p.nps) 
@@ -3963,13 +3964,14 @@ bool driver::transform_handler(raw_prog &p) {
 	if (opts.enabled("bitunv")) {
 		typechecker tc(p, true);
 		if(tc.tcheck()) {
-			tbl->spbu = make_shared<bit_univ>(dict, opts.get_int("bitorder"));
+			ir->spbu = make_shared<bit_univ>(dict, opts.get_int("bitorder"));
+
 			raw_prog brawp(dict);
-			tbl->spbu->btransform(p, brawp);
+			ir->spbu->btransform(p, brawp);
 			//FIXME: type env is being created in p, but program that must be executed
 			// is brawp. Also, it might be needed to copy brawp onto p, but transform
 			// should operate on p, as i.e guards
-			tbl->spbu->ptypenv = p.typenv;
+			ir->spbu->ptypenv = p.typenv;
 			result = tbl->run_prog_wstrs(brawp, pd.strs, 0, 0);
 		}
 	}

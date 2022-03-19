@@ -167,15 +167,18 @@ bool tables::init_bdd_builtins() {
 		return [this](blt_ctx& c) {
 			spbdd_handle arg0, arg1;
 			size_t i = 0;
-			size_t arg0_w,arg1_w = 0;
+			size_t arg0_w = 0,arg1_w = 0;
 			spbdd_handle const0 = htrue, const1 = htrue;
 
+			assert(false && "BIT_TRASFORM leq_handler is disabled");
+			/*
 			for (auto &x : tab_type.at(c.t.tab)){
 				//COUT << "bits " << x.pty.bsz << endl;
 				if (i == 0) arg0_w = x.pty.bsz;
 				else if (i == 1) arg1_w = x.pty.bsz;
 				i++;
 			}
+			*/
 
 			//workaround to get constants
 			if (c.t[0] >= 0 || c.t[1] >= 0) {

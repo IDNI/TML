@@ -756,20 +756,9 @@ template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
 	const rule&) const;
 
 template <typename T>
-basic_ostream<T>& tables::print(basic_ostream<T>& os, const sig& s) const {
-	bool sep = false;
-	os << dict.get_rel_lexeme(s.first) << "/";
-	for (auto i : s.second) os << (sep?",":(sep=true,"")) << i;
-	return os;
-}
-template basic_ostream<char>& tables::print(basic_ostream<char>&, const sig&)
-	const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
-	const sig&) const;
-
-template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const table& t) const {
-	print(os << "#\t", t.s) << (t.hidden ? "@":"")
+	//print(os << "#\t", "UNDEF" /*t.s*/)
+	os	<< (t.hidden ? "@":"")
 		<< (t.idbltin > -1 ? " builtin" : "")
 		<< endl;
 	for (auto r : t.r) print(os << "#\t\t", rules[r]) << endl;

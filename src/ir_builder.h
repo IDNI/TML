@@ -19,8 +19,26 @@
 #include "term.h"
 #include "analysis.h"
 
-typedef std::set<std::vector<term>> flat_prog;
+struct tml_native_t {
+	enum native_type {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB} type = UNDEF;
+	int_t bit_w = -1;
+	bool operator==(const tml_native_t& l) const {
+	     return l.type == type && l.bit_w == bit_w;
+	}
+	bool operator<(const tml_native_t& l) const {
+		return l.type < type && l.bit_w < bit_w;
+	}
+};
+
+typedef std::vector<tml_native_t> tml_natives;
+#define TML_NATIVES
+#ifdef TML_NATIVES
+typedef std::pair<int_t, tml_natives> sig;
+#else
 typedef std::pair<int_t, ints> sig;
+#endif
+
+typedef std::set<std::vector<term>> flat_prog;
 
 class tables;
 
@@ -33,14 +51,15 @@ public:
 	int_t syms = 0, nums = 0, chars = 0;
 	dict_t &dict;
 	rt_options opts;
-	//environment &typenv;
 	tables *dynenv = 0;
 	tables *printer = 0;
+	std::map<sig, int_t> smap; //signature-table_id map
+	std::shared_ptr<bit_univ> spbu = nullptr;
 
 	int  regex_level = 0;
 	bool error = false;
 
-	ir_builder(dict_t& dict_, rt_options& opts_/*, environment& env_*/);
+	ir_builder(dict_t& dict_, rt_options& opts_);
 	~ir_builder();
 
 	flat_prog to_terms(const raw_prog& p);
@@ -48,13 +67,20 @@ public:
 	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	raw_term to_raw_term(const term& t) const;
 
+	void load_strings_as_fp(flat_prog &fp, const strs_t&);
+
+	int_t get_table(const sig& s);
+
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
 
-	sig get_sig(const term& t);
+// work-in-progress
+//	sig get_sig(const term& t);
 	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
-	size_t sig_len(const sig& s);
+	sig get_sig(const int& rel_id, const ints& arity);
+//	sig get_sig(const lexeme& rel, const tml_natives& types);
+	size_t sig_len(const sig& s) const;
 
 	bool to_pnf( form *&froot);
 

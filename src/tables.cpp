@@ -290,6 +290,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	spbdd_handle leq = htrue, q;
 	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
 
+
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
 			if(opts.bitunv) handler_bitunv(b, t, a);
@@ -471,23 +472,6 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
-ntable tables::get_table(const sig& s) {
-	auto it = smap.find(s);
-	if (it != smap.end()) return it->second;
-	ntable nt = tbls.size();
-	size_t len = ir_handler->sig_len(s);
-	max_args = max(max_args, len);
-	if(opts.bitunv) {
-		bool found = false;
-		string_t relname = lexeme2str(dict.get_rel_lexeme(s.first));
-		auto & types = spbu->ptypenv->search_pred(relname, found);
-		tab_type.insert({nt, types});
-	}
-	table tb;
-	return	tb.t = hfalse, tb.s = s, tb.len = len, 
-	tbls.push_back(tb), smap.emplace(s,nt), nt;
-}
-
 term tables::to_nums(term t) {
 	for (int_t& i : t)  if (i > 0) i = mknum(i);
 	return t;
@@ -504,8 +488,6 @@ void tables::to_nums(flat_prog& m) {
 	for (auto x : m) mm.insert(to_nums(x));
 	m = move(mm);
 }
-
-ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
 
 bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	map<ntable, ntable> m1, m2;
@@ -527,13 +509,17 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	};
 	auto h = [this, f](const set<term>& s) {
 		set<term> r;
-		for (term t : s)
-			get_table({ f(&t.tab), {(int_t)t.size()}}), r.insert(t);
+		for (term t : s) {
+			ir_handler->get_table(
+					ir_handler->get_sig((int_t) f(&t.tab), {(int_t) t.size()}));
+			r.insert(t);
+		}
 		return r;
 	};
 	flat_prog p;
 	for (vector<term> x : m) {
-		get_table({ f(&x[0].tab), { (int_t)x[0].size() } });
+		ir_handler->get_table(
+				ir_handler->get_sig(f(&x[0].tab), {(int_t)x[0].size()}));
 		auto s = h(set<term>(x.begin() + 1, x.end()));
 		x.erase(x.begin() + 1, x.end()),
 		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
@@ -545,18 +531,20 @@ bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
 	return true;
 }
 
+//#ifdef TML_POP_UPDATE
 void tables::add_tml_update(const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
 	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
-	ints arity = tbls.at(t.tab).s.second;
+	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
+	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
 	arity[0] += 3;
-	ntable tab = get_table({ rel_tml_update, arity });
+	ntable tab = ir_handler->get_table(ir_handler->get_sig(rel_tml_update, arity));
 	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
 		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
 	args.insert(args.end(), t.begin(), t.end());
 	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
 }
-
+//#endif
 template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
@@ -573,7 +561,10 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
+
+		//#ifdef TML_POP_UPDATE
 		if (populate_tml_update) add_tml_update(x, r.neg);
+		//#endif
 	});
 	if (print_updates) os << endl;
 	return os;
@@ -610,7 +601,6 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
-//	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;
 	b.tlast = tbls[b.tab].t;
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
@@ -708,10 +698,11 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
+
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
-		opts.pu_states.insert(get_table({ dict.get_rel(
-			dict.get_lexeme(tname)), {0}}));
+		opts.pu_states.insert(ir_handler->get_table(
+				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
 }
 
 bool tables::print_updates_check() {
@@ -906,13 +897,13 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 //-----------------------------------------------------------------------------
 void tables::load_string(lexeme r, const string_t& s) {
 
-	//FIXME: this will be loadaed by get new get facts
+	//FIXME: this will be loadaed by new get facts
 	unary_string us(sizeof(char32_t)*8);
 	us.buildfrom(s);
 	for( auto it: us.rel ){
 		int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(it.first)));
 		term t; t.resize(1);
-		ntable tb = get_table({r, {1} });
+		ntable tb = ir_handler->get_table(ir_handler->get_sig(r, {1}));
 		t.tab = tb;
 		bdd_handles b;
 		b.reserve(it.second.size());
@@ -943,8 +934,8 @@ void tables::load_string(lexeme r, const string_t& s) {
 		if (isalnum(s[n])) tb[0] = mksym(salnum), b2.push_back(from_fact(tb));
 		if (isprint(s[n])) tb[0] = mksym(sprint), b2.push_back(from_fact(tb));
 	}
-	ntable st = get_table({rel, {2}}); // str(pos char)
-	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
+	ntable st = ir_handler->get_table(ir_handler->get_sig(rel, {2})); // str(pos char)
+	ntable stb = ir_handler->get_table(ir_handler->get_sig(rel, {3})); // str(printable pos 0)
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
 }
@@ -957,16 +948,11 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 	if (mknums) to_nums(m);
 	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
-	ir_handler->syms = dict.nsyms();
 
-	if (opts.bitunv) {
-		bits = 1;
-	} else {
-		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
-			add_bit();
-	}
 
+	#ifndef LOAD_STRS
 	for (auto x : strs) load_string(x.first, x.second);
+	#endif
 
 	if (!ir_handler->transform_grammar(g, m)) return false;
 
@@ -996,6 +982,8 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	double t;
 	if (opts.optimize) measure_time_start();
 
+	flat_prog fp = ir_handler->to_terms(p);
+
 	strs = strs_in;
 	if (!strs.empty()) {
 		for (auto x : strs) {
@@ -1005,11 +993,20 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
 		}
 	}
+	#ifdef LOAD_STRS
+	ir_handler->load_strings_as_fp(fp, strs_in);
+	#endif
 
-	flat_prog fp = ir_handler->to_terms(p);
+	ir_handler->syms = dict.nsyms();
+	if (opts.bitunv) {
+		bits = 1;
+	} else {
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+			add_bit();
+	}
+
 	if (!add_prog_wprod(fp, p.g)) return false;;
 
-	//----------------------------------------------------------
 	//----------------------------------------------------------
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
@@ -1033,7 +1030,6 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	//----------------------------------------------------------
 	//TODO: prog_after_fp is required for grammar/str recognition,
 	// but it should be restructured
-
 	if (r && prog_after_fp.size()) {
 		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
 		r = pfp();
@@ -1255,7 +1251,8 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
 
-		if(!opts.bitunv || spbu.get()->brev_transform_check(r, tbl) ) f(r);
+		if(!opts.bitunv || ir_handler->spbu.get()->brev_transform_check(r, tbl))
+			f(r);
 	})();
 }
 

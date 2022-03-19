@@ -19,8 +19,8 @@
 #include "analysis.h"
 using namespace std;
 
-ir_builder::ir_builder(dict_t& dict_, rt_options& opts_/*, environment& env_*/) :
-		dict(dict_), opts(opts_) /*, typenv(env_),*/ /*dynenv(0)*/ {
+ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
+		dict(dict_), opts(opts_) {
 }
 ir_builder::~ir_builder() {
 }
@@ -97,7 +97,6 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
-
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
 				? make_shared<raw_form_tree>(elem::NOT,
@@ -144,23 +143,55 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				m.insert({t}), get_nums(x);
 		}
 	// Note the relations that are marked as tmprel in the raw_prog
+
+	#ifdef HIDDEN_RELS
 	for(const auto &[functor, arity] : p.hidden_rels)
-		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
+		dynenv->tbls[get_table(get_sig(functor, arity))].hidden = true;
+	#endif
 	
 	return m;
 }
 
 sig ir_builder::get_sig(const raw_term&t) {
-	int_t aux = dict.get_rel(t.e[0].e);
-	return{aux ,t.arity};
+	int_t table_name_id = dict.get_rel(t.e[0].e);
+#ifdef TML_NATIVES
+	assert(t.arity.size() == 1);
+	tml_natives tn(t.arity[0], {tml_native_t::UNDEF,-1});
+	return {table_name_id , tn};
+#else
+	return {table_name_id , t.arity};
+#endif
 }
-sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
-	return { dict.get_rel(rel), arity };
+
+sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
+#ifdef TML_NATIVES
+	assert(arity.size() == 1);
+	tml_natives tn(arity[0], {tml_native_t::UNDEF,-1});
+	return {rel_id, tn};
+#else
+	return {rel_id, arity};
+#endif
 }
-size_t ir_builder::sig_len(const sig& s) {
-	size_t r = 0;
-	for (int_t x : get<ints>(s)) if (x > 0) r += x;
-	return r;
+
+
+sig ir_builder::get_sig(const lexeme& rel, const ints& arity ) {
+	int_t table_name_id = dict.get_rel(rel);
+#ifdef TML_NATIVES
+	assert(arity.size() == 1);
+	tml_natives tn(arity[0], {tml_native_t::UNDEF,-1});
+	return {table_name_id, tn};
+#else
+	return {table_name_id, arity};
+#endif
+}
+
+size_t ir_builder::sig_len(const sig& s) const {
+#ifdef TML_NATIVES
+	return s.second.size();
+#else
+	assert(s.second.size()==1);
+	return s.second[0];
+#endif
 }
 
 term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
@@ -197,8 +228,9 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 				break;
 			default: break;
 		}
-	// stronger 'realrel' condition for tables, only REL and header BLTIN
-	ntable tab = realrel ? dynenv->get_table(get_sig(r)) : -1;
+
+	int_t tab = realrel ? get_table(get_sig(r)) : -1;
+
 	// D: idbltin name isn't handled above (only args, much like rel-s & tab-s).
 	if (extype == term::BLTIN) {
 		int_t idbltin = dict.get_bltin(r.e[0].e);
@@ -213,7 +245,6 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 			(bool) (r.e[0].num & 1), (bool) (r.e[0].num & 2));
 	}
 	return term(r.neg, extype, r.arith_op, tab, t, orderid);
-	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
 elem ir_builder::get_elem(int_t arg) const {
@@ -234,6 +265,18 @@ void ir_builder::get_nums(const raw_term& t) {
 		if (e.type == elem::NUM) nums = max(nums, e.num);
 		else if (e.type == elem::CHR) chars = max(chars, (int_t)e.ch);
 		else if (e.type == elem::SYM) syms = max(syms, e.num);
+}
+
+int_t ir_builder::get_table(const sig& s) {
+	auto it = smap.find(s);
+	if (it != smap.end())
+		return it->second;
+	int_t nt = dynenv->tbls.size();
+	table tb;
+	tb.s = s, tb.len = sig_len(s);
+	dynenv->tbls.push_back(tb);
+	smap.emplace(s,nt);
+	return nt;
 }
 
 //---------------------------------------------------------
@@ -365,7 +408,10 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
 				rt.e[0] = elem(elem::SYM,
 						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
-				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
+				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
+				#ifdef TML_NATIVES
+				assert(rt.arity.size() == 1);
+				#endif
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
 				rt.add_parenthesis();
@@ -377,7 +423,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
-			if(dynenv->spbu.get()->brev_transform(rt))
+			if(spbu.get()->brev_transform(rt))
 				rt.calc_arity(nullptr);
 		}
 		return rt;
@@ -684,8 +730,7 @@ bool ir_builder::get_substr_equality(const raw_term &rt, size_t &n,
 	//format : substr(1) = substr(2)
 	term svalt;
 	svalt.resize(4);
-	int_t relp = dict.get_rel(dict.get_lexeme("equals"));
-	svalt.tab = dynenv->get_table({relp, {(int_t)svalt.size()}});
+	svalt.tab = get_table(get_sig(dict.get_lexeme("equals"), {(int_t) svalt.size()}));
 	svalt.extype = term::textype::REL;
 
 	for( int i=0; i<2 ; i++) {
@@ -778,7 +823,7 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 	for(size_t r = 0; r < eqr.size(); r++) {
 		int_t var = 0;
 		int_t i= --var, j= --var , k=--var, n= --var;
-		ntable nt = dynenv->get_table({dict.get_rel(dict.get_lexeme("equals")), {4}});
+		ntable nt = get_table(get_sig(dict.get_lexeme("equals"), {4}));
 		// making head   equals( i j k n) :-
 		eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP, nt,
 								std::initializer_list<int>{i, j, k, n}, 0 );
@@ -801,10 +846,9 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 				//work in progress
 				//DBG(COUT << "get_rule_substr_equality" << endl);
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
-									dynenv->get_table({*dynenv->str_rels.begin(),{2}}),
+									get_table(get_sig(*dynenv->str_rels.begin(),{2})),
 									std::initializer_list<int>{eqr[r][0][2*vi], cv} , 0);
 			}
-
 			eqr[r].emplace_back( false, term::ARITH, t_arith_op::ADD, -1,
 								 std::initializer_list<int>{i, mknum(1), j}, 0);
 			eqr[r].emplace_back( eqr[r].back());
@@ -1274,7 +1318,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 							DBG(COUT << "size: " << sm.size() << std::endl);
 							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
 							t.resize(2);
-							t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
+							t.tab = get_table(get_sig(elem.e,{2}));
 							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
 							p.insert({t});
 							bmatch = true;
@@ -1292,7 +1336,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 					DBG(COUT << "len: " << iter->length(0) << std::endl);
 					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
 					t.resize(2);
-					t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
+					t.tab = get_table(get_sig(elem.e,{2}));
 					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
 					p.insert({t});
 					statterm++;
@@ -1343,7 +1387,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			term t;
 			t.resize(2);
 			t[0] = t[1] = -1;
-			t.tab = dynenv->get_table({dict.get_rel(x.p[0].e),{2}});
+			t.tab = get_table(get_sig(x.p[0].e,{2}));
 			// Ensure that the index is an integer by asserting that it is >= 0
 			term guard;
 			guard.resize(2);
@@ -1366,8 +1410,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			term t;
 			#ifdef GRAMMAR_BLTINS
 			if (builtins.find(x.p[n].e) != builtins.end()) {
-				t.tab = dynenv->get_table({*dynenv->str_rels.begin(), {3}});
-				//TODO: REVIEW usage of get sym here
+				t.tab = get_table(get_sig(*dynenv->str_rels.begin(), {3}));
 				t.resize(3), t[0] = mksym(dict.get_sym(x.p[n].e)),
 				t[1] = -n, t[2] = mknum(0);
 				term plus1;
@@ -1381,7 +1424,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			#endif
 			if (x.p[n].type == elem::SYM) {
 				t.resize(2);
-				t.tab = dynenv->get_table({dict.get_rel(x.p[n].e),{2}});
+				t.tab = get_table(get_sig(x.p[n].e,{2}));
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
 			} else if (x.p[n].type == elem::CHR) {
@@ -1390,9 +1433,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 				int_t tv=n;
 				//DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
-					int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(rl)));
 					term t; t.resize(1);
-					t.tab= dynenv->get_table({r, {1}});
+					t.tab = get_table(get_sig(dict.get_lexeme(us.getrelin_str(rl)), {1}));
 					t[0] = -tv;
 					term plus1;
 					plus1.resize(3);
@@ -1429,3 +1471,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		<< endl;
 	return true;
 }
+
+/*
+void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t&) {
+}
+*/
