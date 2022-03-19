@@ -294,7 +294,6 @@ private:
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	bool get_rules(flat_prog m);
 
-	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
@@ -309,8 +308,11 @@ private:
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+#ifndef LOAD_STRS
+	void load_string(lexeme rel, const string_t& s);
 	strs_t strs;
 	std::set<int_t> str_rels;
+#endif
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
 	// tml_update population

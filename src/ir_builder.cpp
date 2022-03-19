@@ -817,8 +817,8 @@ int_t ir_builder::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &re
 
 bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 
-	if (dynenv->str_rels.size() > 1) er(err_one_input);
-	if (dynenv->str_rels.empty()) return false;
+	if (str_rels.size() > 1) er(err_one_input);
+	if (str_rels.empty()) return false;
 	eqr.resize(3); // three rules for substr equality
 	for(size_t r = 0; r < eqr.size(); r++) {
 		int_t var = 0;
@@ -846,7 +846,7 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 				//work in progress
 				//DBG(COUT << "get_rule_substr_equality" << endl);
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
-									get_table(get_sig(*dynenv->str_rels.begin(),{2})),
+									get_table(get_sig(*str_rels.begin(),{2})),
 									std::initializer_list<int>{eqr[r][0][2*vi], cv} , 0);
 			}
 			eqr[r].emplace_back( false, term::ARITH, t_arith_op::ADD, -1,
@@ -1282,8 +1282,14 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	set<elem> torem;
 	measure_time_start();
 	bool enable_regdetect_matching = opts.apply_regexpmatch;
+#ifdef LOAD_STRS
+	if (strs.size() && enable_regdetect_matching) {
+		string inputstr = to_string(strs.begin()->second);
+#else
 	if (dynenv->strs.size() && enable_regdetect_matching) {
 		string inputstr = to_string(dynenv->strs.begin()->second);
+
+#endif
 		DBG(COUT<<inputstr<<endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
@@ -1410,7 +1416,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			term t;
 			#ifdef GRAMMAR_BLTINS
 			if (builtins.find(x.p[n].e) != builtins.end()) {
-				t.tab = get_table(get_sig(*dynenv->str_rels.begin(), {3}));
+				t.tab = get_table(get_sig(*str_rels.begin(), {3}));
 				t.resize(3), t[0] = mksym(dict.get_sym(x.p[n].e)),
 				t[1] = -n, t[2] = mknum(0);
 				term plus1;
@@ -1472,7 +1478,49 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	return true;
 }
 
-/*
-void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t&) {
+#ifdef LOAD_STRS
+void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) {
+
+	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
+	unary_string us(sizeof(char32_t)*8);
+	chars = max(chars, (int_t) us.rel.size()); //TODO: review this one
+	vector<term> v;
+	us.buildfrom(s);
+	for (auto it: us.rel) {
+		term t; t.resize(1);
+		ntable tb = get_table(get_sig(dict.get_lexeme(us.getrelin_str(it.first)), {1}));
+		t.tab = tb;
+		for (int_t i : it.second)
+			t[0] = mknum(i), v.push_back(t), fp.insert(move(v));
+	}
+	//FIXME: these are always the same for all eventual strs, so could be stored
+	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
+		salpha = dict.get_sym(dict.get_lexeme("alpha")),
+		salnum = dict.get_sym(dict.get_lexeme("alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme("digit")),
+		sprint = dict.get_sym(dict.get_lexeme("printable"));
+	int_t rel = dict.get_rel(r);
+	term t(2),tb(3);
+	t.tab = get_table(get_sig(rel, {2}));
+	tb.tab =  get_table(get_sig(rel, {3}));
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		t[0] = mknum(n), t[1] = mkchr(s[n]); // t[2] = mknum(n + 1),
+		chars = max(chars, t[1]);
+		v.push_back(t), fp.insert(move(v));
+		tb[1] = t[0], tb[2] = mknum(0);
+		if (isspace(s[n])) tb[0] = mksym(sspace), v.push_back(tb), fp.insert(move(v));
+		if (isdigit(s[n])) tb[0] = mksym(sdigit), v.push_back(tb), fp.insert(move(v));
+		if (isalpha(s[n])) tb[0] = mksym(salpha), v.push_back(tb), fp.insert(move(v));
+		if (isalnum(s[n])) tb[0] = mksym(salnum), v.push_back(tb), fp.insert(move(v));
+		if (isprint(s[n])) tb[0] = mksym(sprint), v.push_back(tb), fp.insert(move(v));
+	}
+	str_rels.insert(rel);
 }
-*/
+
+void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
+	strs = s;
+	for (auto x : strs) {
+		load_string(fp, x.first, x.second);
+	}
+}
+#endif

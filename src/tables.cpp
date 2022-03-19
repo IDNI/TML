@@ -895,6 +895,7 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 }
 
 //-----------------------------------------------------------------------------
+#ifndef LOAD_STRS
 void tables::load_string(lexeme r, const string_t& s) {
 
 	//FIXME: this will be loadaed by new get facts
@@ -914,7 +915,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 
 	//FIXME: this will be loadaed by get new get facts
 	int_t rel = dict.get_rel(r);
-	str_rels.insert(rel);
+	ir_handler->str_rels.insert(rel);
 	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
 		salpha = dict.get_sym(dict.get_lexeme("alpha")),
 		salnum = dict.get_sym(dict.get_lexeme("alnum")),
@@ -939,6 +940,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 	tbls[st].t = bdd_or_many(move(b1));
 	tbls[stb].t = bdd_or_many(move(b2));
 }
+#endif
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
 
@@ -948,7 +950,6 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 	if (mknums) to_nums(m);
 	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
-
 
 	#ifndef LOAD_STRS
 	for (auto x : strs) load_string(x.first, x.second);
@@ -984,6 +985,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 
 	flat_prog fp = ir_handler->to_terms(p);
 
+	#ifndef LOAD_STRS
 	strs = strs_in;
 	if (!strs.empty()) {
 		for (auto x : strs) {
@@ -993,7 +995,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
 		}
 	}
-	#ifdef LOAD_STRS
+	#else
 	ir_handler->load_strings_as_fp(fp, strs_in);
 	#endif
 
@@ -1040,7 +1042,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
-			r = run_prog_wstrs(np, strs, steps, break_on_step);
+			r = run_prog_wstrs(np, strs_in, steps, break_on_step);
 			went = nstep - begstep;
 			if (!r && went >= steps) {
 				//assert(false && "!r && went >= steps");

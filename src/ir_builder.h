@@ -55,7 +55,6 @@ public:
 	tables *printer = 0;
 	std::map<sig, int_t> smap; //signature-table_id map
 	std::shared_ptr<bit_univ> spbu = nullptr;
-
 	int  regex_level = 0;
 	bool error = false;
 
@@ -67,8 +66,13 @@ public:
 	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	raw_term to_raw_term(const term& t) const;
 
-	void load_strings_as_fp(flat_prog &fp, const strs_t&);
-
+	std::set<int_t> str_rels;
+#define LOAD_STRS
+#ifdef LOAD_STRS
+	strs_t strs;
+	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
+	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
+#endif
 	int_t get_table(const sig& s);
 
 	struct elem get_elem(int_t arg) const;
