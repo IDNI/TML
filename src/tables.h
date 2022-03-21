@@ -28,7 +28,6 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
-#include "analysis.h"
 #include "ir_builder.h"
 
 class tables;

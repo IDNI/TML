@@ -20,6 +20,44 @@
 
 using namespace std;
 
+bool operator==(const lexeme& l, const string& s) {
+	if ((size_t) (l[1] - l[0]) != s.size()) return false;
+	return !strncmp(l[0], s.c_str(), l[1] - l[0]);
+}
+
+bool operator==(const lexeme& l, const char* s) {
+	size_t n = strlen(s);
+	return (size_t) (l[1] - l[0]) != n
+		? false : !strncmp(l[0], s, n);
+}
+
+bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
+	if (x[1]-x[0] != y[1]-y[0]) return x[1]-x[0] < y[1]-y[0];
+	for (size_t n = 0; n != (size_t)(x[1]-x[0]); ++n)
+		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
+	return false;
+}
+
+/* Compare lexemes by their character content rather than by memory
+ * locations. */
+
+bool operator==(const lexeme& x, const lexeme& y) {
+	return x[1] - x[0] == y[1] - y[0] && !strncmp(x[0], y[0], x[1] - x[0]);
+}
+
+bool less<lexeme>::operator()(const lexeme& m, const lexeme &n) const {
+	return lexeme2str(m) < lexeme2str(n);
+}
+
+bool operator<(const lexeme& m, const lexeme &n) {
+	return less<lexeme>()(m, n);
+}
+
+size_t hash<lexeme>::operator()(const lexeme& m) const {
+	string_t str = lexeme2str(m);
+	return hash<string>()(string(str.begin(), str.end()));
+}
+
 wstring s2ws(const string& s) {
 	return wstring_convert<codecvt_utf8<wchar_t>>().from_bytes(s);
 }

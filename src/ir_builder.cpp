@@ -16,7 +16,6 @@
 
 #include "ir_builder.h"
 #include "tables.h"
-#include "analysis.h"
 using namespace std;
 
 ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
@@ -355,7 +354,7 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 	}
 }
 
-raw_term ir_builder::to_raw_term(const term& r) const {
+raw_term ir_builder::to_raw_term(const term& r) {
 		raw_term rt;
 		size_t args;
 		rt.neg = r.neg;
@@ -423,7 +422,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
-			if(spbu.get()->brev_transform(rt))
+			if(bitunv_to_raw_term(rt))
 				rt.calc_arity(nullptr);
 		}
 		return rt;
@@ -709,7 +708,7 @@ bool transformer::traverse(form *&root ) {
 	return changed;
 }
 
-void form::printnode(int lv, const ir_builder* tb) {
+void form::printnode(int lv, ir_builder* tb) {
 	if (r) r->printnode(lv+1, tb);
 	for (int i = 0; i < lv; i++) COUT << '\t';
 	if( tb && this->tm != NULL)

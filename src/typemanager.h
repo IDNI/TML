@@ -1,19 +1,16 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+/*
+ * typemanager.h
+ *
+ *  Created on: Mar 20, 2022
+ *      Author: juan
+ */
 
-#ifndef _ANALYSIS_H_
-#define _ANALYSIS_H_
+#ifndef SRC_TYPEMANAGER_H_
+#define SRC_TYPEMANAGER_H_
+
 #include "input.h"
+
+typedef std::shared_ptr<class environment> spenvironment;
 
 struct context {
     std::map<string_t, primtype> context_prim_var;
@@ -42,7 +39,7 @@ struct context {
     std::string to_print() const {
         std::string ret;
         ret.append("\n");
-        for(auto &it: context_prim_var) 
+        for(auto &it: context_prim_var)
           ret.append( to_string(it.first)+ ":" + it.second.to_print());
         for(auto &it: context_typedef_var)
           ret.append(to_string(it.first) + ":" + to_string(it.second));
@@ -50,11 +47,9 @@ struct context {
     }
 };
 
-typedef std::shared_ptr<class environment> spenvironment;
-
-class environment {    
+class environment {
     //type signatures for relations/predicates and user defined
-    //complex structures if any 
+    //complex structures if any
     std::map<string_t, std::vector<typedecl> > predtype;
     std::map<string_t, structype> usertypedef;
     //contexts for vars
@@ -78,7 +73,7 @@ class environment {
         return predtype.insert({predname, instype}).second;
     }
     bool add_sig(string_t &predname, std::vector<typedecl>& types) {
-        if( contains_pred(predname) )    return false;   
+        if( contains_pred(predname) )    return false;
         return predtype.insert({predname, types}).second;
     }
     std::vector<string_t> get_predicates() {
@@ -94,7 +89,7 @@ class environment {
         nested.emplace_back(_e);
     }
 
-    const std::vector<typedecl>& search_pred(string_t &key, bool &found, int_t insize=-1) {
+    const std::vector<typedecl> &search_pred(string_t &key, bool &found, int_t insize=-1) {
         auto it = predtype.find(key);
 
         if( it != predtype.end() ) {
@@ -138,7 +133,7 @@ class environment {
     bool is_init(){
         return predtype.size()>0;
     }
-    std::string to_print() const{ 
+    std::string to_print() const{
         std::string ret;
         for(auto &it : predtype){
         	ret.append("Signature for table ");
@@ -200,151 +195,44 @@ class environment {
     }
 };
 
-class typechecker { 
-    public:
-    typechecker(raw_prog &p, bool _infer = false) : rp(p),infer(_infer), env(p.get_typenv()) {
-        env.build_from(p);
+//-----------------------------------------------------------------------------
+
+class typemanager {
+
+public:
+	typemanager() {}
+    ~typemanager() {}
+
+    bool type_check(raw_prog &rp) {
+    	if (env.build_from(rp)) return true;
+    	else return tcheck(rp);
     }
-    enum TINFO_STATUS { 
+    bool infer = true;
+    environment env;
+
+private:
+    enum TINFO_STATUS {
         TINFO_TYPE_INFER_SUCESS  =0x01,
         TINFO_TYPE_CHECK_SUCCESS =0x02,
         TINFO_TYPE_CHECK_FAIL = 0x0,
         TINFO_TYPE_INFER_FAIL = 0x80,
         TINFO_UNKNOWN_VAR_TYPE = 0x90,
         TINFO_UNKNOWN_PRED_TYPE = 0xA0,
-    };
-    bool tcheck();
-    private:
-    raw_prog &rp;
-    bool infer; 
-    environment &env;
-    TINFO_STATUS tstat;
+    } tstat = TINFO_TYPE_CHECK_FAIL;
+
     std::vector<TINFO_STATUS> verrs;
-    bool tinfer (const raw_rule&);
-    bool tinfer( const raw_form_tree &);
-    bool tcheck (const raw_rule&);
+    bool tinfer(const raw_rule&);
+    bool tinfer(const raw_form_tree &);
+    bool tcheck(const raw_rule&);
     bool tcheck(const raw_form_tree &prft);
-    bool tcheck (const raw_term&);
+    bool tcheck(const raw_term&);
+    bool tcheck(const raw_prog&);
     bool type_error(const char* e, lexeme l) {
         if(tstat == TINFO_TYPE_CHECK_SUCCESS)
             tstat = TINFO_TYPE_CHECK_FAIL;
     	input in((void*) 0, (size_t) 0);
 	    return in.type_error(0, e, l[0]);
     }
-    
 };
 
-struct bit_univ {
-	enum { //should be compatible with typesystem's prim type
-		CHAR_BSZ = 8,
-		INT_BSZ = 8,
-		SYM_BSZ = 8,
-		VAR_BSZ = 8,
-	};
-    inline static primtype dt_nop;
-	inline static primtype dt_int= primtype(primtype::UINT);
-	dict_t &d;
-    size_t bit_order;
-    size_t char_bsz, int_bsz, sym_bsz, var_bsz;
-    spenvironment ptypenv = nullptr;
-    typedef std::vector<size_t> tab_args;
-  
-	bit_univ(dict_t &_d, size_t _bo, size_t _cbsz = CHAR_BSZ, size_t _ibsz = INT_BSZ,
-	size_t _sbsz = SYM_BSZ, size_t _vbsz = VAR_BSZ): d(_d), bit_order(_bo), char_bsz(_cbsz),
-	int_bsz(_ibsz), sym_bsz(_sbsz), var_bsz(_vbsz) {
-
-        this->pos = [this](size_t a, size_t b, size_t c, size_t d, bit_univ::tab_args t)-> size_t{
-					return this->pos_gen(a, b, c, d, t); };
-    }
-    std::vector<primtype> get_arg_types( const raw_term & rt, const raw_rule & rr);
-    void append_types(string_t &, std::vector<primtype>&) ;
-	const primtype& get_typeinfo(size_t n, const raw_term& rt, const raw_rule &rr );
-	size_t pos_eqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args /*,tab_args rtab */ ) {
-		DBG(assert(bit_from_right < bsz && arg < args); )
-		return (bsz - bit_from_right - 1)* args + arg;
-	}
-    size_t pos_gen(size_t
-#ifdef DEBUG
-	bsz
-#endif
-, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
-		DBG(assert(bit_from_right < bsz && arg < args); )
-		size_t pos = -1;
-        size_t max_bits=0;
-        for(size_t bits : rtab ) max_bits= std::max(max_bits, bits);
-        for( size_t bit = 0; bit < max_bits; bit++)
-            for( size_t a= 0 ; a<args ; a++) {
-                if(bit < rtab[a]) pos++;
-                if( bit == bit_from_right && arg == a) goto end;
-            }
-        
-        end: return pos;
-	}
-
-    size_t pos_neqsz(size_t bsz, size_t bit_from_right , size_t arg, size_t args, tab_args rtab  ) {
-        DBG(assert(bit_from_right < bsz && arg < args && args == rtab.size() && rtab[arg] == bsz); )
-        DBG(COUT<< arg << " "<<  args << " "<<  bit_from_right << " "<< (bsz - bit_from_right -1) << " " <<bsz << " " );
-        bools szsort(64); //max number of args <=64 in radix sorted form
-
-        size_t skip = 0, cargs  = 0; // # of args with sz less than bit_rom_right;
-        for( size_t i = 0 ; i <rtab.size(); i++) {
-            szsort[rtab[i]] = true;
-            if( (bsz -bit_from_right -1) < rtab[i]  ) cargs++;
-            else if( i <= arg ) skip++;  //to adjust arg to be within carg range
-        }    
-        size_t lastsz=0, base=0,  s = args;
-        for( size_t sz = 0; sz < szsort.size() && sz <= (bsz - bit_from_right -1) ; sz++) 
-            if(szsort[sz]) {
-                base = ((sz-lastsz) * s-- ) + base, lastsz = sz; }
-
-		return base + (bsz - bit_from_right - 1 - lastsz)*cargs + (arg -skip);
-    
-    }
-    size_t pos_default(size_t bsz, size_t bit_from_right , size_t
-#ifdef DEBUG
-    arg
-#endif
-, size_t
-#ifdef DEBUG
-	args
-#endif
-/*, tab_args rtab */ ) {
-		DBG(assert(bit_from_right < bsz && arg < args); )
-    	return (bsz - bit_from_right - 1); //* args + arg;
-	}
-
-    typedef std::function< size_t ( size_t , size_t , size_t , size_t, tab_args) > posfunc;
-	posfunc pos;
-    
-    bool brev_transform( raw_term& bit_raw_term);
-    bool brev_transform_check(const struct term &t, const struct table &tab);
-	bool btransform( const raw_prog& rpin, raw_prog &rpout );
-	private:
-    bool btransform( const raw_rule& rrin, raw_rule &rrout );
-	bool btransform( const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout );
-    bool btransform( const raw_form_tree& rfin, raw_form_tree &rfout, const raw_rule& rrin, raw_rule &rrout );
-    public:
-    template<class T>
-    bool permuteorder(std::vector<T> &cont, size_t n, bool backward = false){
-        static std::vector<int_t> ord, rord;
-        if ( n == 0 ) return false;         
-        std::vector<T> ocont = cont;
-        if(ord.size() != cont.size()) {
-            // should do more memoization,
-            ord.resize(cont.size());
-            rord.resize(cont.size());
-            for( size_t i=0; i < ord.size(); i++)	ord[i] = i;
-            while( n--  &&  std::next_permutation(ord.begin(), ord.end()));
-            for( size_t i=0; i<rord.size(); i++)	rord[ord[i]] = i;
-            DBG(COUT<<std::endl);
-            DBG(for(int_t v: ord) { COUT<< v; })
-        }
-            // copy values from old array to cont
-        DBG(COUT<< std::endl<<"B:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
-        for(size_t i=0; i<cont.size(); i++)	cont[i] = ocont[!backward ? ord[i]: rord[i]];    
-        DBG(COUT<< std::endl<<"A:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
-        return true;
-    }
-};
-
-#endif
+#endif /* SRC_TYPECHECKER_H_ */

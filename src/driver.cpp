@@ -3962,18 +3962,7 @@ bool driver::transform_handler(raw_prog &p) {
 						"-g (-guards) option enabled.");
 
 	if (opts.enabled("bitunv")) {
-		typechecker tc(p, true);
-		if(tc.tcheck()) {
-			ir->spbu = make_shared<bit_univ>(dict, opts.get_int("bitorder"));
-
-			raw_prog brawp(dict);
-			ir->spbu->btransform(p, brawp);
-			//FIXME: type env is being created in p, but program that must be executed
-			// is brawp. Also, it might be needed to copy brawp onto p, but transform
-			// should operate on p, as i.e guards
-			ir->spbu->ptypenv = p.typenv;
-			result = tbl->run_prog_wstrs(brawp, pd.strs, 0, 0);
-		}
+		ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 	}
 
 	DBG(if (opts.enabled("transformed"))
@@ -4016,13 +4005,13 @@ bool driver::run(size_t steps, size_t break_on_step) {
 		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
 	else if (opts.enabled("bitunv"))
 		//FIXME: bitunv is called still from transform handler
-		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
-		;
+		result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
+
 	else {
 		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
-		//FIXME: calling run as bleo leads to double call to get_rules but 
-		// is needed for programs with productions, otherwise chars get wrogly
-		// represented. Check prog_after_fp since it is related to this behavoiur
+		//FIXME: calling run as bleow leads to double call to get_rules but
+		// is needed for programs with productions to clean null strings
+		// Check prog_after_fp since it is related to this behavior
 		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
 	}
 	o::ms() << "# elapsed: ", measure_time_end();

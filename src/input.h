@@ -26,13 +26,6 @@
 #include "dict.h"
 #include "memory_map.h"
 
-struct context;
-class environment;
-
-#define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
-
-enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
-
 /**
  * input class contains input data. input can be one of three types: STDIN,
  * FILE or STRING. STDIN works as a STRING which is read from the standard input
@@ -231,27 +224,6 @@ public:
 	}
 };
 
-struct raw_form_tree;
-typedef std::shared_ptr<raw_form_tree> sprawformtree;
-typedef std::shared_ptr<struct context> spenvcontext;
-typedef std::shared_ptr<class environment> spenvironment;
-
-// <-- This will be deprecated
-// Type that uniquely identifies relations
-typedef std::pair<lexeme, ints> signature;
-bool operator<(const signature& m, const signature &n);
-bool operator==(const signature& m, const signature &n);
-template<> struct std::hash<lexeme> {size_t operator()(const lexeme&)const;};
-bool operator<(const lexeme&, const lexeme&);
-template<> struct std::less<lexeme> {bool operator()(const lexeme&, const lexeme&)const;};
-template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
-// -->
-
-struct raw_prog;
-
-bool operator==(const lexeme& x, const lexeme& y);
-#define STR_TO_LEXEME(str) { (unsigned char *) (str), (unsigned char *) (str) + sizeof(str) - 1 }
-
 struct elem {
 	enum etype {
 		NONE, SYM, NUM, CHR, VAR, OPENP, CLOSEP, ALT, STR,
@@ -269,26 +241,26 @@ struct elem {
 	elem(char32_t ch) : type(CHR), ch(ch) {}
 	elem(etype type) : type(type) {
 		switch(type) {
-			case EQ: e = STR_TO_LEXEME("="); break;
-			case OPENP: e = STR_TO_LEXEME("("); break;
-			case CLOSEP: e = STR_TO_LEXEME(")"); break;
-			case ALT: e = STR_TO_LEXEME("||"); break;
-			case NEQ: e = STR_TO_LEXEME("!="); break;
-			case LEQ: e = STR_TO_LEXEME("<="); break;
-			case GT: e = STR_TO_LEXEME(">"); break;
-			case LT: e = STR_TO_LEXEME("<"); break;
-			case GEQ: e = STR_TO_LEXEME(">="); break;
-			case NOT: e = STR_TO_LEXEME("~"); break;
-			case AND: e = STR_TO_LEXEME("&&"); break;
-			case FORALL: e = STR_TO_LEXEME("forall"); break;
-			case EXISTS: e = STR_TO_LEXEME("exists"); break;
-			case UNIQUE: e = STR_TO_LEXEME("unique"); break;
-			case IMPLIES: e = STR_TO_LEXEME("->"); break;
-			case COIMPLIES: e = STR_TO_LEXEME("<->"); break;
-			case OPENB: e = STR_TO_LEXEME("{"); break;
-			case CLOSEB: e = STR_TO_LEXEME("}"); break;
-			case OPENSB: e = STR_TO_LEXEME("["); break;
-			case CLOSESB: e = STR_TO_LEXEME("]"); break;
+			case EQ: e = str2lexeme("="); break;
+			case OPENP: e = str2lexeme("("); break;
+			case CLOSEP: e = str2lexeme(")"); break;
+			case ALT: e = str2lexeme("||"); break;
+			case NEQ: e = str2lexeme("!="); break;
+			case LEQ: e = str2lexeme("<="); break;
+			case GT: e = str2lexeme(">"); break;
+			case LT: e = str2lexeme("<"); break;
+			case GEQ: e = str2lexeme(">="); break;
+			case NOT: e = str2lexeme("~"); break;
+			case AND: e = str2lexeme("&&"); break;
+			case FORALL: e = str2lexeme("forall"); break;
+			case EXISTS: e = str2lexeme("exists"); break;
+			case UNIQUE: e = str2lexeme("unique"); break;
+			case IMPLIES: e = str2lexeme("->"); break;
+			case COIMPLIES: e = str2lexeme("<->"); break;
+			case OPENB: e = str2lexeme("{"); break;
+			case CLOSEB: e = str2lexeme("}"); break;
+			case OPENSB: e = str2lexeme("["); break;
+			case CLOSESB: e = str2lexeme("]"); break;
 			default: assert(false); //should never reach here
 		}
 	}
@@ -338,6 +310,26 @@ struct elem {
 		return to_string(lexeme2str(e));
 	}
 };
+
+//-----------------------------------------------------------------------------
+// <-- This will be deprecated
+// Type that uniquely identifies relations
+typedef std::pair<lexeme, ints> signature;
+bool operator<(const signature& m, const signature &n);
+bool operator==(const signature& m, const signature &n);
+template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
+// -->
+
+enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
+struct raw_term;
+struct raw_rule;
+struct raw_prog;
+struct raw_form_tree;
+typedef std::shared_ptr<raw_form_tree> sprawformtree;
+
+struct context;
+class environment;
+typedef std::shared_ptr<struct context> spenvcontext;
 
 struct primtype {
 	elem el;
@@ -427,6 +419,7 @@ struct typedecl {
 
 	bool parse(input *in , const raw_prog& prog, bool multivar = true);
 };
+
 struct typestmt {
 	structype rty;
 	elem reln;
@@ -442,24 +435,6 @@ struct typestmt {
 	bool parse(input *in, const raw_prog& prog);
 
 };
-
-struct raw_term;
-struct raw_prog;
-struct raw_rule;
-
-class bit_dict {
-	std::map<lexeme, size_t, lexcmp > syms;
-	std::map<lexeme, int_t, lexcmp > vars;
-	public:
-	size_t get_bit_sym(const elem &e) {
-		assert(e.type == elem::SYM);
-		if(syms.find(e.e) == syms.end())
-			syms.insert({e.e, syms.size()+1});
-		return syms[e.e];
-	}
-};
-
-typedef std::tuple<elem, int_t> rel_info;
 
 
 /* A raw term is produced from the parsing stage. In TML source code, it
@@ -552,8 +527,6 @@ struct directive {
 };
 
 struct production {
-//	bool start = false;
-//	raw_term t;
 	std::vector<elem> p;
 	std::vector<raw_term> c{};   // constraints after production
 	bool parse(input* in, const raw_prog& prog);
@@ -715,8 +688,10 @@ struct raw_rule {
 	std::vector<std::vector<raw_term>> b;
 	// Contains a tree representing the logical formula.
 	std::optional<raw_form_tree> prft;
+
 	// contains the context types of vars used in rule from type inference
 	mutable spenvcontext varctx = nullptr;
+
 	enum etype { NONE, GOAL, TREE };
 	etype type = NONE;
 	bool guarding = false;
@@ -737,6 +712,7 @@ struct raw_rule {
 	raw_rule(const raw_term& h, const raw_form_tree &prft) : h({h}), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const raw_form_tree &prft) : h(h), prft(prft) {}
 	raw_rule(const std::vector<raw_term> &h, const sprawformtree &prft) : h(h), prft(*prft) {}
+
 	void update_context(const spenvcontext &_c) const {
 		varctx = _c;
 	}
@@ -820,14 +796,12 @@ struct raw_prog {
 	std::vector<raw_rule> r;
 
 	std::vector<guard_statement> gs;
-	std::vector<struct typestmt> vts;
+	std::vector<typestmt> vts;
 	std::vector<raw_prog> nps;
 	std::vector<state_block> sbs;
-	spenvironment typenv; // only one item, build by typechecker
 
 	// The relations that should be hidden from the user by default
 	std::set<signature> hidden_rels;
-
 	int_t id = 0;
 	int_t guarded_by = -1;
 	int_t true_rp_id = -1;
@@ -842,9 +816,7 @@ struct raw_prog {
 	bool parse_xfp(input* in);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j,
 				std::vector<raw_term> &vrt);
-	environment& get_typenv();
-	void set_typenv(const environment &e);
-	raw_prog(dict_t &dict_);
+	raw_prog(dict_t &dict_) : dict(dict_) {};
 };
 
 struct raw_progs {
@@ -921,8 +893,6 @@ template <typename T>
 std::basic_ostream<T>& print_raw_rule(std::basic_ostream<T>& os,
 	const raw_rule& r, size_t level);
 
-bool operator==(const lexeme& l, std::string s);
-bool operator==(const lexeme& l, const char* s);
 bool operator<(const raw_rule& x, const raw_rule& y);
 void parser_test();
 

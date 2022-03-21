@@ -32,6 +32,7 @@
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
+typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
