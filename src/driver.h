@@ -87,11 +87,12 @@ struct z3_context {
 
 #endif
 
+// TODO remove next functions as they are auxiliary in optimization
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
 template <class InputIterator>
-	void collect_vars(InputIterator first, InputIterator last,
-		std::set<elem> &vars);
+void collect_vars(InputIterator first, InputIterator last,
+	std::set<elem> &vars);
 void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
@@ -109,6 +110,7 @@ elem rename_variables(const elem &e, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
 void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
+// TODO remove aboove function for the former given reason
 
 class driver {
 	friend struct flat_rules;
@@ -169,6 +171,7 @@ class driver {
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);
+	// TODO create one entry point for optimization 
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
@@ -176,6 +179,7 @@ class driver {
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
+	// TODO and remove previous ones
 #ifdef WITH_Z3
 	void qc_z3(raw_prog &rp);
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
@@ -208,9 +212,11 @@ class driver {
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
+	// TODO create one entry point to optimization 
 	void subsume_queries_cqc(raw_prog &rp);
 	void subsume_queries_cqnc(raw_prog &rp);
 	void subsume_queries_z3(raw_prog &rp);
+	// TODO and remove the previous ones
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
 	string_t generate_cpp(const elem &e, string_t &prog_constr, uint_t &cid,
@@ -315,6 +321,9 @@ public:
 #endif
 
 };
+
+// bool is_cqn(const raw_rule &rr);
+// bool is_cq(const raw_rule &rr);
 
 template void driver::out<char>(std::ostream&) const;
 template void driver::out<wchar_t>(std::wostream&) const;
