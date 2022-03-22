@@ -197,6 +197,12 @@ void options::setup() {
 		"generate C++ code to generate the given TML code");
 	add_bool("safecheck",
 		"enable safety check");
+	add_bool("O1",
+		"enables split-rules");
+	add_bool("O2",
+		"enables all O1 optimizations and also cqc-subsumes and cqnc-subsumes");
+	add(option(option::type::INT, { "O3" })
+		.description("enables all O2 optimizations and transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add(option(option::type::INT, { "iterate" })
 		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add_bool("gc",      "enable garbage collection");
