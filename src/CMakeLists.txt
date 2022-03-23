@@ -16,7 +16,6 @@ list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
 
 set(TML_HEADERS
-	analysis.h
 	bdd.h
 	builtins.h
 	char_defs.h
@@ -31,10 +30,10 @@ set(TML_HEADERS
 	output.h
 	tables.h
 	ir_builder.h
+	typemanager.h
 )
 
 set(TML_SOURCES
-	analysis.cpp
 	bdd.cpp
 	bdd_ext.cpp
 	builtins.cpp
@@ -53,6 +52,8 @@ set(TML_SOURCES
 	transform_guards.cpp
 	utils.cpp
 	ir_builder.cpp
+	typemanager.cpp
+	transform_bitunv.cpp
 )
 
 if (WITH_THREADS)
@@ -133,11 +134,6 @@ if (WITH_Z3)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
 endif()
 
-# enable eval
-#############
-if (WITH_EVAL)
-	target_compile_definitions(TMLo PRIVATE "-DWITH_EVAL")
-endif()
 
 # shared library
 #################

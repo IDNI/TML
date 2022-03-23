@@ -18,7 +18,8 @@
 #include "input.h"
 #include "err.h"
 #include "output.h"
-#include "analysis.h"
+#include "typemanager.h"
+
 using namespace std;
 
 int_t raw_prog::last_id = 0;
@@ -37,6 +38,7 @@ input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	if (mm_.error) {
 		//CERR << "error: " << mm_.error_message <<endl;
 		throw_runtime_error(err_fnf, f);
+		error = true;
 	}
 }
 
@@ -179,7 +181,8 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
-#ifdef WITH_EVAL
+//TODO: review what to with these directive
+#ifdef WITH_EVAL_DIRECTIVES
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
 		type = EDOMAIN; ++pos;
@@ -253,6 +256,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 		return true;
 	}
 #endif
+
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
 		if (!t.parse(in, prog)) return
@@ -451,9 +455,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 				if      (el.e == "forget") forget = true;
 				else if (el.e == "renew")  renew = true;
 				break;
-			case elem::SYM:	if (prog.builtins.find(el.e)
-						!= prog.builtins.end())
-				{
+			case elem::SYM:	if (prog.dict.is_bltin(el.e)) {
 					el.type = elem::BLTIN;
 					bltin = true;
 					el.num = renew << 1 | forget;
@@ -481,8 +483,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	if (forget) bltin = true, e[0].type = elem::BLTIN;
 
 	if (pref_type == rtextype::CONSTRAINT)  {
-		extype = rtextype::CONSTRAINT;		
-		return true;	
+		extype = rtextype::CONSTRAINT;
+		return true;
 	}
 
 	if (bltin) {
@@ -500,7 +502,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			in->parse_error(l[pos][0], err_eq_expected, l[pos]);
 		if (noteq)
 			neg = !neg; // flip the neg as we have NEQ, don't do it for EQ ofc
-		extype = raw_term::EQ; // iseq = true;
+		extype = raw_term::EQ;
 		return calc_arity(in);
 	}
 	if ((leq || gt) && !arith) {
@@ -544,7 +546,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		//return calc_arity(in), true;
 		return true;
 	}
-	
+
 	if (e[0].type != elem::SYM)
 		return in->parse_error(l[curr][0], err_relsym_expected,l[curr]);
 	if (e.size() == 1) return calc_arity(in), true;
@@ -555,8 +557,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	return calc_arity(in);
 }
 
-void raw_term::insert_parens(lexeme op, lexeme cl) {
-	elem o = elem(elem::OPENP, op), c = elem(elem::CLOSEP, cl);
+void raw_term::add_parenthesis() {
+	elem o = elem(elem::OPENP), c = elem(elem::CLOSEP);
 	e.insert(e.begin() + 1, o), e.push_back(c);
 	for (size_t n = 0, k = 2; n != arity.size(); ++n)
 		if (arity[n] == -1) e.insert(e.begin() + k++, o);
@@ -599,12 +601,12 @@ bool macro::parse(input* in, const raw_prog& prog){
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;	size_t curr = pos;
 	elem e;
-	if(	!this->def.parse(in,prog) || 
+	if(	!this->def.parse(in,prog) ||
 		pos >= l.size() ||
 		l[pos][0][0] != ':' ||
 		l[pos][0][1] != '=' )
 		goto fail;
-	
+
 	++pos;
 	for (b.emplace_back(); b.back().parse(in, prog);
 		b.emplace_back(), ++pos) {
@@ -714,7 +716,7 @@ head:	h.emplace_back();
 
 	++pos;
 
-	//XXX: workaround to use ":-" both for standard rules and formulas
+	//NOTE: workaround to use ":-" both for standard rules and formulas
 	//     syntax revision for formula may be required
 	bool is_form = false;
 	//TODO: check for fault
@@ -932,9 +934,9 @@ bool production::parse(input *in, const raw_prog& prog) {
 		if (*l[pos][0] == ',') {
 
 			if(p.size() < 2 ) goto fail;  // prod rhs atleast one non-terminal
-			
-			for (;*l[pos][0] == L','; ) { 
-				++pos;	
+
+			for (;*l[pos][0] == L','; ) {
+				++pos;
 				raw_term rt;
 				if (!rt.parse(in, prog, 0,raw_term::CONSTRAINT))
 					goto fail;
@@ -942,7 +944,7 @@ bool production::parse(input *in, const raw_prog& prog) {
 			}
 			if (*l[pos][0] != '.') goto fail;
 			return ++pos, true;
-		}		
+		}
 		if (!e.parse(in)) goto fail;
 		p.push_back(e);
 	}
@@ -968,9 +970,9 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 	if (!parse_condition(in, rp)) return false;
 	if (!(l[pos] == "then")) return in->parse_error(l[pos][0],
 		"'then' expected.", l[pos]);
-	raw_prog t_p;
+	raw_prog t_p(dict);
 	++pos;
-	if (!t_p.parse_nested(in, dict) && !in->error) {
+	if (!t_p.parse_nested(in) && !in->error) {
 		t_p.id = ++raw_prog::last_id;
 		if (!t_p.r.emplace_back().parse(in, t_p))
 			return --raw_prog::last_id, false;
@@ -980,9 +982,9 @@ bool guard_statement::parse_if(input* in, dict_t &dict, raw_prog& rp) {
 	true_rp_id = t_p.id;
 	rp.nps.push_back(t_p);
 	if (pos != l.size() && l[pos] == "else") {
-		raw_prog f_p;
+		raw_prog f_p(dict);
 		++pos;
-		if (!f_p.parse_nested(in, dict) && !in->error) {
+		if (!f_p.parse_nested(in) && !in->error) {
 			f_p.id = ++raw_prog::last_id;
 			if (!f_p.r.emplace_back().parse(in, f_p))
 				return --raw_prog::last_id, false;
@@ -1005,8 +1007,8 @@ bool guard_statement::parse_while(input* in, dict_t &dict, raw_prog& rp) {
 	if (!(l[pos] == "do")) return in->parse_error(l[pos][0],
 		"'do' expected.", l[pos]);
 	++pos;
-	raw_prog l_p;
-	if (!l_p.parse_nested(in, dict) && !in->error) {
+	raw_prog l_p(dict);
+	if (!l_p.parse_nested(in) && !in->error) {
 		l_p.id = ++raw_prog::last_id;
 		if (!l_p.r.emplace_back().parse(in, l_p))
 			return --raw_prog::last_id, false;
@@ -1021,7 +1023,7 @@ bool guard_statement::parse(input* in, dict_t &dict, raw_prog& rp) {
 	return parse_if(in, dict, rp) || parse_while(in, dict, rp);
 }
 
-bool state_block::parse(input* in, dict_t &dict) {
+bool state_block::parse(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	size_t bpos = pos;
@@ -1032,39 +1034,39 @@ bool state_block::parse(input* in, dict_t &dict) {
 	if (pos >= l.size() || *l[pos][0] != ':' || ++pos >= l.size())
 		return false;
 	while (*l[pos][0] != ']' && pos < l.size()) {
-		if (!rp.parse(in, dict)) return false;
-		if (rp.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
+		if (!p.parse(in)) return false;
+		if (p.nps.size()) return in->parse_error(l[bpos][0], "programs cannot be nested inside a state block",
 			l[bpos]);
 	}
 	if (*l[pos][0] == ']') return ++pos, true;
 	else return false;
 }
 
-bool raw_prog::parse_xfp(input* in, dict_t& dict) {
+bool raw_prog::parse_xfp(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	if (*l[pos][0] != '{') return false;
 	++pos;
-	if (!parse(in, dict)) return in->error ? false :
+	if (!parse(in)) return in->error ? false :
 		in->parse_error(l[pos][0], err_parse, l[pos]);
 	if (pos == l.size() || *l[pos++][0] != '}') return in->error ? false
 		: in->parse_error(l[pos-1][1], err_close_curly, l[pos-1]);
 	return true;
 }
 
-bool raw_prog::parse_statement(input* in, dict_t &dict) {
+bool raw_prog::parse_statement(input* in) {
 	directive x;
 	raw_rule y;
 	production p;
 	macro m;
 	guard_statement c;
 	typestmt ts;
-	raw_prog np;
-	state_block sb;
+	raw_prog np(dict);
+	state_block sb(dict);
 	//COUT << "\tparsing statement " << in->l[in->pos] << endl;
-	if (sb.parse(in, dict)) sbs.push_back(sb);
+	if (sb.parse(in)) sbs.push_back(sb);
 	else if (!in->error && ts.parse(in, *this)) vts.push_back(ts);
-	else if (!in->error && np.parse_nested(in, dict)) nps.push_back(np);
+	else if (!in->error && np.parse_nested(in)) nps.push_back(np);
 	else if (!in->error && c.parse(in, dict, *this)) {
 		if (c.type == guard_statement::IF) has[COND] = true;
 		else c.p_break_rp->has[CURR] = true;
@@ -1081,7 +1083,7 @@ bool raw_prog::parse_statement(input* in, dict_t &dict) {
 	return !in->error;
 }
 
-bool raw_prog::parse_nested(input* in, dict_t &dict) {
+bool raw_prog::parse_nested(input* in) {
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	type = PFP;
@@ -1093,18 +1095,15 @@ bool raw_prog::parse_nested(input* in, dict_t &dict) {
 	}
 	if (pos >= l.size() || *l[pos][0] != '{') return in->parse_error(
 		l[pos][0], "unexpected end of nested", l[pos]);
-	return parse_xfp(in, dict);
+	return parse_xfp(in);
 }
 
-bool raw_prog::parse(input* in, dict_t &dict) {
-	// BLTINS: insert builtins from dict
-	for (size_t n = 0; n != dict.nbltins(); ++n)
-		builtins.insert(dict.get_bltin(n));
+bool raw_prog::parse(input* in) {
 	id = ++last_id;
 	while (in->pos < in->l.size() &&
 			*in->l[in->pos][0] != '}' &&
 			*in->l[in->pos][0] != ']')
-		if (!parse_statement(in, dict)) return --last_id, false;
+		if (!parse_statement(in)) return --last_id, false;
 	//COUT << "\t\tparsed rp statements:\n" << *this << endl;
 
 	if (macros.empty()) return true;
@@ -1115,70 +1114,60 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 				for (macro &mm : macros)
 					for(size_t j = 0; j < vrt[i].e.size(); j++)
 						if( vrt[i].e[j].e == mm.def.e[0].e ) {
-							if( !macro_expand(in, mm, i, j, vrt, dict))
+							if( !macro_expand(in, mm, i, j, vrt))
 								return --last_id, false;
 							else break;
-						}								
+						}
 	return true;
 }
-environment& raw_prog::get_typenv() {
-	return *typenv;
-}
-void raw_prog::set_typenv( const environment &e ) {
-	*typenv = e;
-}
-raw_prog::raw_prog(){
-	 typenv = std::make_shared<environment>();
-}
-bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
-						vector<raw_term> &vrt, dict_t &dict) {
 
-	std::map<elem, elem> chng; 
+bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
+						vector<raw_term> &vrt) {
+
+	std::map<elem, elem> chng;
 	vector<elem>::iterator et = vrt[i].e.begin()+j;
 	vector<elem>::iterator ed = mm.def.e.begin();
-	
+
 	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
 		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-			if( (et->type == elem::VAR || et->type == elem::NUM || 
+			if( (et->type == elem::VAR || et->type == elem::NUM ||
 				et->type == elem::CHR || et->type == elem::SYM || et->type == elem::STR)
-				&& ed->type == elem::VAR) 
+				&& ed->type == elem::VAR)
 				chng[*ed] = *et;
-				
+
 		for ( auto &tt:mm.b )
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
-					
+
 		vrt.erase(i+vrt.begin());
 		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
 		return true;
-	
+
 	} else if( j > 0)  {// create fresh var and unary case
 		vector<elem> carg;
 		for( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
 			if(	et->type == elem::VAR ) carg.emplace_back(*et);
-		if(carg.size() == 0 ) 
-			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e), 
+		if(carg.size() == 0 )
+			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e),
 			false;
 
-		int counter = 0;
 		elem ret;
 		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
 			if(ed->type == elem::VAR)  {
 				if(a < carg.size())
 					chng[*ed] = carg[a++];
 				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(
-											dict.get_fresh_var(counter++))), 
+					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme(dict.get_new_var())),
 					ret = chng[*ed];
 			}
 		}
-		for( auto &tt:mm.b ) 
+		for( auto &tt:mm.b )
 			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
 				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
 					*tochng = chng[*tochng];
 		// TODO
-		DBG(o::dbg()<<carg.size();)	
+		DBG(o::dbg()<<carg.size();)
 		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
 		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
 		vrt[i].calc_arity(in);
@@ -1186,45 +1175,31 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 		return true;
 	}
 	else return in->parse_error(vrt[i].e[0].e[0],"Error macro call",vrt[i].e[0].e),
-			false;	
+			false;
 }
 
-bool raw_progs::parse(input* in, dict_t& dict) {
-	if (!in->data()) return true;
+bool raw_progs::parse(input* in) {
+	if (!in->data()) return false;
 	lexemes& l = in->l;
 	size_t& pos = in->pos;
 	in->prog_lex();
 	if (in->error) return false;
-	if (!l.size()) return true;
-	raw_prog& rp = p.nps.emplace_back();
+	if (!l.size()) return false;
+	raw_prog rp(dict); //raw_prog& rp = p.nps.emplace_back(raw_prog(dict));
 	raw_prog::require_guards = false;
 	raw_prog::require_state_blocks = false;
-	if (!rp.parse(in, dict))  return in->error?false:
+	if (!rp.parse(in))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
-
+	
+	//FIXME: guards needs ROOT_EMPTY
+ 	p.nps.push_back(rp);
 	return true;
 }
 
-/* Compare lexemes by their character content rather than by memory
- * locations. */
-
-bool operator==(const lexeme& x, const lexeme& y) {
-	return x[1] - x[0] == y[1] - y[0] && !strncmp(x[0], y[0], x[1] - x[0]);
-}
-
-bool less<lexeme>::operator()(const lexeme& m, const lexeme &n) const {
-	return lexeme2str(m) < lexeme2str(n);
-}
-
-bool operator<(const lexeme& m, const lexeme &n) {
-	return less<lexeme>()(m, n);
-}
-
-size_t hash<lexeme>::operator()(const lexeme& m) const {
-	string_t str = lexeme2str(m);
-	return hash<string>()(string(str.begin(), str.end()));
-}
+//-----------------------------------------------------------------------------
+// <--
+// signature to be deprecated
 
 /* Compare signatures in a manner that treats their identifier as a
  * string rather than a pair of memory locations. */
@@ -1243,21 +1218,15 @@ bool operator<(const signature& m, const signature &n) {
 	return less<signature>()(m, n);
 }
 
+// -->
+
 bool operator<(const raw_term& x, const raw_term& y) {
 	if (x.neg != y.neg) return x.neg < y.neg;
 	if (x.extype != y.extype) return x.extype < y.extype;
-	//if (x.iseq != y.iseq) return x.iseq < y.iseq;
-	//if (x.isleq != y.isleq) return x.isleq < y.isleq;
-	//if (x.islt != y.islt) return x.islt < y.islt;
-	//if (x.isarith != y.isarith) return x.isarith < y.isarith;
 	if (x.e != y.e) return x.e < y.e;
 	if (x.arity != y.arity) return x.arity < y.arity;
 	return false;
 }
-
-//bool operator==(const raw_term& x, const raw_term& y) {
-//	return x.neg == y.neg && x.e == y.e && x.arity == y.arity;
-//}
 
 bool operator<(const raw_rule& x, const raw_rule& y) {
 	if (x.h != y.h) return x.h < y.h;
@@ -1272,30 +1241,6 @@ bool operator<(const raw_rule& x, const raw_rule& y) {
 		if (!(x.head(n) == y.h[n])) return x.head(n) < y.head(n);
 	for (size_t n = 0; n != x.bodies().size(); ++n)
 		if (!(x.body(n) == y.body(n))) return x.body(n) < y.body(n);*/
-}
-
-bool operator==(const lexeme& l, const string& s) {
-	if ((size_t) (l[1] - l[0]) != s.size()) return false;
-	return !strncmp(l[0], s.c_str(), l[1] - l[0]);
-}
-
-bool operator==(const lexeme& l, const char* s) {
-	size_t n = strlen(s);
-	return (size_t) (l[1] - l[0]) != n
-		? false : !strncmp(l[0], s, n);
-}
-
-bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
-	//COUT<<""
-	//	<< "\tx: \t"<<&x[0]<<" - "<<&x[1]<<"\n"
-	//	<< "\ty: \t"<<&y[0]<<" - "<<&y[1]<<"\n";
-	if (x[1]-x[0] != y[1]-y[0]) return x[1]-x[0] < y[1]-y[0];
-	for (size_t n = 0; n != (size_t)(x[1]-x[0]); ++n)
-		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
-	return false;
-	// the following causes valgrind to complain about __STRNCMP_avx2:
-//	return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0]
-//		: (STRNCMP(x[0], y[0], x[1]-x[0]) < 0);
 }
 
 bool operator==(const vector<raw_term>& x, const vector<raw_term>& y){
@@ -1344,6 +1289,7 @@ string input::file_read_text(string fname) {
 	fclose(f);
 	return r;
 }
+
 void input::count_pos(ccs o, long& l, long& ch) {
 	l = 1;
 	ccs c = beg_ ? beg_ : o, n = c - 1;
@@ -1364,44 +1310,32 @@ bool throw_runtime_error(string err, string details) {
 	return false;
 #endif
 }
-
 bool parse_error(const char* e, lexeme l) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(0, e, l);
 }
-
 bool parse_error(const char* e) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(0, e, 0);
 }
-
 bool parse_error(const char* e, std::string s) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(0, e, (ccs) s.c_str());
 }
-
-// Display an error with the given message, erronous lexeme, and context
-
 bool parse_error(const char* e, lexeme l, std::string u) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(0, e, l[0], (ccs) u.c_str());
 }
-
 bool parse_error(ccs offset, const char* err) {
 	input in((void*) 0, (size_t) 0);
 	return in.parse_error(offset, err, offset);
 }
-
 bool input::parse_error(ccs offset, const char* err, lexeme close_to) {
 	return parse_error(offset, err, close_to[0]);
 }
 bool input::type_error(const char* e, lexeme l) {
 	return type_error(0, e, l[0]);
 }
-
-// Display an error with the given location, message, erronous lexeme,
-// and context
-
 bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 	//DBG(o::dbg() << "parse_error: in->data: " << &data_ << " '" << data_
 	//	<< "' offset: " << &offset << " '" << offset << "' "
@@ -1427,8 +1361,7 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 #endif
 	return false;
 }
-
-bool input::type_error(ccs offset, const char* err, ccs close_to) {	
+bool input::type_error(ccs offset, const char* err, ccs close_to) {
 	error = true;
 	ostringstream msg; msg << "Type error: \"" << err << '"';
 	ccs p = close_to;
@@ -1444,4 +1377,145 @@ bool input::type_error(ccs offset, const char* err, ccs close_to) {
 	throw parse_error_exception(msg.str());
 #endif
 	return false;
+}
+
+//-----------------------------------------------------------------------------
+
+size_t structype::calc_bitsz(const std::vector<typestmt> &types) {
+	size_t bsz=0;
+	static std::set<elem> done;
+	if(done.find(structname) != done.end()) {
+		DBG(COUT<<"Recursive type "<< structname <<" not defined completely" <<std::endl);
+		return bsz;
+	}
+	done.insert(structname);
+
+	for (auto md : this->membdecl) {
+			if(md.is_primitive())
+				bsz += md.pty.get_bitsz()*md.vars.size();
+			else {	// do for struct;
+				for( auto rit : types)
+					if( rit.rty.structname == md.structname  )
+						bsz +=  rit.rty.get_bitsz( types ) * md.vars.size();
+			}
+		}
+	done.erase(this->structname);
+	DBG(COUT<<std::endl<<structname << "calculated bits:"<<bsz);
+	return bsz;
+}
+
+size_t structype::calc_bitsz(environment &env) {
+
+	size_t bsz = 0;
+	static std::set<elem> done;
+	if (done.find(structname) != done.end()) {
+		DBG(COUT<<"Recursive type "<< structname <<" not defined completely" <<std::endl);
+		return bsz = 0 ;
+	}
+	done.insert(structname);
+	for (auto md : this->membdecl) {
+			if (md.is_primitive())
+				bsz += md.pty.get_bitsz()*md.vars.size();
+			else {	// do for struct;
+					string_t stctnm = lexeme2str(md.structname.e) ;
+					if (env.contains_typedef(stctnm))
+						bsz +=  env.lookup_typedef(stctnm).get_bitsz(env) * md.vars.size();
+			}
+		}
+	done.erase(this->structname);
+	DBG(COUT<<std::endl<<structname << "calculated bits:"<<bsz);
+	return bsz;
+}
+
+bool primtype::parse(input* in, const raw_prog& /*prog*/) {
+
+	static const std::map<std::string, _ptype> tym = {
+		{ "int",  UINT  },
+		{ "char", UCHAR },
+		{ "sym",  SYMB  }
+	};
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
+
+	if (!el.parse(in) ||  el.type != elem::SYM)
+		return pos = curr, false;
+
+	std::string st = to_string(lexeme2str(el.e));
+	auto it = tym.find(st);
+	if( it == tym.end()) return pos = curr, false;
+
+	ty = it->second;
+	if (ty == primtype::UINT) {
+		if (*l[pos][0] == ':') {
+			pos++;
+			elem b;
+			if( b.parse(in) && b.type == elem::NUM)
+				bsz = b.num;
+			else return pos = curr, false;
+		}
+	}
+	return true;
+}
+bool structype::parse(input *in, const raw_prog& prog) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
+
+	if ((l[pos][1] - l[pos][0]) != 6 || strncmp(l[pos++][0],"struct", 6) != 0) goto FAIL;
+	if (!structname.parse(in) || structname.type != elem::SYM) goto FAIL;
+	if (*l[pos++][0] != '{') goto FAIL;
+
+	while (pos < l.size() &&  *l[pos][0] != '}') {
+		membdecl.emplace_back();
+		if (false == membdecl.back().parse(in, prog)) {
+				in->parse_error(l[pos][0], "Incorrect member declaration", l[pos]);
+				goto FAIL;
+			}
+		if (*l[pos][0] == '.') { pos++; }
+		else goto FAIL;
+	}
+	if (*l[pos++][0] == '}') return true;
+
+	FAIL:
+	in->parse_error(l[pos][0], "Incorrect struct declaration", l[pos]);
+	return pos=curr, false;
+}
+bool typedecl::parse(input* in, const raw_prog& prog, bool notparam) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
+	if (pty.parse(in, prog) || (structname.parse(in) && structname.type == elem::SYM)) {
+		for( ;pos < l.size() ; )  {
+			vars.emplace_back();
+			if( ! vars.back().parse(in) || vars.back().type != elem::VAR ) goto FAIL;
+			if( !notparam) break; // if parameter then only one var for one type
+			if (*l[pos][0] == ',') pos++; else break;
+		}
+		if (vars.size())	return true;
+	}
+	else if (!notparam ) return true; // for void parameters in predtype declarattion
+
+	FAIL:
+	in->parse_error(l[pos][0], "Incorrect var declared ", l[pos]);
+	return pos = curr, false;
+}
+bool typestmt::parse(input* in, const raw_prog& prog) {
+	const lexemes& l = in->l;
+	size_t& pos = in->pos;	size_t curr = pos;
+	if( (l[pos][1]-l[pos][0]) == 8 && strncmp(l[pos][0],"predtype", 8) == 0 ) {
+		pos++;
+		if( !reln.parse(in) || reln.type != elem::SYM ) goto FAIL;
+		if(*l[pos++][0] != '(') goto FAIL;
+		for( ;pos < l.size() && (*l[pos][0] != ')'); ) {
+			typeargs.emplace_back();
+			if( !typeargs.back().parse(in, prog, false) ) goto FAIL;
+			if (*l[pos][0] == ',') pos++; else break;
+		}
+		if(*l[pos++][0] != ')' ||  *l[pos++][0] != '.'   ) goto FAIL;
+		return true;
+	}
+	else if ((l[pos][1]-l[pos][0]) == 6 && strncmp(l[pos][0],"struct", 6) == 0) {
+		if (rty.parse(in, prog)) return true;
+		if (*l[pos++][0] != '.') goto FAIL;
+	}
+	FAIL:
+	return pos=curr, false;
 }

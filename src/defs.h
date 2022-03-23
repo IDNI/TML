@@ -38,7 +38,6 @@ typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef int_t ntable;
 typedef size_t nlevel;
-//typedef std::vector<size_t> sizes;
 
 #include "char_defs.h"
 
@@ -63,8 +62,8 @@ typedef size_t nlevel;
 		(double(end - start) / CLOCKS_PER_SEC) * 1000 \
 		<< " ms" << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
-#define elem_openp elem(elem::OPENP, get_lexeme("("))
-#define elem_closep elem(elem::CLOSEP, get_lexeme(")"))
+#define elem_openp elem(elem::OPENP)
+#define elem_closep elem(elem::CLOSEP)
 #define elem_eq elem(elem::EQ, get_lexeme("="))
 #define htrue bdd_handle::T
 #define hfalse bdd_handle::F
@@ -141,5 +140,16 @@ typedef const spform_handle& cr_spform_handle;
 template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
+
+//#define BIT_TRANSFORM  //work in progress, use it with --bitunv option
+#ifdef BIT_TRANSFORM
+#define mkchr(x) ((int_t) x )
+#define mknum(x) ((int_t) x )
+#define mksym(x) ((int_t) x )
+#else
+#define mkchr(x) ((int_t) ((x) << 2) | 1)
+#define mknum(x) ((int_t) ((x) << 2) | 2)
+#define mksym(x) ((int_t) ((x) << 2) )
+#endif
 
 #endif

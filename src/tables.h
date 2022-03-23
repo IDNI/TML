@@ -30,10 +30,7 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
-#include "analysis.h"
 #include "ir_builder.h"
-
-typedef bdd_handles level;
 
 class tables;
 
@@ -167,16 +164,16 @@ class tables {
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-	std::shared_ptr<bit_univ> spbu = nullptr;
+
 private:
-	typedef int_t rel_t;
 
 	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 		cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
+
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
-	//std::set<alt*, ptrcmp<alt>> grnds;
+
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -201,27 +198,23 @@ private:
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 
 	nlevel nstep = 0;
+
 	std::vector<table> tbls;
-	std::map<sig, ntable> smap;
-	std::unordered_map<ntable, std::vector<typedecl>> tab_type;
 	std::vector<rule> rules;
-	std::vector<level> fronts;
-	std::vector<level> levels;
+	std::vector<bdd_handles> fronts;
+	std::vector<bdd_handles> levels;
 
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
-	int_t freeze(std::vector<term>& v, int_t );
+
 	std::vector<term> to_nums(const std::vector<term>& v);
 	void to_nums(flat_prog& m);
 	term to_nums(term t);
-	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
-	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
 	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
-	size_t max_args = 0;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -275,9 +268,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
-
-
-	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
@@ -343,16 +333,13 @@ private:
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	bool get_rules(flat_prog m);
 
-	ntable get_table(const sig& s);
-	ntable get_new_tab(int_t x, ints ar);
-	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,
 		bool mknums = false);
 	bool contradiction_detected();
 	bool infloop_detected();
 	char fwd() noexcept;
-	level get_front() const;
+	bdd_handles get_front() const;
 
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
@@ -360,8 +347,11 @@ private:
 //	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+#ifndef LOAD_STRS
+	void load_string(lexeme rel, const string_t& s);
 	strs_t strs;
 	std::set<int_t> str_rels;
+#endif
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
 	// tml_update population
@@ -375,7 +365,6 @@ private:
 
 	//-------------------------------------------------------------------------
 	//builtins
-	builtins bltins;
 
 	bool init_builtins();
 	bool init_print_builtins();
@@ -476,6 +465,7 @@ public:
 
 	rt_options opts;
 	ir_builder *ir_handler;
+	builtins bltins;
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
@@ -493,7 +483,7 @@ public:
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>&) const;
-	bool compute_fixpoint(level &trues, level &falses, level &undefineds);
+	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
 	template <typename T>
 	bool out_fixpoint(std::basic_ostream<T>& os);
@@ -508,20 +498,6 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-	// transform nested programs into a single program controlled by guards
-	void transform_guards(raw_prog& rp);
-	// recursive fn for transformation of a program and its nested programs
-	void transform_guards_program(raw_prog& target_rp, raw_prog& rp,
-		int_t& prev_id);
-	void transform_guard_statements(raw_prog& target_rp, raw_prog& rp);
-
-	// helper functions for creating internal ids = __lx__id1__id2__
-	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
-		bool neg = false);
-	void iid(std::vector<raw_term>& rts, const std::string& lx, int_t i,
-		int_t i2, bool neg = false);
-	void iid(std::vector<raw_term>& rts, const lexeme& lx, bool neg=0);
-	lexeme lx_id(std::string name, int_t id = -1, int_t id2 = -1);
 
 	void add_print_updates_states(const std::set<std::string> &tlist);
 	bool populate_tml_update = false;

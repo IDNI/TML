@@ -90,7 +90,7 @@ bool tables::init_builtins() {
 		uniform_int_distribution<> distr(arg0, arg1);
 		int_t rnd = distr(gen);
 		DBG(o::dbg()<<"rnd("<<arg0<<" "<<arg1<<" "<<rnd<<endl;)
-		c.out(from_sym(c.outvarpos(0), c.a->varslen, c.mknum(rnd)));
+		c.out(from_sym(c.outvarpos(0), c.a->varslen, mknum(rnd)));
 	});
 	
 	bltins.add(B, "count", -1, 1, [this](blt_ctx& c) {
@@ -130,7 +130,7 @@ bool tables::init_builtins() {
 		//::out(COUT, x)<<endl<<endl;
 		size_t cnt2 = satcount(x, (bits) * (c.a->varslen-varsout));
 		//DBG(COUT << "count2 result: " << cnt2 << endl;)
-		c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(cnt2)));
+		c.out(from_sym(c.outvarpos(), c.a->varslen, mknum(cnt2)));
 	}, -1);
 
 	return  init_bdd_builtins() &&
@@ -167,15 +167,18 @@ bool tables::init_bdd_builtins() {
 		return [this](blt_ctx& c) {
 			spbdd_handle arg0, arg1;
 			size_t i = 0;
-			size_t arg0_w,arg1_w = 0;
+			size_t arg0_w = 0,arg1_w = 0;
 			spbdd_handle const0 = htrue, const1 = htrue;
 
+			assert(false && "BIT_TRASFORM leq_handler is disabled");
+			/*
 			for (auto &x : tab_type.at(c.t.tab)){
 				//COUT << "bits " << x.pty.bsz << endl;
 				if (i == 0) arg0_w = x.pty.bsz;
 				else if (i == 1) arg1_w = x.pty.bsz;
 				i++;
 			}
+			*/
 
 			//workaround to get constants
 			if (c.t[0] >= 0 || c.t[1] >= 0) {
@@ -306,7 +309,7 @@ bool tables::init_js_builtins() {
 	//		to_string((to_raw_term(t))).c_str());
 	//	//COUT << "js_eval_to_int result: " << r << endl;
 	//	// TODO check for universe size
-	//	c.out(from_sym(c.outvarpos(), c.a->varslen, c.mknum(r)));
+	//	c.out(from_sym(c.outvarpos(), c.a->varslen, mknum(r)));
 	//});
 	//bltins.add(B, "js_eval_to_sym", -1, 1, [this](blt_ctx& c) {
 	//	term t(c.g);

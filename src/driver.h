@@ -32,6 +32,7 @@
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
+typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -116,36 +117,27 @@ class driver {
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
 	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
-	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
-	int_t nums = 0, chars = 0, syms = 0;
+	bool transform_handler(raw_prog &p);
+	bool transform(raw_prog& rp, const strs_t& strtrees);
 
-	std::set<lexeme, lexcmp> strs_extra, rels;
-	std::vector<ccs> strs_allocated;
-	lexeme get_var_lexeme(int_t i);
-	lexeme get_new_var();
-	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
-	lexeme get_lexeme(const std::basic_string<char>& s);
-	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
+	//int_t nums = 0, chars = 0, syms = 0;
+	std::set<lexeme, lexcmp>  rels;
 	lexeme get_new_rel();
-//	std::function<int_t(void)> *fget_new_rel;
-//	lexeme get_num_lexeme(int_t i);
-//	lexeme get_char_lexeme(char_t i);
-//	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
+	
 	std::set<raw_term> get_queries(const raw_prog& p);
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
-	bool transform(raw_prog& rp, const strs_t& strtrees);
+	void directives_load(raw_prog& p);
+	
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
-//	raw_prog transform_bwd(raw_prog& p);
 	raw_term get_try_pred(const raw_term& x);
 	void transform_bwd(const raw_term& h, const std::vector<raw_term>& b,
 		std::set<raw_rule>& s);
@@ -153,7 +145,6 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
-	bool transform_evals(raw_prog &rp, const directive &drt);
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
@@ -166,7 +157,7 @@ class driver {
 		std::map<elem, const raw_form_tree*> &scopes);
 	std::optional<elem> is_safe(const raw_form_tree &t);
 	std::optional<elem> is_safe(const raw_rule &rr);
-	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
+	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F> void minimize(raw_rule &rr, const F &f);
@@ -179,8 +170,8 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void pdatalog_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
-	void recursive_transform(raw_prog &rp,
-		const std::function<void(raw_prog &)> &f);
+	void recursive_transform(raw_prog &rp
+	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);
@@ -196,7 +187,7 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
-	raw_prog read_prog(elem prog, const raw_prog &rp);
+	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
@@ -253,6 +244,7 @@ class driver {
 	ir_builder *ir = 0;
 
 	std::set<lexeme> vars;
+	options opts;
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
@@ -264,7 +256,6 @@ class driver {
 public:
 	bool result = false;
 	bool error = false;
-	options opts;
 	driver(const options& o);
 	driver(FILE *f, const options& o);
 	driver(string_t, const options& o);
