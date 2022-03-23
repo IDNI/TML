@@ -366,9 +366,17 @@ pass:	//DBG(o::out() << " returned " << res << endl;)
 
 typedef pair<raw_term, vector<raw_term>> frule;
 
+/*!
+ * Convert a raw program into a flat one.
+ * 
+ * Convert a raw program to a flat one, i.e. for each rule of the original raw
+ * program, if the type is not a goal or none, refresh the vars and add it back
+ * again to the program.
+ */
 struct flat_rules : public vector<frule> {
 	raw_term q;
 	map<pair<elem, ints>, set<size_t>> m;
+
 	flat_rules(const raw_prog& p, driver& d) {
 		for (const raw_rule& r : p.r)
 			if (r.type == raw_rule::GOAL) q = r.h[0]; // FIXME
@@ -392,6 +400,7 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const flat_rules& f
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
 }
+
 /*
 template<typename T> struct nullable {
 	const bool null;
@@ -543,13 +552,21 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	return r;
 }*/
 
+/*!
+ * Transform all rules into binary form.
+ *
+ * Transform all the rules into binary form, i.e. h -> b1, b2. 
+ */
 void driver::transform_bin(raw_prog& p) {
+	// the raw program is converted to a flat form. 
 	flat_rules f(p, *this);
 	for (const frule& r : f) {
 		rels.insert(r.first.e[0].e);
 		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
 	}
 //	DBG(o::out()<<"bin before:"<<endl<<f<<endl;)
+	// raw rules of type NONE are added back to the flat program
+	// as are ignored by the flat_rules method.
 	for (const raw_rule& r : p.r)
 		if (r.b.empty() && r.type == raw_rule::NONE)
 			f.push_back({r.h[0], {}}),
@@ -570,6 +587,8 @@ void driver::transform_bin(raw_prog& p) {
 		return append_closep(r.h[0].e), r.h[0].calc_arity(nullptr), r;
 	};
 	for (auto x : f) {
+		// while the body has more that to elements create a new rule
+		// to reduce the size of the body.
 		while (x.second.size() > 2) {
 			set<elem> v;
 			for (size_t n = 2, k; n != x.second.size(); ++n)

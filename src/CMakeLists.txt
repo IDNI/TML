@@ -188,7 +188,7 @@ if (WITH_EXCEPTIONS)
 	target_compile_definitions(tml PRIVATE "-DWITH_EXCEPTIONS")
 endif ()
 if (BUILD_CODE_COVERAGE)
-	target_link_libraries(tml gcov)
+	target_link_libraries(tml gcov)               
 endif ()
 
 # executable using shared library

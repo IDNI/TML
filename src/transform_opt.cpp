@@ -314,10 +314,14 @@ bool is_cqn(const raw_rule &rr) {
 	return true;
 }
 
-/* If rr1 and rr2 are both conjunctive queries, check if there is a
+/*!
+ * Checks if rr1 and rr2 are both conjunctive formulas and there exists
+ * and homomorphism from rr2 to rr1.
+ * 
+ * If rr1 and rr2 are both conjunctive queries, check if there is a
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
- * of a homomorphism implies that rr1 is contained by rr2. */
-
+ * of a homomorphism implies that rr1 is contained by rr2. 
+ */
 bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
@@ -355,8 +359,12 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	return false;
 }
 
-/* If rr1 and rr2 are both conjunctive queries with negation, check that
- * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
+/*!
+ * If rr1 and rr2 are both conjunctive queries with negation, check that
+ * rr1 is contained by rr2. 
+ * 
+ * The implementation is based in the Levy-Sagiv test. 
+ */
 
 bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Check that rules have correct format
