@@ -3,7 +3,7 @@
 @internal Married(?x).
 Looking_At(A B).
 Looking_At(B C).
-~Married(A).
+# ~Married(A).
 Married(C).
 # Make B alternate between married and unmarried
 Married(B) :- ~Married(B).
@@ -14,4 +14,4 @@ Yes() :- exists ?a exists ?b { Looking_At(?a ?b) && Married(?a) && ~Married(?b) 
 # If Yes is determined to be "true", then there must always be a married person looking at someone who is not regardless of B's marital status, 
 # If Yes is is determined to be "unsat", then whether there is an married person looking at someone who is not depends on B's marital status,
 # If Yes is is determined to be "false", then there is never a married person looking at someone who is not regardless B's marital status.
-!~Yes().
+# !~Yes().

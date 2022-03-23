@@ -16,6 +16,8 @@
 
 #include <map>
 #include <vector>
+#include <tuple>
+#include <functional>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/val.h>
@@ -228,8 +230,32 @@ private:
 	size_t bit(size_t v, size_t args) const {
 		return bits - 1 - v / args;
 	}
+	std::pair<std::vector<size_t>, std::vector<size_t>> _inverse(
+			size_t bits, 
+			size_t args) const {
+		std::vector<size_t> _args(bits * args);
+		std::vector<size_t> _bits(bits * args);
+		for (size_t arg = 0; arg < args; ++arg) 
+			for (size_t bit = 0; bit < bits; ++bit)
+				_args[pos(bit, arg, args)] = arg, 
+				_bits[pos(bit, arg, args)] = bit;
+		std::pair<std::vector<size_t>, std::vector<size_t>> i(_bits, _args);
+		return i;
+	}
+	size_t _args(const term* t) const {
+		return t->size();
+	}
+	size_t bit(size_t v, const term* t, const std::vector<size_t>& _bits,
+			const std::vector<size_t>& _args) const {
+		size_t b = _bits[v];
+		size_t i = _args[v];
+		return t->at(i) & (1 << b);	
+	}
+	size_t max_pos(const term* t) const {
+		return _args(t) * bits -1;
+	}
 
-	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
+	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
@@ -287,7 +313,21 @@ private:
 			spbdd_handle &c) const;
 	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
-	bool get_facts(const flat_prog& m);
+	bool get_facts(const flat_prog& m) ;
+	bool is_optimizable_fact(const term& t) const;
+	std::map<ntable, spbdd_handle> from_facts(
+		std::map<ntable, std::vector<const term*>>& pending,
+		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> &inverses) const;
+	spbdd_handle from_facts(std::vector<const term*>& pending, 
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+	spbdd_handle from_facts(std::vector<const term*>& terms, 
+		std::vector<const term*>::iterator left, 
+		std::vector<const term*>::iterator right, 
+		const size_t& pos, 
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+	spbdd_handle from_bit(const std::vector<const term*>::iterator& current,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);

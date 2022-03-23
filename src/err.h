@@ -86,5 +86,6 @@ const char err_codec_sym[] = "Expected symbol denoting the relation associated w
 const char err_internal_term[] = "Expected term whose relation is to be marked as internal.";
 const char err_x_escape[] = "Wrong \\x character escape. Use values between: \\x00 and \\xFF.";
 const char err_u_escape[] = "Wrong \\u character escape. Use values between: \\u0000 and \\uFFFF.";
+const char err_neg_fact[] = "Facts cannot be negated.";
 
 #endif

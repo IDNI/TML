@@ -13,6 +13,9 @@
 #include <algorithm>
 #include <random>
 #include <list>
+#include <algorithm>
+#include <variant>
+#include <memory>
 
 #include "tables.h"
 #include "dict.h"
@@ -180,26 +183,89 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	return b;
 }
 
-bool tables::get_facts(const flat_prog& m) {
-	map<ntable, set<spbdd_handle>> add, del;
-	for (const auto& r : m)
+bool tables::get_facts(const flat_prog& m) { 
+	// TODO: Ee need add and del in order to deal with negations in heads.
+	// A couple of regression tests use negation in heads.
+	// We should check whether this is a desirable feature.
+	map<ntable, vector<const term*>> add, del;
+	map<ntable, size_t> invert;
+	map<ntable, pair<vector<size_t>, vector<size_t>>> inverses;
+	// get facts by table
+	for (const auto& r : m) 
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else if (r[0].is_builtin()) fact_builtin(r[0]);
-		else (r[0].neg ? del : add)[r[0].tab].insert(from_fact(r[0]));
+		else if (is_optimizable_fact(r[0]))
+			(r[0].neg ? del: add)[r[0].tab].push_back(std::addressof(r[0])),
+			invert[r[0].tab] = r[0].size();
 	if (unsat || halt) return false;
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
-	bdd_handles v;
-	for (auto x : add) for (auto y : x.second)
-		tbls[x.first].t = tbls[x.first].t || y;
-	for (auto x : del) {
-		for (auto y : x.second) tbls[x.first].t = tbls[x.first].t % y;
-	}
+	// Compute the inverse of pos for the collected facts
+	for (auto const p: invert)
+		inverses[p.first] = _inverse(bits, p.second);
+	// Compute the bdds for the each table
+	for (auto x: from_facts(add, inverses)) 
+		tbls[x.first].t = x.second; 
+	for (auto x: from_facts(del, inverses)) 
+		tbls[x.first].t = tbls[x.first].t % x.second; 
 	if (opts.optimize)
 		(o::ms() << "# get_facts: "),
 		measure_time_end();
 	return true;
+}
+bool tables::is_optimizable_fact(const term& t) const {
+	// For example: a. a(1 2 3). ~b. ~b(4 5 6).
+	return t.size() == 0 || (t.size() >0 && t[0] >= 0);
+}
+	
+map<ntable, spbdd_handle> tables::from_facts(
+		map<ntable, vector<const term*>>& pending,
+		const map<ntable, pair<vector<size_t>, vector<size_t>>>& inverses) const {
+	map<ntable, spbdd_handle> p;
+	for (auto t: pending) 
+		if (t.second.size() == 0) continue;
+		else p[t.first] = from_facts(t.second, inverses.at(t.first));
+	return p;
+}
+spbdd_handle tables::from_facts(
+		vector<const term*>& pending,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	if (pending.size() == 0) return htrue;
+	// If the facts have no arguments, we return htrue regardless if
+	// they correspond to a del or and call. They will be process 
+	// properly in get_facts. 
+	if (pending[0]->size() == 0) return htrue;
+	// Otherwise, we prooceed with the radix sorting & building of
+	// the bdd.
+	return from_facts(pending, pending.begin(), pending.end(), 0, inverse);
+}
+spbdd_handle tables::from_facts(vector<const term*>& terms, 
+		vector<const term*>::iterator left, 
+		vector<const term*>::iterator right, 
+		const size_t& pos, 
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	size_t max = max_pos(*left);
+	if (pos == max) return from_bit(left, inverse);
+	auto it = partition(left, right, 
+		[this, pos, inverse](const term* t) -> bool { 
+			return !bit(pos, t, inverse.first, inverse.second); });
+	if (left == it)	return from_high(pos, 
+		from_facts(terms, it, right, pos +1, inverse) -> b);
+	if (right == it) return from_low(pos, 
+		from_facts(terms, left, it, pos + 1, inverse) -> b);
+	return from_high_and_low(pos,
+		from_facts(terms, it, right, pos + 1, inverse) -> b,
+		from_facts(terms, left, it, pos + 1, inverse) -> b);
+}
+spbdd_handle tables::from_bit(
+		const vector<const term*>::iterator& current,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	size_t max = max_pos(*current);
+	size_t a = (*current)->size();
+	size_t i = inverse.second.at(max);
+	size_t b = inverse.first.at(max);
+	return from_bit(b, i, a, (*current)->at(i));
 }
 
 bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
