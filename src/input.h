@@ -340,10 +340,11 @@ struct elem {
 	static elem fresh_temp_sym(dict_t &d) {
 		return elem(elem::SYM, d.get_temp_sym(d.get_fresh_temp_sym(0)));
 	}
-	std::string to_str() const{
-		if (type == NUM) return to_string(to_string_t(num));
-		if (type == CHR) return to_string(to_string_t(ch)); 
-		return to_string(lexeme2str(e));			
+	std::string to_str() const { return to_string(to_str_t()); }
+	string_t to_str_t() const {
+		if (type == NUM) return to_string_t(num);
+		if (type == CHR) return to_string_t(ch);
+		return lexeme2str(e);
 	}
 };
 

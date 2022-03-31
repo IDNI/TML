@@ -18,8 +18,10 @@
 #include "defs.h"
 #include "term.h"
 #include "analysis.h"
+#include "earley.h"
 
 typedef std::set<std::vector<term>> flat_prog;
+typedef earley<char32_t> earley_t;
 
 typedef int_t rel_t;
 typedef std::pair<rel_t, ints> sig;

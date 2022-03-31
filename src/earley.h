@@ -5,7 +5,6 @@
 #include <list>
 #include <string>
 #include <variant>
-#include <cstring>
 #include <cassert>
 #include <iostream>
 #include <sstream>
@@ -18,30 +17,49 @@
 #else
 #define DBG(x)
 #endif
-//typedef char char_t;
 
 #define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
 #define emeasure_time_start(start, end) clock_t end, start = clock()
 #define emeasure_time_end(start, end) end = clock(), o::pms() << std::fixed << \
 	std::setprecision(2) << tdiff(start, end) << " ms"
+
+std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& os,
+	const std::string& s);
+
+std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& os,
+	const char* s);
+
+template <typename CharT>
 class earley {
-	struct lit : public std::variant<size_t, char> {
-		using std::variant<size_t, char>::variant;
+public:
+	typedef std::basic_stringstream<CharT> stringstream;
+	typedef std::basic_ostream<CharT> ostream;
+	typedef std::basic_string<CharT> string;
+	typedef std::vector<string> strings;
+	typedef std::vector<std::pair<string,
+			std::vector<std::vector<string>>>> grammar;
+	typedef std::variant<size_t, CharT> lit_t;
+private:
+	struct lit : public lit_t {
+		using lit_t::variant;
 		bool nt() const { return std::holds_alternative<size_t>(*this);}
 		size_t n() const { return std::get<size_t>(*this); }
-		char c() const { return std::get<char>(*this); }
+		CharT c() const { return std::get<CharT>(*this); }
 	};
-
+	string to_str(const lit& l) const {
+		if (l.nt()) return d.get(l.n());
+		else if (l.c() == (CharT) '\0') return epsilon();
+		else return string{ '\'', l.c(), '\'' };
+	}
 	struct pnode {
-		earley::lit l;
+		lit l;
 		std::pair<size_t, size_t> span; // start/end of the matched span
-		pnode(const earley::lit _l,
-			const std::pair<size_t, size_t> _span = {0, 0} ): 
-		l(_l),span(_span){}
+		pnode(const lit _l, const std::pair<size_t, size_t> _span={0,0})
+			: l(_l), span(_span) {}
 		
 		bool nt() const { return l.nt(); }
 		size_t n() const { return l.n(); }
-		char c() const { return l.c(); }
+		CharT c() const { return l.c(); }
 		
 		bool operator<(const pnode& i) const {
 			if(l != i.l )	return l < i.l;
@@ -54,19 +72,21 @@ class earley {
 		}
 	};
 
-	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
-	DBG(friend std::ostream& operator<<(std::ostream& os,
-		const std::vector<lit>& v);)
+	DBG(template <typename CharU> friend ostream_t& operator<<(
+		ostream_t& os, const typename earley<CharU>::lit& l);)
+	DBG(template <typename CharU> friend ostream_t& operator<<(
+		ostream_t& os,
+		const std::vector<typename earley<CharU>::lit>& v);)
 	std::vector<std::vector<lit>> G;
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
 	std::set<size_t> nullables;
-	std::string inputstr;
+	string inputstr;
 	struct item {
 		item(size_t set, size_t prod, size_t from, size_t dot) :
 			set(set), prod(prod), from(from), dot(dot) {}
 		size_t set, prod, from, dot;
-		mutable std::set<item> advancers, completers;
+		// mutable std::set<item> advancers, completers;
 		bool operator<(const item& i) const {
 			if (set != i.set) return set < i.set;
 			if (prod != i.prod) return prod < i.prod;
@@ -80,7 +100,6 @@ class earley {
 			return true;
 		}
 	};
-	
 /*	struct ast {
 		ast() {}
 		ast(const item& i) : i(i) {}
@@ -91,11 +110,11 @@ class earley {
 	bool completed(const item& i) const { return G[i.prod].size()==i.dot; }
 	lit get_nt(const item& i) const { return G[i.prod][0]; }
 	bool all_nulls(const std::vector<lit>& p) const;
-	std::ostream& print(std::ostream& os, const item& i) const;
-	std::set<item>::iterator add(std::set<item>& t, const item& i);
+	ostream& print(ostream& os, const item& i) const;
+	typename std::set<item>::iterator add(std::set<item>& t, const item& i);
 	void complete(const item& i, std::set<item>& t);
 	void predict(const item& i, std::set<item>& t);
-	void scan(const item& i, size_t n, char ch);
+	void scan(const item& i, size_t n, CharT ch);
 	bool nullable(const item& i) const {
 		return	i.dot < G[i.prod].size() &&
 			((get_lit(i).nt() &&
@@ -106,31 +125,30 @@ class earley {
 	std::set<item> S;
 
 	struct {
-		std::map<std::string, size_t> m;
-		std::vector<std::string> v;
-		size_t get(const std::string& s) {
+		std::map<string, size_t> m;
+		std::vector<string> v;
+		size_t get(const string& s) {
 			if (auto it = m.find(s); it != m.end())
 				return it->second;
 			return m.emplace(s, v.size()), v.push_back(s),
 			       v.size() - 1;
 		}
-		std::string get(size_t n) const { return v[n]; }
+		string get(size_t n) const { return v[n]; }
 	} d;
 public:
 	typedef pnode nidx_t;
-	typedef std::vector<std::variant<size_t, std::string>> arg_t;
-	typedef std::vector<std::pair<std::string, const nidx_t>> node_children;
-	earley(const std::vector<
-		std::pair<
-			std::string,
-			std::vector<std::vector<std::string>>>>& g);
+	typedef std::vector<std::variant<size_t, string>> arg_t;
+	typedef std::vector<std::pair<string, const nidx_t>> node_children;
+	earley(const grammar& g);
 	earley(const std::vector<production>& g);
-	bool recognize(const char* s);
+	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
-	raw_progs get_raw_progs(dict_t* dict);
+	string flatten(string label, const nidx_t nd) const;
 private:
+	string epsilon() const;
+	node_children get_children(const nidx_t nd, bool all) const;
 	bool to_dot(ostream_t& os);
-	std::string to_dot_safestring(const std::string& s) const;
+	std::string to_dot_safestring(const string& s) const;
 	struct hasher_t{
 		size_t hash_size_t(const size_t &val) const{
 			return std::hash<size_t>()(val)  + 0x9e3779b9 + (val << 6) + (val >> 2);
@@ -154,13 +172,14 @@ private:
 	};
 	//std::unordered_map< size_t, 
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
-	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem;
+	std::unordered_map<std::pair<size_t,size_t>, std::vector<item>,
+		hasher_t>  sorted_citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	std::string grammar_text();
 	bool forest(const nidx_t & );
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
 		std::set<std::vector<nidx_t>>&);
-	template<typename T>
+	template <typename T>
 	bool visit_forest(T) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
 	
@@ -169,18 +188,6 @@ private:
 	//make parse forest grammar
 	bool to_tml_rule(ostream_t& os) const;
 	std::string to_tml_rule(const nidx_t nd) const;
-	friend int test_out(int c, earley &e);
-	// following is used by get_raw_progs()
-	dict_t* dict;
-	node_children get_children(const nidx_t nd, bool all) const;
-	std::string flatten(std::string label, const nidx_t nd);
-	raw_term pred_to_raw_term(const nidx_t nd);
-	raw_term to_raw_term(const nidx_t nd);
-	raw_prog to_raw_prog(const nidx_t nd);
-	void preds_to_raw_rule(raw_rule &rr, bool head, const nidx_t p);
-	void args_to_raw_term(raw_term& rt, const nidx_t p);
-	void elem_to_raw_term(raw_term& rt, const nidx_t p);
-	void add_fact(raw_prog &rp, const nidx_t p);
-	void add_rule(raw_prog &rp, const nidx_t p);
-	void add_statements(raw_prog &rp, const nidx_t p);
+	template <typename CharU>
+	friend int test_out(int c, earley<CharU> &e);
 };

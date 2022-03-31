@@ -223,10 +223,7 @@ string_t to_string_t(char32_t ch) {
 string_t to_string_t(const u32string& str) {
 	basic_ostringstream<char_t> ss;
 	auto it = str.begin();
-	while (it != str.end()) {
-		emit_codepoint(ss, *(it++));
-		it++;
-	}
+	while (it != str.end()) emit_codepoint(ss, *(it++));
 	return ss.str();
 }
 

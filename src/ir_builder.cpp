@@ -17,7 +17,6 @@
 #include "ir_builder.h"
 #include "tables.h"
 #include "analysis.h"
-#include "earley.h"
 using namespace std;
 
 #define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
@@ -967,14 +966,13 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 bool ptransformer::visit() {
 	size_t cur = 1;
 	//DBG(o::dbg()<<endl<<p<<endl);
-	bool ret = this->parse_alts( this->p.p, cur);
-	if( this->p.p.size() > cur ) ret = false;
+	bool ret = this->parse_alts(this->p.p, cur);
+	if (this->p.p.size() > cur) ret = false;
 
 	//DBG(o::dbg()<<p<<endl);
-	for ( production t : lp )
-		DBG(o::dbg()<<t<<endl);
-	if(!ret) parse_error("Error Production",
-		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e );
+	//DBG(for (production &t : lp) o::dbg() << t << endl);
+	if (!ret) parse_error("Error Production",
+		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e);
 	return ret;
 
 }
@@ -1245,34 +1243,37 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
 	transform_alts(g);
-	add_character_builtins(g);
-	DBG(o::dbg()<<"grammar after:"<<endl);
-	DBG(for (production& p : g) o::dbg() << p << endl;)
-	
+	//DBG(o::dbg()<<"grammar after:"<<endl);
+	//DBG(for (production& p : g) o::dbg() << p << endl;)
+
 	#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
-	
-	earley parser(g);
-	bool success = parser.recognize(
-		to_string(dynenv->strs.begin()->second).c_str());
+
+	add_character_builtins(g);
+	earley_t parser(g);
+	bool success = parser
+		.recognize(to_u32string(dynenv->strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
 
 	//raw_progs rps = parser.get_raw_progs(&dict);
 	//o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
 
-	vector<earley::arg_t> facts = parser.get_parse_graph_facts();
+	vector<earley_t::arg_t> facts = parser.get_parse_graph_facts();
 	vector<raw_term> rts;
-	for( earley::arg_t &af: facts) {
+	for (auto& af: facts) {
 		vector<elem> e;
-		e.emplace_back(elem::STR, dict.get_lexeme(std::get<std::string>(af[0])) );
+		e.emplace_back(elem::STR, dict.get_lexeme(
+			to_string_t(std::get<earley_t::string>(af[0]))));
 		e.emplace_back(elem::OPENP);
 		e.emplace_back(int_t(std::get<size_t>(af[1])));
 		for( size_t i=2; i < af.size(); i++) 
 			if(std::holds_alternative<size_t>(af[i]))
 				e.emplace_back(int_t(std::get<size_t>(af[i])));
 			else 
-				e.emplace_back(elem::STR, dict.get_lexeme(std::get<string>(af[i])));
+				e.emplace_back(elem::STR, dict.get_lexeme(
+					to_string_t(std::get<earley_t::string>(
+						af[i]))));
 		e.emplace_back(elem(elem::CLOSEP));
 
 		rts.emplace_back(raw_term::REL, e);
@@ -1318,7 +1319,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 
 		// ref: maps ith sybmol production to resp. terms
 		std::map<size_t, term> refs;
-		DBG(o::dbg()<<x;)
+		//DBG(o::dbg()<<x;)
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
 			if (builtins.find(x.p[n].e) != builtins.end()) {
