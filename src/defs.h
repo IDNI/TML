@@ -115,7 +115,7 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 //runtime options
 typedef struct {
 	bool optimize, print_transformed, apply_regexpmatch, fp_step, bitunv,
-		show_hidden;
+		show_hidden, bin_lr;
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;

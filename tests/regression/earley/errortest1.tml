@@ -10,7 +10,7 @@
 #PO => '-'.
 
 #S => S '+' S | S '/' S | '1'.
-S => '+' S | S '+' S | S'+' | '1' .
+start => '+' start | start '+' start | start '+' | '1' .
 #S =>  S '+' S | '2'.
 
 #!S(0 5).

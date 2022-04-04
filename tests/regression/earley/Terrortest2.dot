@@ -1,0 +1,326 @@
+digraph {
+_input_[label ="3+3+3", shape = rectangle]_grammar_[label ="
+\lstart -> E 
+\lPO -> - 
+\lE -> E IO E 
+\lIO -> + 
+\lE -> PO E 
+\lE -> 3 
+\lIO -> - 
+\lIO -> * 
+\ldigit -> 0 
+\ldigit -> 1 
+\ldigit -> 2 
+\ldigit -> 3 
+\ldigit -> 4 
+\ldigit -> 5 
+\ldigit -> 6 
+\ldigit -> 7 
+\ldigit -> 8 
+\ldigit -> 9 
+\lalpha -> A 
+\lalpha -> B 
+\lalpha -> C 
+\lalpha -> D 
+\lalpha -> E 
+\lalpha -> F 
+\lalpha -> G 
+\lalpha -> H 
+\lalpha -> I 
+\lalpha -> J 
+\lalpha -> K 
+\lalpha -> L 
+\lalpha -> M 
+\lalpha -> N 
+\lalpha -> O 
+\lalpha -> P 
+\lalpha -> Q 
+\lalpha -> R 
+\lalpha -> S 
+\lalpha -> T 
+\lalpha -> U 
+\lalpha -> V 
+\lalpha -> W 
+\lalpha -> X 
+\lalpha -> Y 
+\lalpha -> Z 
+\lalpha -> a 
+\lalpha -> b 
+\lalpha -> c 
+\lalpha -> d 
+\lalpha -> e 
+\lalpha -> f 
+\lalpha -> g 
+\lalpha -> h 
+\lalpha -> i 
+\lalpha -> j 
+\lalpha -> k 
+\lalpha -> l 
+\lalpha -> m 
+\lalpha -> n 
+\lalpha -> o 
+\lalpha -> p 
+\lalpha -> q 
+\lalpha -> r 
+\lalpha -> s 
+\lalpha -> t 
+\lalpha -> u 
+\lalpha -> v 
+\lalpha -> w 
+\lalpha -> x 
+\lalpha -> y 
+\lalpha -> z 
+\lalnum -> 0 
+\lalnum -> 1 
+\lalnum -> 2 
+\lalnum -> 3 
+\lalnum -> 4 
+\lalnum -> 5 
+\lalnum -> 6 
+\lalnum -> 7 
+\lalnum -> 8 
+\lalnum -> 9 
+\lalnum -> A 
+\lalnum -> B 
+\lalnum -> C 
+\lalnum -> D 
+\lalnum -> E 
+\lalnum -> F 
+\lalnum -> G 
+\lalnum -> H 
+\lalnum -> I 
+\lalnum -> J 
+\lalnum -> K 
+\lalnum -> L 
+\lalnum -> M 
+\lalnum -> N 
+\lalnum -> O 
+\lalnum -> P 
+\lalnum -> Q 
+\lalnum -> R 
+\lalnum -> S 
+\lalnum -> T 
+\lalnum -> U 
+\lalnum -> V 
+\lalnum -> W 
+\lalnum -> X 
+\lalnum -> Y 
+\lalnum -> Z 
+\lalnum -> a 
+\lalnum -> b 
+\lalnum -> c 
+\lalnum -> d 
+\lalnum -> e 
+\lalnum -> f 
+\lalnum -> g 
+\lalnum -> h 
+\lalnum -> i 
+\lalnum -> j 
+\lalnum -> k 
+\lalnum -> l 
+\lalnum -> m 
+\lalnum -> n 
+\lalnum -> o 
+\lalnum -> p 
+\lalnum -> q 
+\lalnum -> r 
+\lalnum -> s 
+\lalnum -> t 
+\lalnum -> u 
+\lalnum -> v 
+\lalnum -> w 
+\lalnum -> x 
+\lalnum -> y 
+\lalnum -> z 
+\lspace -> 	 
+\lspace -> 
+ 
+\lspace ->  
+\lspace ->  
+\lspace -> 
+ 
+\lspace ->   
+\lprintable ->   
+\lprintable -> ! 
+\lprintable -> " 
+\lprintable -> # 
+\lprintable -> $ 
+\lprintable -> % 
+\lprintable -> & 
+\lprintable -> ' 
+\lprintable -> ( 
+\lprintable -> ) 
+\lprintable -> * 
+\lprintable -> + 
+\lprintable -> , 
+\lprintable -> - 
+\lprintable -> . 
+\lprintable -> / 
+\lprintable -> 0 
+\lprintable -> 1 
+\lprintable -> 2 
+\lprintable -> 3 
+\lprintable -> 4 
+\lprintable -> 5 
+\lprintable -> 6 
+\lprintable -> 7 
+\lprintable -> 8 
+\lprintable -> 9 
+\lprintable -> : 
+\lprintable -> ; 
+\lprintable -> < 
+\lprintable -> = 
+\lprintable -> > 
+\lprintable -> ? 
+\lprintable -> @ 
+\lprintable -> A 
+\lprintable -> B 
+\lprintable -> C 
+\lprintable -> D 
+\lprintable -> E 
+\lprintable -> F 
+\lprintable -> G 
+\lprintable -> H 
+\lprintable -> I 
+\lprintable -> J 
+\lprintable -> K 
+\lprintable -> L 
+\lprintable -> M 
+\lprintable -> N 
+\lprintable -> O 
+\lprintable -> P 
+\lprintable -> Q 
+\lprintable -> R 
+\lprintable -> S 
+\lprintable -> T 
+\lprintable -> U 
+\lprintable -> V 
+\lprintable -> W 
+\lprintable -> X 
+\lprintable -> Y 
+\lprintable -> Z 
+\lprintable -> [ 
+\lprintable -> \ 
+\lprintable -> ] 
+\lprintable -> ^ 
+\lprintable -> _ 
+\lprintable -> ` 
+\lprintable -> a 
+\lprintable -> b 
+\lprintable -> c 
+\lprintable -> d 
+\lprintable -> e 
+\lprintable -> f 
+\lprintable -> g 
+\lprintable -> h 
+\lprintable -> i 
+\lprintable -> j 
+\lprintable -> k 
+\lprintable -> l 
+\lprintable -> m 
+\lprintable -> n 
+\lprintable -> o 
+\lprintable -> p 
+\lprintable -> q 
+\lprintable -> r 
+\lprintable -> s 
+\lprintable -> t 
+\lprintable -> u 
+\lprintable -> v 
+\lprintable -> w 
+\lprintable -> x 
+\lprintable -> y 
+\lprintable -> z 
+\lprintable -> { 
+\lprintable -> | 
+\lprintable -> } 
+\lprintable -> ~ ", shape = rectangle]
+node[ ordering ="out"];
+graph[ overlap =false, splines = true];
+15612834750854861469[label="start_0_5_"];
+3250970277208327015[shape = point,label="start_0_5_0"];
+15612834750854861469->3250970277208327015;
+7004079133807143690[label="E_0_5_"];
+3250970277208327015->7004079133807143690;
+6746839768347946474[shape = point,label="start_0_5_1"];
+15612834750854861469->6746839768347946474;
+8919953417783434702[label="E_2_5_"];
+6746839768347946474->8919953417783434702;
+10700285461061038568[shape = point,label="start_0_5_2"];
+15612834750854861469->10700285461061038568;
+8466334383771585950[label="E_4_5_"];
+10700285461061038568->8466334383771585950;
+226322014838972084[label="E_0_1_"];
+13644350309168142446[shape = point,label="E_0_1_0"];
+226322014838972084->13644350309168142446;
+547738938155536259[label="3_0_1_"];
+13644350309168142446->547738938155536259;
+15559482692195795195[label="E_0_3_"];
+1904973329426205485[shape = point,label="E_0_3_0"];
+15559482692195795195->1904973329426205485;
+5865092031528429656[label="temp0_0_2_"];
+1904973329426205485->5865092031528429656;
+17560030549302403438[label="E_2_3_"];
+1904973329426205485->17560030549302403438;
+7004079133807143690[label="E_0_5_"];
+11277542449796836210[shape = point,label="E_0_5_0"];
+7004079133807143690->11277542449796836210;
+5865092031528429656[label="temp0_0_2_"];
+11277542449796836210->5865092031528429656;
+8919953417783434702[label="E_2_5_"];
+11277542449796836210->8919953417783434702;
+2244213305062557417[shape = point,label="E_0_5_1"];
+7004079133807143690->2244213305062557417;
+11027602241716437141[label="temp0_0_4_"];
+2244213305062557417->11027602241716437141;
+8466334383771585950[label="E_4_5_"];
+2244213305062557417->8466334383771585950;
+17560030549302403438[label="E_2_3_"];
+9886961428569863576[shape = point,label="E_2_3_0"];
+17560030549302403438->9886961428569863576;
+11298539650951834449[label="3_2_3_"];
+9886961428569863576->11298539650951834449;
+8919953417783434702[label="E_2_5_"];
+14550289664059221521[shape = point,label="E_2_5_0"];
+8919953417783434702->14550289664059221521;
+13213361095631517502[label="temp0_2_4_"];
+14550289664059221521->13213361095631517502;
+8466334383771585950[label="E_4_5_"];
+14550289664059221521->8466334383771585950;
+8466334383771585950[label="E_4_5_"];
+15277613388577659703[shape = point,label="E_4_5_0"];
+8466334383771585950->15277613388577659703;
+8793476326343089891[label="3_4_5_"];
+15277613388577659703->8793476326343089891;
+1775072270810101333[label="IO_1_2_"];
+5239769649382665260[shape = point,label="IO_1_2_0"];
+1775072270810101333->5239769649382665260;
+11249478828358270957[label="+_1_2_"];
+5239769649382665260->11249478828358270957;
+8487742161292126888[label="IO_3_4_"];
+16730638417642630457[shape = point,label="IO_3_4_0"];
+8487742161292126888->16730638417642630457;
+5641157369914558198[label="+_3_4_"];
+16730638417642630457->5641157369914558198;
+5865092031528429656[label="temp0_0_2_"];
+14877524895711577475[shape = point,label="temp0_0_2_0"];
+5865092031528429656->14877524895711577475;
+226322014838972084[label="E_0_1_"];
+14877524895711577475->226322014838972084;
+1775072270810101333[label="IO_1_2_"];
+14877524895711577475->1775072270810101333;
+11027602241716437141[label="temp0_0_4_"];
+313646304973116767[shape = point,label="temp0_0_4_0"];
+11027602241716437141->313646304973116767;
+15559482692195795195[label="E_0_3_"];
+313646304973116767->15559482692195795195;
+8487742161292126888[label="IO_3_4_"];
+313646304973116767->8487742161292126888;
+13213361095631517502[label="temp0_2_4_"];
+8232151188403768376[shape = point,label="temp0_2_4_0"];
+13213361095631517502->8232151188403768376;
+17560030549302403438[label="E_2_3_"];
+8232151188403768376->17560030549302403438;
+8487742161292126888[label="IO_3_4_"];
+8232151188403768376->8487742161292126888;
+}

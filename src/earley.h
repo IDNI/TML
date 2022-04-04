@@ -55,8 +55,8 @@ class earley {
 	};
 
 	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
-	DBG(friend std::ostream& operator<<(std::ostream& os,
-		const std::vector<lit>& v);)
+	friend std::ostream& operator<<(std::ostream& os,
+		const std::vector<lit>& v);
 	std::vector<std::vector<lit>> G;
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
@@ -123,12 +123,13 @@ public:
 	earley(const std::vector<
 		std::pair<
 			std::string,
-			std::vector<std::vector<std::string>>>>& g);
-	earley(const std::vector<production>& g);
+			std::vector<std::vector<std::string>>>>& g, bool _bin_lr =false);
+	earley(const std::vector<production>& g, bool _bin_lr = false);
 	bool recognize(const char* s);
 	std::vector<arg_t> get_parse_graph_facts();
 	raw_progs get_raw_progs(dict_t* dict);
 private:
+	bool bin_lr;  //enables binarizaion and left right optimization
 	bool to_dot(ostream_t& os);
 	std::string to_dot_safestring(const std::string& s) const;
 	struct hasher_t{
@@ -154,10 +155,14 @@ private:
 	};
 	//std::unordered_map< size_t, 
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
-	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem;
+	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  sorted_citem, rsorted_citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
+	std::map<std::vector<earley::lit>, earley::lit> bin_tnt; // binariesed temporary intermediate non-terminals
 	std::string grammar_text();
-	bool forest(const nidx_t & );
+	bool build_forest ( const nidx_t &root );
+	bool build_forest2 ( const nidx_t &root );
+	bool forest();
+	bool bin_lr_comb(const item&, std::set<std::vector<nidx_t>>&);
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
 		std::set<std::vector<nidx_t>>&);
 	template<typename T>

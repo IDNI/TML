@@ -24,9 +24,7 @@ int test_out(int c, earley &e){
 }
 int main() {
 	using namespace std;
-	
 	size_t c = 0;
-
 	// Using Elizbeth Scott paper example 2, pg 64
 	earley e({
 			{"start", { { "b" }, { "start", "start" } } }

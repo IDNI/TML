@@ -1245,14 +1245,14 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
 	transform_alts(g);
-	add_character_builtins(g);
+	//add_character_builtins(g);
 	DBG(o::dbg()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::dbg() << p << endl;)
 	
 	#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
-	
-	earley parser(g);
+
+	earley parser(g, opts.bin_lr);
 	bool success = parser.recognize(
 		to_string(dynenv->strs.begin()->second).c_str());
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
