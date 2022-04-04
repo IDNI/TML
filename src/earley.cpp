@@ -452,8 +452,8 @@ bool earley::forest( ){
 				}
 				else tlit = bin_tnt[v];
 				
-				DBG(print(o::dbg(), i);)
-				o::dbg()<< endl << d.get(tlit.n()) << v << endl;
+				//DBG(print(o::dbg(), i);)
+				//o::dbg()<< endl << d.get(tlit.n()) << v << endl;
 				sorted_citem[{tlit.n(), i.from}].emplace_back(i),
 				rsorted_citem[{tlit.n(), i.set}].emplace_back(i);
 			}
@@ -512,11 +512,11 @@ bool earley::bin_lr_comb(const item& eitem, std::set<std::vector<nidx_t>>& ambse
 	}
 	// many literals in rhs
 	if(eitem.dot > 3) {
-		DBG(print(o::dbg(), eitem);)
+		//DBG(print(o::dbg(), eitem);)
 		std::vector<lit> v(G[eitem.prod].begin()+1, G[eitem.prod].begin()+ eitem.dot - 1);
 		DBG(assert( bin_tnt.find(v) != bin_tnt.end());)
 		nidx_t left = bin_tnt[v];
-		DBG(COUT << std::endl << d.get(bin_tnt[v].n()) << std::endl);
+		//DBG(COUT << std::endl << d.get(bin_tnt[v].n()) << std::endl);
 		auto &leftit = sorted_citem[{left.n(), eitem.from}];
 		// doing left right optimization
 		for(auto &it : leftit) 
