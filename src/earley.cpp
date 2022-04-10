@@ -460,7 +460,7 @@ bool earley::forest( ){
 		}
 	}
 
-	emeasure_time_end(tspfo, tepfo) <<" :: pre forest optimizations,"<< "size : "<< count << endl;
+	emeasure_time_end(tspfo, tepfo) <<" :: preprocess time ,"<< "size : "<< count << endl;
 	o::dbg() <<"sort sizes : " << sorted_citem.size() <<" " << rsorted_citem.size() <<" \n";
 	// build forest
 	emeasure_time_start(tsf, tef);

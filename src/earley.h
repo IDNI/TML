@@ -54,7 +54,7 @@ class earley {
 		}
 	};
 
-	DBG(friend std::ostream& operator<<(std::ostream& os, const lit& l);)
+	friend std::ostream& operator<<(std::ostream& os, const lit& l);
 	friend std::ostream& operator<<(std::ostream& os,
 		const std::vector<lit>& v);
 	std::vector<std::vector<lit>> G;
