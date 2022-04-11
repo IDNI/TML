@@ -1355,6 +1355,10 @@ size_t hash<array<int_t, 2>>::operator()(const array<int_t, 2>& x) const {
 	return hash_pair(x[0], x[1]);
 }
 
+size_t hash<pair<int_t,int_t>>::operator()(const std::pair<int_t, int_t>& p) const {
+	return hash_pair(p.first, p.second);
+}
+
 size_t hash<bdd_key>::operator()(const bdd_key& k) const {return k.hash;}
 
 size_t hash<poset>::operator()(const poset& p) const { return p.hash; }
@@ -1622,6 +1626,7 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 	// Lifting of equality due to singletons
 	lift_eq_from_sing(res, eq_lift_hi, eq_lift_lo);
 
+	//TODO: find faster way
 	if (!(union_find::intersect(res.eq_var, hi.eq_var) == hi.eq_var))
 		res.is_pure = false;
 	else if (!(union_find::intersect(res.eq_var, lo.eq_var) == lo.eq_var))
@@ -1631,75 +1636,43 @@ poset poset::merge(int_t var, poset& hi, poset& lo) {
 }
 
 void poset::lift_implications(poset &hi, poset &lo, poset &res) {
+	vec_abs_cmp vec_comp;
 	abs_cmp comp;
 	auto it_hi = hi.imp_var.begin();
 	auto it_lo = lo.imp_var.begin();
 	while (it_hi != hi.imp_var.end() || it_lo != lo.imp_var.end()) {
 		if (it_lo == lo.imp_var.end() ||
-		    (comp(it_hi->first,it_lo->first) && it_hi != end(hi.imp_var))) {
+		    (it_hi != hi.imp_var.end() && vec_comp(*it_hi,*it_lo))) {
 			if (hasbc(lo.true_var, -it_hi->first, comp)){
 				// Implication is true in lo since antecedent is violated
-				res.imp_var.emplace(it_hi->first, it_hi->second);
+				res.insert_implication(*it_hi);
 			} else {
-				for (const auto v : it_hi->second){
-					if (hasbc(lo.true_var, v, comp) ||
-					    lo.eq_var.in_same_set(it_hi->first, v)) {
-						// Implication is trivially true in lo or
-						// Implication is contained in equality of lo
-						res.imp_var[it_hi->first].insert(v);
-					} else res.is_pure = false;
-				}
+				if (hasbc(lo.true_var, it_hi->second, comp) ||
+				    lo.eq_var.in_same_set(it_hi->first, it_hi->second)) {
+					// Implication is trivially true in lo or
+					// Implication is contained in equality of lo
+					res.insert_implication(*it_hi);
+				} else res.is_pure = false;
 			}
 			++it_hi;
 		}
-		else if (it_hi == hi.imp_var.end() || comp(it_lo->first, it_hi->first)) {
+		else if (it_hi == hi.imp_var.end() || vec_comp(*it_lo, *it_hi)) {
 			if (hasbc(hi.true_var, -it_lo->first, comp)){
 				// Implication is true in hi since antecedent is violated
-				res.imp_var.emplace(it_lo->first, it_lo->second);
+				res.insert_implication(*it_lo);
 			} else {
-				for (const auto v : it_lo->second) {
-					if (hasbc(hi.true_var, v, comp) ||
-					    hi.eq_var.in_same_set(it_lo->first, v)) {
-						// Implication is trivially true in hi or
-						// Implication is contained in equality of hi
-						res.imp_var[it_lo->first].insert(v);
-					} else res.is_pure = false;
-				}
+				if (hasbc(hi.true_var, it_lo->second, comp) ||
+				    hi.eq_var.in_same_set(it_lo->first, it_lo->second)) {
+					// Implication is trivially true in hi or
+					// Implication is contained in equality of hi
+					res.insert_implication(*it_lo);
+				} else res.is_pure = false;
 			}
 			++it_lo;
 		}
 		else {
-			auto it_hi_set = it_hi->second.begin();
-			auto it_lo_set = it_lo->second.begin();
-			while (it_hi_set != it_hi->second.end() || it_lo_set != it_lo->second.end()) {
-				if (it_lo_set == it_lo->second.end() ||
-				    (*it_hi_set < *it_lo_set && it_hi_set != end(it_hi->second) )) {
-					DBG(assert(!hasbc(lo.true_var, -it_hi->first, comp));)
-					if (hasbc(lo.true_var, *it_hi_set, comp) ||
-					    lo.eq_var.in_same_set(it_hi->first, *it_hi_set)){
-						// Implication is trivially true in lo or
-						// Implication is contained in equality of lo
-						res.imp_var[it_hi->first].insert(*it_hi_set);
-					} else res.is_pure = false;
-					++it_hi_set;
-				}
-				else if (it_hi_set == it_hi->second.end() || *it_lo_set < * it_hi_set) {
-					DBG(assert(!hasbc(hi.true_var, -it_lo->first, comp));)
-					if (hasbc(hi.true_var, *it_lo_set, comp) ||
-					    hi.eq_var.in_same_set(it_lo->first, *it_lo_set)){
-						// Implication is trivially true in hi or
-						// Implication is contained in equality of hi
-						res.imp_var[it_lo->first].insert(*it_lo_set);
-					}
-					else res.is_pure = false;
-					++it_lo_set;
-				}
-				else {
-					// Implication is contained in both, lo and hi
-					res.imp_var[it_hi->first].insert(*it_hi_set);
-					++it_hi_set; ++ it_lo_set;
-				}
-			}
+			// Implication is contained in both, lo and hi
+			res.insert_implication(*it_hi);
 			++it_hi; ++it_lo;
 		}
 	}
@@ -1716,13 +1689,13 @@ void poset::lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
 		    (it_hi_var != end(hi.true_var) && (abs(*it_hi_var) < abs(*it_lo_var)))) {
 			//Singleton in high but not in lo
 			eq_lift_lo.emplace_back(lo.eq_var.find(*it_hi_var).first, *it_hi_var);
-			res.imp_var[var].insert(*it_hi_var);
+			res.insert_implication(var,*it_hi_var);
 			++it_hi_var;
 		}
 		else if (it_hi_var == hi.true_var.end() || abs(*it_hi_var) > abs(*it_lo_var)) {
 			//Singleton in lo but not in high
 			eq_lift_hi.emplace_back(hi.eq_var.find(*it_lo_var).first, *it_lo_var);
-			res.imp_var[-var].insert(*it_lo_var);
+			res.insert_implication(-var, *it_lo_var);
 			//Implications assuring the transitive closure of resulting constrain
 			for (const auto v : hi.true_var) {
 				if (abs(v) != abs(*it_lo_var) &&
@@ -1730,9 +1703,9 @@ void poset::lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
 				    !hasbc(lo.true_var, -v, comp)){
 					// Assure canonicity of implications
 					if(abs(*it_lo_var) < abs(v))
-						res.imp_var[-*it_lo_var].insert(v);
+						res.insert_implication(-*it_lo_var, v);
 					else
-						res.imp_var[-v].insert(*it_lo_var);
+						res.insert_implication(-v, *it_lo_var);
 				}
 			}
 			++it_lo_var;
@@ -1754,9 +1727,9 @@ void poset::lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
 					    !hasbc(lo.true_var, -v, comp)){
 						// Assure canonicity of implications
 						if (abs(*it_lo_var) < abs(v))
-							res.imp_var[-*it_lo_var].insert(v);
+							res.insert_implication(-*it_lo_var, v);
 						else
-							res.imp_var[-v].insert(*it_lo_var);
+							res.insert_implication(-v, *it_lo_var);
 					}
 				}
 			}
@@ -1837,53 +1810,39 @@ poset poset::eval(int_t v) {
 		for(const auto& e : eq_set) res.insert_true_var(e);
 	}
 	// complete true_var set of res, possible due to transitive closure
-	auto imp = begin(imp_var);
-	while(imp != end(imp_var)) {
+	for(auto imp = imp_var.begin(); imp != imp_var.end(); ++imp) {
 		// Antecedent of implication is true
 		if(hasbc(res.true_var, imp->first, abs_cmp())) {
-			for(const auto& var : imp->second) {
-				res.insert_true_var(var);
-				// Ensure that equalities are used
-				eq_set = res.eq_var.get_set(var);
-				res.eq_var.delete_set(var);
-				if(eq_set.size()>1)
-					for(const auto& e : eq_set)
-						res.insert_true_var(e);
-			}
+			res.insert_true_var(imp->second);
+			// Ensure that equalities are used
+			eq_set = res.eq_var.get_set(imp->second);
+			res.eq_var.delete_set(imp->second);
+			if (eq_set.size() > 1)
+				for (const auto &e: eq_set)
+					res.insert_true_var(e);
 		}
 		// Check if a consequent is already true
-		else {
-			for(const auto& var : imp->second) {
-				if(hasbc(res.true_var, -var, abs_cmp())) {
-					res.insert_true_var(-imp->first);
-					// Ensure that equalities are used
-					eq_set = res.eq_var.get_set(-imp->first);
-					res.eq_var.delete_set(-imp->first);
-					if(eq_set.size()>1)
-						for(const auto& e : eq_set)
-							res.insert_true_var(e);
-				}
-			}
+		else if (hasbc(res.true_var, -imp->second, abs_cmp())) {
+			res.insert_true_var(-imp->first);
+			// Ensure that equalities are used
+			eq_set = res.eq_var.get_set(-imp->first);
+			res.eq_var.delete_set(-imp->first);
+			if (eq_set.size() > 1)
+				for (const auto &e: eq_set)
+					res.insert_true_var(e);
 		}
-		++imp;
 	}
 	// delete all implications where at least one variable
 	// (in absolute value) appears in true_var
-	imp = begin(imp_var);
-	while(imp != end(imp_var)) {
+	for(auto imp = imp_var.begin(); imp != imp_var.end(); ++imp) {
 		if (!hasbc(res.true_var, imp->first, abs_cmp())
 			&& !hasbc(res.true_var, -imp->first, abs_cmp())){
-			auto var = begin(imp->second);
-			while(var != end(imp->second)) {
-				// negated antecedent is already in true_var
-				DBG(assert(!hasbc(res.true_var, -*var, abs_cmp()));)
-				if(!hasbc(res.true_var, *var, abs_cmp())){
-					res.imp_var[imp->first].insert(*var);
-				}
-				++var;
+			// negated antecedent is already in true_var
+			DBG(assert(!hasbc(res.true_var, -imp->second, abs_cmp()));)
+			if (!hasbc(res.true_var, imp->second, abs_cmp())) {
+				res.insert_implication(*imp);
 			}
 		}
-		++imp;
 	}
 	// v was only temporarily added
 	res.true_var.erase(getbc(res.true_var, v, abs_cmp()));

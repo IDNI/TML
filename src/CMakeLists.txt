@@ -174,6 +174,9 @@ set_target_properties(TMLs PROPERTIES OUTPUT_NAME "TML")
 # executable
 #############
 
+add_executable(2cnf 2cnf_extraction_test.cpp)
+target_link_libraries(2cnf TMLs)
+
 add_executable(tml)
 target_setup(tml)
 target_compile_options(tml PRIVATE ${TML_COMPILE_OPTIONS})

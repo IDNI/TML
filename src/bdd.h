@@ -79,10 +79,24 @@ struct abs_cmp {
 	}
 };
 
+struct vec_abs_cmp {
+	bool operator() (const std::pair<int_t,int_t>& a,
+				const std::pair<int_t,int_t>& b) const {
+		if (abs_cmp()(a.first, b.first)) return true;
+		else if (abs_cmp()(b.first, a.first)) return false;
+		else {
+			return abs_cmp()(a.second, b.second);
+		}
+	}
+};
+
 template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
 	size_t operator()(const std::array<int_t, 2>&) const;
+};
+template<> struct std::hash<std::pair<int_t,int_t>>{
+	size_t operator()(const std::pair<int_t,int_t>&) const;
 };
 template<> struct std::hash<poset> {size_t operator()(const poset&)const;};
 template<typename X, typename Y> struct std::hash<std::set<X,Y>> {
@@ -214,7 +228,7 @@ public:
 
 // representation for 2-CNFs
 struct poset {
-	std::map<int_t, std::set<int_t>, abs_cmp> imp_var;
+	std::vector<std::pair<int_t,int_t>> imp_var;
 	// true_var is sorted by absolute value of variables
 	std::vector<int_t> true_var;
 	union_find eq_var;
@@ -246,6 +260,17 @@ public:
 		if(hasbc(true_var, v, abs_cmp())) return;
 		true_var.emplace_back(v);
 		sortc(true_var, abs_cmp());
+	}
+	inline void insert_implication (int_t x, int_t y) {
+		std::pair<int_t,int_t> p = {x,y};
+		if(hasbc(imp_var, p, vec_abs_cmp())) return;
+		imp_var.emplace_back((move(p)));
+		sortc(imp_var, vec_abs_cmp());
+	}
+	inline void insert_implication (std::pair<int_t,int_t>& p) {
+		if(hasbc(imp_var, p, vec_abs_cmp())) return;
+		imp_var.emplace_back(p);
+		sortc(imp_var, vec_abs_cmp());
 	}
 	inline bool is_singleton () const{
 		return imp_var.empty() && eq_var.empty() && !true_var.empty();
