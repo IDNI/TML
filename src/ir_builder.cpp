@@ -1218,22 +1218,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 	return true;
 }
 
-void ir_builder::add_character_builtins(std::vector<struct production> &g)const{
-	auto init = [this, &g](string n, function<bool(int_t)> fn) {
-		production p;
-		p.p.emplace_back(elem::SYM, dict.get_lexeme(n));
-		p.p.emplace_back((char32_t) 0);
-		for (int_t c = 0; c != 255; ++c) if (fn(c))
-			p.p.back() = (char32_t) c,
-			g.push_back(p);
-	};
-	init("digit",     [](int_t c) { return isdigit(c); });
-	init("alpha",     [](int_t c) { return isalpha(c); });
-	init("alnum",     [](int_t c) { return isalnum(c); });
-	init("space",     [](int_t c) { return isspace(c); });
-	init("printable", [](int_t c) { return isprint(c); });
-}
-
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*r*/ ) {
 	if (g.empty()) return true;
 	//DBG(o::dbg()<<"grammar before:"<<endl;)
@@ -1249,8 +1233,20 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
 
-	//add_character_builtins(g);
-	earley_t parser(g, opts.bin_lr);
+	earley_t::char_builtins_map bltnmap{
+		{ U"space", [](const char32_t &c)->bool {
+			return c < 256 && isspace(c); }	},
+		{ U"digit", [](const char32_t &c)->bool {
+			return c < 256 && isdigit(c); }	},
+		{ U"alpha", [](const char32_t &c)->bool {
+			return c > 160 || isalpha(c); }	},
+		{ U"alnum", [](const char32_t &c)->bool {
+			return c > 160 || isalnum(c); }	},
+		{ U"printable", [](const char32_t &c)->bool {
+			return c > 160 || isprint(c); }	}
+	};
+
+	earley_t parser(g, bltnmap, opts.bin_lr);
 	bool success = parser
 		.recognize(to_u32string(dynenv->strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<

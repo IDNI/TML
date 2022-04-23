@@ -40,15 +40,20 @@ public:
 	typedef std::vector<std::pair<string,
 			std::vector<std::vector<string>>>> grammar;
 	typedef std::variant<size_t, CharT> lit_t;
+	typedef std::function<bool(CharT)> char_builtin_t;
+	typedef std::map<string, char_builtin_t> char_builtins_map;
 private:
 	struct lit : public lit_t {
 		using lit_t::variant;
 		bool nt() const { return std::holds_alternative<size_t>(*this);}
 		size_t n() const { return std::get<size_t>(*this); }
 		CharT c() const { return std::get<CharT>(*this); }
+		int_t builtin = -1;
+		bool is_builtin() const { return builtin != -1; }
 	};
 	string to_str(const lit& l) const {
-		if (l.nt()) return d.get(l.n());
+		if (l.is_builtin()) return d.get(l.builtin);
+		else if (l.nt()) return d.get(l.n());
 		else if (l.c() == (CharT) '\0') return epsilon();
 		else return string{ '\'', l.c(), '\'' };
 	}
@@ -57,11 +62,11 @@ private:
 		std::pair<size_t, size_t> span; // start/end of the matched span
 		pnode(const lit _l, const std::pair<size_t, size_t> _span={0,0})
 			: l(_l), span(_span) {}
-		
 		bool nt() const { return l.nt(); }
 		size_t n() const { return l.n(); }
 		CharT c() const { return l.c(); }
-		
+		bool is_builtin() const { return l.is_builtin(); }
+		int_t builtin() const { return l.builtin; }
 		bool operator<(const pnode& i) const {
 			if(l != i.l )	return l < i.l;
 			if(span != i.span ) return span < i.span;
@@ -116,6 +121,7 @@ private:
 	void complete(const item& i, std::set<item>& t);
 	void predict(const item& i, std::set<item>& t);
 	void scan(const item& i, size_t n, CharT ch);
+	void scan_builtin(const item& i, size_t n, CharT ch);
 	bool nullable(const item& i) const {
 		return	i.dot < G[i.prod].size() &&
 			((get_lit(i).nt() &&
@@ -141,8 +147,15 @@ public:
 	typedef std::map<nidx_t, std::vector<nidx_t>> ptree_t;
 	typedef std::vector<std::variant<size_t, string>> arg_t;
 	typedef std::vector<std::pair<string, const nidx_t>> node_children;
-	earley(const grammar& g, bool _bin_lr =false);
-	earley(const std::vector<production>& g, bool _bin_lr = false);
+	earley(const grammar& g, const char_builtins_map& bm,
+		bool _bin_lr = false);
+	earley(const grammar& g, bool _bin_lr) : earley(g, {}, _bin_lr) {}
+	earley(const grammar& g)               : earley(g, {}) {}
+	earley(const std::vector<production>& g, const char_builtins_map& bm,
+		bool _bin_lr = false);
+	earley(const std::vector<production>& g, bool _bin_lr) :
+		earley(g, {}, _bin_lr) {}
+	earley(const std::vector<production>& g) : earley(g, {}) {}
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
 	string flatten(string label, const nidx_t nd) const;
@@ -180,6 +193,8 @@ private:
 		sorted_citem, rsorted_citem;
 	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
 	std::map<std::vector<earley::lit>, earley::lit> bin_tnt; // binariesed temporary intermediate non-terminals
+	std::vector<char_builtin_t> builtins;
+	std::vector<std::map<CharT, size_t>> builtin_char_prod; // char -> prod
 	std::string grammar_text();
 	bool build_forest ( const nidx_t &root );
 	bool build_forest2 ( const nidx_t &root );

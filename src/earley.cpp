@@ -53,8 +53,18 @@ bool earley<CharT>::all_nulls(const vector<lit>& p) const {
 }
 
 template <typename CharT>
-earley<CharT>::earley(const vector<production> &g, bool _bin_lr): bin_lr(_bin_lr) {
+earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
+	bool _bin_lr) : bin_lr(_bin_lr)
+{
 	set<string> nt;
+	map<string, int_t> bmi;
+	for (auto& bmp : bm) {
+		d.get(bmp.first);
+		nt.insert(bmp.first);
+		bmi.emplace(bmp.first, builtins.size());
+		builtins.push_back(bmp.second);
+		builtin_char_prod.emplace_back();
+	}
 	auto tostr = [this](const string_t &s) {
 		std::basic_ostringstream<CharT> os;
 		for (auto &c : s) os << (CharT) c;
@@ -67,6 +77,9 @@ earley<CharT>::earley(const vector<production> &g, bool _bin_lr): bin_lr(_bin_lr
 			auto s = tostr(y.to_str_t());
 			if (y.type == elem::SYM && nt.find(s) != nt.end()) {
 				G.back().emplace_back(d.get(s));
+				auto it = bmi.find(s);					
+				if (it != bmi.end()) G.back().back()
+					.builtin = it->second;
 			} else if (x.p.size() == 2 &&
 				s == string{ 'n', 'u', 'l', 'l' })
 					G.back().emplace_back((CharT) '\0');
@@ -104,16 +117,29 @@ earley<CharT>::earley(const vector<production> &g, bool _bin_lr): bin_lr(_bin_lr
 }
 
 template <typename CharT>
-earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g, bool _bin_lr) : bin_lr(_bin_lr) {
+earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
+	const char_builtins_map& bm, bool _bin_lr) : bin_lr(_bin_lr)
+{
 	set<string> nt;
+	map<string, int_t> bmi;
+	for (auto& bmp : bm) {
+		d.get(bmp.first);
+		nt.insert(bmp.first);
+		bmi.emplace(bmp.first, builtins.size());
+		builtins.push_back(bmp.second);
+		builtin_char_prod.emplace_back();
+	}
 	for (const auto &x : g) nt.insert(x.first);
 	for (const auto &x : g)
 		for (auto &y : x.second) {
 			G.push_back({lit(d.get(x.first))});
 			for (auto &s : y)
-				if (nt.find(s) != nt.end())
+				if (nt.find(s) != nt.end()) {
 					G.back().emplace_back(d.get(s));
-				else if (s.size() == 0)
+					auto it = bmi.find(s);					
+					if (it != bmi.end()) G.back().back()
+						.builtin = it->second;
+				} else if (s.size() == 0)
 					G.back().emplace_back((CharT) '\0');
 				else for (CharT c : s)
 					G.back().emplace_back(c);
@@ -195,6 +221,24 @@ void earley<CharT>::predict(const item& i, set<item>& t) {
 }
 
 template <typename CharT>
+void earley<CharT>::scan_builtin(const item& i, size_t n, CharT ch) {
+	int_t bid = get_lit(i).builtin;
+	if (!builtins[bid](ch)) return; // character is not in the builtin class
+	size_t p = 0; // character's prod rule
+	auto it = builtin_char_prod[bid].find(ch);
+	if (it == builtin_char_prod[bid].end()) {
+		p = G.size(); // its a new character in this builtin -> store it 
+		G.push_back({ get_lit(i) });
+		G.back().emplace_back(ch);
+		builtin_char_prod[bid][ch] = p; // store prod of this ch
+	} else p = it->second; // this ch has its prod already
+	item j(n + 1, i.prod, n, 2); // complete builtin
+	S.insert(j);
+	item k(n + 1, p, n, 2);      // complete builtin's character
+	S.insert(k);
+}
+
+template <typename CharT>
 void earley<CharT>::scan(const item& i, size_t n, CharT ch) {
 	if (ch != get_lit(i).c()) return;
 	item j(n + 1, i.prod, i.from, i.dot + 1);
@@ -234,11 +278,13 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 				it != S.end() && it->set == n; ++it) {
 				//DBG(print(o::dbg() << "processing ", *it) << endl;)
 				if (completed(*it)) complete(*it, t);
-				else if (get_lit(*it).nt()) predict(*it, t);
+				else if (get_lit(*it).is_builtin()) {
+					if (n < len) scan_builtin(*it, n, s[n]);
+				} else if (get_lit(*it).nt()) predict(*it, t);
 				else if (n < len) scan(*it, n, s[n]);
 			}
 		} while (!t.empty());
-#ifdef DEBUG		
+#ifdef DEBUG
 		if (pms) {
 			o::pms()<<n<<" \tln: "<<r<<" col: "<<(n-cb+1)<<" :: ";
 			emeasure_time_end(tsp, tep)<<"\n";
@@ -280,7 +326,8 @@ std::string earley<CharT>::grammar_text() {
 		for( const auto &l : p){
 			if (l.nt()) txt << to_string(to_string_t(d.get(l.n())));
 			else if (l.c() != '\0')
-				txt << to_string(to_string_t(l.c()));
+				txt << to_string(to_string_t((CharT)l.c())),
+				COUT << "\tgrammar_text - c: `" << to_string(to_string_t((CharT)l.c())) << "`\n";
 			else txt << "ε";
 			txt <<  " ";
 			if (i++ == 0) txt << "-> ";
