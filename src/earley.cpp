@@ -359,6 +359,30 @@ bool earley<CharT>::visit_forest(T out_rel) const {
 	}
 	return true;
 }
+template <typename CharT>
+size_t earley<CharT>::count_parsed_trees() const{
+	nidx_t root(start, {0, inputstr.length()});
+	std::unordered_set<nidx_t, hasher_t> done;
+	return _count_parsed_trees(root, done);
+
+}
+
+template <typename CharT>
+size_t earley<CharT>::_count_parsed_trees(const nidx_t &root, 
+					std::unordered_set<nidx_t, hasher_t> &done ) const{
+	
+	if( !root.nt() ) return 1;
+	else if( pfgraph.find(root) == pfgraph.end() ) return 0;
+	auto &pack =  pfgraph.find(root)->second;
+	size_t count = pack.size();
+	done.insert(root);
+	for( const auto &nodes: pack)
+		for( const auto &chd: nodes)
+		if(chd.nt() && !done.count(chd)) 
+			count *= _count_parsed_trees(chd, done);
+	return count;
+}
+
 
 template <typename CharT>
 vector<typename earley<CharT>::arg_t> earley<CharT>::get_parse_graph_facts(){
@@ -538,7 +562,7 @@ bool earley<CharT>::forest( ){
 	}
 
 	emeasure_time_end(tspfo, tepfo) <<" :: preprocess time ,"<< "size : "<< count << endl;
-	o::dbg() <<"sort sizes : " << sorted_citem.size() <<" " << rsorted_citem.size() <<" \n";
+	o::inf() <<"sort sizes : " << sorted_citem.size() <<" " << rsorted_citem.size() <<" \n";
 	// build forest
 	emeasure_time_start(tsf, tef);
 	if(bin_lr)
@@ -546,6 +570,9 @@ bool earley<CharT>::forest( ){
 	else 
 		ret = build_forest(root);
 	emeasure_time_end(tsf, tef) <<" :: forest time "<<endl ;
+
+	o::inf() <<"# parse trees " << count_parsed_trees() <<endl;
+
 	// emit output in various formats
 	if (o::enabled("parser-to-dot")) {	
 		emeasure_time_start(tsf1, tef1);
@@ -562,6 +589,7 @@ bool earley<CharT>::forest( ){
 		to_tml_rule(o::to("parser-to-rules")),
 		emeasure_time_end(tsf3, tef3) << ":: to rules time\n";
 	}
+
 	return ret; 
 }
 template <typename CharT>

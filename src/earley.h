@@ -2,6 +2,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <list>
 #include <string>
 #include <variant>
@@ -137,6 +138,7 @@ private:
 	} d;
 public:
 	typedef pnode nidx_t;
+	typedef std::map<nidx_t, std::vector<nidx_t>> ptree_t;
 	typedef std::vector<std::variant<size_t, string>> arg_t;
 	typedef std::vector<std::pair<string, const nidx_t>> node_children;
 	earley(const grammar& g, bool _bin_lr =false);
@@ -144,6 +146,8 @@ public:
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
 	string flatten(string label, const nidx_t nd) const;
+	ptree_t get_parsed_tree(size_t );
+	size_t count_parsed_trees() const;
 private:
 	string epsilon() const;
 	node_children get_children(const nidx_t nd, bool all) const;
@@ -169,7 +173,6 @@ private:
 			h ^= hash_size_t(size_t(k.l.nt()?k.l.n():k.c()));
 			return h;
 		}
-
 	};
 	//std::unordered_map< size_t, 
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
@@ -187,7 +190,7 @@ private:
 	template <typename T>
 	bool visit_forest(T) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
-	
+	size_t _count_parsed_trees(const nidx_t &, std::unordered_set<nidx_t, hasher_t>&) const;
 	// only store graph as facts
 	bool to_tml_facts(ostream_t& os) const;
 	//make parse forest grammar
