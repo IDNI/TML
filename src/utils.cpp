@@ -36,7 +36,7 @@ string to_string_(int_t v) { stringstream ss; ss << v; return ss.str(); }
 string_t to_string_t(int_t v) {
 	return to_string_t(to_string_(v));
 }
-string_t to_string_t(const std::string& s) {
+string_t to_string_t(const string& s) {
 	return string_t(s.begin(), s.end());
 }
 string_t to_string_t(const char* s) {
@@ -211,6 +211,10 @@ basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& os,
 			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	return os;
+}
+
+string_t to_string_t(char ch) {
+	return to_string_t(string{ ch });
 }
 
 string_t to_string_t(char32_t ch) {
