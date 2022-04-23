@@ -433,41 +433,43 @@ std::string earley<CharT>::to_dot_safestring(const string &s) const {
 template <typename CharT>
 bool earley<CharT>::to_dot(ostream_t& ss) {
 	auto keyfun = [this] (const nidx_t & k){
-		stringstream l;
-		k.nt() ? l<<to_string(to_string_t(d.get(k.n())))
-			: k.c() == '\0' ? l<<"ε" : l<<k.c();		
-		l <<"_"<<k.span.first<<"_"<<k.span.second<<"_";
-		std::string desc = to_string(to_string_t(l.str()));
+		std::stringstream l;
+		k.nt() ? l << to_string(to_string_t(d.get(k.n())))
+			: k.c() == '\0' ? l << "ε" : l << k.c();		
+		l << "_" << k.span.first << "_" << k.span.second << "_";
+		std::string desc = l.str();
 		return std::pair<size_t, std::string>(
 			std::hash<std::string>()(desc), desc);
 	};
 	ss << "digraph {\n";
-	ss << "_input_"<<"[label =\""<<to_string(to_string_t(inputstr)) <<
+	ss << "_input_" << "[label =\"" << to_string(to_string_t(inputstr)) <<
 		"\", shape = rectangle]" ;
-	ss << "_grammar_"<<"[label =\""<<grammar_text()<<
+	ss << "_grammar_" << "[label =\"" << grammar_text() <<
 		"\", shape = rectangle]" ;
-	ss << endl << "node" << "[ ordering =\"out\"];";
-	ss << endl << "graph" << "[ overlap =false, splines = true];";
+	ss << "\nnode" << "[ ordering =\"out\"];";
+	ss << "\ngraph" << "[ overlap =false, splines = true];";
 
 	std::unordered_set<std::pair<size_t,size_t>, hasher_t> edgedone;
-
 	edgedone.clear();
-	for( auto &it: pfgraph ) {
+	for (auto &it: pfgraph) {
 		auto key = keyfun(it.first);
-		ss << endl<< key.first << "[label=\""<< key.second <<"\"];";
-		size_t p=0;
-		stringstream pstr;
-		for( auto &pack : it.second) {
-			pstr<<to_string(to_string_t(key.second))<<p++;
-			auto ambkey = std::hash<string>()(pstr.str());
-			ss << std::endl<<ambkey << "[shape = point,label=\""<< to_string(to_string_t(pstr.str())) << "\"];";
+		ss << "\n" << key.first << "[label=\"" << key.second <<"\"];";
+		size_t p = 0;
+		std::stringstream pstr;
+		for (auto &pack : it.second) {
+			pstr<<key.second<<p++;
+			auto ambkey = std::hash<std::string>()(pstr.str());
+			ss << "\n" << ambkey << "[shape = point,label=\"" <<
+				pstr.str() << "\"];";
 			if(edgedone.insert({ key.first, ambkey }).second )
-				ss << std::endl << key.first   <<"->" << ambkey<<';';
-			for( auto & nn: pack) {
+				ss << "\n" << key.first << "->" << ambkey <<';';
+			for (auto & nn: pack) {
 				auto nkey = keyfun(nn);
-				ss  << endl<< nkey.first << "[label=\""<< nkey.second<< "\"];";
-				if(edgedone.insert({ ambkey, nkey.first }).second )
-					ss << std::endl << ambkey   <<"->" << nkey.first<< ';';
+				ss << "\n" << nkey.first << "[label=\"" <<
+					nkey.second << "\"];";
+				if (edgedone.insert({ ambkey, nkey.first })
+					.second) ss << "\n" << ambkey << "->" <<
+						nkey.first<< ';';
 			}
 			pstr.str({});
 		}

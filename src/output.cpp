@@ -87,7 +87,7 @@ output::type_t output::target(const string t) {
 	}
 	if (open_path_before_finish)
 		file_.open(path_, ofstream::binary | ofstream::app),
-		file_.imbue(locale("")),
+		//file_.imbue(locale("")), # -> wrong formating of os << numbers
 		os(&file_);
 	return type_;
 }

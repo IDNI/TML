@@ -238,7 +238,7 @@ void options::setup() {
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step","fp","adds __fp__ fact when reaches a fixed point");
 	add(option(option::type::STRING, {"arguments","args","options","opts"},
-		[this](const option::value& v) {
+		[this](const option::value&) {
 			this->program_arguments = !this->program_arguments;
 		}
 	 ).description("delimiter between TML and program's arguments"));
