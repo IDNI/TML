@@ -276,13 +276,14 @@ std::string earley<CharT>::grammar_text() {
 	std::stringstream txt;
 	for (const auto &p : G) {
 		txt << "\n\\l";
-		size_t i=0;
+		size_t i = 0;
 		for( const auto &l : p){
-			if(l.nt()) txt << to_string(to_string_t(d.get(l.n())));
-			else if ( l.c() != '\0') txt << l.c();
+			if (l.nt()) txt << to_string(to_string_t(d.get(l.n())));
+			else if (l.c() != '\0')
+				txt << to_string(to_string_t(l.c()));
 			else txt << "ε";
-			txt<< " ";
-			if( i++ == 0) txt << "-> ";
+			txt <<  " ";
+			if (i++ == 0) txt << "-> ";
 		}
 	}
 	return txt.str();
@@ -435,7 +436,8 @@ bool earley<CharT>::to_dot(ostream_t& ss) {
 	auto keyfun = [this] (const nidx_t & k){
 		std::stringstream l;
 		k.nt() ? l << to_string(to_string_t(d.get(k.n())))
-			: k.c() == '\0' ? l << "ε" : l << k.c();		
+			: k.c() == '\0' ? l << "ε"
+				: l << to_string(to_string_t(k.c()));
 		l << "_" << k.span.first << "_" << k.span.second << "_";
 		std::string desc = l.str();
 		return std::pair<size_t, std::string>(
