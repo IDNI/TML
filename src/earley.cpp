@@ -53,7 +53,7 @@ bool earley<CharT>::all_nulls(const vector<lit>& p) const {
 }
 
 template <typename CharT>
-earley<CharT>::earley(const vector<production> &g) {
+earley<CharT>::earley(const vector<production> &g, bool _bin_lr): bin_lr(_bin_lr) {
 	set<string> nt;
 	auto tostr = [this](const string_t &s) {
 		std::basic_ostringstream<CharT> os;
@@ -104,7 +104,7 @@ earley<CharT>::earley(const vector<production> &g) {
 }
 
 template <typename CharT>
-earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g) {
+earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g, bool _bin_lr) : bin_lr(_bin_lr) {
 	set<string> nt;
 	for (const auto &x : g) nt.insert(x.first);
 	for (const auto &x : g)
@@ -266,61 +266,10 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 		if (S.find( item(len, n, 0, G[n].size())) != S.end()) {
 			found = true;
 		}
-	emeasure_time_end( tsr, ter ) <<" :: parse time" <<endl;
-	nidx_t root(start, {0,len});
-	pfgraph.clear();
-	emeasure_time_start(tspfo, tepfo);
-	int count = 0;
-	for (const item& i : S) 
-		if (completed(i)) count++,
-			//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
-			sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i);
-	(emeasure_time_end(tspfo, tepfo) <<" :: pre forest optimizations,"<< "size "<< count++ <<" \n");
-	emeasure_time_start(tsf, tef);
-	forest(root);
-	(emeasure_time_end(tsf, tef) <<" :: forest time "<<endl) ;
-	if (o::enabled("parser-to-dot")) {
-		emeasure_time_start(tsf1, tef1);
-		to_dot(o::to("parser-to-dot"));
-		emeasure_time_end(tsf1, tef1) << ":: to dot time\n";
-	}
-	if (o::enabled("parser-to-tml")) {
-		emeasure_time_start(tsf2, tef2);
-		to_tml_facts(o::to("parser-to-tml")),
-		emeasure_time_end(tsf2, tef2) << ":: to tml time\n";
-	}
-	if (o::enabled("parser-to-rules")) {
-		emeasure_time_start(tsf3, tef3);
-		to_tml_rule(o::to("parser-to-rules")),
-		emeasure_time_end(tsf3, tef3) << ":: to rules time\n";
-	}
+	emeasure_time_end( tsr, ter ) <<" :: recognize time" <<endl;
+	forest();
 	return found;
 }
-/*
-void earley::forest(ast& a, const vector<ast>& v) const {
-	size_t from = a.i.from;
-	for (size_t a.i.dot = 1; a.i.dot != G[a.i.prod].size(); ++a.i.dot)
-		if (!get_lit(a.i).nt()) ++from;
-		else {
-			;
-		}
-}
-
-void earley::forest(size_t prod, size_t from, const vector<ast>& v,
-		function<void(ast&)> f) const {
-}
-
-vector<ast> earley::forest() {
-	vector<ast> v;
-	for (const item& i : S) if (completed(i)) v.emplace_back(i);
-	S.clear();
-	for (size_t n : nts.at(start))
-		for (ast& a : v)
-			if (a.i == item(len, n, 0, G[n].size()))
-				forest(a, v);
-	return v;
-}
-*/
 
 template <typename CharT>
 std::string earley<CharT>::grammar_text() {
@@ -549,10 +498,148 @@ void earley<CharT>::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curc
 		}
 	}
 }
+template <typename CharT>
+bool earley<CharT>::forest( ){
+	bool ret = false;
+	// clear forest structure if any
+	pfgraph.clear();
+	bin_tnt.clear();
+	// set the start root node
+	size_t len = inputstr.length();
+	nidx_t root(start, {0,len});
+	// preprocess earley items for faster retrieval
+	emeasure_time_start(tspfo, tepfo);
+	int count = 0;
+	for (const item& i : S) { 
+		count++;
+			//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
+		if( completed(i) )
+			sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i),
+			rsorted_citem[{G[i.prod][0].n(), i.set}].emplace_back(i);
+		else if(bin_lr) {
+			static size_t tid=0;
+			if( i.dot >= 3 ){
+				std::vector<lit> v(G[i.prod].begin()+1, G[i.prod].begin()+i.dot);
+				lit tlit;
+				if(bin_tnt.find(v) == bin_tnt.end()) {
+					stringstream ss;
+					ss << "temp" << tid++;
+					tlit = lit(d.get(ss.str()));
+					bin_tnt.insert({v, tlit});
+				}
+				else tlit = bin_tnt[v];
+				
+				//DBG(print(o::dbg(), i);)
+				//o::dbg()<< endl << d.get(tlit.n()) << v << endl;
+				sorted_citem[{tlit.n(), i.from}].emplace_back(i),
+				rsorted_citem[{tlit.n(), i.set}].emplace_back(i);
+			}
+		}
+	}
+
+	emeasure_time_end(tspfo, tepfo) <<" :: preprocess time ,"<< "size : "<< count << endl;
+	o::dbg() <<"sort sizes : " << sorted_citem.size() <<" " << rsorted_citem.size() <<" \n";
+	// build forest
+	emeasure_time_start(tsf, tef);
+	if(bin_lr)
+		ret = build_forest2(root);
+	else 
+		ret = build_forest(root);
+	emeasure_time_end(tsf, tef) <<" :: forest time "<<endl ;
+	// emit output in various formats
+	if (o::enabled("parser-to-dot")) {	
+		emeasure_time_start(tsf1, tef1);
+		to_dot(o::to("parser-to-dot")),
+		emeasure_time_end(tsf1, tef1) << ":: to dot time\n";
+	}
+	if (o::enabled("parser-to-tml")) {
+		emeasure_time_start(tsf2, tef2);
+		to_tml_facts(o::to("parser-to-tml")),
+		emeasure_time_end(tsf2, tef2) << ":: to tml time\n";
+	}
+	if (o::enabled("parser-to-rules")) {
+		emeasure_time_start(tsf3, tef3);
+		to_tml_rule(o::to("parser-to-rules")),
+		emeasure_time_end(tsf3, tef3) << ":: to rules time\n";
+	}
+	return ret; 
+}
+template <typename CharT>
+bool earley<CharT>::bin_lr_comb(const item& eitem, std::set<std::vector<nidx_t>>& ambset) {
+
+	std::vector<nidx_t> rcomb, lcomb;
+	if( eitem.dot < 2  ) return false;
+
+	nidx_t right = G[eitem.prod][eitem.dot-1];
+
+	if(!right.nt()) {
+		right.span.second = eitem.set;
+		if( right.c() == (CharT) '\0') right.span.first = right.span.second;
+		else if (inputstr.at(eitem.set -1) == right.c() )
+			right.span.first = eitem.set -1 ;
+		else return false;
+		rcomb.emplace_back(right);
+	}
+	else {
+		auto &rightit = rsorted_citem[{right.n(), eitem.set}];
+		for( auto &it : rightit)
+			if( eitem.from <= it.from ) 
+				right.span.second = it.set, right.span.first = it.from,
+				rcomb.emplace_back(right);
+	}
+	// many literals in rhs
+	if(eitem.dot > 3) {
+		//DBG(print(o::dbg(), eitem);)
+		std::vector<lit> v(G[eitem.prod].begin()+1, G[eitem.prod].begin()+ eitem.dot - 1);
+		DBG(assert( bin_tnt.find(v) != bin_tnt.end());)
+		nidx_t left = bin_tnt[v];
+		//DBG(COUT << std::endl << d.get(bin_tnt[v].n()) << std::endl);
+		auto &leftit = sorted_citem[{left.n(), eitem.from}];
+		// doing left right optimization
+		for(auto &it : leftit) 
+			for(auto &rit : rcomb)    
+				if(it.set == rit.span.first) {
+					left.span.first = it.from;
+					left.span.second = it.set;
+					ambset.insert({left, rit});
+				} 
+	}
+	// exact two literals in rhs
+	else if(eitem.dot == 3 ) {	
+		nidx_t left = G[eitem.prod][eitem.dot-2];
+		if(!left.nt()) {
+			left.span.first = eitem.from;
+			if( left.c() == (CharT) '\0') left.span.second = left.span.first;
+			else if (inputstr.at(eitem.from) == left.c() )
+				left.span.second = eitem.from + 1  ;
+			else return false;
+			//do Left right optimisation
+			for(auto &rit : rcomb)  
+				if( left.span.second == rit.span.first)
+					ambset.insert({left, rit});
+		}
+		else {
+	 		auto &leftit = sorted_citem[{left.n(), eitem.from}];
+			for(auto &it : leftit) 
+				for(auto &rit : rcomb)    
+					if(it.set == rit.span.first)
+						left.span.first = it.from,
+						left.span.second = it.set,
+						ambset.insert({left, rit});
+		}
+	}
+	else {
+		DBG(assert(eitem.dot == 2));
+		for(auto &rit : rcomb)    
+			if(eitem.from <= rit.span.first)
+				ambset.insert({rit});
+	}
+	return true;
+}
 
 // builds the forest starting with root
 template <typename CharT>
-bool earley<CharT>::forest ( const nidx_t &root ) {
+bool earley<CharT>::build_forest ( const nidx_t &root ) {
 	if(!root.nt()) return false;
 	if(pfgraph.find(root) != pfgraph.end()) return false;
 
@@ -567,7 +654,29 @@ bool earley<CharT>::forest ( const nidx_t &root ) {
 		pfgraph[cnode] = ambset;
 		for ( auto &aset: ambset )
 			for( const nidx_t& nxt: aset) {
-				forest( nxt);
+				build_forest( nxt);
+			}
+	}	
+	return true;
+}
+
+template <typename CharT>
+bool earley<CharT>::build_forest2 ( const nidx_t &root ) {
+	if(!root.nt()) return false;
+	if(pfgraph.find(root) != pfgraph.end()) return false;
+
+	//auto &nxtset = sorted_citem[root.n()][root.span.first];
+	auto &nxtset = sorted_citem[{root.n(),root.span.first}];
+	std::set<std::vector<nidx_t>> ambset;
+	for(const item &cur: nxtset) {
+		if(cur.set != root.span.second) continue;
+		nidx_t cnode( completed(cur) ? G[cur.prod][0]: root.n(),
+		 {cur.from, cur.set} );
+		bin_lr_comb(cur, ambset);
+		pfgraph[cnode] = ambset;
+		for ( auto &aset: ambset )
+			for( const nidx_t& nxt: aset) {
+				build_forest2( nxt);
 			}
 	}	
 	return true;

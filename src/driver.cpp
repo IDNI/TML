@@ -5211,6 +5211,7 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.show_hidden       = opts.enabled("show-hidden");
 	to.bitunv			 = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
+	to.bin_lr            = opts.enabled("bin-lr");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);
