@@ -860,7 +860,8 @@ bool ptransformer::parse_alts( vector<elem> &next, size_t& cur){
 
 lexeme ptransformer::get_fresh_nonterminal(){
 	static size_t count=0;
-	string fnt = "_R"+ to_string(lexeme2str(this->p.p[0].e))+ to_string(count++);
+	string fnt = "_R" + to_string(lexeme2str(this->p.p[0].e)) + "_" +
+		to_string(count++);
 	return d.get_lexeme(fnt);
 }
 
@@ -1230,7 +1231,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 	DBG(o::dbg()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::dbg() << p << endl;)
 
-	#define ONLY_EARLEY
+	//#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
 
 	earley_t::char_builtins_map bltnmap{
@@ -1282,7 +1283,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p, form*& /*
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
 	return true;
-	#endif
+	#endif // ONLY_EARLEY
 
 	vector<term> v;
 	static const set<string> b =

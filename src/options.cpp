@@ -266,8 +266,11 @@ void options::setup() {
 		.description("load database from file before start"));
 	add(option(option::type::STRING, { "save", "s" })
 		.description("save database to file after finish"));
-	add_bool2("bin-lr", "blr",
-		"on the fly binarization and left right optimization for earley items ");
+	add_bool2("earley", "ep", "use earley parser");
+	add_bool2("print-ambiguity", "pamb", "print parsed ambiguous packs");
+	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");
+	add_bool2("bin-lr", "blr", "on the fly binarization and left "
+					"right optimization for earley items");
 	add_output    ("dump",        "dump output     (@stdout by default)");
 	add_output_alt("output", "o","standard output (@stdout by default)");
 	add_output    ("error",       "errors          (@stderr by default)");

@@ -467,7 +467,8 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 						}), e.end()); // del modifiers
 				}
 				break;
-			case elem::ARITH: arith = true; arith_op_aux = e.back().arith_op; break;
+			case elem::ARITH: arith_op_aux = e.back().arith_op;
+				arith = true; break;
 			default: break;
 		}
 	}
@@ -484,7 +485,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 	if (forget) bltin = true, e[0].type = elem::BLTIN;
 
 	if (pref_type == rtextype::CONSTRAINT)  {
-		extype = rtextype::CONSTRAINT;		
+		extype = rtextype::CONSTRAINT;
 		return true;	
 	}
 
@@ -888,6 +889,7 @@ bool raw_sof::parse(input* in, sprawformtree &root) {
 
 	root = NULL;
 	bool ret = parseform(in, root );
+	//DBG(print_raw_form_tree(COUT << "raw_sof::parsed: ", *root) << "\n";)
 
 	if (!(in->l[in->pos] == "then" || in->l[in->pos] == "do")) {
 		if (in->pos >= in->l.size() || *in->l[in->pos][0] != '.')
@@ -1107,16 +1109,19 @@ bool raw_prog::parse(input* in, dict_t &dict) {
 
 	if (macros.empty()) return true;
 
-	for(raw_rule &rr : r)
-		for (vector<raw_term> &vrt : rr.b)
-			for (size_t i = 0; i != vrt.size(); i++)
-				for (macro &mm : macros)
-					for(size_t j = 0; j < vrt[i].e.size(); j++)
-						if( vrt[i].e[j].e == mm.def.e[0].e ) {
-							if( !macro_expand(in, mm, i, j, vrt, dict))
-								return --last_id, false;
-							else break;
-						}								
+	return expand_macros(in, dict);
+}
+bool raw_prog::expand_macros(input* in, dict_t &dict) {
+	if (macros.empty()) return true;
+	//DBG(o::dbg() << "rp before expanding: >\n" << *this << "\n<\n";)
+	for (raw_rule &rr : r) for (vector<raw_term> &vrt : rr.b)
+		for (size_t i= 0; i != vrt.size(); i++) for (macro &mm : macros)
+			for (size_t j = 0; j < vrt[i].e.size(); j++)
+				if (vrt[i].e[j].e == mm.def.e[0].e) {
+					if (!macro_expand(in,mm,i,j, vrt, dict))
+						return --last_id, false;
+					else break;
+				}
 	return true;
 }
 environment& raw_prog::get_typenv() {
@@ -1129,62 +1134,60 @@ raw_prog::raw_prog(){
 	 typenv = std::make_shared<environment>();
 }
 bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j, 
-						vector<raw_term> &vrt, dict_t &dict) {
-
+	vector<raw_term> &vrt, dict_t &dict)
+{
 	std::map<elem, elem> chng; 
-	vector<elem>::iterator et = vrt[i].e.begin()+j;
+	vector<elem>::iterator et = vrt[i].e.begin() + j;
 	vector<elem>::iterator ed = mm.def.e.begin();
-	
-	if( vrt[i].e.size() == mm.def.e.size()  && j == 0)  {// normal macro
-		for( ++et, ++ed; et!=vrt[i].e.end() && ed!=mm.def.e.end(); 	et++, ed++)
-			if( (et->type == elem::VAR || et->type == elem::NUM || 
-				et->type == elem::CHR || et->type == elem::SYM || et->type == elem::STR)
-				&& ed->type == elem::VAR) 
-				chng[*ed] = *et;
-				
-		for ( auto &tt:mm.b )
-			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
-				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
-					*tochng = chng[*tochng];
-					
-		vrt.erase(i+vrt.begin());
-		vrt.insert(i+vrt.begin(), mm.b.begin(), mm.b.end());
+	if (vrt[i].e.size() == mm.def.e.size() && j == 0)  {// normal macro
+		for (++et, ++ed; et != vrt[i].e.end() && ed != mm.def.e.end();
+			et++, ed++) if (ed->type == elem::VAR && (
+				et->type == elem::VAR || et->type == elem::NUM||
+				et->type == elem::CHR || et->type == elem::SYM||
+				et->type == elem::STR)) chng[*ed] = *et;
+		for (auto &tt:mm.b)
+			for (auto tochng = tt.e.begin(); tochng != tt.e.end();
+				tochng++) if (tochng->type == elem::VAR &&
+					(chng.find(*tochng)!= chng.end()))
+						*tochng = chng[*tochng];
+		vrt.erase(i + vrt.begin());
+		vrt.insert(i + vrt.begin(), mm.b.begin(), mm.b.end());
 		return true;
-	
-	} else if( j > 0)  {// create fresh var and unary case
+	} else if (j > 0) { // create fresh var and unary case
 		vector<elem> carg;
-		for( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
-			if(	et->type == elem::VAR ) carg.emplace_back(*et);
-		if(carg.size() == 0 ) 
-			return in->parse_error(vrt[i].e[0].e[0],"Missing arg in macro call",vrt[i].e[0].e), 
+		for ( ; et != vrt[i].e.end() && et->type != elem::CLOSEP; et++)
+			if (et->type == elem::VAR) carg.emplace_back(*et);
+		if (carg.size() == 0) 
+			return in->parse_error(vrt[i].e[0].e[0],
+				"Missing arg in macro call", vrt[i].e[0].e), 
 			false;
-
 		int counter = 0;
 		elem ret;
-		for( size_t a = 0 ; ed!=mm.def.e.end(); ed++) {
-			if(ed->type == elem::VAR)  {
-				if(a < carg.size())
-					chng[*ed] = carg[a++];
-				else
-					chng[*ed] = elem(elem::VAR, dict.get_var_lexeme_from(
-											dict.get_fresh_var(counter++))), 
+		for (size_t a = 0; ed != mm.def.e.end(); ed++)
+			if (ed->type == elem::VAR)  {
+				if (a < carg.size()) chng[*ed] = carg[a++];
+				else chng[*ed] = elem(elem::VAR, dict
+					.get_var_lexeme_from(dict
+						.get_fresh_var(counter++))), 
 					ret = chng[*ed];
 			}
-		}
-		for( auto &tt:mm.b ) 
-			for(  auto tochng = tt.e.begin(); tochng!=tt.e.end(); tochng++ )
-				if( tochng->type == elem::VAR &&  (chng.find(*tochng)!= chng.end()))
-					*tochng = chng[*tochng];
+		for (auto &tt:mm.b) 
+			for (auto tochng = tt.e.begin(); tochng != tt.e.end();
+				tochng++)
+				if (tochng->type == elem::VAR &&
+					(chng.find(*tochng) != chng.end()))
+						*tochng = chng[*tochng];
 		// TODO
-		DBG(o::dbg()<<carg.size();)	
-		vrt[i].e.erase(vrt[i].e.begin()+j, vrt[i].e.begin()+j+1+carg.size()+2);
-		vrt[i].e.insert(vrt[i].e.begin()+2, ret);
+		//DBG(o::dbg() << carg.size();)	
+		vrt[i].e.erase(vrt[i].e.begin() + j,
+			vrt[i].e.begin() + j + 1 + carg.size() + 2);
+		vrt[i].e.insert(vrt[i].e.begin() + 2, ret);
 		vrt[i].calc_arity(in);
-		vrt.insert(i+vrt.begin()+1, mm.b.begin(), mm.b.end());
+		vrt.insert(i + vrt.begin() + 1, mm.b.begin(), mm.b.end());
 		return true;
-	}
-	else return in->parse_error(vrt[i].e[0].e[0],"Error macro call",vrt[i].e[0].e),
-			false;	
+	} else return in->parse_error(vrt[i].e[0].e[0], "Error macro call",
+		vrt[i].e[0].e),
+		false;	
 }
 
 raw_progs::raw_progs() { } // parse(s); 

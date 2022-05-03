@@ -194,23 +194,22 @@ size_t emit_codepoint(char32_t ch, char_t *s) {
  * @param ch unicode codepoint
  * @return output stream
  */
-basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& os,
-	char32_t ch)
-{
-	if (ch < 0x80) return os.put((char_t) ch);
+basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& o, char32_t ch) {
+	if (ch < 0x80)
+		return o.put((char_t) ch);
 	else if (ch < 0x800)
-		return os.put((char_t) (0xC0 + (ch >> 6)))
+		return o.put((char_t) (0xC0 + (ch >> 6)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	else if (ch < 0x10000)
-		return os.put((char_t) (0xE0 + (ch >> 12)))
+		return o.put((char_t) (0xE0 + (ch >> 12)))
 			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	else if (ch < 0x110000)
-		return os .put((char_t) (0xF0 + (ch >> 18)))
+		return o.put((char_t) (0xF0 + (ch >> 18)))
 			.put((char_t) (0x80 + ((ch >> 12) & 0x3F)))
 			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
-	return os;
+	return o;
 }
 
 string_t to_string_t(char ch) {

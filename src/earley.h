@@ -42,6 +42,9 @@ public:
 	typedef std::variant<size_t, CharT> lit_t;
 	typedef std::function<bool(CharT)> char_builtin_t;
 	typedef std::map<string, char_builtin_t> char_builtins_map;
+	bool print_ambiguity  = false;
+	bool print_traversing = false;
+	bool auto_passthrough = true;
 private:
 	struct lit : public lit_t {
 		using lit_t::variant;
@@ -57,6 +60,7 @@ private:
 		else if (l.c() == (CharT) '\0') return epsilon();
 		else return string{ '\'', l.c(), '\'' };
 	}
+	string to_str(const string_t& s) const;
 	struct pnode {
 		lit l;
 		std::pair<size_t, size_t> span; // start/end of the matched span
@@ -121,7 +125,7 @@ private:
 	void complete(const item& i, std::set<item>& t);
 	void predict(const item& i, std::set<item>& t);
 	void scan(const item& i, size_t n, CharT ch);
-	void scan_builtin(const item& i, size_t n, CharT ch);
+	void scan_builtin(const item& i, size_t n, const string& s);
 	bool nullable(const item& i) const {
 		return	i.dot < G[i.prod].size() &&
 			((get_lit(i).nt() &&
@@ -147,6 +151,11 @@ public:
 	typedef std::map<nidx_t, std::vector<nidx_t>> ptree_t;
 	typedef std::vector<std::variant<size_t, string>> arg_t;
 	typedef std::vector<std::pair<string, const nidx_t>> node_children;
+	typedef std::vector<node_children> node_children_variations;
+	typedef std::function<void(const nidx_t&, const node_children_variations&)>
+		action_fn;
+	typedef std::pair<string, action_fn> action_pair;
+	typedef std::map<string, action_fn> actions;
 	earley(const grammar& g, const char_builtins_map& bm,
 		bool _bin_lr = false);
 	earley(const grammar& g, bool _bin_lr) : earley(g, {}, _bin_lr) {}
@@ -158,15 +167,28 @@ public:
 	earley(const std::vector<production>& g) : earley(g, {}) {}
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
-	string flatten(string label, const nidx_t nd) const;
+	void topdown(const string& start, const actions& a) const;
+	void down(const nidx_t& nd, const actions& a) const;
+	void down(const node_children& nc, const actions& a) const {
+		for (auto&c : nc) down(c.second, a);	
+	};
+	void down(const node_children_variations& ncs, const actions& a) const {
+		for (auto&nc : ncs) down(nc, a);
+	};
+	string shorten(const string& s, size_t len = 60,
+		const string& suffix = string{ '.', '.', '.' }) const;
+	string flatten(const nidx_t nd) const;
 	ptree_t get_parsed_tree(size_t );
 	size_t count_parsed_trees() const;
 private:
 	string epsilon() const;
-	node_children get_children(const nidx_t nd, bool all) const;
+	node_children_variations get_children(const nidx_t nd, bool all = false)
+		const;
 	bool bin_lr;  //enables binarizaion and left right optimization
 	bool to_dot(ostream_t& os);
-	std::string to_dot_safestring(const string& s) const;
+	std::string dot_safe(const std::string& s) const;
+	std::string to_stdstr(const string& s) const;
+	std::string to_stdstr(const char32_t& s) const;
 	struct hasher_t{
 		size_t hash_size_t(const size_t &val) const{
 			return std::hash<size_t>()(val)  + 0x9e3779b9 + (val << 6) + (val >> 2);

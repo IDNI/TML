@@ -280,7 +280,7 @@ struct elem {
 			case EQ: e = STR_TO_LEXEME("="); break;
 			case OPENP: e = STR_TO_LEXEME("("); break;
 			case CLOSEP: e = STR_TO_LEXEME(")"); break;
-			case ALT: e = STR_TO_LEXEME("||"); break;
+			case ALT: e = STR_TO_LEXEME("|"); break;
 			case NEQ: e = STR_TO_LEXEME("!="); break;
 			case LEQ: e = STR_TO_LEXEME("<="); break;
 			case GT: e = STR_TO_LEXEME(">"); break;
@@ -288,6 +288,7 @@ struct elem {
 			case GEQ: e = STR_TO_LEXEME(">="); break;
 			case NOT: e = STR_TO_LEXEME("~"); break;
 			case AND: e = STR_TO_LEXEME("&&"); break;
+			case OR: e = STR_TO_LEXEME("||"); break;
 			case FORALL: e = STR_TO_LEXEME("forall"); break;
 			case EXISTS: e = STR_TO_LEXEME("exists"); break;
 			case UNIQUE: e = STR_TO_LEXEME("unique"); break;
@@ -310,6 +311,13 @@ struct elem {
 	elem(etype type, t_arith_op arith_op, lexeme e) : type(type),
 			arith_op(arith_op), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
+	}
+	elem(t_arith_op arith_op) : type(ARITH), arith_op(arith_op) {
+		switch(arith_op) {
+			case MULT: e = STR_TO_LEXEME("*"); break;
+			case ADD:  e = STR_TO_LEXEME("+"); break;
+			default: assert(false); //should never reach here
+		}
 	}
 	etype peek(input* in);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }
@@ -444,11 +452,11 @@ struct typestmt {
 	structype rty;
 	elem reln;
 	std::vector<typedecl> typeargs;
-	bool is_predicate(){
+	bool is_predicate() const {
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
 		return reln.e[0] != NULL; 
 	}
-	bool is_typedef(){
+	bool is_typedef() const {
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
 		return rty.structname.e[0] != NULL; 
 	}
@@ -855,6 +863,7 @@ struct raw_prog {
 	bool parse_statement(input* in, dict_t &dict);
 	bool parse_nested(input* in, dict_t &dict);
 	bool parse_xfp(input* in, dict_t &dict);
+	bool expand_macros(input* in, dict_t& dict);
 	bool macro_expand(input *in , macro mm, const size_t i, const size_t j, 
 				std::vector<raw_term> &vrt, dict_t &dict);
 	environment& get_typenv();
@@ -894,6 +903,10 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const elem& e);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_form_tree &t);
+#ifdef DEBUG
+template <typename T>
+std::basic_ostream<T>& print_raw_form_tree(std::basic_ostream<T>& os, const raw_form_tree &t, bool root = true);
+#endif // DEBUG
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_term& t);
 template <typename T>

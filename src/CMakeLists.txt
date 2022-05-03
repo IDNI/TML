@@ -55,6 +55,7 @@ set(TML_SOURCES
 	tables.cpp
 	tables_builtins.cpp
 	tables_ext.cpp
+	tml_earley.cpp
 	transform.cpp
 	transform_guards.cpp
 	utils.cpp

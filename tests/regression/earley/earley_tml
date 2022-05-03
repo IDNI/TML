@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# temporary file common part
+TMPFILE="tmp.earley_tml"
+
+# empty temporary files
+echo -n > $TMPFILE.dump.tml
+echo -n > $TMPFILE.dot
+echo -n > $TMPFILE.tml
+echo -n > $TMPFILE.rules.tml
+
+
+# run early parser
+#gdb --args \
+../../../build-Debug/tml \
+	--earley \
+	--no-debug  \
+	--info   \
+	--no-benchmarks \
+	--dont-print-steps \
+	--dump $TMPFILE.dump.tml \
+	--print-traversing \
+	--print-ambiguity \
+	--parser-to-dot $TMPFILE.dot \
+	--parser-to-tml $TMPFILE.tml \
+	--parser-to-rules $TMPFILE.rules.tml \
+	$@

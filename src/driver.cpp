@@ -5087,7 +5087,19 @@ bool driver::prog_run(raw_prog& p, size_t steps, size_t break_on_step) {
 }
 
 bool driver::add(input* in) {
-	if (!rp.parse(in, tbl->get_dict())) return !(error = true);
+	if (opts.enabled("earley")) {
+		rp = earley_parse_tml(in);
+#ifdef DEBUG
+		raw_progs rpt;
+		rpt.parse(in, tbl->get_dict());
+		o::inf() << "\n### parsed by earley:   >\n" << rp << "<###\n";			
+		o::inf() << "\n### parsed the old way: >\n" << rpt << "<###\n";
+		stringstream s1, s2;
+		s1 << rp;
+		s2 << rpt;
+		if (s1.str() != s2.str()) o::inf() << "\n\tNO MATCH\n";
+#endif
+	} else if (!rp.parse(in, tbl->get_dict())) return !(error = true);
 	//if (opts.enabled("transformed")) o::to("transformed")
 	//	<< "# program before transformation:\n" << rp << endl << endl;
 	if (opts.enabled("state-blocks"))
@@ -5209,9 +5221,8 @@ driver::driver(string s, const options &o) : rp(), opts(o) {
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.show_hidden       = opts.enabled("show-hidden");
-	to.bitunv			 = opts.enabled("bitunv");
+	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
-	to.bin_lr            = opts.enabled("bin-lr");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);

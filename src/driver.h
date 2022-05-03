@@ -204,6 +204,8 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
+	raw_progs earley_parse_tml(input* in);
+	std::vector<production> load_tml_grammar(inputs& gi);
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);

@@ -87,7 +87,7 @@ output::type_t output::target(const string t) {
 	}
 	if (open_path_before_finish)
 		file_.open(path_, ofstream::binary | ofstream::app),
-		file_.imbue(locale("")),
+		//file_.imbue(locale("")),
 		os(&file_);
 	return type_;
 }
@@ -359,7 +359,8 @@ basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const elem&);
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const production& p) {
 	os << p.p[0] << " => ";
-	for (size_t n = 1; n < p.p.size(); ++n) os << p.p[n] << ' ';
+	for (size_t n = 1; n  < p.p.size(); ++n) os << p.p[n] << ' ';
+	for (size_t n = 0; n != p.c.size(); ++n) os << ", " << p.c[n];
 	return os << '.';
 }
 template
@@ -448,19 +449,109 @@ template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_form_tr
 template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_form_tree &);
 
+#ifdef DEBUG
+template <typename T>
+basic_ostream<T>& print_raw_form_tree(basic_ostream<T>& os, const raw_form_tree &t, bool root) {
+	if (root) os << "@";
+	os << "[" << t.type << "]";
+	if (root) os << "@";
+	switch(t.type) {
+		case elem::IMPLIES:
+			os << "{";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " -> ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << "}";
+			break;
+		case elem::COIMPLIES:
+			os << "{";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " <-> ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << "}";
+			break;
+		case elem::AND:
+			os << "{";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " && ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << "}";
+			break;
+		case elem::ALT:
+			os << "{";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " || ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << "}";
+			break;
+		case elem::NOT:
+			os << "~{";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << "}";
+			break;
+		case elem::EXISTS:
+			os << "exists ";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " { ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << " }";
+			break;
+		case elem::UNIQUE:
+			os << "unique ";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " { ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << " }";
+			break;
+		case elem::FORALL:
+			os << "forall ";
+			if (!t.l) os << "NULL";
+			else print_raw_form_tree(os, *t.l, false);
+			os << " { ";
+			if (!t.r) os << "NULL";
+			else print_raw_form_tree(os, *t.r, false);
+			os << " }";
+			break;
+		case elem::NONE:
+			os << "#" << *t.rt << "#";
+			break;
+		case elem::SYM: case elem::VAR:
+			os << "%" << *t.el << "%";
+			break;
+		default:
+			assert(false); //should never reach here
+	}
+	return os;
+}
+template basic_ostream<char>& print_raw_form_tree(basic_ostream<char>&, const raw_form_tree&, bool root);
+template
+basic_ostream<wchar_t>& print_raw_form_tree(basic_ostream<wchar_t>&, const raw_form_tree&, bool root);
+#endif // DEBUG
+
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
 	if (t.neg) os << '~';
 	
-	if( t.extype == raw_term::ARITH) {
+	if (t.extype == raw_term::ARITH || t.extype == raw_term::CONSTRAINT) {
 		if (t.neg) os << '{';
-		for ( elem el : t.e) 
-			os << el;
+		for ( elem el : t.e) os << el;
 		if (t.neg) os << '}';
 		return os;
 	}
-	if (t.extype == raw_term::EQ ||
-		t.extype == raw_term::LEQ) {
+	if (t.extype == raw_term::EQ || t.extype == raw_term::LEQ) {
 		if (t.neg) os << '{';
 		os << t.e[0];
 		t.e[1].type == elem::EQ ? os << "=" : t.e[1].type == elem::LEQ ? os << "<=" :
@@ -537,6 +628,64 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_rule& r) {
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_rule&);
 template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const raw_rule&);
+
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const macro& m) {
+	os << m.def << " := ";
+	for (size_t k = 0; k != m.b.size(); ++k)
+		os << m.b[k] << (k != m.b.size()-1 ? ", " : "");
+	return os << ".";
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&, const macro&);
+template
+basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const macro&);
+
+template <typename T>
+basic_ostream<T>& print_typedecl(basic_ostream<T>& os,
+	const struct typedecl& td, bool comma = false)
+{
+	switch (td.pty.ty) {
+		case primtype::UCHAR: os << "char"; break;
+		case primtype::SYMB:  os << "sym"; break;
+		case primtype::UINT:  os << "int";
+			if (td.pty.bsz > 0) os << ':' << td.pty.bsz;
+			break;
+		case primtype::NOP:   os << td.structname; break;
+		default: assert(false);
+	}
+	os << " ";
+	std::string sep = comma ? ", " : " ";
+	for (size_t k = 0; k != td.vars.size(); ++k)
+		os << td.vars[k] << (k != td.vars.size()-1 ? sep : "");
+	return os;
+}
+template basic_ostream<char>& print_typedecl(basic_ostream<char>& os,
+	const struct typedecl& td, bool comma = false);
+template basic_ostream<wchar_t>& print_typedecl(basic_ostream<wchar_t>& os,
+	const struct typedecl& td, bool comma = false);
+
+template <typename T>
+basic_ostream<T>& operator<<(basic_ostream<T>& os, const struct typestmt& ts) {
+	if (ts.is_predicate()) {
+		os << "predtype " << ts.reln << "(";
+		for (size_t k = 0; k != ts.typeargs.size(); ++k)
+			print_typedecl(os, ts.typeargs[k]) <<
+				(k != ts.typeargs.size()-1 ? ", " : "");
+		os << ").";
+	} else {
+		os << "struct " << ts.rty.structname << " {\n";
+		for (size_t k = 0; k != ts.rty.membdecl.size(); ++k)
+			print_typedecl(os << "\t", ts.rty.membdecl[k], true) <<
+			".\n";
+		os << "}";
+	}
+	return os;
+}
+template basic_ostream<char>& operator<<(basic_ostream<char>&,
+	const struct typestmt&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&,
+	const struct typestmt&);
+
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::set<raw_term>& rts) {
@@ -688,6 +837,7 @@ basic_ostream<T>& print_raw_prog_tree(basic_ostream<T>& os, const raw_prog& p,
 {
 	basic_string<T> indent(level, '\t');
 	if (p.type != raw_prog::PFP) os << indent << "# "<< (int_t)p.type<<"\n";
+	for (auto x : p.vts) os << indent << x << "\n";
 	for (auto x : p.d) os << indent << x << "\n";
 	for (auto x : p.g) os << indent << x << "\n";
 	for (auto x : p.r) print_raw_rule(os, x, level) << "\n";
