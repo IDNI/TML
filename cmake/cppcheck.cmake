@@ -10,7 +10,7 @@ if (CPPCHECK)
             -j ${CORE_COUNT}
             --project=${CMAKE_BINARY_DIR}/compile_commands.json
             --quiet
-            --std=c++20
+            --std=c++2a
             -DBOOST_AUTO_TEST_SUITE
             -DTOOLBOX_BENCHMARK
             -DTOOLBOX_BENCHMARK_MAIN
