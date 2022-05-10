@@ -2662,7 +2662,7 @@ void driver::step_transform(raw_prog &rp,
 		vector<elem> clock_states = { elem::fresh_temp_sym(d) };
 		// Push the internal rules onto the program using conditioning to
 		// control execution order
-		for(const set<const relation *> v : sorted) {
+		for(const set<const relation *>& v : sorted) {
 			// Make a new clock state for the current stage
 			const elem clock_state = elem::fresh_temp_sym(d);
 			// If the previous state is asserted, then de-assert it and assert

@@ -152,4 +152,15 @@ template<typename T> struct ptrcmp {
 #define mksym(x) ((int_t) ((x) << 2) )
 #endif
 
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
+
 #endif
