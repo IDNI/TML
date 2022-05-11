@@ -28,22 +28,19 @@
 
 using namespace std;
 
-vector<production> driver::load_tml_grammar(inputs& gi) {
-	gi.add_file("./tml.g");
-	raw_progs rp;
-	bool ret = rp.parse(gi.last(), dict);
-	if (!ret || gi.last()->error) o::err() << "parsing tml grammar failed\n";
-	auto g = rp.p.nps[0].g;
+vector<production> driver::load_tml_grammar() {
+	// the following file is generated from /src/tml.g by /gen_tml.g.cpp.sh
+	#include "tml.g.cpp"
+	auto g = program_gen.p.nps[0].g;
 	ir->transform_strsplit(g);
-	//ir->transform_apply_regex(g, p);
 	bool changed = false;
 	if (!ir->transform_ebnf(g, dict, changed)) return {};
 	ir->transform_alts(g);
-#ifdef DEBUG
+//#ifdef DEBUG
 	//o::dbg() << "vector<production>:\n";
 	//for (auto& x : g) o::dbg() << "\t" << x << endl;
 	//o::dbg() << "///vector<production>;" << endl;
-#endif
+//#endif
 	return g;
 }
 
@@ -66,8 +63,7 @@ raw_progs driver::earley_parse_tml(input* in) {
 		{ U"eof",       [&eof](const char32_t& c)->bool {
 			return c == eof; } }
 	};
-	inputs gi;
-	auto g = load_tml_grammar(gi);
+	auto g = load_tml_grammar();
 	earley_t parser(g, bltnmap, opts.enabled("bin-lr"));
 	o::inf() << "\n### parser.recognize() : ";
 	bool success = parser

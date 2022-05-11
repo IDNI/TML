@@ -80,6 +80,7 @@ public:
 		create("parser-to-dot",        ".dot");
 		create("parser-to-tml",        ".parsed.tml");
 		create("parser-to-rules",      ".parsed-rules.tml");
+		create("program-gen",          ".cpp");
 #ifdef WITH_THREADS
 		create("repl-output", ".repl.out.log");
 #endif

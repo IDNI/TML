@@ -194,8 +194,6 @@ void options::setup() {
 		"factor out parts of queries using CQC test");
 	add_bool("to-dnf",
 		"convert FOL formulas into to DNF before running program");
-	add_bool("program-gen",
-		"generate C++ code to generate the given TML code");
 	add_bool("safecheck",
 		"enable safety check");
 	add(option(option::type::INT, { "iterate" }).description("transforms"
@@ -285,6 +283,8 @@ void options::setup() {
 	add_output("xsb",     "attempt to translate program into XSB");
 	add_output("swipl",   "attempt to translate program into SWI-Prolog");
 	add_output("souffle", "attempt to translate program into Souffle");
+	add_output_alt("program-gen", "cpp",
+		"generated C++ code of the given TML code");
 
 	init_defaults();
 }

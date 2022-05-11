@@ -204,8 +204,10 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
+	// following 2 methods are defined in a file tml_earley.cpp
 	raw_progs earley_parse_tml(input* in);
-	std::vector<production> load_tml_grammar(inputs& gi);
+	std::vector<production> load_tml_grammar();
+
 	raw_prog read_prog(elem prog, const raw_prog &rp);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
@@ -236,19 +238,6 @@ class driver {
 	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
-	string_t generate_cpp(const elem &e, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_term &rt, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_form_tree &prft, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const lexeme &lex);
-	string_t generate_cpp(const directive &dir, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,

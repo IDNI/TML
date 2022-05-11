@@ -22,6 +22,7 @@ set(TML_HEADERS
 	bdd.h
 	builtins.h
 	char_defs.h
+	cpp_gen.h
 	defs.h
 	dict.h
 	driver.h
@@ -42,6 +43,7 @@ set(TML_SOURCES
 	bdd.cpp
 	bdd_ext.cpp
 	builtins.cpp
+	cpp_gen.cpp
 	dict.cpp
 	driver.cpp
 	form.cpp
