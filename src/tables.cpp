@@ -183,7 +183,7 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 	return b;
 }
 
-bool tables::get_facts(const flat_prog& m) { 
+bool tables::get_facts(const flat_prog& m) {
 	// TODO: Ee need add and del in order to deal with negations in heads.
 	// A couple of regression tests use negation in heads.
 	// We should check whether this is a desirable feature.
@@ -191,7 +191,7 @@ bool tables::get_facts(const flat_prog& m) {
 	map<ntable, size_t> invert;
 	map<ntable, pair<vector<size_t>, vector<size_t>>> inverses;
 	// get facts by table
-	for (const auto& r : m) 
+	for (const auto& r : m)
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else if (r[0].is_builtin()) fact_builtin(r[0]);
@@ -205,10 +205,10 @@ bool tables::get_facts(const flat_prog& m) {
 	for (auto const p: invert)
 		inverses[p.first] = _inverse(bits, p.second);
 	// Compute the bdds for the each table
-	for (auto x: from_facts(add, inverses)) 
-		tbls[x.first].t = x.second; 
-	for (auto x: from_facts(del, inverses)) 
-		tbls[x.first].t = tbls[x.first].t % x.second; 
+	for (auto x: from_facts(add, inverses))
+		tbls[x.first].t = x.second;
+	for (auto x: from_facts(del, inverses))
+		tbls[x.first].t = tbls[x.first].t % x.second;
 	if (opts.optimize)
 		(o::ms() << "# get_facts: "),
 		measure_time_end();
@@ -218,12 +218,12 @@ bool tables::is_optimizable_fact(const term& t) const {
 	// For example: a. a(1 2 3). ~b. ~b(4 5 6).
 	return t.size() == 0 || (t.size() >0 && t[0] >= 0);
 }
-	
+
 map<ntable, spbdd_handle> tables::from_facts(
 		map<ntable, vector<const term*>>& pending,
 		const map<ntable, pair<vector<size_t>, vector<size_t>>>& inverses) const {
 	map<ntable, spbdd_handle> p;
-	for (auto t: pending) 
+	for (auto t: pending)
 		if (t.second.size() == 0) continue;
 		else p[t.first] = from_facts(t.second, inverses.at(t.first));
 	return p;
@@ -233,26 +233,31 @@ spbdd_handle tables::from_facts(
 		const pair<vector<size_t>, vector<size_t>>& inverse) const {
 	if (pending.size() == 0) return htrue;
 	// If the facts have no arguments, we return htrue regardless if
-	// they correspond to a del or and call. They will be process 
-	// properly in get_facts. 
+	// they correspond to a del or and call. They will be process
+	// properly in get_facts.
 	if (pending[0]->size() == 0) return htrue;
 	// Otherwise, we prooceed with the radix sorting & building of
 	// the bdd.
 	return from_facts(pending, pending.begin(), pending.end(), 0, inverse);
 }
-spbdd_handle tables::from_facts(vector<const term*>& terms, 
-		vector<const term*>::iterator left, 
-		vector<const term*>::iterator right, 
-		const size_t& pos, 
+spbdd_handle tables::from_facts(vector<const term*>& terms,
+		vector<const term*>::iterator left,
+		vector<const term*>::iterator right,
+		const size_t& pos,
 		const pair<vector<size_t>, vector<size_t>>& inverse) const {
 	size_t max = max_pos(*left);
-	if (pos == max) return from_bit(left, inverse);
-	auto it = partition(left, right, 
-		[this, pos, inverse](const term* t) -> bool { 
+	if (pos == max) {
+		#ifdef TYPE_RESOLUTION
+		if (next(left) != right) return htrue;
+		#endif
+		return from_bit(left, inverse);
+	}
+	auto it = partition(left, right,
+		[this, pos, inverse](const term* t) -> bool {
 			return !bit(pos, t, inverse.first, inverse.second); });
-	if (left == it)	return from_high(pos, 
+	if (left == it)	return from_high(pos,
 		from_facts(terms, it, right, pos +1, inverse) -> b);
-	if (right == it) return from_low(pos, 
+	if (right == it) return from_low(pos,
 		from_facts(terms, left, it, pos + 1, inverse) -> b);
 	return from_high_and_low(pos,
 		from_facts(terms, it, right, pos + 1, inverse) -> b,
@@ -301,16 +306,22 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] <= t[1]));
 	if (t[0] < 0 && t[1] < 0) {
 		q = leq_var(vm.at(t[0]), vm.at(t[1]), vl, bits);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[0]), vl) &&
 			constrain_to_num(vm.at(t[1]), vl);
+		#endif
 	} else if (t[0] < 0) {
 		q = leq_const(t[1], vm.at(t[0]), vl, bits);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[0]), vl);
+		#endif
 	} else if (t[1] < 0) {
 		// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 		q = htrue % leq_const(t[0], vm.at(t[1]), vl, bits) ||
 			from_sym(vm.at(t[1]), vl ,t[0]);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[1]), vl);
+		#endif
 	}
 	// Enforce the numeric constraint regardless of whether this term is positive
 	// or negated. This essentially forces any operands to inequalities to be
@@ -342,7 +353,7 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 		b.insert({ get_body(t, a.vm, a.varslen), t });
 		return;
 	}
-	
+
 	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
 	//todo: check that idbltin is properly configured in builtins
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
@@ -407,6 +418,12 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 }
 
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
+	#ifndef TYPE_RESOLUTION
+	size_t bits_l = bits - 2;
+	#else
+	size_t bits_l = bits;
+	#endif
+
 	auto t0 = al.begin();
 	DBG(assert(t0->extype == term::FORM1 || t0->extype == term::FORM2));
 	alt a;
@@ -437,12 +454,12 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	if (a.f->perm.size() == 0) {
 		term t; t.resize(a.f->varslen);
 		for (auto &v : vm) t[v.second] = v.first;
-		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits-2);
+		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits_l);
 	}
 
 	//todo: review to reach an arity-increment permutation to handle head constants
 	if (a.f->ex_h.size() == 0) {
-		auto d = deltail(a.f->varslen, tmpvm.size(), bits-2);
+		auto d = deltail(a.f->varslen, tmpvm.size(), bits_l);
 		a.f->ex_h = d.first, a.f->perm_h = d.second;
 	}
 	a.f->varslen_h = varsh;
@@ -461,25 +478,20 @@ void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
 	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
 }
 
-ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
-	vector<term> x) {
-	return p.emplace(x), x[0].tab;
-}
-
-bool tables::get_rules(flat_prog p) {
+bool tables::get_rules(flat_prog &p) {
 
 	if (!get_facts(p)) return false;
-
-	// <-- review
+	/*
+	// <-- TODO: review
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
-	for (const auto& x : q) prog_add_rule(p, r, x);
+	for (const auto& x : q) p.emplace(x);
 	replace_rel(move(r), p);
 	q = move(p);
-	for (const auto& x : q) prog_add_rule(p, r, x);
+	for (const auto& x : q) p.emplace(x);
 	replace_rel(move(r), p);
 	// -->
-
+	*/
 	if (opts.optimize) bdd::gc();
 
 	map<term, set<term_set>> m;
@@ -532,65 +544,6 @@ void tables::get_var_ex(size_t arg, size_t args, bools& b) const {
 
 void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
-}
-
-term tables::to_nums(term t) {
-	for (int_t& i : t)  if (i > 0) i = mknum(i);
-	return t;
-}
-
-vector<term> tables::to_nums(const vector<term>& v) {
-	vector<term> r;
-	for (const term& t : v) r.push_back(to_nums(t));
-	return r;
-}
-
-void tables::to_nums(flat_prog& m) {
-	flat_prog mm;
-	for (auto x : m) mm.insert(to_nums(x));
-	m = move(mm);
-}
-
-bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
-	map<ntable, ntable> m1, m2;
-	auto f = [&m1, &m2](ntable *x) {
-		auto it = m1.find(*x);
-		if (it != m1.end()) return *x = it->second;
-		const int_t y = (int_t)m2.size();
-		m1.emplace(*x, y), m2.emplace(y, *x);
-		return *x = y;
-	};
-	auto g = [&m2](const set<term>& s) {
-		set<term> r;
-		for (term t : s) {
-			auto it = m2.find(t.tab);
-			if (it == m2.end()) r.insert(t);
-			else t.tab = it->second, r.insert(t);
-		}
-		return r;
-	};
-	auto h = [this, f](const set<term>& s) {
-		set<term> r;
-		for (term t : s) {
-			ir_handler->get_table(
-					ir_handler->get_sig((int_t) f(&t.tab), {(int_t) t.size()}));
-			r.insert(t);
-		}
-		return r;
-	};
-	flat_prog p;
-	for (vector<term> x : m) {
-		ir_handler->get_table(
-				ir_handler->get_sig(f(&x[0].tab), {(int_t)x[0].size()}));
-		auto s = h(set<term>(x.begin() + 1, x.end()));
-		x.erase(x.begin() + 1, x.end()),
-		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
-	}
-//	DBG(print(o::out()<<"run_nums for:"<<endl, p)<<endl<<"returned:"<<endl;)
-	if (!add_prog_wprod(move(p), {})) return false;
-	if (!pfp(nsteps)) return false;
-	r = g(decompress());
-	return true;
 }
 
 //#ifdef TML_POP_UPDATE
@@ -691,7 +644,9 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		formula_query(a.f, f);
 		//TODO: complete for any type, only for ints by now
 		if (a.f->ex_h.size() != 0 ) {
+			#ifndef TYPE_RESOLUTION
 			append_num_typebits(f[0], a.f->varslen_h);
+			#endif
 			a.rlast = f[0];
 		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;
@@ -879,37 +834,6 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	DBGFAIL;
 }
 
-
-/* Run the given program with the given settings, put the query
- * results into the given out-parameter, and return true in the case
- * that it reaches a fixed point. Otherwise just return false. */
-
-bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		set<raw_term> &results)
-{
-	rt_options to;
-	to.bproof            = proof_mode::none;
-	to.optimize          = opts.enabled("optimize");
-	to.print_transformed = opts.enabled("t");
-	to.apply_regexpmatch = opts.enabled("regex");
-	to.fp_step           = opts.enabled("fp");
-	to.bitunv            = opts.enabled("bitunv");
-	to.bitorder          = opts.get_int("bitorder");
-	ir_builder ir_handler(dict, to);
-	tables tbl(dict, to, &ir_handler);
-	ir_handler.dynenv = &tbl;
-	ir_handler.printer = &tbl;
-	strs_t strs;
-	if(tbl.run_prog_wstrs(rp, strs)) {
-		for(const term &result : tbl.decompress()) {
-			results.insert(tbl.ir_handler->to_raw_term(result));
-		}
-		return true;
-	} else {
-		return false;
-	}
-}
-
 /* Run the given program on the given extensional database and yield
  * the derived facts. Returns true or false depending on whether the
  * given program reaches a fixed point. Useful for query containment
@@ -943,7 +867,24 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	}
 	// Run the program to obtain the results which we will then filter
 	std::set<raw_term> tmp_results;
-	bool result = run_prog(rp, dict, opts, tmp_results);
+	rt_options to;
+	to.bproof            = proof_mode::none;
+	to.optimize          = opts.enabled("optimize");
+	to.print_transformed = opts.enabled("t");
+	to.apply_regexpmatch = opts.enabled("regex");
+	to.fp_step           = opts.enabled("fp");
+	to.bitunv            = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
+	ir_builder ir_handler(dict, to);
+	tables tbl(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl;
+	ir_handler.printer = &tbl;
+	strs_t strs;
+
+	if (!tbl.run_prog(rp, strs)) return false;
+	for(const term &result : tbl.decompress())
+		tmp_results.insert(tbl.ir_handler->to_raw_term(result));
+
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -953,7 +894,7 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 			results.insert(res);
 		}
 	}
-	return result;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -1004,12 +945,12 @@ void tables::load_string(lexeme r, const string_t& s) {
 }
 #endif
 
-bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
+bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
 
 	DBG(COUT <<  "add_prog_wprod" << endl;);
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
-	if (mknums) to_nums(m);
+	//if (mknums) to_nums(m);
 	if (populate_tml_update) init_tml_update();
 	rules.clear(), datalog = true;
 
@@ -1019,7 +960,8 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 
 	if (!ir_handler->transform_grammar(g, m)) return false;
 
-	if (!get_rules(move(m))) return false;
+	//if (!get_rules(move(m))) return false;
+	if (!get_rules(m)) return false;
 
 	// filter for rels starting and ending with __
 	auto filter_internal_tables = [] (const lexeme& l) {
@@ -1037,10 +979,10 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknum
 }
 
 
-bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t steps,
+bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
-	DBG(COUT << "run_prog_wstrs" << endl;);
+	DBG(COUT << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
@@ -1065,8 +1007,14 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	if (opts.bitunv) {
 		bits = 1;
 	} else {
+		#ifdef TYPE_RESOLUTION
+		size_t a = max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms);
+		if (a == 0) bits++;
+		else while (a > size_t (1 << bits)-1) bits++;
+		#else
 		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
 			add_bit();
+		#endif
 	}
 
 	if (!add_prog_wprod(fp, p.g)) return false;;
@@ -1095,7 +1043,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	//TODO: prog_after_fp is required for grammar/str recognition,
 	// but it should be restructured
 	if (r && prog_after_fp.size()) {
-		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
+		if (!add_prog_wprod(move(prog_after_fp), {})) return false;
 		r = pfp();
 	}
 
@@ -1104,7 +1052,7 @@ bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs_in, size_t ste
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
-			r = run_prog_wstrs(np, strs_in, steps, break_on_step);
+			r = run_prog(np, strs_in, steps, break_on_step);
 			went = nstep - begstep;
 			if (!r && went >= steps) {
 				//assert(false && "!r && went >= steps");

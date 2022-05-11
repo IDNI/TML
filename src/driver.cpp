@@ -465,8 +465,7 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 optional<pair<elem, raw_rule>> driver::is_safe(raw_prog &rp) {
 	// Ignore the outermost existential quantifiers
 	export_outer_quantifiers(rp);
-	// Split heads are a prerequisite to safety checking
-	split_heads(rp);
+
 	for(const raw_rule &rr : rp.r) {
 		if(auto unlimited_var = is_safe(rr)) {
 			return make_pair(*unlimited_var, rr);
@@ -3915,6 +3914,13 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 bool driver::transform_handler(raw_prog &p) {
 
+	// Split heads are a prerequisite to safety checking
+	split_heads(p);
+
+	#ifdef TYPE_RESOLUTION
+	ir->type_resolve(p.nps[0]);
+	#endif
+
 	if(opts.enabled("safecheck")) {
 		raw_prog temp_rp(p); //temporary fix to safecheck
 		if(auto res = is_safe(temp_rp.nps[0])) {
@@ -4000,18 +4006,10 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	//Work in progress
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
-		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
-	else if (opts.enabled("bitunv"))
-		//FIXME: bitunv is called still from transform handler
-		result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
+		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step);
+	else
+		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step);
 
-	else {
-		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
-		//FIXME: calling run as bleow leads to double call to get_rules but
-		// is needed for programs with productions to clean null strings
-		// Check prog_after_fp since it is related to this behavior
-		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
-	}
 	o::ms() << "# elapsed: ", measure_time_end();
 
 	if (tbl->error) error = true;
