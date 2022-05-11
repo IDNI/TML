@@ -20,6 +20,12 @@
 
 using namespace std;
 
+string_t unquote(string_t str) {
+	for (size_t i = 0; i != str.size(); ++i)
+		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
+	return str;
+}
+
 bool operator==(const lexeme& l, const string& s) {
 	if ((size_t) (l[1] - l[0]) != s.size()) return false;
 	return !strncmp(l[0], s.c_str(), l[1] - l[0]);
@@ -148,7 +154,7 @@ bool is_mb_codepoint(const char_t ch) {
  * convert ccs sequence s of 1-4 utf8 code units into codepoint &ch
  * @param str string of unsigned chars containing utf8 text
  * @param l size of the str string
- * @param ch reference to a codepoint read from string 
+ * @param ch reference to a codepoint read from string
  * @return size (0, 1 - 4 bytes) or (size_t) -1 if illegal UTF8 code unit
  */
 #define utf_cont(ch) (((ch) & 0xc0) == 0x80)

@@ -24,13 +24,6 @@ ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
 ir_builder::~ir_builder() {
 }
 
-void unquote(string_t& str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
-}
-
-string_t _unquote(string_t str) { unquote(str); return str; }
-
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
 	for (size_t k = 0; k != v.size(); ++k)
@@ -147,7 +140,7 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 	for(const auto &[functor, arity] : p.hidden_rels)
 		dynenv->tbls[get_table(get_sig(functor, arity))].hidden = true;
 	#endif
-	
+
 	return m;
 }
 
@@ -215,7 +208,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 			case elem::STR: {
 				l = r.e[n].e;
 				++l[0], --l[1];
-				int_t s = dict.get_sym(dict.get_lexeme(_unquote(lexeme2str(l))));
+				int_t s = dict.get_sym(dict.get_lexeme(unquote(lexeme2str(l))));
 				t.push_back(mksym(s));
 				break;
 			}

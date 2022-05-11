@@ -50,15 +50,13 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 		}
 }
 
-void unquote(string_t& str);
-
 string_t driver::directive_load(const directive& d) {
 	string_t str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
 	switch (d.type) {
 		case directive::FNAME:
 			return to_string_t(input::file_read(to_string(str)));
 		case directive::STDIN: return move(pd.std_input);
-		default: return unquote(str), str;
+		default: return unquote(str);
 	}
 	DBGFAIL;
 }
@@ -3785,7 +3783,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	static set<raw_prog *> transformed_progs;
 	if(transformed_progs.find(&rp) != transformed_progs.end()) return true;
 	transformed_progs.insert(&rp);
-		
+
 	// If we want proof trees, then we need to transform the productions into
 	// rules first since only rules are supported by proof trees.
 	//if(opts.get_string("proof") != "none") {
@@ -3935,9 +3933,9 @@ bool driver::transform_handler(raw_prog &p) {
 		o::transformed() << "Pre-Transforms Prog:\n" << p << endl;);
 
 	if (!transform(p, pd.strs)) return false;
-	for (auto& np : p.nps) 
+	for (auto& np : p.nps)
 		if (!transform(np, pd.strs)) return false;
-	
+
 	if (opts.enabled("state-blocks"))
     	transform_state_blocks(p, {});
 	else if (raw_prog::require_state_blocks)
@@ -4015,7 +4013,7 @@ bool driver::run(size_t steps, size_t break_on_step) {
 		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
 	}
 	o::ms() << "# elapsed: ", measure_time_end();
-	
+
 	if (tbl->error) error = true;
 	pd.elapsed_steps = nsteps() - step;
 	return result;
@@ -4048,7 +4046,7 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
 	rt_options to;
-	
+
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
 			{{"none", proof_mode::none}, {"tree", proof_mode::tree},

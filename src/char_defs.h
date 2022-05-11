@@ -76,6 +76,7 @@ std::wostream& operator<<(std::wostream& os, const std::string& s);
 std::ostream&  operator<<(std::ostream&  os, const char c);
 #endif
 
+string_t unquote(string_t str);
 std::string to_string_(int_t v);
 string_t to_string_t(int_t v);
 string_t to_string_t(const std::string& s);
@@ -108,4 +109,4 @@ bool is_alnum(ccs s, size_t n, size_t& l);
 bool is_alpha(ccs s, size_t n, size_t& l);
 bool is_printable(char32_t ch);
 
-int_t hex_to_int_t (ccs str, size_t len = 2);
+int_t hex_to_int_t(ccs str, size_t len = 2);

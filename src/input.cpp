@@ -181,7 +181,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
-//TODO: review what to with these directive
+//TODO: review what to do with these directive
 #ifdef WITH_EVAL_DIRECTIVES
 	// Parse @domain <domain_sym> <limit_num> <arity_num>.
 	if (l[pos] == "domain") {
@@ -543,8 +543,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		neg = false;
 		arith_op = arith_op_aux;
 		extype = raw_term::ARITH;
-		//return calc_arity(in), true;
-		return true;
+		return calc_arity(in);
 	}
 
 	if (e[0].type != elem::SYM)
@@ -1192,7 +1191,7 @@ bool raw_progs::parse(input* in) {
 	if (!rp.parse(in))  return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
-	
+
 	//FIXME: guards needs ROOT_EMPTY
  	p.nps.push_back(rp);
 	return true;
