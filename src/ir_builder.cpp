@@ -148,7 +148,7 @@ sig ir_builder::get_sig(const raw_term&t) {
 	int_t table_name_id = dict.get_rel(t.e[0].e);
 #ifdef TML_NATIVES
 	assert(t.arity.size() == 1);
-	tml_natives tn(t.arity[0], {tml_native_t::UNDEF,-1});
+	tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
 	return {table_name_id , tn};
 #else
 	return {table_name_id , t.arity};
@@ -158,7 +158,7 @@ sig ir_builder::get_sig(const raw_term&t) {
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
 #ifdef TML_NATIVES
 	assert(arity.size() == 1);
-	tml_natives tn(arity[0], {tml_native_t::UNDEF,-1});
+	tml_natives tn(arity[0], {native_type::UNDEF,-1});
 	return {rel_id, tn};
 #else
 	return {rel_id, arity};
@@ -170,7 +170,7 @@ sig ir_builder::get_sig(const lexeme& rel, const ints& arity ) {
 	int_t table_name_id = dict.get_rel(rel);
 #ifdef TML_NATIVES
 	assert(arity.size() == 1);
-	tml_natives tn(arity[0], {tml_native_t::UNDEF,-1});
+	tml_natives tn(arity[0], {native_type::UNDEF,-1});
 	return {table_name_id, tn};
 #else
 	return {table_name_id, arity};

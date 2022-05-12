@@ -340,8 +340,8 @@ struct primtype {
 	bool parse(input *in, const raw_prog& prog);
 	bool operator==(const primtype& r) const {
 		return ty == r.ty && bsz == r.bsz;
-	}
-	primtype(_ptype _ty = NOP): ty(_ty){}
+	};
+	primtype(_ptype _ty = NOP) : ty(_ty) {}
 	bool operator!=(const primtype& r) const {
 		return !(*this == r);
 	}
@@ -378,7 +378,7 @@ struct structype {
 	elem structname;
 	std::vector<struct typedecl> membdecl;
 	bool parse(input *in, const raw_prog& prog);
-	size_t get_bitsz(const std::vector<struct typestmt> & t){
+	size_t get_bitsz(const std::vector<struct typestmt> & t) {
 		DBG(bitsz > -1 ?  COUT<<"optimz" : COUT<<"";)
 		return (bitsz < 0)? bitsz = calc_bitsz(t) :  bitsz;
 	}
@@ -459,6 +459,11 @@ struct raw_term {
 	// with their cardinality.
 	ints arity;
 	static bool require_fp_step;
+
+	#ifdef TML_NATIVES
+	sig s;
+	#endif
+
 	raw_term() {}
 	raw_term(const elem &rel_name, const std::set<elem> &args) {
 		e = { rel_name, elem(elem::OPENP) };
@@ -487,7 +492,7 @@ struct raw_term {
 	bool parse(input* in, const raw_prog& prog, bool is_form = false,
 		rtextype pref_type = raw_term::REL);
 	bool calc_arity(input* in);
-	int_t get_formal_arity () const;
+	int_t get_formal_arity() const;
 	void add_parenthesis();
 	void clear() { e.clear(), arity.clear(); }
 	bool operator==(const raw_term& t) const {
@@ -894,6 +899,5 @@ std::basic_ostream<T>& print_raw_rule(std::basic_ostream<T>& os,
 	const raw_rule& r, size_t level);
 
 bool operator<(const raw_rule& x, const raw_rule& y);
-void parser_test();
 
 #endif

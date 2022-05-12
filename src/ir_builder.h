@@ -19,25 +19,6 @@
 #include "term.h"
 #include "typemanager.h"
 
-struct tml_native_t {
-	enum native_type {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB} type = UNDEF;
-	int_t bit_w = -1;
-	bool operator==(const tml_native_t& l) const {
-	     return l.type == type && l.bit_w == bit_w;
-	}
-	bool operator<(const tml_native_t& l) const {
-		return l.type < type && l.bit_w < bit_w;
-	}
-};
-
-typedef std::vector<tml_native_t> tml_natives;
-#define TML_NATIVES
-#ifdef TML_NATIVES
-typedef std::pair<int_t, tml_natives> sig;
-#else
-typedef std::pair<int_t, ints> sig;
-#endif
-
 typedef std::set<std::vector<term>> flat_prog;
 
 struct table;
