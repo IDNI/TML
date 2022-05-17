@@ -13,21 +13,20 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(tml-common)
 
 set(JSLIB_SOURCES
-	../src/analysis.cpp
-	../src/analysis.h
-	../src/archive.cpp
-	../src/archive.h
 	../src/bdd.cpp
 	../src/bdd.h
 	../src/bdd_ext.cpp
 	../src/builtins.cpp
 	../src/builtins.h
 	../src/char_defs.h
+	../src/cpp_gen.cpp
+	../src/cpp_gen.h
 	../src/defs.h
 	../src/dict.cpp
 	../src/dict.h
 	../src/driver.cpp
 	../src/driver.h
+	../src/earley.h
 	../src/err.h
 	../src/form.cpp
 	../src/form.h
@@ -40,8 +39,6 @@ set(JSLIB_SOURCES
 	../src/options.h
 	../src/output.cpp
 	../src/output.h
-	../src/print_prolog.cpp
-	../src/print_souffle.cpp
 	../src/proof.cpp
 	../src/save_csv.cpp
 	../src/tables.cpp
@@ -49,8 +46,12 @@ set(JSLIB_SOURCES
 	../src/tables_builtins.cpp
 	../src/tables_ext.cpp
 	../src/term.h
+	../src/tml_earley.h
 	../src/transform.cpp
+	../src/transform_bitunv.cpp
 	../src/transform_guards.cpp
+	../src/typemanager.cpp
+	../src/typemanager.h
 	../src/utils.cpp
 )
 

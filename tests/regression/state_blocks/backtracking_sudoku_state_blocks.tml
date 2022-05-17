@@ -341,7 +341,7 @@ input(8 4 7) :- t5.
 	]
 }
 {
-	~c(?x).
+	# ~c(?x).
 	c(?x) :- solution(?r ?c ?n), count(?x).
 	println("solution found") :- c(81).
 	# dump only the solution relation

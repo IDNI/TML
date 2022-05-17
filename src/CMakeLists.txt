@@ -16,9 +16,6 @@ list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
 
 set(TML_HEADERS
-	TML.h
-	archive.h
-	analysis.h
 	bdd.h
 	builtins.h
 	char_defs.h
@@ -35,11 +32,10 @@ set(TML_HEADERS
 	tables.h
 	ir_builder.h
 	earley.h
+	typemanager.h
 )
 
 set(TML_SOURCES
-	archive.cpp
-	analysis.cpp
 	bdd.cpp
 	bdd_ext.cpp
 	builtins.cpp
@@ -50,8 +46,6 @@ set(TML_SOURCES
 	input.cpp
 	options.cpp
 	output.cpp
-	print_prolog.cpp
-	print_souffle.cpp
 	proof.cpp
 	save_csv.cpp
 	tables.cpp
@@ -63,6 +57,8 @@ set(TML_SOURCES
 	utils.cpp
 	ir_builder.cpp
 	earley.cpp
+	typemanager.cpp
+	transform_bitunv.cpp
 )
 
 if (WITH_THREADS)
@@ -143,11 +139,6 @@ if (WITH_Z3)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
 endif()
 
-# enable eval
-#############
-if (WITH_EVAL)
-	target_compile_definitions(TMLo PRIVATE "-DWITH_EVAL")
-endif()
 
 # shared library
 #################

@@ -30,9 +30,9 @@
 #include "options.h"
 
 
-typedef enum prolog_dialect { XSB, SWIPL } prolog_dialect;
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
+typedef std::tuple<elem, int_t> rel_info;
 
 #define QFACT 0
 #define QRULE 1
@@ -46,8 +46,6 @@ typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
 #define QIMPLIES 9
 #define QUNIQUE 10
 #define QCOIMPLIES 11
-
-class archive;
 
 struct prog_data {
 	strs_t strs;
@@ -63,9 +61,7 @@ struct prog_data {
 };
 
 #ifdef WITH_Z3
-
 /* Provides consistent conversions of TML objects into Z3. */
-
 struct z3_context {
 	size_t arith_bit_len;
 	size_t universe_bit_len;
@@ -116,44 +112,32 @@ void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
 
 class driver {
-	friend class archive;
 	friend struct flat_rules;
 	friend struct pattern;
 	friend std::ostream& operator<<(std::ostream& os, const driver& d);
 	friend std::istream& operator>>(std::istream& is, driver& d);
 	dict_t dict;
-	std::set<int_t> builtin_rels;//, builtin_symbdds;
 
-	int_t nums = 0, chars = 0, syms = 0;
-//	bool mult = false;
+	bool transform_handler(raw_prog &p);
+	bool transform(raw_prog& rp, const strs_t& strtrees);
 
-	std::set<lexeme, lexcmp> strs_extra, rels;
-	std::vector<ccs> strs_allocated;
-	lexeme get_var_lexeme(int_t i);
-	lexeme get_new_var();
-	lexeme get_lexeme(ccs w, size_t l = (size_t)-1);
-	lexeme get_lexeme(const std::basic_string<char>& s);
-	lexeme get_lexeme(const std::basic_string<unsigned char>& s);
+	//int_t nums = 0, chars = 0, syms = 0;
+	std::set<lexeme, lexcmp>  rels;
 	lexeme get_new_rel();
-//	std::function<int_t(void)> *fget_new_rel;
-//	lexeme get_num_lexeme(int_t i);
-//	lexeme get_char_lexeme(char_t i);
-//	lexeme get_demand_lexeme(elem e, const ints& i, const bools& b);
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
+	
 	std::set<raw_term> get_queries(const raw_prog& p);
-
 	string_t directive_load(const directive& d);
-	void directives_load(raw_prog& p, lexeme& trel);
-	bool transform(raw_prog& rp, const strs_t& strtrees);
+	void directives_load(raw_prog& p);
+	
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
-//	raw_prog transform_bwd(raw_prog& p);
 	raw_term get_try_pred(const raw_term& x);
 	void transform_bwd(const raw_term& h, const std::vector<raw_term>& b,
 		std::set<raw_rule>& s);
@@ -161,7 +145,6 @@ class driver {
 	void transform_proofs(raw_prog& r, const lexeme& rel);
 	void transform_string(const string_t&, raw_prog&, const lexeme &);
 	void transform_grammar(raw_prog& r, lexeme rel, size_t len);
-	bool transform_evals(raw_prog &rp, const directive &drt);
 	bool transform_quotes(raw_prog &rp, const directive &drt);
 	bool transform_domains(raw_prog &rp, const directive& drt);
 	bool transform_codecs(raw_prog &rp, const directive &drt);
@@ -174,7 +157,7 @@ class driver {
 		std::map<elem, const raw_form_tree*> &scopes);
 	std::optional<elem> is_safe(const raw_form_tree &t);
 	std::optional<elem> is_safe(const raw_rule &rr);
-	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog rp);
+	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 	template<typename F> void minimize(raw_rule &rr, const F &f);
@@ -187,8 +170,8 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void pdatalog_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
-	void recursive_transform(raw_prog &rp,
-		const std::function<void(raw_prog &)> &f);
+	void recursive_transform(raw_prog &rp
+	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);
@@ -205,10 +188,10 @@ class driver {
 		z3_context &ctx);
 #endif
 	// following 2 methods are defined in a file tml_earley.cpp
-	raw_progs earley_parse_tml(input* in);
+	bool earley_parse_tml(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();
 
-	raw_prog read_prog(elem prog, const raw_prog &rp);
+	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
 	elem numeric_quote_elem(const elem &e, std::map<elem, elem> &variables);
@@ -245,33 +228,25 @@ class driver {
 	raw_term from_grammar_elem_builtin(const lexeme& r, const string_t&b,
 		int_t v);
 	raw_term prepend_arg(const raw_term& t, lexeme s);
-//	template <typename T>
-//	void get_trees(std::basic_ostream<T>& os, const term& root,
-//		const std::map<term, std::vector<term>>&, std::set<term>& done);
-//	sysstring_t get_trees(const term& roots,const db_t& t,size_t bits);
-	void progs_read(cstr s);
-	bool prog_run(raw_prog& rp, nlevel steps=0, size_t brstep=0);
-	//driver(raw_progs, options o);
-	//driver(raw_progs);
-	size_t load_stdin();
+
 	prog_data pd;
 	std::set<lexeme> transformed_strings;
 	tables *tbl = 0;
 	ir_builder *ir = 0;
 
-	void output_pl(const raw_prog& p) const;
 	std::set<lexeme> vars;
+	options opts;
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
 	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
-	std::vector<archive> load_archives;
+	size_t nsteps() { return tbl->step(); };
+
 public:
 	bool result = false;
 	bool error = false;
-	options opts;
 	driver(const options& o);
 	driver(FILE *f, const options& o);
 	driver(string_t, const options& o);
@@ -285,41 +260,41 @@ public:
 	driver(ccs s);
 	~driver();
 
-	template <typename T>
-	void info(std::basic_ostream<T>&);
-	template <typename T>
-	void list(std::basic_ostream<T>& os, size_t p = 0);
+	void read_inputs();
 	bool add(input* in);
 	void restart();
-	bool run(size_t steps = 0, size_t br_on_step=0);
 	bool step(size_t steps = 1, size_t br_on_step=0);
-	size_t nsteps() { return tbl->step(); };
-	template <typename T>
-	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
-	void dump() { out(o::dump()); }
-	template <typename T>
-	void out_fixpoint(std::basic_ostream<T>& os) const { if (tbl) tbl->out_fixpoint(os); }
-	void dump_fixpoint() { out_fixpoint(o::dump()); }
-	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
+	bool run(size_t steps = 0, size_t br_on_step=0);
+
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
 	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
 	void set_regex_level(int val ) { ir->regex_level = val; }
+
+	inputs* get_inputs() const { return ii; }
+	input* get_current_input() const { return current_input; }
+	void set_current_input(input* in) { current_input = in; }
+
+	template <typename T>
+	void info(std::basic_ostream<T>&);
+	template <typename T>
+	void list(std::basic_ostream<T>& os, size_t p = 0);
+	template <typename T>
+	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
+	template <typename T>
+	void out_fixpoint(std::basic_ostream<T>& os) const {
+		if (tbl) tbl->out_fixpoint(os); }
 	template <typename T>
 	bool out_goals(std::basic_ostream<T>& os) const {
 		return tbl->get_goals(os); }
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	size_t size();
-	void load(std::string filename);
-	void save(std::string filename);
-	size_t db_size();
-	void db_load(std::string filename);
-	void db_save(std::string filename);
-	inputs* get_inputs() const { return ii; }
-	input* get_current_input() const { return current_input; }
-	void set_current_input(input* in) { current_input = in; }
-	void read_inputs();
+
+	void dump() { out(o::dump()); }
+	void dump_fixpoint() { out_fixpoint(o::dump()); }
+	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
+
+	void save_csv() const;
 	
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
@@ -334,23 +309,6 @@ public:
 	}
 #endif
 
-//	std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, spbdd t, size_t bits,
-//		const prefix&) const;
-//	std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>& os, spbdd t, size_t bits,
-//		const prefix&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_prolog(std::basic_ostream<T>& os,
-		const raw_prog&, prolog_dialect) const;
-	template <typename T>
-	std::basic_ostream<T>& print_xsb(std::basic_ostream<T>& os,
-		const raw_prog&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_swipl(std::basic_ostream<T>& os,
-		const raw_prog&) const;
-	template <typename T>
-	std::basic_ostream<T>& print_souffle(std::basic_ostream<T>& os,
-		const raw_prog&) const;
-	void save_csv() const;
 };
 
 template void driver::out<char>(std::ostream&) const;
@@ -374,5 +332,5 @@ std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
 //std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
 //	int_t rel);
 #endif
-string_t _unquote(string_t str);
+
 #endif

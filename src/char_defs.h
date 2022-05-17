@@ -50,10 +50,20 @@ typedef const char_t* ccs;
 typedef ccs* pccs;
 typedef std::array<ccs, 2> ccs_range;
 typedef ccs_range lexeme;
+const lexeme null_lexeme {0,0};
 typedef std::vector<lexeme> lexemes;
 typedef std::array<size_t, 2> lexeme_range;
 
 struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
+bool operator==(const lexeme& l, std::string s);
+bool operator==(const lexeme& l, const char* s);
+template<> struct std::hash<lexeme> {size_t operator()(const lexeme&)const;};
+bool operator<(const lexeme&, const lexeme&);
+template<> struct std::less<lexeme> {bool operator()(const lexeme&, const lexeme&)const;};
+bool operator==(const lexeme& x, const lexeme& y);
+#define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
+#define str2lexeme(s) { (unsigned char *) (s), (unsigned char *) (s) + sizeof(s) - 1 }
+
 typedef std::map<lexeme, string_t, lexcmp> strs_t;
 
 std::wstring s2ws(const std::string&);
@@ -66,6 +76,7 @@ std::wostream& operator<<(std::wostream& os, const std::string& s);
 std::ostream&  operator<<(std::ostream&  os, const char c);
 #endif
 
+string_t unquote(string_t str);
 std::string to_string_(int_t v);
 string_t to_string_t(int_t v);
 string_t to_string_t(const std::string& s);
@@ -99,4 +110,4 @@ bool is_alnum(ccs s, size_t n, size_t& l);
 bool is_alpha(ccs s, size_t n, size_t& l);
 bool is_printable(char32_t ch);
 
-int_t hex_to_int_t (ccs str, size_t len = 2);
+int_t hex_to_int_t(ccs str, size_t len = 2);

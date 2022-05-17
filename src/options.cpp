@@ -233,6 +233,9 @@ void options::setup() {
 			pu_states.insert(v.get_string());
 		}).description("active state to printing updates"));
 	add_bool2("print-dict", "dict", "print internal string dictionary");
+
+	add_bool("strgrammar", "...");
+
 	add_bool2("reg-match", "regex", "applies regular expression matching");
 	add_bool2("fp-step","fp","adds __fp__ fact when reaches a fixed point");
 	add(option(option::type::STRING, {"arguments","args","options","opts"},
@@ -260,10 +263,10 @@ void options::setup() {
 		[](const option::value& v) {
 			outputs::name(v.get_string());
 		}).description("name used for @name output"));
-	add(option(option::type::STRING, { "load", "l" })
-		.description("load database from file before start"));
-	add(option(option::type::STRING, { "save", "s" })
-		.description("save database to file after finish"));
+	//add(option(option::type::STRING, { "load", "l" })
+	//	.description("load database from file before start"));
+	//add(option(option::type::STRING, { "save", "s" })
+	//	.description("save database to file after finish"));
 	add_bool2("earley", "ep", "use earley parser");
 	add_bool2("print-ambiguity", "pamb", "print parsed ambiguous packs");
 	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");
@@ -280,9 +283,6 @@ void options::setup() {
 	add_output_alt("parser-to-dot",  "pdot", "parsed forest in dot format");
 	add_output_alt("parser-to-tml",  "ptml", "parsed forest as tml facts");
 	add_output_alt("parser-to-rules","prules","parsed forest as tml rules");
-	add_output("xsb",     "attempt to translate program into XSB");
-	add_output("swipl",   "attempt to translate program into SWI-Prolog");
-	add_output("souffle", "attempt to translate program into Souffle");
 	add_output_alt("program-gen", "cpp",
 		"generated C++ code of the given TML code");
 

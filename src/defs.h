@@ -38,11 +38,9 @@ typedef std::vector<bool> bools;
 typedef std::vector<bools> vbools;
 typedef int_t ntable;
 typedef size_t nlevel;
-//typedef std::vector<size_t> sizes;
 
 #include "char_defs.h"
 
-//#define DEEPDEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #define NDBG(x)
@@ -52,6 +50,7 @@ typedef size_t nlevel;
 #define NDBG(x) x
 #define DBGFAIL
 #endif
+
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
 #define has(x, y) ((x).find(y) != (x).end())
@@ -63,8 +62,8 @@ typedef size_t nlevel;
 		(double(end - start) / CLOCKS_PER_SEC) * 1000 \
 		<< " ms" << endl
 #define measure_time(x) measure_time_start(); x; measure_time_end()
-#define elem_openp elem(elem::OPENP, get_lexeme("("))
-#define elem_closep elem(elem::CLOSEP, get_lexeme(")"))
+#define elem_openp elem(elem::OPENP)
+#define elem_closep elem(elem::CLOSEP)
 #define elem_eq elem(elem::EQ, get_lexeme("="))
 #define htrue bdd_handle::T
 #define hfalse bdd_handle::F
@@ -142,4 +141,49 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
+//-----------------------------------------------------------------------------
+#define TML_NATIVES
+//#define TYPE_RESOLUTION //work-in-progress, dependent on TML_NATIVES
+//#define BIT_TRANSFORM  //to be deprecated, use it with --bitunv option
+#if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
+#define mkchr(x) ((int_t) x )
+#define mknum(x) ((int_t) x )
+#define mksym(x) ((int_t) x )
+#else
+#define mkchr(x) ((int_t) ((x) << 2) | 1)
+#define mknum(x) ((int_t) ((x) << 2) | 2)
+#define mksym(x) ((int_t) ((x) << 2) )
+#endif
+
+#ifdef TML_NATIVES
+typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB} native_type;
+struct tml_native_t {
+	native_type type = UNDEF;
+	int_t bit_w = -1;
+	bool operator==(const tml_native_t& l) const {
+	     return (l.type == type && l.bit_w == bit_w) || (l.type == UNDEF);
+	}
+	bool operator<(const tml_native_t& l) const {
+		//if (*this == l) return false;
+		//return l.type < type && l.bit_w < bit_w;
+		return std::tie(l.type, l.bit_w) < std::tie(type, bit_w);
+	}
+};
+typedef std::vector<tml_native_t> tml_natives;
+typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
+#else
+typedef std::pair<int_t, ints> sig;
+#endif
+
+//-----------------------------------------------------------------------------
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
 #endif

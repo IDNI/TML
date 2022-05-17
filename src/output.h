@@ -84,9 +84,6 @@ public:
 #ifdef WITH_THREADS
 		create("repl-output", ".repl.out.log");
 #endif
-		create("xsb",         ".P");
-		create("swipl",       ".pl");
-		create("souffle",     ".souffle");
 	}
 	static outputs* in_use() { return o_; }
 	static ostream_t& out()  { return o_ ? o_to(o_->out_)  : CNULL; }
@@ -150,5 +147,9 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
 
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
+
+struct elem;
+
+std::string quote_sym(const elem& e);
 
 #endif

@@ -13,12 +13,6 @@
 #include "tables.h"
 using namespace std;
 
-string blt_ctx::arg_as_string(size_t arg) const {
-	std::ostringstream ss;
-	ss << dict->get_sym(g[arg]);
-	return ss.str();
-}
-
 size_t blt_ctx::varpos(size_t arg) const { return a->vm.at(g[arg]); }
 
 int_t blt_ctx::outvarpos(size_t oarg) const {

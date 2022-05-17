@@ -10,11 +10,11 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "tables.h"
+#include "ir_builder.h"
 
 using namespace std;
 
-lexeme tables::lx_id(string name, int_t id, int_t id2) {
+lexeme ir_builder::lx_id(string name, int_t id, int_t id2) {
 	static std::string s = "__";
 	std::stringstream ss;
 	if (id  != -1) ss << s << id;
@@ -24,7 +24,7 @@ lexeme tables::lx_id(string name, int_t id, int_t id2) {
 }
 
 // emplaces back a new 0ary term named lx into rts
-void tables::iid(vector<raw_term>& rts, const lexeme& lx, bool neg) {
+void ir_builder::iid(vector<raw_term>& rts, const lexeme& lx, bool neg) {
 	raw_term& rt = rts.emplace_back();
 	rt.arity = { 0 };
 	rt.e.emplace_back(elem::SYM, lx);
@@ -32,19 +32,19 @@ void tables::iid(vector<raw_term>& rts, const lexeme& lx, bool neg) {
 }
 
 // emplaces back a new term names as: iididiidlxiid into rts
-void tables::iid(vector<raw_term>& rts, const string& lx, int_t id, bool neg) {
+void ir_builder::iid(vector<raw_term>& rts, const string& lx, int_t id, bool neg) {
 	iid(rts, lx_id(lx, id), neg);
 }
 
 // emplaces back a new term named as: iididiidid2iidlxiid into rts
-void tables::iid(vector<raw_term>& rts, const string& lx, int_t id, int_t id2,
+void ir_builder::iid(vector<raw_term>& rts, const string& lx, int_t id, int_t id2,
 	bool neg)
 {
 	iid(rts, lx_id(lx, id, id2), neg);
 }
 
 // transforms guards = facts into rules, adds state guards, transf. if and while
-void tables::transform_guards(raw_prog& rp) {
+void ir_builder::transform_guards(raw_prog& rp) {
 	// initiate program by setting the id of the fixed point program to 0
 	int_t prev_id = 0;
 	if (rp.r.size() || rp.nps.size()) // but only if not empty
@@ -58,7 +58,7 @@ void tables::transform_guards(raw_prog& rp) {
 // transforms a program into phases
 // del, rule, true, false, curr and fp states and guard each add/del/rule
 // statement with its state guard
-void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
+void ir_builder::transform_guards_program(raw_prog& trp, raw_prog& rp,
 	int_t& prev_id)
 {
 	vector<string> states = {
@@ -136,7 +136,7 @@ void tables::transform_guards_program(raw_prog& trp, raw_prog& rp,
 }
 
 // transforms ifs and whiles
-void tables::transform_guard_statements(raw_prog& trp, raw_prog& rp) {
+void ir_builder::transform_guard_statements(raw_prog& trp, raw_prog& rp) {
 	for (auto& c : rp.gs) {
 		if (c.type == guard_statement::IF) {
 			trp.r.emplace_back();

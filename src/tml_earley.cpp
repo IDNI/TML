@@ -44,7 +44,7 @@ vector<production> driver::load_tml_grammar() {
 	return g;
 }
 
-raw_progs driver::earley_parse_tml(input* in) {
+bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 	typedef const earley_t::nidx_t& ni_t; // node id/handle
 	typedef const earley_t::node_children_variations& ncs_t;
 	                                      // various node children args
@@ -70,7 +70,7 @@ raw_progs driver::earley_parse_tml(input* in) {
 		.recognize(to_u32string(string_t(in->data())));
 	o::inf() << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
-	parsing_context ctx;
+	parsing_context ctx(rps);
 	earley_t::actions a{};
 	auto to_int = [](std::string s) {
 		int_t r = stoll(s);
@@ -104,26 +104,25 @@ raw_progs driver::earley_parse_tml(input* in) {
 	};
 
 	a.emplace(U"start", [&parser, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
-		ctx.rps = {};
-		ctx.rps.p.nps.emplace_back();
+		ctx.rps.p.nps.emplace_back(dict);
 		ctx.rp.push_back(&(ctx.rps.p.nps.back()));
 		parser.down(ncs, a);
-		ctx.rp.back()->expand_macros(in, dict);
+		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 	});
 	a.emplace(U"block", [&parser, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
-		ctx.rp.back()->nps.push_back({});
+		ctx.rp.back()->nps.emplace_back(dict);
 		ctx.rp.push_back(&(ctx.rp.back()->nps.back()));
 		parser.down(ncs, a);
-		ctx.rp.back()->expand_macros(in, dict);
+		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 	});
 	a.emplace(U"state_block",[&parser, &ctx, &a, &in, this](ni_t,ncs_t ncs){
-		ctx.rp.back()->sbs.emplace_back();
+		ctx.rp.back()->sbs.emplace_back(dict);
 		ctx.sbs.push_back(&(ctx.rp.back()->sbs.back()));
-		ctx.rp.push_back(&(ctx.sbs.back()->rp));
+		ctx.rp.push_back(&(ctx.sbs.back()->p));
 		parser.down(ncs, a);
-		ctx.rp.back()->expand_macros(in, dict);
+		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 		ctx.sbs.pop_back();
 	});
@@ -553,5 +552,5 @@ raw_progs driver::earley_parse_tml(input* in) {
 	
 	parser.topdown(U"start", a);
 
-	return ctx.rps;
+	return true;
 }

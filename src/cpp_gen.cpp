@@ -195,7 +195,7 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const production &g) {
 
 // Generate the C++ code to generate the given TML lexeme
 ostream_t& cpp_gen::gen(ostream_t& os, const lexeme &lex) {
-	return os << "STR_TO_LEXEME(" << to_string(lexeme2str(lex)) << ")";
+	return os << "str2lexeme(" << to_string(lexeme2str(lex)) << ")";
 }
 
 // Generate the C++ code to generate the given TML directive
@@ -312,7 +312,7 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_prog &rp) {
 	for (const raw_prog &np : rp.nps)
 		prog_names.emplace_back(), gen(os, prog_names.back(), np);
 	stringstream ss; ss << "rp" << id++; name = ss.str();
-	os << "raw_prog " << name << ";\n";
+	os << "raw_prog " << name << "(" << dict_name << ");\n";
 	// Insert the productions we have constructed into the final program
 	if (prod_names.size()) {
 		os << name << ".g.insert(" << name << ".g.end(), { ";
@@ -345,5 +345,6 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_progs &rps){
 	string pname;
 	gen(os, pname, rps.p);
 	stringstream ss; ss << "rps" << id++; name = ss.str();
-	return os<<"raw_progs "<<name<<";\n"<<name<<".p = "<<pname<<";\n";
+	return os << "raw_progs " << name << "(" << dict_name << ");\n"
+		<< name << ".p.merge(" << pname << ");\n";
 }

@@ -33,7 +33,7 @@ function(target_setup target)
 			-Wno-missing-braces
 			-Wno-parentheses-equality)
 	endif()
-	target_compile_features(${target} PRIVATE cxx_std_17)
+	target_compile_features(${target} PRIVATE cxx_std_20)
 	target_git_definitions(${target})
 	target_build_output(${target})
 endfunction()

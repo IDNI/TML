@@ -425,11 +425,12 @@ production gp423{{e421, e12, e411, e421, e2, e14, }, {}, };
 production gp424{{e411, e211, e2, e341, e2, e265, e2, e214, e2, e395, e2, e302, e2, e204, e2, e200, e2, e220, e2, e217, e2, e357, }, {}, };
 elem e425(elem::SYM, t_arith_op::NOP, dict.get_lexeme("start"));
 production gp426{{e425, e212, e12, }, {}, };
-raw_prog rp427;
+raw_prog rp427(dict);
 rp427.g.insert(rp427.g.end(), { gp5, gp9, gp13, gp15, gp30, gp33, gp36, gp38, gp69, gp74, gp76, gp78, gp81, gp82, gp85, gp86, gp89, gp90, gp94, gp95, gp98, gp100, gp102, gp104, gp109, gp111, gp113, gp116, gp117, gp120, gp121, gp125, gp126, gp129, gp131, gp134, gp135, gp137, gp138, gp142, gp144, gp147, gp149, gp151, gp153, gp175, gp182, gp186, gp188, gp190, gp191, gp196, gp199, gp203, gp206, gp208, gp209, gp210, gp213, gp216, gp219, gp224, gp227, gp229, gp230, gp235, gp237, gp238, gp241, gp242, gp245, gp247, gp248, gp249, gp250, gp251, gp253, gp255, gp257, gp260, gp261, gp264, gp275, gp278, gp280, gp282, gp284, gp286, gp288, gp290, gp292, gp294, gp298, gp299, gp300, gp301, gp305, gp308, gp313, gp317, gp318, gp320, gp321, gp323, gp326, gp330, gp332, gp334, gp336, gp339, gp340, gp344, gp347, gp350, gp351, gp352, gp355, gp356, gp358, gp360, gp363, gp366, gp369, gp372, gp374, gp376, gp378, gp380, gp384, gp385, gp386, gp389, gp393, gp394, gp399, gp404, gp406, gp409, gp410, gp413, gp417, gp418, gp419, gp420, gp422, gp423, gp424, gp426, });
-raw_prog rp428;
-rp428.nps.insert(rp428.nps.end(), { rp427, });
-raw_progs rps429;
-rps429.p = rp428;
+raw_prog rp428(dict);
+rp428.nps.emplace_back(dict);
+rp428.nps.back().merge(rp427);
+raw_progs rps429(dict);
+rps429.p.merge(rp428);
 
 auto& program_gen = rps429;

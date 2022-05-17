@@ -150,31 +150,8 @@ basic_ostream<char>& operator<<(basic_ostream<char>& os, const lexeme& l) {
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& os, const lexeme& l){
 	return os << s2ws(to_string(lexeme2str(l)));
 }
-//template <typename T>
-//basic_ostream<T>& operator<<(basic_ostream<T>& os, const lexeme& l) {
-//	os << (l[0], l[1], l[1]-l[0]);
-//	//for (ccs s = l[0]; s != l[1]; ++s) os << *s;
-//	//DBG(os << " (" << (void*)l[0] << " " << (void*)l[1] << ")";)
-//	return os;
-//}
-//template basic_ostream<char>& operator<<(basic_ostream<char>&, const lexeme&);
-//template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const lexeme&);
 
 #ifdef DEBUG
-/*template <typename T>
-basic_ostream<T>& bdd_out_ite(basic_ostream<T>& os, spbdd x, size_t dep) {
-	for (size_t n = 0; n != dep; ++n) os << '\t';
-	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F') << endl;
-	bdd_out_ite(os << "if " << x->v() << endl, x->h(), dep+1);
-	for (size_t n = 0; n != dep; ++n) os << '\t';
-	return bdd_out_ite(os << "else" << endl, x->l(), dep+1);
-}
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, spbdd x) {
-	if (x->leaf()) return os << (x->trueleaf() ? 'T' : 'F');
-	return os << x->v() << " ? " << x->h() << " : " << x->l();
-}*/
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const bools& x) {
@@ -204,107 +181,7 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const term& t) {
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const term&);
 template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const term&);
-
-/*template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const matrix& m) {
-	for (const term& t : m) os << t << ',';
-	return os;
-}
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const matrices& m) {
-	for (const matrix& x : m) os << x << endl;
-	return os;
-}*/
 #endif
-
-/*template <typename T>
-basic_ostream<T>& driver::print_term(basic_ostream<T>& os, const term& t) const {
-	if (xsb) return print_term_xsb(os, t);
-	if (t.neg()) os << '~';
-	os << dict.get_rel(t.rel()) << '(';
-	for (size_t ar = 0, n = 0; ar != t.arity().size();) {
-		while (t.arity()[ar] == -1) ++ar, os << '(';
-		for (int_t k = 0; k != t.arity()[ar]; ++k) {
-			if (t.arg(n) < 0) DBGFAIL;//os<<dict.get_var(t.args[n]);
-			else if (t.arg(n) & 1) {
-				char_t c = t.arg(n)>>2;
-				if (c == '\r') os << "'\\r'";
-				else if (c == '\n') os << "'\\n'";
-				else if (c == '\t') os << "'\\t'";
-				else os << '\'' << c << '\'';
-			} else if (t.arg(n) & 2) os << (int_t)(t.arg(n)>>2);
-			else if ((size_t)(t.arg(n)>>2) < dict.nsyms())
-				os << dict.get_sym(t.arg(n));
-			else os << '[' << (t.arg(n)>>2) << ']';
-			if (++n != t.nargs()) os << ' ';
-		}
-		++ar;
-		while (ar<t.arity().size()&&t.arity()[ar] == -2) ++ar, os<<')';
-	}
-	return os << ").";
-}
-
-template <typename T>
-basic_ostream<T>& driver::printmat(basic_ostream<T>& os, const matrix& t) const {
-	set<wstring> s;
-	for (auto v : t) {
-		wstringstream ss;
-		print_term(ss, v);
-		s.emplace(ss.str());
-	}
-	for (auto& x : s) os << x << endl;
-	return os;
-}
-
-#ifdef DEBUG
-driver* drv;
-
-template <typename T>
-basic_ostream<T>& printdb(basic_ostream<T>& os, lp *p) { return drv->printdb(os, p); }
-
-template <typename T>
-basic_ostream<T>& printbdd(basic_ostream<T>& os, spbdd t, size_t bits, const prefix& p) {
-	//bdd_out(os<<allsat(t, arlen(ar)*drv->bits), t)<<endl;
-	return drv->printbdd(os, t, bits, p);
-}
-
-template <typename T>
-basic_ostream<T>& printbdd_one(basic_ostream<T>& os, spbdd t, size_t bits, const prefix& p) {
-	return drv->printbdd_one(os, t, bits, p);
-}
-
-template <typename T>
-basic_ostream<T>& driver::printbdd(basic_ostream<T>& os, spbdd t, size_t bits, const prefix&p)
-	const {
-	from_bits(t,bits,p,[&os,this](const term&t){
-			print_term(os, t)<<endl;});
-	return os;
-}
-
-template <typename T>
-basic_ostream<T>& driver::printbdd_one(basic_ostream<T>& os, spbdd t, size_t bits,
-	const prefix& p) const {
-//	os << "one of " << bdd_count(t, bits * arlen(ar)) << " results: ";
-	return print_term(os, one_from_bits(t, bits, p));
-}
-#endif
-
-template <typename T>
-basic_ostream<T>& driver::printdb(basic_ostream<T>& os, lp *p) const {
-	return printdb(os, p->db, p->rng.bits);
-}
-
-template <typename T>
-basic_ostream<T>& driver::printdb(basic_ostream<T>& os, const db_t& db, size_t bits) const {
-	for (auto x : db)
-		if (builtin_rels.find(x.first.rel) == builtin_rels.end()) {
-			from_bits(x.second,bits,x.first,
-				[&os,this](const term&t){
-				print_term(os, t)<<endl; });
-		}
-	return os;
-}*/
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
@@ -543,21 +420,30 @@ basic_ostream<wchar_t>& print_raw_form_tree(basic_ostream<wchar_t>&, const raw_f
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_term& t) {
+
 	if (t.neg) os << '~';
-	
 	if (t.extype == raw_term::ARITH || t.extype == raw_term::CONSTRAINT) {
 		if (t.neg) os << '{';
 		for ( elem el : t.e) os << el;
 		if (t.neg) os << '}';
 		return os;
 	}
-	if (t.extype == raw_term::EQ || t.extype == raw_term::LEQ) {
+	//understand raw_term::parse before touching this
+	if (t.extype == raw_term::EQ)  {
 		if (t.neg) os << '{';
-		os << t.e[0];
-		t.e[1].type == elem::EQ ? os << "=" : t.e[1].type == elem::LEQ ? os << "<=" :
-						t.e[1].type == elem::LT ? os << "<" : t.e[1].type == elem::GEQ ?
-						os << ">=": t.e[1].type == elem::GT ? os << ">": os <<"";
-		os << t.e[2];
+		os << t.e[0] << "=" << t.e[2];
+		if (t.neg) os << '}';
+		return os;
+	}
+	//understand raw_term::parse before touching this
+	if (t.extype == raw_term::LEQ) {
+		if (t.neg) os << '{';
+		if (t.e[1].type == elem::GT || t.e[1].type == elem::LEQ)
+			os << t.e[0] << "<=" << t.e[2];
+		else if (t.e[1].type == elem::LT || t.e[1].type == elem::GEQ)
+			os << t.e[2] << "<=" << t.e[0];
+		else
+			assert(false);
 		if (t.neg) os << '}';
 		return os;
 	}
@@ -803,7 +689,7 @@ basic_ostream<T>& print_state_block(basic_ostream<T>& os, const state_block& sb,
 	basic_string<T> indent(level, '\t');
 	return print_raw_prog_tree(os << indent << '[' << sb.label
 		<< (sb.flip ? "~" : "") << ":\n",
-		sb.rp, level+1) << indent << "]";
+		sb.p, level+1) << indent << "]";
 }
 template
 basic_ostream<char>& print_state_block(basic_ostream<char>& os,
@@ -984,14 +870,6 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const flat_prog& p) const{
 	for (const auto& x : p)
 		print(os << (x[0].tab == -1 ? 0 : tbls[x[0].tab].priority) <<
 			'\t', x) << endl;
-/*	map<size_t, flat_prog> m;
-	for (const auto& x : p) m[tbls[x[0].tab].priority].insert(x);
-	size_t n = m.rbegin()->first;
-	vector<flat_prog> v(n);
-	for (const auto& x : m) v[n--] = move(x.second);
-	for (n = 0; n != v.size(); ++n)
-		for (const vector<term>& y : v[n])
-			print(os << n << '\t', y) << endl;*/
 	return os;
 }
 template basic_ostream<char>& tables::print(basic_ostream<char>&, const flat_prog&) const;
@@ -1033,20 +911,9 @@ template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
 	const rule&) const;
 
 template <typename T>
-basic_ostream<T>& tables::print(basic_ostream<T>& os, const sig& s) const {
-	bool sep = false;
-	os << dict.get_rel(s.first) << "/";
-	for (auto i : s.second) os << (sep?",":(sep=true,"")) << i;
-	return os;
-}
-template basic_ostream<char>& tables::print(basic_ostream<char>&, const sig&)
-	const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
-	const sig&) const;
-
-template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const table& t) const {
-	print(os << "#\t", t.s) << (t.hidden ? "@":"")
+	//print(os << "#\t", "UNDEF" /*t.s*/)
+	os	<< (t.hidden ? "@":"")
 		<< (t.idbltin > -1 ? " builtin" : "")
 		<< endl;
 	for (auto r : t.r) print(os << "#\t\t", rules[r]) << endl;
@@ -1071,22 +938,21 @@ template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
 	os <<   "# nrels:   " << d.nrels() << '\t' << flush;
 	for (size_t i = 0; i != d.nrels(); ++i)
-		os << i << ":" << d.get_rel(i)
+		os << i << ":" << d.get_rel_lexeme(i)
 			<< (i != d.nrels() - 1 ? ", " : "");
 	os << "\n# nsyms:   " << d.nsyms() << '\t' << flush;
 	for (size_t i = 0; i != d.nsyms(); ++i)
-		os << i << ":" << d.get_sym(i<<2)
+		os << i << ":" << d.get_sym_lexeme(i)
 			<< (i != d.nsyms() - 1 ? ", " : "");
 	os << "\n# nvars:   " << d.nvars() << '\t';
 	os << "\n# nbltins: " << d.nbltins() << '\t' << flush;
 	for (size_t i = 0; i != d.nbltins(); ++i)
-		os << i << ":" << d.get_bltin(i)
+		os << i << ":" << d.get_bltin_lexeme(i)
 			<< (i != d.nbltins() - 1 ? ", " : "");
 	return os << "\n# -" << endl;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const dict_t&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
 
 template <typename T, typename VT>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::vector<VT>& hs) {

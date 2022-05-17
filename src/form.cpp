@@ -61,16 +61,23 @@ void pnft::print() const {
 }
 
 void pnft::quantify(spbdd_handle &q, size_t bits) const {
+
+#ifndef TYPE_RESOLUTION
+	size_t bits_l = bits - 2;
+#else
+	size_t bits_l = bits;
+#endif
+
 	//TODO: move perms inits to preparation
-	uints perm1 = perm_init((bits-2)*varslen);
-	uints perm2 = perm_init((bits-2)*varslen);
+	uints perm1 = perm_init((bits_l)*varslen);
+	uints perm2 = perm_init((bits_l)*varslen);
 	for (size_t i = 0; i < varslen; i++)
-		for (size_t j = 0; j < bits-2; j++) {
-			perm1[j * varslen + i] = i*(bits-2)+j;
-			perm2[i*(bits-2)+j] = j*varslen + i;
+		for (size_t j = 0; j < bits_l; j++) {
+			perm1[j * varslen + i] = i*(bits_l)+j;
+			perm2[i*(bits_l)+j] = j*varslen + i;
 		}
 	q = q^perm1;
-	q = bdd_quantify(q, quants, bits-2, varslen);
+	q = bdd_quantify(q, quants, bits_l, varslen);
 	q = q^perm2;
 }
 
