@@ -47,7 +47,7 @@ public:
 	bool auto_passthrough = true;
 private:
 	struct lit : public lit_t {
-		using lit_t::variant;
+		using typename lit_t::variant;
 		bool nt() const { return std::holds_alternative<size_t>(*this);}
 		size_t n() const { return std::get<size_t>(*this); }
 		CharT c() const { return std::get<CharT>(*this); }

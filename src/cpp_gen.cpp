@@ -89,7 +89,7 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_term &rt) {
 	vector<string> elem_names;
 	for (const elem &e : rt.e)
 		elem_names.emplace_back(), gen(os, elem_names.back(), e);
-	stringstream ss; ss << "rt" + id++; name = ss.str();
+	stringstream ss; ss << "rt" << id++; name = ss.str();
 	os << "raw_term " << name << "(" << (
 		rt.extype == raw_term::REL        ? "raw_term::REL" :
 		rt.extype == raw_term::EQ         ? "raw_term::EQ" :

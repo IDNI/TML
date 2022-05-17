@@ -76,7 +76,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		if (to_string_(r) != s) { DBGFAIL; } // number reading parse err
 		return r;
 	};
-	auto to_elem = [&parser, &to_int, this]
+	auto to_elem = [&to_int, this]
 		(const std::u32string& s, const std::u32string& f)
 	{
 		elem::etype t = elem::NONE;
@@ -319,12 +319,12 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		//DBG(print_raw_form_tree(COUT << "new root: ", *ctx.root) << "\n";)
 		ctx.prefixes.pop_back();
 	});
-	a.emplace(U"prefix", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"prefix", [&parser, &ctx](ni_t ni, ncs_t) {
 		auto s = parser.flatten(ni);
 		ctx.prefixes.back().first = elem(s == U"forall" ? elem::FORALL
 			: s == U"exists" ? elem::EXISTS : elem::UNIQUE);
 	});
-	a.emplace(U"causal_op", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"causal_op", [&ctx](ni_t, ncs_t ncs) {
 		assert(ncs.size() == 1);
 		elem e(ncs[0][0].first == U"implies"
 			? elem::IMPLIES : elem::COIMPLIES);
@@ -332,7 +332,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		ctx.root = cur;
 		//DBG(print_raw_form_tree(COUT << "new root: ", *ctx.root) << "\n";)
 	});
-	a.emplace(U"junct_op", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"junct_op", [&ctx](ni_t, ncs_t ncs) {
 		assert(ncs.size() == 1);
 		DBG(print_raw_form_tree(COUT << "old root: ", *ctx.root) << "\n";)
 		elem e(ncs[0][0].first == U"and" ? elem::AND : elem::OR);
@@ -374,7 +374,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		parser.down(ncs, a);
 		ctx.head = false;
 	});
-	a.emplace(U"pred", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"pred", [&parser, &a](ni_t, ncs_t ncs) {
 		bool amb = ncs.size() > 1;
 		for (auto& nc : ncs) for (auto& c : nc)
 			if (!amb || c.first == U"builtin_expr")
@@ -439,10 +439,10 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		ctx.rt.e.back().num = ctx.renew << 1 | ctx.forget;
 		ctx.renew = false, ctx.forget = false;
 	});
-	a.emplace(U"renew_prefix", [&parser, &ctx, this](ni_t, ncs_t) {
+	a.emplace(U"renew_prefix", [&ctx](ni_t, ncs_t) {
 		ctx.renew = true;
 	});
-	a.emplace(U"forget_prefix", [&parser, &ctx, this](ni_t, ncs_t) {
+	a.emplace(U"forget_prefix", [&ctx](ni_t, ncs_t) {
 		ctx.forget = true;
 	});
 	a.emplace(U"arith_expr", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
@@ -484,7 +484,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme(to_string_t(
 			parser.flatten(ni))));
 	});
-	a.emplace(U"constraint_arg", [&parser, &ctx, &to_elem, this](ni_t ni, ncs_t) {
+	a.emplace(U"constraint_arg", [&parser, &ctx, &to_elem](ni_t ni, ncs_t) {
 		ctx.rt.e.push_back(to_elem(U"number", parser.flatten(ni)));
 	});
 	a.emplace(U"arith_op", [&parser, &ctx](ni_t ni, ncs_t) {
@@ -535,13 +535,13 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 	a.emplace(U"]", [&ctx](ni_t, ncs_t) {
 		if (ctx.is_production) ctx.p.p.emplace_back(elem::CLOSESB);
 	});
-	a.emplace(U"*", [&parser, &ctx, this](ni_t, ncs_t) {
+	a.emplace(U"*", [&ctx](ni_t, ncs_t) {
 		if (ctx.is_production) ctx.p.p.emplace_back(t_arith_op::MULT);
 	});
-	a.emplace(U"+", [&parser, &ctx, this](ni_t, ncs_t) {
+	a.emplace(U"+", [&ctx](ni_t, ncs_t) {
 		if (ctx.is_production) ctx.p.p.emplace_back(t_arith_op::ADD);
 	});
-	a.emplace(U"elem", [&parser, &ctx, &to_elem, this](ni_t, ncs_t ncs) {
+	a.emplace(U"elem", [&parser, &ctx, &to_elem](ni_t, ncs_t ncs) {
 		for (auto& nc : ncs) for (auto &c : nc)	ctx.rt.e
 			.push_back(to_elem(c.first, parser.flatten(c.second)));
 	});
