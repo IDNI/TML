@@ -125,7 +125,7 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				t = term(extype, qbf);
 				v.push_back(t);
 				//align_vars_form(v);
-				m.insert(move(v));
+				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
 		} else  {
