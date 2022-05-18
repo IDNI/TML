@@ -13,15 +13,15 @@
 #include <algorithm>
 #include <random>
 #include <list>
+#include <algorithm>
+#include <variant>
+#include <memory>
 
 #include "tables.h"
 #include "dict.h"
 #include "input.h"
 #include "output.h"
 using namespace std;
-
-#define mkchr(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|1)))
-#define mknum(x) (opts.bitunv? ((int_t)(x)):(((((int_t)(x))<<2)|2)))
 
 typedef tuple<size_t, size_t, size_t, int_t> skmemo;
 typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
@@ -44,15 +44,6 @@ varmap tables::get_varmap(const term& h, const T& b, size_t &varslen, bool blt) 
 			if (t[n] < 0 && !has(m, t[n]))
 				m.emplace(t[n], varslen++);
 	return m;
-}
-
-map<size_t, int_t> varmap_inv(const varmap& vm) {
-	map<size_t, int_t> inv;
-	for (auto x : vm) {
-		assert(!has(inv, x.second));
-		inv.emplace(x.second, x.first);
-	}
-	return inv;
 }
 
 void getvars(const term& t, set<int_t>& v) {
@@ -193,86 +184,94 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 }
 
 bool tables::get_facts(const flat_prog& m) {
-	map<ntable, set<spbdd_handle>> add, del;
+	// TODO: Ee need add and del in order to deal with negations in heads.
+	// A couple of regression tests use negation in heads.
+	// We should check whether this is a desirable feature.
+	map<ntable, vector<const term*>> add, del;
+	map<ntable, size_t> invert;
+	map<ntable, pair<vector<size_t>, vector<size_t>>> inverses;
+	// get facts by table
 	for (const auto& r : m)
 		if (r.size() != 1) continue;
 		else if (r[0].goal) goals.insert(r[0]);
 		else if (r[0].is_builtin()) fact_builtin(r[0]);
-		else (r[0].neg ? del : add)[r[0].tab].insert(from_fact(r[0]));
+		else if (is_optimizable_fact(r[0]))
+			(r[0].neg ? del: add)[r[0].tab].push_back(std::addressof(r[0])),
+			invert[r[0].tab] = r[0].size();
 	if (unsat || halt) return false;
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
-	bdd_handles v;
-	for (auto x : add) for (auto y : x.second)
-		tbls[x.first].t = tbls[x.first].t || y;
-	for (auto x : del) {
-		for (auto y : x.second) tbls[x.first].t = tbls[x.first].t % y;
-	}
+	// Compute the inverse of pos for the collected facts
+	for (auto const p: invert)
+		inverses[p.first] = _inverse(bits, p.second);
+	// Compute the bdds for the each table
+	for (auto x: from_facts(add, inverses))
+		tbls[x.first].t = x.second;
+	for (auto x: from_facts(del, inverses))
+		tbls[x.first].t = tbls[x.first].t % x.second;
 	if (opts.optimize)
 		(o::ms() << "# get_facts: "),
 		measure_time_end();
 	return true;
 }
-
-int_t tables::freeze(vector<term>& v, int_t m = 0) {
-	map<int_t, int_t> p;
-	map<int_t, int_t>::const_iterator it;
-	for (const term& t : v) for (int_t i : t)
-		if (opts.bitunv && (i ==0 || i == 1 )) m = max(m, i);
-		else if (i & 2) m = max(m, i >> 2);
-	for (term& t : v)
-		for (int_t& i : t)
-			if (i >= 0) continue;
-			else if ((it = p.find(i)) != p.end()) i = it->second;
-			else p.emplace(i, mknum(m)), i = mknum(m++);
-	return m;
+bool tables::is_optimizable_fact(const term& t) const {
+	// For example: a. a(1 2 3). ~b. ~b(4 5 6).
+	return t.size() == 0 || (t.size() >0 && t[0] >= 0);
 }
 
-flat_prog& tables::get_canonical_db(vector<term>& x, flat_prog& p) {
-	freeze(x);
-	for (size_t n = 1; n != x.size(); ++n) p.insert({x[n]});
+map<ntable, spbdd_handle> tables::from_facts(
+		map<ntable, vector<const term*>>& pending,
+		const map<ntable, pair<vector<size_t>, vector<size_t>>>& inverses) const {
+	map<ntable, spbdd_handle> p;
+	for (auto t: pending)
+		if (t.second.size() == 0) continue;
+		else p[t.first] = from_facts(t.second, inverses.at(t.first));
 	return p;
 }
-
-flat_prog& tables::get_canonical_db(vector<vector<term>>& x, flat_prog& p) {
-	int_t m = 0;
-	for (vector<term>& v : x)
-		for (const term& t : v)
-			for (int_t i : t)
-				if (opts.bitunv && (i == 1 || i == 0) ) m = max(m, i);
-				else if (i & 2) m = max(m, i >> 2);
-	for (vector<term>& t : x) {
-		freeze(t, m);
-		for (size_t n = 1; n != t.size(); ++n) p.insert({t[n]});
+spbdd_handle tables::from_facts(
+		vector<const term*>& pending,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	if (pending.size() == 0) return htrue;
+	// If the facts have no arguments, we return htrue regardless if
+	// they correspond to a del or and call. They will be process
+	// properly in get_facts.
+	if (pending[0]->size() == 0) return htrue;
+	// Otherwise, we prooceed with the radix sorting & building of
+	// the bdd.
+	return from_facts(pending, pending.begin(), pending.end(), 0, inverse);
+}
+spbdd_handle tables::from_facts(vector<const term*>& terms,
+		vector<const term*>::iterator left,
+		vector<const term*>::iterator right,
+		const size_t& pos,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	size_t max = max_pos(*left);
+	if (pos == max) {
+		#ifdef TYPE_RESOLUTION
+		if (next(left) != right) return htrue;
+		#endif
+		return from_bit(left, inverse);
 	}
-	return p;
+	auto it = partition(left, right,
+		[this, pos, inverse](const term* t) -> bool {
+			return !bit(pos, t, inverse.first, inverse.second); });
+	if (left == it)	return from_high(pos,
+		from_facts(terms, it, right, pos +1, inverse) -> b);
+	if (right == it) return from_low(pos,
+		from_facts(terms, left, it, pos + 1, inverse) -> b);
+	return from_high_and_low(pos,
+		from_facts(terms, it, right, pos + 1, inverse) -> b,
+		from_facts(terms, left, it, pos + 1, inverse) -> b);
 }
-
-void tables::run_internal_prog(flat_prog p, set<term>& r, size_t nsteps) {
-	dict_t tmpdict(dict); // copy ctor, only here, if this's needed at all?
-	rt_options tmpopts(opts);
-	tables t(tmpdict, tmpopts, ir_handler);
-	if (!t.run_nums(move(p), r, nsteps)) { DBGFAIL; }
+spbdd_handle tables::from_bit(
+		const vector<const term*>::iterator& current,
+		const pair<vector<size_t>, vector<size_t>>& inverse) const {
+	size_t max = max_pos(*current);
+	size_t a = (*current)->size();
+	size_t i = inverse.second.at(max);
+	size_t b = inverse.first.at(max);
+	return from_bit(b, i, a, (*current)->at(i));
 }
-
-void create_head(vector<term>&, ntable) {
-/*	set<int_t> v;
-	getvars(x, v);
-	term h;
-	h.tab = tab, h.insert(h.begin(), vx.begin(), vx.end());
-	x.insert(x.begin(), move(h));*/
-}
-
-void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
-	auto it = m.end();
-	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
-}
-
-void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
-	flat_prog q(move(p));
-	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
-}
-
 
 bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 		spbdd_handle &c) const {
@@ -307,16 +306,22 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	if (t[0] >= 0 && t[1] >= 0) return !(t.neg == (t[0] <= t[1]));
 	if (t[0] < 0 && t[1] < 0) {
 		q = leq_var(vm.at(t[0]), vm.at(t[1]), vl, bits);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[0]), vl) &&
 			constrain_to_num(vm.at(t[1]), vl);
+		#endif
 	} else if (t[0] < 0) {
 		q = leq_const(t[1], vm.at(t[0]), vl, bits);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[0]), vl);
+		#endif
 	} else if (t[1] < 0) {
 		// 1 <= v1, v1 >= 1, ~(v1 <= 1) || v1==1.
 		q = htrue % leq_const(t[0], vm.at(t[1]), vl, bits) ||
 			from_sym(vm.at(t[1]), vl ,t[0]);
+		#ifndef TYPE_RESOLUTION
 		numeric_constraint = constrain_to_num(vm.at(t[1]), vl);
+		#endif
 	}
 	// Enforce the numeric constraint regardless of whether this term is positive
 	// or negated. This essentially forces any operands to inequalities to be
@@ -327,10 +332,12 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 
-	string pred = to_string(lexeme2str(dict.get_rel(t.tab)));
+	//FIXME: cannot be comparing strings at FWD
+	string pred = to_string(lexeme2str(dict.get_rel_lexeme(t.tab)));
 	//COUT << to_string(pred) << endl;
 	int_t idbltin = -1;
 	term taux(t);
+
 	if (pred.find("_EQ_") != std::string::npos)
 		idbltin = dict.get_bltin("eq");
 	else if (pred.find("_LEQ_") != string::npos) {
@@ -348,7 +355,7 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	}
 
 	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
-	//todo: check that idbltin is poperly configured in builtins
+	//todo: check that idbltin is properly configured in builtins
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
 	a.bltins.push_back(taux);
 }
@@ -358,7 +365,8 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
-	a.vm = get_varmap(h, al, a.varslen, blt), a.inv = varmap_inv(a.vm);
+	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
+
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
@@ -409,18 +417,13 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	a.ex = d.first, a.perm = d.second, as.insert(a);
 }
 
-lexeme tables::get_new_rel() {
-	static size_t last = 1;
-	string s = "r";
-	size_t sz;
-	lexeme l;
-retry:	sz = dict.nrels(), l = dict.get_lexeme(s + to_string_(last));
-	dict.get_rel(l);
-	if (dict.nrels() == sz) { ++last; goto retry; }
-	return l;
-}
-
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
+	#ifndef TYPE_RESOLUTION
+	size_t bits_l = bits - 2;
+	#else
+	size_t bits_l = bits;
+	#endif
+
 	auto t0 = al.begin();
 	DBG(assert(t0->extype == term::FORM1 || t0->extype == term::FORM2));
 	alt a;
@@ -448,19 +451,15 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	else
 		handler_formh(a.f, t0->qbf.get(), vm, vmh);
 
-	size_t cbits= 0; 
-	if(opts.bitunv) cbits = bits;
-	else cbits = bits-2 ;
-
 	if (a.f->perm.size() == 0) {
 		term t; t.resize(a.f->varslen);
 		for (auto &v : vm) t[v.second] = v.first;
-		a.f->perm = get_perm(t, tmpvm, a.f->varslen, cbits);
+		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits_l);
 	}
 
 	//todo: review to reach an arity-increment permutation to handle head constants
 	if (a.f->ex_h.size() == 0) {
-		auto d = deltail(a.f->varslen, tmpvm.size(), cbits);
+		auto d = deltail(a.f->varslen, tmpvm.size(), bits_l);
 		a.f->ex_h = d.first, a.f->perm_h = d.second;
 	}
 	a.f->varslen_h = varsh;
@@ -468,27 +467,38 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	return;
 }
 
-ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
-	vector<term> x) {
-	return p.emplace(x), x[0].tab;
+//review
+void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
+	auto it = m.end();
+	for (term& t : x) if (m.end() != (it = m.find(t[0]))) t[0] = it->second;
 }
 
-bool tables::get_rules(flat_prog p) {
+void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
+	flat_prog q(move(p));
+	for (vector<term> v : q) replace_rel(m, v), p.insert(v);
+}
+
+bool tables::get_rules(flat_prog &p) {
+
 	if (!get_facts(p)) return false;
+	/*
+	// <-- TODO: review
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
-	for (const auto& x : q) prog_add_rule(p, r, x);
+	for (const auto& x : q) p.emplace(x);
 	replace_rel(move(r), p);
 	q = move(p);
-	for (const auto& x : q) prog_add_rule(p, r, x);
+	for (const auto& x : q) p.emplace(x);
 	replace_rel(move(r), p);
+	// -->
+	*/
 	if (opts.optimize) bdd::gc();
 
-	// BLTINS: set order is important (and wrong) for e.g. REL, BLTIN, EQ
 	map<term, set<term_set>> m;
 	for (const auto& x : p)
 		if (x.size() == 1) m[x[0]] = {};
 		else m[x[0]].insert(term_set(x.begin() + 1, x.end()));
+
 	set<rule> rs;
 	varmap::const_iterator it;
 	set<alt*, ptrcmp<alt>>::const_iterator ait;
@@ -500,7 +510,7 @@ bool tables::get_rules(flat_prog p) {
 		rule r;
 		if (t.neg) datalog = false;
 		varmap v;
-		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //XXX: review why we replicate t variables in r
+		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //TODO: review why we replicate t variables in r
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
 			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
@@ -517,7 +527,7 @@ bool tables::get_rules(flat_prog p) {
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
-			else	*(aa = new alt) = x,
+			else *(aa = new alt) = x,
 				r.push_back(aa), alts.insert(aa);
 		rs.insert(r);
 	}
@@ -528,64 +538,6 @@ bool tables::get_rules(flat_prog p) {
 	return true;
 }
 
-#define rdict() ((dict_t&)dict)
-void tables::load_string(lexeme r, const string_t& s) {
-
-	unary_string us(sizeof(char32_t)*8);
-	us.buildfrom(s);
-	//DBG(us.toprint(o::dbg()));
-	for( auto it: us.rel ){
-		int_t r = dict.get_rel(rdict().get_lexeme(us.getrelin_str(it.first)));
-		term t; t.resize(1);
-		ntable tb = get_table({r, {1} });
-		t.tab =tb;
-		bdd_handles b;
-		b.reserve(it.second.size());
-		for( int_t i :it.second)
-			t[0]= mknum(i), b.push_back(from_fact(t));
-		tbls[tb].t = bdd_or_many(b);
-	}
-
-	int_t rel = dict.get_rel(r);
-	str_rels.insert(rel);
-
-//	const ints ar = {0,-1,-1,1,-2,-2,-1,1,-2,-1,-1,1,-2,-2};
-	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
-		salpha = dict.get_sym(dict.get_lexeme("alpha")),
-		salnum = dict.get_sym(dict.get_lexeme("alnum")),
-		sdigit = dict.get_sym(dict.get_lexeme("digit")),
-		sprint = dict.get_sym(dict.get_lexeme("printable"));
-	term t,tb;
-	bdd_handles b1, b2;
-	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
-	for (int_t n = 0; n != (int_t)s.size(); ++n) {
-		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
-		ir_handler->chars = max(ir_handler->chars, t[1]),
-		b1.push_back(from_fact(t));
-		tb[1] = t[0], tb[2] = mknum(0);
-		if (isspace(s[n])) tb[0] = sspace, b2.push_back(from_fact(tb));
-		if (isdigit(s[n])) tb[0] = sdigit, b2.push_back(from_fact(tb));
-		if (isalpha(s[n])) tb[0] = salpha, b2.push_back(from_fact(tb));
-		if (isalnum(s[n])) tb[0] = salnum, b2.push_back(from_fact(tb));
-		if (isprint(s[n])) tb[0] = sprint, b2.push_back(from_fact(tb));
-	}
-	clock_t start{}, end;
-	if (opts.optimize)
-		(o::ms()<<"# load_string or_many: "),
-		measure_time_start();
-	ntable st = get_table({rel, {2}}); // str(pos char)
-	ntable stb = get_table({rel, {3}}); // str(printable pos 0)
-
-	tbls[st].t = bdd_or_many(move(b1));
-	tbls[stb].t = bdd_or_many(move(b2));
-	if (opts.optimize) measure_time_end();
-}
-
-/*template<typename T> bool subset(const set<T>& small, const set<T>& big) {
-	for (const T& t : small) if (!has(big, t)) return false;
-	return true;
-}*/
-
 void tables::get_var_ex(size_t arg, size_t args, bools& b) const {
 	for (size_t k = 0; k != bits; ++k) b[pos(k, arg, args)] = true;
 }
@@ -594,127 +546,20 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
-ntable tables::get_table(const sig& s) {
-	auto it = smap.find(s);
-	if (it != smap.end()) return it->second;
-	ntable nt = tbls.size();
-	size_t len = ir_handler->sig_len(s);
-	max_args = max(max_args, len);
-	if(opts.bitunv) {
-		bool found = false;
-		string_t relname = lexeme2str(dict.get_rel(s.first));
-		auto & types = spbu->ptypenv->search_pred( relname , found);
-		tab_type.insert({nt, types});
-		DBG(COUT<< "For table " << nt << " " << to_string(relname) << " < ");
-		for( auto &t: types )
-			DBG(COUT<<t.to_print()<<" ");
-		DBG(COUT<< ">" << std::endl;);
-	}
-	table tb;
-	return	tb.t = hfalse, tb.s = s, tb.len = len, 
-	tbls.push_back(tb), smap.emplace(s,nt), nt;
-}
-
-term tables::to_nums(term t) {
-	for (int_t& i : t)  if (i > 0) i = mknum(i);
-	return t;
-}
-
-//term from_nums(term t) {
-//	for (int_t& i : t)  if (i > 0) i >>= 2;
-//	return t;
-//}
-
-vector<term> tables::to_nums(const vector<term>& v) {
-	vector<term> r;
-	for (const term& t : v) r.push_back(to_nums(t));
-	return r;
-}
-
-//set<term> from_nums(const set<term>& s) {
-//	set<term> ss;
-//	for (const term& t : s) ss.insert(from_nums(t));
-//	return ss;
-//}
-
-void tables::to_nums(flat_prog& m) {
-	flat_prog mm;
-	for (auto x : m) mm.insert(to_nums(x));
-	m = move(mm);
-}
-
-ntable tables::get_new_tab(int_t x, ints ar) { return get_table({ x, ar }); }
-
-bool tables::add_prog(const raw_prog& p, const strs_t& strs_) {
-	strs = strs_;
-	if (!strs.empty()) {
-		//ir_handler->chars = 255,
-		dict.get_sym(dict.get_lexeme("space")),
-		dict.get_sym(dict.get_lexeme("alpha")),
-		dict.get_sym(dict.get_lexeme("alnum")),
-		dict.get_sym(dict.get_lexeme("digit")),
-		dict.get_sym(dict.get_lexeme("printable"));
-		for (auto x : strs) {
-			ir_handler->nums = max(ir_handler->nums, (int_t)x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
-		}
-	}
-	flat_prog fp = ir_handler->to_terms(p);
-	return add_prog_wprod(fp, p.g);
-}
-
-bool tables::run_nums(flat_prog m, set<term>& r, size_t nsteps) {
-	map<ntable, ntable> m1, m2;
-	auto f = [&m1, &m2](ntable *x) {
-		auto it = m1.find(*x);
-		if (it != m1.end()) return *x = it->second;
-		const int_t y = (int_t)m2.size();
-		m1.emplace(*x, y), m2.emplace(y, *x);
-		return *x = y;
-	};
-	auto g = [&m2](const set<term>& s) {
-		set<term> r;
-		for (term t : s) {
-			auto it = m2.find(t.tab);
-			if (it == m2.end()) r.insert(t);
-			else t.tab = it->second, r.insert(t);
-		}
-		return r;
-	};
-	auto h = [this, f](const set<term>& s) {
-		set<term> r;
-		for (term t : s)
-			get_table({ f(&t.tab), {(int_t)t.size()}}), r.insert(t);
-		return r;
-	};
-	flat_prog p;
-	for (vector<term> x : m) {
-		get_table({ f(&x[0].tab), { (int_t)x[0].size() } });
-		auto s = h(set<term>(x.begin() + 1, x.end()));
-		x.erase(x.begin() + 1, x.end()),
-		x.insert(x.begin() + 1, s.begin(), s.end()), p.insert(x);
-	}
-//	DBG(print(o::out()<<"run_nums for:"<<endl, p)<<endl<<"returned:"<<endl;)
-	if (!add_prog_wprod(move(p), {})) return false;
-	if (!pfp(nsteps)) return false;
-	r = g(decompress());
-	return true;
-}
-
+//#ifdef TML_POP_UPDATE
 void tables::add_tml_update(const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
 	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
-	ints arity = tbls.at(t.tab).s.second;
+	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
+	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
 	arity[0] += 3;
-	ntable tab = get_table({ rel_tml_update, arity });
+	ntable tab = ir_handler->get_table(ir_handler->get_sig(rel_tml_update, arity));
 	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
-		dict.get_sym(dict.get_rel(tbls[t.tab].s.first)) };
+		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
 	args.insert(args.end(), t.begin(), t.end());
 	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
 }
-
+//#endif
 template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
@@ -731,7 +576,10 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
+
+		//#ifdef TML_POP_UPDATE
 		if (populate_tml_update) add_tml_update(x, r.neg);
+		//#endif
 	});
 	if (print_updates) os << endl;
 	return os;
@@ -741,41 +589,6 @@ void tables::init_tml_update() {
 	rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
 	sym_add = dict.get_sym(dict.get_lexeme("add"));
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
-}
-
-bool tables::add_prog_wprod(flat_prog m, const vector<production>& g, bool mknums) {
-	error = false;
-	smemo.clear(), ememo.clear(), leqmemo.clear();
-	if (mknums) to_nums(m);
-	if (populate_tml_update) init_tml_update();
-	rules.clear(), datalog = true;
-	ir_handler->syms = dict.nsyms();
-
-	if (opts.bitunv) {
-		bits = 1;
-	} else {
-		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
-			add_bit();
-	}
-
-	for (auto x : strs) load_string(x.first, x.second);
-	form *froot;
-	if (!ir_handler->transform_grammar(g, m, froot)) return false;
-	if (!get_rules(move(m))) return false;
-
-	// filter for rels starting and ending with __
-	auto filter_internal_tables = [] (const lexeme& l) {
-		size_t len = l[1] - l[0];
-		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
-				  '_' == l[0][len-2] && '_' == l[0][len-1];
-	};
-	ints internal_rels = dict.get_rels(filter_internal_tables);
-	for (auto& tbl : tbls)
-		for (int_t rel : internal_rels)
-			if (rel == tbl.s.first) { tbl.hidden = true; break; }
-
-	if (opts.optimize) bdd::gc();
-	return true;
 }
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
@@ -803,7 +616,6 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 
 spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
 //	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
-//	DBG(assert(bdd_nvars(get_table(b.tab, db)) <= b.ex.size());)
 	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;
 	b.tlast = tbls[b.tab].t;
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
@@ -832,7 +644,9 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		formula_query(a.f, f);
 		//TODO: complete for any type, only for ints by now
 		if (a.f->ex_h.size() != 0 ) {
-			if(!opts.bitunv) append_num_typebits(f[0], a.f->varslen_h);
+			#ifndef TYPE_RESOLUTION
+			append_num_typebits(f[0], a.f->varslen_h);
+			#endif
 			a.rlast = f[0];
 		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;
@@ -901,10 +715,11 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
+
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
-		opts.pu_states.insert(get_table({ dict.get_rel(
-			dict.get_lexeme(tname)), {0}}));
+		opts.pu_states.insert(ir_handler->get_table(
+				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
 }
 
 bool tables::print_updates_check() {
@@ -955,8 +770,8 @@ char tables::fwd() noexcept {
 	return b;*/
 }
 
-level tables::get_front() const {
-	level r(tbls.size());
+bdd_handles tables::get_front() const {
+	bdd_handles r(tbls.size());
 	for (ntable n = 0; n != (ntable)tbls.size(); ++n) r[n] = tbls.at(n).t;
 	return r;
 }
@@ -968,6 +783,7 @@ bool tables::contradiction_detected() {
 #endif
 	return false;
 }
+
 bool tables::infloop_detected() {
 	error = true, o::err() << err_infloop << endl;
 #ifdef WITH_EXCEPTIONS
@@ -995,7 +811,7 @@ bool tables::add_fixed_point_fact() {
 
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	error = false;
-	level l = get_front();
+	bdd_handles l = get_front();
 	fronts.push_back(l);
 	if (opts.bproof != proof_mode::none) levels.emplace_back(l);
 	for (;;) {
@@ -1003,7 +819,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		++nstep;
 		bool fwd_ret = fwd();
 		if (halt) return true;
-		level l = get_front();
+		bdd_handles l = get_front();
 		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp();
 		fronts.push_back(l);
 		if (halt) return true;
@@ -1016,36 +832,6 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 		if (is_repeat) return is_infloop() ? infloop_detected() : true;
 	}
 	DBGFAIL;
-}
-
-/* Run the given program with the given settings, put the query
- * results into the given out-parameter, and return true in the case
- * that it reaches a fixed point. Otherwise just return false. */
-
-bool tables::run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		set<raw_term> &results)
-{
-	rt_options to;
-	to.bproof            = proof_mode::none;
-	to.optimize          = opts.enabled("optimize");
-	to.print_transformed = opts.enabled("t");
-	to.apply_regexpmatch = opts.enabled("regex");
-	to.fp_step           = opts.enabled("fp");
-	to.bitunv            = opts.enabled("bitunv");
-	to.bitorder          = opts.get_int("bitorder");
-	ir_builder ir_handler(dict, to);
-	tables tbl(dict, to, &ir_handler);
-	ir_handler.dynenv = &tbl;
-	ir_handler.printer = &tbl;
-	strs_t strs;
-	if(tbl.run_prog_wstrs(rp, strs)) {
-		for(const term &result : tbl.decompress()) {
-			results.insert(tbl.ir_handler->to_raw_term(result));
-		}
-		return true;
-	} else {
-		return false;
-	}
 }
 
 /* Run the given program on the given extensional database and yield
@@ -1081,7 +867,24 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	}
 	// Run the program to obtain the results which we will then filter
 	std::set<raw_term> tmp_results;
-	bool result = run_prog(rp, dict, opts, tmp_results);
+	rt_options to;
+	to.bproof            = proof_mode::none;
+	to.optimize          = opts.enabled("optimize");
+	to.print_transformed = opts.enabled("t");
+	to.apply_regexpmatch = opts.enabled("regex");
+	to.fp_step           = opts.enabled("fp");
+	to.bitunv            = opts.enabled("bitunv");
+	to.bitorder          = opts.get_int("bitorder");
+	ir_builder ir_handler(dict, to);
+	tables tbl(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl;
+	ir_handler.printer = &tbl;
+	strs_t strs;
+
+	if (!tbl.run_prog(rp, strs)) return false;
+	for(const term &result : tbl.decompress())
+		tmp_results.insert(tbl.ir_handler->to_raw_term(result));
+
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -1091,55 +894,183 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 			results.insert(res);
 		}
 	}
-	return result;
+	return true;
 }
 
-bool tables::run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps,
+//-----------------------------------------------------------------------------
+#ifndef LOAD_STRS
+void tables::load_string(lexeme r, const string_t& s) {
+
+	//FIXME: this will be loadaed by new get facts
+	unary_string us(sizeof(char32_t)*8);
+	us.buildfrom(s);
+	for( auto it: us.rel ){
+		int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(it.first)));
+		term t; t.resize(1);
+		ntable tb = ir_handler->get_table(ir_handler->get_sig(r, {1}));
+		t.tab = tb;
+		bdd_handles b;
+		b.reserve(it.second.size());
+		for( int_t i :it.second)
+			t[0]= mknum(i), b.push_back(from_fact(t));
+		tbls[tb].t = bdd_or_many(b);
+	}
+
+	//FIXME: this will be loadaed by get new get facts
+	int_t rel = dict.get_rel(r);
+	ir_handler->str_rels.insert(rel);
+	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
+		salpha = dict.get_sym(dict.get_lexeme("alpha")),
+		salnum = dict.get_sym(dict.get_lexeme("alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme("digit")),
+		sprint = dict.get_sym(dict.get_lexeme("printable"));
+	term t,tb;
+	bdd_handles b1, b2;
+	b1.reserve(s.size()), b2.reserve(s.size()), t.resize(2), tb.resize(3);
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		t[0] = mknum(n), t[1] = mkchr(s[n]), // t[2] = mknum(n + 1),
+		ir_handler->chars = max(ir_handler->chars, t[1]),
+		b1.push_back(from_fact(t));
+		tb[1] = t[0], tb[2] = mknum(0);
+		if (isspace(s[n])) tb[0] = mksym(sspace), b2.push_back(from_fact(tb));
+		if (isdigit(s[n])) tb[0] = mksym(sdigit), b2.push_back(from_fact(tb));
+		if (isalpha(s[n])) tb[0] = mksym(salpha), b2.push_back(from_fact(tb));
+		if (isalnum(s[n])) tb[0] = mksym(salnum), b2.push_back(from_fact(tb));
+		if (isprint(s[n])) tb[0] = mksym(sprint), b2.push_back(from_fact(tb));
+	}
+	ntable st = ir_handler->get_table(ir_handler->get_sig(rel, {2})); // str(pos char)
+	ntable stb = ir_handler->get_table(ir_handler->get_sig(rel, {3})); // str(printable pos 0)
+	tbls[st].t = bdd_or_many(move(b1));
+	tbls[stb].t = bdd_or_many(move(b2));
+}
+#endif
+
+bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
+
+	DBG(COUT <<  "add_prog_wprod" << endl;);
+	error = false;
+	smemo.clear(), ememo.clear(), leqmemo.clear();
+	//if (mknums) to_nums(m);
+	if (populate_tml_update) init_tml_update();
+	rules.clear(), datalog = true;
+
+	#ifndef LOAD_STRS
+	for (auto x : strs) load_string(x.first, x.second);
+	#endif
+
+	if (!ir_handler->transform_grammar(g, m)) return false;
+
+	//if (!get_rules(move(m))) return false;
+	if (!get_rules(m)) return false;
+
+	// filter for rels starting and ending with __
+	auto filter_internal_tables = [] (const lexeme& l) {
+		size_t len = l[1] - l[0];
+		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
+				  '_' == l[0][len-2] && '_' == l[0][len-1];
+	};
+	ints internal_rels = dict.get_rels(filter_internal_tables);
+	for (auto& tbl : tbls)
+		for (int_t rel : internal_rels)
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
+
+	if (opts.optimize) bdd::gc();
+	return true;
+}
+
+
+bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
+	DBG(COUT << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
-	if (!add_prog(p, strs)) return false;
+
+	flat_prog fp = ir_handler->to_terms(p);
+
+	#ifndef LOAD_STRS
+	strs = strs_in;
+	if (!strs.empty()) {
+		for (auto x : strs) {
+			ir_handler->nums = max(ir_handler->nums, (int_t)x.second.size()+1);
+			unary_string us(32);
+			us.buildfrom(x.second);
+			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
+		}
+	}
+	#else
+	ir_handler->load_strings_as_fp(fp, strs_in);
+	#endif
+
+	ir_handler->syms = dict.nsyms();
+	if (opts.bitunv) {
+		bits = 1;
+	} else {
+		#ifdef TYPE_RESOLUTION
+		size_t a = max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms);
+		if (a == 0) bits++;
+		else while (a > size_t (1 << bits)-1) bits++;
+		#else
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+			add_bit();
+		#endif
+	}
+
+	if (!add_prog_wprod(fp, p.g)) return false;;
+
+	//----------------------------------------------------------
 	if (opts.optimize) {
 		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-		o::ms() << "# pfp: ";
-		measure_time_start();
+		o::ms() << "# pfp: " << endl; measure_time_start();
 	}
-	//DBG(o::dbg()<<endl<<p<<endl);
 
+	#define NPS_ATRUNTIME
+	#ifdef NPS_ATRUNTIME
 	nlevel begstep = nstep;
+	#endif
+
 	bool r = true;
 	// run program only if there are any rules
 	if (rules.size()) {
 		fronts.clear();
 		r = pfp(steps ? nstep + steps : 0, break_on_step);
 	} else {
-		level l = get_front();
+		bdd_handles l = get_front();
 		fronts = {l, l};
 	}
-	size_t went = nstep - begstep;
+	//----------------------------------------------------------
+	//TODO: prog_after_fp is required for grammar/str recognition,
+	// but it should be restructured
 	if (r && prog_after_fp.size()) {
-		if (!add_prog_wprod(move(prog_after_fp), {}, false)) return false;
+		if (!add_prog_wprod(move(prog_after_fp), {})) return false;
 		r = pfp();
 	}
+
+	#ifdef NPS_ATRUNTIME
+	size_t went = nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
-			r = run_prog_wstrs(np, strs, steps, break_on_step);
+			r = run_prog(np, strs_in, steps, break_on_step);
 			went = nstep - begstep;
-			if (!r && went >= steps) break;
+			if (!r && went >= steps) {
+				//assert(false && "!r && went >= steps");
+				break;
+			}
 		}
 	}
+	#endif
+
 	if (opts.optimize)
 		(o::ms() <<"# add_prog: "<<t << " pfp: "),
 		measure_time_end();
 	return r;
 }
 
-tables::tables(dict_t& dict, rt_options opts, ir_builder* ir_handler_) :
-	dict(dict), opts(opts), ir_handler(ir_handler_) {
-	init_builtins();
+tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
+	dict(dict_), opts(opts_), ir_handler(ir_handler_)/*, bltins(dict_) */{
+		init_builtins();
 }
 
 tables::~tables() {
@@ -1191,7 +1122,7 @@ template void tables::out<wchar_t>(wostream& os) const;
 template <typename T>
 bool tables::out_fixpoint(basic_ostream<T>& os) {
 	// The variables in which the fixpoint will be placed if it exists
-	level trues, falses, undefineds;
+	bdd_handles trues, falses, undefineds;
 	if(compute_fixpoint(trues, falses, undefineds)) {
 		// Print out the true points
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
@@ -1210,7 +1141,7 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 
 bool tables::is_infloop() {
 	// The variables in which the fixpoint will be placed if it exists
-	level trues, falses, undefineds;
+	bdd_handles trues, falses, undefineds;
 	if(compute_fixpoint(trues, falses, undefineds)) {
 		for(ntable n = 0; n < (ntable)undefineds.size(); n++) {
 			// If this relation is visible then existince of undefined parts in it
@@ -1229,7 +1160,7 @@ bool tables::is_infloop() {
  * never occur in the final cycle, and the undefined points comprise the
  * rest. */
 
-bool tables::compute_fixpoint(level &trues, level &falses, level &undefineds) {
+bool tables::compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds) {
 	const int_t fronts_size = fronts.size(), tbls_size = tbls.size();
 	if(fronts_size < 2 ||
 			std::find(fronts.begin(), fronts.end()-1, fronts.back()) ==
@@ -1332,7 +1263,11 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
 
-		if(!opts.bitunv || spbu.get()->brev_transform_check(r, tbl) ) f(r);
+#ifdef BIT_TRANSFORM
+		if (ir_handler->bitunv_decompress(r, tbl))
+#endif
+		f(r);
+
 	})();
 }
 
@@ -1349,161 +1284,3 @@ void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 }
 
 // ----------------------------------------------------------------------------
-// tramsform bin
-set<int_t> intersect(const set<int_t>& x, const set<int_t>& y) {
-	set<int_t> r;
-	set_intersection(x.begin(), x.end(), y.begin(), y.end(),
-		inserter(r, r.begin()));
-	return r;
-}
-
-// ----------------------------------------------------------------------------
-
-/*
-// BACKUP CQC
-set<term> tables::bodies_equiv(vector<term> x, vector<term> y) const {
-//	if (x[0].size() != y[0].size()) return false;
-	x[0].tab = y[0].tab;
-	x.erase(x.begin()), y.erase(y.begin()),
-	create_head(x, x[0].tab), create_head(y, y[0].tab);
-	if (cqc(x, y)) {
-		if (cqc(y, x)) return true;
-	}
-}
-
-enum cqc_res { CONTAINED, CONTAINS, BOTH, NONE };
-
-cqc_res maybe_contains(const vector<term>& x, const vector<term>& y) {
-	if (x.size() == 1 || y.size() == 1) return NONE;
-	set<ntable> tx, ty;
-	for (size_t n = 1; n != x.size(); ++n)
-		if (x[n].neg) return NONE; else tx.insert(x[n].tab);
-	for (size_t n = 1; n != y.size(); ++n)
-		if (y[n].neg) return NONE; else ty.insert(y[n].tab);
-	bool maybe_contained, maybe_contains;
-	if ((maybe_contained = tx.size() < ty.size()))
-		for (ntable n : tx)
-			if (!has(ty, n)) { maybe_contained = false; break; }
-	if ((maybe_contains = tx.size() > ty.size()))
-		for (ntable n : ty)
-			if (!has(tx, n))
-				return maybe_contained ? CONTAINED : NONE;
-	return maybe_contained ? BOTH : CONTAINS;
-}
-*/
-/*struct cqcdata {
-	vector<term> r;
-	size_t from;
-	set<int_t> vars;
-	set<ntable> tabs;
-	cqcdata() {}
-	cqcdata(const vector<term>& r) : r(r) {
-		from = r.size();
-		if (from == 1) return;
-		sort(r.begin(), r.end());
-		for (size_t n = 1; n < from;)
-			if (tabs.insert(find(r[n].tab).second) ++n;
-			else r.push_back(r[n]), r.erase(r.begin() + n), --from;
-		for (size_t n = from; n != r.size(); ++n) getvars(r[n], vars);
-		for (size_t n = 1, k; n != from; ++n)
-			for (k = 0; k != r[n].size(); ++k)
-				if (r[n][k] < 0) vars.erase(r[n][k]);
-		align_vars(r);
-	}
-};
-void tables::cqc_minimize(cqcdata& d) {
-	if (d.from != d.r.size()) return;
-}
-void tables::cqc(flat_prog& p) {
-	vector<cqcdata> v;
-	for (const vector<term>& r : p)
-		v.emplace_back(r), cqc_minimize(v.back());
-}*/
-
-/*
-ntable tables::prog_add_rule(flat_prog& p, map<ntable, ntable>&,// r,
-	vector<term> x) {
-	return p.emplace(x), x[0].tab;
-
-//	if (!bcqc || x.size() == 1) return p.emplace(x), x[0].tab;
-//	for (const vector<term>& y : p)
-//		if (x == y || y.size() == 1) continue;
-//		else if (bodies_equiv(x, y)) {
-//			if (has(tmprels, x[0].tab) && has(tmprels, y[0].tab)) {
-//
-//			}
-//			return y[0].tab;
-//		}
-//	if (has(tmprels, x[0][0])) {
-//		for (const vector<term>& y : p)
-//			if (has(tmprels, y[0].tab) && cqc(x, y) && cqc(y, x))
-//				return (tbls[x[0].tab].priority >
-//					tbls[y[0].tab].priority ? x : y)[0].tab;
-//		return x[0].tab;
-//	}
-//	if (x.size() > 3) cqc_minimize(x);
-//	if (!cqc(x, p)) p.emplace(x);
-//	return x[0].tab;
-//
-}
-*/
-
-//set<body*, ptrcmp<body>> body::s;
-//set<alt*, ptrcmp<alt>> alt::s;
-
-/*flat_prog tables::cqc(vector<term> x, vector<term> y) const {
-	if (x == y) return {x};
-	cqc_res r = maybe_contains(x, y), r1;
-	if (r == NONE) return { x, y };
-	const vector<term> xx = x, yy = y;
-	flat_prog p;
-	if (x[0].tab == y[0].tab) {
-		if (r == BOTH) get_canonical_db({x, y}, p = { x, y });
-		else if (r == CONTAINED) get_canonical_db({x}, p = { y });
-		else get_canonical_db({y}, p = { x });
-	}
-	term f[2];
-	f[0] = x[0], f[1] = y[0], x.erase(x.begin()), y.erase(y.begin());
-	set<int_t> vx, vy;
-	getvars(x, vx), getvars(y, vy);
-	bool b;
-	term hx, hy;
-	if ((b = vx.size() == vy.size())) // TODO: support otherwise
-		create_tmp_head(x), create_head(y, x[0].tab),
-		hx = x[0], hy = y[0],
-		get_canonical_db({ x, y }, p), p.insert(x), p.insert(y);
-	run_internal_prog(p, r);
-	if (has(r, f[0])) return has(r, f[1]) ? { x } : { y };
-	if (has(r, f[1])) return { x };
-	if (!b) return { x, y };
-	if (has(r, x[0])) {
-		if (has(r, y[0]))
-			return	x[0] = hx, y[0] = hy,
-				{ x, { xx[0], x[0] }, y, { yy[0], y[0] } };
-		if (has(tmprels, x) && has(tmprels, y)) return { y };
-	} else if (has(r, y[0]) && has(tmprels, x) && has(tmprels, y))
-		return { x };
-	return { x, y };
-//	if (has(r, y[0]))
-//		return print(print(o::out(),x)<<" is a generalization of ",yy),
-//		       true;
-//	return false;
-}*/
-
-/*bool tables::cqc(const vector<term>& v, const flat_prog& m) const {
-	for (const vector<term>& x : m) if (cqc(x, v)) return true;
-	return false;
-}
-
-void tables::cqc_minimize(vector<term>& v) const {
-	if (v.size() < 2) return;
-	const vector<term> v1 = v;
-	term t;
-	for (size_t n = 1; n != v.size(); ++n) {
-		t = move(v[n]), v.erase(v.begin() + n);
-		if (!cqc(v1, v)) v.insert(v.begin() + n, t);
-	}
-	DBG(if (v.size() != v1.size())
-		print(print(o::err()<<"Rule\t\t", v)<<endl<<"minimized into\t"
-		, v1)<<endl;)
-}*/

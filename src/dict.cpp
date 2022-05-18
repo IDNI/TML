@@ -17,49 +17,10 @@
 #include "input.h"
 using namespace std;
 
-dict_t::dict_t() :  bitunv(false), op(get_lexeme("(")), cl(get_lexeme(")")) {}
-
+dict_t::dict_t() {}
 dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
-bool dict_t::is_valid_sym_val(int_t t) const { 
-	return bitunv ? (t >=2 && t <= syms.size()-1+2) : 
-					(t>>2 >= 0 && t>>2 < syms.size());
-}
-lexeme dict_t::get_sym(int_t t) const {	
-	if (bitunv == false) {
-		DBG(assert(!(t&1) && !(t&2) && syms.size()>(size_t)(t>>2));)
-		static char_t str_nums[20], str_chr[] = { '\'', 'a', '\'' };
-		if (t & 1) { str_chr[1] = t>>=2; return { str_chr, str_chr + 3 }; }
-		if (t & 2) return strcpy(str_nums, to_string_t(t>>=2).c_str()),
-				lexeme{ str_nums, str_nums + strlen(str_nums) };
-		return syms[t>>2];
-	}
-	else {
-		DBG(assert(t>=0));
-		static char_t str_num[] = { '\'', 'a', '\'' };
-		if (t == 1 || t == 0) { str_num[1] = t; return { str_num, str_num + 3 }; }
-		DBG(assert(syms.size());)
-		if( t >=2 && t <= syms.size()-1+2)
-			return syms[t-2]; // all known and valid symbols remain b/w >=2 and syms.size()-2;
-		else return lexeme{(ccs)"BOT",(ccs)"BOT"+3 };
-		//get_temp_sym(const_cast<dict_t*>(this)->get_fresh_temp_sym(t));
-	}
-}
 
-int_t dict_t::get_fresh_var(int_t old) {
-	static int_t counter = 0;
-	std::string fresh = "?0f" + to_string_(++counter) + to_string_(old);
-	int_t fresh_int = get_var(get_lexeme(fresh));
-	return fresh_int;
-}
-
-int_t dict_t::get_fresh_sym(int_t old) {
-	static int_t counter = 0;
-	std::string fresh = "0f" + to_string_(++counter) + to_string_(old);
-	int_t fresh_int = get_sym(get_lexeme(fresh));
-	return fresh_int;
-}
 int_t dict_t::get_var(const lexeme& l) {
-	//DBG(assert(*l[0] == '?');)
 	auto it = vars_dict.find(l);
 	if (it != vars_dict.end()) return it->second;
 	int_t r = -vars_dict.size() - 1;
@@ -67,28 +28,7 @@ int_t dict_t::get_var(const lexeme& l) {
 	return vars_dict[l] = r;
 }
 
-lexeme dict_t::get_var_lexeme_from(int_t r) {
-	DBG(assert(r<0);)
-	int index = (-r -1);
-	if (index < (int_t)vars.size()) {
-#ifdef DEBUG
-		int nr =
-#endif
-			get_var(vars[index]);
-		DBG(assert(nr == r);)
-		return vars[index];
-	}
-	lexeme l = get_lexeme(string("?v") + to_string_(-r));
-#ifdef DEBUG
-	int nr =
-#endif
-		get_var(l) ;
-	DBG(assert(nr == r));
-	return l;
-}
-
 int_t dict_t::get_rel(const lexeme& l) {
-	//if (*l[0] == L'?') parse_error(err_var_relsym, l);
 	auto it = rels_dict.find(l);
 	if (it != rels_dict.end()) return it->second;
 	rels.push_back(l);
@@ -98,8 +38,8 @@ int_t dict_t::get_rel(const lexeme& l) {
 int_t dict_t::get_sym(const lexeme& l) {
 	auto it = syms_dict.find(l);
 	if (it != syms_dict.end()) return it->second;
-	return syms.push_back(l), 
-	syms_dict[l] = !bitunv?(syms.size()-1)<<2:(syms.size()-1+2);
+	syms.push_back(l);
+	return syms_dict[l] = syms.size()-1;
 }
 
 int_t dict_t::get_bltin(const lexeme& l) {
@@ -108,6 +48,37 @@ int_t dict_t::get_bltin(const lexeme& l) {
 	if (it != bltins_dict.end()) return it->second;
 	bltins.push_back(l);
 	return bltins_dict[l] = bltins.size() - 1;
+}
+
+int_t dict_t::get_new_sym() {
+	static int_t cnt = 0;
+	return get_sym(get_lexeme( "0s" + to_string_(++cnt) ));
+}
+
+int_t dict_t::get_new_var() {
+	static int_t cnt = 0;
+	return get_var(get_lexeme("?0v" + to_string_(++cnt)));
+}
+
+int_t dict_t::get_new_rel() {
+	static int_t cnt = 0;
+	string n = "0r" + to_string_(++cnt);
+	int_t nidx = get_rel(get_lexeme(n));
+	return nidx;
+	//TODO: add check for pre existing rel ?
+	//size_t sz;
+	//lexeme l;
+	//retry: sz = rels.size(), l = get_lexeme(s + to_string_(last));
+	//rels.insert(l);
+	//if (rels.size() == sz) { ++last; goto retry; }
+	//return get_rel(l);
+}
+
+ints dict_t::get_rels(function<bool(const lexeme&)> filter) {
+	ints filtered;
+	for (size_t i = 0; i != rels.size(); ++i)
+		if (!filter || filter(rels[i])) filtered.push_back(i);
+	return filtered;
 }
 
 lexeme dict_t::get_lexeme(ccs w, size_t l) {
@@ -129,15 +100,17 @@ lexeme dict_t::get_lexeme(const std::basic_string<char>& s) {
 	return get_lexeme(w, s.size());
 }
 
+//---
+
 int_t dict_t::get_temp_sym(const lexeme& l) {
 	auto it = temp_syms_dict.find(l);
 	if (it != temp_syms_dict.end()) return it->second;
 	return temp_syms.push_back(l), temp_syms_dict[l] = (temp_syms.size());
 }
 
-int_t dict_t::get_fresh_temp_sym(int_t old) {
+int_t dict_t::get_fresh_temp_sym() {
 	static int_t counter = 0;
-	std::string fresh = "0tf" + to_string_(++counter) + to_string_(old);
+	std::string fresh = "0tf" + to_string_(++counter);
 	int_t fresh_int = get_temp_sym(get_lexeme(fresh));
 	return fresh_int;
 }
@@ -146,9 +119,3 @@ lexeme dict_t::get_temp_sym(int_t t) const {
 	return temp_syms[t-1];
 }
 
-ints dict_t::get_rels(function<bool(const lexeme&)> filter) {
-	ints filtered;
-	for (size_t i = 0; i != rels.size(); ++i)
-		if (!filter || filter(rels[i])) filtered.push_back(i);
-	return filtered;
-}

@@ -78,7 +78,11 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 			size_t var0 = vm.at(t[0]);
 			//TODO: move check to parser
 			DBG(assert(t[1] > 0 && "shift value must be a constant");)
+#ifndef TYPE_RESOLUTION
 			size_t num1 = t[1] >> 2;
+#else
+			size_t num1 = t[1];
+#endif
 			size_t var2 = vm.at(t[2]);
 			q = shr(var0, num1, var2, vl);
 		} break;
@@ -87,7 +91,11 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 			size_t var0 = vm.at(t[0]);
 			//TODO: move check to parser
 			DBG(assert(t[1] > 0 && "shift value must be a constant");)
+#ifndef TYPE_RESOLUTION
 			size_t num1 = t[1] >> 2;
+#else
+			size_t num1 = t[1];
+#endif
 			size_t var2 = vm.at(t[2]);
 			q = shl(var0, num1, var2, vl);
 		} break;
@@ -112,6 +120,7 @@ bool tables::handler_arith(const term &t, const varmap &vm, const size_t vl,
 
 // -----------------------------------------------------------------------------
 // adder
+#ifndef TYPE_RESOLUTION
 spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 		uint_t b, spbdd_handle r) const {
 	if (b == 1) return bdd_handle::F;
@@ -121,9 +130,23 @@ spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
 							::from_bit(pos(b, var1, n_vars),true), bdd_handle::F));
 }
+#else
+spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
+		uint_t b, spbdd_handle r) const {
+	if (b == 0)
+		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
+				::from_bit(pos(b, var1, n_vars),true), bdd_handle::F);
+	return bdd_ite(full_addder_carry(var0, var1, n_vars, b-1, r),
+					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
+							bdd_handle::T, ::from_bit(pos(b, var1, n_vars),true)),
+					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
+							::from_bit(pos(b, var1, n_vars),true), bdd_handle::F));
+}
+#endif
 
 spbdd_handle tables::full_adder(size_t var0, size_t var1, size_t n_vars,
 		uint_t b) const {
+#ifndef TYPE_RESOLUTION
 	if (b < 2)
 		return ::from_bit( pos(b, var0, n_vars),true)
 				&& ::from_bit( pos(b, var1, n_vars),true);
@@ -131,6 +154,13 @@ spbdd_handle tables::full_adder(size_t var0, size_t var1, size_t n_vars,
 		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
 									::from_bit(pos(b, var1, n_vars),false),
 									::from_bit(pos(b, var1, n_vars),true));
+#else
+	if (b == 0)
+		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
+								::from_bit(pos(b, var1, n_vars),false),
+								::from_bit(pos(b, var1, n_vars),true));
+
+#endif
 
 	spbdd_handle carry = bdd_handle::F;
 	carry = full_addder_carry(var0, var1, n_vars, b-1, carry);
@@ -145,6 +175,7 @@ spbdd_handle tables::full_adder(size_t var0, size_t var1, size_t n_vars,
 			);
 }
 
+#ifndef TYPE_RESOLUTION
 spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 		size_t n_vars) {
 	spbdd_handle r = bdd_handle::T;
@@ -168,7 +199,18 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 	}
  	return r;
 }
-
+#else
+spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
+		size_t n_vars) {
+	spbdd_handle r = bdd_handle::T;
+	for (size_t b = 0; b != bits; ++b) {
+		spbdd_handle fa = full_adder( var0, var1, n_vars , b);
+		r = r && bdd_ite(fa, ::from_bit(pos(b, var2, n_vars), true),
+				::from_bit(pos(b, var2, n_vars), false));
+	}
+ 	return r;
+}
+#endif
 // ----------------------------------------------------------------------------
 // multiplier
 spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
@@ -178,15 +220,25 @@ spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
 	if ((it = carrymemo.find(x = { var0, var1, n_vars, bits, i, j })) !=
 			carrymemo.end()) return it->second;
 	spbdd_handle r;
+#ifndef TYPE_RESOLUTION
 	//extended precision support
 	if (i == 2 || j == 2) {
+#else
+	if (i == 0 || j == 0) {
+#endif
 		r = bdd_handle::F;
 	}
+
 	//-
 	else {
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
+#ifndef TYPE_RESOLUTION
 		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true) &&
 				::from_bit(pos(i-j+2, var1, n_vars),true);
+#else
+		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true) &&
+					::from_bit(pos(i-j, var1, n_vars),true);
+#endif
 		if (i == j) {
 			r = acc_i && bit;
 		}
@@ -198,6 +250,7 @@ spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
 	return carrymemo.emplace(x, r), r;
 }
 
+#ifndef TYPE_RESOLUTION
 spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 		uint_t j) {
 	static alumemo x;
@@ -237,7 +290,6 @@ spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 	}
 	return addermemo.emplace(x, r), r;
 }
-
 spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 			size_t n_vars) {
 
@@ -259,7 +311,6 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 	}
 	return r;
 }
-
 spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 		size_t var3, size_t n_vars) {
 
@@ -290,13 +341,102 @@ spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 	}
 	return r;
 }
+#else
+
+spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
+		uint_t j) {
+	static alumemo x;
+	static map<alumemo, spbdd_handle>::const_iterator it;
+	if ((it = addermemo.find(x = { var0, var1, n_vars, bits, i, j })) !=
+			addermemo.end()) return it->second;
+	spbdd_handle r;
+	//extended precision support
+	if (i - j == bits) {
+		r = add_ite_carry(var0, var1, n_vars,i-1,j);
+	}
+	else if (i == 0 || j == 0) {
+			r = ::from_bit(pos(j, var0, n_vars),true) &&
+					::from_bit(pos(i, var1, n_vars),true);
+	}
+	else if (i == j) {
+		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
+				&& ::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
+		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
+		r =  bdd_xor(bit, acc_i);
+	}
+	else  { //(i != j)
+		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
+				&& ::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
+		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
+		spbdd_handle carry_ij = add_ite_carry(var0, var1, n_vars,i-1,j);
+		spbdd_handle bout =
+				bdd_ite( bit ,
+						bdd_ite(acc_i ,
+								bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F),
+								bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T)),
+						bdd_ite(acc_i ,
+								bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T),
+								bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F))
+					);
+		r =  bout;
+	}
+	return addermemo.emplace(x, r), r;
+}
+
+spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
+			size_t n_vars) {
+
+	spbdd_handle r = bdd_handle::T;
+
+	for (size_t b = 0; b < bits; ++b) {
+		spbdd_handle acc_bit = bdd_handle::F;
+		acc_bit = add_ite(var0, var1, n_vars, b, b);
+		//equality
+		r = r && bdd_ite(acc_bit ,
+				::from_bit(pos(b, var2, n_vars), true),
+				::from_bit(pos(b, var2, n_vars), false));
+	}
+	return r;
+}
+
+spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
+		size_t var3, size_t n_vars) {
+
+	spbdd_handle r = bdd_handle::T;
+	for (size_t b = 0; b < bits; ++b) {
+		spbdd_handle acc_bit = bdd_handle::F;
+		acc_bit = add_ite(var0, var1, n_vars, b, b);
+		//equality
+		r = r && bdd_ite(acc_bit ,
+				::from_bit(pos(b, var3, n_vars), true),
+				::from_bit(pos(b, var3, n_vars), false));
+	}
+	for (size_t b = 0; b < bits; ++b) {
+		spbdd_handle acc_bit = bdd_handle::F;
+		acc_bit = add_ite(var0, var1, n_vars, bits + b , bits-1);
+		//equality
+		r = r && bdd_ite(acc_bit ,
+				::from_bit(pos(b, var2, n_vars), true),
+				::from_bit(pos(b, var2, n_vars), false));
+	}
+	return r;
+}
+
+#endif
+
 // ----------------------------------------------------------------------------
 
 //shr for equality
 spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 
+#ifndef TYPE_RESOLUTION
+	size_t pb = bits-2;
+#else
+	size_t pb = bits;
+#endif
+
 	spbdd_handle s = bdd_handle::T;
-	if (n <= bits-2) {
+	if (n <= pb) {
 		s = from_sym_eq(var0, var2, n_vars);
 		bools exvec;
 		for (size_t i = 0; i < (n_vars*bits); i++)
@@ -307,60 +447,77 @@ spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 
 		uints perm1;
 		perm1 = perm_init(n_vars*bits);
-		for (size_t i = bits-2-1; i >= n; i--)
+		for (size_t i = pb-1; i >= n; i--)
 			for (size_t j = 0; j < n_vars; ++j) {
 				if (j == var0)
 					perm1[i*n_vars+j] = perm1[(i-n)*n_vars+j];
 		}
 		s = s^perm1;
-		for(size_t i = 0; i < n; i++)
+		for (size_t i = 0; i < n; i++)
 			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
 	} else {
-		for(size_t i = 0; i < bits-2; i++)
+		for (size_t i = 0; i < pb; i++)
 			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
 	}
+#ifndef TYPE_RESOLUTION
 	return s && constrain_to_num(var0, n_vars) &&
 		constrain_to_num(var2, n_vars);
+#else
+	return s;
+#endif
 }
 
 //shl for equality
 spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 		size_t n_vars)  {
 
+#ifndef TYPE_RESOLUTION
+	size_t pb = bits-2;
+#else
+	size_t pb = bits;
+#endif
+
 	spbdd_handle s = bdd_handle::T;
-
-	if (n <= bits-2) {
-
+	if (n <= pb) {
 		s = from_sym_eq(var0, var2, n_vars);
-
-		//XXX: before permuting(shifting) the equality is mandatory
-		//     to remove all bits that won't be part of it
+		// before permuting(shifting) the equality is mandatory
+		// to remove all bits that won't be part of it
 		bools exvec;
 		for (size_t i = 0; i < (n_vars*bits); i++)
-			if (i >= n_vars*(bits-2-n) && i < n_vars*(bits-2) )
+			if (i >= n_vars*(pb-n) && i < n_vars*(pb) )
 				exvec.push_back(true);
 			else exvec.push_back(false);
 		s = s / exvec;
 
 		uints perm1;
 		perm1 = perm_init(n_vars*bits);
-		for (size_t i = 0; i < bits-2-n; i++)
+		for (size_t i = 0; i < pb-n; i++)
 			for (size_t j = 0; j < n_vars; ++j) {
-				if (j == var0 )
+				if (j == var0)
 					perm1[i*n_vars+j] = perm1[(i+n)*n_vars+j];
-				//COUT << i*n_vars+j+1 << "--" << perm1[i*n_vars+j]+1 << endl;
 			}
 		s = s^perm1;
-
 		for(size_t i = 0; i < n; i++)
+			#ifndef TYPE_RESOLUTION
 			s = s && ::from_bit(pos(i+2, var2, n_vars), false);
-
+			#else
+			s = s && ::from_bit(pos(i, var2, n_vars), false);
+			#endif
 	} else {
-		for(size_t i = 0; i < bits-2; i++)
-		    	s = s && ::from_bit(pos(i+2, var2, n_vars), false);
+		for (size_t i = 0; i < pb; i++)
+			#ifndef TYPE_RESOLUTION
+		    s = s && ::from_bit(pos(i+2, var2, n_vars), false);
+			#else
+			s = s && ::from_bit(pos(i, var2, n_vars), false);
+			#endif
 	}
+#ifndef TYPE_RESOLUTION
 	return s && constrain_to_num(var0, n_vars) &&
 		constrain_to_num(var2, n_vars);
+#else
+	return s;
+#endif
+
 }
 
 //-----------------------------------------------------------------------------
@@ -380,7 +537,30 @@ spbdd_handle tables::ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars
 	return out;
 }
 
-// switch between LS and MS bit ordering
+// switch between LS and MS bit ordering on non interleaved
+// delta: offset to 1st possible bit for argument / variable
+spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t delta) {
+
+	uints perm1;
+	bools ex;
+	perm1 = perm_init(n_bits+delta);
+	for (size_t i = 0; i < n_bits+delta; i++) {
+		if (i < delta) {
+			perm1[i] = i;
+			ex.push_back(true);
+		}
+		else {
+			perm1[i] = ((n_bits+delta-1-(i-delta)));// + i;
+			ex.push_back(false);
+		}
+	}
+	spbdd_handle x = in^perm1;
+	//spbdd_handle x = bdd_permute_ex(in,ex,perm1);
+
+	return x;
+}
+
+// switch between LS and MS bit ordering on interleaved bit ordering
 spbdd_handle tables::perm_bit_reverse(spbdd_handle in, size_t n_bits, size_t n_vars) {
 
 	uints perm1;
@@ -413,14 +593,17 @@ spbdd_handle tables::perm_from_to(size_t from, size_t to, spbdd_handle in, size_
 spbdd_handle tables::bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op ) {
 
-	//XXX: actually not required for bitwise operators
-	//     removing type bits leaves bits = bits - 2
+#ifndef TYPE_RESOLUTION
 	spbdd_handle s0 = ex_typebits(in0_varid, in0, n_vars);
 	spbdd_handle s1 = ex_typebits(in1_varid, in1, n_vars);
-
-	s0 = perm_from_to(in0_varid, 0, s0, bits-2, n_vars);
-	s1 = perm_from_to(in1_varid, 1, s1, bits-2, n_vars);
-
+	size_t pb = bits - 2;
+#else
+	spbdd_handle s0 = in0;
+	spbdd_handle s1 = in1;
+	size_t pb = bits;
+#endif
+	s0 = perm_from_to(in0_varid, 0, s0, pb, n_vars);
+	s1 = perm_from_to(in1_varid, 1, s1, pb, n_vars);
 	spbdd_handle x;
 	switch (op) {
 		case BITWAND : x = bdd_bitwise_and(s0, s1); break;
@@ -429,11 +612,11 @@ spbdd_handle tables::bitwise_handler(size_t in0_varid, size_t in1_varid, size_t 
 		case BITWNOT : x = bdd_bitwise_not(s0); break;
 		default 	 : break;
 	}
-	x = perm_from_to(2, out_varid, x, bits-2, n_vars);
-
+	x = perm_from_to(2, out_varid, x, pb, n_vars);
+#ifndef TYPE_RESOLUTION
 	x = x && ::from_bit(pos(1, out_varid, n_vars),true) &&
 			::from_bit(pos(0, out_varid, n_vars),false);
-
+#endif
 	return x;
 }
 
@@ -441,30 +624,31 @@ spbdd_handle tables::bitwise_handler(size_t in0_varid, size_t in1_varid, size_t 
 spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op ) {
 
+#ifndef TYPE_RESOLUTION
 	spbdd_handle s0 = ex_typebits(in0_varid, in0, n_vars);
 	spbdd_handle s1 = ex_typebits(in1_varid, in1, n_vars);
-	s0 = perm_from_to(in0_varid, 0, s0, bits-2, n_vars);
-	s1 = perm_from_to(in1_varid, 1, s1, bits-2, n_vars);
-	s0 = perm_bit_reverse(s0, bits-2, n_vars);
-	s1 = perm_bit_reverse(s1, bits-2, n_vars);
-	//COUT << "a:\n";
-	//::out(COUT, s0) << endl;
-	//COUT << "b:\n";
-	//::out(COUT, s1) << endl;
-
+	size_t pb = bits - 2;
+#else
+	spbdd_handle s0 = in0;
+	spbdd_handle s1 = in1;
+	size_t pb = bits;
+#endif
+	s0 = perm_from_to(in0_varid, 0, s0, pb, n_vars);
+	s1 = perm_from_to(in1_varid, 1, s1, pb, n_vars);
+	s0 = perm_bit_reverse(s0, pb, n_vars);
+	s1 = perm_bit_reverse(s1, pb, n_vars);
 	spbdd_handle x;
 	switch (op) {
 		case ADD : x = bdd_adder(s0, s1); break;
-		case MULT: x = bdd_mult_dfs(s0, s1, bits-2,3); break;
+		case MULT: x = bdd_mult_dfs(s0, s1, pb,3); break;
 		default  : break;
 	}
-	//COUT << "x:\n";
-	//::out(COUT, x) << endl;
-
-	x = perm_bit_reverse( x, bits-2, n_vars);
-	x = perm_from_to(2, out_varid, x, bits-2, n_vars);
+	x = perm_bit_reverse( x, pb, n_vars);
+	x = perm_from_to(2, out_varid, x, pb, n_vars);
+#ifndef TYPE_RESOLUTION
 	x = x && ::from_bit(pos(1, out_varid, n_vars),true) &&
 			::from_bit(pos(0, out_varid, n_vars),false);
+#endif
 	return x;
 }
 
@@ -531,7 +715,6 @@ void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
 	}
 }
 
-
 void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq) {
 
 	DBG(assert(
@@ -547,20 +730,19 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		if (f->tm->extype == term::REL) {
 			if ( vmh.find(f->arg) == vmh.end() ) { /*f->arg <= 0*/
 				//assuming no free variables in qbf
-				for (auto &v : *f->tm) {
-					assert(
-						(v >= 0 || vm.find(v) != vm.end()) &&
-						"error: Free variable in formula, only closed formulas currently supported"
-					);
-				}
+				for (auto &v : *f->tm)
+					if (v < 0 && vm.find(v) == vm.end())
+						assert(false && "error: Free variable in formula, only \
+								closed formulas currently supported");
 				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
 				//DBG(assert(p0->b->neg == false);)
 				//COUT << "handleform1\n";
 				//spbdd_handle auxq = body_query(*p0->b,0);
 				//::out(COUT, auxq)<<endl<<endl;
-
+				#ifndef TYPE_RESOLUTION
 				ex_typebits(p0->b->ex, f->tm->size());
+				#endif
 				static set<body*, ptrcmp<body>>::const_iterator bit;
 				if ((bit = p->bodies.find(p0->b)) == p->bodies.end())
 					p->bodies.insert(p0->b);
@@ -568,11 +750,13 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 				DBG(assert(f->tm->neg == false);)
 				body *aux = new body(get_body(*f->tm, vm, vm.size()));
 				//body.q = T, body.tab =
+				#ifndef TYPE_RESOLUTION
 				bools exvec(aux->ex.size());
 				ex_typebits(exvec, f->tm->size());
 				//TODO review for T31
 				//aux->q = aux->q ^ aux->perm;
 				aux->q =  aux->q / exvec;
+				#endif
 				std::tuple<int_t, body*, int_t> hvar = {f->arg, move(aux), vm.size()};
 				p0->hvar_b = hvar;
 			}
@@ -580,23 +764,31 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		else if (f->tm->extype == term::ARITH) {
 			DBG(assert(f->tm->neg == false));
 			handler_arith(*f->tm, vm, vm.size(), p0->cons);
+			#ifndef TYPE_RESOLUTION
 			ex_typebits(p0->cons, vm.size());
+			#endif
 		}
 		else if (f->tm->extype == term::EQ) {
 			if (f->tm->neg) f->tm->neg = false, p0->neg = true;
 			handler_eq(*f->tm, vm, vm.size(), p0->cons);
+			#ifndef TYPE_RESOLUTION
 			ex_typebits(p0->cons, vm.size());
+			#endif
 		}
 		else if (f->tm->extype == term::LEQ) {
 			if (f->tm->neg) f->tm->neg = false, p0->neg = true;
 			handler_leq(*f->tm, vm, vm.size(), p0->cons);
+			#ifndef TYPE_RESOLUTION
 			ex_typebits(p0->cons, vm.size());
+			#endif
 		}
 		else {
 			p0->cons =  bdd_ite(::from_bit(0,true), bdd_handle::T, bdd_handle::F);
 			uints perm = get_perm(*f->tm, vm, vm.size());
 			p0->cons  = p0->cons^perm;
+			#ifndef TYPE_RESOLUTION
 			ex_typebits(p0->cons, vm.size());
+			#endif
 		}
 		//TODO: intersect consts
 		p->matrix.push_back(p0);
@@ -720,6 +912,11 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		} else
 			handler_form1(p, f->r,vm, vmh, false);
 
+		#ifndef TYPE_RESOLUTION
+		size_t bits_l = bits - 2;
+		#else
+		size_t bits_l = bits;
+		#endif
 		if(fq) {
 			p->varslen = vm.size();
 			if (vm.size() > 0) {
@@ -730,13 +927,13 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 					}
 				term t; t.resize(vm.size());
 				for (auto &v : vm) t[v.second] = v.first;
-				p->perm = get_perm(t, aux, vm.size(), bits-2);
+				p->perm = get_perm(t, aux, vm.size(), bits_l);
 				vm = tmpvm; //for nested formulas
 			}
 
 			// ---
 			if (p->ex_h.size() == 0) {
-				auto d = deltail(p->varslen, tmpvm.size(), bits-2);
+				auto d = deltail(p->varslen, tmpvm.size(), bits_l);
 				p->ex_h = d.first, p->perm_h = d.second;
 			}
 			p->varslen_h = tmpvm.size();
@@ -942,7 +1139,6 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 		bool out = v2s.quantify(f->quantsh);
 		spbdd_handle q = out ? htrue : hfalse;
 
-
 		if (out) COUT << "## model found\n";
 		else COUT << "## model NOT found\n";
 		#ifndef SOL_VERBOSE
@@ -953,4 +1149,3 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	}
 	else fol_query(f,v);
 }
-

@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <unordered_set>
 #include "earley.h"
 using
@@ -6,6 +7,7 @@ using
 	std::pair,
 	std::set,
 	std::variant,
+	std::char_traits,
 	std::basic_string,
 	std::basic_ostream,
 	std::basic_stringstream,
@@ -52,6 +54,16 @@ bool earley<CharT>::all_nulls(const vector<lit>& p) const {
 	return true;
 }
 
+template <>
+earley<char>::string earley<char>::to_str(const string_t &s) const {
+	return to_string(s);	
+}
+
+template <>
+earley<char32_t>::string earley<char32_t>::to_str(const string_t &s) const {
+	return to_u32string(s);
+}
+
 template <typename CharT>
 earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 	bool _bin_lr) : bin_lr(_bin_lr)
@@ -65,16 +77,11 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 		builtins.push_back(bmp.second);
 		builtin_char_prod.emplace_back();
 	}
-	auto tostr = [this](const string_t &s) {
-		std::basic_ostringstream<CharT> os;
-		for (auto &c : s) os << (CharT) c;
-		return os.str();
-	};
-	for (const auto &x : g) nt.insert(tostr(x.p[0].to_str_t()));
+	for (const auto &x : g) nt.insert(to_str(x.p[0].to_str_t()));
 	for (const auto &x : g) {
 		G.emplace_back();
 		for (auto &y : x.p) {
-			auto s = tostr(y.to_str_t());
+			auto s = to_str(y.to_str_t());
 			if (y.type == elem::SYM && nt.find(s) != nt.end()) {
 				G.back().emplace_back(d.get(s));
 				auto it = bmi.find(s);					
@@ -115,22 +122,22 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 	for (auto x : G) {
 		int i = 0;
 		for (auto &l : x)
-			o::dbg() << to_string(to_string_t(to_str(l))),
+			o::dbg() << to_stdstr(to_str(l)),
 			i++ == 0 ? o::dbg() << "->" : o::dbg() << ' ';
 		for (auto y : x)
-			o::dbg() << to_string(to_string_t(to_str(y)));
+			o::dbg() << to_stdstr(to_str(y));
 		
 		auto it = priority.find(x);
 		if( it != priority.end())
 			o::dbg() <<" " << it->second;
 		if( prefer.count(x))
-			o::dbg() <<" pref";
+			o::dbg() <<" _pref";
 		//o::dbg() << ": " << x 
 		o::dbg() << endl;
 	}
 	o::dbg() << endl << "grammar end" << endl;
 	o::dbg() << endl << "dictionary start" << endl;
-	for (auto x : d.m) o::dbg() << to_string(to_string_t(x.first)) << ' ' <<
+	for (auto x : d.m) o::dbg() << to_stdstr(x.first) << ' ' <<
 		x.second << endl;
 	o::dbg() << endl << "dictionary end " << endl;
 #endif
@@ -171,15 +178,14 @@ earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
 	do {
 		k = nullables.size();
 		for (const auto& p : G)
-			if (all_nulls(p))
-				nullables.insert(p[0].n());
+			if (all_nulls(p)) nullables.insert(p[0].n());
 	} while (k != nullables.size());
 #ifdef DEBUG
 	o::dbg() << "g: \n";
 	for (auto x : g)
 		for (auto y : x.second) {
-			o::dbg() <<'\t'<< to_string(to_string_t(x.first)) <<'=';
-			for (auto z : y) o::dbg() << to_string(to_string_t(z));
+			o::dbg() <<'\t'<< to_stdstr(x.first) <<'=';
+			for (auto z : y) o::dbg() << to_stdstr(z);
 			o::dbg() << endl;
 		}
 	// o::dbg() << "G:\n";
@@ -189,7 +195,8 @@ earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
 	// 	o::dbg() << endl;
 	// }
 	o::dbg() << "d.m:\n";
-	for (auto x : d.m) o::dbg() << '\t' << to_string(to_string_t(x.first)) << ' '<< x.second << endl;
+	for (auto x : d.m) o::dbg() <<
+		'\t' << to_stdstr(x.first) << ' ' << x.second << endl;
 #endif
 }
 
@@ -241,20 +248,22 @@ void earley<CharT>::predict(const item& i, set<item>& t) {
 }
 
 template <typename CharT>
-void earley<CharT>::scan_builtin(const item& i, size_t n, CharT ch) {
-	int_t bid = get_lit(i).builtin;
-	if (!builtins[bid](ch)) return; // character is not in the builtin class
+void earley<CharT>::scan_builtin(const item& i, size_t n, const string& s) {
 	size_t p = 0; // character's prod rule
+	int_t bid = get_lit(i).builtin;
+	bool eof = n == s.size();
+	CharT ch = eof ? std::char_traits<CharT>::eof() : s[n];
 	auto it = builtin_char_prod[bid].find(ch);
 	if (it == builtin_char_prod[bid].end()) {
+		if (!builtins[bid](ch)) return; //char isn't in the builtn class
 		p = G.size(); // its a new character in this builtin -> store it 
 		G.push_back({ get_lit(i) });
 		G.back().emplace_back(ch);
 		builtin_char_prod[bid][ch] = p; // store prod of this ch
 	} else p = it->second; // this ch has its prod already
-	item j(n + 1, i.prod, n, 2); // complete builtin
+	item j(n + !eof, i.prod, n, 2); // complete builtin
 	S.insert(j);
-	item k(n + 1, p, n, 2);      // complete builtin's character
+	item k(n + !eof, p, n, 2);      // complete builtin's character
 	S.insert(k);
 }
 
@@ -276,7 +285,7 @@ void earley<CharT>::scan(const item& i, size_t n, CharT ch) {
 template <typename CharT>
 bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 	DBG(bool pms = o::enabled("parser-benchmarks");)
-	//DBG(o::dbg() << "recognizing: " << to_string(to_string_t(s)) << endl;)
+	//DBG(o::dbg() << "recognizing: " << to_stdstr(s) << endl;)
 	emeasure_time_start(tsr, ter);
 	inputstr = s;
 	size_t len = s.size();
@@ -299,7 +308,7 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 				//DBG(print(o::dbg() << "processing ", *it) << endl;)
 				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).is_builtin()) {
-					if (n < len) scan_builtin(*it, n, s[n]);
+					if (n <= len) scan_builtin(*it, n, s);
 				} else if (get_lit(*it).nt()) predict(*it, t);
 				else if (n < len) scan(*it, n, s[n]);
 			}
@@ -355,42 +364,22 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 	return found;
 }
 
-template <typename CharT>
-std::string earley<CharT>::grammar_text() {
-	std::stringstream txt;
-	for (const auto &p : G) {
-		txt << "\n\\l";
-		size_t i = 0;
-		for( const auto &l : p){
-			if (l.nt()) txt << to_string(to_string_t(d.get(l.n())));
-			else if (l.c() != '\0')
-				txt << to_string(to_string_t((CharT)l.c())),
-				COUT << "\tgrammar_text - c: `" << to_string(to_string_t((CharT)l.c())) << "`\n";
-			else txt << "ε";
-			txt <<  " ";
-			if (i++ == 0) txt << "-> ";
-		}
-	}
-	return txt.str();
-}
 
 template <typename CharT>
 template< typename T>
 bool earley<CharT>::to_tml_facts(ostream_t& ss, T &&pt) const {
-	auto str_rel_output = [&ss] (string rel, size_t id,
+	auto str_rel_output = [&ss, this] (string rel, size_t id,
 		vector<variant<size_t, typename earley<CharT>::string>> args)
 	{
-		ss << to_string(to_string_t(rel)) << "("<< id;
+		ss << to_stdstr(rel) << "("<< id;
 		for (auto &a : args) {
 			if (std::holds_alternative<size_t>(a))
 				ss << " " << std::get<size_t>(a);
-			else    ss << " " << to_string(to_string_t(
-							std::get<string>(a)));
+			else    ss << " " << to_stdstr(std::get<string>(a));
 #ifdef DEBUG
 			if (std::holds_alternative<size_t>(a))
 				o::dbg() << " " << std::get<size_t>(a);
-			else o::dbg() << " " << to_string(to_string_t(
-							std::get<string>(a)));
+			else o::dbg() << " " << to_stdstr(std::get<string>(a));
 #endif
 		}
 		ss << ").\n";
@@ -595,9 +584,9 @@ vector<typename earley<CharT>::arg_t> earley<CharT>::get_parse_graph_facts(){
 template <typename CharT>
 std::string earley<CharT>::to_tml_rule(const nidx_t nd) const {
 	std::stringstream ss;
-	if (nd.l.nt()) ss << to_string(to_string_t(d.get(nd.l.n())));
+	if (nd.l.nt()) ss << to_stdstr(d.get(nd.l.n()));
 	else if (nd.l.c() == (CharT) '\0') ss << "ε";
-	else ss << to_string(to_string_t(nd.l.c()));
+	else ss << to_stdstr(nd.l.c());
 	ss << "(" << nd.span.first << " " << nd.span.second << ")";
 	return ss.str();
 }
@@ -624,8 +613,41 @@ bool earley<CharT>::to_tml_rule(ostream_t& ss, P &&pt) const{
 }
 
 template <typename CharT>
-std::string earley<CharT>::to_dot_safestring(const string &s) const {
+std::string earley<CharT>::to_stdstr(const string& s) const {
 	return to_string(to_string_t(s));
+}
+
+template <typename CharT>
+std::string earley<CharT>::to_stdstr(const char32_t& ch) const {
+	return to_string(to_string_t(ch));
+}
+
+
+template <typename CharT>
+std::string earley<CharT>::dot_safe(const std::string &s) const {
+	std::stringstream ss;
+	for (size_t n = 0; n != s.size(); ++n) {
+		if (s[n] == '"') ss << '\\';
+		ss << s[n];
+	}
+	return ss.str();
+}
+
+template <typename CharT>
+std::string earley<CharT>::grammar_text() {
+	std::stringstream txt;
+	for (const auto &p : G) {
+		txt << "\n\\l";
+		size_t i = 0;
+		for( const auto &l : p){
+			if (l.nt()) txt << to_stdstr(d.get(l.n()));
+			else if (l.c() != '\0') txt << to_stdstr(l.c());
+			else txt << "ε";
+			txt <<  " ";
+			if (i++ == 0) txt << "-> ";
+		}
+	}
+	return txt.str();
 }
 
 template <typename CharT>
@@ -633,18 +655,18 @@ template <typename P>
 bool earley<CharT>::to_dot(ostream_t& ss, P &&pt) {
 	auto keyfun = [this] (const nidx_t & k){
 		std::stringstream l;
-		k.nt() ? l << to_string(to_string_t(d.get(k.n())))
+		k.nt() ? l << to_stdstr(d.get(k.n()))
 			: k.c() == '\0' ? l << "ε"
-				: l << to_string(to_string_t(k.c()));
+				: l << to_stdstr(k.c());
 		l << "_" << k.span.first << "_" << k.span.second << "_";
 		std::string desc = l.str();
 		return std::pair<size_t, std::string>(
 			std::hash<std::string>()(desc), desc);
 	};
 	ss << "digraph {\n";
-	ss << "_input_" << "[label =\"" << to_string(to_string_t(inputstr)) <<
+	ss << "_input_" << "[label =\"" << dot_safe(to_stdstr(inputstr)) <<
 		"\", shape = rectangle]" ;
-	ss << "_grammar_" << "[label =\"" << grammar_text() <<
+	ss << "_grammar_" << "[label =\"" << dot_safe(grammar_text()) <<
 		"\", shape = rectangle]" ;
 	ss << "\nnode" << "[ ordering =\"out\"];";
 	ss << "\ngraph" << "[ overlap =false, splines = true];";
@@ -916,45 +938,98 @@ bool earley<CharT>::build_forest2 ( const nidx_t &root ) {
 }
 
 template <typename CharT>
-typename earley<CharT>::node_children earley<CharT>::get_children(const nidx_t nd, bool all) const {
-	node_children nc;
+vector<typename earley<CharT>::node_children> earley<CharT>::get_children(
+	const nidx_t nd, bool all) const
+{
+	vector<node_children> ncs;
 	auto label = [this](const nidx_t p, bool all=1) {
 		return p.nt() ? d.get(p.n()) : (all ? string{ p.c() } : string{});
 	};
 	auto it = pfgraph.find(nd);
-	if (it == pfgraph.end()) return nc;
-	auto &packset = it->second;
-	bool amb = packset.size() > 1;
+	if (it == pfgraph.end()) return {{}};
+	bool amb = false;
+	if (print_ambiguity && it->second.size() > 1) amb = true, o::inf() <<"'"
+		<< to_stdstr(label(nd, true)) <<"' is ambiguous\n";
 	size_t c = 0;
-	if (amb) o::inf() << "\n'" << to_string(to_string_t(label(nd, true)))
-		<<"' is ambiguous:";
-	bool picked = false;
-	for (auto &pack : packset) {
-		if (amb) o::inf() << "\n\tpack " << ++c << ":\t";
-		for (auto &p : pack) {
-			if (!picked) nc.push_back(std::pair<string,
-				const nidx_t>(label(p, all), p));
-			if (amb) o::inf() << "'" << to_string(to_string_t(
-				label(p, true))) << "' ";
+	for (auto &pack : it->second) {
+		if (amb) o::inf() << "\tpack " << ++c << ":\t";
+		ncs.emplace_back();
+		for (auto& p : pack) {
+			if (amb) o::inf() << "\t'" <<
+				to_stdstr(label(p, true)) << "' ";
+			ncs.back().push_back(
+				pair<string, const nidx_t>(label(p, all), p));
 		}
-		picked = true;
+		if (amb) o::inf() << "\n";
 	}
-	return nc;
+	return ncs;
 }
 
 template <typename CharT>
-typename earley<CharT>::string earley<CharT>::flatten(
-	earley<CharT>::string label, const nidx_t p) const
+typename earley<CharT>::string earley<CharT>::shorten(const string& s,
+	size_t len, const string& suffix) const
 {
+	if (s.size() > len) return s.substr(0, len) + suffix;
+	return s;
+}
+
+template <typename CharT>
+typename earley<CharT>::string earley<CharT>::flatten(const nidx_t p) const {
 	stringstream ss;
-	node_children nc = get_children(p, true);
-	if (nc.size())
-		for (auto &c : nc) ss << flatten(c.first, c.second);
-	else if (label.size()) ss << label;
+	auto it = pfgraph.find(p);
+	if (it == pfgraph.end()) return {{}};
+	for (auto &pack : it->second) {
+		for (auto &p : pack)
+			if (p.nt()) {
+				auto flat = flatten(p);
+				if (flat.size() && flat[0] != 0 &&
+					flat[0] != char_traits<CharT>::eof())
+						ss << flat;
+			} else ss << p.c();
+		break; // traverse only the first pack of each node
+	}
 	return ss.str();
 }
 
+template <typename CharT>
+void earley<CharT>::down(const nidx_t& p, const actions& a) const {
+	auto label = p.is_builtin() ? d.get(p.builtin())
+		: p.nt() ? d.get(p.n()) : string{ p.c() };
+	auto print_traversing_info = [&label, &p, this]() {
+		std::string wrap = p.nt() ? "" : "'";
+		std::string l = to_stdstr(label);
+		bool print_flattened = true;
+		if (l.size() == 1 && !isprint(l[0])) {
+			print_flattened = false;
+			if (l[0] == 0) l = "ε";
+			else {
+				std::stringstream ss;
+				ss << "\\" << (size_t) l[0];
+				l = ss.str();
+			}
+		}
+		o::inf() << "down(" << wrap << l << wrap << ")";
+		if (print_flattened) l = to_stdstr(shorten(flatten(p))),
+			(!l.size() || l[0] == 0) ? o::inf()
+				: o::inf() << ": \t\"" << l << "\"";
+		o::inf() << "\n";		
+	};
+	if (print_traversing) print_traversing_info();
+	// include also ebnf-transformation generated nodes
+	if (label.size() > 1 && label[0]==(CharT)'_' && label[1]==(CharT)'R')
+		label = label.substr(2, label.find_last_of((CharT)'_') - 2);
+	auto it = a.find(label);
+	if (it != a.end()) it->second(p, get_children(p));
+	else if (auto_passthrough) down(get_children(p), a);
+}
 
+template <typename CharT>
+void earley<CharT>::topdown(const string& start, const actions& a) const {
+ 	auto it = pfgraph.begin();
+ 	for ( ; it != pfgraph.end() &&
+ 		!(it->first.nt() && d.get(it->first.n()) == start); ++it) ;
+	if (it != pfgraph.end()) down(it->first, a);
+}
 
 template class earley<char>;
 template class earley<char32_t>;

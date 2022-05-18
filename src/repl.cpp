@@ -20,8 +20,6 @@ using namespace std;
 repl::repl(options &o, ostream_t& os) : o(o), os(os) {
 	os<<"# TML REPL ("<<GIT_DESCRIBED<<"). Enter ? or h for help."<<endl;
 	redrive("");
-	string archive_file = o.get_string("load");
-	if (archive_file.size()) d->load(archive_file);
 	if (o.enabled("udp")) {
 		string addr = o.get_string("udp-addr");
 		int_t port = o.get_int("udp-port");
@@ -33,8 +31,6 @@ repl::repl(options &o, ostream_t& os) : o(o), os(os) {
 		}
 	}
 	loop();
-	archive_file = o.get_string("save");
-	if (archive_file != "") d->save(archive_file);
 }
 
 template <typename T>
@@ -215,10 +211,10 @@ bool repl::eval_input(basic_ostream<T>& os, string l) {
 	else if  (l == "s")   step(os);
 	else if  (size_t s =   parse_size_t(l, "s")) step(os, s);
 	else if  (size_t s =   parse_size_t(l, "b")) break_on_step(os, s);
-	else if  ((f = ws2s(parse_string(l, "load"))) != "")
-		d->load(f);
-	else if  ((f = ws2s(parse_string(l, "save"))) != "")
-		d->save(f);
+	//else if  ((f = ws2s(parse_string(l, "load"))) != "")
+	//	d->load(f);
+	//else if  ((f = ws2s(parse_string(l, "save"))) != "")
+	//	d->save(f);
 	else if  (l == "ps")
 		d->set_print_step(toggle(os, "print steps", ps));
 	else if  (l == "pu")

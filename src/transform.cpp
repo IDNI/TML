@@ -15,49 +15,7 @@
 #include "err.h"
 using namespace std;
 
-/*lexeme driver::get_char_lexeme(char_t c) {
-	wstring s;
-	return dict.get_lexeme(s += c);
-}
-
-lexeme driver::get_num_lexeme(int_t n) { return dict.get_lexeme(to_wstring(n));}
-*/
-
-lexeme driver::get_lexeme(ccs w, size_t l) {
-	if (l == (size_t)-1) l = strlen(w);
-	auto it = strs_extra.find({ w, w + l });
-	if (it != strs_extra.end()) return *it;
-	cstr r = strdup(w);
-	strs_allocated.push_back(r);
-	lexeme lx = { r, r + l };
-	strs_extra.insert(lx);
-	return lx;
-}
-lexeme driver::get_lexeme(const std::basic_string<unsigned char>& s) {
-	ccs w = s.c_str();
-	return get_lexeme(w, s.size());
-}
-lexeme driver::get_lexeme(const std::basic_string<char>& s) {
-	ccs w = (ccs) s.c_str();
-	return get_lexeme(w, s.size());
-}
-
-lexeme driver::get_var_lexeme(int_t i) {
-	std::string s = "?v";
-	return get_lexeme(s += to_string_(i));
-}
-
-#define get_var_elem(i) elem(elem::VAR, get_var_lexeme(i))
-
-lexeme driver::get_new_var() {
-	static size_t last = 1;
-//	size_t sz = dict.nvars();
-	lexeme l;
-//	for (;;)
-	while (vars.find(l = get_var_lexeme(last++)) != vars.end());
-	return vars.insert(l), l;//, dict.nvars() == sz) return l;
-//		else sz = dict.nvars();
-}
+#define get_var_elem(i) elem(elem::VAR, dict.get_var_lexeme(i))
 
 void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
 	for (elem& e : t.e)
@@ -88,12 +46,6 @@ set<raw_rule> driver::refresh_vars(raw_rule& r) {
 	}
 	return s;
 }
-/*struct lexemecmp {
-	bool operator()(const lexeme& x, const lexeme& y) const {
-		return	x[1]-x[0] != y[1]-y[0] ? x[1]-x[0] < y[1]-y[0] :
-			(STRNCMP(x[0], y[0], x[1]-x[0]) < 0);
-	}
-};*/
 
 raw_term driver::from_grammar_elem(const elem& v, int_t v1, int_t v2) {
 	return raw_term({v, elem_openp, get_var_elem(v1), get_var_elem(v2), elem_closep});
@@ -114,7 +66,7 @@ raw_term driver::from_grammar_elem_nt(const lexeme& r, const elem& c,
 raw_term driver::from_grammar_elem_builtin(const lexeme& r, const string_t& b,
 	int_t v){
 	return raw_term({ elem(elem::SYM, r),
-		elem_openp, elem(elem::SYM, get_lexeme(b)),
+		elem_openp, elem(elem::SYM, dict.get_lexeme(b)),
 		get_var_elem(v), get_var_elem(v+1), elem_closep});
 }
 
@@ -278,7 +230,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 		r.r.push_back(l);
 	}
 	raw_term t;
-	append_sym_elem(t.e, get_lexeme("start")), append_openp(t.e),
+	append_sym_elem(t.e, dict.get_lexeme("start")), append_openp(t.e),
 	t.e.push_back(elem((int_t)0)), t.e.push_back(elem((int_t)len)),
 	append_closep(t.e), t.calc_arity(current_input);
 	raw_rule rr;
@@ -591,17 +543,6 @@ raw_prog driver::transform_sdt(const raw_prog& p) {
 	return r;
 }*/
 
-lexeme driver::get_new_rel() {
-	static size_t last = 1;
-	string s = "r";
-	size_t sz;
-	lexeme l;
-retry:	sz = rels.size(), l = get_lexeme(s + to_string_(last));
-	rels.insert(l);
-	if (rels.size() == sz) { ++last; goto retry; }
-	return l;
-}
-
 void driver::transform_bin(raw_prog& p) {
 	flat_rules f(p, *this);
 	for (const frule& r : f) {
@@ -619,7 +560,7 @@ void driver::transform_bin(raw_prog& p) {
 		const vector<raw_term>& x, set<elem> v) {
 		raw_rule r;
 		r.b = {x}, r.h.emplace_back();
-		r.h[0].e.emplace_back(elem::SYM, get_new_rel());
+		r.h[0].e.emplace_back(elem::SYM, dict.get_rel_lexeme(dict.get_new_rel()));
 		append_openp(r.h[0].e);
 		for (size_t k = 0; k != x.size(); ++k)
 			for (size_t n = 0; n != x[k].e.size(); ++n)
@@ -769,13 +710,13 @@ void driver::transform_state_blocks(raw_prog &rp, set<lexeme> guards) {
 	for (state_block& sb : rp.sbs) {
 		set<lexeme> grds(guards);
 		grds.insert(sb.label);
-		transform_state_blocks(sb.rp, grds);
+		transform_state_blocks(sb.p, grds);
 		raw_term rt(elem(elem::SYM, sb.label), vector<elem>{});
 		if (sb.flip) {
 			raw_term h(rt); h.neg = true;
 			rp.r.push_back(raw_rule(h, rt));
 		}
-		for (raw_rule& r : sb.rp.r) {
+		for (raw_rule& r : sb.p.r) {
 			raw_term rt(elem(elem::SYM, sb.label), vector<elem>{});
 			if (r.prft) r.prft = raw_form_tree(elem::AND,
 				make_shared<raw_form_tree>(rt),

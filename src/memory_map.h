@@ -249,12 +249,11 @@ public:
 		fn(fn), m(m) { }
 	memory_map_allocator(const memory_map_allocator<T>& a) :
 		fn(a.fn), m(a.m) { }
-	T* allocate(size_t n, const void* hint = 0) {
+	T* allocate(size_t n) {
 		//DBG(o::dbg()<<"allocate n="<<n<<" fn="
 		//	<<s2ws(fn)<<" m="<<m<<std::endl;)
-		if (m == MMAP_NONE) return (T*) nommap.allocate(n, hint);
+		if (m == MMAP_NONE) return (T*) nommap.allocate(n);
 		if (n == 0) return 0;
-		//if (hint != 0) return 0; // not supported
 		mm = std::make_unique<memory_map>(fn, n*sizeof(T), m);
 		//o::dbg() << "mm.data() = " << mm->data() << std::endl;
 		return (T*) mm->data();

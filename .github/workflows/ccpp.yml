@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        compiler: [clang-9, gcc-9]
+        compiler: [clang-10, gcc-10]
         os: [ubuntu-latest, macOS-latest]
 
     steps:
@@ -22,13 +22,17 @@ jobs:
       - name: Installing Boost on Ubuntu
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo add-apt-repository ppa:mhier/libboost-latest
+          sudo add-apt-repository -y ppa:mhier/libboost-latest
           sudo apt-get update
           sudo apt-get install -y libboost1.70 libboost1.70-dev
       - name: Installing Gcovr on Ubuntu
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get install -y gcovr
+      - name: Installing Gcovr on MacOS
+        if: matrix.compiler == 'gcc-10' && matrix.os == 'macOS-latest'
+        run: |
+          brew install gcovr
 #      - name: Install compilers for OSX
 #          if: matrix.os == 'macOS-latest'
 #          run: |
@@ -42,23 +46,31 @@ jobs:
         run: |
           brew install boost
       - name: Installing clang tidy
-        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+        if: matrix.compiler == 'clang-10' && matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get install -y clang-tidy-9
+          sudo apt-get install -y clang-tidy-10
       - name: Installing lcov on macOS
-        if: matrix.compiler == 'clang-9' && matrix.os == 'macOS-latest'
+        if: matrix.compiler == 'clang-10' && matrix.os == 'macOS-latest'
         run: |
           brew install lcov
       - name: Installing cppcheck on macOS
         if: matrix.os == 'macOS-latest'
         run: |
           brew install cppcheck
+      - name: Installing cmake
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y cmake
+      - name: Installing clang
+        if: matrix.compiler == 'clang-10' && matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y clang
       - name: Bulding debug version
         run: |
           mkdir -p build-Debug
           cd build-Debug
-          if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
-            CMAKE_CXX_COMPILER=g++-9
+          if [ "${{ matrix.compiler }}" = "gcc-10" ]; then
+            CMAKE_CXX_COMPILER=g++
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
           else
             CMAKE_CXX_COMPILER=clang++
@@ -68,22 +80,22 @@ jobs:
       - name: Running tests
         run: ./build-Debug/tests/test_tml
       - name: Running CPP check
-        if: matrix.compiler == 'clang-9' && matrix.os == 'macOS-latest'
+        if: matrix.compiler == 'clang-10' && matrix.os == 'macOS-latest'
         run: |
           cd build-Debug
           make -j5 cppcheck
 #      - name: Formatting
-#        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+#        if: matrix.compiler == 'clang-10' && matrix.os == 'ubuntu-latest'
 #        run: |
 #          cd build-Debug
 #          make -j5 clang-format
       - name: Running clang tidy
-        if: matrix.compiler == 'clang-9' && matrix.os == 'ubuntu-latest'
+        if: matrix.compiler == 'clang-10' && matrix.os == 'ubuntu-latest'
         run: |
           cd build-Debug
           make -j5 clang-tidy
       - name: Generating coverage report
-        if: success() && matrix.compiler == 'gcc-9' && matrix.os == 'ubuntu-latest'
+        if: success() && matrix.compiler == 'gcc-10' && matrix.os == 'ubuntu-latest'
         run: |
           sudo git clone https://github.com/linux-test-project/lcov
           cd lcov

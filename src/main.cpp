@@ -22,14 +22,11 @@
 #endif
 using namespace std;
 
-//void print_memos_len();
-
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	inputs ii;
 	outputs oo;
 	options o(argc, argv, &ii, &oo);
-	string archive_file = o.get_string("load");
 	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
 		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
 	bdd::set_gc_enabled(o.get_bool("gc"));
@@ -38,8 +35,7 @@ int main(int argc, char** argv) {
 #ifdef WITH_THREADS
 			&& o.disabled("repl") && o.disabled("udp")
 #endif
-			&& o.disabled("h") && o.disabled("v")
-			&& archive_file == "")
+			&& o.disabled("h") && o.disabled("v"))
 		o.parse(strings{ "-i",  "@stdin" }, true);
 #ifdef WITH_THREADS
 	if (o.enabled("udp") && o.disabled("repl")) o.enable("repl");
@@ -48,14 +44,10 @@ int main(int argc, char** argv) {
 #endif
 		driver d(o);
 		if (d.error) goto quit;
-		if (archive_file != "") d.load(archive_file);
+		d.run( (size_t) o.get_int("steps"), (size_t) o.get_int("break") );
 		if (d.error) goto quit;
-		d.run((size_t)o.get_int("steps"), (size_t)o.get_int("break"));
-		if (d.error) goto quit;
-		archive_file = o.get_string("save");
-		if (archive_file != "") d.save(archive_file);
-		if (o.enabled("dump") && d.result &&
-			!d.out_goals(o::dump())) d.dump_fixpoint();
+		if (o.enabled("dump") && d.result && !d.out_goals(o::dump()))
+			d.dump_fixpoint();
 		if (o.enabled("dict")) d.out_dict(o::inf());
 		if (o.enabled("csv")) d.save_csv();
 #ifdef WITH_THREADS
@@ -63,6 +55,5 @@ int main(int argc, char** argv) {
 #endif
 quit:
 	onexit = true;
-//	print_memos_len();
 	return 0;
 }

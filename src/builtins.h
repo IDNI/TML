@@ -38,9 +38,6 @@ struct blt_ctx {
 	size_t varpos(size_t arg) const;
 	inline int_t arg(size_t arg) const { return g[arg]; }
 	inline int_t arg_as_int(size_t arg) const { return int_t(g[arg] >> 2); }
-	std::string arg_as_string(size_t arg) const;
-	int_t mkchr(size_t arg) const { return (((int_t)arg) << 2)|1; }
-	int_t mknum(size_t arg) const { return (((int_t)arg) << 2)|2; }
 	int_t outvarpos(size_t oarg = 0) const;
 	void args_bodies(bdd_handles& hs, size_t len = 0);
 	void out(spbdd_handle x) { outs.push_back(x); }
@@ -112,14 +109,12 @@ struct builtins : std::map<int_t, builtins_pair> {
 		blt_handler h, int_t nargs = 0)
 	{
 		int_t id = dict->get_bltin(name);
-		//COUT << "adding builtin id: " << id  << " ishead? " << ishead << std::endl;
 		auto it = find(id);
 		if (it == end()) it = emplace(id, builtins_pair{}).first;
 		builtins_pair& bp = it->second;
-		if (ishead) bp.has_head = true,
-			bp.head = builtin{ args, oargs, nargs, h};
-		else        bp.has_body = true,
-			bp.body = builtin{ args, oargs, nargs, h};
+		if (ishead) 
+		bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
+		else bp.has_body = true, bp.body = builtin{ args, oargs, nargs, h};
 		return true;
 	}
 	void run_head(blt_ctx& c) { run(c, true);  }

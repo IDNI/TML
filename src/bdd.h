@@ -138,6 +138,11 @@ template<> struct std::hash<std::array<bdd_ref, 2>>{
 const bdd_ref T = BDD_REF(1, 0, false, false), F = BDD_REF(1, 0, false, true);
 
 spbdd_handle from_bit(bdd_shft b, bool v);
+
+spbdd_handle from_high(bdd_shft s, bdd_ref x);
+spbdd_handle from_low(bdd_shft s, bdd_ref y);
+spbdd_handle from_high_and_low(bdd_shft s, bdd_ref x, bdd_ref y);
+
 bool leaf(cr_spbdd_handle h);
 bool trueleaf(cr_spbdd_handle h);
 template <typename T>
@@ -222,6 +227,8 @@ spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
+spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
+		const size_t x_bitw, const size_t y_bitw/*, size_t x_idx, size_t y_idx*/);
 spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars);
@@ -236,10 +243,8 @@ size_t satcount(cr_spbdd_handle x, const size_t bits);
  * different functions. */
 
 class bdd {
-	friend class archive;
 	friend class bdd_handle;
 	friend class allsat_cb;
-	//friend class satcount_iter;
 	friend struct sbdd_and_many_ex;
 	friend struct sbdd_and_ex_perm;
 	friend struct sbdd_and_many_ex_perm;
@@ -273,6 +278,11 @@ class bdd {
 	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
 	friend vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
 	friend spbdd_handle from_bit(bdd_shft b, bool v);
+
+	friend spbdd_handle from_high(bdd_shft s, bdd_ref x);
+	friend spbdd_handle from_low(bdd_shft s, bdd_ref y);
+	friend spbdd_handle from_high_and_low(bdd_shft s, bdd_ref x, bdd_ref y);
+	
 	friend bdd_shft bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);
@@ -290,15 +300,17 @@ class bdd {
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
+	friend spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
+			const size_t x_bitw, const size_t y_bitw /*, size_t x_idx, size_t y_idx*/);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	friend spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt);
-	
+
 	/* Get the absolute BDD referenced by the given BDD reference. If the given
 	 * BDD reference represents the function f, the low reference of the produced
 	 * BDD represents f with the variable represented by x set to 0, and the high
 	 * reference the function f with this variable set to 1. */
-	
+
 	inline static bdd get(bdd_ref x) {
 		// Get the BDD that this reference is attributing
 		bdd cbdd = V[GET_BDD_ID(x)];
@@ -369,6 +381,9 @@ class bdd {
 	static bdd_ref bitwise_xor(bdd_ref a_in, bdd_ref b_in);
 	static bdd_ref bitwise_not(bdd_ref a_in);
 	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
+	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, const size_t x_bitw,
+			const size_t y_bitw /*, const size_t x_idx=0, const size_t y_idx=0*/);
+	//static int_t geq(int_t a, int_t b, size_t bit, size_t x_bitw, size_t y_bitw);
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
 	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
@@ -419,19 +434,19 @@ public:
 	static size_t get_ite_cache_size();
 	static void set_gc_limit(size_t new_gc_limit);
 	static void set_gc_enabled(bool new_gc_enabled);
-	
+
 	/* Return the absolute BDD corresponding to the high part of the given BDD
 	 * reference. If x represents a boolean function f, then this function returns
 	 * a reference to a BDD representing the function f with the variable
 	 * corresponding to x set to 1. */
-	
+
 	inline static bdd_ref hi(bdd_ref x) {
 		// Get the BDD that this reference is attributing
 		bdd &cbdd = V[GET_BDD_ID(x)];
 		// Apply output inversion
 		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.l : cbdd.h, GET_SHIFT(x));
 	}
-	
+
 	/* Definition is analogous to hi with high and 1 replaced by low and 0. */
 
 	inline static bdd_ref lo(bdd_ref x) {
@@ -441,23 +456,14 @@ public:
 		// Apply output inversion
 		return GET_INV_OUT(x) ? FLIP_INV_OUT(PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x))) : PLUS_SHIFT(GET_INV_INP(x) ? cbdd.h : cbdd.l, GET_SHIFT(x));
 	}
-	
+
 	/* The variable of a BDD reference is its root/absolute shift. */
-
 	inline static bdd_shft var(bdd_ref x) { return GET_SHIFT(x); }
-
-	static size_t satcount_perm(bdd_ref x, bdd_shft leafvar);
-
 	static bdd_shft getvar(bdd_ref x);
-	static size_t satcount_k(bdd_ref x, const bools& ex, const bdd_shfts& perm);
-	static size_t satcount_k(bdd_ref x, bdd_shft leafvar,
-		std::map<bdd_shft, bdd_shft>& mapvars);
-	static size_t satcount(spbdd_handle x, const bools& inv);
 };
 
 class bdd_handle {
 	friend class bdd;
-	friend class archive;
 	bdd_handle(bdd_ref b) : b(b) { }//bdd::mark(b); }
 	static void update(const std::vector<bdd_id>& p);
 	static std::unordered_map<bdd_ref, std::weak_ptr<bdd_handle>> M;
@@ -487,20 +493,4 @@ private:
 	void sat(bdd_ref x);
 };
 
-class satcount_iter {
-public:
-	satcount_iter(cr_spbdd_handle r, bdd_shft nvars, const bools& inv) :
-		r(r->b), nvars(nvars), p(nvars), inv(inv), vp() {}
-	size_t count() {
-		sat(r);
-		return vp.size();
-	}
-private:
-	bdd_ref r;
-	const bdd_shft nvars;
-	bdd_shft v = 1;
-	bools p;
-	const bools& inv;
-	std::set<bools> vp;
-	void sat(bdd_ref x);
-};
+

@@ -59,9 +59,6 @@ Default outputs are:
 | benchmarks  | measured benchmarks                               |
 | transformed | transformed program                               |
 | repl-output | repl                                              |
-| xsb         | program translated into XSB                       |
-| swipl       | program translated into SWIPL                     |
-| souffle     | program translated into Soufflé                   |
 
 
 `outputs` object acts also as a global container. It is possible to use multiple
