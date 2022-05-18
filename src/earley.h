@@ -11,6 +11,7 @@
 #include <sstream>
 #include <fstream>
 #include <functional>
+#include <cstdint>
 #include "input.h"
 
 #ifdef DEBUG
@@ -84,6 +85,8 @@ private:
 		ostream_t& os,
 		const std::vector<typename earley<CharU>::lit>& v);)
 	std::vector<std::vector<lit>> G;
+	std::map<std::vector<lit>, int_t> priority;
+	std::set<std::vector<lit>> prefer;
 	lit start;
 	std::map<lit, std::set<size_t>> nts;
 	std::set<size_t> nullables;
@@ -106,12 +109,7 @@ private:
 			return true;
 		}
 	};
-/*	struct ast {
-		ast() {}
-		ast(const item& i) : i(i) {}
-		item i;
-		std::set<std::vector<ast*>> next;
-	};*/
+
 	lit get_lit(const item& i) const { return G[i.prod][i.dot]; }
 	bool completed(const item& i) const { return G[i.prod].size()==i.dot; }
 	lit get_nt(const item& i) const { return G[i.prod][0]; }
@@ -142,9 +140,11 @@ private:
 		}
 		string get(size_t n) const { return v[n]; }
 	} d;
+	
 public:
 	typedef pnode nidx_t;
-	typedef std::map<nidx_t, std::vector<nidx_t>> ptree_t;
+	typedef std::map<nidx_t, std::set<std::vector<nidx_t>>> parse_forest_t;
+	typedef parse_forest_t ptree_t;
 	typedef std::vector<std::variant<size_t, string>> arg_t;
 	typedef std::vector<std::pair<string, const nidx_t>> node_children;
 	earley(const grammar& g, const char_builtins_map& bm,
@@ -159,13 +159,38 @@ public:
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
 	string flatten(string label, const nidx_t nd) const;
-	ptree_t get_parsed_tree(size_t );
-	size_t count_parsed_trees() const;
+	uintmax_t count_parsed_trees() ;
+	ptree_t get_parsed_tree();
+
+	template <typename cb_enter_t , 
+				typename cb_exit_t
+				,typename cb_revisit_t, 
+				typename cb_ambig_t 
+				>
+	bool traverse_forest( const nidx_t &root, 
+	cb_enter_t cb_enter, 
+	cb_exit_t cb_exit, 
+	cb_revisit_t cb_revisit,
+	cb_ambig_t cb_ambig 
+	);
 private:
+	template <typename cb_enter_t, 
+				typename cb_exit_t,
+				typename cb_revisit_t,
+				typename cb_ambig_t
+				>
+	bool _traverse_forest( const nidx_t &root, 
+				std::set<nidx_t> &done,
+				cb_enter_t cb_enter, 
+				cb_exit_t cb_exit, 
+				cb_revisit_t cb_revisit,
+				cb_ambig_t cb_ambig 
+				);
 	string epsilon() const;
 	node_children get_children(const nidx_t nd, bool all) const;
 	bool bin_lr;  //enables binarizaion and left right optimization
-	bool to_dot(ostream_t& os);
+	template<typename P=ptree_t>
+	bool to_dot(ostream_t& os, P && p = ptree_t());
 	std::string to_dot_safestring(const string& s) const;
 	struct hasher_t{
 		size_t hash_size_t(const size_t &val) const{
@@ -191,7 +216,7 @@ private:
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
 	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  
 		sorted_citem, rsorted_citem;
-	std::map<nidx_t, std::set<std::vector<nidx_t>>> pfgraph;
+	parse_forest_t pfgraph;
 	std::map<std::vector<earley::lit>, earley::lit> bin_tnt; // binariesed temporary intermediate non-terminals
 	std::vector<char_builtin_t> builtins;
 	std::vector<std::map<CharT, size_t>> builtin_char_prod; // char -> prod
@@ -202,15 +227,26 @@ private:
 	bool bin_lr_comb(const item&, std::set<std::vector<nidx_t>>&);
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
 		std::set<std::vector<nidx_t>>&);
-	template <typename T>
-	bool visit_forest(T) const;
+	template <typename T, typename P = ptree_t>
+	bool iterate_forest(T, P &&pt = ptree_t()) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
-	size_t _count_parsed_trees(const nidx_t &, std::unordered_set<nidx_t, hasher_t>&) const;
+	uintmax_t _count_parsed_trees(const nidx_t &, std::unordered_set<nidx_t, hasher_t>&) const;
 	// only store graph as facts
-	bool to_tml_facts(ostream_t& os) const;
+	template<typename P = ptree_t>
+	bool to_tml_facts(ostream_t& os, P && p = ptree_t()) const;
 	//make parse forest grammar
-	bool to_tml_rule(ostream_t& os) const;
+	template<typename P = ptree_t>
+	bool to_tml_rule(ostream_t& os, P && p = ptree_t()) const;
 	std::string to_tml_rule(const nidx_t nd) const;
 	template <typename CharU>
 	friend int test_out(int c, earley<CharU> &e);
+
+	struct overlay_tree {
+		std::vector<int> choices;
+		nidx_t &root;
+		earley::parse_forest_t &pf;
+		
+		overlay_tree(nidx_t &_r, earley::parse_forest_t &_pf):
+		root(_r), pf(_pf){};
+	};
 };
