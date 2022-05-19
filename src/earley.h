@@ -53,9 +53,6 @@ private:
 		CharT c() const { return std::get<CharT>(*this); }
 		int_t builtin = -1;
 		bool is_builtin() const { return builtin != -1; }
-		lit(size_t n) { *this = n; }
-		lit(CharT ch) { *this = ch; }
-		lit() {}
 	};
 	string to_str(const lit& l) const {
 		if (l.is_builtin()) return d.get(l.builtin);

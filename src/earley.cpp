@@ -83,18 +83,18 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 		for (auto &y : x.p) {
 			auto s = to_str(y.to_str_t());
 			if (y.type == elem::SYM && nt.find(s) != nt.end()) {
-				G.back().emplace_back(d.get(s));
+				G.back().push_back(lit{ d.get(s) });
 				auto it = bmi.find(s);					
 				if (it != bmi.end()) G.back().back()
 					.builtin = it->second;
 			} else if (x.p.size() == 2 &&
 				s == string{ 'n', 'u', 'l', 'l' })
-					G.back().emplace_back((CharT) '\0');
+					G.back().push_back(lit{ (CharT) '\0' });
 			else for (CharT c : s)
-				G.back().emplace_back((CharT) c);
+				G.back().push_back(lit{ (CharT) c });
 		}
 	}
-	start = lit(d.get(string{ 's', 't', 'a', 'r', 't' }));
+	start = lit{ d.get(string{ 's', 't', 'a', 'r', 't' }) };
 	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
 	size_t k;
 	do {
@@ -139,20 +139,20 @@ earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
 	for (const auto &x : g) nt.insert(x.first);
 	for (const auto &x : g)
 		for (auto &y : x.second) {
-			G.push_back({lit(d.get(x.first))});
+			G.push_back({ lit{ d.get(x.first) } });
 			for (auto &s : y)
 				if (nt.find(s) != nt.end()) {
-					G.back().emplace_back(d.get(s));
+					G.back().push_back(lit{ d.get(s) });
 					auto it = bmi.find(s);					
 					if (it != bmi.end()) G.back().back()
 						.builtin = it->second;
 				} else if (s.size() == 0)
-					G.back().emplace_back((CharT) '\0');
+					G.back().push_back(lit{ (CharT) '\0' });
 				else for (CharT c : s)
-					G.back().emplace_back(c);
+					G.back().push_back(lit{ c });
 
 	}
-	start = lit(d.get(basic_string<CharT>{ 's', 't', 'a', 'r', 't' }));
+	start = lit{ d.get(basic_string<CharT>{ 's', 't', 'a', 'r', 't' }) };
 	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
 	size_t k;
 	do {
@@ -238,7 +238,7 @@ void earley<CharT>::scan_builtin(const item& i, size_t n, const string& s) {
 		if (!builtins[bid](ch)) return; //char isn't in the builtn class
 		p = G.size(); // its a new character in this builtin -> store it 
 		G.push_back({ get_lit(i) });
-		G.back().emplace_back(ch);
+		G.back().push_back(lit{ ch });
 		builtin_char_prod[bid][ch] = p; // store prod of this ch
 	} else p = it->second; // this ch has its prod already
 	item j(n + !eof, i.prod, n, 2); // complete builtin
@@ -620,7 +620,7 @@ bool earley<CharT>::forest( ){
 				if(bin_tnt.find(v) == bin_tnt.end()) {
 					stringstream ss;
 					ss << "temp" << tid++;
-					tlit = lit(d.get(ss.str()));
+					tlit = lit{ d.get(ss.str()) };
 					bin_tnt.insert({v, tlit});
 				}
 				else tlit = bin_tnt[v];
@@ -770,7 +770,7 @@ bool earley<CharT>::build_forest2 ( const nidx_t &root ) {
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
 		if(cur.set != root.span.second) continue;
-		nidx_t cnode( completed(cur) ? G[cur.prod][0]: root.n(),
+		nidx_t cnode( completed(cur) ? G[cur.prod][0] : lit{ root.n() },
 		 {cur.from, cur.set} );
 		bin_lr_comb(cur, ambset);
 		pfgraph[cnode] = ambset;
