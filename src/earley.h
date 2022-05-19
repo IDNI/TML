@@ -186,6 +186,16 @@ private:
 		const;
 	bool bin_lr;  //enables binarizaion and left right optimization
 	bool to_dot(ostream_t& os);
+	ostream& put(ostream& os, const size_t& n) const {
+		for (const auto& ch : to_string_(n)) os.put((CharT) ch);
+		return os;
+	}
+	ostream& put(ostream& os, const CharT& ch) const {
+		return os.put(ch); }
+	ostream& put(ostream& os, const string& s) const {
+		for (const auto& ch : s) os.put(ch);
+		return os;
+	}
 	std::string dot_safe(const std::string& s) const;
 	std::string to_stdstr(const string& s) const;
 	std::string to_stdstr(const char32_t& s) const;

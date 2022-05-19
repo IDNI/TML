@@ -242,7 +242,6 @@ class driver {
 	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
-	size_t nsteps() { return tbl->step(); };
 
 public:
 	bool result = false;
@@ -265,6 +264,7 @@ public:
 	void restart();
 	bool step(size_t steps = 1, size_t br_on_step=0);
 	bool run(size_t steps = 0, size_t br_on_step=0);
+	size_t nsteps() { return tbl->step(); };
 
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
@@ -274,6 +274,8 @@ public:
 	inputs* get_inputs() const { return ii; }
 	input* get_current_input() const { return current_input; }
 	void set_current_input(input* in) { current_input = in; }
+	
+	const options& get_opts() const { return opts; }
 
 	template <typename T>
 	void info(std::basic_ostream<T>&);

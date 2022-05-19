@@ -76,7 +76,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		//.function("db_save", &driver::db_save)
 		.property("result", &driver::result)
 		.property("error", &driver::error)
-		.property("opts", &driver::opts)
+		.property("get_opts", &driver::get_opts)
 		;
 //	class_<repl>("repl")
 //		.constructor<options, ostream_t>(allow_raw_pointers())

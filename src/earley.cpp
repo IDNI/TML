@@ -15,13 +15,22 @@ using
 	std::endl;
 
 basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss, const char* c){
-	return ss << to_u32string(to_string_t(c));
+	for (const auto& ch: to_u32string(to_string_t(c))) ss.put(ch);
+	return ss;
 }
 
-basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss, const std::string& s){
-	return ss << to_u32string(to_string_t(s));
+basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss,
+	const std::string& s)
+{
+	for (const auto& ch: to_u32string(to_string_t(s))) ss.put(ch);
+	return ss;
 }
 
+//basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss,const size_t& n)
+//{
+//	return ss << to_string_(n);
+//}
+//
 template<typename CharT>
 ostream_t& operator<<(ostream_t& os,
 	const vector<typename earley<CharT>::string>& v)
@@ -182,12 +191,12 @@ earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
 
 template <typename CharT>
 std::basic_ostream<CharT>& earley<CharT>::print(std::basic_ostream<CharT>& os, const item& i) const {
-	os << i.set << " " << i.from << " ";
+	put(put(os, i.set) << " ", i.from) << " ";
 	for (size_t n = 0; n != G[i.prod].size(); ++n) {
 		if (n == i.dot) os << "* ";
-		if (G[i.prod][n].nt()) os << d.get(G[i.prod][n].n()) << " ";
+		if (G[i.prod][n].nt()) put(os, d.get(G[i.prod][n].n())) << " ";
 		else if (G[i.prod][n].c() == (CharT) '\0') os << "ε " << " ";
-		else os << G[i.prod][n].c() << " ";
+		else put(os, G[i.prod][n].c()) << " ";
 	}
 	if (G[i.prod].size() == i.dot) os << "*";
 	return os;
@@ -619,7 +628,7 @@ bool earley<CharT>::forest( ){
 				lit tlit;
 				if(bin_tnt.find(v) == bin_tnt.end()) {
 					stringstream ss;
-					ss << "temp" << tid++;
+					put(ss << "temp", tid++);
 					tlit = lit{ d.get(ss.str()) };
 					bin_tnt.insert({v, tlit});
 				}
@@ -829,8 +838,8 @@ typename earley<CharT>::string earley<CharT>::flatten(const nidx_t p) const {
 				auto flat = flatten(p);
 				if (flat.size() && flat[0] != 0 &&
 					flat[0] != char_traits<CharT>::eof())
-						ss << flat;
-			} else ss << p.c();
+						put(ss, flat);
+			} else put(ss, p.c());
 		break; // traverse only the first pack of each node
 	}
 	return ss.str();

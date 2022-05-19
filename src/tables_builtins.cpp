@@ -298,7 +298,7 @@ bool tables::init_js_builtins() {
 	const bool H = true, B = false;
 	blt_handler h;
 #ifdef __EMSCRIPTEN__
-	bltins.add(H, "js_eval", -1, 0, h = [](blt_ctx& c) {
+	bltins.add(H, "js_eval", -1, 0, h = [this](blt_ctx& c) {
 		emscripten_run_script(to_string(
 			ir_handler->to_raw_term(c.g)).c_str()); });
 	bltins.add(B, "js_eval", -1, 0, h);
