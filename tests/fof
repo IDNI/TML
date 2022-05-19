@@ -1,7 +1,7 @@
 @string str "p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).".
 #@bwd.
 
-S => pred ws ':' '=' ws form ws '.'.
+start => pred ws ':' '=' ws form ws '.'.
 pred => chars ws '(' ws args ws ')' ws.
 identifier => chars | var.
 args => identifier ws args | null.

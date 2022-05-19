@@ -62,5 +62,5 @@ rule => ws preds ws ":-" ws preds ws '.' ws.
 
 fof => term ws ':' '=' ws form ws '.' ws.
 
-prog => directive S | rule S | production S | fof S | query S | null.
-S => ws '{' ws prog ws '}' ws S ws | ws prog ws | null.
+prog => directive start | rule start | production start | fof start | query start | null.
+start => ws '{' ws prog ws '}' ws start ws | ws prog ws | null.

@@ -12,4 +12,4 @@ rparen   => ')'.
 operation  => plus | minus | multiply | divide.
 expression => number | expression operation expression | lparen expression rparen.
 
-S => expression.
+start => expression.

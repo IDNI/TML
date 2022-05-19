@@ -3737,6 +3737,7 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.show_hidden       = opts.enabled("show-hidden");
+	to.bin_lr            = opts.enabled("bin-lr");
 	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
 

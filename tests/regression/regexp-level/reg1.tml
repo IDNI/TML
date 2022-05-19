@@ -1,7 +1,7 @@
 @string str "aabbccdd".
 B => ('b'| 'z')+'c'+'d''d'.
-S => ('a')* B 'a' RR.
-RR => S | 'r'.
+start => ('a')* B 'a' RR.
+RR => start | 'r'.
 C => B.
 D => B C.
 J => D L 'a' D.

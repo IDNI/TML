@@ -1,10 +1,10 @@
 
 @string str "abbb".
 
-S => A T | 'a' T .
+start => A T | 'a' T .
 A =>  B A | 'a' .
 B => null. 
 T => 'b' 'b' 'b'.
 
 #remove this to get all facts
-!node(?x S ?y ?z).
+!node(?x start ?y ?z).

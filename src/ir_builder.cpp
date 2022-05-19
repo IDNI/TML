@@ -1267,7 +1267,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	DBG(o::dbg()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::dbg() << p << endl;)
 
-	//#define ONLY_EARLEY
+	#define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
 
 	earley_t::char_builtins_map bltnmap{
@@ -1285,7 +1285,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 
 	earley_t parser(g, bltnmap, opts.bin_lr);
 	bool success = parser
-		.recognize(to_u32string(dynenv->strs.begin()->second));
+		.recognize(to_u32string(strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
 

@@ -1,11 +1,11 @@
 @string str "aaa".
 
-S => 'a'+.
+start => 'a'+.
 
 C => "cb".
 C =>  'd'.
-S => 'a' 'c' 'b'. 
-S => 'd' .
+start => 'a' 'c' 'b'. 
+start => 'd' .
 
 J =>  'a'* D 'j'.
 D => J | 'a'.
