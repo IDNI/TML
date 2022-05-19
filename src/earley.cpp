@@ -876,10 +876,10 @@ void earley<CharT>::topdown(const string& start, const actions& a) const {
 	if (it != pfgraph.end()) down(it->first, a);
 };
 
-template class earley<char>;
-template class earley<char32_t>;
-
 template <>
 std::basic_string<char> earley<char>::epsilon()         const { return  "ε"; }
 template <>
 std::basic_string<char32_t> earley<char32_t>::epsilon() const { return U"ε"; }
+
+template class earley<char>;
+template class earley<char32_t>;

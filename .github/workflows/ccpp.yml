@@ -13,99 +13,94 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        compiler: [clang-11, gcc-11]
-        os: [ubuntu-22.04, macOS-latest]
+        compiler: [clang, gcc]
+        os: [ubuntu-22.04, macOS-12]
 
     steps:
       - uses: actions/checkout@v2
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Installing Boost on Ubuntu
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo add-apt-repository -y ppa:mhier/libboost-latest
-          sudo apt-get update
-          sudo apt-get install -y libboost1.70 libboost1.70-dev
-      - name: Installing Gcovr on Ubuntu
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get install -y gcovr
-      - name: Installing Gcovr on MacOS
-        if: matrix.compiler == 'gcc-11' && matrix.os == 'macOS-latest'
-        run: |
-          brew install gcovr
-#      - name: Install compilers for OSX
-#          if: matrix.os == 'macOS-latest'
-#          run: |
-#            if [ "${{ matrix.compiler }}" = "gcc-9" ]; then
-#            brew install gcc@9
-#            else
-#            sudo xcode-select -s /Applications/Xcode_11.app/Contents/Developer
-#            fi
-      - name: Installing Boost on MacOS
-        if: matrix.os == 'macOS-latest'
-        run: |
-          brew install boost
-      - name: Installing clang tidy
-        if: matrix.compiler == 'clang-11' && matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get install -y clang-tidy-11
-      - name: Installing lcov on macOS
-        if: matrix.compiler == 'clang-11' && matrix.os == 'macOS-latest'
-        run: |
-          brew install lcov
-      - name: Installing cppcheck on macOS
-        if: matrix.os == 'macOS-latest'
-        run: |
-          brew install cppcheck
-      - name: Installing cmake
+# Ubuntu installations
+      - name: Installing cmake on Ubuntu
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get install -y cmake
-      - name: Installing clang
-        if: matrix.compiler == 'clang-11' && matrix.os == 'ubuntu-22.04'
+      - name: Installing gcovr on Ubuntu
+        if: matrix.os == 'ubuntu-22.04'
         run: |
-          sudo apt-get install -y clang
+          sudo apt-get install -y gcovr
+      - name: Installing boost on Ubuntu
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get install -y libboost1.74 libboost1.74-dev
+      - name: Installing clang and clang tidy on Ubuntu
+        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get install -y clang clang-tidy
+# macOS installations
+      - name: Installing boost on macOS
+        if: matrix.os == 'macOS-12'
+        run: |
+          brew install boost
+      - name: Installing lcov on macOS (clang)
+        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        run: |
+          brew install lcov
+      - name: Installing gcovr on macOS (gcc)
+        if: matrix.compiler == 'gcc' && matrix.os == 'macOS-12'
+        run: |
+          brew install gcovr
+      - name: Installing cppcheck on macOS
+        if: matrix.os == 'macOS-12'
+        run: |
+          brew install cppcheck
+# building
       - name: Bulding debug version
         run: |
           mkdir -p build-Debug
           cd build-Debug
-          if [ "${{ matrix.compiler }}" = "gcc-11" ]; then
-            CMAKE_CXX_COMPILER=g++
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            CMAKE_CXX_COMPILER=g++-11
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
           else
-            CMAKE_CXX_COMPILER=clang++
+            if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+              CMAKE_CXX_COMPILER=clang++-12
+            else
+              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+            fi
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           fi
           make -j5
+# tests
       - name: Running tests
         run: ./build-Debug/tests/test_tml
-      - name: Running CPP check
-        if: matrix.compiler == 'clang-11' && matrix.os == 'macOS-latest'
-        run: |
-          cd build-Debug
-          make -j5 cppcheck
+      - name: TML execution
+        run: ./build-Debug/tml -ie "a(1)."
+# Ubuntu analyzes
 #      - name: Formatting
-#        if: matrix.compiler == 'clang-11' && matrix.os == 'ubuntu-22.04'
+#        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
 #        run: |
 #          cd build-Debug
 #          make -j5 clang-format
-      - name: Running clang tidy
-        if: matrix.compiler == 'clang-11' && matrix.os == 'ubuntu-22.04'
+      - name: Running clang tidy on Ubuntu
+        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
         run: |
           cd build-Debug
           make -j5 clang-tidy
-      - name: Generating coverage report
-        if: success() && matrix.compiler == 'gcc-11' && matrix.os == 'ubuntu-22.04'
+      - name: Generating coverage report on Ubuntu
+        if: success() && matrix.compiler == 'gcc' && matrix.os == 'ubuntu-22.04'
         run: |
           sudo git clone https://github.com/linux-test-project/lcov
           cd lcov
           sudo make install
           cd ../
           echo `ls`
-          /usr/local/bin/lcov -c -d ./build-Debug/src/CMakeFiles --gcov-tool /usr/bin/gcov-9 -o coverage.info
+          /usr/local/bin/lcov -c -d ./build-Debug/src/CMakeFiles --gcov-tool /usr/bin/gcov -o coverage.info
           /usr/local/bin/lcov --remove coverage.info '/usr/*' --output-file coverage.info
           /usr/local/bin/lcov --list coverage.info # debug info
           bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
-      - name: TML execution
-        run: ./build-Debug/tml -ie "a(1)."
-
+# macOS analyzes
+      - name: Running CPP check on macOS
+        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        run: |
+          cd build-Debug
+          make -j5 cppcheck

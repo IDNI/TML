@@ -242,7 +242,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 			if (!amb || c.first == U"primtype")
 				parser.down(c.second, a);
 	});
-	a.emplace(U"predtypedef", [&parser, &ctx, &a, this](ni_t, ncs_t ncs) {
+	a.emplace(U"predtypedef", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_predtype = true;
 		parser.down(ncs, a);
 		ctx.is_predtype = false;
@@ -300,7 +300,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		if (temp) ctx.rr.prft = *temp;
 		ctx.rp.back()->r.push_back(ctx.rr);
 	});
-	a.emplace(U"prefix_decl", [&parser, &ctx, &a, this](ni_t, ncs_t ncs) {
+	a.emplace(U"prefix_decl", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.prefixes.emplace_back();
 		ctx.is_prefix = true;
 		parser.down(ncs, a);

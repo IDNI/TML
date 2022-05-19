@@ -324,7 +324,7 @@ bool tables::init_js_builtins() {
 	//	c.out(from_sym(c.outvarpos(), c.a->varslen, sym));
 	//});
 #else // TODO embed a JS engine if not in browser?
-	bltins.add(H, "js_eval", -1, 0, h = [this](blt_ctx) {
+	bltins.add(H, "js_eval", -1, 0, h = [](blt_ctx) {
 		o::err() << "js_eval is available only in a browser environment"
 			" (ignoring)." << endl;
 	});
@@ -334,4 +334,3 @@ bool tables::init_js_builtins() {
 #endif
 	return true;
 }
-
