@@ -24,22 +24,10 @@
 #include "memory_map.h"
 #endif
 
-#define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
-#define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
-#define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
-
-inline size_t fpairing(size_t x, size_t y) {
-	size_t z = x + y;
-	z *= z+1;
-	return y+(z>>1);
-}
-
-
-extern bool onexit;
+extern bool onexit_;
 
 class bdd;
 class poset;
-class union_find;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
@@ -70,26 +58,6 @@ struct bdd_key {
 	bool operator==(const bdd_key& k) const { return h==k.h && l==k.l; }
 };
 
-struct abs_cmp {
-	bool operator() (int a, int b) const {
-		int abs_a = abs(a), abs_b = abs(b);
-		if (abs_a < abs_b) return true;
-		if (abs_b < abs_a) return false;
-		return a < b;
-	}
-};
-
-struct vec_abs_cmp {
-	bool operator() (const std::pair<int_t,int_t>& a,
-				const std::pair<int_t,int_t>& b) const {
-		if (abs_cmp()(a.first, b.first)) return true;
-		else if (abs_cmp()(b.first, a.first)) return false;
-		else {
-			return abs_cmp()(a.second, b.second);
-		}
-	}
-};
-
 template<> struct std::hash<bdd_key> {size_t operator()(const bdd_key&)const;};
 template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
@@ -104,9 +72,6 @@ template<typename X, typename Y> struct std::hash<std::set<X,Y>> {
 };
 template<typename X, typename Y, typename Z> struct std::hash<std::map<X,Y,Z>> {
 	size_t operator()(const std::map<X,Y,Z>&) const;
-};
-template<> struct std::hash<union_find>{
-	size_t operator()(const union_find& u)const;
 };
 
 const int_t T = 1, F = -1;
@@ -203,29 +168,6 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
-// Union-Find data structure with negation
-class union_find {
-	std::map<int_t, std::pair<int_t,int_t>, abs_cmp> parent;
-public:
-	bool operator==(const union_find& u) const;
-	std::pair<int_t,int_t> find(int_t x);
-	int_t get_high_var () const;
-	void merge (int_t x, int_t y);
-	bool insert (int_t x);
-	bool in_same_set (int_t x, int_t y) {
-		auto x_rep = find(x).first;
-		return x_rep != 0 && x_rep == find(y).first;
-	}
-	std::vector<int_t> get_set (int_t x);
-	void delete_set (int_t x);
-	bool empty () const { return parent.empty(); }
-	size_t size() const { return parent.size(); }
-	static union_find
-	intersect(union_find &uf1, union_find &uf2);
-
-	friend std::hash<union_find>;
-};
-
 // representation for 2-CNFs
 struct poset {
 	std::vector<std::pair<int_t,int_t>> imp_var;
@@ -257,7 +199,7 @@ public:
 				      std::vector<std::pair<int_t,int_t>>& eq_lift_lo);
 	static poset extend_sing (const poset& c, int_t var, bool b);
 	inline void insert_true_var(int_t v) {
-		if(hasbc(true_var, v, abs_cmp())) return;
+		if(hasbc(true_var, v, abs_cmp)) return;
 		true_var.emplace_back(v);
 		sortc(true_var, abs_cmp());
 	}
@@ -485,7 +427,7 @@ public:
 	static spbdd_handle get(int_t b);
 	static spbdd_handle T, F;
 	~bdd_handle() {
-		if (onexit) return;
+		if (onexit_) return;
 		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
 		if (abs(b) > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
 	}

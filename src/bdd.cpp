@@ -24,7 +24,7 @@
 using namespace std;
 
 #define MEMO
-bool onexit = false;
+bool onexit_ = false;
 
 template<typename T> struct veccmp {
 	bool operator()(const vector<T>& x, const vector<T>& y) const{
@@ -115,7 +115,7 @@ void bdd::max_bdd_size_check() {
 	if (V.size() == max_bdd_nodes)
 		CERR << "Maximum bdd size reached. Increase the limit"
 		" with --bdd-max-size parameter. Exiting." << endl,
-		onexit = true,
+              onexit_ = true,
 		exit(0);
 		// TODO: offer user to remap instead of exit
 }

@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 	}
 #endif
 quit:
-	onexit = true;
+  onexit_ = true;
 //	print_memos_len();
 	return 0;
 }

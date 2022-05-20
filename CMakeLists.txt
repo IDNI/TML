@@ -68,7 +68,7 @@ option(BUILD_CLANG_TIDY "Run clang tidy" FALSE)
 option(BUILD_CLANG_FORMAT "Run clang format" FALSE)
 option(BUILD_CPPCHECK "Run cppcheck" FALSE)
 option(BUILD_CODE_COVERAGE "Generate code coverage" FALSE)
-option(BUILD_TML_CHECK "Build TML parsing check" TRUE)
+option(BUILD_TML_CHECK "Build TML parsing check" FALSE)
 
 message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
 

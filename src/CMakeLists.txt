@@ -31,6 +31,7 @@ set(TML_HEADERS
 	memory_map.h
 	options.h
 	output.h
+	poset.h
 	tables.h
 	ir_builder.h
 )
@@ -47,6 +48,7 @@ set(TML_SOURCES
 	input.cpp
 	options.cpp
 	output.cpp
+	poset.cpp
 	print_prolog.cpp
 	print_souffle.cpp
 	proof.cpp
@@ -175,6 +177,8 @@ set_target_properties(TMLs PROPERTIES OUTPUT_NAME "TML")
 #############
 
 add_executable(2cnf 2cnf_extraction_test.cpp)
+target_compile_options(2cnf PRIVATE ${TML_COMPILE_OPTIONS})
+target_link_options(2cnf    PRIVATE ${TML_LINK_OPTIONS})
 target_link_libraries(2cnf TMLs)
 
 add_executable(tml)
