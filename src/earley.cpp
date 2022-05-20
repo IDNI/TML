@@ -102,6 +102,20 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 			else for (CharT c : s)
 				G.back().push_back(lit{ (CharT) c });
 		}
+		// add priorities/prefer
+		//  .... , #     or   ..... , pref
+		if(x.c.size() == 1 && x.c[0].e.size() == 1 ){
+			if( x.c[0].e[0].type == elem::NUM)
+		   		priority.insert({G.back(), x.c[0].e[0].num });
+			else if( x.c[0].e[0].type == elem::SYM
+				&& x.c[0].e[0].to_str_t() == string_t{'_', 'p','r', 'e', 'f' } )
+				prefer.insert(G.back());
+			else 
+				o::err() <<std::endl << "Ignoring " << x.c[0] << std::endl; 
+		}
+		else if( x.c.size() > 1 )
+			o::err() <<std::endl << "Ignoring " << x.c[0] << "..." << std::endl;
+
 	}
 	start = lit{ d.get(string{ 's', 't', 'a', 'r', 't' }) };
 	for (size_t n = 0; n != G.size(); ++n) nts[G[n][0]].insert(n);
@@ -121,6 +135,12 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 			i++ == 0 ? o::dbg() << "->" : o::dbg() << ' ';
 		for (auto y : x)
 			o::dbg() << to_stdstr(to_str(y));
+		
+		auto it = priority.find(x);
+		if( it != priority.end())
+			o::dbg() <<" " << it->second;
+		if( prefer.count(x))
+			o::dbg() <<" _pref";
 		//o::dbg() << ": " << x 
 		o::dbg() << endl;
 	}
@@ -332,11 +352,31 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 		}
 	emeasure_time_end( tsr, ter ) <<" :: recognize time" <<endl;
 	forest();
+	ptree_t pt = this->get_parsed_tree();
+
+	if (o::enabled("parser-to-rules")) {
+		emeasure_time_start(tsf3, tef3);
+		to_tml_rule(o::to("parser-to-rules"), pt),
+		emeasure_time_end(tsf3, tef3) << ":: to rules time\n";
+	}
+	if (o::enabled("parser-to-dot")) {	
+		emeasure_time_start(tsf1, tef1);
+		to_dot(o::to("parser-to-dot"), pt),
+		emeasure_time_end(tsf1, tef1) << ":: to dot time\n";
+	}
+	if (o::enabled("parser-to-tml")) {
+		emeasure_time_start(tsf2, tef2);
+		to_tml_facts(o::to("parser-to-tml"), pt),
+		emeasure_time_end(tsf2, tef2) << ":: to tml time\n";
+	}
+
 	return found;
 }
 
+
 template <typename CharT>
-bool earley<CharT>::to_tml_facts(ostream_t& ss) const {
+template< typename T>
+bool earley<CharT>::to_tml_facts(ostream_t& ss, T &&pt) const {
 	auto str_rel_output = [&ss, this] (string rel, size_t id,
 		vector<variant<size_t, typename earley<CharT>::string>> args)
 	{
@@ -353,14 +393,13 @@ bool earley<CharT>::to_tml_facts(ostream_t& ss) const {
 		}
 		ss << ").\n";
 	};
-	visit_forest(str_rel_output);
+	iterate_forest(str_rel_output, pt);
 	return true;
 }
 
 template <typename CharT>
-template <typename T>
-bool earley<CharT>::visit_forest(T out_rel) const {
-//bool earley::visit_forest(std::function<void(std::string,size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const{
+template <typename T, typename P>
+bool earley<CharT>::iterate_forest(T out_rel, P &&pt) const {
 	std::stringstream ss;
 	auto get_args = [this] (const nidx_t & k){
 		arg_t args;
@@ -375,16 +414,16 @@ bool earley<CharT>::visit_forest(T out_rel) const {
 
 	map<nidx_t, size_t> nid;
 	size_t id = 0;
-	for( auto &it: pfgraph ){
+	for( auto &it: pt.size() ? pt : pfgraph ){
 		nid[it.first] = id;
 		// skip ids for one child ambig node
-		id += it.second.size()==1? 0:it.second.size(); // ambig node ids;
+		id += it.second.size()== 1 ? 0 : it.second.size(); // ambig node ids;
 		//DBG(assert(it.second.size()!= 0));
 		id++;
 	}
-	ss<<std::endl;
+	ss << std::endl;
 	string node_s{ 'n', 'o', 'd', 'e' }, edge_s{ 'e', 'd', 'g', 'e' };
-	for( auto &it: pfgraph ) {
+	for( auto &it : pt.size()? pt : pfgraph ) {
 		arg_t ndesc = get_args(it.first);
 		out_rel(node_s, nid[it.first], ndesc);
 		size_t p = 0;
@@ -404,28 +443,139 @@ bool earley<CharT>::visit_forest(T out_rel) const {
 	}
 	return true;
 }
-template <typename CharT>
-size_t earley<CharT>::count_parsed_trees() const{
-	nidx_t root(start, {0, inputstr.length()});
-	std::unordered_set<nidx_t, hasher_t> done;
-	return _count_parsed_trees(root, done);
 
+template <typename CharT>
+template <typename cb_enter_t , 
+		typename cb_exit_t,
+		typename cb_revisit_t, 
+		typename cb_ambig_t 
+		>
+bool earley<CharT>::traverse_forest( const nidx_t &root, 
+	cb_enter_t cb_enter , 
+	cb_exit_t cb_exit, 
+	cb_revisit_t cb_revisit,
+	cb_ambig_t cb_ambig  
+	) {
+	
+	std::set<nidx_t > done;
+	return _traverse_forest(root, done,
+		 cb_enter ,
+		 cb_exit, 
+		 cb_revisit, 
+		 cb_ambig 
+		 );
+}
+
+
+template <typename CharT>
+template <typename cb_enter_t , 
+			typename cb_exit_t,
+		    typename cb_revisit_t,
+		    typename cb_ambig_t 
+		   >
+bool earley<CharT>::_traverse_forest( const nidx_t &root, std::set<nidx_t> &done,
+	cb_enter_t cb_enter , 
+	cb_exit_t cb_exit,
+	cb_revisit_t cb_revisit,
+	cb_ambig_t cb_ambig 
+	) { 
+
+	bool ret = true;
+	std::set<std::vector<nidx_t>> pack;
+	if(root.nt()) {
+		auto it = pfgraph.find(root);
+		if(it == pfgraph.end()) return false;
+		pack = it->second;
+	}
+	
+	cb_enter (root);
+	done.insert(root);
+
+	std::set<std::vector<nidx_t>>  choosen_pack = pack.size() > 1 ? cb_ambig(root, pack): pack; 
+	for( auto &nodes: choosen_pack)
+		for( auto &chd: nodes )
+			if(!done.count(chd)  || cb_revisit( chd ) ) 
+				ret &= _traverse_forest(chd, done, cb_enter
+				,cb_exit
+				,cb_revisit
+				,cb_ambig
+				);
+	
+	cb_exit(root, choosen_pack );
+	return ret;
+}
+
+
+template <typename CharT>
+typename earley<CharT>::ptree_t earley<CharT>::get_parsed_tree() {
+	nidx_t root(start, {0, inputstr.length()});
+	ptree_t pt;
+
+	auto cb_enter = [](const nidx_t&){};
+	auto cb_revisit =  [](const auto&){ return false; };
+	auto cb_exit =  [&pt](const nidx_t& root, const std::set<std::vector<nidx_t>>& choice_set  ){
+			DBG( assert(choice_set.size() <= 1));
+			if(root.nt())
+				pt.insert({root, choice_set});
+	};
+	auto cb_disambig_by_priority = [this](const nidx_t& root, 
+									const std::set<std::vector<nidx_t>>& ambset){
+		DBG(assert(root.nt()));
+		int_t cur = -1, pchoice = INT32_MIN , maxp = INT32_MIN, pref_choice = INT32_MIN;
+
+		for( auto & choice : ambset){
+			std::vector<lit> gprod;
+			gprod.push_back(root.l);
+			//get the production
+			for( auto & nd : choice)
+				gprod.emplace_back(nd.l);
+			
+			++cur;
+			// find the top priority if any
+			auto it = priority.find(gprod);
+			if( it != priority.end())
+				if(it->second >= maxp) {
+				 	maxp = it->second, pchoice = cur;
+				} 
+			// find the preference if any
+			if( prefer.count(gprod) ) 
+				pref_choice = cur;
+		}
+		if( pchoice == INT32_MIN && pref_choice == INT32_MIN) {
+			o::err() << std::endl<< " Could not resolve ambiguity, defaulting to first choice!"<<std::endl;
+			pchoice = 0;
+		}
+		std::set<std::vector<nidx_t>> choosen;
+		auto it = std::next(ambset.begin(), int_t(pchoice >= 0 ? pchoice : pref_choice));
+		choosen.insert(*it );
+		return choosen;
+	};
+
+	traverse_forest(root, cb_enter, cb_exit, cb_revisit, cb_disambig_by_priority );
+	return pt;
 }
 
 template <typename CharT>
-size_t earley<CharT>::_count_parsed_trees(const nidx_t &root, 
-					std::unordered_set<nidx_t, hasher_t> &done ) const{
+uintmax_t earley<CharT>::count_parsed_trees() {
+	nidx_t root(start, {0, inputstr.length()});
 	
-	if( !root.nt() ) return 1;
-	else if( pfgraph.find(root) == pfgraph.end() ) return 0;
-	auto &pack =  pfgraph.find(root)->second;
-	size_t count = pack.size();
-	done.insert(root);
-	for( const auto &nodes: pack)
-		for( const auto &chd: nodes)
-		if(chd.nt() && !done.count(chd)) 
-			count *= _count_parsed_trees(chd, done);
-	return count;
+	size_t count= 1;
+	
+	auto cb_enter = [](const auto&){};
+	auto cb_exit =  [](const auto&, const auto&){};
+	auto cb_keep_ambig = [&count](const nidx_t&, auto& ambset){
+						count *= ambset.size();
+						return ambset;
+					};
+	auto cb_revisit =  [](const auto&){ return false; }; // revisit
+									
+	traverse_forest( root, cb_enter ,
+		 cb_exit, 
+		 cb_revisit, 
+		 cb_keep_ambig 
+		 );
+				 
+	return count; 
 }
 
 
@@ -436,7 +586,7 @@ vector<typename earley<CharT>::arg_t> earley<CharT>::get_parse_graph_facts(){
 		args.insert(args.begin(), {rel, id });
 		rts.emplace_back(args);
 	};
-	visit_forest(rt_rel_output);
+	iterate_forest(rt_rel_output);
 	return rts;
 }
 
@@ -451,9 +601,10 @@ std::string earley<CharT>::to_tml_rule(const nidx_t nd) const {
 }
 
 template <typename CharT>
-bool earley<CharT>::to_tml_rule(ostream_t& ss) const{
+template <typename P>
+bool earley<CharT>::to_tml_rule(ostream_t& ss, P &&pt) const{
 	set<std::string> terminals;
-	for (auto &it: pfgraph ) {
+	for (auto &it: pt.size()? pt : pfgraph ) {
 		for (auto &pack : it.second) { 
 			ss << to_tml_rule(it.first) << ":-";
 			for (size_t i = 0; i < pack.size(); i++) {
@@ -492,7 +643,7 @@ std::string earley<CharT>::dot_safe(const std::string &s) const {
 }
 
 template <typename CharT>
-std::string earley<CharT>::grammar_text() {
+std::string earley<CharT>::grammar_text() const {
 	std::stringstream txt;
 	for (const auto &p : G) {
 		txt << "\n\\l";
@@ -509,7 +660,8 @@ std::string earley<CharT>::grammar_text() {
 }
 
 template <typename CharT>
-bool earley<CharT>::to_dot(ostream_t& ss) {
+template <typename P>
+bool earley<CharT>::to_dot(ostream_t& ss, P &&pt) const {
 	auto keyfun = [this] (const nidx_t & k){
 		std::stringstream l;
 		k.nt() ? l << to_stdstr(d.get(k.n()))
@@ -530,7 +682,7 @@ bool earley<CharT>::to_dot(ostream_t& ss) {
 
 	std::unordered_set<std::pair<size_t,size_t>, hasher_t> edgedone;
 	edgedone.clear();
-	for (auto &it: pfgraph) {
+	for (auto &it: pt.size() ? pt : pfgraph) {
 		auto key = keyfun(it.first);
 		ss << "\n" << key.first << "[label=\"" << key.second <<"\"];";
 		size_t p = 0;
@@ -615,6 +767,7 @@ bool earley<CharT>::forest( ){
 	// preprocess earley items for faster retrieval
 	emeasure_time_start(tspfo, tepfo);
 	int count = 0;
+	size_t tid = 0;
 	for (const item& i : S) { 
 		count++;
 			//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
@@ -622,7 +775,9 @@ bool earley<CharT>::forest( ){
 			sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i),
 			rsorted_citem[{G[i.prod][0].n(), i.set}].emplace_back(i);
 		else if(bin_lr) {
-			static size_t tid=0;
+			// Precreating temporaries to help in binarisation later
+			// each temporary represents a partial rhs production with
+			// atleast 3 symbols
 			if( i.dot >= 3 ){
 				std::vector<lit> v(G[i.prod].begin()+1, G[i.prod].begin()+i.dot);
 				lit tlit;
@@ -652,8 +807,7 @@ bool earley<CharT>::forest( ){
 		ret = build_forest(root);
 	emeasure_time_end(tsf, tef) <<" :: forest time "<<endl ;
 
-	o::inf() <<"# parse trees " << count_parsed_trees() <<endl;
-
+	o::pms() <<"# parse trees " << count_parsed_trees() <<endl;
 	// emit output in various formats
 	if (o::enabled("parser-to-dot")) {	
 		emeasure_time_start(tsf1, tef1);
@@ -757,6 +911,7 @@ bool earley<CharT>::build_forest ( const nidx_t &root ) {
 	std::set<std::vector<nidx_t>> ambset;
 	for(const item &cur: nxtset) {
 		if(cur.set != root.span.second) continue;
+		assert(root.n() == G[cur.prod][0].n() );
 		nidx_t cnode( G[cur.prod][0], {cur.from, cur.set} );
 		vector<nidx_t> nxtlits;
 		sbl_chd_forest(cur, nxtlits, cur.from, ambset );
@@ -825,7 +980,7 @@ typename earley<CharT>::string earley<CharT>::shorten(const string& s,
 {
 	if (s.size() > len) return s.substr(0, len) + suffix;
 	return s;
-};
+}
 
 template <typename CharT>
 typename earley<CharT>::string earley<CharT>::flatten(const nidx_t p) const {
@@ -875,7 +1030,7 @@ void earley<CharT>::down(const nidx_t& p, const actions& a) const {
 	auto it = a.find(label);
 	if (it != a.end()) it->second(p, get_children(p));
 	else if (auto_passthrough) down(get_children(p), a);
-};
+}
 
 template <typename CharT>
 void earley<CharT>::topdown(const string& start, const actions& a) const {
@@ -883,12 +1038,19 @@ void earley<CharT>::topdown(const string& start, const actions& a) const {
  	for ( ; it != pfgraph.end() &&
  		!(it->first.nt() && d.get(it->first.n()) == start); ++it) ;
 	if (it != pfgraph.end()) down(it->first, a);
-};
+}
 
 template <>
 std::basic_string<char> earley<char>::epsilon()         const { return  "ε"; }
 template <>
 std::basic_string<char32_t> earley<char32_t>::epsilon() const { return U"ε"; }
+
+template bool earley<char>::to_tml_facts(ostream_t& os, ptree_t&& p) const;
+template bool earley<char32_t>::to_tml_facts(ostream_t& os, ptree_t&& p) const;
+template bool earley<char>::to_tml_rule(ostream_t& os, ptree_t&& p) const;
+template bool earley<char32_t>::to_tml_rule(ostream_t& os, ptree_t&& p) const;
+template bool earley<char>::to_dot(ostream_t& os, ptree_t&& p) const;
+template bool earley<char32_t>::to_dot(ostream_t& os, ptree_t&& p) const;
 
 template class earley<char>;
 template class earley<char32_t>;
