@@ -480,12 +480,21 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		parser.down(ncs, a);
 		ctx.p.c.push_back(ctx.rt);
 	});
-	a.emplace(U"constraint_builtin_name", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"constraint_builtin_name", [&parser, &ctx, this](
+		ni_t ni, ncs_t)
+	{
 		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme(to_string_t(
 			parser.flatten(ni))));
 	});
 	a.emplace(U"constraint_arg", [&parser, &ctx, &to_elem](ni_t ni, ncs_t) {
 		ctx.rt.e.push_back(to_elem(U"number", parser.flatten(ni)));
+	});
+	a.emplace(U"pref", [&ctx, this](ni_t, ncs_t) {
+		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme("_pref"));
+	});
+	a.emplace(U"priority", [&parser, &ctx, &to_int, this](ni_t ni, ncs_t) {
+		ctx.rt.e.emplace_back(to_int(to_string(to_string_t(
+			parser.flatten(ni)))));
 	});
 	a.emplace(U"arith_op", [&parser, &ctx](ni_t ni, ncs_t) {
 		elem e;

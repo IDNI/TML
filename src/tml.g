@@ -190,11 +190,15 @@ nonterminal     => relname.
 constraints     => ws ',' ws constraint constraints | null.
 
 constraint      => constraint_elem ws arith_op ws constraint_elem |
-			constraint_elem ws arith_aux_op ws constraint_elem ws arith_op ws constraint_elem.
+			constraint_elem ws arith_aux_op ws constraint_elem ws
+			arith_op ws constraint_elem | preference.
 constraint_elem => elem | constraint_builtin.
 constraint_builtin => constraint_builtin_name ws '(' ws constraint_arg ws ')'.
 constraint_arg  => integer.
 constraint_builtin_name => "len" | "substr".
+preference      => pref | priority.
+pref            => "_pref".
+priority        => integer.
 
 # directive statement
 directive       => string_drctv | stdout_drctv | trace_drctv | internal_drctv |

@@ -331,12 +331,11 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_prog &rp) {
 		for (const string &dn : dir_names) os << dn << ", ";
 		os << "});\n";
 	}
-	// Insert the directives we have constructed into the final program
-	if (prog_names.size()) {
-		os << name << ".nps.insert(" << name << ".nps.end(), { ";
-		for (const string &np : prog_names) os << np << ", ";
-		os << "});\n";
-	}	
+	// Insert the nested progs we have constructed into the final program
+	if (prog_names.size())
+		for (const string &np : prog_names) os <<
+			name << ".nps.emplace_back(" << dict_name << ");\n" <<
+			name << ".nps.back().merge(" << np << ");\n";
 	return os;
 }
 
