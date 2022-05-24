@@ -1,0 +1,85 @@
+# Examples from Information Integration Using Logical Views
+# http://www.dit.unitn.it/~accord/RelatedWork/GAV&LAV/Information%20Integration%20using%20local%20views.pdf
+
+# Example 3: (1) <= (2)
+
+u(?x ?z) :- a(?x ?y), a(?y ?z).
+u(?x ?z) :- a(?x ?u), a(?v ?z).
+
+# Example 4: (1) <= (2)
+
+p(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+p(?a ?c) :- a(?a ?b), a(?b ?c), ~a(?a ?d).
+
+j(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+j(?a ?c) :- a(?a ?b), a(?b ?c), ~a(?c ?c).
+
+# Examples from Containment of Conjunctive Queries with Safe Negation
+# http://www2.informatik.uni-freiburg.de/~dbis/Publications/03/icdt03.pdf
+
+# Example 1: (1) <= (2)
+
+q(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+q(?a ?c) :- a(?a ?b), a(?b ?c), a(?b ?d), ~a(?a ?d).
+
+# Example 2:
+
+r(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+r(?a ?c) :- a(?a ?b), a(?b ?c), ~b(?c ?c).
+
+# Example 3: (1) <= (2)
+
+s(?a ?c) :- a(?a ?b), a(?b ?c), a(?b ?d).
+s(?x ?z) :- a(?x ?y), a(?y ?z).
+
+# Example 4: (1) <= (2)
+
+h() :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+h() :- a(?a ?b), a(?c ?d), ~a(?b ?c).
+
+# Example 5:
+
+t() :- a(?x ?y), a(?y ?z), ~a(?x ?z).
+t() :- a(?a ?b), a(?c ?d), ~a(?a ?d), ~a(?b ?c).
+
+# http://sparql-qc-bench.inrialpes.fr/UCQProj.html
+
+/*PREFIX : 
+
+SELECT ?x WHERE { 
+   ?x :takesCourse "Course10" . ?x :takesCourse "Course20" . 
+}*/
+
+Q11(?x) :- takesCourse(?x Course10), takesCourse(?x Course20).
+
+/*PREFIX : 
+
+SELECT ?x WHERE { 
+   ?x :takesCourse "Course10" .
+}*/
+
+Q11(?x) :- takesCourse(?x Course10).
+
+/*PREFIX : 
+
+SELECT ?x ?y WHERE {
+	?x a :Professor .
+	?x :graduatedFrom ?y .
+	?x :memeberOf ?y 
+}*/
+
+Q13(?x ?y) :-
+  Professor(?x),
+  graduatedFrom(?x ?y),
+  memberOf(?x ?y).
+
+/*PREFIX : 
+
+SELECT ?x ?y WHERE {
+	?x a :Professor .
+	?x :memeberOf ?y 
+}*/
+
+Q13(?x ?y) :-
+  Professor(?x),
+  memberOf(?x ?y).

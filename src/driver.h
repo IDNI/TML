@@ -15,6 +15,7 @@
 #include <map>
 #include <cmath>
 #include <variant>
+#include <vector>
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
@@ -28,6 +29,7 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
+#include "transform_opt.h"
 
 
 typedef std::map<elem, elem> var_subs;
@@ -110,6 +112,7 @@ elem rename_variables(const elem &e, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
 void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
+raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d);
 // TODO remove aboove function for the former given reason
 
 class driver {
@@ -169,6 +172,9 @@ class driver {
 	void recursive_transform(raw_prog &rp
 	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
+	// TODO dupllicate and customize squaring functions
+	void o3_square_root_program(raw_prog &rp);
+	void o3_square_program(raw_prog &rp);
 	void square_root_program(raw_prog &rp);
 	void square_program(raw_prog &rp);
 	// TODO create one entry point for optimization 
@@ -176,6 +182,14 @@ class driver {
 		dict_t &d);
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
+	bool o2_cqc(const raw_rule &rr1, const raw_rule &rr2);
+	bool o2_cqnc(const raw_rule &rr1, const raw_rule &rr2);
+
+	std::vector<mutation> brancher_subsume_queries_cqc(mutated_prog &mp);
+	std::vector<mutation> brancher_subsume_queries_cqnc(mutated_prog &mp);
+	std::vector<mutation> brancher_split_heads(mutated_prog &mp);
+	std::vector<mutation> brancher_split_bodys(mutated_prog &mp);
+
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
@@ -213,9 +227,13 @@ class driver {
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
 	// TODO create one entry point to optimization 
+	void o1_transform_bin(raw_prog& p);
+	void o2_subsume_queries_cqc(raw_prog &rp);
+	void o2_subsume_queries_cqnc(raw_prog &rp);
 	void subsume_queries_cqc(raw_prog &rp);
 	void subsume_queries_cqnc(raw_prog &rp);
 	void subsume_queries_z3(raw_prog &rp);
+
 	// TODO and remove the previous ones
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);

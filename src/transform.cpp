@@ -20,7 +20,7 @@ using namespace std;
 void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
 	for (elem& e : t.e)
 		if (e.type == elem::VAR && m.find(e) == m.end())
-			m.emplace(e, get_var_elem(v++));
+			m.emplace(e, elem(elem::VAR, e.e));
 	for (elem& e : t.e) if (e.type == elem::VAR) e = m[e];
 }
 

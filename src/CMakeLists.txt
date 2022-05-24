@@ -31,6 +31,8 @@ set(TML_HEADERS
 	output.h
 	tables.h
 	ir_builder.h
+	iterators.h
+	transform_opt.h
 )
 
 set(TML_SOURCES
@@ -53,6 +55,7 @@ set(TML_SOURCES
 	transform_guards.cpp
 	transform_opt.cpp
 	utils.cpp
+	iterators.cpp
 	ir_builder.cpp
 )
 

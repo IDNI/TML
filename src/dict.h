@@ -34,7 +34,7 @@ public:
 	int_t get_rel(const lexeme& l);
 	int_t get_bltin(const lexeme& l);
 	const lexeme& get_sym_lexeme(int_t t) const  { return syms[t]; } ;
-	const lexeme& get_var_lexeme(int_t r) const { return vars[-r-1]; };
+	const lexeme& get_var_lexeme(int_t r) const { return vars[r+1]; };
 	const lexeme& get_rel_lexeme(int_t t) const { return rels[t]; }
 	const lexeme& get_bltin_lexeme(int_t t) const { return bltins[t]; }
 	size_t nsyms() const { return syms.size(); }
