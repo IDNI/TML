@@ -24,7 +24,7 @@
  * applied to the given (mutated) program. This is a cheap implementation of
  * the command pattern.
  */
-using mutation = std::function<bool(class mutated_prog&)>;
+typedef std::function<bool(class mutated_prog&)> mutation;
 
 /*!
  * Represents a mutated program, i.e. the original program, the additions and 
@@ -84,4 +84,5 @@ private:
 	cost_function cost;
 	std::map<float, mutated_prog> bests; 
 };
+
 #endif // __TRANSFORM_OPT_H__

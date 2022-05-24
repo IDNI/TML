@@ -14,6 +14,7 @@
 #include <numeric>
 
 #include "input.h"
+#include "transform_opt.h"
 #include "iterators.h"
 
 using namespace std;
@@ -37,13 +38,16 @@ grey_code_const_iterator::grey_code_const_iterator(): size_(0), delta_(0) {
 }
 
 grey_code_const_iterator& grey_code_const_iterator::operator++() {
-	compute_next_delta_();
-	return *this;
+	if (compute_next_delta_()) return *this;
+	grey_code_const_iterator end;
+	return end;
 }
 
 grey_code_const_iterator grey_code_const_iterator::operator++(int) {
 	grey_code_const_iterator previous(*this);
-	compute_next_delta_();
+	if (!compute_next_delta_()) {
+		size = 0;
+	}
 	return previous;
 }
 
