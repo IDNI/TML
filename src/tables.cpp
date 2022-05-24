@@ -704,17 +704,24 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	if (add.empty()) x = t % bdd_or_many(move(del));
 	else if (del.empty()) add.push_back(t), x = bdd_or_many(move(add));
 	else {
+		// check for any intersection between add and del
+		sort(add.begin(), add.end(), handle_cmp);
+		sort(del.begin(), del.end(), handle_cmp);
+		auto ita = add.begin(), itd = del.begin();
+		while (ita != add.end() && itd != del.end())
+			if (handle_cmp(*ita, *itd)) ita++;
+			else if (!handle_cmp(*itd, *ita)) // contradiction
+				return (add.clear(), del.clear()), unsat = true;
+			else itd++;
 		spbdd_handle a = bdd_or_many(move(add)),
-				 d = bdd_or_many(move(del)), s = a % d;
-//		DBG(assert(bdd_nvars(a) < len*bits);)
-//		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == hfalse) return unsat = true;
+			d = bdd_or_many(move(del));
+		//DBG(assert(bdd_nvars(a) < len*bits);)
+		//DBG(assert(bdd_nvars(d) < len*bits);)
 		x = (t || a) % d;
 	}
-//	DBG(assert(bdd_nvars(x) < len*bits);)
+	//DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
-
 
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
