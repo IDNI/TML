@@ -27,7 +27,6 @@
 extern bool onexit_;
 
 class bdd;
-class poset;
 typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef const spbdd_handle& cr_spbdd_handle;
 typedef std::vector<int_t> bdds;
@@ -63,10 +62,6 @@ template<> struct std::hash<ite_memo>{size_t operator()(const ite_memo&)const;};
 template<> struct std::hash<std::array<int_t, 2>>{
 	size_t operator()(const std::array<int_t, 2>&) const;
 };
-template<> struct std::hash<std::pair<int_t,int_t>>{
-	size_t operator()(const std::pair<int_t,int_t>&) const;
-};
-template<> struct std::hash<poset> {size_t operator()(const poset&)const;};
 template<typename X, typename Y> struct std::hash<std::set<X,Y>> {
 	size_t operator()(const std::set<X,Y>&) const;
 };
@@ -112,8 +107,8 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
-extern std::vector<poset> CV;
-extern std::vector<poset> neg_CV;
+//extern std::vector<poset> CV;
+//extern std::vector<poset> neg_CV;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;
@@ -167,71 +162,6 @@ spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits,
 		size_t n_vars);
 spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
-
-// representation for 2-CNFs
-struct poset {
-	std::vector<std::pair<int_t,int_t>> imp_var;
-	// true_var is sorted by absolute value of variables
-	std::vector<int_t> true_var;
-	union_find eq_var;
-	bool is_pure = false;
-	uint_t hash=0;
-public:
-	poset() = default;
-	poset(int_t var, bool b) {
-		b ? true_var.emplace_back(var) : true_var.emplace_back(-var);
-		is_pure = true;
-		calc_hash();
-	}
-
-	bool operator==(const poset& p) const;
-	void calc_hash();
-	friend std::hash<poset>;
-
-	poset eval (int_t v);
-	static poset merge(int_t var, poset& hi, poset& lo);
-	static void lift_implications(poset& hi, poset& lo, poset& res);
-	static void lift_singletons(int_t var, poset& hi,  poset& lo, poset& res,
-				    std::vector<std::pair<int_t,int_t>>& eq_lift_hi,
-				    std::vector<std::pair<int_t,int_t>>& eq_lift_lo);
-	static void lift_eq_from_sing(poset& res,
-				      std::vector<std::pair<int_t,int_t>>& eq_lift_hi,
-				      std::vector<std::pair<int_t,int_t>>& eq_lift_lo);
-	static poset extend_sing (const poset& c, int_t var, bool b);
-	inline void insert_true_var(int_t v) {
-		if(hasbc(true_var, v, abs_cmp)) return;
-		true_var.emplace_back(v);
-		sortc(true_var, abs_cmp());
-	}
-	inline void insert_implication (int_t x, int_t y) {
-		std::pair<int_t,int_t> p = {x,y};
-		if(hasbc(imp_var, p, vec_abs_cmp())) return;
-		imp_var.emplace_back((move(p)));
-		sortc(imp_var, vec_abs_cmp());
-	}
-	inline void insert_implication (std::pair<int_t,int_t>& p) {
-		if(hasbc(imp_var, p, vec_abs_cmp())) return;
-		imp_var.emplace_back(p);
-		sortc(imp_var, vec_abs_cmp());
-	}
-	inline bool is_singleton () const{
-		return imp_var.empty() && eq_var.empty() && !true_var.empty();
-	}
-	inline bool is_empty() const {
-		return imp_var.empty() && eq_var.empty() && true_var.empty();
-	}
-	inline bool pure() const { return is_pure; }
-	inline bool is_false() const {return is_empty() && !is_pure;}
-	inline bool is_true() const {return is_empty() && is_pure;}
-	inline void set_pure() { is_pure = true; }
-	int_t get_high_var () const;
-	inline static poset& get (int_t c) {
-		return c > 0 ? CV[c] : neg_CV[-c];
-	}
-	inline static poset& get_neg (int_t c) {
-		return c > 0 ? neg_CV[c] : CV[-c];
-	}
-};
 
 class bdd {
 	friend class archive;

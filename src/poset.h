@@ -12,6 +12,9 @@ struct PersistentSet;
 struct PersistentPairs;
 class poset;
 
+extern std::vector<poset> P;
+extern std::vector<poset> NP;
+
 template<> struct std::hash<PersistentUnionFind> {size_t operator()(const PersistentUnionFind&)const;};
 template<> struct std::hash<PersistentSet> {size_t operator()(const PersistentSet&)const;};
 template<> struct std::hash<PersistentPairs> {size_t operator()(const PersistentPairs&) const;};
@@ -84,8 +87,9 @@ class PersistentUnionFind {
 
   static void init(int_t n);
   static int_t find(const puf &t, int_t elem);
+  static int_t find(int_t t, int_t elem);
   static int_t merge (int_t t, int_t x, int_t y);
-  static int_t int_tersect (int_t t1, int_t t2);
+  static int_t intersect (int_t t1, int_t t2);
   static bool equal (int_t t, int_t x, int_t y);
   static std::vector<int_t> get_equal (int_t t, int_t x);
   static int_t rm_equal (int_t t, int_t x);
@@ -99,13 +103,11 @@ class PersistentUnionFind {
     return ((x_hash == 0 ? x*x : x_hash) + (y_hash == 0 ? y*y : y_hash));
   }
   template <typename T>
-  static std::basic_ostream<T> print_t(int_t uf, std::basic_ostream<T>& os);
+  static std::basic_ostream<T> print(int_t uf, std::basic_ostream<T>& os);
 };
 
 // The representative of a set of ints is its highest element
 struct PersistentSet {
-  using setuniv = std::vector<PersistentSet>&;
-  using setmemo = std::unordered_map<PersistentSet,int_t>&;
   // Element in set
   // If e is 0 we are dealing with the empty set
   int_t e;
@@ -115,22 +117,21 @@ struct PersistentSet {
   PersistentSet() = delete;
   PersistentSet(int_t e_, int_t n_) : e(e_), n(n_) {}
   bool operator==(const PersistentSet&)const;
-  static int_t add (setuniv u, setmemo m, int_t e, int_t n);
-  static void init (setuniv u, setmemo m);
+  static int_t add (int_t e, int_t n);
+  static void init ();
   // The insertion will return 0, if the insertion causes a contradiction
-  static int_t insert (setuniv u, setmemo m, int_t set_id, int_t elem);
-  static int_t remove (setuniv u, setmemo m, int_t set_id, int_t elem);
+  static int_t insert (int_t set_id, int_t elem);
+  static int_t remove (int_t set_id, int_t elem);
   static bool empty (int_t set_id);
-  static bool contains (setuniv u, int_t set_id, int_t elem);
-  static int_t find (setuniv u, int_t set_id, int_t elem);
-  static int_t next(setuniv u, int_t set_id);
-  static void print_t (setuniv u, int_t set_id);
+  static bool contains (int_t set_id, int_t elem);
+  static int_t find (int_t set_id, int_t elem);
+  static int_t next(int_t set_id);
+  static PersistentSet get (int_t set_id);
+  static void print(int_t set_id);
 };
 
 // The representative of a set of pairs is its highest element
 struct PersistentPairs {
-  using pairuniv = std::vector<PersistentPairs>&;
-  using pairmemo = std::unordered_map<PersistentPairs,int_t>&;
   // Element in set
   // If e is 0 we are dealing with the empty set
   std::pair<int_t,int_t> e;
@@ -141,15 +142,17 @@ struct PersistentPairs {
   PersistentPairs(std::pair<int_t,int_t> &&e_, int_t n_) : e(e_), n(n_) {}
   bool operator==(const PersistentPairs&)const;
   static std::pair<int_t,int_t> form (std::pair<int_t,int_t>&);
-  static int_t add (pairuniv u, pairmemo m, std::pair<int_t,int_t> &e, int_t n);
-  static void init (pairuniv u, pairmemo m);
-  static int_t insert (pairuniv u, pairmemo m, int_t set_id, std::pair<int_t,int_t> &elem);
-  static int_t remove (pairuniv u, pairmemo m, int_t set_id, std::pair<int_t,int_t> &elem);
+  static int_t add (std::pair<int_t,int_t> &e, int_t n);
+  static void init ();
+  static int_t insert (int_t set_id, std::pair<int_t,int_t> &elem);
+  static int_t insert (int_t set_id, int_t fst, int_t snd);
+  static int_t remove (int_t set_id, std::pair<int_t,int_t> &elem);
   static bool empty (int_t set_id);
-  static bool contains (pairuniv u, int_t set_id, std::pair<int_t,int_t> &elem);
-  static std::vector<int_t> implies (pairuniv u, int_t set_id, int_t elem);
-  static int_t next(pairuniv u, int_t set_id);
-  static void print_t (pairuniv u, int_t set_id);
+  static bool contains (int_t set_id, std::pair<int_t,int_t> &elem);
+  static std::vector<int_t> implies (int_t set_id, int_t elem);
+  static int_t next(int_t set_id);
+  static PersistentPairs get (int_t set_id);
+  static void print(int_t set_id);
 };
 
 /*
@@ -159,31 +162,36 @@ struct PersistentPairs {
  * single variables being True or False.
  */
 class poset {
+  using pu = PersistentUnionFind;
+  using pp = PersistentPairs;
+  using ps = PersistentSet;
   // Equal variables, represented by a pointer to the uf_univ
-  int_t eqs;
+  int_t eqs=0;
   // Implications, represented by a pointer to the pair_univ
-  int_t imps;
+  int_t imps=0;
   // Singletons, represented by a pointer to the set_univ
-  int_t vars;
+  int_t vars=0;
   // Internal memory structures for lifting equalities from single variables
   static std::vector<std::pair<int_t,int_t>> eq_lift_hi;
   static std::vector<std::pair<int_t,int_t>> eq_lift_lo;
 
   static void lift_imps (poset& p,poset& hi, poset& lo);
   static void lift_vars (poset& p, int_t v, poset& hi, poset& lo);
-  static void lift_eqs (poset& p, poset& hi, poset& lo);
+  static void lift_eqs (poset& p, int_t v, poset& hi, poset& lo);
  public:
   // Indicates if the poset has an associated BDD part
-  bool pure;
+  bool pure=false;
   // Indicates if the poset contains a higher up variable then the associated BDD
-  int_t highest;
+  int_t highest=0;
 
   friend std::hash<poset>;
   bool operator==(const poset& p) const;
   static poset lift (int_t v, poset& hi, poset& lo);
-  static poset eval (int_t v, poset& p);
+  //static poset eval (int_t v, poset& p);
   static bool insert_var (poset& p, int_t v, bool val);
-  static bool insert_imp (std::pair<int_t, int_t>& p);
+  static void insert_imp (poset& p, std::pair<int_t, int_t>& el);
+  static void insert_imp (poset& p, int_t fst, int_t snd);
+  static void insert_eq (poset& p, int_t v1, int_t v2);
   static poset get (int_t pos, bool negated);
   inline static bool is_empty (poset& p) {return p.eqs + p.imps + p.vars == 0;}
   inline static bool only_vars (poset& p) {return p.eqs + p.imps == 0 && p.vars > 0;}
