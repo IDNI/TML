@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include <map>
 #include <set>
+#include <vector>
 #include <string>
 #include <cstring>
 #include <sstream>
@@ -33,6 +35,8 @@
 
 using namespace std;
 
+// starting node of the mutated progs log
+mutated_prog::mutated_prog(){}
 
 // starting node of the mutated progs log
 mutated_prog::mutated_prog(raw_prog *p) : current(p) {}
@@ -40,11 +44,11 @@ mutated_prog::mutated_prog(raw_prog *p) : current(p) {}
 // link to previous mutated prog
 mutated_prog::mutated_prog(mutated_prog *m) : previous(m) {}
 
-mutated_prog::mutated_prog(const mutated_prog &that) {
-	this->current = that.current;
-	this->previous = that.previous;
-	this->deletions = that.deletions;
-}
+//mutated_prog::mutated_prog(const mutated_prog &that) {
+//	this->current = that.current;
+//	this->previous = that.previous;
+//	this->deletions = that.deletions;
+//}
 
 void mutated_prog::operator()(mutation& m) {
 	// apply the mutation to the current mutated_prog
@@ -66,8 +70,8 @@ vector<raw_rule>  mutated_prog::get_rules() {
 		all.insert(all.end(), v.begin(), v.end());
 	}
 	// remove current deletions
-	for (auto &r: deletions) {
-		auto i = find(deletions.begin(), deletions.end(), &r);
+	for (auto r: deletions) {
+		auto i = find(deletions.begin(), deletions.end(), r);
 		if (i != deletions.end()) deletions.erase(i);
 	}
 	// add current rules
@@ -107,16 +111,32 @@ raw_prog best_solution::solution() {
 /*!
  * Optimize a mutated program
  */
-void optimize(mutated_prog& mutated, bounder& bounder, set<brancher>& branchers) {
+vector<mutation> get_optimizations(mutated_prog& mutated, vector<brancher>& branchers) {
 	// we collect all possible changes to the current mutated program
-	vector<mutation> mutations;
+	vector<mutation> optimizations;
 	for(brancher brancher: branchers) {
 		auto proposed = brancher(mutated);
-		mutations.insert(mutations.end(), proposed.begin(), proposed.end());
+		optimizations.insert(optimizations.end(), proposed.begin(), proposed.end());
 	}
+	return optimizations;
+}
+
+void optimize(mutated_prog& mutated, vector<brancher>& branchers) {
+	// we collect all possible changes to the current mutated program
+	vector<mutation> optimizations = get_optimizations(mutated, branchers);
 	// for each subset of optimizations, compute the new mutated program,
 	// bound the current mutation and try to optimize again if needed
-	powerset_range subsets(mutations);
+	for (auto it = optimizations.begin(); it != optimizations.end(); ++it) {
+		(*it)(mutated);
+	}
+}
+
+void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
+	// we collect all possible changes to the current mutated program
+	vector<mutation> optimizations = get_optimizations(mutated, branchers);
+	// for each subset of optimizations, compute the new mutated program,
+	// bound the current mutation and try to optimize again if needed
+	powerset_range subsets(optimizations);
 	for (auto it = subsets.begin(); it != subsets.end(); ++it) {
 		mutated_prog new_mutated(mutated);
 		for (auto mt = (*it).begin(); mt != (*it).end(); ++mt) (*mt)(new_mutated);
@@ -129,7 +149,18 @@ void optimize(mutated_prog& mutated, bounder& bounder, set<brancher>& branchers)
 /*!
  * Optimize a raw program
  */
-raw_prog optimize(raw_prog& program, bounder& bounder, set<brancher>& branchers) {
+raw_prog optimize(raw_prog &program, optimization_plan &plan) {
+	// the first mutated program just contain the original program as additions.
+	mutated_prog mutated {&program};
+	optimize(mutated, plan.begin); 
+	plan.bounder.bound(mutated);
+	optimize(mutated, plan.bounder, plan.loop);
+	optimize(mutated, plan.end);
+	plan.bounder.bound(mutated);
+	return plan.bounder.solution();
+}
+
+raw_prog optimize(raw_prog& program, bounder& bounder, vector<brancher>& branchers) {
 	// the first mutated program just contain the original program as additions.
 	mutated_prog mutated {&program};
 	optimize(mutated, bounder, branchers);

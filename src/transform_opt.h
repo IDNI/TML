@@ -31,7 +31,8 @@ typedef std::function<bool(class mutated_prog&)> mutation;
  * substractions.
  */
 struct mutated_prog  {
-
+	// empty
+	mutated_prog();
 	// starting node of the mutated progs log
 	mutated_prog(raw_prog *p);
 	// link to previous mutated prog
@@ -85,4 +86,14 @@ private:
 	std::map<float, mutated_prog> bests; 
 };
 
+/*!
+ * Optimization plan accordignly to command line options
+ */
+struct optimization_plan {
+	std::vector<brancher> begin;
+	std::vector<brancher> loop;
+	std::vector<brancher> end;
+
+	bounder& bounder;
+}
 #endif // __TRANSFORM_OPT_H__

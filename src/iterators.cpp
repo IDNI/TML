@@ -12,6 +12,7 @@
 // modified over time by the Author.
 
 #include <numeric>
+#include <ranges>
 
 #include "input.h"
 #include "transform_opt.h"
