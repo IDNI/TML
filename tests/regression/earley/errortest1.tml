@@ -1,0 +1,17 @@
+#@string str "2+2/2".
+@string str "1+++1".
+#@string str "1+1/1".
+#@string str "3+3+3".
+
+
+
+#start => start IO start | PO start | '3' .
+#IO => '+' | '-' | '*'.
+#PO => '-'.
+
+#start => start '+' start | start '/' start | '1'.
+start => '+' start | start '+' start | start '+' | '1' .
+#start => start '+' start | '2'.
+
+#!start(0 5).
+!node(?x "start" 0 5).

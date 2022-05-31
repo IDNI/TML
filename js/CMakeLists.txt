@@ -13,19 +13,21 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(tml-common)
 
 set(JSLIB_SOURCES
-	../src/analysis.cpp
-	../src/analysis.h
 	../src/bdd.cpp
 	../src/bdd.h
 	../src/bdd_ext.cpp
 	../src/builtins.cpp
 	../src/builtins.h
 	../src/char_defs.h
+	../src/cpp_gen.cpp
+	../src/cpp_gen.h
 	../src/defs.h
 	../src/dict.cpp
 	../src/dict.h
 	../src/driver.cpp
 	../src/driver.h
+	../src/earley.cpp
+	../src/earley.h
 	../src/err.h
 	../src/form.cpp
 	../src/form.h
@@ -45,13 +47,17 @@ set(JSLIB_SOURCES
 	../src/tables_builtins.cpp
 	../src/tables_ext.cpp
 	../src/term.h
+	../src/tml_earley.cpp
 	../src/transform.cpp
+	../src/transform_bitunv.cpp
 	../src/transform_guards.cpp
+	../src/typemanager.cpp
+	../src/typemanager.h
 	../src/utils.cpp
 )
 
 set(JSLIB_COMPILE_OPTIONS
-	"$<$<CONFIG:DEBUG>:-O0;-DDEBUG;-g4;-fno-exceptions>"
+	"$<$<CONFIG:DEBUG>:-O0;-DDEBUG;-gsource-map;-fno-exceptions>"
 	"$<$<CONFIG:RELEASE>:-O3;-DNDEBUG;-g0;-fno-exceptions>"
 )
 set(JSLIB_LINK_OPTIONS "--bind --no-entry")
@@ -65,7 +71,7 @@ string(APPEND JSLIB_LINK_OPTIONS " -s EXIT_RUNTIME=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s ERROR_ON_UNDEFINED_SYMBOLS=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_THROWING=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_CATCHING=1")
-string(APPEND JSLIB_LINK_OPTIONS " -s 'EXTRA_EXPORTED_RUNTIME_METHODS=[\"lengthBytesUTF8\",\"stringToUTF8\"]'")
+string(APPEND JSLIB_LINK_OPTIONS " -s 'EXPORTED_RUNTIME_METHODS=[\"lengthBytesUTF8\",\"stringToUTF8\"]'")
 string(APPEND JSLIB_LINK_OPTIONS " -s ASSERTIONS=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s FETCH=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s WARN_UNALIGNED=1")

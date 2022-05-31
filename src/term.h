@@ -13,16 +13,17 @@
 #ifndef __TERM__
 #define __TERM__
 
+#include <compare>
 #include "defs.h"
 
 struct term : public ints {
 	bool neg = false, goal = false;
-	//XXX: ARITH is also a formula, likely should be handled
-	//     along logic formulas FORM1, FORM2:SO[HORN], SO[KROM]
+	//ARITH is also a formula, likely should be handled
+	//along logic formulas FORM1, FORM2:SO[HORN], SO[KROM]
 
 	//FIXME: warning, there is direct assignment between these two enums in from_raw_term
 	// enum rtextype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT }
-	enum textype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1 /*QBF1*/, FORM2} extype = term::REL;
+	enum textype { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2} extype = term::REL;
 
 	t_arith_op arith_op = NOP;
 	spform_handle qbf;
@@ -31,12 +32,12 @@ struct term : public ints {
 	ntable tab = -1;
 	size_t orderid = 0;
 
-	// D: TODO: builtins are very different, handle as a same size union struct?
-	int_t idbltin = -1; // size_t bltinsize;
+	int_t idbltin = -1;
 	bool forget = false, renew = false;
 
 	term() {}
 
+	term(int_t s) {resize(s);};
 	term(bool neg, textype extype, t_arith_op arith_op, ntable tab, const ints& args, size_t orderid)
 		: ints(args), neg(neg),extype(extype), arith_op(arith_op), tab(tab), orderid(orderid) {}
 
@@ -60,6 +61,11 @@ struct term : public ints {
 		if (forget != t.forget) return forget;
 		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
+	}
+	std::weak_ordering operator<=>(const term& t) const {
+		return *this < t ? std::weak_ordering::less :
+			t < *this ? std::weak_ordering::greater :
+				std::weak_ordering::equivalent;
 	}
 	bool operator==(const term& t) const {
 		return neg == t.neg && extype == t.extype && tab == t.tab &&

@@ -138,6 +138,11 @@ template<> struct std::hash<std::array<bdd_ref, 2>>{
 const bdd_ref T = BDD_REF(1, 0, false, false), F = BDD_REF(1, 0, false, true);
 
 spbdd_handle from_bit(bdd_shft b, bool v);
+
+spbdd_handle from_high(bdd_shft s, bdd_ref x);
+spbdd_handle from_low(bdd_shft s, bdd_ref y);
+spbdd_handle from_high_and_low(bdd_shft s, bdd_ref x, bdd_ref y);
+
 bool leaf(cr_spbdd_handle h);
 bool trueleaf(cr_spbdd_handle h);
 template <typename T>
@@ -273,6 +278,11 @@ class bdd {
 	friend std::array<spbdd_handle, 2> solve(spbdd_handle x, bdd_shft v);
 	friend vbools allsat(cr_spbdd_handle x, bdd_shft nvars);
 	friend spbdd_handle from_bit(bdd_shft b, bool v);
+
+	friend spbdd_handle from_high(bdd_shft s, bdd_ref x);
+	friend spbdd_handle from_low(bdd_shft s, bdd_ref y);
+	friend spbdd_handle from_high_and_low(bdd_shft s, bdd_ref x, bdd_ref y);
+	
 	friend bdd_shft bdd_nvars(spbdd_handle x);
 	friend bool leaf(cr_spbdd_handle h);
 	friend bool trueleaf(cr_spbdd_handle h);

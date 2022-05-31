@@ -1,0 +1,30 @@
+node(0 "S" 0 1).
+edge(0 1).
+node(1).
+node(0 "S" 0 1).
+edge(1 0).
+node(3 "S" 1 1).
+edge(1 3).
+node(3 "S" 1 1).
+edge(1 3).
+node(3 "S" 1 1).
+edge(1 3).
+edge(0 2).
+node(2).
+node(6 "b" 0 1).
+edge(2 6).
+node(3 "S" 1 1).
+edge(3 4).
+node(4).
+node(3 "S" 1 1).
+edge(4 3).
+node(3 "S" 1 1).
+edge(4 3).
+node(3 "S" 1 1).
+edge(4 3).
+node(3 "S" 1 1).
+edge(4 3).
+edge(3 5).
+node(5).
+node(7 ε 1 1).
+edge(5 7).

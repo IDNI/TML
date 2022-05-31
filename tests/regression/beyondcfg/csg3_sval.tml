@@ -3,6 +3,6 @@ A => 'a' A 'b' | "ab" .
 B => A.
 C => 'c' C.
 C => 'c'.
-S => A B C.
-				
-!S(0 10).
+start => A B C.
+
+!node(?x start 0 10).

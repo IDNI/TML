@@ -2,4 +2,4 @@
 A => 'a'A | 'a' .
 C => 'c'C | 'c' .
 B => 'b'B | 'b' .
-S => A B C ,  len(1) = len(2), len(3) = len(1).
+start => A B C ,  len(1) = len(2), len(3) = len(1).

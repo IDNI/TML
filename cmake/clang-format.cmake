@@ -1,4 +1,4 @@
-find_program(CLANG_FORMAT NAMES clang-format-9 clang-format)
+find_program(CLANG_FORMAT NAMES clang-format)
 if (CLANG_FORMAT)
     message(STATUS "Found clang-format")
     configure_file("${PROJECT_SOURCE_DIR}/clang-format.sh.in"

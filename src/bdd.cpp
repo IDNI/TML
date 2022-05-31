@@ -889,6 +889,18 @@ spbdd_handle bdd_or_many(bdd_handles v) {
 	return bdd_handle::get(FLIP_INV_OUT(bdd::bdd_and_many(move(b))));*/
 }
 
+spbdd_handle from_high(bdd_shft s, bdd_ref x) {
+	return bdd_handle::get(bdd::add(s + 1, x, F));
+}
+
+spbdd_handle from_low(bdd_shft s, bdd_ref y) {
+	return bdd_handle::get(bdd::add(s + 1, F, y));
+}
+
+spbdd_handle from_high_and_low(bdd_shft s, bdd_ref x, bdd_ref y) {
+	return bdd_handle::get(bdd::add(s + 1, x, y));
+}
+
 void bdd::sat(bdd_shft v, bdd_shft nvars, bdd_ref  t, bools& p, vbools& r) {
 	if (t == F) return;
 	if (!leaf(t) && v < var(t))

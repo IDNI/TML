@@ -22,7 +22,8 @@ void options::add(option o) {
 
 optional<option> options::get(const string name) const {
 	if (auto ait = alts.find(name); ait == alts.end()) return nullopt;
-	else if (auto oit = opts.find(ait->second); oit == opts.end()) return nullopt;
+	else if (auto oit = opts.find(ait->second); oit == opts.end())
+		return nullopt;
 	else return oit->second;
 }
 
@@ -40,8 +41,7 @@ string options::get_string(string name) const {
 
 bool options::parse(int c, char** v, bool internal) {
 	strings sargs = {};
-	for (int i = 0; i < c; ++i)
-		sargs.push_back(string(v[i]));
+	for (int i = 0; i < c; ++i) sargs.push_back(string(v[i]));
 	return parse(sargs, internal);
 }
 
@@ -56,7 +56,8 @@ bool options::parse(strings sargs, bool internal) {
 	bool skip_next = false;
 	for (size_t i = 0; i < sargs.size(); ++i) {
 		if (!internal) args.push_back(sargs[i]);
-		if (skip_next) skip_next = false;
+		if (program_arguments) pargs.push_back(sargs[i]);
+		else if (skip_next) skip_next = false;
 		else if (!parse_option(sargs, i, skip_next))
 			return false;
 	}
@@ -83,7 +84,7 @@ bool options::enabled(const string &name) const {
 			case option::type::INT:    return o->get_int() > 0;
 			case option::type::STRING: {
 				output* t = outputs::get(o->name());
-				return t ? !t->is_null() : o->get_string() != "";
+				return t ? !t->is_null() : o->get_string()!="";
 			}
 			default: ;
 		}
@@ -193,8 +194,6 @@ void options::setup() {
 		"factor out parts of queries using CQC test");
 	add_bool("to-dnf",
 		"convert FOL formulas into to DNF before running program");
-	add_bool("program-gen",
-		"generate C++ code to generate the given TML code");
 	add_bool("safecheck",
 		"enable safety check");
 	add_bool("O1",
@@ -205,9 +204,14 @@ void options::setup() {
 		.description("enables all O2 optimizations and transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
 	add(option(option::type::INT, { "iterate" })
 		.description("transforms the program into one where each step is equivalent to 2^x of the original's (default: x=0)"));
+	add(option(option::type::INT, { "iterate" }).description("transforms"
+		" the program into one where each step is equivalent to 2^x of"
+		" the original's (default: x=0)"));
 	add_bool("gc",      "enable garbage collection");
-	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", "partial-tree", "partial-forest" }).
-		description("control if and how proofs are extracted: none (default), tree, forest, partial-tree, partial-forest"));
+	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", 
+		"partial-tree", "partial-forest" }).description("control if and"
+		" how proofs are extracted: none (default), tree, forest,"
+		" partial-tree, partial-forest"));
 	add_bool("run",     "run program     (enabled by default)");
 	add_bool("csv",     "save result into CSV files");
 
@@ -222,8 +226,10 @@ void options::setup() {
 	add(option(option::type::INT, { "break", "b" })
 		.description("break on the N-th step"));
 	add(option(option::type::INT, { "regex-level", "" })
-		.description("aggressive matching with regex with levels 1 and more."
-		"\n\t 1 - try all substrings - n+1  delete n rules after processing reg matching"));
+		.description("aggressive matching with regex with levels 1 and"
+		" more.\n\t 1 - try all substrings - n+1  delete n rules after"
+		" processing reg matching"));
+	add_bool2("break-on-fp", "bfp", "break on a fixed point");
 
 	add_bool2("populate-tml_update", "tml_update",
 		"populates relation tml_update(N_step add|delete fact).");
@@ -239,17 +245,23 @@ void options::setup() {
 	add_bool("strgrammar", "...");
 
 	add_bool2("reg-match", "regex", "applies regular expression matching");
-	add_bool2("fp-step", "fp", "adds __fp__ fact when reaches a fixed point");
-	add_bool2("break-on-fp", "bfp", "break on a fixed point");
+	add_bool2("fp-step","fp","adds __fp__ fact when reaches a fixed point");
+	add(option(option::type::STRING, {"arguments","args","options","opts"},
+		[this](const option::value&) {
+			this->program_arguments = !this->program_arguments;
+		}
+	 ).description("delimiter between TML and program's arguments"));
 	add(option(option::type::BOOL, { "guards", "g", "unnest" },
 		[this](const option::value& v) {
 			if (v.get_bool()) this->enable("fp-step");
 		}
 	).description("transforms nested progs (req. for if and while)"));
 	add_bool2("state-blocks", "sb", "transforms state blocks");
-	add_bool2("bitunv", "buv", "transforms and runs rule directly in bit size 2 universe ");
+	add_bool2("bitunv", "buv",
+		"transforms and runs rule directly in bit size 2 universe ");
 	add(option(option::type::INT, { "bitorder", "bod" })
-		.description("specifies the variable ordering permutation (default: 0)"));
+		.description("specifies the variable ordering permutation"
+							" (default: 0)"));
 	add(option(option::type::BOOL, { "optimize" },
 		[this](const option::value& v) {
 			if (v.get_bool()) set("print-steps", true);
@@ -263,13 +275,24 @@ void options::setup() {
 	//	.description("load database from file before start"));
 	//add(option(option::type::STRING, { "save", "s" })
 	//	.description("save database to file after finish"));
+	add_bool2("earley", "ep", "use earley parser");
+	add_bool2("print-ambiguity", "pamb", "print parsed ambiguous packs");
+	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");
+	add_bool2("bin-lr", "blr", "on the fly binarization and left "
+					"right optimization for earley items");
 	add_output    ("dump",        "dump output     (@stdout by default)");
 	add_output_alt("output", "o","standard output (@stdout by default)");
 	add_output    ("error",       "errors          (@stderr by default)");
 	add_output    ("info",        "info            (@null by default)");
 	add_output    ("debug",       "debug output");
-	add_output    ("benchmarks",  "benchmarking results (@null by default)");
+	add_output    ("benchmarks", "benchmarking results (@null by default)");
 	add_output_alt("transformed", "t",  "transformation into clauses");
+	add_output_alt("parser-benchmarks", "pms",  "parser benchmarking");
+	add_output_alt("parser-to-dot",  "pdot", "parsed forest in dot format");
+	add_output_alt("parser-to-tml",  "ptml", "parsed forest as tml facts");
+	add_output_alt("parser-to-rules","prules","parsed forest as tml rules");
+	add_output_alt("program-gen", "cpp",
+		"generated C++ code of the given TML code");
 
 	init_defaults();
 }

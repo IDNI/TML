@@ -114,7 +114,7 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 //runtime options
 typedef struct {
 	bool optimize, print_transformed, apply_regexpmatch, fp_step, bitunv,
-		show_hidden;
+		show_hidden, bin_lr;
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;
@@ -141,8 +141,11 @@ template<typename T> struct ptrcmp {
 	bool operator()(const T* x, const T* y) const { return *x < *y; }
 };
 
-//#define BIT_TRANSFORM  //work in progress, use it with --bitunv option
-#ifdef BIT_TRANSFORM
+//-----------------------------------------------------------------------------
+#define TML_NATIVES
+//#define TYPE_RESOLUTION //work-in-progress, dependent on TML_NATIVES
+//#define BIT_TRANSFORM  //to be deprecated, use it with --bitunv option
+#if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
 #define mkchr(x) ((int_t) x )
 #define mknum(x) ((int_t) x )
 #define mksym(x) ((int_t) x )
@@ -152,4 +155,35 @@ template<typename T> struct ptrcmp {
 #define mksym(x) ((int_t) ((x) << 2) )
 #endif
 
+#ifdef TML_NATIVES
+typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB} native_type;
+struct tml_native_t {
+	native_type type = UNDEF;
+	int_t bit_w = -1;
+	bool operator==(const tml_native_t& l) const {
+	     return (l.type == type && l.bit_w == bit_w) || (l.type == UNDEF);
+	}
+	bool operator<(const tml_native_t& l) const {
+		//if (*this == l) return false;
+		//return l.type < type && l.bit_w < bit_w;
+		return std::tie(l.type, l.bit_w) < std::tie(type, bit_w);
+	}
+};
+typedef std::vector<tml_native_t> tml_natives;
+typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
+#else
+typedef std::pair<int_t, ints> sig;
+#endif
+
+//-----------------------------------------------------------------------------
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
 #endif

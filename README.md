@@ -13,28 +13,6 @@ space terms, and allowing negation to be feasible even over large universes. In
 fact negated bodies, as below, do not consume more time or space than positive
 bodies by any means, thanks to the BDD mechanism.
 
-## Not Implemented Yet
-Not everything on this document is implemented though implementation is ongoing
-and everything is expected to be implemented in a matter of weeks. Besides there
-is no release yet as tests and final finishes have not been done yet.
-
-Specifically:
-* Proof extraction needs a rewrite.
-* Proof extraction for programs that contain negation.
-* Tree extraction is not fully working and is a very preliminary implementation,
-specifically:
-  * Cycle detection
-  * Node omission
-  * Testing
-* Queries need a rewrite.
-* String from trees.
-* Strings are encoded in a different style than described here.
-* Symbol for length of strings.
-* Support binary input files and UTF-8 charset.
-* Parsing error messages and bugs.
-* First order formulas.
-* Comprehensive tests of everything.
-
 # Universe
 
 The size of the universe (or domain of discourse) of a TML program is:
@@ -200,51 +178,58 @@ the section "Queries".
 
 # Nested programs
 
-It is possible to nest programs (actually whole sequences). Sequence of nested
-programs is run after the current (parent) program reaches its fixed point.
+It is possible to nest programs (actually whole sequences). Any nested program
+(or sequence of nested programs) is evaluated after the parent program reaches
+its fixed point.
 
-# Trees
+For example this nested program:
 
-Terms of certain form are interpreted as trees. This does not affect the rules
-at all, but only as means of inputting and outputting facts, as below. Trees are
-expressed by constructing a directed graph of terms. For example the following
-term
+    {
+        x1 :- x.
+        {   y.
+            { x2 :- x. }
+            { y2 :- y. }
+            { z2 :- z. }
+        }
+        y1 :- y.
+        {   y.
+            x2 :- x.
+            { z.
+              x3 :- x.
+              y3 :- y.
+              z3 :- z.
+            }
+            y2 :- y.
+            z2 :- z.
+        }
+        z1 :- z.
+        x.
+    }
 
-    b((a(1 2)) (a(2 2)) (c(2 3)))
+is equivalent to this sequence:
 
-indicates two edges in a graph named `b`, where a vertex labelled `a(1 2)` has
-two [ordered] outgoing edges, one to the term `a(2 2)` and one to the term
-`c(2 3)`. Terms as labels of vertices need not be proper terms in the sense
-that we could also have
-
-    b((a 1 2) (a 2 2) (c 2 3))
-
-Either way, `a` and `c` are interpreted as universe elements rather relation
-symbols. In general having a relation symbols and then parenthesized sequences
-of elements is interpreted as denoting ordered outgoing edges.
-
-We can construct trees in the normal way using rules. For example, a proof
-tree of a program consisting of the rule
-
-    e(?x ?y) :- e(?x ?z), e(?y ?z).
-
-may be constructed by adding the rule
-
-    proof((e(?x ?y)) (e(?x ?z)) (e(?y ?z))) :- e(?x ?y), e(?x ?z), e(?y ?z).
-
-We can then extract the proof tree by querying, as in the section "Queries".
-However as in that section there's a shortcut syntax for extracting proofs.
-
-Note that as we indeed construct a directed graph rather a tree, it is
-interpreted as a packed representation of a forest. Further this graph may
-contain loops. They are avoided during the traversal by simply skipping
-previously visited nodes.
-
-Terms that appear in double parenthesis, like `a 2 2` in:
-
-    b((a 1 2) ((a 2 2)) (c 2 3))
-
-will be omitted when converting a tree to a string, as in the next section.
+    {
+        x.
+        x1 :- x.
+        y1 :- y.
+        z1 :- z.
+    }
+    { y. }
+    { x2 :- x. }
+    { y2 :- y. }
+    { z2 :- z. }
+    {
+        y.
+        x2 :- x.
+        y2 :- y.
+        z2 :- z.
+    }
+    {
+        z.
+        x3 :- x.
+        y3 :- y.
+        z3 :- z.
+    }
 
 # Strings
 
@@ -252,63 +237,35 @@ It is possible to input strings to the database. The line
 
     @string mystr "abc".
 
-will add the following fact to the database:
+will add following facts to the database:
 
-    mystr(((0))('a')((1))).
-    mystr(((1))('b')((2))).
-    mystr(((2))('c')((3))).
+    c(2).
+    b(1).
+    a(0).
+    mystr(2 'c').
+    mystr(1 'b').
+    mystr(0 'a').
+    mystr(printable 2 0).
+    mystr(printable 1 0).
+    mystr(printable 0 0).
+    mystr(alnum 2 0).
+    mystr(alnum 1 0).
+    mystr(alnum 0 0).
+    mystr(alpha 2 0).
+    mystr(alpha 1 0).
+    mystr(alpha 0 0).
 
 More generally, `@string relname "str"` will use the relation symbol relname
-to declare a tree where each string position has first successor to the
-character on that position, and a second successor to the next position.
-Observe that the positions appear in double parenthesis. This is because of the
-following:
+to declare two relations with that name:
+ - 2-ary relation `mystr(?pos ?char)` with a character and its position in the string
+ - 3-ary relation `mystr(?class ?pos 0) with a character classification (digit, alpha, alnum, printable, space). Third argument is always 0 to distinguish from 2-ary relation of the same name.
 
-It is possible to construct a string by specifying a root of a tree. The backend
-will then traverse the tree depth-first left-first (Pre-Order) and stringify its
-content. It will omit from the output string nodes that appear in double
-parenthesis. For example the program
-
-    @string str T((1 2)).
-    T((1 2) (2 3) (a b)).
-    T((a b) (c d)).
-    T((2 3) (4 5)).
-
-will result in having the relation symbol `str` represent the string:
-
-    "122345abcd"
-
-while if we had:
-
-    @string str T((1 2)).
-    T((1 2) ((2 3)) (a b)).
-    T((a b) ((c d))).
-    T(((2 3)) (4 5)).
-
-the string `str` would be:
-
-    "1245ab"
-
-This relation `str` is then transferred to the next sequenced program, or
-emitted as the output of the program if no sequenced program is present.
-
-Note that the double-parenthesis omission is denoted on the successor nodes.
-
-Now we can see why strings create trees with double parenthesis: the following
-
-    @string str1 "abc".
-    @string str2 str1(((0))).
-
-will result with `str2="abc"`.
+@string directive also declares unary relation for each unique character of the string and stores in it all character positions.
 
 It is also possible to output a string to `stdout` by using it as a relation
 symbol:
 
-    @stdout str1(((0))).
-
-or arbitrary tree:
-
-    @stdout T((1 2)).
+    @stdout str1.
 
 In addition a string can refer to command line arguments:
 
@@ -321,6 +278,10 @@ or to be taken from `stdin`:
 or from a file:
 
     @string str <filename>.
+
+or from a file provided as a command line argument:
+
+    @string str <$1>.
 
 Finally it is possible to refer to the length of the string by the symbol
 `len:str`.
@@ -363,15 +324,15 @@ then the trace tree will have the form
 It is possible to supply a context free grammar as a syntactic shortcut for
 definite clause grammars. For example Dyck's language may be written as:
 
-    S => null.
-    S => '(' S ')' S.
+    start => null.
+    start => '(' start ')' start.
 
 and will be converted to the rules:
 
-    S(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
-    S(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
-    S(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), S(?v2 ?v3),
-        str(((?v3)) (')') ((?v4))), S(?v4 ?v5).
+    start(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
+    start(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
+    start(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), start(?v2 ?v3),
+        str(((?v3)) (')') ((?v4))), start(?v4 ?v5).
 
 where `str` is some string defined in the program. Grammars are allowed in
 programs that contain only one string. If multiple strings require parsing it
@@ -380,7 +341,7 @@ is possible to define them in sequenced programs.
 Extracting the parse forest can be done by extracting a proof of the start
 symbol:
 
-    !! parseForest S(0, len:str).
+    !! parseForest start(0, len:str).
 
 which also defines the start symbol.
 
@@ -432,7 +393,7 @@ TML grammar can take EBNF syntax as well. It supports { } for zero or more occu
     B => 'b'+.
     C => 'c'*.
     D => 'd''d'
-    S => A B C D
+    start => A B C D
 
 Here 'a' can occur zero or more times and 'b' can occur one or more time. Internally, TML shall replace it with fresh production symbols that would do recursion. A more complex example is
 
@@ -440,7 +401,7 @@ Here 'a' can occur zero or more times and 'b' can occur one or more time. Intern
     C => 'c' + .
     B => 'b' [ B ] .          # B occurs one or zero time.
     D => ( 'd' 'd' ) * .      # ( ) allows * operator to be applied to all terms as a whole.
-    S => A * B + C * D + | A + ( B * ) .
+    start => A * B + C * D + | A + ( B * ) .
     K => ( C + ) * [ B + ] .
 
 # Grammar Constraints 
@@ -459,7 +420,7 @@ Consider the following grammar.
     A => 'a' A 'b' | "ab" .
     C => 'c'C .
     C => 'c' .
-    S => A C ,  len(2) + len(2) = len(1) .
+    start => A C ,  len(2) + len(2) = len(1) .
 
 Here the constraints are specified for S production where the length of the derived string from A should be twice the length derived from C. 
 Note that due to constraints it would not accept "abc".
@@ -471,7 +432,7 @@ Another example using string comparison.
     C => 'c' C .
     C => 'c' | 'z'.
     A => 'a' A | 'a'.
-    S => C A C, substr(1) = substr(3), len(2) = 1.
+    start => C A C, substr(1) = substr(3), len(2) = 1.
 
 Here the derived content of both Cs should match.  
 

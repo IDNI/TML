@@ -16,6 +16,8 @@
 
 #include <map>
 #include <vector>
+#include <tuple>
+#include <functional>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/val.h>
@@ -28,7 +30,6 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
-#include "analysis.h"
 #include "ir_builder.h"
 
 class tables;
@@ -120,7 +121,7 @@ struct gnode {
 	std::vector<gnode*> next;
 	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level) {
 		type = typ; }
-	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){ 
+	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){
 		type = interm;
 		this->next.emplace_back(new gnode(lev, t, gnode::gntype::pack));
 		next.back()->next = inter;
@@ -163,16 +164,16 @@ class tables {
 
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-	std::shared_ptr<bit_univ> spbu = nullptr;
+
 private:
-	typedef int_t rel_t;
 
 	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
 		cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
+
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
-	//std::set<alt*, ptrcmp<alt>> grnds;
+
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -197,9 +198,8 @@ private:
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 
 	nlevel nstep = 0;
+
 	std::vector<table> tbls;
-	std::map<sig, ntable> smap;
-	std::unordered_map<ntable, std::vector<typedecl>> tab_type;
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -207,17 +207,15 @@ private:
 	void get_sym(int_t s, size_t arg, size_t args, spbdd_handle& r) const;
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
-	int_t freeze(std::vector<term>& v, int_t );
-	std::vector<term> to_nums(const std::vector<term>& v);
-	void to_nums(flat_prog& m);
-	term to_nums(term t);
-	flat_prog& get_canonical_db(std::vector<term>& x, flat_prog& p);
-	flat_prog& get_canonical_db(std::vector<std::vector<term>>& x, flat_prog& p);
 
-	size_t bits = 2;/*TODO: this init is affecting dict.cpp:36*/
+	#ifdef TYPE_RESOLUTION
+	size_t bits = 0;
+	#else
+	size_t bits = 2;
+	#endif
+
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
-	size_t max_args = 0;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -233,8 +231,32 @@ private:
 	size_t bit(size_t v, size_t args) const {
 		return bits - 1 - v / args;
 	}
+	std::pair<std::vector<size_t>, std::vector<size_t>> _inverse(
+			size_t bits,
+			size_t args) const {
+		std::vector<size_t> _args(bits * args);
+		std::vector<size_t> _bits(bits * args);
+		for (size_t arg = 0; arg < args; ++arg)
+			for (size_t bit = 0; bit < bits; ++bit)
+				_args[pos(bit, arg, args)] = arg,
+				_bits[pos(bit, arg, args)] = bit;
+		std::pair<std::vector<size_t>, std::vector<size_t>> i(_bits, _args);
+		return i;
+	}
+	size_t _args(const term* t) const {
+		return t->size();
+	}
+	size_t bit(size_t v, const term* t, const std::vector<size_t>& _bits,
+			const std::vector<size_t>& _args) const {
+		size_t b = _bits[v];
+		size_t i = _args[v];
+		return t->at(i) & (1 << b);
+	}
+	size_t max_pos(const term* t) const {
+		return _args(t) * bits -1;
+	}
 
-	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
+	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
@@ -247,8 +269,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args) const;
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
-
-	ntable add_table(sig s);
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
 	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
@@ -258,7 +278,6 @@ private:
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-//	void align_vars(std::vector<term>& b) const;
 	spbdd_handle from_fact(const term& t);
 
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
@@ -294,31 +313,40 @@ private:
 			spbdd_handle &c) const;
 	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
 
-	bool get_facts(const flat_prog& m);
+	bool get_facts(const flat_prog& m) ;
+	bool is_optimizable_fact(const term& t) const;
+	std::map<ntable, spbdd_handle> from_facts(
+		std::map<ntable, std::vector<const term*>>& pending,
+		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> &inverses) const;
+	spbdd_handle from_facts(std::vector<const term*>& pending,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+	spbdd_handle from_facts(std::vector<const term*>& terms,
+		std::vector<const term*>::iterator left,
+		std::vector<const term*>::iterator right,
+		const size_t& pos,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+	spbdd_handle from_bit(const std::vector<const term*>::iterator& current,
+		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
-	bool get_rules(flat_prog m);
+	bool get_rules(flat_prog& m);
 
-	ntable get_table(const sig& s);
-	ntable get_new_tab(int_t x, ints ar);
-	void load_string(lexeme rel, const string_t& s);
 	lexeme get_var_lexeme(int_t i);
-	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&,
-		bool mknums = false);
+	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();
 	char fwd() noexcept;
 	bdd_handles get_front() const;
-
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
-	ntable prog_add_rule(flat_prog& p, std::map<ntable, ntable>& r,
-		std::vector<term> x);
-//	std::map<ntable, std::set<spbdd_handle>> goals;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
+#ifndef LOAD_STRS
+	void load_string(lexeme rel, const string_t& s);
 	strs_t strs;
 	std::set<int_t> str_rels;
+#endif
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
 	// tml_update population
@@ -434,20 +462,15 @@ public:
 	ir_builder *ir_handler;
 	builtins bltins;
 
-
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
 	size_t step() { return nstep; }
-	bool add_prog(const raw_prog& p, const strs_t& strs);
+	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 
-	static bool run_prog(const raw_prog &rp, dict_t &dict, const options &opts,
-		std::set<raw_term> &results);
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
-	bool run_prog_wstrs(const raw_prog& p, const strs_t& strs, size_t steps = 0,
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
-
-	bool run_nums(flat_prog m, std::set<term>& r, size_t nsteps);
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>&) const;
@@ -492,4 +515,3 @@ struct infloop_exception : public unsat_exception {
 	}
 };
 #endif
-

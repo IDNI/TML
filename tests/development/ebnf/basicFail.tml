@@ -8,5 +8,5 @@ missBrac => { ['a' { 'a' ] }[ 'f'] ] }.
 doublestar => 'c'+*.
 startfollowBrac => 'b'([B]*) .
 emty => "dd"*().
-S => .
+start => .
 emtySQ =>  (C+)*[].

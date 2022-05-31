@@ -1,4 +1,4 @@
-find_program(CLANG_TIDY NAMES run-clang-tidy-9 run-clang-tidy run-clang-tidy-10 run-clang-tidy.py)
+find_program(CLANG_TIDY NAMES run-clang-tidy run-clang-tidy.py)
 if (CLANG_TIDY)
     set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
     message(STATUS "Found clang-tidy")

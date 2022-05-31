@@ -13,24 +13,16 @@
 
 #include <vector>
 #include <regex>
-
+#include <variant>
 #include "ir_builder.h"
 #include "tables.h"
-#include "analysis.h"
 using namespace std;
 
-ir_builder::ir_builder(dict_t& dict_, rt_options& opts_/*, environment& env_*/) :
-		dict(dict_), opts(opts_) /*, typenv(env_),*/ /*dynenv(0)*/ {
+ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
+		dict(dict_), opts(opts_) {
 }
 ir_builder::~ir_builder() {
 }
-
-void unquote(string_t& str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
-}
-
-string_t _unquote(string_t str) { unquote(str); return str; }
 
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
@@ -97,7 +89,6 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 		else if(r.prft) {
 			bool is_sol = false;
 			form* froot = 0;
-
 			//TODO: review
 			sprawformtree root = r.prft->neg // neg transform
 				? make_shared<raw_form_tree>(elem::NOT,
@@ -112,14 +103,14 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 			}
 			from_raw_form(root, froot, is_sol);
 			/*
-			DBG(COUT << "\n ........... \n";)
+			DBG(o::dbg() << "\n ........... \n";)
 			DBG(r.prft->printTree();)
-			DBG(COUT << "\n ........... \n";)
+			DBG(o::dbg() << "\n ........... \n";)
 			DBG(froot->printnode(0, this);)
 			*/
 			term::textype extype;
 			if(is_sol) {
-				//DBG(COUT << "\n SOL parsed \n";)
+				//DBG(o::dbg() << "\n SOL parsed \n";)
 				//to_pnf(froot);
 				extype = term::FORM2;
 			} else {
@@ -134,7 +125,7 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				t = term(extype, qbf);
 				v.push_back(t);
 				//align_vars_form(v);
-				m.insert(move(v));
+				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
 		} else  {
@@ -144,23 +135,55 @@ flat_prog ir_builder::to_terms(const raw_prog& p) {
 				m.insert({t}), get_nums(x);
 		}
 	// Note the relations that are marked as tmprel in the raw_prog
+
+	#ifdef HIDDEN_RELS
 	for(const auto &[functor, arity] : p.hidden_rels)
-		dynenv->tbls[dynenv->get_table(get_sig(functor, arity))].hidden = true;
-	
+		dynenv->tbls[get_table(get_sig(functor, arity))].hidden = true;
+	#endif
+
 	return m;
 }
 
 sig ir_builder::get_sig(const raw_term&t) {
-	int_t aux = dict.get_rel(t.e[0].e);
-	return{aux ,t.arity};
+	int_t table_name_id = dict.get_rel(t.e[0].e);
+#ifdef TML_NATIVES
+	assert(t.arity.size() == 1);
+	tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
+	return {table_name_id , tn};
+#else
+	return {table_name_id , t.arity};
+#endif
 }
-sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
-	return { dict.get_rel(rel), arity };
+
+sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
+#ifdef TML_NATIVES
+	assert(arity.size() == 1);
+	tml_natives tn(arity[0], {native_type::UNDEF,-1});
+	return {rel_id, tn};
+#else
+	return {rel_id, arity};
+#endif
 }
-size_t ir_builder::sig_len(const sig& s) {
-	size_t r = 0;
-	for (int_t x : get<ints>(s)) if (x > 0) r += x;
-	return r;
+
+
+sig ir_builder::get_sig(const lexeme& rel, const ints& arity ) {
+	int_t table_name_id = dict.get_rel(rel);
+#ifdef TML_NATIVES
+	assert(arity.size() == 1);
+	tml_natives tn(arity[0], {native_type::UNDEF,-1});
+	return {table_name_id, tn};
+#else
+	return {table_name_id, arity};
+#endif
+}
+
+size_t ir_builder::sig_len(const sig& s) const {
+#ifdef TML_NATIVES
+	return s.second.size();
+#else
+	assert(s.second.size()==1);
+	return s.second[0];
+#endif
 }
 
 term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid) {
@@ -185,7 +208,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 			case elem::STR: {
 				l = r.e[n].e;
 				++l[0], --l[1];
-				int_t s = dict.get_sym(dict.get_lexeme(_unquote(lexeme2str(l))));
+				int_t s = dict.get_sym(dict.get_lexeme(unquote(lexeme2str(l))));
 				t.push_back(mksym(s));
 				break;
 			}
@@ -197,8 +220,9 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 				break;
 			default: break;
 		}
-	// stronger 'realrel' condition for tables, only REL and header BLTIN
-	ntable tab = realrel ? dynenv->get_table(get_sig(r)) : -1;
+
+	int_t tab = realrel ? get_table(get_sig(r)) : -1;
+
 	// D: idbltin name isn't handled above (only args, much like rel-s & tab-s).
 	if (extype == term::BLTIN) {
 		int_t idbltin = dict.get_bltin(r.e[0].e);
@@ -213,7 +237,6 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 			(bool) (r.e[0].num & 1), (bool) (r.e[0].num & 2));
 	}
 	return term(r.neg, extype, r.arith_op, tab, t, orderid);
-	// ints t is elems (VAR, consts) mapped to unique ints/ids for perms.
 }
 
 elem ir_builder::get_elem(int_t arg) const {
@@ -234,6 +257,18 @@ void ir_builder::get_nums(const raw_term& t) {
 		if (e.type == elem::NUM) nums = max(nums, e.num);
 		else if (e.type == elem::CHR) chars = max(chars, (int_t)e.ch);
 		else if (e.type == elem::SYM) syms = max(syms, e.num);
+}
+
+int_t ir_builder::get_table(const sig& s) {
+	auto it = smap.find(s);
+	if (it != smap.end())
+		return it->second;
+	int_t nt = dynenv->tbls.size();
+	table tb;
+	tb.s = s, tb.len = sig_len(s);
+	dynenv->tbls.push_back(tb);
+	smap.emplace(s,nt);
+	return nt;
 }
 
 //---------------------------------------------------------
@@ -312,19 +347,20 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 	}
 }
 
-raw_term ir_builder::to_raw_term(const term& r) const {
+raw_term ir_builder::to_raw_term(const term& r) {
 		raw_term rt;
-		rt.neg = r.neg;
 		size_t args;
-		if (r.extype == term::EQ) {//r.iseq)
-			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, dict.get_lexeme(r.neg ? "!=" : "=")),
-			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::EQ;
+		rt.neg = r.neg;
+		//understand raw_term::parse before touching this
+		if (r.extype == term::EQ) {
+			args = 2, rt.e.resize(args + 1), rt.arity = {2};
+			rt.extype = raw_term::EQ;
+			rt.e[0] = get_elem(r[0]), rt.e[1] = elem::EQ, rt.e[2] = get_elem(r[1]);
 			return rt;
-		} else if (r.extype == term::LEQ) {//r.isleq)
-			args = 2, rt.e.resize(args + 1), rt.e[0] = get_elem(r[0]),
-			rt.e[1] = elem(elem::SYM, dict.get_lexeme("<=")),
-			rt.e[2] = get_elem(r[1]), rt.arity = {2}, rt.extype = raw_term::LEQ;
+		} else if (r.extype == term::LEQ) {
+			rt.extype = raw_term::LEQ;
+			args = 2, rt.e.resize(args + 1), rt.arity = {2};
+			rt.e[0] = get_elem(r[0]), rt.e[1] = elem::LEQ; rt.e[2] = get_elem(r[1]);
 			return rt;
 		} else if( r.tab == -1 && r.extype == term::ARITH ) {
 				rt.e.resize(5);
@@ -364,7 +400,10 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
 				rt.e[0] = elem(elem::SYM,
 						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
-				rt.arity = get<ints>(dynenv->tbls.at(r.tab).s);
+				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
+				#ifdef TML_NATIVES
+				assert(rt.arity.size() == 1);
+				#endif
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
 				rt.add_parenthesis();
@@ -376,7 +415,7 @@ raw_term ir_builder::to_raw_term(const term& r) const {
 		}
 		DBG(assert(args == r.size());)
 		if( opts.bitunv ) {
-			if(dynenv->spbu.get()->brev_transform(rt))
+			if(bitunv_to_raw_term(rt))
 				rt.calc_arity(nullptr);
 		}
 		return rt;
@@ -431,10 +470,10 @@ bool ir_builder::to_pnf(form *&froot) {
 	bool changed = false;
 	changed = impltrans.traverse(froot);
 	changed |= demtrans.traverse(froot);
-	COUT << "\n ........... \n";
+	DBG(o::dbg() << "\n ........... \n";)
 	froot->printnode(0, this);
 	changed |= pullquant.traverse(froot);
-	COUT << "\n ........... \n";
+	DBG(o::dbg() << "\n ........... \n";)
 	froot->printnode(0, this);
 
 	return changed;
@@ -585,7 +624,7 @@ bool pull_quantifier::dosubstitution(form *phi, form * prefend){
 
 		subst.add( temp->l->arg, fresh_int );
 
-		COUT << "\nNew fresh: "<<temp->l->arg<<" --> "<<fresh_int;
+		DBG(o::dbg()<<"\nNew fresh: "<<temp->l->arg<<" --> "<<fresh_int;)
 		if( temp == prefend) break;
 		else temp = temp->r;
 	}
@@ -614,8 +653,9 @@ bool pull_quantifier::apply( form *&root) {
 		rprefend->r = curr;
 		root = lprefbeg;
 		changed = true;
-		COUT<<"\nPulled both: "<<lprefbeg->type<<" "<<lprefbeg->arg<<
-			" , "<< rprefbeg->type << " " << rprefbeg->arg<< "\n";
+		DBG(o::dbg()<<"\nPulled both: "<<lprefbeg->type<<" "<<
+			lprefbeg->arg<<" , "<< rprefbeg->type << " " <<
+			rprefbeg->arg<< "\n";)
 	}
 	else if(lprefbeg) {
 		if(!dosubstitution(lprefbeg, lprefend))
@@ -624,8 +664,8 @@ bool pull_quantifier::apply( form *&root) {
 		lprefend->r = curr;
 		root = lprefbeg;
 		changed = true;
-		COUT<<"\nPulled left: "<<lprefbeg->type<<" "<<lprefbeg->arg<<
-			"\n";
+		DBG(o::dbg()<<"\nPulled left: "<<lprefbeg->type<<" "<<
+			lprefbeg->arg<<"\n";)
 	}
 	else if (rprefbeg) {
 		if(!dosubstitution(rprefbeg, rprefend))
@@ -634,8 +674,8 @@ bool pull_quantifier::apply( form *&root) {
 		rprefend->r = curr;
 		root = rprefbeg;
 		changed = true;
-		COUT <<"\nPulled right: "<<rprefbeg->type<<" "<<rprefbeg->arg<<
-			"\n";
+		DBG(o::dbg() <<"\nPulled right: "<<rprefbeg->type<<" "<<
+			rprefbeg->arg<<"\n";)
 	}
 	return changed;
 }
@@ -662,13 +702,13 @@ bool transformer::traverse(form *&root ) {
 	return changed;
 }
 
-void form::printnode(int lv, const ir_builder* tb) {
+void form::printnode(int lv, ir_builder* tb) {
 	if (r) r->printnode(lv+1, tb);
-	for (int i = 0; i < lv; i++) COUT << '\t';
+	for (int i = 0; i < lv; i++) o::dbg() << '\t';
 	if( tb && this->tm != NULL)
-		COUT << " " << type << " " << tb->to_raw_term(*tm) << "\n";
+		o::dbg() << " " << type << " " << tb->to_raw_term(*tm) << "\n";
 	else
-		COUT << " " << type << " " << arg << "\n";
+		o::dbg() << " " << type << " " << arg << "\n";
 	if (l) l->printnode(lv+1, tb);
 }
 
@@ -683,8 +723,7 @@ bool ir_builder::get_substr_equality(const raw_term &rt, size_t &n,
 	//format : substr(1) = substr(2)
 	term svalt;
 	svalt.resize(4);
-	int_t relp = dict.get_rel(dict.get_lexeme("equals"));
-	svalt.tab = dynenv->get_table({relp, {(int_t)svalt.size()}});
+	svalt.tab = get_table(get_sig(dict.get_lexeme("equals"), {(int_t) svalt.size()}));
 	svalt.extype = term::textype::REL;
 
 	for( int i=0; i<2 ; i++) {
@@ -771,13 +810,13 @@ int_t ir_builder::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &re
 
 bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 
-	if (dynenv->str_rels.size() > 1) er(err_one_input);
-	if (dynenv->str_rels.empty()) return false;
+	if (str_rels.size() > 1) er(err_one_input);
+	if (str_rels.empty()) return false;
 	eqr.resize(3); // three rules for substr equality
 	for(size_t r = 0; r < eqr.size(); r++) {
 		int_t var = 0;
 		int_t i= --var, j= --var , k=--var, n= --var;
-		ntable nt = dynenv->get_table({dict.get_rel(dict.get_lexeme("equals")), {4}});
+		ntable nt = get_table(get_sig(dict.get_lexeme("equals"), {4}));
 		// making head   equals( i j k n) :-
 		eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP, nt,
 								std::initializer_list<int>{i, j, k, n}, 0 );
@@ -800,10 +839,9 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 				//work in progress
 				//DBG(COUT << "get_rule_substr_equality" << endl);
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
-									dynenv->get_table({*dynenv->str_rels.begin(),{2}}),
+									get_table(get_sig(*str_rels.begin(),{2})),
 									std::initializer_list<int>{eqr[r][0][2*vi], cv} , 0);
 			}
-
 			eqr[r].emplace_back( false, term::ARITH, t_arith_op::ADD, -1,
 								 std::initializer_list<int>{i, mknum(1), j}, 0);
 			eqr[r].emplace_back( eqr[r].back());
@@ -855,19 +893,20 @@ bool ptransformer::parse_alts( vector<elem> &next, size_t& cur){
 
 lexeme ptransformer::get_fresh_nonterminal(){
 	static size_t count=0;
-	string fnt = "_R"+ to_string(lexeme2str(this->p.p[0].e))+ to_string(count++);
+	string fnt = "_R" + to_string(lexeme2str(this->p.p[0].e)) + "_" +
+		to_string(count++);
 	return d.get_lexeme(fnt);
 }
 
-bool ptransformer::synth_recur( vector<elem>::const_iterator from,
-		vector<elem>::const_iterator till, bool bnull = true, bool brecur =true,
-		bool balt= true ){
+bool ptransformer::synth_recur(vector<elem>::const_iterator from,
+		vector<elem>::const_iterator till, bool bnull = true, bool brecur = true,
+		bool balt = true) {
 
-	if(brecur ) {
+	if (brecur) {
 		bool binsidealt =false; // for | to be present inside
 		for( vector<elem>::const_iterator f = from; f!=till; f++)
-			if(f->type == elem::ALT) {binsidealt =true; break;}
-		if(binsidealt) {
+			if(f->type == elem::ALT) {binsidealt = true; break;}
+		if (binsidealt) {
 			synth_recur( from, till, false, false, false);
 			from = lp.back().p.begin();
 			till = lp.back().p.begin()+1;
@@ -875,41 +914,46 @@ bool ptransformer::synth_recur( vector<elem>::const_iterator from,
 	}
 	lp.emplace_back();
 	production &np = lp.back();
-	elem sym = elem(elem::SYM,  get_fresh_nonterminal());
-	np.p.push_back( sym);
+	elem sym = elem(elem::SYM, get_fresh_nonterminal());
+	np.p.push_back(sym);
 	np.p.insert(np.p.end(), from , till);
-	if(brecur) np.p.push_back( sym);
-	elem alte = elem(elem::ALT, d.get_lexeme( "|" ) );
-	if(balt) np.p.emplace_back(alte);
-	if( balt && bnull )	np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
-	else if(balt) np.p.insert(np.p.end(), from, till);
+	if(brecur) np.p.push_back(sym);
+	elem alte = elem(elem::ALT, d.get_lexeme("|"));
+	if (balt) np.p.emplace_back(alte);
+	if (balt && bnull) {
+		#ifdef NNULL_KLEENE
+			np.p.insert(np.p.end(), from , till);
+			np.p.emplace_back(elem::SYM, d.get_lexeme("_null_tg_"));
+		#else
+			np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
+		#endif
+	}
+	else if (balt) np.p.insert(np.p.end(), from, till);
 	return true;
 }
 
 bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 	size_t cur1 = cur;
-	if(cur >= next.size()) return false;
-	if( next[cur].type ==  elem::SYM ||
-		next[cur].type ==  elem::STR ||
-		next[cur].type ==  elem::CHR ) {
+	if (cur >= next.size()) return false;
+	if (next[cur].type == elem::SYM ||
+		next[cur].type == elem::STR ||
+		next[cur].type == elem::CHR) {
 		size_t start = cur;
 		++cur;
-		if( next.size() > cur 				&&
-			next[cur].type == elem::ARITH 	&&
-			(next[cur].arith_op == MULT 	||
-				next[cur].arith_op == ADD		)) {
-
+		if ((next.size() > cur) &&
+			(next[cur].type == elem::ARITH) &&
+			(next[cur].arith_op == MULT || next[cur].arith_op == ADD)) {
 			//lp.emplace_back(),
 			synth_recur( next.begin()+start, next.begin()+cur,
 			next[cur].arith_op == MULT),
 			++cur;
-			next.erase( next.begin()+start, next.begin()+cur);
-			next.insert( next.begin()+start, lp.back().p[0]);
+			next.erase(next.begin()+start, next.begin()+cur);
+			next.insert(next.begin()+start, lp.back().p[0]);
 			return cur = start+1, true;
 		}
 		return true;
 	}
-	if( next[cur].type == elem::OPENSB ) {
+	if (next[cur].type == elem::OPENSB) {
 		size_t start = cur;
 		++cur;
 		if( !parse_alts(next, cur)) return cur = cur1, false;
@@ -960,17 +1004,14 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 
 bool ptransformer::visit() {
 	size_t cur = 1;
-	//DBG(COUT<<endl<<p<<endl);
-	bool ret = this->parse_alts( this->p.p, cur);
-	if( this->p.p.size() > cur ) ret = false;
+	bool ret = this->parse_alts(this->p.p, cur);
+	if (this->p.p.size() > cur) ret = false;
 
-	//DBG(COUT<<p<<endl);
-	for ( production t : lp )
-		DBG(COUT<<t<<endl);
-	if(!ret) parse_error("Error Production",
-		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e );
+	//DBG(COUT << "transform_ebnf:visit" << endl << lp <<endl);
+	//DBG(for (production &t : lp) o::dbg() << t << endl);
+	if (!ret) parse_error("Error Production",
+		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e);
 	return ret;
-
 }
 
 bool ir_builder::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
@@ -1092,14 +1133,15 @@ bool graphgrammar::combine_rhs( const elem &s, vector<elem> &comb) {
 }
 
 bool graphgrammar::collapsewith(){
-	for( _itg_t it = _g.begin(); it != _g.end(); it++){
-		DBG(COUT<< it->second.second << ":" << it->second.first.to_str(0)<<endl);
-	}
+#ifdef DEBUG
+	for( _itg_t it = _g.begin(); it != _g.end(); it++) o::dbg()
+		<< it->second.second << ":" << it->second.first.to_str(0)<<endl;
+#endif
 	if(sort.empty()) return false;
 
 	static const map<lexeme,string,lexcmp> &b = get_builtin_reg();
 	for (elem &e: sort) {
-		DBG(COUT<<e<<endl;)
+		DBG(o::dbg()<<e<<endl;)
 		auto rang = _g.equal_range(e);
 		for( auto sit = rang.first; sit != rang.second; sit++){
 
@@ -1215,116 +1257,69 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return true;
-
-	for (production& p : g)
-		for (size_t n = 0; n < p.p.size(); ++n)
-			if (p.p[n].type == elem::STR) {
-				ccs s = p.p[n].e[0]+1;
-				size_t chl, sl = p.p[n].e[1]-1 - s;
-				char32_t ch;
-				bool esc = false;
-				p.p.erase(p.p.begin() + n);
-				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
-					sl -= chl; s += chl;
-					chars = max(chars, (int_t) ch);
-					if (ch == U'\\' && !esc) esc = true;
-					else p.p.insert(p.p.begin() + n++,
-						elem(ch)), esc = false;
-				}
-			}
-	clock_t start, end;
-	int statterm=0;
-	set<elem> torem;
-	measure_time_start();
-	bool enable_regdetect_matching = opts.apply_regexpmatch;
-	if (dynenv->strs.size() && enable_regdetect_matching) {
-		string inputstr = to_string(dynenv->strs.begin()->second);
-		DBG(COUT<<inputstr<<endl);
-		graphgrammar ggraph(g, dict);
-		ggraph.detectcycle();
-		ggraph.collapsewith();
-		for(auto &elem : ggraph.sort) {
-			bool bnull =false;
-			string regexp = ggraph.get_regularexpstr(elem, bnull);
-			DBG(COUT<<"Trying"<<regexp<<"for "<< elem<<endl);
-			regex rgx;
-#ifdef WITH_EXCEPTIONS
-			try {
-#else
-// TODO: check regexp's validity another way?
-#endif
-				rgx = regexp;
-#ifdef WITH_EXCEPTIONS
-			} catch( ... ) {
-				DBG(COUT<<"Ignoring Invalid regular expression"<<regexp);
-				continue;
-			}
-#endif
-			smatch sm;
-			term t;
-			bool bmatch=false;
-			if(regex_level > 0) {
-				for( size_t i = 0; i <= inputstr.size(); i++)
-					for( size_t j = i; j <= inputstr.size(); j++)	{
-						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
-						if( regex_match(ss, sm, rgx)) {
-							DBG(COUT << regexp << " match "<< sm.str() << endl);
-							DBG(COUT << "len: " << sm.length(0) << std::endl);
-							DBG(COUT << "size: " << sm.size() << std::endl);
-							DBG(COUT << "posa: " << i + sm.position(0) << std::endl);
-							t.resize(2);
-							t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
-							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
-							p.insert({t});
-							bmatch = true;
-							statterm++;
-						}
-					}
-				if(bmatch) torem.insert(elem);
-			}
-			else if( regex_level == 0) {
-				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
-				std::sregex_iterator end;
-				for(;iter != end; ++iter) {
-					DBG(COUT << regexp << " match "<< iter->str()<< endl);
-					DBG(COUT << "size: " << iter->size() << std::endl);
-					DBG(COUT << "len: " << iter->length(0) << std::endl);
-					DBG(COUT << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
-					t.resize(2);
-					t.tab = dynenv->get_table({dict.get_rel(elem.e),{2}});
-					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
-					p.insert({t});
-					statterm++;
-				}
-			}
-		}
-		size_t removed = 0;
-		for( auto pit = g.begin(); pit != g.end(); )
-			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
-				o::ms()<<*pit<<endl;
-				pit = g.erase(pit);
-				removed++;
-			} else pit++;
-
-		o::ms()<<"REGEX: "<<"terms added:"<<statterm<<" production removed:"
-		<<removed<<" for "<< torem.size()<<endl;
-	}
-	measure_time_end();
+	//DBG(o::dbg()<<"grammar before:"<<endl;)
+	//DBG(for (production& p : g) o::dbg() << p << endl;)
 	bool changed;
+	transform_strsplit(g);
+	transform_apply_regex(g, p);
 	if(!transform_ebnf(g, dict, changed )) return true;
+	transform_alts(g);
+	DBG(o::dbg()<<"grammar after:"<<endl);
+	DBG(for (production& p : g) o::dbg() << p << endl;)
 
-	for (size_t k = 0; k != g.size();) {
-		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
-		size_t n = 0;
-		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
-		if (n == g[k].p.size()) { ++k; continue; }
-		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
-		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
-		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
-		g.erase(g.begin() + k);
+	#define ONLY_EARLEY
+	#ifdef ONLY_EARLEY
+
+	earley_t::char_builtins_map bltnmap{
+		{ U"space", [](const char32_t &c)->bool {
+			return c < 256 && isspace(c); }	},
+		{ U"digit", [](const char32_t &c)->bool {
+			return c < 256 && isdigit(c); }	},
+		{ U"alpha", [](const char32_t &c)->bool {
+			return c > 160 || isalpha(c); }	},
+		{ U"alnum", [](const char32_t &c)->bool {
+			return c > 160 || isalnum(c); }	},
+		{ U"printable", [](const char32_t &c)->bool {
+			return c > 160 || isprint(c); }	}
+	};
+
+	earley_t parser(g, bltnmap, opts.bin_lr);
+	bool success = parser
+		.recognize(to_u32string(strs.begin()->second));
+	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
+		" <###\n" << endl;
+
+	//raw_progs rps = parser.get_raw_progs(&dict);
+	//o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
+
+	vector<earley_t::arg_t> facts = parser.get_parse_graph_facts();
+	vector<raw_term> rts;
+	for (auto& af: facts) {
+		vector<elem> e;
+		e.emplace_back(elem::STR, dict.get_lexeme(
+			to_string_t(std::get<earley_t::string>(af[0]))));
+		e.emplace_back(elem::OPENP);
+		e.emplace_back(int_t(std::get<size_t>(af[1])));
+		for( size_t i=2; i < af.size(); i++) 
+			if(std::holds_alternative<size_t>(af[i]))
+				e.emplace_back(int_t(std::get<size_t>(af[i])));
+			else 
+				e.emplace_back(elem::STR, dict.get_lexeme(
+					to_string_t(std::get<earley_t::string>(
+						af[i]))));
+		e.emplace_back(elem(elem::CLOSEP));
+
+		rts.emplace_back(raw_term::REL, e);
+		
+		//DBG(o::dbg()<<rts.back()<<endl);
 	}
-	DBG(o::out()<<"grammar after:"<<endl);
-	DBG(for (production& p : g) o::out() << p << endl;)
+	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
+	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
+		<< "# after transform_grammar:\n", p)
+		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
+		<< endl;
+	return true;
+	#endif // ONLY_EARLEY
 
 	vector<term> v;
 
@@ -1342,7 +1337,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			term t;
 			t.resize(2);
 			t[0] = t[1] = -1;
-			t.tab = dynenv->get_table({dict.get_rel(x.p[0].e),{2}});
+			t.tab = get_table(get_sig(x.p[0].e,{2}));
 			// Ensure that the index is an integer by asserting that it is >= 0
 			term guard;
 			guard.resize(2);
@@ -1361,13 +1356,11 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 
 		// ref: maps ith sybmol production to resp. terms
 		std::map<size_t, term> refs;
-		DBG(o::dbg()<<x;)
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
 			#ifdef GRAMMAR_BLTINS
 			if (builtins.find(x.p[n].e) != builtins.end()) {
-				t.tab = dynenv->get_table({*dynenv->str_rels.begin(), {3}});
-				//TODO: REVIEW usage of get sym here
+				t.tab = get_table(get_sig(*str_rels.begin(), {3}));
 				t.resize(3), t[0] = mksym(dict.get_sym(x.p[n].e)),
 				t[1] = -n, t[2] = mknum(0);
 				term plus1;
@@ -1381,7 +1374,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			#endif
 			if (x.p[n].type == elem::SYM) {
 				t.resize(2);
-				t.tab = dynenv->get_table({dict.get_rel(x.p[n].e),{2}});
+				t.tab = get_table(get_sig(x.p[n].e,{2}));
 				if (n) t[0] = -n, t[1] = -n-1;
 				else t[0] = -1, t[1] = -(int_t)(x.p.size());
 			} else if (x.p[n].type == elem::CHR) {
@@ -1390,9 +1383,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 				int_t tv=n;
 				//DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
-					int_t r = dict.get_rel(dict.get_lexeme(us.getrelin_str(rl)));
 					term t; t.resize(1);
-					t.tab= dynenv->get_table({r, {1}});
+					t.tab = get_table(get_sig(dict.get_lexeme(us.getrelin_str(rl)), {1}));
 					t[0] = -tv;
 					term plus1;
 					plus1.resize(3);
@@ -1420,12 +1412,184 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			dict.get_var_lexeme(dict.get_new_var());
 
 		transform_grammar_constraints(x, v, p, refs);
-
 		p.insert(move(v));
 	}
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
-		<< "# after transform_grammar:\n", p)
+		<< "\n# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
 	return true;
 }
+
+bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_prog &p ){
+	clock_t start, end;
+	int statterm=0;
+	set<elem> torem;
+	measure_time_start();
+	bool enable_regdetect_matching = opts.apply_regexpmatch;
+#ifdef LOAD_STRS
+	if (strs.size() && enable_regdetect_matching) {
+		string inputstr = to_string(strs.begin()->second);
+#else
+	if (dynenv->strs.size() && enable_regdetect_matching) {
+		string inputstr = to_string(dynenv->strs.begin()->second);
+
+#endif
+		DBG(o::dbg()<<inputstr<<endl);
+		graphgrammar ggraph(g, dict);
+		ggraph.detectcycle();
+		ggraph.collapsewith();
+		for(auto &elem : ggraph.sort) {
+			bool bnull =false;
+			string regexp = ggraph.get_regularexpstr(elem, bnull);
+			DBG(o::dbg()<<"Trying"<<regexp<<"for "<< elem<<endl);
+			regex rgx;
+#ifdef WITH_EXCEPTIONS
+			try {
+#else
+// TODO: check regexp's validity another way?
+#endif
+				rgx = regexp;
+#ifdef WITH_EXCEPTIONS
+			} catch( ... ) {
+				DBG(o::dbg()<<"Ignoring Invalid regular expression"<<regexp);
+				continue;
+			}
+#endif
+			smatch sm;
+			term t;
+			bool bmatch=false;
+			if(regex_level > 0) {
+				for( size_t i = 0; i <= inputstr.size(); i++)
+					for( size_t j = i; j <= inputstr.size(); j++)	{
+						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
+						if( regex_match(ss, sm, rgx)) {
+							DBG(o::dbg() << regexp << " match "<< sm.str() << endl);
+							DBG(o::dbg() << "len: " << sm.length(0) << std::endl);
+							DBG(o::dbg() << "size: " << sm.size() << std::endl);
+							DBG(o::dbg() << "posa: " << i + sm.position(0) << std::endl);
+							t.resize(2);
+							t.tab = get_table(get_sig(elem.e, {2}));
+							t[0] = mknum(i), t[1] = mknum(i+ sm.length(0));
+							p.insert({t});
+							bmatch = true;
+							statterm++;
+						}
+					}
+				if(bmatch) torem.insert(elem);
+			}
+			else if( regex_level == 0) {
+				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
+				std::sregex_iterator end;
+				for(;iter != end; ++iter) {
+					DBG(o::dbg() << regexp << " match "<< iter->str()<< endl);
+					DBG(o::dbg() << "size: " << iter->size() << std::endl);
+					DBG(o::dbg() << "len: " << iter->length(0) << std::endl);
+					DBG(o::dbg() << "posa: " << (iter->position(0) % (inputstr.length()+1)) << std::endl);
+					t.resize(2);
+					t.tab = get_table(get_sig(elem.e, {2}));
+					t[0] = mknum(iter->position(0)), t[1] = mknum(iter->position(0)+iter->length(0));
+					p.insert({t});
+					statterm++;
+				}
+			}
+		}
+		size_t removed = 0;
+		for( auto pit = g.begin(); pit != g.end(); )
+			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
+				o::ms()<<*pit<<endl;
+				pit = g.erase(pit);
+				removed++;
+			} else pit++;
+
+		o::ms()<<"REGEX: "<<"terms added:"<<statterm<<" production removed:"
+		<<removed<<" for "<< torem.size()<<endl;
+	}
+	measure_time_end();
+	return statterm != 0; 
+}
+
+bool ir_builder::transform_alts( vector<production> &g){
+	bool changed = false;
+	for (size_t k = 0; k != g.size();) {
+		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
+		size_t n = 0;
+		while (n < g[k].p.size() && g[k].p[n].type != elem::ALT) ++n;
+		if (n == g[k].p.size()) { ++k; continue; }
+		g.push_back({ vector<elem>(g[k].p.begin(), g[k].p.begin()+n) });
+		g.push_back({ vector<elem>(g[k].p.begin()+n+1, g[k].p.end()) });
+		g.back().p.insert(g.back().p.begin(), g[k].p[0]);
+		g.erase(g.begin() + k);
+		changed = true;
+	}
+	return changed;
+}
+
+bool ir_builder::transform_strsplit(vector<production> &g){
+
+	bool changed = false;
+	for (production& p : g)
+		for (size_t n = 0; n < p.p.size(); ++n)
+			if (p.p[n].type == elem::STR) {
+				ccs s = p.p[n].e[0]+1;
+				size_t chl, sl = p.p[n].e[1]-1 - s;
+				char32_t ch;
+				bool esc = false;
+				p.p.erase(p.p.begin() + n);
+				while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+					sl -= chl; s += chl;
+					chars = max(chars, (int_t) ch);
+					if (ch == U'\\' && !esc) esc = true;
+					else p.p.insert(p.p.begin() + n++,
+						elem(ch)), esc = false;
+				}
+				changed = true;
+			}
+	return changed;		
+}
+#ifdef LOAD_STRS
+void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) {
+
+	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
+	unary_string us(sizeof(char32_t)*8);
+	chars = max(chars, (int_t) us.rel.size()); //TODO: review this one
+	vector<term> v;
+	us.buildfrom(s);
+	for (auto it: us.rel) {
+		term t; t.resize(1);
+		ntable tb = get_table(get_sig(dict.get_lexeme(us.getrelin_str(it.first)), {1}));
+		t.tab = tb;
+		for (int_t i : it.second)
+			t[0] = mknum(i), v.push_back(t), fp.insert(move(v));
+	}
+	//FIXME: these are always the same for all eventual strs, so could be stored
+	const int_t sspace = dict.get_sym(dict.get_lexeme("space")),
+		salpha = dict.get_sym(dict.get_lexeme("alpha")),
+		salnum = dict.get_sym(dict.get_lexeme("alnum")),
+		sdigit = dict.get_sym(dict.get_lexeme("digit")),
+		sprint = dict.get_sym(dict.get_lexeme("printable"));
+	int_t rel = dict.get_rel(r);
+	term t(2),tb(3);
+	t.tab = get_table(get_sig(rel, {2}));
+	tb.tab =  get_table(get_sig(rel, {3}));
+	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+		t[0] = mknum(n), t[1] = mkchr(s[n]); // t[2] = mknum(n + 1),
+		chars = max(chars, t[1]);
+		v.push_back(t), fp.insert(move(v));
+		tb[1] = t[0], tb[2] = mknum(0);
+		if (isspace(s[n])) tb[0] = mksym(sspace), v.push_back(tb), fp.insert(move(v));
+		if (isdigit(s[n])) tb[0] = mksym(sdigit), v.push_back(tb), fp.insert(move(v));
+		if (isalpha(s[n])) tb[0] = mksym(salpha), v.push_back(tb), fp.insert(move(v));
+		if (isalnum(s[n])) tb[0] = mksym(salnum), v.push_back(tb), fp.insert(move(v));
+		if (isprint(s[n])) tb[0] = mksym(sprint), v.push_back(tb), fp.insert(move(v));
+	}
+	str_rels.insert(rel);
+}
+
+void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
+	strs = s;
+	for (auto x : strs) {
+		load_string(fp, x.first, x.second);
+	}
+}
+#endif

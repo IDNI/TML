@@ -16,10 +16,10 @@ list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
 
 set(TML_HEADERS
-	analysis.h
 	bdd.h
 	builtins.h
 	char_defs.h
+	cpp_gen.h
 	defs.h
 	dict.h
 	driver.h
@@ -33,13 +33,15 @@ set(TML_HEADERS
 	ir_builder.h
 	iterators.h
 	transform_opt.h
+	earley.h
+	typemanager.h
 )
 
 set(TML_SOURCES
-	analysis.cpp
 	bdd.cpp
 	bdd_ext.cpp
 	builtins.cpp
+	cpp_gen.cpp
 	dict.cpp
 	driver.cpp
 	form.cpp
@@ -51,12 +53,16 @@ set(TML_SOURCES
 	tables.cpp
 	tables_builtins.cpp
 	tables_ext.cpp
+	tml_earley.cpp
 	transform.cpp
 	transform_guards.cpp
 	transform_opt.cpp
 	utils.cpp
 	iterators.cpp
 	ir_builder.cpp
+	earley.cpp
+	typemanager.cpp
+	transform_bitunv.cpp
 )
 
 if (WITH_THREADS)
@@ -81,7 +87,7 @@ set(TML_COMPILE_OPTIONS
 	"$<$<CONFIG:Release>:-flto>"
 	${TML_PGO_OPTIONS}
 )
-set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
+set(TML_LINK_OPTIONS "${TML_PGO_OPTIONS};-flto")
 if (BUILD_CODE_COVERAGE)
 	set(TML_DEBUG_OPTIONS "${TML_DEBUG_OPTIONS}" --coverage)
 	set(TML_RELEASE_OPTIONS "${TML_RELEASE_OPTIONS}" --coverage)

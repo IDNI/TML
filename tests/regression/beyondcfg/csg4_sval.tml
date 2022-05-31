@@ -3,5 +3,6 @@
 C => 'c' C .
 C => 'c' | 'z'.
 A => 'a' A | 'a'.
-S => C A C, substr(1) = substr(3), len(2) = 1.
-!S(0 7).
+start => C A C, substr(1) = substr(3), len(2) = 1.
+
+!node(?x start 0 7).

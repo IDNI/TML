@@ -69,13 +69,18 @@ public:
 		add(output::create(n, t, e));
 	}
 	void init_defaults() {
-		create("output",      ".out.tml");
-		create("error",       ".error.log");
-		create("info",        ".info.log");
-		create("debug",       ".debug.log");
-		create("dump",        ".dump.tml");
-		create("benchmarks",  ".bench.log");
-		create("transformed", ".trans.tml");
+		create("output",               ".out.tml");
+		create("error",                ".error.log");
+		create("info",                 ".info.log");
+		create("debug",                ".debug.log");
+		create("dump",                 ".dump.tml");
+		create("benchmarks",           ".bench.log");
+		create("transformed",          ".trans.tml");
+		create("parser-benchmarks",    ".parser-bench.log");
+		create("parser-to-dot",        ".dot");
+		create("parser-to-tml",        ".parsed.tml");
+		create("parser-to-rules",      ".parsed-rules.tml");
+		create("program-gen",          ".cpp");
 #ifdef WITH_THREADS
 		create("repl-output", ".repl.out.log");
 #endif
@@ -89,6 +94,7 @@ public:
 	static ostream_t& repl() { return o_ ? o_to(o_->repl_) : CNULL; }
 #endif
 	static ostream_t& ms()   { return o_ ? o_to(o_->ms_)   : CNULL; }
+	static ostream_t& pms()  { return o_ ? o_to(o_->pms_)  : CNULL; }
 	static ostream_t& dump() { return o_ ? o_to(o_->dump_) : CNULL; }
 	static ostream_t& transformed() { return o_ ? o_to(o_->trns_) : CNULL; }
 	static output* get(const std::string& n) { return o_?o_->o_get(n):0; }
@@ -99,8 +105,10 @@ public:
 	static void target(const std::string& n, const std::string& t);
 	static void name(std::string n) { if (o_) o_->name_ = n; }
 	static std::string named() { return o_?o_->name_:std::string(); }
+	static bool enabled(std::string n) { return get(n) != 0; }
 private:
-	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0, *trns_=0;
+	output *out_=0, *err_=0, *inf_=0, *dbg_=0, *ms_=0, *dump_=0, *trns_=0,
+		*pms_=0;
 #ifdef WITH_THREADS
 	output *repl_=0;
 #endif
@@ -124,8 +132,10 @@ namespace o { // o:: namespace shortcuts
 	ostream_t& repl();
 #endif
 	ostream_t& ms();
+	ostream_t& pms();
 	ostream_t& dump();
 	ostream_t& transformed();
+	bool enabled(std::string n);
 }
 
 template <typename T, typename T1, typename T2>

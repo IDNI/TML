@@ -5,12 +5,12 @@
 
 
 
-#S => S IO S | PO S | '3' .
+#start => start IO start | PO start | '3' .
 #IO => '+' | '-' | '*'.
 #PO => '-'.
 
-#S => S '+' S | S '/' S | '1'.
-#S => '+' S | S '+' S | S'+' | '1' .
-S =>  S '+' S | '2'.
+#start => start '+' start | start '/' start | '1'.
+#start => '+' start | start '+' start | start'+' | '1' .
+start => start '+' start | '2'.
 
-!S(0 5).
+!node(?x start 0 5).

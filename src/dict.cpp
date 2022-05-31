@@ -52,17 +52,17 @@ int_t dict_t::get_bltin(const lexeme& l) {
 
 int_t dict_t::get_new_sym() {
 	static int_t cnt = 0;
-	return get_sym(get_lexeme( "0S" + to_string_(++cnt) ));
+	return get_sym(get_lexeme( "0s" + to_string_(++cnt) ));
 }
 
 int_t dict_t::get_new_var() {
 	static int_t cnt = 0;
-	return get_var(get_lexeme("?0V" + to_string_(++cnt)));
+	return get_var(get_lexeme("?0v" + to_string_(++cnt)));
 }
 
 int_t dict_t::get_new_rel() {
 	static int_t cnt = 0;
-	string n = "0R" + to_string_(++cnt);
+	string n = "0r" + to_string_(++cnt);
 	int_t nidx = get_rel(get_lexeme(n));
 	return nidx;
 	//TODO: add check for pre existing rel ?

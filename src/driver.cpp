@@ -24,6 +24,7 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
+#include "cpp_gen.h"
 
 #ifdef __EMSCRIPTEN__
 #include "../js/embindings.h"
@@ -50,15 +51,20 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 		}
 }
 
-void unquote(string_t& str);
-
 string_t driver::directive_load(const directive& d) {
+	if (d.type == directive::CMDLINEFILE) {
+		int_t a = d.n - 1;
+		if (a >= 0 && a < opts.pargc())
+			return to_string_t(input::file_read(opts.pargv(a)));
+		else parse_error(err_num_cmdline);
+		return {};
+	}
 	string_t str(d.arg[0]+1, d.arg[1]-d.arg[0]-2);
 	switch (d.type) {
 		case directive::FNAME:
 			return to_string_t(input::file_read(to_string(str)));
 		case directive::STDIN: return move(pd.std_input);
-		default: return unquote(str), str;
+		default: return unquote(str);
 	}
 	DBGFAIL;
 }
@@ -71,6 +77,7 @@ void driver::directives_load(raw_prog& p) {
 
 	lexeme trel = null_lexeme;
 	// The list of directives that have been processed so far
+	int_t a;
 	vector<directive> processed;
 	// Iterate through the directives that remain in the program
 	while (!p.d.empty()) {
@@ -90,9 +97,9 @@ void driver::directives_load(raw_prog& p) {
 		case directive::INTERNAL:
 			p.hidden_rels.insert(get_signature(d.internal_term)); break;
 		case directive::CMDLINE:
-			if (d.n < opts.argc())
-				pd.strs.emplace(d.rel.e,
-					to_string_t(opts.argv(d.n)));
+			a = d.n - 1;
+			if (a >= 0 && a < opts.pargc()) pd.strs
+				.emplace(d.rel.e, to_string_t(opts.pargv(a)));
 			else parse_error(err_num_cmdline);
 			break;
 /*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
@@ -464,11 +471,10 @@ optional<elem> driver::is_safe(const raw_rule &rr) {
 /* Check whether a given TML program is safe and return the offending
  * variable and rule if not. This means that every rule must be safe. */
 
-optional<pair<elem, raw_rule>> driver::is_safe(raw_prog rp) {
+optional<pair<elem, raw_rule>> driver::is_safe(raw_prog &rp) {
 	// Ignore the outermost existential quantifiers
 	export_outer_quantifiers(rp);
-	// Split heads are a prerequisite to safety checking
-	split_heads(rp);
+
 	for(const raw_rule &rr : rp.r) {
 		if(auto unlimited_var = is_safe(rr)) {
 			return make_pair(*unlimited_var, rr);
@@ -1890,7 +1896,7 @@ void driver::step_transform(raw_prog &rp,
 		vector<elem> clock_states = { elem::fresh_temp_sym(d) };
 		// Push the internal rules onto the program using conditioning to
 		// control execution order
-		for(const set<const relation *> v : sorted) {
+		for(const set<const relation *>& v : sorted) {
 			// Make a new clock state for the current stage
 			const elem clock_state = elem::fresh_temp_sym(d);
 			// If the previous state is asserted, then de-assert it and assert
@@ -2518,336 +2524,6 @@ void collect_free_vars(const raw_form_tree &t, vector<elem> &bound_vars,
 	}
 }
 
-/* It is sometimes desirable to embed a large amount of TML code into
- * this C++ codebase. Unfortunately, manually writing C++ code to
- * generate a certain TML fragment can be tedious. This pseudo-
- * transformation takes TML code and automatically produces the C++ code
- * necessary to generate the TML code. This transformation is used to
- * embed TML interpreter written in TML into this codebase. */
-
-// Generate C++ code to generate the given elem
-
-string_t driver::generate_cpp(const elem &e, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
-	if(elem_cache.find(e) != elem_cache.end()) {
-		return elem_cache[e];
-	}
-	string_t e_name = to_string_t("e") + to_string_t(to_string(cid++).c_str());
-	elem_cache[e] = e_name;
-	if(e.type == elem::CHR) {
-		prog_constr += to_string_t("elem ") + e_name +
-			to_string_t("(char32_t(") + to_string_t(to_string(e.ch).c_str()) +
-			to_string_t("));\n");
-	} else if(e.type == elem::NUM) {
-		prog_constr += to_string_t("elem ") + e_name + to_string_t("(int_t(") +
-			to_string_t(to_string(e.num).c_str()) + to_string_t("));\n");
-	} else {
-		prog_constr += to_string_t("elem ") + e_name + to_string_t("(") +
-			to_string_t(
-				e.type == elem::NONE ? "elem::NONE" :
-				e.type == elem::SYM ? "elem::SYM" :
-				e.type == elem::NUM ? "elem::NUM" :
-				e.type == elem::CHR ? "elem::CHR" :
-				e.type == elem::VAR ? "elem::VAR" :
-				e.type == elem::OPENP ? "elem::OPENP" :
-				e.type == elem::CLOSEP ? "elem::CLOSEP" :
-				e.type == elem::ALT ? "elem::ALT" :
-				e.type == elem::STR ? "elem::STR" :
-				e.type == elem::EQ ? "elem::EQ" :
-				e.type == elem::NEQ ? "elem::NEQ" :
-				e.type == elem::LEQ ? "elem::LEQ" :
-				e.type == elem::GT ? "elem::GT" :
-				e.type == elem::LT ? "elem::LT" :
-				e.type == elem::GEQ ? "elem::GEQ" :
-				e.type == elem::BLTIN ? "elem::BLTIN" :
-				e.type == elem::NOT ? "elem::NOT" :
-				e.type == elem::AND ? "elem::AND" :
-				e.type == elem::OR ? "elem::OR" :
-				e.type == elem::FORALL ? "elem::FORALL" :
-				e.type == elem::EXISTS ? "elem::EXISTS" :
-				e.type == elem::UNIQUE ? "elem::UNIQUE" :
-				e.type == elem::IMPLIES ? "elem::IMPLIES" :
-				e.type == elem::COIMPLIES ? "elem::COIMPLIES" :
-				e.type == elem::ARITH ? "elem::ARITH" :
-				e.type == elem::OPENB ? "elem::OPENB" :
-				e.type == elem::CLOSEB ? "elem::CLOSEB" :
-				e.type == elem::OPENSB ? "elem::OPENSB" :
-				e.type == elem::CLOSESB ? "elem::CLOSESB" : "") + to_string_t(", ") +
-			to_string_t(
-				e.arith_op == t_arith_op::NOP ? "t_arith_op::NOP" :
-				e.arith_op == t_arith_op::ADD ? "t_arith_op::ADD" :
-				e.arith_op == t_arith_op::SUB ? "t_arith_op::SUB" :
-				e.arith_op == t_arith_op::MULT ? "t_arith_op::MULT" :
-				e.arith_op == t_arith_op::BITWAND ? "t_arith_op::BITWAND" :
-				e.arith_op == t_arith_op::BITWOR ? "t_arith_op::BITWOR" :
-				e.arith_op == t_arith_op::BITWXOR ? "t_arith_op::BITWXOR" :
-				e.arith_op == t_arith_op::BITWNOT ? "t_arith_op::BITWNOT" :
-				e.arith_op == t_arith_op::SHR ? "t_arith_op::SHR" :
-				e.arith_op == t_arith_op::SHL ? "t_arith_op::SHL" : "") +
-			to_string_t(", ") + dict_name + to_string_t(".get_lexeme(\"") +
-			lexeme2str(e.e) + to_string_t("\"));\n");
-	}
-	return e_name;
-}
-
-// Generate the C++ code to generate the given raw_term
-
-string_t driver::generate_cpp(const raw_term &rt, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
-	vector<string_t> elem_names;
-	for(const elem &e : rt.e) {
-		elem_names.push_back(generate_cpp(e, prog_constr, cid, dict_name, elem_cache));
-	}
-	string_t rt_name = to_string_t("rt") + to_string_t(to_string(cid++).c_str());
-	prog_constr += to_string_t("raw_term ") + rt_name + to_string_t("(") +
-		to_string_t(
-			rt.extype == raw_term::REL ? "raw_term::REL" :
-			rt.extype == raw_term::EQ ? "raw_term::EQ" :
-			rt.extype == raw_term::LEQ ? "raw_term::LEQ" :
-			rt.extype == raw_term::BLTIN ? "raw_term::BLTIN" :
-			rt.extype == raw_term::ARITH ? "raw_term::ARITH" :
-			rt.extype == raw_term::CONSTRAINT ? "raw_term::CONSTRAINT" : "") +
-		to_string_t(", ") + to_string_t(
-			rt.arith_op == t_arith_op::NOP ? "t_arith_op::NOP" :
-			rt.arith_op == t_arith_op::ADD ? "t_arith_op::ADD" :
-			rt.arith_op == t_arith_op::SUB ? "t_arith_op::SUB" :
-			rt.arith_op == t_arith_op::MULT ? "t_arith_op::MULT" :
-			rt.arith_op == t_arith_op::BITWAND ? "t_arith_op::BITWAND" :
-			rt.arith_op == t_arith_op::BITWOR ? "t_arith_op::BITWOR" :
-			rt.arith_op == t_arith_op::BITWXOR ? "t_arith_op::BITWXOR" :
-			rt.arith_op == t_arith_op::BITWNOT ? "t_arith_op::BITWNOT" :
-			rt.arith_op == t_arith_op::SHR ? "t_arith_op::SHR" :
-			rt.arith_op == t_arith_op::SHL ? "t_arith_op::SHL" : "") +
-		to_string_t(", {");
-	for(const string_t &en : elem_names) {
-		prog_constr += en + to_string_t(", ");
-	}
-	prog_constr += to_string_t("});\n");
-	prog_constr += rt_name + to_string_t(".neg = ") +
-		to_string_t(rt.neg ? "true" : "false") + to_string_t(";\n");
-	return rt_name;
-}
-
-// Generate the C++ code to generate the raw_form_tree
-
-string_t driver::generate_cpp(const raw_form_tree &t, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, map<elem, string_t> &elem_cache) {
-	string_t ft_name = to_string_t("ft") + to_string_t(to_string(cid++).c_str());
-	switch(t.type) {
-		case elem::IMPLIES: case elem::COIMPLIES: case elem::AND:
-		case elem::ALT: case elem::EXISTS: case elem::UNIQUE:
-		case elem::FORALL: {
-			string_t lft_name =
-				generate_cpp(*t.l, prog_constr, cid, dict_name, elem_cache);
-			string_t rft_name = generate_cpp(*t.r, prog_constr, cid, dict_name,
-				elem_cache);
-			string_t t_string = to_string_t(
-				t.type == elem::IMPLIES ? "elem::IMPLIES" :
-				t.type == elem::COIMPLIES ? "elem::COIMPLIES" :
-				t.type == elem::AND ? "elem::AND" :
-				t.type == elem::ALT ? "elem::ALT" :
-				t.type == elem::EXISTS ? "elem::EXISTS" :
-				t.type == elem::UNIQUE ? "elem::UNIQUE" :
-				t.type == elem::FORALL ? "elem::FORALL" : "");
-			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
-				"std::make_shared<raw_form_tree>(") + t_string + to_string_t(", ") +
-				lft_name + to_string_t(", ") + rft_name + to_string_t(");\n");
-			break;
-		} case elem::NOT: {
-			string_t body_name = generate_cpp(*t.l, prog_constr, cid, dict_name,
-				elem_cache);
-			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
-				"std::make_shared<raw_form_tree>(elem::NOT, ") +
-				body_name + to_string_t(");\n");
-			break;
-		} case elem::NONE: {
-			string_t term_name = generate_cpp(*t.rt, prog_constr, cid, dict_name,
-				elem_cache);
-			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
-				"std::make_shared<raw_form_tree>(") + term_name + to_string_t(");\n");
-			break;
-		} case elem::VAR: {
-			string_t var_name = generate_cpp(*t.el, prog_constr, cid, dict_name,
-				elem_cache);
-			prog_constr += to_string_t("sprawformtree ") + ft_name + to_string_t(" = "
-				"std::make_shared<raw_form_tree>(elem::VAR, ") +
-				var_name + to_string_t(");\n");
-			break;
-		} default:
-			assert(false); //should never reach here
-	}
-	return ft_name;
-}
-
-// Generate the C++ code to generate the given TML rule
-
-string_t driver::generate_cpp(const raw_rule &rr, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
-	vector<string_t> term_names;
-	for(const raw_term &rt : rr.h) {
-		term_names.push_back(
-			generate_cpp(rt, prog_constr, cid, dict_name, elem_cache));
-	}
-	string_t prft_name = generate_cpp(*rr.get_prft(),
-		prog_constr, cid, dict_name, elem_cache);
-	string_t rule_name = to_string_t("rr") + to_string_t(to_string(cid++).c_str());
-	prog_constr += to_string_t("raw_rule ") + rule_name + to_string_t("({");
-	for(const string_t &tn : term_names) {
-		prog_constr += tn + to_string_t(", ");
-	}
-	prog_constr += to_string_t("}, ");
-	if(rr.is_fact() || rr.is_goal()) {
-		prog_constr += to_string_t("std::vector<raw_term> {}");
-	} else {
-		prog_constr += prft_name;
-	}
-	prog_constr += to_string_t(");\n");
-	return rule_name;
-}
-
-// Generate the C++ code to generate the given TML lexeme
-
-string_t driver::generate_cpp(const lexeme &lex) {
-	return to_string_t("STR_TO_LEXEME(") + lexeme2str(lex) + to_string_t(")");
-}
-
-// Generate the C++ code to generate the given TML directive
-
-string_t driver::generate_cpp(const directive &dir, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, map<elem, string_t> &elem_cache) {
-	string_t dir_name = to_string_t("dir") + to_string_t(to_string(cid++).c_str());
-	prog_constr += to_string_t("directive ") + dir_name + to_string_t(";\n");
-	switch(dir.type) {
-		case directive::STR:
-			prog_constr += dir_name + to_string_t(".type = directive::STR;\n");
-			prog_constr += dir_name + to_string_t(".rel = ") +
-				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arg = ") + generate_cpp(dir.arg) +
-				to_string_t(";\n");
-			break;
-		case directive::FNAME:
-			prog_constr += dir_name + to_string_t(".type = directive::FNAME;\n");
-			prog_constr += dir_name + to_string_t(".rel = ") +
-				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arg = ") + generate_cpp(dir.arg) +
-				to_string_t(";\n");
-			break;
-		case directive::CMDLINE:
-			prog_constr += dir_name + to_string_t(".type = directive::CMDLINE;\n");
-			prog_constr += dir_name + to_string_t(".rel = ") +
-				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".n = ") +
-				to_string_t(to_string(dir.n).c_str()) + to_string_t(";\n");
-			break;
-		case directive::STDIN:
-			prog_constr += dir_name + to_string_t(".type = directive::STDIN;\n");
-			prog_constr += dir_name + to_string_t(".rel = ") +
-				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-		case directive::STDOUT:
-			prog_constr += dir_name + to_string_t(".type = directive::STDOUT;\n");
-			prog_constr += dir_name + to_string_t(".t = ") +
-				generate_cpp(dir.t, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-		case directive::TREE:
-			prog_constr += dir_name + to_string_t(".type = directive::TREE;\n");
-			prog_constr += dir_name + to_string_t(".t = ") +
-				generate_cpp(dir.t, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-		case directive::TRACE:
-			prog_constr += dir_name + to_string_t(".type = directive::TRACE;\n");
-			prog_constr += dir_name + to_string_t(".rel = ") +
-				generate_cpp(dir.rel, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-		case directive::BWD:
-			prog_constr += dir_name + to_string_t(".type = directive::BWD;\n");
-			break;
-		case directive::EVAL:
-			prog_constr += dir_name + to_string_t(".type = directive::EVAL;\n");
-			prog_constr += dir_name + to_string_t(".eval_sym = ") +
-				generate_cpp(dir.eval_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".domain_sym = ") +
-				generate_cpp(dir.domain_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".quote_sym = ") +
-				generate_cpp(dir.quote_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".timeout_num = ") +
-				to_string_t(to_string(dir.timeout_num.num).c_str()) + to_string_t(";\n");
-			break;
-		case directive::QUOTE:
-			prog_constr += dir_name + to_string_t(".type = directive::QUOTE;\n");
-			prog_constr += dir_name + to_string_t(".quote_sym = ") +
-				generate_cpp(dir.quote_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".domain_sym = ") +
-				generate_cpp(dir.domain_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".quote_str = ") +
-				generate_cpp(dir.quote_str, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-		case directive::EDOMAIN:
-			prog_constr += dir_name + to_string_t(".type = directive::EDOMAIN;\n");
-			prog_constr += dir_name + to_string_t(".domain_sym = ") +
-				generate_cpp(dir.domain_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".limit_num = ") +
-				to_string_t(to_string(dir.limit_num.num).c_str()) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arity_num = ") +
-				to_string_t(to_string(dir.arity_num.num).c_str()) + to_string_t(";\n");
-			break;
-		case directive::CODEC:
-			prog_constr += dir_name + to_string_t(".type = directive::CODEC;\n");
-			prog_constr += dir_name + to_string_t(".codec_sym = ") +
-				generate_cpp(dir.codec_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".domain_sym = ") +
-				generate_cpp(dir.domain_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".eval_sym = ") +
-				generate_cpp(dir.eval_sym, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			prog_constr += dir_name + to_string_t(".arity_num = ") +
-				to_string_t(to_string(dir.arity_num.num).c_str()) + to_string_t(";\n");
-			break;
-		case directive::INTERNAL:
-			prog_constr += dir_name + to_string_t(".type = directive::INTERNAL;\n");
-			prog_constr += dir_name + to_string_t(".internal_term = ") +
-				generate_cpp(dir.internal_term, prog_constr, cid, dict_name, elem_cache) + to_string_t(";\n");
-			break;
-	}
-	return dir_name;
-}
-
-// Generate the C++ code to generate the given TML program
-
-string_t driver::generate_cpp(const raw_prog &rp, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name,
-		map<elem, string_t> &elem_cache) {
-	vector<string_t> directive_names;
-	for(const directive &dir: rp.d) {
-		directive_names.push_back(generate_cpp(dir, prog_constr, cid, dict_name,
-			elem_cache));
-	}
-	vector<string_t> rule_names;
-	for(const raw_rule &rr : rp.r) {
-		rule_names.push_back(generate_cpp(rr, prog_constr, cid, dict_name,
-			elem_cache));
-	}
-	string_t prog_name = to_string_t("rp") + to_string_t(to_string(cid++).c_str());
-	prog_constr += to_string_t("raw_prog ") + prog_name + to_string_t(";\n");
-	// Insert the rules we have constructed into the final program
-	prog_constr += prog_name + to_string_t(".r.insert(") + prog_name +
-		to_string_t(".r.end(), { ");
-	for(const string_t &rn : rule_names) {
-		prog_constr += rn + to_string_t(", ");
-	}
-	prog_constr += to_string_t("});\n");
-	// Insert the directives we have constructed into the final program
-	prog_constr += prog_name + to_string_t(".d.insert(") + prog_name +
-		to_string_t(".d.end(), { ");
-	for(const string_t &dn : directive_names) {
-		prog_constr += dn + to_string_t(", ");
-	}
-	prog_constr += to_string_t("});\n");
-	return prog_name;
-}
-
 // ----------------------------------------------------------------------------
 // transformations handler
 bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
@@ -2873,7 +2549,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	static set<raw_prog *> transformed_progs;
 	if(transformed_progs.find(&rp) != transformed_progs.end()) return true;
 	transformed_progs.insert(&rp);
-		
+
 	// If we want proof trees, then we need to transform the productions into
 	// rules first since only rules are supported by proof trees.
 	//if(opts.get_string("proof") != "none") {
@@ -2895,15 +2571,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			"Transformed Grammar:\n\n" << rp << endl;)
 	}
 
-	if(opts.enabled("program-gen")) {
-		uint_t cid = 0;
-		string_t rp_generator;
-		map<elem, string_t> elem_cache;
-		o::dbg() << "Generating Program Generator ..." << endl << endl;
-		generate_cpp(rp, rp_generator, cid, to_string_t("d"), elem_cache);
-		o::dbg() << "Program Generator:" << endl << endl
-			<< to_string(rp_generator) << endl;
-	}
 #ifdef WITH_Z3
 		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
 		z3_context z3_ctx(int_bit_len, universe_bit_len);
@@ -3059,13 +2726,16 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 bool driver::transform_handler(raw_prog &p) {
 
-	#ifdef DEBUG
-	if (opts.enabled("transformed")) o::transformed() <<
-			"Pre-Transformation Program:\n\n" << p << endl;
+	// Split heads are a prerequisite to safety checking
+	split_heads(p);
+
+	#ifdef TYPE_RESOLUTION
+	ir->type_resolve(p.nps[0]);
 	#endif
 
 	if(opts.enabled("safecheck")) {
-		if(auto res = is_safe(p)) {
+		raw_prog temp_rp(p); //temporary fix to safecheck
+		if(auto res = is_safe(temp_rp.nps[0])) {
 			ostringstream msg;
 			// The program is unsafe so inform the user of the offending rule
 			// and variable.
@@ -3077,10 +2747,13 @@ bool driver::transform_handler(raw_prog &p) {
 		}
 	}
 
+	DBG(if (opts.enabled("transformed"))
+		o::transformed() << "Pre-Transforms Prog:\n" << p << endl;);
+
 	if (!transform(p, pd.strs)) return false;
-	for (auto& np : p.nps) 
+	for (auto& np : p.nps)
 		if (!transform(np, pd.strs)) return false;
-	
+
 	if (opts.enabled("state-blocks"))
     	transform_state_blocks(p, {});
 	else if (raw_prog::require_state_blocks)
@@ -3090,8 +2763,8 @@ bool driver::transform_handler(raw_prog &p) {
 
 	if (opts.disabled("fp-step") && raw_term::require_fp_step)
 		return error = true,
-				throw_runtime_error("Usage of the __fp__ term requires "
-						"--fp-step option enabled.");
+			throw_runtime_error("Usage of the __fp__ term requires "
+				"--fp-step option enabled.");
 
 
 	//NOTE: guards is assuming empty rules with single nps at top
@@ -3105,23 +2778,12 @@ bool driver::transform_handler(raw_prog &p) {
 						"-g (-guards) option enabled.");
 
 	if (opts.enabled("bitunv")) {
-		typechecker tc(p, true);
-		if(tc.tcheck()) {
-			tbl->spbu = make_shared<bit_univ>(dict, opts.get_int("bitorder"));
-			raw_prog brawp(dict);
-			tbl->spbu->btransform(p, brawp);
-			//FIXME: type env is being created in p, but program that must be executed
-			// is brawp. Also, it might be needed to copy brawp onto p, but transform
-			// should operate on p, as i.e guards
-			tbl->spbu->ptypenv = p.typenv;
-			result = tbl->run_prog_wstrs(brawp, pd.strs, 0, 0);
-		}
+		ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 	}
 
-	#ifdef DEBUG
-	if (opts.enabled("transformed")) o::to("transformed")
-		<< "# transformed program:\n" << p << endl << endl;
-	#endif
+	DBG(if (opts.enabled("transformed"))
+		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);
+
 	return true;
 }
 
@@ -3156,20 +2818,12 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	//Work in progress
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
-		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
-	else if (opts.enabled("bitunv"))
-		//FIXME: bitunv is called still from transform handler
-		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
-		;
-	else {
-		//result = tbl->run_prog_wstrs((rp.p.nps)[0], pd.strs, steps, break_on_step);
-		//FIXME: calling run as bleo leads to double call to get_rules but 
-		// is needed for programs with productions, otherwise chars get wrogly
-		// represented. Check prog_after_fp since it is related to this behavoiur
-		result = tbl->run_prog_wstrs(rp.p, pd.strs, steps, break_on_step);
-	}
+		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step);
+	else
+		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step);
+
 	o::ms() << "# elapsed: ", measure_time_end();
-	
+
 	if (tbl->error) error = true;
 	pd.elapsed_steps = nsteps() - step;
 	return result;
@@ -3179,8 +2833,20 @@ bool driver::run(size_t steps, size_t break_on_step) {
 
 bool driver::add(input* in) {
 	//TODO: handle earlier errors on the input arguments
-	//TODO: lex here
-	if (in->error | !rp.parse(in)) return !(error = true);
+	if (opts.enabled("earley")) {
+		earley_parse_tml(in, rp);
+#ifdef DEBUG
+		raw_progs rpt(dict);
+		rpt.parse(in);
+		o::inf() << "\n### parsed by earley:   >\n" << rp << "<###\n";			
+		o::inf() << "\n### parsed the old way: >\n" << rpt << "<###\n";
+		stringstream s1, s2;
+		s1 << rp;
+		s2 << rpt;
+		if (s1.str() != s2.str()) o::inf() << "\n\tNO MATCH\n";
+#endif
+	} else 	//TODO: lex here
+		if (in->error | !rp.parse(in)) return !(error = true);
 	return true;
 }
 
@@ -3202,7 +2868,7 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
 	rt_options to;
-	
+
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
 			{{"none", proof_mode::none}, {"tree", proof_mode::tree},
@@ -3213,13 +2879,14 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.show_hidden       = opts.enabled("show-hidden");
-	to.bitunv	     = opts.enabled("bitunv");
+	to.bin_lr            = opts.enabled("bin-lr");
+	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);
 	tbl = new tables(dict, to, ir);
-	ir->dynenv = tbl;
+	ir->dynenv  = tbl;
 	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
 
 	set_print_step(opts.enabled("ps"));
@@ -3236,6 +2903,12 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 		//TODO: review how recursion to nested programs should be handled
 		// per transform vs globally
 		//recursive_transform(rp-p);
+		if (opts.enabled("program-gen")) {
+			string pname;
+			cpp_gen g;
+			g.gen(o::to("program-gen"), pname, rp) <<
+				"\nauto& program_gen = " << pname << ";\n";
+		}
 	}
 }
 
