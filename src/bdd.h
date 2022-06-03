@@ -20,6 +20,7 @@
 #include <memory>
 #include <functional>
 #include "defs.h"
+#include "poset.h"
 #ifndef NOMMAP
 #include "memory_map.h"
 #endif
@@ -220,7 +221,7 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	static bdd get(int_t x);
-	static bdd poset_to_bdd(poset &p, bool posUniverse);
+	//static bdd poset_to_bdd(poset &p, bool posUniverse);
 	//static bdd poset_to_bdd(poset &p);
 
 	static int_t bdd_and(int_t x, int_t y);
@@ -328,12 +329,13 @@ public:
 	template <typename T>
 	static std::basic_ostream<T>& stats(std::basic_ostream<T>& os);
 
-	static int_t hi(int_t x);
+	inline static int_t hi(int_t x);
 	inline static int_t lo(int_t x);
 	inline static uint_t var(int_t x) {
-		return CV[abs(x)].pure() ? CV[abs(x)].get_high_var() :
-			(neg_CV[abs(x)].pure() ? neg_CV[abs(x)].get_high_var() :
-				abs(V[abs(x)].v));
+		//return CV[abs(x)].pure() ? CV[abs(x)].get_high_var() :
+		//	(neg_CV[abs(x)].pure() ? neg_CV[abs(x)].get_high_var() :
+		//		abs(V[abs(x)].v));
+		return abs(V[abs(x)].v);
 	}
 
 	static size_t satcount_perm(int_t x, size_t leafvar);

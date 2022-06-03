@@ -164,6 +164,36 @@ int_t PersistentUnionFind::update(const puf &t, int_t x, int_t y) {
 	return add(uf);
 }
 
+int_t PersistentUnionFind::equalize_on(int_t t, int_t x, int_t m) {
+	auto uf = uf_univ[t];
+	auto uf_master = uf_univ[m];
+
+	int_t hash_m = p_arr::get(hashes_s, uf_master.hash_pt, abs(x));
+	auto link = get_equal(m, x);
+
+	int_t parent_in_t = find(t, x);
+
+	int_t hash_current = p_arr::get(hashes_s, uf.hash_pt, abs(parent_in_t));
+	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(x), hash_m);
+	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(parent_in_t),
+				hash_current - hash_m);
+
+	for (auto pos : link) {
+		uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, abs(pos),
+				       pos < 0 ? -x : x);
+	}
+
+
+	// Update linking
+
+
+
+	// Update hash
+	uf.hash = uf.hash ^ hash_current ^ hash_m ^ (hash_current - hash_m);
+
+	return add(uf);
+}
+
 int_t PersistentUnionFind::add(puf &uf) {
 	if (auto it = memo.find(uf); it != memo.end()) {
 		return it->second;
@@ -233,33 +263,33 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 		el.second = find(uf1, el.first);
 	}
 
-	int_t result = t2;
 	for (auto &el: diffs) {
 		// Now create equivalence pairs
 		int_t eq_class_uf2 = find(uf2, el.first);
-		if (el.first == el.second || el.first == eq_class_uf2) {
-			// Element is set representative --> no further equality possible in intersection
-			t2 = remove(t2, el.first);
+		if (el.first == el.second && el.first != eq_class_uf2) {
+			// Equality in uf2 is bigger -> reset set representative
+			// since no further equality is possible in intersection
+			t2 = equalize_on(t2, el.first, 0);
 		}
 		if (el.second < 0) {
-			eq_classes[{-el.first, -eq_class_uf2}].emplace_back(
+			eq_classes[{-el.second, -eq_class_uf2}].emplace_back(
 				-el.first);
 		} else {
-			eq_classes[{el.first, eq_class_uf2}].emplace_back(
+			eq_classes[{el.second, eq_class_uf2}].emplace_back(
 				el.first);
 		}
 	}
 
 	for (const auto &p: eq_classes) {
 		// Remove singletons
-		if (p.second.size() == 1) t2 = remove(t2, p.second[0]);
+		if (p.second.size() == 1) t2 = equalize_on(t2, p.second[0], 0);
 		// Merge equivalence classes --> already done?!
 		//else if (p.second.size() > 1) {
 		//  for(const auto& el : p.second)
 		//    merge(t2,p.second[0],el);
 		//}
 	}
-	return result;
+	return t2;
 }
 
 bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
@@ -412,7 +442,7 @@ int_t PersistentSet::insert(int_t set_id, int_t elem) {
 
 	int_t r;
 	if (abs(el) == abs(elem)) r = 0;
-	else if (abs_cmp(el, elem)) r = add(elem, set_id);
+	else if (abs_cmp(elem, el)) r = add(elem, set_id);
 	else r = add(el, insert(set_univ[set_id].n, elem));
 
 	set_cache.emplace(make_pair(set_id, elem), r);
@@ -423,7 +453,7 @@ int_t PersistentSet::remove(int_t set_id, int_t elem) {
 	int_t el = set_univ[set_id].e;
 	if (el == elem) return set_univ[set_id].n;
 		// In this case the element does not belong to the set
-	else if (abs_cmp(el, elem)) return set_id;
+	else if (abs_cmp(elem, el)) return set_id;
 	else return add(el, remove(set_univ[set_id].n, elem));
 }
 
@@ -478,7 +508,7 @@ int_t PersistentPairs::insert(int_t set_id, pair<int_t, int_t> &elem) {
 	int_t r;
 	auto &el = pairs_univ[set_id].e;
 	if (el == elem) r = set_id;
-	else if (abs_lex_cmp(el, elem)) r = add(elem, set_id);
+	else if (abs_lex_cmp(elem, el)) r = add(elem, set_id);
 	else r = add(el, insert(pairs_univ[set_id].n, elem));
 
 	pair_cache.emplace(pair(set_id, elem), r);
@@ -495,7 +525,7 @@ int_t PersistentPairs::remove(int_t set_id, pair<int_t, int_t> &elem) {
 	auto &el = pairs_univ[set_id].e;
 	if (el == elem) return pairs_univ[set_id].n;
 		// In this case the element does not belong to the set
-	else if (abs_lex_cmp(el, elem)) return set_id;
+	else if (abs_lex_cmp(elem, el)) return set_id;
 	else return add(el, remove(pairs_univ[set_id].n, elem));
 }
 
@@ -544,8 +574,8 @@ void PersistentPairs::print(int_t set_id) {
 }
 
 pair<int_t, int_t> PersistentPairs::form(pair<int_t, int_t> &p) {
-	return abs_cmp(p.first, -p.second) ? move(
-		make_pair(-p.second, -p.first)) : move(p);
+	return abs_cmp(-p.second, p.first) ?
+		make_pair(-p.second, -p.first) : move(p);
 }
 
 std::vector<std::pair<int_t, int_t>> poset::eq_lift_hi;
@@ -566,7 +596,7 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo) {
 				h_imp = pp::get(h).e;
 			}
 			return;
-		} else if (l == 0 || (l != 0 && abs_lex_cmp(l_imp, h_imp))) {
+		} else if (l == 0 || (h != 0 && abs_lex_cmp(h_imp, l_imp))) {
 			if (ps::contains(lo.vars, -h_imp.first)) {
 				// Implication is true in lo since antecedent is violated
 				insert_imp(p, h_imp);
@@ -578,7 +608,7 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo) {
 			} else p.pure = false;
 			h = pp::next(h);
 			h_imp = pp::get(h).e;
-		} else if (h == 0 || abs_lex_cmp(h_imp, l_imp)) {
+		} else if (h == 0 || abs_lex_cmp(l_imp, h_imp)) {
 			if (ps::contains(hi.vars, -l_imp.first)) {
 				// Implication is true in hi since antecedent is violated
 				insert_imp(p, l_imp);
@@ -611,17 +641,17 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo) {
 		if (h == l) {
 			// hi and lo have the same vars
 			while (h != 0) {
-				insert_var(p, h_var, true);
+				insert_var(p, h_var);
 				h = ps::next(h);
 				h_var = ps::get(h).e;
 			}
 			return;
-		} else if (l == 0 || (h != 0 && abs(l_var) < abs(h_var))) {
+		} else if (l == 0 || (h != 0 && abs(h_var) < abs(l_var))) {
 			// Variable in hi but not in lo
 			eq_lift_lo.emplace_back(pu::find(lo.eqs, h_var), h_var);
 			h = ps::next(h);
 			h_var = ps::get(h).e;
-		} else if (h == 0 || abs(h_var) < abs(l_var)) {
+		} else if (h == 0 || abs(l_var) < abs(h_var)) {
 			eq_lift_hi.emplace_back(pu::find(hi.eqs, l_var), l_var);
 			// Here implications for the transitive closure have to be added.
 			// But we want transitive reduction, therefore we don't add anything else.
@@ -629,7 +659,7 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo) {
 			l_var = ps::get(l).e;
 		} else {
 			// The absolute values of the variables are equal -> creates equality
-			if (h_var == l_var) insert_var(p, h_var, true);
+			if (h_var == l_var) insert_var(p, h_var);
 			else insert_eq(p, v, h_var);
 			// Here implications for the transitive closure have to be added.
 			// But we want transitive reduction, therefore we don't add anything else.
@@ -685,7 +715,7 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 	}
 }
 
-poset poset::lift(int_t v, poset &hi, poset &lo) {
+poset poset::lift(int_t v, poset &&hi, poset &&lo) {
 	poset p;
 	// Check if p can possibly be pure
 	if (hi.pure && lo.pure) p.pure = true;
@@ -694,6 +724,7 @@ poset poset::lift(int_t v, poset &hi, poset &lo) {
 	lift_imps(p, hi, lo);
 	lift_vars(p, v, hi, lo);
 	lift_eqs(p, v, hi, lo);
+	p.v = v; // v must be the smallest variable in p
 	return p;
 }
 
@@ -769,9 +800,15 @@ poset poset::eval(int_t v) {
 }
 */
 
-bool poset::insert_var(poset &p, int_t v, bool val) {
-	return val ? p.vars = ps::insert(p.vars, v) :
-		p.vars = ps::insert(p.vars, -v);
+bool poset::insert_var(poset &p, int_t v) {
+	if (abs(v) < p.v) p.v = abs(v);
+	return p.vars = ps::insert(p.vars, v);
+}
+
+poset poset::insert_var(poset &&p, int_t v) {
+	p.vars = ps::insert(p.vars, v);
+	if (abs(v) < p.v) p.v = abs(v);
+	return p;
 }
 
 void poset::insert_imp(poset &p, std::pair<int_t, int_t> &el) {

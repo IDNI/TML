@@ -105,8 +105,7 @@ void bdd::init(bool gc) {
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
-	CV.emplace_back(), CV.emplace_back(), // adding empty poset
-	neg_CV.emplace_back(), neg_CV.emplace_back(), // adding empty poset
+	poset::init(100); // controls initial max value for var in poset
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -125,47 +124,48 @@ void bdd::max_bdd_size_check() {
 
 bdd bdd::get(int_t x) {
 	if (x > 0) {
-		if (CV[x].pure()) return poset_to_bdd(CV[x], true);
+		/*if (CV[x].pure()) return poset_to_bdd(CV[x], true);
 		else if (neg_CV[x].pure()) {
 			bdd v = poset_to_bdd(neg_CV[x], false);
 			return bdd(v.v, -v.h, -v.l);
-		}
+		}*/
 		const bdd &y = V[x];
 		return y.v > 0 ? y : bdd(-y.v, y.l, y.h);
-	}
+	}/*
 	if (neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x], false);
 	else if (CV[-x].pure()) {
 		bdd v = poset_to_bdd(CV[-x], true);
 		return bdd(v.v, -v.h, -v.l);
-	}
+	}*/
 	const bdd &y = V[-x];
 	return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 }
 
 int_t bdd::hi(int_t x) {
-	if(x > 0){
+	if(x > 0){/*
 		if(CV[x].pure()) return poset_to_bdd(CV[x], true).h;
 		else if (neg_CV[x].pure()) return -poset_to_bdd(neg_CV[x], false).h;
-		else return V[x].v < 0 ? V[x].l : V[x].h;
+		else*/ return V[x].v < 0 ? V[x].l : V[x].h;
 	} else {
-		if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).h;
+		/*if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).h;
 		else if (CV[-x].pure()) return -poset_to_bdd(CV[-x], true).h;
-		else return V[-x].v < 0 ? -V[-x].l : -V[-x].h;
+		else*/ return V[-x].v < 0 ? -V[-x].l : -V[-x].h;
 	}
 }
 
 int_t bdd::lo(int_t x) {
 	if(x > 0){
-		if(CV[x].pure()) return poset_to_bdd(CV[x], true).l;
+		/*if(CV[x].pure()) return poset_to_bdd(CV[x], true).l;
 		else if (neg_CV[x].pure()) return -poset_to_bdd(neg_CV[x], false).l;
-		else return V[x].v < 0 ? V[x].h : V[x].l;
+		else*/ return V[x].v < 0 ? V[x].h : V[x].l;
 	} else {
-		if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).l;
+		/*if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).l;
 		else if (CV[-x].pure()) return -poset_to_bdd(CV[-x], true).l;
-		else return V[-x].v < 0 ? -V[-x].h : -V[-x].l;
+		else*/ return V[-x].v < 0 ? -V[-x].h : -V[-x].l;
 	}
 }
 
+/*
 //TODO: Saving evaluated poset positive or negative
 bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
 	// get the highest variable and build high and low
@@ -208,13 +208,14 @@ bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
 	}
 	return bdd(v, h, l);
 }
+*/
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(h && l && v > 0););
 	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)
-		|| v < CV[abs(h)].get_high_var() || v < neg_CV[abs(h)].get_high_var()););
+		   || v < P[abs(h)].v || v < NP[abs(h)].v););
 	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)
-		|| v < CV[abs(l)].get_high_var() || v < neg_CV[abs(l)].get_high_var()););
+		   || v < P[abs(l)].v || v < NP[abs(l)].v););
 
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
@@ -222,6 +223,7 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 	bdd_key k;
 	auto &mm = v < 0 ? Mn : Mp;
 	if (mm.size() <= (size_t)abs(v)) mm.resize(abs(v)+1);
+	if (poset::size() <= abs(v)) poset::resize(abs(v)+1);
 	auto &m = mm[abs(v)];
 	if (l < 0) {
 		h = -h;
@@ -244,74 +246,86 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	if(h == F) {
 		if(l == T) {
 			// pure 2-CNF
-			V.emplace_back(0,0,0);
-			poset c = poset(v,false);
-			poset neg_c = poset(v, true);
-			CV.emplace_back(v, false);
-			Mc.emplace(move(c), CV.size()-1);
-			neg_CV.emplace_back(v, true);
-			Mneg_c.emplace(move(neg_c), neg_CV.size()-1);
+			V.emplace_back(v,h,l);
+			//V.emplace_back(0,0,0);
+			auto p = poset(-v);
+			auto np = poset(v);
+			P.emplace_back(p);
+			//Mc.emplace(move(c), CV.size()-1);
+			NP.emplace_back(np);
+			//Mneg_c.emplace(move(neg_c), neg_CV.size()-1);
 			return;
 		} else {
-			poset neg_c_l = poset::get_neg(l);
-			poset c = poset::extend_sing(poset::get(l), v, true);
-			poset neg_c = poset::merge(v, poset::get_neg(h), neg_c_l);
-			if (c.pure()) {
-				V.emplace_back(0,0,0);
-				Mc.emplace(c, CV.size());
-				if(neg_c.pure())
-					Mneg_c.emplace(neg_c, neg_CV.size());
+			poset np_l = poset::get(l, true);
+			poset p = poset::insert_var(poset::get(l, false), v);
+			poset np = poset::lift(v,
+					       poset::get(h,true),
+					       forward<poset>(np_l)	);
+			if (p.pure) {
+				V.emplace_back(v,h,l);
+				//V.emplace_back(0,0,0);
+				//Mc.emplace(c, CV.size());
+				//if(np.pure)
+					//Mneg_c.emplace(neg_c, neg_CV.size());
 			}
-			else if (neg_c_l.pure() && neg_c_l.is_singleton()){
-				neg_c.set_pure();
-				V.emplace_back(0,0,0);
-				Mneg_c.emplace(neg_c, neg_CV.size());
+			else if (np_l.pure && poset::only_vars(np_l)){
+				np.pure = true;
+				V.emplace_back(v,h,l);
+				//V.emplace_back(0,0,0);
+				//Mneg_c.emplace(neg_c, neg_CV.size());
 			}
 			else V.emplace_back(v,h,l);
-			CV.emplace_back(move(c));
-			neg_CV.emplace_back(move(neg_c));
+			P.emplace_back(p);
+			NP.emplace_back(np);
 			return;
 		}
 	}
 	if(l == T) {
 		// h cannot be F here
-		poset c_h = poset::get(h);
-		poset c = poset::merge(v, c_h, poset::get(l));
-		poset neg_c = poset::extend_sing(poset::get_neg(h), v, true);
-		if (c_h.pure() && c_h.is_singleton()) {
-			c.set_pure();
-			V.emplace_back(0, 0, 0);
-			Mc.emplace(c, CV.size());
-			if (neg_c.pure())
-				Mneg_c.emplace(neg_c, neg_CV.size());
+		poset p_h = poset::get(h,false);
+		poset p = poset::lift(v,
+				      forward<poset>(p_h),
+				      poset::get(l, false)	);
+		poset np = poset::insert_var(poset::get(h, true), v);
+		if (p_h.pure && poset::only_vars(p_h)) {
+			p.pure = true;
+			V.emplace_back(v,h,l);
+			//V.emplace_back(0, 0, 0);
+			//Mc.emplace(c, CV.size());
+			//if (neg_c.pure())
+			//	Mneg_c.emplace(neg_c, neg_CV.size());
 		}
-		else if (neg_c.pure()) {
-			V.emplace_back(0, 0, 0);
-			Mneg_c.emplace(neg_c, neg_CV.size());
+		else if (np.pure) {
+			V.emplace_back(v,h,l);
+			//V.emplace_back(0, 0, 0);
+			//Mneg_c.emplace(neg_c, neg_CV.size());
 		}
 		else V.emplace_back(v, h, l);
-		CV.emplace_back(move(c));
-		neg_CV.emplace_back(move(neg_c));
+		P.emplace_back(p);
+		NP.emplace_back(np);
 		return;
 	}
 	DBG(assert(h!=T);)
 	// general lifting case
-	poset c = poset::merge(v, poset::get(h), poset::get(l));
-	poset neg_c = poset::merge(v, poset::get_neg(h), poset::get_neg(l));
-	if (c.pure() && neg_c.pure()) {
-		V.emplace_back(0, 0, 0);
-		Mc.emplace(c, CV.size());
-		Mneg_c.emplace(neg_c, neg_CV.size());
-	} else if (c.pure()) {
-		V.emplace_back(0, 0, 0);
-		Mc.emplace(c, CV.size());
-	} else if (neg_c.pure()){
-		V.emplace_back(0, 0, 0);
-		Mneg_c.emplace(neg_c, neg_CV.size());
+	poset p = poset::lift(v, poset::get(h,false), poset::get(l,false));
+	poset np = poset::lift(v, poset::get(h,true), poset::get(l,true));
+	if (p.pure && np.pure) {
+		V.emplace_back(v,h,l);
+		//V.emplace_back(0, 0, 0);
+		//Mc.emplace(c, CV.size());
+		//Mneg_c.emplace(neg_c, neg_CV.size());
+	} else if (p.pure) {
+		V.emplace_back(v,h,l);
+		//V.emplace_back(0, 0, 0);
+		//Mc.emplace(c, CV.size());
+	} else if (np.pure){
+		V.emplace_back(v,h,l);
+		//V.emplace_back(0, 0, 0);
+		//Mneg_c.emplace(neg_c, neg_CV.size());
 	}
 	else 	V.emplace_back(v,h,l);
-	CV.emplace_back(move(c));
-	neg_CV.emplace_back(move(neg_c));
+	P.emplace_back(p);
+	NP.emplace_back(np);
 }
 
 int_t bdd::from_bit(uint_t b, bool v) {
@@ -790,10 +804,12 @@ void bdd::gc() {
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V.size() < S.size() << 3) return;
 	const size_t pvars = Mp.size(), nvars = Mn.size();
-	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1),
-	Mc.clear(), Mneg_c.clear();
+	Mp.clear(), Mn.clear(), S.insert(0), S.insert(1);
+	//Mc.clear(), Mneg_c.clear();
 //	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
 	vector<int_t> p(V.size(), 0);
+	vector<poset> P1; vector<poset> NP1;
+	P1.reserve(S.size()); NP1.reserve(S.size());
 #ifndef NOMMAP
 	bdd_mmap v1(memory_map_allocator<bdd>("", bdd_mmap_mode));
 	v1.reserve(bdd_mmap_mode == MMAP_NONE ? S.size() : max_bdd_nodes);
@@ -804,18 +820,18 @@ void bdd::gc() {
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) {
 			p[n] = v1.size();
-			CV[v1.size()] = move(CV[n]);
-			neg_CV[v1.size()] = move(neg_CV[n]);
-			v1.emplace_back(move(V[n]));
+			P1.emplace_back(P[n]);
+			NP1.emplace_back(NP[n]);
+			v1.emplace_back(V[n]);
 		}
-	CV.erase(CV.begin() + v1.size(), CV.end());
-	neg_CV.erase(neg_CV.begin() + v1.size(), neg_CV.end());
 	OUT(stats(o::dbg())<<endl;)
 	V = move(v1);
+	P = move(P1);
+	NP = move(NP1);
 #define f(i) (i = (i >= 0 ? (p[i] ? p[i] : i) : (p[-i] ? -p[-i] : i)))
 	for (size_t n = 2; n < V.size(); ++n) {
 		DBG(assert((p[abs(V[n].h)] && p[abs(V[n].l)] && V[n].v)
-			|| CV[n].pure() || neg_CV[n].pure());)
+			|| P[n].pure || NP[n].pure);)
 		f(V[n].h), f(V[n].l);
 	}
 	unordered_map<ite_memo, int_t> c;
@@ -919,11 +935,11 @@ void bdd::gc() {
 		if (V[n].v < 0)
 			Mn[-V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
-		else if (V[n].v == 0) {
+		/*else if (V[n].v == 0) {
 			//Emplace pure 2CNF in lookup table
 			if(CV[n].pure()) Mc.emplace(CV[n], n);
 			if(neg_CV[n].pure()) Mneg_c.emplace(neg_CV[n], n);
-		}
+		}*/
 		else Mp[V[n].v].emplace(bdd_key(hash_pair(V[n].h, V[n].l),
 				V[n].h, V[n].l), n);
 	OUT(o::dbg() <<"AM: " << AM.size() << " C: "<< C.size() << endl;)

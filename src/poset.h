@@ -113,7 +113,7 @@ class PersistentUnionFind {
 
 	static int_t add(puf &uf);
 	static int_t update(const puf &t, int_t x, int_t y);
-	static int_t remove(int_t t, int_t x);
+	static int_t equalize_on(int_t t, int_t x, int_t m);
 	static sppa update_link(const puf &t, int_t x, int_t y);
   public:
 	PersistentUnionFind() = delete;
@@ -144,7 +144,7 @@ class PersistentUnionFind {
 	static std::basic_ostream<T> print(int_t uf, std::basic_ostream<T> &os);
 };
 
-// The representative of a set of ints is its highest element
+// The representative of a set of ints is its smallest element
 struct PersistentSet {
 	// Element in set
 	// If e is 0 we are dealing with the empty set
@@ -170,7 +170,7 @@ struct PersistentSet {
 	static void print(int_t set_id);
 };
 
-// The representative of a set of pairs is its highest element
+// The representative of a set of pairs is its smallest element
 struct PersistentPairs {
 	// Element in set
 	// If e is 0 we are dealing with the empty set
@@ -224,14 +224,38 @@ class poset {
   public:
 	// Indicates if the poset has an associated BDD part
 	bool pure = false;
-	// Indicates if the poset contains a higher up variable then the associated BDD
-	int_t highest = 0;
+	// Indicates the smallest variable in the poset
+	int_t v = 0;
+
+	poset () = default;
+
+	//Creates single variable poset
+	explicit poset (int_t v) : vars(v), pure(true), v(v) {}
 
 	friend std::hash<poset>;
 	bool operator==(const poset &p) const;
-	static poset lift(int_t v, poset &hi, poset &lo);
+
+	static void init(int n) {
+		P.emplace_back(); P.emplace_back();
+		NP.emplace_back(); NP.emplace_back();
+		pu::init(n);
+		pp::init();
+		ps::init();
+	};
+
+	static bool resize (int n) {
+		return pu::resize(n);
+	};
+
+	static int_t size () {
+		// The only data structure that needs size control is union find
+		return pu::size();
+	};
+
+	static poset lift(int_t v, poset &&hi, poset &&lo);
 	//static poset eval (int_t v, poset& p);
-	static bool insert_var(poset &p, int_t v, bool val);
+	static bool insert_var(poset &p, int_t v);
+	static poset insert_var(poset &&p, int_t v);
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);
 	static void insert_imp(poset &p, int_t fst, int_t snd);
 	static void insert_eq(poset &p, int_t v1, int_t v2);
