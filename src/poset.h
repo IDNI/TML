@@ -113,15 +113,21 @@ class PersistentUnionFind {
 
 	static int_t add(puf &uf);
 	static int_t update(const puf &t, int_t x, int_t y);
-	static int_t equalize_on(int_t t, int_t x, int_t m);
+	static void split_set (std::vector<int_t> &s, puf& uf, int_t root);
+	static void split_linking(std::vector<int_t> &s, sppa& link_p,
+				  int_t root);
+	static void
+	extend_eq_set(std::vector<std::pair<int_t, int_t>> &diffs, int_t root,
+		      puf& uf, std::vector<int_t> &eq_set);
 	static sppa update_link(const puf &t, int_t x, int_t y);
+	static int_t find(const puf &t, int_t elem);
+	static std::vector<int_t> get_equal(const puf& uf, int_t x);
   public:
 	PersistentUnionFind() = delete;
 	bool operator==(const puf &) const;
 	friend std::hash<puf>;
 
 	static void init(int_t n);
-	static int_t find(const puf &t, int_t elem);
 	static int_t find(int_t t, int_t elem);
 	static int_t merge(int_t t, int_t x, int_t y);
 	static int_t intersect(int_t t1, int_t t2);

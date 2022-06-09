@@ -1,4 +1,5 @@
 #include "poset.h"
+#include <numeric>
 
 #ifndef NOOUTPUTS
 
@@ -164,36 +165,6 @@ int_t PersistentUnionFind::update(const puf &t, int_t x, int_t y) {
 	return add(uf);
 }
 
-int_t PersistentUnionFind::equalize_on(int_t t, int_t x, int_t m) {
-	auto uf = uf_univ[t];
-	auto uf_master = uf_univ[m];
-
-	int_t hash_m = p_arr::get(hashes_s, uf_master.hash_pt, abs(x));
-	auto link = get_equal(m, x);
-
-	int_t parent_in_t = find(t, x);
-
-	int_t hash_current = p_arr::get(hashes_s, uf.hash_pt, abs(parent_in_t));
-	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(x), hash_m);
-	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(parent_in_t),
-				hash_current - hash_m);
-
-	for (auto pos : link) {
-		uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, abs(pos),
-				       pos < 0 ? -x : x);
-	}
-
-
-	// Update linking
-
-
-
-	// Update hash
-	uf.hash = uf.hash ^ hash_current ^ hash_m ^ (hash_current - hash_m);
-
-	return add(uf);
-}
-
 int_t PersistentUnionFind::add(puf &uf) {
 	if (auto it = memo.find(uf); it != memo.end()) {
 		return it->second;
@@ -202,6 +173,91 @@ int_t PersistentUnionFind::add(puf &uf) {
 		memo.try_emplace(move(uf), uf_univ.size() - 1);
 		return (int_t) uf_univ.size() - 1;
 	}
+}
+
+void
+PersistentUnionFind::split_set(vector<int_t> &s, PersistentUnionFind::puf &uf, int_t root) {
+	// Calculate new hashes
+	int_t hash_s = accumulate(s.begin(),s.end(), 0,
+				  [&](int_t x, int_t y){return x+y*y;});
+	int_t hash_cs = p_arr::get(hashes_s, uf.hash_pt, abs(root)) - hash_s;
+	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(root), hash_cs);
+	uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, abs(s[0]), hash_s);
+	// Reset parents
+	for (auto el : s) {
+		uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, abs(el),
+				       el < 0 ? -s[0] : s[0]);
+	}
+	// update linking
+	split_linking(s, uf.link_pt, abs(root));
+}
+
+void
+PersistentUnionFind::split_linking(std::vector<int_t> &s, sppa &link_p,
+				   int_t root) {
+	bool inv = false;
+	// Remove set s from linking
+	int_t next = p_arr::get(link_s, link_p, root);
+	while (abs(next) != root) {
+		inv = next < 0;
+		if (hasbc(s, next, abs_cmp) || hasbc(s, -next, abs_cmp)) {
+			next = p_arr::get(link_s, link_p, abs(next));
+			link_p = p_arr::set(link_s, link_p, root,
+					 inv ? -next : next);
+		}
+		next = p_arr::get(link_s, link_p, abs(next));
+		next = inv ? -next : next;
+	}
+
+	// Introduce linking for set s
+	inv = false;
+	for (int_t i = 0; i + 1 < (int_t) s.size(); ++i) {
+		link_p = p_arr::set(link_s, link_p, abs(s[i]),
+				 inv ? -s[i + 1] : s[i + 1]);
+		if ((s[i] < 0 && s[i + 1] > 0) || (s[i] > 0 && s[i + 1] < 0))
+			inv = !inv;
+	}
+}
+
+void
+PersistentUnionFind::extend_eq_set(vector<pair<int_t, int_t>> &diffs, int_t root,
+				   puf& uf, vector<int_t> &eq_set) {
+	//TODO: Avoid creating vector -> use static variant
+	vector<int_t> root_set = get_equal(uf, root);
+	sortc(root_set, abs_cmp);
+	//sortc(eq_set, abs_cmp);
+	//vector<int_t> res;
+
+	auto it_diff = diffs.begin();
+	auto it_root = root_set.begin();
+	//auto it_eq = eq_set.begin();
+
+	while (it_root != root_set.end()) {
+		if(it_diff->first < abs(*it_root)) ++it_diff;
+		else if(abs(*it_root) < it_diff->first) {
+			// Element in root_set but not in diff
+			int_t p = find(uf, *it_root);
+			if(hasbc(eq_set, p, abs_cmp))
+				eq_set.emplace_back(*it_root);
+			else if (hasbc(eq_set, -p, abs_cmp))
+				eq_set.emplace_back(-*it_root);
+			++it_root;
+		}
+		else {
+			++it_root; ++it_diff;
+			/*// Element is in intersection
+			if(abs(*it_root) < abs(*it_eq)) {
+				//Element is not in eq_set
+				res.emplace_back(*it_root);
+				++it_root; ++it_diff;
+			} else {
+				//Element is in eq_set
+				//Note, that eq_set is contained in root_set
+				++it_root; ++it_diff; ++it_eq;
+			}*/
+		}
+	}
+	sortc(eq_set, abs_cmp);
 }
 
 PersistentUnionFind::sppa
@@ -239,11 +295,12 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	if (t1 == t2) return t1;
 	else if (t1 == 0 || t2 == 0) return 0;
 
-	static map<pair<int_t, int_t>, vector<int_t>> eq_classes;
+	static map<pair<int_t, int_t>, vector<int_t>, decltype(abs_lex_cmp)> eq_classes(
+		abs_lex_cmp);
 	eq_classes.clear();
 
 	auto &uf1 = uf_univ[t1];
-	auto &uf2 = uf_univ[t2];
+	auto uf2 = uf_univ[t2];
 
 	// Make uf1 root, so we check the diff path from uf2
 	p_arr::reroot(parent_s, uf1.arr_pt);
@@ -252,9 +309,9 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	vector<pair<int_t, int_t>> diffs;
 	while (diff_pt.lock()->diff != nullptr) {
 		auto el = make_pair(diff_pt.lock()->p, 0);
-		if (!binary_search(diffs.begin(), diffs.end(), el)) {
+		if (!hasbc(diffs, el, abs_lex_cmp)) {
 			diffs.emplace_back(move(el));
-			sort(diffs.begin(), diffs.end());
+			sortc(diffs, abs_lex_cmp);
 		}
 		diff_pt = diff_pt.lock()->diff;
 	}
@@ -266,11 +323,6 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	for (auto &el: diffs) {
 		// Now create equivalence pairs
 		int_t eq_class_uf2 = find(uf2, el.first);
-		if (el.first == el.second && el.first != eq_class_uf2) {
-			// Equality in uf2 is bigger -> reset set representative
-			// since no further equality is possible in intersection
-			t2 = equalize_on(t2, el.first, 0);
-		}
 		if (el.second < 0) {
 			eq_classes[{-el.second, -eq_class_uf2}].emplace_back(
 				-el.first);
@@ -280,16 +332,11 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 		}
 	}
 
-	for (const auto &p: eq_classes) {
-		// Remove singletons
-		if (p.second.size() == 1) t2 = equalize_on(t2, p.second[0], 0);
-		// Merge equivalence classes --> already done?!
-		//else if (p.second.size() > 1) {
-		//  for(const auto& el : p.second)
-		//    merge(t2,p.second[0],el);
-		//}
+	for (auto &p: eq_classes) {
+		extend_eq_set(diffs, p.first.second, uf2, p.second);
+		split_set(p.second, uf2, p.first.second);
 	}
-	return t2;
+	return add(uf2);
 }
 
 bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
@@ -344,18 +391,7 @@ basic_ostream<T> PersistentUnionFind::print(int_t uf, basic_ostream<T> &os) {
 //Returns a vector of all equal elements to x including x in t
 std::vector<int_t> PersistentUnionFind::get_equal(int_t t, int_t x) {
 	auto &uf = uf_univ[t];
-	int_t rep_x = find(uf, x);
-
-	vector<int_t> set{};
-	bool negate = false;
-	//Go down linked list and negate rest of chain if - is encountered
-	int_t next = rep_x;
-	do {
-		if (next < 0) negate = !negate;
-		next = p_arr::get(link_s, uf.link_pt, abs(next));
-		set.push_back(negate ? -next : next);
-	} while (abs(next) != abs(rep_x));
-	return set;
+	return get_equal(uf, x);
 }
 
 // Removes the set of equal elements from t
@@ -396,6 +432,22 @@ bool PersistentUnionFind::resize(int_t n) {
 
 int_t PersistentUnionFind::size() {
 	return p_arr::size(parent_s);
+}
+
+std::vector<int_t>
+PersistentUnionFind::get_equal(const PersistentUnionFind::puf &uf, int_t x) {
+	int_t rep_x = find(uf, x);
+
+	vector<int_t> set{};
+	bool negate = false;
+	//Go down linked list and negate rest of chain if - is encountered
+	int_t next = rep_x;
+	do {
+		if (next < 0) negate = !negate;
+		next = p_arr::get(link_s, uf.link_pt, abs(next));
+		set.push_back(negate ? -next : next);
+	} while (abs(next) != abs(rep_x));
+	return set;
 }
 
 bool PersistentSet::operator==(const PersistentSet &s) const {
