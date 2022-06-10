@@ -12,6 +12,9 @@
 // modified over time by the Author.
 #include <sstream>
 #include "options.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 using namespace std;
 
@@ -194,8 +197,7 @@ void options::setup() {
 		"factor out parts of queries using CQC test");
 	add_bool("to-dnf",
 		"convert FOL formulas into to DNF before running program");
-	add_bool("safecheck",
-		"enable safety check");
+	add_bool("safecheck", "to be DEPRECATED: safety check will be always on");
 	add(option(option::type::INT, { "iterate" }).description("transforms"
 		" the program into one where each step is equivalent to 2^x of"
 		" the original's (default: x=0)"));
@@ -285,6 +287,21 @@ void options::setup() {
 	add_output_alt("parser-to-rules","prules","parsed forest as tml rules");
 	add_output_alt("program-gen", "cpp",
 		"generated C++ code of the given TML code");
+
+#ifdef __EMSCRIPTEN__
+#ifndef NODERAWFS
+	static bool nodefsmounted = false;
+	if (!nodefsmounted) {
+		nodefsmounted = true;
+		EM_ASM({
+    			var directory = '/workspace';
+    			FS.mkdir(directory);
+    			FS.mount(NODEFS, {root : '.'}, directory);
+			FS.chdir(directory);
+		}, "fs");
+	}
+#endif
+#endif
 
 	init_defaults();
 }

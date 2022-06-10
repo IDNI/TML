@@ -60,7 +60,7 @@ set(JSLIB_COMPILE_OPTIONS
 	"$<$<CONFIG:DEBUG>:-O0;-DDEBUG;-gsource-map;-fno-exceptions>"
 	"$<$<CONFIG:RELEASE>:-O3;-DNDEBUG;-g0;-fno-exceptions>"
 )
-set(JSLIB_LINK_OPTIONS "--bind --no-entry")
+set(JSLIB_LINK_OPTIONS "--bind --no-entry -lnodefs.js")
 string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_NAME='tml'")
 string(APPEND JSLIB_LINK_OPTIONS " -s MODULARIZE=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s USE_ES6_IMPORT_META=0")
@@ -76,15 +76,16 @@ string(APPEND JSLIB_LINK_OPTIONS " -s ASSERTIONS=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s FETCH=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s WARN_UNALIGNED=1")
 
-if (BUILD_JSMODULE)
-	string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_ES6=1")
-	string(APPEND JSLIB_LINK_OPTIONS " -s ENVIRONMENT='web,worker'")
-endif ()
+# tmllib.js library
+add_executable(tmllib)
+target_setup(tmllib)
+target_compile_options(tmllib PRIVATE ${JSLIB_COMPILE_OPTIONS})
+set_target_properties(tmllib PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
+target_sources(tmllib PRIVATE ${JSLIB_SOURCES})	
 
-# build mjs module
-# set(CMAKE_EXECUTABLE_SUFFIX ".mjs")
-
-# tml.js library
+# tml.js module
+string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_ES6=1")
+string(APPEND JSLIB_LINK_OPTIONS " -s ENVIRONMENT='web,worker'")
 add_executable(tml)
 target_setup(tml)
 target_compile_options(tml PRIVATE ${JSLIB_COMPILE_OPTIONS})
