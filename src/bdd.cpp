@@ -15,7 +15,6 @@
 #include "bdd.h"
 
 #ifndef NOOUTPUTS
-#include "output.h"
 #define OUT(x) x
 #else
 #define OUT(x)
@@ -104,7 +103,7 @@ void bdd::init(mmap_mode m, size_t max_size, const string fn) {
 #else
 void bdd::init() {
 #endif
-	//DBG(o::dbg() << "bdd::init(m: MMAP_" <<
+	//DBG(COUT << "bdd::init(m: MMAP_" <<
 	//	(m == MMAP_NONE ? "NONE" : "WRITE") <<
 	//	", max_size: " << max_size << ", fn: " << fn
 	//	<< ") max_bdd_nodes=" << max_bdd_nodes << "\n";)
@@ -117,7 +116,7 @@ void bdd::init() {
 
 #ifndef NOMMAP
 void bdd::max_bdd_size_check() {
-	//DBG(o::dbg() << "add_check V.size()-1=" << V.size()-1
+	//DBG(COUT << "add_check V.size()-1=" << V.size()-1
 	//	<< " max_bdd_nodes=" << max_bdd_nodes << endl;)
 	if (V.size() == max_bdd_nodes)
 		CERR << "Maximum bdd size reached. Increase the limit"
@@ -639,7 +638,7 @@ void bdd::gc() {
 	for (auto x : bdd_handle::M) mark_all(x.first);
 //	if (V.size() < S.size() << 3) return;
 	id_map.clear(), S.insert(0), S.insert(1);
-//	if (S.size() >= 1e+6) { o::err() << "out of memory" << endl; exit(1); }
+//	if (S.size() >= 1e+6) { COUT << "out of memory" << endl; exit(1); }
 	vector<bdd_id> p(V.size(), 0);
 #ifndef NOMMAP
 	bdd_mmap v1(memory_map_allocator<bdd>("", bdd_mmap_mode));
@@ -650,7 +649,7 @@ void bdd::gc() {
 #endif
 	for (size_t n = 0; n < V.size(); ++n)
 		if (has(S, n)) p[n] = v1.size(), v1.emplace_back(move(V[n]));
-	OUT(stats(o::dbg())<<endl;)
+	//OUT(stats(COUT)<<endl;)
 	V = move(v1);
 #define f(i) (SET_BDD_ID(i, (p[GET_BDD_ID(i)] ? p[GET_BDD_ID(i)] : GET_BDD_ID(i))), i)
 	for (size_t n = 2; n < V.size(); ++n) {
@@ -758,7 +757,7 @@ void bdd::gc() {
 	for (size_t n = 0; n < V.size(); ++n)
 		id_map.emplace(bdd_key(hash_upair(hsh(V[n].h), hsh(V[n].l)),
 			V[n].h, V[n].l), n);
-	OUT(o::dbg() <<"# AM: " << AM.size() << " C: "<< C.size() << endl;)
+	//OUT(COUT <<"# AM: " << AM.size() << " C: "<< C.size() << endl;)
 }
 
 void bdd_handle::update(const vector<bdd_id>& p) {
@@ -833,9 +832,9 @@ spbdd_handle bdd_and_many(bdd_handles v) {
 	b.reserve(v.size());
 	for (size_t n = 0; n != v.size(); ++n) b.push_back(v[n]->b);
 	am_sort(b);
-//	DBG( o::out()<<"am begin"<<endl;
+//	DBG( COUT<<"am begin"<<endl;
 	auto r = bdd_handle::get(bdd::bdd_and_many(move(b)));
-//	DBG( o::out()<<"am end"<<endl;
+//	DBG( COUT<<"am end"<<endl;
 	return r;
 }
 
@@ -1018,8 +1017,8 @@ spbdd_handle bdd_and_ex(cr_spbdd_handle x, cr_spbdd_handle y,
 	const bools& b) {
 //	DBG(assert(bdd_nvars(x) < b.size());)
 //	DBG(assert(bdd_nvars(y) < b.size());)
-//	out(o::out(), x)<<endl<<endl;
-//	out(o::out(), y)<<endl<<endl;
+//	out(COUT, x)<<endl<<endl;
+//	out(COUT, y)<<endl<<endl;
 	return bdd_handle::get(bdd::bdd_and_ex(x->b, y->b, b));
 }
 
