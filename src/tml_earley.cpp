@@ -492,7 +492,7 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 	a.emplace(U"pref", [&ctx, this](ni_t, ncs_t) {
 		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme("_pref"));
 	});
-	a.emplace(U"priority", [&parser, &ctx, &to_int, this](ni_t ni, ncs_t) {
+	a.emplace(U"priority", [&parser, &ctx, &to_int](ni_t ni, ncs_t) {
 		ctx.rt.e.emplace_back(to_int(to_string(to_string_t(
 			parser.flatten(ni)))));
 	});

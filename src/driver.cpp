@@ -3591,7 +3591,7 @@ bool driver::transform_handler(raw_prog &p) {
 	ir->type_resolve(p.nps[0]);
 	#endif
 
-	if(opts.enabled("safecheck")) {
+	if (opts.enabled("safecheck")) {
 		raw_prog temp_rp(p); //temporary fix to safecheck
 		if(auto res = is_safe(temp_rp.nps[0])) {
 			ostringstream msg;
@@ -3601,7 +3601,7 @@ bool driver::transform_handler(raw_prog &p) {
 					res->second << " is not limited. "
 					"Try rewriting the rule to make its "
 					"safety clearer.";
-			parse_error(msg.str().c_str());
+			return error = true, parse_error(msg.str().c_str());
 		}
 	}
 
