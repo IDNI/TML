@@ -392,13 +392,15 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 // ----------------------------------------------------------------------------
 // Over bdds MULT
 // ----------------------------------------------------------------------------
-// temporary fix to link issue
-//extern uints perm_init(size_t n);
+#ifdef BDD_ARITH
+extern uints perm_init(size_t n);
+#else
 uints perm_init(size_t n) {
 	uints p(n);
 	while (n--) p[n] = n;
 	return p;
 }
+#endif
 
 template<typename T> struct veccmp {
 	bool operator()(const vector<T>& x, const vector<T>& y) const{
@@ -1243,4 +1245,3 @@ spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
 spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt) {
 	return bdd_handle::get(bdd::bdd_shift(x->b, amt));
 }
-
