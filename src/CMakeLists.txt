@@ -37,7 +37,7 @@ set(TML_HEADERS
 
 set(TML_SOURCES
 	bdd.cpp
-	bdd_ext.cpp
+	bdd_arith.cpp
 	builtins.cpp
 	cpp_gen.cpp
 	dict.cpp

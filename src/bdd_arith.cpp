@@ -392,8 +392,13 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 // ----------------------------------------------------------------------------
 // Over bdds MULT
 // ----------------------------------------------------------------------------
-
-extern uints perm_init(size_t n);
+// temporary fix to link issue
+//extern uints perm_init(size_t n);
+uints perm_init(size_t n) {
+	uints p(n);
+	while (n--) p[n] = n;
+	return p;
+}
 
 template<typename T> struct veccmp {
 	bool operator()(const vector<T>& x, const vector<T>& y) const{
@@ -1228,3 +1233,14 @@ void bdd::mult_dfs(bdd_ref a_in, bdd_ref b_in, bdd_ref *accs, size_t depth, size
 		mult_dfs(a.h, b_in, accs, depth+1, bits, n_args, c);
 	}
 }
+
+bdd_ref bdd::bdd_xor(bdd_ref x, bdd_ref y) { return bdd_ite(x,FLIP_INV_OUT(y),y); }
+
+spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
+	return bdd_handle::get(bdd::bdd_xor(x->b,y->b));
+}
+
+spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt) {
+	return bdd_handle::get(bdd::bdd_shift(x->b, amt));
+}
+

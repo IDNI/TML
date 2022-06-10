@@ -813,10 +813,6 @@ spbdd_handle bdd_ite_var(bdd_shft x, cr_spbdd_handle y, cr_spbdd_handle z) {
 	return bdd_handle::get(bdd::bdd_ite_var(x, y->b, z->b));
 }
 
-spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt) {
-	return bdd_handle::get(bdd::bdd_shift(x->b, amt));
-}
-
 spbdd_handle bdd_and_many(bdd_handles v) {
 	if (V.size() >= gclimit) bdd::gc();
 /*	if (v.size() > 16) {
@@ -931,12 +927,6 @@ void allsat_cb::sat(bdd_ref x) {
 		p[++v-2] = true, sat(bx.h),
 		p[v-2] = false, sat(bx.l), --v;
 	else f(p, x);
-}
-
-bdd_ref bdd::bdd_xor(bdd_ref x, bdd_ref y) { return bdd_ite(x,FLIP_INV_OUT(y),y); }
-
-spbdd_handle bdd_xor(cr_spbdd_handle x, cr_spbdd_handle y) {
-	return bdd_handle::get(bdd::bdd_xor(x->b,y->b));
 }
 
 bdd_ref bdd::bdd_ex(bdd_ref x, const bools& b, unordered_map<bdd_ref, bdd_ref>& memo,
