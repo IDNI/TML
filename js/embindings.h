@@ -50,6 +50,9 @@ EMSCRIPTEN_BINDINGS(tml) {
 					reinterpret_cast<const char*>(cptr);
 				return new driver(prog, o);
 			}), allow_raw_pointers())
+		.class_function("version", optional_override([]() -> std::string {
+				return std::string(GIT_DESCRIBED);
+			}), allow_raw_pointers())
 		.function("out", optional_override(
 			[](driver& self, emscripten::val v) {
 				return self.out(v);

@@ -954,7 +954,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
 
-	DBG(COUT <<  "add_prog_wprod" << endl;);
+	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	//if (mknums) to_nums(m);
@@ -989,7 +989,7 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
-	DBG(COUT << "run_prog" << endl;);
+	DBG(o::dbg() << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
