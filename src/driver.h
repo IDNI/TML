@@ -28,7 +28,7 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
-
+#include "printing.h"
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;

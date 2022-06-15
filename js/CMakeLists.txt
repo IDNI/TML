@@ -15,7 +15,7 @@ include(tml-common)
 set(JSLIB_SOURCES
 	../src/bdd.cpp
 	../src/bdd.h
-	../src/bdd_ext.cpp
+	../src/bdd_arith.cpp
 	../src/builtins.cpp
 	../src/builtins.h
 	../src/char_defs.h
@@ -40,6 +40,8 @@ set(JSLIB_SOURCES
 	../src/options.h
 	../src/output.cpp
 	../src/output.h
+	../src/printing.cpp
+	../src/printing.h
 	../src/proof.cpp
 	../src/save_csv.cpp
 	../src/tables.cpp

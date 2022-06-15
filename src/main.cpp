@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	inputs ii;
 	outputs oo;
+	o::init_outputs(oo);
 	options o(argc, argv, &ii, &oo);
 	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
 		o.get_int("bdd-max-size"), o.get_string("bdd-file"));

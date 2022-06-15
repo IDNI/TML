@@ -72,7 +72,16 @@ jobs:
           make -j5
 # tests
       - name: Running tests
-        run: ./build-Debug/tests/test_tml
+        run: |
+          cd ./build-Debug
+          echo -en "a.\nb.\nc :- a, b.\n" > ./input.test.file
+          ./test_input
+          ./test_output >output.test.stdout 2>output.test.stderr
+          O=`cat output.test.file2`  && [ "$O" == "file test"   ] || echo "ERROR: file output fail"
+          O=`grep -v doctest output.test.stdout | head -n 1` && [ "$O" == "stdout test" ] || echo "ERROR: standard output fail"
+          O=`cat output.test.stderr` && [ "$O" == "stderr test" ] || echo "ERROR: standard error fail"
+          rm -f output.test.stdout output.test.stderr output.test.file* output.test.info named.name1 named.name2 input.test.file
+          cd -
       - name: TML execution
         run: ./build-Debug/tml -ie "a(1)."
 # Ubuntu analyzes
