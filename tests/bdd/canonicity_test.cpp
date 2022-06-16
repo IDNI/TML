@@ -2,7 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_set>
-#include "../src/bdd.h"
+#include "../../src/bdd.h"
 using namespace std;
 
 // Recursively generate all boolean functions of the given arity

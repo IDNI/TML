@@ -71,19 +71,23 @@ jobs:
           fi
           make -j5
 # tests
-      - name: Running tests
+      - name: Test TML execution
+        run: ./build-Debug/tml -ie "a(1)."
+      - name: Running unit tests
         run: |
           cd ./build-Debug
-          echo -en "a.\nb.\nc :- a, b.\n" > ./input.test.file
-          ./test_input
-          ./test_output >output.test.stdout 2>output.test.stderr
-          O=`cat output.test.file2`  && [ "$O" == "file test"   ] || echo "ERROR: file output fail"
-          O=`grep -v doctest output.test.stdout | head -n 1` && [ "$O" == "stdout test" ] || echo "ERROR: standard output fail"
-          O=`cat output.test.stderr` && [ "$O" == "stderr test" ] || echo "ERROR: standard error fail"
-          rm -f output.test.stdout output.test.stderr output.test.file* output.test.info named.name1 named.name2 input.test.file
+          ../tests/run_unit_tests.sh
           cd -
-      - name: TML execution
-        run: ./build-Debug/tml -ie "a(1)."
+      - name: Running regression tests
+        run: |
+          cd ./tests
+          ./run_all_regression_tests.sh
+          cd -
+#      - name: Running NodeJS regression tests # TODO: build tmllib.js first
+#        run: |
+#          cd ./tests
+#          ./run_all_nodejs_regression_tests.sh
+#          cd -
 # Ubuntu analyzes
 #      - name: Formatting
 #        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
