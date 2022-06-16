@@ -24,13 +24,13 @@ r=$?; [[ $r != 0 ]] && status=$r
 cat output.test.stdout
 O=`cat output.test.file2` && \
 	[ "$O" == "file test"   ] \
-		|| echo "ERROR: file output fail" && status=1
+		|| (echo "ERROR: file output fail" && status=1)
 O=`grep -v doctest output.test.stdout | head -n 1` && \
 	[ "$O" == "stdout test" ] \
-		|| echo "ERROR: standard output fail" && status=1
+		|| (echo "ERROR: standard output fail" && status=1)
 O=`cat output.test.stderr` && \
 	[ "$O" == "stderr test" ] \
-		|| echo "ERROR: standard error fail" && status=1
+		|| (echo "ERROR: standard error fail" && status=1)
 
 ###############
 echo "cleaning"
