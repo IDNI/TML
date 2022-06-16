@@ -202,7 +202,7 @@ bool tables::get_facts(const flat_prog& m) {
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
 	// Compute the inverse of pos for the collected facts
-	for (auto const p: invert)
+	for (auto& p: invert)
 		inverses[p.first] = _inverse(bits, p.second);
 	// Compute the bdds for the each table
 	for (auto x: from_facts(add, inverses))
