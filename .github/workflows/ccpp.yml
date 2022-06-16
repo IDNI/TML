@@ -70,12 +70,30 @@ jobs:
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           fi
           make -j5
+      - name: Bulding release version
+        run: |
+          mkdir -p build-Release
+          cd build-Release
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            CMAKE_CXX_COMPILER=g++-11
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          else
+            if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+              CMAKE_CXX_COMPILER=clang++-12
+            else
+              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+            fi
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          fi
+          make -j5
 # tests
       - name: Test TML execution
-        run: ./build-Debug/tml -ie "a(1)."
+        run: |
+          ./build-Debug/tml -ie "a(1)."
+          ./build-Release/tml -ie "a(1)."
       - name: Running unit tests
         run: |
-          cd ./build-Debug
+          cd ./build-Release
           ../tests/run_unit_tests.sh
           cd -
       - name: Running regression tests
