@@ -46,8 +46,7 @@ int main(int argc, char** argv) {
 		if (d.error) goto quit;
 		d.run( (size_t) o.get_int("steps"), (size_t) o.get_int("break") );
 		if (d.error) goto quit;
-		if (o.enabled("dump") && d.result && !d.out_goals(o::dump()))
-			d.dump_fixpoint();
+		if (o.enabled("dump") && d.result) d.out_result();
 		if (o.enabled("dict")) d.out_dict(o::inf());
 		if (o.enabled("csv")) d.save_csv();
 #ifdef WITH_THREADS

@@ -3917,9 +3917,30 @@ bool driver::transform_handler(raw_prog &p) {
 	// Split heads are a prerequisite to safety checking
 	split_heads(p);
 
-	#ifdef TYPE_RESOLUTION
+#ifdef TYPE_RESOLUTION
+	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
+	o::to("transformed") << "Type resolutor Nto1 mapping:\n" << tr << endl;
+	rt_options to;
+	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
+	to.optimize  = false;
+	to.bitunv = false;
+	to.bproof = proof_mode::none;
+	to.show_hidden = false;
+	ir_builder ir_handler(dict, to);
+	tables tbl_int(dict, to, &ir_handler);
+	ir_handler.dynenv = &tbl_int;
+	ir_handler.printer = &tbl_int;
+	ir_handler.dynenv->bits = 2;
+	if (!tbl_int.run_prog(tr, {})) return false;
+	DBG(tbl_int.out_fixpoint(o::dump()););
+	for(const term &el : tbl_int.decompress()) {
+		DBG(COUT << el << endl;); //this line fails in release
+		sig s = ir_handler.to_native_sig(el);
+		ir->append(ir->relid_argtypes_map, s);
+	}
+	ir_handler.dynenv->bits = 0;
 	ir->type_resolve(p.nps[0]);
-	#endif
+#endif
 
 	if(opts.enabled("safecheck")) {
 		raw_prog temp_rp(p); //temporary fix to safecheck
@@ -3954,7 +3975,6 @@ bool driver::transform_handler(raw_prog &p) {
 				throw_runtime_error("Usage of the __fp__ term requires "
 						"--fp-step option enabled.");
 
-
 	//NOTE: guards is assuming empty rules with single nps at top
 	if (opts.enabled("guards")) {
 		ir->transform_guards(p);
@@ -3965,9 +3985,11 @@ bool driver::transform_handler(raw_prog &p) {
 				throw_runtime_error("Conditional statements require "
 						"-g (-guards) option enabled.");
 
+#ifdef BIT_TRANSFORM
 	if (opts.enabled("bitunv")) {
 		ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 	}
+#endif
 
 	DBG(if (opts.enabled("transformed"))
 		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);

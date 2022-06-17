@@ -21,13 +21,31 @@
 
 typedef std::set<std::vector<term>> flat_prog;
 
+#ifdef TYPE_RESOLUTION
+typedef struct {
+	int_t rt_idx = 0;
+	ints positions;
+} rt_var_inst;
+
+struct rt_vartypes {
+	rt_var_inst inst;
+	spbdd_handle types;
+	std::vector<term> c;
+	bool operator==(const int_t& idx) const {
+	     return (idx == inst.rt_idx);
+	}
+	rt_vartypes(rt_var_inst &inst_, spbdd_handle &types_) : inst(inst_), types(types_){}
+} ;
+
+typedef std::map<int_t, std::vector<rt_vartypes>> rr_varmap;
+#endif
+
 struct table;
 class tables;
 
 class ir_builder {
 
 public:
-
 	int_t syms = 0, nums = 0, chars = 0;
 	dict_t &dict;
 	rt_options opts;
@@ -36,51 +54,82 @@ public:
 	int  regex_level = 0;
 	bool error = false;
 
-	std::map<sig, int_t> smap; //signature-table_id map
-	typemanager tc;
-
-	void bit_transform(raw_prog &rp, size_t bo) {
-		if(tc.type_check(rp)) {
-			set_pos_func(bo);
-			btransform(rp);
-		}
-	}
-	bool bitunv_to_raw_term(raw_term &rt) {
-		return brev_transform(rt);
-	}
-	bool bitunv_decompress(const term &t, const table &tb) {
-		return brev_transform_check(t,tb);
-	}
+	std::map<sig, int_t> tsmap; //signature-table_id map
+	std::map<sig, int_t> bsmap; //signature-bltin_id map
 
 	ir_builder(dict_t& dict_, rt_options& opts_);
 	~ir_builder();
 
+	//-------------------------------------------------------------------------
+#ifdef TYPE_RESOLUTION
+	std::map<int_t, std::vector<tml_natives>> relid_argtypes_map;
+
+	void set_vartypes(int_t i, ints &mp, rr_varmap &v, raw_rule &auxr);
+
+	bool append(std::map<int_t, std::vector<tml_natives>> &m, sig s) {
+		auto it = m.find(s.first);
+		if (it != m.end()) {
+			if (find(it->second.begin(), it->second.end(), s.second) ==
+					it->second.end()) {
+				it->second.push_back(s.second);
+				return true;
+			}
+			return false;
+		}
+		else {
+			m.insert({s.first, {s.second}});
+			return true;
+		}
+	}
+
+	rr_varmap get_vars(raw_rule &r);
+	void get_vars_rel(const raw_term& t, int_t idx, rr_varmap& v);
+	void get_vars_eq(const raw_term& t, int_t idx, rr_varmap& v);
+	void get_vars_leq(const raw_term& t, int_t idx, rr_varmap& v);
+	void get_vars_arith(const raw_term& t, int_t idx, rr_varmap& v);
+	void get_vars_bltin(const raw_term&t, int_t idx, rr_varmap& v);
+
+	raw_prog generate_type_resolutor(raw_prog &rp);
+	void type_resolve_facts(std::vector<raw_rule> &rp);
+	void type_resolve_bodies(raw_rule &r, rr_varmap &v);
+	void type_resolve_rules(std::vector<raw_rule> &rp);
+	void type_resolve(raw_prog &rp);
+
+	sig get_sig_bltin(raw_term&t);
+	sig get_sig_eq(const raw_term&t);
+	sig get_sig_arith(const raw_term&t);
+	sig get_sig_typed(const lexeme& rel, std::vector<native_type> tys);
+	sig get_sig_typed(const int& rel_id, std::vector<native_type> tys);
+	sig to_native_sig(const term& e);
+
+	int_t get_bltin(const sig& s);
+
+#endif
+
+	sig get_sig(raw_term& t);
+	sig get_sig(const lexeme& rel, const ints& arity);
+	sig get_sig(const int& rel_id, const ints& arity);
+	size_t sig_len(const sig& s) const;
+
+	std::set<int_t> str_rels;
+	#define LOAD_STRS
+	#ifdef LOAD_STRS
+	strs_t strs;
+	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
+	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
+	#endif
+
+	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
 	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	raw_term to_raw_term(const term& t);
-
-	std::set<int_t> str_rels;
-#define LOAD_STRS
-#ifdef LOAD_STRS
-	strs_t strs;
-	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
-	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
-#endif
 	int_t get_table(const sig& s);
-
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
 
-// work-in-progress
-//	sig get_sig(const term& t);
-	sig get_sig(const raw_term& t);
-	sig get_sig(const lexeme& rel, const ints& arity);
-	sig get_sig(const int& rel_id, const ints& arity);
-//	sig get_sig(const lexeme& rel, const tml_natives& types);
-	size_t sig_len(const sig& s) const;
-
-	bool to_pnf( form *&froot);
+	//-------------------------------------------------------------------------
+	bool to_pnf(form *&froot);
 
 	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);
@@ -92,7 +141,6 @@ public:
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v,
 			flat_prog &p,std::map<size_t, term> &refs);
-
 	template <typename T>
 	bool er(const T& data) { return error=true, throw_runtime_error(data); }
 
@@ -114,7 +162,22 @@ public:
 
 	//-------------------------------------------------------------------------
 	// bit universe
-	size_t bit_order;
+#ifdef BIT_TRANSFORM
+	typemanager tc;
+	void bit_transform(raw_prog &rp, size_t bo) {
+		if(tc.type_check(rp)) {
+			set_pos_func(bo);
+			btransform(rp);
+		}
+	}
+	bool bitunv_to_raw_term(raw_term &rt) {
+		return brev_transform(rt);
+	}
+	bool bitunv_decompress(const term &t, const table &tb) {
+		return brev_transform_check(t,tb);
+	}
+
+	size_t bit_order = 0;
 
 	enum { //should be compatible with typesystem's prim type
 		CHAR_BSZ = 8,
@@ -196,8 +259,9 @@ public:
 	bool btransform(raw_prog& rpin);
 private:
 	bool btransform(const raw_rule& rrin, raw_rule &rrout );
-	bool btransform(const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout );
-	bool btransform(const raw_form_tree& rfin, raw_form_tree &rfout, const raw_rule& rrin, raw_rule &rrout );
+	bool btransform(const raw_term& rtin, raw_term &rtout, const raw_rule &rr, raw_rule &rrout);
+	bool btransform(const raw_form_tree& rfin, raw_form_tree &rfout, const raw_rule& rrin, raw_rule &rrout);
+
 public:
 	template<class T>
 	bool permuteorder(std::vector<T> &cont, size_t n, bool backward = false) {
@@ -220,7 +284,11 @@ public:
 		DBG(COUT<< std::endl<<"A:"; std::for_each(cont.begin(), cont.end(), [](T val) { COUT<< val; } );)
 		return true;
 	}
+
+#endif
 };
+
+//-----------------------------------------------------------------------------
 
 struct unary_string{
 	//IMPROVE: use array [ pos] = rel or unorderedmap instead

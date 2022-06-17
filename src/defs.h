@@ -156,12 +156,12 @@ template<typename T> struct ptrcmp {
 #endif
 
 #ifdef TML_NATIVES
-typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB} native_type;
+typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB, POLY} native_type;
 struct tml_native_t {
 	native_type type = UNDEF;
 	int_t bit_w = -1;
 	bool operator==(const tml_native_t& l) const {
-	     return (l.type == type && l.bit_w == bit_w) || (l.type == UNDEF);
+	     return (l.type == type && l.bit_w == bit_w) || (l.type == UNDEF) || (l.type == POLY);
 	}
 	bool operator<(const tml_native_t& l) const {
 		//if (*this == l) return false;

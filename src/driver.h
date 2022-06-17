@@ -290,19 +290,19 @@ public:
 	void list(std::basic_ostream<T>& os, size_t p = 0);
 	template <typename T>
 	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
-	template <typename T>
-	void out_fixpoint(std::basic_ostream<T>& os) const {
-		if (tbl) tbl->out_fixpoint(os); }
-	template <typename T>
-	bool out_goals(std::basic_ostream<T>& os) const {
-		return tbl->get_goals(os); }
+	void out_result() {
+		if (tbl) {
+			if (!tbl->out_goals(o::dump()))
+				tbl->out_fixpoint(o::dump());
+#ifdef PROOF
+			tbl->get_proof(o::dump());
+#endif
+		}
+	}
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-
 	void dump() { out(o::dump()); }
-	void dump_fixpoint() { out_fixpoint(o::dump()); }
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
-
 	void save_csv() const;
 	
 #ifdef __EMSCRIPTEN__
@@ -319,13 +319,6 @@ public:
 #endif
 
 };
-
-template void driver::out<char>(std::ostream&) const;
-template void driver::out<wchar_t>(std::wostream&) const;
-template bool driver::out_goals(std::basic_ostream<char>&) const;
-template bool driver::out_goals(std::basic_ostream<wchar_t>&) const;
-template void driver::out_dict(std::basic_ostream<char>&) const;
-template void driver::out_dict(std::basic_ostream<wchar_t>&) const;
 
 #ifdef DEBUG
 extern driver* drv;

@@ -37,7 +37,11 @@ struct blt_ctx {
 	inline blt_cache_key key() const { return blt_cache_key{ a, g, outs }; }
 	size_t varpos(size_t arg) const;
 	inline int_t arg(size_t arg) const { return g[arg]; }
+#ifndef TYPE_RESOLUTION
 	inline int_t arg_as_int(size_t arg) const { return int_t(g[arg] >> 2); }
+#else
+	inline int_t arg_as_int(size_t arg) const { return int_t(g[arg]); }
+#endif
 	int_t outvarpos(size_t oarg = 0) const;
 	void args_bodies(bdd_handles& hs, size_t len = 0);
 	void out(spbdd_handle x) { outs.push_back(x); }
@@ -93,6 +97,7 @@ struct builtins_pair {
 struct builtins : std::map<int_t, builtins_pair> {
 	dict_t* dict = 0;
 	blt_cache cache; // builtins' cache for calls
+	std::vector<sig> sigs;
 	bool reset(dict_t& d) { return clear(), dict = &d, true; }
 	// clear cache (TODO: add possibility to clear cache by builtin id)
 	void forget(blt_ctx&) { cache.clear(); }
