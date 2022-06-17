@@ -202,7 +202,7 @@ bool tables::get_facts(const flat_prog& m) {
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
 	// Compute the inverse of pos for the collected facts
-	for (auto const p: invert)
+	for (auto& p: invert)
 		inverses[p.first] = _inverse(bits, p.second);
 	// Compute the bdds for the each table
 	for (auto x: from_facts(add, inverses))
@@ -709,14 +709,22 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	if (add.empty()) x = t % bdd_or_many(move(del));
 	else if (del.empty()) add.push_back(t), x = bdd_or_many(move(add));
 	else {
+		// check for any intersection between add and del
+		sort(add.begin(), add.end(), handle_cmp);
+		sort(del.begin(), del.end(), handle_cmp);
+		auto ita = add.begin(), itd = del.begin();
+		while (ita != add.end() && itd != del.end())
+			if (handle_cmp(*ita, *itd)) ita++;
+			else if (!handle_cmp(*itd, *ita)) // contradiction
+				return (add.clear(), del.clear()), unsat = true;
+			else itd++;
 		spbdd_handle a = bdd_or_many(move(add)),
-				 d = bdd_or_many(move(del)), s = a % d;
-//		DBG(assert(bdd_nvars(a) < len*bits);)
-//		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == hfalse) return unsat = true;
+			d = bdd_or_many(move(del));
+		//DBG(assert(bdd_nvars(a) < len*bits);)
+		//DBG(assert(bdd_nvars(d) < len*bits);)
 		x = (t || a) % d;
 	}
-//	DBG(assert(bdd_nvars(x) < len*bits);)
+	//DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
 
@@ -970,7 +978,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
 
-	DBG(COUT <<  "add_prog_wprod" << endl;);
+	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	//if (mknums) to_nums(m);
@@ -1004,7 +1012,7 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
-	DBG(COUT << "run_prog" << endl;);
+	DBG(o::dbg() << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
@@ -1294,5 +1302,3 @@ void tables::out(emscripten::val o) const {
 	});
 }
 #endif
-
-// ----------------------------------------------------------------------------

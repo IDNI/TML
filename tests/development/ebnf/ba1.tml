@@ -5,4 +5,4 @@ B => 'b'+.
 C => 'c'*.
 D => 'd''d'.
 
-S => A B C D.
+start => A B C D.

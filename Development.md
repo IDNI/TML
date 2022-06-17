@@ -44,21 +44,26 @@ section.
 
 ## default outputs
 
-After creating `outputs` object. You can call its method `init_defaults()` to
-create default outputs.
+After creating `outputs` object. You can call function
+`o::init_outputs(outputs&)` to create default outputs.
 
 Default outputs are:
 
-|             |                                                   |
-| ----------- | ------------------------------------------------- |
-| output      | default output for TML print builtins             |
-| error       | error messages                                    |
-| info        | info messages                                     |
-| debug       | debug messages (requires Debug build)             |
-| dump        | database dump                                     |
-| benchmarks  | measured benchmarks                               |
-| transformed | transformed program                               |
-| repl-output | repl                                              |
+|                   |                                                    |
+| ----------------- | -------------------------------------------------- |
+| output            | default output for TML print builtins              |
+| error             | error messages                                     |
+| info              | info messages                                      |
+| debug             | debug messages (requires Debug build)              |
+| dump              | database dump                                      |
+| transformed       | transformed program                                |
+| benchmarks        | measured benchmarks                                |
+| parser-benchmarks | measured parser benchmarks                         |
+| parser-to-dot     | parsed forest to dot file                          |
+| parser-to-tml     | parsed forest to tml facts                         |
+| parser-to-rules   | parsed forest to tml rules                         |
+| program-gen       | raw program in cpp to compile in (to skip parsing) |
+| repl-output       | repl                                               |
 
 
 `outputs` object acts also as a global container. It is possible to use multiple
@@ -69,7 +74,7 @@ time. Switch between `outputs` objects by calling `outputs::use()` or
 Example:
 ```
 	outputs oo;
-	oo.init_defaults();
+	o::init_outputs(oo);
 	oo.use();
 ```
 This is required when using multiple `outputs` objects.
@@ -91,16 +96,18 @@ There is a namespace `o`  to allow quick access to global streams (global
 `outputs` object is the first such object or the one which was set global by
 calling `outputs::use()`).
 
-For convenience there are methods with quick access to configured wostreams:
+For convenience there are methods with quick access to configured ostreams:
 - `o::out()`
 - `o::err()`
 - `o::inf()`
 - `o::dbg()`
 - `o::repl()`,
 - `o::ms()` - this is output for **benchmarks**
+- `o::pms()` - this is output for **benchmarks**
 - `o::dump()`
+- `o::transformed()`
 
-There is also `o::to(const std::wstring&)` to get output's wostream by its name.
+There is also `o::to(const std::string&)` to get output's ostream by its name.
 
 
 # Options
@@ -205,6 +212,7 @@ Example:
 ```
 	inputs ii;
 	outputs oo;
+	o::init_outputs(oo);
 	string program = "a(2). b(?x) :- a(?x).";
 	vector<string> args{
 		"--dump", "@buffer",
@@ -221,8 +229,8 @@ Example:
 
 To extract result there are several functions:
 `driver::dump()` prints database to the "dump" output
-`driver::out(wostream&)` prints database to a stream
-`driver::out_goals(wostream&)` prints extracted proofs
+`driver::out(ostream_t&)` prints database to a stream
+`driver::out_goals(ostream_t&)` prints extracted proofs
 
 It is also possible to pass a custom raw term printer:
 `driver::out(const tables::rt_printer& p)` which gets called for each printed term.

@@ -1,0 +1,66 @@
+@string str <tml.g.reg.tml>.
+
+identifier => sym | var.
+args => (identifier ws)*.
+var => '?' chars.
+sym => chars.
+relname => sym.
+chars => ( alpha | '_' )(alnum  | '_' )*.
+ws => (space |'#' printable_chars eol)*.
+terminal => quoted_char | string.
+quoted_char => 	'\'' printable '\'' | "'\\r'" | "'\\n'"
+		| "'\\t'" | "'\\''" | "''".
+eol => '\r' | '\n'.
+nonterminal => relname.
+fname => '<' printable_chars '>' ws.
+string => '"' printable_chars '"' ws.
+printable_chars => (printable)*.
+
+cmdline => '$' digits ws.
+query => '!' ws term | "!!" ws term.
+
+term => relname args.
+pred => term | '~' ws term ws.
+args => ws '(' ws args1 ws ')' ws | null.
+args1 => identifier ws args1 ws | args | null.
+
+directive =>	ws "@string" space ws strdir ws '.' ws |
+		ws "@stdout" space ws term ws '.' ws |
+		ws "@trace" space ws relname ws '.' ws |
+		ws "@bwd" ws '.' ws.
+strdir => relname ws fname | relname ws string | relname ws cmdline | relname ws term.
+
+production => relname ws "=>" ws alts '.'. 
+alts => ws alt | alt ws '|' alts.
+alt  => ws factor | factor ws alt.
+factor => 	ws terminal ws unot |
+			ws nonterminal ws unot |
+			ws '{' alts ws '}' |
+			ws '(' alts ws ')' unot |
+			ws '[' alts ws ']'.
+unot => '*' |'+' | null.
+
+prefix => "forall" | "exists" | "unique" .
+prefixdecl => ( prefix ws identifier ws )+.
+
+form => form1 | form1 bop form.
+form1 => matrix | matrix bop1 form1. 
+
+matrix => 	term | '~' term |
+			'{' form '}'|'~' '{' form '}' |
+			prefixdecl'{' form '}' | '~' prefixdecl '{' form '}'.
+
+bop => '|' | '&'.			
+bop1 => "->" | "<->".
+
+
+fact => pred '.' ws.
+
+preds => ws pred (ws ',' ws pred ws)*.
+
+rule => ws preds ws ":-" ws preds ws '.' ws. 
+
+fof => term ws ':' '=' ws form ws '.' ws.
+
+prog => directive start | rule start | production start | fof start | query start | null.
+start => ws '{' ws prog ws '}' ws start ws | ws prog ws | null.

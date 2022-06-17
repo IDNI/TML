@@ -1,0 +1,26 @@
+@string str "p(?x ?y) :=forall ?x (exists ?y (unique ?z ((e(?x ?y) and e(?y ?z)) or e(?x ?z)))).".
+#@bwd.
+
+start => pred ws ':' '=' ws form ws '.'.
+pred => chars ws '(' ws args ws ')' ws.
+identifier => chars | var.
+args => identifier ws args | null.
+var => '?' chars.
+chars => alpha chars1.
+chars1=> alnum chars1 | null.
+ws => space ws | null.
+form => pred |
+	ws prefix ws var ws '(' ws form ws ')' ws |
+	ws '(' ws form ws ')' ws "and" ws '(' ws form ws ')' ws |
+	ws '(' ws form ws ')' ws "or" ws '(' ws form ws ')' ws |
+	ws "not" '(' ws form ws ')' ws |
+	ws pred ws "and" ws '(' ws form ws ')' ws |
+	ws pred ws "or" ws '(' ws form ws ')' ws |
+	ws "not" '(' ws form ws ')' ws |
+	ws pred ws "and" ws pred ws |
+	ws pred ws "or" ws pred ws |
+	ws "not" pred ws |
+	ws '(' ws form ws ')' ws "and" ws pred ws |
+	ws '(' ws form ws ')' ws "or" ws pred ws.
+prefix => "forall" | "exists" | "unique".
+#!! S(0 ?x).

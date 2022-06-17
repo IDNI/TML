@@ -1,3 +1,3 @@
 @string str "d".
 
-S => "d"*.
+start => "d"*.

@@ -13,6 +13,7 @@
 #ifndef __TERM__
 #define __TERM__
 
+#include <compare>
 #include "defs.h"
 
 struct term : public ints {
@@ -60,6 +61,11 @@ struct term : public ints {
 		if (forget != t.forget) return forget;
 		if (renew != t.renew) return renew;
 		return (const ints&)*this < t;
+	}
+	std::weak_ordering operator<=>(const term& t) const {
+		return *this < t ? std::weak_ordering::less :
+			t < *this ? std::weak_ordering::greater :
+				std::weak_ordering::equivalent;
 	}
 	bool operator==(const term& t) const {
 		return neg == t.neg && extype == t.extype && tab == t.tab &&

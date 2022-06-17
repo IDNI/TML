@@ -18,8 +18,10 @@
 #include "defs.h"
 #include "term.h"
 #include "typemanager.h"
+#include "earley.h"
 
 typedef std::set<std::vector<term>> flat_prog;
+typedef earley<char32_t> earley_t;
 
 #ifdef TYPE_RESOLUTION
 typedef struct {
@@ -138,6 +140,9 @@ public:
 					std::vector<term> &v, std::set<term> &done);
 
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p);
+	bool transform_apply_regex(std::vector<struct production> &g,  flat_prog& p);
+	bool transform_alts( std::vector<struct production> &g);
+	bool transform_strsplit(std::vector<struct production> &g);
 	bool transform_ebnf(std::vector<struct production> &g, dict_t &d, bool &changed);
 	bool transform_grammar_constraints(const struct production &x, std::vector<term> &v,
 			flat_prog &p,std::map<size_t, term> &refs);
@@ -427,6 +432,33 @@ struct graphgrammar {
 	const std::map<lexeme, std::string, lexcmp> & get_builtin_reg();
 	bool combine_rhs( const elem &s, std::vector<elem> &comb);
 	bool collapsewith();
+};
+
+struct parsing_context {
+	raw_progs& rps;
+	std::vector<raw_prog*> rp;
+	std::vector<state_block*> sbs;
+	raw_rule rr;
+	raw_term rt;
+	directive d;
+	production p;
+	macro m;
+	typestmt ts;
+	bool head = true;
+	bool neg  = false;
+	bool is_directive = false;
+	bool is_production = false;
+	bool is_macro = false;
+	bool is_type = false;
+	bool is_predtype = false;
+	bool renew = false;
+	bool forget = false;
+	bool is_constraint = false;
+	bool is_fof = false;
+	bool is_prefix = false;
+	sprawformtree root;
+	std::vector<std::pair<elem, elem>> prefixes;
+	parsing_context(raw_progs& rps) : rps(rps) {}
 };
 
 #endif

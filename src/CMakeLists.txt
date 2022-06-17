@@ -19,41 +19,48 @@ set(TML_HEADERS
 	bdd.h
 	builtins.h
 	char_defs.h
+	cpp_gen.h
 	defs.h
 	dict.h
 	driver.h
+	earley.h
 	err.h
 	form.h
 	input.h
+	ir_builder.h
 	memory_map.h
 	options.h
 	output.h
+	printing.h
 	tables.h
-	ir_builder.h
 	typemanager.h
 )
 
 set(TML_SOURCES
 	bdd.cpp
-	bdd_ext.cpp
+	bdd_arith.cpp
 	builtins.cpp
+	cpp_gen.cpp
 	dict.cpp
 	driver.cpp
+	earley.cpp
 	form.cpp
 	input.cpp
+	ir_builder.cpp
 	options.cpp
 	output.cpp
+	printing.cpp
 	proof.cpp
 	save_csv.cpp
 	tables.cpp
 	tables_builtins.cpp
 	tables_ext.cpp
+	tml_earley.cpp
 	transform.cpp
 	transform_guards.cpp
-	utils.cpp
-	ir_builder.cpp
-	typemanager.cpp
 	transform_bitunv.cpp
+	typemanager.cpp
+	utils.cpp
 )
 
 if (WITH_THREADS)
@@ -78,7 +85,7 @@ set(TML_COMPILE_OPTIONS
 	"$<$<CONFIG:Release>:-flto>"
 	${TML_PGO_OPTIONS}
 )
-set(TML_LINK_OPTIONS ${TML_PGO_OPTIONS})
+set(TML_LINK_OPTIONS "${TML_PGO_OPTIONS};-flto")
 if (BUILD_CODE_COVERAGE)
 	set(TML_DEBUG_OPTIONS "${TML_DEBUG_OPTIONS}" --coverage)
 	set(TML_RELEASE_OPTIONS "${TML_RELEASE_OPTIONS}" --coverage)

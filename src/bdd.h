@@ -25,6 +25,8 @@
 #include "memory_map.h"
 #endif
 
+#define BDD_ARITH
+
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -372,6 +374,7 @@ class bdd {
 	bdd_ref h, l;
 
 	//---
+#ifdef BDD_ARITH
 	static void bdd_sz_abs(bdd_ref x, std::set<bdd_id>& s);
 	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
@@ -416,7 +419,7 @@ class bdd {
 	static bdd_ref copy_arg2arg(bdd_ref a , size_t arg_a, size_t arg_b, size_t bits, size_t n_args);
 	static bdd_ref shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args);
 	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
-
+#endif
 public:
 	bdd(bdd_ref h, bdd_ref l);
 	inline bool operator==(const bdd& b) const {

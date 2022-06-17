@@ -1,0 +1,12 @@
+# Dyck's language
+#@str "((()()()((()()()))))".
+
+
+
+
+{
+@string str "3+3+4".
+start => start '+' start | '3'.
+}
+
+

@@ -1,7 +1,7 @@
 
 @string str "bbb".
 
-S => S S | 'b' .
+start => start start | 'b' .
 
-!S(0 3).
+!node(?x start 0 3).
 

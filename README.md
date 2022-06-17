@@ -324,15 +324,15 @@ then the trace tree will have the form
 It is possible to supply a context free grammar as a syntactic shortcut for
 definite clause grammars. For example Dyck's language may be written as:
 
-    S => null.
-    S => '(' S ')' S.
+    start => null.
+    start => '(' start ')' start.
 
 and will be converted to the rules:
 
-    S(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
-    S(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
-    S(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), S(?v2 ?v3),
-        str(((?v3)) (')') ((?v4))), S(?v4 ?v5).
+    start(?v1 ?v1) :- str(((?v1)) (?v2) ((?v3))).
+    start(?v3 ?v3) :- str(((?v1)) (?v2) ((?v3))).
+    start(?v1 ?v5) :- str(((?v1)) ('(') ((?v2))), start(?v2 ?v3),
+        str(((?v3)) (')') ((?v4))), start(?v4 ?v5).
 
 where `str` is some string defined in the program. Grammars are allowed in
 programs that contain only one string. If multiple strings require parsing it
@@ -341,7 +341,7 @@ is possible to define them in sequenced programs.
 Extracting the parse forest can be done by extracting a proof of the start
 symbol:
 
-    !! parseForest S(0, len:str).
+    !! parseForest start(0, len:str).
 
 which also defines the start symbol.
 
@@ -393,7 +393,7 @@ TML grammar can take EBNF syntax as well. It supports { } for zero or more occu
     B => 'b'+.
     C => 'c'*.
     D => 'd''d'
-    S => A B C D
+    start => A B C D
 
 Here 'a' can occur zero or more times and 'b' can occur one or more time. Internally, TML shall replace it with fresh production symbols that would do recursion. A more complex example is
 
@@ -401,7 +401,7 @@ Here 'a' can occur zero or more times and 'b' can occur one or more time. Intern
     C => 'c' + .
     B => 'b' [ B ] .          # B occurs one or zero time.
     D => ( 'd' 'd' ) * .      # ( ) allows * operator to be applied to all terms as a whole.
-    S => A * B + C * D + | A + ( B * ) .
+    start => A * B + C * D + | A + ( B * ) .
     K => ( C + ) * [ B + ] .
 
 # Grammar Constraints 
@@ -420,7 +420,7 @@ Consider the following grammar.
     A => 'a' A 'b' | "ab" .
     C => 'c'C .
     C => 'c' .
-    S => A C ,  len(2) + len(2) = len(1) .
+    start => A C ,  len(2) + len(2) = len(1) .
 
 Here the constraints are specified for S production where the length of the derived string from A should be twice the length derived from C. 
 Note that due to constraints it would not accept "abc".
@@ -432,7 +432,7 @@ Another example using string comparison.
     C => 'c' C .
     C => 'c' | 'z'.
     A => 'a' A | 'a'.
-    S => C A C, substr(1) = substr(3), len(2) = 1.
+    start => C A C, substr(1) = substr(3), len(2) = 1.
 
 Here the derived content of both Cs should match.  
 

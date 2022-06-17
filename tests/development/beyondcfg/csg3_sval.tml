@@ -1,0 +1,8 @@
+@string str "aabbaabbcc".
+A => 'a' A 'b' | "ab" .
+B => A.
+C => 'c' C.
+C => 'c'.
+start => A B C.
+
+!node(?x start 0 10).

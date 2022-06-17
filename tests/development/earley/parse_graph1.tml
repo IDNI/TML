@@ -1,0 +1,9 @@
+node(0 "S" 0 1).
+edge(0 1).
+node(1).
+node(0 "S" 0 1).
+edge(1 0).
+edge(0 2).
+node(2).
+node(3 "b" 0 1).
+edge(2 3).

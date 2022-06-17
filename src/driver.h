@@ -28,7 +28,7 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
-
+#include "printing.h"
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
@@ -187,6 +187,10 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
+	// following 2 methods are defined in a file tml_earley.cpp
+	bool earley_parse_tml(input* in, raw_progs& rps);
+	std::vector<production> load_tml_grammar();
+
 	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
@@ -217,19 +221,6 @@ class driver {
 	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
-	string_t generate_cpp(const elem &e, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_term &rt, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_form_tree &prft, string_t &prog_constr,
-		uint_t &cid, const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_rule &rr, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const lexeme &lex);
-	string_t generate_cpp(const directive &dir, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
-	string_t generate_cpp(const raw_prog &rp, string_t &prog_constr, uint_t &cid,
-		const string_t &dict_name, std::map<elem, string_t> &elem_cache);
 	raw_prog reify(const raw_prog& p);
 	raw_term from_grammar_elem(const elem& v, int_t v1, int_t v2);
 	raw_term from_grammar_elem_nt(const lexeme& r, const elem& c,
@@ -251,7 +242,6 @@ class driver {
 	inputs dynii; // For inputs generated from running TML programs
 	input* current_input = 0;
 	size_t current_input_id = 0;
-	size_t nsteps() { return tbl->step(); };
 
 public:
 	bool result = false;
@@ -274,6 +264,7 @@ public:
 	void restart();
 	bool step(size_t steps = 1, size_t br_on_step=0);
 	bool run(size_t steps = 0, size_t br_on_step=0);
+	size_t nsteps() { return tbl->step(); };
 
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
@@ -283,6 +274,8 @@ public:
 	inputs* get_inputs() const { return ii; }
 	input* get_current_input() const { return current_input; }
 	void set_current_input(input* in) { current_input = in; }
+	
+	const options& get_opts() const { return opts; }
 
 	template <typename T>
 	void info(std::basic_ostream<T>&);

@@ -50,12 +50,16 @@ EMSCRIPTEN_BINDINGS(tml) {
 					reinterpret_cast<const char*>(cptr);
 				return new driver(prog, o);
 			}), allow_raw_pointers())
+		.class_function("version", optional_override([]() -> std::string {
+				return std::string(GIT_DESCRIBED);
+			}), allow_raw_pointers())
 		.function("out", optional_override(
 			[](driver& self, emscripten::val v) {
 				return self.out(v);
 			}
 		))
 		.function("dump", &driver::dump)
+		.function("dump_fixpoint", &driver::dump_fixpoint)
 		.function("info", &driver::info<syschar_t>)
 		.function("list", &driver::list<syschar_t>)
 		.function("add", &driver::add, allow_raw_pointers())
@@ -66,6 +70,17 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("set_print_step", &driver::set_print_step)
 		.function("set_print_updates", &driver::set_print_updates)
 		.function("set_populate_tml_update", &driver::set_populate_tml_update)
+		.function("save_csv", &driver::save_csv)
+		.function("dump_goals", optional_override(
+			[](driver& self) {
+				return self.out_goals(o::dump());
+			}
+		))
+		.function("inf_dict", optional_override(
+			[](driver& self) {
+				return self.out_dict(o::inf());
+			}
+		))
 		.function("out_goals", &driver::out_goals<syschar_t>)
 		.function("out_dict", &driver::out_dict<syschar_t>)
 		//.function("size", &driver::size)
@@ -76,7 +91,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		//.function("db_save", &driver::db_save)
 		.property("result", &driver::result)
 		.property("error", &driver::error)
-		.property("opts", &driver::opts)
+		.property("get_opts", &driver::get_opts)
 		;
 //	class_<repl>("repl")
 //		.constructor<options, ostream_t>(allow_raw_pointers())
@@ -87,6 +102,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 			<bool(std::vector<std::string>, bool)>
 				(&options::parse), allow_raw_pointers())
 		.function("enabled", &options::enabled)
+		.function("disabled", &options::disabled)
 		//.function("get", &options::get)
 		.function("get_int", &options::get_int)
 		.function("get_bool", &options::get_bool)

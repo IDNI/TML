@@ -1,0 +1,6 @@
+@string str "aabbcc".
+A => 'a' A 'b' | "ab" .
+C => 'c'C .
+C => 'c' .
+
+start => A C ,  len(2) +len(2) = len(1) .

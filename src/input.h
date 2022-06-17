@@ -244,7 +244,7 @@ struct elem {
 			case EQ: e = str2lexeme("="); break;
 			case OPENP: e = str2lexeme("("); break;
 			case CLOSEP: e = str2lexeme(")"); break;
-			case ALT: e = str2lexeme("||"); break;
+			case ALT: e = str2lexeme("|"); break;
 			case NEQ: e = str2lexeme("!="); break;
 			case LEQ: e = str2lexeme("<="); break;
 			case GT: e = str2lexeme(">"); break;
@@ -252,6 +252,7 @@ struct elem {
 			case GEQ: e = str2lexeme(">="); break;
 			case NOT: e = str2lexeme("~"); break;
 			case AND: e = str2lexeme("&&"); break;
+			case OR: e = str2lexeme("||"); break;
 			case FORALL: e = str2lexeme("forall"); break;
 			case EXISTS: e = str2lexeme("exists"); break;
 			case UNIQUE: e = str2lexeme("unique"); break;
@@ -274,6 +275,13 @@ struct elem {
 	elem(etype type, t_arith_op arith_op, lexeme e) : type(type),
 			arith_op(arith_op), e(e) {
 		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
+	}
+	elem(t_arith_op arith_op) : type(ARITH), arith_op(arith_op) {
+		switch(arith_op) {
+			case MULT: e = str2lexeme("*"); break;
+			case ADD:  e = str2lexeme("+"); break;
+			default: assert(false); //should never reach here
+		}
 	}
 	etype peek(input* in);
 	bool is_paren() const { return type == OPENP || type == CLOSEP; }
@@ -304,10 +312,11 @@ struct elem {
 	static elem fresh_temp_sym(dict_t &d) {
 		return elem(elem::SYM, d.get_temp_sym(d.get_fresh_temp_sym()));
 	}
-	std::string to_str() const{
-		if (type == NUM) return to_string(to_string_t(num));
-		if (type == CHR) return to_string(to_string_t(ch));
-		return to_string(lexeme2str(e));
+	std::string to_str() const { return to_string(to_str_t()); }
+	string_t to_str_t() const {
+		if (type == NUM) return to_string_t(num);
+		if (type == CHR) return to_string_t(ch);
+		return lexeme2str(e);
 	}
 };
 
@@ -424,11 +433,11 @@ struct typestmt {
 	structype rty;
 	elem reln;
 	std::vector<typedecl> typeargs;
-	bool is_predicate(){
+	bool is_predicate() const {
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
 		return reln.e[0] != NULL;
 	}
-	bool is_typedef(){
+	bool is_typedef() const {
 		DBG(assert( reln.e[0] != NULL || rty.structname.e[0] != NULL ));
 		return rty.structname.e[0] != NULL;
 	}
@@ -526,7 +535,7 @@ struct directive {
 	raw_term internal_term; // The term whose relation should be made internal
 
 	enum etype { STR, FNAME, CMDLINE, STDIN, STDOUT, TREE, TRACE, BWD,
-		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL }type;
+		EVAL, QUOTE, EDOMAIN, CODEC, INTERNAL, CMDLINEFILE } type;
 	bool parse(input* in, const raw_prog& prog);
 	bool operator==(const directive &b) const;
 };
@@ -819,9 +828,11 @@ struct raw_prog {
 	bool parse_statement(input* in);
 	bool parse_nested(input* in);
 	bool parse_xfp(input* in);
-	bool macro_expand(input *in , macro mm, const size_t i, const size_t j,
+	bool expand_macros(input* in);
+	bool macro_expand(input *in, macro mm, const size_t i, const size_t j, 
 				std::vector<raw_term> &vrt);
 	raw_prog(dict_t &dict_) : dict(dict_) {};
+	raw_prog& merge(const raw_prog& p);
 };
 
 struct raw_progs {
@@ -829,6 +840,10 @@ struct raw_progs {
 	raw_prog p;
 	bool parse(input* in);
 	raw_progs(dict_t &dict_) : dict(dict_), p(raw_prog(dict_)) { };
+	raw_progs& merge(const raw_progs& rps) {
+		p.merge(rps.p);
+		return *this;
+	}
 };
 
 struct state_block {
@@ -837,6 +852,10 @@ struct state_block {
 	raw_prog p;
 	state_block(dict_t &dict_) : p(raw_prog(dict_)) {};
 	bool parse(input* in);
+	state_block& merge(const state_block& sb) {
+		flip = sb.flip,	label = sb.label, p.merge(sb.p);
+		return *this;
+	}
 };
 
 bool throw_runtime_error(std::string err, std::string details = "");
@@ -858,6 +877,10 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const elem& e);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_form_tree &t);
+#ifdef DEBUG
+template <typename T>
+std::basic_ostream<T>& print_raw_form_tree(std::basic_ostream<T>& os, const raw_form_tree &t, bool root = true);
+#endif // DEBUG
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const raw_term& t);
 template <typename T>

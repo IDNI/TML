@@ -58,22 +58,106 @@ str(printable 3 0).
 str(printable 2 0).
 str(printable 1 0).
 str(printable 0 0).
-S(14 16).
-S(12 16).
-S(10 16).
-S(8 18).
-S(9 17).
-S(6 18).
-S(4 18).
-S(0 20).
-S(2 18).
-S(1 19).
-S(12 14).
-S(10 14).
-S(10 12).
-S(6 8).
-S(4 8).
-S(2 8).
-S(4 6).
-S(2 6).
-S(2 4).
+node(51 "" 20 20).
+node(50 "" 19 19).
+node(49 "" 18 18).
+node(48 "" 17 17).
+node(47 "" 16 16).
+node(37 ")" 16 17).
+node(35 ")" 17 18).
+node(45 ")" 15 16).
+node(46 "" 15 15).
+node(43 "" 13 13).
+node(40 "" 11 11).
+node(44 "(" 14 15).
+node(42 ")" 13 14).
+node(41 "(" 12 13).
+node(33 "" 7 7).
+node(39 ")" 11 12).
+node(38 "(" 10 11).
+node(36 "(" 9 10).
+node(34 "(" 8 9).
+node(32 ")" 7 8).
+node(24 ")" 18 19).
+node(20 start 20 20).
+node(22 ")" 19 20).
+node(19 start 19 19).
+node(18 start 18 18).
+node(17 start 17 17).
+node(16 start 16 16).
+node(30 "" 5 5).
+node(27 "" 3 3).
+node(31 "(" 6 7).
+node(29 ")" 5 6).
+node(28 "(" 4 5).
+node(26 ")" 3 4).
+node(25 "(" 2 3).
+node(23 "(" 1 2).
+node(21 "(" 0 1).
+node(14 start 14 16).
+node(12 start 12 16).
+node(10 start 10 16).
+node(8 start 8 18).
+node(9 start 9 17).
+node(6 start 6 18).
+node(4 start 4 18).
+node(0 start 0 20).
+node(2 start 2 18).
+node(1 start 1 19).
+node(15 start 15 15).
+node(13 start 13 13).
+node(11 start 11 11).
+node(7 start 7 7).
+node(5 start 5 5).
+node(3 start 3 3).
+edge(20 51).
+edge(19 50).
+edge(18 49).
+edge(17 48).
+edge(16 47).
+edge(15 46).
+edge(14 45).
+edge(14 44).
+edge(13 43).
+edge(12 42).
+edge(12 41).
+edge(11 40).
+edge(10 39).
+edge(10 38).
+edge(9 37).
+edge(9 36).
+edge(8 35).
+edge(8 34).
+edge(7 33).
+edge(6 32).
+edge(14 16).
+edge(8 18).
+edge(9 17).
+edge(6 31).
+edge(5 30).
+edge(4 29).
+edge(4 28).
+edge(3 27).
+edge(2 26).
+edge(2 25).
+edge(1 24).
+edge(1 23).
+edge(0 22).
+edge(0 21).
+edge(0 20).
+edge(1 19).
+edge(14 15).
+edge(12 14).
+edge(12 13).
+edge(10 12).
+edge(10 11).
+edge(9 10).
+edge(8 9).
+edge(6 8).
+edge(6 7).
+edge(4 6).
+edge(4 5).
+edge(2 4).
+edge(2 3).
+edge(1 2).
+edge(0 1).

@@ -80,7 +80,7 @@ string to_string_(int_t v) { stringstream ss; ss << v; return ss.str(); }
 string_t to_string_t(int_t v) {
 	return to_string_t(to_string_(v));
 }
-string_t to_string_t(const std::string& s) {
+string_t to_string_t(const string& s) {
 	return string_t(s.begin(), s.end());
 }
 string_t to_string_t(const char* s) {
@@ -238,23 +238,26 @@ size_t emit_codepoint(char32_t ch, char_t *s) {
  * @param ch unicode codepoint
  * @return output stream
  */
-basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& os,
-	char32_t ch)
-{
-	if (ch < 0x80) return os.put((char_t) ch);
+basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& o, char32_t ch) {
+	if (ch < 0x80)
+		return o.put((char_t) ch);
 	else if (ch < 0x800)
-		return os.put((char_t) (0xC0 + (ch >> 6)))
+		return o.put((char_t) (0xC0 + (ch >> 6)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	else if (ch < 0x10000)
-		return os.put((char_t) (0xE0 + (ch >> 12)))
+		return o.put((char_t) (0xE0 + (ch >> 12)))
 			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	else if (ch < 0x110000)
-		return os .put((char_t) (0xF0 + (ch >> 18)))
+		return o.put((char_t) (0xF0 + (ch >> 18)))
 			.put((char_t) (0x80 + ((ch >> 12) & 0x3F)))
 			.put((char_t) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((char_t) (0x80 + (ch & 0x3F)));
-	return os;
+	return o;
+}
+
+string_t to_string_t(char ch) {
+	return to_string_t(string{ ch });
 }
 
 string_t to_string_t(char32_t ch) {
@@ -267,10 +270,7 @@ string_t to_string_t(char32_t ch) {
 string_t to_string_t(const u32string& str) {
 	basic_ostringstream<char_t> ss;
 	auto it = str.begin();
-	while (it != str.end()) {
-		emit_codepoint(ss, *(it++));
-		it++;
-	}
+	while (it != str.end()) emit_codepoint(ss, *(it++));
 	return ss.str();
 }
 

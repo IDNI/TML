@@ -1,0 +1,10 @@
+#!/bin/bash
+
+TML="../../../build-Release/tml -i ./tml_earley.g --no-dump --info --parser-to-rules parsed_rules.tml --args"
+declare -a A=($(find ../../ -name '*.tml' -print | grep -v earley))
+
+for I in "${A[@]}"
+do :
+   echo -n $I
+   ./parse_tml $I
+done

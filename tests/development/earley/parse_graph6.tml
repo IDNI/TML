@@ -1,0 +1,46 @@
+node(0 "S" 0 1).
+node(10 "n" 0 1).
+edge(0 10).
+node(1 "S" 0 3).
+node(0 "S" 0 1).
+edge(1 0).
+node(8 "X" 1 2).
+edge(1 8).
+node(5 "S" 2 3).
+edge(1 5).
+node(2 "S" 0 5).
+edge(2 3).
+node(3).
+node(0 "S" 0 1).
+edge(3 0).
+node(8 "X" 1 2).
+edge(3 8).
+node(6 "S" 2 5).
+edge(3 6).
+edge(2 4).
+node(4).
+node(1 "S" 0 3).
+edge(4 1).
+node(9 "X" 3 4).
+edge(4 9).
+node(7 "S" 4 5).
+edge(4 7).
+node(5 "S" 2 3).
+node(11 "n" 2 3).
+edge(5 11).
+node(6 "S" 2 5).
+node(5 "S" 2 3).
+edge(6 5).
+node(9 "X" 3 4).
+edge(6 9).
+node(7 "S" 4 5).
+edge(6 7).
+node(7 "S" 4 5).
+node(12 "n" 4 5).
+edge(7 12).
+node(8 "X" 1 2).
+node(13 "p" 1 2).
+edge(8 13).
+node(9 "X" 3 4).
+node(14 "m" 3 4).
+edge(9 14).

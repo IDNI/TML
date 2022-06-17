@@ -1,0 +1,11 @@
+@string str "aaa".
+
+start => 'a'+.
+
+C => "cb".
+C =>  'd'.
+start => 'a' 'c' 'b'. 
+start => 'd' .
+
+J =>  'a'* D 'j'.
+D => J | 'a'.

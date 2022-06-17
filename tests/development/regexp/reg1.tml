@@ -1,0 +1,10 @@
+@string str "aabbccdd".
+B => ('b'| 'z')+'c'+'d''d'.
+start => ('a')* B 'a' RR.
+RR => start | 'r'.
+C => B.
+D => B C.
+J => D L 'a' D.
+L => C.
+E => D RR .
+R1 => RR 'a'.

@@ -101,6 +101,7 @@ size_t codepoint_size(char32_t ch);
 size_t emit_codepoint(char32_t ch, char_t *s);
 std::basic_ostream<char_t>& emit_codepoint(std::basic_ostream<char_t>& os,
 	char32_t ch);
+string_t to_string_t(char ch);
 string_t to_string_t(char32_t ch);
 string_t to_string_t(const std::u32string& str);
 std::u32string to_u32string(const string_t& str);
