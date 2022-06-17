@@ -156,7 +156,7 @@ template<typename T> struct ptrcmp {
 #endif
 
 #ifdef TML_NATIVES
-typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB, POLY} native_type;
+typedef enum { SYMB = 0, UINT = 1, UCHAR = 2, POLY = 3, UNDEF, INT, RATIONAL } native_type;
 struct tml_native_t {
 	native_type type = UNDEF;
 	int_t bit_w = -1;

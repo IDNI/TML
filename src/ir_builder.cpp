@@ -63,13 +63,9 @@ void ir_builder::set_vartypes(int_t i, ints &mp, rr_varmap &v, raw_rule &auxr) {
 		}
 
 		tml_native_t t; //term2tml_native(r[var_id]);
-		switch (var.second[0].c[var_idx][0]) {
-			case 0: t.type = SYMB; break;
-			case 1: t.type = UINT; break;
-			case 2: t.type = UCHAR; break;
-			case 3: return; //only required for goals
-			default : assert(false);
-		}
+		if (var.second[0].c[var_idx][0] == POLY) return;//only required for goals
+		assert(var.second[0].c[var_idx][0] <= 2);
+		t.type = (native_type) var.second[0].c[var_idx][0];
 		a++;
 
 		for (auto &vi : var.second) {
@@ -94,13 +90,8 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 		rt_var_inst aux0 = {idx,{}};
 		rt_vartypes aux(aux0,hfalse);
 		term f;
-		switch (s.second[k].type) {
-			case SYMB: f.push_back(0);	break;
-			case UINT: f.push_back(1); break;
-			case UCHAR: f.push_back(2); break;
-			case POLY: assert(false); break;
-			default : assert(false);
-		}
+		assert(s.second[k].type <= 2);
+		f.push_back(s.second[k].type);
 		aux.types = dynenv->from_fact(f);
 		int_t id = dict.get_var(t.e[h].e);
 		vars[id].push_back(aux);
@@ -108,9 +99,8 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 	else {
 		rt_var_inst aux0 = {idx,{}};
 		rt_vartypes aux(aux0,hfalse);
-		term f;
-		for (auto &i : {0,1,2}) {
-			f.clear();
+		for (auto &i : {UINT,UCHAR,SYMB}) {
+			term f;
 			f.push_back(i);
 			aux.types = aux.types || dynenv->from_fact(f);
 		}
@@ -138,7 +128,7 @@ void ir_builder::get_vars_leq(const raw_term&t, int_t idx, rr_varmap& vars) {
 			else {
 				rt_var_inst aux0 = {idx,{}};
 				rt_vartypes aux(aux0,hfalse);
-				term f; f.push_back(1);
+				term f; f.push_back(UINT);
 				aux.types = dynenv->from_fact(f);
 				vars[id].push_back(aux);
 			}
@@ -161,7 +151,7 @@ void ir_builder::get_vars_arith(const raw_term&t, int_t idx, rr_varmap& vars) {
 			else {
 				rt_var_inst aux0 = {idx,{}};
 				rt_vartypes aux(aux0,hfalse);
-				term f; f.push_back(1);
+				term f; f.push_back(UINT);
 				aux.types = dynenv->from_fact(f);
 				vars[id].push_back(aux);
 			}
@@ -183,16 +173,15 @@ void ir_builder::get_vars_bltin(const raw_term&t, int_t idx, rr_varmap& vars) {
 						(t.e[0].e == "count" && i == (int_t) t.e.size()-2) ) {
 					rt_var_inst aux0 = {idx,{i-2}};
 					rt_vartypes aux(aux0,hfalse);
-					term f; f.push_back(1);
+					term f; f.push_back(UINT);
 					aux.types = dynenv->from_fact(f);
 					vars[id].push_back(aux);
 				}
 				else {
 					rt_var_inst aux0 = {idx,{i-2}};
 					rt_vartypes aux(aux0,hfalse);
-					term f;
-					for (auto &j : {0,1,2}) {
-						f.clear();
+					for (auto &j : {UINT, UCHAR, SYMB}) {
+						term f;
 						f.push_back(j);
 						aux.types = aux.types || dynenv->from_fact(f);
 					}
@@ -281,12 +270,8 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 							}
 							if (vld) {
 								term f;
-								switch (ts) {
-									case SYMB: f.push_back(0); break;
-									case UINT: f.push_back(1); break;
-									case UCHAR: f.push_back(2); break;
-									default : assert(false);
-								}
+								assert(ts <= 2);
+								f.push_back(ts);
 								vt.types = vt.types || dynenv->from_fact(f);
 							}
 						}
@@ -412,16 +397,12 @@ sig ir_builder::to_native_sig(const term& e) {
 	tml_natives tn(e.size(), {native_type::UNDEF,-1});
 
 	for (size_t i = 0; i != e.size(); ++i) {
-		if (e[i] == 0) tn[i].type = SYMB;
-		else if (e[i] == 1) tn[i].type = UINT;
-		else if (e[i] == 2) tn[i].type = UCHAR;
-		else if (e[i] == 3) ;
+		if (e[i] <= 2) tn[i].type = (native_type) e[i];
+		else if (e[i] == 3) ; //leave it UNDEF
 		else assert(false);
 	}
 	int_t tab_id = dynenv->tbls[e.tab].s.first;
 	sig s = {tab_id, tn};
-	//sig s = {0, tn};
-	//smap[s] = e.tab
 	return s;
 }
 
@@ -429,9 +410,9 @@ void reencode_rel(raw_term *rt, tml_natives &t) {
 	size_t tl = (rt->e.size() == 1) ? 0 : rt->e.size()-2;
 	for (size_t i = 2; i <= tl; ++i)
 		switch (t[i-2].type) {
-			case SYMB:	rt->e[i] = elem((int_t) 0); break;
-			case UINT:	rt->e[i] = elem((int_t) 1); break;
-			case UCHAR: rt->e[i] = elem((int_t) 2); break;
+			case SYMB:
+			case UINT:
+			case UCHAR: rt->e[i] = elem((int_t) t[i-2].type); break;
 			case POLY: break;
 			default : assert(false);
 		}
@@ -443,16 +424,16 @@ void reencode_rel(raw_term *rt, tml_natives &t) {
 void reencode_eqleq(raw_term *rt, tml_natives &t) {
 
 	switch (t[0].type) {
-		case SYMB:	rt->e[0] = elem((int_t) 0); break;
-		case UINT:	rt->e[0] = elem((int_t) 1); break;
-		case UCHAR: rt->e[0] = elem((int_t) 2); break;
+		case SYMB:
+		case UINT:
+		case UCHAR: rt->e[0] = elem((int_t) t[0].type); break;
 		case POLY: break;
 		default : assert(false);
 	}
 	switch (t[1].type) {
-		case SYMB:	rt->e[2] = elem((int_t) 0); break;
-		case UINT:	rt->e[2] = elem((int_t) 1); break;
-		case UCHAR: rt->e[2] = elem((int_t) 2); break;
+		case SYMB:
+		case UINT:
+		case UCHAR: rt->e[2] = elem((int_t) t[1].type); break;
 		case POLY: break;
 		default : assert(false);
 	}
@@ -475,7 +456,7 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 				int_t j = 2;
 				for (auto &i : sh.second) {
 					if (i.type == POLY) i.type = UINT;
-					rth->e[j] = elem((int_t)1);
+					rth->e[j] = elem((int_t) native_type::UINT);
 					j++;
 				}
 			}
@@ -542,7 +523,7 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 									raw_term r;
 									r.e.push_back(v);
 									r.e.push_back(elem(elem::etype::EQ));
-									r.e.push_back(elem(1));
+									r.e.push_back(elem((int_t) native_type::UINT));
 									r.extype = raw_term::EQ;
 									vrt.push_back(r);
 								}
