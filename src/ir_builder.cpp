@@ -105,7 +105,6 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 		int_t id = dict.get_var(t.e[h].e);
 		vars[id].push_back(aux);
 	}
-
 	else {
 		rt_var_inst aux0 = {idx,{}};
 		rt_vartypes aux(aux0,hfalse);
@@ -192,9 +191,9 @@ void ir_builder::get_vars_bltin(const raw_term&t, int_t idx, rr_varmap& vars) {
 					rt_var_inst aux0 = {idx,{i-2}};
 					rt_vartypes aux(aux0,hfalse);
 					term f;
-					for (auto &i : {0,1,2}) {
+					for (auto &j : {0,1,2}) {
 						f.clear();
-						f.push_back(i-2);
+						f.push_back(j);
 						aux.types = aux.types || dynenv->from_fact(f);
 					}
 					vars[id].push_back(aux);
