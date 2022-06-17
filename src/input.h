@@ -805,7 +805,7 @@ struct guard_statement {
 	raw_prog* p_break_rp = 0; // ptr to a prog to break if while cond. true
 };
 
-struct state_block;
+struct state_block; 
 
 struct raw_prog {
 	enum ptype {

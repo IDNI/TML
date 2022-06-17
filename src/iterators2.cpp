@@ -11,13 +11,10 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-
 #include <numeric>
 #include <ranges>
 #include <algorithm>
 
-#include "input.h"
-#include "transform_opt.h"
 #include "iterators.h"
 
 using namespace std;
@@ -31,12 +28,13 @@ bool grey_code_const_iterator::compute_next_delta_() {
 }
 
 grey_code_const_iterator::grey_code_const_iterator(size_t size): size_(size) {
-	focus_pointers_.resize(size_++);
+	focus_pointers_.resize(++size_);
 	std::iota(focus_pointers_.begin(), focus_pointers_.end(), 0);
 	delta_ = 0;
 }
 
-grey_code_const_iterator::grey_code_const_iterator(): size_(0), delta_(0) {
+grey_code_const_iterator::grey_code_const_iterator(): size_(1), delta_(0) {
+	focus_pointers_.resize(1);
 	focus_pointers_[0] = 0;
 }
 
@@ -80,67 +78,5 @@ grey_code_const_iterator grey_code_range::begin() {
 
 grey_code_const_iterator grey_code_range::end() {
 	grey_code_const_iterator end;
-	return end;
-}
-
-/*!
- * Iterator returning all the subsets of a given set. It uses the 
- * grey_code_const_iterator under the hood.
- */
-power_set_const_iterator::power_set_const_iterator(vector<T>& s) : set{s} {
-	grey_code_const_iterator gc(s.size());
-	grey_code = gc;
-}
-
-power_set_const_iterator::power_set_const_iterator() {}
-
-power_set_const_iterator& power_set_const_iterator::operator++() {
-	auto delta = *(grey_code++);
-	auto it = subset.find(delta);
-	if (it != subset.end())
-		subset.erase(it);
-	else 
-		subset.insert(delta);
-	return *this;
-}
-	
-power_set_const_iterator power_set_const_iterator::operator++(int) {
-	auto current = *this; 
-	auto delta = *(grey_code++);
-	auto it = subset.find(delta);
-	if (it != subset.end())
-		subset.erase(it);
-	else 
-		subset.insert(delta);
-	return current;
-}
-	
-bool power_set_const_iterator::operator==(power_set_const_iterator that) const {
-	return set == that.set && subset == that.subset;
-}
-	
-bool power_set_const_iterator::operator!=(power_set_const_iterator that) const {
-	return !(*this == that);
-}
-
-const vector<mutation*> &power_set_const_iterator::operator*() const {
-	auto mutations = subset | views::transform([this](size_t idx ) { return set[idx]; });
-	vector<mutation*> v(mutations.begin(), mutations.end());
-	return v;
-}
-
-powerset_range::powerset_range(vector<mutation*>& ms) : set(ms) {}
-
-bool powerset_range::empty() {
-	return set.size() == 0;
-}
-
-power_set_const_iterator powerset_range::begin() {
-	power_set_const_iterator begin(set);
-	return begin;
-}
-
-power_set_const_iterator powerset_range::end() {
-	power_set_const_iterator end;
 	return end;
 }

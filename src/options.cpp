@@ -196,6 +196,8 @@ void options::setup() {
 		"convert FOL formulas into to DNF before running program");
 	add_bool("safecheck",
 		"enable safety check");
+	add_bool("O0",
+		"enables optimization on requested transformations");
 	add_bool("O1",
 		"enables split-rules");
 	add_bool("O2",

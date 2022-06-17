@@ -16,15 +16,9 @@
 
 #include <vector>
 #include <map>
+#include <cmath>
 
-#include "driver.h"
-
-/*!
- * Represents a mutation of a given (mutated) program. If selected, it is
- * applied to the given (mutated) program. This is a cheap implementation of
- * the command pattern.
- */
-typedef std::function<bool(class mutated_prog&)> mutation;
+class raw_prog;
 
 /*!
  * Represents a mutated program, i.e. the original program, the additions and 
@@ -38,23 +32,35 @@ struct mutated_prog  {
 	// link to previous mutated prog
 	mutated_prog(mutated_prog *m);
 
-	// link to previous mutated prog
-	mutated_prog(const mutated_prog &m);
-
-	void operator()(mutation& m);
-	mutated_prog* operator--();
+	void operator()(struct mutation& m);
+	mutated_prog *operator--();
 	std::vector<raw_rule> get_rules();
 	raw_prog to_raw_program();
 
-	raw_prog* current;
+	raw_prog *current;
 	std::vector<raw_rule*> deletions;
-	mutated_prog* previous;
+	mutated_prog *previous;
+};
+
+/*!
+ * Represents a mutation of a given (mutated) program. If selected, it is
+ * applied to the given (mutated) program. This is a cheap implementation of
+ * the command pattern.
+ */
+class mutation {
+public:
+	auto operator<=>(const mutation &rhs) const = default;
+	virtual const bool operator()(mutated_prog &mp) const;
 };
 
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using cost_function = std::function<float(mutated_prog&)>;
+using cost_function = std::function<double(mutated_prog&)>;
+
+extern cost_function constant_cost_function;
+
+extern cost_function exp_in_heads;
 
 /*!
  * Computes the approximate cost of executing a given mutated program.
@@ -90,10 +96,16 @@ private:
  * Optimization plan accordignly to command line options
  */
 struct optimization_plan {
+public:
 	std::vector<brancher> begin;
 	std::vector<brancher> loop;
 	std::vector<brancher> end;
 
-	bounder& bounder;
-}
+	bounder& bndr;
+
+	optimization_plan(bounder &b);
+};
+
+raw_prog optimize(raw_prog &program, optimization_plan &plan);
+
 #endif // __TRANSFORM_OPT_H__

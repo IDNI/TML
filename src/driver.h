@@ -15,7 +15,9 @@
 #include <map>
 #include <cmath>
 #include <variant>
+#include <memory>
 #include <vector>
+
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
@@ -35,7 +37,6 @@
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
 typedef std::tuple<elem, int_t> rel_info;
-typedef std::function<bool(class mutated_prog&)> mutation;
 
 #define QFACT 0
 #define QRULE 1
@@ -91,7 +92,6 @@ struct z3_context {
 
 #endif
 
-// TODO remove next functions as they are auxiliary in optimization
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
 template <class InputIterator>
@@ -114,8 +114,7 @@ elem rename_variables(const elem &e, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
 void rename_variables(raw_form_tree &t, std::map<elem, elem> &renames,
 	const std::function<elem (const elem &)> &gen);
-raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d);
-// TODO remove aboove function for the former given reason
+
 
 class driver {
 	friend struct flat_rules;
@@ -142,7 +141,9 @@ class driver {
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
+public:
 	void transform_bin(raw_prog& p);
+private:
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_term get_try_pred(const raw_term& x);
 	void transform_bwd(const raw_term& h, const std::vector<raw_term>& b,
@@ -166,6 +167,11 @@ class driver {
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
+	template<typename F> void minimize(raw_rule &rr, const F &f);
+	template<typename F>
+		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
+		const raw_rule &var_rule, raw_form_tree &ref_tree,
+		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -175,32 +181,36 @@ class driver {
 	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	// TODO dupllicate and customize squaring functions
-	void o3_square_root_program(raw_prog &rp);
-	void o3_square_program(raw_prog &rp);
 	void square_root_program(raw_prog &rp);
+public:
 	void square_program(raw_prog &rp);
-	// TODO create one entry point for optimization 
+private:	// TODO create one entry point for optimization 
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
-	bool o2_cqc(const raw_rule &rr1, const raw_rule &rr2);
-	bool o2_cqnc(const raw_rule &rr1, const raw_rule &rr2);
 
+	std::vector<mutation> brancher_export_outer_quantifiers(mutated_prog &mp);
+	std::vector<mutation> brancher_to_dnf(mutated_prog &mp);
 	std::vector<mutation> brancher_subsume_queries_cqc(mutated_prog &mp);
 	std::vector<mutation> brancher_subsume_queries_cqnc(mutated_prog &mp);
 	std::vector<mutation> brancher_split_heads(mutated_prog &mp);
-	std::vector<mutation> brancher_split_bodys(mutated_prog &mp);
+	std::vector<mutation> brancher_split_bodies(mutated_prog &mp);
+	std::vector<mutation> brancher_square_program(mutated_prog &mp);
+	std::vector<mutation> brancher_eliminate_dead_variables(mutated_prog &mp);
 
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
+public:
 	void eliminate_dead_variables(raw_prog &rp);
+private:
 	void factor_rules(raw_prog &rp);
-	// TODO and remove previous ones
+
 #ifdef WITH_Z3
+	std::vector<mutation*> brancher_subsume_queries_z3(mutated_prog &mp) {
 	void qc_z3(raw_prog &rp);
-	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
-		z3_context &ctx);
+	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 #endif
+
 	// following 2 methods are defined in a file tml_earley.cpp
 	bool earley_parse_tml(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();
@@ -219,23 +229,26 @@ class driver {
 		const elem &domain_name, raw_prog &rp, int_t &part_count);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp);
+public:
 	void split_heads(raw_prog &rp);
+private:
 	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
 		const std::set<elem> &fv);
+public:
 	void to_dnf(raw_prog &rp);
+private:
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
+public:
 	void export_outer_quantifiers(raw_prog &rp);
+private:
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	// TODO create one entry point to optimization 
-	void o1_transform_bin(raw_prog& p);
-	void o2_subsume_queries_cqc(raw_prog &rp);
-	void o2_subsume_queries_cqnc(raw_prog &rp);
+	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
 	void subsume_queries_cqc(raw_prog &rp);
 	void subsume_queries_cqnc(raw_prog &rp);
 	void subsume_queries_z3(raw_prog &rp);
@@ -334,9 +347,6 @@ public:
 #endif
 
 };
-
-// bool is_cqn(const raw_rule &rr);
-// bool is_cq(const raw_rule &rr);
 
 template void driver::out<char>(std::ostream&) const;
 template void driver::out<wchar_t>(std::wostream&) const;
