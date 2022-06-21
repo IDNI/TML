@@ -6,7 +6,10 @@ const args = process.argv.slice(2);
 
 require('./tmllib.js')().then(tml => {
 	// import from tml
-	const { bdd, driver, options, inputs, outputs, strings, mmap_mode } = tml;
+	const {
+		bdd, driver, options, inputs, outputs, init_outputs, strings,
+		mmap_mode
+	} = tml;
 
 	// create vector<string> arg_strings from command line args
 	const arg_strings = new strings();
@@ -16,6 +19,7 @@ require('./tmllib.js')().then(tml => {
 	// create outputs and parse options
 	const ii = new inputs();
 	const oo = new outputs();
+	init_outputs(outputs.ref(oo));
 	const o = new options(arg_strings, inputs.ref(ii), outputs.ref(oo));
 	
 	if (o.disabled("i") && o.disabled("ie") && o.disabled("h")
@@ -37,8 +41,7 @@ require('./tmllib.js')().then(tml => {
 	d.run(0, 0);
 
 	if (!d.error) {
-		if (o.enabled("dump") && d.result && !d.dump_goals())
-			d.dump_fixpoint();
+		if (o.enabled("dump") && d.result) d.out_result();
 		if (o.enabled("dict")) d.inf_dict();
 		if (o.enabled("csv")) d.save_csv();
 	}

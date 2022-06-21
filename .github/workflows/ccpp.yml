@@ -54,22 +54,22 @@ jobs:
         run: |
           brew install cppcheck
 # building
-      - name: Bulding debug version
-        run: |
-          mkdir -p build-Debug
-          cd build-Debug
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            CMAKE_CXX_COMPILER=g++-11
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
-          else
-            if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-              CMAKE_CXX_COMPILER=clang++-12
-            else
-              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
-            fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
-          fi
-          make -j5
+#      - name: Bulding debug version
+#        run: |
+#          mkdir -p build-Debug
+#          cd build-Debug
+#          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+#            CMAKE_CXX_COMPILER=g++-11
+#            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
+#          else
+#            if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
+#              CMAKE_CXX_COMPILER=clang++-12
+#            else
+#              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+#            fi
+#            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+#          fi
+#          make -j5
       - name: Bulding release version
         run: |
           mkdir -p build-Release
@@ -89,7 +89,6 @@ jobs:
 # tests
       - name: Test TML execution
         run: |
-          ./build-Debug/tml -ie "a(1)."
           ./build-Release/tml -ie "a(1)."
       - name: Running unit tests
         run: |
@@ -101,11 +100,20 @@ jobs:
           cd ./tests
           ./run_all_regression_tests.sh
           cd -
-#      - name: Running NodeJS regression tests # TODO: build tmllib.js first
-#        run: |
-#          cd ./tests
-#          ./run_all_nodejs_regression_tests.sh
-#          cd -
+# emscripten
+      - name: Installing emscripten
+        run: |
+          ./get_emsdk.sh
+# build tmllib.js
+      - name: Building tmllib.js (NodeJS)
+        run: |
+          ./release-js.sh
+# run NodeJS regression tests
+      - name: Running NodeJS regression tests # TODO: build tmllib.js first
+        run: |
+          cd ./tests
+          ./run_all_nodejs_regression_tests.sh
+          cd -
 # Ubuntu analyzes
 #      - name: Formatting
 #        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'

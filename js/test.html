@@ -82,7 +82,10 @@ console.log(`running: '${program}' with options: '${args.join(' ')}'`);
 
 tml().then(tml => {
 	// import from tml
-	const { bdd, driver, options, inputs, outputs, strings, mmap_mode } = tml;
+	const {
+		bdd, driver, options, inputs, outputs, init_outputs, strings,
+		mmap_mode
+	} = tml;
 
 	console.log('imported');
 
@@ -100,6 +103,7 @@ tml().then(tml => {
 	// create inputs, outputs and parse options
 	const ii = new inputs();
 	const oo = new outputs();
+	init_outputs(outputs.ref(oo));
 	const o = new options(arg_strings, inputs.ref(ii), outputs.ref(oo));
 	console.log('args:', o.to_string());
 
@@ -107,7 +111,9 @@ tml().then(tml => {
 	const d = new driver(program, o);
 	d.run(0, 0);
 	d.dump();
+	if (!d.error && d.result) d.out_result();
 
+	console.log('error: ', d.error);
 	console.log('result: ', d.result);
 
 	// for all streams

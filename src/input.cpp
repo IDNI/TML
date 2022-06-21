@@ -1059,7 +1059,8 @@ raw_prog& raw_prog::merge(const raw_prog& p) {
 		nps.emplace_back(dict), nps.back().merge(*it);
 	for (auto it = p.sbs.begin(); it != p.sbs.end(); ++it)
 		sbs.emplace_back(dict), sbs.back().merge(*it);
-	hidden_rels.insert(p.hidden_rels.begin(), p.hidden_rels.end());
+	if (!p.hidden_rels.empty())
+		hidden_rels.insert(p.hidden_rels.begin(), p.hidden_rels.end());
 	return *this;
 }
 
