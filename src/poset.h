@@ -77,10 +77,47 @@ class PersistentArray {
 
 	static int_t get(storage &arr, const sppa &t, int_t pos);
 	static sppa set(storage &arr, const sppa &t, int_t pos, int_t val);
-	static void undo(storage &arr, const sppa &current, const sppa &last);
 	static void reroot(storage &arr, const sppa &t);
 
 	static int_t size(storage &arr) { return (int_t) arr.size(); }
+};
+
+class pu_iterator {
+	using pa = PersistentArray;
+	int_t val;
+	int_t end_val;
+	bool negate = false;
+	std::vector<int_t> &storage;
+	std::shared_ptr<pa> &p;
+
+  public:
+	pu_iterator(std::vector<int_t> &_s, std::shared_ptr<pa> &_p,
+		    int_t pos) : end_val(abs(pos)), storage(_s), p(_p) {
+		val = pa::get(storage, p, abs(pos));
+	};
+
+	pu_iterator &operator++() {
+		if (val < 0) negate = !negate;
+		val = pa::get(storage, p, abs(val));
+		return *this;
+	}
+
+	int_t operator*() const { return val; }
+
+	bool operator==(pu_iterator &other) const {
+		return abs(val) == abs(other.val);
+	}
+
+	bool operator!=(pu_iterator &other) const {
+		return abs(val) != abs(other.val);
+	}
+
+	pu_iterator begin() { return {storage, p, end_val}; }
+
+	pu_iterator end() {
+		auto it = pu_iterator(storage, p, end_val);
+		it.val = abs(end_val); return it;
+	}
 };
 
 class PersistentUnionFind {
@@ -114,7 +151,11 @@ class PersistentUnionFind {
 	static int_t add(puf &uf);
 	static int_t update(const puf &t, int_t x, int_t y);
 	static void split_set (std::vector<int_t> &s, puf& uf, int_t root);
-	static void split_linking(std::vector<int_t> &s, sppa& link_p,
+	static void
+	split_hashes(int_t root_x, int_t root_y, int_t hash_x,
+		     int_t hash_y, int_t count_x, int_t count_y,
+		     int_t prev_root, puf &uf);
+	static void split_linking(std::vector<int_t> &s, puf &uf,
 				  int_t root);
 	static void
 	extend_eq_set(std::vector<std::pair<int_t, int_t>> &diffs, int_t root,
@@ -146,8 +187,8 @@ class PersistentUnionFind {
 			(y_hash == 0 ? y * y : y_hash));
 	}
 
-	template<typename T>
-	static std::basic_ostream<T> print(int_t uf, std::basic_ostream<T> &os);
+	static void print(int_t uf, std::ostream &os);
+	static void print(puf& uf, std::ostream &os);
 };
 
 // The representative of a set of ints is its smallest element
@@ -173,13 +214,13 @@ struct PersistentSet {
 	static int_t find(int_t set_id, int_t elem);
 	static int_t next(int_t set_id);
 	static PersistentSet get(int_t set_id);
-	static void print(int_t set_id);
+	static void print(int_t set_id, std::ostream &os);
 };
 
 // The representative of a set of pairs is its smallest element
 struct PersistentPairs {
 	// Element in set
-	// If e is 0 we are dealing with the empty set
+	// If e is (0,0) we are dealing with the empty set
 	std::pair<int_t, int_t> e;
 	// Pointer to next element
 	// If n is 0 we have reached the end of a set
@@ -201,7 +242,7 @@ struct PersistentPairs {
 	static std::vector<int_t> implies(int_t set_id, int_t elem);
 	static int_t next(int_t set_id);
 	static PersistentPairs get(int_t set_id);
-	static void print(int_t set_id);
+	static void print(int_t set_id, std::ostream &os);
 };
 
 /*
@@ -236,14 +277,15 @@ class poset {
 	poset () = default;
 
 	//Creates single variable poset
-	explicit poset (int_t v) : vars(v), pure(true), v(v) {}
+	explicit poset (int_t v) : pure(true), v(v) {insert_var(*this, v);}
+	explicit poset (bool isPure) : pure (isPure) {}
 
 	friend std::hash<poset>;
 	bool operator==(const poset &p) const;
 
 	static void init(int n) {
-		P.emplace_back(); P.emplace_back();
-		NP.emplace_back(); NP.emplace_back();
+		P.emplace_back(true); P.emplace_back(true);
+		NP.emplace_back(true); NP.emplace_back(true);
 		pu::init(n);
 		pp::init();
 		ps::init();
@@ -266,6 +308,7 @@ class poset {
 	static void insert_imp(poset &p, int_t fst, int_t snd);
 	static void insert_eq(poset &p, int_t v1, int_t v2);
 	static poset get(int_t pos, bool negated);
+	static void print(poset &p, std::ostream &os);
 
 	inline static bool is_empty(poset &p) {
 		return p.eqs + p.imps + p.vars == 0;

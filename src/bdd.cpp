@@ -105,7 +105,7 @@ void bdd::init(bool gc) {
 	V.emplace_back(0, 1, 1), Mp.resize(1),
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
-	poset::init(100); // controls initial max value for var in poset
+	poset::init(10); // controls initial max value for var in poset
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 

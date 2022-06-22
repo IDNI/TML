@@ -4,7 +4,7 @@
 outputs=(output dump)
 
 # tml executable to test against
-tml=../cmake-build-debug/tml
+tml=../cmake-build-release/tml
 
 usage() {
 	echo "usage: ./tests_runner.sh <dir> [--save]" && exit 1

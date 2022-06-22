@@ -54,6 +54,7 @@ typedef size_t nlevel;
 #endif
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
+#define all(x) x.begin(), x.end()
 #define has(x, y) ((x).find(y) != (x).end())
 #define hasb(x, y) std::binary_search(x.begin(), x.end(), y)
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)

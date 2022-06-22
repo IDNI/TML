@@ -32,7 +32,7 @@ void generate_functions(int arity, unordered_set<spbdd_handle> &func_set, int of
 void test_canonicity () {
 	bdd::init();
 	// First generate set of all boolean functions of given arity
-	const int arity = 5;
+	const int arity = 3;
 	unordered_set<spbdd_handle> func_set;
 	generate_functions(arity, func_set);
 	// Generate single existential quantifications
@@ -91,13 +91,33 @@ void test_canonicity () {
 
 void test_2cnf_gc () {
 	bdd::init();
-	spbdd_handle a = from_bit(2, true);
-	spbdd_handle b  = a && from_bit(3, true);
-	bdd::stats(cout);
-	cout << endl;
-	bdd::gc();
-	bdd::stats(cout);
-	return;
+
+	poset h;
+	poset l;
+
+	poset::insert_eq(h, 1, 1);
+	poset::insert_eq(h, 2, 3);
+	poset::insert_eq(h, 4, 1);
+	poset::insert_eq(h, 5, 2);
+	poset::insert_eq(h, 2, 6);
+	poset::insert_eq(h, 7, 7);
+	poset::insert_eq(h, 8, 8);
+
+	poset::insert_eq(l, 1, 1);
+	poset::insert_eq(l, 2, 1);
+	poset::insert_eq(l, -3, -2);
+	poset::insert_eq(l, 4, 3);
+	poset::insert_eq(l, 5, 2);
+	poset::insert_eq(l, 6, 6);
+	poset::insert_eq(l, 7, 2);
+	poset::insert_eq(l, 8, 6);
+
+	poset::print(h, std::cout);
+	poset::print(l, cout);
+
+	auto res1 = poset::lift(9, forward<poset>(h), forward<poset>(l));
+	poset::print(res1 , std::cout);
+
 }
 
 int main() {
