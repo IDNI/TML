@@ -435,9 +435,8 @@ production gp433{{e432, e212, e12, }, {}, };
 raw_prog rp434(dict);
 rp434.g.insert(rp434.g.end(), { gp5, gp9, gp13, gp15, gp30, gp33, gp36, gp38, gp69, gp74, gp76, gp78, gp81, gp82, gp85, gp86, gp89, gp90, gp94, gp95, gp98, gp100, gp102, gp104, gp109, gp111, gp113, gp116, gp117, gp120, gp121, gp125, gp126, gp129, gp131, gp134, gp135, gp137, gp138, gp142, gp144, gp147, gp149, gp151, gp153, gp175, gp182, gp186, gp188, gp190, gp191, gp196, gp199, gp203, gp206, gp208, gp209, gp210, gp213, gp216, gp219, gp224, gp227, gp229, gp230, gp235, gp237, gp238, gp241, gp242, gp245, gp247, gp248, gp249, gp250, gp251, gp253, gp256, gp258, gp261, gp262, gp265, gp268, gp270, gp271, gp282, gp285, gp287, gp289, gp291, gp293, gp295, gp297, gp299, gp301, gp305, gp306, gp307, gp308, gp312, gp315, gp320, gp324, gp325, gp327, gp328, gp330, gp333, gp337, gp339, gp341, gp343, gp346, gp347, gp351, gp354, gp357, gp358, gp359, gp362, gp363, gp365, gp367, gp370, gp373, gp376, gp379, gp381, gp383, gp385, gp387, gp391, gp392, gp393, gp396, gp400, gp401, gp406, gp411, gp413, gp416, gp417, gp420, gp424, gp425, gp426, gp427, gp429, gp430, gp431, gp433, });
 raw_prog rp435(dict);
-rp435.nps.emplace_back(dict);
-rp435.nps.back().merge(rp434);
+rp435.nps.push_back(rp434);
 raw_progs rps436(dict);
-rps436.p.merge(rp435);
+rps436.p = rp435;
 
 auto& program_gen = rps436;

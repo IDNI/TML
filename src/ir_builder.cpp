@@ -698,7 +698,7 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 	flat_prog m;
 	vector<term> v;
 	term t;
-	raw_prog p(pin.dict); p.merge(pin);
+	raw_prog p = pin;
 	for (raw_rule& r : p.r)
 
 		//XXX:  each rule is a context.

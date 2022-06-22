@@ -458,7 +458,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 				if      (el.e == "forget") forget = true;
 				else if (el.e == "renew")  renew = true;
 				break;
-			case elem::SYM:	if (prog.dict.is_bltin(el.e)) {
+			case elem::SYM:	if (prog.dict.get().is_bltin(el.e)) {
 					el.type = elem::BLTIN;
 					bltin = true;
 					el.num = renew << 1 | forget;
@@ -1047,22 +1047,6 @@ bool state_block::parse(input* in) {
 	else return false;
 }
 
-raw_prog& raw_prog::merge(const raw_prog& p) {
-	type = p.type;
-	macros.insert(macros.end(), p.macros.begin(), p.macros.end());
-	d.insert(d.end(), p.d.begin(), p.d.end());
-	g.insert(g.end(), p.g.begin(), p.g.end());
-	r.insert(r.end(), p.r.begin(), p.r.end());
-	gs.insert(gs.end(), p.gs.begin(), p.gs.end());
-	vts.insert(vts.end(), p.vts.begin(), p.vts.end());
-	for (auto it = p.nps.begin(); it != p.nps.end(); ++it)
-		nps.emplace_back(dict), nps.back().merge(*it);
-	for (auto it = p.sbs.begin(); it != p.sbs.end(); ++it)
-		sbs.emplace_back(dict), sbs.back().merge(*it);
-	if (!p.hidden_rels.empty())
-		hidden_rels.insert(p.hidden_rels.begin(), p.hidden_rels.end());
-	return *this;
-}
 
 bool raw_prog::parse_xfp(input* in) {
 	lexemes& l = in->l;
@@ -1178,8 +1162,9 @@ bool raw_prog::macro_expand(input *in, macro mm, const size_t i, const size_t j,
 		for (size_t a = 0; ed != mm.def.e.end(); ed++)
 			if (ed->type == elem::VAR)  {
 				if (a < carg.size()) chng[*ed] = carg[a++];
-				else chng[*ed] = elem(elem::VAR, dict
-					.get_var_lexeme(dict.get_new_var())), 
+				else chng[*ed] = elem(elem::VAR, dict.get()
+					.get_var_lexeme(dict.get()
+					.get_new_var())), 
 					ret = chng[*ed];
 			}
 		for (auto &tt:mm.b) 
@@ -1207,11 +1192,10 @@ bool raw_progs::parse(input* in) {
 	size_t& pos = in->pos;
 	in->prog_lex();
 	if (in->error) return false;
-	if (!l.size()) return false;
 	raw_prog rp(dict); //raw_prog& rp = p.nps.emplace_back(raw_prog(dict));
 	raw_prog::require_guards = false;
 	raw_prog::require_state_blocks = false;
-	if (!rp.parse(in))  return in->error?false:
+	if (l.size() && !rp.parse(in)) return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
 

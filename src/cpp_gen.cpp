@@ -334,8 +334,7 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_prog &rp) {
 	// Insert the nested progs we have constructed into the final program
 	if (prog_names.size())
 		for (const string &np : prog_names) os <<
-			name << ".nps.emplace_back(" << dict_name << ");\n" <<
-			name << ".nps.back().merge(" << np << ");\n";
+			name << ".nps.push_back(" << np << ");\n";
 	return os;
 }
 
@@ -345,5 +344,5 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_progs &rps){
 	gen(os, pname, rps.p);
 	stringstream ss; ss << "rps" << id++; name = ss.str();
 	return os << "raw_progs " << name << "(" << dict_name << ");\n"
-		<< name << ".p.merge(" << pname << ");\n";
+		<< name << ".p = " << pname << ";\n";
 }
