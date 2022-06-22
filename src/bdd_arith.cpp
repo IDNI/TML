@@ -392,7 +392,7 @@ bdd_ref bdd::adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit) {
 // ----------------------------------------------------------------------------
 // Over bdds MULT
 // ----------------------------------------------------------------------------
-#ifdef BDD_ARITH
+#ifndef NOBDDARITH
 extern uints perm_init(size_t n);
 #else
 uints perm_init(size_t n) {

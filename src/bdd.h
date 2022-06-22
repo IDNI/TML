@@ -25,8 +25,6 @@
 #include "memory_map.h"
 #endif
 
-#define BDD_ARITH
-
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -238,6 +236,7 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
 size_t satcount(cr_spbdd_handle x, const size_t bits);
+void allsat_bin(cr_spbdd_handle x, const size_t bits);
 //size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex);
 
 /* A BDD is a pair of attributed references to BDDs. Separating out attributes
@@ -297,6 +296,7 @@ class bdd {
 	friend spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
 	friend size_t satcount(cr_spbdd_handle x, const size_t bits);
+	friend void allsat_bin(cr_spbdd_handle x, const size_t bits);
 	//friend size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools& ex);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -373,8 +373,12 @@ class bdd {
 	static std::basic_ostream<T>& out(std::basic_ostream<T>& os, bdd_ref x);
 	bdd_ref h, l;
 
+	typedef enum { L, H, X, U } t_path;
+	typedef std::vector<t_path> t_pathv;
+	static void allsat_bin_dump(bdd_ref a_in, t_pathv &p, size_t bit, size_t bits);
+
 	//---
-#ifdef BDD_ARITH
+#ifndef NOBDDARITH
 	static void bdd_sz_abs(bdd_ref x, std::set<bdd_id>& s);
 	static bdd_ref bdd_xor(bdd_ref x, bdd_ref y);
 	static bdd_ref bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &quants,
@@ -387,8 +391,8 @@ class bdd {
 	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, const size_t x_bitw,
 			const size_t y_bitw /*, const size_t x_idx=0, const size_t y_idx=0*/);
 	//static int_t geq(int_t a, int_t b, size_t bit, size_t x_bitw, size_t y_bitw);
-	typedef enum { L, H, X, U } t_path;
-	typedef std::vector<t_path> t_pathv;
+	//typedef enum { L, H, X, U } t_path;
+	//typedef std::vector<t_path> t_pathv;
 	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
 			size_t bits, size_t n_args);
 	static int_t balance_paths(t_pathv & next_path_a, t_pathv & next_path_b, size_t bits,
@@ -420,6 +424,7 @@ class bdd {
 	static bdd_ref shr(bdd_ref a_in, size_t arg, size_t bits, size_t n_args);
 	static bdd_ref shlx(bdd_ref b_in, size_t x, size_t bits, size_t n_args);
 #endif
+
 public:
 	bdd(bdd_ref h, bdd_ref l);
 	inline bool operator==(const bdd& b) const {
