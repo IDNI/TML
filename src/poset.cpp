@@ -172,12 +172,11 @@ int_t PersistentUnionFind::add(puf &uf) {
 
 void
 PersistentUnionFind::split_set(vector<int_t> &s, PersistentUnionFind::puf &uf, int_t root) {
-	// Reset parents
+	if (s.empty()) return;
 	for (auto el : s) {
 		uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, abs(el),
 				       el < 0 ? -s[0] : s[0]);
 	}
-	// update linking and hashes
 	split_linking(s, uf, abs(root));
 }
 
@@ -239,47 +238,6 @@ PersistentUnionFind::split_linking(std::vector<int_t> &s, puf &uf, int_t root) {
 
 	split_hashes(abs(s[0]), root_cs, hash_s, hash_cs, (int_t) s.size(),
 		     count_cs, root, uf);
-}
-
-void
-PersistentUnionFind::extend_eq_set(vector<pair<int_t, int_t>> &diffs, int_t root,
-				   puf& uf, vector<int_t> &eq_set) {
-	//TODO: Avoid creating vector -> use static variant
-	vector<int_t> root_set = get_equal(uf, root);
-	sortc(root_set, abs_cmp);
-	//sortc(eq_set, abs_cmp);
-	//vector<int_t> res;
-
-	auto it_diff = diffs.begin();
-	auto it_root = root_set.begin();
-	//auto it_eq = eq_set.begin();
-
-	while (it_root != root_set.end()) {
-		if(it_diff->first < abs(*it_root)) ++it_diff;
-		else if(abs(*it_root) < it_diff->first) {
-			// Element in root_set but not in diff
-			int_t p = find(uf, *it_root);
-			if(hasbc(eq_set, p, abs_cmp))
-				eq_set.emplace_back(*it_root);
-			else if (hasbc(eq_set, -p, abs_cmp))
-				eq_set.emplace_back(-*it_root);
-			++it_root;
-		}
-		else {
-			++it_root; ++it_diff;
-			/*// Element is in intersection
-			if(abs(*it_root) < abs(*it_eq)) {
-				//Element is not in eq_set
-				res.emplace_back(*it_root);
-				++it_root; ++it_diff;
-			} else {
-				//Element is in eq_set
-				//Note, that eq_set is contained in root_set
-				++it_root; ++it_diff; ++it_eq;
-			}*/
-		}
-	}
-	sortc(eq_set, abs_cmp);
 }
 
 PersistentUnionFind::sppa
@@ -356,15 +314,21 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	}
 
 	//Get the sets and intersect, I am on uf2
+	int count=0;
 	for (auto &p : eq_classes) {
-		eq_sets.emplace_back(get_equal(uf2, p.first.second));
+		eq_sets.emplace_back();
+		for(auto el : get_equal(uf2, p.first.second))
+			eq_sets[count].emplace_back(el);
 		sortc(eq_sets[eq_sets.size()-1], abs_cmp);
+		++count;
 	}
 
-	int count=0;
+	count=0;
 	for(auto &p : eq_classes){
 		// could make use of vector in eq_classes (second in p)
-		vector<int_t> eq_set_uf1 = get_equal(uf1, p.first.first);
+		vector<int_t> eq_set_uf1;
+		for (auto el : get_equal(uf1, p.first.first))
+		 	eq_set_uf1.emplace_back(el);
 		sortc(eq_set_uf1, abs_cmp);
 		p.second.clear();
 		set_intersection(all(eq_sets[count]), all(eq_set_uf1),
@@ -416,7 +380,7 @@ void PersistentUnionFind::print(int_t uf, ostream &os) {
 }
 
 //Returns a vector of all equal elements to x including x in t
-std::vector<int_t> PersistentUnionFind::get_equal(int_t t, int_t x) {
+pu_iterator PersistentUnionFind::get_equal(int_t t, int_t x) {
 	auto &uf = uf_univ[t];
 	return get_equal(uf, x);
 }
@@ -461,20 +425,10 @@ int_t PersistentUnionFind::size() {
 	return p_arr::size(parent_s);
 }
 
-std::vector<int_t>
+pu_iterator
 PersistentUnionFind::get_equal(const PersistentUnionFind::puf &uf, int_t x) {
 	int_t rep_x = find(uf, x);
-
-	vector<int_t> set{};
-	bool negate = false;
-	//Go down linked list and negate rest of chain if - is encountered
-	int_t next = rep_x;
-	do {
-		if (next < 0) negate = !negate;
-		next = p_arr::get(link_s, uf.link_pt, abs(next));
-		set.push_back(negate ? -next : next);
-	} while (abs(next) != abs(rep_x));
-	return set;
+	return {link_s, uf.link_pt, rep_x};
 }
 
 void PersistentUnionFind::print(PersistentUnionFind::puf &uf, ostream &os) {
@@ -645,15 +599,33 @@ bool PersistentPairs::contains(int_t set_id, pair<int_t, int_t> &elem) {
 	return false;
 }
 
-std::vector<int_t> PersistentPairs::implies(int_t set_id, int_t elem) {
-	vector<int_t> imp;
+int_t PersistentPairs::implies(int_t set_id, int_t elem, bool del, vector<int_t>& imp) {
+	int_t id = set_id;
 	while (set_id != 0) {
 		auto &p = pairs_univ[set_id].e;
-		if (p.first == elem) imp.emplace_back(p.second);
-		else if (-p.second == elem) imp.emplace_back(-p.first);
+		if (p.first == elem) {
+			imp.emplace_back(p.second);
+			if(del) id = remove(id, p);
+		} else if (-p.second == elem) {
+			imp.emplace_back(-p.first);
+			if(del) id = remove(id, p);
+		} else if (p.first == -elem || p.second == elem) {
+			if(del) id = remove(id, p);
+		}
 		set_id = next(set_id);
 	}
-	return imp;
+	return id;
+}
+
+int_t PersistentPairs::all_implies(int_t set_id, int_t elem, bool del, vector<int_t>& all_imp) {
+	if(set_id == 0) return 0;
+	auto start = (int_t)all_imp.size();
+	set_id = implies(set_id, elem, del, all_imp);
+	auto end = (int_t)all_imp.size();
+	for (int i = start; i < end; ++i){
+		set_id = all_implies(set_id, all_imp[i], del, all_imp);
+	}
+	return set_id;
 }
 
 int_t PersistentPairs::next(int_t set_id) {
@@ -842,6 +814,40 @@ poset poset::lift(int_t v, poset &&hi, poset &&lo) {
 	return p;
 }
 
+// Evaluate poset on the variable v
+//TODO: return false
+poset poset::eval(poset &p, int_t v) {
+	if (p.v != abs(v)) DBGFAIL;
+	if(!p.pure) DBGFAIL;
+
+	poset res = p;
+	if(ps::contains(p.vars, v)) {
+		res.vars = ps::remove(p.vars, v);
+		return res;
+	}
+
+	if(ps::contains(p.vars, -v)) {
+		return {};
+	}
+
+	static vector<int_t> all_imp;
+	for (auto el : pu::get_equal(res.eqs, v)) {
+		res.vars = ps::insert(res.vars, el);
+		res.imps = pp::all_implies(res.imps, el, true, all_imp);
+	}
+	res.eqs = pu::rm_equal(res.eqs, v);
+	for(int i=0; i < (int)all_imp.size(); ++i) {
+		for (auto el : pu::get_equal(res.eqs, all_imp[i])) {
+			res.vars = ps::insert(res.vars, el);
+			res.imps = pp::all_implies(res.imps, el, true, all_imp);
+		}
+		res.eqs = pu::rm_equal(res.eqs, all_imp[i]);
+	}
+	res.vars = ps::remove(res.vars, v);
+	all_imp.clear();
+	return res;
+}
+
 /*
 // Get resulting poset when assigning v
 //TODO: return false
@@ -915,25 +921,31 @@ poset poset::eval(int_t v) {
 */
 
 bool poset::insert_var(poset &p, int_t v) {
-	if (abs(v) < p.v) p.v = abs(v);
+	if (abs(v) < p.v || p.v == 0) p.v = abs(v);
 	return (p.vars = ps::insert(p.vars, v));
 }
 
 poset poset::insert_var(poset &&p, int_t v) {
 	p.vars = ps::insert(p.vars, v);
-	if (abs(v) < p.v) p.v = abs(v);
+	if (abs(v) < p.v || p.v == 0) p.v = abs(v);
 	return p;
 }
 
 void poset::insert_imp(poset &p, std::pair<int_t, int_t> &el) {
+	if(abs(el.first) < p.v || p.v == 0) p.v = abs(el.first);
+	if(abs(el.second) < p.v || p.v == 0) p.v = abs(el.second);
 	p.imps = pp::insert(p.imps, el);
 }
 
 void poset::insert_imp(poset &p, int_t fst, int_t snd) {
+	if(abs(fst) < p.v || p.v == 0) p.v = abs(fst);
+	if(abs(snd) < p.v || p.v == 0) p.v = abs(snd);
 	p.imps = pp::insert(p.imps, fst, snd);
 }
 
 void poset::insert_eq(poset &p, int_t v1, int_t v2) {
+	if(abs(v1) < p.v || p.v == 0) p.v = abs(v1);
+	if(abs(v2) < p.v || p.v == 0) p.v = abs(v2);
 	p.eqs = pu::merge(p.eqs, v1, v2);
 }
 

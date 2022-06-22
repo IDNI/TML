@@ -87,36 +87,41 @@ class pu_iterator {
 	int_t val;
 	int_t end_val;
 	bool negate = false;
+	bool looped = false;
 	std::vector<int_t> &storage;
-	std::shared_ptr<pa> &p;
+	const std::shared_ptr<pa> &p;
 
   public:
-	pu_iterator(std::vector<int_t> &_s, std::shared_ptr<pa> &_p,
-		    int_t pos) : end_val(abs(pos)), storage(_s), p(_p) {
+	pu_iterator(std::vector<int_t> &_s, const std::shared_ptr<pa> &_p,
+		    int_t pos) : end_val(pos), storage(_s), p(_p) {
 		val = pa::get(storage, p, abs(pos));
+		if(pos < 0) negate = !negate;
+		val = negate ? -val : val;
 	};
 
 	pu_iterator &operator++() {
+		if(!looped) looped = true;
 		if (val < 0) negate = !negate;
 		val = pa::get(storage, p, abs(val));
+		val = negate ? -val : val;
 		return *this;
 	}
 
 	int_t operator*() const { return val; }
 
 	bool operator==(pu_iterator &other) const {
-		return abs(val) == abs(other.val);
+		return abs(val) == abs(other.val) && looped == other.looped;
 	}
 
 	bool operator!=(pu_iterator &other) const {
-		return abs(val) != abs(other.val);
+		return abs(val) != abs(other.val) || looped != other.looped;
 	}
 
 	pu_iterator begin() { return {storage, p, end_val}; }
 
 	pu_iterator end() {
 		auto it = pu_iterator(storage, p, end_val);
-		it.val = abs(end_val); return it;
+		it.looped = true; return it;
 	}
 };
 
@@ -157,12 +162,9 @@ class PersistentUnionFind {
 		     int_t prev_root, puf &uf);
 	static void split_linking(std::vector<int_t> &s, puf &uf,
 				  int_t root);
-	static void
-	extend_eq_set(std::vector<std::pair<int_t, int_t>> &diffs, int_t root,
-		      puf& uf, std::vector<int_t> &eq_set);
 	static sppa update_link(const puf &t, int_t x, int_t y);
 	static int_t find(const puf &t, int_t elem);
-	static std::vector<int_t> get_equal(const puf& uf, int_t x);
+	static pu_iterator get_equal(const puf& uf, int_t x);
   public:
 	PersistentUnionFind() = delete;
 	bool operator==(const puf &) const;
@@ -173,7 +175,7 @@ class PersistentUnionFind {
 	static int_t merge(int_t t, int_t x, int_t y);
 	static int_t intersect(int_t t1, int_t t2);
 	static bool equal(int_t t, int_t x, int_t y);
-	static std::vector<int_t> get_equal(int_t t, int_t x);
+	static pu_iterator get_equal(int_t t, int_t x);
 	static int_t rm_equal(int_t t, int_t x);
 	static bool resize(int_t n);
 	static int_t size();
@@ -239,7 +241,10 @@ struct PersistentPairs {
 	static int_t remove(int_t set_id, std::pair<int_t, int_t> &elem);
 	static bool empty(int_t set_id);
 	static bool contains(int_t set_id, std::pair<int_t, int_t> &elem);
-	static std::vector<int_t> implies(int_t set_id, int_t elem);
+	static int_t
+	implies(int_t set_id, int_t elem, bool del, std::vector<int_t> &imp);
+	static int_t
+	all_implies(int_t set_id, int_t elem, bool del, std::vector<int_t> &all_imp);
 	static int_t next(int_t set_id);
 	static PersistentPairs get(int_t set_id);
 	static void print(int_t set_id, std::ostream &os);
@@ -301,7 +306,7 @@ class poset {
 	};
 
 	static poset lift(int_t v, poset &&hi, poset &&lo);
-	//static poset eval (int_t v, poset& p);
+	static poset eval (poset& p, int_t v);
 	static bool insert_var(poset &p, int_t v);
 	static poset insert_var(poset &&p, int_t v);
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);

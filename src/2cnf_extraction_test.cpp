@@ -93,8 +93,10 @@ void test_2cnf_gc () {
 	bdd::init();
 
 	poset h;
+	h.pure = true;
 	poset l;
-
+	l.pure = true;
+/*
 	poset::insert_eq(h, 1, 1);
 	poset::insert_eq(h, 2, 3);
 	poset::insert_eq(h, 4, 1);
@@ -111,13 +113,23 @@ void test_2cnf_gc () {
 	poset::insert_eq(l, 6, 6);
 	poset::insert_eq(l, 7, 2);
 	poset::insert_eq(l, 8, 6);
+*/
+
+	poset::insert_var(h, 2);
+	poset::insert_var(h,3);
+
+	poset::insert_imp(l, 2, 3);
 
 	poset::print(h, std::cout);
 	poset::print(l, cout);
 
-	auto res1 = poset::lift(9, forward<poset>(h), forward<poset>(l));
+	auto res1 = poset::lift(1, forward<poset>(h), forward<poset>(l));
 	poset::print(res1 , std::cout);
 
+	auto high = poset::eval(res1, 1);
+	auto low = poset::eval(res1, -1);
+	poset::print(high, std::cout);
+	poset::print(low, cout);
 }
 
 int main() {
