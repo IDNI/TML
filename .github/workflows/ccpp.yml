@@ -111,18 +111,18 @@ jobs:
         run: |
           cd build-Debug
           make -j5 clang-tidy
-      - name: Generating coverage report on Ubuntu
-        if: success() && matrix.compiler == 'gcc' && matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo git clone https://github.com/linux-test-project/lcov
-          cd lcov
-          sudo make install
-          cd ../
-          echo `ls`
-          /usr/local/bin/lcov -c -d ./build-Debug/src/CMakeFiles --gcov-tool /usr/bin/gcov -o coverage.info
-          /usr/local/bin/lcov --remove coverage.info '/usr/*' --output-file coverage.info
-          /usr/local/bin/lcov --list coverage.info # debug info
-          bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
+#       - name: Generating coverage report on Ubuntu
+#         if: success() && matrix.compiler == 'gcc' && matrix.os == 'ubuntu-22.04'
+#         run: |
+#           sudo git clone https://github.com/linux-test-project/lcov
+#           cd lcov
+#           sudo make install
+#           cd ../
+#           echo `ls`
+#           /usr/local/bin/lcov -c -d ./build-Debug/src/CMakeFiles --gcov-tool /usr/bin/gcov -o coverage.info
+#           /usr/local/bin/lcov --remove coverage.info '/usr/*' --output-file coverage.info
+#           /usr/local/bin/lcov --list coverage.info # debug info
+#           bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
 # macOS analyzes
       - name: Running CPP check on macOS
         if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
