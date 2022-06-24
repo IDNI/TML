@@ -75,8 +75,8 @@ earley<char32_t>::string earley<char32_t>::to_str(const string_t &s) const {
 
 template <typename CharT>
 earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
-	bool _bin_lr) : bin_lr(_bin_lr)
-{
+	bool _bin_lr, bool _incr_gen_forest) : bin_lr(_bin_lr),
+	incr_gen_forest(_incr_gen_forest) { 
 	set<string> nt;
 	map<string, int_t> bmi;
 	for (auto& bmp : bm) {
@@ -154,8 +154,9 @@ earley<CharT>::earley(const vector<production> &g, const char_builtins_map& bm,
 
 template <typename CharT>
 earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
-	const char_builtins_map& bm, bool _bin_lr) : bin_lr(_bin_lr)
-{
+	const char_builtins_map& bm, bool _bin_lr, bool _incr_gen_forest) :
+	 bin_lr(_bin_lr), incr_gen_forest(_incr_gen_forest) {
+
 	set<string> nt;
 	map<string, int_t> bmi;
 	for (auto& bmp : bm) {
@@ -210,7 +211,7 @@ earley<CharT>::earley(const vector<pair<string, vector<vector<string>>>>& g,
 }
 
 template <typename CharT>
-std::basic_ostream<CharT>& earley<CharT>::print(std::basic_ostream<CharT>& os, const item& i) const {
+earley<CharT>::ostream& earley<CharT>::print(earley<CharT>::ostream& os, const item& i) const {
 	put(put(os, i.set) << " ", i.from) << " ";
 	for (size_t n = 0; n != G[i.prod].size(); ++n) {
 		if (n == i.dot) os << "* ";
@@ -298,8 +299,16 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 	emeasure_time_start(tsr, ter);
 	inputstr = s;
 	size_t len = s.size();
+	pfgraph.clear();
+	bin_tnt.clear();
+	tid = 0;
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
-	for (size_t n : nts[start]) S.emplace(0, n, 0, 1);
+	for (size_t n : nts[start]) {
+		auto it = S.emplace(0, n, 0, 1).first;
+		// fix the bug for missing Start( 0 0) when start is nulllable
+		if(nullable(*it))
+			S.emplace(0, n, 0, 2);
+	}
 	set<item> t;
 #ifdef DEBUG
 	size_t r = 1, cb = 0; // row and cel beginning
@@ -340,10 +349,21 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 			DBG(o::dbg()<<endl;)
 #endif
 */
-/*		DBG(o::dbg() << "set: " << n << endl;)
+		if( true == incr_gen_forest ) {
+		DBG(o::dbg() << "set: " << n << endl;)
+		for (	auto it = S.lower_bound(item(n, 0, 0, 0));
+			it != S.end() && it->set == n; ++it) 
+			if(completed(*it)) pre_process(*it);
+			
 		for (	auto it = S.lower_bound(item(n, 0, 0, 0));
 			it != S.end() && it->set == n; ++it)
-			print(*it);*/
+			if( completed(*it) ) { 
+				DBG(o::dbg()<<endl<< it->from <<it->set << it->prod << it->dot <<endl);				
+				nidx_t curroot(get_nt(*it), {it->from, it->set});
+				build_forest(curroot);
+				//to_tml_rule(o::to("parser-to-rules"));
+			}
+		}
 	}
 	bool found = false;
 	for (size_t n : nts[start])
@@ -351,8 +371,9 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 			found = true;
 		}
 	emeasure_time_end( tsr, ter ) <<" :: recognize time" <<endl;
-	forest();
-	ptree_t pt = this->get_parsed_tree();
+	if(!incr_gen_forest) forest();
+	ptree_t pt;
+	//this->get_parsed_tree();
 
 	if (o::enabled("parser-to-rules")) {
 		emeasure_time_start(tsf3, tef3);
@@ -756,45 +777,50 @@ void earley<CharT>::sbl_chd_forest( const item &eitem, std::vector<nidx_t> &curc
 	}
 }
 template <typename CharT>
+void earley<CharT>::pre_process(const item &i){
+
+	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
+	if( completed(i) )
+		sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i),
+		rsorted_citem[{G[i.prod][0].n(), i.set}].emplace_back(i);
+	else if(bin_lr) {
+		// Precreating temporaries to help in binarisation later
+		// each temporary represents a partial rhs production with
+		// atleast 3 symbols
+		if( i.dot >= 3 ){
+			std::vector<lit> v(G[i.prod].begin()+1, G[i.prod].begin()+i.dot);
+			lit tlit;
+			if(bin_tnt.find(v) == bin_tnt.end()) {
+				stringstream ss;
+				put(ss << "temp", tid++);
+				tlit = lit{ d.get(ss.str()) };
+				bin_tnt.insert({v, tlit});
+			}
+			else tlit = bin_tnt[v];
+			
+			//DBG(print(o::dbg(), i);)
+			//o::dbg()<< endl << d.get(tlit.n()) << v << endl;
+			sorted_citem[{tlit.n(), i.from}].emplace_back(i),
+			rsorted_citem[{tlit.n(), i.set}].emplace_back(i);
+		}
+	}
+}
+template <typename CharT>
 bool earley<CharT>::forest( ){
 	bool ret = false;
 	// clear forest structure if any
 	pfgraph.clear();
 	bin_tnt.clear();
+	tid = 0;
 	// set the start root node
 	size_t len = inputstr.length();
 	nidx_t root(start, {0,len});
 	// preprocess earley items for faster retrieval
 	emeasure_time_start(tspfo, tepfo);
 	int count = 0;
-	size_t tid = 0;
 	for (const item& i : S) { 
 		count++;
-			//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
-		if( completed(i) )
-			sorted_citem[{G[i.prod][0].n(), i.from}].emplace_back(i),
-			rsorted_citem[{G[i.prod][0].n(), i.set}].emplace_back(i);
-		else if(bin_lr) {
-			// Precreating temporaries to help in binarisation later
-			// each temporary represents a partial rhs production with
-			// atleast 3 symbols
-			if( i.dot >= 3 ){
-				std::vector<lit> v(G[i.prod].begin()+1, G[i.prod].begin()+i.dot);
-				lit tlit;
-				if(bin_tnt.find(v) == bin_tnt.end()) {
-					stringstream ss;
-					put(ss << "temp", tid++);
-					tlit = lit{ d.get(ss.str()) };
-					bin_tnt.insert({v, tlit});
-				}
-				else tlit = bin_tnt[v];
-				
-				//DBG(print(o::dbg(), i);)
-				//o::dbg()<< endl << d.get(tlit.n()) << v << endl;
-				sorted_citem[{tlit.n(), i.from}].emplace_back(i),
-				rsorted_citem[{tlit.n(), i.set}].emplace_back(i);
-			}
-		}
+		pre_process(i);
 	}
 
 	emeasure_time_end(tspfo, tepfo) <<" :: preprocess time ,"<< "size : "<< count << endl;

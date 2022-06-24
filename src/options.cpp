@@ -274,6 +274,7 @@ void options::setup() {
 	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");
 	add_bool2("bin-lr", "blr", "on the fly binarization and left "
 					"right optimization for earley items");
+	add_bool2("incr-gen-forest", "igf", "incremental generation of forest");
 	add_output    ("dump",        "dump output     (@stdout by default)");
 	add_output_alt("output", "o","standard output (@stdout by default)");
 	add_output    ("error",       "errors          (@stderr by default)");

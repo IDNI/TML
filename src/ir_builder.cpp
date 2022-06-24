@@ -1971,7 +1971,7 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 			return c > 160 || isprint(c); }	}
 	};
 
-	earley_t parser(g, bltnmap, opts.bin_lr);
+	earley_t parser(g, bltnmap, opts.bin_lr, opts.incr_gen_forest );
 	bool success = parser
 		.recognize(to_u32string(strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<

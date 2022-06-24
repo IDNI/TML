@@ -3762,6 +3762,7 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.bin_lr            = opts.enabled("bin-lr");
 	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
+	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);

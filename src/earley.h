@@ -146,6 +146,8 @@ private:
 	} d;
 	
 public:
+	typedef std::map<item, std::set<std::vector<item>>> item_forest_t;
+	
 	typedef pnode nidx_t;
 	typedef std::map<nidx_t, std::set<std::vector<nidx_t>>> parse_forest_t;
 	typedef parse_forest_t ptree_t;
@@ -156,15 +158,15 @@ public:
 		action_fn;
 	typedef std::pair<string, action_fn> action_pair;
 	typedef std::map<string, action_fn> actions;
-	earley(const grammar& g, const char_builtins_map& bm,
-		bool _bin_lr = false);
-	earley(const grammar& g, bool _bin_lr) : earley(g, {}, _bin_lr) {}
-	earley(const grammar& g)               : earley(g, {}) {}
+	earley(const grammar& g, const char_builtins_map& bm = {},
+		bool _bin_lr = false, bool _incr_gen_forest = false);
+	earley(const grammar& g, bool _bin_lr = false, bool _incr_gen_forest = false)
+		:earley(g, {}, _bin_lr, _incr_gen_forest) {}
 	earley(const std::vector<production>& g, const char_builtins_map& bm,
-		bool _bin_lr = false);
-	earley(const std::vector<production>& g, bool _bin_lr) :
-		earley(g, {}, _bin_lr) {}
-	earley(const std::vector<production>& g) : earley(g, {}) {}
+		bool _bin_lr = false, bool _incr_gen_forest = false );
+	earley(const std::vector<production>& g, bool _bin_lr = false, 
+		bool _incr_gen_forest = false):earley(g, {}, _bin_lr, _incr_gen_forest){}
+
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
 	string flatten(string label, const nidx_t nd) const;
@@ -212,6 +214,7 @@ private:
 	node_children_variations get_children(const nidx_t nd, bool all = false)
 		const;
 	bool bin_lr;  //enables binarizaion and left right optimization
+	bool incr_gen_forest; //enables incremental generation of forest
 	ostream& put(ostream& os, const size_t& n) const {
 		for (const auto& ch : to_string_(n)) os.put((CharT) ch);
 		return os;
@@ -253,11 +256,13 @@ private:
 		sorted_citem, rsorted_citem;
 	parse_forest_t pfgraph;
 	std::map<std::vector<earley::lit>, earley::lit> bin_tnt; // binariesed temporary intermediate non-terminals
+	size_t tid; // id for temporary non-terminals
 	std::vector<char_builtin_t> builtins;
 	std::vector<std::map<CharT, size_t>> builtin_char_prod; // char -> prod
 	std::string grammar_text() const;
 	bool build_forest ( const nidx_t &root );
 	bool build_forest2 ( const nidx_t &root );
+	void pre_process(const item &i);
 	bool forest();
 	bool bin_lr_comb(const item&, std::set<std::vector<nidx_t>>&);
 	void sbl_chd_forest(const item&, std::vector<nidx_t>&, size_t,
