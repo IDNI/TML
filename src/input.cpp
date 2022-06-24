@@ -1332,7 +1332,7 @@ void input::count_pos(ccs o, long& l, long& ch) {
 bool throw_runtime_error(string err, string details) {
 	ostringstream msg; msg << "Runtime error: \"" << err << "\"";
 	if (details.size()) msg << " details: \"" << details << "\"";
-	o::err() << msg.str() << endl;
+	(o::enabled("error") ? o::err() : CERR) << msg.str() << endl;
 #ifdef WITH_EXCEPTIONS
 	throw runtime_error_exception(msg.str());
 #else

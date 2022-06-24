@@ -39,16 +39,13 @@ int test_out(int c, earley<CharT> &e){
 
 int main(int argc, char** argv) {
 	using namespace std;
-	outputs oo;
 	inputs ii;
-	oo.target("debug",  "@stderr");  // o::dbg()
-	oo.target("info",   "@stderr");  // o::inf()
-	oo.target("error",  "@stderr");  // o::err()
-	oo.target("output", "@stdout");  // o::out()
-	o::dbg() << "DBG" << std::endl;
-	o::inf() << "INF" << std::endl;
-	o::err() << "ERR" << std::endl;
-	o::out() << "OUT" << std::endl;
+	outputs oo;
+	o::init_outputs(oo);
+	oo.target("debug",  "@stderr");
+	oo.target("info",   "@stderr");
+	oo.target("error",  "@stderr");
+	oo.target("output", "@stdout");
 	options o(argc, argv, &ii, &oo);
 	bool binlr = o.enabled("bin-lr");
 

@@ -87,21 +87,22 @@ vector<raw_rule>  mutated_prog::get_rules() {
 }
 
 raw_prog  mutated_prog::to_raw_program() {
+	raw_prog new_raw_prog(*current);
 	if (!previous) {
 		// remove current deletions
 		for (auto &r: deletions) {
-			auto i = find(current->r.begin(), current->r.end(), *r);
-			if (i != current->r.end()) current->r.erase(i);
+			auto i = find(new_raw_prog.r.begin(), new_raw_prog.r.end(), *r);
+			if (i != new_raw_prog.r.end()) new_raw_prog.r.erase(i);
 		}
-		return *current;
+		return new_raw_prog;
 	}
-	auto p = (*previous).to_raw_program();
+	auto p = previous->to_raw_program();
 	for (auto &r: deletions) {
-		auto i = find(current->r.begin(), current->r.end(), *r);
-		if (i != current->r.end()) current->r.erase(i);
+		auto i = find(p.r.begin(), p.r.end(), *r);
+		if (i != p.r.end()) p.r.erase(i);
 	}
-	current->r.insert(current->r.end(), p.r.begin(), p.r.end());
-	return *current;
+	p.r.insert(current->r.end(), p.r.begin(), p.r.end());
+	return p;
 }
 
 best_solution::best_solution(cost_function &f): cost(f) {}

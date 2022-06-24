@@ -221,7 +221,7 @@ rule tables::new_identity_rule(const ntable tab, const bool neg) {
  * chain over the levels structure, which contains the entirity of facts
  * derivable by the given program from the given initial database. */
 
-template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
+template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
 	// Fact proofs are stored by level
 	proof p(levels.size());
 	set<term> s;
@@ -262,8 +262,8 @@ template <typename T> bool tables::get_goals(std::basic_ostream<T>& os) {
 	rules.resize(explicit_rule_count);
 	return goals.size() || opts.bproof != proof_mode::none;
 }
-template bool tables::get_goals(std::basic_ostream<char>&);
-template bool tables::get_goals(std::basic_ostream<wchar_t>&);
+template bool tables::get_proof(std::basic_ostream<char>&);
+template bool tables::get_proof(std::basic_ostream<wchar_t>&);
 
 std::set<const gnode*> gnode::visited;
 std::map<std::set<term>, gnode*> gnode::interm2g;

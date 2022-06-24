@@ -2,33 +2,48 @@
 
 const fs = require('fs');
 
-const program = fs.readFileSync(0, 'utf-8');
 const args = process.argv.slice(2);
 
-require('./tml.js')().then(tml => {
+require('./tmllib.js')().then(tml => {
 	// import from tml
 	const { bdd, driver, options, inputs, outputs, strings, mmap_mode } = tml;
 
 	// create vector<string> arg_strings from command line args
 	const arg_strings = new strings();
 	args.forEach(arg => arg_strings.push_back(arg));
+	const stdin_opts = new strings(); 
 
 	// create outputs and parse options
 	const ii = new inputs();
 	const oo = new outputs();
 	const o = new options(arg_strings, inputs.ref(ii), outputs.ref(oo));
-	console.log('args:', o.to_string());
-
+	
+	if (o.disabled("i") && o.disabled("ie") && o.disabled("h")
+						&& o.disabled("v")) {
+		stdin_opts.push_back("-i");
+		stdin_opts.push_back("@stdin")
+		o.parse(stdin_opts, true);
+	}
+	//console.log('args:', o.to_string());
+	
 	// initialize bdd database
-	bdd.init(mmap_mode.MMAP_NONE, 10000, "");
+	bdd.init(o.enabled("bdd-mmap") ? mmap_mode.MMAP_WRITE
+					: mmap_mode.MMAP_NONE,
+		o.get_int("bdd-max-size"),
+		o.get_string("bdd-file"));
 
 	// create a driver and run program
-	const d = new driver(program, o);
+	const d = new driver("", o);
 	d.run(0, 0);
 
-	if (!d.result) console.log('unsat');
-	else d.dump();
+	if (!d.error) {
+		if (o.enabled("dump") && d.result && !d.dump_goals())
+			d.dump_fixpoint();
+		if (o.enabled("dict")) d.inf_dict();
+		if (o.enabled("csv")) d.save_csv();
+	}
 
 	// delete created objects
-	d.delete(); o.delete(); ii.delete(); oo.delete(); arg_strings.delete();
+	d.delete(); o.delete(); ii.delete(); oo.delete();
+	arg_strings.delete(); stdin_opts.delete();
 });

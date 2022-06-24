@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");
 	inputs ii;
 	outputs oo;
+	o::init_outputs(oo);
 	options o(argc, argv, &ii, &oo);
 	bdd::init(o.enabled("bdd-mmap") ? MMAP_WRITE : MMAP_NONE,
 		o.get_int("bdd-max-size"), o.get_string("bdd-file"));
@@ -46,8 +47,7 @@ int main(int argc, char** argv) {
 		if (d.error) goto quit;
 		d.run( (size_t) o.get_int("steps"), (size_t) o.get_int("break") );
 		if (d.error) goto quit;
-		if (o.enabled("dump") && d.result && !d.out_goals(o::dump()))
-			d.dump_fixpoint();
+		if (o.enabled("dump") && d.result) d.out_result();
 		if (o.enabled("dict")) d.out_dict(o::inf());
 		if (o.enabled("csv")) d.save_csv();
 #ifdef WITH_THREADS

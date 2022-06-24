@@ -178,7 +178,7 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 			b.q = b.q && from_sym(n, t.size(), t[n]),
 			get_var_ex(n, t.size(), b.ex);
 		else if (m.end() == (it = m.find(t[n]))) m.emplace(t[n], n);
-		else	b.q = b.q && from_sym_eq(n, it->second, t.size()),
+		else b.q = b.q && from_sym_eq(n, it->second, t.size()),
 			get_var_ex(n, t.size(), b.ex);
 	return b;
 }
@@ -202,7 +202,7 @@ bool tables::get_facts(const flat_prog& m) {
 	clock_t start{}, end;
 	if (opts.optimize) measure_time_start();
 	// Compute the inverse of pos for the collected facts
-	for (auto const p: invert)
+	for (auto& p: invert)
 		inverses[p.first] = _inverse(bits, p.second);
 	// Compute the bdds for the each table
 	for (auto x: from_facts(add, inverses))
@@ -330,6 +330,7 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
+#ifdef BIT_TRANSFORM
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 
 	//FIXME: cannot be comparing strings at FWD
@@ -359,6 +360,7 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
 	a.bltins.push_back(taux);
 }
+#endif
 
 void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) {
 
@@ -367,11 +369,14 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	spbdd_handle leq = htrue, q;
 	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
 
-
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
+#ifdef BIT_TRANSFORM
 			if(opts.bitunv) handler_bitunv(b, t, a);
-			else b.insert({ get_body(t, a.vm, a.varslen), t });
+			else
+#else
+				b.insert({get_body(t, a.vm, a.varslen), t});
+#endif
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
@@ -704,17 +709,24 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	if (add.empty()) x = t % bdd_or_many(move(del));
 	else if (del.empty()) add.push_back(t), x = bdd_or_many(move(add));
 	else {
+		// check for any intersection between add and del
+		sort(add.begin(), add.end(), handle_cmp);
+		sort(del.begin(), del.end(), handle_cmp);
+		auto ita = add.begin(), itd = del.begin();
+		while (ita != add.end() && itd != del.end())
+			if (handle_cmp(*ita, *itd)) ita++;
+			else if (!handle_cmp(*itd, *ita)) // contradiction
+				return (add.clear(), del.clear()), unsat = true;
+			else itd++;
 		spbdd_handle a = bdd_or_many(move(add)),
-				 d = bdd_or_many(move(del)), s = a % d;
-//		DBG(assert(bdd_nvars(a) < len*bits);)
-//		DBG(assert(bdd_nvars(d) < len*bits);)
-		if (s == hfalse) return unsat = true;
+			d = bdd_or_many(move(del));
+		//DBG(assert(bdd_nvars(a) < len*bits);)
+		//DBG(assert(bdd_nvars(d) < len*bits);)
 		x = (t || a) % d;
 	}
-//	DBG(assert(bdd_nvars(x) < len*bits);)
+	//DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
-
 
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
@@ -789,6 +801,25 @@ bool tables::infloop_detected() {
 #ifdef WITH_EXCEPTIONS
 	throw infloop_exception();
 #endif
+	return false;
+}
+
+/* If this sequence of databases has a generalized fixpoint and there are
+ * undefined points in it belonging to a visible relation, then we have an
+ * infloop. */
+
+bool tables::is_infloop() {
+	// The variables in which the fixpoint will be placed if it exists
+	bdd_handles trues, falses, undefineds;
+	if(compute_fixpoint(trues, falses, undefineds)) {
+		for(ntable n = 0; n < (ntable)undefineds.size(); n++) {
+			// If this relation is visible then existince of undefined parts in it
+			// constitute an infloop
+			if(!tbls[n].hidden && undefineds[n] != bdd_handle::F) {
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -947,7 +978,7 @@ void tables::load_string(lexeme r, const string_t& s) {
 
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
 
-	DBG(COUT <<  "add_prog_wprod" << endl;);
+	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	//if (mknums) to_nums(m);
@@ -978,11 +1009,10 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	return true;
 }
 
-
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
-	DBG(COUT << "run_prog" << endl;);
+	DBG(o::dbg() << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
@@ -1012,7 +1042,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		if (a == 0) bits++;
 		else while (a > size_t (1 << bits)-1) bits++;
 		#else
-		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2)))
+		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
 			add_bit();
 		#endif
 	}
@@ -1103,57 +1133,6 @@ vbools tables::allsat(spbdd_handle x, size_t args) const {
 }
 #endif
 
-template <typename T>
-void tables::out(basic_ostream<T>& os) const {
-	//strs_t::const_iterator it;
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
-//		if ((it = strs.find(dict.get_rel(tab))) == strs.end())
-		if (opts.show_hidden || !tbls[tab].hidden) out(os, tbls[tab].t, tab);
-//		else os << it->first << " = \"" << it->second << '"' << endl;
-	}
-}
-
-template void tables::out<char>(ostream& os) const;
-template void tables::out<wchar_t>(wostream& os) const;
-
-/* If this sequence of databases has a fixpoint, then print it out and return
- * true. Otherwise return false. */
-
-template <typename T>
-bool tables::out_fixpoint(basic_ostream<T>& os) {
-	// The variables in which the fixpoint will be placed if it exists
-	bdd_handles trues, falses, undefineds;
-	if(compute_fixpoint(trues, falses, undefineds)) {
-		// Print out the true points
-		for(ntable n = 0; n < (ntable)trues.size(); n++) {
-			if(opts.show_hidden || !tbls[n].hidden) {
-				decompress(trues[n], n, [&os, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl; });
-			}
-		}
-		return true;
-	} else return false;
-}
-
-/* If this sequence of databases has a generalized fixpoint and there are
- * undefined points in it belonging to a visible relation, then we have an
- * infloop. */
-
-bool tables::is_infloop() {
-	// The variables in which the fixpoint will be placed if it exists
-	bdd_handles trues, falses, undefineds;
-	if(compute_fixpoint(trues, falses, undefineds)) {
-		for(ntable n = 0; n < (ntable)undefineds.size(); n++) {
-			// If this relation is visible then existince of undefined parts in it
-			// constitute an infloop
-			if(!tbls[n].hidden && undefineds[n] != bdd_handle::F) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 /* If this sequence of databases has a generalized fixpoint, then compute it and
  * return true, otherwise return false. The true points in the generalized
  * fixpoint are those that remain true throughout a cycle, those that are false
@@ -1202,18 +1181,94 @@ bool tables::compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handl
 	}
 }
 
+void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
+	size_t len, bool allowbltins) const {
+	table tbl = tbls.at(tab);
+	// D: bltins are special type of REL-s, mostly as any but no decompress.
+	if (!allowbltins && tbl.is_builtin()) return;
+	if (!len) len = tbl.len;
+	allsat_cb(x/*&&ts[tab].t*/, len * bits,
+		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
+		DBG(assert(BDD_ABS(y) == T);)
+		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
+		for (size_t n = 0; n != len; ++n)
+			for (size_t k = 0; k != bits; ++k)
+				if (p[pos(k, n, len)])
+					r[n] |= 1 << k;
+
+#ifdef BIT_TRANSFORM
+		if (ir_handler->bitunv_decompress(r, tbl))
+#endif
+		f(r);
+
+	})();
+}
+
+set<term> tables::decompress() {
+	set<term> r;
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		decompress(tbls[tab].t, tab, [&r](const term& t) {r.insert(t);});
+	return r;
+}
+
+/* If this sequence of databases has a fixpoint, then print it out and return
+ * true. Otherwise return false. */
+template <typename T>
+bool tables::out_fixpoint(basic_ostream<T>& os) {
+	bdd_handles trues, falses, undefineds;
+	if(compute_fixpoint(trues, falses, undefineds)) {
+		for(ntable n = 0; n < (ntable)trues.size(); n++) {
+			if(opts.show_hidden || !tbls[n].hidden) {
+				decompress(trues[n], n, [&os, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl; });
+			}
+		}
+		return true;
+	} else return false;
+}
 template bool tables::out_fixpoint<char>(ostream& os);
 template bool tables::out_fixpoint<wchar_t>(wostream& os);
 
-void tables::out(const rt_printer& f) const {
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		if (opts.show_hidden || !tbls[tab].hidden) out(tbls[tab].t, tab, f);
+template <typename T>
+bool tables::out_goals(std::basic_ostream<T>& os) {
+	if (goals.size()) {
+		bdd_handles trues, falses, undefineds;
+		if(compute_fixpoint(trues, falses, undefineds)) {
+			for (term t : goals) {
+				decompress(trues[t.tab], t.tab, [&os, this](const term& r) {
+					os << ir_handler->to_raw_term(r) << '.' << endl; });
+			}
+		}
+		return true;
+	}
+	else return false;
 }
+template bool tables::out_goals(std::basic_ostream<char>&);
+template bool tables::out_goals(std::basic_ostream<wchar_t>&);
+
+template <typename T>
+void tables::out(basic_ostream<T>& os) const {
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
+		if (opts.show_hidden || !tbls[tab].hidden) out(os, tbls[tab].t, tab);
+	}
+}
+template void tables::out<char>(ostream& os) const;
+template void tables::out<wchar_t>(wostream& os) const;
 
 template <typename T>
 void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
 	if (opts.show_hidden || !tbls[tab].hidden) // don't print internal tables.
 		out(x, tab, [&os](const raw_term& rt) { os<<rt<<'.'<<endl; });
+}
+
+void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
+	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
+		f(ir_handler->to_raw_term(r)); });
+}
+
+void tables::out(const rt_printer& f) const {
+	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
+		if (opts.show_hidden || !tbls[tab].hidden) out(tbls[tab].t, tab, f);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -1247,40 +1302,3 @@ void tables::out(emscripten::val o) const {
 	});
 }
 #endif
-
-void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
-	size_t len, bool allowbltins) const {
-	table tbl = tbls.at(tab);
-	// D: bltins are special type of REL-s, mostly as any but no decompress.
-	if (!allowbltins && tbl.is_builtin()) return;
-	if (!len) len = tbl.len;
-	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, len, this](const bools& p, bdd_ref  DBG(y)) {
-		DBG(assert(BDD_ABS(y) == T);)
-		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
-		for (size_t n = 0; n != len; ++n)
-			for (size_t k = 0; k != bits; ++k)
-				if (p[pos(k, n, len)])
-					r[n] |= 1 << k;
-
-#ifdef BIT_TRANSFORM
-		if (ir_handler->bitunv_decompress(r, tbl))
-#endif
-		f(r);
-
-	})();
-}
-
-set<term> tables::decompress() {
-	set<term> r;
-	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
-		decompress(tbls[tab].t, tab, [&r](const term& t){r.insert(t);});
-	return r;
-}
-
-void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
-	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
-		f(ir_handler->to_raw_term(r)); });
-}
-
-// ----------------------------------------------------------------------------

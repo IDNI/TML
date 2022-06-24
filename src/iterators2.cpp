@@ -20,28 +20,28 @@
 using namespace std;
 
 bool grey_code_const_iterator::compute_next_delta_() {
-	if (focus_pointers_[0] == size_) return false;
-	delta_ = focus_pointers_[0];
+	delta_ = focus_pointers_[0]; focus_pointers_[0] = 0;
+	if (delta_ == size_) return false;
 	focus_pointers_[delta_] = focus_pointers_[delta_ + 1];
 	focus_pointers_[delta_ + 1] = delta_ + 1;
 	return true;
 }
 
-grey_code_const_iterator::grey_code_const_iterator(size_t size): size_(size) {
-	focus_pointers_.resize(++size_);
+grey_code_const_iterator::grey_code_const_iterator(size_t size) 
+		: size_(size), delta_(0) {
+	focus_pointers_.resize(size + 1);
 	std::iota(focus_pointers_.begin(), focus_pointers_.end(), 0);
-	delta_ = 0;
+//	delta_ = 0;
 }
 
-grey_code_const_iterator::grey_code_const_iterator(): size_(1), delta_(0) {
+grey_code_const_iterator::grey_code_const_iterator(): size_(0), delta_(0) {
 	focus_pointers_.resize(1);
 	focus_pointers_[0] = 0;
 }
 
 grey_code_const_iterator& grey_code_const_iterator::operator++() {
-	if (compute_next_delta_()) return *this;
-	grey_code_const_iterator end;
-	return end;
+	compute_next_delta_();
+	return *this;
 }
 
 grey_code_const_iterator grey_code_const_iterator::operator++(int) {
@@ -52,31 +52,24 @@ grey_code_const_iterator grey_code_const_iterator::operator++(int) {
 	return previous;
 }
 
-bool grey_code_const_iterator::operator==(const grey_code_const_iterator rhs) const {
+bool grey_code_const_iterator::operator==(const grey_code_const_iterator &that) const {
 	// checking equality from cheapest to most expensive
-	return size_ == rhs.size_ && delta_ == rhs.delta_ && focus_pointers_ == rhs.focus_pointers_;
+	return size_ == that.size_ && delta_ == that.delta_ && focus_pointers_ == that.focus_pointers_;
 }
 
-bool grey_code_const_iterator::operator!=(const grey_code_const_iterator rhs) const {
-	return !(*this == rhs);
+bool grey_code_const_iterator::operator!=(const grey_code_const_iterator &that) const {
+	return !(*this == that);
+}
+
+bool grey_code_const_iterator::operator==(const grey_code_const_iterator::sentinel&) const {
+	return delta_ == size_;
+}
+
+bool grey_code_const_iterator::operator!=(const grey_code_const_iterator::sentinel &that) const {
+	return !(*this == that);
 }
 
 const size_t &grey_code_const_iterator::operator*() const {
 	return delta_;
 }
 
-grey_code_range::grey_code_range(size_t s) : size(s) {}
-
-bool grey_code_range::empty() {
-	return size == 0;
-}
-
-grey_code_const_iterator grey_code_range::begin() {
-	grey_code_const_iterator begin(size);
-	return begin;
-}
-
-grey_code_const_iterator grey_code_range::end() {
-	grey_code_const_iterator end;
-	return end;
-}

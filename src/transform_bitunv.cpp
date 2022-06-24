@@ -11,12 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+#ifdef BIT_TRANSFORM
 
-#include <algorithm>
-#include <vector>
 #include "ir_builder.h"
-#include "dict.h"
-#include "term.h"
 #include "tables.h"
 
 bool ir_builder::btransform(raw_prog& rpin) {
@@ -423,3 +420,4 @@ bool ir_builder::btransform(const raw_term& rtin, raw_term& rtout, const raw_rul
 	}
 	return ret;
 }
+#endif

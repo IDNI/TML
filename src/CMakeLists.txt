@@ -23,12 +23,15 @@ set(TML_HEADERS
 	defs.h
 	dict.h
 	driver.h
+	earley.h
 	err.h
 	form.h
 	input.h
+	ir_builder.h
 	memory_map.h
 	options.h
 	output.h
+	printing.h
 	tables.h
 	ir_builder.h
 	iterators.h
@@ -39,15 +42,18 @@ set(TML_HEADERS
 
 set(TML_SOURCES
 	bdd.cpp
-	bdd_ext.cpp
+	bdd_arith.cpp
 	builtins.cpp
 	cpp_gen.cpp
 	dict.cpp
 	driver.cpp
+	earley.cpp
 	form.cpp
 	input.cpp
+	ir_builder.cpp
 	options.cpp
 	output.cpp
+	printing.cpp
 	proof.cpp
 	save_csv.cpp
 	tables.cpp
@@ -63,6 +69,8 @@ set(TML_SOURCES
 	earley.cpp
 	typemanager.cpp
 	transform_bitunv.cpp
+	typemanager.cpp
+	utils.cpp
 )
 
 if (WITH_THREADS)

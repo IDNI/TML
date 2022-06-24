@@ -287,6 +287,7 @@ private:
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 
+//#ifdef PROOF
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
@@ -300,12 +301,9 @@ private:
 	void print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int level = 0);
 	bool build_graph( std::map<term, gnode*> &tg, proof &p, gnode &g);
 	gnode* get_forest(const term& t, proof& p );
-
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
-	template <typename T>
-	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
-	void out(spbdd_handle, ntable, const rt_printer&) const;
+//#endif
 
 	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
@@ -333,7 +331,7 @@ private:
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	bool get_rules(flat_prog& m);
 
-	lexeme get_var_lexeme(int_t i);
+	//lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();
@@ -471,20 +469,29 @@ public:
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
+
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-	template <typename T>
-	void out(std::basic_ostream<T>&) const;
+
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
-	template <typename T>
-	bool out_fixpoint(std::basic_ostream<T>& os);
+	template <typename T> void out(std::basic_ostream<T>&) const;
+	template <typename T> bool out_fixpoint(std::basic_ostream<T>& os);
+	template <typename T> bool out_goals(std::basic_ostream<T>&);
 	void out(const rt_printer&) const;
+
+//#ifdef PROOFS
+	template <typename T>
+	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
+	void out(spbdd_handle, ntable, const rt_printer&) const;
+	template <typename T>bool get_proof(std::basic_ostream<T>& os);
+	void set_proof(proof_mode v) { opts.bproof = v; }
+//#endif
+
+
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
-	void set_proof(proof_mode v) { opts.bproof = v; }
-	template <typename T>
-	bool get_goals(std::basic_ostream<T>&);
+
 	dict_t& get_dict() { return dict; }
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
@@ -496,7 +503,6 @@ public:
 	bool print_steps         = false;
 	bool error               = false;
 };
-
 
 #ifdef WITH_EXCEPTIONS
 struct unsat_exception : public std::exception {

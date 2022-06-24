@@ -34,12 +34,18 @@ public:
 	using reference = const size_t&;
 	using iterator_category = std::input_iterator_tag;
 
+	// sentinel class
+	class sentinel {};
+	static constexpr sentinel end{};
+
 	grey_code_const_iterator(size_t size);
 	grey_code_const_iterator();
 	grey_code_const_iterator &operator++();
 	grey_code_const_iterator operator++(int);
-	bool operator==(const grey_code_const_iterator rhs) const;
-	bool operator!=(const grey_code_const_iterator rhs) const;
+	bool operator==(const grey_code_const_iterator&) const;
+	bool operator!=(const grey_code_const_iterator &that) const;
+	bool operator==(const sentinel &that) const;
+	bool operator!=(const sentinel &that) const;
 	const size_t &operator*() const;
 
 private:
@@ -48,21 +54,6 @@ private:
 	size_t delta_;
 
 	bool compute_next_delta_();
-};
-
-/*!
- * Range returning iterators to Grey Codes up to a given integer.
- */
-class grey_code_range {
-public:
-
-	grey_code_range(size_t size);
-	bool empty();
-	grey_code_const_iterator begin();
-	grey_code_const_iterator end();
-
-private:
-	size_t size;
 };
 
 /*!
@@ -79,52 +70,64 @@ public:
 	using reference = const std::vector<T>&;
 	using iterator_category = std::input_iterator_tag;
 
-	power_set_const_iterator(std::vector<T>& s) : set{s} {
-		grey_code_const_iterator gc(s.size());
-		grey_code = gc;
-	}
+	// sentinel class
+	class sentinel {
+	public:
+		bool operator==(const power_set_const_iterator<T> &that) const {
+			return that.grey_code_ == grey_code_const_iterator::end;
+		}
 
-	power_set_const_iterator() {}
+		bool operator!=(const power_set_const_iterator<T> &that) const {
+			return !(*this == that);
+		}		
+	};
+
+	static constexpr sentinel end{};
+
+//	power_set_const_iterator(): grey_code_(0) {}
+
+	power_set_const_iterator(std::vector<T> &set): grey_code_(set.size()), set_(set) {}
 
 	power_set_const_iterator &operator++() {
-		auto delta = *(++grey_code);
-		auto it = subset.find(delta);
-		if (it != subset.end())
-			subset.erase(it);
+		auto delta = *(++grey_code_);
+		auto it = subset_.find(delta);
+		if (it != subset_.end())
+			subset_.erase(it);
 		else 
-			subset.insert(delta);
+			subset_.insert(delta);
 		return *this;
 	}
 
 	power_set_const_iterator operator++(int) {
 		auto current = *this; 
-		auto delta = *(++grey_code);
-		auto it = subset.find(delta);
-		if (it != subset.end())
-			subset.erase(it);
+		auto delta = *(++grey_code_);
+		auto it = subset_.find(delta);
+		if (it != subset_.end())
+			subset_.erase(it);
 		else 
-			subset.insert(delta);
+			subset_.insert(delta);
 		return current;
 	}
 
-	bool operator==(power_set_const_iterator &that) const {
-		return set == that.set && subset == that.subset;
+	bool operator==(power_set_const_iterator<T> &that) const {
+		return set_ == that.set_ && subset_ == that.subset_;
 	}
 
-	bool operator!=(power_set_const_iterator &that) const {
+	bool operator!=(power_set_const_iterator<T> &that) const {
 		return !(*this == that);
 	}		
 
 	const std::vector<T> operator*() const{
-		auto mutations = subset | std::views::transform([this](size_t idx ) { return set[idx]; });
-		std::vector<T> v(mutations.begin(), mutations.end());
+		auto subset = subset_ 
+			| std::views::transform([this](size_t idx ) { return set_[idx]; });
+		std::vector<T> v(subset.begin(), subset.end());
 		return v;
 	}
 
 private:
-	grey_code_const_iterator grey_code;
-	std::vector<T> set;
-	std::set<size_t> subset;
+	grey_code_const_iterator grey_code_;
+	std::vector<T> &set_;
+	std::set<size_t> subset_;
 };
 
 /*!
@@ -134,24 +137,23 @@ template<class T>
 class powerset_range {
 public:
 
-	powerset_range(std::vector<T>& ms) : set(ms) {}
+	powerset_range(std::vector<T>& set) : set_(set) {}
 	
 	bool empty() {
-		return set.size() == 0;
+		return set_.size() == 0;
 	}
 
 	power_set_const_iterator<T> begin() {
-		power_set_const_iterator<T> begin(set);
+		power_set_const_iterator<T> begin(set_);
 		return begin;
 	}
 
-	power_set_const_iterator<T> end() {
-		power_set_const_iterator<T> end;
-		return end;
+	power_set_const_iterator<T>::sentinel end() {
+		return power_set_const_iterator<T>::end;
 	}
 
 private:
-	std::vector<T> set;
+	std::vector<T> &set_;
 };
 
 #endif // __ITERATORS_H__

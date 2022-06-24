@@ -1,3 +1,16 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+
 //
 // Created by ak on 06.03.2020.
 //
@@ -17,8 +30,8 @@ namespace testing = doctest;
 
 #define TEST(A, B)            TEST_CASE(#A "." #B)
 
-#define EXPECT_TRUE(A)        CHECK(A)
-#define EXPECT_FALSE(A)       CHECK_FALSE(A)
+#define EXPECT_TRUE(A)        CHECK((A) == true)
+#define EXPECT_FALSE(A)       CHECK((A) == false)
 
 #define EXPECT_EQ(A, B)       CHECK_EQ(A, B)
 #define EXPECT_NE(A, B)       CHECK_NE(A, B)
