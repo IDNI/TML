@@ -73,12 +73,12 @@ private:
 		bool is_builtin() const { return l.is_builtin(); }
 		int_t builtin() const { return l.builtin; }
 		bool operator<(const pnode& i) const {
-			if(l != i.l )	return l < i.l;
-			if(span != i.span ) return span < i.span;
+			if (l != i.l) return l < i.l;
+			if (span != i.span) return span < i.span;
 			return false;
 		}
 		bool operator==(const pnode& rhs) const {
-			if(l == rhs.l && span == rhs.span ) return true;
+			if (l == rhs.l && span == rhs.span ) return true;
 			else return false;
 		}
 	};
@@ -125,7 +125,7 @@ private:
 	void scan(const item& i, size_t n, CharT ch);
 	void scan_builtin(const item& i, size_t n, const string& s);
 	bool nullable(const item& i) const {
-		return	i.dot < G[i.prod].size() &&
+		return i.dot < G[i.prod].size() &&
 			((get_lit(i).nt() &&
 			nullables.find(get_lit(i).n()) !=
 			nullables.end()) ||
@@ -154,18 +154,20 @@ public:
 	typedef std::vector<std::variant<size_t, string>> arg_t;
 	typedef std::vector<std::pair<string, const nidx_t>> node_children;
 	typedef std::vector<node_children> node_children_variations;
-	typedef std::function<void(const nidx_t&, const node_children_variations&)>
-		action_fn;
+	typedef std::function<void(const nidx_t&,
+		const node_children_variations&)> action_fn;
 	typedef std::pair<string, action_fn> action_pair;
 	typedef std::map<string, action_fn> actions;
 	earley(const grammar& g, const char_builtins_map& bm = {},
 		bool _bin_lr = false, bool _incr_gen_forest = false);
-	earley(const grammar& g, bool _bin_lr = false, bool _incr_gen_forest = false)
-		:earley(g, {}, _bin_lr, _incr_gen_forest) {}
+	earley(const grammar& g, bool _bin_lr = false,
+		bool _incr_gen_forest = false) :
+			earley(g, {}, _bin_lr, _incr_gen_forest) {}
 	earley(const std::vector<production>& g, const char_builtins_map& bm,
-		bool _bin_lr = false, bool _incr_gen_forest = false );
+		bool _bin_lr = false, bool _incr_gen_forest = false);
 	earley(const std::vector<production>& g, bool _bin_lr = false, 
-		bool _incr_gen_forest = false):earley(g, {}, _bin_lr, _incr_gen_forest){}
+		bool _incr_gen_forest = false) :
+			earley(g, {}, _bin_lr, _incr_gen_forest) {}
 
 	bool recognize(const string s);
 	std::vector<arg_t> get_parse_graph_facts();
@@ -173,17 +175,10 @@ public:
 	uintmax_t count_parsed_trees() ;
 	ptree_t get_parsed_tree();
 
-	template <typename cb_enter_t , 
-				typename cb_exit_t
-				,typename cb_revisit_t, 
-				typename cb_ambig_t 
-				>
-	bool traverse_forest( const nidx_t &root, 
-	cb_enter_t cb_enter, 
-	cb_exit_t cb_exit, 
-	cb_revisit_t cb_revisit,
-	cb_ambig_t cb_ambig 
-	);
+	template <typename cb_enter_t, typename cb_exit_t,
+		typename cb_revisit_t, typename cb_ambig_t>
+	bool traverse_forest(const nidx_t &root, cb_enter_t cb_enter, 
+		cb_exit_t cb_exit, cb_revisit_t cb_revisit,cb_ambig_t cb_ambig);
 	void topdown(const string& start, const actions& a) const;
 	void down(const nidx_t& nd, const actions& a) const;
 	void down(const node_children& nc, const actions& a) const {
@@ -195,21 +190,14 @@ public:
 	string shorten(const string& s, size_t len = 60,
 		const string& suffix = string{ '.', '.', '.' }) const;
 	string flatten(const nidx_t nd) const;
-	ptree_t get_parsed_tree(size_t );
+	ptree_t get_parsed_tree(size_t);
 	size_t count_parsed_trees() const;
 private:
-	template <typename cb_enter_t, 
-				typename cb_exit_t,
-				typename cb_revisit_t,
-				typename cb_ambig_t
-				>
-	bool _traverse_forest( const nidx_t &root, 
-				std::set<nidx_t> &done,
-				cb_enter_t cb_enter, 
-				cb_exit_t cb_exit, 
-				cb_revisit_t cb_revisit,
-				cb_ambig_t cb_ambig 
-				);
+	template <typename cb_enter_t, typename cb_exit_t,
+		typename cb_revisit_t, typename cb_ambig_t>
+	bool _traverse_forest(const nidx_t &root, std::set<nidx_t> &done,
+		cb_enter_t cb_enter, cb_exit_t cb_exit, cb_revisit_t cb_revisit,
+		cb_ambig_t cb_ambig);
 	string epsilon() const;
 	node_children_variations get_children(const nidx_t nd, bool all = false)
 		const;
@@ -232,7 +220,8 @@ private:
 	std::string to_stdstr(const char32_t& s) const;
 	struct hasher_t{
 		size_t hash_size_t(const size_t &val) const{
-			return std::hash<size_t>()(val)  + 0x9e3779b9 + (val << 6) + (val >> 2);
+			return std::hash<size_t>()(val) + 0x9e3779b9 +
+							(val << 6) + (val >> 2);
 		}
 		size_t operator()(const std::pair<size_t, size_t> &k) const {
 			// lets substitute with better if possible.
@@ -252,8 +241,8 @@ private:
 	};
 	//std::unordered_map< size_t, 
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
-	std::unordered_map< std::pair<size_t,size_t> , std::vector<item>, hasher_t >  
-		sorted_citem, rsorted_citem;
+	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
+		hasher_t> sorted_citem, rsorted_citem;
 	parse_forest_t pfgraph;
 	std::map<std::vector<earley::lit>, earley::lit> bin_tnt; // binariesed temporary intermediate non-terminals
 	size_t tid; // id for temporary non-terminals
@@ -270,7 +259,8 @@ private:
 	template <typename T, typename P = ptree_t>
 	bool iterate_forest(T, P &&pt = ptree_t()) const;
 	//bool visit_forest(std::function<void(std::string, size_t, std::vector<std::variant<size_t, std::string>>)> out_rel) const;
-	uintmax_t _count_parsed_trees(const nidx_t &, std::unordered_set<nidx_t, hasher_t>&) const;
+	uintmax_t _count_parsed_trees(const nidx_t &,
+		std::unordered_set<nidx_t, hasher_t>&) const;
 	// only store graph as facts
 	template<typename P = ptree_t>
 	bool to_tml_facts(ostream_t& os, P && p = ptree_t()) const;
@@ -285,7 +275,6 @@ private:
 		std::vector<int> choices;
 		nidx_t &root;
 		earley::parse_forest_t &pf;
-		
 		overlay_tree(nidx_t &_r, earley::parse_forest_t &_pf):
 		root(_r), pf(_pf){};
 	};
