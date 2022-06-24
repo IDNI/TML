@@ -236,7 +236,7 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 		const size_t bits, const size_t n_args);
 
 size_t satcount(cr_spbdd_handle x, const size_t bits);
-void allsat_bin(cr_spbdd_handle x, const size_t bits);
+void allsat_bin(cr_spbdd_handle x);
 //size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex);
 
 /* A BDD is a pair of attributed references to BDDs. Separating out attributes
@@ -296,7 +296,7 @@ class bdd {
 	friend spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 			const size_t bits, const size_t n_args);
 	friend size_t satcount(cr_spbdd_handle x, const size_t bits);
-	friend void allsat_bin(cr_spbdd_handle x, const size_t bits);
+	friend void allsat_bin(cr_spbdd_handle x);
 	//friend size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools& ex);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
@@ -375,7 +375,7 @@ class bdd {
 
 	typedef enum { L, H, X, U } t_path;
 	typedef std::vector<t_path> t_pathv;
-	static void allsat_bin_dump(bdd_ref a_in, t_pathv &p, size_t bit, size_t bits);
+	static void allsat_bin_dump(bdd_ref a_in, t_pathv &p, size_t bit);
 
 	//---
 #ifndef NOBDDARITH
