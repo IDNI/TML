@@ -172,6 +172,8 @@ std::string quote_sym(const elem& e) {
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree &t) {
+	if (t.guard_lx != lexeme{ 0, 0 }) os << t.guard_lx << "() && { ";
+	if (t.neg) os << "~ { ";
 	switch(t.type) {
 		case elem::IMPLIES:
 			os << "{" << *t.l << " -> " << *t.r << "}";
@@ -206,6 +208,8 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const raw_form_tree &t) {
 		default:
 			assert(false); //should never reach here
 	}
+	if (t.neg) os << " }";
+	if (t.guard_lx != lexeme{ 0, 0 }) os << " }";
 	return os;
 }
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const raw_form_tree &);
