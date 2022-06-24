@@ -1,5 +1,7 @@
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
+add_link_options("-flto")
+
 set(TML_TESTS test_input.cpp)
 add_executable(test_input ${TML_TESTS})
 target_setup(test_input)

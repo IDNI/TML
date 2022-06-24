@@ -59,7 +59,6 @@ EMSCRIPTEN_BINDINGS(tml) {
 			}
 		))
 		.function("dump", &driver::dump)
-		.function("dump_fixpoint", &driver::dump_fixpoint)
 		.function("info", &driver::info<syschar_t>)
 		.function("list", &driver::list<syschar_t>)
 		.function("add", &driver::add, allow_raw_pointers())
@@ -71,17 +70,12 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("set_print_updates", &driver::set_print_updates)
 		.function("set_populate_tml_update", &driver::set_populate_tml_update)
 		.function("save_csv", &driver::save_csv)
-		.function("dump_goals", optional_override(
-			[](driver& self) {
-				return self.out_goals(o::dump());
-			}
-		))
 		.function("inf_dict", optional_override(
 			[](driver& self) {
 				return self.out_dict(o::inf());
 			}
 		))
-		.function("out_goals", &driver::out_goals<syschar_t>)
+		.function("out_result", &driver::out_result)
 		.function("out_dict", &driver::out_dict<syschar_t>)
 		//.function("size", &driver::size)
 		//.function("load", &driver::load)
@@ -136,7 +130,6 @@ EMSCRIPTEN_BINDINGS(tml) {
 				return &oo;
 			}), allow_raw_pointers())
 		.function("use", &outputs::use)
-		.function("init_defaults", &outputs::init_defaults)
 		.function("add", &outputs::add)
 		.class_function("read", &outputs::read)
 		.class_function("in_use", &outputs::in_use, allow_raw_pointers())
@@ -152,6 +145,7 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.class_function("exists", &outputs::exists)
 		.class_function("target", &outputs::target)
 		;
+	emscripten::function("init_outputs", o::init_outputs);
 	register_vector<std::string>("strings");
 };
 
