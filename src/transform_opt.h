@@ -17,29 +17,37 @@
 #include <vector>
 #include <map>
 #include <cmath>
+#include <functional>
+#include <limits>
 
 class raw_prog;
+class dict_t;
 
 /*!
  * Represents a mutated program, i.e. the original program, the additions and 
  * substractions.
  */
 struct mutated_prog  {
-	// empty
-	mutated_prog();
 	// starting node of the mutated progs log
-	mutated_prog(raw_prog *p);
+	mutated_prog(raw_prog &rp): 
+		original(rp), 
+		current(rp.dict), 
+		previous(nullptr) {};
 	// link to previous mutated prog
-	mutated_prog(mutated_prog *m);
+	mutated_prog(mutated_prog *mp): 
+		original(mp->original), 
+		previous(mp), 
+		current(mp->current.dict) {};
 
 	void operator()(struct mutation& m);
 	mutated_prog *operator--();
 	std::vector<raw_rule> get_rules();
 	raw_prog to_raw_program();
 
-	raw_prog *current;
+	raw_prog current;
 	std::vector<raw_rule*> deletions;
 	mutated_prog *previous;
+	std::reference_wrapper<raw_prog> original;
 };
 
 /*!
@@ -50,7 +58,7 @@ struct mutated_prog  {
 class mutation {
 public:
 	auto operator<=>(const mutation &rhs) const = default;
-	virtual const bool operator()(mutated_prog &mp) const = 0;
+	virtual bool const operator()(mutated_prog &mp) const = 0;
 };
 
 /*!
@@ -84,13 +92,16 @@ public:
  */
 class best_solution: public bounder {
 public:
-	best_solution(cost_function& f);
+	best_solution(cost_function& f, mutated_prog &rp): 
+		func_(f), 
+		best_(rp), 
+		cost_(std::numeric_limits<size_t>::max()) {};
 	virtual bool bound(mutated_prog& p);
 	virtual raw_prog solution();
 private:
 	cost_function func_;
-	float cost_;
-	mutated_prog best_; 
+	size_t cost_;
+	std::reference_wrapper<mutated_prog> best_; 
 };
 
 /*!

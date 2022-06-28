@@ -3588,7 +3588,8 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	}
 
 	if(opts.enabled("O1") || opts.enabled("O2")) {
-		best_solution bndr(exp_in_heads); 
+		mutated_prog mp(rp);
+		best_solution bndr(exp_in_heads, mp); 
 		optimization_plan plan(bndr);
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
@@ -3599,9 +3600,9 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			// This transformation is a prerequisite to the CQC and binary
 			// transformations, hence its more general activation condition.
 			o::dbg() << "Adding dnf brancher ..." << endl << endl;
-			plan.begin.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
+			//plan.begin.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
 			o::dbg() << "Adding split heads brancher ..." << endl << endl;
-			plan.begin.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			//plan.begin.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
 			// Though this is a binary transformation, rules will become
 			// ternary after timing guards are added
 			o::dbg() << "Adding split bodies brancher ..." << endl << endl;
@@ -3609,17 +3610,17 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			if(opts.enabled("O2")) {
 				#ifndef WITH_Z3
 				o::dbg() << "Adding CQNC brancher ..." << endl << endl;
-				// plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
+				//plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
 				o::dbg() << "Adding CQC brancher ..." << endl << endl;
-				// plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
+				//plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
 				#else
 				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
-				// subsume_queries_cqnc(rp);
+				//plan.loop.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
+				subsume_queries_cqnc(rp);
 				#endif
 			}
 			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			plan.end.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
+			//plan.end.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
 			auto best = optimize(rp, plan);
 			rp.r = best.r;
 			o::dbg() << "Current:" << endl << rp << endl;
