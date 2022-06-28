@@ -50,7 +50,7 @@ struct mutated_prog  {
 class mutation {
 public:
 	auto operator<=>(const mutation &rhs) const = default;
-	virtual const bool operator()(mutated_prog &mp) const;
+	virtual const bool operator()(mutated_prog &mp) const = 0;
 };
 
 /*!
@@ -65,7 +65,7 @@ extern cost_function exp_in_heads;
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using brancher = std::function<std::vector<mutation>(mutated_prog&)>;
+using brancher = std::function<std::vector<std::shared_ptr<mutation>>(mutated_prog&)>;
 
 
 /**
@@ -88,8 +88,9 @@ public:
 	virtual bool bound(mutated_prog& p);
 	virtual raw_prog solution();
 private:
-	cost_function cost;
-	std::map<float, mutated_prog> bests; 
+	cost_function func_;
+	float cost_;
+	mutated_prog best_; 
 };
 
 /*!

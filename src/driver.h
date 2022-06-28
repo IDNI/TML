@@ -190,14 +190,15 @@ private:	// TODO create one entry point for optimization
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 
-	std::vector<mutation> brancher_export_outer_quantifiers(mutated_prog &mp);
-	std::vector<mutation> brancher_to_dnf(mutated_prog &mp);
-	std::vector<mutation> brancher_subsume_queries_cqc(mutated_prog &mp);
-	std::vector<mutation> brancher_subsume_queries_cqnc(mutated_prog &mp);
-	std::vector<mutation> brancher_split_heads(mutated_prog &mp);
-	std::vector<mutation> brancher_split_bodies(mutated_prog &mp);
-	std::vector<mutation> brancher_square_program(mutated_prog &mp);
-	std::vector<mutation> brancher_eliminate_dead_variables(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_export_outer_quantifiers(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_to_dnf(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqc(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqnc(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_split_heads(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_split_bodies(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_square_program(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_eliminate_dead_variables(mutated_prog &mp);
 
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 public:

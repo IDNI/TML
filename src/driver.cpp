@@ -3524,7 +3524,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		});
 	}
 
-	if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
+/*	if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
 			opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
 			opts.enabled("to-dnf")) {
 		// Trimmed existentials are a precondition to program optimizations
@@ -3567,101 +3567,64 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				o::dbg() << "Binary Program:" << endl << rp << endl;
 			}
 		});
-	}
+	}*/
 
-	if(opts.enabled("O0") &&(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-			opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-			opts.enabled("to-dnf"))) {
-		best_solution bndr(exp_in_heads); 
-		optimization_plan plan(bndr);
+	if(int_t iter_num = opts.get_int("O3")) {
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		plan.begin.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
-		// export_outer_quantifiers(rp);
-		o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
+		export_outer_quantifiers(rp);
 
-		step_transform(rp, [&](raw_prog &rp) {
-			// This transformation is a prerequisite to the CQC and binary
-			// transformations, hence its more general activation condition.
-			o::dbg() << "Converting to DNF format ..." << endl << endl;
-			plan.begin.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
-			o::dbg() << "DNF Program:" << endl << endl << rp << endl;
-			//plan.loop.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
-			// transform_bin(rp);
-			o::dbg() << "Binary Program:" << endl << rp << endl;
-			if (opts.enabled("cqnc-subsume")||opts.enabled("cqc-subsume")) {
-				#ifndef WITH_Z3
-				o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
-				// subsume_queries_cqnc(rp);
-				o::dbg() << "CQNC Subsumed Program:" << endl << rp << endl;
-				o::dbg() << "Subsuming using CQC test ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
-				// subsume_queries_cqc(rp);
-				o::dbg() << "CQC Subsumed Program:" << endl << rp << endl;
-				#else
-				o::dbg() << "Subsuming using Z3 test ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
-				// subsume_queries_cqnc(rp);
-				#endif
+		pdatalog_transform(rp, [&](raw_prog &rp) {
+			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
+			split_heads(rp);
+			// Alternately square and simplify the program iter_num times
+			for(int_t i = 0; i < iter_num; i++) {
+				o::dbg() << "Squaring Program ..." << endl << endl;
+				square_program(rp);
+				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
 			}
-			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			o::dbg() << "Eliminating dead variables ..." << endl << endl;
-			plan.end.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			// eliminate_dead_variables(rp);
-			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-			optimize(rp, plan);
+			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
 		});
 	}
 
-	if(opts.enabled("O1") || opts.enabled("O2") || opts.enabled("O2")) {
+	if(opts.enabled("O1") || opts.enabled("O2")) {
 		best_solution bndr(exp_in_heads); 
 		optimization_plan plan(bndr);
 		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+		o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
 		plan.begin.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
 		// export_outer_quantifiers(rp);
-		o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
 
 		step_transform(rp, [&](raw_prog &rp) {
 			// This transformation is a prerequisite to the CQC and binary
 			// transformations, hence its more general activation condition.
-			o::dbg() << "Converting to DNF format ..." << endl << endl;
+			o::dbg() << "Adding dnf brancher ..." << endl << endl;
 			plan.begin.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
-			// to_dnf(rp);
-			o::dbg() << "DNF Program:" << endl << endl << rp << endl;
+			o::dbg() << "Adding split heads brancher ..." << endl << endl;
 			plan.begin.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
-			// split_heads(rp);
 			// Though this is a binary transformation, rules will become
 			// ternary after timing guards are added
-			o::dbg() << "Converting rules to unary form ..." << endl;
+			o::dbg() << "Adding split bodies brancher ..." << endl << endl;
 			plan.loop.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
-			// transform_bin(rp);
-			o::dbg() << "Binary Program:" << endl << rp << endl;
 			if(opts.enabled("O2")) {
 				#ifndef WITH_Z3
-				o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
-				// subsume_queries_cqnc(rp);
-				o::dbg() << "CQNC Subsumed Program:" << endl << rp << endl;
-				o::dbg() << "Subsuming using CQC test ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
-				// subsume_queries_cqc(rp);
-				o::dbg() << "CQC Subsumed Program:" << endl << rp << endl;
+				o::dbg() << "Adding CQNC brancher ..." << endl << endl;
+				// plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
+				o::dbg() << "Adding CQC brancher ..." << endl << endl;
+				// plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
 				#else
-				o::dbg() << "Subsuming using Z3 test ..." << endl << endl;
+				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
 				plan.loop.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
 				// subsume_queries_cqnc(rp);
 				#endif
 			}
 			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			o::dbg() << "Eliminating dead variables ..." << endl << endl;
 			plan.end.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			// eliminate_dead_variables(rp);
-			o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-			optimize(rp, plan);
-		});
+			auto best = optimize(rp, plan);
+			rp.r = best.r;
+			o::dbg() << "Current:" << endl << rp << endl;
 
+		});
 	}
 
 	return true;

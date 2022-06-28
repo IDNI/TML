@@ -87,8 +87,9 @@ vector<raw_rule>  mutated_prog::get_rules() {
 }
 
 raw_prog  mutated_prog::to_raw_program() {
-	raw_prog new_raw_prog(*current);
 	if (!previous) {
+		raw_prog new_raw_prog(current->dict);
+		new_raw_prog.merge(*current);
 		// remove current deletions
 		for (auto &r: deletions) {
 			auto i = find(new_raw_prog.r.begin(), new_raw_prog.r.end(), *r);
@@ -96,32 +97,41 @@ raw_prog  mutated_prog::to_raw_program() {
 		}
 		return new_raw_prog;
 	}
-	auto p = previous->to_raw_program();
-	for (auto &r: deletions) {
-		auto i = find(p.r.begin(), p.r.end(), *r);
-		if (i != p.r.end()) p.r.erase(i);
+	if (previous->current) {
+		auto p = previous->to_raw_program();
+		for (auto &r: deletions) {
+			auto i = find(p.r.begin(), p.r.end(), *r);
+			if (i != p.r.end()) p.r.erase(i);
+		}
+		p.r.insert(current->r.end(), p.r.begin(), p.r.end());
+		return p;
 	}
-	p.r.insert(current->r.end(), p.r.begin(), p.r.end());
+	raw_prog p(current->dict);
 	return p;
 }
 
-best_solution::best_solution(cost_function &f): cost(f) {}
+best_solution::best_solution(cost_function &f): func_(f) {}
 
 bool best_solution::bound(mutated_prog &p) {
-	best_solution::bests[best_solution::cost(p)] = p;
+	double cost = func_(p);
+	if (cost < cost_) {
+		cost_ = cost;
+		best_ = p;
+		return true;
+	}
 	return false;
 }
 
 raw_prog best_solution::solution() {
-	return (*bests.begin()).second.to_raw_program();
+	return best_.to_raw_program();
 }
 
 /*!
  * Optimize a mutated program
  */
-vector<mutation> get_optimizations(mutated_prog& mutated, vector<brancher>& branchers) {
+vector<std::shared_ptr<mutation>> get_optimizations(mutated_prog& mutated, vector<brancher>& branchers) {
 	// we collect all possible changes to the current mutated program
-	vector<mutation> optimizations;
+	vector<std::shared_ptr<mutation>>  optimizations;
 	for(brancher brancher: branchers) {
 		auto proposed = brancher(mutated);
 		optimizations.insert(optimizations.end(), proposed.begin(), proposed.end());
@@ -131,24 +141,24 @@ vector<mutation> get_optimizations(mutated_prog& mutated, vector<brancher>& bran
 
 void optimize(mutated_prog& mutated, vector<brancher>& branchers) {
 	// we collect all possible changes to the current mutated program
-	vector<mutation> optimizations = get_optimizations(mutated, branchers);
+	vector<std::shared_ptr<mutation>>  optimizations = get_optimizations(mutated, branchers);
 	// for each subset of optimizations, compute the new mutated program,
 	// bound the current mutation and try to optimize again if needed
 	for (auto it = optimizations.begin(); it != optimizations.end(); ++it) {
-		(*it)(mutated);
+		(*it).get()->operator()(mutated);
 	}
 }
 
 void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
 	// we collect all possible changes to the current mutated program
-	vector<mutation> optimizations = get_optimizations(mutated, branchers);
+	vector<std::shared_ptr<mutation>>  optimizations = get_optimizations(mutated, branchers);
 	// for each subset of optimizations, compute the new mutated program,
 	// bound the current mutation and try to optimize again if needed
-	powerset_range<mutation> subsets(optimizations);
+	powerset_range<std::shared_ptr<mutation>> subsets(optimizations);
 	for (auto it = subsets.begin(); it != subsets.end(); ++it) {
 		mutated_prog new_mutated(mutated);
-		vector<mutation> v = *it;
-		for (auto mt = v.begin(); mt != v.end(); ++mt) (*mt)(new_mutated);
+		vector<std::shared_ptr<mutation>> v = *it;
+		for (auto mt = v.begin(); mt != v.end(); ++mt) (*mt).get()->operator()(new_mutated);
 		if (bounder.bound(new_mutated)) {
 			optimize(new_mutated, bounder, branchers);
 		}
@@ -205,11 +215,11 @@ vector<mutation> brancher_minimize_queries(mutated_prog &mutated, const F &f) {
 	return mutations;
 }
 
-const bool mutation::operator()( mutated_prog &rhs) const {
+/* const bool mutation::operator()( mutated_prog &rhs) const {
 	return false;
-}
+} */
 
-struct mutation_add_rule : public mutation  {
+struct mutation_add_rule : public virtual mutation  {
 	raw_rule &rr;
 
 	mutation_add_rule(raw_rule &r) : rr(r) {}
@@ -220,7 +230,7 @@ struct mutation_add_rule : public mutation  {
 	}
 };
 
-struct mutation_add_del_rule : public mutation  {
+struct mutation_add_del_rule : public virtual mutation  {
 	raw_rule &rr;
 
 	mutation_add_del_rule(raw_rule &r) : rr(r) {}
@@ -231,7 +241,7 @@ struct mutation_add_del_rule : public mutation  {
 	}
 };
 
-struct mutation_remove_rule : public mutation  {
+struct mutation_remove_rule : public virtual mutation  {
 	raw_rule &rr;
 
 	mutation_remove_rule(raw_rule &r) : rr(r) {}
@@ -249,8 +259,8 @@ struct mutation_remove_rule : public mutation  {
  * respect order, so it should only be used on an unordered stratum. 
  */
 template<typename F>
-vector<mutation> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
-	vector<mutation> mutations;
+std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
+	std::vector<std::shared_ptr<mutation>> mutations;
 	vector<raw_rule> reduced;
 	for (raw_rule &rr : mp.get_rules()) {
 		bool subsumed = false;
@@ -260,7 +270,9 @@ vector<mutation> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
 				// then move onto the next rule in the outer loop
 				mutation_add_rule add(rr);
 				mutation_add_del_rule del(*nrr);
-				mutations.push_back(add), mutations.push_back(del);
+				mutations.push_back(std::make_shared<mutation_add_rule>(add));
+				mutations.push_back(std::make_shared<mutation_add_del_rule>(del));
+				//mutations.push_back(add), mutations.push_back(del);
 				subsumed = true;
 				break;
 			} else if (f(*nrr, rr)) {
@@ -269,7 +281,9 @@ vector<mutation> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
 				reduced.erase(nrr);
 				// remove the subsumed rule and add the current rule
 				mutation_remove_rule rem(*nrr);
-				mutations.push_back(rem);
+				//	mutations.push_back(rem);
+				mutations.push_back(std::make_shared<mutation_remove_rule>(rem));
+
 			} else {
 				// Neither rule contains the other. Move on.
 				nrr++;
@@ -290,123 +304,116 @@ vector<mutation*> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
 }
 #endif
 
-vector<mutation> driver::brancher_subsume_queries_cqc(mutated_prog &mp) {
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqc(mutated_prog &mp) {
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqc(rr1, rr2);});
 }
 
-vector<mutation> driver::brancher_subsume_queries_cqnc(mutated_prog &mp) {
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqnc(mutated_prog &mp) {
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqnc(rr1, rr2);});
 }
 
-struct mutation_to_dnf : public mutation  {
+struct mutation_to_dnf : public virtual mutation  {
 	driver &drvr;
 
 	mutation_to_dnf(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Converting to DNF format ..." << endl << endl;
 		drvr.to_dnf(*(mp.current));
+		o::dbg() << "DNF Program:" << endl << endl << mp.to_raw_program() << endl;
 		return true;
 	}
 };
 
-vector<mutation> driver::brancher_to_dnf(mutated_prog &mp) {
-	vector<mutation> mutations;
+vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog &mp) {
+	vector<std::shared_ptr<mutation>> mutations;
 	mutation_to_dnf m(*this);
-	mutations.push_back(m);
-	return mutations;
+	mutations.push_back(std::make_shared<mutation_to_dnf>(m));
+	return mutations; 
 }
 
-struct mutation_to_split_heads : public mutation  {
+struct mutation_to_split_heads : public virtual mutation  {
 	driver &drvr;
 
 	mutation_to_split_heads(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Converting rules to unary form ..." << endl;
 		drvr.split_heads(*(mp.current));
+		o::dbg() << "Binary Program:" << endl << mp.to_raw_program() << endl;
 		return false;
 	}
 };
 
-vector<mutation> driver::brancher_split_heads(mutated_prog &mp) {
-	vector<mutation> mutations;
+vector<std::shared_ptr<mutation>> driver::brancher_split_heads(mutated_prog &mp) {
+	vector<std::shared_ptr<mutation>> mutations;
 	mutation_to_split_heads m(*this);
-	mutations.push_back(m);
+	mutations.push_back(std::make_shared<mutation_to_split_heads>(m));
 	return mutations;
 }
 
-struct mutation_eliminate_dead_variables : public mutation  {
+struct mutation_eliminate_dead_variables : public virtual mutation  {
 	driver &drvr;
 
 	mutation_eliminate_dead_variables(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Eliminating dead variables ..." << endl << endl;
 		drvr.eliminate_dead_variables(*(mp.current));
+		o::dbg() << "Stripped TML Program:" << endl << endl << mp.to_raw_program() << endl;
 		return true;
 	}
 };
 
-vector<mutation> driver::brancher_eliminate_dead_variables(mutated_prog &mp) {
-	vector<mutation> mutations;
+vector<std::shared_ptr<mutation>> driver::brancher_eliminate_dead_variables(mutated_prog &mp) {
+	vector<std::shared_ptr<mutation>> mutations;
 	mutation_eliminate_dead_variables m(*this);
-	mutations.push_back(m);
+	mutations.push_back(std::make_shared<mutation_eliminate_dead_variables>(m));
 	return mutations;
 }
 
-struct mutation_export_outer_quantifiers : public mutation  {
+struct mutation_export_outer_quantifiers : public virtual mutation  {
 	driver &drvr;
 
 	mutation_export_outer_quantifiers(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 		drvr.export_outer_quantifiers(*(mp.current));
+		o::dbg() << "Reduced Program:" << endl << endl << mp.to_raw_program() << endl;
 		return true;
 	}
 };
 
-vector<mutation> driver::brancher_export_outer_quantifiers(mutated_prog &mp) {
-	vector<mutation> mutations;
+vector<std::shared_ptr<mutation>> driver::brancher_export_outer_quantifiers(mutated_prog &mp) {
+	// Trimmed existentials are a precondition to program optimizations
+	vector<std::shared_ptr<mutation>> mutations;
 	mutation_export_outer_quantifiers m(*this);
-	mutations.push_back(m);
+	mutations.push_back(std::make_shared<mutation_export_outer_quantifiers>(m));
 	return mutations;
 }
 
-struct mutation_split_bodies : public mutation  {
+struct mutation_split_bodies : public virtual mutation  {
 	driver &drvr;
 
 	mutation_split_bodies(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Converting rules to unary form ..." << endl;
 		drvr.transform_bin(*(mp.current));
+		o::dbg() << "Binary Program:" << endl << mp.to_raw_program() << endl;
 		return true;
 	}
 };
 
-vector<mutation> driver::brancher_split_bodies(mutated_prog &mp) {
-	vector<mutation> mutations;
-	mutation_split_bodies sb(*this);
-	mutations.push_back(sb);
-	return mutations;
-}
-
-struct mutation_square_program : public mutation  {
-	driver &drvr;
-
-	mutation_square_program(driver &d) : drvr(d) {}
-
-	bool const operator()(mutated_prog &mp) const override {
-		drvr.square_program(*(mp.current));
-		return true;
-	}
-};
-
-vector<mutation> driver::brancher_square_program(mutated_prog &mp) {
-	vector<mutation> mutations;
-	mutation_square_program sp(*this);
-	mutations.push_back(sp);
+vector<std::shared_ptr<mutation>> driver::brancher_split_bodies(mutated_prog &mp) {
+	vector<std::shared_ptr<mutation>> mutations;
+	mutation_split_bodies m(*this);
+	mutations.push_back(std::make_shared<mutation_split_bodies>(m));
 	return mutations;
 }
 

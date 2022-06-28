@@ -1,0 +1,8 @@
+# Simple examples for testing to-bin transform.
+a(a0 a1).
+a(a1 a2).
+a(a2 a3).
+
+c(?x):-a(?x ?y).
+d(?x):-a(?x ?y), a(?y ?z).
+e(?x):-a(?x ?y), a(?y ?z), a(?z ?t).

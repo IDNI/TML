@@ -17,6 +17,7 @@
 #include <vector>
 #include <set>
 #include <ranges>
+#include <memory>
 
 
 /*!
@@ -118,10 +119,14 @@ public:
 	}		
 
 	const std::vector<T> operator*() const{
-		auto subset = subset_ 
-			| std::views::transform([this](size_t idx ) { return set_[idx]; });
-		std::vector<T> v(subset.begin(), subset.end());
+		std::vector<T> v;
+		for(auto it = subset_.begin(); it != subset_.end(); ++it) {
+			v.emplace_back(set_[*it]);
+		}
 		return v;
+/*		auto subset = subset_ 
+			| std::views::transform([this, v](size_t idx ) mutable { v.push_back(set_[idx]); });
+		return v;*/
 	}
 
 private:
