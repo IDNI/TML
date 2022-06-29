@@ -374,9 +374,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 #ifdef BIT_TRANSFORM
 			if(opts.bitunv) handler_bitunv(b, t, a);
 			else
-#else
-				b.insert({get_body(t, a.vm, a.varslen), t});
 #endif
+			b.insert({get_body(t, a.vm, a.varslen), t});
+
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
