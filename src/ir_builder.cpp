@@ -1083,7 +1083,7 @@ raw_term ir_builder::to_raw_term(const term& r) {
 			}
 		}
 		DBG(assert(args == r.size());)
-#ifdef BIT_TRASNFORM
+#ifdef BIT_TRANSFORM
 		if( opts.bitunv ) {
 			if(bitunv_to_raw_term(rt))
 				rt.calc_arity(nullptr);
