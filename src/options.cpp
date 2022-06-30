@@ -290,6 +290,7 @@ void options::setup() {
 		"generated C++ code of the given TML code");
 
 #ifdef __EMSCRIPTEN__
+#ifdef NODEFSMOUNT
 #ifndef NODERAWFS
 	static bool nodefsmounted = false;
 	if (!nodefsmounted) {
@@ -301,6 +302,7 @@ void options::setup() {
 			FS.chdir(directory);
 		}, "fs");
 	}
+#endif
 #endif
 #endif
 

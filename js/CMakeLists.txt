@@ -84,6 +84,7 @@ target_setup(tmllib)
 target_compile_options(tmllib PRIVATE ${JSLIB_COMPILE_OPTIONS})
 set_target_properties(tmllib PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
 target_sources(tmllib PRIVATE ${JSLIB_SOURCES})	
+target_compile_definitions(tmllib PRIVATE "-DNODEFSMOUNT")
 
 # tml.js module
 set(MODULE_LINK_OPTIONS ${JSLIB_LINK_OPTIONS})
