@@ -113,7 +113,7 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 
 //runtime options
 typedef struct {
-	bool optimize, print_transformed, apply_regexpmatch, fp_step, bitunv,
+	bool optimize, print_transformed, apply_regexpmatch, fp_step,
 		show_hidden, bin_lr, incr_gen_forest;
 	enum proof_mode bproof;
 	size_t bitorder;
@@ -144,7 +144,8 @@ template<typename T> struct ptrcmp {
 //-----------------------------------------------------------------------------
 #define TML_NATIVES
 //#define TYPE_RESOLUTION //work-in-progress, dependent on TML_NATIVES
-//#define BIT_TRANSFORM  //to be deprecated, use it with --bitunv option
+//#define BIT_TRANSFORM  //to be deprecated,
+//#define BIT_TRANSFORM_V2
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
 #define mkchr(x) ((int_t) x )
 #define mknum(x) ((int_t) x )

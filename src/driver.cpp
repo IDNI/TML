@@ -3593,7 +3593,6 @@ bool driver::transform_handler(raw_prog &p) {
 	rt_options to;
 	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
 	to.optimize  = false;
-	to.bitunv = false;
 	to.bproof = proof_mode::none;
 	to.show_hidden = false;
 	ir_builder ir_handler(dict, to);
@@ -3656,9 +3655,8 @@ bool driver::transform_handler(raw_prog &p) {
 						"-g (-guards) option enabled.");
 
 #ifdef BIT_TRANSFORM
-	if (opts.enabled("bitunv")) {
-		ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
-	}
+	ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
+
 #endif
 
 	DBG(if (opts.enabled("transformed"))
@@ -3760,7 +3758,6 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.fp_step           = opts.enabled("fp");
 	to.show_hidden       = opts.enabled("show-hidden");
 	to.bin_lr            = opts.enabled("bin-lr");
-	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 

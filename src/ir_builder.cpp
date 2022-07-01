@@ -842,15 +842,14 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 elem ir_builder::get_elem(int_t arg) const {
 	if (arg < 0) return elem(elem::VAR, dict.get_var_lexeme(arg));
 
-	if(!opts.bitunv) {
+#ifndef BIT_TRANSFORM
 		if (arg & 1) return elem((char32_t) (arg >> 2));
 		if (arg & 2) return elem((int_t) (arg >> 2));
 		return elem(elem::SYM, dict.get_sym_lexeme(arg >>2));
-	}
-	else {
+#else
 		if(arg == 1 || arg == 0) return elem((bool) (arg));
 		return elem(elem::SYM, dict.get_sym_lexeme(arg));
-	}
+#endif
 }
 
 void ir_builder::get_nums(const raw_term& t) {
@@ -1084,10 +1083,8 @@ raw_term ir_builder::to_raw_term(const term& r) {
 		}
 		DBG(assert(args == r.size());)
 #ifdef BIT_TRANSFORM
-		if( opts.bitunv ) {
-			if(bitunv_to_raw_term(rt))
-				rt.calc_arity(nullptr);
-		}
+		if(bitunv_to_raw_term(rt))
+			rt.calc_arity(nullptr);
 #endif
 		return rt;
 }

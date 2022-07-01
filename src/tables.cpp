@@ -371,12 +371,10 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
-#ifdef BIT_TRANSFORM
-			if(opts.bitunv) handler_bitunv(b, t, a);
-			else
-#endif
+			#ifdef BIT_TRANSFORM
+			handler_bitunv(b, t, a);
+			#endif
 			b.insert({get_body(t, a.vm, a.varslen), t});
-
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
@@ -904,7 +902,6 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
-	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
 	ir_builder ir_handler(dict, to);
 	tables tbl(dict, to, &ir_handler);
@@ -1034,9 +1031,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#endif
 
 	ir_handler->syms = dict.nsyms();
-	if (opts.bitunv) {
+	#ifdef BIT_TRANSFORM
 		bits = 1;
-	} else {
+	#else
 		#ifdef TYPE_RESOLUTION
 		size_t a = max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms);
 		if (a == 0) bits++;
@@ -1045,7 +1042,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
 			add_bit();
 		#endif
-	}
+	#endif
 
 	if (!add_prog_wprod(fp, p.g)) return false;;
 
