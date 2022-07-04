@@ -64,17 +64,13 @@ public:
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using cost_function = std::function<double(mutated_prog&)>;
-
-extern cost_function constant_cost_function;
-
+using cost_function = std::function<size_t(mutated_prog&)>;
 extern cost_function exp_in_heads;
 
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
 using brancher = std::function<std::vector<std::shared_ptr<mutation>>(mutated_prog&)>;
-
 
 /**
  * Represents and strategy to select the best mutation according to the passed
@@ -112,7 +108,6 @@ public:
 	std::vector<brancher> begin;
 	std::vector<brancher> loop;
 	std::vector<brancher> end;
-
 	bounder& bndr;
 
 	optimization_plan(bounder &b);

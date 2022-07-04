@@ -34,12 +34,6 @@
 
 using namespace std;
 
-#define append_openp(x) (x).push_back(elem_openp)
-#define append_closep(x) (x).push_back(elem_closep)
-typedef pair<raw_term, vector<raw_term>> frule;
-
-cost_function constant_cost_function = [](mutated_prog &mp) { return 1.0; };
-
 cost_function exp_in_heads = [](mutated_prog &mp) {
 	auto rs = (mp.get_rules());
 	size_t c = 0.0;
@@ -169,8 +163,8 @@ raw_prog optimize(raw_prog &program, optimization_plan &plan) {
 	optimize(mutated, plan.begin); 
 //	plan.bndr.bound(mutated);
 	optimize(mutated, plan.bndr, plan.loop);
-//	optimize(mutated, plan.end);
-//	plan.bndr.bound(mutated);
+	optimize(mutated, plan.end);
+	plan.bndr.bound(mutated);
 	return plan.bndr.solution();
 }
 
@@ -180,39 +174,6 @@ raw_prog optimize(raw_prog& program, bounder& bounder, vector<brancher>& branche
 	optimize(mutated, bounder, branchers);
 	return bounder.solution();
 }
-
-/*!
- * Minimizes the queries as much as posible.
- */
-template<typename F>
-vector<mutation> brancher_minimize_queries(mutated_prog &mutated, const F &f) {
-	vector<mutation> mutations;
-/*	vector<raw_rule> minimized;
-	vector<raw_rule> deletions;
-
-	for (raw_rule &rr: mutated.current->r) {
-		// remove the current rule and add the minimize one
-		deletions.push_back(rr);
-		// Do the maximal amount of query minimization on the query we are
-		// about to admit. This should reduce the time cost of future
-		// subsumptions.
-		auto nrr = rr;
-		minimize(nrr, f);
-		// If the current rule has not been subsumed, then it needs to be
-		// represented in the reduced rules.
-		minimized.push_back(nrr);
-	}
-	mutation m = [minimized, deletions](mutated_prog &mp) {
-		mp.current->r.insert(mp.current->r.end(), minimized.begin(), minimized.end());
-		mp.deletions.insert(mp.deletions.end(), deletions.begin(), deletions.end());
-	};
-	mutations.push_back(&m);*/
-	return mutations;
-}
-
-/* const bool mutation::operator()( mutated_prog &rhs) const {
-	return false;
-} */
 
 struct mutation_add_rule : public virtual mutation  {
 	raw_rule &rr;
@@ -377,7 +338,7 @@ struct mutation_export_outer_quantifiers : public virtual mutation  {
 	mutation_export_outer_quantifiers(driver &d) : drvr(d) {}
 
 	bool const operator()(mutated_prog &mp) const override {
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
+		o::dbg() << "Exporting Outer Quantifiers ..." << endl << endl;
 		drvr.export_outer_quantifiers(mp.current);
 		o::dbg() << "Reduced Program:" << endl << endl << mp.to_raw_program() << endl;
 		return true;
