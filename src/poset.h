@@ -8,6 +8,7 @@
 #include "defs.h"
 
 class PersistentUnionFind;
+class pu_iterator;
 struct PersistentSet;
 struct PersistentPairs;
 class poset;
@@ -82,48 +83,10 @@ class PersistentArray {
 	static int_t size(storage &arr) { return (int_t) arr.size(); }
 };
 
-class pu_iterator {
-	using pa = PersistentArray;
-	int_t val;
-	int_t end_val;
-	bool negate = false;
-	bool looped = false;
-	std::vector<int_t> &storage;
-	const std::shared_ptr<pa> &p;
-
-  public:
-	pu_iterator(std::vector<int_t> &_s, const std::shared_ptr<pa> &_p,
-		    int_t pos) : end_val(pos), storage(_s), p(_p) {
-		val = pa::get(storage, p, abs(pos));
-		if(pos < 0) negate = !negate;
-		val = negate ? -val : val;
-	};
-
-	pu_iterator &operator++() {
-		if(!looped) looped = true;
-		if (val < 0) negate = !negate;
-		val = pa::get(storage, p, abs(val));
-		val = negate ? -val : val;
-		return *this;
-	}
-
-	int_t operator*() const { return val; }
-
-	bool operator==(pu_iterator &other) const {
-		return abs(val) == abs(other.val) && looped == other.looped;
-	}
-
-	bool operator!=(pu_iterator &other) const {
-		return abs(val) != abs(other.val) || looped != other.looped;
-	}
-
-	pu_iterator begin() { return {storage, p, end_val}; }
-
-	pu_iterator end() {
-		auto it = pu_iterator(storage, p, end_val);
-		it.looped = true; return it;
-	}
-};
+// Functions for merge sort
+pu_iterator HalfList (const pu_iterator& start, const pu_iterator& end);
+void SortedMerge (pu_iterator& a, pu_iterator& b, pu_iterator& res);
+void MergeSort (pu_iterator start, const pu_iterator& end, pu_iterator& res);
 
 class PersistentUnionFind {
 	typedef PersistentUnionFind puf;
@@ -164,11 +127,12 @@ class PersistentUnionFind {
 				  int_t root);
 	static sppa update_link(const puf &t, int_t x, int_t y);
 	static int_t find(const puf &t, int_t elem);
-	static pu_iterator get_equal(const puf& uf, int_t x);
+	static pu_iterator get_equal(puf& uf, int_t x);
   public:
 	PersistentUnionFind() = delete;
 	bool operator==(const puf &) const;
 	friend std::hash<puf>;
+	friend pu_iterator;
 
 	static void init(int_t n);
 	static int_t find(int_t t, int_t elem);
@@ -191,6 +155,53 @@ class PersistentUnionFind {
 
 	static void print(int_t uf, std::ostream &os);
 	static void print(puf& uf, std::ostream &os);
+};
+
+class pu_iterator {
+	using pa = PersistentArray;
+	using pu = PersistentUnionFind;
+	int_t val;
+	int_t end_val;
+	bool negate = false;
+	bool looped = false;
+	pu uf;
+
+  public:
+	pu_iterator(pu &uf, int_t pos) : val(pos), end_val(pos), uf(uf) {};
+
+	pu_iterator(const pu_iterator &) = default;
+
+	pu_iterator &operator++() {
+		if (!looped) looped = true;
+		if (val < 0) negate = !negate;
+		val = pa::get(pu::link_s, uf.link_pt, abs(val));
+		val = negate ? -val : val;
+		return *this;
+	}
+
+	int_t operator*() const { return val; }
+
+	bool operator==(const pu_iterator &other) const {
+		return abs(val) == abs(other.val) && looped == other.looped;
+	}
+
+	bool operator!=(const pu_iterator &other) const {
+		return abs(val) != abs(other.val) || looped != other.looped;
+	}
+
+	pu_iterator &operator=(int_t v) {
+		uf.link_pt = pa::set(pu::link_s, uf.link_pt, abs(val), v);
+		return *this;
+	}
+
+	void update_end (const pu_iterator& end) {end_val = end.val;}
+
+	pu_iterator begin() { return {uf, end_val}; }
+
+	pu_iterator end() {
+		auto it = pu_iterator(uf, end_val);
+		it.looped = true; return it;
+	}
 };
 
 // The representative of a set of ints is its smallest element

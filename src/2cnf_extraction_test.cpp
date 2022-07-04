@@ -132,8 +132,27 @@ void test_2cnf_gc () {
 	poset::print(low, cout);
 }
 
+void test_merge_sort () {
+	using pu = PersistentUnionFind;
+
+	pu::init(5);
+
+	int puf = pu::merge(0,1,3);
+	puf = pu::merge(puf, 3, 2);
+	puf = pu::merge(puf, 2, 4);
+
+	pu_iterator iter = pu::get_equal(puf, 1);
+	pu_iterator res(iter);
+	MergeSort(iter.begin(), iter.end(), res);
+
+	for (const auto& el : res) {
+		cout << el << endl;
+	}
+}
+
 int main() {
-	test_2cnf_gc();
+	//test_2cnf_gc();
 	//test_canonicity();
+	test_merge_sort();
 	return 0;
 }

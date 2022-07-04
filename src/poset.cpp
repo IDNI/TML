@@ -117,6 +117,63 @@ void PersistentArray::reroot(storage &arr, const sppa &t) {
 	arr_pt->v = val;
 }
 
+// Functions for merge sort
+pu_iterator HalfList (const pu_iterator& start, const pu_iterator& end) {
+	pu_iterator fast(start);
+	pu_iterator slow(start);
+
+	while (fast != end) {
+		++fast;
+		if(fast != end){
+			++fast;
+			++slow;
+		}
+	}
+	return slow;
+}
+
+void SortedMerge (pu_iterator& a, pu_iterator& b, pu_iterator& res) {
+	if (a == a.end()) {
+		res = *b;
+		/*do{
+			(++res) = *(++b);
+		}while(b != b.end());*/
+		return;
+	} else if (b == b.end()) {
+		res = *a;
+		/*do{
+			(++res) = *(++a);
+		}while(a != a.end());*/
+		return;
+	}
+
+	if (abs_cmp(*a, *b)) {
+		res = *a;
+		SortedMerge(++a, b, ++res);
+	} else {
+		res = *b;
+		SortedMerge(a, ++b, ++res);
+	}
+}
+
+void MergeSort (pu_iterator start, const pu_iterator& end, pu_iterator& res) {
+	if (start == end) return;
+
+	pu_iterator mid (HalfList(start, end));
+	if (mid == start) return;
+
+	start.update_end(mid);
+	mid.update_end(end);
+
+	MergeSort(start, mid, res);
+	MergeSort(mid, end, res);
+
+	if(*start < *mid)
+		SortedMerge(++start, mid, res);
+	else
+		SortedMerge(++mid, start, res);
+}
+
 vector<int_t> PersistentUnionFind::parent_s;
 vector<int_t> PersistentUnionFind::link_s;
 vector<int_t> PersistentUnionFind::hashes_s;
@@ -426,9 +483,9 @@ int_t PersistentUnionFind::size() {
 }
 
 pu_iterator
-PersistentUnionFind::get_equal(const PersistentUnionFind::puf &uf, int_t x) {
+PersistentUnionFind::get_equal(PersistentUnionFind::puf &uf, int_t x) {
 	int_t rep_x = find(uf, x);
-	return {link_s, uf.link_pt, rep_x};
+	return {uf, rep_x};
 }
 
 void PersistentUnionFind::print(PersistentUnionFind::puf &uf, ostream &os) {
