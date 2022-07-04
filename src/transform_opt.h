@@ -30,24 +30,28 @@ class dict_t;
 struct mutated_prog  {
 	// starting node of the mutated progs log
 	mutated_prog(raw_prog &rp): 
-		original(rp), 
-		current(rp.dict), 
-		previous(nullptr) {};
+	//		original(rp), 
+			current(raw_prog(rp.dict)), 
+			previous(nullptr) {
+		current.merge(rp);
+	};
 	// link to previous mutated prog
 	mutated_prog(mutated_prog *mp): 
-		original(mp->original), 
-		previous(mp), 
-		current(mp->current.dict) {};
+	//		original(mp->original), 
+			previous(mp), 
+			current(raw_prog(mp->current.dict)) {
+		current.merge(mp->current);
+	};
 
 	void operator()(struct mutation& m);
-	mutated_prog *operator--();
-	std::vector<raw_rule> get_rules();
-	raw_prog to_raw_program();
+//	mutated_prog *operator--();
+//	std::vector<raw_rule> get_rules();
+//	raw_prog to_raw_program();
 
 	raw_prog current;
 	std::vector<raw_rule*> deletions;
 	mutated_prog *previous;
-	std::reference_wrapper<raw_prog> original;
+//	std::reference_wrapper<raw_prog> original;
 };
 
 /*!
@@ -89,15 +93,18 @@ public:
 class best_solution: public bounder {
 public:
 	best_solution(cost_function& f, mutated_prog &rp): 
-		func_(f), 
-		best_(rp), 
-		cost_(std::numeric_limits<size_t>::max()) {};
+			func_(f), 
+			cost_(std::numeric_limits<size_t>::max()) {
+		best_[f(rp)] = std::make_shared<mutated_prog>(rp);
+	};
 	virtual bool bound(mutated_prog& p);
 	virtual raw_prog solution();
 private:
 	cost_function func_;
 	size_t cost_;
-	std::reference_wrapper<mutated_prog> best_; 
+	std::map<size_t, std::shared_ptr<mutated_prog>> best_;
+//	raw_prog best_; 
+//	std::reference_wrapper<mutated_prog> best_; 
 };
 
 /*!

@@ -35,7 +35,7 @@
 using namespace std;
 
 cost_function exp_in_heads = [](mutated_prog &mp) {
-	auto rs = (mp.get_rules());
+	auto rs = mp.current.r;
 	size_t c = 0.0;
 	for (auto it = rs.begin(); it != rs.end(); ++it) {
 		c += (*it).h.size() * (*it).b.size();
@@ -48,14 +48,14 @@ void mutated_prog::operator()(mutation &m) {
 	m(*this);
 }
 
-mutated_prog *mutated_prog::operator--() {
-	return previous;
-}
+//mutated_prog *mutated_prog::operator--() {
+//	return previous;
+//}
 
 /*!
  * Collapse all valid raw rules into a vector.
  */ 
-vector<raw_rule>  mutated_prog::get_rules() {
+/*vector<raw_rule>  mutated_prog::get_rules() {
 	vector<raw_rule> all;
 	if (!previous) {
 		all.insert(all.end(), current.r.begin(), current.r.end());
@@ -77,9 +77,9 @@ vector<raw_rule>  mutated_prog::get_rules() {
 	// add current rules
 	all.insert(all.end(), current.r.begin(), current.r.end());
 	return all;
-}
+}*/
 
-raw_prog  mutated_prog::to_raw_program() {
+/*raw_prog  mutated_prog::to_raw_program() {
 	if (!previous) {
 		raw_prog new_raw_prog(original.get().dict);
 		new_raw_prog.merge(original.get());
@@ -99,20 +99,20 @@ raw_prog  mutated_prog::to_raw_program() {
 		if (i != new_raw_prog.r.end()) new_raw_prog.r.erase(i);
 	}
 	return new_raw_prog;
-}
+}*/
 
 bool best_solution::bound(mutated_prog &p) {
 	size_t cost = func_(p);
 	if (cost < cost_) {
 		cost_ = cost;
-		best_.get().current.merge(p.current); // = p;
+		best_[cost] = std::make_shared<mutated_prog>(p); // = p;
 		return true;
 	}
 	return false;
 }
 
 raw_prog best_solution::solution() {
-	return best_.get().to_raw_program();
+	return best_.begin().operator*().second.get()->current;
 }
 
 /*!
@@ -160,11 +160,15 @@ void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branche
 raw_prog optimize(raw_prog &program, optimization_plan &plan) {
 	// the first mutated program just contain the original program as additions.
 	mutated_prog mutated {program};
+	o::dbg() << "Applying begin optimizations ..." << endl << endl;
 	optimize(mutated, plan.begin); 
-//	plan.bndr.bound(mutated);
-	optimize(mutated, plan.bndr, plan.loop);
-	optimize(mutated, plan.end);
 	plan.bndr.bound(mutated);
+	o::dbg() << "Applying loop optimizations ..." << endl << endl;
+	optimize(mutated, plan.bndr, plan.loop);
+	// o::dbg() << "Applying end optimizations ..." << endl << endl;
+	// mutated_prog loop{plan.bndr.solution()};
+	// optimize(loop, plan.end);
+	// plan.bndr.bound(mutated);
 	return plan.bndr.solution();
 }
 
@@ -218,7 +222,7 @@ template<typename F>
 std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
 	std::vector<std::shared_ptr<mutation>> mutations;
 	vector<raw_rule> reduced;
-	for (raw_rule &rr : mp.get_rules()) {
+	for (raw_rule &rr : mp.current.r) {
 		bool subsumed = false;
 		for (auto nrr = reduced.begin(); nrr != reduced.end();) {
 			if (f(rr, *nrr)) {
@@ -261,12 +265,16 @@ vector<mutation*> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
 #endif
 
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqc(mutated_prog &mp) {
+	split_heads(mp.current);
+	to_dnf(mp.current);
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqc(rr1, rr2);});
 }
 
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqnc(mutated_prog &mp) {
+	split_heads(mp.current);
+	to_dnf(mp.current);
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqnc(rr1, rr2);});
@@ -279,8 +287,9 @@ struct mutation_to_dnf : public virtual mutation  {
 
 	bool const operator()(mutated_prog &mp) const override {
 		o::dbg() << "Converting to DNF format ..." << endl << endl;
-		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
-		o::dbg() << "DNF Program:" << endl << endl << mp.to_raw_program() << endl;
+//		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
+		drvr.to_dnf(mp.current);
+		o::dbg() << "DNF Program:" << endl << endl << mp.current << endl;
 		return true;
 	}
 };
@@ -300,7 +309,8 @@ struct mutation_to_split_heads : public virtual mutation  {
 	bool const operator()(mutated_prog &mp) const override {
 		o::dbg() << "Splitting heads ..." << endl;
 		drvr.split_heads(mp.current);
-		o::dbg() << "Binary Program:" << endl << mp.to_raw_program() << endl;
+//		drvr.split_heads(mp.current);
+		o::dbg() << "Binary Program:" << endl << mp.current << endl;
 		return false;
 	}
 };
@@ -320,7 +330,8 @@ struct mutation_eliminate_dead_variables : public virtual mutation  {
 	bool const operator()(mutated_prog &mp) const override {
 		o::dbg() << "Eliminating dead variables ..." << endl << endl;
 		drvr.eliminate_dead_variables(mp.current);
-		o::dbg() << "Stripped TML Program:" << endl << endl << mp.to_raw_program() << endl;
+//		drvr.eliminate_dead_variables(mp.current);
+		o::dbg() << "Stripped TML Program:" << endl << endl << mp.current << endl;
 		return true;
 	}
 };
@@ -340,7 +351,7 @@ struct mutation_export_outer_quantifiers : public virtual mutation  {
 	bool const operator()(mutated_prog &mp) const override {
 		o::dbg() << "Exporting Outer Quantifiers ..." << endl << endl;
 		drvr.export_outer_quantifiers(mp.current);
-		o::dbg() << "Reduced Program:" << endl << endl << mp.to_raw_program() << endl;
+		o::dbg() << "Reduced Program:" << endl << endl << mp.current << endl;
 		return true;
 	}
 };
@@ -360,12 +371,8 @@ struct mutation_split_bodies : public virtual mutation  {
 
 	bool const operator()(mutated_prog &mp) const override {
 		o::dbg() << "Splitting bodies ..." << endl;
-		auto rr = mp.get_rules();
-		raw_prog aux(mp.original.get().dict);
-		aux.r.insert(aux.r.end(), rr.begin(), rr.end());
-		drvr.transform_bin(aux);
-		mp.current.merge(aux);
-		o::dbg() << "Binary Program:" << endl << mp.to_raw_program() << endl;
+		drvr.transform_bin(mp.current);
+		o::dbg() << "Binary Program:" << endl << mp.current << endl;
 		return true;
 	}
 };
