@@ -193,6 +193,8 @@ private:	// TODO create one entry point for optimization
 	std::vector<std::shared_ptr<mutation>> brancher_export_outer_quantifiers(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_to_dnf(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
+	template<typename F>
+	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp, const F &f);
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqc(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqnc(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_split_heads(mutated_prog &mp);

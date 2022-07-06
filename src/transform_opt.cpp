@@ -191,12 +191,15 @@ struct mutation_add_rule : public virtual mutation  {
 };
 
 struct mutation_add_del_rule : public virtual mutation  {
-	raw_rule &rr;
+	raw_rule del_;
+	raw_rule add_;
 
-	mutation_add_del_rule(raw_rule &r) : rr(r) {}
+	mutation_add_del_rule(raw_rule del, raw_rule add) : del_(del), add_(add) {}
 
 	bool const operator()(mutated_prog &mp) const override {
-		mp.deletions.insert(mp.deletions.end(), &rr);
+		mp.current.r.resize(mp.current.r.size() +1);
+		mp.current.r.push_back(add_);
+		remove(mp.current.r.begin(), mp.current.r.end(), del_);
 		return true;
 	}
 };
@@ -219,7 +222,9 @@ struct mutation_remove_rule : public virtual mutation  {
  * respect order, so it should only be used on an unordered stratum. 
  */
 template<typename F>
-std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
+	to_dnf(mp.current);
+	split_heads(mp.current);
 	std::vector<std::shared_ptr<mutation>> mutations;
 	vector<raw_rule> reduced;
 	for (raw_rule &rr : mp.current.r) {
@@ -228,10 +233,8 @@ std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp
 			if (f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
 				// then move onto the next rule in the outer loop
-				mutation_add_rule add(rr);
-				mutation_add_del_rule del(*nrr);
-				mutations.push_back(std::make_shared<mutation_add_rule>(add));
-				mutations.push_back(std::make_shared<mutation_add_del_rule>(del));
+				mutation_add_del_rule del_add(rr, *nrr);
+				mutations.push_back(std::make_shared<mutation_add_del_rule>(del_add));
 				//mutations.push_back(add), mutations.push_back(del);
 				subsumed = true;
 				break;
@@ -265,16 +268,12 @@ vector<mutation*> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
 #endif
 
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqc(mutated_prog &mp) {
-	split_heads(mp.current);
-	to_dnf(mp.current);
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqc(rr1, rr2);});
 }
 
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqnc(mutated_prog &mp) {
-	split_heads(mp.current);
-	to_dnf(mp.current);
 	return brancher_subsume_queries(mp,
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqnc(rr1, rr2);});

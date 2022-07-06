@@ -3612,7 +3612,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			if(opts.enabled("O2")) {
 				#ifndef WITH_Z3
 				o::dbg() << "Adding CQNC brancher ..." << endl << endl;
-				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
+				// plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
 				o::dbg() << "Adding CQC brancher ..." << endl << endl;
 				plan.loop.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
 				#else
