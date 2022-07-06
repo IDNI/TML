@@ -117,63 +117,6 @@ void PersistentArray::reroot(storage &arr, const sppa &t) {
 	arr_pt->v = val;
 }
 
-// Functions for merge sort
-pu_iterator HalfList (const pu_iterator& start, const pu_iterator& end) {
-	pu_iterator fast(start);
-	pu_iterator slow(start);
-
-	while (fast != end) {
-		++fast;
-		if(fast != end){
-			++fast;
-			++slow;
-		}
-	}
-	return slow;
-}
-
-void SortedMerge (pu_iterator& a, pu_iterator& b, pu_iterator& res) {
-	if (a == a.end()) {
-		res = *b;
-		/*do{
-			(++res) = *(++b);
-		}while(b != b.end());*/
-		return;
-	} else if (b == b.end()) {
-		res = *a;
-		/*do{
-			(++res) = *(++a);
-		}while(a != a.end());*/
-		return;
-	}
-
-	if (abs_cmp(*a, *b)) {
-		res = *a;
-		SortedMerge(++a, b, ++res);
-	} else {
-		res = *b;
-		SortedMerge(a, ++b, ++res);
-	}
-}
-
-void MergeSort (pu_iterator start, const pu_iterator& end, pu_iterator& res) {
-	if (start == end) return;
-
-	pu_iterator mid (HalfList(start, end));
-	if (mid == start) return;
-
-	start.update_end(mid);
-	mid.update_end(end);
-
-	MergeSort(start, mid, res);
-	MergeSort(mid, end, res);
-
-	if(*start < *mid)
-		SortedMerge(++start, mid, res);
-	else
-		SortedMerge(++mid, start, res);
-}
-
 vector<int_t> PersistentUnionFind::parent_s;
 vector<int_t> PersistentUnionFind::link_s;
 vector<int_t> PersistentUnionFind::hashes_s;
@@ -306,6 +249,86 @@ PersistentUnionFind::update_link(const puf &t, int_t x, int_t y) {
 
 	auto link1 = p_arr::set(link_s, t.link_pt, y, x < 0 ? -x_link : x_link);
 	return p_arr::set(link_s, link1, abs(x), x < 0 ? -y_link : y_link);
+}
+
+pu_iterator PersistentUnionFind::HalfList(const pu_iterator &start,
+					  const pu_iterator &end) {
+	pu_iterator fast(start);
+	pu_iterator slow(start);
+
+	while (fast != end) {
+		++fast;
+		if (fast != end) {
+			++fast;
+			++slow;
+		}
+	}
+	return slow;
+}
+
+void PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
+				      int_t a_end, int_t b_end,
+				      int_t pos, puf &uf) {
+	if (*a == a_end) {
+		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
+		pos = *b;
+		while (*(++b) != b_end) {
+			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
+			pos = *b;
+		}
+		return;
+	} else if (*b == b_end) {
+		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
+		pos = *a;
+		while (*(++a) != a_end) {
+			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
+			pos = *a;
+		}
+		//Correcting end value of chain
+		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, b_end);
+		return;
+	}
+
+	if (abs_cmp(*a, *b)) {
+		if(pos == 0) {
+			pos = *a;
+			SortedMerge(++a,b,a_end,b_end,pos,uf);
+		} else {
+			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
+			pos = *a;
+			SortedMerge(++a,b,a_end,b_end,pos,uf);
+		}
+	} else {
+		if(pos == 0) {
+			pos = *b;
+			SortedMerge(a,++b,a_end,b_end,pos,uf);
+		} else {
+			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
+			pos = *b;
+			SortedMerge(a,++b,a_end,b_end,pos,uf);
+		}
+	}
+}
+
+//TODO: Take care of negated/unnegated in resulting ordering
+void PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end,
+				     puf &uf) {
+	if (start == end) return;
+
+	pu_iterator mid(HalfList(start, end));
+	if (mid == start) return;
+
+	MergeSort(start, mid, uf);
+	MergeSort(mid, end, uf);
+
+	SortedMerge(start, mid, *mid, *end, 0, uf);
+}
+
+//Testing function
+void PersistentUnionFind::MergeSort(pu_iterator &start, const pu_iterator &&end,
+				    int_t t) {
+	auto &uf = uf_univ[t];
+	MergeSort(start, end, uf);
 }
 
 int_t PersistentUnionFind::merge(int_t t, int_t x, int_t y) {

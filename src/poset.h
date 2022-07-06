@@ -8,9 +8,12 @@
 #include "defs.h"
 
 class PersistentUnionFind;
+
 class pu_iterator;
+
 struct PersistentSet;
 struct PersistentPairs;
+
 class poset;
 
 extern std::vector<poset> P;
@@ -83,11 +86,6 @@ class PersistentArray {
 	static int_t size(storage &arr) { return (int_t) arr.size(); }
 };
 
-// Functions for merge sort
-pu_iterator HalfList (const pu_iterator& start, const pu_iterator& end);
-void SortedMerge (pu_iterator& a, pu_iterator& b, pu_iterator& res);
-void MergeSort (pu_iterator start, const pu_iterator& end, pu_iterator& res);
-
 class PersistentUnionFind {
 	typedef PersistentUnionFind puf;
 	typedef PersistentArray p_arr;
@@ -118,7 +116,7 @@ class PersistentUnionFind {
 
 	static int_t add(puf &uf);
 	static int_t update(const puf &t, int_t x, int_t y);
-	static void split_set (std::vector<int_t> &s, puf& uf, int_t root);
+	static void split_set(std::vector<int_t> &s, puf &uf, int_t root);
 	static void
 	split_hashes(int_t root_x, int_t root_y, int_t hash_x,
 		     int_t hash_y, int_t count_x, int_t count_y,
@@ -127,7 +125,14 @@ class PersistentUnionFind {
 				  int_t root);
 	static sppa update_link(const puf &t, int_t x, int_t y);
 	static int_t find(const puf &t, int_t elem);
-	static pu_iterator get_equal(puf& uf, int_t x);
+	static pu_iterator get_equal(puf &uf, int_t x);
+	static pu_iterator
+	HalfList(const pu_iterator &start, const pu_iterator &end);
+	static void
+	SortedMerge(pu_iterator &a, pu_iterator &b, int_t a_end, int_t b_end,
+		    int_t pos, puf &uf);
+	static void
+	MergeSort(pu_iterator start, const pu_iterator &end, puf &uf);
   public:
 	PersistentUnionFind() = delete;
 	bool operator==(const puf &) const;
@@ -140,6 +145,8 @@ class PersistentUnionFind {
 	static int_t intersect(int_t t1, int_t t2);
 	static bool equal(int_t t, int_t x, int_t y);
 	static pu_iterator get_equal(int_t t, int_t x);
+	static void
+	MergeSort(pu_iterator &start, const pu_iterator &&end, int_t t);
 	static int_t rm_equal(int_t t, int_t x);
 	static bool resize(int_t n);
 	static int_t size();
@@ -154,7 +161,7 @@ class PersistentUnionFind {
 	}
 
 	static void print(int_t uf, std::ostream &os);
-	static void print(puf& uf, std::ostream &os);
+	static void print(puf &uf, std::ostream &os);
 };
 
 class pu_iterator {
@@ -164,10 +171,11 @@ class pu_iterator {
 	int_t end_val;
 	bool negate = false;
 	bool looped = false;
-	pu uf;
+	pu& uf;
 
   public:
-	pu_iterator(pu &uf, int_t pos) : val(pos), end_val(pos), uf(uf) {};
+	pu_iterator(pu &puf, int_t val_) : val(val_), end_val(val_),
+					  uf(puf) {};
 
 	pu_iterator(const pu_iterator &) = default;
 
@@ -189,18 +197,14 @@ class pu_iterator {
 		return abs(val) != abs(other.val) || looped != other.looped;
 	}
 
-	pu_iterator &operator=(int_t v) {
-		uf.link_pt = pa::set(pu::link_s, uf.link_pt, abs(val), v);
-		return *this;
-	}
-
-	void update_end (const pu_iterator& end) {end_val = end.val;}
+	//int_t get_end () const {return end_val; }
 
 	pu_iterator begin() { return {uf, end_val}; }
 
 	pu_iterator end() {
 		auto it = pu_iterator(uf, end_val);
-		it.looped = true; return it;
+		it.looped = true;
+		return it;
 	}
 };
 
@@ -255,7 +259,8 @@ struct PersistentPairs {
 	static int_t
 	implies(int_t set_id, int_t elem, bool del, std::vector<int_t> &imp);
 	static int_t
-	all_implies(int_t set_id, int_t elem, bool del, std::vector<int_t> &all_imp);
+	all_implies(int_t set_id, int_t elem, bool del,
+		    std::vector<int_t> &all_imp);
 	static int_t next(int_t set_id);
 	static PersistentPairs get(int_t set_id);
 	static void print(int_t set_id, std::ostream &os);
@@ -290,34 +295,37 @@ class poset {
 	// Indicates the smallest variable in the poset
 	int_t v = 0;
 
-	poset () = default;
+	poset() = default;
 
 	//Creates single variable poset
-	explicit poset (int_t v) : pure(true), v(v) {insert_var(*this, v);}
-	explicit poset (bool isPure) : pure (isPure) {}
+	explicit poset(int_t v) : pure(true), v(v) { insert_var(*this, v); }
+
+	explicit poset(bool isPure) : pure(isPure) {}
 
 	friend std::hash<poset>;
 	bool operator==(const poset &p) const;
 
 	static void init(int n) {
-		P.emplace_back(true); P.emplace_back(true);
-		NP.emplace_back(true); NP.emplace_back(true);
+		P.emplace_back(true);
+		P.emplace_back(true);
+		NP.emplace_back(true);
+		NP.emplace_back(true);
 		pu::init(n);
 		pp::init();
 		ps::init();
 	};
 
-	static bool resize (int n) {
+	static bool resize(int n) {
 		return pu::resize(n);
 	};
 
-	static int_t size () {
+	static int_t size() {
 		// The only data structure that needs size control is union find
 		return pu::size();
 	};
 
 	static poset lift(int_t v, poset &&hi, poset &&lo);
-	static poset eval (poset& p, int_t v);
+	static poset eval(poset &p, int_t v);
 	static bool insert_var(poset &p, int_t v);
 	static poset insert_var(poset &&p, int_t v);
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);
