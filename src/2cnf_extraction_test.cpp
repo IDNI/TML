@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include "../src/bdd.h"
+#include <cmath>
 using namespace std;
 
 // Recursively generate all boolean functions of the given arity
@@ -135,15 +136,15 @@ void test_2cnf_gc () {
 void test_merge_sort () {
 	using pu = PersistentUnionFind;
 
-	pu::init(40);
+	pu::init(100);
 
 	int puf=0;
-	for (int_t i = 2; i<30; ++i) {
-		puf = pu::merge(puf, 1, i);
+	for (int_t i = 2; i<100; ++i) {
+		puf = pu::merge(puf, 1, pow(-1,i)*i);
 	}
 
 	pu_iterator iter = pu::get_equal(puf, 1);
-	pu::MergeSort(iter, iter.end(), puf);
+	pu::MergeSort(iter, iter.end());
 
 	for (const auto& el : iter) {
 		cout << el << endl;

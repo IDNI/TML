@@ -130,10 +130,10 @@ class PersistentUnionFind {
 	HalfList(const pu_iterator &start, const pu_iterator &end);
 	static int_t
 	SortedMerge(pu_iterator &a, pu_iterator &b, int_t a_end, int_t b_end,
-		    int_t pos,puf &uf);
-	static int_t
-	MergeSort(pu_iterator start, const pu_iterator &end, puf &uf);
+		    int_t pos, bool negated);
   public:
+	static int_t
+	MergeSort(pu_iterator start, const pu_iterator &end);
 	PersistentUnionFind() = delete;
 	bool operator==(const puf &) const;
 	friend std::hash<puf>;
@@ -145,8 +145,6 @@ class PersistentUnionFind {
 	static int_t intersect(int_t t1, int_t t2);
 	static bool equal(int_t t, int_t x, int_t y);
 	static pu_iterator get_equal(int_t t, int_t x);
-	static void
-	MergeSort(pu_iterator &start, const pu_iterator &&end, int_t t);
 	static int_t rm_equal(int_t t, int_t x);
 	static bool resize(int_t n);
 	static int_t size();
@@ -179,11 +177,13 @@ class pu_iterator {
 
 	pu_iterator(const pu_iterator &) = default;
 
+	friend pu;
+
 	pu_iterator &operator++() {
 		if (!looped) looped = true;
-		if (val < 0) negate = !negate;
 		val = pa::get(pu::link_s, uf.link_pt, abs(val));
 		val = negate ? -val : val;
+		if ((negate ? -val : val) < 0) negate = !negate;
 		return *this;
 	}
 
@@ -197,7 +197,11 @@ class pu_iterator {
 		return abs(val) != abs(other.val) || looped != other.looped;
 	}
 
-	void update_pos (int_t v) { val = v; }
+	void update_pos (int_t v) {
+		if(v < 0 && val > 0 || v > 0 && val < 0)
+			negate = !negate;
+		val = v;
+	}
 
 	pu_iterator begin() { return {uf, end_val}; }
 

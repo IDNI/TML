@@ -268,76 +268,78 @@ pu_iterator PersistentUnionFind::HalfList(const pu_iterator &start,
 
 int_t PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 				      int_t a_end, int_t b_end,
-				      int_t pos, puf &uf) {
-	if (*a == a_end) {
-		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
-		pos = *b;
-		while (*(++b) != b_end) {
-			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
-			pos = *b;
+				      int_t pos, bool negated) {
+	auto set_pos = [&](int_t v) {
+		pos = negated ? -v : v;
+	    	if(pos < 0) negated = !negated;
+	};
+
+	if (abs(*a) == abs(a_end)) {
+		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*b : *b);
+		set_pos(*b);
+		while (abs(*(++b)) != abs(b_end)) {
+			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*b : *b);
+			set_pos(*b);
 		}
 		return 0;
-	} else if (*b == b_end) {
-		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
-		pos = *a;
-		while (*(++a) != a_end) {
-			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
-			pos = *a;
+	} else if (abs(*b) == abs(b_end)) {
+		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*a : *a);
+		set_pos(*a);
+		while (abs(*(++a)) != abs(a_end)) {
+			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*a : *a);
+			set_pos(*a);
 		}
 		//Correcting end value of chain
-		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, b_end);
+		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -b_end : b_end);
 		return 0;
 	}
 
 	if (abs_cmp(*a, *b)) {
 		if(pos == 0) {
-			pos = *a;
-			return SortedMerge(++a,b,a_end,b_end,pos,uf);
+			set_pos(*a);
+			return SortedMerge(++a,b,a_end,b_end,pos,negated);
 		} else {
-			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
-			pos = *a;
-			return SortedMerge(++a,b,a_end,b_end,pos,uf);
+			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*a : *a);
+			set_pos(*a);
+			return SortedMerge(++a,b,a_end,b_end,pos,negated);
 		}
 	} else {
 		if(pos == 0) {
-			pos = *b;
-			SortedMerge(a,++b,a_end,b_end,pos,uf);
+			set_pos(*b);
+			SortedMerge(a,++b,a_end,b_end,pos,negated);
 			// Start position changed
 			return pos;
 		} else {
-			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
-			pos = *b;
-			return SortedMerge(a,++b,a_end,b_end,pos,uf);
+			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos), negated ? -*b : *b);
+			set_pos(*b);
+			return SortedMerge(a,++b,a_end,b_end,pos,negated);
 		}
 	}
 }
 
 //TODO: Take care of negated/unnegated in resulting ordering
-int_t PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end,
-				     puf &uf) {
+int_t PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end) {
 	if (start == end) return 0;
 
 	pu_iterator mid(HalfList(start, end));
 	if (mid == start) return 0;
 
 	int_t mid_val = *mid;
-	if(int_t i = MergeSort(start, mid, uf); i > 0) {
+	int_t start_update=0;
+	if(start_update = MergeSort(start, mid); abs(start_update) > 0) {
 		//update start position
-		start.update_pos(i);
+		start.update_pos(start_update);
 	}
-	if(int_t i = MergeSort(mid, end, uf); i > 0) {
+	if(int_t i = MergeSort(mid, end); abs(i) > 0) {
 		//update start position
 		mid.update_pos(i);
 	}
 
-	return SortedMerge(start, mid, mid_val, *end, 0, uf);
-}
-
-//Testing function
-void PersistentUnionFind::MergeSort(pu_iterator &start, const pu_iterator &&end,
-				    int_t t) {
-	auto &uf = uf_univ[t];
-	MergeSort(start, end, uf);
+	if (int_t res = SortedMerge(start, mid, mid_val, *end, 0, false);
+		res == 0)
+		return start_update;
+	else
+		return res;
 }
 
 int_t PersistentUnionFind::merge(int_t t, int_t x, int_t y) {
