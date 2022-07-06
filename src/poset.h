@@ -128,10 +128,10 @@ class PersistentUnionFind {
 	static pu_iterator get_equal(puf &uf, int_t x);
 	static pu_iterator
 	HalfList(const pu_iterator &start, const pu_iterator &end);
-	static void
+	static int_t
 	SortedMerge(pu_iterator &a, pu_iterator &b, int_t a_end, int_t b_end,
-		    int_t pos, puf &uf);
-	static void
+		    int_t pos,puf &uf);
+	static int_t
 	MergeSort(pu_iterator start, const pu_iterator &end, puf &uf);
   public:
 	PersistentUnionFind() = delete;
@@ -197,7 +197,7 @@ class pu_iterator {
 		return abs(val) != abs(other.val) || looped != other.looped;
 	}
 
-	//int_t get_end () const {return end_val; }
+	void update_pos (int_t v) { val = v; }
 
 	pu_iterator begin() { return {uf, end_val}; }
 

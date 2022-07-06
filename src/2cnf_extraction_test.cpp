@@ -135,14 +135,12 @@ void test_2cnf_gc () {
 void test_merge_sort () {
 	using pu = PersistentUnionFind;
 
-	pu::init(10);
+	pu::init(40);
 
-	int puf = pu::merge(0,1,3);
-	puf = pu::merge(puf, 1, 2);
-	puf = pu::merge(puf, 2, 4);
-	puf = pu::merge(puf, 4, 9);
-	puf = pu::merge(puf, 5, 8);
-	puf = pu::merge(puf, 8, 2);
+	int puf=0;
+	for (int_t i = 2; i<30; ++i) {
+		puf = pu::merge(puf, 1, i);
+	}
 
 	pu_iterator iter = pu::get_equal(puf, 1);
 	pu::MergeSort(iter, iter.end(), puf);

@@ -266,7 +266,7 @@ pu_iterator PersistentUnionFind::HalfList(const pu_iterator &start,
 	return slow;
 }
 
-void PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
+int_t PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 				      int_t a_end, int_t b_end,
 				      int_t pos, puf &uf) {
 	if (*a == a_end) {
@@ -276,7 +276,7 @@ void PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
 			pos = *b;
 		}
-		return;
+		return 0;
 	} else if (*b == b_end) {
 		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
 		pos = *a;
@@ -286,42 +286,51 @@ void PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 		}
 		//Correcting end value of chain
 		uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, b_end);
-		return;
+		return 0;
 	}
 
 	if (abs_cmp(*a, *b)) {
 		if(pos == 0) {
 			pos = *a;
-			SortedMerge(++a,b,a_end,b_end,pos,uf);
+			return SortedMerge(++a,b,a_end,b_end,pos,uf);
 		} else {
 			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *a);
 			pos = *a;
-			SortedMerge(++a,b,a_end,b_end,pos,uf);
+			return SortedMerge(++a,b,a_end,b_end,pos,uf);
 		}
 	} else {
 		if(pos == 0) {
 			pos = *b;
 			SortedMerge(a,++b,a_end,b_end,pos,uf);
+			// Start position changed
+			return pos;
 		} else {
 			uf.link_pt = p_arr::set(puf::link_s, uf.link_pt, pos, *b);
 			pos = *b;
-			SortedMerge(a,++b,a_end,b_end,pos,uf);
+			return SortedMerge(a,++b,a_end,b_end,pos,uf);
 		}
 	}
 }
 
 //TODO: Take care of negated/unnegated in resulting ordering
-void PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end,
+int_t PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end,
 				     puf &uf) {
-	if (start == end) return;
+	if (start == end) return 0;
 
 	pu_iterator mid(HalfList(start, end));
-	if (mid == start) return;
+	if (mid == start) return 0;
 
-	MergeSort(start, mid, uf);
-	MergeSort(mid, end, uf);
+	int_t mid_val = *mid;
+	if(int_t i = MergeSort(start, mid, uf); i > 0) {
+		//update start position
+		start.update_pos(i);
+	}
+	if(int_t i = MergeSort(mid, end, uf); i > 0) {
+		//update start position
+		mid.update_pos(i);
+	}
 
-	SortedMerge(start, mid, *mid, *end, 0, uf);
+	return SortedMerge(start, mid, mid_val, *end, 0, uf);
 }
 
 //Testing function
