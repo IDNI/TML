@@ -119,9 +119,6 @@ private:
 	lit get_nt(const item& i) const { return G[i.prod][0]; }
 	bool all_nulls(const std::vector<lit>& p) const;
 	ostream& print(ostream& os, const item& i) const;
-	typename std::set<item>::iterator add(std::set<item>& t, const item& i);
-	void complete(const item& i, std::set<item>& t);
-	void predict(const item& i, std::set<item>& t);
 	void scan(const item& i, size_t n, CharT ch);
 	void scan_builtin(const item& i, size_t n, const string& s);
 	bool nullable(const item& i) const {
@@ -131,7 +128,6 @@ private:
 			nullables.end()) ||
 			(!get_lit(i).nt() && get_lit(i).c() == '\0'));
 	}
-	std::set<item> S;
 
 	struct {
 		std::map<string, size_t> m;
@@ -238,6 +234,15 @@ private:
 			h ^= hash_size_t(size_t(k.l.nt()?k.l.n():k.c()));
 			return h;
 		}
+		size_t operator()(const item &k) const {
+			// lets substitute with better if possible.
+			std::size_t h = 0;
+			h ^= hash_size_t(k.set);
+			h ^= hash_size_t(k.from);
+			h ^= hash_size_t(k.prod);
+			h ^= hash_size_t(k.dot);
+			return h;
+		}
 	};
 	//std::unordered_map< size_t, 
 	//	std::unordered_map<size_t, std::vector<item>>>  sorted_citem;
@@ -270,6 +275,13 @@ private:
 	std::string to_tml_rule(const nidx_t nd) const;
 	template <typename CharU>
 	friend int test_out(int c, earley<CharU> &e);
+	typedef std::unordered_set<earley<CharT>::item, earley<CharT>::hasher_t> container_t;
+	typedef container_t::iterator container_iter;
+	std::vector<container_t> S;
+	container_iter add(container_t& t, const item& i);
+	void complete(const item& i, container_t& t);
+	void predict(const item& i, container_t& t);
+
 
 	struct overlay_tree {
 		std::vector<int> choices;

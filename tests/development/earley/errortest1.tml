@@ -13,5 +13,5 @@
 start => '+' start | start '+' start | start '+' | '1' .
 #start => start '+' start | '2'.
 
-#!start(0 5).
+!start(0 5).
 !node(?x "start" 0 5).

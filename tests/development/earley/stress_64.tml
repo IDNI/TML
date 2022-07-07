@@ -1,0 +1,11 @@
+@string str "abcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefgh".
+start => A B C D E F G H A B C D E F G H start | null.
+
+A => 'a'| A | null.
+B => 'b'| B | null.
+C => 'c'| C | null.
+D => 'd'| D | null.
+E => 'e'| E | null.
+F => 'f'| F | null.
+G => 'g'| G | null.
+H => 'h'| H | null.

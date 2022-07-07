@@ -228,12 +228,12 @@ typename earley<CharT>::ostream& earley<CharT>::print(
 }
 
 template <typename CharT>
-typename set<typename earley<CharT>::item>::iterator earley<CharT>::add(
-	set<item>& t, const item& i)
-{
+earley<CharT>::container_iter earley<CharT>::add(container_t& t, 
+		const item& i) {
 	//DBG(print(o::dbg() << "adding ", i) << endl;)
-	auto it = S.find(i);
-	if (it != S.end()) return it;
+	auto& cont = S[i.set];
+	auto it = cont.find(i);
+	if (it != cont.end()) return it;
 	if ((it = t.find(i)) != t.end()) return it;
 	it = t.insert(i).first;
 	if (nullable(*it))
@@ -243,10 +243,10 @@ typename set<typename earley<CharT>::item>::iterator earley<CharT>::add(
 }
 
 template <typename CharT>
-void earley<CharT>::complete(const item& i, set<item>& t) {
+void earley<CharT>::complete(const item& i, container_t& t) {
 	//DBG(print(o::dbg() << "completing ", i) << endl;)
-	for (auto it = S.lower_bound(item(i.from, 0, 0, 0));
-		it != S.end() && it->set == i.from; ++it)
+	const container_t& cont = S[i.from];
+	for (auto it = cont.begin(); it != cont.end(); ++it)
 		if (G[it->prod].size() > it->dot &&
 			get_lit(*it) == get_nt(i))
 			add(t, item(i.set, it->prod, it->from, it->dot + 1));
@@ -254,7 +254,7 @@ void earley<CharT>::complete(const item& i, set<item>& t) {
 }
 
 template <typename CharT>
-void earley<CharT>::predict(const item& i, set<item>& t) {
+void earley<CharT>::predict(const item& i, container_t& t) {
 	//DBG(print(o::dbg() << "predicting ", i) << endl;)
 	for (size_t p : nts[get_lit(i)]) {
 		item j(i.set, p, i.set, 1);
@@ -278,16 +278,16 @@ void earley<CharT>::scan_builtin(const item& i, size_t n, const string& s) {
 		builtin_char_prod[bid][ch] = p; // store prod of this ch
 	} else p = it->second; // this ch has its prod already
 	item j(n + !eof, i.prod, n, 2); // complete builtin
-	S.insert(j);
+	S[j.set].insert(j);
 	item k(n + !eof, p, n, 2);      // complete builtin's character
-	S.insert(k);
+	S[k.set].insert(k);
 }
 
 template <typename CharT>
 void earley<CharT>::scan(const item& i, size_t n, CharT ch) {
 	if (ch != get_lit(i).c()) return;
 	item j(n + 1, i.prod, i.from, i.dot + 1);
-	S.insert(j);
+	S[j.set].insert(j);
 	//first->advancers.insert(i);
 	//DBG(print(o::dbg(), i) << ' ';)
 	//DBG(print(o::dbg() << "scanned " << ch << " and added ", j) << "\n";)
@@ -310,13 +310,15 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 	bin_tnt.clear();
 	tid = 0;
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
+	S.resize(len+1);
 	for (size_t n : nts[start]) {
-		auto it = S.emplace(0, n, 0, 1).first;
+		auto& cont = S[0];
+		auto it = cont.emplace(0, n, 0, 1).first;
 		// fix the bug for missing Start( 0 0) when start is nulllable
 		if(nullable(*it))
-			S.emplace(0, n, 0, 2);
+			cont.emplace(0, n, 0, 2);
 	}
-	set<item> t;
+	container_t t;
 #ifdef DEBUG
 	size_t r = 1, cb = 0; // row and cel beginning
 #endif
@@ -326,10 +328,11 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 		emeasure_time_start(tsp, tep);
 #endif
 		do {
-			S.insert(t.begin(), t.end());
+			for(const item &x : t) S[x.set].insert(x);
 			t.clear();
-			for (	auto it = S.lower_bound(item(n, 0, 0, 0));
-				it != S.end() && it->set == n; ++it) {
+			const auto& cont = S[n];
+			for (auto it = cont.begin();
+				it != cont.end(); ++it) {
 				//DBG(print(o::dbg() << "processing ", *it) << endl;)
 				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).is_builtin()) {
@@ -358,16 +361,15 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 */
 		if (true == incr_gen_forest) {
 		DBG(o::dbg() << "set: " << n << endl;)
-		for (auto it = S.lower_bound(item(n, 0, 0, 0));
-			it != S.end() && it->set == n; ++it) 
+		const auto& cont = S[n];
+		for (auto it = cont.begin(); it != cont.end(); ++it)
 			if(completed(*it)) pre_process(*it);
 			
-		for (auto it = S.lower_bound(item(n, 0, 0, 0));
-			it != S.end() && it->set == n; ++it)
+		for (auto it = cont.begin(); it != cont.end(); ++it)
 			if (completed(*it)) { 
-				DBG(o::dbg() << endl << it->from << it->set <<
-					it->prod << it->dot << endl);
-				nidx_t curroot(get_nt(*it), {it->from,it->set});
+				DBG(o::dbg()<<endl<< it->from <<it->set << 
+					it->prod << it->dot <<endl);				
+				nidx_t curroot(get_nt(*it), {it->from, it->set});
 				build_forest(curroot);
 				//to_tml_rule(o::to("parser-to-rules"));
 			}
@@ -375,7 +377,7 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 	}
 	bool found = false;
 	for (size_t n : nts[start])
-		if (S.find(item(len, n, 0, G[n].size())) != S.end())
+		if (S[len].find( item(len, n, 0, G[n].size())) != S[len].end()) 
 			found = true;
 	emeasure_time_end(tsr, ter) <<" :: recognize time" <<endl;
 	if(!incr_gen_forest) forest();
@@ -807,10 +809,12 @@ bool earley<CharT>::forest() {
 	// preprocess earley items for faster retrieval
 	emeasure_time_start(tspfo, tepfo);
 	int count = 0;
-	for (const item& i : S) { 
-		count++;
-		pre_process(i);
-	}
+
+	for(size_t n=0; n<len+1 ; n++)
+		for (const item& i : S[n]) {
+			count++;
+			pre_process(i);
+		}
 
 	emeasure_time_end(tspfo, tepfo) << " :: preprocess time ," <<
 						"size : "<< count << "\n";
