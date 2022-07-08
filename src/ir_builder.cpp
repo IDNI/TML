@@ -14,6 +14,8 @@
 #include <vector>
 #include <regex>
 #include <variant>
+#include <math.h>
+
 #include "ir_builder.h"
 #include "tables.h"
 using namespace std;
@@ -34,77 +36,75 @@ void align_vars(vector<term>& v) {
 
 #ifdef TYPE_RESOLUTION
 
-void ir_builder::set_vartypes(int_t i, ints &mp, rr_varmap &v, raw_rule &auxr) {
-	ints tix;
-	tml_natives var_types;
-	int_t d = i;
-	for (size_t k = 0; k != v.size(); k++) {
-		tix.push_back(d % mp[k]);
-		d = d / mp[k];
-	}
-
-	//decompress, select ith, and fill var_types
-	int_t a = 0;
-	for (auto &var: v) {
-		int_t len = 1;
-		int_t bits = 2;
-		int_t var_idx = tix[a];
-		vector<term> *r = &var.second[0].c;
-		if (r->size() == 0) { //decompress only once
-			allsat_cb(var.second[0].types, len * bits,
-					[r, bits, len, this](const bools& p, bdd_ref ) {
-				term t(false, term::REL, NOP, 0, ints(len, 0), 0);
-				for (int_t n = 0; n != len; ++n)
-					for (int_t k = 0; k != bits; ++k)
-						if (p[dynenv->pos(k, n, len)])
-							t[n] |= 1 << k;
-				r->insert(r->begin(),t);
-			})();
+bool ir_builder::append(std::map<int_t, std::vector<tml_natives>> &m, sig &s) {
+	auto it = m.find(s.first);
+	if (it != m.end()) {
+		auto it2 = find(it->second.begin(), it->second.end(), s.second);
+		if (it2 == it->second.end()) {
+			it->second.push_back(s.second);	return true;
 		}
-
-		tml_native_t t; //term2tml_native(r[var_id]);
-		if (var.second[0].c[var_idx][0] == POLY) return;//only required for goals
-		assert(var.second[0].c[var_idx][0] <= 2);
-		t.type = (native_type) var.second[0].c[var_idx][0];
-		a++;
-
-		for (auto &vi : var.second) {
-			for (auto &vii : vi.inst.positions) {
-				if (vi.inst.rt_idx == 0)
-					auxr.h[0].s.second[vii] = t;
-				else
-					auxr.b[0][vi.inst.rt_idx-1].s.second[vii] = t;
+		#ifdef BIT_TRANSFORM_V2
+		else {
+			int_t i = 0;
+			for ( auto &j : *it2 ) {
+				j.bit_w = max(j.bit_w,s.second[i].bit_w);
+				++i;
 			}
 		}
+		#endif
 	}
-	//free_vars ?
+	else {
+		m.insert({s.first, {s.second}}); return true;
+	}
+	return false;
+}
+
+void rt_vartypes::append(const tml_native_t &ts) {
+	auto it = find(types.begin(), types.end(), ts);
+	if (it == types.end()) types.push_back(ts);
+	#ifdef BIT_TRANSFORM_V2
+	else types[it-types.begin()].bit_w = min(types[it-types.begin()].bit_w,ts.bit_w);
+	#endif
+}
+
+void ir_builder::set_vartypes(int_t i, ints &mp, rr_varmap &v, raw_rule &auxr) {
+	ints tix;
+	for (size_t k = 0; k != v.size(); k++) {
+		tix.push_back(i % mp[k]);
+		i = i / mp[k];
+	}
+	//select ith, and fill var_types
+	int_t a = 0;
+	for (auto &var: v) {
+		tml_native_t t = var.second[0].types[tix[a]];
+		a++;
+
+		if (t.type == POLY) return;//only required for goals
+		DBG(assert(t.type <= 2););
+
+		for (auto &vi : var.second)
+			for (auto &vii : vi.positions)
+				if (vi.rt_idx == 0) auxr.h[0].s.second[vii] = t;
+				else auxr.b[0][vi.rt_idx-1].s.second[vii] = t;
+	}
+	//TODO: further review free vars
 }
 
 void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 	assert(t.e.size()==3);
-
 	sig s = get_sig_eq(t);
 	if (s.second[0].type != POLY || s.second[1].type != POLY) {
 		int_t k = s.second[0].type != POLY ? 0 : 1;
 		int_t h = k == 0 ? 2 : 0;
-		rt_var_inst aux0 = {idx,{}};
-		rt_vartypes aux(aux0,hfalse);
-		term f;
-		assert(s.second[k].type <= 2);
-		f.push_back(s.second[k].type);
-		aux.types = dynenv->from_fact(f);
+		rt_vartypes aux(idx);
+		DBG(assert(s.second[k].type <= 2););
+		aux.append(s.second[k]);
 		int_t id = dict.get_var(t.e[h].e);
 		vars[id].push_back(aux);
 	}
 	else {
-		rt_var_inst aux0 = {idx,{}};
-		rt_vartypes aux(aux0,hfalse);
-		for (auto &i : {UINT,UCHAR,SYMB}) {
-			term f;
-			f.push_back(i);
-			aux.types = aux.types || dynenv->from_fact(f);
-		}
-
+		rt_vartypes aux(idx);
+		for (auto &i : {SYMB,UINT,UCHAR}) aux.append({i,-1});
 		vars[dict.get_var(t.e[0].e)].push_back(aux);
 		//v[dict.get_var(rt.e[0].e)][0].positions
 		vars[dict.get_var(t.e[2].e)].push_back(aux);
@@ -116,48 +116,33 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 void ir_builder::get_vars_leq(const raw_term&t, int_t idx, rr_varmap& vars) {
 	assert(t.e.size()==3);
 	ints tl = {0,2};
-	for (auto &i : tl) {
-		//int_t pos = i == 0 ? i : i-1;
+	for (auto &i : tl)
 		if (t.e[i].type == elem::VAR) {
 			int_t id = dict.get_var(t.e[i].e);
-			auto it = find(vars[id].begin(), vars[id].end(), idx);
-			if (it != vars[id].end())
-				//assert types is UINT
-				//it->inst.positions.push_back(pos); //no required
-				;
-			else {
-				rt_var_inst aux0 = {idx,{}};
-				rt_vartypes aux(aux0,hfalse);
-				term f; f.push_back(UINT);
-				aux.types = dynenv->from_fact(f);
+			if (find(vars[id].begin(), vars[id].end(), idx) == vars[id].end()) {
+				rt_vartypes aux(idx);
+				aux.append({UINT,-1});
 				vars[id].push_back(aux);
 			}
 		}
 		//TODO: assert that non var elem is indeed a NUM
-	}
 }
 
 void ir_builder::get_vars_arith(const raw_term&t, int_t idx, rr_varmap& vars) {
 	assert(t.e.size()==5 || t.e.size()==6);
 	ints tl = {0,2,4};
+
 	if (t.e.size()==6) tl.push_back(5);
-	for (auto &i : tl) {
+	for (auto &i : tl)
 		if (t.e[i].type == elem::VAR) {
 			int_t id = dict.get_var(t.e[i].e);
-			auto it = find(vars[id].begin(), vars[id].end(), idx);
-			if (it != vars[id].end())
-				//assert types is UINT
-				;
-			else {
-				rt_var_inst aux0 = {idx,{}};
-				rt_vartypes aux(aux0,hfalse);
-				term f; f.push_back(UINT);
-				aux.types = dynenv->from_fact(f);
+			if (find(vars[id].begin(), vars[id].end(), idx) == vars[id].end()) {
+				rt_vartypes aux(idx);
+				aux.append({UINT,-1});
 				vars[id].push_back(aux);
 			}
 		}
 		//TODO: assert that non var elem is indeed a NUM
-	}
 }
 
 void ir_builder::get_vars_bltin(const raw_term&t, int_t idx, rr_varmap& vars) {
@@ -167,24 +152,17 @@ void ir_builder::get_vars_bltin(const raw_term&t, int_t idx, rr_varmap& vars) {
 			int_t id = dict.get_var(t.e[i].e);
 			auto it = find(vars[id].begin(), vars[id].end(), idx);
 			if (it != vars[id].end())
-				it->inst.positions.push_back(i);
+				it->positions.push_back(i);
 			else {
 				if (t.e[0].e == "pw_add" || t.e[0].e == "pw_mult" || t.e[0].e == "bw_xor" ||
 						(t.e[0].e == "count" && i == (int_t) t.e.size()-2) ) {
-					rt_var_inst aux0 = {idx,{i-2}};
-					rt_vartypes aux(aux0,hfalse);
-					term f; f.push_back(UINT);
-					aux.types = dynenv->from_fact(f);
+					rt_vartypes aux(idx, {i-2});
+					aux.append({UINT,-1});
 					vars[id].push_back(aux);
 				}
 				else {
-					rt_var_inst aux0 = {idx,{i-2}};
-					rt_vartypes aux(aux0,hfalse);
-					for (auto &j : {UINT, UCHAR, SYMB}) {
-						term f;
-						f.push_back(j);
-						aux.types = aux.types || dynenv->from_fact(f);
-					}
+					rt_vartypes aux(idx, {i-2});
+					for (auto &i : {SYMB,UINT,UCHAR}) aux.append({i,-1});
 					vars[id].push_back(aux);
 				}
 			}
@@ -199,10 +177,9 @@ void ir_builder::get_vars_rel(const raw_term&t, int_t idx, rr_varmap& vars) {
 		if (t.e[i].type == elem::VAR) { //could be based on t.s[i] == POLY
 			int_t id = dict.get_var(t.e[i].e);
 			auto it = find(vars[id].begin(), vars[id].end(), idx);
-			if (it != vars[id].end()) it->inst.positions.push_back(i-2);
+			if (it != vars[id].end()) it->positions.push_back(i-2);
 			else {
-				rt_var_inst aux0 = {idx,{i-2}};
-				rt_vartypes aux(aux0,hfalse);
+				rt_vartypes aux(idx,{i-2});
 				vars[id].push_back(aux);
 			}
 		}
@@ -231,11 +208,14 @@ void ir_builder::type_resolve_facts(vector<raw_rule> &rp) {
 	for (auto itr = rp.begin(); itr != rp.end();) {
 		if (!itr->b.empty()) {++itr; continue; }
 		if (itr->type == raw_rule::GOAL) {++itr; continue; }
-
 		//head bltins handled here as well
 		sig s = get_sig(*itr->h.begin());
-		//assert(it = relid_argtypes_map.find(s.first) != relid_argtypes_map.end());
-		//assert(find(it->second.begin(), it->second.end(), s.second) != it->second.end());
+		#ifdef BIT_TRANSFORM_V2
+		append(relid_argtypes_map,s);
+		auto it = relid_argtypes_map.find(s.first);
+		auto it2 = find(it->second.begin(), it->second.end(), s.second);
+		itr->h.front().s = {s.first, *it2};
+		#endif
 		++itr;
 	}
 }
@@ -245,8 +225,7 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 	for (auto &rtv : r.b) for (auto &rt : rtv) {
 		sig s;
 		if (rt.extype == raw_term::BLTIN) {
-			s = get_sig_bltin(rt);
-			++i; continue;
+			s = get_sig_bltin(rt); ++i; continue;
 		}
 		else if (rt.extype != raw_term::REL) {
 			++i; continue;
@@ -260,25 +239,38 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 					//COUT << "body matched" << endl;
 					//TODO: simplify / improve this matching
 					for (auto &var : v) for (auto &vt : var.second)
-						if (vt.inst.rt_idx == i) {
-							native_type ts = UNDEF;
+						if (vt.rt_idx == i) {
+							tml_native_t ts;
 							bool vld = true;
-							for (auto j: vt.inst.positions) {
+							for (auto j: vt.positions) {
 								assert(rel_sig[j].type == UINT || rel_sig[j].type == SYMB || rel_sig[j].type == UCHAR);
-								if (ts == UNDEF) ts = rel_sig[j].type;
-								if (!(ts == rel_sig[j].type)) {vld = false; break;}
+								if (ts.type == UNDEF) {
+									ts = rel_sig[j];
+								}
+								if (!(ts == rel_sig[j])) {vld = false; break;}
 							}
-							if (vld) {
-								term f;
-								assert(ts <= 2);
-								f.push_back(ts);
-								vt.types = vt.types || dynenv->from_fact(f);
-							}
+							if (vld) vt.append(ts);
 						}
 				}
 			++i;
 		}
 	}
+}
+
+void intersect_varmaps(tml_natives &v0, tml_natives &v1, tml_natives &v2) {
+	sort(v0.begin(), v0.end());
+	sort(v1.begin(), v1.end());
+	auto it0 = v0.begin();
+	auto it1 = v1.begin();
+	while (it0!= v0.end() && it1!= v1.end())
+		if (it0->type < it1->type) ++it0;
+		else if (it1->type < it0->type) ++it1;
+		else {
+			if (it0->bit_w == -1) v2.push_back(*it1);
+			else if (it1->bit_w == -1) v2.push_back(*it0);
+			else v2.push_back(it0->bit_w < it1->bit_w ? *it0 : *it1);
+			++it0; ++it1;
+		}
 }
 
 void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
@@ -299,19 +291,20 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			sig sh = get_sig(*it->h.begin());
 			v = get_vars(*it);
 			if ((*it->h.begin()).extype == raw_term::BLTIN) assert(false);
-			//free_vars: detected only at bodies, for cons/bltinsTBD
+			//free_vars: detected only at bodies, for cons/bltins TBD
 		}
 
 		type_resolve_bodies(*it, v);
 
+		//---------------------------------------------------------------------
 		//reorder negated terms to end of bodies vector as required by *TR001*
 		//for (auto &var : v) {
 		for (auto itv = v.begin(); itv != v.end(); itv++) {
 			int_t bound = itv->second.size();
 			for (int_t k = 0; k < bound; k++) {
-				if ((itv->second[k].inst.rt_idx != 0) &&
-					(it->b[0][itv->second[k].inst.rt_idx-1].neg)) {
-					while (it->b[0][itv->second[bound-1].inst.rt_idx-1].neg && k < bound)
+				if ((itv->second[k].rt_idx != 0) &&
+					(it->b[0][itv->second[k].rt_idx-1].neg)) {
+					while (it->b[0][itv->second[bound-1].rt_idx-1].neg && k < bound)
 						bound--;
 					if (k < bound)
 						swap(itv->second[k], itv->second[bound-1]);
@@ -319,42 +312,40 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			}
 		}
 
+		//---------------------------------------------------------------------
 		//rule context: set head and free var vts
 		DBG(COUT << "match types ..." << endl;);
-		spbdd_handle *ptr = 0;
+		tml_natives *ptr = 0;
 		for (auto &var : v) {
 			for (auto &vt : var.second) {
-				if (vt.inst.rt_idx == 0) {//is_head
-					vt.types = htrue;
+				if (vt.rt_idx == 0) {//is_head
+					vt.types = {{SYMB,-1},{UINT,-1},{UCHAR,-1}};
 					ptr = &vt.types;
 				}
 				else if (ptr != 0) {
-					spbdd_handle aux = *ptr && vt.types;
-					//::out(COUT, aux) << endl;;
-					//*TR001*: avoid type mismatch due to negated body
-					if (!(it->b[0][vt.inst.rt_idx-1].neg && aux == hfalse)) {
+					tml_natives aux;
+					intersect_varmaps(ptr[0], vt.types, aux);
+					if (!(it->b[0][vt.rt_idx-1].neg && aux.size() == 0))
 						*ptr = aux;
-					}
 				}
 				else { //is_free
 					//TODO: test polyms of free var between multiple bodies
 					;
 				}
 			}
-			//::out(COUT, *ptr);
 		}
 
+		//---------------------------------------------------------------------
 		DBG(COUT << "starting rule replacement ... " << endl;);
 		int_t mpn = 0;
 		ints mp;
 		for (auto &var : v) {
-			int_t vl = satcount(var.second[0].types,2); //types.size()
-			vl = vl > 3 ? 3 : vl;
+			int_t vl = var.second[0].types.size();
 			mpn = mpn == 0 ? vl : mpn * vl;
 			mp.push_back(vl);
 		}
-
 		if (v.size() == 0) {it++;continue;}
+
 		if (mpn == 0) {
 			COUT << "WARNING: removing rule due to invalid types" << endl; //add lineno
 			const raw_rule aux = *it;
@@ -362,45 +353,37 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			continue;
 		}
 
-		const raw_rule aux = *it;
+		raw_rule aux = *it;
 		it = rp.erase(it);
-
 		for (int_t i = 0; i < mpn; ++i) {
-			raw_rule auxr = aux;
-			set_vartypes(i, mp, v, auxr);
-			it = rp.insert(it, auxr);
+			set_vartypes(i, mp, v, aux);
+			it = rp.insert(it, aux);
 			it++;
-			sig s = auxr.h[0].s;
-
+			sig s = aux.h[0].s;
 			auto it = relid_argtypes_map.find(s.first);
-			if (it != relid_argtypes_map.end()) {
-				//TODO: add some monitor here for POLY?
-				if (find(it->second.begin(), it->second.end(), s.second) == it->second.end())
-					it->second.push_back(s.second);
+			if (it == relid_argtypes_map.end())
+				relid_argtypes_map.insert({s.first, {s.second}});
+			else {
+				auto it2 = find(it->second.begin(), it->second.end(), s.second);
+				//single step bitwidth inference - just proof of concept
+				if (it2 != it->second.end()) append(relid_argtypes_map, s);
+				else assert(false);
 			}
-			else relid_argtypes_map.insert({s.first, {s.second}});
 		}
-		if (mpn == 0) it++;
 	}
 }
 
 void ir_builder::type_resolve(raw_prog &rp) {
-	//setting universe size due usage of bdd data structure to operate with sets of types
-	dynenv->bits = 2;
 	type_resolve_facts(rp.r);
 	type_resolve_rules(rp.r);
-	dynenv->bits = 0;
 }
 
 sig ir_builder::to_native_sig(const term& e) {
-
 	tml_natives tn(e.size(), {native_type::UNDEF,-1});
-
-	for (size_t i = 0; i != e.size(); ++i) {
+	for (size_t i = 0; i != e.size(); ++i)
 		if (e[i] <= 2) tn[i].type = (native_type) e[i];
 		else if (e[i] == 3) ; //leave it UNDEF
 		else assert(false);
-	}
 	int_t tab_id = dynenv->tbls[e.tab].s.first;
 	sig s = {tab_id, tn};
 	return s;
@@ -438,7 +421,7 @@ void reencode_eqleq(raw_term *rt, tml_natives &t) {
 		default : assert(false);
 	}
 }
-
+//TODO: improve code below
 raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 
 	raw_prog tr(dict);
@@ -470,7 +453,6 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 		}
 		else {
 			if (rth->neg) {itr++; continue;}
-
 			reencode_rel(rth, sh.second);
 			vector<native_type> tys((int_t) sig_len(sh), UINT);
 			sig st = get_sig_typed(sh.first, tys);
@@ -555,23 +537,30 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 	return tr;
 }
 
+void raw2natives(const ints &tl, const raw_term &t, tml_natives &tn) {
+	tn.resize(tl.size(), {native_type::UNDEF,-1});
+	int_t j = 0;
+	for (auto &i : tl) {
+		switch (t.e[i].type) {
+			case elem::STR:
+			case elem::SYM:	tn[j].type = native_type::SYMB; break;
+			case elem::NUM:	tn[j].type = native_type::UINT ; break;
+			case elem::CHR: tn[j].type = native_type::UCHAR; break;
+			case elem::VAR: tn[j].type = native_type::POLY; break;
+			default : assert(false);
+		}
+		++j;
+	}
+}
 sig ir_builder::get_sig_bltin(raw_term&t) {
 	if (t.s.second.size()) return t.s;
 	int_t id = dict.get_bltin(t.e[0].e);
-	size_t tl = (t.e.size() == 1) ? 0 : t.e.size()-2;
-	tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
-	for (size_t i = 2; i <= tl; ++i)
-		switch (t.e[i].type) {
-			case elem::STR:
-			case elem::SYM:	tn[i-2].type = native_type::SYMB; break;
-			case elem::NUM:	tn[i-2].type = native_type::UINT ; break;
-			case elem::CHR: tn[i-2].type = native_type::UCHAR; break;
-			case elem::VAR: tn[i-2].type = native_type::POLY; break;
-			default : assert(false);
-		}
+	ints tl;
+	for (size_t i = 2; i < t.e.size()-1; i++) tl.push_back(i);
+	tml_natives tn;
+	raw2natives(tl, t,tn);
 	t.s = {id, tn};
 	return t.s;
-
 	/*if (is_head) {
 		assert(dynenv->bltins[id].has_head);
 		return dynenv->bltins[id].head.sig;
@@ -580,96 +569,106 @@ sig ir_builder::get_sig_bltin(raw_term&t) {
 		return dynenv->bltins[id].body.sig;
 	}*/
 }
-
 sig ir_builder::get_sig_arith(const raw_term&t) {
-
-	int_t table_name_id = dict.get_rel(dict.get_lexeme("ARITH"));
-	assert(t.e.size()==5 || t.e.size()==6);
+	int_t id = dict.get_rel(dict.get_lexeme("ARITH"));
+	DBG(assert(t.e.size()==5 || t.e.size()==6));
 	ints tl = {0,2,4};
 	if (t.e.size()==6) tl.push_back(5);
+	//assert(t.arity[0] == tl.size());
 	tml_natives tn;
-	for (auto &i : tl) {
-		switch (t.e[i].type) {
-			case elem::STR:
-			case elem::SYM:	tn.push_back({native_type::SYMB,-1}); break;
-			case elem::NUM:	tn.push_back({native_type::UINT,-1}); break;
-			case elem::CHR: tn.push_back({native_type::UCHAR,-1}); break;
-			case elem::VAR: tn.push_back({native_type::POLY,-1}); break;
-			default : assert(false);
-		}
-	}
-	return {table_name_id , tn};
+	raw2natives(tl,t,tn);
+	return {id, tn};
 }
-
 sig ir_builder::get_sig_eq(const raw_term&t) {
-	//if (t.s.second.size()) return t.s;
-	int_t table_name_id = dict.get_rel(dict.get_lexeme("EQ"));
+	int_t id = dict.get_rel(dict.get_lexeme("EQ"));
 	ints tl = {0,2};
 	tml_natives tn;
-	for (auto &i : tl) {
-		switch (t.e[i].type) {
-			case elem::STR:
-			case elem::SYM:	tn.push_back({native_type::SYMB,-1}); break;
-			case elem::NUM:	tn.push_back({native_type::UINT,-1}); break;
-			case elem::CHR: tn.push_back({native_type::UCHAR,-1}); break;
-			case elem::VAR: tn.push_back({native_type::POLY,-1}); break;
-			default : assert(false);
-		}
-	}
-	//t.s = {table_name_id , tn};
-	return {table_name_id , tn};
+	raw2natives(tl, t, tn);
+	return {id, tn};
 }
-
 sig ir_builder::get_sig_typed(const lexeme& rel, vector<native_type> tys) {
-	int_t table_name_id = dict.get_rel(rel);
+	int_t rel_id = dict.get_rel(rel);
 	tml_natives tn;
-	for (auto &t : tys)
-		tn.push_back({t,-1});
-	return {table_name_id, tn};
-}
-
-sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
-	tml_natives tn;
-	for (auto &t : tys)
-		tn.push_back({t,-1});
+	for (auto &t : tys) tn.push_back({t,-1});
 	return {rel_id, tn};
 }
+sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
+	tml_natives tn;
+	for (auto &t : tys) tn.push_back({t,-1});
+	return {rel_id, tn};
+}
+
+
 #endif //TYPE_RESOLUTION
 
-sig ir_builder::get_sig(raw_term&t) {
-	int_t table_name_id = dict.get_rel(t.e[0].e);
 #ifdef TML_NATIVES
-	assert(t.arity.size() == 1);
-	if (t.s.second.size()) return t.s;
-	tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
+sig ir_builder::get_sig(raw_term &t) {
+	if (t.s.second.size()) {
+		#ifdef BIT_TRANSFORM_V2
+		if (opts.binarize) {
+			auto it = relid_argtypes_map.find(t.s.first);
+			auto it2 = find(it->second.begin(), it->second.end(), t.s.second);
+			return {t.s.first, *it2};
+		} else return t.s;
+		#else
+		return t.s;
+		#endif
+	}
+
+	int_t rel_id = dict.get_rel(t.e[0].e);
+	DBG(assert(t.arity.size() == 1 || !opts.binarize));
 #ifdef TYPE_RESOLUTION
-	size_t tl = (t.e.size() == 1) ? 0 : t.e.size()-2;
-	//TODO: fill bitwidth
-	for (size_t i = 2; i <= tl; ++i)
+	ints tl;
+	for (size_t i = 2; i < t.e.size()-1; i++) tl.push_back(i);
+	tml_natives tn;
+	raw2natives(tl, t, tn);
+
+	#ifdef BIT_TRANSFORM_V2
+	for (auto &i : tl)
 		switch (t.e[i].type) {
 			case elem::STR:
-			case elem::SYM:	tn[i-2].type = native_type::SYMB; break;
-			case elem::NUM:	tn[i-2].type = native_type::UINT ; break;
-			case elem::CHR: tn[i-2].type = native_type::UCHAR; break;
-			case elem::VAR: tn[i-2].type = native_type::POLY; break;
+			case elem::SYM: {
+				int_t num = dict.get_sym(t.e[i].e); //TODO: symb at this point should not require new access to dict
+				tn[i-2].bit_w = floor(num != 0 ? log2(num) : 0) + 1; break;
+			}
+			case elem::NUM:	tn[i-2].bit_w = floor(t.e[i].num != 0 ? log2(t.e[i].num) : 0) + 1; break;
+			case elem::CHR: tn[i-2].bit_w = sizeof(char32_t); break; //TODO: REVIEW
+			case elem::VAR: break;
 			default : assert(false);
 		}
-#endif
-	t.s = {table_name_id , tn};
-	return t.s;
+	#endif
 #else
-	return {table_name_id , t.arity};
+	tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
+#endif
+	t.s = {rel_id , tn};
+	return t.s;
+}
+#endif
+
+sig ir_builder::get_sig(const raw_term&t) {
+#ifdef TML_NATIVES
+	#ifdef TYPE_RESOLUTION
+		raw_term aux = t; //TODO: avoid workaround
+		return get_sig(aux);
+	#else
+		int_t rel_id = dict.get_rel(t.e[0].e);
+		tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
+		return {rel_id , tn};
+	#endif
+#else
+	int_t rel_id = dict.get_rel(t.e[0].e);
+	return {rel_id , t.arity};
 #endif
 }
 
 sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
-	int_t table_name_id = dict.get_rel(rel);
+	int_t rel_id = dict.get_rel(rel);
 #ifdef TML_NATIVES
-	assert(arity.size() == 1);
+	DBG(assert(arity.size() == 1));
 	tml_natives tn(arity[0], {native_type::UNDEF,-1});
-	return {table_name_id, tn};
+	return {rel_id, tn};
 #else
-	return {table_name_id, arity};
+	return {rel_id, arity};
 #endif
 }
 
@@ -692,6 +691,55 @@ size_t ir_builder::sig_len(const sig& s) const {
 #endif
 }
 
+#if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
+
+int_t inc_pos_bt (tml_natives &rts, int_t i, int_t j) {
+    int_t inc = 0;
+    for (int_t k = 0; k < (int_t) rts.size(); k++)
+		if (j < rts[k].bit_w) inc++;
+		else if ((i < k) && (j-1 < rts[k].bit_w)) inc++;
+	return inc;
+}
+
+void ir_builder::bit_transform(tml_natives &ts, tml_natives &rts, ints &t, ints &bt) {
+	int_t bw = 0;
+	for (auto &i: ts) bw += i.bit_w;
+	bt.resize(bw);
+	for (int_t i = 0; i < (int_t) t.size(); ++i) {
+		int_t offset = i;
+		if (t[i] < 0) {
+			int_t e = floor(log10(rts[i].bit_w));
+			int_t scl = pow(10,e);
+			for (int_t j = 0; j < ts[i].bit_w; ++j) {
+				if (j < rts[i].bit_w)
+					bt[offset] = -(-t[i] * scl + j);
+				else bt[offset] = 0;
+				offset += inc_pos_bt(ts,i,j+1);
+			}
+		}
+		else
+			for (int_t j = 0; j < ts[i].bit_w; ++j) {
+				bt[offset] = (t[i] & (1 << j)) == 0 ? 0 : 1;
+				offset += inc_pos_bt(ts,i,j+1);
+			}
+	}
+}
+
+void ir_builder::bit_transform_inv(tml_natives &ts, const ints &bt, ints &t) {
+	t.resize(ts.size());
+	for (int_t i = 0; i <  (int_t) t.size(); ++i) {
+		int_t offset = i;
+		if (t[i] < 0)
+			;//TODO: required to print variables binary form
+		else
+			for (int_t j = 0; j < ts[i].bit_w; ++j) {
+				t[i] = bt[offset] ? (1 << j) | t[i] : t[i];
+				offset += inc_pos_bt(ts,i,j+1);
+			}
+	}
+}
+#endif
+
 // ----------------------------------------------------------------------------
 
 flat_prog ir_builder::to_terms(const raw_prog& pin) {
@@ -700,8 +748,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 	term t;
 	raw_prog p = pin;
 	for (raw_rule& r : p.r)
-
-		//XXX:  each rule is a context.
 		if (r.type == raw_rule::NONE && !r.b.empty()) {
 			for (const raw_term& x : r.h) {
 				get_nums(x);
@@ -799,6 +845,7 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
 	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
 	//bool isrel = realrel || extype == term::BLTIN;
+
 	for (size_t n = !realrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM:	t.push_back(mknum(r.e[n].num)); break;
@@ -813,14 +860,23 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 			case elem::SYM:	t.push_back(mksym(dict.get_sym(r.e[n].e))); break;
 			default: break;
 		}
-	raw_term auxr = r;
-	int_t tab = realrel ? get_table(get_sig(auxr)) : -1;
+
+
+	int_t tab = realrel ? get_table(get_sig(r)) : -1;
+	#ifdef BIT_TRANSFORM_V2
+	if (opts.binarize) {
+		sig s = r.s;
+		ints taux = t;
+		t.clear();
+		bit_transform(dynenv->tbls[tab].s.second, s.second, taux, t);
+		return term(r.neg, extype, r.arith_op, tab, t, orderid);
+	}
+	#endif
 
 	if (extype == term::BLTIN) {
 		#ifdef TYPE_RESOLUTION
-		sig s = get_sig_bltin(auxr);
-		int_t idbltin = s.first;
-		int_t idbltin_tr = get_bltin(s);
+		int_t idbltin = r.s.first;
+		int_t idbltin_tr = get_bltin(r.s);
 		return term(r.neg, idbltin_tr, t, orderid, idbltin,
 			(bool) (r.e[0].num & 1), (bool) (r.e[0].num & 2));
 
@@ -872,19 +928,18 @@ int_t ir_builder::get_bltin(const sig& s) {
 #endif
 
 int_t ir_builder::get_table(const sig& s) {
-
-#ifdef TYPE_RESOLUTION
-	DBG(for (auto &se : s.second) {
-		assert (se.type != UNDEF && "error: unresolved type");
-	};);
-#endif
-
 	auto it = tsmap.find(s);
-	if (it != tsmap.end())
-		return it->second;
+	if (it != tsmap.end()) return it->second;
 	int_t nt = dynenv->tbls.size();
 	table tb;
-	tb.s = s, tb.len = sig_len(s);
+	int_t bw = sig_len(s);
+	#ifdef BIT_TRANSFORM_V2
+	if (opts.binarize) {
+		bw = 0;
+		for (auto &i: s.second) bw += i.bit_w;
+	}
+	#endif
+	tb.s = s, tb.len = bw;
 	dynenv->tbls.push_back(tb);
 	tsmap.emplace(s,nt);
 	return nt;
@@ -975,7 +1030,25 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 		return ret;
 	}
 }
-
+#ifdef TYPE_RESOLUTION
+void ir_builder::natives2raw(int_t args, const ints &r, const sig &s, raw_term &rt) {
+	for (int_t n = 1; n != args + 1; ++n) {
+		if (r[n - 1] < 0)
+			rt.e[n] = elem(elem::VAR,dict.get_var_lexeme(r[n - 1]));
+		switch (s.second[n-1].type) {
+			case native_type::UINT :
+				rt.e[n] =  elem((int_t) r[n - 1]); break;
+			case native_type::UCHAR :
+				rt.e[n] =  elem((char32_t) r[n - 1]); break;
+			case native_type::SYMB :
+				rt.e[n] =  elem(elem::SYM,dict.get_sym_lexeme(r[n - 1])); break;
+			case native_type::POLY :
+				COUT << "warning: unhandled sig path for BLTIN" << endl; break;
+			default : assert(false);
+		}
+	}
+}
+#endif
 raw_term ir_builder::to_raw_term(const term& r) {
 		raw_term rt;
 		size_t args;
@@ -1023,19 +1096,7 @@ raw_term ir_builder::to_raw_term(const term& r) {
 
 			#ifdef TYPE_RESOLUTION
 			sig s = dynenv->bltins.sigs[r.tab];
-			for (size_t n = 1; n != args + 1; ++n) {
-				switch (s.second[n-1].type) {
-					case native_type::UINT :
-						rt.e[n] =  elem((int_t) r[n - 1]); break;
-					case native_type::UCHAR :
-						rt.e[n] =  elem((char32_t) r[n - 1]); break;
-					case native_type::SYMB :
-						rt.e[n] =  elem(elem::SYM,dict.get_sym_lexeme(r[n - 1])); break;
-					case native_type::POLY :
-						COUT << "warning: unhandled sig path for BLTIN" << endl; break;
-					default : assert(false);
-				}
-			}
+			natives2raw(args,r,s,rt);
 			#else
 			for (size_t n = 1; n != args + 1; ++n)
 				rt.e[n] = get_elem(r[n - 1]);
@@ -1049,26 +1110,33 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				rt.e[0] = elem(elem::SYM,
 						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
 				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
-				#ifdef TML_NATIVES
-				assert(rt.arity.size() == 1);
-				#endif
+				//#ifdef TML_NATIVES
+				//assert(rt.arity.size() == 1);
+				//#endif
 
 				#ifdef TYPE_RESOLUTION
 				sig s = dynenv->tbls[r.tab].s;
-				for (size_t n = 1; n != args + 1; ++n) {
-					elem e;
-					switch (s.second[n-1].type) {
-						case native_type::UINT :
-							rt.e[n] =  elem((int_t) r[n - 1]); break;
-						case native_type::UCHAR :
-							rt.e[n] =  elem((char32_t) r[n - 1]); break;
-						case native_type::SYMB :
-							rt.e[n] =  elem(elem::SYM,dict.get_sym_lexeme(r[n - 1])); break;
-						case native_type::POLY :
-							COUT << "warning: unhandled sig path" << endl; break;
-						default : assert(false);
+				ints aux = r;
+				#ifdef BIT_TRANSFORM_V2
+				if (opts.binarize) {
+					if (!opts.print_binarized) {
+						aux.clear();
+						bit_transform_inv(s.second, r, aux) ;
+						args = sig_len(s);
+					} else {
+						rt.arity[0] = args;
+						for (size_t n = 1; n != args + 1; n++) {
+							if (aux[n - 1] < 0)
+								;//TODO: rt.e[n] = elem(elem::VAR,dict.get_var_lexeme(aux[n - 1]));
+							else rt.e[n] =  elem((int_t) aux[n - 1]);
+						}
 					}
 				}
+				#endif
+				if (!opts.print_binarized) {
+					natives2raw(args,aux,s,rt);
+				}
+
 				#else
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
@@ -1081,7 +1149,9 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				rt.e[0] = get_elem(r[0]);
 			}
 		}
+#ifndef BIT_TRANSFORM_V2
 		DBG(assert(args == r.size());)
+#endif
 #ifdef BIT_TRANSFORM
 		if(bitunv_to_raw_term(rt))
 			rt.calc_arity(nullptr);

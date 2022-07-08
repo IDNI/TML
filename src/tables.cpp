@@ -373,8 +373,9 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 		if (t.extype == term::REL) {
 			#ifdef BIT_TRANSFORM
 			handler_bitunv(b, t, a);
-			#endif
+			#else
 			b.insert({get_body(t, a.vm, a.varslen), t});
+			#endif
 		} else if (t.extype == term::EQ) {
 			if (!handler_eq(t, a.vm, a.varslen, a.eq)) return;
 		} else if (t.extype == term::LEQ) {
@@ -1015,6 +1016,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	if (opts.optimize) measure_time_start();
 
 	flat_prog fp = ir_handler->to_terms(p);
+	//DBG(ir_handler->opts.print_binarized = true;);
+	//DBG(print(o::out() << "\n", fp) << endl;);
+	//DBG(ir_handler->opts.print_binarized = false;);
 
 	#ifndef LOAD_STRS
 	strs = strs_in;
@@ -1031,7 +1035,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#endif
 
 	ir_handler->syms = dict.nsyms();
-	#ifdef BIT_TRANSFORM
+	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		bits = 1;
 	#else
 		#ifdef TYPE_RESOLUTION
@@ -1181,8 +1185,7 @@ bool tables::compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handl
 void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	size_t len, bool allowbltins) const {
 	table tbl = tbls.at(tab);
-	// D: bltins are special type of REL-s, mostly as any but no decompress.
-	if (!allowbltins && tbl.is_builtin()) return;
+	if (!allowbltins && tbl.is_builtin()) return; //bltins no decompress
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
 		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
