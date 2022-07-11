@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
 	oo.target("output", "@stdout");
 	options o(argc, argv, &ii, &oo);
 	bool binlr = o.enabled("bin-lr");
+	bool incr_gen = o.enabled("incr-gen-forest");
 
 	size_t c = 0;
 	// Using Elizbeth Scott paper example 2, pg 64
@@ -57,14 +58,14 @@ int main(int argc, char** argv) {
 //			{"start", { { "" }, { "A", "start", "B", "start" } } },
 //			{"A", { { "" }, { "A", "a" } } },
 //			{"B", { { "b" }, { "B", "b" } } }
-		} , binlr);
+		} , binlr, incr_gen );
 	cout << e.recognize("bbb") << endl << endl;
 	test_out(c++, e);	
 	
 	
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
 	// will capture cycles
-	earley<char> e1({{"start", { { "b" }, {"start"} }}}, binlr);
+	earley<char> e1({{"start", { { "b" }, {"start"} }}}, binlr, incr_gen);
 	cout << e1.recognize("b") << endl << endl;
 	test_out(c++, e1);	
 	
@@ -73,14 +74,14 @@ int main(int argc, char** argv) {
 	earley<char> e2({ {"start", { { "a", "X", "X", "c" }, {"start"} }},
 				{"X", { {"X", "b"}, { "" } } },
 
-	}, binlr);
+	}, binlr, incr_gen);
 	cout << e2.recognize("abbc") << endl << endl;
 	test_out(c++, e2);	
 	
 
 	// highly ambigous grammar, advanced parsing pdf, pg 89
 	earley<char> e3({ {"start", { { "start", "start" }, {"a"} }}
-	}, binlr);
+	}, binlr, incr_gen);
 	cout << e3.recognize("aaaaa") << endl << endl;
 	test_out(c++, e3);
 
@@ -89,17 +90,18 @@ int main(int argc, char** argv) {
 				{"A", { { "a" }, {"B","A"} }},
 				{"B", { { ""} }},
 				{"T", { { "b","b","b" } }},
-	}, binlr);
+	}, binlr, incr_gen);
 	cout << e4.recognize("abbb") << endl << endl;
 	test_out(c++, e4);
 
-	earley<char> e5({{"start", { { "b", }, {"start", "start", "start", "start"}, {""} }}}, binlr);
+	earley<char> e5({{"start", { { "b", }, {"start", "start", "start", "start"}, {""} }}}, 
+		binlr, incr_gen);
 	cout << e5.recognize("b") << endl << endl;
 	test_out(c++, e5);
 
 	earley<char> e6({{"start", { {"n"}, { "start", "X", "start" }}},
 				{"X", { {"p"}, {"m"}}}
-	}, binlr);
+	}, binlr, incr_gen);
 	cout << e6.recognize("npnmn") << endl;
 	test_out(c++, e6);
 /*	cout << e.recognize("aa") << endl << endl;
@@ -115,7 +117,7 @@ int main(int argc, char** argv) {
 		{ U"žluťoučký" },
 		{ U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" },
 		{ U"start", U"start" }
-	} } }, binlr);
+	} } }, binlr, incr_gen);
 	cout << e7.recognize(U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ") << endl << endl;
 	test_out(c++, e7);
 

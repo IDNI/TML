@@ -1098,9 +1098,39 @@ bdd::bdd(bdd_ref h, bdd_ref l) : h(h), l(l) {
 }
 
 template <typename T>
-basic_ostream<T>& bdd::out(basic_ostream<T>& os, bdd_ref  x) {
+basic_ostream<T>& bdd::out(basic_ostream<T>& os, bdd_ref x) {
 	if (leaf(x)) return os << (trueleaf(x) ? 'T' : 'F');
 	const bdd b = get(x);
-	//return out(out(os << b.v << " ? ", b.h) << " : ", b.l);
-	return out(out(os << GET_SHIFT(x) << " ? (", b.h) << ") : (", b.l) << ")";
+	return out(out(os << GET_SHIFT(x) << " ? (", b.h) << ") : (", b.l) << ")" << endl;
+}
+
+void allsat_bin(cr_spbdd_handle x) {
+	bdd::t_pathv p;
+	bdd::allsat_bin_dump(x->b, p, 0);
+}
+
+void bdd::allsat_bin_dump(bdd_ref x, t_pathv &p, size_t bit) {
+	bdd xb = bdd::get(x);
+	bdd_shft xs = GET_SHIFT(x);
+	//COUT << xs << endl;
+	if (x == F) return;
+	if (x == T) {
+		for (auto &b : p)
+			COUT << ((b == H) ? '1' : ((b == L) ? '0' : 'x'));
+		//for (size_t i = 0; i != bits-bit; ++i) COUT << 'x';
+		COUT << endl;
+		return;
+	}
+	if (xb.l != F) {
+		t_pathv pa = p;
+		for (size_t i = 0; i < xs-1-bit; ++i) pa.push_back(X);
+		pa.push_back(L);
+		allsat_bin_dump(xb.l, pa, xs);
+	}
+	if (xb.h != F) {
+		t_pathv pa = p;
+		for (size_t i = 0; i < xs-1-bit; ++i) pa.push_back(X);
+		pa.push_back(H);
+		allsat_bin_dump(xb.h, pa, xs);
+	}
 }

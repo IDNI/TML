@@ -204,8 +204,8 @@ public:
     ~typemanager() {}
 
     bool type_check(raw_prog &rp) {
-    	if (env.build_from(rp)) return true;
-    	else return tcheck(rp);
+    	env.build_from(rp);
+    	return tcheck(rp);
     }
     bool infer = true;
     environment env;

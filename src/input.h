@@ -337,6 +337,7 @@ struct raw_prog;
 struct raw_form_tree;
 typedef std::shared_ptr<raw_form_tree> sprawformtree;
 
+//#ifdef BIT_UNIVERSE TODO: check whether this may affect early parser
 struct context;
 class environment;
 typedef std::shared_ptr<struct context> spenvcontext;
@@ -445,7 +446,7 @@ struct typestmt {
 	bool parse(input *in, const raw_prog& prog);
 
 };
-
+//#endif
 
 /* A raw term is produced from the parsing stage. In TML source code, it
  * takes the following form: <rel>(<arg1> <arg2> ... <argN>). A raw term can
@@ -811,7 +812,7 @@ struct raw_prog {
 	enum ptype {
 		PFP, LFP, GFP
 	} type = PFP;
-	dict_t &dict;
+	std::reference_wrapper<dict_t> dict;
 	std::vector<macro> macros;
 	std::vector<directive> d;
 	std::vector<production> g;
@@ -840,30 +841,21 @@ struct raw_prog {
 	bool macro_expand(input *in, macro mm, const size_t i, const size_t j, 
 				std::vector<raw_term> &vrt);
 	raw_prog(dict_t &dict_) : dict(dict_) {};
-	raw_prog& merge(const raw_prog& p);
 };
 
 struct raw_progs {
-	dict_t &dict;
+	std::reference_wrapper<dict_t> dict;
 	raw_prog p;
 	bool parse(input* in);
-	raw_progs(dict_t &dict_) : dict(dict_), p(raw_prog(dict_)) { };
-	raw_progs& merge(const raw_progs& rps) {
-		p.merge(rps.p);
-		return *this;
-	}
+	raw_progs(dict_t &dict_) : dict(dict_), p(dict_) { };
 };
 
 struct state_block {
 	bool flip = false;
 	lexeme label;
 	raw_prog p;
-	state_block(dict_t &dict_) : p(raw_prog(dict_)) {};
+	state_block(dict_t &dict_) : p(dict_) {};
 	bool parse(input* in);
-	state_block& merge(const state_block& sb) {
-		flip = sb.flip,	label = sb.label, p.merge(sb.p);
-		return *this;
-	}
 };
 
 bool throw_runtime_error(std::string err, std::string details = "");

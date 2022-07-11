@@ -261,8 +261,7 @@ void options::setup() {
 		}
 	).description("transforms nested progs (req. for if and while)"));
 	add_bool2("state-blocks", "sb", "transforms state blocks");
-	add_bool2("bitunv", "buv",
-		"transforms and runs rule directly in bit size 2 universe ");
+
 	add(option(option::type::INT, { "bitorder", "bod" })
 		.description("specifies the variable ordering permutation"
 							" (default: 0)"));
@@ -284,6 +283,7 @@ void options::setup() {
 	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");
 	add_bool2("bin-lr", "blr", "on the fly binarization and left "
 					"right optimization for earley items");
+	add_bool2("incr-gen-forest", "igf", "incremental generation of forest");
 	add_output    ("dump",        "dump output     (@stdout by default)");
 	add_output_alt("output", "o","standard output (@stdout by default)");
 	add_output    ("error",       "errors          (@stderr by default)");
@@ -299,6 +299,7 @@ void options::setup() {
 		"generated C++ code of the given TML code");
 
 #ifdef __EMSCRIPTEN__
+#ifdef NODEFSMOUNT
 #ifndef NODERAWFS
 	static bool nodefsmounted = false;
 	if (!nodefsmounted) {
@@ -310,6 +311,7 @@ void options::setup() {
 			FS.chdir(directory);
 		}, "fs");
 	}
+#endif
 #endif
 #endif
 

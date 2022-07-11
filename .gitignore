@@ -52,3 +52,4 @@ CMakeCache.txt
 __pycache__
 src/doctest.h
 src/tml.g.cpp.bak*
+emsdk

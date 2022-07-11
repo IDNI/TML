@@ -3642,11 +3642,11 @@ bool driver::transform_handler(raw_prog &p) {
 
 #ifdef TYPE_RESOLUTION
 	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
-	o::to("transformed") << "Type resolutor Nto1 mapping:\n" << tr << endl;
+	//o::out() << "Type resolutor Nto1 mapping:\n" << tr << endl;
 	rt_options to;
 	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
 	to.optimize  = false;
-	to.bitunv = false;
+	to.binarize = false;
 	to.bproof = proof_mode::none;
 	to.show_hidden = false;
 	ir_builder ir_handler(dict, to);
@@ -3655,7 +3655,7 @@ bool driver::transform_handler(raw_prog &p) {
 	ir_handler.printer = &tbl_int;
 	ir_handler.dynenv->bits = 2;
 	if (!tbl_int.run_prog(tr, {})) return false;
-	DBG(tbl_int.out_fixpoint(o::dump()););
+	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
 		DBG(COUT << el << endl;); //this line fails in release
 		sig s = ir_handler.to_native_sig(el);
@@ -3663,6 +3663,7 @@ bool driver::transform_handler(raw_prog &p) {
 	}
 	ir_handler.dynenv->bits = 0;
 	ir->type_resolve(p.nps[0]);
+	//o::out() << "------------------:\n" << p.nps[0] << endl;
 #endif
 
 	if (opts.enabled("safecheck")) {
@@ -3709,11 +3710,9 @@ bool driver::transform_handler(raw_prog &p) {
 						"-g (-guards) option enabled.");
 
 #ifdef BIT_TRANSFORM
-	if (opts.enabled("bitunv")) {
-		ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
-	}
-#endif
+	ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 
+#endif
 	DBG(if (opts.enabled("transformed"))
 		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);
 
@@ -3813,8 +3812,8 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.fp_step           = opts.enabled("fp");
 	to.show_hidden       = opts.enabled("show-hidden");
 	to.bin_lr            = opts.enabled("bin-lr");
-	to.bitunv            = opts.enabled("bitunv");
 	to.bitorder          = opts.get_int("bitorder");
+	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);

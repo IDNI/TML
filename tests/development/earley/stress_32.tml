@@ -1,6 +1,4 @@
-
 @string str "abcdefghabcdefghabcdefghabcdefgh".
-
 start => A B C D E F G H A B C D E F G H start | null.
 
 A => 'a'| A | null.

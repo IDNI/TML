@@ -113,8 +113,9 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 
 //runtime options
 typedef struct {
-	bool optimize, print_transformed, apply_regexpmatch, fp_step, bitunv,
-		show_hidden, bin_lr;
+	bool optimize, print_transformed, apply_regexpmatch, fp_step,
+		show_hidden, bin_lr, incr_gen_forest,
+		binarize = true, print_binarized = false;
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;
@@ -142,9 +143,12 @@ template<typename T> struct ptrcmp {
 };
 
 //-----------------------------------------------------------------------------
+//#define BIT_TRANSFORM  //to be deprecated,
+
 #define TML_NATIVES
-//#define TYPE_RESOLUTION //work-in-progress, dependent on TML_NATIVES
-//#define BIT_TRANSFORM  //to be deprecated, use it with --bitunv option
+//#define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
+//#define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
+
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
 #define mkchr(x) ((int_t) x )
 #define mknum(x) ((int_t) x )
@@ -156,17 +160,15 @@ template<typename T> struct ptrcmp {
 #endif
 
 #ifdef TML_NATIVES
-typedef enum {UNDEF, UINT, INT, RATIONAL, UCHAR, SYMB, POLY} native_type;
+typedef enum { SYMB = 0, UINT = 1, UCHAR = 2, POLY = 3, UNDEF, INT, RATIONAL } native_type;
 struct tml_native_t {
 	native_type type = UNDEF;
 	int_t bit_w = -1;
 	bool operator==(const tml_native_t& l) const {
-	     return (l.type == type && l.bit_w == bit_w) || (l.type == UNDEF) || (l.type == POLY);
+	     return (l.type == type) || (l.type == UNDEF) || (l.type == POLY);
 	}
 	bool operator<(const tml_native_t& l) const {
-		//if (*this == l) return false;
-		//return l.type < type && l.bit_w < bit_w;
-		return std::tie(l.type, l.bit_w) < std::tie(type, bit_w);
+		return std::tie(type, bit_w) < std::tie(l.type, l.bit_w);
 	}
 };
 typedef std::vector<tml_native_t> tml_natives;

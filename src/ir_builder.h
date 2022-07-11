@@ -24,20 +24,17 @@ typedef std::set<std::vector<term>> flat_prog;
 typedef earley<char32_t> earley_t;
 
 #ifdef TYPE_RESOLUTION
-typedef struct {
+struct rt_vartypes {
 	int_t rt_idx = 0;
 	ints positions;
-} rt_var_inst;
-
-struct rt_vartypes {
-	rt_var_inst inst;
-	spbdd_handle types;
-	std::vector<term> c;
+	tml_natives types;
 	bool operator==(const int_t& idx) const {
-	     return (idx == inst.rt_idx);
+		return (rt_idx == idx);
 	}
-	rt_vartypes(rt_var_inst &inst_, spbdd_handle &types_) : inst(inst_), types(types_){}
-} ;
+	rt_vartypes(const int_t &idx_) : rt_idx(idx_) { };
+	rt_vartypes(const int_t &idx_, const ints &pos_) : rt_idx(idx_), positions(pos_) { };
+	void append(const tml_native_t &t);
+};
 
 typedef std::map<int_t, std::vector<rt_vartypes>> rr_varmap;
 #endif
@@ -63,27 +60,11 @@ public:
 	~ir_builder();
 
 	//-------------------------------------------------------------------------
+
 #ifdef TYPE_RESOLUTION
 	std::map<int_t, std::vector<tml_natives>> relid_argtypes_map;
-
+	bool append(std::map<int_t, std::vector<tml_natives>> &m, sig &s);
 	void set_vartypes(int_t i, ints &mp, rr_varmap &v, raw_rule &auxr);
-
-	bool append(std::map<int_t, std::vector<tml_natives>> &m, sig s) {
-		auto it = m.find(s.first);
-		if (it != m.end()) {
-			if (find(it->second.begin(), it->second.end(), s.second) ==
-					it->second.end()) {
-				it->second.push_back(s.second);
-				return true;
-			}
-			return false;
-		}
-		else {
-			m.insert({s.first, {s.second}});
-			return true;
-		}
-	}
-
 	rr_varmap get_vars(raw_rule &r);
 	void get_vars_rel(const raw_term& t, int_t idx, rr_varmap& v);
 	void get_vars_eq(const raw_term& t, int_t idx, rr_varmap& v);
@@ -106,9 +87,15 @@ public:
 
 	int_t get_bltin(const sig& s);
 
+	#ifdef BIT_TRANSFORM_V2
+	void bit_transform(tml_natives &ts, tml_natives &rts, ints &t, ints &bt);
+	void bit_transform_inv(tml_natives &ts, const ints &tb, ints &t);
+	#endif
+	void natives2raw(int_t args, const ints &r, const sig &s, raw_term &rt);
 #endif
 
 	sig get_sig(raw_term& t);
+	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
 	sig get_sig(const int& rel_id, const ints& arity);
 	size_t sig_len(const sig& s) const;

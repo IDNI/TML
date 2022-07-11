@@ -11,10 +11,11 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifdef BIT_TRANSFORM
 
 #include "ir_builder.h"
 #include "tables.h"
+
+#ifdef BIT_TRANSFORM
 
 bool ir_builder::btransform(raw_prog& rpin) {
 	bool ret = true;
