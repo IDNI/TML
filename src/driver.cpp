@@ -1460,7 +1460,7 @@ z3::expr z3_context::arg_to_z3(const elem& el) {
 			context.bv_val(el.num, value_sort.bv_size());
 		var_to_decl.emplace(make_pair(el, ndecl));
 		return ndecl;
-	} else {
+	} else if (el.ch != 0) {
 		const z3::expr &ndecl =
 			context.constant(el.to_str().c_str(), value_sort);
 		var_to_decl.emplace(make_pair(el, ndecl));

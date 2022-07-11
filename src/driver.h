@@ -192,6 +192,7 @@ private:	// TODO create one entry point for optimization
 
 	std::vector<std::shared_ptr<mutation>> brancher_export_outer_quantifiers(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_to_dnf(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_factor_rules(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
 	template<typename F>
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp, const F &f);
@@ -205,11 +206,11 @@ private:	// TODO create one entry point for optimization
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 public:
 	void eliminate_dead_variables(raw_prog &rp);
-private:
 	void factor_rules(raw_prog &rp);
+private:
 
 #ifdef WITH_Z3
-	std::vector<mutation*> brancher_subsume_queries_z3(mutated_prog &mp) {
+	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_z3(mutated_prog &mp);
 	void qc_z3(raw_prog &rp);
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 #endif

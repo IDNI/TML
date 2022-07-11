@@ -258,11 +258,75 @@ std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_
 }
 
 #ifdef WITH_Z3
-vector<mutation*> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
-	const auto &[int_bit_len, universe_bit_len] = prog_bit_len(mp.current);
+/* Recurse through the given formula tree in pre-order calling the given
+ * function with the accumulator. */
+
+template<typename X, typename F>
+		X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
+	const X &new_acc = f(t, acc);
+	switch(t.type) {
+		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
+				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
+			// Fold through binary trees by threading accumulator through both
+			// the LHS and RHS
+			return prefold_tree2(*t.r, prefold_tree2(*t.l, new_acc, f), f);
+		// Fold though unary trees by threading accumulator through this
+		// node then single child
+		case elem::NOT: return prefold_tree2(*t.l, new_acc, f);
+		// Otherwise for leaf nodes like terms and variables, thread
+		// accumulator through just this node
+		default: return new_acc;
+	}
+}
+
+/* Update the number and characters counters as well as the distinct
+ * symbol set to account for the given term. */
+
+void update_element_counts2(const raw_term &rt, set<elem> &distinct_syms,
+		int_t &char_count, int_t &max_int) {
+	for(const elem &el : rt.e)
+		if(el.type == elem::NUM) max_int = max(max_int, el.num);
+		else if(el.type == elem::SYM) distinct_syms.insert(el);
+		else if(el.type == elem::CHR) char_count = 256;
+}
+
+/* Compute the number of bits required to represent first the largest
+ * integer in the given program and second the universe. */
+
+pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
+	int_t max_int = 0, char_count = 0;
+	set<elem> distinct_syms;
+
+	for(const raw_rule &rr : rp.r) {
+		// Updates the counters based on the heads of the current rule
+		for(const raw_term &rt : rr.h)
+			update_element_counts2(rt, distinct_syms, char_count, max_int);
+		// If this is a rule, update the counters based on the body
+		if(rr.is_dnf() || rr.is_form()) {
+			raw_form_tree prft = *rr.get_prft();
+			prefold_tree2(prft, monostate {},
+				[&](const raw_form_tree &t, monostate) -> monostate {
+					if(t.type == elem::NONE)
+						update_element_counts2(*t.rt, distinct_syms, char_count, max_int);
+					return monostate {};
+				});
+		}
+	}
+	// Now compute the bit-length of the largest integer found
+	size_t int_bit_len = 0, universe_bit_len = 0,
+		max_elt = max_int + char_count + distinct_syms.size();
+	for(; max_int; max_int >>= 1, int_bit_len++);
+	for(; max_elt; max_elt >>= 1, universe_bit_len++);
+	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
+	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
+	return {int_bit_len, universe_bit_len};
+}
+
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
+	const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
 	z3_context z3_ctx(int_bit_len, universe_bit_len);
 	return brancher_subsume_queries(mp,
-		[this](const raw_rule &rr1, const raw_rule &rr2)
+		[this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
 			{return check_qc_z3(rr1, rr2, z3_ctx);});
 }
 #endif
@@ -300,6 +364,26 @@ vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog &mp) {
 	return mutations; 
 }
 
+struct mutation_factor_rules : public virtual mutation  {
+	driver &drvr;
+
+	mutation_factor_rules(driver &d) : drvr(d) {}
+
+	bool const operator()(mutated_prog &mp) const override {
+		o::dbg() << "Factoring rules..." << endl << endl;
+//		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
+		drvr.factor_rules(mp.current);
+		o::dbg() << "Factored Program:" << endl << endl << mp.current << endl;
+		return true;
+	}
+};
+
+vector<std::shared_ptr<mutation>> driver::brancher_factor_rules(mutated_prog &mp) {
+	vector<std::shared_ptr<mutation>> mutations;
+	mutation_factor_rules m(*this);
+	mutations.push_back(std::make_shared<mutation_factor_rules>(m));
+	return mutations; 
+}
 struct mutation_to_split_heads : public virtual mutation  {
 	driver &drvr;
 
