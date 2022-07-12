@@ -366,9 +366,6 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	if (t1 == t2) return t1;
 	else if (t1 == 0 || t2 == 0) return 0;
 
-	static map<pair<int_t, int_t>, vector<int_t>, decltype(abs_lex_cmp)> eq_classes(
-		abs_lex_cmp);
-
 	auto uf1 = uf_univ[t1];
 	auto &uf2 = uf_univ[t2];
 
@@ -392,45 +389,48 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 		el.second = find(uf1, el.first);
 	}
 
-	for (const auto &el: diffs) {
+	for (auto &el: diffs) {
+		// Can use diffs here instead of eq_classes
 		// Now create equivalence pairs
 		int_t eq_class_uf2 = find(uf2, el.first);
 		if (el.second < 0) {
-			eq_classes[{-el.second, -eq_class_uf2}].emplace_back(
-				-el.first);
+			el.first = -el.second;
+			el.second = -eq_class_uf2;
 		} else {
-			eq_classes[{el.second, eq_class_uf2}].emplace_back(
-				el.first);
+			el.first = el.second;
+			el.second = eq_class_uf2;
 		}
 	}
+	sortc(diffs, abs_lex_cmp);
+	auto dupls = unique(all(diffs));
+	diffs.erase(dupls, diffs.end());
 
-	//Get the sets and intersect, I am on uf2
-	int count=0;
-	for (auto &p : eq_classes) {
+	//Leave the first set empty for intersection later
+	int count=1;
+	eq_sets.emplace_back();
+	for (auto &p : diffs) {
 		eq_sets.emplace_back();
-		for(auto el : get_equal(uf2, p.first.second))
+		auto iter = get_equal(uf2, p.second);
+		MergeSort(all(iter));
+		for(auto el : iter)
 			eq_sets[count].emplace_back(el);
-		sortc(eq_sets[eq_sets.size()-1], abs_cmp);
 		++count;
 	}
 
 	count=0;
-	for(auto &p : eq_classes){
-		// could make use of vector in eq_classes (second in p)
-		vector<int_t> eq_set_uf1;
-		for (auto el : get_equal(uf1, p.first.first))
-		 	eq_set_uf1.emplace_back(el);
-		sortc(eq_set_uf1, abs_cmp);
-		p.second.clear();
-		set_intersection(all(eq_sets[count]), all(eq_set_uf1),
-				 back_inserter(p.second), abs_cmp);
+	for(auto &p : diffs){
+		auto iter = get_equal(uf1, p.first);
+		MergeSort(all(iter));
+		set_intersection(all(eq_sets[count+1]), all(iter),
+				 back_inserter(eq_sets[count]), abs_cmp);
+		eq_sets[count+1].clear();
 		++count;
 	}
 
-	for (auto &p: eq_classes) {
-		split_set(p.second, uf1, find(uf1, p.second[0]));
+	for (auto &inter_set: eq_sets) {
+		split_set(inter_set, uf1, find(uf1, inter_set[0]));
 	}
-	eq_classes.clear(); diffs.clear(); eq_sets.clear();
+	diffs.clear(); eq_sets.clear();
 	return add(uf1);
 }
 
@@ -446,7 +446,8 @@ bool PersistentUnionFind::operator==(const puf &uf) const {
 	p_arr::reroot(parent_s, arr_pt);
 	weak_ptr<p_arr> diff_pt = uf.arr_pt;
 
-	vector<pair<int_t, int_t>> diffs;
+	static vector<pair<int_t, int_t>> diffs;
+	diffs.clear();
 	while (diff_pt.lock()->diff != nullptr) {
 		auto el = make_pair(diff_pt.lock()->p, 0);
 		if (!binary_search(diffs.begin(), diffs.end(), el)) {
@@ -938,78 +939,6 @@ poset poset::eval(poset &p, int_t v) {
 	all_imp.clear();
 	return res;
 }
-
-/*
-// Get resulting poset when assigning v
-//TODO: return false
-poset poset::eval(int_t v) {
-  if (hasbc(true_var, v, abs_cmp())) {
-    // remove v from true_var
-    // check if poset is empty -> return T
-    // else return *this with v removed
-    poset res;
-    res = *this;
-    auto it = getbc(res.true_var, v, abs_cmp());
-    res.true_var.erase(it);
-    if(res.is_empty()) res.set_pure();
-    return res.calc_hash(), res;
-  }
-  else if(hasbc(true_var, -v, abs_cmp())){
-    // return F
-    poset res;
-    return res;
-  }
-  poset res;
-  res.true_var = true_var;
-  res.insert_true_var(v); // temporarily insert v
-  res.eq_var = eq_var; // delete used equalities later
-  // Check if v is part of some equality
-  auto eq_set = eq_var.get_set(v);
-  res.eq_var.delete_set(v);
-  if(eq_set.size() > 1) {
-    for(const auto& e : eq_set) res.insert_true_var(e);
-  }
-  // complete true_var set of res, possible due to transitive closure
-  for(auto imp = imp_var.begin(); imp != imp_var.end(); ++imp) {
-    // Antecedent of implication is true
-    if(hasbc(res.true_var, imp->first, abs_cmp())) {
-      res.insert_true_var(imp->second);
-      // Ensure that equalities are used
-      eq_set = res.eq_var.get_set(imp->second);
-      res.eq_var.delete_set(imp->second);
-      if (eq_set.size() > 1)
-        for (const auto &e: eq_set)
-          res.insert_true_var(e);
-    }
-    // Check if a consequent is already true
-    else if (hasbc(res.true_var, -imp->second, abs_cmp())) {
-      res.insert_true_var(-imp->first);
-      // Ensure that equalities are used
-      eq_set = res.eq_var.get_set(-imp->first);
-      res.eq_var.delete_set(-imp->first);
-      if (eq_set.size() > 1)
-        for (const auto &e: eq_set)
-          res.insert_true_var(e);
-    }
-  }
-  // delete all implications where at least one variable
-  // (in absolute value) appears in true_var
-  for(auto imp = imp_var.begin(); imp != imp_var.end(); ++imp) {
-    if (!hasbc(res.true_var, imp->first, abs_cmp())
-        && !hasbc(res.true_var, -imp->first, abs_cmp())){
-      // negated antecedent is already in true_var
-      DBG(assert(!hasbc(res.true_var, -imp->second, abs_cmp()));)
-      if (!hasbc(res.true_var, imp->second, abs_cmp())) {
-        res.insert_implication(*imp);
-      }
-    }
-  }
-  // v was only temporarily added
-  res.true_var.erase(getbc(res.true_var, v, abs_cmp()));
-  res.set_pure();
-  return res.calc_hash(), res;
-}
-*/
 
 bool poset::insert_var(poset &p, int_t v) {
 	if (abs(v) < p.v || p.v == 0) p.v = abs(v);
