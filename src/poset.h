@@ -167,13 +167,14 @@ class pu_iterator {
 	using pu = PersistentUnionFind;
 	int_t val;
 	int_t end_val;
-	bool negate = false;
-	bool looped = false;
+	bool negate:1;
+	bool looped:1;
 	pu& uf;
 
   public:
 	pu_iterator(pu &puf, int_t val_) : val(val_), end_val(val_),
-					  uf(puf) {};
+					   negate(false), looped(false),
+					   uf(puf) {};
 
 	pu_iterator(const pu_iterator &) = default;
 
