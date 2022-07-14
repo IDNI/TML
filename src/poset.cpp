@@ -892,39 +892,23 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 	int_t hi_eq = hi.eqs;
 	int_t lo_eq = lo.eqs;
 
-	// Lifting of equalities due to variables
-	//TODO: For equality also lift first implication
+	// Lifting of equalities and implications due to variables
 	sortc(eq_lift_hi, pcomp);
 	sortc(eq_lift_lo, pcomp);
 	for (auto i = 0; i < (int_t) eq_lift_hi.size(); ++i) {
-		if (i + 1 == (int_t) eq_lift_hi.size()) {
-			if (i == 0 ||
-			    eq_lift_hi[i - 1].first != eq_lift_hi[i].first) {
-				insert_imp(p, -v, eq_lift_hi[i].second);
-			}
-		} else if (eq_lift_hi[i].first == eq_lift_hi[i + 1].first) {
-			lo_eq = pu::merge(lo_eq, eq_lift_hi[i].second,
-					  eq_lift_hi[i + 1].second);
-		} else if (i == 0 ||
-			   (eq_lift_hi[i - 1].first != eq_lift_hi[i].first)) {
-			// Single variable is not part of an equality
+		if (i == 0 || eq_lift_hi[i - 1].first != eq_lift_hi[i].first) {
 			insert_imp(p, -v, eq_lift_hi[i].second);
+		} else if (eq_lift_hi[i - 1].first == eq_lift_hi[i].first) {
+			lo_eq = pu::merge(lo_eq, eq_lift_hi[i - 1].second,
+					  eq_lift_hi[i].second);
 		}
 	}
 	for (auto i = 0; i < (int_t) eq_lift_lo.size(); ++i) {
-		if (i + 1 == (int_t) eq_lift_lo.size()) {
-			if (i == 0 ||
-			    eq_lift_lo[i - 1].first != eq_lift_lo[i].first) {
-				insert_imp(p, v, eq_lift_lo[i].second);
-			}
-		}
-		else if (eq_lift_lo[i].first == eq_lift_lo[i + 1].first) {
-			hi_eq = pu::merge(hi_eq, eq_lift_lo[i].second,
-					  eq_lift_lo[i + 1].second);
-		} else if (i == 0 ||
-			   eq_lift_lo[i - 1].first != eq_lift_lo[i].first) {
-			// Single variable is not part of an equality
+		if (i == 0 || eq_lift_lo[i - 1].first != eq_lift_lo[i].first) {
 			insert_imp(p, v, eq_lift_lo[i].second);
+		} else if (eq_lift_lo[i - 1].first == eq_lift_lo[i].first) {
+			hi_eq = pu::merge(hi_eq, eq_lift_lo[i - 1].second,
+					  eq_lift_lo[i].second);
 		}
 	}
 
