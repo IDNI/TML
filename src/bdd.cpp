@@ -241,6 +241,8 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 		(int_t) V.size()-1);
 }
 
+//Consider: variable can be removed at higher level if high and low only differ by 2-CNF part
+//Needs that in the negation the mentioned variable is also part of the 2-CNF
 void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	DBG(assert (l != F);)
 	if(h == F) {
@@ -254,6 +256,11 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 			//Mc.emplace(move(c), CV.size()-1);
 			NP.emplace_back(np);
 			//Mneg_c.emplace(move(neg_c), neg_CV.size()-1);
+
+			//Testing
+			DBG(assert(poset::eval(p, -v) == P[1]);)
+			DBG(assert(poset::eval(np, v) == P[1]);)
+
 			return;
 		} else {
 			poset np_l = poset::get(l, true);
@@ -263,6 +270,10 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 					       forward<poset>(np_l)	);
 			if (p.pure) {
 				V.emplace_back(v,h,l);
+
+				//Testing
+				DBG(assert(poset::eval(p, v) == poset::get(l, false));)
+
 				//V.emplace_back(0,0,0);
 				//Mc.emplace(c, CV.size());
 				//if(np.pure)
@@ -271,6 +282,11 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 			else if (np_l.pure && poset::only_vars(np_l)){
 				np.pure = true;
 				V.emplace_back(v,h,l);
+
+				//Testing
+				DBG(assert(poset::eval(np, v) == poset::get(h,true));)
+				DBG(assert(poset::eval(np, -v) == poset::get(l, true));)
+
 				//V.emplace_back(0,0,0);
 				//Mneg_c.emplace(neg_c, neg_CV.size());
 			}
@@ -290,6 +306,11 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		if (p_h.pure && poset::only_vars(p_h)) {
 			p.pure = true;
 			V.emplace_back(v,h,l);
+
+			//Testing
+			DBG(assert(poset::eval(p, v) == poset::get(h,false));)
+			DBG(assert(poset::eval(p, -v) == poset::get(l,false));)
+
 			//V.emplace_back(0, 0, 0);
 			//Mc.emplace(c, CV.size());
 			//if (neg_c.pure())
@@ -297,6 +318,11 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 		}
 		else if (np.pure) {
 			V.emplace_back(v,h,l);
+
+			//Testing
+			DBG(assert(poset::eval(np, v) == poset::get(h,true));)
+			DBG(assert(poset::eval(np, -v) == poset::get(l,true));)
+
 			//V.emplace_back(0, 0, 0);
 			//Mneg_c.emplace(neg_c, neg_CV.size());
 		}
@@ -307,19 +333,39 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	}
 	DBG(assert(h!=T);)
 	// general lifting case
+	if(v == 29 && h == -32 && l == 32)
+		int_t r = 3;
 	poset p = poset::lift(v, poset::get(h,false), poset::get(l,false));
 	poset np = poset::lift(v, poset::get(h,true), poset::get(l,true));
 	if (p.pure && np.pure) {
 		V.emplace_back(v,h,l);
+
+		//Testing
+		DBG(assert(poset::eval(p, v) == poset::get(h,false));)
+		DBG(assert(poset::eval(p, -v) == poset::get(l,false));)
+
+		DBG(assert(poset::eval(np, v) == poset::get(h,true));)
+		DBG(assert(poset::eval(np, -v) == poset::get(l,true));)
+
 		//V.emplace_back(0, 0, 0);
 		//Mc.emplace(c, CV.size());
 		//Mneg_c.emplace(neg_c, neg_CV.size());
 	} else if (p.pure) {
 		V.emplace_back(v,h,l);
+
+		//Testing
+		DBG(assert(poset::eval(p, v) == poset::get(h,false));)
+		DBG(assert(poset::eval(p, -v) == poset::get(l,false));)
+
 		//V.emplace_back(0, 0, 0);
 		//Mc.emplace(c, CV.size());
 	} else if (np.pure){
 		V.emplace_back(v,h,l);
+
+		//Testing
+		DBG(assert(poset::eval(np, v) == poset::get(h,true));)
+		DBG(assert(poset::eval(np, -v) == poset::get(l,true));)
+
 		//V.emplace_back(0, 0, 0);
 		//Mneg_c.emplace(neg_c, neg_CV.size());
 	}

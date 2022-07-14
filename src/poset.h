@@ -290,6 +290,7 @@ class poset {
 	// Internal memory structures for lifting equalities from single variables
 	static std::vector<std::pair<int_t, int_t>> eq_lift_hi;
 	static std::vector<std::pair<int_t, int_t>> eq_lift_lo;
+	static std::vector<std::pair<int_t, int_t>> eq_lift;
 
 	static void lift_imps(poset &p, poset &hi, poset &lo);
 	static void lift_vars(poset &p, int_t v, poset &hi, poset &lo);
@@ -303,7 +304,7 @@ class poset {
 	poset() = default;
 
 	//Creates single variable poset
-	explicit poset(int_t v) : pure(true), v(v) { insert_var(*this, v); }
+	explicit poset(int_t v) : pure(true), v(abs(v)) { insert_var(*this, v); }
 
 	explicit poset(bool isPure) : pure(isPure) {}
 
@@ -314,7 +315,7 @@ class poset {
 		P.emplace_back(true);
 		P.emplace_back(true);
 		NP.emplace_back(true);
-		NP.emplace_back(true);
+		NP.emplace_back(false);
 		pu::init(n);
 		pp::init();
 		ps::init();

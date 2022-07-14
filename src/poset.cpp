@@ -768,6 +768,7 @@ pair<int_t, int_t> PersistentPairs::form(pair<int_t, int_t> &p) {
 
 std::vector<std::pair<int_t, int_t>> poset::eq_lift_hi;
 std::vector<std::pair<int_t, int_t>> poset::eq_lift_lo;
+std::vector<std::pair<int_t, int_t>> poset::eq_lift;
 
 // Must be called after lift_vars due to initialization of eq_lift_hi/lo
 void poset::lift_imps(poset &p, poset &hi, poset &lo) {
@@ -871,7 +872,7 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo) {
 		} else {
 			// The absolute values of the variables are equal -> creates equality
 			if (h_var == l_var) insert_var(p, h_var);
-			else insert_eq(p, v, h_var);
+			else eq_lift.emplace_back(v,h_var);
 			// Here implications for the transitive closure have to be added.
 			// But we want transitive reduction, therefore we don't add anything else.
 			h = ps::next(h);
@@ -920,6 +921,9 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 		p.eqs = pu::intersect(hi_eq, lo_eq);
 		p.pure = false;
 	}
+	for(auto& eq : eq_lift) {
+		p.eqs = pu::merge(p.eqs, eq.first, eq.second);
+	}
 }
 
 poset poset::lift(int_t v, poset &&hi, poset &&lo) {
@@ -928,17 +932,19 @@ poset poset::lift(int_t v, poset &&hi, poset &&lo) {
 	if (hi.pure && lo.pure) p.pure = true;
 	eq_lift_hi.clear();
 	eq_lift_lo.clear();
+	eq_lift.clear();
 	lift_vars(p, v, hi, lo);
 	lift_imps(p, hi, lo);
 	lift_eqs(p, v, hi, lo);
-	p.v = v; // v must be the smallest variable in p
+	p.v = abs(v); // v must be the smallest variable in p
 	return p;
 }
 
 // Evaluate poset on the variable v
 //TODO: return false
+//TODO: Update variable v in p
 poset poset::eval(poset &p, int_t v) {
-	if (p.v != abs(v)) DBGFAIL;
+	//if (p.v != abs(v)) DBGFAIL;
 	if (!p.pure) DBGFAIL;
 
 	poset res = p;
