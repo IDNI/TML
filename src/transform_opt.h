@@ -29,20 +29,12 @@ class dict_t;
  */
 struct mutated_prog  {
 	// starting node of the mutated progs log
-	mutated_prog(raw_prog &rp): 
-	//		original(rp), 
-			current(rp), 
-			previous(nullptr) {};
+	mutated_prog(raw_prog &rp): current(rp) {};
 	// link to previous mutated prog
-	mutated_prog(mutated_prog *mp): 
-	//		original(mp->original), 
-			previous(mp), 
-			current(mp->current) {};
-
+	mutated_prog(mutated_prog *mp): current(mp->current) {};
 	void operator()(struct mutation& m);
 
 	raw_prog current;
-	mutated_prog *previous;
 };
 
 /*!
@@ -109,6 +101,7 @@ public:
 	plan(bounder &b): bndr(b) {};
 };
 
-raw_prog optimize(raw_prog &program, plan &plan);
+raw_prog optimize_once(raw_prog &program, plan &plan);
+raw_prog optimize_loop(raw_prog &program, plan &plan);
 
 #endif // __TRANSFORM_OPT_H__

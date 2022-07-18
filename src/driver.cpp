@@ -3622,7 +3622,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			}
 			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
 			p.branchers.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			auto best = optimize(rp, p);
+			auto best = optimize_once(rp, p);
 			rp.r = best.r;
 			rp.hidden_rels = best.hidden_rels;
 			// rp.r.insert(rp.r.end(), best.r.begin(), best.r.end());
