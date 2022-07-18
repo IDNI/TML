@@ -173,7 +173,7 @@ class pu_iterator {
 
   public:
 	pu_iterator(pu &puf, int_t val_) : val(val_), end_val(val_),
-					   negate(false), looped(false),
+					   negate(val_ < 0), looped(false),
 					   uf(puf) {};
 
 	pu_iterator(const pu_iterator &) = default;

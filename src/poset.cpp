@@ -443,6 +443,9 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 		++count;
 	}
 
+	//Testing
+	if(t1 == 77 && t2 == 36)
+		int r = 4;
 	for (auto &inter_set: eq_sets) {
 		split_set(inter_set, uf1, find(uf1, inter_set[0]));
 	}
@@ -919,6 +922,8 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 	} else if (hi_eq != 0 && lo_eq != 0) {
 		// Lifting of equalities contained in hi and lo
 		p.eqs = pu::intersect(hi_eq, lo_eq);
+		p.pure = false;
+	} else if (hi_eq != 0 || lo_eq != 0) {
 		p.pure = false;
 	}
 	for(auto& eq : eq_lift) {

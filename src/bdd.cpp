@@ -333,8 +333,6 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	}
 	DBG(assert(h!=T);)
 	// general lifting case
-	if(v == 29 && h == -32 && l == 32)
-		int_t r = 3;
 	poset p = poset::lift(v, poset::get(h,false), poset::get(l,false));
 	poset np = poset::lift(v, poset::get(h,true), poset::get(l,true));
 	if (p.pure && np.pure) {
