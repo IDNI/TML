@@ -133,7 +133,7 @@ struct mutation_add_rule : public virtual mutation  {
 
 	mutation_add_rule(raw_rule &r) : rr(r) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		mp.current.r.insert(mp.current.r.end(), rr);
 		return true;
 	}
@@ -145,7 +145,7 @@ struct mutation_add_del_rule : public virtual mutation  {
 
 	mutation_add_del_rule(raw_rule del, raw_rule add) : del_(del), add_(add) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		mp.current.r.resize(mp.current.r.size() +1);
 		mp.current.r.push_back(add_);
 		remove(mp.current.r.begin(), mp.current.r.end(), del_);
@@ -158,7 +158,7 @@ struct mutation_remove_rule : public virtual mutation  {
 
 	mutation_remove_rule(raw_rule &r) : rr(r) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		remove(mp.current.r.begin(), mp.current.r.end(), rr);
 		return true;
 	}
@@ -297,7 +297,7 @@ struct mutation_to_dnf : public virtual mutation  {
 
 	mutation_to_dnf(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Converting to DNF format ..." << endl << endl;
 //		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
 		drvr.to_dnf(mp.current);
@@ -306,7 +306,7 @@ struct mutation_to_dnf : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog&) {
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_to_dnf m(*this);
 	mutations.push_back(std::make_shared<mutation_to_dnf>(m));
@@ -318,7 +318,7 @@ struct mutation_factor_rules : public virtual mutation  {
 
 	mutation_factor_rules(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Factoring rules..." << endl << endl;
 //		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
 		drvr.factor_rules(mp.current);
@@ -327,7 +327,7 @@ struct mutation_factor_rules : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_factor_rules(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_factor_rules(mutated_prog&) {
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_factor_rules m(*this);
 	mutations.push_back(std::make_shared<mutation_factor_rules>(m));
@@ -338,7 +338,7 @@ struct mutation_to_split_heads : public virtual mutation  {
 
 	mutation_to_split_heads(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Splitting heads ..." << endl;
 		drvr.split_heads(mp.current);
 //		drvr.split_heads(mp.current);
@@ -347,7 +347,7 @@ struct mutation_to_split_heads : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_split_heads(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_split_heads(mutated_prog&) {
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_to_split_heads m(*this);
 	mutations.push_back(std::make_shared<mutation_to_split_heads>(m));
@@ -359,7 +359,7 @@ struct mutation_eliminate_dead_variables : public virtual mutation  {
 
 	mutation_eliminate_dead_variables(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Eliminating dead variables ..." << endl << endl;
 		drvr.eliminate_dead_variables(mp.current);
 //		drvr.eliminate_dead_variables(mp.current);
@@ -368,7 +368,7 @@ struct mutation_eliminate_dead_variables : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_eliminate_dead_variables(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_eliminate_dead_variables(mutated_prog&) {
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_eliminate_dead_variables m(*this);
 	mutations.push_back(std::make_shared<mutation_eliminate_dead_variables>(m));
@@ -380,7 +380,7 @@ struct mutation_export_outer_quantifiers : public virtual mutation  {
 
 	mutation_export_outer_quantifiers(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Exporting Outer Quantifiers ..." << endl << endl;
 		drvr.export_outer_quantifiers(mp.current);
 		o::dbg() << "Reduced Program:" << endl << endl << mp.current << endl;
@@ -388,7 +388,7 @@ struct mutation_export_outer_quantifiers : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_export_outer_quantifiers(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_export_outer_quantifiers(mutated_prog&) {
 	// Trimmed existentials are a precondition to program optimizations
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_export_outer_quantifiers m(*this);
@@ -401,7 +401,7 @@ struct mutation_split_bodies : public virtual mutation  {
 
 	mutation_split_bodies(driver &d) : drvr(d) {}
 
-	bool const operator()(mutated_prog &mp) const override {
+	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Splitting bodies ..." << endl;
 		drvr.transform_bin(mp.current);
 		o::dbg() << "Binary Program:" << endl << mp.current << endl;
@@ -409,7 +409,7 @@ struct mutation_split_bodies : public virtual mutation  {
 	}
 };
 
-vector<std::shared_ptr<mutation>> driver::brancher_split_bodies(mutated_prog &mp) {
+vector<std::shared_ptr<mutation>> driver::brancher_split_bodies(mutated_prog&) {
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_split_bodies m(*this);
 	mutations.push_back(std::make_shared<mutation_split_bodies>(m));

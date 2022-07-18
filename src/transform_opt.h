@@ -45,7 +45,7 @@ struct mutated_prog  {
 class mutation {
 public:
 	auto operator<=>(const mutation &rhs) const = default;
-	virtual bool const operator()(mutated_prog &mp) const = 0;
+	virtual bool operator()(mutated_prog &mp) const = 0;
 };
 
 /*!
