@@ -64,7 +64,7 @@ set(TML_SOURCES
 	transform_guards.cpp
 	transform_opt.cpp
 	utils.cpp
-	iterators2.cpp
+	iterators.cpp
 	ir_builder.cpp
 	earley.cpp
 	typemanager.cpp

@@ -31,17 +31,13 @@ struct mutated_prog  {
 	// starting node of the mutated progs log
 	mutated_prog(raw_prog &rp): 
 	//		original(rp), 
-			current(raw_prog(rp.dict)), 
-			previous(nullptr) {
-		current.merge(rp);
-	};
+			current(rp), 
+			previous(nullptr) {};
 	// link to previous mutated prog
 	mutated_prog(mutated_prog *mp): 
 	//		original(mp->original), 
 			previous(mp), 
-			current(raw_prog(mp->current.dict)) {
-		current.merge(mp->current);
-	};
+			current(mp->current) {};
 
 	void operator()(struct mutation& m);
 //	mutated_prog *operator--();

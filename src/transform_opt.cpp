@@ -48,59 +48,6 @@ void mutated_prog::operator()(mutation &m) {
 	m(*this);
 }
 
-//mutated_prog *mutated_prog::operator--() {
-//	return previous;
-//}
-
-/*!
- * Collapse all valid raw rules into a vector.
- */ 
-/*vector<raw_rule>  mutated_prog::get_rules() {
-	vector<raw_rule> all;
-	if (!previous) {
-		all.insert(all.end(), current.r.begin(), current.r.end());
-		all.insert(all.end(), original.get().r.begin(), original.get().r.end());
-		for (auto r: deletions) {
-			auto i = find(all.begin(), all.end(), *r);
-			if (i != all.end()) all.erase(i);
-		}
-		return all;
-	}
-	// get previous rules
-	auto v = previous->get_rules();
-	all.insert(all.end(), v.begin(), v.end());
-	// remove current deletions
-	for (auto r: deletions) {
-		auto i = find(all.begin(), all.end(), *r);
-		if (i != all.end()) all.erase(i);
-	}
-	// add current rules
-	all.insert(all.end(), current.r.begin(), current.r.end());
-	return all;
-}*/
-
-/*raw_prog  mutated_prog::to_raw_program() {
-	if (!previous) {
-		raw_prog new_raw_prog(original.get().dict);
-		new_raw_prog.merge(original.get());
-		new_raw_prog.merge(current);
-		// remove current deletions
-		for (auto &r: deletions) {
-			auto i = find(new_raw_prog.r.begin(), new_raw_prog.r.end(), *r);
-			if (i != new_raw_prog.r.end()) new_raw_prog.r.erase(i);
-		}
-		return new_raw_prog;
-	}
-	raw_prog new_raw_prog = previous->to_raw_program();
-	new_raw_prog.merge(current);
-	// remove current deletions
-	for (auto &r: deletions) {
-		auto i = find(new_raw_prog.r.begin(), new_raw_prog.r.end(), *r);
-		if (i != new_raw_prog.r.end()) new_raw_prog.r.erase(i);
-	}
-	return new_raw_prog;
-}*/
-
 bool best_solution::bound(mutated_prog &p) {
 	size_t cost = func_(p);
 	if (cost < cost_) {
