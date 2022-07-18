@@ -85,7 +85,7 @@ void optimize(mutated_prog& mutated, vector<brancher>& branchers) {
 	}
 }
 
-void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
+void optimize_loop(mutated_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
 	// we collect all possible changes to the current mutated program
 	vector<std::shared_ptr<mutation>>  optimizations = get_optimizations(mutated, branchers);
 	// for each subset of optimizations, compute the new mutated program,
@@ -96,7 +96,7 @@ void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branche
 		vector<std::shared_ptr<mutation>> v = *it;
 		for (auto mt = v.begin(); mt != v.end(); ++mt) (*mt).get()->operator()(new_mutated);
 		if (bounder.bound(new_mutated)) {
-			optimize(new_mutated, bounder, branchers);
+			optimize_loop(new_mutated, bounder, branchers);
 		}
 	}
 }
@@ -104,27 +104,29 @@ void optimize(mutated_prog& mutated, bounder& bounder, vector<brancher>& branche
 /*!
  * Optimize a raw program
  */
-raw_prog optimize(raw_prog &program, optimization_plan &plan) {
+raw_prog optimize_once(raw_prog &program, plan &plan) {
 	// the first mutated program just contain the original program as additions.
 	mutated_prog mutated {program};
-	o::dbg() << "Applying begin optimizations ..." << endl << endl;
-	optimize(mutated, plan.begin); 
-	plan.bndr.bound(mutated);
-	o::dbg() << "Applying loop optimizations ..." << endl << endl;
-	optimize(mutated, plan.bndr, plan.loop);
-	// o::dbg() << "Applying end optimizations ..." << endl << endl;
-	// mutated_prog loop{plan.bndr.solution()};
-	// optimize(loop, plan.end);
-	// plan.bndr.bound(mutated);
-	return plan.bndr.solution();
+	o::dbg() << "Applying optimizations ..." << endl << endl;
+	optimize(mutated, plan.branchers); 
+	plan.bndr.get().bound(mutated);
+	return plan.bndr.get().solution();
 }
 
-raw_prog optimize(raw_prog& program, bounder& bounder, vector<brancher>& branchers) {
+raw_prog optimize_loop(raw_prog &program, plan &plan) {
+	// loop over the branchers.
+	mutated_prog mutated {program};
+	o::dbg() << "Looping over optimizations ..." << endl << endl;
+	optimize_loop(mutated, plan.bndr, plan.branchers);
+	return plan.bndr.get().solution();
+}
+
+/* raw_prog optimize(raw_prog& program, bounder& bounder, vector<brancher>& branchers) {
 	// the first mutated program just contain the original program as additions.
 	mutated_prog mutated {program};
 	optimize(mutated, bounder, branchers);
 	return bounder.solution();
-}
+} */
 
 struct mutation_add_rule : public virtual mutation  {
 	raw_rule &rr;
@@ -413,5 +415,3 @@ vector<std::shared_ptr<mutation>> driver::brancher_split_bodies(mutated_prog &mp
 	mutations.push_back(std::make_shared<mutation_split_bodies>(m));
 	return mutations;
 }
-
-optimization_plan::optimization_plan(bounder &b) : bndr(b) {}

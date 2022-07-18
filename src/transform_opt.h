@@ -101,16 +101,14 @@ private:
 /*!
  * Optimization plan accordignly to command line options
  */
-struct optimization_plan {
+struct plan {
 public:
-	std::vector<brancher> begin;
-	std::vector<brancher> loop;
-	std::vector<brancher> end;
-	bounder& bndr;
+	std::vector<brancher> branchers;
+	std::reference_wrapper<bounder> bndr;
 
-	optimization_plan(bounder &b);
+	plan(bounder &b): bndr(b) {};
 };
 
-raw_prog optimize(raw_prog &program, optimization_plan &plan);
+raw_prog optimize(raw_prog &program, plan &plan);
 
 #endif // __TRANSFORM_OPT_H__
