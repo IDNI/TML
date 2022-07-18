@@ -3524,51 +3524,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		});
 	}
 
-/*	if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-			opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-			opts.enabled("to-dnf")) {
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		export_outer_quantifiers(rp);
-		o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
-
-		step_transform(rp, [&](raw_prog &rp) {
-			// This transformation is a prerequisite to the CQC and binary
-			// transformations, hence its more general activation condition.
-			o::dbg() << "Converting to DNF format ..." << endl << endl;
-			to_dnf(rp);
-			split_heads(rp);
-			o::dbg() << "DNF Program:" << endl << endl << rp << endl;
-
-			if(opts.enabled("cqnc-subsume")) {
-				o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
-				subsume_queries(rp,
-					[this](const raw_rule &rr1, const raw_rule &rr2)
-						{return cqnc(rr1, rr2);});
-				o::dbg() << "CQNC Subsumed Program:" << endl << rp << endl;
-			}
-			if(opts.enabled("cqc-subsume")) {
-				o::dbg() << "Subsuming using CQC test ..." << endl << endl;
-				subsume_queries(rp,
-					[this](const raw_rule &rr1, const raw_rule &rr2)
-						{return cqc(rr1, rr2);});
-				o::dbg() << "CQC Subsumed Program:" << endl << rp << endl;
-			}
-			if(opts.enabled("cqc-factor")) {
-				o::dbg() << "Factoring queries using CQC test ..." << endl;
-				factor_rules(rp);
-				o::dbg() << "Factorized Program:" << endl << rp	<< endl;
-			}
-			if(opts.enabled("split-rules")) {
-				// Though this is a binary transformation, rules will become
-				// ternary after timing guards are added
-				o::dbg() << "Converting rules to unary form ..." << endl;
-				transform_bin(rp);
-				o::dbg() << "Binary Program:" << endl << rp << endl;
-			}
-		});
-	}*/
-
 	if(int_t iter_num = opts.get_int("O3")) {
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
