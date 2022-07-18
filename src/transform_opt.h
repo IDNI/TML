@@ -40,14 +40,9 @@ struct mutated_prog  {
 			current(mp->current) {};
 
 	void operator()(struct mutation& m);
-//	mutated_prog *operator--();
-//	std::vector<raw_rule> get_rules();
-//	raw_prog to_raw_program();
 
 	raw_prog current;
-	std::vector<raw_rule*> deletions;
 	mutated_prog *previous;
-//	std::reference_wrapper<raw_prog> original;
 };
 
 /*!
