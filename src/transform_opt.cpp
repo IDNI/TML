@@ -121,13 +121,6 @@ raw_prog optimize_loop(raw_prog &program, plan &plan) {
 	return plan.bndr.get().solution();
 }
 
-/* raw_prog optimize(raw_prog& program, bounder& bounder, vector<brancher>& branchers) {
-	// the first mutated program just contain the original program as additions.
-	mutated_prog mutated {program};
-	optimize(mutated, bounder, branchers);
-	return bounder.solution();
-} */
-
 struct mutation_add_rule : public virtual mutation  {
 	raw_rule &rr;
 
@@ -299,7 +292,6 @@ struct mutation_to_dnf : public virtual mutation  {
 
 	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Converting to DNF format ..." << endl << endl;
-//		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
 		drvr.to_dnf(mp.current);
 		o::dbg() << "DNF Program:" << endl << endl << mp.current << endl;
 		return true;
@@ -320,7 +312,6 @@ struct mutation_factor_rules : public virtual mutation  {
 
 	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Factoring rules..." << endl << endl;
-//		drvr.to_dnf(mp.previous ? mp.current : mp.original.get());
 		drvr.factor_rules(mp.current);
 		o::dbg() << "Factored Program:" << endl << endl << mp.current << endl;
 		return true;
@@ -333,6 +324,7 @@ vector<std::shared_ptr<mutation>> driver::brancher_factor_rules(mutated_prog&) {
 	mutations.push_back(std::make_shared<mutation_factor_rules>(m));
 	return mutations; 
 }
+
 struct mutation_to_split_heads : public virtual mutation  {
 	driver &drvr;
 
@@ -341,7 +333,6 @@ struct mutation_to_split_heads : public virtual mutation  {
 	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Splitting heads ..." << endl;
 		drvr.split_heads(mp.current);
-//		drvr.split_heads(mp.current);
 		o::dbg() << "Binary Program:" << endl << mp.current << endl;
 		return false;
 	}
@@ -362,7 +353,6 @@ struct mutation_eliminate_dead_variables : public virtual mutation  {
 	bool operator()(mutated_prog &mp) const override {
 		o::dbg() << "Eliminating dead variables ..." << endl << endl;
 		drvr.eliminate_dead_variables(mp.current);
-//		drvr.eliminate_dead_variables(mp.current);
 		o::dbg() << "Stripped TML Program:" << endl << endl << mp.current << endl;
 		return true;
 	}
@@ -389,7 +379,7 @@ struct mutation_export_outer_quantifiers : public virtual mutation  {
 };
 
 vector<std::shared_ptr<mutation>> driver::brancher_export_outer_quantifiers(mutated_prog&) {
-	// Trimmed existentials are a precondition to program optimizations
+	// trimmed existentials are a precondition to program optimizations
 	vector<std::shared_ptr<mutation>> mutations;
 	mutation_export_outer_quantifiers m(*this);
 	mutations.push_back(std::make_shared<mutation_export_outer_quantifiers>(m));

@@ -3625,8 +3625,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			auto best = optimize_once(rp, p);
 			rp.r = best.r;
 			rp.hidden_rels = best.hidden_rels;
-			// rp.r.insert(rp.r.end(), best.r.begin(), best.r.end());
-			// rp.r = best.r;
 			o::dbg() << "Current:" << endl << rp << endl;
 
 		});
