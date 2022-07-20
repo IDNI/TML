@@ -7,10 +7,9 @@
 #include <functional>
 #include "defs.h"
 
-class PersistentUnionFind;
-
 class pu_iterator;
 
+class PersistentUnionFind;
 struct PersistentSet;
 struct PersistentPairs;
 
@@ -51,27 +50,21 @@ struct std::hash<std::pair<int_t, std::pair<int_t, int_t>>> {
 };
 
 class PersistentArray {
-	typedef PersistentArray p_arr;
-	typedef std::shared_ptr<PersistentArray> sppa;
 	typedef std::vector<int_t> storage;
 
-	int_t p = -1, v = -1;
-	sppa diff;
-  public:
-	PersistentArray() : diff(nullptr) {}
+	int_t p = -1, v = -1, diff = -1;
 
-	PersistentArray(int_t pos, int_t val, sppa &a) : p(pos), v(val),
+	static void update(storage &arr, int t);
+  public:
+	PersistentArray() : diff(-1) {}
+
+	PersistentArray(int_t pos, int_t val, int_t a) : p(pos), v(val),
 							 diff(a) {}
 
 	friend class PersistentUnionFind;
 
-	static sppa
-	init(storage &arr, int_t n, std::function<int_t(int_t)> &&f) {
-		if (!arr.empty()) return nullptr;
-		arr.reserve(n);
-		for (int_t i = 0; i < n; ++i) arr.emplace_back(f(i));
-		return std::make_shared<p_arr>(PersistentArray());
-	}
+	static inline int_t
+	init(storage &arr, int_t n, std::function<int_t(int_t)> &&f);
 
 	static void
 	resize(storage &arr, int_t n, std::function<int_t(int_t)> &&f) {
@@ -79,53 +72,51 @@ class PersistentArray {
 		for (int_t i = arr.size(); i < n; ++i) arr.emplace_back(f(i));
 	}
 
-	static int_t get(storage &arr, const sppa &t, int_t pos);
-	static sppa set(storage &arr, const sppa &t, int_t pos, int_t val);
-	static void reroot(storage &arr, const sppa &t);
+	static int_t get(storage &arr, int_t& c, int_t t, int_t pos, bool reset_to_num);
+	static int_t set(storage &arr, int_t& c, int_t t, int_t pos, int_t val, bool reset_to_num);
+	static void reroot(storage &arr, int_t& c, int_t t, bool reset_to_num);
 
 	static int_t size(storage &arr) { return (int_t) arr.size(); }
 };
 
 class PersistentUnionFind {
-	typedef PersistentUnionFind puf;
-	typedef PersistentArray p_arr;
-	typedef std::shared_ptr<PersistentArray> sppa;
+	typedef PersistentUnionFind pu;
+	typedef PersistentArray pa;
 
-	static std::vector<int_t> parent_s;
-	static std::vector<int_t> link_s;
-	static std::vector<int_t> hashes_s;
-	mutable sppa arr_pt;
-	sppa link_pt;
-	sppa hash_pt;
+	static std::vector<int_t> parent_s, link_s, hashes_s;
+	static int current_parent, current_link, current_hash;
+	mutable int_t arr_pt;
+	int_t link_pt;
+	int_t hash_pt;
 	int_t hash = 0;
 
 	explicit PersistentUnionFind(int_t n) {
-		arr_pt = p_arr::init(parent_s, n, [](int_t i) { return i; });
-		link_pt = p_arr::init(link_s, n, [](int_t i) { return i; });
-		hash_pt = p_arr::init(hashes_s, n, [](int_t i) { return 0; });
+		arr_pt = pa::init(parent_s, n, [](int_t i) { return i; });
+		link_pt = pa::init(link_s, n, [](int_t i) { return i; }) + 1;
+		hash_pt = pa::init(hashes_s, n, [](int_t i) { return 0; }) + 2;
+		current_parent = 0; current_link = 1; current_hash = 2;
 	}
 
 	// Create puf taking the change from setting value at position x to y into account
-	explicit PersistentUnionFind(sppa &&a_ptr, sppa &&l_ptr, sppa &&h_ptr,
+	explicit PersistentUnionFind(int_t a_ptr, int_t l_ptr, int_t h_ptr,
 				     int_t h_old, int_t x, int_t y,
 				     int_t hash_x, int_t hash_y) {
-		arr_pt = move(a_ptr), link_pt = move(l_ptr), hash_pt = move(
-			h_ptr);
+		arr_pt = a_ptr, link_pt = l_ptr, hash_pt = h_ptr;
 		hash = h_old ^ hash_x ^ hash_y ^ hash_set(x, y, hash_x, hash_y);
 	}
 
-	static int_t add(puf &uf);
-	static int_t update(const puf &t, int_t x, int_t y);
-	static void split_set(std::vector<int_t> &s, puf &uf, int_t root);
+	static int_t add(pu &uf);
+	static int_t update(const pu &t, int_t x, int_t y);
+	/*static void split_set(std::vector<int_t> &s, pu &uf, int_t root);
 	static void
 	split_hashes(int_t root_x, int_t root_y, int_t hash_x,
 		     int_t hash_y, int_t count_x, int_t count_y,
-		     int_t prev_root, puf &uf);
-	static void split_linking(std::vector<int_t> &s, puf &uf,
-				  int_t root);
-	static sppa update_link(const puf &t, int_t x, int_t y);
-	static int_t find(const puf &t, int_t elem);
-	static pu_iterator get_equal(puf &uf, int_t x);
+		     int_t prev_root, pu &uf);
+	static void split_linking(std::vector<int_t> &s, pu &uf,
+				  int_t root);*/
+	static int_t update_link(const pu &t, int_t x, int_t y);
+	static int_t find(const pu &t, int_t elem);
+	static pu_iterator get_equal(pu &uf, int_t x);
 	static pu_iterator
 	HalfList(const pu_iterator &start, const pu_iterator &end);
 	static int_t
@@ -135,13 +126,14 @@ class PersistentUnionFind {
 	static int_t
 	MergeSort(pu_iterator start, const pu_iterator &end);
 	PersistentUnionFind() = delete;
-	bool operator==(const puf &) const;
-	friend std::hash<puf>;
+	bool operator==(const pu &) const;
+	friend std::hash<pu>;
 	friend pu_iterator;
 
 	static void init(int_t n);
 	static int_t find(int_t t, int_t elem);
 	static int_t merge(int_t t, int_t x, int_t y);
+	static int_t merge_set (int_t t, std::vector<int_t>& s);
 	static int_t intersect(int_t t1, int_t t2);
 	static bool equal(int_t t, int_t x, int_t y);
 	static pu_iterator get_equal(int_t t, int_t x);
@@ -159,7 +151,7 @@ class PersistentUnionFind {
 	}
 
 	static void print(int_t uf, std::ostream &os);
-	static void print(puf &uf, std::ostream &os);
+	static void print(pu &uf, std::ostream &os);
 };
 
 class pu_iterator {
@@ -182,7 +174,7 @@ class pu_iterator {
 
 	pu_iterator &operator++() {
 		if (!looped) looped = true;
-		val = pa::get(pu::link_s, uf.link_pt, abs(val));
+		val = pa::get(pu::link_s, pu::current_link, uf.link_pt, abs(val), true);
 		val = negate ? -val : val;
 		if ((negate ? -val : val) < 0) negate = !negate;
 		return *this;
@@ -249,7 +241,7 @@ struct PersistentPairs {
 	int_t n;
 	PersistentPairs() = delete;
 
-	PersistentPairs(std::pair<int_t, int_t> &&e_, int_t n_) : e(e_),
+	PersistentPairs(std::pair<int_t, int_t> &&e_, int_t n_) : e(move(e_)),
 								  n(n_) {}
 
 	bool operator==(const PersistentPairs &) const;
@@ -288,8 +280,8 @@ class poset {
 	// Singletons, represented by a pointer to the set_univ
 	int_t vars = 0;
 	// Internal memory structures for lifting equalities from single variables
-	static std::vector<std::pair<int_t, int_t>> eq_lift_hi;
-	static std::vector<std::pair<int_t, int_t>> eq_lift_lo;
+	static std::unordered_map<int_t,int_t> eq_lift_hi;
+	static std::unordered_map<int_t,int_t> eq_lift_lo;
 	static std::vector<std::pair<int_t, int_t>> eq_lift;
 
 	static void lift_imps(poset &p, poset &hi, poset &lo);
@@ -330,21 +322,21 @@ class poset {
 		return pu::size();
 	};
 
-	static poset lift(int_t v, poset &&hi, poset &&lo);
+	static poset lift(int_t v, int_t h, int_t l);
 	static poset eval(poset &p, int_t v);
 	static bool insert_var(poset &p, int_t v);
 	static poset insert_var(poset &&p, int_t v);
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);
 	static void insert_imp(poset &p, int_t fst, int_t snd);
 	static void insert_eq(poset &p, int_t v1, int_t v2);
-	static poset get(int_t pos, bool negated);
+	static poset get(int_t pos);
 	static void print(poset &p, std::ostream &os);
 
 	inline static bool is_empty(poset &p) {
 		return p.eqs + p.imps + p.vars == 0;
 	}
 
-	inline static bool only_vars(poset &p) {
+	inline static bool only_vars(poset &&p) {
 		return p.eqs + p.imps == 0 && p.vars > 0;
 	}
 };

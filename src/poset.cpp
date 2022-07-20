@@ -35,14 +35,13 @@ vector<poset> P;
 // universe for negatively saved posets
 vector<poset> NP;
 
+std::vector<PersistentArray> pa_univ;
 std::vector<PersistentUnionFind> uf_univ;
 std::vector<PersistentPairs> pairs_univ;
 std::vector<PersistentSet> set_univ;
-std::unordered_map<PersistentUnionFind, int_t> memo;
+std::unordered_map<PersistentUnionFind, int_t> uf_memo;
 std::unordered_map<PersistentPairs, int_t> pair_memo;
 std::unordered_map<PersistentSet, int_t> set_memo;
-unordered_map<pair<int_t, int_t>, int_t> set_cache;
-unordered_map<pair<int_t, pair<int_t, int_t>>, int_t> pair_cache;
 
 size_t std::hash<PersistentUnionFind>::operator()(
 	const PersistentUnionFind &uf) const {
@@ -72,69 +71,88 @@ size_t std::hash<std::pair<int_t, std::pair<int_t, int_t>>>::operator()(
 	return hash_pair(p.first, hash_pair(p.second.first, p.second.second));
 }
 
+int_t PersistentArray::init(storage &arr, int_t n,
+			   std::function<int_t(int_t)> &&f) {
+	pa_univ.emplace_back();
+	if (!arr.empty()) return -1;
+	arr.reserve(n);
+	for (int_t i = 0; i < n; ++i) arr.emplace_back(f(i));
+	return 0;
 
-int_t PersistentArray::get(storage &arr, const sppa &t, int_t pos) {
-	if (t->diff == nullptr) {
+}
+
+int_t PersistentArray::get(storage &arr, int_t &c, int_t t, int_t pos,
+			   bool reset_to_num) {
+	if (t == c) {
 		// Here we operate directly on the vector
 		return arr[pos];
 	}
-	reroot(arr, t);
-	DBG(assert(t->diff == nullptr));
+	reroot(arr, c, t, reset_to_num);
 	return arr[pos];
 }
 
-PersistentArray::sppa
-PersistentArray::set(storage &arr, const sppa &t, int_t pos, int_t val) {
-	reroot(arr, t);
-	// The hash also stays the same in this situation
-	if (get(arr, t, pos) == val) return t;
+int_t
+PersistentArray::set(storage &arr, int_t &c, int_t t, int_t pos, int_t val,
+		     bool reset_to_num) {
+	reroot(arr, c, t, reset_to_num);
+	if (get(arr, c, t, pos, reset_to_num) == val) return t;
 
-	DBG(assert(t->diff == nullptr));
-	int_t old_val = arr[pos];
 	arr[pos] = val;
-	auto res = make_shared<PersistentArray>(PersistentArray());
-	t->p = pos;
-	t->v = old_val;
-	t->diff = res;
-	return res;
+	pa_univ.emplace_back(pos, val, t);
+	c = (int) pa_univ.size() - 1;
+	return c;
 }
 
-void PersistentArray::reroot(storage &arr, const sppa &t) {
-	if (t->diff == nullptr) return;
-	reroot(arr, t->diff);
-	DBG(assert(t->diff->diff == nullptr));
-	int_t pos = t->p;
-	int_t val = arr[pos];
-	arr[pos] = t->v;
-	shared_ptr<p_arr> arr_pt = t->diff;
+void PersistentArray::reroot(storage &arr, int_t& c, int_t t, bool reset_to_num) {
+	if(t == c) return;
 
-	t->p = t->diff->p;
-	t->v = t->diff->v;
-	t->diff = t->diff->diff;
+	// Undo diff chain from c
+	while(pa_univ[c].diff != -1) {
+		if(c == t) {
+			update(arr, t);
+			return;
+		}
+		if(reset_to_num)
+			arr[pa_univ[c].p] = pa_univ[c].p;
+		else arr[pa_univ[c].p] = 0;
+		c = pa_univ[c].diff;
+	}
 
-	arr_pt->diff = t;
-	arr_pt->p = pos;
-	arr_pt->v = val;
+	update(arr, t);
+	c = t;
+}
+
+void PersistentArray::update(storage &arr, int t) {
+	if (pa_univ[t].diff == -1) return;
+	update(arr, pa_univ[t].diff);
+
+	arr[pa_univ[t].p] = pa_univ[t].v;
 }
 
 vector<int_t> PersistentUnionFind::parent_s;
 vector<int_t> PersistentUnionFind::link_s;
 vector<int_t> PersistentUnionFind::hashes_s;
 
+int_t PersistentUnionFind::current_parent;
+int_t PersistentUnionFind::current_link;
+int_t PersistentUnionFind::current_hash;
+
 void PersistentUnionFind::init(int_t n) {
 	if (!uf_univ.empty()) return;
-	puf root = puf(n);
+	pu root = pu(n);
 	uf_univ.push_back(root);
-	memo.try_emplace(move(root), 0);
+	uf_memo.try_emplace(root, 0);
 }
 
-int_t PersistentUnionFind::find(const puf &t, int_t elem) {
-	auto t_elem = p_arr::get(parent_s, t.arr_pt, abs(elem));
+int_t PersistentUnionFind::find(const pu &t, int_t elem) {
+	auto t_elem = pa::get(parent_s, current_parent, t.arr_pt, abs(elem),
+			      true);
 	if (abs(t_elem) == abs(elem)) return elem < 0 ? -t_elem : t_elem;
 	else {
 		auto r = elem < 0 ? -find(t, t_elem) : find(t, t_elem);
-		t.arr_pt = p_arr::set(parent_s, t.arr_pt, abs(elem),
-				      elem < 0 ? -r : r);
+		t.arr_pt = pa::set(parent_s, current_parent, t.arr_pt,
+				   abs(elem),
+				   elem < 0 ? -r : r, true);
 		// We do not reset the hashes because those are only queried on root nodes
 		return r;
 	}
@@ -148,34 +166,35 @@ int_t PersistentUnionFind::find(int_t t, int_t elem) {
 // Updates t by setting the value at x to y
 // while assuming that x and y are root nodes
 // y is the new parent of x
-int_t PersistentUnionFind::update(const puf &t, int_t x, int_t y) {
+int_t PersistentUnionFind::update(const pu &t, int_t x, int_t y) {
 	DBG(assert(y >= 0));
-	auto hash_x = p_arr::get(hashes_s, t.hash_pt, abs(x));
-	auto hash_y = p_arr::get(hashes_s, t.hash_pt, y);
-	auto uf = puf(p_arr::set(parent_s, t.arr_pt, abs(x), x < 0 ? -y : y),
-		      update_link(t, x, y),
-		      p_arr::set(hashes_s, t.hash_pt, y,
-				 hash_set(x, y, hash_x, hash_y)),
-		      t.hash, x, y, hash_x, hash_y);
+	auto hash_x = pa::get(hashes_s, current_hash, t.hash_pt, abs(x), false);
+	auto hash_y = pa::get(hashes_s, current_hash, t.hash_pt, y, false);
+	auto uf = pu(pa::set(parent_s, current_parent, t.arr_pt, abs(x),
+			     x < 0 ? -y : y, true),
+		     update_link(t, x, y),
+		     pa::set(hashes_s, current_hash, t.hash_pt, y,
+			     hash_set(x, y, hash_x, hash_y), false),
+		     t.hash, x, y, hash_x, hash_y);
 	return add(uf);
 }
 
-int_t PersistentUnionFind::add(puf &uf) {
-	if (auto it = memo.find(uf); it != memo.end()) {
+int_t PersistentUnionFind::add(pu &uf) {
+	if (auto it = uf_memo.find(uf); it != uf_memo.end()) {
 		return it->second;
 	} else {
 		uf_univ.push_back(uf);
-		memo.try_emplace(move(uf), uf_univ.size() - 1);
+		uf_memo.try_emplace(uf, uf_univ.size() - 1);
 		return (int_t) uf_univ.size() - 1;
 	}
 }
 
-void
-PersistentUnionFind::split_set(vector<int_t> &s, PersistentUnionFind::puf &uf,
+/*void
+PersistentUnionFind::split_set(vector<int_t> &s, PersistentUnionFind::pu &uf,
 			       int_t root) {
 	if (s.empty()) return;
 	for (auto el: s) {
-		uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, abs(el),
+		uf.arr_pt = pa::set(parent_s, uf.arr_pt, abs(el),
 				       el < 0 ? -s[0] : s[0]);
 	}
 	split_linking(s, uf, abs(root));
@@ -247,16 +266,18 @@ PersistentUnionFind::split_linking(std::vector<int_t> &s, puf &uf, int_t root) {
 	split_hashes(abs(s[0]), root_cs, hash_s, hash_cs, (int_t) s.size(),
 		     count_cs, root, uf);
 }
+*/
 
-PersistentUnionFind::sppa
-PersistentUnionFind::update_link(const puf &t, int_t x, int_t y) {
+int_t PersistentUnionFind::update_link(const pu &t, int_t x, int_t y) {
 	// y is the new parent of x
 	DBG(assert(y >= 0));
-	int_t y_link = p_arr::get(link_s, t.link_pt, y);
-	int_t x_link = p_arr::get(link_s, t.link_pt, abs(x));
+	int_t y_link = pa::get(link_s, current_link, t.link_pt, y, true);
+	int_t x_link = pa::get(link_s, current_link, t.link_pt, abs(x), true);
 
-	auto link1 = p_arr::set(link_s, t.link_pt, y, x < 0 ? -x_link : x_link);
-	return p_arr::set(link_s, link1, abs(x), x < 0 ? -y_link : y_link);
+	auto link1 = pa::set(link_s, current_link, t.link_pt, y,
+			     x < 0 ? -x_link : x_link, true);
+	return pa::set(link_s, current_link, link1, abs(x),
+		       x < 0 ? -y_link : y_link, true);
 }
 
 pu_iterator PersistentUnionFind::HalfList(const pu_iterator &start,
@@ -283,27 +304,27 @@ int_t PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 	};
 
 	if (abs(*a) == abs(a_end)) {
-		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos),
-					  negated ? -*b : *b);
+		a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt, abs(pos),
+					  negated ? -*b : *b, true);
 		set_pos(*b);
 		while (abs(*(++b)) != abs(b_end)) {
-			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt,
-						  abs(pos), negated ? -*b : *b);
+			a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt,
+						  abs(pos), negated ? -*b : *b, true);
 			set_pos(*b);
 		}
 		return 0;
 	} else if (abs(*b) == abs(b_end)) {
-		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos),
-					  negated ? -*a : *a);
+		a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt, abs(pos),
+					  negated ? -*a : *a, true);
 		set_pos(*a);
 		while (abs(*(++a)) != abs(a_end)) {
-			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt,
-						  abs(pos), negated ? -*a : *a);
+			a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt,
+						  abs(pos), negated ? -*a : *a, true);
 			set_pos(*a);
 		}
 		//Correcting end value of chain
-		a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt, abs(pos),
-					  negated ? -b_end : b_end);
+		a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt, abs(pos),
+					  negated ? -b_end : b_end, true);
 		return 0;
 	}
 
@@ -312,8 +333,8 @@ int_t PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 			set_pos(*a);
 			return SortedMerge(++a, b, a_end, b_end, pos, negated);
 		} else {
-			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt,
-						  abs(pos), negated ? -*a : *a);
+			a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt,
+						  abs(pos), negated ? -*a : *a, true);
 			set_pos(*a);
 			return SortedMerge(++a, b, a_end, b_end, pos, negated);
 		}
@@ -324,15 +345,14 @@ int_t PersistentUnionFind::SortedMerge(pu_iterator &a, pu_iterator &b,
 			// Start position changed
 			return pos;
 		} else {
-			a.uf.link_pt = p_arr::set(puf::link_s, a.uf.link_pt,
-						  abs(pos), negated ? -*b : *b);
+			a.uf.link_pt = pa::set(pu::link_s, current_link, a.uf.link_pt,
+						  abs(pos), negated ? -*b : *b, true);
 			set_pos(*b);
 			return SortedMerge(a, ++b, a_end, b_end, pos, negated);
 		}
 	}
 }
 
-//TODO: Take care of negated/unnegated in resulting ordering
 int_t
 PersistentUnionFind::MergeSort(pu_iterator start, const pu_iterator &end) {
 	if (start == end) return 0;
@@ -367,8 +387,8 @@ int_t PersistentUnionFind::merge(int_t t, int_t x, int_t y) {
 	};
 	form(x, y);
 	auto &uf = uf_univ[t];
-	auto cx = puf::find(uf, x);
-	auto cy = puf::find(uf, y);
+	auto cx = pu::find(uf, x);
+	auto cy = pu::find(uf, y);
 	form(cx, cy);
 	if (cx != cy) {
 		if (abs(cy) < abs(cx)) return update(uf, cx, cy);
@@ -378,27 +398,35 @@ int_t PersistentUnionFind::merge(int_t t, int_t x, int_t y) {
 	} else return t;
 }
 
+int_t PersistentUnionFind::merge_set(int_t t, std::vector<int_t> &s) {
+	if (s.size()<2) return t;
+	for (int_t i = 1; i < (int_t)s.size(); ++i) {
+		t = merge(t, s[0], s[i]);
+	}
+	return t;
+}
+
 int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	if (t1 == t2) return t1;
 	else if (t1 == 0 || t2 == 0) return 0;
 
-	auto uf1 = uf_univ[t1];
+	auto &uf1 = uf_univ[t1];
 	auto &uf2 = uf_univ[t2];
 
 	// Make uf1 root, so we check the diff path from uf2
-	p_arr::reroot(parent_s, uf1.arr_pt);
-	weak_ptr<p_arr> diff_pt = uf2.arr_pt;
+	pa::reroot(parent_s, current_parent, uf1.arr_pt, true);
+	int_t diff_pt = uf2.arr_pt;
 
 	static vector<pair<int_t, int_t>> diffs;
 	static vector<vector<int_t>> eq_sets;
 
-	while (diff_pt.lock()->diff != nullptr) {
-		auto el = pair(diff_pt.lock()->p, 0);
+	while (pa_univ[diff_pt].diff != -1) {
+		auto el = pair(pa_univ[diff_pt].p, 0);
 		if (!hasbc(diffs, el, abs_lex_cmp)) {
 			diffs.emplace_back(move(el));
 			sortc(diffs, abs_lex_cmp);
 		}
-		diff_pt = diff_pt.lock()->diff;
+		diff_pt = pa_univ[diff_pt].diff;
 	}
 
 	for (auto &el: diffs) {
@@ -443,15 +471,13 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 		++count;
 	}
 
-	//Testing
-	if(t1 == 77 && t2 == 36)
-		int r = 4;
 	for (auto &inter_set: eq_sets) {
-		split_set(inter_set, uf1, find(uf1, inter_set[0]));
+		t1 = rm_equal(t1, inter_set[0]);
+		t1 = merge_set(t1, inter_set);
 	}
 	diffs.clear();
 	eq_sets.clear();
-	return add(uf1);
+	return t1;
 }
 
 bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
@@ -459,23 +485,22 @@ bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
 	return find(uf, x) == find(uf, y);
 }
 
-bool PersistentUnionFind::operator==(const puf &uf) const {
+bool PersistentUnionFind::operator==(const pu &uf) const {
 	//Quickcheck hashes
 	if (hash != uf.hash) return false;
 	// First reroot and then check the diff path from one to another
-	p_arr::reroot(parent_s, arr_pt);
-	weak_ptr<p_arr> diff_pt = uf.arr_pt;
+	pa::reroot(parent_s, current_parent, arr_pt, true);
+	int_t diff_pt = uf.arr_pt;
 
 	static vector<pair<int_t, int_t>> diffs;
 	diffs.clear();
-	while (diff_pt.lock()->diff != nullptr) {
-		auto el = make_pair(diff_pt.lock()->p, 0);
+	while (pa_univ[diff_pt].diff != -1) {
+		auto el = make_pair(pa_univ[diff_pt].p, 0);
 		if (!binary_search(diffs.begin(), diffs.end(), el)) {
 			diffs.emplace_back(move(el));
 			sort(diffs.begin(), diffs.end());
 		}
-		//if(find(uf, diff_pt.lock()->p) != find(*this, arr_pt->p)) return false;
-		diff_pt = diff_pt.lock()->diff;
+		diff_pt = pa_univ[diff_pt].diff;
 	}
 	for (auto &el: diffs) {
 		el.second = find(*this, el.first);
@@ -499,23 +524,23 @@ pu_iterator PersistentUnionFind::get_equal(int_t t, int_t x) {
 
 // Removes the set of equal elements from t
 int_t PersistentUnionFind::rm_equal(int_t t, int_t x) {
-	auto reset = [&](int_t pos, puf &uf) {
-	    uf.arr_pt = p_arr::set(parent_s, uf.arr_pt, pos, pos);
-	    uf.link_pt = p_arr::set(link_s, uf.link_pt, pos, pos);
-	    uf.hash_pt = p_arr::set(hashes_s, uf.hash_pt, pos, 0);
+	auto reset = [&](int_t pos, pu &uf) {
+	    uf.arr_pt = pa::set(parent_s, current_parent, uf.arr_pt, pos, pos, true);
+	    uf.link_pt = pa::set(link_s, current_link, uf.link_pt, pos, pos, true);
+	    uf.hash_pt = pa::set(hashes_s, current_hash, uf.hash_pt, pos, 0, false);
 	};
 
 	//Create copy of current union find and remove from their
 	auto uf = uf_univ[t];
 	int_t rep_x = find(uf, x);
 	// Nothing to remove
-	if (abs(rep_x) == abs(p_arr::get(link_s, uf.link_pt, abs(rep_x))))
+	if (abs(rep_x) == abs(pa::get(link_s, current_link, uf.link_pt, abs(rep_x), true)))
 		return t;
 
-	int_t hash_rm = p_arr::get(hashes_s, uf.hash_pt, abs(rep_x));
+	int_t hash_rm = pa::get(hashes_s, current_hash, uf.hash_pt, abs(rep_x), false);
 	int_t next = rep_x;
 	do {
-		int_t tmp = p_arr::get(link_s, uf.link_pt, abs(next));
+		int_t tmp = pa::get(link_s, current_link, uf.link_pt, abs(next), true);
 		reset(abs(next), uf);
 		next = tmp;
 	} while (abs(rep_x) != abs(next));
@@ -525,39 +550,39 @@ int_t PersistentUnionFind::rm_equal(int_t t, int_t x) {
 }
 
 bool PersistentUnionFind::resize(int_t n) {
-	if (p_arr::size(parent_s) > n) return false;
+	if (pa::size(parent_s) > n) return false;
 
-	p_arr::resize(parent_s, n, [](int_t i) { return i; });
-	p_arr::resize(link_s, n, [](int_t i) { return i; });
-	p_arr::resize(hashes_s, n, [](int_t i) { return 0; });
+	pa::resize(parent_s, n, [](int_t i) { return i; });
+	pa::resize(link_s, n, [](int_t i) { return i; });
+	pa::resize(hashes_s, n, [](int_t i) { return 0; });
 	return true;
 }
 
 int_t PersistentUnionFind::size() {
-	return p_arr::size(parent_s);
+	return pa::size(parent_s);
 }
 
 pu_iterator
-PersistentUnionFind::get_equal(PersistentUnionFind::puf &uf, int_t x) {
+PersistentUnionFind::get_equal(PersistentUnionFind::pu &uf, int_t x) {
 	int_t rep_x = find(uf, x);
 	return {uf, rep_x};
 }
 
-void PersistentUnionFind::print(PersistentUnionFind::puf &uf, ostream &os) {
-	for (int_t i = 0; i < (int_t) p_arr::size(parent_s); ++i) {
+void PersistentUnionFind::print(PersistentUnionFind::pu &uf, ostream &os) {
+	for (int_t i = 0; i < (int_t) pa::size(parent_s); ++i) {
 		os << i << " ";
 	}
 	os << endl;
-	for (int_t i = 0; i < (int_t) p_arr::size(parent_s); ++i) {
-		os << p_arr::get(parent_s, uf.arr_pt, i) << " ";
+	for (int_t i = 0; i < (int_t) pa::size(parent_s); ++i) {
+		os << pa::get(parent_s, current_parent, uf.arr_pt, i, true) << " ";
 	}
 	os << endl;
-	for (int_t i = 0; i < (int_t) p_arr::size(link_s); ++i) {
-		os << p_arr::get(link_s, uf.link_pt, i) << " ";
+	for (int_t i = 0; i < (int_t) pa::size(link_s); ++i) {
+		os << pa::get(link_s, current_link, uf.link_pt, i, true) << " ";
 	}
 	os << endl;
-	for (int_t i = 0; i < (int_t) p_arr::size(hashes_s); ++i) {
-		os << p_arr::get(hashes_s, uf.hash_pt, i) << " ";
+	for (int_t i = 0; i < (int_t) pa::size(hashes_s); ++i) {
+		os << pa::get(hashes_s, current_hash, uf.hash_pt, i, false) << " ";
 	}
 	os << endl << "Hash: " << uf.hash << endl;
 	os << endl;
@@ -598,9 +623,9 @@ bool PersistentSet::contains(int_t set_id, int_t elem) {
 }
 
 int_t PersistentSet::insert(int_t set_id, int_t elem) {
-	if (auto it = set_cache.find(make_pair(set_id, elem)); it !=
-							       set_cache.end())
-		return it->second;
+	//if (auto it = set_cache.find(make_pair(set_id, elem)); it !=
+							       //set_cache.end())
+	//	return it->second;
 	int_t el = set_univ[set_id].e;
 	if (el == elem) return set_id;
 
@@ -609,7 +634,7 @@ int_t PersistentSet::insert(int_t set_id, int_t elem) {
 	else if (abs_cmp(elem, el) || el == 0) r = add(elem, set_id);
 	else r = add(el, insert(set_univ[set_id].n, elem));
 
-	set_cache.emplace(make_pair(set_id, elem), r);
+	//set_cache.emplace(make_pair(set_id, elem), r);
 	return r;
 }
 
@@ -666,9 +691,9 @@ void PersistentPairs::init() {
 
 int_t PersistentPairs::insert(int_t set_id, pair<int_t, int_t> &elem) {
 	elem = form(elem);
-	if (auto it = pair_cache.find(pair(set_id, elem)); it !=
+	/*if (auto it = pair_cache.find(pair(set_id, elem)); it !=
 							   pair_cache.end())
-		return it->second;
+		return it->second;*/
 	int_t r;
 	auto el = pairs_univ[set_id].e;
 
@@ -678,14 +703,12 @@ int_t PersistentPairs::insert(int_t set_id, pair<int_t, int_t> &elem) {
 	else r = add(el, insert(pairs_univ[set_id].n, elem));
 
 
-	pair_cache.emplace(pair(set_id, elem), r);
+	//pair_cache.emplace(pair(set_id, elem), r);
 	return r;
 }
 
 int_t PersistentPairs::insert(int_t set_id, int_t fst, int_t snd) {
 	auto elem = pair(fst, snd);
-	if (fst == 22 && snd == 29 && set_id == 16383)
-		int debug = 0;
 	return insert(set_id, elem);
 }
 
@@ -766,11 +789,11 @@ void PersistentPairs::print(int_t set_id, ostream &os) {
 
 pair<int_t, int_t> PersistentPairs::form(pair<int_t, int_t> &p) {
 	return abs_cmp(-p.second, p.first) ?
-	       pair(-p.second, -p.first) : move(p);
+	       move(pair(-p.second, -p.first)) : move(p);
 }
 
-std::vector<std::pair<int_t, int_t>> poset::eq_lift_hi;
-std::vector<std::pair<int_t, int_t>> poset::eq_lift_lo;
+std::unordered_map<int_t,int_t> poset::eq_lift_hi;
+std::unordered_map<int_t,int_t> poset::eq_lift_lo;
 std::vector<std::pair<int_t, int_t>> poset::eq_lift;
 
 // Must be called after lift_vars due to initialization of eq_lift_hi/lo
@@ -779,15 +802,6 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo) {
 	int_t l = lo.imps;
 	auto h_imp = pp::get(hi.imps).e;
 	auto l_imp = pp::get(lo.imps).e;
-
-	auto reduce_lo = [&](const auto &el) {
-	    return el.second == (abs_cmp(l_imp.first, l_imp.second)
-		   ? l_imp.second : l_imp.first);
-	};
-	auto reduce_hi = [&](const auto &el) {
-	    return el.second == (abs_cmp(h_imp.first, h_imp.second)
-		   ? h_imp.second : h_imp.first);
-	};
 
 	while (h != 0 || l != 0) {
 		if (h == l) {
@@ -809,10 +823,8 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo) {
 				insert_imp(p, h_imp);
 				if (ps::contains(lo.vars, h_imp.first)) {
 					//In this case v -> h_imp.second is not allowed to be lifted later
-					eq_lift_hi.erase(
-						remove_if(all(eq_lift_hi),
-							  reduce_hi),
-						eq_lift_hi.end());
+					eq_lift_hi.erase((abs_cmp(h_imp.first, h_imp.second)
+							  ? h_imp.second : h_imp.first));
 				}
 			} else p.pure = false;
 			h = pp::next(h);
@@ -827,10 +839,8 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo) {
 				insert_imp(p, l_imp);
 				if (ps::contains(hi.vars, l_imp.first)) {
 					//In this case v -> l_imp.second is not allowed to be lifted later
-					eq_lift_lo.erase(
-						remove_if(all(eq_lift_lo),
-							  reduce_lo),
-						eq_lift_lo.end());
+					eq_lift_lo.erase((abs_cmp(l_imp.first, l_imp.second)
+							  ? l_imp.second : l_imp.first));
 				}
 			} else p.pure = false;
 			l = pp::next(l);
@@ -863,11 +873,17 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo) {
 			return;
 		} else if (l == 0 || (h != 0 && abs(h_var) < abs(l_var))) {
 			// Variable in hi but not in lo
-			eq_lift_lo.emplace_back(pu::find(lo.eqs, h_var), h_var);
+			if (auto iter = eq_lift_lo.find(pu::find(lo.eqs, h_var));
+				iter != eq_lift_lo.end()) {
+				pu::merge(hi.eqs, iter->second, h_var);
+			} else eq_lift_lo.emplace(pu::find(lo.eqs, h_var), h_var);
 			h = ps::next(h);
 			h_var = ps::get(h).e;
 		} else if (h == 0 || abs(l_var) < abs(h_var)) {
-			eq_lift_hi.emplace_back(pu::find(hi.eqs, l_var), l_var);
+			if (auto iter = eq_lift_hi.find(pu::find(hi.eqs, l_var));
+				iter != eq_lift_hi.end()) {
+				pu::merge(lo.eqs, iter->second, l_var);
+			} else eq_lift_hi.emplace(pu::find(hi.eqs, l_var), l_var);
 			// Here implications for the transitive closure have to be added.
 			// But we want transitive reduction, therefore we don't add anything else.
 			l = ps::next(l);
@@ -896,24 +912,12 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 	int_t hi_eq = hi.eqs;
 	int_t lo_eq = lo.eqs;
 
-	// Lifting of equalities and implications due to variables
-	sortc(eq_lift_hi, pcomp);
-	sortc(eq_lift_lo, pcomp);
-	for (auto i = 0; i < (int_t) eq_lift_hi.size(); ++i) {
-		if (i == 0 || eq_lift_hi[i - 1].first != eq_lift_hi[i].first) {
-			insert_imp(p, -v, eq_lift_hi[i].second);
-		} else if (eq_lift_hi[i - 1].first == eq_lift_hi[i].first) {
-			lo_eq = pu::merge(lo_eq, eq_lift_hi[i - 1].second,
-					  eq_lift_hi[i].second);
-		}
+	// Lifting of implications due to variables
+	for(auto &el : eq_lift_hi) {
+		//insert_imp(p, -v, el.second);
 	}
-	for (auto i = 0; i < (int_t) eq_lift_lo.size(); ++i) {
-		if (i == 0 || eq_lift_lo[i - 1].first != eq_lift_lo[i].first) {
-			insert_imp(p, v, eq_lift_lo[i].second);
-		} else if (eq_lift_lo[i - 1].first == eq_lift_lo[i].first) {
-			hi_eq = pu::merge(hi_eq, eq_lift_lo[i - 1].second,
-					  eq_lift_lo[i].second);
-		}
+	for(auto &el : eq_lift_lo) {
+		//insert_imp(p, v, el.second);
 	}
 
 	if (hi_eq == lo_eq) {
@@ -931,8 +935,10 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 	}
 }
 
-poset poset::lift(int_t v, poset &&hi, poset &&lo) {
+poset poset::lift(int_t v, int_t h, int_t l) {
 	poset p;
+	auto hi = get(h);
+	auto lo = get(l);
 	// Check if p can possibly be pure
 	if (hi.pure && lo.pure) p.pure = true;
 	eq_lift_hi.clear();
@@ -1009,10 +1015,8 @@ void poset::insert_eq(poset &p, int_t v1, int_t v2) {
 	p.eqs = pu::merge(p.eqs, v1, v2);
 }
 
-poset poset::get(int_t pos, bool negated) {
-	return negated ?
-	       (pos > 0 ? NP[pos] : P[-pos]) :
-	       (pos > 0 ? P[pos] : NP[-pos]);
+poset poset::get(int_t pos) {
+	return (pos > 0 ? P[pos] : NP[-pos]);
 }
 
 bool poset::operator==(const poset &p) const {
