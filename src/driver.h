@@ -167,11 +167,13 @@ private:
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
+public:
 	template<typename F> void minimize(raw_rule &rr, const F &f);
 	template<typename F>
 		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
 		const raw_rule &var_rule, raw_form_tree &ref_tree,
 		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
+private:
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -194,6 +196,7 @@ private:	// TODO create one entry point for optimization
 	std::vector<std::shared_ptr<mutation>> brancher_to_dnf(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_factor_rules(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
+	std::vector<std::shared_ptr<mutation>> brancher_minimize_z3(mutated_prog&);
 	template<typename F>
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp, const F &f);
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqc(mutated_prog &mp);
@@ -207,7 +210,6 @@ private:	// TODO create one entry point for optimization
 public:
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
-private:
 
 #ifdef WITH_Z3
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_z3(mutated_prog &mp);
@@ -215,6 +217,7 @@ private:
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 #endif
 
+private:
 	// following 2 methods are defined in a file tml_earley.cpp
 	bool earley_parse_tml(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();

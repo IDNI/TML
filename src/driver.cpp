@@ -3542,46 +3542,50 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		});
 	}
 
-	if(opts.enabled("O1") || opts.enabled("O2")) {
+	if(opts.enabled("O1") || opts.enabled("O2") || opts.get_int("O3")) {
 		mutated_prog mp(rp);
 		best_solution bs(exp_in_heads, mp); 
-		plan p(bs);
+		plan begin(bs);
+		raw_prog optimized(rp);
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
-		p.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
-		// export_outer_quantifiers(rp);
-
+		begin.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
+		optimized = optimize_once(rp, begin);
 		step_transform(rp, [&](raw_prog &rp) {
+			plan o1(bs);
 			// This transformation is a prerequisite to the CQC and binary
 			// transformations, hence its more general activation condition.
 			o::dbg() << "Adding dnf brancher in begin..." << endl << endl;
-			p.branchers.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
+			o1.branchers.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
 			o::dbg() << "Adding split heads brancher in begin..." << endl << endl;
-			p.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
 			// Though this is a binary transformation, rules will become
 			// ternary after timing guards are added
-			o::dbg() << "Adding split bodies brancher in loop..." << endl << endl;
-			p.branchers.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
 			o::dbg() << "Adding split heads brancher in loop..." << endl << endl;
-			p.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			optimized = optimize_once(optimized, o1);
 			if(opts.enabled("O2")) {
-				#ifdef WITH_Z3
+				plan o2(bs);
+				#ifndef WITH_Z3
 				o::dbg() << "Adding CQNC brancher ..." << endl << endl;
-				p.branchers.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
+				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
 				o::dbg() << "Adding CQC brancher ..." << endl << endl;
-				p.branchers.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
+				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
 				#else
 				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
-				plan.branchers.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
+				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
+				o::dbg() << "Adding minimizer brancher ..." << endl << endl;
+				o2.branchers.push_back(bind(&driver::brancher_minimize_z3, this, placeholders::_1));
 				#endif
+				optimized = optimize_loop(optimized, o2);
 			}
+			plan end(bs);
+			o::dbg() << "Adding split bodies brancher in loop..." << endl << endl;
+			end.branchers.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
 			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			p.branchers.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			auto best = optimize_once(rp, p);
-			rp.r = best.r;
-			rp.hidden_rels = best.hidden_rels;
+			end.branchers.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
+			rp = optimize_once(optimized, end);
 			o::dbg() << "Current:" << endl << rp << endl;
-
 		});
 	}
 

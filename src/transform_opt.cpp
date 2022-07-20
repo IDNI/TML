@@ -132,27 +132,14 @@ struct mutation_add_rule : public virtual mutation  {
 	}
 };
 
-struct mutation_add_del_rule : public virtual mutation  {
+struct mutation_del_rule : public virtual mutation  {
 	raw_rule del_;
-	raw_rule add_;
 
-	mutation_add_del_rule(raw_rule del, raw_rule add) : del_(del), add_(add) {}
+	mutation_del_rule(raw_rule r) : del_(r) {}
 
 	bool operator()(mutated_prog &mp) const override {
 		mp.current.r.resize(mp.current.r.size() +1);
-		mp.current.r.push_back(add_);
 		remove(mp.current.r.begin(), mp.current.r.end(), del_);
-		return true;
-	}
-};
-
-struct mutation_remove_rule : public virtual mutation  {
-	raw_rule &rr;
-
-	mutation_remove_rule(raw_rule &r) : rr(r) {}
-
-	bool operator()(mutated_prog &mp) const override {
-		remove(mp.current.r.begin(), mp.current.r.end(), rr);
 		return true;
 	}
 };
@@ -165,8 +152,6 @@ struct mutation_remove_rule : public virtual mutation  {
  */
 template<typename F>
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
-	to_dnf(mp.current);
-	split_heads(mp.current);
 	std::vector<std::shared_ptr<mutation>> mutations;
 	vector<raw_rule> reduced;
 	for (raw_rule &rr : mp.current.r) {
@@ -175,19 +160,16 @@ std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_
 			if (f(rr, *nrr)) {
 				// If the current rule is contained by a rule in reduced rules,
 				// then move onto the next rule in the outer loop
-				mutation_add_del_rule del_add(rr, *nrr);
-				mutations.push_back(std::make_shared<mutation_add_del_rule>(del_add));
-				//mutations.push_back(add), mutations.push_back(del);
+				mutation_del_rule rem(*nrr);
+				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
 				subsumed = true;
 				break;
 			} else if (f(*nrr, rr)) {
 				// If current rule contains that in reduced rules, then remove
 				// the subsumed rule from reduced rules
 				reduced.erase(nrr);
-				// remove the subsumed rule and add the current rule
-				mutation_remove_rule rem(*nrr);
-				//	mutations.push_back(rem);
-				mutations.push_back(std::make_shared<mutation_remove_rule>(rem));
+				mutation_del_rule rem(*nrr);
+				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
 
 			} else {
 				// Neither rule contains the other. Move on.
@@ -304,6 +286,33 @@ vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog&) {
 	mutations.push_back(std::make_shared<mutation_to_dnf>(m));
 	return mutations; 
 }
+
+#ifdef WITH_Z3
+struct mutation_minimize_z3 : public virtual mutation  {
+	driver &drvr;
+
+	mutation_minimize_z3(driver &d) : drvr(d) {}
+
+	bool operator()(mutated_prog &mp) const override {
+		const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
+		z3_context z3_ctx(int_bit_len, universe_bit_len);
+		o::dbg() << "Minimizing rules ..." << endl << endl;
+		for(auto &rr: mp.current.r) {
+			drvr.minimize(rr, [this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
+				{ return drvr.check_qc_z3(rr1, rr2, z3_ctx); });
+		}
+		o::dbg() << "Minimized:" << endl << endl << mp.current << endl;
+		return true;
+	}
+};
+
+vector<std::shared_ptr<mutation>> driver::brancher_minimize_z3(mutated_prog&) {
+	vector<std::shared_ptr<mutation>> mutations;
+	mutation_to_dnf m(*this);
+	mutations.push_back(std::make_shared<mutation_to_dnf>(m));
+	return mutations; 
+}
+#endif
 
 struct mutation_factor_rules : public virtual mutation  {
 	driver &drvr;
