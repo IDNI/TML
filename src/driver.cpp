@@ -1032,6 +1032,7 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 	}
 }
 
+#ifdef DELETE_ME
 /* If rr1 and rr2 are both conjunctive queries with negation, check that
  * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
 
@@ -1166,6 +1167,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 		return false;
 	}
 }
+#endif
 
 /* Takes a reference rule, its formula tree, and copies of both and
  * tries to eliminate redundant subtrees of the former using the latter
@@ -1176,18 +1178,17 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
  * only apply the supplied query containment procedure for the reverse
  * direction to establish the equivalence of the entire trees. */
 
-template<typename F>
-		raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
-			const raw_rule &var_rule, raw_form_tree &ref_tree,
-			raw_form_tree &var_tree, const F &f, bool ctx_sign) {
+raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
+	const raw_rule &var_rule, raw_form_tree &ref_tree,
+	raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign) {
 	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
 	// Minimize different formulas in different ways
 	switch(var_tree.type) {
 		case elem::IMPLIES: {
 			// Minimize the subtrees separately first. Since a -> b is
 			// equivalent to ~a OR b, alter the parity of the first operand
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
 			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
@@ -1197,14 +1198,19 @@ template<typename F>
 						{*ref_tree.r, *orig_var.r}})
 				// Apply the same treatment as for a disjunction since this is
 				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule))
+				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx)
+                                             : check_qc_z3(var_rule.try_as_b(),
+                                                           ref_rule,
+                                                           ctx))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
 		} case elem::ALT: {
 			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
 			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
@@ -1213,14 +1219,19 @@ template<typename F>
 				// If in positive context, eliminating disjunct certainly
 				// produces smaller query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule_b))
+				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx)
+                                             : check_qc_z3(var_rule.try_as_b(),
+                                                           ref_rule_b,
+                                                           ctx))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
 		} case elem::AND: {
 			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
 			const raw_rule &ref_rule_b = ref_rule.try_as_b();
 			raw_form_tree orig_var = var_tree;
 			// Now try eliminating each subtree in turn
@@ -1229,21 +1240,26 @@ template<typename F>
 				// If in positive context, eliminating conjunct certainly
 				// produces bigger query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(var_rule.try_as_b(), ref_rule_b) : f(ref_rule_b, var_rule.try_as_b()))
+				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(var_rule.try_as_b(),
+                                                           ref_rule_b,
+                                                           ctx)
+                                             : check_qc_z3(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx))
 					return ref_tree = ref_tmp;
 			var_tree = orig_var;
 			break;
 		} case elem::NOT: {
 			// Minimize the single subtree taking care to update the negation
 			// parity
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
 			break;
 		} case elem::EXISTS: case elem::FORALL: {
 			// Existential quantification preserves the containment relation
 			// between two formulas, so just recurse. Universal quantification
 			// is just existential with two negations, hence negation parity
 			// is preserved.
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
 			break;
 		} default: {
 			// Do not bother with co-implication nor uniqueness quantification
@@ -1259,8 +1275,7 @@ template<typename F>
  * be removed whilst preserving rule equivalence according to the given
  * containment testing function. */
 
-template<typename F>
-void driver::minimize(raw_rule &rr, const F &f) {
+void driver::minimize(raw_rule &rr, z3_context &ctx) {
 	if(rr.is_fact() || rr.is_goal()) return;
 	// Switch to the formula tree representation of the rule if this has
 	// not yet been done for this is a precondition to minimize_aux. Note
@@ -1271,11 +1286,12 @@ void driver::minimize(raw_rule &rr, const F &f) {
 	raw_rule var_rule = rr;
 	// Now minimize the formula tree of the given rule using the given
 	// containment testing function
-	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, f);
+	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
 	// If the input rule was in DNF, provide the output in DNF
 	if(orig_form) rr = rr.try_as_b();
 }
 
+#ifdef DELETE_ME
 /* Go through the program and removed those queries that the function f
  * determines to be subsumed by others. While we're at it, minimize
  * (i.e. subsume a query with its part) the shortlisted queries to
@@ -1315,6 +1331,7 @@ void driver::subsume_queries(raw_prog &rp, const F &f) {
 	}
 	rp.r = reduced_rules;
 }
+#endif
 
 /* Update the number and characters counters as well as the distinct
  * symbol set to account for the given term. */
@@ -1359,8 +1376,7 @@ pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
 	return {int_bit_len, universe_bit_len};
 }
 
-#ifdef WITH_Z3
-
+#ifdef DELETE_ME
 /* Check query containment for rules of the given program using theorem prover Z3
   and remove subsumed rules. */
 
@@ -1401,6 +1417,7 @@ void driver::qc_z3 (raw_prog &raw_p) {
 		++selected;
 	}
 }
+#endif
 
 /* Initialize an empty context that can then be populated with TML to Z3
  * conversions. value_sort is either a bit-vector whose width can
@@ -1658,8 +1675,7 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
  * Returns false if rules are not comparable or not contained.
  * Returns true if r1 is contained in r2. */
 
-bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
-		z3_context &ctx) {
+bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
 	if (!(is_query(r1) && is_query(r2))) return false;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
@@ -1683,8 +1699,6 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	o::dbg() << res << endl;
 	return res;
 }
-
-#endif
 
 /* Make relations mapping list ID's to their heads and tails. Domain's
  * first argument is the relation into which it should put the domain it
@@ -3479,23 +3493,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			"Transformed Grammar:\n\n" << rp << endl;)
 	}
 
-#ifdef WITH_Z3
-		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
-		z3_context z3_ctx(int_bit_len, universe_bit_len);
-
-		if(opts.enabled("qc-subsume-z3")){
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			export_outer_quantifiers(rp);
-			o::dbg() << "Query containment subsumption using z3" << endl;
-			split_heads(rp);
-			subsume_queries(rp,
-				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_qc_z3(rr1, rr2, z3_ctx);});
-			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-		}
-#endif
-
 	if(int_t iter_num = opts.get_int("iterate")) {
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
@@ -3509,17 +3506,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 				o::dbg() << "Squaring Program ..." << endl << endl;
 				square_program(rp);
 				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-#ifdef WITH_Z3
-				if(opts.enabled("qc-subsume-z3")){
-					o::dbg() << "Query containment subsumption using z3" << endl;
-					export_outer_quantifiers(rp);
-					subsume_queries(rp,
-						[&](const raw_rule &rr1, const raw_rule &rr2)
-							{return check_qc_z3(rr1, rr2, z3_ctx);});
-					o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-				}
-#endif
-				}
+			}
 			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
 		});
 	}
@@ -3542,14 +3529,16 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		});
 	}
 
-	if(opts.enabled("O1") || opts.enabled("O2") || opts.get_int("O3")) {
+	if(opts.enabled("O1") || opts.enabled("O2")) {
 		mutated_prog mp(rp);
 		best_solution bs(exp_in_heads, mp); 
 		plan begin(bs);
 		raw_prog optimized(rp);
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
-		begin.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
+		if (!opts.get_int("O3")) {
+			// Trimmed existentials are a precondition to program optimizations
+			o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
+			begin.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
+		}
 		optimized = optimize_once(rp, begin);
 		step_transform(rp, [&](raw_prog &rp) {
 			plan o1(bs);
@@ -3557,26 +3546,19 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			// transformations, hence its more general activation condition.
 			o::dbg() << "Adding dnf brancher in begin..." << endl << endl;
 			o1.branchers.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
-			o::dbg() << "Adding split heads brancher in begin..." << endl << endl;
-			o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			if (!opts.get_int("O3")) {
+				o::dbg() << "Adding split heads brancher in begin..." << endl << endl;
+				o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
+			}
 			// Though this is a binary transformation, rules will become
 			// ternary after timing guards are added
-			o::dbg() << "Adding split heads brancher in loop..." << endl << endl;
-			o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
 			optimized = optimize_once(optimized, o1);
 			if(opts.enabled("O2")) {
 				plan o2(bs);
-				#ifndef WITH_Z3
-				o::dbg() << "Adding CQNC brancher ..." << endl << endl;
-				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_cqnc, this, placeholders::_1));
-				o::dbg() << "Adding CQC brancher ..." << endl << endl;
-				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_cqc, this, placeholders::_1));
-				#else
 				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
 				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
 				o::dbg() << "Adding minimizer brancher ..." << endl << endl;
 				o2.branchers.push_back(bind(&driver::brancher_minimize_z3, this, placeholders::_1));
-				#endif
 				optimized = optimize_loop(optimized, o2);
 			}
 			plan end(bs);

@@ -52,14 +52,14 @@ bool best_solution::bound(mutated_prog &p) {
 	size_t cost = func_(p);
 	if (cost < cost_) {
 		cost_ = cost;
-		best_[cost] = std::make_shared<mutated_prog>(p); // = p;
+		best_ = std::make_shared<mutated_prog>(p);
 		return true;
 	}
 	return false;
 }
 
 raw_prog best_solution::solution() {
-	return best_.begin().operator*().second.get()->current;
+	return best_.get()->current;
 }
 
 /*!
@@ -144,49 +144,12 @@ struct mutation_del_rule : public virtual mutation  {
 	}
 };
 
-/*! Go through the program and removed those queries that the function f
- * determines to be subsumed by others. While we're at it, minimize
- * (i.e. subsume a query with its part) the shortlisted queries to
- * reduce time cost of future subsumptions. This function does not
- * respect order, so it should only be used on an unordered stratum. 
- */
-template<typename F>
-std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_prog &mp /*rp*/, const F &f) {
-	std::vector<std::shared_ptr<mutation>> mutations;
-	vector<raw_rule> reduced;
-	for (raw_rule &rr : mp.current.r) {
-		bool subsumed = false;
-		for (auto nrr = reduced.begin(); nrr != reduced.end();) {
-			if (f(rr, *nrr)) {
-				// If the current rule is contained by a rule in reduced rules,
-				// then move onto the next rule in the outer loop
-				mutation_del_rule rem(*nrr);
-				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
-				subsumed = true;
-				break;
-			} else if (f(*nrr, rr)) {
-				// If current rule contains that in reduced rules, then remove
-				// the subsumed rule from reduced rules
-				reduced.erase(nrr);
-				mutation_del_rule rem(*nrr);
-				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
 
-			} else {
-				// Neither rule contains the other. Move on.
-				nrr++;
-			}
-		}
-		if (!subsumed) reduced.push_back(rr);
-	}
-	return mutations;
-}
-
-#ifdef WITH_Z3
 /* Recurse through the given formula tree in pre-order calling the given
  * function with the accumulator. */
 
 template<typename X, typename F>
-		X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
+X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
 	const X &new_acc = f(t, acc);
 	switch(t.type) {
 		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
@@ -246,14 +209,50 @@ pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
 	return {int_bit_len, universe_bit_len};
 }
 
-std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
+/*! 
+ * Go through the program and removed those queries that the function f
+ * determines to be subsumed by others. While we're at it, minimize
+ * (i.e. subsume a query with its part) the shortlisted queries to
+ * reduce time cost of future subsumptions. This function does not
+ * respect order, so it should only be used on an unordered stratum. 
+ */
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries(mutated_prog &mp) {
 	const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
-	z3_context z3_ctx(int_bit_len, universe_bit_len);
-	return brancher_subsume_queries(mp,
-		[this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
-			{return check_qc_z3(rr1, rr2, z3_ctx);});
+	z3_context ctx(int_bit_len, universe_bit_len);
+
+	std::vector<std::shared_ptr<mutation>> mutations;
+	vector<raw_rule> reduced;
+	for (raw_rule &rr : mp.current.r) {
+		bool subsumed = false;
+		for (auto nrr = reduced.begin(); nrr != reduced.end();) {
+			if (check_qc_z3(rr, *nrr, ctx)) {
+				// If the current rule is contained by a rule in reduced rules,
+				// then move onto the next rule in the outer loop
+				mutation_del_rule rem(*nrr);
+				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
+				subsumed = true;
+				break;
+			} else if (check_qc_z3(*nrr, rr, ctx)) {
+				// If current rule contains that in reduced rules, then remove
+				// the subsumed rule from reduced rules
+				reduced.erase(nrr);
+				mutation_del_rule rem(*nrr);
+				mutations.push_back(std::make_shared<mutation_del_rule>(rem));
+
+			} else {
+				// Neither rule contains the other. Move on.
+				nrr++;
+			}
+		}
+		if (!subsumed) reduced.push_back(rr);
+	}
+	return mutations;
 }
-#endif
+
+#ifdef DELETE_ME
+std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_z3(mutated_prog &mp) {
+	return brancher_subsume_queries(mp);
+}
 
 std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqc(mutated_prog &mp) {
 	return brancher_subsume_queries(mp,
@@ -266,6 +265,7 @@ std::vector<std::shared_ptr<mutation>> driver::brancher_subsume_queries_cqnc(mut
 		[this](const raw_rule &rr1, const raw_rule &rr2)
 			{return cqnc(rr1, rr2);});
 }
+#endif
 
 struct mutation_to_dnf : public virtual mutation  {
 	driver &drvr;
@@ -287,7 +287,6 @@ vector<std::shared_ptr<mutation>> driver::brancher_to_dnf(mutated_prog&) {
 	return mutations; 
 }
 
-#ifdef WITH_Z3
 struct mutation_minimize_z3 : public virtual mutation  {
 	driver &drvr;
 
@@ -295,11 +294,12 @@ struct mutation_minimize_z3 : public virtual mutation  {
 
 	bool operator()(mutated_prog &mp) const override {
 		const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
-		z3_context z3_ctx(int_bit_len, universe_bit_len);
+		z3_context ctx(int_bit_len, universe_bit_len);
 		o::dbg() << "Minimizing rules ..." << endl << endl;
-		for(auto &rr: mp.current.r) {
-			drvr.minimize(rr, [this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
-				{ return drvr.check_qc_z3(rr1, rr2, z3_ctx); });
+//		auto f = [this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
+//			{ return drvr.check_qc_z3(rr1, rr2, z3_ctx); };
+		for(auto rr: mp.current.r) {
+			drvr.minimize(rr, ctx);
 		}
 		o::dbg() << "Minimized:" << endl << endl << mp.current << endl;
 		return true;
@@ -312,7 +312,6 @@ vector<std::shared_ptr<mutation>> driver::brancher_minimize_z3(mutated_prog&) {
 	mutations.push_back(std::make_shared<mutation_to_dnf>(m));
 	return mutations; 
 }
-#endif
 
 struct mutation_factor_rules : public virtual mutation  {
 	driver &drvr;

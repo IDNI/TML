@@ -29,9 +29,9 @@ class dict_t;
  */
 struct mutated_prog  {
 	// starting node of the mutated progs log
-	mutated_prog(raw_prog &rp): current(rp) {};
+	explicit mutated_prog(raw_prog &rp): current(rp) {};
 	// link to previous mutated prog
-	mutated_prog(mutated_prog *mp): current(mp->current) {};
+	explicit mutated_prog(mutated_prog *mp): current(mp->current) {};
 	void operator()(struct mutation& m);
 
 	raw_prog current;
@@ -59,7 +59,7 @@ extern cost_function exp_in_heads;
  */
 using brancher = std::function<std::vector<std::shared_ptr<mutation>>(mutated_prog&)>;
 
-/**
+/*!
  * Represents and strategy to select the best mutation according to the passed
  * cost_function.
  */
@@ -77,17 +77,15 @@ class best_solution: public bounder {
 public:
 	best_solution(cost_function& f, mutated_prog &rp): 
 			func_(f), 
-			cost_(std::numeric_limits<size_t>::max()) {
-		best_[f(rp)] = std::make_shared<mutated_prog>(rp);
-	};
+			cost_(std::numeric_limits<size_t>::max()), 
+			best_(std::make_shared<mutated_prog>(rp)) {};
+
 	virtual bool bound(mutated_prog& p);
 	virtual raw_prog solution();
 private:
 	cost_function func_;
 	size_t cost_;
-	std::map<size_t, std::shared_ptr<mutated_prog>> best_;
-//	raw_prog best_; 
-//	std::reference_wrapper<mutated_prog> best_; 
+	std::shared_ptr<mutated_prog> best_;
 };
 
 /*!

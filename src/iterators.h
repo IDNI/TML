@@ -124,9 +124,6 @@ public:
 			v.emplace_back(set_[*it]);
 		}
 		return v;
-/*		auto subset = subset_ 
-			| std::views::transform([this, v](size_t idx ) mutable { v.push_back(set_[idx]); });
-		return v;*/
 	}
 
 private:
@@ -142,7 +139,7 @@ template<class T>
 class powerset_range {
 public:
 
-	powerset_range(std::vector<T>& set) : set_(set) {}
+	explicit powerset_range(std::vector<T>& set) : set_(set) {}
 	
 	bool empty() {
 		return set_.size() == 0;

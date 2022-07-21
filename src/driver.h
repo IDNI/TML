@@ -18,9 +18,7 @@
 #include <memory>
 #include <vector>
 
-#ifdef WITH_Z3
 #include "z3++.h"
-#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -64,7 +62,6 @@ struct prog_data {
 	string_t std_input;
 };
 
-#ifdef WITH_Z3
 /* Provides consistent conversions of TML objects into Z3. */
 struct z3_context {
 	size_t arith_bit_len;
@@ -89,8 +86,6 @@ struct z3_context {
 	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
 	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
 };
-
-#endif
 
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
@@ -168,11 +163,10 @@ private:
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
 public:
-	template<typename F> void minimize(raw_rule &rr, const F &f);
-	template<typename F>
-		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
+	void minimize(raw_rule &rr, z3_context &ctx);
+	raw_form_tree &minimize_aux(const raw_rule &ref_rule,
 		const raw_rule &var_rule, raw_form_tree &ref_tree,
-		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
+		raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign = true);
 private:
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
@@ -197,10 +191,11 @@ private:	// TODO create one entry point for optimization
 	std::vector<std::shared_ptr<mutation>> brancher_factor_rules(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_minimize_z3(mutated_prog&);
-	template<typename F>
-	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp, const F &f);
+	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp);
+#ifdef DELETE_ME
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqc(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqnc(mutated_prog &mp);
+#endif
 	std::vector<std::shared_ptr<mutation>> brancher_split_heads(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_split_bodies(mutated_prog &mp);
 	std::vector<std::shared_ptr<mutation>> brancher_square_program(mutated_prog &mp);
@@ -211,11 +206,9 @@ public:
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
 
-#ifdef WITH_Z3
 	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_z3(mutated_prog &mp);
 	void qc_z3(raw_prog &rp);
-	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
-#endif
+        bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 
 private:
 	// following 2 methods are defined in a file tml_earley.cpp
@@ -255,9 +248,11 @@ private:
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
+#ifdef DELETE_ME
+	void subsume_queries(raw_prog &rp);
 	void subsume_queries_cqc(raw_prog &rp);
 	void subsume_queries_cqnc(raw_prog &rp);
+#endif
 	void subsume_queries_z3(raw_prog &rp);
 
 	// TODO and remove the previous ones
