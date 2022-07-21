@@ -1676,6 +1676,11 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
  * Returns true if r1 is contained in r2. */
 
 bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
+	static map<pair<raw_rule, raw_rule>, bool> memo;
+	auto key = make_pair(r1, r2);
+	if (memo.contains(key)) {
+		return memo[key];
+	}
 	if (!(is_query(r1) && is_query(r2))) return false;
 	// Check if rules are comparable
 	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
@@ -1697,6 +1702,7 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx
 	bool res = ctx.solver.check() == z3::unsat;
 	ctx.solver.pop();
 	o::dbg() << res << endl;
+	memo[key] = res;
 	return res;
 }
 

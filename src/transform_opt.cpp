@@ -217,6 +217,7 @@ pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
  * respect order, so it should only be used on an unordered stratum. 
  */
 std::vector<std::shared_ptr<change>> driver::brancher_subsume_queries(mutated_prog &mp) {
+	//TODO Check if z3 context should be static?
 	const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
 	z3_context ctx(int_bit_len, universe_bit_len);
 
