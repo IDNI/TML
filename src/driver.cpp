@@ -3493,24 +3493,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			"Transformed Grammar:\n\n" << rp << endl;)
 	}
 
-	if(int_t iter_num = opts.get_int("iterate")) {
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		export_outer_quantifiers(rp);
-
-		pdatalog_transform(rp, [&](raw_prog &rp) {
-			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
-			split_heads(rp);
-			// Alternately square and simplify the program iter_num times
-			for(int_t i = 0; i < iter_num; i++) {
-				o::dbg() << "Squaring Program ..." << endl << endl;
-				square_program(rp);
-				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-			}
-			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
-		});
-	}
-
 	if(int_t iter_num = opts.get_int("O3")) {
 		// Trimmed existentials are a precondition to program optimizations
 		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
@@ -3556,7 +3538,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 			if(opts.enabled("O2")) {
 				plan o2(bs);
 				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
-				o2.branchers.push_back(bind(&driver::brancher_subsume_queries_z3, this, placeholders::_1));
+				o2.branchers.push_back(bind(&driver::brancher_subsume_queries, this, placeholders::_1));
 				o::dbg() << "Adding minimizer brancher ..." << endl << endl;
 				o2.branchers.push_back(bind(&driver::brancher_minimize_z3, this, placeholders::_1));
 				optimized = optimize_loop(optimized, o2);

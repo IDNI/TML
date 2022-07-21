@@ -32,19 +32,19 @@ struct mutated_prog  {
 	explicit mutated_prog(raw_prog &rp): current(rp) {};
 	// link to previous mutated prog
 	explicit mutated_prog(mutated_prog *mp): current(mp->current) {};
-	void operator()(struct mutation& m);
+	void operator()(struct change& m);
 
 	raw_prog current;
 };
 
 /*!
- * Represents a mutation of a given (mutated) program. If selected, it is
+ * Represents a change of a given (mutated) program. If selected, it is
  * applied to the given (mutated) program. This is a cheap implementation of
  * the command pattern.
  */
-class mutation {
+class change {
 public:
-	auto operator<=>(const mutation &rhs) const = default;
+	auto operator<=>(const change &rhs) const = default;
 	virtual bool operator()(mutated_prog &mp) const = 0;
 };
 
@@ -57,10 +57,10 @@ extern cost_function exp_in_heads;
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using brancher = std::function<std::vector<std::shared_ptr<mutation>>(mutated_prog&)>;
+using brancher = std::function<std::vector<std::shared_ptr<change>>(mutated_prog&)>;
 
 /*!
- * Represents and strategy to select the best mutation according to the passed
+ * Represents and strategy to select the best change according to the passed
  * cost_function.
  */
 class bounder {

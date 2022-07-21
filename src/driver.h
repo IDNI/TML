@@ -186,27 +186,26 @@ private:	// TODO create one entry point for optimization
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 
-	std::vector<std::shared_ptr<mutation>> brancher_export_outer_quantifiers(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_to_dnf(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_factor_rules(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_squaring(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_minimize_z3(mutated_prog&);
-	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_export_outer_quantifiers(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_to_dnf(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_factor_rules(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_squaring(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_minimize_z3(mutated_prog&);
+	std::vector<std::shared_ptr<change>> brancher_subsume_queries(mutated_prog &mp);
 #ifdef DELETE_ME
-	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqc(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_cqnc(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_subsume_queries_cqc(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_subsume_queries_cqnc(mutated_prog &mp);
 #endif
-	std::vector<std::shared_ptr<mutation>> brancher_split_heads(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_split_bodies(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_square_program(mutated_prog &mp);
-	std::vector<std::shared_ptr<mutation>> brancher_eliminate_dead_variables(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_split_heads(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_split_bodies(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_square_program(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_eliminate_dead_variables(mutated_prog &mp);
 
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 public:
 	void eliminate_dead_variables(raw_prog &rp);
 	void factor_rules(raw_prog &rp);
 
-	std::vector<std::shared_ptr<mutation>> brancher_subsume_queries_z3(mutated_prog &mp);
 	void qc_z3(raw_prog &rp);
         bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 
