@@ -331,6 +331,7 @@ class poset {
 	static void insert_eq(poset &p, int_t v1, int_t v2);
 	static poset get(int_t pos);
 	static void print(poset &p, std::ostream &os);
+	static void print(poset &&p, std::ostream &os);
 
 	inline static bool is_empty(poset &p) {
 		return p.eqs + p.imps + p.vars == 0;

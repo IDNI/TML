@@ -413,71 +413,26 @@ int_t PersistentUnionFind::intersect(int_t t1, int_t t2) {
 	auto &uf1 = uf_univ[t1];
 	auto &uf2 = uf_univ[t2];
 
-	// Make uf1 root, so we check the diff path from uf2
-	pa::reroot(parent_s, current_parent, uf1.arr_pt, true);
-	int_t diff_pt = uf2.arr_pt;
-
-	static vector<pair<int_t, int_t>> diffs;
-	static vector<vector<int_t>> eq_sets;
+	int_t diff_pt = uf1.arr_pt;
+	int_t result = 0;
+	static unordered_map<pair<int_t, int_t>, int_t> classes;
+	static set<pair<int_t,int_t>> diffs;
 
 	while (pa_univ[diff_pt].diff != -1) {
-		auto el = pair(pa_univ[diff_pt].p, 0);
-		if (!hasbc(diffs, el, abs_lex_cmp)) {
-			diffs.emplace_back(move(el));
-			sortc(diffs, abs_lex_cmp);
-		}
+		diffs.emplace(pa_univ[diff_pt].p, find(uf1, pa_univ[diff_pt].p));
 		diff_pt = pa_univ[diff_pt].diff;
 	}
-
-	for (auto &el: diffs) {
-		el.second = find(uf1, el.first);
-	}
-
-	for (auto &el: diffs) {
-		// Can use diffs here instead of eq_classes
-		// Now create equivalence pairs
-		int_t eq_class_uf2 = find(uf2, el.first);
-		if (el.second < 0) {
-			el.first = -el.second;
-			el.second = -eq_class_uf2;
+	for (auto& el : diffs) {
+		if (auto iter = classes.find({el.second, find(uf2, el.first)});
+			iter != classes.end()) {
+			result = merge(result, el.first, iter->second);
 		} else {
-			el.first = el.second;
-			el.second = eq_class_uf2;
+			classes.emplace(pair(el.second, find(uf2, el.first)), el.first);
 		}
 	}
-	sortc(diffs, abs_lex_cmp);
-	auto dupls = unique(all(diffs));
-	diffs.erase(dupls, diffs.end());
-
-	//Leave the first set empty for intersection later
-	int count = 1;
-	eq_sets.emplace_back();
-	for (auto &p: diffs) {
-		eq_sets.emplace_back();
-		auto iter = get_equal(uf2, p.second);
-		MergeSort(all(iter));
-		for (auto el: iter)
-			eq_sets[count].emplace_back(el);
-		++count;
-	}
-
-	count = 0;
-	for (auto &p: diffs) {
-		auto iter = get_equal(uf1, p.first);
-		MergeSort(all(iter));
-		set_intersection(all(eq_sets[count + 1]), all(iter),
-				 back_inserter(eq_sets[count]), abs_cmp);
-		eq_sets[count + 1].clear();
-		++count;
-	}
-
-	for (auto &inter_set: eq_sets) {
-		t1 = rm_equal(t1, inter_set[0]);
-		t1 = merge_set(t1, inter_set);
-	}
+	classes.clear();
 	diffs.clear();
-	eq_sets.clear();
-	return t1;
+	return result;
 }
 
 bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
@@ -488,27 +443,26 @@ bool PersistentUnionFind::equal(int_t t, int_t x, int_t y) {
 bool PersistentUnionFind::operator==(const pu &uf) const {
 	//Quickcheck hashes
 	if (hash != uf.hash) return false;
-	// First reroot and then check the diff path from one to another
-	pa::reroot(parent_s, current_parent, arr_pt, true);
-	int_t diff_pt = uf.arr_pt;
 
-	static vector<pair<int_t, int_t>> diffs;
+	int_t diff_pt = arr_pt;
+	static set<pair<int_t,int_t>> diffs;
 	diffs.clear();
+
 	while (pa_univ[diff_pt].diff != -1) {
-		auto el = make_pair(pa_univ[diff_pt].p, 0);
-		if (!binary_search(diffs.begin(), diffs.end(), el)) {
-			diffs.emplace_back(move(el));
-			sort(diffs.begin(), diffs.end());
-		}
+		diffs.emplace(pa_univ[diff_pt].p, find(*this, pa_univ[diff_pt].p));
 		diff_pt = pa_univ[diff_pt].diff;
 	}
-	for (auto &el: diffs) {
-		el.second = find(*this, el.first);
+	diff_pt = uf.arr_pt;
+	pair<int_t,int_t> tmp_pair;
+	while (pa_univ[diff_pt].diff != -1) {
+		tmp_pair.first = pa_univ[diff_pt].p;
+		tmp_pair.second = find(uf, pa_univ[diff_pt].p);
+		if (auto iter = diffs.find(tmp_pair); iter != diffs.end()) {
+			diffs.erase(iter);
+		} else if(tmp_pair.first != tmp_pair.second) return false;
+		diff_pt = pa_univ[diff_pt].diff;
 	}
-	return all_of(diffs.begin(), diffs.end(),
-		      [&](pair<int_t, int_t> &el) {
-			  return find(uf, el.first) == el.second;
-		      });
+	return all_of(all(diffs), [](auto &p) { return p.first == p.second; });
 }
 
 void PersistentUnionFind::print(int_t uf, ostream &os) {
@@ -673,7 +627,7 @@ bool PersistentPairs::operator==(const PersistentPairs &p) const {
 	return (e == p.e && n == p.n);
 }
 
-// Canonicity with negation is ensured by having the larger variable first
+// Canonicity with negation is ensured by having the smaller variable first
 int_t PersistentPairs::add(pair<int_t, int_t> &e, int_t n) {
 	PersistentPairs pair = PersistentPairs(form(e), n);
 	if (auto it = pair_memo.find(pair); it != pair_memo.end())
@@ -914,10 +868,10 @@ void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo) {
 
 	// Lifting of implications due to variables
 	for(auto &el : eq_lift_hi) {
-		//insert_imp(p, -v, el.second);
+		insert_imp(p, -v, el.second);
 	}
 	for(auto &el : eq_lift_lo) {
-		//insert_imp(p, v, el.second);
+		insert_imp(p, v, el.second);
 	}
 
 	if (hi_eq == lo_eq) {
@@ -1030,6 +984,9 @@ void poset::print(poset &p, ostream &os) {
 	ps::print(p.vars, os);
 }
 
+void poset::print(poset &&p, ostream &os) {
+	print(p, os);
+}
 
 
 
