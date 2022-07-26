@@ -107,13 +107,6 @@ class PersistentUnionFind {
 
 	static int_t add(pu &uf);
 	static int_t update(const pu &t, int_t x, int_t y);
-	/*static void split_set(std::vector<int_t> &s, pu &uf, int_t root);
-	static void
-	split_hashes(int_t root_x, int_t root_y, int_t hash_x,
-		     int_t hash_y, int_t count_x, int_t count_y,
-		     int_t prev_root, pu &uf);
-	static void split_linking(std::vector<int_t> &s, pu &uf,
-				  int_t root);*/
 	static int_t update_link(const pu &t, int_t x, int_t y);
 	static int_t find(const pu &t, int_t elem);
 	static pu_iterator get_equal(pu &uf, int_t x);
