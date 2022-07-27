@@ -65,6 +65,188 @@ flat_prog best_solution::solution() {
 	return best_.get()->current;
 }
 
+/* 
+ * Squaring program 
+ *
+ */
+
+#ifdef DELETE_ME
+
+/* If the given element is a variable, rename it using the relevant
+ * mapping. If the mapping does not exist, then create a new one. */
+
+elem rename_variables(const elem &e, map<elem, elem> &renames,
+		const function<elem (const elem &)> &gen) {
+	if(e.type == elem::VAR) {
+		if(auto it = renames.find(e); it != renames.end()) {
+			return it->second;
+		} else {
+			return renames[e] = gen(e);
+		}
+	} else return e;
+}
+
+/* Rename all the variables in the given formula tree using the given
+ * mappings. Where the mappings do not exist, create them. Note that
+ * variables introduced inside quantifiers are treated as distinct. Note
+ * also that the mappings made for variables introduced inside
+ * quantifiers are not exported. */
+
+void rename_variables(raw_form_tree &t, map<elem, elem> &renames,
+		const function<elem (const elem &)> &gen) {
+	switch(t.type) {
+		case elem::NONE: {
+			for(elem &e : t.rt->e) e = rename_variables(e, renames, gen);
+			break;
+		} case elem::NOT: {
+			rename_variables(*t.l, renames, gen);
+			break;
+		} case elem::ALT: case elem::AND: case elem::IMPLIES:
+				case elem::COIMPLIES: {
+			rename_variables(*t.l, renames, gen);
+			rename_variables(*t.r, renames, gen);
+			break;
+		} case elem::FORALL: case elem::EXISTS: case elem::UNIQUE: {
+			// The variable that is being mapped to something else
+			const elem ovar = *t.l->el;
+			// Get what that variable maps to in the outer scope
+			const auto &ivar = renames.find(ovar);
+			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
+			// Temporarily replace the outer scope mapping with new inner one
+			*t.l->el = renames[ovar] = gen(ovar);
+			// Rename body using inner scope mapping
+			rename_variables(*t.r, renames, gen);
+			// Now restore the (possibly non-existent) outer scope mapping
+			if(pvar) renames[ovar] = *pvar; else renames.erase(ovar);
+			break;
+		} default:
+			assert(false); //should never reach here
+	}
+}
+
+/* Useful when copying formula trees whilst trying to ensure that none of its
+ * variables are accidentally captured by the context into which its being
+ * inserted. */
+
+function<elem (const elem &)> gen_fresh_var(dict_t &d) {
+	return [&d](const elem &) {return elem::fresh_var(d);};
+}
+
+/* Useful when copying formula tree whilst only modifying a limited set of
+ * variables. */
+
+elem gen_id_var(const elem &var) {
+	return var;
+}
+
+/* Expand the given term using the given rule whose head unifies with
+ * it. Literally returns the rule's body with its variables replaced by
+ * the arguments of the given term or fresh variables. Fresh variables
+ * are used so that the produced formula tree can be grafted in
+ * anywhere. */
+
+raw_form_tree driver::expand_term(const raw_term &use,
+		const raw_rule &def) {
+	// Get dictionary for generating fresh symbols
+	dict_t &d = tbl->get_dict();
+
+	const raw_term &head = def.h[0];
+	// Where all the mappings for the substitution will be stored
+	map<elem, elem> renames;
+	// Let's try to reduce the number of equality constraints required
+	// by substituting some of the correct variables in the first place.
+	for(size_t i = 2; i < head.e.size() - 1; i++) {
+		if(head.e[i].type == elem::VAR) {
+			renames[head.e[i]] = use.e[i];
+		}
+	}
+	// Deep copy the rule's body because the in-place renaming required
+	// for this expansion should not affect the original
+	raw_form_tree subst = *def.get_prft();
+	rename_variables(subst, renames, gen_fresh_var(d));
+	// Take care to existentially quantify the non-exported variables of this
+	// formula in case it is inserted into a negative context
+	for(const auto &[ovar, nvar] : renames) {
+		if(find(use.e.begin() + 2, use.e.end() - 1, nvar) == use.e.end() - 1) {
+			subst = raw_form_tree(elem::EXISTS,
+				make_shared<raw_form_tree>(nvar),
+				make_shared<raw_form_tree>(subst));
+		}
+	}
+	// Append remaining equality constraints to the renamed tree to link
+	// the logic back to its context
+	for(size_t i = 2; i < head.e.size() - 1; i++) {
+		// Add equality constraint only if it has not already been captured
+		// in the substitution choice.
+		elem new_name = rename_variables(head.e[i], renames, gen_fresh_var(d));
+		if(new_name != use.e[i]) {
+			subst = raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(subst),
+				make_shared<raw_form_tree>(raw_term(raw_term::EQ,
+					{ use.e[i], elem(elem::EQ), new_name })));
+		}
+	}
+	return subst;
+}
+
+/* Produces a program where executing a single step is equivalent to
+ * executing two steps of the original program. This is achieved through
+ * inlining where each body term is replaced by the disjunction of the
+ * bodies of the relation that it refers to. For those facts not
+ * computed in the previous step, it is enough to check that they were
+ * derived to steps ago and were not deleted in the previous step. */
+
+void driver::square_program(raw_prog &rp) {
+	// Partition the rules by relations
+	typedef set<raw_rule> relation;
+	map<rel_info, relation> rels;
+	// Separate the program rules according to the relation they belong
+	// to and their sign. This will simplify lookups during inlining.
+	for(const raw_rule &rr : rp.r)
+		if(!rr.is_fact() && !rr.is_goal())
+			rels[get_relation_info(rr.h[0])].insert(rr);
+
+	// The place where we will construct the squared program
+	vector<raw_rule> squared_prog;
+	for(const raw_rule &rr : rp.r) {
+		if(rr.is_fact() || rr.is_goal()) {
+			// Leave facts alone as they are not part of the function
+			squared_prog.push_back(rr);
+		} else {
+			// Deep copy so that we can inline out of place. Future terms/
+			// rules may need the original body of this rule
+			raw_form_tree nprft = *rr.get_prft();
+			// Iterate through tree looking for terms
+			postfold_tree(nprft, monostate {},
+				[&](raw_form_tree &t, monostate acc) -> monostate {
+					if(t.type == elem::NONE && t.rt->extype == raw_term::REL) {
+						// Replace term according to following rule:
+						// term -> (term && ~del1body && ... && ~delNbody) ||
+						// ins1body || ... || insMbody
+						raw_term &rt = *t.rt;
+						// Inner conjunction to handle case where fact was derived
+						// before the last step. We just need to make sure that it
+						// was not deleted in the last step.
+						optional<raw_form_tree> subst;
+						// Outer disjunction to handle the case where fact derived
+						// exactly in the last step.
+						for(const raw_rule &rr : rels[get_relation_info(rt)])
+							subst = !subst ? expand_term(rt, rr) :
+								raw_form_tree(elem::ALT,
+									make_shared<raw_form_tree>(*subst),
+									make_shared<raw_form_tree>(expand_term(rt, rr)));
+						// We can replace the raw_term now that we no longer need it
+						if(subst) t = *subst;
+					}
+					// Just a formality. Nothing is being accumulated.
+					return acc; });
+			squared_prog.push_back(raw_rule(rr.h[0], nprft));
+		}
+	}
+	rp.r = squared_prog;
+}
+#endif
+
 /*!
  * Optimize a mutated program
  */
