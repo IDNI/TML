@@ -2651,6 +2651,27 @@ elem gen_id_var(const elem &var) {
 	return var;
 }
 
+/* Returns the difference between the two given sets. I.e. the second
+ * set removed with multiplicity from the first. */
+
+set<elem> set_difference(const multiset<elem> &s1,
+		const set<elem> &s2) {
+	set<elem> res;
+	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
+	return res;
+}
+
+/* Returns the intersection of the two given sets. I.e. all the elems
+ * that occur in both sets. */
+
+set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
+	set<elem> res;
+	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
+	return res;
+}
+
 /* Iterate through the FOL rules and remove the outermost existential
  * quantifiers. Required because TML to DNF conversion assumes that quantifier
  * variables are only visible within their bodies. */
@@ -2684,146 +2705,6 @@ void driver::export_outer_quantifiers(raw_prog &rp) {
 				*rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
 			}
 		}
-	}
-}
-
-/* Returns the difference between the two given sets. I.e. the second
- * set removed with multiplicity from the first. */
-
-set<elem> set_difference(const multiset<elem> &s1,
-		const set<elem> &s2) {
-	set<elem> res;
-	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		inserter(res, res.end()));
-	return res;
-}
-
-/* Returns the intersection of the two given sets. I.e. all the elems
- * that occur in both sets. */
-
-set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
-	set<elem> res;
-	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		inserter(res, res.end()));
-	return res;
-}
-
-/* Make a term with behavior equivalent to the supplied first order
- * logic formula with the given bound variables. This might involve
- * adding temporary relations to the given program. */
-
-raw_term driver::to_dnf(const raw_form_tree &t,
-		raw_prog &rp, const set<elem> &fv) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-	const elem part_id = elem::fresh_temp_sym(d);
-
-	switch(t.type) {
-		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
-			// Process the expanded formula instead
-			return to_dnf(expand_formula_node(t, d), rp, fv);
-		case elem::AND: {
-			// Collect all the conjuncts within the tree top
-			vector<const raw_form_tree *> ands;
-			t.flatten_associative(elem::AND, ands);
-			// Collect the free variables in each conjunct. The intersection
-			// of variables between one and the rest is what will need to be
-			// exported
-			multiset<elem> all_vars(fv.begin(), fv.end());
-			map<const raw_form_tree *, set<elem>> fvs;
-			for(const raw_form_tree *tree : ands) {
-				fvs[tree] = collect_free_vars(*tree);
-				all_vars.insert(fvs[tree].begin(), fvs[tree].end());
-			}
-			vector<raw_term> terms;
-			// And make a DNF rule listing them
-			for(const raw_form_tree *tree : ands) {
-				set<elem> nv = set_intersection(fvs[tree],
-					set_difference(all_vars, fvs[tree]));
-				terms.push_back(to_dnf(*tree, rp, nv));
-			}
-			// Make the representative rule and add to the program
-			raw_rule nr(raw_term(part_id, fv), terms);
-			rp.r.push_back(nr);
-			// Hide this new auxilliary relation
-			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			break;
-		} case elem::ALT: {
-			// Collect all the disjuncts within the tree top
-			vector<const raw_form_tree *> alts;
-			t.flatten_associative(elem::ALT, alts);
-			for(const raw_form_tree *tree : alts) {
-				// Make a separate rule for each disjunct
-				raw_rule nr(raw_term(part_id, fv), to_dnf(*tree, rp, fv));
-				rp.r.push_back(nr);
-				// Hide this new auxilliary relation
-				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			}
-			break;
-		} case elem::NOT: {
-			return to_dnf(*t.l, rp, fv).negate();
-		} case elem::EXISTS: {
-			// Make the proposition that is being quantified
-			set<elem> nfv = fv;
-			const raw_form_tree *current_formula;
-			set<elem> qvars;
-			// Get all the quantified variables used in a sequence of
-			// existential quantifiers
-			for(current_formula = &t;
-					current_formula->type == elem::EXISTS;
-					current_formula = &*current_formula->r) {
-				qvars.insert(*(current_formula->l->el));
-			}
-			nfv.insert(qvars.begin(), qvars.end());
-			// Convert the body occuring within the nested quantifiers into DNF
-			raw_term nrt = to_dnf(*current_formula, rp, nfv);
-			// Make the rule corresponding to this existential formula
-			for(const elem &e : qvars) {
-				nfv.erase(e);
-			}
-			raw_rule nr(raw_term(part_id, nfv), nrt);
-			rp.r.push_back(nr);
-			// Hide this new auxilliary relation
-			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			return raw_term(part_id, nfv);
-		} case elem::NONE: {
-			return *t.rt;
-		} case elem::FORALL: {
-			const raw_form_tree *current_formula;
-			set<elem> qvars;
-			// Get all the quantified variables used in a sequence of
-			// existential quantifiers
-			for(current_formula = &t;
-					current_formula->type == elem::FORALL;
-					current_formula = &*current_formula->r) {
-				qvars.insert(*(current_formula->l->el));
-			}
-			// The universal quantifier is logically equivalent to the
-			// following (forall ?x forall ?y = ~ exists ?x exists ?y ~)
-			sprawformtree equiv_formula =
-				make_shared<raw_form_tree>(elem::NOT,
-					make_shared<raw_form_tree>(*current_formula));
-			for(const elem &qvar : qvars) {
-				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
-					make_shared<raw_form_tree>(qvar), equiv_formula);
-			}
-			return to_dnf(raw_form_tree(elem::NOT, equiv_formula), rp, fv);
-		} default:
-			assert(false); //should never reach here
-	}
-	return raw_term(part_id, fv);
-}
-
-/* Convert every rule in the given program to DNF rules. */
-
-void driver::to_dnf(raw_prog &rp) {
-	// Convert all FOL formulas to DNF
-	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
-		raw_rule rr = rp.r[i];
-		if(rr.is_form()) {
-			rr.set_b({{to_dnf(*rr.prft, rp, collect_free_vars(rr))}});
-		}
-		rp.r[i] = rr;
 	}
 }
 
