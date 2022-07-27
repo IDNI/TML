@@ -24,6 +24,8 @@
 #include <memory>
 #include <fstream>
 #include <numeric>
+#include <optional>
+#include <ranges>
 
 #include "driver.h"
 #include "err.h"
@@ -581,6 +583,7 @@ bool is_query (const raw_rule &rr) {
 	return true;
 }
 
+#ifdef DELETE_ME
 /* If rr1 and rr2 are both conjunctive queries, check if there is a
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
  * of a homomorphism implies that rr1 is contained by rr2. */
@@ -623,6 +626,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		return false;
 	}
 }
+#endif
 
 /* If rr1 and rr2 are both conjunctive bodies, check if there is a
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
@@ -630,8 +634,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
  * turned into a valid substitution for rr2. This function provides all
  * off them. */
 
-bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
-		set<terms_hom> &homs) {
+bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
 
@@ -924,84 +927,6 @@ void driver::factor_rules(raw_prog &rp) {
 	}
 }
 
-/* Function to iterate through the partitions of the given set. Calls
- * the supplied function with a vector of sets representing each
- * partition. If the supplied function returns false, then the iteration
- * stops. */
-
-template<typename T, typename F> bool partition_iter(set<T> &vars,
-		vector<set<T>> &partition, const F &f) {
-	if(vars.empty()) {
-		return f(partition);
-	} else {
-		const T nvar = *vars.begin();
-		vars.erase(nvar);
-		for(size_t i = 0; i < partition.size(); i++) {
-			partition[i].insert(nvar);
-			if(!partition_iter(vars, partition, f)) {
-				return false;
-			}
-			partition[i].erase(nvar);
-		}
-		set<T> npart = { nvar };
-		partition.push_back(npart);
-		if(!partition_iter(vars, partition, f)) {
-			return false;
-		}
-		partition.pop_back();
-		vars.insert(nvar);
-		return true;
-	}
-}
-
-/* Function to iterate through the given set raised to the given
- * cartesian power. The supplied function is called with each tuple in
- * the product and if it returns false, the iteration stops. */
-
-template<typename T, typename F>
-		bool product_iter(const set<T> &vars, vector<T> &seq,
-			size_t len, const F &f) {
-	if(len == 0) {
-		return f(seq);
-	} else {
-		for(const T &el : vars) {
-			seq.push_back(el);
-			if(!product_iter(vars, seq, len - 1, f)) {
-				return false;
-			}
-			seq.pop_back();
-		}
-		return true;
-	}
-}
-
-/* Function to iterate through the power set of the given set. The
- * supplied function is called with each element of the power set and
- * if it returns false, the iteration stops. */
-
-template<typename T, typename F> bool power_iter(set<T> &elts,
-		set<T> &subset, const F &f) {
-	if(elts.size() == 0) {
-		return f(subset);
-	} else {
-		const T nelt = *elts.begin();
-		elts.erase(nelt);
-		// Case where current element will not be in subset
-		if(!power_iter(elts, subset, f)) {
-			return false;
-		}
-		if(subset.insert(nelt).second) {
-			// Case where current element will be in subset
-			if(!power_iter(elts, subset, f)) {
-				return false;
-			}
-			subset.erase(nelt);
-		}
-		elts.insert(nelt);
-		return true;
-	}
-}
-
 /* Collect the variables used in the given terms and return. */
 
 void collect_vars(const raw_term &rt, set<elem> &vars) {
@@ -1032,143 +957,6 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 	}
 }
 
-#ifdef DELETE_ME
-/* If rr1 and rr2 are both conjunctive queries with negation, check that
- * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
-
-bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
-	// Check that rules have correct format
-	if(!(is_cqn(rr1) && is_cqn(rr2) &&
-		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
-
-	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << endl;
-
-	set<elem> vars;
-	collect_vars(rr1, vars);
-	vector<set<elem>> partition;
-
-	// Do the Levy-Sagiv test
-	bool contained = partition_iter(vars, partition,
-		[&](const vector<set<elem>> &partition) -> bool {
-			// Print the current partition
-			o::dbg() << "Testing partition: ";
-			for(const set<elem> &s : partition) {
-				o::dbg() << "{";
-				for(const elem &e : s) {
-					o::dbg() << e << ", ";
-				}
-				o::dbg() << "}, ";
-			}
-			o::dbg() << endl;
-
-			// Create new dictionary so that symbols created for these tests
-			// do not affect final program
-			dict_t d;
-
-			// Map each variable to a fresh symbol according to the partition
-			map<elem, elem> subs;
-			for(const set<elem> &part : partition) {
-				elem pvar = elem::fresh_sym(d);
-				for(const elem &e : part) {
-					subs[e] = pvar;
-				}
-			}
-			raw_rule subbed = freeze_rule(rr1, subs, d);
-			set<raw_term> canonical, canonical_negative;
-			// Separate the positive and negative subgoals. Note the symbols
-			// supplied to the subgoals.
-			for(raw_term &rt : subbed.b[0]) {
-				if(rt.neg) {
-					rt.neg = false;
-					canonical_negative.insert(rt);
-					rt.neg = true;
-				} else {
-					canonical.insert(rt);
-				}
-			}
-			// Print the canonical database
-			o::dbg() << "Current canonical Database: ";
-			for(const raw_term &rt : canonical) {
-				o::dbg() << rt << ", ";
-			}
-			o::dbg() << endl;
-			// Does canonical database make all the subgoals of subbed true?
-			for(raw_term &rt : subbed.b[0]) {
-				if(rt.neg) {
-					// If the term in the rule is negated, we need to make sure
-					// that it is not in the canonical database.
-					rt.neg = false;
-					if(canonical.find(rt) != canonical.end()) {
-						o::dbg() << "Current canonical database causes its source query to be inconsistent."
-							<< endl;
-						return true;
-					}
-					rt.neg = true;
-				}
-			}
-			// Collect the symbols/literals from the freeze map
-			set<elem> symbol_set;
-			for(const auto &[elm, sym] : subs) {
-				symbol_set.insert(sym);
-				// Finer control over elements in the universe is required to
-				// make this algorithm work with unsafe negations. In
-				// particular, we need need to control over which characters and
-				// numbers are in the domain.
-				if(sym.type == elem::SYM) {
-					d.get_sym(sym.e);
-				}
-			}
-			// Get all the relations used in both queries
-			set<rel_info> rels;
-			for(const raw_term &rt : rr1.b[0]) {
-				rels.insert(get_relation_info(rt));
-			}
-			for(const raw_term &rt : rr2.b[0]) {
-				rels.insert(get_relation_info(rt));
-			}
-			// Now we need to get the largest superset of our canonical
-			// database
-			set<raw_term> superset;
-			for(const rel_info &ri : rels) {
-				vector<elem> tuple;
-				product_iter(symbol_set, tuple, get<1>(ri),
-					[&](const vector<elem> tuple) -> bool {
-						vector<elem> nterm_e = { get<0>(ri), elem_openp };
-						for(const elem &e : tuple) {
-							nterm_e.push_back(e);
-						}
-						nterm_e.push_back(elem_closep);
-						raw_term nterm(nterm_e);
-						superset.insert(nterm);
-						return true;
-					});
-			}
-			// Remove the frozen negative subgoals
-			for(const raw_term &rt : canonical_negative) {
-				superset.erase(rt);
-			}
-			// Now need to through all the supersets of our canonical database
-			// and check that they yield the frozen head.
-			return power_iter(superset, canonical,
-				[&](const set<raw_term> ext) -> bool {
-					raw_prog test_prog(dict);
-					test_prog.r.push_back(rr2);
-					set<raw_term> res;
-					tables::run_prog_wedb(ext, test_prog, d, opts, res);
-					return res.find(subbed.h[0]) != res.end();
-				});
-		});
-
-	if(contained) {
-		o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
-		return true;
-	} else {
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
-		return false;
-	}
-}
-#endif
-
 /* Takes a reference rule, its formula tree, and copies of both and
  * tries to eliminate redundant subtrees of the former using the latter
  * as scratch. Generally speaking, boolean algebra guarantees that
@@ -1198,10 +986,10 @@ raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
 						{*ref_tree.r, *orig_var.r}})
 				// Apply the same treatment as for a disjunction since this is
 				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(ref_rule_b,
+				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
                                                            var_rule.try_as_b(),
                                                            ctx)
-                                             : check_qc_z3(var_rule.try_as_b(),
+                                             : check_qc(var_rule.try_as_b(),
                                                            ref_rule,
                                                            ctx))
 					return ref_tree = ref_tmp;
@@ -1219,10 +1007,10 @@ raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
 				// If in positive context, eliminating disjunct certainly
 				// produces smaller query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(ref_rule_b,
+				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
                                                            var_rule.try_as_b(),
                                                            ctx)
-                                             : check_qc_z3(var_rule.try_as_b(),
+                                             : check_qc(var_rule.try_as_b(),
                                                            ref_rule_b,
                                                            ctx))
 					return ref_tree = ref_tmp;
@@ -1240,10 +1028,10 @@ raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
 				// If in positive context, eliminating conjunct certainly
 				// produces bigger query, so check only the reverse. Otherwise
 				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc_z3(var_rule.try_as_b(),
+				if(var_tree = var_tmp; ctx_sign ? check_qc(var_rule.try_as_b(),
                                                            ref_rule_b,
                                                            ctx)
-                                             : check_qc_z3(ref_rule_b,
+                                             : check_qc(ref_rule_b,
                                                            var_rule.try_as_b(),
                                                            ctx))
 					return ref_tree = ref_tmp;
@@ -1276,6 +1064,14 @@ raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
  * containment testing function. */
 
 void driver::minimize(raw_rule &rr, z3_context &ctx) {
+	// have we compute already the result
+	static set<raw_rule> memo;
+	if (memo.contains(rr)) {
+		return;
+	}
+	// TODO Write a quick test to avoid easy cases
+	
+	// do the expensive computation
 	if(rr.is_fact() || rr.is_goal()) return;
 	// Switch to the formula tree representation of the rule if this has
 	// not yet been done for this is a precondition to minimize_aux. Note
@@ -1289,6 +1085,8 @@ void driver::minimize(raw_rule &rr, z3_context &ctx) {
 	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
 	// If the input rule was in DNF, provide the output in DNF
 	if(orig_form) rr = rr.try_as_b();
+	// remmber raw_rule as minimized
+	memo.insert(rr);
 }
 
 #ifdef DELETE_ME
@@ -1407,10 +1205,10 @@ void driver::qc_z3 (raw_prog &raw_p) {
 				isEndReached = compared == raw_p.r.end();
 			} if (isEndReached) break;
 			// Check rules for containment
-			if (check_qc_z3(*selected, *compared, ctx)) {
+			if (check_qc(*selected, *compared, ctx)) {
 				selected = raw_p.r.erase(selected);
 				continue;
-			} else if(check_qc_z3(*compared, *selected, ctx))
+			} else if(check_qc(*compared, *selected, ctx))
 				compared = raw_p.r.erase(compared);
 			else ++compared;
 		}
@@ -1671,20 +1469,40 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
 	return decl;
 }
 
-/* Checks if r1 is contained in r2 or vice versa.
- * Returns false if rules are not comparable or not contained.
- * Returns true if r1 is contained in r2. */
+bool disjoint(const raw_rule &r1, const raw_rule &r2) {
+	auto get_terms = [](vector<raw_term> t) { return t[0]; };
+	auto r1_terms = r1.b | views::transform(get_terms);
+	auto r2_terms = r2.b | views::transform(get_terms);
+	vector<raw_term> i;
+	set_intersection(r1_terms.begin(), r1_terms.end(), r2_terms.begin(), r2_terms.end(), back_inserter(i));
+	return !i.empty();
+}
 
-bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
+bool comparable(const raw_rule &r1, const raw_rule &r2) {
+	return (r1.h[0].e[0] == r2.h[0].e[0] && r1.h[0].arity == r2.h[0].arity);
+}
+
+/*! 
+ * Checks if r1 is contained in r2 or vice versa.
+ * Returns false if rules are not comparable or not contained.
+ * Returns true if r1 is contained in r2. 
+ */
+bool driver::check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
+	// have we compute already the result
 	static map<pair<raw_rule, raw_rule>, bool> memo;
 	auto key = make_pair(r1, r2);
 	if (memo.contains(key)) {
 		return memo[key];
 	}
-	if (!(is_query(r1) && is_query(r2))) return false;
-	// Check if rules are comparable
-	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
-				r1.h[0].arity == r2.h[0].arity)) return 0;
+
+	// if the heads in the body are disjoint, no qc is possible
+	if (disjoint(r1, r2) || !comparable(r1, r2) || !is_query(r1) || !is_query(r2)) {
+		memo[key] = false;
+		swap(get<0>(key), get<1>(key));
+		memo[key] = false;
+	}
+
+	// do the expensive work
 	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
 	// Get head variables for z3
 	z3::expr_vector bound_vars(ctx.context);
@@ -2766,6 +2584,7 @@ void driver::step_transform(raw_prog &rp,
 	}
 }
 
+
 /* If the given element is a variable, rename it using the relevant
  * mapping. If the mapping does not exist, then create a new one. */
 
@@ -2832,6 +2651,8 @@ function<elem (const elem &)> gen_fresh_var(dict_t &d) {
 elem gen_id_var(const elem &var) {
 	return var;
 }
+
+#ifdef DELETE_ME
 
 /* Expand the given term using the given rule whose head unifies with
  * it. Literally returns the rule's body with its variables replaced by
@@ -2965,6 +2786,8 @@ void driver::square_root_program(raw_prog &rp) {
 		rp.r.push_back(raw_rule(tick.negate(), tick));
 	}
 }
+
+#endif // DELETE_ME
 
 /* Iterate through the FOL rules and remove the outermost existential
  * quantifiers. Required because TML to DNF conversion assumes that quantifier
@@ -3498,67 +3321,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		DBG(o::transformed() <<
 			"Transformed Grammar:\n\n" << rp << endl;)
 	}
-
-	if(int_t iter_num = opts.get_int("O3")) {
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		export_outer_quantifiers(rp);
-
-		pdatalog_transform(rp, [&](raw_prog &rp) {
-			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
-			split_heads(rp);
-			// Alternately square and simplify the program iter_num times
-			for(int_t i = 0; i < iter_num; i++) {
-				o::dbg() << "Squaring Program ..." << endl << endl;
-				square_program(rp);
-				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-			}
-			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
-		});
-	}
-
-	if(opts.enabled("O1") || opts.enabled("O2")) {
-		mutated_prog mp(rp);
-		best_solution bs(exp_in_heads, mp); 
-		plan begin(bs);
-		raw_prog optimized(rp);
-		if (!opts.get_int("O3")) {
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
-			begin.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
-		}
-		optimized = optimize_once(rp, begin);
-		step_transform(rp, [&](raw_prog &rp) {
-			plan o1(bs);
-			// This transformation is a prerequisite to the CQC and binary
-			// transformations, hence its more general activation condition.
-			o::dbg() << "Adding dnf brancher in begin..." << endl << endl;
-			o1.branchers.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
-			if (!opts.get_int("O3")) {
-				o::dbg() << "Adding split heads brancher in begin..." << endl << endl;
-				o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
-			}
-			// Though this is a binary transformation, rules will become
-			// ternary after timing guards are added
-			optimized = optimize_once(optimized, o1);
-			if(opts.enabled("O2")) {
-				plan o2(bs);
-				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
-				o2.branchers.push_back(bind(&driver::brancher_subsume_queries, this, placeholders::_1));
-				o::dbg() << "Adding minimizer brancher ..." << endl << endl;
-				o2.branchers.push_back(bind(&driver::brancher_minimize_z3, this, placeholders::_1));
-				optimized = optimize_loop(optimized, o2);
-			}
-			plan end(bs);
-			o::dbg() << "Adding split bodies brancher in loop..." << endl << endl;
-			end.branchers.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
-			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			end.branchers.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			rp = optimize_once(optimized, end);
-			o::dbg() << "Current:" << endl << rp << endl;
-		});
-	}
-
 	return true;
 }
 

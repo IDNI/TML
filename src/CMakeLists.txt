@@ -37,6 +37,7 @@ set(TML_HEADERS
 	iterators.h
 	transform_opt.h
 	earley.h
+	generators.h
 	typemanager.h
 )
 
@@ -142,14 +143,12 @@ endif()
 
 # z3 library
 #############
-if (WITH_Z3)
-	find_library(Z3 NAMES z3)
-	add_library(Z3 SHARED IMPORTED)
-	set_target_properties(Z3 PROPERTIES
-		IMPORTED_LOCATION "${Z3}")
-	target_link_libraries(TMLo Z3)
-	target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
-endif()
+find_library(Z3 NAMES z3)
+add_library(Z3 SHARED IMPORTED)
+set_target_properties(Z3 PROPERTIES
+	IMPORTED_LOCATION "${Z3}")
+target_link_libraries(TMLo Z3)
+#target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
 
 
 # shared library

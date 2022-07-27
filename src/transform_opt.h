@@ -20,6 +20,8 @@
 #include <functional>
 #include <limits>
 
+#include "ir_builder.h"
+
 class raw_prog;
 class dict_t;
 
@@ -27,14 +29,14 @@ class dict_t;
  * Represents a mutated program, i.e. the original program, the additions and 
  * substractions.
  */
-struct mutated_prog  {
+struct changed_prog  {
 	// starting node of the mutated progs log
-	explicit mutated_prog(raw_prog &rp): current(rp) {};
+	explicit changed_prog(flat_prog &rp): current(rp) {};
 	// link to previous mutated prog
-	explicit mutated_prog(mutated_prog *mp): current(mp->current) {};
+	explicit changed_prog(changed_prog *mp): current(mp->current) {};
 	void operator()(struct change& m);
 
-	raw_prog current;
+	flat_prog current;
 };
 
 /*!
@@ -45,19 +47,19 @@ struct mutated_prog  {
 class change {
 public:
 	auto operator<=>(const change &rhs) const = default;
-	virtual bool operator()(mutated_prog &mp) const = 0;
+	virtual bool operator()(changed_prog &mp) const = 0;
 };
 
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using cost_function = std::function<size_t(mutated_prog&)>;
+using cost_function = std::function<size_t(changed_prog&)>;
 extern cost_function exp_in_heads;
 
 /*!
  * Computes the approximate cost of executing a given mutated program.
  */
-using brancher = std::function<std::vector<std::shared_ptr<change>>(mutated_prog&)>;
+using brancher = std::function<std::vector<std::shared_ptr<change>>(changed_prog&)>;
 
 /*!
  * Represents and strategy to select the best change according to the passed
@@ -65,8 +67,8 @@ using brancher = std::function<std::vector<std::shared_ptr<change>>(mutated_prog
  */
 class bounder {
 public:
-	virtual bool bound(mutated_prog& p) = 0;
-	virtual raw_prog solution() = 0;
+	virtual bool bound(changed_prog& p) = 0;
+	virtual flat_prog solution() = 0;
 };
 
 /*!
@@ -75,17 +77,17 @@ public:
  */
 class best_solution: public bounder {
 public:
-	best_solution(cost_function& f, mutated_prog &rp): 
+	best_solution(cost_function& f, changed_prog &rp): 
 			func_(f), 
 			cost_(std::numeric_limits<size_t>::max()), 
-			best_(std::make_shared<mutated_prog>(rp)) {};
+			best_(std::make_shared<changed_prog>(rp)) {};
 
-	virtual bool bound(mutated_prog& p);
-	virtual raw_prog solution();
+	virtual bool bound(changed_prog& p);
+	virtual flat_prog solution();
 private:
 	cost_function func_;
 	size_t cost_;
-	std::shared_ptr<mutated_prog> best_;
+	std::shared_ptr<changed_prog> best_;
 };
 
 /*!

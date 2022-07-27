@@ -17,11 +17,16 @@ add_executable(test_iterators ${TEST_ITERATORS})
 target_setup(test_iterators)
 target_link_libraries(test_iterators TMLo ${TEST_FRAMEWORK})
 
+set(TEST_GENERATORS test_generators.cpp)
+add_executable(test_generators ${TEST_GENERATORS})
+target_setup(test_generators)
+target_link_libraries(test_generators TMLo ${TEST_FRAMEWORK})
+
 set(TEST_EARLEY test_earley.cpp)
 add_executable(test_earley ${TEST_EARLEY})
 target_setup(test_earley)
 target_link_libraries(test_earley TMLo ${TEST_FRAMEWORK})
 
 add_custom_target(tmltest
-	COMMAND test_input && tml_output && tml_earley && test_iterators
-	DEPENDS test_input test_output test_earley test_iterators)
+	COMMAND test_input && tml_output && tml_earley && test_iterators && test_generators
+	DEPENDS test_input test_output test_earley test_iterators test_generators)

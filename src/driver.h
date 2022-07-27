@@ -175,31 +175,29 @@ private:
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp
 	/*,const std::function<void(raw_prog &)> &f*/);
+	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
+		dict_t &d);
+#ifdef DELETE_ME
 	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
 	// TODO dupllicate and customize squaring functions
 	void square_root_program(raw_prog &rp);
 public:
 	void square_program(raw_prog &rp);
 private:	// TODO create one entry point for optimization 
-	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
-		dict_t &d);
+#endif //DELETE_ME
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 
-	std::vector<std::shared_ptr<change>> brancher_export_outer_quantifiers(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_to_dnf(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_factor_rules(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_squaring(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_minimize_z3(mutated_prog&);
-	std::vector<std::shared_ptr<change>> brancher_subsume_queries(mutated_prog &mp);
-#ifdef DELETE_ME
-	std::vector<std::shared_ptr<change>> brancher_subsume_queries_cqc(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_subsume_queries_cqnc(mutated_prog &mp);
-#endif
-	std::vector<std::shared_ptr<change>> brancher_split_heads(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_split_bodies(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_square_program(mutated_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_eliminate_dead_variables(mutated_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_export_outer_quantifiers(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_to_dnf(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_factor_rules(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_squaring(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_minimize(changed_prog&);
+	std::vector<std::shared_ptr<change>> brancher_subsume_queries(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_split_heads(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_split_bodies(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_square_program(changed_prog &mp);
+	std::vector<std::shared_ptr<change>> brancher_eliminate_dead_variables(changed_prog &mp);
 
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
 public:
@@ -207,7 +205,7 @@ public:
 	void factor_rules(raw_prog &rp);
 
 	void qc_z3(raw_prog &rp);
-        bool check_qc_z3(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
+        bool check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
 
 private:
 	// following 2 methods are defined in a file tml_earley.cpp

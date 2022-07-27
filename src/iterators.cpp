@@ -31,7 +31,6 @@ grey_code_const_iterator::grey_code_const_iterator(size_t size)
 		: size_(size), delta_(0) {
 	focus_pointers_.resize(size + 1);
 	std::iota(focus_pointers_.begin(), focus_pointers_.end(), 0);
-//	delta_ = 0;
 }
 
 grey_code_const_iterator::grey_code_const_iterator(): size_(0), delta_(0) {
