@@ -25,6 +25,7 @@
 #include <fstream>
 
 #include <optional>
+#include <ranges>
 #include <functional>
 
 #include "driver.h"
@@ -191,24 +192,27 @@ flat_prog optimize_loop(flat_prog &program, plan &plan) {
 	return plan.bndr.get().solution();
 }
 
-struct mutation_add_rule : public virtual change  {
-	vector<term> &rr;
+class change_del_rule : public virtual change  {
+public:
+	explicit change_del_rule(flat_prog &d): change(d) { }
+	explicit change_del_rule(vector<term> &r): change(r) { }
 
-	mutation_add_rule(vector<term> &r) : rr(r) {}
-
-	bool operator()(changed_prog &mp) const override {
-		mp.current.insert(mp.current.end(), rr);
+	bool operator()(changed_prog &cp) const override {
+		for (auto& r: clashing)	cp.current.erase(r);
 		return true;
 	}
 };
 
-struct mutation_del_rule : public virtual change  {
-	vector<term> del_;
+class change_add_rule : public virtual change  {
+public:
+	vector<term> add;
 
-	mutation_del_rule(vector<term> r) : del_(r) {}
+	explicit change_add_rule(vector<term> &a): add(a) { }
+	explicit change_add_rule(vector<term> &a, flat_prog d): change(d), add(a) { }
+	explicit change_add_rule(vector<term> &a, vector<term> d): change(d), add(a)  { }
 
-	bool operator()(changed_prog &mp) const override {
-		mp.current.erase(del_);
+	bool operator()(changed_prog &cp) const override {
+		cp.current.insert(add);
 		return true;
 	}
 };

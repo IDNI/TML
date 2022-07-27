@@ -46,6 +46,13 @@ struct changed_prog  {
  */
 class change {
 public:
+	flat_prog clashing;
+
+	explicit change() = default;
+	explicit change(flat_prog &c): clashing(c) {}
+	explicit change(std::vector<term> &r) { clashing.insert(r); }
+	virtual ~change() = default;
+
 	auto operator<=>(const change &rhs) const = default;
 	virtual bool operator()(changed_prog &mp) const = 0;
 };
@@ -101,7 +108,7 @@ public:
 	plan(bounder &b): bndr(b) {};
 };
 
-raw_prog optimize_once(raw_prog &program, plan &plan);
-raw_prog optimize_loop(raw_prog &program, plan &plan);
+// raw_prog optimize_once(flat_prog &program, plan &plan);
+// raw_prog optimize_loop(flat_prog &program, plan &plan);
 
 #endif // __TRANSFORM_OPT_H__
