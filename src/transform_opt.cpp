@@ -249,33 +249,33 @@ void driver::square_program(raw_prog &rp) {
 
 #ifndef WORK_IN_PROGRESS
 
-using rule = vector<term>;
-using head_body_cache = map<reference_wrapper<term>, set<reference_wrapper<rule>>>;
+using term_rule = vector<term>;
+using head_body_cache = map<reference_wrapper<term>, set<reference_wrapper<term_rule>>>;
 
 /* Constructs a map with head/body information. In our case, the body is the 
  * first element of the vector of terms and the body the remaining terms. */
 
 head_body_cache get_relation_info(flat_prog &fp) {
-	map<reference_wrapper<term>, set<reference_wrapper<rule>>> relations;
+	head_body_cache relations;
 	return relations;
 }
 
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
 
-bool is_fact(rule r) {
+bool is_fact(term_rule r) {
 	return false;
 }
 
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
 
-bool is_goal(rule r) {
+bool is_goal(term_rule r) {
 	return false;
 }
 
 /* Returns the squaring of a rule  */
 
-set<rule> square_rule(rule r, head_body_cache ri) {
-	set<rule> sqr;
+set<term_rule> square_rule(term_rule r, head_body_cache ri) {
+	set<term_rule> sqr;
 	return sqr;
 }
 
@@ -308,15 +308,15 @@ flat_prog square_program(flat_prog &fp) {
 
 /* Minimize the rule using CQC */
 
-rule minimize_rule(rule $fp) {
-	rule mnmzd;
+term_rule minimize_rule(term_rule $fp) {
+	term_rule mnmzd;
 	return mnmzd;
 }
 
 /* Returns all the possible splittings of the rule */
 
-set<pair<rule, rule>> split_rule(rule $fp) {
-	set<pair<rule, rule>> splt;
+set<pair<term_rule, term_rule>> split_rule(term_rule $fp) {
+	set<pair<term_rule, term_rule>> splt;
 	return splt;
 }
 
