@@ -247,10 +247,36 @@ void driver::square_program(raw_prog &rp) {
 }
 #endif // DELETE_ME
 
-#ifdef WONT_COMPILE
+#ifndef WORK_IN_PROGRESS
 
-map<> get_relation_info(flat_prog &fp) {
-	
+using rule = vector<term>;
+using head_body_cache = map<reference_wrapper<term>, set<reference_wrapper<rule>>>;
+
+/* Constructs a map with head/body information. In our case, the body is the 
+ * first element of the vector of terms and the body the remaining terms. */
+
+head_body_cache get_relation_info(flat_prog &fp) {
+	map<reference_wrapper<term>, set<reference_wrapper<rule>>> relations;
+	return relations;
+}
+
+/* Returns true if the vector of terms correspond to a fact, false otherwise. */
+
+bool is_fact(rule r) {
+	return false;
+}
+
+/* Returns true if the vector of terms correspond to a goal, false otherwise. */
+
+bool is_goal(rule r) {
+	return false;
+}
+
+/* Returns the squaring of a rule  */
+
+set<rule> square_rule(rule r, head_body_cache ri) {
+	set<rule> sqr;
+	return sqr;
 }
 
 /* Produces a program where executing a single step is equivalent to
@@ -260,16 +286,43 @@ map<> get_relation_info(flat_prog &fp) {
  * computed in the previous step, it is enough to check that they were
  * derived to steps ago and were not deleted in the previous step. */
 
-void square_program(flat_prog &fp) {
-	auto ri = get_relation_info(flat_prog &fp);
+flat_prog square_program(flat_prog &fp) {
+	// new flat_prog holding the squaring of fp
+	flat_prog sqr;
+	// cache info for speed up the squaring holding a map between heads
+	// and bodies
+	auto ri = get_relation_info(fp);
 	for (auto &r: fp) {
-		if(r.is_fact() || r.is_goal()) continue;
-
+		if(is_fact(r) || is_goal(r)) { 
+			// no squaring possible
+			sqr.insert(r);
+			continue;
+		} else { 
+			// go ahead with squaring
+			auto nr = square_rule(r, ri);
+			sqr.insert(nr.begin(), nr.end()); 
+		}
 	}
+	return sqr;
 }
 
-#endif // WONT_COMPILE
+/* Minimize the rule using CQC */
 
+rule minimize_rule(rule $fp) {
+	rule mnmzd;
+	return mnmzd;
+}
+
+/* Returns all the possible splittings of the rule */
+
+set<pair<rule, rule>> split_rule(rule $fp) {
+	set<pair<rule, rule>> splt;
+	return splt;
+}
+
+#endif // WORK_IN_PROGRESS
+
+#ifdef CHANGE_ME
 /*!
  * Optimize a mutated program
  */
@@ -286,7 +339,7 @@ vector<std::shared_ptr<change>> get_optimizations(changed_prog& mutated, vector<
 /*! Entry point for optimization process. */
 
 void optimize(flat_prog fp) {
-/*	changed_prog cp(fp);
+	changed_prog cp(fp);
 	best_solution bs(exp_in_heads, fp); 
 
 	if(int_t iter_num = opts.get_int("O3")) {
@@ -348,7 +401,7 @@ void optimize(flat_prog fp) {
 			rp = optimize_once(optimized, end);
 			o::dbg() << "Current:" << endl << rp << endl;
 		});
-	}*/
+	}
 }
 
 void optimize(changed_prog& mutated, vector<brancher>& branchers) {
@@ -397,6 +450,8 @@ flat_prog optimize_loop(flat_prog &program, plan &plan) {
 	return plan.bndr.get().solution();
 }
 
+#endif // CHANGE_ME
+
 class change_del_rule : public virtual change  {
 public:
 	explicit change_del_rule(flat_prog &d): change(d) { }
@@ -422,11 +477,11 @@ public:
 	}
 };
 
-
+#ifdef DELETE_ME
 /* Recurse through the given formula tree in pre-order calling the given
  * function with the accumulator. */
 
-/* template<typename X, typename F>
+template<typename X, typename F>
 X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
 	const X &new_acc = f(t, acc);
 	switch(t.type) {
@@ -442,23 +497,23 @@ X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
 		// accumulator through just this node
 		default: return new_acc;
 	}
-}*/
+}
 
 /* Update the number and characters counters as well as the distinct
  * symbol set to account for the given term. */
 
-/*void update_element_counts2(const raw_term &rt, set<elem> &distinct_syms,
+void update_element_counts2(const raw_term &rt, set<elem> &distinct_syms,
 		int_t &char_count, int_t &max_int) {
 	for(const elem &el : rt.e)
 		if(el.type == elem::NUM) max_int = max(max_int, el.num);
 		else if(el.type == elem::SYM) distinct_syms.insert(el);
 		else if(el.type == elem::CHR) char_count = 256;
-} */
+} 
 
 /* Compute the number of bits required to represent first the largest
  * integer in the given program and second the universe. */
 
-/* pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
+pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
 	int_t max_int = 0, char_count = 0;
 	set<elem> distinct_syms;
 
@@ -485,7 +540,7 @@ X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
 	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
 	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
 	return {int_bit_len, universe_bit_len};
-}*/ 
+} 
 
 /*! Go through the program and removed those queries that the function f
  * determines to be subsumed by others. While we're at it, minimize
@@ -493,7 +548,7 @@ X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
  * reduce time cost of future subsumptions. This function does not
  * respect order, so it should only be used on an unordered stratum. */
 
-/* std::vector<std::shared_ptr<change>> driver::brancher_subsume_queries(changed_prog &mp) {
+std::vector<std::shared_ptr<change>> driver::brancher_subsume_queries(changed_prog &mp) {
 	//TODO Check if z3 context should be static?
 	const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
 	z3_context ctx(int_bit_len, universe_bit_len);
@@ -631,4 +686,6 @@ vector<std::shared_ptr<change>> driver::brancher_split_bodies(changed_prog&) {
 	mutation_split_bodies m(*this);
 	mutations.push_back(std::make_shared<mutation_split_bodies>(m));
 	return mutations;
-} */
+}
+
+#endif // DELETE_ME
