@@ -37,7 +37,6 @@ set(TML_HEADERS
 	iterators.h
 	transform_opt.h
 	earley.h
-	generators.h
 	typemanager.h
 )
 

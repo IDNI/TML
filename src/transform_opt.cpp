@@ -65,12 +65,12 @@ flat_prog best_solution::solution() {
 	return best_.get()->current;
 }
 
+#ifdef DELETE_ME
 /* 
  * Squaring program 
  *
  */
 
-#ifdef DELETE_ME
 
 /* If the given element is a variable, rename it using the relevant
  * mapping. If the mapping does not exist, then create a new one. */
@@ -245,7 +245,30 @@ void driver::square_program(raw_prog &rp) {
 	}
 	rp.r = squared_prog;
 }
-#endif
+#endif // DELETE_ME
+
+#ifdef WONT_COMPILE
+
+map<> get_relation_info(flat_prog &fp) {
+	
+}
+
+/* Produces a program where executing a single step is equivalent to
+ * executing two steps of the original program. This is achieved through
+ * inlining where each body term is replaced by the disjunction of the
+ * bodies of the relation that it refers to. For those facts not
+ * computed in the previous step, it is enough to check that they were
+ * derived to steps ago and were not deleted in the previous step. */
+
+void square_program(flat_prog &fp) {
+	auto ri = get_relation_info(flat_prog &fp);
+	for (auto &r: fp) {
+		if(r.is_fact() || r.is_goal()) continue;
+
+	}
+}
+
+#endif // WONT_COMPILE
 
 /*!
  * Optimize a mutated program
