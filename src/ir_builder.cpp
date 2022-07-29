@@ -45,12 +45,18 @@ bool ir_builder::append(std::map<int_t, std::vector<tml_natives>> &m, sig &s) {
 		}
 		#ifdef BIT_TRANSFORM_V2
 		else {
+			bool updated = false;
 			int_t i = 0;
 			for ( auto &j : *it2 ) {
-				j.bit_w = max(j.bit_w,s.second[i].bit_w);
+				if (j.bit_w < s.second[i].bit_w) {
+					j.bit_w = s.second[i].bit_w;
+					updated = true;
+				}
 				++i;
 			}
+			return updated;
 		}
+
 		#endif
 	}
 	else {
@@ -243,10 +249,10 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 							tml_native_t ts;
 							bool vld = true;
 							for (auto j: vt.positions) {
-								assert(rel_sig[j].type == UINT || rel_sig[j].type == SYMB || rel_sig[j].type == UCHAR);
-								if (ts.type == UNDEF) {
-									ts = rel_sig[j];
-								}
+								DBG(assert((rel_sig[j].type == UINT ||
+									rel_sig[j].type == SYMB ||
+									rel_sig[j].type == UCHAR) && "un-handled argument type in sig"););
+								if (ts.type == UNDEF) ts = rel_sig[j];
 								if (!(ts == rel_sig[j])) {vld = false; break;}
 							}
 							if (vld) vt.append(ts);
@@ -273,8 +279,9 @@ void intersect_varmaps(tml_natives &v0, tml_natives &v1, tml_natives &v2) {
 		}
 }
 
-void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
+bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 
+	bool updated = false;
 	for (auto it = rp.begin(); it != rp.end();) {
 		rr_varmap v;
 		if (it->b.empty()) {
@@ -325,7 +332,7 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 				else if (ptr != 0) {
 					tml_natives aux;
 					intersect_varmaps(ptr[0], vt.types, aux);
-					if (!(it->b[0][vt.rt_idx-1].neg && aux.size() == 0))
+					if (!(it->b[0][vt.rt_idx-1].neg && aux.size() == 0)) //*TR001*
 						*ptr = aux;
 				}
 				else { //is_free
@@ -365,17 +372,28 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 				relid_argtypes_map.insert({s.first, {s.second}});
 			else {
 				auto it2 = find(it->second.begin(), it->second.end(), s.second);
-				//single step bitwidth inference - just proof of concept
-				if (it2 != it->second.end()) append(relid_argtypes_map, s);
-				else assert(false);
+				//fixed point bitwidth inference
+				if (it2 != it->second.end())
+						if (append(relid_argtypes_map, s)) updated = true;
+						//if updated... restart ... loop ? :)
+				//else assert(false);
 			}
 		}
 	}
+	return updated;
 }
 
 void ir_builder::type_resolve(raw_prog &rp) {
+
 	type_resolve_facts(rp.r);
-	type_resolve_rules(rp.r);
+
+	bool updated;
+
+	updated = type_resolve_rules(rp.r);
+
+	while (updated) //TEST: jump to non halting cycle?
+		updated = type_resolve_rules(rp.r);
+
 }
 
 sig ir_builder::to_native_sig(const term& e) {
@@ -498,7 +516,8 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 						ints ev;
 						for (auto &t : s.second) {
 							if (t.type == POLY) {
-								int_t id = i <= 2 ? dict.get_var(rt->e[i*2].e) : dict.get_var(rt->e[i*2-1].e);
+								int_t id = i <= 2 ?	dict.get_var(rt->e[i*2].e) :
+										dict.get_var(rt->e[i*2-1].e);
 								if (find(ev.begin(), ev.end(), id) == ev.end()) {
 									elem v = i <= 2 ? rt->e[i*2] : rt->e[i*2-1];
 									ev.push_back(id);
@@ -597,8 +616,6 @@ sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
 	for (auto &t : tys) tn.push_back({t,-1});
 	return {rel_id, tn};
 }
-
-
 #endif //TYPE_RESOLUTION
 
 #ifdef TML_NATIVES
@@ -608,6 +625,7 @@ sig ir_builder::get_sig(raw_term &t) {
 		if (opts.binarize) {
 			auto it = relid_argtypes_map.find(t.s.first);
 			auto it2 = find(it->second.begin(), it->second.end(), t.s.second);
+			if (it2->begin()->bit_w == -1) return t.s; //workaround for constant head
 			return {t.s.first, *it2};
 		} else return t.s;
 		#else
@@ -693,7 +711,7 @@ size_t ir_builder::sig_len(const sig& s) const {
 
 #if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
 
-int_t inc_pos_bt (tml_natives &rts, int_t i, int_t j) {
+int_t inc_pos_bt(tml_natives &rts, int_t i, int_t j) {
     int_t inc = 0;
     for (int_t k = 0; k < (int_t) rts.size(); k++)
 		if (j < rts[k].bit_w) inc++;
