@@ -262,7 +262,7 @@ struct elem {
 			case CLOSEB: e = str2lexeme("}"); break;
 			case OPENSB: e = str2lexeme("["); break;
 			case CLOSESB: e = str2lexeme("]"); break;
-			default: assert(false); //should never reach here
+			default: assert(false);
 		}
 	}
 	elem(bool b) {
@@ -270,7 +270,7 @@ struct elem {
 		type = NUM;
 	}
 	elem(etype type, lexeme e) : type(type), e(e) {
-		DBG(assert(type!=NUM&&type!=CHR&&(type!=SYM||(e[0]&&e[1])));)
+		DBG(assert(type!=NUM && type!=CHR && ( type!=SYM || (e[0]&&e[1])));)
 	}
 	elem(etype type, t_arith_op arith_op, lexeme e) : type(type),
 			arith_op(arith_op), e(e) {

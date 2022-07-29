@@ -112,6 +112,7 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+//#ifdef PROOF
 struct gnode {
 	enum gntype{
 		pack, interm, symbol
@@ -136,6 +137,7 @@ struct gnode {
 	static std::map<std::set<term>, gnode*> interm2g;
 	bool _binarise();
 };
+//#endif
 
 struct table {
 	sig s;

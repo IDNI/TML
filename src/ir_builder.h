@@ -39,7 +39,9 @@ struct rt_vartypes {
 typedef std::map<int_t, std::vector<rt_vartypes>> rr_varmap;
 #endif
 
+#ifdef BIT_TRANSFORM
 struct table;
+#endif
 class tables;
 
 class ir_builder {
@@ -75,7 +77,7 @@ public:
 	raw_prog generate_type_resolutor(raw_prog &rp);
 	void type_resolve_facts(std::vector<raw_rule> &rp);
 	void type_resolve_bodies(raw_rule &r, rr_varmap &v);
-	void type_resolve_rules(std::vector<raw_rule> &rp);
+	bool type_resolve_rules(std::vector<raw_rule> &rp);
 	void type_resolve(raw_prog &rp);
 
 	sig get_sig_bltin(raw_term&t);
