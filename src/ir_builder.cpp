@@ -284,6 +284,7 @@ bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 	bool updated = false;
 	for (auto it = rp.begin(); it != rp.end();) {
 		rr_varmap v;
+		sig sh;
 		if (it->b.empty()) {
 			if (it->type == raw_rule::GOAL) {
 				sig s = get_sig(*it->h.begin());
@@ -295,7 +296,7 @@ bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			else { it++; continue;}
 		}
 		else {
-			sig sh = get_sig(*it->h.begin());
+			sh = get_sig(*it->h.begin());
 			v = get_vars(*it);
 			if ((*it->h.begin()).extype == raw_term::BLTIN) assert(false);
 			//free_vars: detected only at bodies, for cons/bltins TBD
@@ -351,7 +352,12 @@ bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			mpn = mpn == 0 ? vl : mpn * vl;
 			mp.push_back(vl);
 		}
-		if (v.size() == 0) {it++;continue;}
+		if (v.size() == 0) {
+			//constant head and bodies
+			if (append(relid_argtypes_map, sh)) updated = true;
+			it++;
+			continue;
+		}
 
 		if (mpn == 0) {
 			COUT << "WARNING: removing rule due to invalid types" << endl; //add lineno
@@ -625,7 +631,7 @@ sig ir_builder::get_sig(raw_term &t) {
 		if (opts.binarize) {
 			auto it = relid_argtypes_map.find(t.s.first);
 			auto it2 = find(it->second.begin(), it->second.end(), t.s.second);
-			if (it2->begin()->bit_w == -1) return t.s; //workaround for constant head
+			//if (it2->begin()->bit_w == -1) return t.s; //workaround for constant head
 			return {t.s.first, *it2};
 		} else return t.s;
 		#else
@@ -726,7 +732,7 @@ void ir_builder::bit_transform(tml_natives &ts, tml_natives &rts, ints &t, ints 
 	for (int_t i = 0; i < (int_t) t.size(); ++i) {
 		int_t offset = i;
 		if (t[i] < 0) {
-			int_t e = floor(log10(rts[i].bit_w));
+			int_t e = floor(log10(rts[i].bit_w)) + 1;
 			int_t scl = pow(10,e);
 			for (int_t j = 0; j < ts[i].bit_w; ++j) {
 				if (j < rts[i].bit_w)
