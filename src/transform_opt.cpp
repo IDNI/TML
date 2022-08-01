@@ -23,7 +23,7 @@
 #include <locale>
 #include <codecvt>
 #include <fstream>
-
+#include <iterator>
 #include <optional>
 #include <ranges>
 #include <functional>
@@ -247,61 +247,114 @@ void driver::square_program(raw_prog &rp) {
 }
 #endif // DELETE_ME
 
-#ifndef WORK_IN_PROGRESS
+#ifdef WORK_IN_PROGRESS
 
 using term_rule = vector<term>;
-using head_body_cache = map<reference_wrapper<term>, set<reference_wrapper<term_rule>>>;
+using rule_index = map<const term, set<const term_rule>>;
+using unification = map<int_t, int_t>;
+
+struct squaring_context {
+	reference_wrapper<dict_t> dict;
+	reference_wrapper<rule_index> index;
+
+};
 
 /* Constructs a map with head/body information. In our case, the body is the 
  * first element of the vector of terms and the body the remaining terms. */
 
-head_body_cache get_relation_info(flat_prog &fp) {
-	head_body_cache relations;
-	return relations;
+rule_index index_rules(const flat_prog &fp) {
+	rule_index c;
+	for (auto const &t: fp) 
+		if (c.contains(t[0])) c[t[0]].insert(t);
+		else c[t[0]] = set<const term_rule> {t};
+	return c;
 }
 
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
 
-bool is_fact(term_rule r) {
-	return false;
+bool is_fact(const term_rule &r) {
+	// only one term and is not a goal
+	return r.size() == 1 && !r[0].goal;
 }
 
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
 
-bool is_goal(term_rule r) {
-	return false;
+bool is_goal(const term_rule &r) {
+	// TODO considder remove defensive programming
+	// non empty and its a goal
+	return !r.empty() && r[0].goal;
 }
 
-/* Returns the squaring of a rule  */
+/* Compute the unification of two terms */
+unification unify(const term &t1, const term &t2) {
+	unification nf;
+	for (size_t i= 0; i != t1.size(); ++i) 
+		if (nf.contains(t2[i]) && t2[i] != t1[i]) return unification();
+		else nf[t2[i]] = t1[i];
+	return nf;
+}
 
-set<term_rule> square_rule(term_rule r, head_body_cache ri) {
-	set<term_rule> sqr;
+vector<term> apply_unification(const unification &nf, const term_rule & r) {
+	for (auto t: r) for( size_t i = 0; i != t.size(); ++i) 
+		if (nf.contains(t[i])) t[i] = nf[t[i]]; // <- ERROR
+}
+
+/* Returns the squaring of a term using a given rule. */
+vector<term> square_term(const term &t, const term_rule &r /*, dict_t &d*/) {
+	if (t.neg) /* TODO something using distributive law */;
+	auto nf = unify(t, r[0]); /* TODO something if no unification is possible */
+	return apply_unification(nf, r);
+}
+
+/* Renames all variables of a rule. */
+term_rule rename_rule(const term_rule &r, dict_t &d) {
+	term_rule rr;
+	map<int_t, int_t> sbs;
+	for (auto &t: r) {
+		term rt; 
+		for (auto i: t) {
+			if (sbs.contains(i)) rt.emplace_back(sbs[i]);
+			else if (i < 0) sbs[i] = d.get_new_var(), rt.emplace_back(sbs[i]);
+			else rt.emplace_back(i);
+		}
+		rr.emplace_back(rt);
+	}
+	return rr;
+}
+
+/* Returns the squaring of a term.  */
+set<term> square_term(const term &t, const rule_index &idx, dict_t &d) {
+	set<term> sqr;
+	for (auto r: idx.at(t)) rename_rule(r, d), square_term(t, r);
 	return sqr;
 }
 
-/* Produces a program where executing a single step is equivalent to
+/* Returns the squaring of a rule  */
+set<term_rule> square_rule(auto &r, const rule_index &idx, dict_t &d) {
+	set<term_rule> sqr;
+	if (begin(r) == end(r)) return sqr;
+	auto hs = square_term(*r, idx, d); 
+	auto ts = square_rule(r| views::drop(1)); // <- ERROR
+	for (auto h: hs) for (auto t: ts) t.emplace(begin(t), h), sqr.insert(t);
+	return sqr;
+}
+
+/*! Produces a program where executing a single step is equivalent to
  * executing two steps of the original program. This is achieved through
  * inlining where each body term is replaced by the disjunction of the
  * bodies of the relation that it refers to. For those facts not
  * computed in the previous step, it is enough to check that they were
  * derived to steps ago and were not deleted in the previous step. */
 
-flat_prog square_program(flat_prog &fp) {
+flat_prog square_program(const flat_prog &fp, dict_t &d) {
 	// new flat_prog holding the squaring of fp
 	flat_prog sqr;
 	// cache info for speed up the squaring holding a map between heads
 	// and bodies
-	auto ri = get_relation_info(fp);
+	auto idx = index_rules(fp);
 	for (auto &r: fp) {
-		if(is_fact(r) || is_goal(r)) { 
-			// no squaring possible
-			sqr.insert(r);
-			continue;
-		} else { 
-			// go ahead with squaring
-			auto nr = square_rule(r, ri);
-			sqr.insert(nr.begin(), nr.end()); 
-		}
+		if(is_fact(r) || is_goal(r)) { sqr.insert(r); continue; } 
+		else { auto nr = square_rule(r, idx, d); sqr.insert(nr.begin(), nr.end()); }
 	}
 	return sqr;
 }
@@ -310,6 +363,7 @@ flat_prog square_program(flat_prog &fp) {
 
 term_rule minimize_rule(term_rule $fp) {
 	term_rule mnmzd;
+	// do minimization
 	return mnmzd;
 }
 
@@ -317,6 +371,7 @@ term_rule minimize_rule(term_rule $fp) {
 
 set<pair<term_rule, term_rule>> split_rule(term_rule $fp) {
 	set<pair<term_rule, term_rule>> splt;
+	// do splitting
 	return splt;
 }
 
