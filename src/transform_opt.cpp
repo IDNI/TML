@@ -280,7 +280,7 @@ bool is_fact(const term_rule &r) {
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
 
 bool is_goal(const term_rule &r) {
-	// TODO considder remove defensive programming
+	// TODO consider remove defensive programming
 	// non empty and its a goal
 	return !r.empty() && r[0].goal;
 }
@@ -308,7 +308,7 @@ vector<term> square_term(const term &t, const term_rule &r) {
 }
 
 /* Renames all variables of a rule. */
-term_rule rename_rule(const term_rule &r, dict_t &d) {
+term_rule rename_rule_vars(const term_rule &r, dict_t &d) {
 	term_rule rr;
 	map<int_t, int_t> sbs;
 	for (auto &t: r) {
@@ -326,7 +326,7 @@ term_rule rename_rule(const term_rule &r, dict_t &d) {
 /* Returns the squaring of a term.  */
 set<term> square_term(const term &t, const rule_index &idx, dict_t &d) {
 	set<term> sqr;
-	for (auto r: idx.at(t)) rename_rule(r, d), square_term(t, r);
+	for (auto r: idx.at(t)) rename_rule_vars(r, d), square_term(t, r);
 	return sqr;
 }
 
