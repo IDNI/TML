@@ -299,8 +299,9 @@ vector<term> apply_unification(const unification &nf, const term_rule & r) {
 		if (nf.contains(t[i])) t[i] = nf[t[i]]; // <- ERROR
 }
 
-/* Returns the squaring of a term using a given rule. */
-vector<term> square_term(const term &t, const term_rule &r /*, dict_t &d*/) {
+/* Returns the squaring of a term using a given rule. When considering negations 
+ * we may return a set<vector<term>>. */
+vector<term> square_term(const term &t, const term_rule &r) {
 	if (t.neg) /* TODO something using distributive law */;
 	auto nf = unify(t, r[0]); /* TODO something if no unification is possible */
 	return apply_unification(nf, r);
