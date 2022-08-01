@@ -247,7 +247,7 @@ void driver::square_program(raw_prog &rp) {
 }
 #endif // DELETE_ME
 
-#ifdef WORK_IN_PROGRESS
+#ifndef WORK_IN_PROGRESS
 
 using term_rule = vector<term>;
 using rule_index = map<const term, set<const term_rule>>;
@@ -355,6 +355,7 @@ flat_prog square_program(const flat_prog &fp, dict_t &d) {
 	auto idx = index_rules(fp);
 	for (auto &r: fp) {
 		if(is_fact(r) || is_goal(r)) { sqr.insert(r); continue; } 
+		// TODO review if we need something else with the head
 		else { auto nr = square_rule(r, idx, d); sqr.insert(nr.begin(), nr.end()); }
 	}
 	return sqr;
