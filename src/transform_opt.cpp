@@ -250,7 +250,7 @@ void driver::square_program(raw_prog &rp) {
 #ifndef WORK_IN_PROGRESS
 
 using term_rule = vector<term>;
-using rule_index = map<const term, set<const term_rule>>;
+using rule_index = map<const term, set<term_rule>>;
 using unification = map<int_t, int_t>;
 
 struct squaring_context {
@@ -266,7 +266,7 @@ rule_index index_rules(const flat_prog &fp) {
 	rule_index c;
 	for (auto const &t: fp) 
 		if (c.contains(t[0])) c[t[0]].insert(t);
-		else c[t[0]] = set<const term_rule> {t};
+		else c[t[0]] = set<term_rule> {t};
 	return c;
 }
 
@@ -294,28 +294,36 @@ unification unify(const term &t1, const term &t2) {
 	return nf;
 }
 
-vector<term> apply_unification(const unification &nf, const term_rule & r) {
-	for (auto t: r) for( size_t i = 0; i != t.size(); ++i) 
-		if (nf.contains(t[i])) t[i] = nf[t[i]]; // <- ERROR
+vector<term> apply_unification(const unification &nf, term_rule & r) {
+	for (auto t: r) for( size_t i = 1; i != t.size(); ++i) 
+		if (nf.contains(t[i])) t[i] = nf.at(t[i]); // <- ERROR
 }
 
 /* Returns the squaring of a term using a given rule. When considering negations 
  * we may return a set<vector<term>>. */
-vector<term> square_term(const term &t, const term_rule &r) {
-	if (t.neg) /* TODO something using distributive law */;
+vector<term> square_term(const term &t, term_rule &r) {
+	/* TODO something using distributive law: if (t.neg) {...} */;
 	auto nf = unify(t, r[0]); /* TODO something if no unification is possible */
 	return apply_unification(nf, r);
 }
 
+/* Copmpute the last var used in the given rule. */
+int_t get_last_var(const term_rule &r) {
+	int_t lst = 0;
+	for (auto &t: r) for (auto i: t) lst = (i < lst) ? i : lst;
+	return lst;
+}
+
 /* Renames all variables of a rule. */
-term_rule rename_rule_vars(const term_rule &r, dict_t &d) {
+term_rule rename_rule_vars(const term_rule &r) {
 	term_rule rr;
 	map<int_t, int_t> sbs;
+	auto lst = get_last_var(r);
 	for (auto &t: r) {
 		term rt; 
 		for (auto i: t) {
 			if (sbs.contains(i)) rt.emplace_back(sbs[i]);
-			else if (i < 0) sbs[i] = d.get_new_var(), rt.emplace_back(sbs[i]);
+			else if (i < 0) sbs[i] = --lst, rt.emplace_back(sbs[i]);
 			else rt.emplace_back(i);
 		}
 		rr.emplace_back(rt);
@@ -324,18 +332,19 @@ term_rule rename_rule_vars(const term_rule &r, dict_t &d) {
 }
 
 /* Returns the squaring of a term.  */
-set<term> square_term(const term &t, const rule_index &idx, dict_t &d) {
+set<term> square_term(const term &t, const rule_index &ndx) {
 	set<term> sqr;
-	for (auto r: idx.at(t)) rename_rule_vars(r, d), square_term(t, r);
+	for (auto r: ndx.at(t)) rename_rule_vars(r), square_term(t, r);
 	return sqr;
 }
 
 /* Returns the squaring of a rule  */
-set<term_rule> square_rule(auto &r, const rule_index &idx, dict_t &d) {
+//template<typename iterator>
+set<term_rule> square_rule(vector<term>::iterator &b, vector<term>::iterator &e, const rule_index &ndx) {
 	set<term_rule> sqr;
-	if (begin(r) == end(r)) return sqr;
-	auto hs = square_term(*r, idx, d); 
-	auto ts = square_rule(r| views::drop(1)); // <- ERROR
+	if (b == e) return sqr;
+	auto hs = square_term(*b, ndx); 
+	auto ts = square_rule(++b, e, ndx); // <- ERROR
 	for (auto h: hs) for (auto t: ts) t.emplace(begin(t), h), sqr.insert(t);
 	return sqr;
 }
@@ -346,23 +355,26 @@ set<term_rule> square_rule(auto &r, const rule_index &idx, dict_t &d) {
  * bodies of the relation that it refers to. For those facts not
  * computed in the previous step, it is enough to check that they were
  * derived to steps ago and were not deleted in the previous step. */
-
-flat_prog square_program(const flat_prog &fp, dict_t &d) {
+flat_prog square_program(const flat_prog &fp) {
 	// new flat_prog holding the squaring of fp
 	flat_prog sqr;
 	// cache info for speed up the squaring holding a map between heads
 	// and bodies
 	auto idx = index_rules(fp);
-	for (auto &r: fp) {
+	for (auto r: fp) {
 		if(is_fact(r) || is_goal(r)) { sqr.insert(r); continue; } 
 		// TODO review if we need something else with the head
-		else { auto nr = square_rule(r, idx, d); sqr.insert(nr.begin(), nr.end()); }
+		else { 
+			auto b = r.begin();
+			auto e = r.end();
+			auto nr = square_rule(b, e, idx); 
+			sqr.insert(nr.begin(), nr.end()); 
+		}
 	}
 	return sqr;
 }
 
 /* Minimize the rule using CQC */
-
 term_rule minimize_rule(term_rule $fp) {
 	term_rule mnmzd;
 	// do minimization
@@ -370,7 +382,6 @@ term_rule minimize_rule(term_rule $fp) {
 }
 
 /* Returns all the possible splittings of the rule */
-
 set<pair<term_rule, term_rule>> split_rule(term_rule $fp) {
 	set<pair<term_rule, term_rule>> splt;
 	// do splitting
@@ -403,6 +414,7 @@ void optimize(flat_prog fp) {
 	// Trimmed existentials are a precondition to program optimizations
 	o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
 
+	// remove call to pdatalog_transform
 	pdatalog_transform(rp, [&](raw_prog &rp) {
 		o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
 		split_heads(rp);
