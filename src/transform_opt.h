@@ -25,10 +25,15 @@
 class raw_prog;
 class dict_t;
 
-/*!
- * Represents a mutated program, i.e. the original program, the additions and 
- * substractions.
- */
+/* Optimization methods. */
+
+/*! Square a datalog falt program. */
+flat_prog square_program(const flat_prog &fp);
+
+/* Optimization branch and bound definitions. */
+
+/*! Represents a mutated program, i.e. the original program, the additions and 
+ * substractions. */
 struct changed_prog  {
 	// starting node of the mutated progs log
 	explicit changed_prog(flat_prog &rp): current(rp) {};
@@ -39,11 +44,9 @@ struct changed_prog  {
 	flat_prog current;
 };
 
-/*!
- * Represents a change of a given (mutated) program. If selected, it is
+/*! Represents a change of a given (mutated) program. If selected, it is
  * applied to the given (mutated) program. This is a cheap implementation of
- * the command pattern.
- */
+ * the command pattern. */
 class change {
 public:
 	flat_prog clashing;
@@ -57,31 +60,23 @@ public:
 	virtual bool operator()(changed_prog &mp) const = 0;
 };
 
-/*!
- * Computes the approximate cost of executing a given mutated program.
- */
+/*! Computes the approximate cost of executing a given mutated program. */
 using cost_function = std::function<size_t(changed_prog&)>;
 extern cost_function exp_in_heads;
 
-/*!
- * Computes the approximate cost of executing a given mutated program.
- */
+/*! Computes the approximate cost of executing a given mutated program. */
 using brancher = std::function<std::vector<std::shared_ptr<change>>(changed_prog&)>;
 
-/*!
- * Represents and strategy to select the best change according to the passed
- * cost_function.
- */
+/*! Represents and strategy to select the best change according to the passed
+ * cost_function. */
 class bounder {
 public:
 	virtual bool bound(changed_prog& p) = 0;
 	virtual flat_prog solution() = 0;
 };
 
-/*!
- * Custom implementation of bounder interface that returns the best solution found
- * so far.
- */
+/*! Custom implementation of bounder interface that returns the best solution found
+ * so far. */
 class best_solution: public bounder {
 public:
 	best_solution(cost_function& f, changed_prog &rp): 
@@ -97,9 +92,7 @@ private:
 	std::shared_ptr<changed_prog> best_;
 };
 
-/*!
- * Optimization plan accordignly to command line options
- */
+/*! Optimization plan accordignly to command line options. */
 struct plan {
 public:
 	std::vector<brancher> branchers;
