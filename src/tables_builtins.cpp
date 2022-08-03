@@ -269,7 +269,11 @@ bool tables::init_print_builtins() {
 		return [this, ln, to, delim] (blt_ctx& c) {
 			//COUT << "printing ln/to/delim" << ln << "/" << to << "/" << delim << " " << to_raw_term(c.g) << endl;
 			print_to_delimited(ir_handler->to_raw_term(c.g), error, to, delim)
-				<< (ln ? "\n" : "");
+				<< (ln ? "\n" : "")
+#ifdef __EMSCRIPTEN__
+				<< std::flush
+#endif
+				;
 		};
 	};
 	const bool NLN = false, NTO = false, NDLM = false;

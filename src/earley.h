@@ -276,7 +276,7 @@ private:
 	template <typename CharU>
 	friend int test_out(int c, earley<CharU> &e);
 	typedef std::unordered_set<earley<CharT>::item, earley<CharT>::hasher_t> container_t;
-	typedef container_t::iterator container_iter;
+	typedef typename container_t::iterator container_iter;
 	std::vector<container_t> S;
 	container_iter add(container_t& t, const item& i);
 	void complete(const item& i, container_t& t);

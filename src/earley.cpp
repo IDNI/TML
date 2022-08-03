@@ -228,7 +228,7 @@ typename earley<CharT>::ostream& earley<CharT>::print(
 }
 
 template <typename CharT>
-earley<CharT>::container_iter earley<CharT>::add(container_t& t, 
+typename earley<CharT>::container_iter earley<CharT>::add(container_t& t, 
 		const item& i) {
 	//DBG(print(o::dbg() << "adding ", i) << endl;)
 	auto& cont = S[i.set];

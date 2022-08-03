@@ -95,7 +95,7 @@ private:
 };
 
 namespace o { // o:: namespace shortcuts
-	void init_outputs(outputs& oo);
+	outputs& init_outputs(outputs& oo);
 	void use (outputs* oo);
 	ostream_t& to(const std::string& n);
 	ostream_t& out();

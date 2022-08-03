@@ -45,7 +45,8 @@ check_output() {
 
 # cleans output ($2) of executed program ($1)
 clean_output() {
-	rm -f "$1.$2"
+	en="$(basename -- "$1")"
+	rm -f "$1.$2" "$1.$2.sorted" "$dir_expected/$en.$2.sorted"
 }
 
 # runs program ($1) and redirect outputs into files
@@ -59,6 +60,13 @@ run() {
 		options+=("$opt")
 	done
 	$tml "${options[@]}"
+}
+
+# sort outputs
+sort_outputs() {
+	for output in ${outputs[*]}; do
+		sort -o "$1.$output.sorted" "$1.$output"
+	done
 }
 
 # save outputs of program ($1) as expected
@@ -76,10 +84,13 @@ check() {
 	filename="$(basename -- "$1")"
 	atleast_one_file=false
 	for output in ${outputs[*]}; do
-		check_output "$1.$output" "$dir_expected/$filename.$output" \
-			|| return 1
-		if [ -f "$dir_expected/$filename.$output" ]; then
-	    atleast_one_file=true
+		expectedname="$dir_expected/$filename.$output"
+		sortedname="$dir_expected/$filename.$output.sorted"
+		if [ -f "$expectedname" ]; then
+			atleast_one_file=true
+			sort -o "$sortedname" "$expectedname"
+			check_output "$1.$output.sorted" "$sortedname" \
+				|| return 1
 		fi
 	done
 	if [ $atleast_one_file = false ];	then
@@ -103,6 +114,7 @@ for P in $tests; do
 	[[ -f "$dir/options" ]] && diropts=`cat $dir/options` \
 		|| diropts=""
 	run "$P"
+	sort_outputs "$P"
 	[[ $save == true ]] \
 		&& save "$P" \
 		|| ( check "$P" \

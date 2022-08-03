@@ -63,7 +63,7 @@ string_t driver::directive_load(const directive& d) {
 	switch (d.type) {
 		case directive::FNAME:
 			return to_string_t(input::file_read(to_string(str)));
-		case directive::STDIN: return move(pd.std_input);
+		case directive::STDIN: return std::move(pd.std_input);
 		default: return unquote(str);
 	}
 	DBGFAIL;
@@ -3307,7 +3307,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 	// affected relations when successful.
 	while(!pending_signatures.empty()) {
 		// Grab pending signatures
-		set<pair<lexeme, ints>> current_signatures = move(pending_signatures);
+		set<pair<lexeme, ints>> current_signatures = std::move(pending_signatures);
 		for(const signature &sig : current_signatures) {
 			// Calculate variable usages so we can know what to eliminate
 			ints uses = calculate_variable_usage(sig, dependants);
@@ -3337,7 +3337,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 				signature new_sig(new_rel.e,
 					{(int_t) count_if(uses.begin(), uses.end(), [](int_t x) { return x > 1; })});
 				// Update the dependencies
-				dependants[new_sig] = move(dependants.at(sig));
+				dependants[new_sig] = std::move(dependants.at(sig));
 				dependants.erase(sig);
 				rp.hidden_rels.insert(new_sig);
 			}
@@ -3593,7 +3593,8 @@ bool driver::transform_handler(raw_prog &p) {
 	rt_options to;
 	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
 	to.optimize  = false;
-	to.binarize = false;
+	to.binarize = true;
+	to.print_binarized = false;
 	to.bproof = proof_mode::none;
 	to.show_hidden = false;
 	ir_builder ir_handler(dict, to);
@@ -3771,6 +3772,8 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 	tbl->add_print_updates_states(opts.pu_states);
+	if (to.fp_step) ir->get_table(
+		ir->get_sig(dict.get_lexeme("__fp__"), { 0 }));
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 

@@ -2382,13 +2382,17 @@ void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) 
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]); // t[2] = mknum(n + 1),
 		chars = max(chars, t[1]);
-		v.push_back(t), fp.insert(move(v));
+		v.push_back(t), fp.insert(std::move(v));
 		tb[1] = t[0], tb[2] = mknum(0);
-		if (isspace(s[n])) tb[0] = mksym(sspace), v.push_back(tb), fp.insert(move(v));
-		if (isdigit(s[n])) tb[0] = mksym(sdigit), v.push_back(tb), fp.insert(move(v));
-		if (isalpha(s[n])) tb[0] = mksym(salpha), v.push_back(tb), fp.insert(move(v));
-		if (isalnum(s[n])) tb[0] = mksym(salnum), v.push_back(tb), fp.insert(move(v));
-		if (isprint(s[n])) tb[0] = mksym(sprint), v.push_back(tb), fp.insert(move(v));
+		auto add_char_cat = [&tb, &v, &fp](int_t cat) {
+			tb[0] = mksym(cat), v.push_back(tb),
+			fp.insert(std::move(v));
+		};
+		if (isspace(s[n])) add_char_cat(sspace);
+		if (isdigit(s[n])) add_char_cat(sdigit);
+		if (isalpha(s[n])) add_char_cat(salpha);
+		if (isalnum(s[n])) add_char_cat(salnum);
+		if (isprint(s[n])) add_char_cat(sprint);
 	}
 	str_rels.insert(rel);
 }
