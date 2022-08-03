@@ -20,29 +20,42 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( square_program(fp).empty() ); 
 	}
 	TEST_CASE("squaring a single fact with no arguments") {
-		term t; auto r = rule_f({t}); auto fp = flat_prog_f({r}); 
+		auto fp = flat_prog_f({{{'a'}}});
 		auto sqr = square_program(fp); 
 		EXPECT_TRUE( sqr.size() == 1 // only one rule
-			&& (*(sqr.begin())).size() == 1 // with only one term
-			&& (*(sqr.begin()))[0] == t); //which equals t
+			&& rules_e(sqr)[0] == rule_f({{'a'}})); 
 	}
 	TEST_CASE("squaring a single fact with one argument") { 
-		flat_prog fp; term t; t.emplace_back(2); std::vector<term> r{t}; fp.insert(r);
+		auto fp = flat_prog_f({{{'a', '1'}}});
 		auto sqr = square_program(fp); 
-		EXPECT_TRUE( sqr.size() == 1 && (*(sqr.begin()))[0] == t);
+		EXPECT_TRUE( sqr.size() == 1 // only one rule
+			&& rules_e(sqr)[0] == rule_f({{'a', '1'}}));
 	}
 	TEST_CASE("squaring a single fact with several arguments") { 
-		flat_prog fp; term t; t.emplace_back(2); t.emplace_back(3); std::vector<term> r{t}; fp.insert(r);
+		auto fp = flat_prog_f({{{'a', '1', '2'}}});
 		auto sqr = square_program(fp); 
-		EXPECT_TRUE( sqr.size() == 1 && (*(sqr.begin()))[0] == t);
+		EXPECT_TRUE( sqr.size() == 1 // only one rule
+			&& rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}));
 	}
-	TEST_CASE("squaring multiple facts") { 
-		flat_prog fp {
-			rule_f({term_f({1,2,3}) })
-		};
-
+	TEST_CASE("squaring multiple unrelated facts") { 
+		auto fp = flat_prog_f({
+			{{'a', '1'}}, 
+			{{'b', '1'}}});
+		auto sqr = square_program(fp); 
+		EXPECT_TRUE( sqr.size() == 2 // only two rules
+			&& rules_e(sqr)[0] == rule_f({{'a', '1'}}) 
+			&& rules_e(sqr)[1] == rule_f({{'b', '1'}}));
 	 }
-	TEST_CASE("squaring a rule and a fact") { EXPECT_TRUE(false); }
+	TEST_CASE("squaring a rule and a fact") { 
+		auto x1 = var_f();
+		auto fp = flat_prog_f({
+			{{'a', '1'}},
+			{{'b', x1}, /* :- */ {'a', x1}}});
+		auto sqr = square_program(fp); 
+		EXPECT_TRUE( sqr.size() == 2 // only two rules
+			&& rules_e(sqr)[0] == rule_f({{'a', '1'}})
+			&& rules_e(sqr)[1] == rule_f({{'b', '1'}}));
+	}
 	TEST_CASE("squaring a single rule") { EXPECT_TRUE(false); }
 	TEST_CASE("squaring two unrelated rules") { EXPECT_TRUE(false); }
 	TEST_CASE("squaring two related rules") { EXPECT_TRUE(false); }

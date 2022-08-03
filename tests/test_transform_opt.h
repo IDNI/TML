@@ -32,13 +32,31 @@ term term_f(std::vector<int_t> as) {
 	return t;
 }
 
-std::vector<term> rule_f(std::vector<term> ts) {
+/* std::vector<term> rule_f(std::vector<term> ts) {
 	std::vector<term> r(ts.begin(), ts.end()); return r;
+}*/
+
+std::vector<term> rule_f(std::vector<std::vector<int_t>> ts) {
+	std::vector<term> r; 
+	for (auto t: ts) r.emplace_back(term_f(t));
+	return r;
 }
 
-flat_prog flat_prog_f(std::vector<std::vector<term>> rs) {
+/*flat_prog flat_prog_f(std::vector<std::vector<term>> rs) {
 	flat_prog fp(rs.begin(), rs.end()); return fp;
+}*/
+
+flat_prog flat_prog_f(std::vector<std::vector<std::vector<int_t>>> rs) {
+	flat_prog fp;
+	for (auto r: rs) fp.emplace(rule_f(r));
+	return fp;
 }
+
+/* flat_prog flat_prog_f(std::vector<std::vector<term>> rs) {
+	flat_prog fp;
+	for (auto r: rs) fp.emplace(rule_f(r));
+	return fp;
+} */
 
 /* Extractor methods to ease testing. */
 std::vector<std::vector<term>> rules_e(flat_prog fp) {
