@@ -250,7 +250,7 @@ void driver::square_program(raw_prog &rp) {
 #ifndef WORK_IN_PROGRESS
 
 using term_rule = vector<term>;
-using rule_index = map<const term, set<term_rule>>;
+using rule_index = map<const term, set<term_rule>>; // TODO change to map<pair<int_t, int_t>, set<term_rule>> 
 using unification = map<int_t, int_t>;
 
 struct squaring_context {
@@ -294,9 +294,12 @@ unification unify(const term &t1, const term &t2) {
 	return nf;
 }
 
-vector<term> apply_unification(const unification &nf, term_rule & r) {
-	for (auto t: r) for( size_t i = 1; i != t.size(); ++i) 
-		if (nf.contains(t[i])) t[i] = nf.at(t[i]); // <- ERROR
+vector<term> apply_unification(const unification &nf, term_rule &r) {
+	term_rule n(r); 
+	n.erase(n.begin());
+	for (auto t: n) for( size_t i = 0; i != t.size(); ++i) 
+		if (nf.contains(t[i])) t[i] = nf.at(t[i]);
+	return n;
 }
 
 /* Returns the squaring of a term using a given rule. When considering negations 
@@ -315,38 +318,49 @@ int_t get_last_var(const term_rule &r) {
 }
 
 /* Renames all variables of a rule. */
-term_rule rename_rule_vars(const term_rule &r) {
-	term_rule rr;
+term_rule rename_rule_vars(const term_rule &r, int_t& lv) {
+	term_rule rr(r);
 	map<int_t, int_t> sbs;
-	auto lst = get_last_var(r);
-	for (auto &t: r) {
-		term rt; 
-		for (auto i: t) {
-			if (sbs.contains(i)) rt.emplace_back(sbs[i]);
-			else if (i < 0) sbs[i] = --lst, rt.emplace_back(sbs[i]);
-			else rt.emplace_back(i);
-		}
-		rr.emplace_back(rt);
-	}
+	for (auto &t: rr) for (auto i = 0; i != t.size(); ++i)
+		if (!sbs.contains(t[i]) && t[i] < 0) sbs[t[i]] = --lv, t[i] = sbs[t[i]];
 	return rr;
 }
 
 /* Returns the squaring of a term.  */
-set<term> square_term(const term &t, const rule_index &ndx) {
-	set<term> sqr;
-	for (auto r: ndx.at(t)) rename_rule_vars(r), square_term(t, r);
+set<term_rule> square_term(const term &t, const rule_index &ndx, int_t& lv) {
+	set<term_rule> sqr;
+	for (auto &r: ndx.at(t)) {
+		auto rnmd = rename_rule_vars(r, lv);
+		sqr.insert(square_term(t, rnmd));
+	}
 	return sqr;
+}
+
+set<term_rule> shuffle(const set<term_rule> &hs, const set<term_rule> &ts) {
+	set<term_rule> shffl;
+	for (auto h: hs) for (auto const& t: ts) {
+		term_rule n(h.begin(), h.end());
+		for (auto e: t) n.emplace_back(e);
+		shffl.emplace(n);
+	}
+	return shffl;
 }
 
 /* Returns the squaring of a rule  */
 //template<typename iterator>
-set<term_rule> square_rule(vector<term>::iterator &b, vector<term>::iterator &e, const rule_index &ndx) {
+set<term_rule> square_rule(vector<term>::iterator &b, vector<term>::iterator &e, const rule_index &ndx, int_t& lv) {
+	if (b == e) return set<term_rule>();
+	auto hs = square_term(*b, ndx, lv); 
+	auto ts = square_rule(++b, e, ndx, lv);
+	return shuffle(hs, ts);
+}
+
+set<term_rule> square_rule(vector<term> &r, const rule_index &ndx) {
 	set<term_rule> sqr;
-	if (b == e) return sqr;
-	auto hs = square_term(*b, ndx); 
-	auto ts = square_rule(++b, e, ndx); // <- ERROR
-	for (auto h: hs) for (auto t: ts) t.emplace(begin(t), h), sqr.insert(t);
-	return sqr;
+	auto lv = get_last_var(r);
+	vector<term>::iterator b = ++(r.begin());
+	vector<term>::iterator e = r.end();
+	return square_rule(b, e, ndx, lv);
 }
 
 /*! Produces a program where executing a single step is equivalent to
@@ -360,14 +374,12 @@ flat_prog square_program(const flat_prog &fp) {
 	flat_prog sqr;
 	// cache info for speed up the squaring holding a map between heads
 	// and bodies
-	auto idx = index_rules(fp);
+	auto ndx = index_rules(fp);
 	for (auto r: fp) {
 		if(is_fact(r) || is_goal(r)) { sqr.insert(r); continue; } 
 		// TODO review if we need something else with the head
-		else { 
-			auto b = r.begin();
-			auto e = r.end();
-			auto nr = square_rule(b, e, idx); 
+		else {
+			auto nr = square_rule(r, ndx); 
 			sqr.insert(nr.begin(), nr.end()); 
 		}
 	}
