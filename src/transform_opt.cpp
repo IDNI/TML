@@ -249,43 +249,49 @@ void driver::square_program(raw_prog &rp) {
 
 #ifndef WORK_IN_PROGRESS
 
-using term_rule = vector<term>;
-using rule_index = map<const term, set<term_rule>>; // TODO change to map<pair<int_t, int_t>, set<term_rule>> 
+using flat_rule = vector<term>;
+using rel_arity = tuple<int_t, size_t>;
+using rule_index = map<rel_arity, set<flat_rule>>; // TODO change to map<pair<int_t, int_t>, set<term_rule>> 
 using unification = map<int_t, int_t>;
 
 struct squaring_context {
 	reference_wrapper<dict_t> dict;
 	reference_wrapper<rule_index> index;
-
 };
+
+/* Get relation info in a way suitable for be used as key. */
+rel_arity get_rel_info(const term &t) {
+	return make_tuple(t[0], t.size());
+}
+
+rel_arity get_rel_info(const vector<term> &t) {
+	return get_rel_info(t[0]);
+}
 
 /* Constructs a map with head/body information. In our case, the body is the 
  * first element of the vector of terms and the body the remaining terms. */
-
 rule_index index_rules(const flat_prog &fp) {
 	rule_index c;
 	for (auto const &t: fp) 
-		if (c.contains(t[0])) c[t[0]].insert(t);
-		else c[t[0]] = set<term_rule> {t};
+		if (c.contains(get_rel_info(t))) c[get_rel_info(t)].insert(t);
+		else c[get_rel_info(t)] = set<flat_rule> {t};
 	return c;
 }
 
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
-
-bool is_fact(const term_rule &r) {
+bool is_fact(const flat_rule &r) {
 	// only one term and is not a goal
 	return r.size() == 1 && !r[0].goal;
 }
 
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
-
-bool is_goal(const term_rule &r) {
+bool is_goal(const flat_rule &r) {
 	// TODO consider remove defensive programming
 	// non empty and its a goal
 	return !r.empty() && r[0].goal;
 }
 
-/* Compute the unification of two terms */
+/* Compute the unification of two terms. */
 unification unify(const term &t1, const term &t2) {
 	unification nf;
 	for (size_t i= 0; i != t1.size(); ++i) 
@@ -294,32 +300,31 @@ unification unify(const term &t1, const term &t2) {
 	return nf;
 }
 
-vector<term> apply_unification(const unification &nf, term_rule &r) {
-	term_rule n(r); 
-	n.erase(n.begin());
-	for (auto t: n) for( size_t i = 0; i != t.size(); ++i) 
+flat_rule apply_unification(const unification &nf, flat_rule &r) {
+	flat_rule n(r); 
+	for (auto t: n) for( size_t i = 1; i != t.size(); ++i) 
 		if (nf.contains(t[i])) t[i] = nf.at(t[i]);
 	return n;
 }
 
 /* Returns the squaring of a term using a given rule. When considering negations 
  * we may return a set<vector<term>>. */
-vector<term> square_term(const term &t, term_rule &r) {
+flat_rule square_term(const term &t, flat_rule &r) {
 	/* TODO something using distributive law: if (t.neg) {...} */;
 	auto nf = unify(t, r[0]); /* TODO something if no unification is possible */
 	return apply_unification(nf, r);
 }
 
 /* Copmpute the last var used in the given rule. */
-int_t get_last_var(const term_rule &r) {
+int_t get_last_var(const flat_rule &r) {
 	int_t lst = 0;
 	for (auto &t: r) for (auto i: t) lst = (i < lst) ? i : lst;
 	return lst;
 }
 
 /* Renames all variables of a rule. */
-term_rule rename_rule_vars(const term_rule &r, int_t& lv) {
-	term_rule rr(r);
+flat_rule rename_rule_vars(const flat_rule &r, int_t& lv) {
+	flat_rule rr(r);
 	map<int_t, int_t> sbs;
 	for (auto &t: rr) for (auto i = 0; i != t.size(); ++i)
 		if (!sbs.contains(t[i]) && t[i] < 0) sbs[t[i]] = --lv, t[i] = sbs[t[i]];
@@ -327,19 +332,19 @@ term_rule rename_rule_vars(const term_rule &r, int_t& lv) {
 }
 
 /* Returns the squaring of a term.  */
-set<term_rule> square_term(const term &t, const rule_index &ndx, int_t& lv) {
-	set<term_rule> sqr;
-	for (auto &r: ndx.at(t)) {
+set<flat_rule> square_term(const term &t, const rule_index &ndx, int_t& lv) {
+	set<flat_rule> sqr;
+	for (auto &r: ndx.at(get_rel_info(t))) {
 		auto rnmd = rename_rule_vars(r, lv);
 		sqr.insert(square_term(t, rnmd));
 	}
 	return sqr;
 }
 
-set<term_rule> shuffle(const set<term_rule> &hs, const set<term_rule> &ts) {
-	set<term_rule> shffl;
+set<flat_rule> shuffle(const set<flat_rule> &hs, const set<flat_rule> &ts) {
+	set<flat_rule> shffl;
 	for (auto h: hs) for (auto const& t: ts) {
-		term_rule n(h.begin(), h.end());
+		flat_rule n(h.begin(), h.end());
 		for (auto e: t) n.emplace_back(e);
 		shffl.emplace(n);
 	}
@@ -347,20 +352,22 @@ set<term_rule> shuffle(const set<term_rule> &hs, const set<term_rule> &ts) {
 }
 
 /* Returns the squaring of a rule  */
-//template<typename iterator>
-set<term_rule> square_rule(vector<term>::iterator &b, vector<term>::iterator &e, const rule_index &ndx, int_t& lv) {
-	if (b == e) return set<term_rule>();
+template<typename iterator>
+set<flat_rule> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx, int_t& lv) {
 	auto hs = square_term(*b, ndx, lv); 
-	auto ts = square_rule(++b, e, ndx, lv);
-	return shuffle(hs, ts);
+	if (distance(b, e) > 1) {
+		auto ts = square_rule_tail(++b, e, ndx, lv);
+		return shuffle(hs, ts);
+	} else return hs;
 }
 
-set<term_rule> square_rule(vector<term> &r, const rule_index &ndx) {
-	set<term_rule> sqr;
-	auto lv = get_last_var(r);
-	vector<term>::iterator b = ++(r.begin());
-	vector<term>::iterator e = r.end();
-	return square_rule(b, e, ndx, lv);
+/* Returns the squaring of a rule. As square_program automatically 
+ * deals with facts and goals, we could assume that the body is not empty. */
+set<flat_rule> square_rule(flat_rule &r, const rule_index &ndx) {
+	auto lv = get_last_var(r); auto b = r.begin(); auto e = r.end();
+	set<flat_rule> head{{*b}};
+	auto sqr_tails = square_rule_tail(++b, e, ndx, lv);
+	return shuffle(head, sqr_tails);
 }
 
 /*! Produces a program where executing a single step is equivalent to
@@ -376,10 +383,10 @@ flat_prog square_program(const flat_prog &fp) {
 	// and bodies
 	auto ndx = index_rules(fp);
 	for (auto r: fp) {
-		if(is_fact(r) || is_goal(r)) { sqr.insert(r); continue; } 
+		if(is_fact(r) || is_goal(r)) sqr.insert(r);
 		// TODO review if we need something else with the head
 		else {
-			auto nr = square_rule(r, ndx); 
+			auto nr = square_rule(r, ndx);
 			sqr.insert(nr.begin(), nr.end()); 
 		}
 	}
@@ -387,15 +394,15 @@ flat_prog square_program(const flat_prog &fp) {
 }
 
 /* Minimize the rule using CQC */
-term_rule minimize_rule(term_rule $fp) {
-	term_rule mnmzd;
+flat_rule minimize_rule(flat_rule $fp) {
+	flat_rule mnmzd;
 	// do minimization
 	return mnmzd;
 }
 
 /* Returns all the possible splittings of the rule */
-set<pair<term_rule, term_rule>> split_rule(term_rule $fp) {
-	set<pair<term_rule, term_rule>> splt;
+set<pair<flat_rule, flat_rule>> split_rule(flat_rule $fp) {
+	set<pair<flat_rule, flat_rule>> splt;
 	// do splitting
 	return splt;
 }

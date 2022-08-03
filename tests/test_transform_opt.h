@@ -79,5 +79,21 @@ int_t pred_e(term t) { return t[0]; }
 bool is_var(int_t v) { return v < 0;}
 bool is_sym(int_t v) { return v > 0;}
 
+/* Helpers methods for printing intermediate results during debugging. */
+std::ostream& operator<<(std::ostream &os, term &fr) {
+	os << "("; for (auto p: fr) os << p; os << ")\n";
+	return os;
+}
+
+std::ostream& operator<<(std::ostream &os, std::vector<term> &fr) {
+	os << "{"; for (auto p: fr) os << p; os << "}\n";
+	return os;
+}
+
+std::ostream& operator<<(std::ostream &os, flat_prog &fp) {
+	os << "flat_prog: ["; for (auto r: fp) os << r; os << "]\n";
+	return os;
+}
+
 #endif // WORK_IN_PROGRESS
 #endif // __TEST_TRANSFORM_H__
