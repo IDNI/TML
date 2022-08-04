@@ -27,7 +27,7 @@
 #include <optional>
 #include <ranges>
 #include <functional>
-
+#include <optional>
 #include "driver.h"
 #include "err.h"
 #include "iterators.h"
@@ -110,28 +110,28 @@ inline bool is_goal(const flat_rule &r) {
 	return !r.empty() && r[0].goal;
 }
 
-/* Compute the unification of two terms. */
-unification unify(const term &t1, const term &t2) {
-	unification nf;
-	for (size_t i= 0; i != t1.size(); ++i) 
-		if (nf.contains(t2[i]) && t2[i] != t1[i]) return unification();
-		else nf[t2[i]] = t1[i];
-	return nf;
-}
-
-flat_rule apply_unification(const unification &nf, flat_rule &r) {
+/* Apply a given unification to a given tail of a relation. */
+flat_rule apply_unification(const unification &nf, const flat_rule &r) {
 	flat_rule n(r); 
 	for (auto t: n) for( size_t i = 1; i < t.size(); ++i) 
 		if (nf.contains(t[i])) t[i] = nf.at(t[i]);
 	return n;
 }
 
+/* Compute the unification of two terms. */
+optional<const unification> unify(const term &t1, const term &t2) {
+	unification nf;
+	for (size_t i= 0; i != t1.size(); ++i) 
+		if (nf.contains(t2[i]) && t2[i] != t1[i]) return {};
+		else nf[t2[i]] = t1[i];
+	return nf;
+}
+
 /* Returns the squaring of a term using a given rule. When considering negations 
  * we may return a set<vector<term>>. */
-flat_rule square_term(const term &t, flat_rule &r) {
-	/* TODO something using distributive law: if (t.neg) {...} */;
-	auto nf = unify(t, r[0]); /* TODO something if no unification is possible */
-	return apply_unification(nf, r);
+optional<flat_rule> square_term(const term &t, flat_rule &r) {
+	if (auto tmp = unify(t, r[0])) return apply_unification(*tmp, r);
+	else return {};
 }
 
 /* Copmpute the last var used in the given rule. */
@@ -151,13 +151,13 @@ flat_rule rename_rule_vars(const flat_rule &r, int_t& lv) {
 }
 
 /* Returns the squaring of a term.  */
-set<flat_rule> square_term(const term &t, const rule_index &ndx, int_t& lv) {
+optional<set<flat_rule>> square_term(const term &t, const rule_index &ndx, int_t& lv) {
 	set<flat_rule> sqr;
 	for (auto &r: ndx.at(get_rel_info(t))) {
 		auto rnmd = rename_rule_vars(r, lv);
-		sqr.insert(square_term(t, rnmd));
+		if (auto tmp = square_term(t, rnmd)) sqr.insert(*tmp);
 	}
-	return sqr;
+	if (sqr.empty()) return {}; else return sqr;
 }
 
 /* Shuffle all possible heads with all possible tails. */
@@ -173,23 +173,25 @@ set<flat_rule> shuffle(const set<flat_rule> &hs, const set<flat_rule> &ts) {
 
 /* Returns the squaring of a rule  */
 template<typename iterator>
-set<flat_rule> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx, int_t& lv) {
+optional<set<flat_rule>> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx, int_t& lv) {
 	// lv is passed as reference as it would be share among
 	// subsequent invokations
-	auto hs = square_term(*b, ndx, lv); 
+	auto hs = square_term(*b, ndx, lv);
 	if (distance(b, e) > 1) {
-		auto ts = square_rule_tail(++b, e, ndx, lv);
-		return shuffle(hs, ts);
-	} else return hs;
+		if (auto ts = square_rule_tail(++b, e, ndx, lv))
+			if (hs) return shuffle(*hs, *ts);
+		return {};
+	}
+	return hs;
 }
 
 /* Returns the squaring of a rule. As square_program automatically 
  * deals with facts and goals, we could assume that the body is not empty. */
-set<flat_rule> square_rule(flat_rule &r, const rule_index &ndx) {
+optional<set<flat_rule>> square_rule(flat_rule &r, const rule_index &ndx) {
 	auto lv = get_last_var(r);
 	auto b = r.begin(); auto e = r.end();
-	auto sqr_tails = square_rule_tail(++b, e, ndx, lv);
-	return shuffle({{*b}} /* set of flat_rules */, sqr_tails);
+	if (auto sqr_tails = square_rule_tail(++b, e, ndx, lv)) return shuffle({{*b}} /* set of flat_rules */, *sqr_tails);
+	else return {};
 }
 
 /*! Produces a program where executing a single step is equivalent to
@@ -206,10 +208,8 @@ flat_prog square_program(const flat_prog &fp) {
 	auto ndx = index_rules(fp);
 	for (auto r: fp) {
 		if(is_fact(r) || is_goal(r)) sqr.insert(r);
-		else {
-			auto nr = square_rule(r, ndx);
-			sqr.insert(nr.begin(), nr.end()); 
-		}
+		// TODO Verify that if it is not possible to square the rule we must ignore it
+		else if (auto nr = square_rule(r, ndx)) sqr.insert(nr->begin(), nr->end());
 	}
 	return sqr;
 }
