@@ -77,12 +77,13 @@ struct squaring_context {
 	reference_wrapper<rule_index> index;
 };
 
-/* Get relation info in a way suitable for be used as key. */
-rel_arity get_rel_info(const term &t) {
+/* Get relation info from the head term in a way suitable for be used as key. */
+inline rel_arity get_rel_info(const term &t) {
 	return make_tuple(t[0], t.size());
 }
 
-rel_arity get_rel_info(const vector<term> &t) {
+/* Get relation info from a flat rule in a way suitable to be used as a key. */
+inline rel_arity get_rel_info(const flat_rule &t) {
 	return get_rel_info(t[0]);
 }
 
@@ -97,13 +98,13 @@ rule_index index_rules(const flat_prog &fp) {
 }
 
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
-bool is_fact(const flat_rule &r) {
+inline bool is_fact(const flat_rule &r) {
 	// only one term and is not a goal
 	return r.size() == 1 && !r[0].goal;
 }
 
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
-bool is_goal(const flat_rule &r) {
+inline bool is_goal(const flat_rule &r) {
 	// TODO consider remove defensive programming
 	// non empty and its a goal
 	return !r.empty() && r[0].goal;
@@ -120,7 +121,7 @@ unification unify(const term &t1, const term &t2) {
 
 flat_rule apply_unification(const unification &nf, flat_rule &r) {
 	flat_rule n(r); 
-	for (auto t: n) for( size_t i = 1; i != t.size(); ++i) 
+	for (auto t: n) for( size_t i = 1; i < t.size(); ++i) 
 		if (nf.contains(t[i])) t[i] = nf.at(t[i]);
 	return n;
 }
@@ -144,7 +145,7 @@ int_t get_last_var(const flat_rule &r) {
 flat_rule rename_rule_vars(const flat_rule &r, int_t& lv) {
 	flat_rule rr(r);
 	map<int_t, int_t> sbs;
-	for (auto &t: rr) for (auto i = 0; i != t.size(); ++i)
+	for (auto &t: rr) for (size_t i = 0; i != t.size(); ++i)
 		if (!sbs.contains(t[i]) && t[i] < 0) sbs[t[i]] = --lv, t[i] = sbs[t[i]];
 	return rr;
 }
@@ -159,6 +160,7 @@ set<flat_rule> square_term(const term &t, const rule_index &ndx, int_t& lv) {
 	return sqr;
 }
 
+/* Shuffle all possible heads with all possible tails. */
 set<flat_rule> shuffle(const set<flat_rule> &hs, const set<flat_rule> &ts) {
 	set<flat_rule> shffl;
 	for (auto h: hs) for (auto const& t: ts) {
@@ -172,6 +174,8 @@ set<flat_rule> shuffle(const set<flat_rule> &hs, const set<flat_rule> &ts) {
 /* Returns the squaring of a rule  */
 template<typename iterator>
 set<flat_rule> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx, int_t& lv) {
+	// lv is passed as reference as it would be share among
+	// subsequent invokations
 	auto hs = square_term(*b, ndx, lv); 
 	if (distance(b, e) > 1) {
 		auto ts = square_rule_tail(++b, e, ndx, lv);
@@ -182,10 +186,10 @@ set<flat_rule> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx,
 /* Returns the squaring of a rule. As square_program automatically 
  * deals with facts and goals, we could assume that the body is not empty. */
 set<flat_rule> square_rule(flat_rule &r, const rule_index &ndx) {
-	auto lv = get_last_var(r); auto b = r.begin(); auto e = r.end();
-	set<flat_rule> head{{*b}};
+	auto lv = get_last_var(r);
+	auto b = r.begin(); auto e = r.end();
 	auto sqr_tails = square_rule_tail(++b, e, ndx, lv);
-	return shuffle(head, sqr_tails);
+	return shuffle({{*b}} /* set of flat_rules */, sqr_tails);
 }
 
 /*! Produces a program where executing a single step is equivalent to
@@ -198,11 +202,10 @@ flat_prog square_program(const flat_prog &fp) {
 	// new flat_prog holding the squaring of fp
 	flat_prog sqr;
 	// cache info for speed up the squaring holding a map between heads
-	// and bodies
+	// and associated bodies
 	auto ndx = index_rules(fp);
 	for (auto r: fp) {
 		if(is_fact(r) || is_goal(r)) sqr.insert(r);
-		// TODO review if we need something else with the head
 		else {
 			auto nr = square_rule(r, ndx);
 			sqr.insert(nr.begin(), nr.end()); 
@@ -211,15 +214,15 @@ flat_prog square_program(const flat_prog &fp) {
 	return sqr;
 }
 
-/* Minimize the rule using CQC */
-flat_rule minimize_rule(flat_rule $fp) {
+/* Minimize the rule using CQC. */
+flat_rule minimize_rule(flat_rule &fp) {
 	flat_rule mnmzd;
 	// do minimization
 	return mnmzd;
 }
 
-/* Returns all the possible splittings of the rule */
-set<pair<flat_rule, flat_rule>> split_rule(flat_rule $fp) {
+/* Returns all the possible splittings of the rule. */
+set<pair<flat_rule, flat_rule>> split_rule(flat_rule &fp) {
 	set<pair<flat_rule, flat_rule>> splt;
 	// do splitting
 	return splt;
