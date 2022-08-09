@@ -118,19 +118,39 @@ flat_rule apply_unification(const unification &nf, const flat_rule &r) {
 	return n;
 }
 
-/* Compute the unification of two terms. */
+/* Compute the unification of two terms. To do this we take into account that
+ * we are only considering the case where both term have the same symbol and 
+ * the same arity. The procedure is as follows:
+ * - a=a or X=X continue,
+ * - a=X or X=a add X->a (apply X->a to the rest of the arguments)
+ * - X=Y add X->Y
+ * See [Martelli, A.; Montanari, U. (Apr 1982). "An Efficient Unification 
+ * Algorithm". ACM Trans. Program. Lang. Syst. 4 (2): 258–282] for details.
+ */
 optional<const unification> unify(const term &t1, const term &t2) {
 	unification nf;
-	for (size_t i= 0; i != t1.size(); ++i) 
+	for (int_t i= 1; i < t1.size(); ++i) {
+		bool apply = false;
+		if (t1[i] == t2[i]) continue;
+		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */)
+			if (t1[i] != t2[i]) return {};
+			else continue;
+		if (t1[i] < 0 /* is var */ && t2[i] > 0 /* is constant */) nf[t1[i]] = t2[i], apply = true;
+		if (t2[i] < 0 /* is var */ && t1[i] > 0 /* is constant */) nf[t2[i]] = t1[i], apply = true;
+
 		if (nf.contains(t2[i]) && t2[i] != t1[i]) return {};
 		else nf[t2[i]] = t1[i];
+	}
 	return nf;
 }
 
 /* Returns the squaring of a term using a given rule. When considering negations 
  * we may return a set<vector<term>>. */
 optional<flat_rule> square_term(const term &t, flat_rule &r) {
-	if (auto tmp = unify(t, r[0])) return apply_unification(*tmp, r);
+	if (auto tmp = unify(t, r[0])) {
+
+		return apply_unification(*tmp, r);
+	}
 	else return {};
 }
 
@@ -145,7 +165,7 @@ int_t get_last_var(const flat_rule &r) {
 flat_rule rename_rule_vars(const flat_rule &r, int_t& lv) {
 	flat_rule rr(r);
 	map<int_t, int_t> sbs;
-	for (auto &t: rr) for (size_t i = 0; i != t.size(); ++i)
+	for (auto &t: rr) for (int_t i = 0; i != t.size(); ++i)
 		if (!sbs.contains(t[i]) && t[i] < 0) sbs[t[i]] = --lv, t[i] = sbs[t[i]];
 	return rr;
 }
@@ -211,6 +231,7 @@ flat_prog square_program(const flat_prog &fp) {
 		// TODO Verify that if it is not possible to square the rule we must ignore it
 		else if (auto nr = square_rule(r, ndx)) sqr.insert(nr->begin(), nr->end());
 	}
+	// TODO reduce rules to facts if possible
 	return sqr;
 }
 
