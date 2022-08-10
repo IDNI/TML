@@ -157,16 +157,6 @@ optional<unification> unify(term &t1, term &t2) {
 	return optional<unification>(u);
 }
 
-#ifdef DELETE_ME
-/* Returns the squaring of a term using a given rule. When considering negations 
- * we may return a set<vector<term>>. */
-optional<flat_rule> square_term(const term &t, flat_rule &r) {
-	if (auto tmp = unify(t, r[0])) {
-		return apply_unification(*tmp, r);
-	}
-	else return {};
-}
-#endif // DELETE_ME
 
 /* Copmpute the last var used in the given rule. */
 int_t get_last_var(const flat_rule &r) {
