@@ -62,7 +62,7 @@ public:
 
 /*! Computes the approximate cost of executing a given mutated program. */
 using cost_function = std::function<size_t(changed_prog&)>;
-extern cost_function exp_in_heads;
+extern const cost_function exp_in_heads;
 
 /*! Computes the approximate cost of executing a given mutated program. */
 using brancher = std::function<std::vector<std::shared_ptr<change>>(changed_prog&)>;

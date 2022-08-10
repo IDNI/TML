@@ -52,9 +52,21 @@ TEST_SUITE("transform_opt-squaring") {
 			{{'a', '1'}},
 			{{'b', x1}, /* :- */ {'a', x1}}});
 		auto sqr = square_program(fp); 
+
+		std::cout << "SQR PROGRAM:"<< std::endl;
+		for (auto r: sqr) {
+			std::cout << "RULE: {";
+			for (auto t: r) {
+				for (auto i: t) {
+				std::cout << i << ",";
+				}
+			}
+			std::cout << "}" << std::endl;
+		}
+
 		EXPECT_TRUE( sqr.size() == 2 ); // only two rules
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}) );
-		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x1},{'a', '1'}}) );
 	}
 	TEST_CASE("squaring a single rule") { EXPECT_TRUE(false); }
 	TEST_CASE("squaring two unrelated rules") { EXPECT_TRUE(false); }

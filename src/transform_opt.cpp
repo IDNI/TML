@@ -36,7 +36,7 @@
 
 using namespace std;
 
-cost_function exp_in_heads = [](changed_prog &mp) {
+const cost_function exp_in_heads = [](changed_prog &mp) {
 	auto rs = mp.current;
 	size_t c = 0.0;
 	for (auto it = rs.begin(); it != rs.end(); ++it) {
@@ -69,8 +69,9 @@ flat_prog best_solution::solution() {
 
 using flat_rule = vector<term>;
 using rel_arity = tuple<int_t, size_t>;
-using rule_index = map<rel_arity, set<flat_rule>>; // TODO change to map<pair<int_t, int_t>, set<term_rule>> 
+using rule_index = map<rel_arity, set<flat_rule>>;
 using unification = map<int_t, int_t>;
+using selection = vector<flat_rule>;
 
 struct squaring_context {
 	reference_wrapper<dict_t> dict;
@@ -110,49 +111,62 @@ inline bool is_goal(const flat_rule &r) {
 	return !r.empty() && r[0].goal;
 }
 
+#ifdef DELETE_ME
 /* Apply a given unification to a given tail of a relation. */
-flat_rule apply_unification(const unification &nf, const flat_rule &r) {
-	flat_rule n(r); 
-	for (auto t: n) for( size_t i = 1; i < t.size(); ++i) 
-		if (nf.contains(t[i])) t[i] = nf.at(t[i]);
+term apply_unification(const unification &nf, const term &t) {
+	term n(t); 
+	for( size_t i = 1; i < t.size(); ++i) 
+		if (nf.contains(t[i])) n[i] = nf.at(t[i]);
 	return n;
+}
+#endif
+
+/* Check if it the given substitution is compatible. */
+inline bool is_compatible(int_t s, int_t u) {
+	return (u >= 0 && (s <= 0 || u == s)) || (u < 0 && s < 0);
+}
+
+/* Apply a given unification to a given tail of a relation. */
+void apply_unification(unification &u, flat_rule &fr) {
+	for (auto t: fr) for(size_t i = 1; i < t.size(); ++i) 
+		if (u.contains(t[i])) 
+			t[i] = u.at(t[i]);
 }
 
 /* Compute the unification of two terms. To do this we take into account that
- * we are only considering the case where both term have the same symbol and 
- * the same arity. The procedure is as follows:
+ * we are only considering the case where both term have the same symbol,  
+ * the same arity and there are no recursive structures (they are flat). 
+ * The procedure is as follows:
  * - a=a or X=X continue,
  * - a=X or X=a add X->a (apply X->a to the rest of the arguments)
  * - X=Y add X->Y
  * See [Martelli, A.; Montanari, U. (Apr 1982). "An Efficient Unification 
  * Algorithm". ACM Trans. Program. Lang. Syst. 4 (2): 258–282] for details.
  */
-optional<const unification> unify(const term &t1, const term &t2) {
-	unification nf;
-	for (int_t i= 1; i < t1.size(); ++i) {
-		bool apply = false;
-		if (t1[i] == t2[i]) continue;
-		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */)
-			if (t1[i] != t2[i]) return {};
-			else continue;
-		if (t1[i] < 0 /* is var */ && t2[i] > 0 /* is constant */) nf[t1[i]] = t2[i], apply = true;
-		if (t2[i] < 0 /* is var */ && t1[i] > 0 /* is constant */) nf[t2[i]] = t1[i], apply = true;
-
-		if (nf.contains(t2[i]) && t2[i] != t1[i]) return {};
-		else nf[t2[i]] = t1[i];
+optional<unification> unify(term &t1, term &t2) {
+	unification u;
+	for (size_t i= 1; i < t1.size(); ++i) {
+		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */) {
+			if (t1[i] != t2[i]) return optional<unification>();
+		} else if (t1[i] < 0 /* is var */ && t2[i] > 0 /* is constant */) { 
+			u[t1[i]] = t2[i]; continue; 
+		} else if (t1[i] > 0 /* is constant */ && t2[i] < 0 /* is var */) { 
+			u[t2[i]] = t1[i]; continue; 
+		} else u[t1[i] /* is var */ ]  = t2[i] /* is var */;
 	}
-	return nf;
+	return optional<unification>(u);
 }
 
+#ifdef DELETE_ME
 /* Returns the squaring of a term using a given rule. When considering negations 
  * we may return a set<vector<term>>. */
 optional<flat_rule> square_term(const term &t, flat_rule &r) {
 	if (auto tmp = unify(t, r[0])) {
-
 		return apply_unification(*tmp, r);
 	}
 	else return {};
 }
+#endif // DELETE_ME
 
 /* Copmpute the last var used in the given rule. */
 int_t get_last_var(const flat_rule &r) {
@@ -162,56 +176,53 @@ int_t get_last_var(const flat_rule &r) {
 }
 
 /* Renames all variables of a rule. */
-flat_rule rename_rule_vars(const flat_rule &r, int_t& lv) {
-	flat_rule rr(r);
+flat_rule rename_rule_vars(flat_rule &fr, int_t& lv) {
+	flat_rule nfr(fr);
 	map<int_t, int_t> sbs;
-	for (auto &t: rr) for (int_t i = 0; i != t.size(); ++i)
+	for (auto &t: nfr) for (size_t i = 0; i != t.size(); ++i)
 		if (!sbs.contains(t[i]) && t[i] < 0) sbs[t[i]] = --lv, t[i] = sbs[t[i]];
-	return rr;
+	return nfr;
 }
 
-/* Returns the squaring of a term.  */
-optional<set<flat_rule>> square_term(const term &t, const rule_index &ndx, int_t& lv) {
-	set<flat_rule> sqr;
-	for (auto &r: ndx.at(get_rel_info(t))) {
-		auto rnmd = rename_rule_vars(r, lv);
-		if (auto tmp = square_term(t, rnmd)) sqr.insert(*tmp);
+/* Returns the squaring of a rule given a selection for the possible substitutions */
+void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
+	flat_rule sfr; 
+	// add the head of the existing rule
+	sfr.emplace_back(fr[0]);
+	auto lv = get_last_var(fr);
+	for (size_t i = 0; i < sels.size(); ++i) {
+		auto rfr = rename_rule_vars(sels[i], lv);
+		if (auto u = unify(fr[i + 1], rfr[0])) {
+			apply_unification(*u, sfr);
+			apply_unification(*u, rfr);
+			sfr.insert(sfr.end(), ++rfr.begin(), rfr.end()); 
+		} else return;
 	}
-	if (sqr.empty()) return {}; else return sqr;
-}
-
-/* Shuffle all possible heads with all possible tails. */
-set<flat_rule> shuffle(const set<flat_rule> &hs, const set<flat_rule> &ts) {
-	set<flat_rule> shffl;
-	for (auto h: hs) for (auto const& t: ts) {
-		flat_rule n(h.begin(), h.end());
-		for (auto e: t) n.emplace_back(e);
-		shffl.emplace(n);
-	}
-	return shffl;
+	fp.insert(sfr);
 }
 
 /* Returns the squaring of a rule  */
-template<typename iterator>
-optional<set<flat_rule>> square_rule_tail(iterator &b, iterator &e, const rule_index &ndx, int_t& lv) {
-	// lv is passed as reference as it would be share among
-	// subsequent invokations
-	auto hs = square_term(*b, ndx, lv);
-	if (distance(b, e) > 1) {
-		if (auto ts = square_rule_tail(++b, e, ndx, lv))
-			if (hs) return shuffle(*hs, *ts);
-		return {};
+void square_rule(flat_rule &fr, selection &sels, const rule_index &idx, 
+		flat_prog &fp, size_t pos = 0) {
+	// if we have selected all possible alternatives proceed with
+	// the squaring of the rule
+	if (pos == sels.size()) {
+		square_rule(fr, sels, fp);
+		return;
 	}
-	return hs;
+	// otherwise, try all the possible selections
+	for (auto &o: idx.at(get_rel_info(fr[pos + 1]))) {
+		sels[pos] = o; 
+		square_rule(fr, sels, idx, fp, pos + 1);
+	}
 }
 
 /* Returns the squaring of a rule. As square_program automatically 
  * deals with facts and goals, we could assume that the body is not empty. */
-optional<set<flat_rule>> square_rule(flat_rule &r, const rule_index &ndx) {
-	auto lv = get_last_var(r);
-	auto b = r.begin(); auto e = r.end();
-	if (auto sqr_tails = square_rule_tail(++b, e, ndx, lv)) return shuffle({{*b}} /* set of flat_rules */, *sqr_tails);
-	else return {};
+void square_rule(flat_rule &fr, flat_prog &fp, const rule_index &idx) {
+	// cache vector with the selected rules to be used in squaring
+	selection sels(fr.size() - 1 );
+	square_rule(fr, sels, idx, fp);
 }
 
 /*! Produces a program where executing a single step is equivalent to
@@ -225,11 +236,12 @@ flat_prog square_program(const flat_prog &fp) {
 	flat_prog sqr;
 	// cache info for speed up the squaring holding a map between heads
 	// and associated bodies
-	auto ndx = index_rules(fp);
-	for (auto r: fp) {
-		if(is_fact(r) || is_goal(r)) sqr.insert(r);
+	auto idx = index_rules(fp);
+	for (auto fr: fp) {
+		if(is_fact(fr) || is_goal(fr)) 
+			sqr.insert(fr);
 		// TODO Verify that if it is not possible to square the rule we must ignore it
-		else if (auto nr = square_rule(r, ndx)) sqr.insert(nr->begin(), nr->end());
+		else square_rule(fr, sqr, idx);
 	}
 	// TODO reduce rules to facts if possible
 	return sqr;
