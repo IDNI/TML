@@ -127,10 +127,12 @@ inline bool is_compatible(int_t s, int_t u) {
 }
 
 /* Apply a given unification to a given tail of a relation. */
-void apply_unification(unification &u, flat_rule &fr) {
-	for (auto t: fr) for(size_t i = 1; i < t.size(); ++i) 
-		if (u.contains(t[i])) 
-			t[i] = u.at(t[i]);
+bool apply_unification(unification &u, flat_rule &fr) {
+	for (auto &t: fr) 
+		for(size_t i = 1; i < t.size(); ++i) 
+			if (u.contains(t[i])) 
+				t[i] = u.at(t[i]);
+	return true;
 }
 
 /* Compute the unification of two terms. To do this we take into account that
@@ -180,11 +182,19 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 	// add the head of the existing rule
 	sfr.emplace_back(fr[0]);
 	auto lv = get_last_var(fr);
+	bool unified = true;
 	for (size_t i = 0; i < sels.size(); ++i) {
 		auto rfr = rename_rule_vars(sels[i], lv);
 		if (auto u = unify(fr[i + 1], rfr[0])) {
-			apply_unification(*u, sfr);
-			apply_unification(*u, rfr);
+			#ifndef DELETE_ME
+			std::cout << "UNIFICATIOIN: {";
+			for (auto p: *u)
+			std::cout << "{" << p.first << ':' << p.second << "}, ";
+			std::cout << "}" << std::endl;
+			#endif // DELETE_ME
+			unified = unified && apply_unification(*u, sfr);
+			unified = unified && apply_unification(*u, rfr);
+			if (!unified) return;
 			sfr.insert(sfr.end(), ++rfr.begin(), rfr.end()); 
 		} else return;
 	}
