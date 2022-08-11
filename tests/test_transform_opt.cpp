@@ -19,25 +19,25 @@ TEST_SUITE("transform_opt-squaring") {
 		flat_prog fp;
 		EXPECT_TRUE( square_program(fp).empty() ); 
 	}
-	TEST_CASE("squaring a single fact with no arguments") {
+	TEST_CASE("squaring: a.") {
 		auto fp = flat_prog_f({{{'a'}}});
 		auto sqr = square_program(fp); 
 		EXPECT_TRUE( sqr.size() == 1); // only one rule
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a'}})); 
 	}
-	TEST_CASE("squaring a single fact with one argument") { 
+	TEST_CASE("squaring: a(1).") { 
 		auto fp = flat_prog_f({{{'a', '1'}}});
 		auto sqr = square_program(fp); 
 		EXPECT_TRUE( sqr.size() == 1); // only one rule
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}));
 	}
-	TEST_CASE("squaring a single fact with several arguments") { 
+	TEST_CASE("squaring: a(1,2).") { 
 		auto fp = flat_prog_f({{{'a', '1', '2'}}});
 		auto sqr = square_program(fp); 
 		EXPECT_TRUE( sqr.size() == 1); // only one rule
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}));
 	}
-	TEST_CASE("squaring multiple unrelated facts") { 
+	TEST_CASE("squaring: a(1). b(1).") { 
 		auto fp = flat_prog_f({
 			{{'a', '1'}}, 
 			{{'b', '1'}}});
@@ -46,13 +46,21 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}) ); 
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
 	 }
-	TEST_CASE("squaring a rule and a fact") { 
-		auto x1 = var_f();
+	TEST_CASE("squaring: a(?x).") { 
+		auto x = var_f();
+		auto fp = flat_prog_f({{{'a', x}}});
+		auto sqr = square_program(fp); 
+		EXPECT_TRUE( sqr.size() == 1 ); // only two rules
+		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', x}}) ); 
+	 }
+	TEST_CASE("squaring: a(1). b(x?):-a(x?).") { 
+		auto x = var_f();
 		auto fp = flat_prog_f({
 			{{'a', '1'}},
-			{{'b', x1}, /* :- */ {'a', x1}}});
+			{{'b', x}, /* :- */ {'a', x}}});
 		auto sqr = square_program(fp); 
 
+		#ifndef DELETE_ME
 		std::cout << "SQR PROGRAM:"<< std::endl;
 		for (auto r: sqr) {
 			std::cout << "RULE: {";
@@ -63,14 +71,38 @@ TEST_SUITE("transform_opt-squaring") {
 			}
 			std::cout << "}" << std::endl;
 		}
+		#endif // DELETE_ME
 
 		EXPECT_TRUE( sqr.size() == 2 ); // only two rules
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}) );
-		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x1},{'a', '1'}}) );
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
 	}
-	TEST_CASE("squaring a single rule") { EXPECT_TRUE(false); }
-	TEST_CASE("squaring two unrelated rules") { EXPECT_TRUE(false); }
-	TEST_CASE("squaring two related rules") { EXPECT_TRUE(false); }
+	TEST_CASE("squaring: a(1,2). b(x):-a(x? y?). c(x):-a(y? x?).") { 
+		auto x = var_f(); auto y = var_f();
+		auto fp = flat_prog_f({
+			{{'a', '1', '2'}},
+			{{'b', x}, /* :- */ {'a', x, y}},
+			{{'c', x}, /* :- */ {'a', y, x}}});
+		auto sqr = square_program(fp); 
+
+		#ifndef DELETE_ME
+		std::cout << "SQR PROGRAM:"<< std::endl;
+		for (auto r: sqr) {
+			std::cout << "RULE: {";
+			for (auto t: r) {
+				for (auto i: t) {
+				std::cout << i << ",";
+				}
+			}
+			std::cout << "}" << std::endl;
+		}
+		#endif // DELETE_ME
+
+		EXPECT_TRUE( sqr.size() == 3 ); // only two rules
+		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
+		EXPECT_TRUE( rules_e(sqr)[2] == rule_f({{'c', '2'}}) );
+	}
 }
 
 #endif // WORK_IN_PROGRESS
