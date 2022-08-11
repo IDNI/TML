@@ -31,7 +31,7 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( sqr.size() == 1); // only one rule
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}));
 	}
-	TEST_CASE("squaring: a(1,2).") { 
+	TEST_CASE("squaring: a(1 2).") { 
 		auto fp = flat_prog_f({{{'a', '1', '2'}}});
 		auto sqr = square_program(fp); 
 		EXPECT_TRUE( sqr.size() == 1); // only one rule
@@ -77,7 +77,7 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}) );
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
 	}
-	TEST_CASE("squaring: a(1,2). b(x):-a(x? y?). c(x):-a(y? x?).") { 
+	TEST_CASE("squaring: a(1 2). b(?x):-a(x? y?). c(?x):-a(y? x?).") { 
 		auto x = var_f(); auto y = var_f();
 		auto fp = flat_prog_f({
 			{{'a', '1', '2'}},
@@ -102,6 +102,52 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
 		EXPECT_TRUE( rules_e(sqr)[2] == rule_f({{'c', '2'}}) );
+	}
+	TEST_CASE("squaring: a(1 2). b(?x):-a(x? x?).") { 
+		auto x = var_f(); 
+		auto fp = flat_prog_f({
+			{{'a', '1', '2'}},
+			{{'b', x}, /* :- */ {'a', x, x}}});
+		auto sqr = square_program(fp); 
+
+		#ifndef DELETE_ME
+		std::cout << "SQR PROGRAM:"<< std::endl;
+		for (auto r: sqr) {
+			std::cout << "RULE: {";
+			for (auto t: r) {
+				for (auto i: t) {
+				std::cout << i << ",";
+				}
+			}
+			std::cout << "}" << std::endl;
+		}
+		#endif // DELETE_ME
+
+		EXPECT_TRUE( sqr.size() == 1 ); // only two rules
+		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
+	}
+	TEST_CASE("squaring: a(1 2). b(?x):-a(2 x?).") { 
+		auto x = var_f(); 
+		auto fp = flat_prog_f({
+			{{'a', '1', '2'}},
+			{{'b', x}, /* :- */ {'a', '2', x}}});
+		auto sqr = square_program(fp); 
+
+		#ifndef DELETE_ME
+		std::cout << "SQR PROGRAM:"<< std::endl;
+		for (auto r: sqr) {
+			std::cout << "RULE: {";
+			for (auto t: r) {
+				for (auto i: t) {
+				std::cout << i << ",";
+				}
+			}
+			std::cout << "}" << std::endl;
+		}
+		#endif // DELETE_ME
+
+		EXPECT_TRUE( sqr.size() == 1 ); // only two rules
+		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
 	}
 }
 

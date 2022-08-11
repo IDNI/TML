@@ -151,14 +151,16 @@ optional<unification> unify(term &t1, term &t2) {
 		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */) {
 			if (t1[i] != t2[i]) return optional<unification>();
 		} else if (t1[i] < 0 /* is var */ && t2[i] > 0 /* is constant */) { 
+			// TODO avoid collisions
 			u[t1[i]] = t2[i]; continue; 
 		} else if (t1[i] > 0 /* is constant */ && t2[i] < 0 /* is var */) { 
+			// TODO avoid collisions
 			u[t2[i]] = t1[i]; continue; 
+			// TODO avoid collisions
 		} else u[t1[i] /* is var */ ]  = t2[i] /* is var */;
 	}
 	return optional<unification>(u);
 }
-
 
 /* Copmpute the last var used in the given rule. */
 int_t get_last_var(const flat_rule &r) {
