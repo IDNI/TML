@@ -45,14 +45,14 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( sqr.size() == 2 );
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1'}}) ); 
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', '1'}}) );
-	 }
+	}
 	TEST_CASE("squaring: a(?x).") { 
 		auto x = var_f();
 		auto fp = flat_prog_f({{{'a', x}}});
 		auto sqr = square_program(fp); 
-		EXPECT_TRUE( sqr.size() == 1 ); // only two rules
+		EXPECT_TRUE( sqr.size() == 1 );
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', x}}) ); 
-	 }
+	}
 	TEST_CASE("squaring: a(1). b(x?):-a(x?).") { 
 		auto x = var_f();
 		auto fp = flat_prog_f({
@@ -81,8 +81,9 @@ TEST_SUITE("transform_opt-squaring") {
 			{{'a', '1', '2'}},
 			{{'b', x}, /* :- */ {'a', x, x}}});
 		auto sqr = square_program(fp); 
-		EXPECT_TRUE( sqr.size() == 1 ); 
+		EXPECT_TRUE( sqr.size() == 2 ); 
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x},{'a', x, x}}) );
 	}
 	TEST_CASE("squaring: a(1 2). b(?x):-a(2 x?).") { 
 		auto x = var_f(); 
@@ -104,8 +105,9 @@ TEST_SUITE("transform_opt-squaring") {
 		}
 		#endif // DELETE_ME
 
-		EXPECT_TRUE( sqr.size() == 1 ); 
+		EXPECT_TRUE( sqr.size() == 2 ); 
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x}, {'a', '2', x}}) );
 	}
 }
 
@@ -125,5 +127,11 @@ TEST_SUITE("transform_opt-splitting") {
 	TEST_CASE("splitting: a(?x):-b(?x ?y), c(?x ?y).") { 
 		EXPECT_TRUE( true ); 
 	}
+}
+
+TEST_SUITE("query containment") {
+}
+
+TEST_SUITE("minimization") {
 }
 #endif // WORK_IN_PROGRESS
