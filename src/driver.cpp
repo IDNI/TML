@@ -2809,6 +2809,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 	o::dbg() << endl;
 }
 
+#ifndef TRY_DELETE_ME
 void collect_free_vars(const vector<vector<raw_term>> &b,
 		vector<elem> &bound_vars, set<elem> &free_vars) {
 	for(const vector<raw_term> &bodie : b) {
@@ -2898,6 +2899,7 @@ void collect_free_vars(const raw_form_tree &t, vector<elem> &bound_vars,
 			assert(false); //should never reach here
 	}
 }
+#endif // TRY_DELETE_ME
 
 // ----------------------------------------------------------------------------
 // transformations handler

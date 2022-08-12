@@ -119,7 +119,7 @@ term apply_unification(const unification &nf, const term &t) {
 		if (nf.contains(t[i])) n[i] = nf.at(t[i]);
 	return n;
 }
-#endif
+#endif // DELETE_ME
 
 /* Check if it the given substitution is compatible. */
 inline bool is_compatible(int_t s, int_t u) {
@@ -247,8 +247,6 @@ flat_prog square_program(const flat_prog &fp) {
 	return sqr;
 }
 
-#ifndef WORK_IN_PROGREE
-
 /* Query conatainment*/
 
 /* Provides consistent conversions of TML objects into Z3. */
@@ -265,6 +263,7 @@ struct z3_context {
 	std::map<raw_rule, z3::expr> rule_to_decl;
 	
 	z3_context(size_t arith_bit_len, size_t universe_bit_len);
+
 	z3::func_decl rel_to_z3(const raw_term& rt);
 	z3::expr globalHead_to_z3(const int_t pos);
 	z3::expr fresh_constant();
@@ -272,7 +271,6 @@ struct z3_context {
 	z3::expr z3_head_constraints(const raw_term &head,
 		std::map<elem, z3::expr> &body_rename);
 	z3::expr term_to_z3(const raw_term &rel);
-	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
 	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
 };
 
@@ -447,112 +445,6 @@ z3::expr z3_context::fresh_constant() {
 		Z3_mk_fresh_const(context, nullptr, value_sort));
 }
 
-/* Reduce the top-level logical operator to a more primitive one if this
- * is possible. That is, reduce implications and co-implications to
- * conjunctions/disjunctions, and reduce uniqueness quantifications to
- * universal and existential quantifications. Useful for avoiding having
- * to separately process these operators. */
-
-raw_form_tree expand_formula_node2(const raw_form_tree &t, dict_t &d) {
-	switch(t.type) {
-		case elem::IMPLIES: {
-			// Implication is logically equivalent to the following
-			return raw_form_tree(elem::ALT,
-				make_shared<raw_form_tree>(elem::NOT, t.l), t.r);
-		} case elem::COIMPLIES: {
-			// Co-implication is logically equivalent to the following
-			return raw_form_tree(elem::AND,
-				make_shared<raw_form_tree>(elem::IMPLIES, t.l, t.r),
-				make_shared<raw_form_tree>(elem::IMPLIES, t.r, t.l));
-		} case elem::UNIQUE: {
-			// The uniqueness quantifier is logically equivalent to the
-			// following
-			const elem evar = elem::fresh_var(d), qvar = *(t.l->el);
-			map<elem, elem> renames {{qvar, evar}};
-			raw_form_tree t_copy = *t.r;
-			rename_variables(t_copy, renames, gen_id_var);
-			return raw_form_tree(elem::EXISTS,
-				make_shared<raw_form_tree>(qvar),
-				make_shared<raw_form_tree>(elem::AND, t.r,
-					make_shared<raw_form_tree>(elem::FORALL,
-						make_shared<raw_form_tree>(evar),
-						make_shared<raw_form_tree>(elem::IMPLIES,
-							make_shared<raw_form_tree>(t_copy),
-							make_shared<raw_form_tree>(
-								raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar }))))));
-		} default: {
-			return t;
-		}
-	}
-}
-
-/* Given a formula tree, output the equivalent Z3 expression using and
- * updating the mappings in the context as necessary. */
-
-z3::expr z3_context::tree_to_z3(const raw_form_tree &t, dict_t &dict) {
-	switch(t.type) {
-		case elem::AND:
-			return tree_to_z3(*t.l, dict) &&
-				tree_to_z3(*t.r, dict);
-		case elem::ALT:
-			return tree_to_z3(*t.l, dict) ||
-				tree_to_z3(*t.r, dict);
-		case elem::NOT:
-			return !tree_to_z3(*t.l, dict);
-		case elem::EXISTS: {
-			const elem &qvar = *t.l->el;
-			// Obtain original Z3 binding this quantified variable
-			z3::expr normal_const = arg_to_z3(qvar);
-			// Use a fresh Z3 binding for this quantified variable
-			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
-			// Make quantified expression
-			z3::expr qexpr = exists(temp_const,
-				tree_to_z3(*t.r, dict));
-			// Restore original binding for quantified variable
-			var_to_decl.at(qvar) = normal_const;
-			return qexpr;
-		} case elem::FORALL: {
-			const elem &qvar = *t.l->el;
-			// Obtain original Z3 binding this quantified variable
-			z3::expr normal_const = arg_to_z3(qvar);
-			// Use a fresh Z3 binding for this quantified variable
-			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
-			// Make quantified expression
-			z3::expr qexpr = forall(temp_const,
-				tree_to_z3(*t.r, dict));
-			// Restore original binding for quantified variable
-			var_to_decl.at(qvar) = normal_const;
-			return qexpr;
-		} case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
-			// Process the expanded formula instead
-			return tree_to_z3(expand_formula_node2(t, dict), dict);
-		case elem::NONE: return term_to_z3(*t.rt);
-		default:
-			assert(false); //should never reach here
-	}
-}
-
-/* Recurse through the given formula tree in pre-order calling the given
- * function with the accumulator. */
-
-template<typename X, typename F>
-		X prefold_tree(raw_form_tree &t, X acc, const F &f) {
-	const X &new_acc = f(t, acc);
-	switch(t.type) {
-		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
-				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
-			// Fold through binary trees by threading accumulator through both
-			// the LHS and RHS
-			return prefold_tree(*t.r, prefold_tree(*t.l, new_acc, f), f);
-		// Fold though unary trees by threading accumulator through this
-		// node then single child
-		case elem::NOT: return prefold_tree(*t.l, new_acc, f);
-		// Otherwise for leaf nodes like terms and variables, thread
-		// accumulator through just this node
-		default: return new_acc;
-	}
-}
-
 /* Checks if the rule has a single head and a body that is either a tree
  * or a non-empty DNF. Second order quantifications and builtin terms
  * are not supported. */
@@ -566,12 +458,6 @@ bool is_query (const raw_rule &rr) {
 	if(!(rr.is_dnf() || rr.is_form())) return false;
 	// Ensure that there is no second order quantification or builtins in
 	// the tree
-	raw_form_tree prft = *rr.get_prft();
-	if(!prefold_tree(prft, true,
-			[&](const raw_form_tree &t, bool acc) -> bool {
-				return acc && (t.type != elem::NONE ||
-					t.rt->extype != raw_term::BLTIN) && t.type != elem::SYM;}))
-		return false;
 	return true;
 }
 
@@ -657,122 +543,19 @@ z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
 		var_backup.emplace(make_pair(el, arg_to_z3(el)));
 		var_to_decl.at(el) = constant;
 	}
+	// TODO fix this code 
 	// Construct z3 expression from rule
-	z3::expr formula = tree_to_z3(*rr.get_prft(), dict);
+	// -> z3::expr formula = tree_to_z3(*rr.get_prft(), dict);
 	// Now undo the global head mapping for future constructions
-	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
-	z3::expr decl = restr && (ex_quant_vars.empty() ?
-		formula : z3::exists(ex_quant_vars, formula));
-	rule_to_decl.emplace(make_pair(rr, decl));
-	return decl;
-}
-
-/* Takes a reference rule, its formula tree, and copies of both and
- * tries to eliminate redundant subtrees of the former using the latter
- * as scratch. Generally speaking, boolean algebra guarantees that
- * eliminating a subtree will produce a formula contained/containing
- * the original depending on the boolean operator that binds it and the
- * parity of the number of negation operators containing it. So we need
- * only apply the supplied query containment procedure for the reverse
- * direction to establish the equivalence of the entire trees. */
-
-raw_form_tree &minimize_aux(const raw_rule &ref_rule,
-	const raw_rule &var_rule, raw_form_tree &ref_tree,
-	raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign = false) {
-	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
-	// Minimize different formulas in different ways
-	switch(var_tree.type) {
-		case elem::IMPLIES: {
-			// Minimize the subtrees separately first. Since a -> b is
-			// equivalent to ~a OR b, alter the parity of the first operand
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{raw_form_tree(elem::NOT, ref_tree.l),
-						raw_form_tree(elem::NOT, orig_var.l)},
-						{*ref_tree.r, *orig_var.r}})
-				// Apply the same treatment as for a disjunction since this is
-				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx)
-                                             : check_qc(var_rule.try_as_b(),
-                                                           ref_rule,
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::ALT: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating disjunct certainly
-				// produces smaller query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx)
-                                             : check_qc(var_rule.try_as_b(),
-                                                           ref_rule_b,
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::AND: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating conjunct certainly
-				// produces bigger query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc(var_rule.try_as_b(),
-                                                           ref_rule_b,
-                                                           ctx)
-                                             : check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::NOT: {
-			// Minimize the single subtree taking care to update the negation
-			// parity
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
-			break;
-		} case elem::EXISTS: case elem::FORALL: {
-			// Existential quantification preserves the containment relation
-			// between two formulas, so just recurse. Universal quantification
-			// is just existential with two negations, hence negation parity
-			// is preserved.
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			break;
-		} default: {
-			// Do not bother with co-implication nor uniqueness quantification
-			// as the naive approach would require expanding them to a bigger
-			// formula.
-			break;
-		}
-	}
-	return ref_tree;
+	// -> for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
+	// -> z3::expr decl; // ->  = restr && (ex_quant_vars.empty() ? formula : z3::exists(ex_quant_vars, formula));
+	// -> rule_to_decl.emplace(make_pair(rr, decl));
+	// -> return decl;
 }
 
 /* Go through the subtrees of the given rule and see which of them can
  * be removed whilst preserving rule equivalence according to the given
  * containment testing function. */
-
 void minimize(raw_rule &rr, z3_context &ctx) {
 	// have we compute already the result
 	static set<raw_rule> memo;
@@ -792,14 +575,13 @@ void minimize(raw_rule &rr, z3_context &ctx) {
 	raw_rule var_rule = rr;
 	// Now minimize the formula tree of the given rule using the given
 	// containment testing function
-	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
+	// TODO fix this code
+	// -> minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
 	// If the input rule was in DNF, provide the output in DNF
 	if(orig_form) rr = rr.try_as_b();
 	// remmber raw_rule as minimized
 	memo.insert(rr);
 }
-
-#endif // WORK_IN_PROGRESS
 
 /* Minimize the rule using CQC. */
 flat_rule minimize_rule(flat_rule &fp) {
