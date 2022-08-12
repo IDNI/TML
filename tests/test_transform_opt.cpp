@@ -53,6 +53,7 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( sqr.size() == 1 );
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', x}}) ); 
 	}
+	#ifdef ENABLE_WHEN_CONSIDERING_FACTS_IN_UNIFICATION
 	TEST_CASE("squaring: a(1). b(x?):-a(x?).") { 
 		auto x = var_f();
 		auto fp = flat_prog_f({
@@ -109,6 +110,32 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x}, {'a', '2', x}}) );
 	}
+	#endif // ENABLE_WHEN_CONSIDERING_FACTS_IN_UNIFICATION
+	TEST_CASE("squaring: a(x? y?):-c(?y). b(?x):-a(y? x?).") { 
+		auto x1 = var_f(); auto y1 = var_f(); int_t x2 = -4; int_t y2 = -3;
+		auto fp = flat_prog_f({
+			{{'a', x1, y1}, {'c', y1}},
+			{{'b', x1}, /* :- */ {'a', y1, x1}}});
+		auto sqr = square_program(fp); 
+
+		#ifndef DELETE_ME
+		std::cout << "SQR PROGRAM:"<< std::endl;
+		for (auto r: sqr) {
+			std::cout << "RULE: {";
+			for (auto t: r) {
+				for (auto i: t) {
+				std::cout << i << ",";
+				}
+			}
+			std::cout << "}" << std::endl;
+		}
+		#endif // DELETE_ME
+
+		EXPECT_TRUE( sqr.size() == 2 ); 
+		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', x1, y1}, {'c', y1}}));
+		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x2}, {'c', y2}}));
+	}
+	
 }
 
 TEST_SUITE("transform_opt-splitting") {

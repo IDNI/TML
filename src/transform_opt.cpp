@@ -88,16 +88,6 @@ inline rel_arity get_rel_info(const flat_rule &t) {
 	return get_rel_info(t[0]);
 }
 
-/* Constructs a map with head/body information. In our case, the body is the 
- * first element of the vector of terms and the body the remaining terms. */
-rule_index index_rules(const flat_prog &fp) {
-	rule_index c;
-	for (auto const &t: fp) 
-		if (c.contains(get_rel_info(t))) c[get_rel_info(t)].insert(t);
-		else c[get_rel_info(t)] = set<flat_rule> {t};
-	return c;
-}
-
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
 inline bool is_fact(const flat_rule &r) {
 	// only one term and is not a goal
@@ -109,6 +99,18 @@ inline bool is_goal(const flat_rule &r) {
 	// TODO consider remove defensive programming
 	// non empty and its a goal
 	return !r.empty() && r[0].goal;
+}
+
+/* Constructs a map with head/body information. In our case, the body is the 
+ * first element of the vector of terms and the body the remaining terms. */
+rule_index index_rules(const flat_prog &fp) {
+	rule_index c;
+	for (auto const &t: fp) {
+		if (is_goal(t) || is_fact(t)) continue;
+		if (c.contains(get_rel_info(t))) c[get_rel_info(t)].insert(t);
+		else c[get_rel_info(t)] = set<flat_rule> {t};
+	}
+	return c;
 }
 
 #ifdef DELETE_ME
@@ -219,6 +221,10 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 /* Returns the squaring of a rule  */
 void square_rule(flat_rule &fr, selection &sels, const rule_index &idx, 
 		flat_prog &fp, size_t pos = 0) {
+	if (!idx.contains(get_rel_info(fr[pos + 1]))) {
+		fp.insert(fr);
+		return;
+	}
 	// if we have selected all possible alternatives proceed with
 	// the squaring of the rule
 	if (pos == sels.size()) {
