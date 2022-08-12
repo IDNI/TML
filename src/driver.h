@@ -62,6 +62,7 @@ struct prog_data {
 	string_t std_input;
 };
 
+#ifdef DELETE_ME
 /* Provides consistent conversions of TML objects into Z3. */
 struct z3_context {
 	size_t arith_bit_len;
@@ -86,6 +87,7 @@ struct z3_context {
 	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
 	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
 };
+#endif // DELETE_ME
 
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
@@ -162,12 +164,14 @@ private:
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
+#ifdef DELETE_ME
 public:
 	void minimize(raw_rule &rr, z3_context &ctx);
 	raw_form_tree &minimize_aux(const raw_rule &ref_rule,
 		const raw_rule &var_rule, raw_form_tree &ref_tree,
 		raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign = true);
 private:
+#endif // DELETE_ME
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -205,8 +209,9 @@ public:
 	void factor_rules(raw_prog &rp);
 
 	void qc_z3(raw_prog &rp);
+#ifdef DEELETE_ME
         bool check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
-
+#endif // DELETE_ME
 private:
 	// following 2 methods are defined in a file tml_earley.cpp
 	bool earley_parse_tml(input* in, raw_progs& rps);

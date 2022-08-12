@@ -242,12 +242,564 @@ flat_prog square_program(const flat_prog &fp) {
 	for (auto fr: fp) {
 		if(is_fact(fr) || is_goal(fr)) 
 			sqr.insert(fr);
-		// TODO Verify that if it is not possible to square the rule we must ignore it
 		else square_rule(fr, sqr, idx);
 	}
-	// TODO reduce rules to facts if possible
 	return sqr;
 }
+
+#ifndef WORK_IN_PROGREE
+
+/* Query conatainment*/
+
+/* Provides consistent conversions of TML objects into Z3. */
+struct z3_context {
+	size_t arith_bit_len;
+	size_t universe_bit_len;
+	z3::context context;
+	z3::solver solver;
+	z3::expr_vector head_rename;
+	z3::sort bool_sort;
+	z3::sort value_sort;
+	std::map<rel_info, z3::func_decl> rel_to_decl;
+	std::map<elem, z3::expr> var_to_decl;
+	std::map<raw_rule, z3::expr> rule_to_decl;
+	
+	z3_context(size_t arith_bit_len, size_t universe_bit_len);
+	z3::func_decl rel_to_z3(const raw_term& rt);
+	z3::expr globalHead_to_z3(const int_t pos);
+	z3::expr fresh_constant();
+	z3::expr arg_to_z3(const elem& el);
+	z3::expr z3_head_constraints(const raw_term &head,
+		std::map<elem, z3::expr> &body_rename);
+	z3::expr term_to_z3(const raw_term &rel);
+	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
+	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
+};
+
+/* Initialize an empty context that can then be populated with TML to Z3
+ * conversions. value_sort is either a bit-vector whose width can
+ * contain the enire program universe and will be used for all Z3
+ * relation arguments and bool_sort is the "return" type of all
+ * relations. */
+
+z3_context::z3_context(size_t arith_bit_len, size_t universe_bit_len) :
+		arith_bit_len(arith_bit_len), universe_bit_len(universe_bit_len),
+		solver(context), head_rename(context), bool_sort(context.bool_sort()),
+		value_sort(context.bv_sort(universe_bit_len ? universe_bit_len : 1)) {
+	// Initialize Z3 solver instance parameters
+	z3::params p(context);
+	p.set(":timeout", 500u);
+	// Enable model based quantifier instantiation since we use quantifiers
+	p.set("mbqi", true);
+	solver.set(p);
+}
+
+/* Function to lookup and create where necessary a Z3 representation of
+ * a relation. */
+
+z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
+	const auto &rel = rt.e[0];
+	const rel_info &rel_sig = get_relation_info(rt);
+	if(auto decl = rel_to_decl.find(rel_sig); decl != rel_to_decl.end())
+		return decl->second;
+	else {
+		z3::sort_vector domain(context);
+		for (int_t i = rt.get_formal_arity(); i != 0; --i)
+			domain.push_back(value_sort);
+		z3::func_decl ndecl =
+			context.function(rel.to_str().c_str(), domain, bool_sort);
+		rel_to_decl.emplace(make_pair(rel_sig, ndecl));
+		return ndecl;
+	}
+}
+
+/* Function to create Z3 representation of global head variable names.
+ * The nth head variable is always assigned the same Z3 constant in
+ * order to ensure that different rules are comparable. */
+
+z3::expr z3_context::globalHead_to_z3(const int_t pos) {
+	for (int_t i=head_rename.size(); i<=pos; ++i)
+		head_rename.push_back(z3::expr(context, fresh_constant()));
+	return head_rename[pos];
+}
+
+/* Function to lookup and create where necessary a Z3 representation of
+ * elements. */
+
+z3::expr z3_context::arg_to_z3(const elem& el) {
+	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
+		return decl->second;
+	else if(el.type == elem::NUM) {
+		const z3::expr &ndecl =
+			context.bv_val(el.num, value_sort.bv_size());
+		var_to_decl.emplace(make_pair(el, ndecl));
+		return ndecl;
+	} else if (el.ch != 0) {
+		const z3::expr &ndecl =
+			context.constant(el.to_str().c_str(), value_sort);
+		var_to_decl.emplace(make_pair(el, ndecl));
+		return ndecl;
+	}
+}
+
+/* Construct a formula that constrains the head variables. The
+ * constraints are of two sorts: the first equate pairwise identical
+ * head variables to each other, and the second equate literals to their
+ * unique Z3 equivalent. Also exports a mapping of each head element to
+ * the Z3 head variable it has been assigned to. */
+
+z3::expr z3_context::z3_head_constraints(const raw_term &head,
+		map<elem, z3::expr> &body_rename) {
+	z3::expr restr = context.bool_val(true);
+	for (size_t i = 0; i < head.e.size() - 3; ++i) {
+		const elem &el = head.e[i + 2];
+		const z3::expr &var = globalHead_to_z3(i);
+		if(const auto &[it, found] = body_rename.try_emplace(el, var); !found)
+			restr = restr && it->second == var;
+		else if (el.type != elem::VAR)
+			restr = restr && var == arg_to_z3(el);
+	}
+	return restr;
+}
+
+/* Given a term, output the equivalent Z3 expression using and updating
+ * the mappings in the context as necessary. */
+
+z3::expr z3_context::term_to_z3(const raw_term &rel) {
+	if(rel.extype == raw_term::REL) {
+		z3::expr_vector vars_of_rel (context);
+		for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
+			// Pushing head variables
+			vars_of_rel.push_back(arg_to_z3(*el));
+		}
+		return rel_to_z3(rel)(vars_of_rel);
+	} else if(rel.extype == raw_term::EQ) {
+		return arg_to_z3(rel.e[0]) == arg_to_z3(rel.e[2]);
+	} else if(rel.extype <= raw_term::LEQ) {
+		return arg_to_z3(rel.e[0]) <= arg_to_z3(rel.e[2]);
+	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 5) {
+		// Obtain the Z3 equivalents of TML elements
+		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
+			arg3 = arg_to_z3(rel.e[4]);
+		// The arithmetic universe may be smaller than the entire universe,
+		// so zero the high bits of arithmetic expressions to ensure that
+		// only the lower bits are relevant in comparisons
+		z3::expr embedding = universe_bit_len == arith_bit_len ?
+			context.bool_val(true) :
+			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg3.extract(universe_bit_len-1, arith_bit_len) == 0;
+		// Its possible that the largest integer in TML program is 0. Z3
+		// does not support 0-length bit-vectors, so short-circuit
+		if(arith_bit_len == 0) return embedding;
+		z3::expr arg1_lo = arg1.extract(arith_bit_len-1, 0),
+			arg2_lo = arg2.extract(arith_bit_len-1, 0),
+			arg3_lo = arg3.extract(arith_bit_len-1, 0);
+		// Finally produce the arithmetic constraint based on the low bits
+		// of the operands
+		switch(rel.arith_op) {
+			case ADD: return (arg1_lo + arg2_lo) == arg3_lo && embedding;
+			case SUB: return (arg1_lo - arg2_lo) == arg3_lo && embedding;
+			case MULT: return (arg1_lo * arg2_lo) == arg3_lo && embedding;
+			case SHL: return shl(arg1_lo, arg2_lo) == arg3_lo && embedding;
+			case SHR: return lshr(arg1_lo, arg2_lo) == arg3_lo && embedding;
+			case BITWAND: return (arg1_lo & arg2_lo) == arg3_lo && embedding;
+			case BITWXOR: return (arg1_lo ^ arg2_lo) == arg3_lo && embedding;
+			case BITWOR: return (arg1_lo | arg2_lo) == arg3_lo && embedding;
+			default: assert(false); //should never reach here
+		}
+	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 6) {
+		// Obtain the Z3 equivalents of TML elements
+		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
+			arg3 = arg_to_z3(rel.e[4]), arg4 = arg_to_z3(rel.e[5]);
+		// The arithmetic universe may be smaller than the entire universe,
+		// so zero the high bits of arithmetic expressions to ensure that
+		// only the lower bits are relevant in comparisons
+		z3::expr embedding = universe_bit_len == arith_bit_len ?
+			context.bool_val(true) :
+			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg3.extract(universe_bit_len-1, arith_bit_len) == 0 &&
+			arg4.extract(universe_bit_len-1, arith_bit_len) == 0;
+		// Its possible that the largest integer in TML program is 0. Z3
+		// does not support 0-length bit-vectors, so short-circuit
+		if(arith_bit_len == 0) return embedding;
+		// Since this is double precision arithmetic, join the 3rd and 4th
+		// operands to form the RHS
+		z3::expr arg1_lo = zext(arg1.extract(arith_bit_len-1, 0), arith_bit_len),
+			arg2_lo = zext(arg2.extract(arith_bit_len-1, 0), arith_bit_len),
+			arg34 = concat(arg3.extract(arith_bit_len-1, 0),
+				arg4.extract(arith_bit_len-1, 0));
+		// Finally produce the arithmetic constraint based on the low bits
+		// of the LHS operands and full bits of the RHS operand
+		switch(rel.arith_op) {
+			case ADD: return embedding && (arg1_lo + arg2_lo) == arg34;
+			case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
+			default: assert(false); //should never reach here
+		}
+	} else assert(false); //should never reach here
+}
+
+/* Make a fresh Z3 constant. */
+
+z3::expr z3_context::fresh_constant() {
+	return z3::expr(context,
+		Z3_mk_fresh_const(context, nullptr, value_sort));
+}
+
+/* Reduce the top-level logical operator to a more primitive one if this
+ * is possible. That is, reduce implications and co-implications to
+ * conjunctions/disjunctions, and reduce uniqueness quantifications to
+ * universal and existential quantifications. Useful for avoiding having
+ * to separately process these operators. */
+
+raw_form_tree expand_formula_node2(const raw_form_tree &t, dict_t &d) {
+	switch(t.type) {
+		case elem::IMPLIES: {
+			// Implication is logically equivalent to the following
+			return raw_form_tree(elem::ALT,
+				make_shared<raw_form_tree>(elem::NOT, t.l), t.r);
+		} case elem::COIMPLIES: {
+			// Co-implication is logically equivalent to the following
+			return raw_form_tree(elem::AND,
+				make_shared<raw_form_tree>(elem::IMPLIES, t.l, t.r),
+				make_shared<raw_form_tree>(elem::IMPLIES, t.r, t.l));
+		} case elem::UNIQUE: {
+			// The uniqueness quantifier is logically equivalent to the
+			// following
+			const elem evar = elem::fresh_var(d), qvar = *(t.l->el);
+			map<elem, elem> renames {{qvar, evar}};
+			raw_form_tree t_copy = *t.r;
+			rename_variables(t_copy, renames, gen_id_var);
+			return raw_form_tree(elem::EXISTS,
+				make_shared<raw_form_tree>(qvar),
+				make_shared<raw_form_tree>(elem::AND, t.r,
+					make_shared<raw_form_tree>(elem::FORALL,
+						make_shared<raw_form_tree>(evar),
+						make_shared<raw_form_tree>(elem::IMPLIES,
+							make_shared<raw_form_tree>(t_copy),
+							make_shared<raw_form_tree>(
+								raw_term(raw_term::EQ, { evar, elem(elem::EQ), qvar }))))));
+		} default: {
+			return t;
+		}
+	}
+}
+
+/* Given a formula tree, output the equivalent Z3 expression using and
+ * updating the mappings in the context as necessary. */
+
+z3::expr z3_context::tree_to_z3(const raw_form_tree &t, dict_t &dict) {
+	switch(t.type) {
+		case elem::AND:
+			return tree_to_z3(*t.l, dict) &&
+				tree_to_z3(*t.r, dict);
+		case elem::ALT:
+			return tree_to_z3(*t.l, dict) ||
+				tree_to_z3(*t.r, dict);
+		case elem::NOT:
+			return !tree_to_z3(*t.l, dict);
+		case elem::EXISTS: {
+			const elem &qvar = *t.l->el;
+			// Obtain original Z3 binding this quantified variable
+			z3::expr normal_const = arg_to_z3(qvar);
+			// Use a fresh Z3 binding for this quantified variable
+			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
+			// Make quantified expression
+			z3::expr qexpr = exists(temp_const,
+				tree_to_z3(*t.r, dict));
+			// Restore original binding for quantified variable
+			var_to_decl.at(qvar) = normal_const;
+			return qexpr;
+		} case elem::FORALL: {
+			const elem &qvar = *t.l->el;
+			// Obtain original Z3 binding this quantified variable
+			z3::expr normal_const = arg_to_z3(qvar);
+			// Use a fresh Z3 binding for this quantified variable
+			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
+			// Make quantified expression
+			z3::expr qexpr = forall(temp_const,
+				tree_to_z3(*t.r, dict));
+			// Restore original binding for quantified variable
+			var_to_decl.at(qvar) = normal_const;
+			return qexpr;
+		} case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
+			// Process the expanded formula instead
+			return tree_to_z3(expand_formula_node2(t, dict), dict);
+		case elem::NONE: return term_to_z3(*t.rt);
+		default:
+			assert(false); //should never reach here
+	}
+}
+
+/* Recurse through the given formula tree in pre-order calling the given
+ * function with the accumulator. */
+
+template<typename X, typename F>
+		X prefold_tree(raw_form_tree &t, X acc, const F &f) {
+	const X &new_acc = f(t, acc);
+	switch(t.type) {
+		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
+				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
+			// Fold through binary trees by threading accumulator through both
+			// the LHS and RHS
+			return prefold_tree(*t.r, prefold_tree(*t.l, new_acc, f), f);
+		// Fold though unary trees by threading accumulator through this
+		// node then single child
+		case elem::NOT: return prefold_tree(*t.l, new_acc, f);
+		// Otherwise for leaf nodes like terms and variables, thread
+		// accumulator through just this node
+		default: return new_acc;
+	}
+}
+
+/* Checks if the rule has a single head and a body that is either a tree
+ * or a non-empty DNF. Second order quantifications and builtin terms
+ * are not supported. */
+
+bool is_query (const raw_rule &rr) {
+	// Ensure that there are no multiple heads
+	if(rr.h.size() != 1) return false;
+	// Ensure that head is positive
+	if(rr.h[0].neg) return false;
+	// Ensure that this rule is either a tree or non-empty DNF
+	if(!(rr.is_dnf() || rr.is_form())) return false;
+	// Ensure that there is no second order quantification or builtins in
+	// the tree
+	raw_form_tree prft = *rr.get_prft();
+	if(!prefold_tree(prft, true,
+			[&](const raw_form_tree &t, bool acc) -> bool {
+				return acc && (t.type != elem::NONE ||
+					t.rt->extype != raw_term::BLTIN) && t.type != elem::SYM;}))
+		return false;
+	return true;
+}
+
+bool disjoint(const raw_rule &r1, const raw_rule &r2) {
+	auto get_terms = [](vector<raw_term> t) { return t[0]; };
+	auto r1_terms = r1.b | views::transform(get_terms);
+	auto r2_terms = r2.b | views::transform(get_terms);
+	vector<raw_term> i;
+	set_intersection(r1_terms.begin(), r1_terms.end(), r2_terms.begin(), r2_terms.end(), back_inserter(i));
+	return !i.empty();
+}
+
+bool comparable(const raw_rule &r1, const raw_rule &r2) {
+	return (r1.h[0].e[0] == r2.h[0].e[0] && r1.h[0].arity == r2.h[0].arity);
+}
+
+/*! 
+ * Checks if r1 is contained in r2 or vice versa.
+ * Returns false if rules are not comparable or not contained.
+ * Returns true if r1 is contained in r2. 
+ */
+bool check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
+	// have we compute already the result
+	static map<pair<raw_rule, raw_rule>, bool> memo;
+	auto key = make_pair(r1, r2);
+	if (memo.contains(key)) {
+		return memo[key];
+	}
+
+	// if the heads in the body are disjoint, no qc is possible
+	if (disjoint(r1, r2) || !comparable(r1, r2) || !is_query(r1) || !is_query(r2)) {
+		memo[key] = false;
+		swap(get<0>(key), get<1>(key));
+		memo[key] = false;
+	}
+
+	// do the expensive work
+	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
+	// Get head variables for z3
+	z3::expr_vector bound_vars(ctx.context);
+	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
+		bound_vars.push_back(ctx.globalHead_to_z3(i));
+	// Rename head variables on the fly such that they match
+	// on both rules
+	
+	// TODO adapt this without dict
+	// -> dict_t &dict = tbl->get_dict();
+	// -> z3::expr rule1 = ctx.rule_to_z3(r1, dict);
+	// -> z3::expr rule2 = ctx.rule_to_z3(r2, dict);
+	// -> ctx.solver.push();
+	// Add r1 => r2 to solver
+	// -> if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
+	// -> else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
+	bool res = ctx.solver.check() == z3::unsat;
+	ctx.solver.pop();
+	o::dbg() << res << endl;
+	memo[key] = res;
+	return res;
+}
+
+/* Given a rule, output the body of this rule converted to the
+ * corresponding Z3 expression. Caches the conversion in the context in
+ * case the same rule is needed in future. */
+
+z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
+	if(auto decl = rule_to_decl.find(rr); decl != rule_to_decl.end())
+		return decl->second;
+	// create map from bound_vars
+	map<elem, z3::expr> body_rename;
+	z3::expr restr = z3_head_constraints(rr.h[0], body_rename);
+	// Collect bound variables of rule and restrictions from constants in head
+	set<elem> free_vars;
+	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
+	collect_free_vars(*rr.get_prft(), bound_vars, free_vars);
+	// Free variables are existentially quantified
+	z3::expr_vector ex_quant_vars (context);
+	for (const auto& var : free_vars)
+		ex_quant_vars.push_back(arg_to_z3(var));
+	map<elem, z3::expr> var_backup;
+	// For the intent of constructing this Z3 expression, replace head
+	// variable expressions with the corresponding global head
+	for(auto &[el, constant] : body_rename) {
+		var_backup.emplace(make_pair(el, arg_to_z3(el)));
+		var_to_decl.at(el) = constant;
+	}
+	// Construct z3 expression from rule
+	z3::expr formula = tree_to_z3(*rr.get_prft(), dict);
+	// Now undo the global head mapping for future constructions
+	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
+	z3::expr decl = restr && (ex_quant_vars.empty() ?
+		formula : z3::exists(ex_quant_vars, formula));
+	rule_to_decl.emplace(make_pair(rr, decl));
+	return decl;
+}
+
+/* Takes a reference rule, its formula tree, and copies of both and
+ * tries to eliminate redundant subtrees of the former using the latter
+ * as scratch. Generally speaking, boolean algebra guarantees that
+ * eliminating a subtree will produce a formula contained/containing
+ * the original depending on the boolean operator that binds it and the
+ * parity of the number of negation operators containing it. So we need
+ * only apply the supplied query containment procedure for the reverse
+ * direction to establish the equivalence of the entire trees. */
+
+raw_form_tree &minimize_aux(const raw_rule &ref_rule,
+	const raw_rule &var_rule, raw_form_tree &ref_tree,
+	raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign = false) {
+	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
+	// Minimize different formulas in different ways
+	switch(var_tree.type) {
+		case elem::IMPLIES: {
+			// Minimize the subtrees separately first. Since a -> b is
+			// equivalent to ~a OR b, alter the parity of the first operand
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
+			raw_form_tree orig_var = var_tree;
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{raw_form_tree(elem::NOT, ref_tree.l),
+						raw_form_tree(elem::NOT, orig_var.l)},
+						{*ref_tree.r, *orig_var.r}})
+				// Apply the same treatment as for a disjunction since this is
+				// what an implication is equivalent to
+				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx)
+                                             : check_qc(var_rule.try_as_b(),
+                                                           ref_rule,
+                                                           ctx))
+					return ref_tree = ref_tmp;
+			var_tree = orig_var;
+			break;
+		} case elem::ALT: {
+			// Minimize the subtrees separately first
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
+			raw_form_tree orig_var = var_tree;
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
+				// If in positive context, eliminating disjunct certainly
+				// produces smaller query, so check only the reverse. Otherwise
+				// vice versa
+				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx)
+                                             : check_qc(var_rule.try_as_b(),
+                                                           ref_rule_b,
+                                                           ctx))
+					return ref_tree = ref_tmp;
+			var_tree = orig_var;
+			break;
+		} case elem::AND: {
+			// Minimize the subtrees separately first
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
+			const raw_rule &ref_rule_b = ref_rule.try_as_b();
+			raw_form_tree orig_var = var_tree;
+			// Now try eliminating each subtree in turn
+			for(auto &[ref_tmp, var_tmp] : bijection
+					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
+				// If in positive context, eliminating conjunct certainly
+				// produces bigger query, so check only the reverse. Otherwise
+				// vice versa
+				if(var_tree = var_tmp; ctx_sign ? check_qc(var_rule.try_as_b(),
+                                                           ref_rule_b,
+                                                           ctx)
+                                             : check_qc(ref_rule_b,
+                                                           var_rule.try_as_b(),
+                                                           ctx))
+					return ref_tree = ref_tmp;
+			var_tree = orig_var;
+			break;
+		} case elem::NOT: {
+			// Minimize the single subtree taking care to update the negation
+			// parity
+			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
+			break;
+		} case elem::EXISTS: case elem::FORALL: {
+			// Existential quantification preserves the containment relation
+			// between two formulas, so just recurse. Universal quantification
+			// is just existential with two negations, hence negation parity
+			// is preserved.
+			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
+			break;
+		} default: {
+			// Do not bother with co-implication nor uniqueness quantification
+			// as the naive approach would require expanding them to a bigger
+			// formula.
+			break;
+		}
+	}
+	return ref_tree;
+}
+
+/* Go through the subtrees of the given rule and see which of them can
+ * be removed whilst preserving rule equivalence according to the given
+ * containment testing function. */
+
+void minimize(raw_rule &rr, z3_context &ctx) {
+	// have we compute already the result
+	static set<raw_rule> memo;
+	if (memo.contains(rr)) {
+		return;
+	}
+	// TODO Write a quick test to avoid easy cases
+	
+	// do the expensive computation
+	if(rr.is_fact() || rr.is_goal()) return;
+	// Switch to the formula tree representation of the rule if this has
+	// not yet been done for this is a precondition to minimize_aux. Note
+	// the current form so that we can attempt to restore it afterwards.
+	bool orig_form = rr.is_dnf();
+	rr = rr.try_as_prft();
+	// Copy the rule to provide scratch for minimize_aux
+	raw_rule var_rule = rr;
+	// Now minimize the formula tree of the given rule using the given
+	// containment testing function
+	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
+	// If the input rule was in DNF, provide the output in DNF
+	if(orig_form) rr = rr.try_as_b();
+	// remmber raw_rule as minimized
+	memo.insert(rr);
+}
+
+#endif // WORK_IN_PROGRESS
 
 /* Minimize the rule using CQC. */
 flat_rule minimize_rule(flat_rule &fp) {
@@ -619,7 +1171,7 @@ struct mutation_split_bodies : public virtual change  {
 
 	bool operator()(changed_prog &mp) const override {
 		o::dbg() << "Splitting bodies ..." << endl;
-		drvr.transform_bin(mp.current);
+		drvr._bintransform(mp.current);
 		o::dbg() << "Binary Program:" << endl << mp.current << endl;
 		return true;
 	}

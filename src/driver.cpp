@@ -121,7 +121,7 @@ void driver::directives_load(raw_prog& p) {
 	p.d.insert(p.d.end(), processed.begin(), processed.end());
 }
 
-
+#ifndef TRY_DELETE_ME
 /* Reduce the top-level logical operator to a more primitive one if this
  * is possible. That is, reduce implications and co-implications to
  * conjunctions/disjunctions, and reduce uniqueness quantifications to
@@ -160,6 +160,7 @@ raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d) {
 		}
 	}
 }
+#endif // TRY_DELETE_ME
 
 /* Check if the given variable is limited in its scope with respect to
  * the given variable. If the element is not a variable, then it is
@@ -520,6 +521,7 @@ bool is_cqn(const raw_rule &rr) {
 	return true;
 }
 
+#ifndef TRY_DELETE_ME
 /* Recurse through the given formula tree in pre-order calling the given
  * function with the accumulator. */
 
@@ -540,6 +542,7 @@ template<typename X, typename F>
 		default: return new_acc;
 	}
 }
+#endif // TRY_DELETE_ME
 
 /* Recurse through the given formula tree in post-order calling the
  * given function with the accumulator. */
@@ -561,6 +564,7 @@ template<typename X, typename F>
 	}
 }
 
+#ifdef DELETE_ME
 /* Checks if the rule has a single head and a body that is either a tree
  * or a non-empty DNF. Second order quantifications and builtin terms
  * are not supported. */
@@ -583,7 +587,6 @@ bool is_query (const raw_rule &rr) {
 	return true;
 }
 
-#ifdef DELETE_ME
 /* If rr1 and rr2 are both conjunctive queries, check if there is a
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
  * of a homomorphism implies that rr1 is contained by rr2. */
@@ -957,6 +960,7 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 	}
 }
 
+#ifdef DELETE_ME
 /* Takes a reference rule, its formula tree, and copies of both and
  * tries to eliminate redundant subtrees of the former using the latter
  * as scratch. Generally speaking, boolean algebra guarantees that
@@ -1089,7 +1093,6 @@ void driver::minimize(raw_rule &rr, z3_context &ctx) {
 	memo.insert(rr);
 }
 
-#ifdef DELETE_ME
 /* Go through the program and removed those queries that the function f
  * determines to be subsumed by others. While we're at it, minimize
  * (i.e. subsume a query with its part) the shortlisted queries to
@@ -1216,6 +1219,8 @@ void driver::qc_z3 (raw_prog &raw_p) {
 	}
 }
 #endif
+
+#ifdef DELETE_ME
 
 /* Initialize an empty context that can then be populated with TML to Z3
  * conversions. value_sort is either a bit-vector whose width can
@@ -1523,6 +1528,7 @@ bool driver::check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx) {
 	memo[key] = res;
 	return res;
 }
+#endif // DELETE_ME
 
 /* Make relations mapping list ID's to their heads and tails. Domain's
  * first argument is the relation into which it should put the domain it
