@@ -293,7 +293,7 @@ struct z3_context {
 	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
 };
 
-/* Initialize an empty context that can then be populated with TML to Z3
+/* Initialize an empty context that can then bn e populated with TML to Z3
  * conversions. value_sort is either a bit-vector whose width can
  * contain the enire program universe and will be used for all Z3
  * relation arguments and bool_sort is the "return" type of all
@@ -342,7 +342,6 @@ z3::expr z3_context::globalHead_to_z3(const int_t pos) {
 
 /* Function to lookup and create where necessary a Z3 representation of
  * elements. */
-
 z3::expr z3_context::arg_to_z3(const elem& el) {
 	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
 		return decl->second;
@@ -364,9 +363,7 @@ z3::expr z3_context::arg_to_z3(const elem& el) {
  * head variables to each other, and the second equate literals to their
  * unique Z3 equivalent. Also exports a mapping of each head element to
  * the Z3 head variable it has been assigned to. */
-
-z3::expr z3_context::z3_head_constraints(const raw_term &head,
-		map<elem, z3::expr> &body_rename) {
+z3::expr z3_context::z3_head_constraints(const raw_term &head, map<elem, z3::expr> &body_rename) {
 	z3::expr restr = context.bool_val(true);
 	for (size_t i = 0; i < head.e.size() - 3; ++i) {
 		const elem &el = head.e[i + 2];
@@ -381,84 +378,18 @@ z3::expr z3_context::z3_head_constraints(const raw_term &head,
 
 /* Given a term, output the equivalent Z3 expression using and updating
  * the mappings in the context as necessary. */
-
 z3::expr z3_context::term_to_z3(const raw_term &rel) {
 	if(rel.extype == raw_term::REL) {
 		z3::expr_vector vars_of_rel (context);
 		for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
-			// Pushing head variables
+			// pushing head variables
 			vars_of_rel.push_back(arg_to_z3(*el));
 		}
 		return rel_to_z3(rel)(vars_of_rel);
-	} else if(rel.extype == raw_term::EQ) {
-		return arg_to_z3(rel.e[0]) == arg_to_z3(rel.e[2]);
-	} else if(rel.extype <= raw_term::LEQ) {
-		return arg_to_z3(rel.e[0]) <= arg_to_z3(rel.e[2]);
-	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 5) {
-		// Obtain the Z3 equivalents of TML elements
-		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
-			arg3 = arg_to_z3(rel.e[4]);
-		// The arithmetic universe may be smaller than the entire universe,
-		// so zero the high bits of arithmetic expressions to ensure that
-		// only the lower bits are relevant in comparisons
-		z3::expr embedding = universe_bit_len == arith_bit_len ?
-			context.bool_val(true) :
-			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg3.extract(universe_bit_len-1, arith_bit_len) == 0;
-		// Its possible that the largest integer in TML program is 0. Z3
-		// does not support 0-length bit-vectors, so short-circuit
-		if(arith_bit_len == 0) return embedding;
-		z3::expr arg1_lo = arg1.extract(arith_bit_len-1, 0),
-			arg2_lo = arg2.extract(arith_bit_len-1, 0),
-			arg3_lo = arg3.extract(arith_bit_len-1, 0);
-		// Finally produce the arithmetic constraint based on the low bits
-		// of the operands
-		switch(rel.arith_op) {
-			case ADD: return (arg1_lo + arg2_lo) == arg3_lo && embedding;
-			case SUB: return (arg1_lo - arg2_lo) == arg3_lo && embedding;
-			case MULT: return (arg1_lo * arg2_lo) == arg3_lo && embedding;
-			case SHL: return shl(arg1_lo, arg2_lo) == arg3_lo && embedding;
-			case SHR: return lshr(arg1_lo, arg2_lo) == arg3_lo && embedding;
-			case BITWAND: return (arg1_lo & arg2_lo) == arg3_lo && embedding;
-			case BITWXOR: return (arg1_lo ^ arg2_lo) == arg3_lo && embedding;
-			case BITWOR: return (arg1_lo | arg2_lo) == arg3_lo && embedding;
-			default: assert(false); //should never reach here
-		}
-	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 6) {
-		// Obtain the Z3 equivalents of TML elements
-		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
-			arg3 = arg_to_z3(rel.e[4]), arg4 = arg_to_z3(rel.e[5]);
-		// The arithmetic universe may be smaller than the entire universe,
-		// so zero the high bits of arithmetic expressions to ensure that
-		// only the lower bits are relevant in comparisons
-		z3::expr embedding = universe_bit_len == arith_bit_len ?
-			context.bool_val(true) :
-			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg3.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg4.extract(universe_bit_len-1, arith_bit_len) == 0;
-		// Its possible that the largest integer in TML program is 0. Z3
-		// does not support 0-length bit-vectors, so short-circuit
-		if(arith_bit_len == 0) return embedding;
-		// Since this is double precision arithmetic, join the 3rd and 4th
-		// operands to form the RHS
-		z3::expr arg1_lo = zext(arg1.extract(arith_bit_len-1, 0), arith_bit_len),
-			arg2_lo = zext(arg2.extract(arith_bit_len-1, 0), arith_bit_len),
-			arg34 = concat(arg3.extract(arith_bit_len-1, 0),
-				arg4.extract(arith_bit_len-1, 0));
-		// Finally produce the arithmetic constraint based on the low bits
-		// of the LHS operands and full bits of the RHS operand
-		switch(rel.arith_op) {
-			case ADD: return embedding && (arg1_lo + arg2_lo) == arg34;
-			case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
-			default: assert(false); //should never reach here
-		}
 	} else assert(false); //should never reach here
 }
 
 /* Make a fresh Z3 constant. */
-
 z3::expr z3_context::fresh_constant() {
 	return z3::expr(context,
 		Z3_mk_fresh_const(context, nullptr, value_sort));
