@@ -1132,7 +1132,7 @@ void driver::subsume_queries(raw_prog &rp, const F &f) {
 	}
 	rp.r = reduced_rules;
 }
-#endif
+#endif // DELETE_ME
 
 /* Update the number and characters counters as well as the distinct
  * symbol set to account for the given term. */
@@ -1218,9 +1218,6 @@ void driver::qc_z3 (raw_prog &raw_p) {
 		++selected;
 	}
 }
-#endif
-
-#ifdef DELETE_ME
 
 /* Initialize an empty context that can then be populated with TML to Z3
  * conversions. value_sort is either a bit-vector whose width can
