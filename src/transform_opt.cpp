@@ -31,7 +31,6 @@
 #include "driver.h"
 #include "err.h"
 #include "iterators.h"
-// #include "generators.h"
 #include "transform_opt.h"
 
 using namespace std;
@@ -47,7 +46,7 @@ const cost_function exp_in_heads = [](changed_prog &mp) {
 };
 
 void changed_prog::operator()(change &m) {
-	// apply the change to the current changed_prog
+	// Apply the change to the current changed_prog
 	m(*this);
 }
 
@@ -77,30 +76,35 @@ struct squaring_context {
 };
 
 /* Get relation info from the head term in a way suitable for be used as key. */
+
 inline rel_arity get_rel_info(const term &t) {
 	return make_tuple(t[0], t.size());
 }
 
 /* Get relation info from a flat rule in a way suitable to be used as a key. */
+
 inline rel_arity get_rel_info(const flat_rule &t) {
 	return get_rel_info(t[0]);
 }
 
 /* Returns true if the vector of terms correspond to a fact, false otherwise. */
+
 inline bool is_fact(const flat_rule &r) {
-	// only one term and is not a goal
+	// Only one term and is not a goal
 	return r.size() == 1 && !r[0].goal;
 }
 
 /* Returns true if the vector of terms correspond to a goal, false otherwise. */
+
 inline bool is_goal(const flat_rule &r) {
 	// TODO consider remove defensive programming
-	// non empty and its a goal
+	// Non empty and its a goal
 	return !r.empty() && r[0].goal;
 }
 
 /* Constructs a map with head/body information. In our case, the body is the 
  * first element of the vector of terms and the body the remaining terms. */
+
 rule_index index_rules(const flat_prog &fp) {
 	rule_index c;
 	for (auto const &t: fp) {
@@ -112,11 +116,13 @@ rule_index index_rules(const flat_prog &fp) {
 }
 
 /* Check if it the given substitution is compatible. */
+
 inline bool is_compatible(int_t s, int_t u) {
 	return (u >= 0 && (s <= 0 || u == s)) || (u < 0 && s < 0);
 }
 
 /* Apply a given unification to a given tail of a relation. */
+
 bool apply_unification(unification &u, flat_rule &fr) {
 	for (auto &t: fr) 
 		for(size_t i = 1; i < t.size(); ++i) 
@@ -134,6 +140,7 @@ bool apply_unification(unification &u, flat_rule &fr) {
  * - X=Y add X->Y
  * See [Martelli, A.; Montanari, U. (Apr 1982). "An Efficient Unification 
  * Algorithm". ACM Trans. Program. Lang. Syst. 4 (2): 258–282] for details. */
+
 optional<unification> unify(term &t1, term &t2) {
 	unification u;
 	for (size_t i= 1; i < t1.size(); ++i) {
@@ -163,6 +170,7 @@ optional<unification> unify(term &t1, term &t2) {
 }
 
 /* Copmpute the last var used in the given rule. */
+
 int_t get_last_var(const flat_rule &r) {
 	int_t lst = 0;
 	for (auto &t: r) for (auto i: t) lst = (i < lst) ? i : lst;
@@ -170,6 +178,7 @@ int_t get_last_var(const flat_rule &r) {
 }
 
 /* Renames all variables of a rule. */
+
 flat_rule rename_rule_vars(flat_rule &fr, int_t& lv) {
 	flat_rule nfr(fr);
 	map<int_t, int_t> sbs;
@@ -178,11 +187,12 @@ flat_rule rename_rule_vars(flat_rule &fr, int_t& lv) {
 	return nfr;
 }
 
-/* Returns the squaring of a rule given a selection for the possible substitutions */
+/* Returns the squaring of a rule given a selection for the possible substitutions. */
+
 void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 	// TODO check fr is a datalog program
 	flat_rule sfr; 
-	// add the head of the existing rule
+	// Add the head of the existing rule
 	sfr.emplace_back(fr[0]);
 	auto lv = get_last_var(fr);
 	bool unified = true;
@@ -207,13 +217,14 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 }
 
 /* Returns the squaring of a rule  */
+
 void square_rule(flat_rule &fr, selection &sels, const rule_index &idx, 
 		flat_prog &fp, size_t pos = 0) {
 	if (!idx.contains(get_rel_info(fr[pos + 1]))) {
 		fp.insert(fr);
 		return;
 	}
-	// if we have selected all possible alternatives proceed with
+	// If we have selected all possible alternatives proceed with
 	// the squaring of the rule
 	if (pos == sels.size()) {
 		square_rule(fr, sels, fp);
@@ -228,8 +239,9 @@ void square_rule(flat_rule &fr, selection &sels, const rule_index &idx,
 
 /* Returns the squaring of a rule. As square_program automatically 
  * deals with facts and goals, we could assume that the body is not empty. */
+
 void square_rule(flat_rule &fr, flat_prog &fp, const rule_index &idx) {
-	// cache vector with the selected rules to be used in squaring
+	// Cache vector with the selected rules to be used in squaring
 	selection sels(fr.size() - 1 );
 	square_rule(fr, sels, idx, fp);
 }
@@ -240,10 +252,11 @@ void square_rule(flat_rule &fr, flat_prog &fp, const rule_index &idx) {
  * bodies of the relation that it refers to. For those facts not
  * computed in the previous step, it is enough to check that they were
  * derived to steps ago and were not deleted in the previous step. */
+
 flat_prog square_program(const flat_prog &fp) {
-	// new flat_prog holding the squaring of fp
+	// New flat_prog holding the squaring of fp
 	flat_prog sqr;
-	// cache info for speed up the squaring holding a map between heads
+	// Cache info for speed up the squaring holding a map between heads
 	// and associated bodies
 	auto idx = index_rules(fp);
 	for (auto fr: fp) {
@@ -256,9 +269,10 @@ flat_prog square_program(const flat_prog &fp) {
 
 #ifndef WORK_IN_PROGRESS
 
-/* Query conatainment*/
+/* Query conatainment and minimization */
 
 /* Provides consistent conversions of TML objects into Z3. */
+
 class z3_context {
 	size_t arith_bit_len;
 	size_t universe_bit_len;
@@ -272,18 +286,19 @@ class z3_context {
 	std::map<flat_rule, z3::expr> rule_to_decl;
 
 	/* Initialize an empty context that can then bn e populated with TML to Z3
-	* conversions. value_sort is either a bit-vector whose width can
-	* contain the enire program universe and will be used for all Z3
-	* relation arguments and bool_sort is the "return" type of all
-	* relations. */
+	 * conversions. value_sort is either a bit-vector whose width can
+	 * contain the enire program universe and will be used for all Z3
+	 * relation arguments and bool_sort is the "return" type of all
+	 * relations. */
+
 	z3_context(size_t arith_bit_len, size_t universe_bit_len) :
 			arith_bit_len(arith_bit_len), universe_bit_len(universe_bit_len),
 			solver(context), head_rename(context), bool_sort(context.bool_sort()),
 			value_sort(context.bv_sort(universe_bit_len ? universe_bit_len : 1)) {
-		// initialize Z3 solver instance parameters
+		// Initialize Z3 solver instance parameters
 		z3::params p(context);
 		p.set(":timeout", 500u);
-		// enable model based quantifier instantiation since we use quantifiers
+		// Enable model based quantifier instantiation since we use quantifiers
 		p.set("mbqi", true);
 		solver.set(p);
 	}
@@ -300,6 +315,7 @@ class z3_context {
 
 	/* Function to lookup and create where necessary a Z3 representation of
 	* a relation. */
+
 	z3::func_decl rel_to_z3(const term &t) {
 		const auto &rel = t[0];
 		const auto &rel_sig = get_rel_info(t);
@@ -319,6 +335,7 @@ class z3_context {
 	/* Function to create Z3 representation of global head variable names.
 	 * The nth head variable is always assigned the same Z3 constant in
 	 * order to ensure that different rules are comparable. */
+
 	z3::expr globalHead_to_z3(const int_t pos) {
 		for (int_t i=head_rename.size(); i<=pos; ++i)
 			head_rename.push_back(z3::expr(context, fresh_constant()));
@@ -326,12 +343,14 @@ class z3_context {
 	}
 
 	/* Make a fresh Z3 constant. */
+
 	inline z3::expr fresh_constant() {
 		return z3::expr(context, Z3_mk_fresh_const(context, nullptr, value_sort));
 	}
 
 	/* Function to lookup and create where necessary a Z3 representation of
-	* elements. */
+	 * elements. */
+
 	z3::expr arg_to_z3(const int_t arg) {
 		if(auto decl = var_to_decl.find(arg); decl != var_to_decl.end())
 			return decl->second;
@@ -348,10 +367,10 @@ class z3_context {
 	}
 
 	/* Construct a formula that constrains the head variables. The
-	* constraints are of two sorts: the first equate pairwise identical
-	* head variables to each other, and the second equate literals to their
-	* unique Z3 equivalent. Also exports a mapping of each head element to
-	* the Z3 head variable it has been assigned to. */
+	 * constraints are of two sorts: the first equate pairwise identical
+	 * head variables to each other, and the second equate literals to their
+	 * unique Z3 equivalent. Also exports a mapping of each head element to
+	 * the Z3 head variable it has been assigned to. */
 
 	z3::expr z3_head_constraints(const term &head, map<int_t, z3::expr> &body_rename) {
 		z3::expr restr = context.bool_val(true);
@@ -367,48 +386,47 @@ class z3_context {
 	}
 
 	/* Given a term, output the equivalent Z3 expression using and updating
-	* the mappings in the context as necessary. */
+	 * the mappings in the context as necessary. */
 
 	z3::expr term_to_z3(const term &t) {
 		if(t.extype == term::REL) {
 			z3::expr_vector vars_of_rel (context);
 			for (auto arg = t.begin() + 1; arg != t.end(); ++arg) {
-				// pushing head variables
+				// Pushing head variables
 				vars_of_rel.push_back(arg_to_z3(*arg));
 			}
 			return rel_to_z3(t)(vars_of_rel);
-		} else assert(false); //should never reach here
+		} else assert(false); // Should never reach here
 	}
 
 	/* Given a rule, output the body of this rule converted to the
-	* corresponding Z3 expression. Caches the conversion in the context in
-	* case the same rule is needed in future. */
+	 * corresponding Z3 expression. Caches the conversion in the context in
+	 * case the same rule is needed in future. */
 
 	z3::expr rule_to_z3(const flat_rule &r) {
 		if(auto decl = rule_to_decl.find(r); decl != rule_to_decl.end())
 			return decl->second;
-		// create map from bound_vars
+		// Create map from bound_vars
 		map<int_t, z3::expr> body_rename;
 		z3::expr restr = z3_head_constraints(r[0], body_rename);
-		// collect bound variables of rule and restrictions from constants in head
+		// Collect bound variables of rule and restrictions from constants in head
 		set<int_t> free_vars;
 		vector<int_t> bound_vars(r[0].size());
-		// collect_free_vars(*r.get_prft(), bound_vars, free_vars);
+		// Collect_free_vars(*r.get_prft(), bound_vars, free_vars);
 		// free variables are existentially quantified
 		z3::expr_vector ex_quant_vars (context);
 		for (const auto& var : free_vars)
 			ex_quant_vars.push_back(arg_to_z3(var));
 		map<int_t, z3::expr> var_backup;
-		// for the intent of constructing this Z3 expression, replace head
+		// For the intent of constructing this Z3 expression, replace head
 		// variable expressions with the corresponding global head
 		for(auto &[arg, constant] : body_rename) {
 			var_backup.emplace(make_pair(arg, arg_to_z3(arg)));
 			var_to_decl.emplace(make_pair(arg, constant));
 		}
-		// TODO fix this code 
-		// construct z3 expression from rule
+		// Construct z3 expression from rule
 		z3::expr formula = context.bool_val(true);
-		// now undo the global head mapping for future constructions
+		// Now undo the global head mapping for future constructions
 		for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
 		z3::expr decl = restr && (ex_quant_vars.empty() ? formula : z3::exists(ex_quant_vars, formula));
 		rule_to_decl.emplace(make_pair(r, decl));
@@ -416,13 +434,13 @@ class z3_context {
 	}
 
 	/* Checks if the rule has a single head and a body that is either a tree
-	* or a non-empty DNF. Second order quantifications and builtin terms
-	* are not supported. */
+	 * or a non-empty DNF. Second order quantifications and builtin terms
+	 * are not supported. */
 
 	bool is_query (const flat_rule &r) const {
-		// ensure that there are no multiple heads
+		// Ensure that there are no multiple heads
 		if(r.size() != 1) return false;
-		// ensure that head is positive
+		// Ensure that head is positive
 		if(r[0].neg) return false;
 		return true;
 	}
@@ -432,7 +450,8 @@ class z3_context {
 		auto r1_terms = r1 | views::transform(get_heads);
 		auto r2_terms = r2 | views::transform(get_heads);
 		vector<int_t> i;
-		set_intersection(r1_terms.begin(), r1_terms.end(), r2_terms.begin(), r2_terms.end(), back_inserter(i));
+		set_intersection(r1_terms.begin(), r1_terms.end(),
+			r2_terms.begin(), r2_terms.end(), back_inserter(i));
 		return !i.empty();
 	}
 
@@ -442,25 +461,25 @@ class z3_context {
 
 public:
 	/*! Checks if r1 is contained in r2 or vice versa.
-	* Returns false if rules are not comparable or not contained.
-	* Returns true if r1 is contained in r2. */
+	 * Returns false if rules are not comparable or not contained.
+	 * Returns true if r1 is contained in r2. */
 
 	bool check_qc(const flat_rule &r1, const flat_rule &r2) {
-		// have we compute already the result
+		// Have we compute already the result
 		static map<pair<flat_rule, flat_rule>, bool> memo;
 		auto key = make_pair(r1, r2);
 		if (memo.contains(key)) {
 			return memo[key];
 		}
 
-		// if the heads in the body are disjoint, no qc is possible
+		// If the heads in the body are disjoint, no qc is possible
 		if (disjoint(r1, r2) || !comparable(r1, r2)) {
 			memo[key] = false;
 			swap(get<0>(key), get<1>(key));
 			memo[key] = false;
 		}
 
-		// do the expensive work
+		// Do the expensive work
 		o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
 		// Get head variables for z3
 		z3::expr_vector bound_vars(context);
@@ -484,9 +503,11 @@ public:
 
 #endif // WORK_IN_PROGRESS
 
+
 #ifdef CHANGE_ME
 
 /* Returns all the possible splittings of the rule. */
+
 set<pair<flat_rule, flat_rule>> split_rule(flat_rule &fp) {
 	set<pair<flat_rule, flat_rule>> splt;
 	// do splitting
@@ -624,6 +645,7 @@ void driver::minimize(raw_rule &rr, z3_context &ctx) {
 	// remmber raw_rule as minimized
 	memo.insert(rr);
 }
+
 
 /*!
  * Optimize a mutated program
