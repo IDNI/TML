@@ -111,16 +111,6 @@ rule_index index_rules(const flat_prog &fp) {
 	return c;
 }
 
-#ifdef DELETE_ME
-/* Apply a given unification to a given tail of a relation. */
-term apply_unification(const unification &nf, const term &t) {
-	term n(t); 
-	for( size_t i = 1; i < t.size(); ++i) 
-		if (nf.contains(t[i])) n[i] = nf.at(t[i]);
-	return n;
-}
-#endif // DELETE_ME
-
 /* Check if it the given substitution is compatible. */
 inline bool is_compatible(int_t s, int_t u) {
 	return (u >= 0 && (s <= 0 || u == s)) || (u < 0 && s < 0);
@@ -362,6 +352,7 @@ class z3_context {
 	* head variables to each other, and the second equate literals to their
 	* unique Z3 equivalent. Also exports a mapping of each head element to
 	* the Z3 head variable it has been assigned to. */
+
 	z3::expr z3_head_constraints(const term &head, map<int_t, z3::expr> &body_rename) {
 		z3::expr restr = context.bool_val(true);
 		for (size_t i = 0; i < head.size(); ++i) {
@@ -377,6 +368,7 @@ class z3_context {
 
 	/* Given a term, output the equivalent Z3 expression using and updating
 	* the mappings in the context as necessary. */
+
 	z3::expr term_to_z3(const term &t) {
 		if(t.extype == term::REL) {
 			z3::expr_vector vars_of_rel (context);
@@ -391,6 +383,7 @@ class z3_context {
 	/* Given a rule, output the body of this rule converted to the
 	* corresponding Z3 expression. Caches the conversion in the context in
 	* case the same rule is needed in future. */
+
 	z3::expr rule_to_z3(const flat_rule &r) {
 		if(auto decl = rule_to_decl.find(r); decl != rule_to_decl.end())
 			return decl->second;
@@ -425,6 +418,7 @@ class z3_context {
 	/* Checks if the rule has a single head and a body that is either a tree
 	* or a non-empty DNF. Second order quantifications and builtin terms
 	* are not supported. */
+
 	bool is_query (const flat_rule &r) const {
 		// ensure that there are no multiple heads
 		if(r.size() != 1) return false;
@@ -447,11 +441,10 @@ class z3_context {
 	}
 
 public:
-	/*! 
-	* Checks if r1 is contained in r2 or vice versa.
+	/*! Checks if r1 is contained in r2 or vice versa.
 	* Returns false if rules are not comparable or not contained.
-	* Returns true if r1 is contained in r2. 
-	*/
+	* Returns true if r1 is contained in r2. */
+
 	bool check_qc(const flat_rule &r1, const flat_rule &r2) {
 		// have we compute already the result
 		static map<pair<flat_rule, flat_rule>, bool> memo;
