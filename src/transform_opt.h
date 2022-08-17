@@ -36,10 +36,10 @@ flat_prog square_program(const flat_prog &fp);
  * substractions. */
 struct changed_prog  {
 	// starting node of the mutated progs log
-	explicit changed_prog(flat_prog &rp): current(rp) {};
+	explicit changed_prog(const flat_prog &rp): current(rp) {};
 	// link to previous mutated prog
-	explicit changed_prog(changed_prog *mp): current(mp->current) {};
-	void operator()(struct change& m);
+	explicit changed_prog(const changed_prog *mp): current(mp->current) {};
+	void operator()(struct change const &m);
 
 	flat_prog current;
 };

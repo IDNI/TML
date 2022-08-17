@@ -35,24 +35,23 @@
 
 using namespace std;
 
-const cost_function exp_in_heads = [](changed_prog &mp) {
-	auto rs = mp.current;
+const cost_function exp_in_heads = [](const changed_prog &mp) {
+	auto const& rs = mp.current;
 	size_t c = 0.0;
-	for (auto it = rs.begin(); it != rs.end(); ++it) {
+	for (auto &it : rs) {
 		// TODO properly define this cost function
-		c += (*it).size();
+		c += it.size();
 	}
 	return c;
 };
 
-void changed_prog::operator()(change &m) {
+void changed_prog::operator()(const change &m) {
 	// Apply the change to the current changed_prog
 	m(*this);
 }
 
 bool best_solution::bound(changed_prog &p) {
-	size_t cost = func_(p);
-	if (cost < cost_) {
+	if (size_t cost = func_(p); cost < cost_) {
 		cost_ = cost;
 		best_ = std::make_shared<changed_prog>(p);
 		return true;
@@ -141,7 +140,7 @@ bool apply_unification(unification &u, flat_rule &fr) {
  * See [Martelli, A.; Montanari, U. (Apr 1982). "An Efficient Unification 
  * Algorithm". ACM Trans. Program. Lang. Syst. 4 (2): 258–282] for details. */
 
-optional<unification> unify(term &t1, term &t2) {
+optional<unification> unify(const term &t1, const term &t2) {
 	unification u;
 	for (size_t i= 1; i < t1.size(); ++i) {
 		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */) {
@@ -179,7 +178,7 @@ int_t get_last_var(const flat_rule &r) {
 
 /* Renames all variables of a rule. */
 
-flat_rule rename_rule_vars(flat_rule &fr, int_t& lv) {
+flat_rule rename_rule_vars(const flat_rule &fr, int_t& lv) {
 	flat_rule nfr(fr);
 	map<int_t, int_t> sbs;
 	for (auto &t: nfr) for (size_t i = 0; i != t.size(); ++i)
@@ -201,8 +200,8 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 		if (auto u = unify(fr[i + 1], rfr[0])) {
 			#ifndef DELETE_ME
 			std::cout << "UNIFICATIOIN: {";
-			for (auto p: *u) {
-				std::cout << "{" << p.first << ':' << p.second << "}, ";
+			for (auto &[f, s]: *u) {
+				std::cout << "{" << f << ':' << s << "}, ";
 				std::cout << "}" << std::endl;
 			}
 			#endif // DELETE_ME
@@ -304,12 +303,12 @@ class z3_context {
 	}
 
 	string get_tmp_pred() const {
-		static int_t pred = 0;
+		static int_t pred;
 		return "?0p" + to_string_(++pred);
 	}
 
 	string get_tmp_const() const {
-		static int_t cons = 0;
+		static int_t cons;
 		return "?0c" + to_string_(++cons);
 	}
 
@@ -317,7 +316,6 @@ class z3_context {
 	* a relation. */
 
 	z3::func_decl rel_to_z3(const term &t) {
-		const auto &rel = t[0];
 		const auto &rel_sig = get_rel_info(t);
 		if(auto decl = rel_to_decl.find(rel_sig); decl != rel_to_decl.end())
 			return decl->second;
@@ -356,12 +354,12 @@ class z3_context {
 			return decl->second;
 		else if(arg >= 0) {
 			const z3::expr &ndecl = context.bv_val(arg, value_sort.bv_size());
-			var_to_decl.emplace(make_pair(arg, ndecl));
+			var_to_decl.try_emplace(arg, ndecl);
 			return ndecl;
 		} else {
 			auto cons = get_tmp_const();
 			const z3::expr &ndecl = context.constant(cons.c_str(), value_sort);
-			var_to_decl.emplace(make_pair(arg, ndecl));
+			var_to_decl.try_emplace(arg, ndecl);
 			return ndecl;
 		}
 	}
@@ -377,7 +375,7 @@ class z3_context {
 		for (size_t i = 0; i < head.size(); ++i) {
 			auto h = head[i];
 			const z3::expr &var = globalHead_to_z3(i);
-			if (const auto &[it, found] = body_rename.emplace(h, var); !found)
+			if (const auto &[it, found] = body_rename.try_emplace(h, var); !found)
 				restr = restr && it->second == var;
 			else if (head[i] >= 0)
 				restr = restr && var == arg_to_z3(h);
@@ -412,8 +410,7 @@ class z3_context {
 		// Collect bound variables of rule and restrictions from constants in head
 		set<int_t> free_vars;
 		vector<int_t> bound_vars(r[0].size());
-		// Collect_free_vars(*r.get_prft(), bound_vars, free_vars);
-		// free variables are existentially quantified
+		// Free variables are existentially quantified
 		z3::expr_vector ex_quant_vars (context);
 		for (const auto& var : free_vars)
 			ex_quant_vars.push_back(arg_to_z3(var));
@@ -421,15 +418,15 @@ class z3_context {
 		// For the intent of constructing this Z3 expression, replace head
 		// variable expressions with the corresponding global head
 		for(auto &[arg, constant] : body_rename) {
-			var_backup.emplace(make_pair(arg, arg_to_z3(arg)));
-			var_to_decl.emplace(make_pair(arg, constant));
+			var_backup.try_emplace(arg, arg_to_z3(arg));
+			var_to_decl.try_emplace(arg, constant);
 		}
 		// Construct z3 expression from rule
 		z3::expr formula = context.bool_val(true);
 		// Now undo the global head mapping for future constructions
 		for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
 		z3::expr decl = restr && (ex_quant_vars.empty() ? formula : z3::exists(ex_quant_vars, formula));
-		rule_to_decl.emplace(make_pair(r, decl));
+		rule_to_decl.try_emplace(r, decl);
 		return decl;
 	}
 
