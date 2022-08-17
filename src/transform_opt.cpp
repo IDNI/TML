@@ -402,17 +402,17 @@ class z3_context {
 		// for the intent of constructing this Z3 expression, replace head
 		// variable expressions with the corresponding global head
 		for(auto &[arg, constant] : body_rename) {
-	//		var_backup.emplace(make_pair(arg, arg_to_z3(arg)));
-	//		var_to_decl[arg] = constant;
+			var_backup.emplace(make_pair(arg, arg_to_z3(arg)));
+			var_to_decl.emplace(make_pair(arg, constant));
 		}
 		// TODO fix this code 
 		// construct z3 expression from rule
-		// -> z3::expr formula = tree_to_z3(*rr.get_prft(), dict);
+		z3::expr formula = context.bool_val(true);
 		// now undo the global head mapping for future constructions
-		// -> for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
-		// -> z3::expr decl; // ->  = restr && (ex_quant_vars.empty() ? formula : z3::exists(ex_quant_vars, formula));
-		// -> rule_to_decl.emplace(make_pair(rr, decl));
-		// -> return decl;
+		for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
+		z3::expr decl = restr && (ex_quant_vars.empty() ? formula : z3::exists(ex_quant_vars, formula));
+		rule_to_decl.emplace(make_pair(r, decl));
+		return decl;
 	}
 
 	/* Checks if the rule has a single head and a body that is either a tree
