@@ -456,13 +456,45 @@ class z3_context {
 		return (r1[0][0] == r2[0][0] && r1[0].size() == r2[0].size());
 	}
 
+#endif // WORK_IN_PROGRESS
+
+#ifdef WORK_IN_PROGRESS
+
+	/* Takes a reference rule, its formula tree, and copies of both and
+	 * tries to eliminate redundant subtrees of the former using the latter
+	 * as scratch. Generally speaking, boolean algebra guarantees that
+	 * eliminating a subtree will produce a formula contained/containing
+	 * the original depending on the boolean operator that binds it and the
+	 * parity of the number of negation operators containing it. So we need
+	 * only apply the supplied query containment procedure for the reverse
+	 * direction to establish the equivalence of the entire trees. */
+
+	raw_form_tree& minimize_aux(const flat_rule &ref_rule,
+		const flat_rule &var_rule) {
+		typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
+		// Minimize different formulas in different ways
+		switch(var_tree.type) {
+			default: {
+				// Do not bother with co-implication nor uniqueness quantification
+				// as the naive approach would require expanding them to a bigger
+				// formula.
+				break;
+			}
+		}
+		return ref_tree;
+	}
+#endif // WORK_IN_PROGRESS
+
 public:
+
+#ifndef WORK_IN_PROGRESS
+
 	/*! Checks if r1 is contained in r2 or vice versa.
 	 * Returns false if rules are not comparable or not contained.
 	 * Returns true if r1 is contained in r2. */
 
 	bool check_qc(const flat_rule &r1, const flat_rule &r2) {
-		// Have we compute already the result
+		// Have we compute already the result?
 		static map<pair<flat_rule, flat_rule>, bool> memo;
 		auto key = make_pair(r1, r2);
 		if (memo.contains(key)) {
@@ -496,10 +528,35 @@ public:
 		memo[key] = res;
 		return res;
 	}
-};
-
 #endif // WORK_IN_PROGRESS
 
+#ifdef WORK_IN_PROGRESS
+	/* Go through the subtrees of the given rule and see which of them can
+	* be removed whilst preserving rule equivalence according to the given
+	* containment testing function. */
+
+	void minimize(flat_rule &r) {
+		// Have we compute already the result
+		static set<raw_rule> memo;
+		if (memo.contains(rr)) {
+			return;
+		}
+		// TODO Write a quick test to avoid easy cases and repeat
+		// do the expensive computation
+		if(r.is_fact() || r.is_goal()) return;
+		// Switch to the formula tree representation of the rule if this has
+		// not yet been done for this is a precondition to minimize_aux. Note
+		// the current form so that we can attempt to restore it afterwards.
+		// Copy the rule to provide scratch for minimize_aux
+		raw_rule var_rule = r;
+		// Now minimize the formula tree of the given rule using the given
+		// containment testing function
+		minimize_aux(r, var_rule);
+		// Remmber raw_rule as minimized
+		memo.insert(rr);
+	}
+#endif // WORK_IN_PROGRESS
+};
 
 #ifdef CHANGE_ME
 
@@ -509,138 +566,6 @@ set<pair<flat_rule, flat_rule>> split_rule(flat_rule &fp) {
 	set<pair<flat_rule, flat_rule>> splt;
 	// do splitting
 	return splt;
-}
-
-/* Takes a reference rule, its formula tree, and copies of both and
- * tries to eliminate redundant subtrees of the former using the latter
- * as scratch. Generally speaking, boolean algebra guarantees that
- * eliminating a subtree will produce a formula contained/containing
- * the original depending on the boolean operator that binds it and the
- * parity of the number of negation operators containing it. So we need
- * only apply the supplied query containment procedure for the reverse
- * direction to establish the equivalence of the entire trees. */
-
-raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
-	const raw_rule &var_rule, raw_form_tree &ref_tree,
-	raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign) {
-	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
-	// Minimize different formulas in different ways
-	switch(var_tree.type) {
-		case elem::IMPLIES: {
-			// Minimize the subtrees separately first. Since a -> b is
-			// equivalent to ~a OR b, alter the parity of the first operand
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{raw_form_tree(elem::NOT, ref_tree.l),
-						raw_form_tree(elem::NOT, orig_var.l)},
-						{*ref_tree.r, *orig_var.r}})
-				// Apply the same treatment as for a disjunction since this is
-				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx)
-                                             : check_qc(var_rule.try_as_b(),
-                                                           ref_rule,
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::ALT: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating disjunct certainly
-				// produces smaller query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx)
-                                             : check_qc(var_rule.try_as_b(),
-                                                           ref_rule_b,
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::AND: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating conjunct certainly
-				// produces bigger query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? check_qc(var_rule.try_as_b(),
-                                                           ref_rule_b,
-                                                           ctx)
-                                             : check_qc(ref_rule_b,
-                                                           var_rule.try_as_b(),
-                                                           ctx))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::NOT: {
-			// Minimize the single subtree taking care to update the negation
-			// parity
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, ctx, !ctx_sign);
-			break;
-		} case elem::EXISTS: case elem::FORALL: {
-			// Existential quantification preserves the containment relation
-			// between two formulas, so just recurse. Universal quantification
-			// is just existential with two negations, hence negation parity
-			// is preserved.
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, ctx, ctx_sign);
-			break;
-		} default: {
-			// Do not bother with co-implication nor uniqueness quantification
-			// as the naive approach would require expanding them to a bigger
-			// formula.
-			break;
-		}
-	}
-	return ref_tree;
-}
-
-/* Go through the subtrees of the given rule and see which of them can
- * be removed whilst preserving rule equivalence according to the given
- * containment testing function. */
-
-void driver::minimize(raw_rule &rr, z3_context &ctx) {
-	// have we compute already the result
-	static set<raw_rule> memo;
-	if (memo.contains(rr)) {
-		return;
-	}
-	// TODO Write a quick test to avoid easy cases
-	
-	// do the expensive computation
-	if(rr.is_fact() || rr.is_goal()) return;
-	// Switch to the formula tree representation of the rule if this has
-	// not yet been done for this is a precondition to minimize_aux. Note
-	// the current form so that we can attempt to restore it afterwards.
-	bool orig_form = rr.is_dnf();
-	rr = rr.try_as_prft();
-	// Copy the rule to provide scratch for minimize_aux
-	raw_rule var_rule = rr;
-	// Now minimize the formula tree of the given rule using the given
-	// containment testing function
-	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, ctx);
-	// If the input rule was in DNF, provide the output in DNF
-	if(orig_form) rr = rr.try_as_b();
-	// remmber raw_rule as minimized
-	memo.insert(rr);
 }
 
 
