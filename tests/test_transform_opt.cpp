@@ -12,8 +12,6 @@
 // modified over time by the Author.
 #include "test_transform_opt.h"
 
-#ifndef WORK_IN_PROGRESS
-
 TEST_SUITE("transform_opt-squaring") {
 	TEST_CASE("squaring: .") { 
 		flat_prog fp;
@@ -111,7 +109,7 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', '1', '2'}}) );
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x}, {'a', '2', x}}) );
 	}
-}
+
 	#endif // ENABLE_WHEN_CONSIDERING_FACTS_IN_UNIFICATION
 
 	TEST_CASE("squaring:  a(?x ?y):-c(?y). b(?x):-a(?y ?x).") { 
@@ -159,18 +157,54 @@ TEST_SUITE("transform_opt-splitting") {
 	}
 }
 
+TEST_SUITE("transform_opt-check_qc") {
+	TEST_CASE("check_qc: .") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("check_qc: a(1).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("check_qc: a(?x):-b(?x).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("check_qc: a(?x):-b(?x), c(?x).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("check_qc: a(?x):-b(?x ?y), c(?x ?y).") { 
+		EXPECT_TRUE( true ); 
+	}
+}
+
+TEST_SUITE("transform_opt-minization") {
+	TEST_CASE("minimization: .") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("minimization: a(1).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("minimization: a(?x):-b(?x).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("minimization: a(?x):-b(?x), c(?x).") { 
+		EXPECT_TRUE( true ); 
+	}
+	TEST_CASE("minimization: a(?x):-b(?x ?y), c(?x ?y).") { 
+		EXPECT_TRUE( true ); 
+	}
+}
+
 #ifdef REWRITE_AS_DOCTESTS
 
-##
-## UCQProj.tml
-##
+//
+// UCQProj.tml
+//
 
-# http://www.dit.unitn.it/~accord/RelatedWork/GAV&LAV/Information%20Integration%20using%20local%20views.pdf
+// http://www.dit.unitn.it/~accord/RelatedWork/GAV&LAV/Information%20Integration%20using%20local%20views.pdf
 
 p(?X ?Z) :- a(?X ?Y), a(?Y ?Z).
 p(?X ?Z) :- a(?X ?U), a(?V ?Z).
 
-# http://sparql-qc-bench.inrialpes.fr/UCQProj.html
+// http://sparql-qc-bench.inrialpes.fr/UCQProj.html
 
 /*PREFIX : 
 
@@ -438,19 +472,19 @@ Q19b(?x ?z) :-
   subOrganizationOf(?y University1),
   email(?x ?z).
 
-##
-## cqnc_test.tml
-##
+//
+// cqnc_test.tml
+//
 
-# Examples from Information Integration Using Logical Views
-# http://www.dit.unitn.it/~accord/RelatedWork/GAV&LAV/Information%20Integration%20using%20local%20views.pdf
+// Examples from Information Integration Using Logical Views
+// http://www.dit.unitn.it/~accord/RelatedWork/GAV&LAV/Information%20Integration%20using%20local%20views.pdf
 
-# Example 3: (1) <= (2)
+// Example 3: (1) <= (2)
 
 u(?x ?z) :- a(?x ?y), a(?y ?z).
 u(?x ?z) :- a(?x ?u), a(?v ?z).
 
-# Example 4: (1) <= (2)
+// Example 4: (1) <= (2)
 
 p(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 p(?a ?c) :- a(?a ?b), a(?b ?c), ~a(?a ?d).
@@ -458,35 +492,35 @@ p(?a ?c) :- a(?a ?b), a(?b ?c), ~a(?a ?d).
 j(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 j(?a ?c) :- a(?a ?b), a(?b ?c), ~a(?c ?c).
 
-# Examples from Containment of Conjunctive Queries with Safe Negation
-# http://www2.informatik.uni-freiburg.de/~dbis/Publications/03/icdt03.pdf
+// Examples from Containment of Conjunctive Queries with Safe Negation
+// http://www2.informatik.uni-freiburg.de/~dbis/Publications/03/icdt03.pdf
 
-# Example 1: (1) <= (2)
+// Example 1: (1) <= (2)
 
 q(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 q(?a ?c) :- a(?a ?b), a(?b ?c), a(?b ?d), ~a(?a ?d).
 
-# Example 2:
+// Example 2:
 
 r(?x ?z) :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 r(?a ?c) :- a(?a ?b), a(?b ?c), ~b(?c ?c).
 
-# Example 3: (1) <= (2)
+// Example 3: (1) <= (2)
 
 s(?a ?c) :- a(?a ?b), a(?b ?c), a(?b ?d).
 s(?x ?z) :- a(?x ?y), a(?y ?z).
 
-# Example 4: (1) <= (2)
+// Example 4: (1) <= (2)
 
 h() :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 h() :- a(?a ?b), a(?c ?d), ~a(?b ?c).
 
-# Example 5:
+// Example 5:
 
 t() :- a(?x ?y), a(?y ?z), ~a(?x ?z).
 t() :- a(?a ?b), a(?c ?d), ~a(?a ?d), ~a(?b ?c).
 
-# http://sparql-qc-bench.inrialpes.fr/UCQProj.html
+// http://sparql-qc-bench.inrialpes.fr/UCQProj.html
 
 /*PREFIX : 
 
@@ -529,11 +563,3 @@ Q13(?x ?y) :-
   memberOf(?x ?y).
 
 #endif  // REWRITE_AS_DOCTESTS
-
-
-TEST_SUITE("query containment") {
-}
-
-TEST_SUITE("minimization") {
-}
-#endif // WORK_IN_PROGRESS
