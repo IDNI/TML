@@ -542,8 +542,9 @@ public:
 		for (powerset_range bodies(body); auto b : bodies) {
 			// For each choice we check for containment...
 			auto nr = get_rule_from(head, b);
-			// ...and update the reference rule if needed.
-			if (check_qc(nr, rr)) rr = nr; 
+			// ...update the reference rule if needed and
+			// memoize intermediate results.
+			if (check_qc(nr, rr)) memo[rr] = nr, rr = nr; 
 		}
 		// We memoize and return the current reference (minimal) rule.
 		memo[r] = rr;
