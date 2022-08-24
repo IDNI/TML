@@ -456,17 +456,16 @@ class z3_context {
 		return (r1[0][0] == r2[0][0] && r1[0].size() == r2[0].size());
 	}
 
-#endif // WORK_IN_PROGRESS
+	/* Cretaes a new rule from head and body. */
 
-#ifndef WORK_IN_PROGRESS
-
-	flat_rule build_rule_from(flat_rule &r, set<term> &b) {
-		// build the new rule 
-		return r;
+	flat_rule get_rule_from(term &h, vector<term> &b) {
+		flat_rule nr;
+		nr.emplace_back(h);
+		for (auto &t: b) nr.emplace_back(t);
+		return nr;
 	}
-
+	
 #endif // WORK_IN_PROGRESS
-
 public:
 
 #ifndef WORK_IN_PROGRESS
@@ -508,18 +507,6 @@ public:
 		memo[key] = res;
 		return res;
 	}
-#endif // WORK_IN_PROGRESS
-
-#ifndef WORK_IN_PROGRESS
-
-	/* Cretaes a new rule from head and body. */
-
-	flat_rule get_rule_from(term &h, vector<term> &b) {
-		flat_rule nr;
-		nr.emplace_back(h);
-		for (auto &t: b) nr.emplace_back(t);
-		return nr;
-	}
 
 	/*! Minimize the given rule using CQC. */
 
@@ -550,6 +537,13 @@ public:
 		memo[r] = rr;
 		return rr;
 	}
+#endif // WORK_IN_PROGRESS
+
+
+#ifndef WORK_IN_PROGRESS
+
+
+
 #endif // WORK_IN_PROGRESS
 };
 
