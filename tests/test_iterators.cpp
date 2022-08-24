@@ -60,22 +60,22 @@ TEST_SUITE("grey_code_const_iterator") {
 		power_set_const_iterator it(v);
 
 		// the generated values are correct
-		std::set<size_t> v0 = {}; EXPECT_TRUE(*it == v0); ++it;
-		std::set<size_t> v1 = {1}; EXPECT_TRUE(*it == v1); ++it;
-		std::set<size_t> v2 = {1, 2};  EXPECT_TRUE(*it == v2); ++it;
-		std::set<size_t> v3 = {2};  EXPECT_TRUE(*it == v3); ++it;
-		std::set<size_t> v4 = {2, 3};  EXPECT_TRUE(*it == v4); ++it;
-		std::set<size_t> v5 = {1, 2, 3};  EXPECT_TRUE(*it == v5); ++it;
-		std::set<size_t> v6 = {1, 3};  EXPECT_TRUE(*it == v6); ++it;
-		std::set<size_t> v7 = {3};  EXPECT_TRUE(*it == v7); ++it;
-		std::set<size_t> v8 = {3, 4};  EXPECT_TRUE(*it == v8); ++it;
-		std::set<size_t> v9 = {1, 3, 4};  EXPECT_TRUE(*it == v9); ++it;
-		std::set<size_t> v10 = {1, 2, 3, 4};  EXPECT_TRUE(*it == v10); ++it;
-		std::set<size_t> v11 = {2, 3, 4};  EXPECT_TRUE(*it == v11); ++it;
-		std::set<size_t> v12 = {2, 4};  EXPECT_TRUE(*it == v12); ++it;
-		std::set<size_t> v13 = {1, 2, 4};  EXPECT_TRUE(*it == v13); ++it;
-		std::set<size_t> v14 = {1, 4};  EXPECT_TRUE(*it == v14); ++it;
-		std::set<size_t> v15 = {4};  EXPECT_TRUE(*it == v15); ++it;
+		std::vector<size_t> v0 = {}; EXPECT_TRUE(*it == v0); ++it;
+		std::vector<size_t> v1 = {1}; EXPECT_TRUE(*it == v1); ++it;
+		std::vector<size_t> v2 = {1, 2};  EXPECT_TRUE(*it == v2); ++it;
+		std::vector<size_t> v3 = {2};  EXPECT_TRUE(*it == v3); ++it;
+		std::vector<size_t> v4 = {2, 3};  EXPECT_TRUE(*it == v4); ++it;
+		std::vector<size_t> v5 = {1, 2, 3};  EXPECT_TRUE(*it == v5); ++it;
+		std::vector<size_t> v6 = {1, 3};  EXPECT_TRUE(*it == v6); ++it;
+		std::vector<size_t> v7 = {3};  EXPECT_TRUE(*it == v7); ++it;
+		std::vector<size_t> v8 = {3, 4};  EXPECT_TRUE(*it == v8); ++it;
+		std::vector<size_t> v9 = {1, 3, 4};  EXPECT_TRUE(*it == v9); ++it;
+		std::vector<size_t> v10 = {1, 2, 3, 4};  EXPECT_TRUE(*it == v10); ++it;
+		std::vector<size_t> v11 = {2, 3, 4};  EXPECT_TRUE(*it == v11); ++it;
+		std::vector<size_t> v12 = {2, 4};  EXPECT_TRUE(*it == v12); ++it;
+		std::vector<size_t> v13 = {1, 2, 4};  EXPECT_TRUE(*it == v13); ++it;
+		std::vector<size_t> v14 = {1, 4};  EXPECT_TRUE(*it == v14); ++it;
+		std::vector<size_t> v15 = {4};  EXPECT_TRUE(*it == v15); ++it;
 
 		// we exhaust the iterator
 		EXPECT_TRUE(it == power_set_const_iterator<size_t>::end);

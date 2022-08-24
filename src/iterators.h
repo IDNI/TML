@@ -66,9 +66,9 @@ class power_set_const_iterator {
 public:
 	// iterator traits
 	using difference_type = size_t;
-	using value_type = std::set<T>;
-	using pointer = const std::set<T>;
-	using reference = const std::set<T>&;
+	using value_type = std::vector<T>;
+	using pointer = const std::vector<T>;
+	using reference = const std::vector<T>&;
 	using iterator_category = std::input_iterator_tag;
 
 	// sentinel class
@@ -77,13 +77,17 @@ public:
 		bool operator==(const power_set_const_iterator<T> &that) const {
 			return that.grey_code_ == grey_code_const_iterator::end;
 		}
+
+		bool operator!=(const power_set_const_iterator<T> &that) const {
+			return !(*this == that);
+		}		
 	};
 
 	static constexpr sentinel end{};
 
 //	power_set_const_iterator(): grey_code_(0) {}
 
-	explicit power_set_const_iterator(std::vector<T> &set): grey_code_(set.size()), set_(set) {}
+	power_set_const_iterator(std::vector<T> &set): grey_code_(set.size()), set_(set) {}
 
 	power_set_const_iterator &operator++() {
 		auto delta = *(++grey_code_);
@@ -110,10 +114,14 @@ public:
 		return set_ == that.set_ && subset_ == that.subset_;
 	}
 
-	std::set<T> operator*() const{
-		std::set<T> v;
+	bool operator!=(power_set_const_iterator<T> &that) const {
+		return !(*this == that);
+	}		
+
+	const std::vector<T> operator*() const{
+		std::vector<T> v;
 		for(auto it = subset_.begin(); it != subset_.end(); ++it) {
-			v.insert(set_[*it]);
+			v.emplace_back(set_[*it]);
 		}
 		return v;
 	}
