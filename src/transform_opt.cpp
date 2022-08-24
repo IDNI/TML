@@ -458,40 +458,20 @@ class z3_context {
 
 #endif // WORK_IN_PROGRESS
 
-#ifdef WORK_IN_PROGRESS
+#ifndef WORK_IN_PROGRESS
 
-	/* Takes a reference rule, its formula tree, and copies of both and
-	 * tries to eliminate redundant subtrees of the former using the latter
-	 * as scratch. Generally speaking, boolean algebra guarantees that
-	 * eliminating a subtree will produce a formula contained/containing
-	 * the original depending on the boolean operator that binds it and the
-	 * parity of the number of negation operators containing it. So we need
-	 * only apply the supplied query containment procedure for the reverse
-	 * direction to establish the equivalence of the entire trees. */
-
-	raw_form_tree& minimize_aux(const flat_rule &ref_rule,
-		const flat_rule &var_rule) {
-		typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
-		// Minimize different formulas in different ways
-		switch(var_tree.type) {
-			default: {
-				// Do not bother with co-implication nor uniqueness quantification
-				// as the naive approach would require expanding them to a bigger
-				// formula.
-				break;
-			}
-		}
-		return ref_tree;
+	flat_rule build_rule_from(flat_rule &r, set<term> &b) {
+		// build the new rule 
+		return r;
 	}
+
 #endif // WORK_IN_PROGRESS
 
 public:
 
 #ifndef WORK_IN_PROGRESS
 
-	/*! Checks if r1 is contained in r2 or vice versa.
-	 * Returns false if rules are not comparable or not contained.
-	 * Returns true if r1 is contained in r2. */
+	/*! Checks if r2 is contained in r1. */
 
 	bool check_qc(const flat_rule &r1, const flat_rule &r2) {
 		// Have we compute already the result?
@@ -530,30 +510,44 @@ public:
 	}
 #endif // WORK_IN_PROGRESS
 
-#ifdef WORK_IN_PROGRESS
-	/* Go through the subtrees of the given rule and see which of them can
-	* be removed whilst preserving rule equivalence according to the given
-	* containment testing function. */
+#ifndef WORK_IN_PROGRESS
 
-	void minimize(flat_rule &r) {
+	/* Cretaes a new rule from head and body. */
+
+	flat_rule get_rule_from(term &h, vector<term> &b) {
+		flat_rule nr;
+		nr.emplace_back(h);
+		for (auto &t: b) nr.emplace_back(t);
+		return nr;
+	}
+
+	/*! Minimize the given rule using CQC. */
+
+	// TODO Check that this is a Chruch-Rossen like algorithm.
+	flat_rule minimize(flat_rule &r) {
 		// Have we compute already the result
-		static set<raw_rule> memo;
-		if (memo.contains(rr)) {
-			return;
+		static map<flat_rule, flat_rule> memo;
+		if (memo.contains(r)) {
+			return memo[r];
 		}
-		// TODO Write a quick test to avoid easy cases and repeat
-		// do the expensive computation
-		if(r.is_fact() || r.is_goal()) return;
-		// Switch to the formula tree representation of the rule if this has
-		// not yet been done for this is a precondition to minimize_aux. Note
-		// the current form so that we can attempt to restore it afterwards.
-		// Copy the rule to provide scratch for minimize_aux
-		raw_rule var_rule = r;
-		// Now minimize the formula tree of the given rule using the given
-		// containment testing function
-		minimize_aux(r, var_rule);
-		// Remmber raw_rule as minimized
-		memo.insert(rr);
+		// Check basic cases.
+		if(is_fact(r) || is_goal(r)) return r;
+		// TODO Write a quick test to avoid easy cases.
+		// We set the reference rule to r.
+		auto rr = r;
+		// We consider the body and the head off r and...
+		vector<term> body(++r.begin(), r.end());
+		term head = r[0];
+		// ...generate all possible subsets.
+		for (powerset_range bodies(body); auto b : bodies) {
+			// For each choice we check for containment...
+			auto nr = get_rule_from(head, b);
+			// ...and update the reference rule if needed.
+			if (check_qc(nr, rr)) rr = nr; 
+		}
+		// We memoize and return the current reference (minimal) rule.
+		memo[r] = rr;
+		return rr;
 	}
 #endif // WORK_IN_PROGRESS
 };
