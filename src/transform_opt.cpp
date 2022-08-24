@@ -464,7 +464,7 @@ class z3_context {
 		for (auto &t: b) nr.emplace_back(t);
 		return nr;
 	}
-	
+
 #endif // WORK_IN_PROGRESS
 public:
 
@@ -512,7 +512,7 @@ public:
 
 	// TODO Check that this is a Chruch-Rossen like algorithm.
 	flat_rule minimize(flat_rule &r) {
-		// Have we compute already the result
+		// Have we compute already the result?
 		static map<flat_rule, flat_rule> memo;
 		if (memo.contains(r)) {
 			return memo[r];
@@ -538,25 +538,9 @@ public:
 		return rr;
 	}
 #endif // WORK_IN_PROGRESS
-
-
-#ifndef WORK_IN_PROGRESS
-
-
-
-#endif // WORK_IN_PROGRESS
 };
 
 #ifdef CHANGE_ME
-
-/* Returns all the possible splittings of the rule. */
-
-set<pair<flat_rule, flat_rule>> split_rule(flat_rule &fp) {
-	set<pair<flat_rule, flat_rule>> splt;
-	// do splitting
-	return splt;
-}
-
 
 /*!
  * Optimize a mutated program
@@ -778,46 +762,6 @@ pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
 	return {int_bit_len, universe_bit_len};
 } 
 
-/*! Go through the program and removed those queries that the function f
- * determines to be subsumed by others. While we're at it, minimize
- * (i.e. subsume a query with its part) the shortlisted queries to
- * reduce time cost of future subsumptions. This function does not
- * respect order, so it should only be used on an unordered stratum. */
-
-std::vector<std::shared_ptr<change>> driver::brancher_subsume_queries(changed_prog &mp) {
-	//TODO Check if z3 context should be static?
-	const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
-	z3_context ctx(int_bit_len, universe_bit_len);
-
-	std::vector<std::shared_ptr<change>> mutations;
-	vector<raw_rule> reduced;
-	for (raw_rule &rr : mp.current.r) {
-		bool subsumed = false;
-		for (auto nrr = reduced.begin(); nrr != reduced.end();) {
-			if (check_qc(rr, *nrr, ctx)) {
-				// If the current rule is contained by a rule in reduced rules,
-				// then move onto the next rule in the outer loop
-				mutation_del_rule del(rr);
-				mutations.push_back(std::make_shared<mutation_del_rule>(del));
-				subsumed = true;
-				break;
-			} else if (check_qc(*nrr, rr, ctx)) {
-				// If current rule contains that in reduced rules, then remove
-				// the subsumed rule from reduced rules
-				reduced.erase(nrr);
-				mutation_del_rule del(*nrr);
-				mutations.push_back(std::make_shared<mutation_del_rule>(del));
-
-			} else {
-				// Neither rule contains the other. Move on.
-				nrr++;
-			}
-		}
-		if (!subsumed) reduced.push_back(rr);
-	}
-	return mutations;
-} 
-
 struct mutation_minimize : public virtual change  {
 	driver &drvr;
 
@@ -843,26 +787,6 @@ vector<std::shared_ptr<change>> driver::brancher_minimize(changed_prog&) {
 	mutations.push_back(std::make_shared<mutation_minimize>(m));
 	return mutations; 
 } 
-
-struct mutation_factor_rules : public virtual change  {
-	driver &drvr;
-
-	mutation_factor_rules(driver &d) : drvr(d) {}
-
-	bool operator()(changed_prog &mp) const override {
-		o::dbg() << "Factoring rules..." << endl << endl;
-		drvr.factor_rules(mp.current);
-		o::dbg() << "Factored Program:" << endl << endl << mp.current << endl;
-		return true;
-	}
-};
-
-vector<std::shared_ptr<change>> driver::brancher_factor_rules(changed_prog&) {
-	vector<std::shared_ptr<change>> mutations;
-	mutation_factor_rules m(*this);
-	mutations.push_back(std::make_shared<mutation_factor_rules>(m));
-	return mutations; 
-}
 
 struct mutation_to_split_heads : public virtual change  {
 	driver &drvr;
