@@ -25,6 +25,7 @@ set(TML_HEADERS
 	driver.h
 	earley.h
 	err.h
+	fof.h
 	form.h
 	input.h
 	ir_builder.h
@@ -44,6 +45,7 @@ set(TML_SOURCES
 	dict.cpp
 	driver.cpp
 	earley.cpp
+	fof.cpp
 	form.cpp
 	input.cpp
 	ir_builder.cpp

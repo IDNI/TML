@@ -16,8 +16,14 @@
 #include <variant>
 #include <math.h>
 
+
 #include "ir_builder.h"
 #include "tables.h"
+#include "output.h"
+
+
+#include "fof.h"
+
 using namespace std;
 
 ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
@@ -788,10 +794,13 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 					//and sudoku backtracking (probalby due to use of count as well)
 					align_vars(v);
 					if (!m.insert(move(v)).second) v.clear();
+
 				}
 			}
 		}
+
 		else if(r.prft) {
+			#ifdef FOL_V1
 			bool is_sol = false;
 			form* froot = 0;
 			//TODO: review
@@ -841,7 +850,26 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
-		} else  {
+			#endif
+			#ifdef FOL_V2
+			sprawformtree root = r.prft->neg // neg transform
+				? make_shared<raw_form_tree>(elem::NOT,
+						make_shared<raw_form_tree>(*r.prft))
+				: make_shared<raw_form_tree>(*r.prft);
+
+			prog pfof = get_fof(root);
+			print_fof(pfof, this);
+
+			assert(r.h.size() == 1);
+			get_nums(r.h[0]), t = from_raw_term(r.h[0], true);
+			to_flat_prog(t, pfof, m);
+
+			//DBG(print(o::out() << "\n", m) << endl;);
+			//print(o::out() << "\n", m) << endl;
+			#endif
+		}
+
+		else  {
 			for (const raw_term& x : r.h)
 				t = from_raw_term(x, true),
 				t.goal = r.type == raw_rule::GOAL,
@@ -971,6 +999,8 @@ int_t ir_builder::get_table(const sig& s) {
 
 //---------------------------------------------------------
 
+#ifdef FOL_V1
+
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
 returns false or the froot is not needed any more, the caller should delete the froot pointer.
@@ -1008,7 +1038,7 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 		switch(rfm->type) {
 			case elem::NOT:
 				root = new form(form::NOT);
-				if(root ) {
+				if (root) {
 					ret =  from_raw_form(rfm->l, root->l, is_sol);
 					froot = root;
 					return ret;
@@ -1018,42 +1048,94 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 			case elem::VAR:
 			case elem::SYM:
 				ft = form::ATOM;
-				if( rfm->type == elem::VAR)
+				if (rfm->type == elem::VAR)
 					arg = dict.get_var(rfm->el->e);
 				else
 					arg = dict.get_temp_sym(rfm->el->e); //VAR2
 				root = new form(ft, arg);
 				froot = root;
-				if(!root) return false;
+				if (!root) return false;
 				return true;
 
 			//identifying sol formula
 			case elem::FORALL:
-				if(rfm->l->type == elem::VAR) ft = form::FORALL1;
+				if (rfm->l->type == elem::VAR) ft = form::FORALL1;
 				else ft = form::FORALL2, is_sol = true;
 				break;
 			case elem::UNIQUE:
-				if(rfm->l->type == elem::VAR) ft = form::UNIQUE1;
+				if (rfm->l->type == elem::VAR) ft = form::UNIQUE1;
 				else ft = form::UNIQUE2, is_sol = true;
 				break;
 			case elem::EXISTS:
-				if(rfm->l->type == elem::VAR) ft = form::EXISTS1;
+				if (rfm->l->type == elem::VAR) ft = form::EXISTS1;
 				else ft = form::EXISTS2, is_sol = true;
 				break;
 			case elem::OR:
 			case elem::ALT: ft = form::OR; break;
 			case elem::AND: ft = form::AND; break;
-			case elem::IMPLIES: ft= form::IMPLIES; break;
-			case elem::COIMPLIES: ft= form::COIMPLIES; break;
-			default: return froot= root, false;
+			case elem::IMPLIES: ft = form::IMPLIES; break;
+			case elem::COIMPLIES: ft = form::COIMPLIES; break;
+			default: return froot = root, false;
 		}
 		root =  new form(ft);
 		ret = from_raw_form(rfm->l, root->l, is_sol);
-		if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
+		if (ret) ret = from_raw_form(rfm->r, root->r, is_sol);
 		froot = root;
 		return ret;
 	}
 }
+#endif
+
+#ifdef FOL_V2
+prog ir_builder::get_fof(sprawformtree root) {
+
+	if (!root) return {};
+	if (root->rt) {
+		term t = from_raw_term(*root->rt);
+		prog p = from_term(t);
+		return p;
+	}
+	else {
+		prog p;
+		switch(root->type) {
+			case elem::VAR:
+			case elem::SYM:
+			case elem::NOT:
+				p = ~get_fof(root->l);
+				break;
+			case elem::OR:
+			case elem::ALT:
+				p = get_fof(root->r) || get_fof(root->l);
+				break;
+			case elem::AND:
+				p = get_fof(root->r) && get_fof(root->l);
+				break;
+			case elem::IMPLIES:
+				p = ~get_fof(root->r) || get_fof(root->l);
+				break;
+			case elem::COIMPLIES:
+				p = (~get_fof(root->r) || get_fof(root->l)) &&
+					(~get_fof(root->l) || get_fof(root->r));
+				break;
+			case elem::FORALL:
+				assert(root->l->type == elem::VAR);
+				p = all(get_fof(root->r), dict.get_var(root->l->el->e), 0);
+				break;
+			case elem::EXISTS: {
+				assert(root->l->type == elem::VAR);
+				p = ex(get_fof(root->r), dict.get_var(root->l->el->e), 0);
+				break;
+			}
+			case elem::UNIQUE:
+				assert(root->l->type == elem::VAR);
+				break;
+			default: ;
+		}
+		return p;
+	}
+}
+#endif
+
 #ifdef TYPE_RESOLUTION
 void ir_builder::natives2raw(int_t args, const ints &r, const sig &s, raw_term &rt) {
 	for (int_t n = 1; n != args + 1; ++n) {
@@ -1130,6 +1212,14 @@ raw_term ir_builder::to_raw_term(const term& r) {
 		}
 		else {
 			if (r.tab != -1) {
+				/*
+				if (is_tmp(r.tab) ) {
+					args = 0, rt.e.resize(args + 1);
+					//rt.e[0] = elem(elem::SYM, get_);
+					rt.arity = {(int_t) 0};
+				}
+				else {
+				*/
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
 				rt.e[0] = elem(elem::SYM,
 						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
@@ -1165,6 +1255,7 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
 				#endif
+				//}
 
 				rt.add_parenthesis();
 			} else {
@@ -1174,7 +1265,7 @@ raw_term ir_builder::to_raw_term(const term& r) {
 			}
 		}
 #ifndef BIT_TRANSFORM_V2
-		DBG(assert(args == r.size());)
+		//DBG(assert(args == r.size());)
 #endif
 #ifdef BIT_TRANSFORM
 		if(bitunv_to_raw_term(rt))

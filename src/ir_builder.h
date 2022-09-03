@@ -44,6 +44,10 @@ struct table;
 #endif
 class tables;
 
+typedef std::set<term> clause;
+typedef std::set<clause> dnf;
+typedef std::vector<std::pair<term, dnf>> prog;
+
 class ir_builder {
 
 public:
@@ -113,7 +117,6 @@ public:
 	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
-	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	raw_term to_raw_term(const term& t);
 	int_t get_table(const sig& s);
 	struct elem get_elem(int_t arg) const;
@@ -121,6 +124,12 @@ public:
 
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
+	#ifdef FOL_V1
+	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
+	#endif
+	#ifdef FOL_V2
+	prog get_fof(sprawformtree root);
+	#endif
 
 	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);

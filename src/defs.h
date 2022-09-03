@@ -176,7 +176,9 @@ typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
 #else
 typedef std::pair<int_t, ints> sig;
 #endif
-
+//-----------------------------------------------------------------------------
+#define FOL_V1
+//#define FOL_V2
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED
