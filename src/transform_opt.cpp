@@ -525,7 +525,7 @@ public:
 		// We consider the body and the head off r and...
 		vector<term> body(++r.begin(), r.end());
 		term head = r[0];
-		// ...generate all possible subsets.
+		// ...generate all possible body subsets.
 		for (powerset_range bodies(body); auto b : bodies) {
 			// For each choice we check for containment...
 			auto nr = get_rule_from(head, b);
