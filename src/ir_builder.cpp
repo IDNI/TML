@@ -1215,20 +1215,16 @@ raw_term ir_builder::to_raw_term(const term& r) {
 		}
 		else {
 			if (r.tab != -1) {
-				#ifdef FOL_V2
-				//if (is_tmp(r.tab) ) {
-				if (dynenv->tbls.at(r.tab).hidden) {
-					args = 0, rt.e.resize(args + 1);
-					//rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(r.tab)));
-					rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(dynenv->tbls.at(r.tab).s.first)));
-					rt.arity = {(int_t) 0};
-				}
-				else {
-				#endif
 
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
-				rt.e[0] = elem(elem::SYM,
-						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
+				#ifdef FOL_V2
+				if (dynenv->tbls.at(r.tab).hidden) {
+					rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(dynenv->tbls.at(r.tab).s.first)));
+				}
+				else
+				#endif
+					rt.e[0] = elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
+
 				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
 				//#ifdef TML_NATIVES
 				//assert(rt.arity.size() == 1);
@@ -1262,9 +1258,9 @@ raw_term ir_builder::to_raw_term(const term& r) {
 					rt.e[n] = get_elem(r[n - 1]);
 				#endif
 
-				#ifdef FOL_V2
-				}
-				#endif
+				//#ifdef FOL_V2
+				//}
+				//#endif
 
 				rt.add_parenthesis();
 			} else {
