@@ -469,6 +469,8 @@ public:
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
+	bool run_prog(const flat_prog& p, const strs_t& strs, size_t steps = 0,
+		size_t break_on_step = 0);
 
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 

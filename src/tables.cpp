@@ -1048,7 +1048,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		#endif
 	#endif
 
-	if (!add_prog_wprod(fp, p.g)) return false;;
+	if (!add_prog_wprod(fp, p.g)) return false;
 
 	//----------------------------------------------------------
 	if (opts.optimize) {
