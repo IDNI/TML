@@ -704,8 +704,10 @@ sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
 #ifdef TML_NATIVES
-	assert(arity.size() == 1);
-	tml_natives tn(arity[0], {native_type::UNDEF,-1});
+	//assert(arity.size() == 1);
+	tml_natives tn;
+	if (arity.size() == 1)
+		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
 	return {rel_id, tn};
 #else
 	return {rel_id, arity};
@@ -851,24 +853,21 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 			}
 			//TODO: review multiple heads and varmaps
 			#endif
+
 			#ifdef FOL_V2
 			sprawformtree root = r.prft->neg // neg transform
 				? make_shared<raw_form_tree>(elem::NOT,
 						make_shared<raw_form_tree>(*r.prft))
 				: make_shared<raw_form_tree>(*r.prft);
-
 			prog pfof = get_fof(root);
 			print_fof(pfof, this);
-
 			assert(r.h.size() == 1);
 			get_nums(r.h[0]), t = from_raw_term(r.h[0], true);
-			to_flat_prog(t, pfof, m);
-
+			to_flat_prog(t, this, pfof, m);
 			//DBG(print(o::out() << "\n", m) << endl;);
 			//print(o::out() << "\n", m) << endl;
 			#endif
 		}
-
 		else  {
 			for (const raw_term& x : r.h)
 				t = from_raw_term(x, true),
@@ -995,6 +994,10 @@ int_t ir_builder::get_table(const sig& s) {
 	dynenv->tbls.push_back(tb);
 	tsmap.emplace(s,nt);
 	return nt;
+}
+
+void ir_builder::set_hidden_table(const int_t t) {
+	dynenv->tbls[t].hidden = true;
 }
 
 //---------------------------------------------------------
@@ -1212,14 +1215,17 @@ raw_term ir_builder::to_raw_term(const term& r) {
 		}
 		else {
 			if (r.tab != -1) {
-				/*
-				if (is_tmp(r.tab) ) {
+				#ifdef FOL_V2
+				//if (is_tmp(r.tab) ) {
+				if (dynenv->tbls.at(r.tab).hidden) {
 					args = 0, rt.e.resize(args + 1);
-					//rt.e[0] = elem(elem::SYM, get_);
+					//rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(r.tab)));
+					rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(dynenv->tbls.at(r.tab).s.first)));
 					rt.arity = {(int_t) 0};
 				}
 				else {
-				*/
+				#endif
+
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
 				rt.e[0] = elem(elem::SYM,
 						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
@@ -1255,7 +1261,10 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				for (size_t n = 1; n != args + 1; ++n)
 					rt.e[n] = get_elem(r[n - 1]);
 				#endif
-				//}
+
+				#ifdef FOL_V2
+				}
+				#endif
 
 				rt.add_parenthesis();
 			} else {

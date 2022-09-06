@@ -43,7 +43,8 @@ f_prog unseq(const prog&);
 #ifdef TML
 #include "ir_builder.h"
 void print_fof(prog& p, ir_builder *irb);
-void to_flat_prog(term &h, const prog& p, flat_prog &m);
+void to_flat_prog(term &h, ir_builder *irb, const prog& p, flat_prog &m);
+void fof_init_tables(std::vector<term> &v);
 #endif
 
 

@@ -19,7 +19,7 @@
 using namespace std;
 
 #ifdef TML
-ir_builder *dynenv;
+ir_builder *builder;
 #endif
 
 ostream& operator<<(ostream& os, const term& t) {
@@ -30,7 +30,7 @@ ostream& operator<<(ostream& os, const term& t) {
 	if (t.size() != 0) os << t.tab << '(';
 	else os << t.tab;
 	for (size_t n = 0; n != t.size(); ++n) {
-		os << dynenv->get_elem(t[n]);
+		os << builder->get_elem(t[n]);
 		if (n == t.size() - 1) os << ')'; else os << ' ';
 	}
 #else
@@ -269,27 +269,52 @@ f_prog unseq(const prog& p) {
 
 #ifdef TML
 
-void to_flat_prog(term &, const prog &p, flat_prog &m) {
+void fof_init_tables(vector<term> &v) {
+	for (auto &t : v) {
+		ints ts {(int_t) t.size()};
+		int_t tab = builder->get_table(builder->get_sig(t.tab, ts));
+		if (t.tab > (1 << 16)) {
+			assert(tab != t.tab && "FOF: error encoding tmp tables");
+			builder->set_hidden_table(tab);
+			t.tab = tab;
+		}
+	}
+}
+
+void to_flat_prog(term &t, ir_builder *irb, const prog &p, flat_prog &m) {
+	builder = irb;
+
 	f_prog fp = unseq(p);
 	cout << fp << endl;
 
+	vector<term> v;
+	term h;
 	for (auto &r : fp) {
-		vector<term> v;
-		//cout << "debug " << r.first.size() << endl;
-		for (auto &h : r.first) {
-			//cout << "debug " << r.second.size() << endl;
-			for (auto &d : r.second) {
+		for (auto &hr : r.first) {
+			if (hr.tab == -1) //emtpy_term
+				h = t;
+			else h = hr;
+
+			if (r.second.size() == 0) {
 				v.push_back(h);
-				v.insert(v.end(), d.begin(), d.end());
+				fof_init_tables(v);
 				m.insert(v);
 				v.clear();
 			}
+			else
+				for (auto &d : r.second) {
+					v.push_back(h);
+					v.insert(v.end(), d.begin(), d.end());
+					fof_init_tables(v);
+					m.insert(v);
+					v.clear();
+				}
 		}
 	}
 }
 
 void print_fof(prog& p, ir_builder *irb) {
-	dynenv = irb;
+	builder = irb;
 	cout << p;
 }
 #endif

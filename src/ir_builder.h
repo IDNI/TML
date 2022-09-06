@@ -103,7 +103,7 @@ public:
 	sig get_sig(raw_term& t);
 	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
-	sig get_sig(const int& rel_id, const ints& arity);
+	sig get_sig(const int_t& rel_id, const ints& arity);
 	size_t sig_len(const sig& s) const;
 
 	std::set<int_t> str_rels;
@@ -121,7 +121,9 @@ public:
 	int_t get_table(const sig& s);
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
-
+	#ifdef FOL_V2
+	void set_hidden_table(const int_t t);
+	#endif
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
 	#ifdef FOL_V1
