@@ -121,9 +121,8 @@ public:
 	int_t get_table(const sig& s);
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
-	#ifdef FOL_V2
 	void set_hidden_table(const int_t t);
-	#endif
+	
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
 	#ifdef FOL_V1
