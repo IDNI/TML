@@ -283,8 +283,8 @@ void fof_init_tables(vector<term> &v) {
 
 void to_flat_prog(term &t, ir_builder *irb, const prog &p, flat_prog &m) {
 	builder = irb;
-
 	f_prog fp = unseq(p);
+	cout << "FOF unseq prog:" << endl;
 	cout << fp << endl;
 
 	vector<term> v;
@@ -315,7 +315,8 @@ void to_flat_prog(term &t, ir_builder *irb, const prog &p, flat_prog &m) {
 
 void print_fof(prog& p, ir_builder *irb) {
 	builder = irb;
-	cout << p;
+	cout << "FOF transformed fol to prog:" << endl;
+	cout << p << endl;
 }
 #endif
 

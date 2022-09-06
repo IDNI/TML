@@ -1023,7 +1023,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 
 	flat_prog fp = ir_handler->to_terms(p);
 	//DBG(ir_handler->opts.print_binarized = true;);
-	//DBG(print(o::out() << "\n", fp) << endl;);
+	#ifdef FOL_V2
+	print(o::out() << "FOF flat_prog:\n", fp) << endl;
+	#endif
 	//DBG(ir_handler->opts.print_binarized = false;);
 
 	#ifndef LOAD_STRS
