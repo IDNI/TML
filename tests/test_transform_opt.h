@@ -16,7 +16,7 @@
 #include "unittest.hpp"
 #include "../src/transform_opt.h"
 
-#ifndef WORK_IN_PROGRESS
+#ifdef ROPT
 
 /* Factory methods to ease test cases building. */
 int_t sym_f() {	static int_t s = 0; return ++s; }
@@ -95,5 +95,5 @@ std::ostream& operator<<(std::ostream &os, flat_prog &fp) {
 	return os;
 }
 
-#endif // WORK_IN_PROGRESS
+#endif // ROPT
 #endif // __TEST_TRANSFORM_H__

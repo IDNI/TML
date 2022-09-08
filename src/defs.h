@@ -178,6 +178,12 @@ typedef std::pair<int_t, ints> sig;
 #endif
 
 //-----------------------------------------------------------------------------
+// Rules optimization
+#ifndef ROPT
+#define ROPT
+#endif
+
+//-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED
 #define GIT_DESCRIBED   "n/a"

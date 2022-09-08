@@ -266,7 +266,7 @@ flat_prog square_program(const flat_prog &fp) {
 	return sqr;
 }
 
-#ifndef WORK_IN_PROGRESS
+#ifdef ROPT
 
 /* Query conatainment and minimization */
 
@@ -465,10 +465,10 @@ class z3_context {
 		return nr;
 	}
 
-#endif // WORK_IN_PROGRESS
+#endif // ROPT
 public:
 
-#ifndef WORK_IN_PROGRESS
+#ifdef ROPT
 
 	/*! Checks if r2 is contained in r1. */
 
@@ -537,7 +537,7 @@ public:
 		memo[r] = rr;
 		return rr;
 	}
-#endif // WORK_IN_PROGRESS
+#endif // ROPT
 };
 
 #ifdef CHANGE_ME
