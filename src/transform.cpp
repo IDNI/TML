@@ -275,66 +275,6 @@ std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const flat_rules& f
 	return os;
 }
 
-/*!
- * Transform all rules into binary form.
- *
- * Transform all the rules into binary form, i.e. h -> b1, b2. 
- */
-void driver::transform_bin(raw_prog& p) {
-	// the raw program is converted to a flat form. 
-	flat_rules f(p, *this);
-	for (const frule& r : f) {
-		rels.insert(r.first.e[0].e);
-		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
-	}
-//	DBG(o::out()<<"bin before:"<<endl<<f<<endl;)
-	// raw rules of type NONE are added back to the flat program
-	// as are ignored by the flat_rules method.
-	for (const raw_rule& r : p.r)
-		if (r.b.empty() && r.type == raw_rule::NONE)
-			f.push_back({r.h[0], {}}),
-			assert(r.h[0].e.size()),
-			assert(f.back().first.e.size());
-	p.r.clear();
-	auto interpolate = [this](
-		const vector<raw_term>& x, set<elem> v) {
-		raw_rule r;
-		r.b = {x}, r.h.emplace_back();
-		r.h[0].e.emplace_back(elem::SYM, dict.get_rel_lexeme(dict.get_new_rel()));
-		append_openp(r.h[0].e);
-		for (size_t k = 0; k != x.size(); ++k)
-			for (size_t n = 0; n != x[k].e.size(); ++n)
-				if (has(v, x[k].e[n]))
-					r.h[0].e.push_back(x[k].e[n]),
-					v.erase(x[k].e[n]);
-		return append_closep(r.h[0].e), r.h[0].calc_arity(nullptr), r;
-	};
-	for (auto x : f) {
-		// while the body has more that to elements create a new rule
-		// to reduce the size of the body.
-		while (x.second.size() > 2) {
-			set<elem> v;
-			for (size_t n = 2, k; n != x.second.size(); ++n)
-				for (k = 0; k != x.second[n].e.size(); ++k)
-					if (x.second[n].e[k].type == elem::VAR)
-						v.insert(x.second[n].e[k]);
-			for (size_t k = 0; k != x.first.e.size(); ++k)
-				if (x.first.e[k].type == elem::VAR)
-					v.insert(x.first.e[k]);
-			raw_rule r = interpolate(
-				{ x.second[0], x.second[1] }, move(v));
-			x.second.erase(x.second.begin(), x.second.begin() + 2);
-			x.second.insert(x.second.begin(), r.h[0]);
-			// This new relation should be hidden from the user by default
-			p.hidden_rels.insert({ r.h[0].e[0].e, r.h[0].arity });
-			p.r.push_back(move(r));
-		}
-		p.r.emplace_back(x.first, x.second);
-//		for (auto x : p.r.back().b) assert(!x.empty());
-	}
-	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
-}
-
 void driver::transform_state_blocks(raw_prog &rp, set<lexeme> guards) {
 	for (raw_prog& nrp : rp.nps) transform_state_blocks(nrp, guards);
 	for (state_block& sb : rp.sbs) {

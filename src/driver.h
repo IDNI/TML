@@ -138,8 +138,6 @@ class driver {
 //	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
 //		const std::set<raw_term>& qs);
 //	raw_prog transform_sdt(const raw_prog& p);
-public:
-	void transform_bin(raw_prog& p);
 private:
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_term get_try_pred(const raw_term& x);
@@ -164,14 +162,6 @@ private:
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
-#ifdef DELETE_ME
-public:
-	void minimize(raw_rule &rr, z3_context &ctx);
-	raw_form_tree &minimize_aux(const raw_rule &ref_rule,
-		const raw_rule &var_rule, raw_form_tree &ref_tree,
-		raw_form_tree &var_tree, z3_context &ctx, bool ctx_sign = true);
-private:
-#endif // DELETE_ME
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -181,14 +171,6 @@ private:
 	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
-#ifdef DELETE_ME
-	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
-	// TODO dupllicate and customize squaring functions
-	void square_root_program(raw_prog &rp);
-public:
-	void square_program(raw_prog &rp);
-private:	// TODO create one entry point for optimization 
-#endif //DELETE_ME
 	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 
