@@ -26,15 +26,11 @@ int_t var_f(int_t v) {	return v > 0 ? -v : v; }
 
 term term_f(std::vector<int_t> as) {
 	term t;	
-	// add a dummy head if needed
-	if (as.empty()) t.emplace_back(sym_f());
-	else for (auto a: as ) t.emplace_back(a); 
+	// Add a dummy head if needed
+	if (as.empty()) t.tab = sym_f();
+	else t.tab = as[0], t.insert(t.end(), ++as.begin(), as.end());		
 	return t;
 }
-
-/* std::vector<term> rule_f(std::vector<term> ts) {
-	std::vector<term> r(ts.begin(), ts.end()); return r;
-}*/
 
 std::vector<term> rule_f(std::vector<std::vector<int_t>> ts) {
 	std::vector<term> r; 
@@ -42,23 +38,14 @@ std::vector<term> rule_f(std::vector<std::vector<int_t>> ts) {
 	return r;
 }
 
-/*flat_prog flat_prog_f(std::vector<std::vector<term>> rs) {
-	flat_prog fp(rs.begin(), rs.end()); return fp;
-}*/
-
 flat_prog flat_prog_f(std::vector<std::vector<std::vector<int_t>>> rs) {
 	flat_prog fp;
 	for (auto r: rs) fp.emplace(rule_f(r));
 	return fp;
 }
 
-/* flat_prog flat_prog_f(std::vector<std::vector<term>> rs) {
-	flat_prog fp;
-	for (auto r: rs) fp.emplace(rule_f(r));
-	return fp;
-} */
-
 /* Extractor methods to ease testing. */
+
 std::vector<std::vector<term>> rules_e(flat_prog fp) {
 	std::vector<std::vector<term>> v(fp.begin(), fp.end()); return v;
 }
@@ -76,10 +63,12 @@ std::vector<int_t> args_e(term t) {
 int_t pred_e(term t) { return t[0]; }
 
 /* Check methods to ease testing. */
+
 bool is_var(int_t v) { return v < 0;}
 bool is_sym(int_t v) { return v > 0;}
 
 /* Helpers methods for printing intermediate results during debugging. */
+
 std::ostream& operator<<(std::ostream &os, term &fr) {
 	os << "("; for (auto p: fr) os << p; os << ")\n";
 	return os;

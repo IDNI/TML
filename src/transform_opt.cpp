@@ -77,7 +77,7 @@ struct squaring_context {
 /* Get relation info from the head term in a way suitable for be used as key. */
 
 inline rel_arity get_rel_info(const term &t) {
-	return make_tuple(t[0], t.size());
+	return make_tuple(t.tab, t.size());
 }
 
 /* Get relation info from a flat rule in a way suitable to be used as a key. */
@@ -142,7 +142,7 @@ bool apply_unification(unification &u, flat_rule &fr) {
 
 optional<unification> unify(const term &t1, const term &t2) {
 	unification u;
-	for (size_t i= 1; i < t1.size(); ++i) {
+	for (size_t i= 0; i < t1.size(); ++i) {
 		if (t1[i] > 0 /* is cte */ && t2[i] > 0 /* is cte */) {
 			if (t1[i] != t2[i]) return optional<unification>();
 		} else if (t1[i] < 0 /* is var */ && t2[i] > 0 /* is constant */) { 
@@ -219,7 +219,7 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 
 void square_rule(flat_rule &fr, selection &sels, const rule_index &idx, 
 		flat_prog &fp, size_t pos = 0) {
-	if (!idx.contains(get_rel_info(fr[pos + 1]))) {
+	if (!idx.contains(get_rel_info(fr))) {
 		fp.insert(fr);
 		return;
 	}
@@ -241,7 +241,7 @@ void square_rule(flat_rule &fr, selection &sels, const rule_index &idx,
 
 void square_rule(flat_rule &fr, flat_prog &fp, const rule_index &idx) {
 	// Cache vector with the selected rules to be used in squaring
-	selection sels(fr.size() - 1 );
+	selection sels(fr.size());
 	square_rule(fr, sels, idx, fp);
 }
 
@@ -526,7 +526,7 @@ public:
 		vector<term> body(++r.begin(), r.end());
 		term head = r[0];
 		// ...generate all possible body subsets.
-		for (powerset_range bodies(body); auto b : bodies) {
+		for (auto b : powerset_range(body)) {
 			// For each choice we check for containment...
 			auto nr = get_rule_from(head, b);
 			// ...update the reference rule if needed and
