@@ -18,16 +18,16 @@ The following are the branchers (objects that suggests improvements according to
 		- one for the trivial (no cost cases: no shared term symbols), and 
 		- another one for the hard ones (using z3 and memoization) .
 
-* split_bodies: given a rule with m terms, produce m new rules one for each a sequential split of the body. In the worst case produces n * m possible optimizations, one for  each pair rule and head (assuming m is the maximum number of terms in the rules we have in the program). 
+* split_bodies: given a rule with m terms, produce 2^m new rules one possible subsetof the body. 
 	
 	* It could be applied to one rule.
 	* No need to cache intermediate results as seem very difficult to have collisions among the produced results.
-	* All cases are fairly simple but the complexity is higher than split_bodies for example, altough polynomial.
+	* All cases are fairly simple but the complexity is expònential in the number of terms of the body.
 
 * squaring: squares the given raw program. The complexity is high as the result stands for several applications of the given program. 
 
 	* Only make sense to be applied to the whole program.
-	* High complexity as the results could grow exponentially on the number of iterations.
+	* High complexity as the result could grow exponentially on the number of terms of the body.
 	* Maybe memoization could be of interest.
 
 We also would need a new additional brancher:
