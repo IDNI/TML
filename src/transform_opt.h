@@ -32,21 +32,22 @@ flat_prog square_program(const flat_prog &fp);
 
 /* Optimization branch and bound definitions. */
 
-/*! Represents a mutated program, i.e. the original program, the additions and 
+/*! Represents a changed program, i.e. the original program, the additions and 
  * substractions. */
 struct changed_prog  {
-	// starting node of the mutated progs log
+	// starting node of the changed progs log
 	explicit changed_prog(const flat_prog &rp): current(rp) {};
-	// link to previous mutated prog
+	// link to previous changed prog
 	explicit changed_prog(const changed_prog *mp): current(mp->current) {};
 	void operator()(struct change const &m);
 
 	flat_prog current;
 };
 
-/*! Represents a change of a given (mutated) program. If selected, it is
- * applied to the given (mutated) program. This is a cheap implementation of
+/*! Represents a change of a given (changed) program. If selected, it is
+ * applied to the given (changed) program. This is a cheap implementation of
  * the command pattern. */
+
 class change {
 public:
 	flat_prog clashing;
@@ -60,11 +61,11 @@ public:
 	virtual bool operator()(changed_prog &mp) const = 0;
 };
 
-/*! Computes the approximate cost of executing a given mutated program. */
+/*! Computes the approximate cost of executing a given changed program. */
 using cost_function = std::function<size_t(changed_prog&)>;
 extern const cost_function exp_in_heads;
 
-/*! Computes the approximate cost of executing a given mutated program. */
+/*! Computes the approximate cost of executing a given changed program. */
 using brancher = std::function<std::vector<std::shared_ptr<change>>(changed_prog&)>;
 
 /*! Represents and strategy to select the best change according to the passed
