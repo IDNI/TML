@@ -10,7 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include "test_transform_opt.h"
+// #include "../src/transform_opt.cpp"
 
 TEST_SUITE("transform_opt-squaring") {
 	TEST_CASE("squaring: .") { 

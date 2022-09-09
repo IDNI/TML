@@ -35,44 +35,11 @@
 
 using namespace std;
 
-const cost_function exp_in_heads = [](const changed_prog &mp) {
-	auto const& rs = mp.current;
-	size_t c = 0.0;
-	for (auto &it : rs) {
-		// TODO properly define this cost function
-		c += it.size();
-	}
-	return c;
-};
-
-void changed_prog::operator()(const change &m) {
-	// Apply the change to the current changed_prog
-	m(*this);
-}
-
-bool best_solution::bound(changed_prog &p) {
-	if (size_t cost = func_(p); cost < cost_) {
-		cost_ = cost;
-		best_ = std::make_shared<changed_prog>(p);
-		return true;
-	}
-	return false;
-}
-
-flat_prog best_solution::solution() {
-	return best_.get()->current;
-}
-
 using flat_rule = vector<term>;
 using rel_arity = tuple<int_t, size_t>;
 using rule_index = map<rel_arity, set<flat_rule>>;
 using unification = map<int_t, int_t>;
 using selection = vector<flat_rule>;
-
-struct squaring_context {
-	reference_wrapper<dict_t> dict;
-	reference_wrapper<rule_index> index;
-};
 
 /* Get relation info from the head term in a way suitable for be used as key. */
 
@@ -199,10 +166,10 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 		auto rfr = rename_rule_vars(sels[i], lv);
 		if (auto u = unify(fr[i + 1], rfr[0])) {
 			#ifndef DELETE_ME
-			std::cout << "UNIFICATIOIN: {";
+			cout << "UNIFICATIOIN: {";
 			for (auto &[f, s]: *u) {
-				std::cout << "{" << f << ':' << s << "}, ";
-				std::cout << "}" << std::endl;
+				cout << "{" << f << ':' << s << "}, ";
+				cout << "}\n";
 			}
 			#endif // DELETE_ME
 			unified = unified && apply_unification(*u, sfr);
@@ -273,6 +240,7 @@ flat_prog square_program(const flat_prog &fp) {
 /* Provides consistent conversions of TML objects into Z3. */
 
 class z3_context {
+private:
 	size_t arith_bit_len;
 	size_t universe_bit_len;
 	z3::context context;
@@ -280,10 +248,11 @@ class z3_context {
 	z3::expr_vector head_rename;
 	z3::sort bool_sort;
 	z3::sort value_sort;
-	std::map<rel_arity, z3::func_decl> rel_to_decl;
-	std::map<int_t, z3::expr> var_to_decl;
-	std::map<flat_rule, z3::expr> rule_to_decl;
+	map<rel_arity, z3::func_decl> rel_to_decl;
+	map<int_t, z3::expr> var_to_decl;
+	map<flat_rule, z3::expr> rule_to_decl;
 
+public:
 	/* Initialize an empty context that can then bn e populated with TML to Z3
 	 * conversions. value_sort is either a bit-vector whose width can
 	 * contain the enire program universe and will be used for all Z3
@@ -489,7 +458,7 @@ public:
 		}
 
 		// Do the expensive work
-		o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
+		o::dbg() << "Z3 QC Testing if "; // << r1 << " <= " << r2 << " : ";
 		// Get head variables for z3
 		z3::expr_vector bound_vars(context);
 		for (size_t i = 0; i != r1[0].size(); ++i)
@@ -538,10 +507,232 @@ public:
 		memo[r] = rr;
 		return rr;
 	}
-#endif // ROPT
 };
 
+/* Branchers and changes. */
 
+/* Optimization branch and bound definitions. */
+
+
+/*! Represents a changed program, i.e. the original program, the additions and 
+ * substractions. */
+
+struct changed_prog  {
+	// starting node of the changed progs log
+	explicit changed_prog(const flat_prog &rp): current(rp) {};
+	// link to previous changed prog
+	explicit changed_prog(const changed_prog *mp): current(mp->current) {};
+
+	flat_prog current;
+};
+
+/*! Represents a change of a given (changed) program. If selected, it is
+ * applied to the given (changed) program. This is a cheap implementation of
+ * the command pattern. */
+
+class change {
+public:
+	flat_prog clashing;
+
+	explicit change() = default;
+	explicit change(flat_prog &c): clashing(c) {}
+	explicit change(vector<term> &r) { clashing.insert(r); }
+	virtual ~change() = default;
+
+	auto operator<=>(const change &rhs) const = default;
+	virtual bool operator()(changed_prog &mp) const = 0;
+};
+
+/*! Computes the approximate cost of executing a given changed program. */
+
+using cost_function = function<size_t(changed_prog&)>;
+const cost_function exp_in_heads = [](const changed_prog &mp) {
+	auto const& rs = mp.current;
+	size_t c = 0.0;
+	for (auto &it : rs) {
+		// TODO properly define this cost function
+		c += it.size();
+	}
+	return c;
+};
+/*! Computes the approximate cost of executing a given changed program. */
+
+using brancher = function<vector<shared_ptr<change>>(changed_prog&)>;
+
+/*! Represents and strategy to select the best change according to the passed
+ * cost_function. */
+
+class bounder {
+public:
+	virtual bool bound(changed_prog& p) = 0;
+	virtual flat_prog solution() = 0;
+};
+
+/*! Custom implementation of bounder interface that returns the best solution found
+ * so far. */
+
+class best_solution: public bounder {
+public:
+	best_solution(cost_function& f, changed_prog &rp): 
+			func_(f), 
+			cost_(numeric_limits<size_t>::max()), 
+			best_(reference_wrapper<changed_prog>(rp)) {};
+
+	bool bound(changed_prog &p) {
+		if (size_t cost = func_(p); cost < cost_) {
+			cost_ = cost;
+			best_ = p;
+			return true;
+		}
+		return false;
+	};
+
+	flat_prog solution() {
+		return best_.get().current;
+	};
+private:
+	cost_function func_;
+	size_t cost_;
+	reference_wrapper<changed_prog> best_;
+};
+
+/*! Optimization plan accordignly to command line options. */
+
+struct plan {
+public:
+	vector<brancher> branchers;
+	reference_wrapper<bounder> bndr;
+
+	plan(bounder &b): bndr(b) {};
+};
+
+// raw_prog optimize_once(flat_prog &program, plan &plan);
+// raw_prog optimize_loop(flat_prog &program, plan &plan);
+class change_del_rule : public virtual change  {
+public:
+	explicit change_del_rule(flat_prog &d): change(d) { }
+	explicit change_del_rule(vector<term> &r): change(r) { }
+
+	bool operator()(changed_prog &cp) const override {
+		for (auto& r: clashing)	cp.current.erase(r);
+		return true;
+	}
+};
+
+class change_add_rule : public virtual change  {
+public:
+	vector<term> add;
+
+	explicit change_add_rule(vector<term> &a): add(a) { }
+	explicit change_add_rule(vector<term> &a, flat_prog d): change(d), add(a) { }
+	explicit change_add_rule(vector<term> &a, vector<term> d): change(d), add(a)  { }
+
+	bool operator()(changed_prog &cp) const override {
+		cp.current.insert(add);
+		return true;
+	}
+};
+
+struct mutation_split_bodies : public virtual change  {
+
+	bool operator()(changed_prog &mp) const override {
+		o::dbg() << "Splitting bodies ..." << endl;
+		// TODO do it...
+		o::dbg() << "Binary Program:" << endl; // << mp.current << endl;
+		return true;
+	}
+};
+
+vector<shared_ptr<change>> brancher_split_bodies(changed_prog&) {
+	vector<shared_ptr<change>> mutations;
+	mutations.push_back(make_shared<mutation_split_bodies>());
+	return mutations;
+}
+
+class mutation_minimize : public virtual change  {
+private:
+
+	/* Compute the number of bits required to represent first the largest
+	* integer in the given program and second the universe. */
+
+	pair<int_t, int_t> prog_bit_len_opt(const flat_prog &rp) const {
+		int_t max_int = 0, char_count = 0;
+		set<int_t> distinct_syms;
+
+		for(const flat_rule &rr : rp) {	
+			// Updates the counters based on the heads of the current rule
+			for(const term &rt : rr) {
+				distinct_syms.insert(rt.tab);
+				for (const auto &a: rt) max_int = max(max_int, a);
+			} 
+		}
+		// Now compute the bit-length of the largest integer found
+		size_t int_bit_len = 0, universe_bit_len = 0,
+			max_elt = max_int + char_count + distinct_syms.size();
+		for(; max_int; max_int >>= 1, int_bit_len++);
+		for(; max_elt; max_elt >>= 1, universe_bit_len++);
+		o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
+		o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
+		return {int_bit_len, universe_bit_len};
+	} 
+
+public:
+	bool operator()(changed_prog &mp) const override {
+		const auto &[int_bit_len, universe_bit_len] = prog_bit_len_opt(mp.current);
+		z3_context ctx(int_bit_len, universe_bit_len);
+		o::dbg() << "Minimizing rules ..." << endl << endl;
+		for(auto rr: mp.current) {
+			ctx.minimize(rr);
+		}
+		o::dbg() << "Minimized:" << endl << endl; // << mp.current << endl;
+		return true;
+	}
+};
+
+vector<shared_ptr<change>> brancher_minimize(changed_prog&) {
+	vector<shared_ptr<change>> mutations;
+	mutations.push_back(make_shared<mutation_minimize>());
+	return mutations; 
+} 
+
+/* Optimization methods. */
+
+vector<shared_ptr<change>> get_optimizations(changed_prog& changed, vector<brancher>& branchers) {
+	// We collect all possible changes to the current mutated program.
+	vector<shared_ptr<change>>  optimizations;
+	for(brancher brancher: branchers) {
+		auto proposed = brancher(changed);
+		optimizations.insert(optimizations.end(), proposed.begin(), proposed.end());
+	}
+	return optimizations;
+}
+
+void optimize(changed_prog& mutated, vector<brancher>& branchers) {
+	// We collect all possible changes to the current mutated program.
+	vector<shared_ptr<change>>  optimizations = get_optimizations(mutated, branchers);
+	// For each subset of optimizations, compute the new mutated program,
+	// bound the current change and try to optimize again if needed.
+	for (auto it = optimizations.begin(); it != optimizations.end(); ++it) {
+		(*it).get()->operator()(mutated);
+	}
+}
+
+void optimize_loop(changed_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
+	// We collect all possible changes to the current mutated program.
+	vector<shared_ptr<change>>  optimizations = get_optimizations(mutated, branchers);
+	// For each subset of optimizations, compute the new mutated program,
+	// bound the current change and try to optimize again if needed.
+	powerset_range<shared_ptr<change>> subsets(optimizations);
+	for (auto it = ++subsets.begin(); it != subsets.end(); ++it) {
+		changed_prog new_mutated(mutated);
+		vector<shared_ptr<change>> v = *it;
+		for (auto mt = v.begin(); mt != v.end(); ++mt) (*mt).get()->operator()(new_mutated);
+		if (bounder.bound(new_mutated)) {
+			optimize_loop(new_mutated, bounder, branchers);
+		}
+	}
+}
+#endif // ROPT
 
 #ifdef CHANGE_ME
 /*!
@@ -604,315 +795,30 @@ void transform_bin(raw_prog& p) {
 	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
 }
 
+#endif 
 
-/*!
- * Optimize a mutated program
- */
-vector<std::shared_ptr<change>> get_optimizations(changed_prog& mutated, vector<brancher>& branchers) {
-	// we collect all possible changes to the current mutated program
-	vector<std::shared_ptr<change>>  optimizations;
-	for(brancher brancher: branchers) {
-		auto proposed = brancher(mutated);
-		optimizations.insert(optimizations.end(), proposed.begin(), proposed.end());
-	}
-	return optimizations;
+/* O1 optimization, just split bodies. */
+
+flat_prog optimize_o1(const flat_prog &fp) {
+	// body splitting
 }
 
-/*! Entry point for optimization process. */
-
-void optimize(flat_prog fp) {
-	changed_prog cp(fp);
-	best_solution bs(exp_in_heads, fp); 
-
-	if(int_t iter_num = opts.get_int("O3")) {
-	// Trimmed existentials are a precondition to program optimizations
-	o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-
-	// remove call to pdatalog_transform
-	pdatalog_transform(rp, [&](raw_prog &rp) {
-		o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
-		split_heads(rp);
-		// Alternately square and simplify the program iter_num times
-		for(int_t i = 0; i < iter_num; i++) {
-			o::dbg() << "Squaring Program ..." << endl << endl;
-			square_program(rp);
-			o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-		}
-		o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
-	});
-
-	if(opts.enabled("O1") || opts.enabled("O2")) {
-		flat_prog fp;
-		changed_prog mp(fp);
-		plan begin(bs);
-		flat_prog optimized(fp);
-		if (!opts.get_int("O3")) {
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Adding export outer quantifiers brancher ..." << endl << endl;
-			begin.branchers.push_back(bind(&driver::brancher_export_outer_quantifiers, this, placeholders::_1));
-		}
-		optimized = optimize_once(rp, begin);
-		step_transform(optimized, [&](raw_prog &rp) {
-			plan o1(bs);
-			// This transformation is a prerequisite to the CQC and binary
-			// transformations, hence its more general activation condition.
-			o::dbg() << "Adding dnf brancher in begin..." << endl << endl;
-			o1.branchers.push_back(bind(&driver::brancher_to_dnf, this, placeholders::_1));
-			if (!opts.get_int("O3")) {
-				o::dbg() << "Adding split heads brancher in begin..." << endl << endl;
-				o1.branchers.push_back(bind(&driver::brancher_split_heads, this, placeholders::_1));
-			}
-			// Though this is a binary transformation, rules will become
-			// ternary after timing guards are added
-			optimized = optimize_once(rp, o1);
-			if(opts.enabled("O2")) {
-				plan o2_loop(bs), o2_once(bs);
-				o::dbg() << "Adding Minimizer brancher ..." << endl << endl;
-				o2_once.branchers.push_back(bind(&driver::brancher_minimize, this, placeholders::_1));
-				optimized = optimize_loop(optimized, o2_once);
-				o::dbg() << "Adding Z3 brancher ..." << endl << endl;
-				o2_loop.branchers.push_back(bind(&driver::brancher_subsume_queries, this, placeholders::_1));
-				o::dbg() << "Adding rulse factor brancher ..." << endl << endl;
-				o2_loop.branchers.push_back(bind(&driver::brancher_factor_rules, this, placeholders::_1));
-				optimized = optimize_loop(optimized, o2_loop);
-			}
-			plan end(bs);
-			o::dbg() << "Adding split bodies brancher in loop..." << endl << endl;
-			end.branchers.push_back(bind(&driver::brancher_split_bodies, this, placeholders::_1));
-			o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-			end.branchers.push_back(bind(&driver::brancher_eliminate_dead_variables, this, placeholders::_1));
-			rp = optimize_once(optimized, end);
-			o::dbg() << "Current:" << endl << rp << endl;
-		});
-	}
+flat_prog optimize_o2(const flat_prog& fp) {
+	// cqc and minimization
 }
 
-void optimize(changed_prog& mutated, vector<brancher>& branchers) {
-	// we collect all possible changes to the current mutated program
-	vector<std::shared_ptr<change>>  optimizations = get_optimizations(mutated, branchers);
-	// for each subset of optimizations, compute the new mutated program,
-	// bound the current change and try to optimize again if needed
-	for (auto it = optimizations.begin(); it != optimizations.end(); ++it) {
-		(*it).get()->operator()(mutated);
-	}
+flat_prog optimize_o3(const flat_prog& fp) {
+	// optimal body splitting and cqc + minimization
 }
 
-void optimize_loop(changed_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
-	// we collect all possible changes to the current mutated program
-	vector<std::shared_ptr<change>>  optimizations = get_optimizations(mutated, branchers);
-	// for each subset of optimizations, compute the new mutated program,
-	// bound the current change and try to optimize again if needed
-	powerset_range<std::shared_ptr<change>> subsets(optimizations);
-	for (auto it = ++subsets.begin(); it != subsets.end(); ++it) {
-		changed_prog new_mutated(mutated);
-		vector<std::shared_ptr<change>> v = *it;
-		for (auto mt = v.begin(); mt != v.end(); ++mt) (*mt).get()->operator()(new_mutated);
-		if (bounder.bound(new_mutated)) {
-			optimize_loop(new_mutated, bounder, branchers);
-		}
-	}
+flat_prog squaring_o1(const flat_prog &fp) {
+
 }
 
-/*!
- * Optimize a raw program
- */
-flat_prog optimize_once(flat_prog &program, plan &plan) {
-	// the first mutated program just contain the original program as additions.
-	changed_prog mutated {program};
-	o::dbg() << "Applying optimizations ..." << endl << endl;
-	optimize(mutated, plan.branchers); 
-	plan.bndr.get().bound(mutated);
-	return plan.bndr.get().solution();
+flat_prog squaring_o2(const flat_prog &fp) {
+
 }
 
-flat_prog optimize_loop(flat_prog &program, plan &plan) {
-	// loop over the branchers.
-	changed_prog mutated {program};
-	o::dbg() << "Looping over optimizations ..." << endl << endl;
-	optimize_loop(mutated, plan.bndr, plan.branchers);
-	return plan.bndr.get().solution();
+flat_prog squaring_o3(const flat_prog &fp) {
+
 }
-
-#endif // CHANGE_ME
-
-class change_del_rule : public virtual change  {
-public:
-	explicit change_del_rule(flat_prog &d): change(d) { }
-	explicit change_del_rule(vector<term> &r): change(r) { }
-
-	bool operator()(changed_prog &cp) const override {
-		for (auto& r: clashing)	cp.current.erase(r);
-		return true;
-	}
-};
-
-class change_add_rule : public virtual change  {
-public:
-	vector<term> add;
-
-	explicit change_add_rule(vector<term> &a): add(a) { }
-	explicit change_add_rule(vector<term> &a, flat_prog d): change(d), add(a) { }
-	explicit change_add_rule(vector<term> &a, vector<term> d): change(d), add(a)  { }
-
-	bool operator()(changed_prog &cp) const override {
-		cp.current.insert(add);
-		return true;
-	}
-};
-
-#ifdef CHANGE_ME
-/* Recurse through the given formula tree in pre-order calling the given
- * function with the accumulator. */
-
-template<typename X, typename F>
-X prefold_tree2(raw_form_tree &t, X acc, const F &f) {
-	const X &new_acc = f(t, acc);
-	switch(t.type) {
-		case elem::ALT: case elem::AND: case elem::IMPLIES: case elem::COIMPLIES:
-				case elem::EXISTS: case elem::FORALL: case elem::UNIQUE:
-			// Fold through binary trees by threading accumulator through both
-			// the LHS and RHS
-			return prefold_tree2(*t.r, prefold_tree2(*t.l, new_acc, f), f);
-		// Fold though unary trees by threading accumulator through this
-		// node then single child
-		case elem::NOT: return prefold_tree2(*t.l, new_acc, f);
-		// Otherwise for leaf nodes like terms and variables, thread
-		// accumulator through just this node
-		default: return new_acc;
-	}
-}
-
-/* Update the number and characters counters as well as the distinct
- * symbol set to account for the given term. */
-
-void update_element_counts2(const raw_term &rt, set<elem> &distinct_syms,
-		int_t &char_count, int_t &max_int) {
-	for(const elem &el : rt.e)
-		if(el.type == elem::NUM) max_int = max(max_int, el.num);
-		else if(el.type == elem::SYM) distinct_syms.insert(el);
-		else if(el.type == elem::CHR) char_count = 256;
-} 
-
-/* Compute the number of bits required to represent first the largest
- * integer in the given program and second the universe. */
-
-pair<int_t, int_t> prog_bit_len2(const raw_prog &rp) {
-	int_t max_int = 0, char_count = 0;
-	set<elem> distinct_syms;
-
-	for(const raw_rule &rr : rp.r) {
-		// Updates the counters based on the heads of the current rule
-		for(const raw_term &rt : rr.h)
-			update_element_counts2(rt, distinct_syms, char_count, max_int);
-		// If this is a rule, update the counters based on the body
-		if(rr.is_dnf() || rr.is_form()) {
-			raw_form_tree prft = *rr.get_prft();
-			prefold_tree2(prft, monostate {},
-				[&](const raw_form_tree &t, monostate) -> monostate {
-					if(t.type == elem::NONE)
-						update_element_counts2(*t.rt, distinct_syms, char_count, max_int);
-					return monostate {};
-				});
-		}
-	}
-	// Now compute the bit-length of the largest integer found
-	size_t int_bit_len = 0, universe_bit_len = 0,
-		max_elt = max_int + char_count + distinct_syms.size();
-	for(; max_int; max_int >>= 1, int_bit_len++);
-	for(; max_elt; max_elt >>= 1, universe_bit_len++);
-	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
-	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
-	return {int_bit_len, universe_bit_len};
-} 
-
-struct mutation_minimize : public virtual change  {
-	driver &drvr;
-
-	mutation_minimize(driver &d) : drvr(d) {}
-
-	bool operator()(changed_prog &mp) const override {
-		const auto &[int_bit_len, universe_bit_len] = prog_bit_len2(mp.current);
-		z3_context ctx(int_bit_len, universe_bit_len);
-		o::dbg() << "Minimizing rules ..." << endl << endl;
-//		auto f = [this, &z3_ctx](const raw_rule &rr1, const raw_rule &rr2)
-//			{ return drvr.check_qc(rr1, rr2, z3_ctx); };
-		for(auto rr: mp.current.r) {
-			drvr.minimize(rr, ctx);
-		}
-		o::dbg() << "Minimized:" << endl << endl << mp.current << endl;
-		return true;
-	}
-};
-
-vector<std::shared_ptr<change>> driver::brancher_minimize(changed_prog&) {
-	vector<std::shared_ptr<change>> mutations;
-	mutation_minimize m(*this);
-	mutations.push_back(std::make_shared<mutation_minimize>(m));
-	return mutations; 
-} 
-
-struct mutation_to_split_heads : public virtual change  {
-	driver &drvr;
-
-	mutation_to_split_heads(driver &d) : drvr(d) {}
-
-	bool operator()(changed_prog &mp) const override {
-		o::dbg() << "Splitting heads ..." << endl;
-		drvr.split_heads(mp.current);
-		o::dbg() << "Binary Program:" << endl << mp.current << endl;
-		return false;
-	}
-};
-
-vector<std::shared_ptr<change>> driver::brancher_split_heads(changed_prog&) {
-	vector<std::shared_ptr<change>> mutations;
-	mutation_to_split_heads m(*this);
-	mutations.push_back(std::make_shared<mutation_to_split_heads>(m));
-	return mutations;
-}
-
-#endif //CHANGE_ME
-
-#ifdef DELETE_ME
-
-struct mutation_eliminate_dead_variables : public virtual change  {
-	driver &drvr;
-
-	mutation_eliminate_dead_variables(driver &d) : drvr(d) {}
-
-	bool operator()(changed_prog &mp) const override {
-		o::dbg() << "Eliminating dead variables ..." << endl << endl;
-		drvr.eliminate_dead_variables(mp.current);
-		o::dbg() << "Stripped TML Program:" << endl << endl << mp.current << endl;
-		return true;
-	}
-};
-
-vector<std::shared_ptr<change>> driver::brancher_eliminate_dead_variables(changed_prog&) {
-	vector<std::shared_ptr<change>> mutations;
-	mutation_eliminate_dead_variables m(*this);
-	mutations.push_back(std::make_shared<mutation_eliminate_dead_variables>(m));
-	return mutations;
-}
-
-struct mutation_split_bodies : public virtual change  {
-	driver &drvr;
-
-	mutation_split_bodies(driver &d) : drvr(d) {}
-
-	bool operator()(changed_prog &mp) const override {
-		o::dbg() << "Splitting bodies ..." << endl;
-		drvr._bintransform(mp.current);
-		o::dbg() << "Binary Program:" << endl << mp.current << endl;
-		return true;
-	}
-};
-
-vector<std::shared_ptr<change>> driver::brancher_split_bodies(changed_prog&) {
-	vector<std::shared_ptr<change>> mutations;
-	mutation_split_bodies m(*this);
-	mutations.push_back(std::make_shared<mutation_split_bodies>(m));
-	return mutations;
-}
-
-#endif // DELETE_ME

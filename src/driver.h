@@ -171,29 +171,7 @@ private:
 	/*,const std::function<void(raw_prog &)> &f*/);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
-	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
-	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
-
-	std::vector<std::shared_ptr<change>> brancher_export_outer_quantifiers(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_to_dnf(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_factor_rules(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_squaring(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_minimize(changed_prog&);
-	std::vector<std::shared_ptr<change>> brancher_subsume_queries(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_split_heads(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_split_bodies(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_square_program(changed_prog &mp);
-	std::vector<std::shared_ptr<change>> brancher_eliminate_dead_variables(changed_prog &mp);
-
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
-public:
-	void eliminate_dead_variables(raw_prog &rp);
-	void factor_rules(raw_prog &rp);
-
-	void qc_z3(raw_prog &rp);
-#ifdef DEELETE_ME
-        bool check_qc(const raw_rule &r1, const raw_rule &r2, z3_context &ctx);
-#endif // DELETE_ME
 private:
 	// following 2 methods are defined in a file tml_earley.cpp
 	bool earley_parse_tml(input* in, raw_progs& rps);
@@ -232,13 +210,6 @@ private:
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-#ifdef DELETE_ME
-	void subsume_queries(raw_prog &rp);
-	void subsume_queries_cqc(raw_prog &rp);
-	void subsume_queries_cqnc(raw_prog &rp);
-#endif
-	void subsume_queries_z3(raw_prog &rp);
-
 	// TODO and remove the previous ones
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
