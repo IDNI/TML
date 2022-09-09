@@ -229,7 +229,10 @@ prog ex(const prog& p, int_t v, int_t ) {
 }
 
 ostream& operator<<(ostream& os, const set<pair<clause, dnf>>& p) {
-	for (auto& x : p) os << x.first << " :- " << x.second << '.' << endl;
+	for (auto& x : p)
+		if (x.second.size())
+			os << x.first << " :- " << x.second << '.' << endl;
+		else os << x.first << '.' << endl;
 	return os;
 }
 
@@ -243,13 +246,13 @@ f_prog unseq(const prog& p) {
 		t.push_back(mkterm(get_tmprel(),{}));
 		term aux0 = t.back(); aux0.neg = true;
 		r.emplace(clause{p[n].first, {aux0}}, p[n].second && dnf{{{t.back()}}});
-		//term aux1 = t[n]; aux1.neg = true;
-		//r.emplace(clause{{aux1}}, dnf{{{t[n]}}});
+		//term aux1 = t[n]; aux1.neg = true; //workaround
+		//r.emplace(clause{{aux1}}, dnf{{{t[n]}}}); //workaround
 	}
 	for (size_t n = 0; n != p.size() - 1; ++n)
 		r.emplace(clause{{t[n + 1]}}, dnf{{{t[n]}}});
 	r.emplace(clause{{t[0]}}, dnf{});
-	//r.emplace(clause{{t[0]}}, dnf{{{t[p.size()-1]}}});
+	//r.emplace(clause{{t[0]}}, dnf{{{t[p.size()-1]}}}); //workaround
 	return r;
 
 #else

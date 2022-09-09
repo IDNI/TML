@@ -1,0 +1,11 @@
+A0(0 0).
+A0(1 0).
+A0(1 1).
+
+A0a :- exists ?x forall ?y { A0(?x ?y) }. #FAIL
+
+#A0b :- forall ?x exists ?y { A0(?x ?y) }. #FAIL
+
+#A0c :- forall ?y exists ?x { A0(?x ?y) }. #FAIL
+
+#A0d :- forall ?y exists ?x { A0(?x ?y) }. #FAIL

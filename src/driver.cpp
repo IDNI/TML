@@ -3593,7 +3593,7 @@ bool driver::transform_handler(raw_prog &p) {
 	rt_options to;
 	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
 	to.optimize  = false;
-	to.binarize = true;
+	to.binarize = false;
 	to.print_binarized = false;
 	to.bproof = proof_mode::none;
 	to.show_hidden = false;

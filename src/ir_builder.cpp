@@ -1258,10 +1258,6 @@ raw_term ir_builder::to_raw_term(const term& r) {
 					rt.e[n] = get_elem(r[n - 1]);
 				#endif
 
-				//#ifdef FOL_V2
-				//}
-				//#endif
-
 				rt.add_parenthesis();
 			} else {
 				args = 1;

@@ -115,7 +115,8 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 typedef struct {
 	bool optimize, print_transformed, apply_regexpmatch, fp_step,
 		show_hidden, bin_lr, incr_gen_forest,
-		binarize, print_binarized;
+		binarize = true, print_binarized = false; //needed default values
+
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;
@@ -177,7 +178,7 @@ typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
 typedef std::pair<int_t, ints> sig;
 #endif
 //-----------------------------------------------------------------------------
-#define FOL_V1
+#define FOL_V1 //mutually exclusive with FOL_V2
 //#define FOL_V2
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
