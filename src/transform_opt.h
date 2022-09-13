@@ -28,9 +28,19 @@ flat_prog optimize_o1(const flat_prog &fp);
 flat_prog optimize_o2(const flat_prog &fp);
 flat_prog optimize_o3(const flat_prog &fp);
 
+/* Optimization plus squaring methods. */
+
 flat_prog squaring_o1(const flat_prog &fp);
 flat_prog squaring_o2(const flat_prog &fp);
 flat_prog squaring_o3(const flat_prog &fp);
+
+
+/*! Produces a program where executing a single step is equivalent to
+ * executing two steps of the original program. This is achieved through
+ * inlining where each body term is replaced by the disjunction of the
+ * bodies of the relation that it refers to. For those facts not
+ * computed in the previous step, it is enough to check that they were
+ * derived to steps ago and were not deleted in the previous step. */
 
 flat_prog square_program(const flat_prog &fp);
 
