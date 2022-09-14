@@ -525,11 +525,6 @@ public:
 	set<flat_rule> del;
 	set<flat_rule> add;
 
-	explicit change() = default;
-	virtual ~change() = default;
-
-	auto operator<=>(const change &rhs) const = default;
-
 	bool operator()(changed_prog &cp) const {
 		cp.current.insert(add.begin(), add.end());
 		cp.current.erase(del.begin(), del.end());
@@ -600,20 +595,23 @@ public:
 	plan(bounder &b): bndr(b) {};
 };
 
-/* Creates a new rule from head and body. */
-
-flat_rule get_rule_from(term const &h, flat_rule const &b)  {
-	flat_rule nr;
-	nr.emplace_back(h);
-	//nr.emplace_back(b.begin(), b.end());
-	return nr;
+flat_rule with_canonical_vars(flat_rule const &r) {
+	return r;
 }
 
-flat_rule get_rule_from(flat_rule const &r, flat_rule const &b) {
-	flat_rule nr;
-	nr.emplace_back(r[0]); 
-	for (auto &t: b) nr.emplace_back(t);
-	return nr;
+/* Split a rule according to a subset of terms of the body. */
+
+pair<flat_rule, flat_rule> split_rule(flat_rule const &r, vector<term> const &b) {
+	// Rule using the elements of b and...
+	flat_rule r1;
+	r1.emplace_back(r[0]); 
+	for (auto &t: b) r1.emplace_back(t);
+	// rule using the remaining terms.
+	flat_rule r2;
+	r2.emplace_back(r[0]); 
+	for (auto &t: r) 
+		if (ranges::find(b, t) == b.end()) r2.emplace_back(t);
+	return {with_canonical_vars(r1), with_canonical_vars(r2)};
 }
 
 vector<change> brancher_split_bodies(changed_prog& cp) {
@@ -622,16 +620,13 @@ vector<change> brancher_split_bodies(changed_prog& cp) {
 	// change splitting the rule accordingly.
 	for (auto &r: cp.current) {
 		vector<term> body(++r.begin(), r.end());
-		term head = r[0];
 		for (auto &b : powerset_range(body)) {
 			// For each choice we compute the new rules
-			auto r1 = get_rule_from(head, b);
-			auto r2 = get_rule_from(r, b);
+			auto split = split_rule(r, b);
 			change c;
 			c.del.insert(r);
-			c.add.insert(r1);
-			c.add.insert(r2);
-			// TODO should we canonize the variables?
+			c.add.insert(split.first);
+			c.add.insert(split.second);
 			changes.emplace_back(c);
 		}
 	}
