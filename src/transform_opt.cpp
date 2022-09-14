@@ -126,26 +126,52 @@ private:
 
 /* Auxiliary function used during rule splitting. */
 
-flat_rule with_canonical_vars(flat_rule const &r) {
+flat_rule with_canonical_vars(const flat_rule &r) {
+	// TODO rename variables from -1 to -n.
+	return r;
+}
+
+// TODO move this function to a more general scope
+term make_temp_term(const ints &is) {
+	static int_t tab = 1 << 16;
+	term nt; for (auto &i: is) nt.emplace_back(i);
+	nt.tab = tab++;
+	return nt;
+}
+
+ints get_vars(const vector<term> &b) {
+	set<int_t> vs;
+	for (auto &t: b) for (auto &i: t)
+		if (i < 0) vs.insert(i);
+	return ints(vs.begin(), vs.end());
+}
+
+flat_rule create_rule_from(const vector<term> &b) {
+	flat_rule r;
+	ints vs = get_vars(b);
+	term head = make_temp_term(vs);
+	r.emplace_back(head);
+	for (auto &t: b) r.emplace_back(t);
+	return r;
+}
+
+flat_rule remove_from_rule(const flat_rule &fr, const vector<term> &b) {
+	flat_rule r;
+	r.emplace_back(fr[0]);
+	for (auto &t: b) r.emplace_back(t);
 	return r;
 }
 
 /* Split a rule according to a subset of terms of the body. */
 
-pair<flat_rule, flat_rule> split_rule(flat_rule const &r, vector<term> const &b) {
+pair<flat_rule, flat_rule> split_rule(const flat_rule &r, const vector<term> &b) {
 	// Rule using the elements of b and...
-	flat_rule r1;
-	r1.emplace_back(r[0]); 
-	for (auto &t: b) r1.emplace_back(t);
-	// rule using the remaining terms.
-	flat_rule r2;
-	r2.emplace_back(r[0]); 
-	for (auto &t: r) 
-		if (ranges::find(b, t) == b.end()) r2.emplace_back(t);
+	flat_rule r1 = create_rule_from(b);
+	flat_rule r2 = remove_from_rule(r, b);
 	return {with_canonical_vars(r1), with_canonical_vars(r2)};
 }
 
-vector<change> brancher_split_bodies(changed_prog& cp) {
+vector<change> brancher_split_bodies(const changed_prog &cp) {
 	vector<change> changes;
 	// For every rule and every possible subset of rules body we produce a
 	// change splitting the rule accordingly.
@@ -170,7 +196,7 @@ vector<change> brancher_minimize(changed_prog& cp) {
 	for(auto rr: cp.current) {
 		minimize_rule(rr, cp.current);
 	}
-	o::dbg() << "Minimized:" << endl << endl; // << mp.current << endl;
+	o::dbg() << "Minimized:" << endl << endl;
 	return changes; 
 } 
 
