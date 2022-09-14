@@ -41,7 +41,7 @@ We also would need a new additional brancher:
 The optimization algorithm should proceed as follows:
 
 * invoke the branchers on the FLAT PROGRAM, the proposed changes represent the actual operations to be performed and also the affected rules.
-* select the maximal set of non clashing changes (i.e. the maximal set of changes that affect different rules) and perform the indicated changes.
+* select a set of non clashing changes (i.e. the maximal set of changes that affect different rules) and perform the indicated changes.
 * for the remaining changes, iterate over the power set: for a given set of changes, applied them and go to first step.
 
 # Squaring + optimization
