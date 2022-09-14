@@ -36,6 +36,9 @@ set(TML_HEADERS
 	ir_builder.h
 	iterators.h
 	transform_opt.h
+	transform_opt_common.h
+	transform_opt_cqc.h
+	transform_opt_squaring.h
 	earley.h
 	typemanager.h
 )
@@ -63,6 +66,9 @@ set(TML_SOURCES
 	transform.cpp
 	transform_guards.cpp
 	transform_opt.cpp
+	transform_opt_common.cpp
+	transform_opt_cqc.cpp
+	transform_opt_squaring.cpp
 	utils.cpp
 	iterators.cpp
 	ir_builder.cpp
