@@ -124,15 +124,7 @@ private:
 	reference_wrapper<changed_prog> best_;
 };
 
-/*! Optimization plan accordignly to command line options. */
-
-struct plan {
-public:
-	vector<brancher> branchers;
-	reference_wrapper<bounder> bndr;
-
-	plan(bounder &b): bndr(b) {};
-};
+/* Auxiliary function used during rule splitting. */
 
 flat_rule with_canonical_vars(flat_rule const &r) {
 	return r;
