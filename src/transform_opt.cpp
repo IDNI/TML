@@ -37,12 +37,6 @@
 
 using namespace std;
 
-using flat_rule = vector<term>;
-using rel_arity = tuple<int_t, size_t>;
-using rule_index = map<rel_arity, set<flat_rule>>;
-using unification = map<int_t, int_t>;
-using selection = vector<flat_rule>;
-
 /* Branchers and changes. */
 
 /* Optimization branch and bound definitions. */
@@ -88,6 +82,7 @@ const cost_function exp_in_heads = [](const changed_prog &mp) {
 	}
 	return c;
 };
+
 /*! Computes the approximate cost of executing a given changed program. */
 
 using brancher = function<vector<change>(changed_prog&)>;

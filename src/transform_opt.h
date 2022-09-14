@@ -14,12 +14,6 @@
 #ifndef __TRANSFORM_OPT_H__
 #define __TRANSFORM_OPT_H__
 
-#include <vector>
-#include <map>
-#include <cmath>
-#include <functional>
-#include <limits>
-
 #include "ir_builder.h"
 #include "transform_opt_squaring.h"
 #include "transform_opt_cqc.h"
