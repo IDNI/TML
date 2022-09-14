@@ -14,7 +14,6 @@
 #ifndef __TRANSFORM_OPT_Z3_H__
 #define __TRANSFORM_OPT_Z3_H__
 
-#include "ir_builder.h"
 #include "transform_opt_common.h"
 
 flat_rule minimize_rule(flat_rule const &r, flat_prog const &p);

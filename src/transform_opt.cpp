@@ -225,28 +225,24 @@ void optimize_loop(changed_prog& mutated, bounder& bounder, vector<brancher>& br
 	}
 }
 
-/* O1 optimization, just split bodies. */
-
-using optimization_level = function<flat_prog(flat_prog&)>;
-
 flat_prog optimize_o1(const flat_prog &fp) {
 	// body splitting
-}
-
-flat_prog optimize_o2(const flat_prog& fp) {
-	// cqc and minimization
-}
-
-flat_prog optimize_o3(const flat_prog& fp) {
-	// optimal body splitting and cqc + minimization
 }
 
 flat_prog squaring_o1(const flat_prog &fp) {
 
 }
 
+flat_prog optimize_o2(const flat_prog& fp) {
+	// cqc and minimization
+}
+
 flat_prog squaring_o2(const flat_prog &fp) {
 
+}
+
+flat_prog optimize_o3(const flat_prog& fp) {
+	// optimal body splitting and cqc + minimization
 }
 
 flat_prog squaring_o3(const flat_prog &fp) {
