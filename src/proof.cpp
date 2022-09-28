@@ -21,6 +21,7 @@ using namespace std;
  * of a relation. */
 
 bool tables::is_term_valid(const term &t) {
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	for(const int_t &el : t) {
 		// Use the type bits to determine what the value limits should be
 		if(((el & 3) == 1 && (el >> 2) >= ir_handler->chars) ||
@@ -28,6 +29,7 @@ bool tables::is_term_valid(const term &t) {
 			((el & 3) == 0 && (el >> 2) >= ir_handler->syms) ||
 			(el & 3) == 3) return false;
 	}
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	return true;
 }
 
@@ -255,7 +257,10 @@ template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
 		if (opts.bproof != proof_mode::none)
 			get_proof(g, p, levels.size() - 1, refuted, explicit_rule_count),
 			get_forest(g, p);
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		else os << ir_handler->to_raw_term(g) << '.' << endl;
+		#endif  // REMOVE_IR_BUILDER_FROM_TABLES
+
 	// Print proofs
 	if (opts.bproof != proof_mode::none) print(os, p);
 	// Remove the auxilliary rules we created as they are no longer needed
@@ -304,7 +309,11 @@ void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visi
 
 	if(!visit.insert(&gh).second) return;
 	if( gh.type == gnode::gntype::symbol)
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		ss  << endl<< sp << size_t(&gh) << L"[label=\""<< " "<< ir_handler->to_raw_term(gh.t)<< L"\"];";
+		#else
+		;
+		#endif
 	else if (gh.type == gnode::gntype::pack)
 		ss  << endl<< sp << size_t(&gh) << L"[shape = \"point\" label=\""<< L"\"];";
 	else if (gh.type == gnode::gntype::interm)

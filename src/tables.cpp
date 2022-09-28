@@ -557,6 +557,7 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 //#ifdef TML_POP_UPDATE
 void tables::add_tml_update(const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
 	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
 	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
@@ -566,6 +567,7 @@ void tables::add_tml_update(const term& t, bool neg) {
 		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
 	args.insert(args.end(), t.begin(), t.end());
 	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 }
 //#endif
 template <typename T>
@@ -582,9 +584,10 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 		print(os << "#       ", r) << "\n#   ->  ";
 	}
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
-
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 		//#ifdef TML_POP_UPDATE
 		if (populate_tml_update) add_tml_update(x, r.neg);
 		//#endif
@@ -735,8 +738,11 @@ bool table::commit(DBG(size_t /*bits*/)) {
 
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		opts.pu_states.insert(ir_handler->get_table(
-				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
+				ir_handler->get_sig(dict.get_lexeme(tname), {0})))
+		#endif
+		;
 }
 
 bool tables::print_updates_check() {
@@ -833,6 +839,7 @@ bool tables::add_fixed_point_fact() {
 	static ntable tab;
 	static spbdd_handle h = 0;
 	if (!h) {
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		raw_term rt;
 		rt.arity = { 0 };
 		rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
@@ -840,6 +847,7 @@ bool tables::add_fixed_point_fact() {
 		tab = t.tab;
 		tbls[tab].hidden = true;
 		h = from_fact(t);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	}
 	if (tbls[tab].t != htrue) return tbls[tab].t = tbls[tab].t || h, true;
 	return false;
@@ -917,9 +925,10 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	strs_t strs;
 
 	if (!tbl.run_prog(rp, strs)) return false;
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	for(const term &result : tbl.decompress())
 		tmp_results.insert(tbl.ir_handler->to_raw_term(result));
-
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -992,8 +1001,10 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	#ifndef LOAD_STRS
 	for (auto x : strs) load_string(x.first, x.second);
 	#endif
-
+	
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	if (!ir_handler->transform_grammar(g, m)) return false;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	//if (!get_rules(move(m))) return false;
 	if (!get_rules(m)) return false;
@@ -1013,6 +1024,7 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	return true;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
@@ -1054,7 +1066,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
 			add_bit();
 		#endif
-	#endif
+	#endif // LOAD_STRS
 
 	if (!add_prog_wprod(fp, p.g)) return false;;
 
@@ -1106,9 +1118,14 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		measure_time_end();
 	return r;
 }
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
-	dict(dict_), opts(opts_), ir_handler(ir_handler_)/*, bltins(dict_) */{
+	dict(dict_), opts(opts_)
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	,ir_handler(ir_handler_)/*, bltins(dict_) */
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	{
 		init_builtins();
 }
 
@@ -1204,11 +1221,13 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 				if (p[pos(k, n, len)])
 					r[n] |= 1 << k;
 
-#ifdef BIT_TRANSFORM
+		#ifdef BIT_TRANSFORM
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		if (ir_handler->bitunv_decompress(r, tbl))
-#endif
-		f(r);
+		#endif
+		#endif
 
+		f(r);
 	})();
 }
 
@@ -1228,7 +1247,10 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
 			if(opts.show_hidden || !tbls[n].hidden) {
 				decompress(trues[n], n, [&os, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl; });
+					#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+					os << ir_handler->to_raw_term(r) << '.' << endl; 
+					#endif // REMOVE_IR_BUILDER_FROM_TABLES
+				});
 			}
 		}
 		return true;
@@ -1244,7 +1266,10 @@ bool tables::out_goals(std::basic_ostream<T>& os) {
 		if(compute_fixpoint(trues, falses, undefineds)) {
 			for (term t : goals) {
 				decompress(trues[t.tab], t.tab, [&os, this](const term& r) {
-					os << ir_handler->to_raw_term(r) << '.' << endl; });
+					#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+					os << ir_handler->to_raw_term(r) << '.' << endl; 
+					#endif // REMOVE_IR_BUILDER_FROM_TABLES
+					});
 			}
 		}
 		return true;
@@ -1271,7 +1296,10 @@ void tables::out(basic_ostream<T>& os, spbdd_handle x, ntable tab) const {
 
 void tables::out(spbdd_handle x, ntable tab, const rt_printer& f) const {
 	decompress(x&&tbls.at(tab).t, tab, [f, this](const term& r) {
-		f(ir_handler->to_raw_term(r)); });
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+		f(ir_handler->to_raw_term(r)); 
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	});
 }
 
 void tables::out(const rt_printer& f) const {

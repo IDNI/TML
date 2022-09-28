@@ -163,9 +163,10 @@ class tables {
 	friend class ir_builder;
 	friend class driver;
 	friend struct bit_univ;
-
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 private:
 
@@ -291,7 +292,9 @@ private:
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
+public:
 	std::set<term> decompress();
+private:
 	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
 	bool get_dnf_proofs(const term& q, proof& p, size_t level,
@@ -460,17 +463,33 @@ private:
 
 public:
 
+	struct progress {
+
+		void builtins_init(); // tables_builtins.cpp: 271
+
+
+	};
+
+	struct output {
+
+		void term(term &t);
+
+	};
+
 	rt_options opts;
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	ir_builder *ir_handler;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	builtins bltins;
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
 	size_t step() { return nstep; }
 	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
-
+	
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
+
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 

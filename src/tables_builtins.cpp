@@ -268,12 +268,14 @@ bool tables::init_print_builtins() {
 	auto printer = [this](bool ln, bool to, bool delim) {
 		return [this, ln, to, delim] (blt_ctx& c) {
 			//COUT << "printing ln/to/delim" << ln << "/" << to << "/" << delim << " " << to_raw_term(c.g) << endl;
+			#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 			print_to_delimited(ir_handler->to_raw_term(c.g), error, to, delim)
 				<< (ln ? "\n" : "")
-#ifdef __EMSCRIPTEN__
+				#ifdef __EMSCRIPTEN__
 				<< std::flush
-#endif
+				#endif
 				;
+			#endif
 		};
 	};
 	const bool NLN = false, NTO = false, NDLM = false;

@@ -12,7 +12,11 @@
 // modified over time by the Author.
 
 
-#ifdef TYPE_RESOLUTION
+//#ifdef TYPE_RESOLUTION
+
+#include "fof.h"
+
+using namespace std;
 
 #define ever ;;
 
@@ -40,7 +44,7 @@ void infer_types(vector<rule>& p, const map<rel, size_t>& rels) {
         };
         for (ever) {
                 bool b = false;
-                for (rule& r : p) b |= infer_types(r);
+                for (rule& r : p) b |= infer_rule(r);
                 if (!b) break;
         }
         for (const auto& x : m)
@@ -51,14 +55,12 @@ void infer_types(vector<rule>& p, const map<rel, size_t>& rels) {
 
 void infer_types(vector<rule>& p) {
         map<rel, size_t> rels;
-        set<rel> eur; // extensional unary relations
+        set<rel> eur; // extensional unary relations, not appear in any head.
         auto move_to_head = [&eur](rule& r) {
                 for (size_t n = 1; n < r.second.size(); ++n)
                         if (eur.find(r.second[n][0]) == eur.end()) continue;
-                        else (auto it = r.first.find(r.second[n][1];
-                                it == r.first.end()))
-                                r.emplace(r.second[n][1], r.second[n][0]),
-                                r.second.erase(n);
+                        else if (auto it = r.first.find(r.second[n][1]); it == r.first.end())
+                                r.emplace(r.second[n][1], r.second[n][0]), r.second.erase(n);
                         else if (it->second != r.second[n][0])
                                 throw "type mismatch for var n";
         };
@@ -76,4 +78,4 @@ void infer_types(vector<rule>& p) {
         infer_types(p, rels);
 }
 
-#endif
+//#endif

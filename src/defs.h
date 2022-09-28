@@ -191,4 +191,9 @@ typedef std::pair<int_t, ints> sig;
 #ifndef GIT_BRANCH
 #define GIT_BRANCH      "n/a"
 #endif
+
+#if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
+//#define REMOVE_IR_BUILDER_FROM_TABLES
 #endif
+
+#endif // __DEFS_H__
