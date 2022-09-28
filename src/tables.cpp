@@ -1082,10 +1082,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		o::ms() << "# pfp: " << endl; measure_time_start();
 	}
 
-	#define NPS_ATRUNTIME
-	#ifdef NPS_ATRUNTIME
 	nlevel begstep = nstep;
-	#endif
 
 	bool r = true;
 	// run program only if there are any rules
@@ -1104,7 +1101,6 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		r = pfp();
 	}
 
-	#ifdef NPS_ATRUNTIME
 	size_t went = nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
@@ -1117,7 +1113,6 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 			}
 		}
 	}
-	#endif
 
 	if (opts.optimize)
 		(o::ms() <<"# add_prog: "<<t << " pfp: "),
