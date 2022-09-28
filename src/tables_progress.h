@@ -63,10 +63,10 @@ class tables_progress {
 	}
 
 	void notify_run_prog(bdd_ref x) {
-			ir_handler.get().nums = std::max(ir_handler.get().nums, (int_t) x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler.get().chars = std::max(ir_handler.get().chars, (int_t) us.rel.size());
+		ir_handler.get().nums = std::max(ir_handler.get().nums, (int_t) x.second.size()+1);
+		unary_string us(32);
+		us.buildfrom(x.second);
+		ir_handler.get().chars = std::max(ir_handler.get().chars, (int_t) us.rel.size());
 
 	}
 

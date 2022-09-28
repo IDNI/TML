@@ -1024,7 +1024,6 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	return true;
 }
 
-#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step)
 {
@@ -1033,11 +1032,12 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	double t;
 	if (opts.optimize) measure_time_start();
 
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	flat_prog fp = ir_handler->to_terms(p);
 	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
-	#endif
+	#endif // FOL_V2
 	//DBG(ir_handler->opts.print_binarized = false;);
 
 	#ifndef LOAD_STRS
@@ -1050,10 +1050,15 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 			ir_handler->chars = max(ir_handler->chars, (int_t)us.rel.size());
 		}
 	}
-	#else
+	#else // LOAD_STRS
 	ir_handler->load_strings_as_fp(fp, strs_in);
-	#endif
+	#endif // LOAD_STRS
+	#else // REMOVE_IR_BUILDER_FROM_TABLES
+	// We left fp as empty flat_prog until run methods refactor refactor .
+	flat_prog fp;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	ir_handler->syms = dict.nsyms();
 	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		bits = 1;
@@ -1066,7 +1071,8 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		while (max(max(ir_handler->nums, ir_handler->chars), ir_handler->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
 			add_bit();
 		#endif
-	#endif // LOAD_STRS
+	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	if (!add_prog_wprod(fp, p.g)) return false;;
 
@@ -1118,7 +1124,6 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		measure_time_end();
 	return r;
 }
-#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
 	dict(dict_), opts(opts_)

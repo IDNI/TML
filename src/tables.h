@@ -163,10 +163,8 @@ class tables {
 	friend class ir_builder;
 	friend class driver;
 	friend struct bit_univ;
-#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
-#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 private:
 
