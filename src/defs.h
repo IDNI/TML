@@ -193,7 +193,7 @@ typedef std::pair<int_t, ints> sig;
 #endif
 
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
-//#define REMOVE_IR_BUILDER_FROM_TABLES
+//#define REMOVE_IR_BUILDER_FROM_TABLES=1
 #endif
 
 #endif // __DEFS_H__

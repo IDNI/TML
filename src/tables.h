@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-//#ifndef __TABLES__
-//#define __TABLES__
+#ifndef __TABLES_H__
+#define __TABLES_H__
 
 #include <map>
 #include <vector>
@@ -166,6 +166,10 @@ class tables {
 public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 
+	struct progress {
+		virtual ~progress() {};
+	};
+
 private:
 
 	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
@@ -187,6 +191,7 @@ private:
 		}
 	};
 
+public:
 	struct proof_elem {
 		size_t rl, al;
 		std::vector<std::pair<nlevel, term>> b;
@@ -198,6 +203,7 @@ private:
 	};
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 
+private:
 	nlevel nstep = 0;
 
 	std::vector<table> tbls;
@@ -214,6 +220,10 @@ private:
 	#else
 	size_t bits = 2;
 	#endif
+
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	progress tp;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
@@ -461,13 +471,6 @@ private:
 
 public:
 
-	struct progress {
-
-		void builtins_init(); // tables_builtins.cpp: 271
-
-
-	};
-
 	struct output {
 
 		void term(term &t);
@@ -542,3 +545,5 @@ struct infloop_exception : public unsat_exception {
 	}
 };
 #endif
+
+#endif // __TABLES_H__

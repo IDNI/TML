@@ -554,22 +554,6 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
-//#ifdef TML_POP_UPDATE
-void tables::add_tml_update(const term& t, bool neg) {
-	// TODO: decompose nstep if too big for the current universe
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
-	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
-	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
-	arity[0] += 3;
-	ntable tab = ir_handler->get_table(ir_handler->get_sig(rel_tml_update, arity));
-	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
-		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
-	args.insert(args.end(), t.begin(), t.end());
-	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-}
-//#endif
 template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)

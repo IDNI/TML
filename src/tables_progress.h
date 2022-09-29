@@ -29,8 +29,8 @@
  * a straightforward consumer as all the functions return void. In a more complex 
  * scenario they could return a boolean to point if the execution should continue
  * or a more complex object to fine tune the forthcoming execution. */
-class tables_progress {
-
+class tables_progress : public tables::progress {
+public:
 	/* This objects are part of tables rightnow, the main task of this class
 	 * is to remove them from tables. The label REMOVE_IR_BUILDER_FROM_TABLES
 	 * control wheter this class is used or not. */
@@ -47,7 +47,6 @@ class tables_progress {
 			dict.get().get_sym(dict.get().get_rel_lexeme(tbls[t.tab].s.first)) };
 		args.insert(args.end(), t.begin(), t.end());
 		tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1))); /* refactor from_fact function */
-
 	}
 
 	void notify_add_fixedpoint_fact(std::vector<table> &tbls) {
@@ -60,6 +59,11 @@ class tables_progress {
 		tab = t.tab;
 		tbls[tab].hidden = true;
 		h = from_fact(t); /* refactor from_fact function */
+	}
+
+	template <typename T>
+	void notify_out_goals(term t, std::basic_ostream<T>& os) {
+		os << ir_handler.get().to_raw_term(t) << ", " << '.'
 	}
 
 	void notify_run_prog(bdd_ref x) {
@@ -90,7 +94,7 @@ class tables_progress {
 
 	#ifdef BIT_TRANSFORM
 	void notify_decompress(table tbl, term r) {
-		if (ir_handler->bitunv_decompress(r, tbl))
+		if (ir_handler.get()bitunv_decompress(r, tbl))
 	}
 	#endif
 
@@ -129,12 +133,7 @@ class tables_progress {
 	void notify_print(term t, std::basic_ostream<T>& os) {
 		os << ir_handler->to_raw_term(t) << ", " << '.'
 	}
-
-	template <typename T>
-	void notify_out_goals(term t, std::basic_ostream<T>& os) {
-		os << ir_handler->to_raw_term(t) << ", " << '.'
-	}
-}
+};
 
 #endif // REMOVE_IR_BUILDER_FROM_TABLES
 #endif // _TABLES_PROGRESS_H_
