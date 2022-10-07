@@ -360,6 +360,7 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 			emeasure_time_end(tsp, tep)<<"\n";
 		}
 #endif
+
 /*
 #ifdef DEBUG
 		for (auto i : S) {

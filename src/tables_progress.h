@@ -24,6 +24,7 @@
 #include "dict.h"
 #include "output.h"
 #include "tables.h"
+#include "printing.h"
 
 /*! This class monitors the progress of the execution of tables. Right now it is
  * a straightforward consumer as all the functions return void. In a more complex 
@@ -36,20 +37,43 @@ public:
 	 * control wheter this class is used or not. */
 	std::reference_wrapper<dict_t> dict;
 	std::reference_wrapper<ir_builder> ir_handler;
+	std::reference_wrapper<std::ostream_t> os;
 
-	void notify_add_tml_update(std::vector<table> &tbls, int_t nstep, int_t rel_tml_update, bool neg, int_t sym_add, int_t sym_del) {
-		ir_handler.get().nums = std::max(ir_handler.get().nums, nstep);
+	void add_tml_update((const term& t, bool neg){
+		ir_handler.get().nums = std::max(ir_handler.get().nums, ts.nstep);
 		//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
 		ints arity = { (int_t) ir_handler.get().sig_len(tbls.at(t.tab).s)};
 		arity[0] += 3;
-		ntable tab = ir_handler.get().get_table(ir_handler.get().get_sig(rel_tml_update, arity));
-		ints args = { mknum(nstep), (neg ? sym_del : sym_add),
+		ntable tab = ir_handler.get().get_table(ir_handler.get().get_sig(ts.rel_tml_update, ts.arity));
+		ints args = { mknum(ts.nstep), (neg ? ts.sym_del : ts.sym_add),
 			dict.get().get_sym(dict.get().get_rel_lexeme(tbls[t.tab].s.first)) };
 		args.insert(args.end(), t.begin(), t.end());
-		tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1))); /* refactor from_fact function */
+		tbls[tab].add.push_back(from_fact(term(false, ts.tab, ts.args, 0, -1))); /* refactor from_fact function */
 	}
 
-	void notify_add_fixedpoint_fact(std::vector<table> &tbls) {
+	void notify_update(tables &ts, spbdd_handle& x, 
+			const rule& r) override {
+		nlevel step             = nstep - 1;
+		static bool   printed   = false;
+		static nlevel last_step = step;
+		if (last_step != step) printed = false, last_step = step;
+		if (print_updates) {
+			if (!print_steps && !printed)
+				os << "# step: " << step << endl, printed = true;
+			print(os << "#       ", r) << "\n#   ->  ";
+		}
+		decompress(x, r.tab, [&os, &r, this](const term& x) {
+			#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+			if (print_updates)
+				os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
+			#endif // REMOVE_IR_BUILDER_FROM_TABLES
+			if (populate_tml_update) add_tml_update(x, r.neg);
+		});
+		if (print_updates) os << endl;
+		return os;
+	}
+
+	void notify_fixedpoint(std::vector<table> &tbls) {
 		ntable tab;
 		static spbdd_handle h = 0;
 		raw_term rt;
@@ -62,7 +86,7 @@ public:
 	}
 
 	template <typename T>
-	void notify_out_goals(term t, std::basic_ostream<T>& os) {
+	void notify_out_goals(term t) {
 		os << ir_handler.get().to_raw_term(t) << ", " << '.'
 	}
 
@@ -84,7 +108,7 @@ public:
 				ir_handler.get().get_sig(dict.get().get_lexeme(tname), {0})));
 	}
 
-	void notify_decompress_update(rule &r, spbdd_handle& x, ostream_t& os) {
+	void notify_decompress_update(rule &r, spbdd_handle& x) {
 		os << (r.neg ? "~" : "") << ir_handler.get().to_raw_term(x) << ". ";
 	}
 
@@ -98,11 +122,11 @@ public:
 	}
 	#endif
 
-	void notify_out_fixpoint(term r, ostream_t& os) {
+	void notify_out_fixpoint(term r) {
 		os << ir_handler.get().to_raw_term(r) << '.' << std::endl; 
 	}
 
-	void notify_get_proof(term &t, ostream_t& os) {
+	void notify_get_proof(term &t) {
 		os << ir_handler.get().to_raw_term(t) << '.' << std::endl;
 	}
 
@@ -119,18 +143,18 @@ public:
 		ss  << std::endl<< sp << size_t(&gh) << L"[label=\""<< " "<< ir_handler.get().to_raw_term(gh.t)<< L"\"];";
 	}
 
-	void notify_print(term t, std::basic_ostream<T>& os) {
+	void notify_print(term t) {
 		os << b.first << ' ' << ir_handler.get().to_raw_term(b.second) << ' ';
 	}
 	
 	template <typename T>
-	void notify_print(size_t n, tables::proof_elem y, std::set<tables::proof_elem> x, std::basic_ostream<T>& os) {
+	void notify_print(size_t n, tables::proof_elem y, std::set<tables::proof_elem> x) {
 		(os<<n<<' '<<ir_handler.get().to_raw_term(x)<<" :- "),
 		print(os, y);
 	}
 
 	template <typename T>
-	void notify_print(term t, std::basic_ostream<T>& os) {
+	void notify_print(term t) {
 		os << ir_handler->to_raw_term(t) << ", " << '.'
 	}
 };

@@ -2185,10 +2185,12 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		//DBG(o::dbg()<<rts.back()<<endl);
 	}
 	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
 		<< "# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	return true;
 	#endif // ONLY_EARLEY
 
@@ -2301,10 +2303,12 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		transform_grammar_constraints(x, v, p, refs);
 		p.insert(move(v));
 	}
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
 		<< "\n# after transform_grammar:\n", p)
 		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
 		<< endl;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	return true;
 }
 

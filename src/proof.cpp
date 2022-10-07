@@ -33,6 +33,8 @@ bool tables::is_term_valid(const term &t) {
 	return true;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+
 /* Get the proofs of the given term occuring at the given level stemming
  * directly from a DNF rule head. Do this by querying the corresponding
  * instrumentation facts. They will tell us which rules derived the given fact
@@ -186,6 +188,7 @@ bool tables::get_proof(const term& q, proof& p, const size_t level,
 	p[level][q];
 	return true;
 }
+#endif
 
 /* For the given table and sign, make a rule that positively or negatively
  * carries all table facts from the previous step to the next step. */
@@ -219,6 +222,7 @@ rule tables::new_identity_rule(const ntable tab, const bool neg) {
 	return rul;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 /* Print proof trees for each goal in the program. Do this by doing a backward
  * chain over the levels structure, which contains the entirity of facts
  * derivable by the given program from the given initial database. */
@@ -269,6 +273,7 @@ template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
 }
 template bool tables::get_proof(std::basic_ostream<char>&);
 template bool tables::get_proof(std::basic_ostream<wchar_t>&);
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 std::set<const gnode*> gnode::visited;
 std::map<std::set<term>, gnode*> gnode::interm2g;
@@ -348,6 +353,7 @@ bool tables::build_graph( std::map<term , gnode*> &tg, proof &p, gnode &g){
 	return true;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 gnode* tables::get_forest(const term& t, proof& p ) {
 
 	std::map<term, gnode*> tg;
@@ -382,3 +388,4 @@ gnode* tables::get_forest(const term& t, proof& p ) {
 	}
 	return root;
 }
+#endif // REMOVE_IR_BUILDER_FROM_TABLES

@@ -554,6 +554,21 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
+void tables::add_tml_update(const term& t, bool neg) {
+	// TODO: decompose nstep if too big for the current universe
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
+	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
+	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
+	arity[0] += 3;
+	ntable tab = ir_handler->get_table(ir_handler->get_sig(rel_tml_update, arity));
+	ints args = { mknum(nstep), (neg ? sym_del : sym_add),
+		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
+	args.insert(args.end(), t.begin(), t.end());
+	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+}
+
 template <typename T>
 basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 	spbdd_handle& x, const rule& r)
@@ -571,10 +586,10 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
+		#else
+		// TODO write something
 		#endif // REMOVE_IR_BUILDER_FROM_TABLES
-		//#ifdef TML_POP_UPDATE
 		if (populate_tml_update) add_tml_update(x, r.neg);
-		//#endif
 	});
 	if (print_updates) os << endl;
 	return os;
@@ -720,6 +735,8 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
+
+// TODO opts must be static, no changes should be allowed
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
 		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
@@ -749,7 +766,13 @@ char tables::fwd() noexcept {
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 		if (populate_tml_update || (print_updates &&
-			print_updates_check())) decompress_update(o::inf(),x,r);
+			print_updates_check())) 
+			#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+			;
+			// TODO write something
+			#else 
+			decompress_update(o::inf(),x,r);
+			#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	}
 	bool b = false;
 	// D: just temp ugly static, move this out of fwd/pass in, or in tables.
@@ -823,7 +846,9 @@ bool tables::add_fixed_point_fact() {
 	static ntable tab;
 	static spbdd_handle h = 0;
 	if (!h) {
-		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+		// TODO write something
+		#else
 		raw_term rt;
 		rt.arity = { 0 };
 		rt.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
@@ -1222,6 +1247,7 @@ set<term> tables::decompress() {
 	return r;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 /* If this sequence of databases has a fixpoint, then print it out and return
  * true. Otherwise return false. */
 template <typename T>
@@ -1231,7 +1257,9 @@ bool tables::out_fixpoint(basic_ostream<T>& os) {
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
 			if(opts.show_hidden || !tbls[n].hidden) {
 				decompress(trues[n], n, [&os, this](const term& r) {
-					#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+					tp.notify_output(r);
+					#else
 					os << ir_handler->to_raw_term(r) << '.' << endl; 
 					#endif // REMOVE_IR_BUILDER_FROM_TABLES
 				});
@@ -1250,7 +1278,9 @@ bool tables::out_goals(std::basic_ostream<T>& os) {
 		if(compute_fixpoint(trues, falses, undefineds)) {
 			for (term t : goals) {
 				decompress(trues[t.tab], t.tab, [&os, this](const term& r) {
-					#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+					tp.notify_output(t);
+					#else
 					os << ir_handler->to_raw_term(r) << '.' << endl; 
 					#endif // REMOVE_IR_BUILDER_FROM_TABLES
 					});
@@ -1290,6 +1320,7 @@ void tables::out(const rt_printer& f) const {
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab)
 		if (opts.show_hidden || !tbls[tab].hidden) out(tbls[tab].t, tab, f);
 }
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 #ifdef __EMSCRIPTEN__
 // o is `tabular_collector` - JS object with methods:

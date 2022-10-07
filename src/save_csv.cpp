@@ -16,6 +16,7 @@ using namespace std;
 
 void driver::save_csv() const {
 	map<elem, ofstream> files;
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	tbl->out([&files](const raw_term& t) {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
@@ -43,4 +44,5 @@ void driver::save_csv() const {
 		}
 		os << endl;
 	});
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 }

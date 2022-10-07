@@ -175,7 +175,7 @@ void repl::out_dict(wostream& os) {
 }
 void repl::out_dict(ostream& os) {
 	ostringstream_t ss;
-	d->out_dict(ss);
+	d->out_dict(os);
 #ifdef WITH_WCHAR
 	os << ws2s(ss.str());
 #else

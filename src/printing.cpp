@@ -692,6 +692,7 @@ template basic_ostream<char>& operator<<(basic_ostream<char>&, const options&);
 template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const options&);
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
 	if (e.rl != (size_t)-1) os << '[' << e.rl << ',' << e.al << "] ";
@@ -702,8 +703,10 @@ void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
 		;
 	os << endl;
 }
+
 template
 void tables::print<char>(basic_ostream<char>&, const tables::proof_elem&);
+
 template
 void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof_elem&);
 
@@ -712,16 +715,15 @@ void tables::print(basic_ostream<T>& os, const tables::proof& p) {
 	for (size_t n = 0; n != p.size(); ++n)
 		for (const auto& x : p[n]) {
 			for (const auto& y : x.second)
-				#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 				(os<<n<<' '<<ir_handler->to_raw_term(x.first)<<" :- "),
 				print(os, y)
-				#endif
 				;
 
-		}
+		};
 }
 template void tables::print<char>(basic_ostream<char>&, const tables::proof&);
 template
+
 void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::proof&);
 
 #ifdef DEBUG
@@ -729,9 +731,7 @@ template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::witness& w) {
 	os << '[' << w.rl << ',' << w.al << "] ";
 	for (const term& t : w.b) 
-		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		os << ir_handler->to_raw_term(t) << ", " << '.'
-		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	;
 }
 
@@ -760,9 +760,7 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const vector<term>& v) con
 	os << " :- ";
 	for (size_t n = 1; n != v.size(); ++n) {
 		if (v[n].goal) os << '!';
-		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		os << ir_handler->to_raw_term(v[n]) << (n == v.size() - 1 ? "." : ", ");
-		#endif
 	}
 	return os;
 }
@@ -779,19 +777,10 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const flat_prog& p) const{
 template basic_ostream<char>& tables::print(basic_ostream<char>&, const flat_prog&) const;
 template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const flat_prog&) const;
 
-template <typename T>
-basic_ostream<T>& tables::print_dict(basic_ostream<T>& os) const {
-	return os << dict;
-}
-template basic_ostream<char>& tables::print_dict(basic_ostream<char>&) const;
-template basic_ostream<wchar_t>& tables::print_dict(basic_ostream<wchar_t>&) const;
-
 // rule printer for --print_updates
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	os << ir_handler->to_raw_term(r.t) << " :- ";
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	//if (r.f) os << "(form printing not supported yet)"; // TODO fix transform_bin
 	for (auto it = r.begin(); it != r.end(); ++it) {
 		for (size_t n = 0; n != (*it)->bltins.size(); ++n) {
@@ -841,8 +830,17 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os) const {
 		print(os << "# " << n << " ", tbls[n]);
 	return os << "# -" << endl;
 }
+
 template basic_ostream<char>& tables::print(basic_ostream<char>&) const;
 template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const;
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
+template <typename T>
+basic_ostream<T>& tables::print_dict(basic_ostream<T>& os) const {
+	return os << dict;
+}
+template basic_ostream<char>& tables::print_dict(basic_ostream<char>&) const;
+template basic_ostream<wchar_t>& tables::print_dict(basic_ostream<wchar_t>&) const;
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {

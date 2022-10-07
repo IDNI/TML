@@ -160,15 +160,11 @@ class tables {
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
+	// TODO #ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	friend class ir_builder;
+	// TODO #endif // REMOVE_IR_BUILDER_FROM_TABLES
 	friend class driver;
 	friend struct bit_univ;
-public:
-	typedef std::function<void(const raw_term&)> rt_printer;
-
-	struct progress {
-		virtual ~progress() {};
-	};
 
 private:
 
@@ -179,6 +175,7 @@ private:
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
 
+public:
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -191,7 +188,6 @@ private:
 		}
 	};
 
-public:
 	struct proof_elem {
 		size_t rl, al;
 		std::vector<std::pair<nlevel, term>> b;
@@ -201,7 +197,21 @@ public:
 			return b < t.b;
 		}
 	};
+
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
+
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	typedef std::function<void(const raw_term&)> rt_printer;
+	#endif
+
+/*	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	struct visitor {
+		virtual ~visitor() = default;
+		virtual void visit(const tables &ts) = 0;
+	};
+	void accept(visitor &v) { v.visit(tables); }
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+*/
 
 private:
 	nlevel nstep = 0;
@@ -220,10 +230,6 @@ private:
 	#else
 	size_t bits = 2;
 	#endif
-
-	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
-	progress tp;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
@@ -436,6 +442,7 @@ private:
 
 	//-------------------------------------------------------------------------
 	//printer
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	template <typename T>
 	void print(std::basic_ostream<T>&, const proof_elem&);
 	template <typename T>
@@ -466,15 +473,14 @@ private:
 	template <typename T>
 	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
 		const;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
-
 public:
 
 	struct output {
 
 		void term(term &t);
-
 	};
 
 	rt_options opts;
@@ -485,43 +491,40 @@ public:
 
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
 	~tables();
-	size_t step() { return nstep; }
-	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 	
+	size_t step() { return nstep; }
+	
+	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
-
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
-
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
+	
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	template <typename T> void out(std::basic_ostream<T>&) const;
 	template <typename T> bool out_fixpoint(std::basic_ostream<T>& os);
 	template <typename T> bool out_goals(std::basic_ostream<T>&);
 	void out(const rt_printer&) const;
-
-//#ifdef PROOFS
+	void out(spbdd_handle, ntable, const rt_printer&) const;
 	template <typename T>
 	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
-	void out(spbdd_handle, ntable, const rt_printer&) const;
 	template <typename T>bool get_proof(std::basic_ostream<T>& os);
-	void set_proof(proof_mode v) { opts.bproof = v; }
-//#endif
+	#endif
 
+	void set_proof(proof_mode v) { opts.bproof = v; }
+	dict_t& get_dict() { return dict; }
 
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
 
-	dict_t& get_dict() { return dict; }
-
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-
 	void add_print_updates_states(const std::set<std::string> &tlist);
+
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;

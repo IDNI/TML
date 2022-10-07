@@ -243,7 +243,23 @@ class driver {
 	input* current_input = 0;
 	size_t current_input_id = 0;
 
+
 public:
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	template <typename T>
+	void out_goals(std::basic_ostream<T> os);
+	template <typename T>
+	void out_fixpoint(std::basic_ostream<T> os);
+	template <typename T>
+	void out_proof(std::basic_ostream<T> os);
+	void out_result() { /* TODO something */}
+	template <typename T>
+	void out(std::basic_ostream<T>& os) { /* TODO something*/ }
+	#endif
+
+	template <typename T>
+	void out_dict(std::basic_ostream<T>& os)  { /* TODO something */ }
+
 	bool result = false;
 	bool error = false;
 	driver(const options& o);
@@ -281,6 +297,7 @@ public:
 	void info(std::basic_ostream<T>&);
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	template <typename T>
 	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
 	void out_result() {
@@ -292,10 +309,17 @@ public:
 #endif
 		}
 	}
-	template <typename T>
-	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	void dump() { out(o::dump()); }
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
+	void dump() { 
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+		out(o::dump()); 
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	}
 	void save_csv() const;
 	
 #ifdef __EMSCRIPTEN__

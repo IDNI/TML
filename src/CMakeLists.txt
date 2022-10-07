@@ -36,7 +36,9 @@ set(TML_HEADERS
 	printing.h
 	tables.h
 	tables_progress.h
+	tables_printer.h
 	typemanager.h
+	internal.h
 )
 
 set(TML_SOURCES

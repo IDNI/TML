@@ -18,6 +18,8 @@
 #include <fstream>
 #include <memory>
 #include <algorithm>
+
+#include "internal.h"
 #include "defs.h"
 
 class output {
