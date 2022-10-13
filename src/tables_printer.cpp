@@ -11,12 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifndef _TABLES_PRINTING_H_
-#define _TABLES_PRINSTING_H_
-
-#include "tables.h"
-#include "ir_builder.h"
-#include "dict.h"
+#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+#include "driver.h"
 
 void driver::out_goals(std::basic_ostream<T> os) {
 	if (ts.goals.size()) {
@@ -96,6 +92,8 @@ void driver::out_proof(std::basic_ostream<T> os) {
 	rules.resize(explicit_rule_count);
 	return goals.size() || opts.bproof != proof_mode::none;	
 }
+
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 /* 
 template <typename T>
@@ -450,4 +448,3 @@ public:
 
 };
 */
-#endif // _TABLES_PRINTING_H_

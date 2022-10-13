@@ -36,9 +36,7 @@ set(TML_HEADERS
 	printing.h
 	tables.h
 	tables_progress.h
-	tables_printer.h
 	typemanager.h
-	internal.h
 )
 
 set(TML_SOURCES
@@ -61,6 +59,7 @@ set(TML_SOURCES
 	save_csv.cpp
 	tables.cpp
 	tables_progress.cpp
+	tables_printer.cpp
 	tables_builtins.cpp
 	tables_ext.cpp
 	tml_earley.cpp

@@ -154,17 +154,27 @@ struct table {
 	inline bool is_builtin() const { return idbltin > -1; }
 };
 
+#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+class progress {
+public:
+	progress() {};
+	virtual ~progress() = default;
+	virtual void notify_update(tables &ts, spbdd_handle& x, const rule& r) = 0;
+};
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
-	// TODO #ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	friend class ir_builder;
-	// TODO #endif // REMOVE_IR_BUILDER_FROM_TABLES
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	friend class driver;
 	friend struct bit_univ;
+	friend struct progress;
 
 private:
 
@@ -176,6 +186,7 @@ private:
 	std::set<alt*, ptrcmp<alt>> alts;
 
 public:
+
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -204,19 +215,10 @@ public:
 	typedef std::function<void(const raw_term&)> rt_printer;
 	#endif
 
-/*	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	struct visitor {
-		virtual ~visitor() = default;
-		virtual void visit(const tables &ts) = 0;
-	};
-	void accept(visitor &v) { v.visit(tables); }
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-*/
-
-private:
 	nlevel nstep = 0;
 
 	std::vector<table> tbls;
+private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -294,7 +296,6 @@ private:
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-	spbdd_handle from_fact(const term& t);
 
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
 	uints addtail(size_t len1, size_t len2) const;
@@ -304,9 +305,10 @@ private:
 
 //#ifdef PROOF
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+public:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
-public:
+	spbdd_handle from_fact(const term& t);
 	std::set<term> decompress();
 private:
 	rule new_identity_rule(ntable tab, bool neg);
@@ -351,7 +353,11 @@ private:
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	char fwd() noexcept;
+	#else 
+	char fwd(progress& p) noexcept;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
@@ -361,15 +367,20 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 #endif
+public:
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
+private:
 	void init_tml_update();
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	void add_tml_update(const term& rt, bool neg);
 	template <typename T>
 	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-			spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	bool print_updates_check();
 
 	//-------------------------------------------------------------------------
@@ -495,11 +506,22 @@ public:
 	size_t step() { return nstep; }
 	
 	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
+
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, const options &opts, std::set<raw_term> &results);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
 		size_t break_on_step = 0);
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
+	#else 
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results,
+		progress& p);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+		size_t break_on_step, progress& ps);
+	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
 	
@@ -523,8 +545,10 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
+	#ifndef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
 	void add_print_updates_states(const std::set<std::string> &tlist);
-
+	#endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
+	
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;

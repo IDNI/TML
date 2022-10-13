@@ -554,9 +554,9 @@ void tables::get_sym(int_t sym, size_t arg, size_t args, spbdd_handle& r) const{
 	for (size_t k = 0; k != bits; ++k) r = r && from_bit(k, arg, args, sym);
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 void tables::add_tml_update(const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	ir_handler->nums = max(ir_handler->nums, (int_t)nstep);
 	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
 	ints arity = { (int_t) ir_handler->sig_len(tbls.at(t.tab).s)};
@@ -566,7 +566,6 @@ void tables::add_tml_update(const term& t, bool neg) {
 		dict.get_sym(dict.get_rel_lexeme(tbls[t.tab].s.first)) };
 	args.insert(args.end(), t.begin(), t.end());
 	tbls[tab].add.push_back(from_fact(term(false, tab, args, 0, -1)));
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 }
 
 template <typename T>
@@ -583,17 +582,14 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 		print(os << "#       ", r) << "\n#   ->  ";
 	}
 	decompress(x, r.tab, [&os, &r, this](const term& x) {
-		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		if (print_updates)
 			os << (r.neg ? "~" : "") << ir_handler->to_raw_term(x) << ". ";
-		#else
-		// TODO write something
-		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 		if (populate_tml_update) add_tml_update(x, r.neg);
 	});
 	if (print_updates) os << endl;
 	return os;
 }
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 void tables::init_tml_update() {
 	rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
@@ -735,7 +731,7 @@ bool table::commit(DBG(size_t /*bits*/)) {
 	return x != t && (t = x, true);
 }
 
-
+#ifndef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
 // TODO opts must be static, no changes should be allowed
 void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 	for (const std::string& tname : tlist)
@@ -745,6 +741,7 @@ void tables::add_print_updates_states(const std::set<std::string> &tlist) {
 		#endif
 		;
 }
+#endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
 
 bool tables::print_updates_check() {
 	if (!opts.pu_states.size()) return true;
@@ -753,7 +750,11 @@ bool tables::print_updates_check() {
 	return false;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 char tables::fwd() noexcept {
+#else 
+char tables::fwd(progress& p) noexcept {
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	for (rule& r : rules) {
 		bdd_handles v(r.size());
 		spbdd_handle x;
@@ -765,10 +766,9 @@ char tables::fwd() noexcept {
 		//DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
-		if (populate_tml_update || (print_updates &&
-			print_updates_check())) 
+		if (populate_tml_update || (print_updates && print_updates_check())) 
 			#ifdef REMOVE_IR_BUILDER_FROM_TABLES
-			;
+			p.notify_update(*this, x, r);
 			// TODO write something
 			#else 
 			decompress_update(o::inf(),x,r);
@@ -862,7 +862,11 @@ bool tables::add_fixed_point_fact() {
 	return false;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::pfp(size_t nsteps, size_t break_on_step) {
+#else
+bool tables::pfp(size_t nsteps, size_t break_on_step, progress& ps) {
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	error = false;
 	bdd_handles l = get_front();
 	fronts.push_back(l);
@@ -870,10 +874,22 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
 	for (;;) {
 		if (print_steps) o::inf() << "# step: " << nstep << endl;
 		++nstep;
+
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		bool fwd_ret = fwd();
+		#else
+		bool fwd_ret = fwd(ps);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 		if (halt) return true;
 		bdd_handles l = get_front();
+
+		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp(0, 0, ps);
+		#else
 		if (!fwd_ret && opts.fp_step && add_fixed_point_fact()) return pfp();
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 		fronts.push_back(l);
 		if (halt) return true;
 		if (unsat) return contradiction_detected();
@@ -892,9 +908,14 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
  * given program reaches a fixed point. Useful for query containment
  * checks. */
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
-	const ::options &opts, set<raw_term> &results)
-{
+	const ::options &opts, set<raw_term> &results) {
+#else 
+static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+	dict_t &dict, const options &opts, std::set<raw_term> &results,
+	progress& p) {
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
 	// generated alias.
@@ -932,9 +953,10 @@ bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	ir_handler.dynenv = &tbl;
 	ir_handler.printer = &tbl;
 	strs_t strs;
-
-	if (!tbl.run_prog(rp, strs)) return false;
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	if (!tbl.run_prog(rp, strs, 0, 0, p)) return false;
+	#else // REMOVE_IR_BUILDER_FROM_TABLES
+	if (!tbl.run_prog(rp, strs, 0, 0)) return false;
 	for(const term &result : tbl.decompress())
 		tmp_results.insert(tbl.ir_handler->to_raw_term(result));
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -1012,6 +1034,7 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	#endif
 	
 	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	// TODO this call must be done in the driver
 	if (!ir_handler->transform_grammar(g, m)) return false;
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
@@ -1033,15 +1056,20 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	return true;
 }
 
+#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
-	size_t break_on_step)
-{
+	size_t break_on_step) {
+#else
+bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
+	size_t break_on_step, progress& ps) {
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	DBG(o::dbg() << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (opts.optimize) measure_time_start();
 
 	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	// TODO move this call to the driver
 	flat_prog fp = ir_handler->to_terms(p);
 	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
@@ -1062,12 +1090,6 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#else // LOAD_STRS
 	ir_handler->load_strings_as_fp(fp, strs_in);
 	#endif // LOAD_STRS
-	#else // REMOVE_IR_BUILDER_FROM_TABLES
-	// We left fp as empty flat_prog until run methods refactor refactor .
-	flat_prog fp;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	ir_handler->syms = dict.nsyms();
 	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		bits = 1;
@@ -1081,9 +1103,13 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 			add_bit();
 		#endif
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+	#else // REMOVE_IR_BUILDER_FROM_TABLES
+	// TODO refactor run methods to recieve the flat_prog directly.
+	flat_prog fp;
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-
-	if (!add_prog_wprod(fp, p.g)) return false;;
+	
+	// TOODO this call must be done in the driver
+	if (!add_prog_wprod(fp, p.g)) return false;
 
 	//----------------------------------------------------------
 	if (opts.optimize) {
@@ -1097,7 +1123,11 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	// run program only if there are any rules
 	if (rules.size()) {
 		fronts.clear();
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		r = pfp(steps ? nstep + steps : 0, break_on_step);
+		#else 
+		r = pfp(steps ? nstep + steps : 0, break_on_step, ps);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	} else {
 		bdd_handles l = get_front();
 		fronts = {l, l};
@@ -1107,14 +1137,22 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	// but it should be restructured
 	if (r && prog_after_fp.size()) {
 		if (!add_prog_wprod(move(prog_after_fp), {})) return false;
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		r = pfp();
+		#else 
+		r = pfp(0, 0, ps);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	}
 
 	size_t went = nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = nstep;
+			#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 			r = run_prog(np, strs_in, steps, break_on_step);
+			#else 
+			r = run_prog(np, strs_in, steps, break_on_step, ps);
+			#endif // REMOVE_IR_BUILDER_FROM_TABLES
 			went = nstep - begstep;
 			if (!r && went >= steps) {
 				//assert(false && "!r && went >= steps");
@@ -1124,15 +1162,14 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	}
 
 	if (opts.optimize)
-		(o::ms() <<"# add_prog: "<<t << " pfp: "),
-		measure_time_end();
+		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
 	return r;
 }
 
 tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
 	dict(dict_), opts(opts_)
 	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	,ir_handler(ir_handler_)/*, bltins(dict_) */
+	, ir_handler(ir_handler_)/*, bltins(dict_) */
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	{
 		init_builtins();
@@ -1233,7 +1270,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 		#ifdef BIT_TRANSFORM
 		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 		if (ir_handler->bitunv_decompress(r, tbl))
-		#endif
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 		#endif
 
 		f(r);

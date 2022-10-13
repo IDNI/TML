@@ -29,6 +29,9 @@
 #include "output.h"
 #include "options.h"
 #include "printing.h"
+#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+#include "tables_progress.h"
+#endif
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;

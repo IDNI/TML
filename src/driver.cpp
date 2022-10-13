@@ -611,7 +611,13 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
+		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+		tables_progress p( dict, *ir);
+		tables::run_prog_wedb(edb, nrp, d, opts, results, p);
+		#else
 		tables::run_prog_wedb(edb, nrp, d, opts, results);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
@@ -700,7 +706,14 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
+		
+		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+		tables_progress p( dict, *ir);
+		if(!tables::run_prog_wedb(edb, nrp, d, opts, results, p)) return false;
+		#else 
 		if(!tables::run_prog_wedb(edb, nrp, d, opts, results)) return false;
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
 			// one of the frozen terms), then there is a homomorphism between
@@ -1157,7 +1170,12 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog(dict);
 					test_prog.r.push_back(rr2);
 					set<raw_term> res;
+					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+					tables_progress p( dict, *ir);
+					tables::run_prog_wedb(ext, test_prog, d, opts, res, p);
+					#else
 					tables::run_prog_wedb(ext, test_prog, d, opts, res);
+					#endif // REMOVE_IR_BUILDER_FROM_TABLES
 					return res.find(subbed.h[0]) != res.end();
 				});
 		});
@@ -3602,7 +3620,14 @@ bool driver::transform_handler(raw_prog &p) {
 	ir_handler.dynenv = &tbl_int;
 	ir_handler.printer = &tbl_int;
 	ir_handler.dynenv->bits = 2;
+
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	tables_progress tp(dict, *ir);
+	if (!tbl_int.run_prog(tr, strs_t(), 0,0, tp)) return false;
+	#else
 	if (!tbl_int.run_prog(tr, {})) return false;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
 		DBG(COUT << el << endl;); //this line fails in release
@@ -3696,11 +3721,20 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	measure_time_start();
 
 	//Work in progress
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	tables_progress tp(dict, *ir);
+	if (opts.enabled("guards"))
+		// guards transform, will lead to !root_empty
+		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step, tp);
+	else
+		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step, tp);
+	#else 
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
 		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step);
 	else
 		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step);
+	#endif
 
 	o::ms() << "# elapsed: ", measure_time_end();
 
@@ -3740,6 +3774,14 @@ void driver::read_inputs() {
 	}
 }
 
+#ifdef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES	
+void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, ir_builder *ir_handler, dict_t &dict) {
+	for (const std::string& tname : tlist)
+		tbls.opts.pu_states.insert(ir_handler->get_table(
+				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
+}
+#endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
+
 driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 
 	if (o.error) { error = true; return; }
@@ -3771,7 +3813,13 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
+
+	#ifndef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES	
 	tbl->add_print_updates_states(opts.pu_states);
+	#else
+	add_print_updates_states(opts.pu_states, *tbl, ir, dict);
+	#endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES	
+
 	if (to.fp_step) ir->get_table(
 		ir->get_sig(dict.get_lexeme("__fp__"), { 0 }));
 	set_populate_tml_update(opts.enabled("tml_update"));
