@@ -10,6 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+#ifndef __CHAR_DESF_H__
+#define __CHAR_DESF_H__
+
 #include <array>
 #include <vector>
 #include <sstream>
@@ -111,3 +115,5 @@ bool is_alpha(ccs s, size_t n, size_t& l);
 bool is_printable(char32_t ch);
 
 int_t hex_to_int_t(ccs str, size_t len = 2);
+
+#endif // __CHAR_DESF_H__
