@@ -30,7 +30,13 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
+
+// TODO remove include and add alternative ones
+//#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 #include "ir_builder.h"
+//#else
+//typedef std::set<std::vector<term>> flat_prog;
+//#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 class tables;
 
@@ -233,7 +239,10 @@ private:
 	size_t bits = 2;
 	#endif
 
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t& dict;
+	#endif // REMOVE_DICT_FROM_TABLES
+
 	bool datalog, halt = false, unsat = false, bcqc = false;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
@@ -353,11 +362,13 @@ private:
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();
+
 	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	char fwd() noexcept;
 	#else 
 	char fwd(progress& p) noexcept;
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
@@ -370,10 +381,18 @@ private:
 public:
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
+#ifndef REMOVE_UPDATES_FROM_TABLE
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
+#endif // #ifdef REMOVE_UPDATES_FROM_TABLE
+
 private:
+	#ifndef REMOVE_UPDATES_FROM_TABLE
 	void init_tml_update();
+	#endif // REMOVE_UPDATES_FROM_TABLE
+
+	bool print_updates_check();
+
 	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	void add_tml_update(const term& rt, bool neg);
 	template <typename T>
@@ -381,15 +400,21 @@ private:
 		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
-	bool print_updates_check();
 
 	//-------------------------------------------------------------------------
 	//builtins
-
+	
+	#ifndef REMOVE_DICT_FROM_BUILTINS
+	
 	bool init_builtins();
 	bool init_print_builtins();
 	bool init_js_builtins();
 	bool init_bdd_builtins();
+	#endif // REMOVE_DICT_FROM_BUILTINS
+
+	#ifdef REMOVE_UPDATES_FROM_TABLE
+	updates updts;
+	#endif // REMOVE_UPDATES_FROM_TABLE
 
 	// simple builtin execution from a fact
 	void fact_builtin(const term& b);
@@ -484,9 +509,13 @@ private:
 	template <typename T>
 	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
 		const;
+
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
+	#ifndef REMOVE_DICT_FROM_TABLES
 	template <typename T>
 	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
+	#endif // REMOVE_DICT_FROM_TABLES
 public:
 
 	struct output {
@@ -500,7 +529,12 @@ public:
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	builtins bltins;
 
+	#ifdef REMOVE_DICT_FROM_BUILTINS
+	tables(rt_options opts, builtins &bltins);
+	#else
 	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
+	#endif // REMOVE_DICT_FROM_BUILTINS
+	
 	~tables();
 	
 	size_t step() { return nstep; }
@@ -515,7 +549,7 @@ public:
 	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	#else 
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, std::set<raw_term> &results,
+		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 		progress& p);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		size_t break_on_step, progress& ps);
@@ -537,7 +571,10 @@ public:
 	#endif
 
 	void set_proof(proof_mode v) { opts.bproof = v; }
+	
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t& get_dict() { return dict; }
+	#endif // REMOVE_DICT_FROM_TABLES
 
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;

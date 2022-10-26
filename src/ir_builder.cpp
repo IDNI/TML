@@ -26,11 +26,6 @@
 
 using namespace std;
 
-ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
-		dict(dict_), opts(opts_) { }
-
-ir_builder::~ir_builder() { }
-
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
 	for (size_t k = 0; k != v.size(); ++k)

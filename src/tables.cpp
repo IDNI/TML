@@ -332,24 +332,56 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 
 #ifdef BIT_TRANSFORM
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
-
+	// TODO check if this could be done during transformation in 
+	// transform_bitunv.cpp:357 and related lines.
+	
 	//FIXME: cannot be comparing strings at FWD
+	#ifndef REMOVE_DICT_FROM_BUILTINS
 	string pred = to_string(lexeme2str(dict.get_rel_lexeme(t.tab)));
+	#else
+	string pred = lexeme2str(bltins.inv_bltins_dict.at(t.tab));
+	#endif // REMOVE_DICT_FROM_BUILTINS
+
+
 	//COUT << to_string(pred) << endl;
 	int_t idbltin = -1;
 	term taux(t);
 
 	if (pred.find("_EQ_") != std::string::npos)
+		
+		#ifndef REMOVE_DICT_FROM_BUILTINS
 		idbltin = dict.get_bltin("eq");
+		#else
+		idbltin = t.tab;
+		#endif // REMOVE_DICT_FROM_BUILTINS
+	
 	else if (pred.find("_LEQ_") != string::npos) {
+
+		#ifndef REMOVE_DICT_FROM_BUILTINS
 		idbltin = dict.get_bltin("leq");
+		#else
+		idbltin = t.tab;
+		#endif // REMOVE_DICT_FROM_BUILTINS
+
 		taux.extype = term::BLTIN;
 		taux.idbltin = idbltin;
 	}
 	else if (pred.find("_PLUS_") != string::npos)
+
+		#ifndef REMOVE_DICT_FROM_BUILTINS
 		idbltin = dict.get_bltin("PW_add");
+		#else
+		idbltin = t.tab;
+		#endif // REMOVE_DICT_FROM_BUILTINS
+
 	else if (pred.find("_MULT_") != string::npos)
+
+		#ifndef REMOVE_DICT_FROM_BUILTINS
 		idbltin = dict.get_bltin("PW_mult");
+		#else
+		idbltin = t.tab;
+		#endif // REMOVE_DICT_FROM_BUILTINS
+
 	else {
 		b.insert({ get_body(t, a.vm, a.varslen), t });
 		return;
@@ -591,11 +623,15 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 }
 #endif // REMOVE_IR_BUILDER_FROM_TABLES
 
+#ifndef REMOVE_UPDATES_FROM_TABLE
 void tables::init_tml_update() {
+	// TODO create updates (similar to builtins) to deal with this
+	// specific rels.
 	rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
 	sym_add = dict.get_sym(dict.get_lexeme("add"));
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
+#endif // REMOVE_UPDATES_FROM_TABLE
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	bools ex(len1 * bits, false);
@@ -909,11 +945,11 @@ bool tables::pfp(size_t nsteps, size_t break_on_step, progress& ps) {
  * checks. */
 
 #ifndef REMOVE_IR_BUILDER_FROM_TABLES
-bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
+static bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
 	const ::options &opts, set<raw_term> &results) {
 #else 
 static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-	dict_t &dict, const options &opts, std::set<raw_term> &results,
+	dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 	progress& p) {
 #endif // REMOVE_IR_BUILDER_FROM_TABLES
 	std::map<elem, elem> freeze_map, unfreeze_map;
@@ -948,18 +984,26 @@ static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	to.apply_regexpmatch = opts.enabled("regex");
 	to.fp_step           = opts.enabled("fp");
 	to.bitorder          = opts.get_int("bitorder");
+
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	tables tbl(to, bltins);
+	#else
 	ir_builder ir_handler(dict, to);
 	tables tbl(dict, to, &ir_handler);
 	ir_handler.dynenv = &tbl;
 	ir_handler.printer = &tbl;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	strs_t strs;
+
 	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 	if (!tbl.run_prog(rp, strs, 0, 0, p)) return false;
-	#else // REMOVE_IR_BUILDER_FROM_TABLES
+	#else
 	if (!tbl.run_prog(rp, strs, 0, 0)) return false;
 	for(const term &result : tbl.decompress())
 		tmp_results.insert(tbl.ir_handler->to_raw_term(result));
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -1026,7 +1070,11 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	error = false;
 	smemo.clear(), ememo.clear(), leqmemo.clear();
 	//if (mknums) to_nums(m);
+
+	#ifndef REMOVE_UPDATES_FROM_TABLE
 	if (populate_tml_update) init_tml_update();
+	#endif // REMOVE_UPDATES_FROM_TABLE
+
 	rules.clear(), datalog = true;
 
 	#ifndef LOAD_STRS
@@ -1047,6 +1095,8 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
 				  '_' == l[0][len-2] && '_' == l[0][len-1];
 	};
+	// TODO clarify difference between hidden and internal. Anyway, this
+	// problem would disappear once we refactor run methosa.
 	ints internal_rels = dict.get_rels(filter_internal_tables);
 	for (auto& tbl : tbls)
 		for (int_t rel : internal_rels)
@@ -1090,7 +1140,9 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#else // LOAD_STRS
 	ir_handler->load_strings_as_fp(fp, strs_in);
 	#endif // LOAD_STRS
+
 	ir_handler->syms = dict.nsyms();
+	
 	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		bits = 1;
 	#else
@@ -1166,14 +1218,14 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	return r;
 }
 
+#ifdef REMOVE_DICT_FROM_BUILTINS 
+tables::tables(rt_options opts_, builtins &bltins_) : opts(opts_), bltins(bltins_) {}
+#else
 tables::tables(dict_t& dict_, rt_options opts_, ir_builder* ir_handler_) :
-	dict(dict_), opts(opts_)
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	, ir_handler(ir_handler_)/*, bltins(dict_) */
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-	{
+	dict(dict_), opts(opts_) {
 		init_builtins();
 }
+#endif // REMOVE_DICT_FROM_BUILTINS
 
 tables::~tables() {
 	while (!bodies.empty()) {

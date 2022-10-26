@@ -835,12 +835,14 @@ template basic_ostream<char>& tables::print(basic_ostream<char>&) const;
 template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const;
 #endif // REMOVE_IR_BUILDER_FROM_TABLES
 
+#ifndef REMOVE_DICT_FROM_TABLES
 template <typename T>
 basic_ostream<T>& tables::print_dict(basic_ostream<T>& os) const {
 	return os << dict;
 }
 template basic_ostream<char>& tables::print_dict(basic_ostream<char>&) const;
 template basic_ostream<wchar_t>& tables::print_dict(basic_ostream<wchar_t>&) const;
+#endif // REMOVE_DICT_FROM_TABLES
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {

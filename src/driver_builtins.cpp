@@ -10,55 +10,19 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifdef REMOVE_DICT_FROM_BUILTINS
+
 #include <random>
 #include <dlfcn.h>
 #include "tables.h"
+#include "builtins.h"
+#include "driver.h"
 
 using namespace std;
 
 extern uints perm_init(size_t n);
 
-void tables::fact_builtin(const term& b) {
-	blt_ctx c(b);
-	bltins.run_head(c);
-}
-
-void tables::head_builtin(const bdd_handles& hs, const table& tbl, ntable tab) {
-	blt_ctx c(term(false,tab,ints(tbl.len, 0), 0, tbl.idbltin));
-	//COUT << "head_builtin: " << hs << endl;
-	for (auto h : hs) decompress(h, tab, [&c, this] (const term& t){
-		// ground builtin vars by decompressed head
-		//COUT << "head_builtin t: " << t << endl;
-		for (size_t n = 0; n != t.size(); ++n) c.g[n] = t[n];
-		bltins.run_head(c);
-	}, 0, true);
-}
-
-void tables::body_builtins(spbdd_handle x, alt* a, bdd_handles& hs) {
-	if (x == hfalse) return; // return if grounding failed
-	vector<blt_ctx> ctx;
-	for (term bt : a->bltins) // create contexts for each builtin
-		ctx.emplace_back(bt, a), ctx.back().hs = &hs;
-	if (a->bltinvars.size())	{ // decompress grounded terms
-	    decompress(x,0, [&ctx, this] (const term t) {
-		for (blt_ctx& c : ctx) {
-			c.g = c.t; // ground vars by decompressed term
-			for (size_t n = 0; n != c.g.size(); ++n)
-				if (c.g[n] < 0 && has(c.a->bltinvars, c.g[n]))
-					c.g[n] = t[c.a->grnd->vm.at(c.g[n])];
-			bltins.run_body(c);
-		}
-	    }, a->grnd->varslen);
-	    // collect outputs
-	    for (blt_ctx& c : ctx) for (auto out : c.outs) hs.push_back(out);
-	} else for (blt_ctx& c : ctx) { // no grounding -> just run
-		bltins.run_body(c);
-		for (auto out : c.outs) hs.push_back(out); // collect outputs
-	}
-}
-
-#ifndef REMOVE_DICT_FROM_BUILTINS
-bool tables::init_builtins() {
+bool driver::add_basic_builtins(builtins& bltins) {
 	// TODO builtins should be managed in a separated object unrelated 
 	// to dict. Dict could contain a given builtin object a delegate queires
 	// to it, but not otherwise.
@@ -144,7 +108,7 @@ bool tables::init_builtins() {
 		init_js_builtins();
 }
 
-bool tables::init_bdd_builtins() {
+bool driver::add_bdd_builtins(builtins& bltins) {
 	const bool B = false;
 	auto get_bw_h = [this](t_arith_op op) {
 		return [this, op](blt_ctx& c) {
@@ -269,7 +233,7 @@ bool tables::init_bdd_builtins() {
 	return true;
 }
 
-bool tables::init_print_builtins() {
+bool driver::add_print_builtins(builtins& bltins) {
 	const bool H = true, B = false;
 	auto printer = [this](bool ln, bool to, bool delim) {
 		return [this, ln, to, delim] (blt_ctx& c) {
@@ -306,7 +270,7 @@ bool tables::init_print_builtins() {
 	return true;
 }
 
-bool tables::init_js_builtins() {
+bool driver::add_js_builtins(builtins& bltins) {
 	const bool H = true, B = false;
 	blt_handler h;
 #ifdef __EMSCRIPTEN__

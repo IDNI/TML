@@ -47,6 +47,7 @@ set(TML_SOURCES
 	dict.cpp
 	dict_tmp.cpp
 	driver.cpp
+	driver_builtins.cpp
 	earley.cpp
 	fof.cpp
 	form.cpp

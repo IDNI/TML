@@ -246,6 +246,12 @@ class driver {
 	input* current_input = 0;
 	size_t current_input_id = 0;
 
+	#ifdef REMOVE_DICT_FROM_BUILTINS
+	bool add_basic_builtins(builtins& bltins);
+	bool add_bdd_builtins(builtins& bltins);
+	bool add_print_builtins(builtins& bltins);
+	bool add_js_builtins(builtins& bltins);
+	#endif // REMOVE_DICT_FROM_BUILTINS
 
 public:
 	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
@@ -259,6 +265,10 @@ public:
 	template <typename T>
 	void out(std::basic_ostream<T>& os) { /* TODO something*/ }
 	#endif
+
+	#ifdef REMOVE_DICT_FROM_BUILTINS
+	builtins bltins;
+	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os)  { /* TODO something */ }

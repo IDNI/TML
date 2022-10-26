@@ -24,6 +24,7 @@
 #include <fstream>
 #include "driver.h"
 #include "err.h"
+#include "builtins.h"
 #include "cpp_gen.h"
 
 #ifdef __EMSCRIPTEN__
@@ -175,7 +176,11 @@ bool driver::is_limited(const elem &var, set<elem> &wrt,
 bool driver::is_limited(const elem &var, const raw_form_tree &t,
 		set<elem> &wrt, map<elem, const raw_form_tree*> &scopes) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	switch(t.type) {
 		case elem::IMPLIES:
@@ -337,7 +342,11 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 		map<elem, const raw_form_tree*> &scopes) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	switch(t.type) {
 		case elem::IMPLIES:
@@ -591,7 +600,13 @@ rel_info get_relation_info(const raw_term &rt) {
 
 bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_BUILTINS
 	dict_t d;
+	#else 
+	builtins bltins;
+	dict_t d(bltins);
+	#endif // REMOVE_DICT_FROM_BUILTINS
+
 	// Check that rules have correct format
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
@@ -613,7 +628,8 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		set<raw_term> results;
 		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 		tables_progress p( dict, *ir);
-		tables::run_prog_wedb(edb, nrp, d, opts, results, p);
+		builtins bt;
+		tables::run_prog_wedb(edb, nrp, d, bt, opts, results, p);
 		#else
 		tables::run_prog_wedb(edb, nrp, d, opts, results);
 		#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -643,7 +659,12 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_BUILTINS
 	dict_t d;
+	#else 
+	builtins bltins;
+	dict_t d(bltins);
+	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	if(is_cq(rr1) && is_cq(rr2)) {
 		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
@@ -709,7 +730,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		
 		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 		tables_progress p( dict, *ir);
-		if(!tables::run_prog_wedb(edb, nrp, d, opts, results, p)) return false;
+		if(!tables::run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
 		#else 
 		if(!tables::run_prog_wedb(edb, nrp, d, opts, results)) return false;
 		#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -830,7 +851,11 @@ bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
 
 void driver::factor_rules(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	o::dbg() << "Factorizing rules ..." << endl;
 
@@ -1079,7 +1104,12 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
+			#ifndef REMOVE_DICT_FROM_BUILTINS
 			dict_t d;
+			#else 
+			builtins bltins;
+			dict_t d(bltins);
+			#endif // REMOVE_DICT_FROM_BUILTINS
 
 			// Map each variable to a fresh symbol according to the partition
 			map<elem, elem> subs;
@@ -1172,7 +1202,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					set<raw_term> res;
 					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 					tables_progress p( dict, *ir);
-					tables::run_prog_wedb(ext, test_prog, d, opts, res, p);
+					tables::run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
 					#else
 					tables::run_prog_wedb(ext, test_prog, d, opts, res);
 					#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -1715,7 +1745,11 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 
 bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	o::dbg() << "Generating domain for: " << drt << endl;
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 	// Ensure that we're working on a DOMAIN directive
 	if(drt.type != directive::EDOMAIN) return false;
 	// The relation to contain the evaled relation is the first symbol
@@ -1911,7 +1945,11 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 	elem term_id(part_count++);
 	if(head.extype == raw_term::REL) {
 		elem elems_id = elem::fresh_var(d), tags_id = elem::fresh_var(d),
@@ -2002,7 +2040,12 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t& d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
+
 	const elem part_id = elem(part_count++);
 	switch(t.type) {
 		case elem::IMPLIES:
@@ -2108,7 +2151,12 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 
 elem driver::concat(const elem &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
+	
 	// Make lexeme from concatenating rel's lexeme with the given suffix
 	return elem(elem::SYM,
 		d.get_lexeme(lexeme2str(rel.e) + to_string_t(suffix)));
@@ -2119,7 +2167,11 @@ elem driver::concat(const elem &rel, string suffix) {
 
 lexeme driver::concat(const lexeme &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 	// Make lexeme from concatenating rel's lexeme with the given suffix
 	return d.get_lexeme(lexeme2str(rel) + to_string_t(suffix));
 }
@@ -2243,7 +2295,11 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// quotation is the fourth symbol between the parentheses
 	int_t max_arity = drt.arity_num.num;
 	// Get dictionary for generating fresh variables
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	// Create the symbols and variables that will feature heavily in
 	// the terms to be created below
@@ -2384,7 +2440,11 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 void driver::pdatalog_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	// Bypass transformation when there are no rules
 	if(rp.r.empty()) {
@@ -2518,7 +2578,11 @@ bool rule_relation_precedes(const raw_rule &rr1, const raw_rule &rr2) {
 
 raw_term driver::relation_to_term(const rel_info &ri) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	vector<elem> els = { get<0>(ri), elem_openp };
 	for(int_t i = 0; i < get<1>(ri); i++) {
@@ -2564,7 +2628,11 @@ raw_rule rename_rule(raw_rule rr, map<elem, elem> &rename_map) {
 void driver::step_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	map<elem, elem> freeze_map;
 	map<elem, elem> unfreeze_map;
@@ -2844,7 +2912,11 @@ elem gen_id_var(const elem &var) {
 raw_form_tree driver::expand_term(const raw_term &use,
 		const raw_rule &def) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	const raw_term &head = def.h[0];
 	// Where all the mappings for the substitution will be stored
@@ -2949,7 +3021,11 @@ void driver::square_program(raw_prog &rp) {
 
 void driver::square_root_program(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 
 	// Only apply this transformation if there are rules to slow down
 	if(!rp.r.empty()) {
@@ -3032,7 +3108,11 @@ set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
 raw_term driver::to_dnf(const raw_form_tree &t,
 		raw_prog &rp, const set<elem> &fv) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES
 	const elem part_id = elem::fresh_temp_sym(d);
 
 	switch(t.type) {
@@ -3308,7 +3388,12 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
 
 void driver::eliminate_dead_variables(raw_prog &rp) {
 	// Get dictionary for generating fresh symbols
+	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t &d = tbl->get_dict();
+	#else 
+	dict_t &d = dict;
+	#endif // REMOVE_DICT_FROM_TABLES	
+	
 	// Before we can eliminate relation positions, we need to know what
 	// rules depend on each relation. Knowing the dependants will allow us
 	// to determine whether a certain position is significant, and if so
@@ -3615,8 +3700,19 @@ bool driver::transform_handler(raw_prog &p) {
 	to.print_binarized = false;
 	to.bproof = proof_mode::none;
 	to.show_hidden = false;
+
+	#ifdef REMOVE_DICT_FROM_BUILTINS
+	ir_builder ir_handler(dict, bltins, to);
+	#else 
 	ir_builder ir_handler(dict, to);
+	#endif // REMOVE_DICT_FROM_BUILTINS
+
+	#if defined(REMOVE_DICT_FROM_TABLES) | defined (REMOVE_IR_BUILDER_FROM_TABLES)
+	tables tbl_int(to, bltins);
+	#else
 	tables tbl_int(dict, to, &ir_handler);
+	#endif // defined(REMOVE_DICT_FROM_TABLES) | defined (REMOVE_IR_BUILDER_FROM_TABLES)
+	
 	ir_handler.dynenv = &tbl_int;
 	ir_handler.printer = &tbl_int;
 	ir_handler.dynenv->bits = 2;
@@ -3782,7 +3878,16 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 }
 #endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
 
+#ifndef REMOVE_DICT_FROM_BUILTINS
 driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
+#else
+driver::driver(string s, const options &o) : opts(o), dict(dict_t(bltins)), rp(raw_progs(dict)) {
+	builtins bltns;
+	dict_t d{bltns};
+	dict = d;
+	raw_progs trp{d};
+	rp = trp;
+#endif // REMOVE_DICT_FROM_BUILTINS
 
 	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
@@ -3806,8 +3911,18 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
+	#ifdef REMOVE_DICT_FROM_BUILTINS
+	ir = new ir_builder(dict, bltins, to);
+	#else
 	ir = new ir_builder(dict, to);
+	#endif // REMOVE_DICT_FROM_BUILTINS
+
+	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
+	tbl = new tables(to, bltins);
+	#else
 	tbl = new tables(dict, to, ir);
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
 	ir->dynenv  = tbl;
 	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
 

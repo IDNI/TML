@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "tables.h"
+
 using namespace std;
 
 size_t blt_ctx::varpos(size_t arg) const { return a->vm.at(g[arg]); }
@@ -51,9 +52,10 @@ void builtins::run(blt_ctx& c, bool ishead) {
 			<< "builtin head/body error" << std::endl;
 	builtin& b = ishead ? it->second.head : it->second.body;
 	c.args = b.args, c.nargs = b.nargs, c.oargs = b.oargs;
+	#ifndef REMOVE_DICT_FROM_BUILTINS
 	c.dict = dict;
+	#endif // REMOVE_DICT_FROM_BUILTINS
 	b.run(c);
 	if (!ishead && !c.t.forget)
 		cache.emplace(k, blt_cache_value(true, c.outs));
 }
-
