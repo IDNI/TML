@@ -12,23 +12,32 @@
 // modified over time by the Author.
 #ifndef __DRIVER_H__
 #define __DRIVER_H__
+
 #include <map>
 #include <cmath>
 #include <variant>
+
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #endif
+
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
 #include "output.h"
 #include "options.h"
 #include "printing.h"
+
+#ifdef REMOVE_UPDATES_FROM_TABLE
+#include "builtins.h"
+#endif // REMOVE_UPDATES_FROM_TABLE
+
 #ifdef REMOVE_IR_BUILDER_FROM_TABLES
 #include "tables_progress.h"
 #endif
@@ -266,6 +275,20 @@ public:
 	void out(std::basic_ostream<T>& os) { /* TODO something*/ }
 	#endif
 
+	#ifdef REMOVE_UPDATES_FROM_TABLES
+	void init_tml_update(updates& updts);
+	#endif // REMOVE_UPDATES_FROM_TABLES
+
+	#ifdef MOVE_RUN_METHODS_TO_DRIVER
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
+		progress& p);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls);
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt);
+	#endif // MOVE_RUN_METHODS_TO_DRIVER
+
+
 	#ifdef REMOVE_DICT_FROM_BUILTINS
 	builtins bltins;
 	#endif // REMOVE_DICT_FROM_BUILTINS
@@ -297,7 +320,7 @@ public:
 
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
-	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	void set_populate_tml_update(bool val) { tbl->populate_tml_update = val; }
 	void set_regex_level(int val ) { ir->regex_level = val; }
 
 	inputs* get_inputs() const { return ii; }

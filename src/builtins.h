@@ -116,12 +116,12 @@ struct builtins_pair {
 typedef std::map<lexeme, int_t, lexcmp> dictmap;
 #endif // REMOVE_DICT_FROM_BUILTINS
 
-#ifdef REMOVE_UPDATES_FROM_TABLE
+#ifdef REMOVE_UPDATES_FROM_TABLES
 struct updates {
 	dictmap updates_dict;
 	int_t rel_tml_update, sym_add, sym_del;
 };
-#endif // REMOVE_UPDATES_FROM_TABLE
+#endif // REMOVE_UPDATES_FROM_TABLES
 
 // container for builtins represented by a map
 // it's key is builtin's id and its value is a builtins_pair (head - body) 

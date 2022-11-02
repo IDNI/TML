@@ -224,6 +224,11 @@ public:
 	nlevel nstep = 0;
 
 	std::vector<table> tbls;
+	#ifdef TYPE_RESOLUTION
+	size_t bits = 0;
+	#else
+	size_t bits = 2;
+	#endif
 private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
@@ -233,11 +238,6 @@ private:
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
 
-	#ifdef TYPE_RESOLUTION
-	size_t bits = 0;
-	#else
-	size_t bits = 2;
-	#endif
 
 	#ifndef REMOVE_DICT_FROM_TABLES
 	dict_t& dict;
@@ -319,6 +319,11 @@ public:
 		size_t len = 0, bool allowbltins = false) const;
 	spbdd_handle from_fact(const term& t);
 	std::set<term> decompress();
+
+	#ifdef MOVE_RUN_METHODS_TO_DRIVER
+	static void clear_memos();
+	#endif // MOVE_RUN_METHODS_TO_DRIVER
+	
 private:
 	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
@@ -541,19 +546,21 @@ public:
 	
 	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, std::set<raw_term> &results);
-	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
-		size_t break_on_step = 0);
-	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-	#else 
+	#ifdef MOVE_RUN_METHODS_TO_DRIVER // NOTE assumming REMOVE_IR_BUILDER_FROM_TABLES
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 		progress& p);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		size_t break_on_step, progress& ps);
 	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
+	#endif // MOVE_RUN_METHODS_TO_DRIVER
+	
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, const options &opts, std::set<raw_term> &results);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
+		size_t break_on_step = 0);
+	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);

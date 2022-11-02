@@ -27,6 +27,11 @@
 #include "builtins.h"
 #include "cpp_gen.h"
 
+#ifndef MOVE_RUN_METHODS_TO_DRIVER
+#include "tables.h"
+#endif // MOVE_RUN_METHODS_TO_DRIVER
+
+
 #ifdef __EMSCRIPTEN__
 #include "../js/embindings.h"
 #endif
@@ -629,7 +634,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 		tables_progress p( dict, *ir);
 		builtins bt;
-		tables::run_prog_wedb(edb, nrp, d, bt, opts, results, p);
+		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
 		#else
 		tables::run_prog_wedb(edb, nrp, d, opts, results);
 		#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -730,7 +735,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		
 		#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 		tables_progress p( dict, *ir);
-		if(!tables::run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
+		if(!run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
 		#else 
 		if(!tables::run_prog_wedb(edb, nrp, d, opts, results)) return false;
 		#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -1202,7 +1207,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					set<raw_term> res;
 					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 					tables_progress p( dict, *ir);
-					tables::run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
+					run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
 					#else
 					tables::run_prog_wedb(ext, test_prog, d, opts, res);
 					#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -3694,11 +3699,11 @@ bool driver::transform_handler(raw_prog &p) {
 	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
 	//o::out() << "Type resolutor Nto1 mapping:\n" << tr << endl;
 	rt_options to;
+	to.binarize = false;
+	to.bproof = proof_mode::none;
 	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
 	to.optimize  = false;
-	to.binarize = false;
 	to.print_binarized = false;
-	to.bproof = proof_mode::none;
 	to.show_hidden = false;
 
 	#ifdef REMOVE_DICT_FROM_BUILTINS
@@ -3719,7 +3724,8 @@ bool driver::transform_handler(raw_prog &p) {
 
 	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 	tables_progress tp(dict, *ir);
-	if (!tbl_int.run_prog(tr, strs_t(), 0,0, tp)) return false;
+	rt_options rt;
+	if (!run_prog(tr, strs_t(), 0,0, tp, rt, tbl_int)) return false;
 	#else
 	if (!tbl_int.run_prog(tr, {})) return false;
 	#endif // REMOVE_IR_BUILDER_FROM_TABLES
@@ -3819,11 +3825,12 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	//Work in progress
 	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 	tables_progress tp(dict, *ir);
+	rt_options rt;
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
-		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step, tp);
+		result = run_prog(rp.p, pd.strs, steps, break_on_step, tp, rt, *tbl);
 	else
-		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step, tp);
+		result = run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step, tp, rt, *tbl);
 	#else 
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
@@ -3869,6 +3876,228 @@ void driver::read_inputs() {
 		++current_input_id;
 	}
 }
+
+#ifdef REMOVE_UPDATES_FROM_TABLES
+void driver::init_tml_update(updates& updts) {
+	updts.rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
+	updts.sym_add = dict.get_sym(dict.get_lexeme("add"));
+	updts.sym_del = dict.get_sym(dict.get_lexeme("delete"));
+}
+#endif // REMOVE_UPDATES_FROM_TABLES
+
+#ifdef MOVE_RUN_METHODS_TO_DRIVER
+bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt) {
+
+	DBG(o::dbg() << "add_prog_wprod" << endl;);
+	error = false;
+	tables::clear_memos();
+	//if (mknums) to_nums(m);
+
+	#ifdef REMOVE_UPDATES_FROM_TABLES
+	updates updts;
+	// TODO this should be part of rt_options
+	if (tbls.populate_tml_update) init_tml_update(updts);
+	#endif // REMOVE_UPDATES_FROM_TABLES
+
+	tbls.rules.clear(), tbls.datalog = true;
+
+	#ifndef LOAD_STRS
+	for (auto x : strs) load_string(x.first, x.second);
+	#endif
+	
+	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+	// TODO this call must be done in the driver
+	if (!ir_handler->transform_grammar(g, m)) return false;
+	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+
+	//if (!get_rules(move(m))) return false;
+	if (!tbls.get_rules(m)) return false;
+
+	// filter for rels starting and ending with __
+	auto filter_internal_tables = [] (const lexeme& l) {
+		size_t len = l[1] - l[0];
+		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
+				  '_' == l[0][len-2] && '_' == l[0][len-1];
+	};
+	// TODO clarify difference between hidden and internal. Anyway, this
+	// problem would disappear once we refactor run methosa.
+	ints internal_rels = dict.get_rels(filter_internal_tables);
+	for (auto& tbl : tbl->tbls)
+		for (int_t rel : internal_rels)
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
+
+	if (rt.optimize) bdd::gc();
+	return true;
+}
+#endif // MOVE_RUN_METHODS_TO_DRIVER
+
+#ifdef MOVE_RUN_METHODS_TO_DRIVER
+bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+	dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
+	progress& p) {
+	std::map<elem, elem> freeze_map, unfreeze_map;
+	// Create a duplicate of each rule in the given program under a
+	// generated alias.
+	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
+		for(raw_term &rt : rp.r[i].h) {
+			raw_term rt2 = rt;
+			auto it = freeze_map.find(rt.e[0]);
+			if(it != freeze_map.end()) {
+				rt.e[0] = it->second;
+			} else {
+				elem frozen_elem = elem::fresh_temp_sym(dict);
+				// Store the mapping so that the derived portion of each
+				// relation is stored in exactly one place
+				unfreeze_map[frozen_elem] = rt.e[0];
+				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
+			}
+			rp.r.push_back(raw_rule(rt2, rt));
+		}
+	}
+	// Now add the extensional database to the given program.
+	for(const raw_term &rt : edb) {
+		rp.r.push_back(raw_rule(rt));
+	}
+	// Run the program to obtain the results which we will then filter
+	std::set<raw_term> tmp_results;
+	rt_options to;
+	to.apply_regexpmatch = opts.enabled("regex");
+	to.bitorder          = opts.get_int("bitorder");
+	to.bproof            = proof_mode::none;
+	to.fp_step           = opts.enabled("fp");
+	to.optimize          = opts.enabled("optimize");
+	to.print_transformed = opts.enabled("t");
+
+	tables tbl(to, bltins);
+
+//	ir_builder ir_handler(dict, to);
+//	tables tbl(dict, to, &ir_handler);
+//	ir_handler.dynenv = &tbl;
+//	ir_handler.printer = &tbl;
+
+	strs_t strs;
+	driver drv(opts);
+	if (!drv.run_prog(rp, strs, 0, 0, p, to, tbl)) return false;
+	for(const term &result : tbl.decompress())
+		tmp_results.insert(drv.ir->to_raw_term(result));
+	
+	// Filter out the result terms that are not derived and rename those
+	// that are derived back to their original names.
+	for(raw_term res : tmp_results) {
+		auto jt = unfreeze_map.find(res.e[0]);
+		if(jt != unfreeze_map.end()) {
+			res.e[0] = jt->second;
+			results.insert(res);
+		}
+	}
+	return true;
+}
+#endif // MOVE_RUN_METHODS_TO_DRIVER
+
+#ifdef MOVE_RUN_METHODS_TO_DRIVER
+bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
+	size_t break_on_step, progress& ps, rt_options& rt, tables &tbls) {
+	DBG(o::dbg() << "run_prog" << endl;);
+	clock_t start{}, end;
+	double t;
+	if (rt.optimize) measure_time_start();
+
+	// TODO move this call to the driver
+	flat_prog fp = ir->to_terms(p);
+	//DBG(ir_handler->opts.print_binarized = true;);
+	#ifdef FOL_V2
+	print(o::out() << "FOF flat_prog:\n", fp) << endl;
+	#endif // FOL_V2
+	//DBG(ir_handler->opts.print_binarized = false;);
+
+	#ifndef LOAD_STRS
+	strs = strs_in;
+	if (!strs.empty()) {
+		for (auto x : strs) {
+			ir->nums = max(ir->nums, (int_t)x.second.size()+1);
+			unary_string us(32);
+			us.buildfrom(x.second);
+			ir->chars = max(ir->chars, (int_t)us.rel.size());
+		}
+	}
+	#else // LOAD_STRS
+	ir->load_strings_as_fp(fp, strs_in);
+	#endif // LOAD_STRS
+
+	ir->syms = dict.nsyms();
+	
+	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
+		tbls.bits = 1;
+	#else
+		#ifdef TYPE_RESOLUTION
+		size_t a = max(max(ir->nums, ir->chars), ir->syms);
+		if (a == 0) bits++;
+		else while (a > size_t (1 << bits)-1) bits++;
+		#else
+		while (max(max(ir->nums, ir->chars), ir->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
+			add_bit();
+		#endif
+	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+	
+	// TOODO this call must be done in the driver
+	if (!add_prog_wprod(fp, p.g, tbls, rt)) return false;
+
+	//----------------------------------------------------------
+	if (tbls.opts.optimize) {
+		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
+		o::ms() << "# pfp: " << endl; measure_time_start();
+	}
+
+	nlevel begstep = tbls.nstep;
+
+	bool r = true;
+	// run program only if there are any rules
+	if (tbls.rules.size()) {
+		tbls.fronts.clear();
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+		r = tbls.pfp(steps ? tbls.nstep + steps : 0, break_on_step);
+		#else 
+		r = tbls.pfp(steps ? tbls.nstep + steps : 0, break_on_step, ps);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	} else {
+		bdd_handles l = tbls.get_front();
+		tbls.fronts = {l, l};
+	}
+	//----------------------------------------------------------
+	//TODO: prog_after_fp is required for grammar/str recognition,
+	// but it should be restructured
+	if (r && tbls.prog_after_fp.size()) {
+		if (!add_prog_wprod(tbls.prog_after_fp, {}, tbls, rt)) return false;
+		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+		r = tbls.pfp();
+		#else 
+		r = tbls.pfp(0, 0, ps);
+		#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	}
+
+	size_t went = tbls.nstep - begstep;
+	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
+		for (const raw_prog& np : p.nps) {
+			steps -= went; begstep = tbls.nstep;
+			#ifndef REMOVE_IR_BUILDER_FROM_TABLES
+			r = run_prog(np, strs_in, steps, break_on_step);
+			#else 
+			rt_options rt;
+			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, *tbl);
+			#endif // REMOVE_IR_BUILDER_FROM_TABLES
+			went = tbls.nstep - begstep;
+			if (!r && went >= steps) {
+				//assert(false && "!r && went >= steps");
+				break;
+			}
+		}
+	}
+
+	if (tbls.opts.optimize)
+		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
+	return r;
+}
+#endif // MOVE_RUN_METHODS_TO_DRIVER
 
 #ifdef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES	
 void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, ir_builder *ir_handler, dict_t &dict) {
@@ -3926,6 +4155,7 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t(bltins)), rp(r
 	ir->dynenv  = tbl;
 	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
 
+	// TODO move this options to rt_options
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
 

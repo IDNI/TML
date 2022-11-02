@@ -25,6 +25,7 @@ using namespace std;
 
 typedef tuple<size_t, size_t, size_t, int_t> skmemo;
 typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
+
 map<skmemo, spbdd_handle> smemo;
 map<ekmemo, spbdd_handle> ememo;
 map<ekmemo, spbdd_handle> leqmemo;
@@ -330,6 +331,12 @@ bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
 	return true;
 }
 
+#ifdef MOVE_RUN_METHODS_TO_DRIVER
+void tables::clear_memos() {
+	smemo.clear(), ememo.clear(), leqmemo.clear();
+}
+#endif // MOVE_RUN_METHODS_TO_DRIVER
+
 #ifdef BIT_TRANSFORM
 void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	// TODO check if this could be done during transformation in 
@@ -339,7 +346,7 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	#ifndef REMOVE_DICT_FROM_BUILTINS
 	string pred = to_string(lexeme2str(dict.get_rel_lexeme(t.tab)));
 	#else
-	string pred = lexeme2str(bltins.inv_bltins_dict.at(t.tab));
+	string pred = to_string(lexeme2str(bltins.inv_bltins_dict.at(t.tab)));
 	#endif // REMOVE_DICT_FROM_BUILTINS
 
 
@@ -623,7 +630,7 @@ basic_ostream<T>& tables::decompress_update(basic_ostream<T>& os,
 }
 #endif // REMOVE_IR_BUILDER_FROM_TABLES
 
-#ifndef REMOVE_UPDATES_FROM_TABLE
+#ifndef REMOVE_UPDATES_FROM_TABLES
 void tables::init_tml_update() {
 	// TODO create updates (similar to builtins) to deal with this
 	// specific rels.
@@ -631,7 +638,7 @@ void tables::init_tml_update() {
 	sym_add = dict.get_sym(dict.get_lexeme("add"));
 	sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
-#endif // REMOVE_UPDATES_FROM_TABLE
+#endif // REMOVE_UPDATES_FROM_TABLES
 
 pair<bools, uints> tables::deltail(size_t len1, size_t len2) const {
 	bools ex(len1 * bits, false);
@@ -943,15 +950,16 @@ bool tables::pfp(size_t nsteps, size_t break_on_step, progress& ps) {
  * the derived facts. Returns true or false depending on whether the
  * given program reaches a fixed point. Useful for query containment
  * checks. */
+#ifndef MOVE_RUN_METHODS_TO_DRIVER
 
-#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-static bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
-	const ::options &opts, set<raw_term> &results) {
+#ifndef MOVE_RUN_METHODS_TO_DRIVER
+bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp, 
+	dict_t &dict, const options &opts, std::set<raw_term> &results) {
 #else 
-static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+bool tables::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 	progress& p) {
-#endif // REMOVE_IR_BUILDER_FROM_TABLES
+#endif // MOVE_RUN_METHODS_TO_DRIVER
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
 	// generated alias.
@@ -1063,7 +1071,9 @@ void tables::load_string(lexeme r, const string_t& s) {
 	tbls[stb].t = bdd_or_many(move(b2));
 }
 #endif
+#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
+#ifndef MOVE_RUN_METHODS_TO_DRIVER
 bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/) {
 
 	DBG(o::dbg() << "add_prog_wprod" << endl;);
@@ -1105,7 +1115,9 @@ bool tables::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	if (opts.optimize) bdd::gc();
 	return true;
 }
+#endif // MOVE_RUN_METHODS_TO_DRIVER
 
+#ifndef MOVE_RUN_METHODS_TO_DRIVER
 #ifndef REMOVE_IR_BUILDER_FROM_TABLES
 bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	size_t break_on_step) {
@@ -1217,6 +1229,7 @@ bool tables::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
 	return r;
 }
+#endif // MOVE_RUN_METHODS_TO_DRIVER
 
 #ifdef REMOVE_DICT_FROM_BUILTINS 
 tables::tables(rt_options opts_, builtins &bltins_) : opts(opts_), bltins(bltins_) {}
