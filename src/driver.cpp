@@ -3616,12 +3616,7 @@ bool driver::transform_handler(raw_prog &p) {
 	to.show_hidden = false;
 
 	ir_builder ir_handler(dict, bltins, to);
-
-	#if defined(REMOVE_DICT_FROM_TABLES) | defined (REMOVE_IR_BUILDER_FROM_TABLES)
 	tables tbl_int(to, bltins);
-	#else
-	tables tbl_int(dict, to, &ir_handler);
-	#endif // defined(REMOVE_DICT_FROM_TABLES) | defined (REMOVE_IR_BUILDER_FROM_TABLES)
 	
 	ir_handler.dynenv = &tbl_int;
 	ir_handler.printer = &tbl_int;
