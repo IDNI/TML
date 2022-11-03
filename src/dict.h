@@ -17,9 +17,7 @@
 #include <map>
 #include <functional>
 
-#ifdef REMOVE_DICT_FROM_BUILTINS
 #include "builtins.h"
-#endif
 
 class inputs;
 class dict_t {
@@ -27,23 +25,14 @@ class dict_t {
 	dictmap syms_dict, vars_dict, rels_dict, temp_syms_dict;
 	std::vector<lexeme> syms, vars, rels, temp_syms;
 
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	dictmap bltins_dict;
-	std::vector<lexeme> bltins;
-	#else 
 	builtins bltins;
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	std::set<lexeme, lexcmp> strs_extra;
 	std::vector<ccs> strs_allocated;
 	inputs* ii = 0;
 public:
 
-	#ifdef REMOVE_DICT_FROM_BUILTINS
 	dict_t(builtins& bltins_) : bltins(bltins_) {};
-	#else
-	dict_t();
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	~dict_t();
 
@@ -57,11 +46,7 @@ public:
 	const lexeme& get_var_lexeme(int_t r) const { return vars[-r-1]; };
 	const lexeme& get_rel_lexeme(int_t t) const { return rels[t]; }
 	const lexeme& get_bltin_lexeme(int_t t) const { 
-		#ifndef REMOVE_DICT_FROM_BUILTINS
-		return bltins[t]; 
-		#else
 		return bltins.bltins[t];
-		#endif // REMOVE_DICT_FROM_BUILTINS
 
 	}
 	size_t nsyms() const { return syms.size(); }
@@ -81,13 +66,8 @@ public:
 	int_t get_new_rel();
 
 	bool is_bltin(const lexeme& l) const {
-		#ifndef REMOVE_DICT_FROM_BUILTINS
-		auto it = bltins_dict.find(l);
-		if (it != bltins_dict.end()) return true;
-		#else
 		auto it = bltins.bltins_dict.find(l);
 		if (it != bltins.bltins_dict.end()) return true;
-		#endif // REMOVE_DICT_FROM_BUILTINS
 		return false;
 	}
 

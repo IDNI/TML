@@ -155,14 +155,12 @@ struct table {
 	inline bool is_builtin() const { return idbltin > -1; }
 };
 
-#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 class progress {
 public:
 	progress() {};
 	virtual ~progress() = default;
 	virtual void notify_update(tables &ts, spbdd_handle& x, const rule& r) = 0;
 };
-#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
@@ -170,9 +168,6 @@ class tables {
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	friend class ir_builder;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	friend class driver;
 	friend struct bit_univ;
 	friend struct progress;
@@ -212,9 +207,6 @@ public:
 
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
 
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	typedef std::function<void(const raw_term&)> rt_printer;
-	#endif
 
 	nlevel nstep = 0;
 
@@ -234,9 +226,6 @@ private:
 	void get_alt_ex(alt& a, const term& h) const;
 
 
-	#ifndef REMOVE_DICT_FROM_TABLES
-	dict_t& dict;
-	#endif // REMOVE_DICT_FROM_TABLES
 
 	bool datalog, halt = false, unsat = false, bcqc = false;
 
@@ -315,9 +304,7 @@ public:
 	spbdd_handle from_fact(const term& t);
 	std::set<term> decompress();
 
-	#ifdef MOVE_RUN_METHODS_TO_DRIVER
 	static void clear_memos();
-	#endif // MOVE_RUN_METHODS_TO_DRIVER
 	
 private:
 	rule new_identity_rule(ntable tab, bool neg);
@@ -363,11 +350,7 @@ private:
 	bool contradiction_detected();
 	bool infloop_detected();
 
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	char fwd() noexcept;
-	#else 
 	char fwd(progress& p) noexcept;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
@@ -393,24 +376,11 @@ private:
 
 	bool print_updates_check();
 
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	void add_tml_update(const term& rt, bool neg);
-	template <typename T>
-	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-		spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 
 	//-------------------------------------------------------------------------
 	//builtins
 	
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	
-	bool init_builtins();
-	bool init_print_builtins();
-	bool init_js_builtins();
-	bool init_bdd_builtins();
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	#ifdef REMOVE_UPDATES_FROM_TABLE
 	updates updts;
@@ -478,44 +448,7 @@ private:
 
 	//-------------------------------------------------------------------------
 	//printer
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof_elem&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const witness&);
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
 
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::vector<term>& b)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
-		const;
-
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
-
-	#ifndef REMOVE_DICT_FROM_TABLES
-	template <typename T>
-	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
-	#endif // REMOVE_DICT_FROM_TABLES
 public:
 
 	struct output {
@@ -524,16 +457,9 @@ public:
 	};
 
 	rt_options opts;
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	ir_builder *ir_handler;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	builtins bltins;
 
-	#ifdef REMOVE_DICT_FROM_BUILTINS
 	tables(rt_options opts, builtins &bltins);
-	#else
-	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
-	#endif // REMOVE_DICT_FROM_BUILTINS
 	
 	~tables();
 	
@@ -541,42 +467,20 @@ public:
 	
 	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 
-	#ifdef MOVE_RUN_METHODS_TO_DRIVER // NOTE assumming REMOVE_IR_BUILDER_FROM_TABLES
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 		progress& p);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		size_t break_on_step, progress& ps);
 	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
-	#endif // MOVE_RUN_METHODS_TO_DRIVER
 	
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, std::set<raw_term> &results);
-	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
-		size_t break_on_step = 0);
-	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
 	
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	template <typename T> void out(std::basic_ostream<T>&) const;
-	template <typename T> bool out_fixpoint(std::basic_ostream<T>& os);
-	template <typename T> bool out_goals(std::basic_ostream<T>&);
-	void out(const rt_printer&) const;
-	void out(spbdd_handle, ntable, const rt_printer&) const;
-	template <typename T>
-	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
-	template <typename T>bool get_proof(std::basic_ostream<T>& os);
-	#endif
 
 	void set_proof(proof_mode v) { opts.bproof = v; }
 	
-	#ifndef REMOVE_DICT_FROM_TABLES
-	dict_t& get_dict() { return dict; }
-	#endif // REMOVE_DICT_FROM_TABLES
 
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
@@ -584,9 +488,6 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-	#ifndef REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
-	void add_print_updates_states(const std::set<std::string> &tlist);
-	#endif // REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
 	
 	bool populate_tml_update = false;
 	bool print_updates       = false;

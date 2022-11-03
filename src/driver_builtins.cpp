@@ -10,7 +10,6 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifdef REMOVE_DICT_FROM_BUILTINS
 
 #include <random>
 #include <dlfcn.h>
@@ -27,9 +26,6 @@ bool driver::add_basic_builtins(builtins& bltins) {
 	// to dict. Dict could contain a given builtin object a delegate queires
 	// to it, but not otherwise.
 	const bool H = true, B = false;
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	bltins.reset(dict);
-	#endif // REMOVE_DICT_FROM_BUILTINS
 	set<string> syms{ "alpha","alnum","digit","space","printable" };
 	for (auto sym : syms) bltins.add(sym);
 
@@ -238,14 +234,6 @@ bool driver::add_print_builtins(builtins& bltins) {
 	auto printer = [this](bool ln, bool to, bool delim) {
 		return [this, ln, to, delim] (blt_ctx& c) {
 			//COUT << "printing ln/to/delim" << ln << "/" << to << "/" << delim << " " << to_raw_term(c.g) << endl;
-			#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-			print_to_delimited(ir_handler->to_raw_term(c.g), error, to, delim)
-				<< (ln ? "\n" : "")
-				#ifdef __EMSCRIPTEN__
-				<< std::flush
-				#endif
-				;
-			#endif // REMOVE_IR_BUILDER_FROM_TABLES
 		};
 	};
 	const bool NLN = false, NTO = false, NDLM = false;
@@ -310,4 +298,3 @@ bool driver::add_js_builtins(builtins& bltins) {
 #endif
 	return true;
 }
-#endif // REMOVE_DICT_FROM_BUILTINS

@@ -18,9 +18,6 @@
 
 using namespace std;
 
-#ifndef REMOVE_DICT_FROM_BUILTINS
-dict_t::dict_t() {}
-#endif // REMOVE_DICT_FROM_BUILTINS
 
 dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
 
@@ -47,15 +44,7 @@ int_t dict_t::get_sym(const lexeme& l) {
 }
 
 int_t dict_t::get_bltin(const lexeme& l) {
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	if (*l[0] == '?') parse_error(err_var_relsym, l);
-	auto it = bltins_dict.find(l);
-	if (it != bltins_dict.end()) return it->second;
-	bltins.push_back(l);
-	return bltins_dict[l] = bltins.size() - 1;
-	#else
 	return bltins.get_bltin(l);
-	#endif // REMOVE_DICT_FROM_BUILTINS
 }
 
 int_t dict_t::get_new_sym() {

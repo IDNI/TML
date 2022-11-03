@@ -38,9 +38,7 @@
 #include "builtins.h"
 #endif // REMOVE_UPDATES_FROM_TABLE
 
-#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 #include "tables_progress.h"
-#endif
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
@@ -255,15 +253,12 @@ class driver {
 	input* current_input = 0;
 	size_t current_input_id = 0;
 
-	#ifdef REMOVE_DICT_FROM_BUILTINS
 	bool add_basic_builtins(builtins& bltins);
 	bool add_bdd_builtins(builtins& bltins);
 	bool add_print_builtins(builtins& bltins);
 	bool add_js_builtins(builtins& bltins);
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 public:
-	#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 	template <typename T>
 	void out_goals(std::basic_ostream<T> os);
 	template <typename T>
@@ -273,25 +268,18 @@ public:
 	void out_result() { /* TODO something */}
 	template <typename T>
 	void out(std::basic_ostream<T>& os) { /* TODO something*/ }
-	#endif
 
-	#ifdef REMOVE_UPDATES_FROM_TABLES
 	void init_tml_update(updates& updts);
-	#endif // REMOVE_UPDATES_FROM_TABLES
 
-	#ifdef MOVE_RUN_METHODS_TO_DRIVER
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 		progress& p);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
 		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls);
 	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt);
-	#endif // MOVE_RUN_METHODS_TO_DRIVER
 
 
-	#ifdef REMOVE_DICT_FROM_BUILTINS
 	builtins bltins;
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	template <typename T>
 	void out_dict(std::basic_ostream<T>& os)  { /* TODO something */ }
@@ -333,28 +321,9 @@ public:
 	void info(std::basic_ostream<T>&);
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	template <typename T>
-	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
-	void out_result() {
-		if (tbl) {
-			if (!tbl->out_goals(o::dump()))
-				tbl->out_fixpoint(o::dump());
-#ifdef PROOF
-			tbl->get_proof(o::dump());
-#endif
-		}
-	}
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 	void dump() { 
-		#ifndef REMOVE_IR_BUILDER_FROM_TABLES
-		out(o::dump()); 
-		#endif // REMOVE_IR_BUILDER_FROM_TABLES
 	}
 	void save_csv() const;
 	

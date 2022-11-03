@@ -17,7 +17,6 @@
 #include "defs.h"
 #include "tables.h"
 
-#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 /*! This class monitors the progress of the execution of tables. Right now it is
  * a straightforward consumer as all the functions return void. In a more complex 
  * scenario they could return a boolean to point if the execution should continue
@@ -42,5 +41,4 @@ private:
 	void add_tml_update(tables &ts, const term& t, bool neg);
 };
 
-#endif // REMOVE_IR_BUILDER_FROM_TABLES
 #endif // __TABLES_PROGRESS_H_

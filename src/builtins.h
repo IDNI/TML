@@ -15,18 +15,12 @@
 
 #include <functional>
 
-#ifndef REMOVE_DICT_FROM_BUILTINS
-#include "dict.h"
-#endif // REMOVE_DICT_FROM_BUILTINS
 
 #include "defs.h"
 #include "char_defs.h"
 #include "term.h"
 #include "bdd.h"
 
-#ifndef REMOVE_DICT_FROM_BUILTINS
-#include "dict.h"
-#endif // REMOVE_DICT_FROM_BUILTINS
 
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
 typedef std::pair<bool, bdd_handles> blt_cache_value;
@@ -43,11 +37,7 @@ struct blt_ctx {
 	size_t nargs = 0;    // number of args to keep ungrounded
 	alt*       a = 0;    // alt if body builtin
 
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	dict_t* dict = 0;
-	#else
 	tables* tbls = 0;
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	bdd_handles* hs = 0;
 	// builtin context for head term
@@ -112,34 +102,23 @@ struct builtins_pair {
 	builtin body;	
 };
 
-#ifdef REMOVE_DICT_FROM_BUILTINS
 typedef std::map<lexeme, int_t, lexcmp> dictmap;
-#endif // REMOVE_DICT_FROM_BUILTINS
 
-#ifdef REMOVE_UPDATES_FROM_TABLES
 struct updates {
 	dictmap updates_dict;
 	int_t rel_tml_update, sym_add, sym_del;
 };
-#endif // REMOVE_UPDATES_FROM_TABLES
 
 // container for builtins represented by a map
 // it's key is builtin's id and its value is a builtins_pair (head - body) 
 struct builtins : std::map<int_t, builtins_pair> {
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	dict_t* dict = 0;
-	#else
 	dictmap bltins_dict;
 	std::map<int_t, lexeme> inv_bltins_dict;
 	std::vector<lexeme> bltins;
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	blt_cache cache; // builtins' cache for calls
 	std::vector<sig> sigs;
 
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	bool reset(dict_t& d) { return clear(), dict = &d, true; }
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	// clear cache (TODO: add possibility to clear cache by builtin id)
 	void forget(blt_ctx&) { cache.clear(); }
@@ -176,13 +155,8 @@ struct builtins : std::map<int_t, builtins_pair> {
 	bool add(bool ishead, std::string name, int_t args, int_t oargs,
 		blt_handler h, int_t nargs = 0)
 	{
-		#ifndef REMOVE_DICT_FROM_BUILTINS
-		int_t id = dict->get_bltin(name);
-		auto it = find(id);
-		#else 
 		int_t id = get_bltin(get_lexeme(name));
 		auto it = find(++id);
-		#endif // REMOVE_DICT_FROM_BUILTINS
 
 		if (it == end()) it = emplace(id, builtins_pair{}).first;
 		builtins_pair& bp = it->second;
@@ -192,7 +166,6 @@ struct builtins : std::map<int_t, builtins_pair> {
 		return true;
 	}
 
-	#ifdef REMOVE_DICT_FROM_BUILTINS
 	int_t get_bltin(const lexeme& l) {
 		// TODO this check should be done elsewhere
 		// if (*l[0] == '?') parse_error(err_var_relsym, l);
@@ -201,13 +174,8 @@ struct builtins : std::map<int_t, builtins_pair> {
 		bltins.push_back(l);
 		return bltins_dict[l] = bltins.size() - 1;
 	}
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	bool add(const std::string& s) { return dict->get_bltin(s), true; }
-	#else
 	bool add(const std::string& s) { return get_bltin(get_lexeme(s)), true; }
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	void run_head(blt_ctx& c) { run(c, true);  }
 	void run_body(blt_ctx& c) { run(c, false); }

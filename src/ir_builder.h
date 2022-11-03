@@ -62,13 +62,9 @@ public:
 	std::map<sig, int_t> tsmap; //signature-table_id map
 	std::map<sig, int_t> bsmap; //signature-bltin_id map
 
-	#ifndef REMOVE_DICT_FROM_BUILTINS
-	ir_builder(dict_t& dict_, rt_options& opts_): dict(dict_), opts(opts_) {}
-	#else
 	builtins bltins;
 	ir_builder(dict_t& dict_, builtins &bltins_, rt_options& opts_):
 		dict(dict_), bltins(bltins_), opts(opts_) {} 
-	#endif // REMOVE_DICT_FROM_BUILTINS
 
 	~ir_builder() = default;
 
