@@ -24,7 +24,7 @@
  * or a more complex object to fine tune the forthcoming execution. */
 struct tables_progress : public progress {
 public:
-	tables_progress(dict_t &d, ir_builder &ir) : dict(d), ir_handler(ir) {}
+	tables_progress(dict_t &d, ir_builder &ir) : dict(d), ir_handler(ir) {};
 	~tables_progress() override = default;
 	void notify_update(tables &ts, spbdd_handle& x, const rule& r) override;
 

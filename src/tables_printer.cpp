@@ -11,9 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 #include "driver.h"
 
+template <typename T>
 void driver::out_goals(std::basic_ostream<T> os) {
 	if (ts.goals.size()) {
 		bdd_handles trues, falses, undefineds;
@@ -30,6 +30,7 @@ void driver::out_goals(std::basic_ostream<T> os) {
 	}
 }
 
+template <typename T>
 void driver::out_fixpoint(std::basic_ostream<T> os) {
 	bdd_handles trues, falses, undefineds;
 	// TODO Change this, fixpoint should be computed before
@@ -38,11 +39,7 @@ void driver::out_fixpoint(std::basic_ostream<T> os) {
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
 			if(opts.show_hidden || !tbls[n].hidden) {
 				decompress(trues[n], n, [&os, this](const term& r) {
-					#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 					tp.notify_output(r);
-					#else
-					os << ir_handler->to_raw_term(r) << '.' << endl; 
-					#endif // REMOVE_IR_BUILDER_FROM_TABLES
 				});
 			}
 		}
@@ -50,6 +47,7 @@ void driver::out_fixpoint(std::basic_ostream<T> os) {
 	} else return false;
 }
 
+template <typename T>
 void driver::out_proof(std::basic_ostream<T> os) {
 	// Fact proofs are stored by level
 	proof p(levels.size());
@@ -92,5 +90,3 @@ void driver::out_proof(std::basic_ostream<T> os) {
 	rules.resize(explicit_rule_count);
 	return goals.size() || opts.bproof != proof_mode::none;	
 }
-
-#endif // REMOVE_IR_BUILDER_FROM_TABLES

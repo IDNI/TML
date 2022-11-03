@@ -11,7 +11,6 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifdef REMOVE_IR_BUILDER_FROM_TABLES
 #include "tables_progress.h"
 
 using namespace std;
@@ -46,4 +45,3 @@ void tables_progress::notify_update(tables &t, spbdd_handle& x, const rule& r) {
 	});
 	if (t.print_updates) o::inf() << endl;
 }
-#endif // REMOVE_IR_BUILDER_FROM_TABLES

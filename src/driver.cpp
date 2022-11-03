@@ -3905,10 +3905,8 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	for (auto x : strs) load_string(x.first, x.second);
 	#endif
 	
-	#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 	// TODO this call must be done in the driver
-	if (!ir_handler->transform_grammar(g, m)) return false;
-	#endif // REMOVE_IR_BUILDER_FROM_TABLES
+	if (!ir->transform_grammar(g, m)) return false;
 
 	//if (!get_rules(move(m))) return false;
 	if (!tbls.get_rules(m)) return false;

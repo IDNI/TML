@@ -32,14 +32,9 @@
 #include "builtins.h"
 
 // TODO remove include and add alternative ones
-//#ifndef REMOVE_IR_BUILDER_FROM_TABLES
 #include "ir_builder.h"
-//#else
-//typedef std::set<std::vector<term>> flat_prog;
-//#endif // REMOVE_IR_BUILDER_FROM_TABLES
 
 class tables;
-
 struct body {
 	bool neg = false;
 	ntable tab;
