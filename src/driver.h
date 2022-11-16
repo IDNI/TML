@@ -34,9 +34,7 @@
 #include "options.h"
 #include "printing.h"
 
-#ifdef REMOVE_UPDATES_FROM_TABLE
 #include "builtins.h"
-#endif // REMOVE_UPDATES_FROM_TABLE
 
 #include "tables_progress.h"
 
@@ -246,6 +244,7 @@ class driver {
 
 	std::set<lexeme> vars;
 	options opts;
+	rt_options rt_opts;
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;

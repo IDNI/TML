@@ -341,7 +341,7 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	// transform_bitunv.cpp:357 and related lines.
 	
 	//FIXME: cannot be comparing strings at FWD
-	string pred = to_string(lexeme2str(bltins.inv_bltins_dict.at(t.tab)));
+	string pred = bltins.aliases[t.tab];
 
 
 	//COUT << to_string(pred) << endl;

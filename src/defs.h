@@ -192,13 +192,4 @@ typedef std::pair<int_t, ints> sig;
 #define GIT_BRANCH      "n/a"
 #endif
 
-#if defined(BIT_TRANSFORM) & defined(TYPE_RESOLUTION)
-#define REMOVE_IR_BUILDER_FROM_TABLES
-#define REMOVE_ADD_PRINT_UPDATE_STATES_FROM_TABLES
-#define REMOVE_DICT_FROM_TABLES
-#define REMOVE_DICT_FROM_BUILTINS
-#define REMOVE_UPDATES_FROM_TABLES
-#define MOVE_RUN_METHODS_TO_DRIVER
-#endif
-
 #endif // __DEFS_H__

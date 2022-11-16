@@ -25,6 +25,7 @@
 #include "driver.h"
 #include "err.h"
 #include "builtins.h"
+#include "builtins_factory.h"
 #include "cpp_gen.h"
 
 
@@ -594,8 +595,7 @@ rel_info get_relation_info(const raw_term &rt) {
 
 bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
-	builtins bltins;
-	dict_t d(bltins);
+	dict_t dict;
 
 	// Check that rules have correct format
 	if(is_cq(rr1) && is_cq(rr2) &&
@@ -605,7 +605,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
 		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
+		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, dict);
 
 		// Build up the queries necessary to check homomorphism.
 		set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
@@ -616,9 +616,11 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		tables_progress p( dict, *ir);
-		builtins bt;
-		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
+		tables_progress p(dict, *ir);
+		builtins_factory bf(dict);
+		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
+
+		run_prog_wedb(edb, nrp, dict, bt, opts, results, p);
 
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
@@ -645,8 +647,9 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
-	builtins bltins;
-	dict_t d(bltins);
+	dict_t d;
+	builtins_factory bf(dict);
+	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 	if(is_cq(rr1) && is_cq(rr2)) {
 		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
@@ -1078,8 +1081,9 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
-			builtins bltins;
-			dict_t d(bltins);
+			dict_t d;
+			builtins_factory bf(dict);
+			builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 			// Map each variable to a fresh symbol according to the partition
 			map<elem, elem> subs;
@@ -1689,7 +1693,9 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		bound_vars.push_back(ctx.globalHead_to_z3(i));
 	// Rename head variables on the fly such that they match
 	// on both rules
-	dict_t &dict = tbl->get_dict();
+	
+	// TODO check if this a proper fix
+	// dict_t &dict = tbl->get_dict();
 	z3::expr rule1 = ctx.rule_to_z3(r1, dict);
 	z3::expr rule2 = ctx.rule_to_z3(r2, dict);
 	ctx.solver.push();
@@ -3615,7 +3621,7 @@ bool driver::transform_handler(raw_prog &p) {
 	to.print_binarized = false;
 	to.show_hidden = false;
 
-	ir_builder ir_handler(dict, bltins, to);
+	ir_builder ir_handler(dict, to);
 	tables tbl_int(to, bltins);
 	
 	ir_handler.dynenv = &tbl_int;
@@ -3908,11 +3914,11 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#else
 		#ifdef TYPE_RESOLUTION
 		size_t a = max(max(ir->nums, ir->chars), ir->syms);
-		if (a == 0) bits++;
+		if (a == 0) tbls.bits++;
 		else while (a > size_t (1 << bits)-1) bits++;
 		#else
-		while (max(max(ir->nums, ir->chars), ir->syms) >= (1 << (bits - 2))) // (1 << (bits - 2))-1
-			add_bit();
+		while (max(max(ir->nums, ir->chars), ir->syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
+			tbls.add_bit();
 		#endif
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 	
@@ -3969,9 +3975,10 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
 }
 
-driver::driver(string s, const options &o) : opts(o), dict(dict_t(bltins)), rp(raw_progs(dict)) {
-	builtins bltns;
-	dict_t d{bltns};
+driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
+	dict_t d;
+	builtins_factory bf(d);
+	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 	dict = d;
 	raw_progs trp{d};
 	rp = trp;
@@ -3998,7 +4005,7 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t(bltins)), rp(r
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
 	//dict belongs to driver and is referenced by ir_builder and tables
-	ir = new ir_builder(dict, bltins, to);
+	ir = new ir_builder(dict, to);
 
 	tbl = new tables(to, bltins);
 

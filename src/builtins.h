@@ -20,6 +20,7 @@
 #include "char_defs.h"
 #include "term.h"
 #include "bdd.h"
+#include "tables.h"
 
 
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
@@ -102,80 +103,43 @@ struct builtins_pair {
 	builtin body;	
 };
 
-typedef std::map<lexeme, int_t, lexcmp> dictmap;
-
 struct updates {
-	dictmap updates_dict;
+	// dictmap updates_dict;
 	int_t rel_tml_update, sym_add, sym_del;
 };
 
 // container for builtins represented by a map
 // it's key is builtin's id and its value is a builtins_pair (head - body) 
 struct builtins : std::map<int_t, builtins_pair> {
-	dictmap bltins_dict;
-	std::map<int_t, lexeme> inv_bltins_dict;
-	std::vector<lexeme> bltins;
 
 	blt_cache cache; // builtins' cache for calls
 	std::vector<sig> sigs;
-
+	std::map<int_t, std::string> aliases;
 
 	// clear cache (TODO: add possibility to clear cache by builtin id)
 	void forget(blt_ctx&) { cache.clear(); }
-	// add builtin symbol (for non functions like digit, alnum...)
-
-	lexeme get_lexeme(ccs w, size_t l) {
-		static std::set<lexeme, lexcmp> strs_extra;
-		static 	std::vector<ccs> strs_allocated;
-		if (l == (size_t)-1) l = strlen(w);
-		auto it = strs_extra.find({ w, w + l });
-		if (it != strs_extra.end()) return *it;
-		cstr r = strdup(w);
-		strs_allocated.push_back(r);
-		lexeme lx = { r, r + l };
-		strs_extra.insert(lx);
-		return lx;
-	}
-	lexeme get_lexeme(const std::basic_string<unsigned char>& s) {
-		ccs w = s.c_str();
-		return get_lexeme(w, s.size());
-	}
-	lexeme get_lexeme(const std::basic_string<char>& s) {
-		ccs w = (ccs) s.c_str();
-		return get_lexeme(w, s.size());
-	}
 
 	// add builtin. ishead to flag head or body builtin
 	// @param ishead true if head builtin, false for body builtin
-	// @param name   identifier of the builtin
+	// @param id     id of the builtin in the dict
 	// @param args   number of arguments (-1 = can vary)
 	// @param oargs  number of output arguments
 	// @param h      building handler
 	// @param nargs  number of arguments to keep ungrounded
-	bool add(bool ishead, std::string name, int_t args, int_t oargs,
+	bool add(bool ishead, int_t id, std::string alias, int_t args, int_t oargs,
 		blt_handler h, int_t nargs = 0)
 	{
-		int_t id = get_bltin(get_lexeme(name));
 		auto it = find(++id);
 
 		if (it == end()) it = emplace(id, builtins_pair{}).first;
 		builtins_pair& bp = it->second;
-		if (ishead) 
-			bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
+
+		if (ishead) bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
 		else bp.has_body = true, bp.body = builtin{ args, oargs, nargs, h};
+		
+		aliases[id] = alias;
 		return true;
 	}
-
-	int_t get_bltin(const lexeme& l) {
-		// TODO this check should be done elsewhere
-		// if (*l[0] == '?') parse_error(err_var_relsym, l);
-		if (auto it = bltins_dict.find(l); it != bltins_dict.end()) 
-			return it->second;
-		bltins.push_back(l);
-		return bltins_dict[l] = bltins.size() - 1;
-	}
-
-	bool add(const std::string& s) { return get_bltin(get_lexeme(s)), true; }
 
 	void run_head(blt_ctx& c) { run(c, true);  }
 	void run_body(blt_ctx& c) { run(c, false); }

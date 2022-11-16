@@ -44,7 +44,10 @@ int_t dict_t::get_sym(const lexeme& l) {
 }
 
 int_t dict_t::get_bltin(const lexeme& l) {
-	return bltins.get_bltin(l);
+	auto it = bltins_dict.find(l);
+	if (it != bltins_dict.end()) return it->second;
+	bltins.push_back(l);
+	return bltins_dict[l] = syms.size()-1;
 }
 
 int_t dict_t::get_new_sym() {

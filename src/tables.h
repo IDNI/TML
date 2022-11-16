@@ -226,8 +226,9 @@ private:
 	void get_alt_ex(alt& a, const term& h) const;
 
 
-
+public:
 	bool datalog, halt = false, unsat = false, bcqc = false;
+private:
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -271,7 +272,10 @@ private:
 	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
+
+public:
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
+private:
 	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args) const;
 
 	void add_bit();
@@ -364,27 +368,21 @@ private:
 public:
 	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
-#ifndef REMOVE_UPDATES_FROM_TABLE
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
-#endif // #ifdef REMOVE_UPDATES_FROM_TABLE
 
 private:
-	#ifndef REMOVE_UPDATES_FROM_TABLE
+	/*
+	 *  updates
+	 */
 	void init_tml_update();
-	#endif // REMOVE_UPDATES_FROM_TABLE
-
 	bool print_updates_check();
+	updates updts;
 
 
 
 	//-------------------------------------------------------------------------
 	//builtins
-	
-
-	#ifdef REMOVE_UPDATES_FROM_TABLE
-	updates updts;
-	#endif // REMOVE_UPDATES_FROM_TABLE
 
 	// simple builtin execution from a fact
 	void fact_builtin(const term& b);
@@ -408,7 +406,9 @@ private:
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits,
 		size_t n_vars);
 	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
+public:
 	spbdd_handle perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t delta);
+private:
 	void set_constants(const term& t, spbdd_handle &q) const;
 	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq);
 	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
@@ -430,10 +430,12 @@ private:
 		size_t n_vars);
 	spbdd_handle mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 		size_t var3, size_t n_vars);
+public:
 	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
+private:
 
 	#ifdef FOL_V1
 	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;

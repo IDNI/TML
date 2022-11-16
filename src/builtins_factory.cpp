@@ -16,32 +16,54 @@
 #include "tables.h"
 #include "builtins.h"
 #include "driver.h"
+#include "builtins_factory.h"
 
 using namespace std;
 
 extern uints perm_init(size_t n);
 
-bool driver::add_basic_builtins(builtins& bltins) {
+lexeme get_lexeme(ccs w, size_t l) {
+	static std::set<lexeme, lexcmp> strs_extra;
+	static 	std::vector<ccs> strs_allocated;
+	if (l == (size_t)-1) l = strlen(w);
+	auto it = strs_extra.find({ w, w + l });
+	if (it != strs_extra.end()) return *it;
+	cstr r = strdup(w);
+	strs_allocated.push_back(r);
+	lexeme lx = { r, r + l };
+	strs_extra.insert(lx);
+	return lx;
+}
+lexeme get_lexeme(const std::basic_string<unsigned char>& s) {
+	ccs w = s.c_str();
+	return get_lexeme(w, s.size());
+}
+lexeme get_lexeme(const std::basic_string<char>& s) {
+	ccs w = (ccs) s.c_str();
+	return get_lexeme(w, s.size());
+}
+
+builtins_factory& builtins_factory::add_basic_builtins() {
 	// TODO builtins should be managed in a separated object unrelated 
 	// to dict. Dict could contain a given builtin object a delegate queires
 	// to it, but not otherwise.
 	const bool H = true, B = false;
 	set<string> syms{ "alpha","alnum","digit","space","printable" };
-	for (auto sym : syms) bltins.add(sym);
+	for (auto sym : syms) dict.get_bltin(sym);
 
-	bltins.add(H, "halt",          0, 0, [this](blt_ctx&) {
+	bltins.add(H, dict.get_bltin(get_lexeme("halt")), "halt",  0, 0, [this](blt_ctx& c) {
 		//COUT << "halting" << endl;
-		halt  = true; });
-	bltins.add(H, "error",         0, 0, [this](blt_ctx&) {
+		c.tbls->halt  = true; });
+	bltins.add(H, dict.get_bltin(get_lexeme("error")), "error", 0, 0, [this](blt_ctx& c) {
 		//COUT << "erroring" << endl;
-		error = true; });
-	bltins.add(H, "false",         0, 0, [this](blt_ctx&) {
+		c.tbls->error = true; });
+	bltins.add(H, dict.get_bltin(get_lexeme("false")), "false", 0, 0, [this](blt_ctx& c) {
 		//COUT << "falsing" << endl;
-		unsat = true; });
-	bltins.add(H, "forget",        0, 0, [this](blt_ctx& c) {
+		c.tbls->unsat = true; });
+	bltins.add(H, dict.get_bltin(get_lexeme("forget")), "forget", 0, 0, [this](blt_ctx& c) {
 		//COUT << "forgetting" << endl;
-		bltins.forget(c); });
-	bltins.add(B, "rnd", 3, 1, [this](blt_ctx& c) {
+		c.tbls->bltins.forget(c); });
+	bltins.add(B, dict.get_bltin(get_lexeme("rnd")), "rnd", 3, 1, [this](blt_ctx& c) {
 	//	// TODO: check that it's num const
 		//COUT << "rnd " << c.g << " " << to_raw_term(c.g) << endl;
 		int_t arg0 = c.arg_as_int(0);
@@ -56,10 +78,10 @@ bool driver::add_basic_builtins(builtins& bltins) {
 		uniform_int_distribution<> distr(arg0, arg1);
 		int_t rnd = distr(gen);
 		DBG(o::dbg()<<"rnd("<<arg0<<" "<<arg1<<" "<<rnd<<endl;)
-		c.out(from_sym(c.outvarpos(0), c.a->varslen, mknum(rnd)));
+		c.out(c.tbls->from_sym(c.outvarpos(0), c.a->varslen, mknum(rnd)));
 	});
 	
-	bltins.add(B, "count", -1, 1, [this](blt_ctx& c) {
+	bltins.add(B, dict.get_bltin(get_lexeme("count")), "count", -1, 1, [this](blt_ctx& c) {
 		/*
 		for (auto x : *c.hs) {
 			COUT << "bltin args\n";
@@ -72,11 +94,11 @@ bool driver::add_basic_builtins(builtins& bltins) {
 		//COUT << "count in\n";
 		//::out(COUT, x)<<endl<<endl;
 		size_t nargs = c.a->vm.size();
-		uints perm = perm_init(nargs * (bits));
+		uints perm = perm_init(nargs * (c.tbls->bits));
 		int_t aux = 0;
 		bools ex;
 		int_t varsout = 0; //counts number of args that are ex
-		for (size_t i = 0; i < bits; ++i)
+		for (size_t i = 0; i < c.tbls->bits; ++i)
 			for (size_t j = 0; j< nargs; ++j)
 				if(j == ((size_t)abs(*c.a->bltoutvars.begin())-1) ||
 					(c.a->bltngvars.size() != 0 &&
@@ -94,23 +116,21 @@ bool driver::add_basic_builtins(builtins& bltins) {
 		x = bdd_permute_ex(x,ex,perm);
 		//COUT << "count after ex\n";
 		//::out(COUT, x)<<endl<<endl;
-		size_t cnt2 = satcount(x, (bits) * (c.a->varslen-varsout));
+		size_t cnt2 = satcount(x, (c.tbls->bits) * (c.a->varslen-varsout));
 		//DBG(COUT << "count2 result: " << cnt2 << endl;)
-		c.out(from_sym(c.outvarpos(), c.a->varslen, mknum(cnt2)));
+		c.out(c.tbls->from_sym(c.outvarpos(), c.a->varslen, mknum(cnt2)));
 	}, -1);
 
-	return  init_bdd_builtins() &&
-		init_print_builtins() &&
-		init_js_builtins();
+	return  *this;
 }
 
-bool driver::add_bdd_builtins(builtins& bltins) {
+builtins_factory& builtins_factory::add_bdd_builtins() {
 	const bool B = false;
 	auto get_bw_h = [this](t_arith_op op) {
 		return [this, op](blt_ctx& c) {
 			bdd_handles hs;
 			c.args_bodies(hs);
-			c.out(bitwise_handler(
+			c.out(c.tbls->bitwise_handler(
 				c.varpos(0), c.varpos(1), c.varpos(2),
 				hs[0], hs[1], c.a->varslen, op));
 		};
@@ -124,7 +144,7 @@ bool driver::add_bdd_builtins(builtins& bltins) {
 
 			bdd_handles hs;
 			c.args_bodies(hs);
-			c.out(pairwise_handler(
+			c.out(c.tbls->pairwise_handler(
 				c.varpos(0), c.varpos(1), c.varpos(2),
 				hs[0], hs[1], c.a->varslen, op));
 		};
@@ -182,13 +202,13 @@ bool driver::add_bdd_builtins(builtins& bltins) {
 
 			spbdd_handle s0 = const0;
 			if (const0 == htrue)
-				s0 = perm_bit_reverse_bt(arg0, arg0_w, 0);
+				s0 = c.tbls->perm_bit_reverse_bt(arg0, arg0_w, 0);
 			//COUT << "### S0:"<< endl;
 			//::out(COUT, s0)<<endl<<endl;
 
 			spbdd_handle s1 = const1;
 			if (const1 == htrue)
-				s1 = perm_bit_reverse_bt(arg1, arg1_w, arg0_w);
+				s1 = c.tbls->perm_bit_reverse_bt(arg1, arg1_w, arg0_w);
 			//COUT << "### S1:"<< endl;
 			//::out(COUT, s1)<<endl<<endl;
 
@@ -210,7 +230,7 @@ bool driver::add_bdd_builtins(builtins& bltins) {
 			//::out(COUT, leq)<<endl<<endl;
 
 			//TODO: arg0_w when ?x in head, arg1_w when ?y in head
-			spbdd_handle s2 = perm_bit_reverse_bt(leq, arg0_w, 0);
+			spbdd_handle s2 = c.tbls->perm_bit_reverse_bt(leq, arg0_w, 0);
 			//COUT << "Leq Handler output:"<< endl;
 			//::out(COUT, s2)<<endl<<endl;
 
@@ -219,17 +239,17 @@ bool driver::add_bdd_builtins(builtins& bltins) {
 		};
 	};
 
-	bltins.add(B, "bw_and",  3, 1, get_bw_h(BITWAND), 2);
-	bltins.add(B, "bw_or",   3, 1, get_bw_h(BITWOR),  2);
-	bltins.add(B, "bw_xor",  3, 1, get_bw_h(BITWXOR), 2);
-	bltins.add(B, "bw_not",  3, 1, get_bw_h(BITWNOT), 2);
-	bltins.add(B, "pw_add",  3, 1, get_pw_h(ADD),     2);
-	bltins.add(B, "pw_mult", 3, 1, get_pw_h(MULT),    2);
-	bltins.add(B, "leq", 2, 1, bltin_leq_handler(), 2);
-	return true;
+	bltins.add(B, dict.get_bltin(get_lexeme("bw_and")), "bw_and", 3, 1, get_bw_h(BITWAND), 2);
+	bltins.add(B, dict.get_bltin(get_lexeme("bw_or")), "bw_or", 3, 1, get_bw_h(BITWOR),  2);
+	bltins.add(B, dict.get_bltin(get_lexeme("bw_xor")), "bw_xor", 3, 1, get_bw_h(BITWXOR), 2);
+	bltins.add(B, dict.get_bltin(get_lexeme("bw_not")), "bw_not", 3, 1, get_bw_h(BITWNOT), 2);
+	bltins.add(B, dict.get_bltin(get_lexeme("pw_add")), "pw_add", 3, 1, get_pw_h(ADD),     2);
+	bltins.add(B, dict.get_bltin(get_lexeme("pw_mult")), "pw_mult", 3, 1, get_pw_h(MULT),    2);
+	bltins.add(B, dict.get_bltin(get_lexeme("leq")), "leq", 2, 1, bltin_leq_handler(), 2);
+	return *this;
 }
 
-bool driver::add_print_builtins(builtins& bltins) {
+builtins_factory& builtins_factory::add_print_builtins() {
 	const bool H = true, B = false;
 	auto printer = [this](bool ln, bool to, bool delim) {
 		return [this, ln, to, delim] (blt_ctx& c) {
@@ -239,26 +259,26 @@ bool driver::add_print_builtins(builtins& bltins) {
 	const bool NLN = false, NTO = false, NDLM = false;
 	const bool  LN = true,   TO = true,   DLM = true;
 	blt_handler h;
-	bltins.add(H, "print",            -1, 0, h = printer(NLN, NTO, NDLM));
-	bltins.add(B, "print",            -1, 0, h);
-	bltins.add(H, "println",          -1, 0, h = printer( LN, NTO, NDLM));
-	bltins.add(B, "println",          -1, 0, h);
-	bltins.add(H, "println_to",       -1, 0, h = printer( LN,  TO, NDLM));
-	bltins.add(B, "println_to",       -1, 0, h);
-	bltins.add(H, "print_to",         -1, 0, h = printer(NLN,  TO, NDLM));
-	bltins.add(B, "print_to",         -1, 0, h);
-	bltins.add(H, "print_delim",      -1, 0, h = printer(NLN, NTO,  DLM));
-	bltins.add(B, "print_delim",      -1, 0, h);
-	bltins.add(H, "println_delim",    -1, 0, h = printer( LN, NTO,  DLM));
-	bltins.add(B, "println_delim",    -1, 0, h);
-	bltins.add(H, "print_to_delim",   -1, 0, h = printer(NLN,  TO,  DLM));
-	bltins.add(B, "print_to_delim",   -1, 0, h);
-	bltins.add(H, "println_to_delim", -1, 0, h = printer( LN,  TO,  DLM));
-	bltins.add(B, "println_to_delim", -1, 0, h);
-	return true;
+	bltins.add(H, dict.get_bltin(get_lexeme("print")), "print",            -1, 0, h = printer(NLN, NTO, NDLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("print")), "print",           -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("println")), "println",         -1, 0, h = printer( LN, NTO, NDLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("println")), "println",         -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("println_to")), "println_to",      -1, 0, h = printer( LN,  TO, NDLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("println_to")), "println_to",      -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("print_to")), "print_to",        -1, 0, h = printer(NLN,  TO, NDLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("print_to")), "print_to",        -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("print_delim")), "print_delim",     -1, 0, h = printer(NLN, NTO,  DLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("print_delim")), "print_delim",     -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("println_delim")), "println_delim",   -1, 0, h = printer( LN, NTO,  DLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("println_delim")), "println_delim",   -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("print_to_delim")), "print_to_delim",  -1, 0, h = printer(NLN,  TO,  DLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("print_to_delim")), "print_to_delim",  -1, 0, h);
+	bltins.add(H, dict.get_bltin(get_lexeme("println_to_delim")), "println_to_delim", -1, 0, h = printer( LN,  TO,  DLM));
+	bltins.add(B, dict.get_bltin(get_lexeme("println_to_delim")), "println_to_delim", -1, 0, h);
+	return *this;
 }
 
-bool driver::add_js_builtins(builtins& bltins) {
+builtins_factory& builtins_factory::add_js_builtins() {
 	const bool H = true, B = false;
 	blt_handler h;
 #ifdef __EMSCRIPTEN__
@@ -288,13 +308,13 @@ bool driver::add_js_builtins(builtins& bltins) {
 	//	c.out(from_sym(c.outvarpos(), c.a->varslen, sym));
 	//});
 #else // TODO embed a JS engine if not in browser?
-	bltins.add(H, "js_eval", -1, 0, h = [](blt_ctx) {
+	bltins.add(H, dict.get_bltin(get_lexeme("js_eval")), "js_eval", -1, 0, h = [](blt_ctx) {
 		o::err() << "js_eval is available only in a browser environment"
 			" (ignoring)." << endl;
 	});
-	bltins.add(B, "js_eval", -1, 0, h);
+	bltins.add(B, dict.get_bltin(get_lexeme("js_eval")), "js_eval", -1, 0, h);
 	//bltins.add(B, "js_eval_to_int", -1, 1, h);
 	//bltins.add(B, "js_eval_to_sym", -1, 1, h);
 #endif
-	return true;
+	return *this;
 }

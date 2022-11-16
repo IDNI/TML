@@ -36,7 +36,8 @@ void tables_progress::notify_update(tables &t, spbdd_handle& x, const rule& r) {
 	if (t.print_updates) {
 		if (!t.print_steps && !printed)
 			o::inf() << "# step: " << step << endl, printed = true;
-		o::inf() << "#       " <<  r << "\n#   ->  ";
+		// TODO fix operator<< for rules
+		//o::inf() << "#       " <<  r << "\n#   ->  ";
 	}
 	t.decompress(x, r.tab, [&t, &r, this](const term& x) {
 		if (t.print_updates)
