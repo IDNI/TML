@@ -595,7 +595,7 @@ rel_info get_relation_info(const raw_term &rt) {
 
 bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
-	dict_t dict;
+	dict_t d;
 
 	// Check that rules have correct format
 	if(is_cq(rr1) && is_cq(rr2) &&
@@ -605,7 +605,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Freeze the variables and symbols of the rule we are checking the
 		// containment of
 		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, dict);
+		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
 
 		// Build up the queries necessary to check homomorphism.
 		set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
@@ -616,11 +616,11 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		tables_progress p(dict, *ir);
-		builtins_factory bf(dict);
+		tables_progress p(d, *ir);
+		builtins_factory bf(d);
 		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
-		run_prog_wedb(edb, nrp, dict, bt, opts, results, p);
+		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
 
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
@@ -648,7 +648,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
-	builtins_factory bf(dict);
+	builtins_factory bf(d);
 	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 	if(is_cq(rr1) && is_cq(rr2)) {
@@ -1082,7 +1082,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
 			dict_t d;
-			builtins_factory bf(dict);
+			builtins_factory bf(d);
 			builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 			// Map each variable to a fresh symbol according to the partition
@@ -1174,7 +1174,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog(dict);
 					test_prog.r.push_back(rr2);
 					set<raw_term> res;
-					tables_progress p( dict, *ir);
+					tables_progress p( d, *ir);
 					run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
 					return res.find(subbed.h[0]) != res.end();
 				});
@@ -1694,8 +1694,6 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	// Rename head variables on the fly such that they match
 	// on both rules
 	
-	// TODO check if this a proper fix
-	// dict_t &dict = tbl->get_dict();
 	z3::expr rule1 = ctx.rule_to_z3(r1, dict);
 	z3::expr rule2 = ctx.rule_to_z3(r2, dict);
 	ctx.solver.push();
@@ -3976,12 +3974,12 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 }
 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
-	dict_t d;
-	builtins_factory bf(d);
-	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-	dict = d;
-	raw_progs trp{d};
-	rp = trp;
+	builtins_factory bf(dict);
+	builtins bltins = bf
+		.add_basic_builtins()
+		.add_bdd_builtins()
+		.add_print_builtins()
+		.add_js_builtins().bltins;
 
 	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
