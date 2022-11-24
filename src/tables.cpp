@@ -185,7 +185,7 @@ body tables::get_body(const term& t, const varmap& vm, size_t len) const {
 }
 
 bool tables::get_facts(const flat_prog& m) {
-	// TODO: Ee need add and del in order to deal with negations in heads.
+	// TODO: We need add and del in order to deal with negations in heads.
 	// A couple of regression tests use negation in heads.
 	// We should check whether this is a desirable feature.
 	map<ntable, vector<const term*>> add, del;
@@ -729,7 +729,6 @@ char tables::fwd(progress& p) noexcept {
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 		if (populate_tml_update || (print_updates && print_updates_check())) 
 			p.notify_update(*this, x, r);
-			// TODO write something
 	}
 	bool b = false;
 	// D: just temp ugly static, move this out of fwd/pass in, or in tables.

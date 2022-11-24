@@ -35,6 +35,7 @@
 #include "ir_builder.h"
 
 class tables;
+
 struct body {
 	bool neg = false;
 	ntable tab;
