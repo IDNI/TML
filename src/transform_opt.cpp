@@ -83,11 +83,11 @@ const cost_function exp_in_heads = [](const changed_prog &mp) {
 	return c;
 };
 
-/*! Computes the approximate cost of executing a given changed program. */
+/* Computes the approximate cost of executing a given changed program. */
 
 using brancher = function<vector<change>(changed_prog&)>;
 
-/*! Represents and strategy to select the best change according to the passed
+/* Represents and strategy to select the best change according to the passed
  * cost_function. */
 
 class bounder {
@@ -96,8 +96,8 @@ public:
 	virtual flat_prog solution() = 0;
 };
 
-/*! Custom implementation of bounder interface that returns the best solution found
- * so far. */
+/* Custom implementation of bounder interface that returns the best solution
+ * found so far. */
 
 class best_solution: public bounder {
 public:
@@ -171,7 +171,30 @@ pair<flat_rule, flat_rule> split_rule(const flat_rule &r, const vector<term> &b)
 	return {with_canonical_vars(r1), with_canonical_vars(r2)};
 }
 
+/* Brancher computing all the possible splits of all the rules. */
+
 vector<change> brancher_split_bodies(const changed_prog &cp) {
+	vector<change> changes;
+	// For every rule and every possible subset of rules body we produce a
+	// change splitting the rule accordingly.
+	for (auto &r: cp.current) {
+		vector<term> body(++r.begin(), r.end());
+		for (auto &b : powerset_range(body)) {
+			// For each choice we compute the new rules
+			auto split = split_rule(r, b);
+			change c;
+			c.del.insert(r);
+			c.add.insert(split.first);
+			c.add.insert(split.second);
+			changes.emplace_back(c);
+		}
+	}
+	return changes;
+}
+
+/* Brancher computing quick splits of all the rules. */
+
+vector<change> brancher_quick_split_bodies(const changed_prog &cp) {
 	vector<change> changes;
 	// For every rule and every possible subset of rules body we produce a
 	// change splitting the rule accordingly.
