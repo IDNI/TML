@@ -29,8 +29,7 @@ class dict_t {
 	inputs* ii = nullptr;
 public:
 
-	dict_t() = default;
-
+	dict_t();
 	~dict_t();
 
 	void set_inputs(inputs* ins) { ii = ins; }
