@@ -147,8 +147,8 @@ template<typename T> struct ptrcmp {
 //#define BIT_TRANSFORM  //to be deprecated,
 
 #define TML_NATIVES
-//#define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
-//#define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
+// #define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
+// #define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
 
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
 #define mkchr(x) ((int_t) x )

@@ -259,23 +259,31 @@ class driver {
 
 public:
 	template <typename T>
-	void out_goals(std::basic_ostream<T> os);
+	void out_goals(std::basic_ostream<T> &os);
 	template <typename T>
-	void out_fixpoint(std::basic_ostream<T> os);
+	void out_fixpoint(std::basic_ostream<T> &os);
 	template <typename T>
-	void out_proof(std::basic_ostream<T> os);
-	void out_result() { /* TODO something */}
+	void out_proof(std::basic_ostream<T> &os);
 	template <typename T>
-	void out(std::basic_ostream<T>& os) { /* TODO something*/ }
+	void out_result(std::basic_ostream<T> &os);
+	template <typename T>
+	void out(std::basic_ostream<T> &os) { /* TODO something*/ }
 
 	void init_tml_update(updates& updts);
 
 	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
 		progress& p);
+	bool run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
+		size_t break_on_step, progress& ps, rt_options& rt, tables &tbls, ir_builder &ir_handler);
 	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
-		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls);
-	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt);
+		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls) {
+			return run_prog(p, strs, steps, break_on_step, ps, rt, tbls, *ir);
+	}
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt, ir_builder &ir_handler);
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt) {
+		return add_prog_wprod(m,  g/*, bool mknums*/, tbls, rt, *ir);
+	}
 
 
 	builtins bltins;

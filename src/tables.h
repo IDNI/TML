@@ -467,23 +467,11 @@ public:
 	~tables();
 	
 	size_t step() { return nstep; }
-	
-	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
-		progress& p);
-	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
-		size_t break_on_step, progress& ps);
 	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
-	
-
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
-	
-
 	void set_proof(proof_mode v) { opts.bproof = v; }
-	
 
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;

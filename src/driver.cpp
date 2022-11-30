@@ -3627,8 +3627,7 @@ bool driver::transform_handler(raw_prog &p) {
 	ir_handler.dynenv->bits = 2;
 
 	tables_progress tp(dict, *ir);
-	rt_options rt;
-	if (!run_prog(tr, strs_t(), 0,0, tp, rt, tbl_int)) return false;
+	if (!run_prog(tr, strs_t(), 0,0, tp, to, tbl_int, ir_handler)) return false;
 
 	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
@@ -3688,6 +3687,7 @@ bool driver::transform_handler(raw_prog &p) {
 	ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 
 #endif
+
 	DBG(if (opts.enabled("transformed"))
 		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);
 
@@ -3775,7 +3775,7 @@ void driver::init_tml_update(updates& updts) {
 	updts.sym_del = dict.get_sym(dict.get_lexeme("delete"));
 }
 
-bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt) {
+bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt, ir_builder &ir_handler) {
 
 	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
@@ -3793,7 +3793,7 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	#endif
 	
 	// TODO this call must be done in the driver
-	if (!ir->transform_grammar(g, m)) return false;
+	if (!ir_handler.transform_grammar(g, m)) return false;
 
 	//if (!get_rules(move(m))) return false;
 	if (!tbls.get_rules(m)) return false;
@@ -3807,7 +3807,7 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	// TODO clarify difference between hidden and internal. Anyway, this
 	// problem would disappear once we refactor run methosa.
 	ints internal_rels = dict.get_rels(filter_internal_tables);
-	for (auto& tbl : tbl->tbls)
+	for (auto& tbl : tbls.tbls)
 		for (int_t rel : internal_rels)
 			if (rel == tbl.s.first) { tbl.hidden = true; break; }
 
@@ -3877,14 +3877,14 @@ bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 }
 
 bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
-	size_t break_on_step, progress& ps, rt_options& rt, tables &tbls) {
+	size_t break_on_step, progress& ps, rt_options& rt, tables &tbls, ir_builder &ir_handler) {
 	DBG(o::dbg() << "run_prog" << endl;);
 	clock_t start{}, end;
 	double t;
 	if (rt.optimize) measure_time_start();
 
 	// TODO move this call to the driver
-	flat_prog fp = ir->to_terms(p);
+	flat_prog fp = ir_handler.to_terms(p);
 	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
@@ -3895,33 +3895,33 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	strs = strs_in;
 	if (!strs.empty()) {
 		for (auto x : strs) {
-			ir->nums = max(ir->nums, (int_t)x.second.size()+1);
+			ir_handler.nums = max(ir_handler.nums, (int_t)x.second.size()+1);
 			unary_string us(32);
 			us.buildfrom(x.second);
-			ir->chars = max(ir->chars, (int_t)us.rel.size());
+			ir_handler.chars = max(ir.chars, (int_t)us.rel.size());
 		}
 	}
 	#else // LOAD_STRS
-	ir->load_strings_as_fp(fp, strs_in);
+	ir_handler.load_strings_as_fp(fp, strs_in);
 	#endif // LOAD_STRS
 
-	ir->syms = dict.nsyms();
+	ir_handler.syms = dict.nsyms();
 	
 	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		tbls.bits = 1;
 	#else
 		#ifdef TYPE_RESOLUTION
-		size_t a = max(max(ir->nums, ir->chars), ir->syms);
+		size_t a = max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms);
 		if (a == 0) tbls.bits++;
-		else while (a > size_t (1 << bits)-1) bits++;
+		else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
 		#else
-		while (max(max(ir->nums, ir->chars), ir->syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
+		while (max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
 			tbls.add_bit();
 		#endif
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 	
 	// TOODO this call must be done in the driver
-	if (!add_prog_wprod(fp, p.g, tbls, rt)) return false;
+	if (!add_prog_wprod(fp, p.g, tbls, rt, ir_handler)) return false;
 
 	//----------------------------------------------------------
 	if (tbls.opts.optimize) {
@@ -3944,7 +3944,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	//TODO: prog_after_fp is required for grammar/str recognition,
 	// but it should be restructured
 	if (r && tbls.prog_after_fp.size()) {
-		if (!add_prog_wprod(tbls.prog_after_fp, {}, tbls, rt)) return false;
+		if (!add_prog_wprod(tbls.prog_after_fp, {}, tbls, rt, ir_handler)) return false;
 		r = tbls.pfp(0, 0, ps);
 	}
 
@@ -3953,7 +3953,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = tbls.nstep;
 			rt_options rt;
-			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, *tbl);
+			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, *tbl, ir_handler);
 			went = tbls.nstep - begstep;
 			if (!r && went >= steps) {
 				//assert(false && "!r && went >= steps");
@@ -3974,12 +3974,13 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 }
 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
-	builtins_factory bf(dict);
-	builtins bltins = bf
-		.add_basic_builtins()
-		.add_bdd_builtins()
-		.add_print_builtins()
-		.add_js_builtins().bltins;
+//	builtins_factory bf(dict);
+//	builtins bltins = bf
+	builtins bltins;
+//		.add_basic_builtins()
+//		.add_bdd_builtins()
+//		.add_print_builtins()
+//		.add_js_builtins().bltins;
 
 	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
@@ -4008,7 +4009,7 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	tbl = new tables(to, bltins);
 
 	ir->dynenv  = tbl;
-	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
+	ir->printer = tbl; //by now leaving printer component in tables, to be refactored
 
 	// TODO move this options to rt_options
 	set_print_step(opts.enabled("ps"));

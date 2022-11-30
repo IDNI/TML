@@ -16,7 +16,7 @@
 using namespace std;
 
 template <typename T>
-void driver::out_goals(std::basic_ostream<T> os) {
+void driver::out_goals(std::basic_ostream<T> &os) {
 	if (tbl->goals.size()) {
 		bdd_handles trues, falses, undefineds;
 		// TODO Change this, fixpoint should be computed before
@@ -25,22 +25,27 @@ void driver::out_goals(std::basic_ostream<T> os) {
 			for (term t : tbl->goals) {
 				tbl->decompress(trues[t.tab], t.tab, 
 					[&os, this](const term& r) {
-						os << ir->to_raw_term(r) << '.\n'; 
+						os << ir->to_raw_term(r) << ".\n"; 
 					});
 			}
 		}
 	}
 }
 
+template 
+void driver::out_goals(std::basic_ostream<char> &os);
+template 
+void driver::out_goals(std::basic_ostream<wchar_t> &os);
+
 template <typename T>
-void driver::out_fixpoint(std::basic_ostream<T> os) {
+void driver::out_fixpoint(std::basic_ostream<T> &os) {
 	bdd_handles trues, falses, undefineds;
 	// TODO Change this, fixpoint should be computed before
 	// requesting to output the fixpoint.
 	if(tbl->compute_fixpoint(trues, falses, undefineds)) {
 		for(ntable n = 0; n < (ntable)trues.size(); n++) {
 			if(rt_opts.show_hidden || !tbl->tbls[n].hidden) {
-				decompress(trues[n], n, [&os, this](const term& r) {
+				tbl->decompress(trues[n], n, [&os, this](const term& r) {
 					os << ir->to_raw_term(r) << '.' << endl;
 				});
 			}
@@ -48,3 +53,25 @@ void driver::out_fixpoint(std::basic_ostream<T> os) {
 	}
 }
 
+template
+void driver::out_fixpoint(std::basic_ostream<char> &os);
+template
+void driver::out_fixpoint(std::basic_ostream<wchar_t> &os);
+
+template <typename T>
+void driver::out_result(std::basic_ostream<T> &os) {
+		if (tbl) {
+			// TODO avoid double fixpoint computation
+			out_goals(os);
+			// if (tbl->goals.size()) out_fixpoint(os);
+			out_fixpoint(os);
+		#ifdef PROOF
+			get_proof(o::dump());
+		#endif
+		}
+}
+
+template
+void driver::out_result(std::basic_ostream<char> &os);
+template
+void driver::out_result(std::basic_ostream<wchar_t> &os);
