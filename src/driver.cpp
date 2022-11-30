@@ -3668,7 +3668,7 @@ bool driver::transform_handler(raw_prog &p) {
 				throw_runtime_error("State blocks require "
 					"-sb (-state-blocks) option enabled.");
 
-	if (opts.disabled("fp-step") && raw_term::require_fp_step)
+	if (opts.disabled("fp-step") && raw_term::require_fp_step) 
 		return error = true,
 			throw_runtime_error("Usage of the __fp__ term requires "
 				"--fp-step option enabled.");
@@ -3728,8 +3728,10 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
 		result = run_prog(rp.p, pd.strs, steps, break_on_step, tp, rt, *tbl);
-	else
+	else if (rp.p.nps.size())
 		result = run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step, tp, rt, *tbl);
+	else
+		result = false;
 
 	o::ms() << "# elapsed: ", measure_time_end();
 
@@ -3883,7 +3885,6 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	double t;
 	if (rt.optimize) measure_time_start();
 
-	// TODO move this call to the driver
 	flat_prog fp = ir_handler.to_terms(p);
 	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
@@ -3974,13 +3975,12 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 }
 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
-//	builtins_factory bf(dict);
-//	builtins bltins = bf
-	builtins bltins;
-//		.add_basic_builtins()
-//		.add_bdd_builtins()
-//		.add_print_builtins()
-//		.add_js_builtins().bltins;
+	builtins_factory bf(dict);
+	bltins = bf
+		.add_basic_builtins()
+		.add_bdd_builtins()
+		.add_print_builtins()
+		.add_js_builtins().bltins;
 
 	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
@@ -4003,18 +4003,15 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	to.bitorder          = opts.get_int("bitorder");
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
-	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);
-
 	tbl = new tables(to, bltins);
 
 	ir->dynenv  = tbl;
-	ir->printer = tbl; //by now leaving printer component in tables, to be refactored
+	ir->printer = tbl;
 
 	// TODO move this options to rt_options
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
-
 	add_print_updates_states(opts.pu_states, *tbl, ir, dict);
 
 	if (to.fp_step) ir->get_table(
@@ -4023,13 +4020,12 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	set_regex_level(opts.get_int("regex-level"));
 
 	read_inputs();
-	if(!error) {
-		//FIXME: root_isempty
+
+	if (!error && !rp.p.nps.empty()) {
 		directives_load((rp.p.nps)[0]);
 		transform_handler(rp.p);
-		//TODO: review how recursion to nested programs should be handled
-		// per transform vs globally
-		//recursive_transform(rp-p);
+		// TODO review how recursion to nested programs should be handled per
+		// transform vs globally recursive_transform(rp-p)
 		if (opts.enabled("program-gen")) {
 			string pname;
 			cpp_gen g;
