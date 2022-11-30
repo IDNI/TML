@@ -212,7 +212,7 @@ bool typemanager::tcheck(const raw_term &rt) {
 			}
 		}
 		else { // the predicate signatures are not specified and found
-			DBG(ss<< "Type signature for predicate"<<rt<< " not found ";);
+			DBG(ss<< "Type signature for predicate "<<rt<< " not found ";);
 			tstat = TINFO_UNKNOWN_PRED_TYPE;
 			return type_error(ss.str().c_str(), rt.e[0].e ), false;
 		}
