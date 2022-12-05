@@ -3722,9 +3722,9 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	clock_t start, end;
 	measure_time_start();
 
-	//Work in progress
 	tables_progress tp(dict, *ir);
 	rt_options rt;
+
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
 		result = run_prog(rp.p, pd.strs, steps, break_on_step, tp, rt, *tbl);
@@ -3975,6 +3975,8 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 }
 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
+	if (opts.error) { error = true; return; }
+
 	builtins_factory bf(dict);
 	bltins = bf
 		.add_basic_builtins()
@@ -3982,17 +3984,18 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 		.add_print_builtins()
 		.add_js_builtins().bltins;
 
-	if (o.error) { error = true; return; }
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
-	rt_options to;
 
+	rt_options to;
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
-			{{"none", proof_mode::none}, {"tree", proof_mode::tree},
-				{"forest", proof_mode::forest}, {"partial-tree", proof_mode::partial_tree},
+			{{"none", proof_mode::none}, 
+				{"tree", proof_mode::tree},
+				{"forest", proof_mode::forest}, 
+				{"partial-tree", proof_mode::partial_tree},
 				{"partial-forest", proof_mode::partial_forest}});
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
@@ -4014,12 +4017,16 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	set_print_updates(opts.enabled("pu"));
 	add_print_updates_states(opts.pu_states, *tbl, ir, dict);
 
-	if (to.fp_step) ir->get_table(
-		ir->get_sig(dict.get_lexeme("__fp__"), { 0 }));
+	if (to.fp_step) ir->get_table(ir->get_sig(dict.get_lexeme("__fp__"), { 0 }));
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 
 	read_inputs();
+
+	raw_term raw_t;
+	raw_t.arity = { 0 };
+	raw_t.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
+	tbl->fixed_point_term = ir->from_raw_term(raw_t);
 
 	if (!error && !rp.p.nps.empty()) {
 		directives_load((rp.p.nps)[0]);

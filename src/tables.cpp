@@ -802,7 +802,9 @@ bool tables::add_fixed_point_fact() {
 	static ntable tab;
 	static spbdd_handle h = 0;
 	if (!h) {
-		// TODO write something
+		tab = fixed_point_term.tab;
+		tbls[tab].hidden = true;
+		h = from_fact(fixed_point_term);	
 	}
 	if (tbls[tab].t != htrue) return tbls[tab].t = tbls[tab].t || h, true;
 	return false;

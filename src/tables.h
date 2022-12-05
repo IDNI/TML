@@ -184,6 +184,7 @@ private:
 
 public:
 
+	term fixed_point_term; 
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;

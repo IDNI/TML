@@ -1368,6 +1368,7 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 #endif
 	return false;
 }
+
 bool input::type_error(ccs offset, const char* err, ccs close_to) {
 	error = true;
 	ostringstream msg; msg << "Type error: \"" << err << '"';

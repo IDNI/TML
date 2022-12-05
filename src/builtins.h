@@ -129,6 +129,8 @@ struct builtins : std::map<int_t, builtins_pair> {
 	bool add(bool ishead, int_t id, std::string alias, int_t args, int_t oargs,
 		blt_handler h, int_t nargs = 0)
 	{
+		 DBG(COUT<< "Adding builtin " << alias << " id " << id << " args " << args << " oargs " << oargs << " nargs " << nargs << std::endl;) 
+
 		auto it = find(++id);
 
 		if (it == end()) it = emplace(id, builtins_pair{}).first;

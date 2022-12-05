@@ -44,9 +44,6 @@ lexeme get_lexeme(const std::basic_string<char>& s) {
 }
 
 builtins_factory& builtins_factory::add_basic_builtins() {
-	// TODO builtins should be managed in a separated object unrelated 
-	// to dict. Dict could contain a given builtin object a delegate queires
-	// to it, but not otherwise.
 	const bool H = true, B = false;
 	set<string> syms{ "alpha","alnum","digit","space","printable" };
 	for (auto sym : syms) dict.get_bltin(sym);
