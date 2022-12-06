@@ -10,3 +10,5 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+// TODO use a common place to generate temporal symbols,...

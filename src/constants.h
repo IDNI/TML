@@ -10,7 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __INTERNAL_H__
-#define __INTERNAL_H__
+#ifndef __CONSTANTS_H__
+#define __CONSTANTS_H__
 
-#endif // __INTERNAL_H__
+#endif // __CONSTANTS_H__
