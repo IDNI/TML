@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __DEFS_H__
 #define __DEFS_H__
+
 #include <cassert>
 #include <vector>
 #include <set>
