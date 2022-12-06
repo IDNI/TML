@@ -472,6 +472,7 @@ public:
 	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
+	template <typename T>bool get_proof(std::basic_ostream<T>& os);
 	void set_proof(proof_mode v) { opts.bproof = v; }
 
 #ifdef __EMSCRIPTEN__
