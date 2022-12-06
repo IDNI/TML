@@ -28,6 +28,7 @@ struct builtins_factory {
 	builtins_factory& add_bdd_builtins();
 	builtins_factory& add_print_builtins();
 	builtins_factory& add_js_builtins();
+	// TODO remove, it is an struct an the field is public
 	builtins get();
 };
 

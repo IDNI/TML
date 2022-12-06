@@ -25,6 +25,7 @@ void tables::fact_builtin(const term& b) {
 
 void tables::head_builtin(const bdd_handles& hs, const table& tbl, ntable tab) {
 	blt_ctx c(term(false,tab,ints(tbl.len, 0), 0, tbl.idbltin));
+	c.tbls = this;
 	//COUT << "head_builtin: " << hs << endl;
 	for (auto h : hs) decompress(h, tab, [&c, this] (const term& t){
 		// ground builtin vars by decompressed head
@@ -38,16 +39,16 @@ void tables::body_builtins(spbdd_handle x, alt* a, bdd_handles& hs) {
 	if (x == hfalse) return; // return if grounding failed
 	vector<blt_ctx> ctx;
 	for (term bt : a->bltins) // create contexts for each builtin
-		ctx.emplace_back(bt, a), ctx.back().hs = &hs;
+		ctx.emplace_back(bt, a), ctx.back().hs = &hs, ctx.back().tbls = this;
 	if (a->bltinvars.size())	{ // decompress grounded terms
 	    decompress(x,0, [&ctx, this] (const term t) {
-		for (blt_ctx& c : ctx) {
-			c.g = c.t; // ground vars by decompressed term
-			for (size_t n = 0; n != c.g.size(); ++n)
-				if (c.g[n] < 0 && has(c.a->bltinvars, c.g[n]))
-					c.g[n] = t[c.a->grnd->vm.at(c.g[n])];
-			bltins.run_body(c);
-		}
+			for (blt_ctx& c : ctx) {
+				c.g = c.t; // ground vars by decompressed term
+				for (size_t n = 0; n != c.g.size(); ++n)
+					if (c.g[n] < 0 && has(c.a->bltinvars, c.g[n]))
+						c.g[n] = t[c.a->grnd->vm.at(c.g[n])];
+				bltins.run_body(c);
+			}
 	    }, a->grnd->varslen);
 	    // collect outputs
 	    for (blt_ctx& c : ctx) for (auto out : c.outs) hs.push_back(out);
