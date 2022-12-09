@@ -941,6 +941,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 					r[n] |= 1 << k;
 
 		#ifdef BIT_TRANSFORM
+		// FIXME Move code to driver/progress monitor
 		#endif
 
 		f(r);

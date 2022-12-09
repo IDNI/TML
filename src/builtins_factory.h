@@ -16,20 +16,26 @@
 #include "builtins.h"
 #include "dict.h"
 #include "tables.h"
+#include "ir_builder.h"
 
 struct builtins_factory {
 
 	builtins bltins;
 	dict_t& dict;
+	ir_builder& ir;
 
-	builtins_factory(dict_t& dict_) : dict(dict_) {};
+	builtins_factory(dict_t& dict_, ir_builder& ir_) : dict(dict_), ir(ir_) {
+		int i;
+		if (&ir) {
+			++i;
+		}
+	};
 
 	builtins_factory& add_basic_builtins();
 	builtins_factory& add_bdd_builtins();
 	builtins_factory& add_print_builtins();
 	builtins_factory& add_js_builtins();
-	// TODO remove, it is an struct an the field is public
-	builtins get();
 };
 
 #endif // __BUILTINS_FACTORY_H__
+

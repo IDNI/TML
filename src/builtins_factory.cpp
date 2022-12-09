@@ -250,8 +250,12 @@ builtins_factory& builtins_factory::add_print_builtins() {
 	const bool H = true, B = false;
 	auto printer = [this](bool ln, bool to, bool delim) {
 		return [this, ln, to, delim] (blt_ctx& c) {
-			//COUT << "printing ln/to/delim" << ln << "/" << to << "/" << delim << " " << to_raw_term(c.g) << endl;
-		};
+			print_to_delimited(ir.to_raw_term(c.g), c.tbls->error, to, delim) << (ln ? "\n" : "")
+				#ifdef __EMSCRIPTEN__
+				<< std::flush
+				#endif
+				;		
+			};
 	};
 	const bool NLN = false, NTO = false, NDLM = false;
 	const bool  LN = true,   TO = true,   DLM = true;

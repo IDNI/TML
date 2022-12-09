@@ -617,7 +617,7 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
 		tables_progress p(d, *ir);
-		builtins_factory bf(d);
+		builtins_factory bf(d, *ir);
 		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
@@ -648,7 +648,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
 		set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
-	builtins_factory bf(d);
+	builtins_factory bf(d, *ir);
 	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 	if(is_cq(rr1) && is_cq(rr2)) {
@@ -1082,7 +1082,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 			// Create new dictionary so that symbols created for these tests
 			// do not affect final program
 			dict_t d;
-			builtins_factory bf(d);
+			builtins_factory bf(d, *ir);
 			builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 			// Map each variable to a fresh symbol according to the partition
@@ -3954,7 +3954,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		for (const raw_prog& np : p.nps) {
 			steps -= went; begstep = tbls.nstep;
 			rt_options rt;
-			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, *tbl, ir_handler);
+			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, tbls, ir_handler);
 			went = tbls.nstep - begstep;
 			if (!r && went >= steps) {
 				//assert(false && "!r && went >= steps");
@@ -3977,12 +3977,6 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
 	if (opts.error) { error = true; return; }
 
-	builtins_factory bf(dict);
-	bltins = bf
-		.add_basic_builtins()
-		.add_bdd_builtins()
-		.add_print_builtins()
-		.add_js_builtins().bltins;
 
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
@@ -4007,6 +4001,12 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
 	ir = new ir_builder(dict, to);
+	builtins_factory* bf = new builtins_factory(dict, *ir);
+	bltins = bf
+		->add_basic_builtins()
+		.add_bdd_builtins()
+		.add_print_builtins()
+		.add_js_builtins().bltins;
 	tbl = new tables(to, bltins);
 
 	ir->dynenv  = tbl;

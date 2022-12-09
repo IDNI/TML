@@ -61,12 +61,10 @@ void driver::out_fixpoint(std::basic_ostream<wchar_t> &os);
 template <typename T>
 void driver::out_result(std::basic_ostream<T> &os) {
 		if (tbl) {
-			// TODO avoid double fixpoint computation
-			out_goals(os);
-			// if (tbl->goals.size()) out_fixpoint(os);
-			out_fixpoint(os);
+			if (tbl->goals.size()) out_goals(os);
+			else out_fixpoint(os);
 		#ifdef PROOF
-			get_proof(o::dump());
+			get_proof(os);
 		#endif
 		}
 }
