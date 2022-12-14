@@ -18,7 +18,6 @@ include(tml-common)
 set(TML_HEADERS
 	bdd.h
 	builtins.h
-	builtins_factory.h
 	char_defs.h
 	cpp_gen.h
 	defs.h
@@ -44,7 +43,6 @@ set(TML_SOURCES
 	bdd.cpp
 	bdd_arith.cpp
 	builtins.cpp
-	builtins_factory.cpp
 	cpp_gen.cpp
 	dict.cpp
 	dict_tmp.cpp

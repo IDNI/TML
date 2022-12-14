@@ -289,7 +289,7 @@ public:
 	builtins bltins;
 
 	template <typename T>
-	void out_dict(std::basic_ostream<T>& os)  { /* TODO something */ }
+	void out_dict(std::basic_ostream<T>& os)  { os << dict; }
 
 	bool result = false;
 	bool error = false;

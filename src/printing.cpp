@@ -692,7 +692,7 @@ template basic_ostream<char>& operator<<(basic_ostream<char>&, const options&);
 template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const options&);
 
-// TODO move these methods to driver
+// TODO move these methods to driver when if needed
 
 /* template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
@@ -815,7 +815,7 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os) const {
 	return os << "# -" << endl;
 }
 template basic_ostream<char>& tables::print(basic_ostream<char>&) const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const; 
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const; */
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
@@ -836,7 +836,7 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
 }
 
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const dict_t&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&); */
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&); 
 
 template <typename T, typename VT>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::vector<VT>& hs) {
