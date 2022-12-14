@@ -20,8 +20,8 @@
 #include "char_defs.h"
 #include "term.h"
 #include "bdd.h"
-#include "tables.h"
-
+#include "dict.h"
+#include "ir_builder.h"
 
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
 typedef std::pair<bool, bdd_handles> blt_cache_value;
@@ -147,6 +147,20 @@ struct builtins : std::map<int_t, builtins_pair> {
 	void run_body(blt_ctx& c) { run(c, false); }
 	void run(blt_ctx& c, bool ishead = true);
 	bool is_builtin(int_t id) const { return find(id) != end(); }
+};
+
+struct builtins_factory {
+
+	builtins bltins;
+	dict_t& dict;
+	ir_builder& ir;
+
+	builtins_factory(dict_t& dict_, ir_builder& ir_) : dict(dict_), ir(ir_) {};
+
+	builtins_factory& add_basic_builtins();
+	builtins_factory& add_bdd_builtins();
+	builtins_factory& add_print_builtins();
+	builtins_factory& add_js_builtins();
 };
 
 #endif // __BUILTINS_H__
