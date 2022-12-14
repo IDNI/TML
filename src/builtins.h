@@ -122,6 +122,7 @@ struct builtins : std::map<int_t, builtins_pair> {
 	// add builtin. ishead to flag head or body builtin
 	// @param ishead true if head builtin, false for body builtin
 	// @param id     id of the builtin in the dict
+	// @param alias  alias of the builtin
 	// @param args   number of arguments (-1 = can vary)
 	// @param oargs  number of output arguments
 	// @param h      building handler
