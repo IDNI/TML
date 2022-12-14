@@ -22,7 +22,6 @@ set(TML_HEADERS
 	cpp_gen.h
 	defs.h
 	dict.h
-	dict_tmp.h
 	driver.h
 	earley.h
 	err.h
@@ -45,7 +44,6 @@ set(TML_SOURCES
 	builtins.cpp
 	cpp_gen.cpp
 	dict.cpp
-	dict_tmp.cpp
 	driver.cpp
 	earley.cpp
 	fof.cpp
