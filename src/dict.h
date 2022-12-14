@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __DICT_H__
 #define __DICT_H__
 
@@ -72,7 +73,6 @@ public:
 	bool is_valid_sym_val(int_t t) const {
 		return (t>>2 >= 0 && t>>2 < (int_t) syms.size());
 	}
-	// END TODO
 };
 
 template <typename T>

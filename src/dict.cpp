@@ -10,6 +10,7 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include <cstring>
 #include "defs.h"
 #include "dict.h"

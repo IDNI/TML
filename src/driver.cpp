@@ -75,7 +75,6 @@ signature get_signature(const raw_term &rt) {
 }
 
 void driver::directives_load(raw_prog& p) {
-
 	lexeme trel = null_lexeme;
 	// The list of directives that have been processed so far
 	int_t a;
@@ -175,16 +174,14 @@ bool driver::is_limited(const elem &var, set<elem> &wrt,
 
 bool driver::is_limited(const elem &var, const raw_form_tree &t,
 		set<elem> &wrt, map<elem, const raw_form_tree*> &scopes) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
 
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		case elem::COIMPLIES:
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		case elem::AND: {
 			// var is limited in a && b if var is limited in a or b
 			vector<const raw_form_tree*> ands;
@@ -236,11 +233,11 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 				} case elem::IMPLIES: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::COIMPLIES: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::EXISTS: case elem::FORALL: {
 					const elem &qvar = *t.l->l->el;
 					if(qvar == var) {
@@ -259,7 +256,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 				} case elem::UNIQUE: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::NONE: {
 					const raw_term &rt = *t.l->rt;
 					switch(rt.extype) {
@@ -295,7 +292,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 			}
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		} case elem::NONE: {
 			const raw_term &rt = *t.rt;
 			switch(rt.extype) {
@@ -337,16 +334,14 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 
 optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 		map<elem, const raw_form_tree*> &scopes) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
 
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		case elem::COIMPLIES:
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<const raw_form_tree*> ands;
@@ -391,7 +386,7 @@ optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 			}
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		} case elem::NONE: {
 			return nullopt;
 		} default:
@@ -828,9 +823,6 @@ bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
  * replace the homomorphism targets with our chosen head. */
 
 void driver::factor_rules(raw_prog &rp) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	o::dbg() << "Factorizing rules ..." << endl;
 
 	// Sort the rules so the biggest come first. Idea is that we want to
@@ -891,7 +883,7 @@ void driver::factor_rules(raw_prog &rp) {
 			if(tmp_rel) {
 				// Variables are not exactly what is required. So make relation
 				// exporting required variables and note argument order.
-				target_rel = elem::fresh_temp_sym(d);
+				target_rel = elem::fresh_temp_sym(dict);
 				target_args.assign(needed_vars.begin(), needed_vars.end());
 				pending_rules.push_back(raw_rule(raw_term(target_rel, target_args), rr2.b[0]));
 			} else {
@@ -1171,7 +1163,7 @@ bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 					raw_prog test_prog(dict);
 					test_prog.r.push_back(rr2);
 					set<raw_term> res;
-					tables_progress p( d, *ir);
+					tables_progress p(d, *ir);
 					run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
 					return res.find(subbed.h[0]) != res.end();
 				});
@@ -1688,9 +1680,9 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 	z3::expr_vector bound_vars(ctx.context);
 	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
 		bound_vars.push_back(ctx.globalHead_to_z3(i));
+
 	// Rename head variables on the fly such that they match
 	// on both rules
-	
 	z3::expr rule1 = ctx.rule_to_z3(r1, dict);
 	z3::expr rule2 = ctx.rule_to_z3(r2, dict);
 	ctx.solver.push();
@@ -1712,7 +1704,6 @@ bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 
 bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	o::dbg() << "Generating domain for: " << drt << endl;
-	dict_t &d = dict;
 	// Ensure that we're working on a DOMAIN directive
 	if(drt.type != directive::EDOMAIN) return false;
 	// The relation to contain the evaled relation is the first symbol
@@ -1731,13 +1722,13 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 
 	// Initialize the symbols, variables, and operators used in the
 	// domain creation rule
-	elem lt_elem(elem::LT, d.get_lexeme("<")),
-		leq_elem(elem::LEQ, d.get_lexeme("<=")),
-		plus_elem(elem::ARITH, t_arith_op::ADD, d.get_lexeme("+")),
-		equals_elem(elem::EQ, d.get_lexeme("=")),
-		list_id = elem::fresh_var(d), list_fst = elem::fresh_var(d),
-		list_rst = elem::fresh_var(d), pred_id = elem::fresh_var(d),
-		divisor_x_quotient = gen_limit == 1 ? list_rst : elem::fresh_var(d);
+	elem lt_elem(elem::LT, dict.get_lexeme("<")),
+		leq_elem(elem::LEQ, dict.get_lexeme("<=")),
+		plus_elem(elem::ARITH, t_arith_op::ADD, dict.get_lexeme("+")),
+		equals_elem(elem::EQ, dict.get_lexeme("=")),
+		list_id = elem::fresh_var(dict), list_fst = elem::fresh_var(dict),
+		list_rst = elem::fresh_var(dict), pred_id = elem::fresh_var(dict),
+		divisor_x_quotient = gen_limit == 1 ? list_rst : elem::fresh_var(dict);
 
 	// Make two relations for manipulating domains, the fst relation
 	// relates a list ID to its head, and the rst relation relates a
@@ -1780,7 +1771,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		// If current quotient is odd, then it will need to be expressed
 		// by doubling something and adding the divisor to it
 		if(quotient % 2 == 1) {
-			elem new_quotient_elem = elem::fresh_var(d);
+			elem new_quotient_elem = elem::fresh_var(dict);
 			// new_quotient_elem + list_rst = quotient_elem
 			bodie.push_back(raw_term(raw_term::ARITH, t_arith_op::ADD,
 				{new_quotient_elem, plus_elem, list_rst, equals_elem, quotient_elem}));
@@ -1791,7 +1782,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		// be expressed by doubling something
 		if(quotient / 2 > 0) {
 			elem new_quotient_elem =
-				quotient / 2 == 1 ? list_rst : elem::fresh_var(d);
+				quotient / 2 == 1 ? list_rst : elem::fresh_var(dict);
 			// new_quotient_elem + new_quotient_elem = quotient_elem
 			bodie.push_back(raw_term(raw_term::ARITH, t_arith_op::ADD,
 				{new_quotient_elem, plus_elem, new_quotient_elem, equals_elem,
@@ -1816,7 +1807,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// Lists are sometimes used to encode interpreter memory. In this
 	// scenario, it is useful to treat the longest lists as possible
 	// memory states
-	elem current_list = elem::fresh_var(d), next_list = elem::fresh_var(d);
+	elem current_list = elem::fresh_var(dict), next_list = elem::fresh_var(dict);
 	// The relation that will contain all the longest lists
 	raw_term max_head({ concat(out_rel, "_max"),
 		elem_openp, current_list, elem_closep });
@@ -1827,7 +1818,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		max_body.push_back(raw_term({ concat(out_rel, "_rst"),
 			elem_openp, current_list, next_list, elem_closep }));
 		current_list = next_list;
-		next_list = elem::fresh_var(d);
+		next_list = elem::fresh_var(dict);
 	}
 	// Not strictly necessary. Makes sure that the list end occurs
 	// after the arity_max nodes.
@@ -1907,16 +1898,14 @@ raw_rule driver::freeze_rule(raw_rule rr,
 elem driver::quote_term(const raw_term &head, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
 	elem term_id(part_count++);
 	if(head.extype == raw_term::REL) {
-		elem elems_id = elem::fresh_var(d), tags_id = elem::fresh_var(d),
+		elem elems_id = elem::fresh_var(dict), tags_id = elem::fresh_var(dict),
 			elems_hid = elems_id, tags_hid = tags_id;
 		vector<raw_term> params_body, param_types_body;
 		for(size_t param_idx = 2; param_idx < head.e.size() - 1; param_idx ++) {
-			elem next_elems_id = elem::fresh_var(d),
-				next_tags_id = elem::fresh_var(d);
+			elem next_elems_id = elem::fresh_var(dict),
+				next_tags_id = elem::fresh_var(dict);
 			params_body.push_back(raw_term({concat(domain_name, "_fst"), elem_openp,
 				elems_id, numeric_quote_elem(head.e[param_idx], variables),
 				elem_closep}));
@@ -1998,9 +1987,6 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
 elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
-	// Get dictionary for generating fresh symbols
-	dict_t& d = dict;
-
 	const elem part_id = elem(part_count++);
 	switch(t.type) {
 		case elem::IMPLIES:
@@ -2060,7 +2046,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 				elem_closep })));
 			break;
 		case elem::EXISTS: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QEXISTS), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_exists_var"),
@@ -2071,7 +2057,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 				elem_closep })));
 			break;
 		} case elem::UNIQUE: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QUNIQUE), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_unique_var"),
@@ -2085,7 +2071,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 			return quote_term(*t.rt, rel_name, domain_name, rp, variables, part_count);
 			break;
 		} case elem::FORALL: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QFORALL), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_forall_var"),
@@ -2117,10 +2103,8 @@ elem driver::concat(const elem &rel, string suffix) {
  * given lexeme. Used for refering to sub relations. */
 
 lexeme driver::concat(const lexeme &rel, string suffix) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
 	// Make lexeme from concatenating rel's lexeme with the given suffix
-	return d.get_lexeme(lexeme2str(rel) + to_string_t(suffix));
+	return dict.get_lexeme(lexeme2str(rel) + to_string_t(suffix));
 }
 
 /* Quote the given rule and put its quotation into the given raw_prog
@@ -2241,14 +2225,12 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// The number representing the maximum arity of relations in the
 	// quotation is the fourth symbol between the parentheses
 	int_t max_arity = drt.arity_num.num;
-	// Get dictionary for generating fresh variables
-	dict_t &d = dict;
 
 	// Create the symbols and variables that will feature heavily in
 	// the terms to be created below
 	elem decode_tmp_rel = concat(codec_rel, "__decode"),
-		name_var = elem::fresh_var(d), timestep_var = elem::fresh_var(d),
-		next_timestep_var = elem::fresh_var(d), params_var = elem::fresh_var(d);
+		name_var = elem::fresh_var(dict), timestep_var = elem::fresh_var(dict),
+		next_timestep_var = elem::fresh_var(dict), params_var = elem::fresh_var(dict);
 
 	// Create the terms that will feature heavily in the rules to be
 	// created below
@@ -2264,8 +2246,8 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// Make variables for each head and tail in a linked list
 	vector<elem> params_vars, param_vars;
 	for(int_t i = 0; i < max_arity; i++) {
-		params_vars.push_back(elem::fresh_var(d));
-		param_vars.push_back(elem::fresh_var(d));
+		params_vars.push_back(elem::fresh_var(dict));
+		param_vars.push_back(elem::fresh_var(dict));
 	}
 
 	// Create rules to decode the contents of the interpreter's
@@ -2382,9 +2364,6 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 
 void driver::pdatalog_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	// Bypass transformation when there are no rules
 	if(rp.r.empty()) {
 		f(rp);
@@ -2403,8 +2382,8 @@ void driver::pdatalog_transform(raw_prog &rp,
 			} else {
 				// Make separate relations to separately hold the positive and
 				// negative derivations
-				elem pos_frozen_elem = elem::fresh_temp_sym(d);
-				elem neg_frozen_elem = elem::fresh_temp_sym(d);
+				elem pos_frozen_elem = elem::fresh_temp_sym(dict);
+				elem neg_frozen_elem = elem::fresh_temp_sym(dict);
 				// Store the mapping so that the derived portion of each
 				// relation is stored in exactly one place
 				freeze_map[orig_rel] = {pos_frozen_elem, neg_frozen_elem};
@@ -2438,7 +2417,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 		ins_head = del_head = prev_head = original_head;
 		ins_head.e[0] = frozen_elems[false];
 		del_head.e[0] = frozen_elems[true];
-		prev_head.e[0] = elem::fresh_temp_sym(d);
+		prev_head.e[0] = elem::fresh_temp_sym(dict);
 		rp.r.push_back(raw_rule(prev_head, original_head));
 		rp.r.push_back(raw_rule(original_head, {ins_head, del_head.negate()}));
 		rp.r.push_back(raw_rule(original_head, {prev_head, del_head.negate()}));
@@ -2446,7 +2425,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 	}
 	// Run the supplied transformation
 	f(rp);
-	const raw_term tick(elem::fresh_temp_sym(d), vector<elem> {});
+	const raw_term tick(elem::fresh_temp_sym(dict), vector<elem> {});
 	map<rel_info, elem> scratch_map;
 	// Map the program rules to temporary relations and execute them only
 	// when the clock is in low state. A temporary relation is required to
@@ -2458,7 +2437,7 @@ void driver::pdatalog_transform(raw_prog &rp,
 				if(auto it = scratch_map.find(orig_rel); it != scratch_map.end()) {
 					rt.e[0] = it->second;
 				} else {
-					elem frozen_elem = elem::fresh_temp_sym(d);
+					elem frozen_elem = elem::fresh_temp_sym(dict);
 					// Store the mapping so that everything from this relation is
 					// moved to a single designated relation.
 					rt.e[0] = scratch_map[orig_rel] = frozen_elem;
@@ -2516,12 +2495,9 @@ bool rule_relation_precedes(const raw_rule &rr1, const raw_rule &rr2) {
  * given relation. */
 
 raw_term driver::relation_to_term(const rel_info &ri) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	vector<elem> els = { get<0>(ri), elem_openp };
 	for(int_t i = 0; i < get<1>(ri); i++) {
-		els.push_back(elem::fresh_var(d));
+		els.push_back(elem::fresh_var(dict));
 	}
 	els.push_back(elem_closep);
 	return raw_term(els);
@@ -2562,9 +2538,6 @@ raw_rule rename_rule(raw_rule rr, map<elem, elem> &rename_map) {
 
 void driver::step_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	map<elem, elem> freeze_map;
 	map<elem, elem> unfreeze_map;
 	// Separate the internal rules used to execute the parts of the
@@ -2586,7 +2559,7 @@ void driver::step_transform(raw_prog &rp,
 			if(auto it = freeze_map.find(rt.e[0]); it != freeze_map.end()) {
 				rt.e[0] = it->second;
 			} else {
-				elem frozen_elem = elem::fresh_temp_sym(d);
+				elem frozen_elem = elem::fresh_temp_sym(dict);
 				// Store the mapping so that the derived portion of each
 				// relation is stored in exactly one place
 				unfreeze_map[frozen_elem] = rt.e[0];
@@ -2682,12 +2655,12 @@ void driver::step_transform(raw_prog &rp,
 		}
 		// At each stage of TML execution, exactly one of the nullary facts
 		// in this vector are asserted
-		vector<elem> clock_states = { elem::fresh_temp_sym(d) };
+		vector<elem> clock_states = { elem::fresh_temp_sym(dict) };
 		// Push the internal rules onto the program using conditioning to
 		// control execution order
 		for(const set<const relation *>& v : sorted) {
 			// Make a new clock state for the current stage
-			const elem clock_state = elem::fresh_temp_sym(d);
+			const elem clock_state = elem::fresh_temp_sym(dict);
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
 			rp.r.push_back(raw_rule(raw_term(clock_state, vector<elem>{}),
@@ -2728,8 +2701,8 @@ void driver::step_transform(raw_prog &rp,
 		// Start the clock ticking by asserting stage0, asserting stage1
 		// if stage0 holds, and asserting the clock if stage0 holds but
 		// stage1 does not.
-		raw_term stage0(elem::fresh_temp_sym(d), vector<elem>{});
-		raw_term stage1(elem::fresh_temp_sym(d), vector<elem>{});
+		raw_term stage0(elem::fresh_temp_sym(dict), vector<elem>{});
+		raw_term stage1(elem::fresh_temp_sym(dict), vector<elem>{});
 		raw_term stage2(clock_states[0], vector<elem>{});
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
@@ -2842,9 +2815,6 @@ elem gen_id_var(const elem &var) {
 
 raw_form_tree driver::expand_term(const raw_term &use,
 		const raw_rule &def) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	const raw_term &head = def.h[0];
 	// Where all the mappings for the substitution will be stored
 	map<elem, elem> renames;
@@ -2858,7 +2828,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	// Deep copy the rule's body because the in-place renaming required
 	// for this expansion should not affect the original
 	raw_form_tree subst = *def.get_prft();
-	rename_variables(subst, renames, gen_fresh_var(d));
+	rename_variables(subst, renames, gen_fresh_var(dict));
 	// Take care to existentially quantify the non-exported variables of this
 	// formula in case it is inserted into a negative context
 	for(const auto &[ovar, nvar] : renames) {
@@ -2873,7 +2843,7 @@ raw_form_tree driver::expand_term(const raw_term &use,
 	for(size_t i = 2; i < head.e.size() - 1; i++) {
 		// Add equality constraint only if it has not already been captured
 		// in the substitution choice.
-		elem new_name = rename_variables(head.e[i], renames, gen_fresh_var(d));
+		elem new_name = rename_variables(head.e[i], renames, gen_fresh_var(dict));
 		if(new_name != use.e[i]) {
 			subst = raw_form_tree(elem::AND,
 				make_shared<raw_form_tree>(subst),
@@ -2947,13 +2917,10 @@ void driver::square_program(raw_prog &rp) {
  * inverse. */
 
 void driver::square_root_program(raw_prog &rp) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-
 	// Only apply this transformation if there are rules to slow down
 	if(!rp.r.empty()) {
 		// Execute program rules only when the clock is in asserted state
-		const raw_term tick(elem::fresh_temp_sym(d), std::vector<elem> {});
+		const raw_term tick(elem::fresh_temp_sym(dict), std::vector<elem> {});
 		for(raw_rule &rr : rp.r) {
 			if(!rr.is_fact() && !rr.is_goal()) {
 				rr.set_prft(raw_form_tree(elem::AND,
@@ -3030,14 +2997,12 @@ set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
 
 raw_term driver::to_dnf(const raw_form_tree &t,
 		raw_prog &rp, const set<elem> &fv) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-	const elem part_id = elem::fresh_temp_sym(d);
+	const elem part_id = elem::fresh_temp_sym(dict);
 
 	switch(t.type) {
 		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
 			// Process the expanded formula instead
-			return to_dnf(expand_formula_node(t, d), rp, fv);
+			return to_dnf(expand_formula_node(t, dict), rp, fv);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<const raw_form_tree *> ands;
@@ -3306,9 +3271,6 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
  * exported to visible relation nor are used in a negative body term. */
 
 void driver::eliminate_dead_variables(raw_prog &rp) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = dict;
-	
 	// Before we can eliminate relation positions, we need to know what
 	// rules depend on each relation. Knowing the dependants will allow us
 	// to determine whether a certain position is significant, and if so
@@ -3345,7 +3307,7 @@ void driver::eliminate_dead_variables(raw_prog &rp) {
 				// next round. Rename the relation after the eliminations in
 				// case the new signature coincides with an already existing
 				// one.
-				elem new_rel = elem::fresh_temp_sym(d);
+				elem new_rel = elem::fresh_temp_sym(dict);
 				for(raw_rule *rr : dependants.at(sig)) {
 					contract_term(rr->h[0], new_rel, uses, sig, pending_signatures, rp);
 					if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
