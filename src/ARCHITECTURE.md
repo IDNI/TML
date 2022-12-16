@@ -48,7 +48,7 @@ Finally, the neccesary interaction between driver, tables and bdd components are
 encapsulated in the following components:
 
 * builtins/builtins_factory: builtins deal with predefined actions on TML. Whereas 
-builtins_factory encapsulatestheir creation
+builtins_factory encapsulates their creation
 
 * progress monitor: It deals with the communication between tables and driver, 
 notifying the former points of interest to the later. 
