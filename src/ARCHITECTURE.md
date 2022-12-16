@@ -1,7 +1,5 @@
 # Architecture
 
-## Overview
-
 The architecture of TML is organized in differents layers according to the 
 level of abstraction of the representation of the TML program:
 
@@ -23,10 +21,6 @@ The following diagram gives an overall view of the different components:
 
 ![Architecture of TML](./ARCHITECTURE.png)
 
-A description of their functionality is given in later sections.
-
-## Main components
-
 The main components of the TML architecture are:
 
 * driver: It governs the execution of TML programs from reading,
@@ -42,9 +36,7 @@ and serves as a computing engine for its execution.
 * ir_builder: It transforms initial structured program representation, 
 raw programs, into the flat programs.
 
-## Other components
-
-Another components of the TML architecture are:
+Other components of the TML architecture are:
 
 * dictionary: It keeps track of the symbol/numeric value to be used in the 
 forthcoming modules. It is main goal is to compress the information mapping 
