@@ -14,7 +14,7 @@ jobs:
       max-parallel: 4
       matrix:
         compiler: [clang, gcc]
-        os: [ubuntu-22.04, macOS-12]
+        os: [ubuntu-22.04, macos-latest]
 
     steps:
       - uses: actions/checkout@v2
@@ -38,23 +38,23 @@ jobs:
           sudo apt-get install -y clang-14 clang-tidy-14
 # macOS installations
       - name: Installing gcc on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install gcc
       - name: Installing boost on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install boost
       - name: Installing lcov on macOS (clang)
-        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'clang' && matrix.os == 'macos-latest'
         run: |
           brew install lcov
       - name: Installing gcovr on macOS (gcc)
-        if: matrix.compiler == 'gcc' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'gcc' && matrix.os == 'macos-latest'
         run: |
           brew install gcovr
       - name: Installing cppcheck on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install cppcheck
 # building
@@ -129,7 +129,7 @@ jobs:
 #           bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
 # macOS analyzes
       - name: Running CPP check on macOS
-        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'clang' && matrix.os == 'macos-latest'
         run: |
           cd build-Debug
           make -j5 cppcheck
