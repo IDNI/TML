@@ -63,7 +63,7 @@ jobs:
           mkdir -p build-Debug
           cd build-Debug
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            CMAKE_CXX_COMPILER=g++-11
+            CMAKE_CXX_COMPILER=g++-12
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
@@ -79,7 +79,7 @@ jobs:
           mkdir -p build-Release
           cd build-Release
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            CMAKE_CXX_COMPILER=g++-11
+            CMAKE_CXX_COMPILER=g++-12
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
