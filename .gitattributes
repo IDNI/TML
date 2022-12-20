@@ -1,0 +1,5 @@
+# TML files use .tml extension
+*.tml linguist-language=TML
+# TML grammar files use .g extensioin
+*.g linguist-language=TML grammar
+
