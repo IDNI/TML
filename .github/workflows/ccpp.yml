@@ -72,10 +72,12 @@ jobs:
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=$(which clang++-14)
+              CMAKE_C_COMPILER=$(which clang-14)
             else
+              CMAKE_C_COMPILER=$(which clang)      
               CMAKE_CXX_COMPILER=$(which clang++)      
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
           fi
           make -j5
       - name: Bulding release version
@@ -88,10 +90,12 @@ jobs:
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=$(which clang++-14)
+              CMAKE_C_COMPILER=$(which clang-14)
             else
+              CMAKE_C_COMPILER=$(which clang)      
               CMAKE_CXX_COMPILER=$(which clang++)
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
           fi
           make -j5
 # tests
