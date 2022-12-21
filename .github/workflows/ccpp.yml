@@ -89,7 +89,7 @@ jobs:
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=clang++-14
             else
-              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+              CMAKE_CXX_COMPILER=$(which clang++)
             fi
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           fi
