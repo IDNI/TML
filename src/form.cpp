@@ -23,7 +23,6 @@ pnft::pnft(){
 
 pnft::~pnft() {
 		if(b) delete b, b = NULL;
-		//for (auto p: matrix ) delete p;
 		if (auto p = get<1>(hvar_b)) delete p;
 }
 
@@ -198,9 +197,7 @@ void var2space::print(int_t level) const {
 
 bool var2space::quantify(vector<quant_t> &quantsh) const {
 
-	for (auto &idx : hvars) {
-		//for (auto &i : bf) {
-		//if (i.nf == D) {
+	for (auto &idx : hvars) { 
 			if (quantsh[vm.at(idx)] == quant_t::EXH) {
 				if (ins.find(vm.at(idx)) != ins.end())
 					if (ins.at(vm.at(idx)).size() > 0)
@@ -215,8 +212,6 @@ bool var2space::quantify(vector<quant_t> &quantsh) const {
 						if (outs.at(vm.at(idx))[0] != hfalse) return false ;
 			}
 			else assert(false);
-		//}
-		// else COUT << "TODO QUATNIFY" << endl;
 	}
 	return true;
 }

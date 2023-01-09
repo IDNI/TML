@@ -90,27 +90,17 @@ builtins_factory& builtins_factory::add_basic_builtins() {
 	for (auto sym : syms) dict.get_bltin(sym);
 
 	bltins.add(H, dict.get_bltin(get_lexeme("halt")), "halt",  0, 0, [this](blt_ctx& c) {
-		//COUT << "halting" << endl;
 		c.tbls->halt  = true; });
 	bltins.add(H, dict.get_bltin(get_lexeme("error")), "error", 0, 0, [this](blt_ctx& c) {
-		//COUT << "erroring" << endl;
 		c.tbls->error = true; });
 	bltins.add(H, dict.get_bltin(get_lexeme("false")), "false", 0, 0, [this](blt_ctx& c) {
-		//COUT << "falsing" << endl;
 		c.tbls->unsat = true; });
 	bltins.add(H, dict.get_bltin(get_lexeme("forget")), "forget", 0, 0, [this](blt_ctx& c) {
-		//COUT << "forgetting" << endl;
 		c.tbls->bltins.forget(c); });
 	bltins.add(B, dict.get_bltin(get_lexeme("rnd")), "rnd", 3, 1, [this](blt_ctx& c) {
-	//	// TODO: check that it's num const
-		//COUT << "rnd " << c.g << " " << to_raw_term(c.g) << endl;
 		int_t arg0 = c.arg_as_int(0);
 		int_t arg1 = c.arg_as_int(1);
-		//COUT << "arg0: " << arg0 << endl;
-		//COUT << "arg1: " << arg1 << endl;
-	//	DBG(assert(t.size() == 3););
 		if (arg0 > arg1) swap(arg0, arg1);
-		//int_t rnd = arg0 + (std::rand() % (arg1 - arg0 + 1));
 		random_device rd;
 		mt19937 gen(rd());
 		uniform_int_distribution<> distr(arg0, arg1);
@@ -120,17 +110,7 @@ builtins_factory& builtins_factory::add_basic_builtins() {
 	});
 	
 	bltins.add(B, dict.get_bltin(get_lexeme("count")), "count", -1, 1, [this](blt_ctx& c) {
-		/*
-		for (auto x : *c.hs) {
-			COUT << "bltin args\n";
-			::out(COUT, x)<<endl<<endl;
-		}
-		*/
 		spbdd_handle x = bdd_and_many(*c.hs);
-
-		// -------------------------------------------------------
-		//COUT << "count in\n";
-		//::out(COUT, x)<<endl<<endl;
 		size_t nargs = c.a->vm.size();
 		uints perm = perm_init(nargs * (c.tbls->bits));
 		int_t aux = 0;
@@ -149,13 +129,8 @@ builtins_factory& builtins_factory::add_basic_builtins() {
 					aux++;
 					ex.push_back(false);
 				}
-		//x =  x/ex;
-		//x =  x^perm;
 		x = bdd_permute_ex(x,ex,perm);
-		//COUT << "count after ex\n";
-		//::out(COUT, x)<<endl<<endl;
 		size_t cnt2 = satcount(x, (c.tbls->bits) * (c.a->varslen-varsout));
-		//DBG(COUT << "count2 result: " << cnt2 << endl;)
 		c.out(c.tbls->from_sym(c.outvarpos(), c.a->varslen, mknum(cnt2)));
 	}, -1);
 
@@ -175,11 +150,6 @@ builtins_factory& builtins_factory::add_bdd_builtins() {
 	};
 	auto get_pw_h = [this](t_arith_op op) {
 		return [this, op](blt_ctx& c) {
-			//for (auto x : *c.hs) {
-			//	COUT << "bltin args\n";
-			//	::out(COUT, x)<<endl<<endl;
-			//}
-
 			bdd_handles hs;
 			c.args_bodies(hs);
 			c.out(c.tbls->pairwise_handler(
@@ -195,16 +165,7 @@ builtins_factory& builtins_factory::add_bdd_builtins() {
 			spbdd_handle const0 = htrue, const1 = htrue;
 
 			assert(false && "BIT_TRASFORM leq_handler is disabled");
-			/*
-			for (auto &x : tab_type.at(c.t.tab)){
-				//COUT << "bits " << x.pty.bsz << endl;
-				if (i == 0) arg0_w = x.pty.bsz;
-				else if (i == 1) arg1_w = x.pty.bsz;
-				i++;
-			}
-			*/
-
-			//workaround to get constants
+			// TODO workaround to get constants
 			if (c.t[0] >= 0 || c.t[1] >= 0) {
 				for (size_t i = 0; i < c.t.size(); ++i) {
 					if (c.t[i] >= 0 && i % 2 == 0)
@@ -214,17 +175,11 @@ builtins_factory& builtins_factory::add_bdd_builtins() {
 				}
 			}
 
-			//bdd_handles hs;
 			//TODO debug why hs[1] is not created
-			//c.args_bodies(hs);
-			//::out(COUT, hs[0])<<endl<<endl;
-			//::out(COUT, hs[1])<<endl<<endl;
-
 			//TODO get output var, ?x or ?y
 			i = 0;
 			bool dual = false;
 			for (auto x : *c.hs) {
-				//COUT << "bltin args\n";
 				//get ordering
 				if(c.t[0] > c.t[1] && c.t[0] < 0) {
 					if (i == 2) arg0 = x;
@@ -235,45 +190,24 @@ builtins_factory& builtins_factory::add_bdd_builtins() {
 					else if (i == 3) arg0 = x;
 				}
 				i++;
-				//::out(COUT, x)<<endl<<endl;
 			}
 
 			spbdd_handle s0 = const0;
 			if (const0 == htrue)
 				s0 = c.tbls->perm_bit_reverse_bt(arg0, arg0_w, 0);
-			//COUT << "### S0:"<< endl;
-			//::out(COUT, s0)<<endl<<endl;
-
 			spbdd_handle s1 = const1;
 			if (const1 == htrue)
 				s1 = c.tbls->perm_bit_reverse_bt(arg1, arg1_w, arg0_w);
-			//COUT << "### S1:"<< endl;
-			//::out(COUT, s1)<<endl<<endl;
-
 			assert( bdd_root(s0) < bdd_root(s1) && "LEQ_handler: wrong assumed term/argument ordering");
-
-			//COUT << " nvars : " << c.a->varslen;
-			//COUT << ", total bits : " << bits << endl;
-			//COUT << c.varpos(0), c.varpos(1),
 
 			spbdd_handle leq = htrue;
 			if (!dual)
-				leq = bdd_leq(/*hs[0]*/ s0, s1 /*hs[1]*/, arg0_w, arg1_w
-						/*, c.varpos(0), c.varpos(1), c.a->varslen , bits*/);
+				leq = bdd_leq( s0, s1, arg0_w, arg1_w);
 			else
 				COUT << "LEQ_handler: DUAL operator GEQ is work in progress\n";
-
-			//spbdd_handle m = bdd_max(s1, arg1_w)
-			//COUT << "Leq Handler output MSB2LSB:"<< endl;
-			//::out(COUT, leq)<<endl<<endl;
-
 			//TODO: arg0_w when ?x in head, arg1_w when ?y in head
 			spbdd_handle s2 = c.tbls->perm_bit_reverse_bt(leq, arg0_w, 0);
-			//COUT << "Leq Handler output:"<< endl;
-			//::out(COUT, s2)<<endl<<endl;
-
 			c.out(s2);
-			//hs.clear();
 		};
 	};
 
@@ -328,35 +262,12 @@ builtins_factory& builtins_factory::add_js_builtins() {
 		emscripten_run_script(to_string(
 			ir_handler->to_raw_term(c.g)).c_str()); });
 	bltins.add(B, "js_eval", -1, 0, h);
-	//bltins.add(B, "js_eval_to_int", -1, 1, [this](blt_ctx& c) {
-	//	term t(c.g);
-	//	t.pop_back(); // remove last argument
-	//	int r = emscripten_run_script_int(
-	//		to_string((to_raw_term(t))).c_str());
-	//	//COUT << "js_eval_to_int result: " << r << endl;
-	//	// TODO check for universe size
-	//	c.out(from_sym(c.outvarpos(), c.a->varslen, mknum(r)));
-	//});
-	//bltins.add(B, "js_eval_to_sym", -1, 1, [this](blt_ctx& c) {
-	//	term t(c.g);
-	//	t.pop_back(); // remove last argument
-	//	string r = emscripten_run_script_string(
-	//		to_string((to_raw_term(t))).c_str());
-	//	//COUT << "js_eval_to_sym result: " << r << endl;
-	//	//size_t nsyms = dict.nsyms();
-	//	int_t sym = dict.get_sym(dict.get_lexeme(r));
-	//	// TODO check for universe size
-	//	// if (sym >= nsyms) DBGFAIL; // new sym in universe!
-	//	c.out(from_sym(c.outvarpos(), c.a->varslen, sym));
-	//});
 #else // TODO embed a JS engine if not in browser?
 	bltins.add(H, dict.get_bltin(get_lexeme("js_eval")), "js_eval", -1, 0, h = [](blt_ctx) {
 		o::err() << "js_eval is available only in a browser environment"
 			" (ignoring)." << endl;
 	});
 	bltins.add(B, dict.get_bltin(get_lexeme("js_eval")), "js_eval", -1, 0, h);
-	//bltins.add(B, "js_eval_to_int", -1, 1, h);
-	//bltins.add(B, "js_eval_to_sym", -1, 1, h);
 #endif
 	return *this;
 }

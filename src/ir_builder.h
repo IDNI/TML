@@ -297,7 +297,7 @@ public:
 //-----------------------------------------------------------------------------
 
 struct unary_string{
-	//IMPROVE: use array [ pos] = rel or unorderedmap instead
+	//TODO  : use array [ pos] = rel or unorderedmap instead
 	std::unordered_map< char32_t, std::set<int_t> > rel;
 	size_t pbsz;
 	uint64_t vmask;
@@ -313,7 +313,6 @@ struct unary_string{
 struct transformer;
 
 //TODO: ? define a container with type of formula as
-//struct formula { form* root,  type: FOL/SOL/ARITH/CONSTRAINT};
 struct form {
 	friend struct transformer;
 

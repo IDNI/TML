@@ -3444,7 +3444,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 	// If we want proof trees, then we need to transform the productions into
 	// rules first since only rules are supported by proof trees.
-	//if(opts.get_string("proof") != "none") {
 	if(opts.enabled("strgrammar")) {
 		DBG(o::transformed() <<
 			"Transforming Grammar ...\n" << endl;)
@@ -3569,7 +3568,6 @@ bool driver::transform_handler(raw_prog &p) {
 
 #ifdef TYPE_RESOLUTION
 	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
-	//o::out() << "Type resolutor Nto1 mapping:\n" << tr << endl;
 	rt_options to;
 	to.binarize = false;
 	to.bproof = proof_mode::none;
@@ -3588,7 +3586,6 @@ bool driver::transform_handler(raw_prog &p) {
 	tables_progress tp(dict, *ir);
 	if (!run_prog(tr, strs_t(), 0,0, tp, to, tbl_int, ir_handler)) return false;
 
-	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
 		DBG(COUT << el << endl;); //this line fails in release
 		sig s = ir_handler.to_native_sig(el);
@@ -3596,7 +3593,6 @@ bool driver::transform_handler(raw_prog &p) {
 	}
 	ir_handler.dynenv->bits = 0;
 	ir->type_resolve(p.nps[0]);
-	//o::out() << "------------------:\n" << p.nps[0] << endl;
 #endif
 
 	if (opts.enabled("safecheck")) {
@@ -3741,7 +3737,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
 	tables::clear_memos();
-	//if (mknums) to_nums(m);
 
 	updates updts;
 	// TODO this should be part of rt_options
@@ -3756,7 +3751,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	// TODO this call must be done in the driver
 	if (!ir_handler.transform_grammar(g, m)) return false;
 
-	//if (!get_rules(move(m))) return false;
 	if (!tbls.get_rules(m)) return false;
 
 	// filter for rels starting and ending with __
@@ -3813,12 +3807,6 @@ bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	to.print_transformed = opts.enabled("t");
 
 	tables tbl(to, bltins);
-
-//	ir_builder ir_handler(dict, to);
-//	tables tbl(dict, to, &ir_handler);
-//	ir_handler.dynenv = &tbl;
-//	ir_handler.printer = &tbl;
-
 	strs_t strs;
 	driver drv(opts);
 	if (!drv.run_prog(rp, strs, 0, 0, p, to, tbl)) return false;
@@ -3845,11 +3833,9 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	if (rt.optimize) measure_time_start();
 
 	flat_prog fp = ir_handler.to_terms(p);
-	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
 	#endif // FOL_V2
-	//DBG(ir_handler->opts.print_binarized = false;);
 
 	#ifndef LOAD_STRS
 	strs = strs_in;

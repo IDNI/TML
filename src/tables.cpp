@@ -114,8 +114,6 @@ void tables::add_bit() {
 	spbdd_handle x = hfalse;
 	bdd_handles v;
 	for (auto& x : tbls)
-//	for (size_t n = 0; n != ts.size(); ++n)
-//		x.second.t = add_bit(x.second.t, x.second.len);
 		x.t = add_bit(x.t, x.len);
 	++bits;
 }
@@ -342,9 +340,6 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 	
 	//FIXME: cannot be comparing strings at FWD
 	string pred = bltins.aliases[t.tab];
-
-
-	//COUT << to_string(pred) << endl;
 	int_t idbltin = -1;
 	term taux(t);
 
@@ -372,7 +367,6 @@ void tables::handler_bitunv(set<pair<body,term>>& b, const term& t, alt& a) {
 		return;
 	}
 
-	//DBG(assert(idbltin != -1 && "wrong operator encoding in bitunv transform"));
 	//todo: check that idbltin is properly configured in builtins
 	bltins.at(idbltin).body.getvars(taux, a.bltinvars, a.bltngvars, a.bltoutvars);
 	a.bltins.push_back(taux);
@@ -460,7 +454,7 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	a.f->varslen = vm.size();
 
 	/*
-	//todo: review since d is not what is always needed to decrease
+	//TOFO review since d is not what is always needed to decrease
 	if (vm.size() != 0 && h.size() != vm.size()) {
 		size_t d = h.size() - vm.size();
 		for (auto &v : vm)
@@ -479,7 +473,7 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 		a.f->perm = get_perm(t, tmpvm, a.f->varslen, bits_l);
 	}
 
-	//todo: review to reach an arity-increment permutation to handle head constants
+	//TODO review to reach an arity-increment permutation to handle head constants
 	if (a.f->ex_h.size() == 0) {
 		auto d = deltail(a.f->varslen, tmpvm.size(), bits_l);
 		a.f->ex_h = d.first, a.f->perm_h = d.second;
@@ -505,7 +499,7 @@ bool tables::get_rules(flat_prog &p) {
 
 	if (!get_facts(p)) return false;
 	/*
-	// <-- TODO: review
+	// TODO: review
 	flat_prog q(move(p));
 	map<ntable, ntable> r;
 	for (const auto& x : q) p.emplace(x);
@@ -513,7 +507,6 @@ bool tables::get_rules(flat_prog &p) {
 	q = move(p);
 	for (const auto& x : q) p.emplace(x);
 	replace_rel(move(r), p);
-	// -->
 	*/
 	if (opts.optimize) bdd::gc();
 
@@ -596,18 +589,11 @@ spbdd_handle tables::addtail(cr_spbdd_handle x, size_t len1, size_t len2) const{
 	return x ^ addtail(len1, len2);
 }
 
-spbdd_handle tables::body_query(body& b, size_t /*DBG(len)*/) {
-//	DBG(assert(bdd_nvars(b.q) <= b.ex.size());)
+spbdd_handle tables::body_query(body& b, size_t) {
 	if (b.tlast && b.tlast->b == tbls[b.tab].t->b) return b.rlast;
 	b.tlast = tbls[b.tab].t;
 	return b.rlast = (b.neg ? bdd_and_not_ex_perm : bdd_and_ex_perm)
 		(b.q, tbls[b.tab].t, b.ex, b.perm);
-//	DBG(assert(bdd_nvars(b.rlast) < len*bits);)
-//	if (b.neg) b.rlast = bdd_and_not_ex_perm(b.q, ts[b.tab].t, b.ex,b.perm);
-//	else b.rlast = bdd_and_ex_perm(b.q, ts[b.tab].t, b.ex, b.perm);
-//	return b.rlast;
-//	return b.rlast = bdd_permute_ex(b.neg ? b.q % ts[b.tab].t :
-//			(b.q && ts[b.tab].t), b.ex, b.perm);
 }
 
 auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
@@ -637,7 +623,6 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 	#endif
 
 	bdd_handles v1 = { a.rng, a.eq };
-	//DBG(assert(!a.empty());)
 
 	for (size_t n = 0; n != a.size(); ++n) {
 		spbdd_handle x = body_query(*a[n], a.varslen);
@@ -699,11 +684,8 @@ bool table::commit(DBG(size_t /*bits*/)) {
 			else itd++;
 		spbdd_handle a = bdd_or_many(move(add)),
 			d = bdd_or_many(move(del));
-		//DBG(assert(bdd_nvars(a) < len*bits);)
-		//DBG(assert(bdd_nvars(d) < len*bits);)
 		x = (t || a) % d;
 	}
-	//DBG(assert(bdd_nvars(x) < len*bits);)
 	return x != t && (t = x, true);
 }
 
@@ -720,18 +702,16 @@ char tables::fwd(progress& p) noexcept {
 		bdd_handles v(r.size());
 		spbdd_handle x;
 		for (size_t n = 0; n != r.size(); ++n)
-			//print(COUT << "rule: ", r) << endl,
 			v[n] = alt_query(*r[n], r.len);
 		if (v == r.last) { if (datalog) continue; x = r.rlast; }
 		else r.last = v, x = r.rlast = bdd_or_many(move(v)) && r.eq;
-		//DBG(assert(bdd_nvars(x) < r.len*bits);)
 		if (x == hfalse) continue;
 		(r.neg ? tbls[r.tab].del : tbls[r.tab].add).push_back(x);
 		if (populate_tml_update || (print_updates && print_updates_check())) 
 			p.notify_update(*this, x, r);
 	}
 	bool b = false;
-	// D: just temp ugly static, move this out of fwd/pass in, or in tables.
+	//TODO just temp ugly static, move this out of fwd/pass in, or in tables.
 	static map<ntable, set<term>> mhits;
 	for (ntable tab = 0; (size_t)tab != tbls.size(); ++tab) {
 		table& tbl = tbls[tab];
@@ -748,12 +728,6 @@ char tables::fwd(progress& p) noexcept {
 		if (tbl.unsat) return unsat = true;
 	}
 	return b;
-/*	if (!b) return false;
-	for (auto x : goals)
-		for (auto y : x.second)
-			b &= (y && ts[x.first].t) == y;
-	if (b) return (o::out() <<"found"<<endl), false;
-	return b;*/
 }
 
 bdd_handles tables::get_front() const {
@@ -866,7 +840,6 @@ tables::~tables() {
 
 #ifdef DEBUG
 vbools tables::allsat(spbdd_handle x, size_t args) const {
-//	const size_t args = siglens[tab];
 	vbools v = ::allsat(x, bits * args), s;
 	for (bools b : v) {
 		s.emplace_back(bits * args);
@@ -931,7 +904,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	table tbl = tbls.at(tab);
 	if (!allowbltins && tbl.is_builtin()) return; //bltins no decompress
 	if (!len) len = tbl.len;
-	allsat_cb(x/*&&ts[tab].t*/, len * bits,
+	allsat_cb(x, len * bits,
 		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
 		DBG(assert(BDD_ABS(y) == T);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);

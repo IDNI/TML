@@ -113,7 +113,6 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 		rt_vartypes aux(idx);
 		for (auto &i : {SYMB,UINT,UCHAR}) aux.append({i,-1});
 		vars[dict.get_var(t.e[0].e)].push_back(aux);
-		//v[dict.get_var(rt.e[0].e)][0].positions
 		vars[dict.get_var(t.e[2].e)].push_back(aux);
 		//TODO: when ?x = ?y possible optimization is to just replace var
 		// over whole rule and just remove equality as a constraint
@@ -240,10 +239,8 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 		else {
 			s = get_sig(rt);
 			auto it = relid_argtypes_map.find(s.first);
-			//assert(it != relid_argtypes_map.end());
 			for (auto &rel_sig : it->second)
 				if (rel_sig == s.second) {
-					//COUT << "body matched" << endl;
 					//TODO: simplify / improve this matching
 					for (auto &var : v) for (auto &vt : var.second)
 						if (vt.rt_idx == i) {
@@ -307,7 +304,6 @@ bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 
 		//---------------------------------------------------------------------
 		//reorder negated terms to end of bodies vector as required by *TR001*
-		//for (auto &var : v) {
 		for (auto itv = v.begin(); itv != v.end(); itv++) {
 			int_t bound = itv->second.size();
 			for (int_t k = 0; k < bound; k++) {
@@ -381,9 +377,7 @@ bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 				auto it2 = find(it->second.begin(), it->second.end(), s.second);
 				//fixed point bitwidth inference
 				if (it2 != it->second.end())
-						if (append(relid_argtypes_map, s)) updated = true;
-						//if updated... restart ... loop ? :)
-				//else assert(false);
+					if (append(relid_argtypes_map, s)) updated = true;
 			}
 		}
 	}
@@ -496,10 +490,8 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 							rt->s = st;
 						}
 						else {
-							//auto it = rr.b.front().begin();
 							auto it = begin(rr.b.front());
 							it += k;
-							//auto it = next(begin(rr.b.front()), k);
 							it = rr.b.front().erase(it);
 							k--;
 						}
@@ -587,20 +579,12 @@ sig ir_builder::get_sig_bltin(raw_term&t) {
 	raw2natives(tl, t,tn);
 	t.s = {id, tn};
 	return t.s;
-	/*if (is_head) {
-		assert(dynenv->bltins[id].has_head);
-		return dynenv->bltins[id].head.sig;
-	} else {
-		assert(dynenv->bltins[id].has_body);
-		return dynenv->bltins[id].body.sig;
-	}*/
 }
 sig ir_builder::get_sig_arith(const raw_term&t) {
 	int_t id = dict.get_rel(dict.get_lexeme("ARITH"));
 	DBG(assert(t.e.size()==5 || t.e.size()==6));
 	ints tl = {0,2,4};
 	if (t.e.size()==6) tl.push_back(5);
-	//assert(t.arity[0] == tl.size());
 	tml_natives tn;
 	raw2natives(tl,t,tn);
 	return {id, tn};
@@ -632,7 +616,6 @@ sig ir_builder::get_sig(raw_term &t) {
 		if (opts.binarize) {
 			auto it = relid_argtypes_map.find(t.s.first);
 			auto it2 = find(it->second.begin(), it->second.end(), t.s.second);
-			//if (it2->begin()->bit_w == -1) return t.s; //workaround for constant head
 			return {t.s.first, *it2};
 		} else return t.s;
 		#else
@@ -673,7 +656,7 @@ sig ir_builder::get_sig(raw_term &t) {
 sig ir_builder::get_sig(const raw_term&t) {
 #ifdef TML_NATIVES
 	#ifdef TYPE_RESOLUTION
-		raw_term aux = t; //TODO: avoid workaround
+		//TODO: avoid workaround
 		return get_sig(aux);
 	#else
 		int_t rel_id = dict.get_rel(t.e[0].e);
@@ -813,19 +796,10 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 					make_shared<raw_form_tree>(gt));
 			}
 			from_raw_form(root, froot, is_sol);
-			/*
-			DBG(o::dbg() << "\n ........... \n";)
-			DBG(r.prft->printTree();)
-			DBG(o::dbg() << "\n ........... \n";)
-			DBG(froot->printnode(0, this);)
-			*/
 			term::textype extype;
 			if(is_sol) {
-				//DBG(o::dbg() << "\n SOL parsed \n";)
-				//to_pnf(froot);
 				extype = term::FORM2;
 			} else {
-				//froot->implic_rmoval();
 				extype = term::FORM1;
 			}
 			spform_handle qbf(froot);
@@ -843,7 +817,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 				v.push_back(t);
 				t = term(extype, qbf);
 				v.push_back(t);
-				//align_vars_form(v);
 				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
@@ -859,8 +832,7 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 			assert(r.h.size() == 1);
 			get_nums(r.h[0]), t = from_raw_term(r.h[0], true);
 			to_flat_prog(t, this, pfof, m);
-			//DBG(print(o::out() << "\n", m) << endl;);
-			//print(o::out() << "\n", m) << endl;
+
 			#endif
 		}
 		else  {
@@ -966,7 +938,7 @@ int_t ir_builder::get_bltin(const sig& s) {
 	auto it = bsmap.find(s);
 	if (it != bsmap.end())
 		return it->second;
-	int_t nb = dynenv->bltins.sigs.size(); // == bsmap.size()
+	int_t nb = dynenv->bltins.sigs.size();
 	bsmap.emplace(s,nb);
 	dynenv->bltins.sigs.push_back(s);
 	return nb;
@@ -1221,9 +1193,6 @@ raw_term ir_builder::to_raw_term(const term& r) {
 					rt.e[0] = elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
 
 				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
-				//#ifdef TML_NATIVES
-				//assert(rt.arity.size() == 1);
-				//#endif
 
 				#ifdef TYPE_RESOLUTION
 				sig s = dynenv->tbls[r.tab].s;
@@ -1260,9 +1229,6 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				rt.e[0] = get_elem(r[0]);
 			}
 		}
-#ifndef BIT_TRANSFORM_V2
-		//DBG(assert(args == r.size());)
-#endif
 #ifdef BIT_TRANSFORM
 		if(bitunv_to_raw_term(rt))
 			rt.calc_arity(nullptr);
@@ -1566,7 +1532,6 @@ void form::printnode(int lv, ir_builder* tb) {
 bool ir_builder::get_substr_equality(const raw_term &rt, size_t &n,
 	std::map<size_t,term> &refs, std::vector<term> &v, std::set<term> &/*done*/)
 {
-	//format : substr(1) = substr(2)
 	term svalt;
 	svalt.resize(4);
 	#ifdef TYPE_RESOLUTION
@@ -1597,7 +1562,7 @@ bool ir_builder::get_substr_equality(const raw_term &rt, size_t &n,
 		if( refs[pos].size()) svalt[i*2] = refs[pos][0];
 		// normal S( ?i ?j ) term, but for binary str(?i a) relation,
 		// get the var by decrementing that at pos0
-		//IMPROVE: Following code needs to aware of bitsz of unary string.
+		// TODO: Following code needs to aware of bitsz of unary string.
 		//Currently, it assume whole char (32 bits) as a relation.
 		if( refs[pos].size()==2)
 			svalt[i*2+1] = refs[pos][1] >= 0 ? refs[pos][0]-1 : refs[pos][1];
@@ -1690,12 +1655,9 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 			eqr[r].emplace_back(false, term::textype::LEQ, t_arith_op::NOP, -1,
 				std::initializer_list<int>{mknum(0), k}, 0 );
 		} else if( r == 1 ) { // inductive case
-			// equals(i j k n ) ;- str(i cv), str(k cv), i + 1 = j, k +1 = n.
 			int_t cv = --var;
-			// str(i cv) ,str( k, cv)
 			for( int vi=0; vi<2; vi++) {
 				//work in progress
-				//DBG(COUT << "get_rule_substr_equality" << endl);
 				#ifdef TYPE_RESOLUTION
 				eqr[r].emplace_back(false, term::textype::REL, t_arith_op::NOP,
 									get_table(get_sig_typed(*str_rels.begin(),{UINT,UCHAR})),
@@ -1714,7 +1676,6 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 			eqr[r].back()[0] = k, eqr[r].back()[2] = n ;
 		}
 		else if( r == 2) { // inductive case.
-			//equals(i j k n ) :- equals( i x k y)	, equals( x j y n)
 			int_t x = --var, y = --var;
 			term eqs(false, term::textype::REL, t_arith_op::NOP, nt, { i, x, k, y }, 0);
 			eqr[r].emplace_back(eqs);
@@ -1727,7 +1688,6 @@ bool ir_builder::get_rule_substr_equality(vector<vector<term>> &eqr ){
 
 bool ptransformer::parse_alt( vector<elem> &next, size_t& cur){
 	bool ret = false;
-	//size_t cur1 = cur;
 	while( cur < next.size() && is_firstoffactor(next[cur])){
 		ret = parse_factor(next, cur);
 		if(!ret) break;
@@ -1809,7 +1769,6 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if ((next.size() > cur) &&
 			(next[cur].type == elem::ARITH) &&
 			(next[cur].arith_op == MULT || next[cur].arith_op == ADD)) {
-			//lp.emplace_back(),
 			synth_recur( next.begin()+start, next.begin()+cur,
 			next[cur].arith_op == MULT),
 			++cur;
@@ -1825,7 +1784,6 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSESB) return false;
 		++cur;
-		//lp.emplace_back();
 		synth_recur( next.begin()+start+1, next.begin()+cur-1, true, false);
 		next.erase( next.begin()+start, next.begin()+cur);
 		next.insert( next.begin()+start, lp.back().p[0]);
@@ -1837,7 +1795,6 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSEP) return false;
 		++cur;
-		//lp.emplace_back();
 		if(next[cur].type == elem::ARITH &&
 			(next[cur].arith_op == MULT 	||
 			next[cur].arith_op == ADD		))
@@ -1858,7 +1815,6 @@ bool ptransformer::parse_factor( vector<elem> &next, size_t& cur){
 		if( !parse_alts(next, cur)) return cur = cur1, false;
 		if(next[cur].type != elem::CLOSEB) return false;
 		++cur;
-		//lp.emplace_back();
 		// making R => ... R | null
 		synth_recur( next.begin()+start+1, next.begin()+cur -1);
 		next.erase( next.begin()+start, next.begin()+cur);
@@ -1872,9 +1828,6 @@ bool ptransformer::visit() {
 	size_t cur = 1;
 	bool ret = this->parse_alts(this->p.p, cur);
 	if (this->p.p.size() > cur) ret = false;
-
-	//DBG(COUT << "transform_ebnf:visit" << endl << lp <<endl);
-	//DBG(for (production &t : lp) o::dbg() << t << endl);
 	if (!ret) parse_error("Error Production",
 		cur < this->p.p.size() ? p.p[cur].e : p.p[0].e);
 	return ret;
@@ -1913,9 +1866,6 @@ bool graphgrammar::dfs( const elem &s) {
 					if( nit->second.second == PROGRESS ) return true;
 					else if( nit->second.second != VISITED)
 						if(  dfs(*nxt)) return true;
-			//	for( auto nit = nang.first; nit != nang.second; nit++)
-			//		nit->second.second = VISITED;
-			//	sort.push_back(*nxt);
 			}
 		}
 	for( auto sgit = rang.first; sgit != rang.second; sgit++)
@@ -2049,9 +1999,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 			}
 			continue;
 		}
-		//every len constraint raw_term should be :
-		//	(len(i)| num) [ bop (len(i)| num) ] (=) (len(i)| num)  ;
-		// e.g. len(1) + 2 = 5  | len(1) = len(2
 		n = 0;
 		int_t lopd = get_factor(rt, n, refs, v, done);
 		int_t ropd, oside;
@@ -2074,13 +2021,11 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 			aritht[1] = ropd;
 			oside = get_factor(rt, n, refs, v, done);
 			aritht[2] = oside;
-			//if(!done.insert(aritht).second)
-			if(n == rt.e.size())	v.push_back(aritht);
+			if(n == rt.e.size()) v.push_back(aritht);
 			else return er("Only simple binary operation allowed.");
 		}
 		else if( n < rt.e.size() &&
 				(rt.e[n].type == elem::EQ || rt.e[n].type == elem::LEQ)) {
-			//format: lopd = ropd
 			term equalt;
 			equalt.resize(2);
 			equalt.extype = rt.e[n].type == elem::EQ ?
@@ -2091,7 +2036,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 			ropd =  get_factor(rt, n, refs, v, done);
 			equalt[1] = ropd;
 
-			//if(!done.insert(equalt).second )
 			if(n == rt.e.size())	v.push_back(equalt);
 			else if( n < rt.e.size()
 					&& rt.e[n].type == elem::ARITH
@@ -2110,7 +2054,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 					aritht[1] = oside;
 					aritht[2] = lopd;
 
-					//if(!done.insert(aritht).second)
 					if(n == rt.e.size())	v.push_back(aritht);
 					else return er("Only simple binary operation allowed.");
 
@@ -2123,8 +2066,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return true;
-	//DBG(o::dbg()<<"grammar before:"<<endl;)
-	//DBG(for (production& p : g) o::dbg() << p << endl;)
 	bool changed;
 	transform_strsplit(g);
 	transform_apply_regex(g, p);
@@ -2154,10 +2095,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		.recognize(to_u32string(strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
-
-	//raw_progs rps = parser.get_raw_progs(&dict);
-	//o::inf() << "\n### earley::get_raw_progs(): >\n" << rps << "<###\n" << endl;
-
 	vector<earley_t::arg_t> facts = parser.get_parse_graph_facts();
 	vector<raw_term> rts;
 	for (auto& af: facts) {
@@ -2176,10 +2113,8 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		e.emplace_back(elem(elem::CLOSEP));
 
 		rts.emplace_back(raw_term::REL, e);
-
-		//DBG(o::dbg()<<rts.back()<<endl);
 	}
-	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
+	for(auto rt: rts) p.insert({from_raw_term(rt)});
 	return true;
 	#endif // ONLY_EARLEY
 
@@ -2255,7 +2190,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 				unary_string us(sizeof(char32_t)*8);
 				us.buildfrom(u32string(1, x.p[n].ch));
 				int_t tv=n;
-				//DBG(us.toprint(o::dbg()));
 				for( auto rl: us.sort_rel) {
 					term t; t.resize(1);
 					#ifdef TYPE_RESOLUTION

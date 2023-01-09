@@ -57,10 +57,6 @@ typedef std::tuple<elem, int_t> rel_info;
 
 struct prog_data {
 	strs_t strs;
-//	std::unordered_map<int_t, term> strtrees;
-//	std::vector<term> out;
-//	matpairs r;
-//	matrix goals, tgoals;
 	bool bwd = false;
 	size_t n = 0;
 	size_t start_step = 0;
@@ -129,7 +125,6 @@ class driver {
 	bool transform_handler(raw_prog &p);
 	bool transform(raw_prog& rp, const strs_t& strtrees);
 
-	//int_t nums = 0, chars = 0, syms = 0;
 	std::set<lexeme, lexcmp>  rels;
 	lexeme get_new_rel();
 	void refresh_vars(raw_term& t, size_t& v, std::map<elem, elem>& m);
@@ -141,9 +136,6 @@ class driver {
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p);
 	
-//	std::set<raw_rule> transform_ms(const std::set<raw_rule>& p,
-//		const std::set<raw_term>& qs);
-//	raw_prog transform_sdt(const raw_prog& p);
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_term get_try_pred(const raw_term& x);
@@ -280,9 +272,9 @@ public:
 		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls) {
 			return run_prog(p, strs, steps, break_on_step, ps, rt, tbls, *ir);
 	}
-	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt, ir_builder &ir_handler);
-	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt) {
-		return add_prog_wprod(m,  g/*, bool mknums*/, tbls, rt, *ir);
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g, tables &tbls, rt_options &rt, ir_builder &ir_handler);
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g, tables &tbls, rt_options &rt) {
+		return add_prog_wprod(m,  g, tbls, rt, *ir);
 	}
 
 
@@ -351,17 +343,11 @@ public:
 
 #ifdef DEBUG
 extern driver* drv;
-//template <typename T>
-//std::basic_ostream<T>& printdb(std::basic_ostream<T>& os, lp *p);
 template <typename T>
 std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t,
 	size_t bits, ints ar, int_t rel);
 template <typename T>
 std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
 	size_t bits, ints ar, int_t rel);
-//template <typename T>
-//std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
-//	int_t rel);
 #endif
-
 #endif

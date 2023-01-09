@@ -210,56 +210,6 @@ rule tables::new_identity_rule(const ntable tab, const bool neg) {
 	return rul;
 }
 
-// TODO move this method to driver
-
-/* Print proof trees for each goal in the program. Do this by doing a backward
- * chain over the levels structure, which contains the entirity of facts
- * derivable by the given program from the given initial database. */
-
-/* template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
-	// Fact proofs are stored by level
-	proof p(levels.size());
-	set<term> s;
-	// Record the facts covered by each goal
-	for (term t : goals) {
-		if(t.neg) {
-			t.neg = false;
-			// Collect all relation facts not matched by goal
-			decompress(htrue % (from_fact(t) && tbls[t.tab].t), t.tab,
-				[&](term t) { t.neg = true; if(is_term_valid(t)) s.insert(t); }, t.size());
-		} else {
-			// Collect all relation facts matched by goal
-			decompress(tbls[t.tab].t && from_fact(t), t.tab,
-				[&s](const term& t) { s.insert(t); }, t.size());
-		}
-	}
-	// Explicitly add rules to carry facts between steps so that the proof tree
-	// will capture proofs by carry. Record where the implicit rules start to
-	// enable their removal.
-	const size_t explicit_rule_count = rules.size();
-	for(size_t i = 0; i < tbls.size(); i++) {
-		// Make the positive identity rule for this table
-		rules.push_back(new_identity_rule(i, false));
-		// Make the negative identity rule for this table
-		rules.push_back(new_identity_rule(i, true));
-	}
-	// Auxilliary variable for get_proof
-	set<pair<term, size_t>> refuted;
-	// Get all proofs for each covered fact
-	for (const term& g : s)
-		if (opts.bproof != proof_mode::none)
-			get_proof(g, p, levels.size() - 1, refuted, explicit_rule_count),
-			get_forest(g, p);
-		else os << ir_handler->to_raw_term(g) << '.' << endl;
-	// Print proofs
-	if (opts.bproof != proof_mode::none) print(os, p);
-	// Remove the auxilliary rules we created as they are no longer needed
-	rules.resize(explicit_rule_count);
-	return goals.size() || opts.bproof != proof_mode::none;
-}
-template bool tables::get_proof(std::basic_ostream<char>&);
-template bool tables::get_proof(std::basic_ostream<wchar_t>&); */
-
 std::set<const gnode*> gnode::visited;
 std::map<std::set<term>, gnode*> gnode::interm2g;
 
@@ -298,8 +248,7 @@ void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visi
 	for(int i=0; i< space; i++)	sp += L"\t";
 
 	if(!visit.insert(&gh).second) return;
-	if( gh.type == gnode::gntype::symbol)
-		/* ss  << endl<< sp << size_t(&gh) << L"[label=\""<< " "<< ir_handler->to_raw_term(gh.t)<< L"\"];" */ ;
+	if( gh.type == gnode::gntype::symbol);
 	else if (gh.type == gnode::gntype::pack)
 		ss  << endl<< sp << size_t(&gh) << L"[shape = \"point\" label=\""<< L"\"];";
 	else if (gh.type == gnode::gntype::interm)

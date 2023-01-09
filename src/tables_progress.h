@@ -26,11 +26,6 @@ public:
 	tables_progress(dict_t &d, ir_builder &ir) : dict(d), ir_handler(ir) {};
 	~tables_progress() {};
 	void notify_update(tables &ts, spbdd_handle& x, const rule& r) override;
-
-	//#ifdef BIT_TRANSFORM
-	//void notify_decompress(table tbl, term r);
-	//#endif
-
 private:
 	/* This objects are part of tables rightnow, the main task of this class
 	 * is to remove them from tables. The label REMOVE_IR_BUILDER_FROM_TABLES

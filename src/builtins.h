@@ -104,7 +104,6 @@ struct builtins_pair {
 };
 
 struct updates {
-	// dictmap updates_dict;
 	int_t rel_tml_update, sym_add, sym_del;
 };
 

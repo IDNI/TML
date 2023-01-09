@@ -109,8 +109,6 @@ bool options::parse_option(const strings &sargs, const size_t &i,
 	skip_next = false;
 	size_t pos = 0;
 	const string &arg = sargs[i];
-	//DBG(o::out()<<"parse_option: "<<arg<<' '<<i<<endl;)
-	// skip hyphens
 	while (pos < arg.length() && arg[pos] == '-' && pos < 2) ++pos;
 	string a = arg.substr(pos);
 	// is option disabled?
@@ -169,8 +167,6 @@ void options::setup() {
 	add(option(option::type::STRING, { "input-eval", "ie" },
 		[this](const option::value& v) {
 			ii->add_string(v.get_string());
-			//COUT << "inputs.size now: " << ii->size()
-			//	<< " this: " << this << std::endl;
 		}).description("input string to evaluate"));
 #ifdef WITH_THREADS
 	add_bool("udp",     "open REPL on udp socket");
@@ -264,10 +260,6 @@ void options::setup() {
 		[](const option::value& v) {
 			outputs::name(v.get_string());
 		}).description("name used for @name output"));
-	//add(option(option::type::STRING, { "load", "l" })
-	//	.description("load database from file before start"));
-	//add(option(option::type::STRING, { "save", "s" })
-	//	.description("save database to file after finish"));
 	add_bool2("earley", "ep", "use earley parser");
 	add_bool2("print-ambiguity", "pamb", "print parsed ambiguous packs");
 	add_bool2("print-traversing", "ptrv", "print parsed nodes traversed");

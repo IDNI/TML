@@ -211,10 +211,6 @@ bool repl::eval_input(basic_ostream<T>& os, string l) {
 	else if  (l == "s")   step(os);
 	else if  (size_t s =   parse_size_t(l, "s")) step(os, s);
 	else if  (size_t s =   parse_size_t(l, "b")) break_on_step(os, s);
-	//else if  ((f = ws2s(parse_string(l, "load"))) != "")
-	//	d->load(f);
-	//else if  ((f = ws2s(parse_string(l, "save"))) != "")
-	//	d->save(f);
 	else if  (l == "ps")
 		d->set_print_step(toggle(os, "print steps", ps));
 	else if  (l == "pu")

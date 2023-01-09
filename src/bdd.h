@@ -188,41 +188,6 @@ extern size_t max_bdd_nodes;
 extern mmap_mode bdd_mmap_mode;
 #endif
 
-// template<typename T>
-// struct veccmp {
-// 	bool operator()(const std::vector<T>& x, const std::vector<T>& y) const;
-// };
-//
-// template<typename T1, typename T2>
-// struct vec2cmp {
-// 	typedef std::pair<std::vector<T1>, std::vector<T2>> t;
-// 	bool operator()(const t& x, const t& y) const;
-// };
-//
-// template<typename T1, typename T2, typename T3>
-// struct vec3cmp {
-// 	typedef std::tuple<std::vector<T1>, std::vector<T2>, std::vector<T3>> t;
-// 	bool operator()(const t& x, const t& y) const;
-// };
-//
-// // these are extern because archive needs access to them. TODO: make it better
-// extern std::vector<std::unordered_map<bdd_key, int_t>> Mp, Mn;
-// extern std::unordered_map<ite_memo, int_t> C;
-// extern std::map<bools, std::unordered_map<std::array<int_t, 2>, int_t>,
-// 	veccmp<bool>> CX;
-// extern std::map<xperm, std::unordered_map<std::array<int_t,2>, int_t>,
-// 	vec2cmp<bool,uint_t>> CXP;
-// extern std::unordered_map<bdds, int_t> AM;
-// extern std::map<bools, std::unordered_map<bdds, int_t>, veccmp<bool>> AMX;
-// extern std::map<std::pair<bools,bdd_shfts>, std::unordered_map<bdds,int_t>,
-// 	vec2cmp<bool,uint_t>> AMXP;
-// extern std::unordered_set<int_t> S;
-// extern std::map<bools, std::unordered_map<int_t, int_t>, veccmp<bool>> memos_ex;
-// extern std::map<bdd_shfts, std::unordered_map<int_t, int_t>, veccmp<uint_t>>
-// 	memos_perm;
-// extern std::map<std::pair<bdd_shfts, bools>, std::unordered_map<int_t, int_t>,
-// 	vec2cmp<uint_t, bool>> memos_perm_ex;
-
 void bdd_size(cr_spbdd_handle x, std::set<bdd_id>& s);
 bdd_shft bdd_root(cr_spbdd_handle x);
 spbdd_handle bdd_not(cr_spbdd_handle x);
@@ -241,7 +206,6 @@ spbdd_handle bdd_quantify(cr_spbdd_handle x, const std::vector<quant_t> &quants,
 
 size_t satcount(cr_spbdd_handle x, const size_t bits);
 void allsat_bin(cr_spbdd_handle x);
-//size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools &ex);
 
 /* A BDD is a pair of attributed references to BDDs. Separating out attributes
  * from BDDs increase the chances that BDDs can be reused in representing
@@ -301,13 +265,12 @@ class bdd {
 			const size_t bits, const size_t n_args);
 	friend size_t satcount(cr_spbdd_handle x, const size_t bits);
 	friend void allsat_bin(cr_spbdd_handle x);
-	//friend size_t satcount_ex(cr_spbdd_handle x, const size_t bits, const bools& ex);
 	friend spbdd_handle bdd_bitwise_and(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_or(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_xor(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_bitwise_not(cr_spbdd_handle x);
 	friend spbdd_handle bdd_leq(cr_spbdd_handle x, cr_spbdd_handle y,
-			const size_t x_bitw, const size_t y_bitw /*, size_t x_idx, size_t y_idx*/);
+			const size_t x_bitw, const size_t y_bitw);
 	friend spbdd_handle bdd_adder(cr_spbdd_handle x, cr_spbdd_handle y);
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 	friend spbdd_handle bdd_shift(cr_spbdd_handle x, bdd_shft amt);
@@ -393,10 +356,7 @@ class bdd {
 	static bdd_ref bitwise_not(bdd_ref a_in);
 	static bdd_ref adder(bdd_ref a_in, bdd_ref b_in, bool carry, size_t bit);
 	static bdd_ref leq(bdd_ref a, bdd_ref b, size_t bit, const size_t x_bitw,
-			const size_t y_bitw /*, const size_t x_idx=0, const size_t y_idx=0*/);
-	//static int_t geq(int_t a, int_t b, size_t bit, size_t x_bitw, size_t y_bitw);
-	//typedef enum { L, H, X, U } t_path;
-	//typedef std::vector<t_path> t_pathv;
+			const size_t y_bitw);
 	static bool bdd_next_path(std::vector<bdd_ref> &a, int_t &i, int_t &bit, t_pathv &path,
 			size_t bits, size_t n_args);
 	static int_t balance_paths(t_pathv & next_path_a, t_pathv & next_path_b, size_t bits,
@@ -476,7 +436,7 @@ public:
 
 class bdd_handle {
 	friend class bdd;
-	bdd_handle(bdd_ref b) : b(b) { }//bdd::mark(b); }
+	bdd_handle(bdd_ref b) : b(b) { }
 	static void update(const std::vector<bdd_id>& p);
 	static std::unordered_map<bdd_ref, std::weak_ptr<bdd_handle>> M;
 public:
@@ -485,8 +445,7 @@ public:
 	static spbdd_handle T, F;
 	~bdd_handle() {
 		if (onexit) return;
-		//if (abs(b) > 1 && (M.erase(b), !has(M, -b))) bdd::unmark(b);
-		if (GET_BDD_ID(b) > 1) M.erase(b);//, !has(M, -b))) bdd::unmark(b);
+		if (GET_BDD_ID(b) > 1) M.erase(b);
 	}
 };
 
