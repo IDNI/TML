@@ -191,7 +191,6 @@ private:
 		temporary_ = true,
 		fd_ = temp_fileno(),
 		filename_ = filename(fd_);
-		//DBG(o::dbg()<<"temporary file: "<<s2ws(filename_)<<"\n";)
 	}
 	void create() {
 		if (filename_ == "") create_temp();

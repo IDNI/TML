@@ -682,7 +682,6 @@ sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
 #ifdef TML_NATIVES
-	//assert(arity.size() == 1);
 	tml_natives tn;
 	if (arity.size() == 1)
 		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
@@ -861,9 +860,6 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 	//FIXME: this is too error prone.
 	term::textype extype = (term::textype)r.extype;
 	bool realrel = extype == term::REL || (extype == term::BLTIN && isheader);
-	// skip the first symbol unless it's EQ/LEQ/ARITH (which has VAR/CONST as 1st)
-	//bool isrel = realrel || extype == term::BLTIN;
-
 	for (size_t n = !realrel ? 0 : 1; n < r.e.size(); ++n)
 		switch (r.e[n].type) {
 			case elem::NUM:	t.push_back(mknum(r.e[n].num)); break;
@@ -2040,7 +2036,6 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 			else if( n < rt.e.size()
 					&& rt.e[n].type == elem::ARITH
 					&& equalt.extype == term::textype::EQ ) {
-				//format: lopd = ropd + oside
 
 					term aritht;
 					aritht.resize(3);

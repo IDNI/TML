@@ -762,7 +762,6 @@ ostream_t& print_to_delimited(const raw_term& rt, bool& error, bool to,
 				ou        = ss.str(), ss.str({});
 		if (delimited) s++, ss << pair<elem,bool>{rt.e[1+s],true},
 				delimiter = ss.str();
-		//COUT << "printing " << to << delimited << endl;
 		if (!outputs::exists(ou)) o::err() << "print_to: Output '" <<
 			ou << "' does not exist." << endl;
 		else return o::to(ou)

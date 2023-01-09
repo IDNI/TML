@@ -555,8 +555,6 @@ spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t 
 		}
 	}
 	spbdd_handle x = in^perm1;
-	//spbdd_handle x = bdd_permute_ex(in,ex,perm1);
-
 	return x;
 }
 

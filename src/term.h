@@ -90,7 +90,6 @@ struct natcmp {
 	bool operator()(const term& l, const term& r) const {
 		if (l.orderid != r.orderid) return l.orderid < r.orderid;
 		if (l.neg != r.neg) return l.neg;
-		//if (extype != l.extype) return extype < l.extype;
 		if (l.tab != r.tab) return l.tab < r.tab;
 		if (l.goal != r.goal) return l.goal;
 		return (const ints&)l < r;

@@ -284,7 +284,6 @@ u32string to_u32string(const string_t& str) {
 		s += chl;
 		ss.put(ch);
 	}
-	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
 	return ss.str();
 }
 

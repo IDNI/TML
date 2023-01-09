@@ -170,7 +170,6 @@ bdd_ref bdd::leq(bdd_ref a_in, bdd_ref b_in, size_t bit, const size_t x_bitw,
 	if (b_in == T) return a_in;
 	if ( (a_in == T) ||
 	     (GET_SHIFT(a_in) + (int_t)x_bitw > GET_SHIFT(b_in)) ) {
-		//pos = b.v + 2; ... on interleaved
 		pos = GET_SHIFT(b_in) - x_bitw + (y_bitw - x_bitw);
 		if (b.h != F) c = add(pos, leq(a_in, b.h, pos, x_bitw, y_bitw), T);
 		else c = add(pos, F, leq(a_in,b.l, pos, x_bitw, y_bitw));

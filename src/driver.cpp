@@ -1745,7 +1745,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	vector<raw_term> bodie = {
 		// 0 < list_id
 		raw_term(raw_term::LEQ, {list_id, leq_elem, elem(0)}).negate(),
-		// list_id < max_id
+ 		// list_id < max_id
 		raw_term(raw_term::LEQ, {elem(max_id), leq_elem, list_id}).negate(),
 		// 0 <= list_fst
 		raw_term(raw_term::LEQ, {elem(0), leq_elem, list_fst}),
