@@ -122,7 +122,6 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &qua
 			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F && h == F) return F;
-			if (l == F || h == F) return add(GET_SHIFT(x), h, l);
 			return add(GET_SHIFT(x), h, l);
 		}
 		case quant_t::UN: {
@@ -255,7 +254,7 @@ bdd_ref bdd::bitwise_xor(bdd_ref a_in, bdd_ref b_in) {
 }
 
 bdd_ref bdd::bitwise_not(bdd_ref a_in) {
-	//TODO: implement
+	// TODO implement bitsie not
 	return a_in;
 }
 
