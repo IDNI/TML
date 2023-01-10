@@ -2027,8 +2027,8 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 			equalt.extype = rt.e[n].type == elem::EQ ?
 							term::textype::EQ : term::textype::LEQ;
 
-			equalt[0]= lopd; //TODO: switched order due to bug <=
-			n++; //equal
+			equalt[0]= lopd; // TODO switched order due to bug <=
+			n++; // equal
 			ropd =  get_factor(rt, n, refs, v, done);
 			equalt[1] = ropd;
 
@@ -2388,7 +2388,7 @@ void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) 
 	tb.tab =  get_table(get_sig(r, {3}));
 	#endif
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
-		t[0] = mknum(n), t[1] = mkchr(s[n]); // t[2] = mknum(n + 1),
+		t[0] = mknum(n), t[1] = mkchr(s[n]);
 		chars = max(chars, t[1]);
 		v.push_back(t), fp.insert(std::move(v));
 		tb[1] = t[0], tb[2] = mknum(0);

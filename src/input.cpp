@@ -486,7 +486,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		// similar as for SYM below (join?) but this format will expand.
 		if (e[0].type != elem::BLTIN) return
 			in->parse_error(l[pos][0], err_builtin_expected, l[pos]);
-		extype = raw_term::BLTIN; // isbltin = true;
+		extype = raw_term::BLTIN;
 		return calc_arity(in);
 	}
 	if ((noteq || eq) && !arith) {
@@ -507,7 +507,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		if (e[1].type != elem::LEQ && e[1].type != elem::GT) return
 			in->parse_error(l[pos][0], err_leq_expected, l[pos]);
 		if (gt) neg = !neg;
-		extype = raw_term::LEQ; // isleq = true;
+		extype = raw_term::LEQ;
 		return calc_arity(in);
 	}
 	if (lt || geq) {
@@ -517,7 +517,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 		if (e[1].type != elem::LT && e[1].type != elem::GEQ) return
 			in->parse_error(l[pos][0], err_leq_expected, l[pos]);
 		// GEQ <==> LEQ + reverse args + !neg
-		swap(e[2], e[0]); // e = { e[2], e[1], e[0] };
+		swap(e[2], e[0]); 
 		if (lt) neg = !neg;
 		extype = raw_term::LEQ;
 		return calc_arity(in);
@@ -532,9 +532,7 @@ bool raw_term::parse(input* in, const raw_prog& prog, bool is_form,
 			return	in->parse_error(l[pos][0], err_term_or_dot,
 				l[pos]);
 		if (e[1].type != elem::ARITH || e[3].type != elem::EQ)
-			return	in->parse_error(l[pos][0], err_term_or_dot,
-				l[pos]);
-		//iseq = true;
+			return	in->parse_error(l[pos][0], err_term_or_dot, l[pos]);
 		neg = false;
 		arith_op = arith_op_aux;
 		extype = raw_term::ARITH;
@@ -1166,14 +1164,14 @@ bool raw_progs::parse(input* in) {
 	size_t& pos = in->pos;
 	in->prog_lex();
 	if (in->error) return false;
-	raw_prog rp(dict); //raw_prog& rp = p.nps.emplace_back(raw_prog(dict));
+	raw_prog rp(dict);
 	raw_prog::require_guards = false;
 	raw_prog::require_state_blocks = false;
 	if (l.size() && !rp.parse(in)) return in->error?false:
 		in->parse_error(l[pos][0],
 			err_rule_dir_prod_expected, l[pos]);
 
-	//FIXME: guards needs ROOT_EMPTY
+	// TODO fix as guards needs ROOT_EMPTY
  	p.nps.push_back(rp);
 	return true;
 }

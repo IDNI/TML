@@ -378,7 +378,7 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	alt a;
 	set<pair<body, term>> b;
 	spbdd_handle leq = htrue, q;
-	a.vm = get_varmap(h, al, a.varslen, blt);// a.inv = varmap_inv(a.vm);
+	a.vm = get_varmap(h, al, a.varslen, blt);
 
 	for (const term& t : al) {
 		if (t.extype == term::REL) {
@@ -408,12 +408,10 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 		get_alt(al, bt, as, true);
 		assert(as.size() == 1);
 		for (alt x : as) *(a.grnd = new alt) = x;
-		// TODO grnd alt sharing?
-		//set<alt*, ptrcmp<alt>>::const_iterator ait;
-		//	if ((ait = grnds.find(&x)) != grnds.end())
-		//		a.grnd = *ait;
-		//	else	*(a.grnd = new alt) = x,
-		//		grnds.insert(a.grnd);
+		// TODO should we grnd alt sharing? The code could be as follows
+		// 	set<alt*, ptrcmp<alt>>::const_iterator ait;
+		//	if ((ait = grnds.find(&x)) != grnds.end()) a.grnd = *ait;
+		//	else *(a.grnd = new alt) = x, grnds.insert(a.grnd);
 	}
 	a.rng = leq;
 	static set<body*, ptrcmp<body>>::const_iterator bit;
@@ -449,18 +447,15 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	size_t varsh;
 	varmap vm = get_varmap(h, al, varsh), vmh;
 	varmap tmpvm = vm;
-	//assert(varsh != 0 && "VARMAP error");
-	a.f->varslen_h = varsh; //h.size()
+	a.f->varslen_h = varsh;
 	a.f->varslen = vm.size();
 
-	/*
-	//TOFO review since d is not what is always needed to decrease
-	if (vm.size() != 0 && h.size() != vm.size()) {
-		size_t d = h.size() - vm.size();
-		for (auto &v : vm)
-			v.second = v.second - d;
-	}
-	*/
+	// TODO review since d is not what is always needed to decrease.
+	// if (vm.size() != 0 && h.size() != vm.size()) {
+	//	size_t d = h.size() - vm.size();
+	//	for (auto &v : vm)
+	//		v.second = v.second - d;
+	//	}
 
 	if (t0->extype == term::FORM1)
 		handler_form1(a.f, t0->qbf.get(), vm, vmh, true);
@@ -498,16 +493,6 @@ void replace_rel(const map<ntable, ntable>& m, flat_prog& p) {
 bool tables::get_rules(flat_prog &p) {
 
 	if (!get_facts(p)) return false;
-	/*
-	// TODO: review
-	flat_prog q(move(p));
-	map<ntable, ntable> r;
-	for (const auto& x : q) p.emplace(x);
-	replace_rel(move(r), p);
-	q = move(p);
-	for (const auto& x : q) p.emplace(x);
-	replace_rel(move(r), p);
-	*/
 	if (opts.optimize) bdd::gc();
 
 	map<term, set<term_set>> m;

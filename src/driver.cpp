@@ -45,7 +45,6 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 			r.e[n+3].type == elem::CLOSEP) {
 			auto it = s.find(r.e[n+2].e);
 			int_t len = it == s.end() ? 0 : it->second.size();
-//			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
 			r.e.insert(r.e.begin()+n, elem(len)),
 			r.calc_arity(current_input);
@@ -91,7 +90,6 @@ void driver::directives_load(raw_prog& p) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::EDOMAIN: transform_domains(p, d); break;
-		//case directive::EVAL: transform_evals(p, d); break;
 		case directive::QUOTE: transform_quotes(p, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
 		case directive::INTERNAL:
@@ -102,14 +100,6 @@ void driver::directives_load(raw_prog& p) {
 				.emplace(d.rel.e, to_string_t(opts.pargv(a)));
 			else parse_error(err_num_cmdline);
 			break;
-/*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
-					break;
-		case directive::TREE:
-			rel = dict.get_rel(d.t.e[0].e);
-			if (has(pd.strtrees, rel) || has(pd.strs, rel))
-				parse_error(err_str_defined, d.t.e[0].e);
-			else pd.strtrees.emplace(rel, get_term(d.t,pd.strs));
-			break;*/
 		default: pd.strs.emplace(d.rel.e, directive_load(d));
 		}
 	}
@@ -3435,7 +3425,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	};
 	get_all_vars(rp);
 
-	//TODO: this is sort of cache to not optimize same program twice
+	// TODO this is sort of cache to not optimize same program twice
 	// but this situation might become evident earlier, i.e if same file is
 	// passed as input twice.
 	static set<raw_prog *> transformed_progs;

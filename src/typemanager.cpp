@@ -392,7 +392,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 					str = lexeme2str(rt.e[i].e);
 						if (this->contains_prim_var(str) && !lastb)
 							lastp = this->lookup_prim_var(str), lastb =true;
-						else if( this->contains_typedef_var(str)) ;//TOD): ;
+						else if( this->contains_typedef_var(str)) ;
 						else notypv.push_back(str);
 				}
 				else if ( rt.e[i].type == elem::NUM){

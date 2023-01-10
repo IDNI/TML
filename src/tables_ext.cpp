@@ -18,7 +18,6 @@
 #include "output.h"
 using namespace std;
 
-//#define L2
 #ifdef L2
 	#define DBG2(x) x
 #else
@@ -550,7 +549,7 @@ spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t 
 			ex.push_back(true);
 		}
 		else {
-			perm1[i] = ((n_bits+delta-1-(i-delta)));// + i;
+			perm1[i] = ((n_bits+delta-1-(i-delta)));
 			ex.push_back(false);
 		}
 	}
@@ -1012,7 +1011,6 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	v.push_back(q);
 }
 
-//#define SOL_VERBOSE
 void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v) {
 
 	vector<int_t> hvars;

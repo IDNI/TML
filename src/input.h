@@ -326,7 +326,8 @@ struct raw_prog;
 struct raw_form_tree;
 typedef std::shared_ptr<raw_form_tree> sprawformtree;
 
-//#ifdef BIT_UNIVERSE TODO: check whether this may affect early parser
+// TODO check whether this may affect early parser
+// #ifdef BIT_UNIVERSE 
 struct context;
 class environment;
 typedef std::shared_ptr<struct context> spenvcontext;
@@ -434,7 +435,8 @@ struct typestmt {
 	bool parse(input *in, const raw_prog& prog);
 
 };
-//#endif
+// TODO check whether this may affect early parser
+// #endif
 
 /* A raw term is produced from the parsing stage. In TML source code, it
  * takes the following form: <rel>(<arg1> <arg2> ... <argN>). A raw term can
