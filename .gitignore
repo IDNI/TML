@@ -53,3 +53,7 @@ __pycache__
 src/doctest.h
 src/tml.g.cpp.bak*
 emsdk
+
+# Sonarqube
+.scannerwork
+bw-output
