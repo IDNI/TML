@@ -549,7 +549,7 @@ spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t 
 			ex.push_back(true);
 		}
 		else {
-			perm1[i] = ((n_bits+delta-1-(i-delta)));
+			perm1[i] = n_bits + delta - 1 - (i - delta);
 			ex.push_back(false);
 		}
 	}
