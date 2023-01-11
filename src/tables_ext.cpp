@@ -18,12 +18,6 @@
 #include "output.h"
 using namespace std;
 
-#ifdef L2
-	#define DBG2(x) x
-#else
-	#define DBG2(x) ;
-#endif
-
 typedef tuple<size_t, size_t, size_t, int_t, uint_t, uint_t> alumemo;
 map<alumemo, spbdd_handle> carrymemo;
 map<alumemo, spbdd_handle> addermemo;
