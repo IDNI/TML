@@ -2115,13 +2115,10 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 
 	vector<term> v;
 
-	#define GRAMMAR_BLTINS
-	#ifdef GRAMMAR_BLTINS
 	static const set<string> b =
 		{ "alpha", "alnum", "digit", "space", "printable" };
 	set<lexeme, lexcmp> builtins;
 	for (const string& s : b) builtins.insert(dict.get_lexeme(s));
-	#endif
 
 	for (const production& x : g) {
 
@@ -2154,7 +2151,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		std::map<size_t, term> refs;
 		for (int_t n = 0; n != (int_t)x.p.size(); ++n) {
 			term t;
-			#ifdef GRAMMAR_BLTINS
 			if (builtins.find(x.p[n].e) != builtins.end()) {
 				#ifdef TYPE_RESOLUTION
 				t.tab = get_table(get_sig_typed(*str_rels.begin(), {SYMB,UINT,UINT}));
@@ -2171,7 +2167,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 				plus1[0]= -n, plus1[1]=mknum(1), plus1[2]=-n-1;
 				v.push_back(move(plus1));
 			} else
-			#endif
 			if (x.p[n].type == elem::SYM) {
 				t.resize(2);
 				#ifdef TYPE_RESOLUTION
