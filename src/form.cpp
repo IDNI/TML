@@ -80,11 +80,6 @@ void pnft::quantify(spbdd_handle &q, size_t bits) const {
 	q = q^perm2;
 }
 
-
-//-----------------------------------------------------------------------------
-
-#define DEV
-
 var2space::var2space(varmap &vmh){
 	vm = vmh;
 }
