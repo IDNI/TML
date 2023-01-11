@@ -133,13 +133,6 @@ void var2space::constraint(spbdd_handle q) {
 			for (auto &i : v) i = i && q;
 		}
 	}
-	else {
-		#ifdef DEV
-		COUT << "TODO CONSTRAINT" << endl;
-		#endif
-		;
-	}
-
 }
 
 void var2space::merge() {
@@ -159,13 +152,6 @@ void var2space::merge() {
 				v.push_back(x);
 			}
 		}
-	}
-
-	else {
-		#ifdef DEV
-		COUT << "TODO MERGE" << endl;
-		#endif
-		;
 	}
 }
 
