@@ -60,6 +60,10 @@ typedef size_t nlevel;
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define getbc(x, y, f) binary_search_it(x.begin(), x.end(), y, f)
 #define sortc(x, f) std::sort(x.begin(), x.end(), f)
+#define insertb(y,x) (y.insert(lower_bound(all(y), x), x))
+#define insertbc(y,x,f) (y.insert(lower_bound(all(y), x, f), x))
+#define check_insertb(y,x) if(!hasb(y,x)) insertb(y,x)
+
 #define measure_time_start() start = clock()
 #define measure_time_end() end = clock(), \
 		o::ms() << std::fixed << std::setprecision(2) << \
@@ -82,6 +86,15 @@ inline size_t fpairing(size_t x, size_t y) {
   z *= z+1;
   return y+(z>>1);
 }
+
+struct abs_cmp_ {
+	bool operator()(const int_t a, const int_t b) const {
+		int_t abs_a = abs(a), abs_b = abs(b);
+		if (abs_a < abs_b) return true;
+		if (abs_b < abs_a) return false;
+		return a < b;
+	}
+};
 
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 

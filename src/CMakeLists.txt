@@ -31,6 +31,9 @@ set(TML_HEADERS
 	memory_map.h
 	options.h
 	output.h
+	persistent_dag.h
+	persistent_set.h
+	persistent_union_find.h
 	poset.h
 	tables.h
 	ir_builder.h
@@ -48,6 +51,9 @@ set(TML_SOURCES
 	input.cpp
 	options.cpp
 	output.cpp
+	persistent_dag.cpp
+	persistent_set.cpp
+	persistent_union_find.cpp
 	poset.cpp
 	print_prolog.cpp
 	print_souffle.cpp
