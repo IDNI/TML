@@ -1,0 +1,6 @@
+[submodule "external/parser"]
+	path = external/parser
+	url = https://github.com/IDNI/parser.git
+[submodule "external/bdd"]
+	path = external/bdd
+	url = https://github.com/IDNI/bdd.git
