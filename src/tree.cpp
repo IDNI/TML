@@ -13,7 +13,10 @@
 #include <sstream>
 #include "lp.h"
 #include "driver.h"
+
 using namespace std;
+
+namespace idni {
 
 bool operator<(const db_t::const_iterator& x, const db_t::const_iterator& y) {
 	return	x->first != y->first ? x->first < y->first :
@@ -107,3 +110,5 @@ wstring driver::get_trees(const term& root, const db_t& t, size_t bits) {
 //	o::out() << "get_trees: " << ss.str() << endl;
 }
 */
+
+} // idni namespace

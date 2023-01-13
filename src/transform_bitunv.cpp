@@ -10,10 +10,12 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-
-
 #include "ir_builder.h"
 #include "tables.h"
+
+using namespace std;
+
+namespace idni {
 
 #ifdef BIT_TRANSFORM
 
@@ -422,3 +424,5 @@ bool ir_builder::btransform(const raw_term& rtin, raw_term& rtout, const raw_rul
 	return ret;
 }
 #endif
+
+} // idni namespace

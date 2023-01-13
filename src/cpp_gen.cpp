@@ -20,9 +20,9 @@
 
 #include "cpp_gen.h"
 
-using std::string;
-using std::stringstream;
-using std::vector;
+using namespace std;
+
+namespace idni {
 
 // Generate C++ code to generate the given elem
 ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const elem &e) {
@@ -346,3 +346,5 @@ ostream_t& cpp_gen::gen(ostream_t& os, std::string& name, const raw_progs &rps){
 	return os << "raw_progs " << name << "(" << dict_name << ");\n"
 		<< name << ".p = " << pname << ";\n";
 }
+
+} // idni namespace

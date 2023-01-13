@@ -22,10 +22,16 @@
 #include <locale>
 #include <codecvt>
 #include <fstream>
+#include <iostream>
 #include "driver.h"
 #include "err.h"
+#include "ir_builder.h"
 
 using namespace std;
+
+namespace idni {
+
+#ifdef NEEDS_REWRITE
 
 vector<production> driver::load_tml_grammar() {
 	// the following file is generated from /src/tml.g by /gen_tml.g.cpp.sh
@@ -43,37 +49,43 @@ vector<production> driver::load_tml_grammar() {
 	return g;
 }
 
-bool driver::earley_parse_tml(input* in, raw_progs& rps) {
-	typedef const earley_t::nidx_t& ni_t; // node id/handle
-	typedef const earley_t::node_children_variations& ncs_t;
+bool driver::parse_tml(input* in, flat_prog& fp) {
+	typedef const parser_t::pnode& n_t; 
+	typedef const parser_t::pnodes_set& ns_t;
+
+	//#include "tml.grammar.inc.h"
+	parser_t::grammar g = {};
+
+	parser_t::parser_options po;
+	po.bin_lr = opts.enabled("bin-lr");
+	po.cc_fns = { "eof", "space", "digit", "alnum", "alpha", "printable" };
+	parser_t pr(g, po);
+	o::inf() << "\n### pr.recognize() : ";
+	bool success = pr
+		.recognize(to_u32string(string_t(in->data())));
+	o::inf() << (success ? "OK" : "FAIL") << " <###\n" << endl;	
+	return true;
+}
+
+bool driver::parse_tml_old(input* in, raw_progs& rps) {
+	typedef const parser_t::pnode& ni_t; // node id/handle
+	typedef const parser_t::pnodes_set& ncs_t;
 	                                      // various node children args
-	auto eof = char_traits<char32_t>::eof();
-	earley_t::char_builtins_map bltnmap{
-		{ U"space",         [](const char32_t& c)->bool {
-			return c < 256 && isspace(c); } },
-		{ U"digit",         [](const char32_t& c)->bool {
-			return c < 256 && isdigit(c); } },
-		{ U"alpha",     [&eof](const char32_t& c)->bool {
-			return c != eof && (c > 160 || isalpha(c)); } },
-		{ U"alnum",     [&eof](const char32_t& c)->bool {
-			return c != eof && (c > 160 || isalnum(c)); } },
-		{ U"printable", [&eof](const char32_t& c)->bool {
-			return c != eof && (c > 160 || isprint(c)); } },
-		{ U"eof",       [&eof](const char32_t& c)->bool {
-			return c == eof; } }
-	};
 	auto g = load_tml_grammar();
-	earley_t parser(g, bltnmap, opts.enabled("bin-lr"));
-	o::inf() << "\n### parser.recognize() : ";
-	bool success = parser
+	parser_t::parser_options po;
+	po.bin_lr = opts.enabled("bin-lr");
+	po.cc_fns = { "eof", "space", "digit", "alnum", "alpha", "printable" };
+	parser_t pr(ir->to_grammar(g), po);
+	o::inf() << "\n### pr.recognize() : ";
+	bool success = pr
 		.recognize(to_u32string(string_t(in->data())));
 	o::inf() << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
 	parsing_context ctx(rps);
-	earley_t::actions a{};
+	parser_t::actions a{};
 	auto to_int = [](std::string s) {
 		int_t r = stoll(s);
-		if (to_string_(r) != s) { DBGFAIL; } // number reading parse err
+		if (to_string(r) != s) { DBGFAIL; } // number reading parse err
 		return r;
 	};
 	auto to_elem = [&to_int, this]
@@ -102,159 +114,159 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 			to_string(to_string_t(f))) };
 	};
 
-	a.emplace(U"start", [&parser, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
+	a.emplace(U"start", [&pr, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
 		ctx.rps.p.nps.emplace_back(dict);
 		ctx.rp.push_back(&(ctx.rps.p.nps.back()));
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 	});
-	a.emplace(U"block", [&parser, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
+	a.emplace(U"block", [&pr, &ctx, &a, &in, this](ni_t, ncs_t ncs) {
 		ctx.rp.back()->nps.emplace_back(dict);
 		ctx.rp.push_back(&(ctx.rp.back()->nps.back()));
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 	});
-	a.emplace(U"state_block",[&parser, &ctx, &a, &in, this](ni_t,ncs_t ncs){
+	a.emplace(U"state_block",[&pr, &ctx, &a, &in, this](ni_t,ncs_t ncs){
 		ctx.rp.back()->sbs.emplace_back(dict);
 		ctx.sbs.push_back(&(ctx.rp.back()->sbs.back()));
 		ctx.rp.push_back(&(ctx.sbs.back()->p));
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->expand_macros(in);
 		ctx.rp.pop_back();
 		ctx.sbs.pop_back();
 	});
-	a.emplace(U"sb_label", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"sb_label", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		ctx.sbs.back()->label = dict.get_lexeme(to_string_t(
-			parser.flatten(ni)));
+			pr.flatten(ni)));
 	});
-	a.emplace(U"sb_flipping", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"sb_flipping", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.sbs.back()->flip = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"query", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"query", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rr = {};
 		ctx.head = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rr.type = raw_rule::GOAL;
 		ctx.rp.back()->r.push_back(ctx.rr);
 	});
-	a.emplace(U"directive",[&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"directive",[&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_directive = true;
 		ctx.d = {};
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->d.push_back(ctx.d);
 		ctx.is_directive = false;
 	});
-	a.emplace(U"string_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"string_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::STR;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"stdout_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"stdout_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::STDOUT;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"trace_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"trace_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::TRACE;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"internal_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"internal_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::INTERNAL;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
 	a.emplace(U"bwd_drctv", [&ctx] (ni_t, ncs_t) {
 		ctx.d.type = directive::BWD;
 	});
 #ifdef WITH_EVAL
-	a.emplace(U"domain_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"domain_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::EDOMAIN;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"eval_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"eval_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::EVAL;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"quote_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"quote_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::QUOTE;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"codec_drctv", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"codec_drctv", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.d.type = directive::CODEC;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
 #endif // WITH_EVAL
-	a.emplace(U"fname", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"fname", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		ctx.d.type = directive::FNAME;
 		ctx.d.arg  = dict.get_lexeme( 
-			to_string_t(parser.flatten(ni)));
+			to_string_t(pr.flatten(ni)));
 	});
-	a.emplace(U"cmdline", [&parser, &ctx, &to_int](ni_t ni, ncs_t) {
+	a.emplace(U"cmdline", [&pr, &ctx, &to_int](ni_t ni, ncs_t) {
 		ctx.d.type = directive::CMDLINE;
 		ctx.d.n    = to_int(to_string(to_string_t(
-			parser.flatten(ni))));
+			pr.flatten(ni))));
 	});
-	a.emplace(U"cmdlinefile", [&parser, &ctx, &to_int](ni_t ni, ncs_t) {
+	a.emplace(U"cmdlinefile", [&pr, &ctx, &to_int](ni_t ni, ncs_t) {
 		ctx.d.type = directive::CMDLINEFILE;
 		ctx.d.n    = to_int(to_string(to_string_t(
-			parser.flatten(ni))));
+			pr.flatten(ni))));
 	});
-	a.emplace(U"string",[&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"string",[&pr, &ctx, this](ni_t ni, ncs_t) {
 		if (ctx.is_directive) ctx.d.arg = dict.get_lexeme(
-			to_string_t(parser.flatten(ni)));
+			to_string_t(pr.flatten(ni)));
 		else if (ctx.is_production) ctx.p.p.emplace_back(
 			elem::STR, dict.get_lexeme(
-				to_string_t(parser.flatten(ni))));
+				to_string_t(pr.flatten(ni))));
 	});
-	a.emplace(U"production", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"production", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.p = {};
 		ctx.is_production = true;
 		ctx.head = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->g.push_back(ctx.p);
 		ctx.is_production = false;
 	});
-	a.emplace(U"constraints", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"constraints", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_constraint = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.is_constraint = false;
 	});
-	a.emplace(U"quoted_char", [&parser, &ctx, &to_elem](ni_t ni, ncs_t) {
+	a.emplace(U"quoted_char", [&pr, &ctx, &to_elem](ni_t ni, ncs_t) {
 		if (ctx.is_production) ctx.p.p
-			.push_back(to_elem(U"quoted_char", parser.flatten(ni)));
+			.push_back(to_elem(U"quoted_char", pr.flatten(ni)));
 	});
 	a.emplace(U"alt_separator", [&ctx](ni_t, ncs_t) {
 		if (ctx.is_production)
 			ctx.p.p.push_back(elem{ elem::ALT });
 	});
-	a.emplace(U"typedef", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"typedef", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_type = true;
 		ctx.ts = {};
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->vts.push_back(ctx.ts);
 		ctx.is_type = false;
 	});
-	a.emplace(U"type", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"type", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		if (ctx.is_predtype) ctx.ts.typeargs.emplace_back();
 		else ctx.ts.rty.membdecl.emplace_back();
 		bool amb = ncs.size() > 1;
 		for (auto& nc : ncs) for (auto& c : nc)
 			if (!amb || c.first == U"primtype")
-				parser.down(c.second, a);
+				pr.down(c.second, a);
 	});
-	a.emplace(U"predtypedef", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"predtypedef", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_predtype = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.is_predtype = false;
 	});
-	a.emplace(U"structypename", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"structypename", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		ctx.ts.rty.structname = elem(elem::SYM, dict.get_lexeme(
-			to_string_t(parser.flatten(ni))));
+			to_string_t(pr.flatten(ni))));
 	});
-	a.emplace(U"structype", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"structype", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		(ctx.is_predtype ? ctx.ts.typeargs : ctx.ts.rty.membdecl)
 			.back().structname = elem(elem::SYM, dict.get_lexeme(
-				to_string_t(parser.flatten(ni))));
+				to_string_t(pr.flatten(ni))));
 	});
 	a.emplace(U"int_type", [&ctx](ni_t, ncs_t) {
 		(ctx.is_predtype ? ctx.ts.typeargs : ctx.ts.rty.membdecl)
@@ -268,42 +280,42 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		(ctx.is_predtype ? ctx.ts.typeargs : ctx.ts.rty.membdecl)
 			.back().pty.ty = primtype::_ptype::SYMB;
 	});
-	a.emplace(U"bitsz", [&parser, &ctx, &to_int](ni_t ni, ncs_t) {
+	a.emplace(U"bitsz", [&pr, &ctx, &to_int](ni_t ni, ncs_t) {
 		auto& t = ctx.is_predtype ? ctx.ts.typeargs:ctx.ts.rty.membdecl;
 		t.back().pty.ty = primtype::_ptype::UINT;
 		t.back().pty.bsz = to_int(
-			to_string(to_string_t(parser.flatten(ni))));
+			to_string(to_string_t(pr.flatten(ni))));
 	});
-	a.emplace(U"var", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"var", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		elem e(elem::VAR,
-			dict.get_lexeme(to_string_t(parser.flatten(ni))));
+			dict.get_lexeme(to_string_t(pr.flatten(ni))));
 		if (ctx.is_prefix) ctx.prefixes.back().second = e;
 		else if (ctx.is_type)
 			(ctx.is_predtype ? ctx.ts.typeargs: ctx.ts.rty.membdecl)
 			.back().vars.push_back(e);
 	});
-	a.emplace(U"rule", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"rule", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rr = {};
 		ctx.head = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->r.push_back(ctx.rr);
 	});
-	a.emplace(U"fof", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"fof", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rr = {};
 		ctx.neg = false;
 		ctx.head = true;
 		ctx.is_fof = true;
 		ctx.root = NULL;
-		parser.down(ncs, a);
-		//DBG(print_raw_form_tree(COUT << "earley parsed: ", *ctx.root) << "\n";)
+		pr.down(ncs, a);
+		//DBG(print_raw_form_tree(COUT << "parser parsed: ", *ctx.root) << "\n";)
 		sprawformtree temp(ctx.root);
 		if (temp) ctx.rr.prft = *temp;
 		ctx.rp.back()->r.push_back(ctx.rr);
 	});
-	a.emplace(U"prefix_decl", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"prefix_decl", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.prefixes.emplace_back();
 		ctx.is_prefix = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.is_prefix = false;
 		//for (auto& t : ctx.prefixes)
 		//	COUT << "prefix "<<c++<<": " << t.first << ", " << t.second << "\n";
@@ -319,8 +331,8 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		//DBG(print_raw_form_tree(COUT << "new root: ", *ctx.root) << "\n";)
 		ctx.prefixes.pop_back();
 	});
-	a.emplace(U"prefix", [&parser, &ctx](ni_t ni, ncs_t) {
-		auto s = parser.flatten(ni);
+	a.emplace(U"prefix", [&pr, &ctx](ni_t ni, ncs_t) {
+		auto s = pr.flatten(ni);
 		ctx.prefixes.back().first = elem(s == U"forall" ? elem::FORALL
 			: s == U"exists" ? elem::EXISTS : elem::UNIQUE);
 	});
@@ -340,54 +352,54 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		ctx.root = cur;
 		//DBG(print_raw_form_tree(COUT << "new root: ", *ctx.root) << "\n";)
 	});
-	a.emplace(U"neg_matrix", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
-		parser.down(ncs, a);
+	a.emplace(U"neg_matrix", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
+		pr.down(ncs, a);
 		ctx.root = make_shared<raw_form_tree>(elem::NOT, ctx.root);
 		//DBG(print_raw_form_tree(COUT << "new root: ", *ctx.root) << "\n";)
 	});
-	a.emplace(U"form", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"form", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_prefix = false;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"form1", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"form1", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_prefix = false;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"matrix", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"matrix", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_prefix = false;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 	});
-	a.emplace(U"fact", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"fact", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.head = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->r.push_back(raw_rule(ctx.rt));
 	});
-	a.emplace(U"macro", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"macro", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.is_macro = true;
 		ctx.head = true;
 		ctx.m = {};
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.rp.back()->macros.push_back(ctx.m);
 		ctx.is_macro = false;
 	});
-	a.emplace(U"preds", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
-		parser.down(ncs, a);
+	a.emplace(U"preds", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
+		pr.down(ncs, a);
 		ctx.head = false;
 	});
-	a.emplace(U"pred", [&parser, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"pred", [&pr, &a](ni_t, ncs_t ncs) {
 		bool amb = ncs.size() > 1;
 		for (auto& nc : ncs) for (auto& c : nc)
 			if (!amb || c.first == U"builtin_expr")
-				parser.down(c.second, a);
+				pr.down(c.second, a);
 	});
-	a.emplace(U"negative_term", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"negative_term", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.neg = true;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.neg = false;
 	});
-	a.emplace(U"positive_term", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"positive_term", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rt = {};
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		if (ctx.rt.extype != raw_term::ARITH) ctx.rt.calc_arity(0);
 		ctx.rt.neg = ctx.neg;
 		if (ctx.is_fof && !ctx.head) {
@@ -407,20 +419,20 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 			ctx.rr.b.back().push_back(ctx.rt);
 		}
 	});
-	a.emplace(U"relname", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"relname", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		elem e(elem::SYM, dict.get_lexeme(
-			to_string_t(parser.flatten(ni))));
+			to_string_t(pr.flatten(ni))));
 		if (ctx.is_predtype)   ctx.ts.reln = e;
 		if (ctx.is_directive)  ctx.d.rel   = e;
 		if (ctx.is_production) ctx.p.p.push_back(e);
 		if (ctx.is_prefix)     ctx.prefixes.back().second = e;
 		else ctx.rt.e.push_back(e);
 	});
-	a.emplace(U"builtin_term", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"builtin_term", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rt = {};
 		ctx.rt.extype = raw_term::rtextype::BLTIN;
 		ctx.neg = false;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		if (ctx.rt.extype != raw_term::ARITH)
 			ctx.rt.calc_arity(0);
 		ctx.rt.neg = ctx.neg;
@@ -433,9 +445,9 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 			ctx.rr.b.back().push_back(ctx.rt);
 		}
 	});
-	a.emplace(U"builtin", [&parser, &ctx, this](ni_t ni, ncs_t) {
+	a.emplace(U"builtin", [&pr, &ctx, this](ni_t ni, ncs_t) {
 		ctx.rt.e.emplace_back(elem::BLTIN, dict.get_lexeme(
-			to_string_t(parser.flatten(ni))));
+			to_string_t(pr.flatten(ni))));
 		ctx.rt.e.back().num = ctx.renew << 1 | ctx.forget;
 		ctx.renew = false, ctx.forget = false;
 	});
@@ -445,11 +457,11 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 	a.emplace(U"forget_prefix", [&ctx](ni_t, ncs_t) {
 		ctx.forget = true;
 	});
-	a.emplace(U"arith_expr", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"arith_expr", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rt = {};
 		ctx.rt.neg = false;
 		ctx.rt.extype = raw_term::ARITH;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		elem::etype t = ctx.rt.e[1].type;
 		bool   neq  = t == elem::NEQ,
 			lt  = t == elem::LT,
@@ -473,32 +485,32 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 			ctx.rr.b.back().push_back(ctx.rt);
 		}
 	});
-	a.emplace(U"constraint", [&parser, &ctx, &a](ni_t, ncs_t ncs) {
+	a.emplace(U"constraint", [&pr, &ctx, &a](ni_t, ncs_t ncs) {
 		ctx.rt = {};
 		ctx.rt.neg = false;
 		ctx.rt.extype = raw_term::CONSTRAINT;
-		parser.down(ncs, a);
+		pr.down(ncs, a);
 		ctx.p.c.push_back(ctx.rt);
 	});
-	a.emplace(U"constraint_builtin_name", [&parser, &ctx, this](
+	a.emplace(U"constraint_builtin_name", [&pr, &ctx, this](
 		ni_t ni, ncs_t)
 	{
 		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme(to_string_t(
-			parser.flatten(ni))));
+			pr.flatten(ni))));
 	});
-	a.emplace(U"constraint_arg", [&parser, &ctx, &to_elem](ni_t ni, ncs_t) {
-		ctx.rt.e.push_back(to_elem(U"number", parser.flatten(ni)));
+	a.emplace(U"constraint_arg", [&pr, &ctx, &to_elem](ni_t ni, ncs_t) {
+		ctx.rt.e.push_back(to_elem(U"number", pr.flatten(ni)));
 	});
 	a.emplace(U"pref", [&ctx, this](ni_t, ncs_t) {
 		ctx.rt.e.emplace_back(elem::SYM, dict.get_lexeme("_pref"));
 	});
-	a.emplace(U"priority", [&parser, &ctx, &to_int](ni_t ni, ncs_t) {
+	a.emplace(U"priority", [&pr, &ctx, &to_int](ni_t ni, ncs_t) {
 		ctx.rt.e.emplace_back(to_int(to_string(to_string_t(
-			parser.flatten(ni)))));
+			pr.flatten(ni)))));
 	});
-	a.emplace(U"arith_op", [&parser, &ctx](ni_t ni, ncs_t) {
+	a.emplace(U"arith_op", [&pr, &ctx](ni_t ni, ncs_t) {
 		elem e;
-		auto s = parser.flatten(ni);
+		auto s = pr.flatten(ni);
 		if      (s == U"=")  e = elem(elem::EQ);
 		else if (s == U"!=") e = elem(elem::NEQ);
 		else if (s == U"<=") e = elem(elem::LEQ);
@@ -508,8 +520,8 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 		else return;
 		ctx.rt.e.emplace_back(e);
 	});
-	a.emplace(U"arith_aux_op", [&parser, &ctx, this](ni_t ni, ncs_t) {
-		auto s = parser.flatten(ni);
+	a.emplace(U"arith_aux_op", [&pr, &ctx, this](ni_t ni, ncs_t) {
+		auto s = pr.flatten(ni);
 		if      (s == U"+")  ctx.rt.arith_op = ADD;
 		else if (s == U"-")  ctx.rt.arith_op = SUB;
 		else if (s == U"*")  ctx.rt.arith_op = MULT;
@@ -550,15 +562,18 @@ bool driver::earley_parse_tml(input* in, raw_progs& rps) {
 	a.emplace(U"+", [&ctx](ni_t, ncs_t) {
 		if (ctx.is_production) ctx.p.p.emplace_back(t_arith_op::ADD);
 	});
-	a.emplace(U"elem", [&parser, &ctx, &to_elem](ni_t, ncs_t ncs) {
+	a.emplace(U"elem", [&pr, &ctx, &to_elem](ni_t, ncs_t ncs) {
 		for (auto& nc : ncs) for (auto &c : nc)	ctx.rt.e
-			.push_back(to_elem(c.first, parser.flatten(c.second)));
+			.push_back(to_elem(c.first, pr.flatten(c.second)));
 	});
 
-	parser.print_ambiguity  = opts.enabled("print-ambiguity");
-	parser.print_traversing = opts.enabled("print-traversing");
+	DBG(pr.print_ambiguity = opts.enabled("print-ambiguity");)
+	DBG(pr.print_traversing = opts.enabled("print-traversing");)
 	
-	parser.topdown(U"start", a);
+	pr.topdown(U"start", a);
 
 	return true;
 }
+#endif
+
+} // idni namespace

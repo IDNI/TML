@@ -16,7 +16,10 @@
 #include "dict.h"
 #include "input.h"
 #include "output.h"
+
 using namespace std;
+
+namespace idni {
 
 //#define L2
 #ifdef L2
@@ -28,9 +31,6 @@ using namespace std;
 typedef tuple<size_t, size_t, size_t, int_t, uint_t, uint_t> alumemo;
 map<alumemo, spbdd_handle> carrymemo;
 map<alumemo, spbdd_handle> addermemo;
-
-extern uints perm_init(size_t n);
-
 map<term, spbdd_handle> cs_addermemo;
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -125,10 +125,10 @@ spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 		uint_t b, spbdd_handle r) const {
 	if (b == 1) return bdd_handle::F;
 	return bdd_ite(full_addder_carry(var0, var1, n_vars, b-1, r),
-					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-							bdd_handle::T, ::from_bit(pos(b, var1, n_vars),true)),
-					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-							::from_bit(pos(b, var1, n_vars),true), bdd_handle::F));
+					bdd_ite(idni::from_bit(pos(b, var0, n_vars),true),
+							bdd_handle::T, idni::from_bit(pos(b, var1, n_vars),true)),
+					bdd_ite(idni::from_bit(pos(b, var0, n_vars),true),
+							idni::from_bit(pos(b, var1, n_vars),true), bdd_handle::F));
 }
 #else
 spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
@@ -138,7 +138,7 @@ spbdd_handle tables::full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 				::from_bit(pos(b, var1, n_vars),true), bdd_handle::F);
 	return bdd_ite(full_addder_carry(var0, var1, n_vars, b-1, r),
 					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-							bdd_handle::T, ::from_bit(pos(b, var1, n_vars),true)),
+							bdd_handle::T, idni::from_bit(pos(b, var1, n_vars),true)),
 					bdd_ite(::from_bit(pos(b, var0, n_vars),true),
 							::from_bit(pos(b, var1, n_vars),true), bdd_handle::F));
 }
@@ -148,17 +148,17 @@ spbdd_handle tables::full_adder(size_t var0, size_t var1, size_t n_vars,
 		uint_t b) const {
 #ifndef TYPE_RESOLUTION
 	if (b < 2)
-		return ::from_bit( pos(b, var0, n_vars),true)
-				&& ::from_bit( pos(b, var1, n_vars),true);
+		return idni::from_bit( pos(b, var0, n_vars),true)
+				&& idni::from_bit( pos(b, var1, n_vars),true);
 	else if (b == 2)
-		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-									::from_bit(pos(b, var1, n_vars),false),
-									::from_bit(pos(b, var1, n_vars),true));
+		return bdd_ite(idni::from_bit(pos(b, var0, n_vars),true),
+			idni::from_bit(pos(b, var1, n_vars),false),
+			idni::from_bit(pos(b, var1, n_vars),true));
 #else
 	if (b == 0)
 		return bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-								::from_bit(pos(b, var1, n_vars),false),
-								::from_bit(pos(b, var1, n_vars),true));
+			idni::from_bit(pos(b, var1, n_vars),false),
+			idni::from_bit(pos(b, var1, n_vars),true));
 
 #endif
 
@@ -166,12 +166,12 @@ spbdd_handle tables::full_adder(size_t var0, size_t var1, size_t n_vars,
 	carry = full_addder_carry(var0, var1, n_vars, b-1, carry);
 	return bdd_ite(
 			carry,
-			bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-					::from_bit(pos(b, var1, n_vars),true),
-					::from_bit(pos(b, var1, n_vars),false)),
-			bdd_ite(::from_bit(pos(b, var0, n_vars),true),
-					::from_bit( pos(b, var1, n_vars),false),
-					::from_bit( pos(b, var1, n_vars),true))
+			bdd_ite(idni::from_bit(pos(b, var0, n_vars),true),
+					idni::from_bit(pos(b, var1, n_vars),true),
+					idni::from_bit(pos(b, var1, n_vars),false)),
+			bdd_ite(idni::from_bit(pos(b, var0, n_vars),true),
+					idni::from_bit( pos(b, var1, n_vars),false),
+					idni::from_bit( pos(b, var1, n_vars),true))
 			);
 }
 
@@ -182,19 +182,19 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 	for (size_t b = 0; b != bits; ++b) {
 		spbdd_handle fa = bdd_handle::T;
 		if (b == 0) {
-			fa = ::from_bit(pos(b, var0, n_vars),false) &&
-					::from_bit(pos(b, var1, n_vars),false);
-			r = fa && ::from_bit(pos(b, var2, n_vars),false);
+			fa = idni::from_bit(pos(b, var0, n_vars),false) &&
+					idni::from_bit(pos(b, var1, n_vars),false);
+			r = fa && idni::from_bit(pos(b, var2, n_vars),false);
 		}
 		else if (b == 1) {
-			fa = ::from_bit(pos(b, var0, n_vars),true) &&
-					::from_bit(pos(b, var1, n_vars),true);
-			r = r && fa && ::from_bit(pos(b, var2, n_vars),true);
+			fa = idni::from_bit(pos(b, var0, n_vars),true) &&
+					idni::from_bit(pos(b, var1, n_vars),true);
+			r = r && fa && idni::from_bit(pos(b, var2, n_vars),true);
 		}
 		else {
 			fa = full_adder( var0, var1, n_vars , b);
-			r = r && bdd_ite(fa , ::from_bit(pos(b, var2, n_vars), true),
-				::from_bit(pos(b, var2, n_vars), false));
+			r = r && bdd_ite(fa, idni::from_bit(pos(b, var2, n_vars), true),
+				idni::from_bit(pos(b, var2, n_vars), false));
 		}
 	}
  	return r;
@@ -205,7 +205,7 @@ spbdd_handle tables::add_var_eq(size_t var0, size_t var1, size_t var2,
 	spbdd_handle r = bdd_handle::T;
 	for (size_t b = 0; b != bits; ++b) {
 		spbdd_handle fa = full_adder( var0, var1, n_vars , b);
-		r = r && bdd_ite(fa, ::from_bit(pos(b, var2, n_vars), true),
+		r = r && bdd_ite(fa, idni::from_bit(pos(b, var2, n_vars), true),
 				::from_bit(pos(b, var2, n_vars), false));
 	}
  	return r;
@@ -233,10 +233,10 @@ spbdd_handle tables::add_ite_carry(size_t var0, size_t var1, size_t n_vars,
 	else {
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
 #ifndef TYPE_RESOLUTION
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true) &&
-				::from_bit(pos(i-j+2, var1, n_vars),true);
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true) &&
+				idni::from_bit(pos(i-j+2, var1, n_vars),true);
 #else
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true) &&
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true) &&
 					::from_bit(pos(i-j, var1, n_vars),true);
 #endif
 		if (i == j) {
@@ -263,29 +263,29 @@ spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 		r = add_ite_carry(var0, var1, n_vars,i-1,j);
 	}
 	else if (i == 2 || j == 2) {
-			r = ::from_bit(pos(j, var0, n_vars),true) &&
-					::from_bit(pos(i, var1, n_vars),true);
+			r = idni::from_bit(pos(j, var0, n_vars),true) &&
+				idni::from_bit(pos(i, var1, n_vars),true);
 	}
 	else if (i == j) {
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
-				&& ::from_bit(pos(i-j+2, var1, n_vars),true);
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true)
+				&& idni::from_bit(pos(i-j+2, var1, n_vars),true);
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
 		r =  bdd_xor(bit, acc_i);
 	}
 	else  { //(i != j)
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
-				&& ::from_bit(pos(i-j+2, var1, n_vars),true);
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true)
+				&& idni::from_bit(pos(i-j+2, var1, n_vars),true);
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
 		spbdd_handle carry_ij = add_ite_carry(var0, var1, n_vars,i-1,j);
 		spbdd_handle bout =
-				bdd_ite( bit ,
-						bdd_ite(acc_i ,
-								bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F),
-								bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T)),
-						bdd_ite(acc_i ,
-								bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T),
-								bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F))
-					);
+			bdd_ite(bit,
+				bdd_ite(acc_i,
+					bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F),
+					bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T)),
+				bdd_ite(acc_i,
+					bdd_ite(carry_ij, bdd_handle::F, bdd_handle::T),
+					bdd_ite(carry_ij, bdd_handle::T, bdd_handle::F))
+			);
 		r =  bout;
 	}
 	return addermemo.emplace(x, r), r;
@@ -294,20 +294,20 @@ spbdd_handle tables::mul_var_eq(size_t var0, size_t var1, size_t var2,
 			size_t n_vars) {
 
 	spbdd_handle r = bdd_handle::T;
-	r = r && ::from_bit(pos(0, var0, n_vars),false) &&
-			 ::from_bit(pos(0, var1, n_vars),false) &&
-			 ::from_bit(pos(0, var2, n_vars),false);
-	r = r && ::from_bit(pos(1, var0, n_vars),true) &&
-			 ::from_bit(pos(1, var1, n_vars),true) &&
-			 ::from_bit(pos(1, var2, n_vars),true);
+	r = r && idni::from_bit(pos(0, var0, n_vars),false) &&
+			idni::from_bit(pos(0, var1, n_vars),false) &&
+			idni::from_bit(pos(0, var2, n_vars),false);
+	r = r && idni::from_bit(pos(1, var0, n_vars),true) &&
+			idni::from_bit(pos(1, var1, n_vars),true) &&
+			idni::from_bit(pos(1, var2, n_vars),true);
 
 	for (size_t b = 2; b < bits; ++b) {
 		spbdd_handle acc_bit = bdd_handle::F;
 		acc_bit = add_ite(var0, var1, n_vars, b, b);
 		//equality
 		r = r && bdd_ite(acc_bit ,
-				::from_bit(pos(b, var2, n_vars), true),
-				::from_bit(pos(b, var2, n_vars), false));
+			idni::from_bit(pos(b, var2, n_vars), true),
+			idni::from_bit(pos(b, var2, n_vars), false));
 	}
 	return r;
 }
@@ -315,29 +315,29 @@ spbdd_handle tables::mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 		size_t var3, size_t n_vars) {
 
 	spbdd_handle r = bdd_handle::T;
-	r = r && ::from_bit(pos(0, var0, n_vars),false) &&
-			 ::from_bit(pos(0, var1, n_vars),false) &&
-			 ::from_bit(pos(0, var2, n_vars),false) &&
-			 ::from_bit(pos(0, var3, n_vars),false);
-	r = r && ::from_bit(pos(1, var0, n_vars),true) &&
-			 ::from_bit(pos(1, var1, n_vars),true) &&
-			 ::from_bit(pos(1, var2, n_vars),true) &&
-			 ::from_bit(pos(1, var3, n_vars),true);
+	r = r && idni::from_bit(pos(0, var0, n_vars),false) &&
+			idni::from_bit(pos(0, var1, n_vars),false) &&
+			idni::from_bit(pos(0, var2, n_vars),false) &&
+			idni::from_bit(pos(0, var3, n_vars),false);
+	r = r && idni::from_bit(pos(1, var0, n_vars),true) &&
+			idni::from_bit(pos(1, var1, n_vars),true) &&
+			idni::from_bit(pos(1, var2, n_vars),true) &&
+			idni::from_bit(pos(1, var3, n_vars),true);
 	for (size_t b = 2; b < bits; ++b) {
 		spbdd_handle acc_bit = bdd_handle::F;
 		acc_bit = add_ite(var0, var1, n_vars, b, b);
 		//equality
 		r = r && bdd_ite(acc_bit ,
-				::from_bit(pos(b, var3, n_vars), true),
-				::from_bit(pos(b, var3, n_vars), false));
+			idni::from_bit(pos(b, var3, n_vars), true),
+			idni::from_bit(pos(b, var3, n_vars), false));
 	}
 	for (size_t b = 2; b < bits; ++b) {
 		spbdd_handle acc_bit = bdd_handle::F;
 		acc_bit = add_ite(var0, var1, n_vars, bits + (b-2) , bits-1);
 		//equality
 		r = r && bdd_ite(acc_bit ,
-				::from_bit(pos(b, var2, n_vars), true),
-				::from_bit(pos(b, var2, n_vars), false));
+			idni::from_bit(pos(b, var2, n_vars), true),
+			idni::from_bit(pos(b, var2, n_vars), false));
 	}
 	return r;
 }
@@ -355,18 +355,18 @@ spbdd_handle tables::add_ite(size_t var0, size_t var1, size_t n_vars, uint_t i,
 		r = add_ite_carry(var0, var1, n_vars,i-1,j);
 	}
 	else if (i == 0 || j == 0) {
-			r = ::from_bit(pos(j, var0, n_vars),true) &&
+			r = idni::from_bit(pos(j, var0, n_vars),true) &&
 					::from_bit(pos(i, var1, n_vars),true);
 	}
 	else if (i == j) {
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
-				&& ::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true)
+				&& idni::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
 		r =  bdd_xor(bit, acc_i);
 	}
 	else  { //(i != j)
-		spbdd_handle bit = ::from_bit(pos(j, var0, n_vars),true)
-				&& ::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
+		spbdd_handle bit = idni::from_bit(pos(j, var0, n_vars),true)
+				&& idni::from_bit(pos(i-j/*+2*/, var1, n_vars),true);
 		spbdd_handle acc_i = add_ite(var0, var1, n_vars, i, j-1);
 		spbdd_handle carry_ij = add_ite_carry(var0, var1, n_vars,i-1,j);
 		spbdd_handle bout =
@@ -454,10 +454,10 @@ spbdd_handle tables::shr(size_t var0, size_t n, size_t var2, size_t n_vars) {
 		}
 		s = s^perm1;
 		for (size_t i = 0; i < n; i++)
-			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
+			s = s && idni::from_bit(pos(bits-1-i, var2, n_vars), false);
 	} else {
 		for (size_t i = 0; i < pb; i++)
-			s = s && ::from_bit(pos(bits-1-i, var2, n_vars), false);
+			s = s && idni::from_bit(pos(bits-1-i, var2, n_vars), false);
 	}
 #ifndef TYPE_RESOLUTION
 	return s && constrain_to_num(var0, n_vars) &&
@@ -499,16 +499,16 @@ spbdd_handle tables::shl(size_t var0, size_t n, size_t var2,
 		s = s^perm1;
 		for(size_t i = 0; i < n; i++)
 			#ifndef TYPE_RESOLUTION
-			s = s && ::from_bit(pos(i+2, var2, n_vars), false);
+			s = s && idni::from_bit(pos(i+2, var2, n_vars), false);
 			#else
-			s = s && ::from_bit(pos(i, var2, n_vars), false);
+			s = s && idni::from_bit(pos(i, var2, n_vars), false);
 			#endif
 	} else {
 		for (size_t i = 0; i < pb; i++)
 			#ifndef TYPE_RESOLUTION
-		    s = s && ::from_bit(pos(i+2, var2, n_vars), false);
+		    s = s && idni::from_bit(pos(i+2, var2, n_vars), false);
 			#else
-			s = s && ::from_bit(pos(i, var2, n_vars), false);
+			s = s && idni::from_bit(pos(i, var2, n_vars), false);
 			#endif
 	}
 #ifndef TYPE_RESOLUTION
@@ -614,8 +614,8 @@ spbdd_handle tables::bitwise_handler(size_t in0_varid, size_t in1_varid, size_t 
 	}
 	x = perm_from_to(2, out_varid, x, pb, n_vars);
 #ifndef TYPE_RESOLUTION
-	x = x && ::from_bit(pos(1, out_varid, n_vars),true) &&
-			::from_bit(pos(0, out_varid, n_vars),false);
+	x = x && idni::from_bit(pos(1, out_varid, n_vars),true) &&
+		idni::from_bit(pos(0, out_varid, n_vars),false);
 #endif
 	return x;
 }
@@ -646,8 +646,8 @@ spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t
 	x = perm_bit_reverse( x, pb, n_vars);
 	x = perm_from_to(2, out_varid, x, pb, n_vars);
 #ifndef TYPE_RESOLUTION
-	x = x && ::from_bit(pos(1, out_varid, n_vars),true) &&
-			::from_bit(pos(0, out_varid, n_vars),false);
+	x = x && idni::from_bit(pos(1, out_varid, n_vars),true) &&
+		idni::from_bit(pos(0, out_varid, n_vars),false);
 #endif
 	return x;
 }
@@ -693,7 +693,7 @@ void tables::ex_typebits(bools &exvec, size_t nvars) const {
 
 void tables::append_num_typebits(spbdd_handle &s, size_t nvars) const {
 	for (size_t j = 0; j < nvars; ++j)
-		s = s && ::from_bit(pos(1, j, nvars),1) && ::from_bit(pos(0, j, nvars),0);
+		s = s && idni::from_bit(pos(1, j, nvars),1) && idni::from_bit(pos(0, j, nvars),0);
 }
 //-----------------------------------------------------------------------------
 void tables::handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh) {
@@ -783,7 +783,7 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			#endif
 		}
 		else {
-			p0->cons =  bdd_ite(::from_bit(0,true), bdd_handle::T, bdd_handle::F);
+			p0->cons = bdd_ite(idni::from_bit(0,true), bdd_handle::T, bdd_handle::F);
 			uints perm = get_perm(*f->tm, vm, vm.size());
 			p0->cons  = p0->cons^perm;
 			#ifndef TYPE_RESOLUTION
@@ -1149,3 +1149,5 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	}
 	else fol_query(f,v);
 }
+
+} // idni namespace

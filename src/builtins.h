@@ -16,6 +16,8 @@
 #include "dict.h"
 #include "input.h"
 
+namespace idni {
+
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
 typedef std::pair<bool, bdd_handles> blt_cache_value;
 typedef std::map<blt_cache_key, blt_cache_value> blt_cache;
@@ -128,4 +130,5 @@ struct builtins : std::map<int_t, builtins_pair> {
 	bool is_builtin(int_t id) const { return find(id) != end(); }
 };
 
+} // idni namespace
 #endif

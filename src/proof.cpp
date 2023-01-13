@@ -13,8 +13,11 @@
 #include "tables.h"
 #include "input.h"
 #include "output.h"
+#include "printing.h"
 
 using namespace std;
+
+namespace idni {
 
 /* Ensure that the current variable instantiations are legal. Needed for proving
  * negative facts by showing that no variable instantiation would satisfy rules
@@ -373,3 +376,5 @@ gnode* tables::get_forest(const term& t, proof& p ) {
 	}
 	return root;
 }
+
+} // idni namespace

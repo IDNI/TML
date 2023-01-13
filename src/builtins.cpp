@@ -11,7 +11,10 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "tables.h"
+
 using namespace std;
+
+namespace idni {
 
 size_t blt_ctx::varpos(size_t arg) const { return a->vm.at(g[arg]); }
 
@@ -57,3 +60,4 @@ void builtins::run(blt_ctx& c, bool ishead) {
 		cache.emplace(k, blt_cache_value(true, c.outs));
 }
 
+} // idni namespace

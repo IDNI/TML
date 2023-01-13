@@ -16,7 +16,7 @@
 
 using namespace std;
 
-extern uints perm_init(size_t n);
+namespace idni {
 
 void tables::fact_builtin(const term& b) {
 	blt_ctx c(b);
@@ -184,9 +184,9 @@ bool tables::init_bdd_builtins() {
 			if (c.t[0] >= 0 || c.t[1] >= 0) {
 				for (size_t i = 0; i < c.t.size(); ++i) {
 					if (c.t[i] >= 0 && i % 2 == 0)
-						const0 = const0 && ::from_bit(arg0_w-(i>>1) , c.t[i] == 1);
+						const0 = const0 && idni::from_bit(arg0_w-(i>>1) , c.t[i] == 1);
 					else if (c.t[i] >= 0 && i % 2 == 1)
-						const1 = const1 && ::from_bit(arg0_w+arg1_w-(i>>1)-1, c.t[i] == 1);
+						const1 = const1 && idni::from_bit(arg0_w+arg1_w-(i>>1)-1, c.t[i] == 1);
 				}
 			}
 
@@ -338,3 +338,5 @@ bool tables::init_js_builtins() {
 #endif
 	return true;
 }
+
+} // idni namespace

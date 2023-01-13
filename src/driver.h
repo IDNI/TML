@@ -18,17 +18,15 @@
 #ifdef WITH_Z3
 #include "z3++.h"
 #endif
+#include "printing.h"
+#include "dict.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #endif
-#include "tables.h"
-#include "input.h"
-#include "dict.h"
-#include "output.h"
-#include "options.h"
-#include "printing.h"
+
+namespace idni {
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
@@ -187,9 +185,12 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
-	// following 2 methods are defined in a file tml_earley.cpp
-	bool earley_parse_tml(input* in, raw_progs& rps);
+	// following methods are defined in a file tml_earley.cpp
+#ifdef NEEDS_REWRITE
+	bool parse_tml(input* in, flat_prog& fp);
+	bool parse_tml_old(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();
+#endif
 
 	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
@@ -318,14 +319,15 @@ extern driver* drv;
 //template <typename T>
 //std::basic_ostream<T>& printdb(std::basic_ostream<T>& os, lp *p);
 template <typename T>
-std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t,
-	size_t bits, ints ar, int_t rel);
+std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os,
+	idni::cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
 template <typename T>
-std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
-	size_t bits, ints ar, int_t rel);
+std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os,
+	idni::cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
 //template <typename T>
-//std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t, size_t bits, ints ar,
-//	int_t rel);
+//std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, size_t t,
+//	size_t bits, ints ar, int_t rel);
 #endif
 
+} // idni namespace
 #endif

@@ -21,11 +21,28 @@
 #include "typemanager.h"
 
 using namespace std;
+using namespace idni;
+
+namespace idni {
 
 int_t raw_prog::last_id = 0;
 bool raw_prog::require_guards = false;
 bool raw_prog::require_state_blocks = false;
 bool raw_term::require_fp_step = false;
+
+bool isalpha(const char_t* s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return ::isalpha(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alpha
+}
+
+bool isalnum(const char_t* s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return ::isalnum(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
+}
 
 input::input(string f, bool ns) : type_(FILE), newseq(ns), mm_(f),
 	beg_((ccs)(mm_.data())), data_(beg_), size_(mm_.size()),
@@ -48,9 +65,9 @@ input::~input() {
 	if (allocated_) free((void*)beg_);
 }
 
-lexeme input::lex(pccs s) {
+lexeme input::lex(ccs* s) {
 #define PE(pe) ((pe), lexeme{ 0, 0 })
-	while (isspace(**s)) ++*s;
+	while (::isspace(**s)) ++*s;
 	if (!**s) return { 0, 0 };
 	ccs t = *s;
 	if (!strncmp(*s, "/*", 2)) {
@@ -115,12 +132,13 @@ lexeme input::lex(pccs s) {
 		return { t, (*s += 2 + chl) };
 	}
 
-	if (strchr("!~.,;(){}[]$@=<>|&^+*-:/", **s)) return ++*s,lexeme{*s-1,*s};
+	if (strchr("!~.,;(){}[]$@=<>|&^+*-:/", **s))
+		return ++*s, lexeme{ *s-1, *s };
 	if (strchr("?", **s)) ++*s;
 	size_t chl, maxs = size_ - (*s - beg_);
-	if (!is_alnum(*s, maxs, chl) && **s != '_')
+	if (!isalnum(*s, maxs, chl) && **s != '_')
 		return PE(parse_error(*s, err_chr));
-	while (**s && (is_alnum(*s, maxs, chl) || **s == '_')) *s += chl;
+	while (**s && (isalnum(*s, maxs, chl) || **s == '_')) *s += chl;
 	return { t, *s };
 #undef PE
 }
@@ -139,7 +157,7 @@ int_t input::get_int_t(ccs from, ccs to) {
 	bool neg = false;
 	if (*from == '-') neg = true, ++from;
 	for (ccs s = from; s != to; ++s)
-		if (!isdigit(*s)) parse_error(from, err_int);
+		if (!::isdigit(*s)) parse_error(from, err_int);
 	string s((const char*) from, to - from);
 #ifdef WITH_EXCEPTIONS
 	try {
@@ -148,7 +166,7 @@ int_t input::get_int_t(ccs from, ccs to) {
 #ifdef WITH_EXCEPTIONS
 	} catch (...) { parse_error(from, err_int); }
 #else
-	if (s != to_string_(r)) parse_error(from, err_int);
+	if (s != to_string(r)) parse_error(from, err_int);
 #endif
 	return neg ? -r : r;
 }
@@ -331,6 +349,19 @@ elem::etype elem::peek(input* in) {
 	return type;
 }
 
+int_t hex_to_int_t(ccs str, size_t len) {
+	int_t c = 1, val = 0;
+	for (int_t i = len - 1; i >= 0; --i)
+		if      (str[i] >= '0' && str[i] <= '9')
+			(val += (str[i] - 48) * c), c *= 16;
+		else if (str[i] >= 'A' && str[i] <= 'F')
+			(val += (str[i] - 55) * c), c *= 16;
+		else if (str[i] >= 'a' && str[i] <= 'f')
+			(val += (str[i] - 87) * c), c *= 16;
+		else return -1;
+	return val;
+}
+
 bool elem::parse(input* in) {
 	const lexemes& l = in->l;
 	size_t& pos = in->pos;
@@ -382,7 +413,7 @@ bool elem::parse(input* in) {
 	if ('<' == l[pos][0][0] && '<' == l[pos][0][1])
 		return e = l[pos++], type = ARITH, arith_op = SHL, true;
 
-	if (!is_alnum(l[pos][0], l[pos][1]-l[pos][0], chl) && *l[pos][0]!='_' &&
+	if (!isalnum(l[pos][0], l[pos][1]-l[pos][0], chl) && *l[pos][0]!='_' &&
 		!strchr("\"`'?", *l[pos][0])) return false;
 	if (e = l[pos], *l[pos][0] == '\'') {
 		type = CHR;
@@ -408,7 +439,7 @@ bool elem::parse(input* in) {
 		else chl = peek_codepoint(l[pos][0]+1,l[pos][1]-l[pos][0]-2,ch);
 	}
 	else if (*l[pos][0] == '?') type = VAR;
-	else if (is_alpha(l[pos][0], l[pos][1]-l[pos][0], chl) ||
+	else if (isalpha(l[pos][0], l[pos][1]-l[pos][0], chl) ||
 		*l[pos][0] == '_')
 	{
 		size_t len = l[pos][1]-l[pos][0];
@@ -1215,12 +1246,6 @@ bool operator==(const signature& m, const signature &n) {
 	return m.first == n.first && m.second == n.second;
 }
 
-bool less<signature>::operator()(const signature& m, const signature &n) const {
-	return less<lexeme>()(m.first, n.first) ||
-		(equal_to<lexeme>()(m.first, n.first) &&
-		less<ints>()(m.second, n.second));
-}
-
 bool operator<(const signature& m, const signature &n) {
 	return less<signature>()(m, n);
 }
@@ -1525,4 +1550,66 @@ bool typestmt::parse(input* in, const raw_prog& prog) {
 	}
 	FAIL:
 	return pos=curr, false;
+}
+
+unsigned char *strdup(const unsigned char *src) {
+	return reinterpret_cast<unsigned char*>(
+		::strdup(reinterpret_cast<const char *>(src)));
+}
+size_t strlen(const unsigned char *src) {
+	return ::strlen(reinterpret_cast<const char *>(src));
+}
+unsigned char* strcpy(unsigned char* dst, const unsigned char* src) {
+	return reinterpret_cast<unsigned char *>(
+		::strcpy(reinterpret_cast<char *>(dst),
+			reinterpret_cast<const char *>(src)));
+}
+int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num) {
+	return ::strncmp(reinterpret_cast<const char *>(str1),
+		reinterpret_cast<const char *>(str2), num);
+}
+int strncmp(const unsigned char* str1, const char* str2, size_t num) {
+	return ::strncmp(reinterpret_cast<const char*>(str1), str2, num);
+}
+int strcmp(const unsigned char* str1, const char* str2) {
+	return ::strcmp(reinterpret_cast<const char *>(str1), str2);
+}
+
+/* Compare lexemes by their character content rather than by memory
+ * locations. */
+bool operator==(const lexeme& x, const lexeme& y) {
+	return x[1] - x[0] == y[1] - y[0] && !strncmp(x[0], y[0], x[1] - x[0]);
+}
+bool operator<(const lexeme& m, const lexeme &n) {
+	return less<lexeme>()(m, n);
+}
+bool operator==(const lexeme& l, const string& s) {
+	if ((size_t) (l[1] - l[0]) != s.size()) return false;
+	return !strncmp(l[0], s.c_str(), l[1] - l[0]);
+}
+bool operator==(const lexeme& l, const char* s) {
+	size_t n = ::strlen(s);
+	return (size_t) (l[1] - l[0]) != n
+		? false : !strncmp(l[0], s, n);
+}
+bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
+	if (x[1]-x[0] != y[1]-y[0]) return x[1]-x[0] < y[1]-y[0];
+	for (size_t n = 0; n != (size_t)(x[1]-x[0]); ++n)
+		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
+	return false;
+}
+
+} // idni namespace
+
+bool less<signature>::operator()(const signature& m, const signature &n) const {
+	return less<lexeme>()(m.first, n.first) ||
+		(equal_to<lexeme>()(m.first, n.first) &&
+		less<ints>()(m.second, n.second));
+}
+bool less<lexeme>::operator()(const lexeme& m, const lexeme &n) const {
+	return lexeme2str(m) < lexeme2str(n);
+}
+size_t hash<lexeme>::operator()(const lexeme& m) const {
+	string_t str = lexeme2str(m);
+	return hash<string>()(string(str.begin(), str.end()));
 }

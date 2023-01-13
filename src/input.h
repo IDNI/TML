@@ -24,7 +24,18 @@
 
 #include "defs.h"
 #include "dict.h"
-#include "memory_map.h"
+#include "../lib/bdd/src/memory_map.h"
+#include "../lib/parser/src/characters.h"
+
+namespace idni {
+
+// str...(const char*) -like functions for const unsigned char* (utf8 string) 
+unsigned char* strdup(const unsigned char* src);
+size_t strlen(const unsigned char *src);
+unsigned char* strcpy(unsigned char* dst, const unsigned char* src);
+int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num);
+int strncmp(const unsigned char* str1, const char* str2, size_t num);
+int strcmp(const unsigned char* str1, const char* str2);
 
 /**
  * input class contains input data. input can be one of three types: STDIN,
@@ -65,8 +76,10 @@ struct input {
 	 * @param ns - set ns true for making the input a new prog sequence
 	 */
 	input(ccs s, bool ns = false) : type_(STRING), newseq(ns),
-		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true)
-	{	//COUT << "created string input *: " << s << std::endl;
+		beg_(idni::strdup(s)), data_(beg_), size_(idni::strlen(beg_)),
+		allocated_(true)
+	{
+		//COUT << "created string input *: " << s << std::endl;
 	}
 	/**
 	 * FILE input constructor
@@ -83,7 +96,7 @@ struct input {
 	 * @param s - pointer to the input data
 	 * @return scanned lexeme
 	 */
-	lexeme lex(pccs s);
+	lexeme lex(ccs* s);
 	/**
 	 * scans input's data for lexemes
 	 * @return scanned lexemes
@@ -146,7 +159,7 @@ struct input {
 	static off_t fsize(const char *fname);
 	static off_t fsize(ccs s, size_t len);
 private:
-	memory_map mm_;
+	idni::memory_map mm_;
 	ccs beg_  = 0;
 	ccs data_ = 0;
 	size_t size_ = 0;
@@ -155,7 +168,7 @@ private:
 	std::unique_ptr<input> next_ = 0;
 	size_t load_stdin() {
 		ostringstream_t ss; ss << CIN.rdbuf();
-		beg_ = (ccs) strdup((ws2s(ss.str())).c_str()),
+		beg_ = (ccs) ::strdup((ws2s(ss.str())).c_str()),
 		data_ = beg_,
 		allocated_ = true;
 		return ss.str().size();
@@ -238,6 +251,7 @@ struct elem {
 	char32_t ch = 0;
 	elem() {};
 	elem(int_t num) : type(NUM), num(num) {}
+	elem(size_t num) : elem((int_t) num) {}
 	elem(char32_t ch) : type(CHR), ch(ch) {}
 	elem(etype type) : type(type) {
 		switch(type) {
@@ -291,7 +305,7 @@ struct elem {
 		if (type == NUM) return num < t.num;
 		if (type == CHR) return ch < t.ch;
 		if (e[1]-e[0] != t.e[1]-t.e[0]) return e[1]-e[0]<t.e[1]-t.e[0];
-		return strncmp(e[0], t.e[0], e[1]-e[0]) < 0;
+		return idni::strncmp(e[0], t.e[0], e[1]-e[0]) < 0;
 	}
 	bool operator==(const elem& t) const {
 		if (type != t.type) return false;
@@ -326,8 +340,12 @@ struct elem {
 typedef std::pair<lexeme, ints> signature;
 bool operator<(const signature& m, const signature &n);
 bool operator==(const signature& m, const signature &n);
-template<> struct std::less<signature> {bool operator()(const signature&, const signature&)const;};
+}
+template<> struct std::less<idni::signature> {
+	bool operator()(const idni::signature&, const idni::signature&) const;
+};
 // -->
+namespace idni {
 
 enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
 struct raw_term;
@@ -914,5 +932,14 @@ std::basic_ostream<T>& print_raw_rule(std::basic_ostream<T>& os,
 	const raw_rule& r, size_t level);
 
 bool operator<(const raw_rule& x, const raw_rule& y);
+
+} // idni namespace
+
+template<> struct std::hash<idni::lexeme> {
+	size_t operator()(const idni::lexeme&) const;
+};
+template<> struct std::less<idni::lexeme> {
+	bool operator()(const idni::lexeme&, const idni::lexeme&) const;
+};
 
 #endif

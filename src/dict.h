@@ -16,6 +16,8 @@
 #include <map>
 #include <functional>
 
+namespace idni {
+
 class inputs;
 class dict_t {
 	typedef std::map<lexeme, int_t, lexcmp> dictmap;
@@ -74,4 +76,5 @@ public:
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const dict_t& d);
 
+} // idni namespace
 #endif // __DICT_H__

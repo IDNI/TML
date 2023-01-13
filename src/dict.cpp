@@ -15,7 +15,10 @@
 #include "dict.h"
 #include "err.h"
 #include "input.h"
+
 using namespace std;
+
+namespace idni {
 
 dict_t::dict_t() {}
 dict_t::~dict_t() { for (auto x : strs_allocated) free((char *)x); }
@@ -52,23 +55,23 @@ int_t dict_t::get_bltin(const lexeme& l) {
 
 int_t dict_t::get_new_sym() {
 	static int_t cnt = 0;
-	return get_sym(get_lexeme( "0s" + to_string_(++cnt) ));
+	return get_sym(get_lexeme( "0s" + to_string(++cnt) ));
 }
 
 int_t dict_t::get_new_var() {
 	static int_t cnt = 0;
-	return get_var(get_lexeme("?0v" + to_string_(++cnt)));
+	return get_var(get_lexeme("?0v" + to_string(++cnt)));
 }
 
 int_t dict_t::get_new_rel() {
 	static int_t cnt = 0;
-	string n = "0r" + to_string_(++cnt);
+	string n = "0r" + to_string(++cnt);
 	int_t nidx = get_rel(get_lexeme(n));
 	return nidx;
 	//TODO: add check for pre existing rel ?
 	//size_t sz;
 	//lexeme l;
-	//retry: sz = rels.size(), l = get_lexeme(s + to_string_(last));
+	//retry: sz = rels.size(), l = get_lexeme(s + to_string(last));
 	//rels.insert(l);
 	//if (rels.size() == sz) { ++last; goto retry; }
 	//return get_rel(l);
@@ -85,7 +88,7 @@ lexeme dict_t::get_lexeme(ccs w, size_t l) {
 	if (l == (size_t)-1) l = strlen(w);
 	auto it = strs_extra.find({ w, w + l });
 	if (it != strs_extra.end()) return *it;
-	cstr r = strdup(w);
+	char_t* r = strdup(w);
 	strs_allocated.push_back(r);
 	lexeme lx = { r, r + l };
 	strs_extra.insert(lx);
@@ -110,7 +113,7 @@ int_t dict_t::get_temp_sym(const lexeme& l) {
 
 int_t dict_t::get_fresh_temp_sym() {
 	static int_t counter = 0;
-	std::string fresh = "0tf" + to_string_(++counter);
+	std::string fresh = "0tf" + to_string(++counter);
 	int_t fresh_int = get_temp_sym(get_lexeme(fresh));
 	return fresh_int;
 }
@@ -119,3 +122,4 @@ lexeme dict_t::get_temp_sym(int_t t) const {
 	return temp_syms[t-1];
 }
 
+} // idni namespace

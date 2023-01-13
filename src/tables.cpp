@@ -21,7 +21,11 @@
 #include "dict.h"
 #include "input.h"
 #include "output.h"
+#include "printing.h"
+
 using namespace std;
+
+namespace idni {
 
 typedef tuple<size_t, size_t, size_t, int_t> skmemo;
 typedef tuple<size_t, size_t, size_t, int_t> ekmemo;
@@ -59,9 +63,8 @@ void getvars(const vector<term>& t, set<int_t>& v) {
 spbdd_handle tables::leq_const(int_t c, size_t arg, size_t args, size_t bit)
 	const
 {
-	if (!--bit)
-		return	(c & 1) ? htrue :
-			::from_bit(pos(0, arg, args), false);
+	if (!--bit) return (c & 1) ? htrue :
+		idni::from_bit(pos(0, arg, args), false);
 	return (c & (1 << bit)) ?
 		bdd_ite_var(pos(bit, arg, args), leq_const(c, arg, args, bit),
 			htrue) :
@@ -82,20 +85,14 @@ spbdd_handle tables::leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 	const
 {
 	if (!--bit)
-		return	bdd_ite(::from_bit(pos(0, arg2, args), true),
+		return	bdd_ite(idni::from_bit(pos(0, arg2, args), true),
 				htrue,
-				::from_bit(pos(0, arg1, args), false));
-	return	bdd_ite(::from_bit(pos(bit, arg2, args), true),
+				idni::from_bit(pos(0, arg1, args), false));
+	return	bdd_ite(idni::from_bit(pos(bit, arg2, args), true),
 			bdd_ite_var(pos(bit, arg1, args),
 				leq_var(arg1, arg2, args, bit), htrue),
 			bdd_ite_var(pos(bit, arg1, args), hfalse,
 				leq_var(arg1, arg2, args, bit)));
-}
-
-uints perm_init(size_t n) {
-	uints p(n);
-	while (n--) p[n] = n;
-	return p;
 }
 
 spbdd_handle tables::add_bit(spbdd_handle x, size_t args) {
@@ -105,7 +102,7 @@ spbdd_handle tables::add_bit(spbdd_handle x, size_t args) {
 			perm[pos(k, n, args)] = pos(k+1, bits+1, n, args);
 	bdd_handles v = { x ^ perm };
 	for (size_t n = 0; n != args; ++n)
-		v.push_back(::from_bit(pos(0, bits + 1, n, args), false));
+		v.push_back(idni::from_bit(pos(0, bits + 1, n, args), false));
 	return bdd_and_many(move(v));
 }
 
@@ -138,7 +135,7 @@ spbdd_handle tables::from_sym_eq(size_t p1, size_t p2, size_t args) const {
 		return it->second;
 	spbdd_handle r = htrue;
 	for (size_t b = 0; b != bits; ++b)
-		r = r && ::from_eq(pos(b, p1, args), pos(b, p2, args));
+		r = r && idni::from_eq(pos(b, p1, args), pos(b, p2, args));
 	return ememo.emplace(x, r), r;
 }
 
@@ -294,8 +291,8 @@ bool tables::handler_eq(const term& t, const varmap& vm, const size_t vl,
 
 spbdd_handle tables::constrain_to_num(size_t var, size_t n_vars) const {
 	// Numbers must have their lowest bits be 01.
-	return ::from_bit(pos(1, var, n_vars),true) &&
-		::from_bit(pos(0, var, n_vars),false);
+	return idni::from_bit(pos(1, var, n_vars),true) &&
+		idni::from_bit(pos(0, var, n_vars),false);
 }
 
 bool tables::handler_leq(const term& t, const varmap& vm, const size_t vl,
@@ -870,7 +867,7 @@ bool tables::pfp(size_t nsteps, size_t break_on_step) {
  * checks. */
 
 bool tables::run_prog_wedb(const set<raw_term> &edb, raw_prog rp, dict_t &dict,
-	const ::options &opts, set<raw_term> &results)
+	const idni::options &opts, set<raw_term> &results)
 {
 	std::map<elem, elem> freeze_map, unfreeze_map;
 	// Create a duplicate of each rule in the given program under a
@@ -1123,7 +1120,7 @@ tables::~tables() {
 #ifdef DEBUG
 vbools tables::allsat(spbdd_handle x, size_t args) const {
 //	const size_t args = siglens[tab];
-	vbools v = ::allsat(x, bits * args), s;
+	vbools v = idni::allsat(x, bits * args), s;
 	for (bools b : v) {
 		s.emplace_back(bits * args);
 		for (size_t n = 0; n != bits; ++n)
@@ -1188,7 +1185,7 @@ void tables::decompress(spbdd_handle x, ntable tab, const cb_decompress& f,
 	if (!allowbltins && tbl.is_builtin()) return; //bltins no decompress
 	if (!len) len = tbl.len;
 	allsat_cb(x/*&&ts[tab].t*/, len * bits,
-		[tab, &f, &tbl, len, this](const bools& p, bdd_ref  DBG(y)) {
+		[tab, &f, /*&tbl,*/ len, this](const bools& p, bdd_ref  DBG(y)) {
 		DBG(assert(BDD_ABS(y) == T);)
 		term r(false, term::REL, NOP, tab, ints(len, 0), 0);
 		for (size_t n = 0; n != len; ++n)
@@ -1302,3 +1299,5 @@ void tables::out(emscripten::val o) const {
 	});
 }
 #endif
+
+} // idni namespace

@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __ERR_H__
-#define __ERR_H__
+#ifndef __IDNI__ERR_H__
+#define __IDNI__ERR_H__
+
+namespace idni {
 
 #ifdef WITH_EXCEPTIONS
 struct parse_error_exception : public virtual std::runtime_error {
@@ -88,4 +90,5 @@ const char err_x_escape[] = "Wrong \\x character escape. Use values between: \\x
 const char err_u_escape[] = "Wrong \\u character escape. Use values between: \\u0000 and \\uFFFF.";
 const char err_neg_fact[] = "Facts cannot be negated.";
 
-#endif
+} // idni namespace
+#endif // __IDNI__ERR_H__

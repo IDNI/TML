@@ -20,6 +20,8 @@
 #include <algorithm>
 #include "defs.h"
 
+namespace idni {
+
 class output {
 public:
 	enum type_t { NONE, STDOUT, STDERR, FILE, BUFFER, NAME };
@@ -112,4 +114,5 @@ namespace o { // o:: namespace shortcuts
 	bool enabled(std::string n);
 }
 
+} // idni namespace
 #endif

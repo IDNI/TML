@@ -12,6 +12,8 @@
 // modified over time by the Author.
 #include "input.h"
 
+namespace idni {
+
 class cpp_gen {
 	uint_t id{0};
 	std::map<elem, std::string> elem_cache;
@@ -28,3 +30,4 @@ public:
 	ostream_t& gen(ostream_t& os, const lexeme& lex);
 };
 
+} // idni namespace

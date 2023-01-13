@@ -25,3 +25,7 @@ set(GIT_DEFINITIONS
 	"GIT_COMMIT_HASH=\"${GIT_COMMIT_HASH}\""
 	"GIT_BRANCH=\"${GIT_BRANCH}\""
 )
+
+function(target_git_definitions target)
+	target_compile_definitions(${target} PRIVATE ${GIT_DEFINITIONS})
+endfunction()

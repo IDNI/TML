@@ -29,6 +29,8 @@
 
 #define BUFLEN 4096
 
+namespace idni {
+
 typedef std::shared_ptr<struct sockaddr> sp_sockaddr;
 typedef std::pair<sp_sockaddr, std::string> udp_message;
 
@@ -127,3 +129,5 @@ skip:
 		}
 	}
 };
+
+} // namespace idni
