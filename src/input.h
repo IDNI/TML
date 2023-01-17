@@ -26,6 +26,8 @@
 #include "dict.h"
 #include "memory_map.h"
 
+using namespace idni;
+
 /**
  * input class contains input data. input can be one of three types: STDIN,
  * FILE or STRING. STDIN works as a STRING which is read from the standard input

@@ -16,7 +16,6 @@ list(APPEND CMAKE_MODULE_PATH ${TML_DIR}/cmake)
 include(tml-common)
 
 set(TML_HEADERS
-	bdd.h
 	builtins.h
 	char_defs.h
 	cpp_gen.h
@@ -29,7 +28,6 @@ set(TML_HEADERS
 	form.h
 	input.h
 	ir_builder.h
-	memory_map.h
 	options.h
 	output.h
 	printing.h
@@ -39,8 +37,6 @@ set(TML_HEADERS
 )
 
 set(TML_SOURCES
-	bdd.cpp
-	bdd_arith.cpp
 	builtins.cpp
 	cpp_gen.cpp
 	dict.cpp
@@ -100,22 +96,27 @@ endif ()
 #################
 add_library(TMLo OBJECT)
 target_setup(TMLo)
+target_include_directories(TMLo PUBLIC 
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/../external/bdd/src
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+#	${CMAKE_CURRENT_SOURCE_DIR}/../external/parser)
 target_compile_options(TMLo     PRIVATE ${TML_COMPILE_OPTIONS} -fPIC)
 target_link_options(TMLo        PRIVATE ${TML_LINK_OPTIONS})
 target_sources(TMLo             PRIVATE ${TML_SOURCES} ${TML_HEADERS})
-target_link_libraries(TMLo      ${CMAKE_THREAD_LIBS_INIT})
-target_include_directories(TMLo PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-)
+target_link_libraries(TMLo      ${CMAKE_THREAD_LIBS_INIT} idni::bdd)
+#target_link_libraries(TMLo      ${CMAKE_THREAD_LIBS_INIT})
+#target_include_directories(TMLo PUBLIC
+#	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+#)	
 if (WITH_THREADS)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_THREADS")
-endif ()
+endif ()	
 if (WITH_WCHAR)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_WCHAR")
-endif ()
+endif ()	
 if (WITH_EXCEPTIONS)
 	target_compile_definitions(TMLo PRIVATE "-DWITH_EXCEPTIONS")
-endif ()
+endif ()	
 
 # boost
 ###########

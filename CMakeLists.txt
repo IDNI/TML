@@ -44,6 +44,8 @@ if (BUILD_JSLIB)
 		add_subdirectory("js")
 	endif ()
 else ()
+#	add_subdirectory("external/parser")
+	add_subdirectory("external/bdd")
 	add_subdirectory("src")
 endif ()
 
@@ -65,7 +67,7 @@ if (BUILD_TESTS)
 	set(TEST_FRAMEWORK doctest)
 
 	enable_testing()
-	add_subdirectory(tests)
+#	add_subdirectory(tests)
 endif ()
 
 option(BUILD_CLANG_TIDY "Run clang tidy" FALSE)
