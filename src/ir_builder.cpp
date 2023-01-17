@@ -15,8 +15,6 @@
 #include <regex>
 #include <variant>
 #include <math.h>
-
-
 #include "ir_builder.h"
 #include "tables.h"
 #include "output.h"
@@ -26,6 +24,26 @@
 
 using namespace std;
 
+namespace idni {
+
+ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
+		dict(dict_), opts(opts_) { }
+
+ir_builder::~ir_builder() { }
+
+string_t unquote(string_t str) {
+	for (size_t i = 0; i != str.size(); ++i)
+		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
+	return str;
+}
+
+string_t unquote(string_t str) {
+	for (size_t i = 0; i != str.size(); ++i)
+		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
+	return str;
+}
+
+>>>>>>> tklip/integratelibs
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
 	for (size_t k = 0; k != v.size(); ++k)
@@ -111,7 +129,7 @@ void ir_builder::get_vars_eq(const raw_term&t, int_t idx, rr_varmap& vars) {
 	}
 	else {
 		rt_vartypes aux(idx);
-		for (auto &i : {SYMB,UINT,UCHAR}) aux.append({i,-1});
+		for (auto &i : { SYMB, UINT, UCHAR }) aux.append({ i, -1 });
 		vars[dict.get_var(t.e[0].e)].push_back(aux);
 		vars[dict.get_var(t.e[2].e)].push_back(aux);
 		//TODO: when ?x = ?y possible optimization is to just replace var
@@ -1254,7 +1272,7 @@ string_t unary_string::getrelin_str(char32_t r) {
 
 ostream_t& unary_string::toprint(ostream_t& o) {
 	for(size_t i = 0; i < sort_rel.size(); i++)
-		if(isalnum(sort_rel[i]))
+		if(::isalnum(sort_rel[i]))
 			o << to_string(to_string_t(sort_rel[i]))
 				<< " " << i << endl;
 		else o <<uint_t(sort_rel[i])<<"  "<< i <<endl;
@@ -1506,7 +1524,7 @@ bool transformer::traverse(form *&root ) {
 
 void form::printnode(int lv, ir_builder* tb) {
 	if (r) r->printnode(lv+1, tb);
-	for (int i = 0; i < lv; i++) o::dbg() << '\t';
+	for (int i = 0; i < lv; i++) o::dbg() << "\t";
 	if( tb && this->tm != NULL)
 		o::dbg() << " " << type << " " << tb->to_raw_term(*tm) << "\n";
 	else
@@ -1597,7 +1615,7 @@ int_t ir_builder::get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &re
 					if( refs[pos][1] < 0 )	lent[2] = refs[pos][1];
 					else lent[2] = refs[pos][0] -1; // so len(i) refers to str relation
 
-					lent[1] = dict.get_var(dict.get_lexeme(string("?len")+to_string_(pos)));
+					lent[1] = dict.get_var(dict.get_lexeme(string("?len")+to_string(pos)));
 					lopd = lent[1];
 					n += 4;
 					//if(!done.insert(lent).second)
@@ -1681,26 +1699,25 @@ bool ptransformer::parse_alt( vector<elem> &next, size_t& cur){
 		ret = parse_factor(next, cur);
 		if(!ret) break;
 	}
-		return ret;
+	return ret;
 }
 
 bool ptransformer::is_firstoffactor(elem &c) {
-	if(c.type == elem::SYM ||
-		c.type == elem::STR ||
-		c.type == elem::CHR ||
+	if     (c.type == elem::SYM   ||
+		c.type == elem::STR   ||
+		c.type == elem::CHR   ||
 		c.type == elem::OPENB ||
 		c.type == elem::OPENP ||
-		c.type == elem::OPENSB )
-		return true;
+		c.type == elem::OPENSB)	return true;
 	else return false;
 }
 
-bool ptransformer::parse_alts( vector<elem> &next, size_t& cur){
+bool ptransformer::parse_alts(vector<elem> &next, size_t& cur){
 	bool ret = false;
-	while(cur < next.size()) {
+	while (cur < next.size()) {
 		ret = parse_alt(next, cur);
-		if(!ret) return false;
-		if(cur < next.size() && next[cur].type == elem::ALT ) cur++;
+		if (!ret) return false;
+		if (cur < next.size() && next[cur].type == elem::ALT ) cur++;
 		else break;
 	}
 	return ret;
@@ -1823,12 +1840,12 @@ bool ptransformer::visit() {
 }
 
 bool ir_builder::transform_ebnf(vector<production> &g, dict_t &d, bool &changed){
-	bool ret= true;
-	changed = false;
+	bool ret = true;
+	changed  = false;
 	for (size_t k = 0; k != g.size();k++) {
 		ptransformer pt(g[k], d);
-		if(!pt.visit()) return ret = false;
-		g.insert( g.end(), pt.lp.begin(), pt.lp.end() ),
+		if (!pt.visit()) return ret = false;
+		g.insert(g.end(), pt.lp.begin(), pt.lp.end()),
 		changed |= pt.lp.size()>0;
 	}
 	return ret;
@@ -2052,6 +2069,56 @@ bool ir_builder::transform_grammar_constraints(const production &x, vector<term>
 	return true;
 }
 
+#ifdef NEEDS_REWRITE
+parser_t::grammar ir_builder::to_grammar(const vector<struct production> &p)
+	const
+{
+	std::map<u32string, std::vector<std::vector<u32string>>> g;
+	parser_t::grammar r;
+	for (const auto& x : p) {
+		u32string head = to_u32string(x.p[0].to_str_t());
+		if (!has(g, head)) g[head] = {};
+		g[head].emplace_back();
+		for (size_t i = 1; i < x.p.size(); ++i)
+			g[head].back().push_back(
+				to_u32string(x.p[i].to_str_t())); 
+	}
+	for (const auto& x : g) r.push_back(x);
+	return r;
+}
+
+void ir_builder::add_parsed_facts(flat_prog& p, const parser_t& pr) {
+	auto nes = pr.parsed_forest().get_nodes_and_edges();
+	vector<raw_term> rts;
+	lexeme  l_node = dict.get_lexeme("node"),
+		l_edge = dict.get_lexeme("edge");
+	for (size_t i = 0; i < nes.first.size(); ++i) {
+		auto& ns = nes.first[i];
+		vector<elem> e;
+		e.emplace_back(elem::SYM, l_node);
+		e.emplace_back(elem::OPENP);
+		e.emplace_back(i);
+		e.emplace_back(elem::STR, dict.get_lexeme(to_string_t(
+			pr.to_string(ns.first))));
+		e.emplace_back(ns.second[0]);
+		e.emplace_back(ns.second[1]);
+		e.emplace_back(elem(elem::CLOSEP));
+		rts.emplace_back(raw_term::REL, e);
+		//DBG(o::dbg()<<rts.back()<<endl);
+	}
+	for (auto& edge : nes.second) {
+		vector<elem> e;
+		e.emplace_back(elem::SYM, l_edge);
+		e.emplace_back(elem::OPENP);
+		e.emplace_back(edge.first);
+		e.emplace_back(edge.second);
+		e.emplace_back(elem(elem::CLOSEP));
+		rts.emplace_back(raw_term::REL, e);
+	}
+	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
+}
+#endif
+
 bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	if (g.empty()) return true;
 	bool changed;
@@ -2062,49 +2129,29 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 	DBG(o::dbg()<<"grammar after:"<<endl);
 	DBG(for (production& p : g) o::dbg() << p << endl;)
 
-	#define ONLY_EARLEY
+#ifdef NEEDS_REWRITE
+
+	// #define ONLY_EARLEY
 	#ifdef ONLY_EARLEY
 
-	earley_t::char_builtins_map bltnmap{
-		{ U"space", [](const char32_t &c)->bool {
-			return c < 256 && isspace(c); }	},
-		{ U"digit", [](const char32_t &c)->bool {
-			return c < 256 && isdigit(c); }	},
-		{ U"alpha", [](const char32_t &c)->bool {
-			return c > 160 || isalpha(c); }	},
-		{ U"alnum", [](const char32_t &c)->bool {
-			return c > 160 || isalnum(c); }	},
-		{ U"printable", [](const char32_t &c)->bool {
-			return c > 160 || isprint(c); }	}
-	};
-
-	earley_t parser(g, bltnmap, opts.bin_lr, opts.incr_gen_forest );
-	bool success = parser
+	parser_t::parser_options po;
+	po.bin_lr = opts.bin_lr;
+	po.incr_gen_forest = opts.incr_gen_forest;
+	po.cc_fns = { "space", "digit", "alpha", "alnum", "printable" };
+	parser_t pr(to_grammar(g), po);
+	bool success = pr
 		.recognize(to_u32string(strs.begin()->second));
 	o::inf() << "\n### parser.recognize() : " << (success ? "OK" : "FAIL")<<
 		" <###\n" << endl;
-	vector<earley_t::arg_t> facts = parser.get_parse_graph_facts();
-	vector<raw_term> rts;
-	for (auto& af: facts) {
-		vector<elem> e;
-		e.emplace_back(elem::STR, dict.get_lexeme(
-			to_string_t(std::get<earley_t::string>(af[0]))));
-		e.emplace_back(elem::OPENP);
-		e.emplace_back(int_t(std::get<size_t>(af[1])));
-		for( size_t i=2; i < af.size(); i++)
-			if(std::holds_alternative<size_t>(af[i]))
-				e.emplace_back(int_t(std::get<size_t>(af[i])));
-			else
-				e.emplace_back(elem::STR, dict.get_lexeme(
-					to_string_t(std::get<earley_t::string>(
-						af[i]))));
-		e.emplace_back(elem(elem::CLOSEP));
-
-		rts.emplace_back(raw_term::REL, e);
-	}
-	for(auto rt: rts) p.insert({from_raw_term(rt)});
+	add_parsed_facts(p, pr);
+	if (opts.print_transformed) printer->print(
+		printer->print(o::to("transformed")
+			<< "# after transform_grammar:\n", p)
+		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
+		<< endl;
 	return true;
 	#endif // ONLY_EARLEY
+#endif // NEEDS_REWRITE
 
 	vector<term> v;
 
@@ -2226,7 +2273,7 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 		string inputstr = to_string(dynenv->strs.begin()->second);
 
 #endif
-		DBG(o::dbg()<<inputstr<<endl);
+		DBG(o::dbg() << inputstr << endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
 		ggraph.collapsewith();
@@ -2249,12 +2296,12 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 #endif
 			smatch sm;
 			term t;
-			bool bmatch=false;
-			if(regex_level > 0) {
-				for( size_t i = 0; i <= inputstr.size(); i++)
-					for( size_t j = i; j <= inputstr.size(); j++)	{
+			bool bmatch = false;
+			if (regex_level > 0) {
+				for (size_t i = 0; i <= inputstr.size(); i++)
+					for (size_t j = i; j <= inputstr.size(); j++)	{
 						string ss = (i == inputstr.size()) ? "": inputstr.substr(i,j-i);
-						if( regex_match(ss, sm, rgx)) {
+						if (regex_match(ss, sm, rgx)) {
 							DBG(o::dbg() << regexp << " match "<< sm.str() << endl);
 							DBG(o::dbg() << "len: " << sm.length(0) << std::endl);
 							DBG(o::dbg() << "size: " << sm.size() << std::endl);
@@ -2267,12 +2314,12 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 							statterm++;
 						}
 					}
-				if(bmatch) torem.insert(elem);
+				if (bmatch) torem.insert(elem);
 			}
-			else if( regex_level == 0) {
+			else if (regex_level == 0) {
 				std::sregex_iterator iter(inputstr.begin(), inputstr.end(), rgx );
 				std::sregex_iterator end;
-				for(;iter != end; ++iter) {
+				for (;iter != end; ++iter) {
 					DBG(o::dbg() << regexp << " match "<< iter->str()<< endl);
 					DBG(o::dbg() << "size: " << iter->size() << std::endl);
 					DBG(o::dbg() << "len: " << iter->length(0) << std::endl);
@@ -2286,8 +2333,8 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 			}
 		}
 		size_t removed = 0;
-		for( auto pit = g.begin(); pit != g.end(); )
-			if(regex_level > 1  && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
+		for (auto pit = g.begin(); pit != g.end();)
+			if (regex_level > 1 && torem.count(pit->p[0]) > 0 && removed < (size_t)(regex_level-1)) {
 				o::ms()<<*pit<<endl;
 				pit = g.erase(pit);
 				removed++;
@@ -2300,7 +2347,7 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 	return statterm != 0;
 }
 
-bool ir_builder::transform_alts( vector<production> &g){
+bool ir_builder::transform_alts(vector<production> &g) {
 	bool changed = false;
 	for (size_t k = 0; k != g.size();) {
 		if (g[k].p.size() < 2) parse_error(err_empty_prod, g[k].p[0].e);
@@ -2316,8 +2363,7 @@ bool ir_builder::transform_alts( vector<production> &g){
 	return changed;
 }
 
-bool ir_builder::transform_strsplit(vector<production> &g){
-
+bool ir_builder::transform_strsplit(vector<production> &g) {
 	bool changed = false;
 	for (production& p : g)
 		for (size_t n = 0; n < p.p.size(); ++n)
@@ -2339,8 +2385,7 @@ bool ir_builder::transform_strsplit(vector<production> &g){
 	return changed;
 }
 #ifdef LOAD_STRS
-void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) {
-
+void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s){
 	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
 	unary_string us(sizeof(char32_t)*8);
 	chars = max(chars, (int_t) us.rel.size()); //TODO: review this one
@@ -2367,15 +2412,15 @@ void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) 
 	syms = dict.nsyms();
 
 	int_t rel = dict.get_rel(r);
-	term t(2),tb(3);
-	#ifdef TYPE_RESOLUTION
-	t.tab = get_table(get_sig_typed(r, {UINT, UCHAR}));
-	tb.tab =  get_table(get_sig_typed(r, {SYMB, UINT, UINT}));
-	#else
-	t.tab = get_table(get_sig(r, {2}));
-	tb.tab =  get_table(get_sig(r, {3}));
-	#endif
-	for (int_t n = 0; n != (int_t)s.size(); ++n) {
+	term t(2), tb(3);
+#ifdef TYPE_RESOLUTION
+	t.tab  = get_table(get_sig_typed(r, {UINT, UCHAR}));
+	tb.tab = get_table(get_sig_typed(r, {SYMB, UINT, UINT}));
+#else
+	t.tab  = get_table(get_sig(r, {2}));
+	tb.tab = get_table(get_sig(r, {3}));
+#endif
+	for (int_t n = 0; n != (int_t) s.size(); ++n) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]);
 		chars = max(chars, t[1]);
 		v.push_back(t), fp.insert(std::move(v));
@@ -2384,19 +2429,19 @@ void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) 
 			tb[0] = mksym(cat), v.push_back(tb),
 			fp.insert(std::move(v));
 		};
-		if (isspace(s[n])) add_char_cat(sspace);
-		if (isdigit(s[n])) add_char_cat(sdigit);
-		if (isalpha(s[n])) add_char_cat(salpha);
-		if (isalnum(s[n])) add_char_cat(salnum);
-		if (isprint(s[n])) add_char_cat(sprint);
+		if (::isspace(s[n])) add_char_cat(sspace);
+		if (::isdigit(s[n])) add_char_cat(sdigit);
+		if (::isalpha(s[n])) add_char_cat(salpha);
+		if (::isalnum(s[n])) add_char_cat(salnum);
+		if (::isprint(s[n])) add_char_cat(sprint);
 	}
 	str_rels.insert(rel);
 }
 
 void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
 	strs = s;
-	for (auto x : strs) {
-		load_string(fp, x.first, x.second);
-	}
+	for (auto x : strs) load_string(fp, x.first, x.second);
 }
 #endif
+
+} // idni namespace

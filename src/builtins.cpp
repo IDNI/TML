@@ -18,6 +18,8 @@
 
 using namespace std;
 
+namespace idni {
+
 size_t blt_ctx::varpos(size_t arg) const { return a->vm.at(g[arg]); }
 
 int_t blt_ctx::outvarpos(size_t oarg) const {
@@ -271,3 +273,5 @@ builtins_factory& builtins_factory::add_js_builtins() {
 #endif
 	return *this;
 }
+
+} // idni namespace

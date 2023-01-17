@@ -13,56 +13,15 @@
 #include <locale>
 #include <codecvt>
 #include <filesystem>
+#include <string.h>
 #ifdef _WIN32
 #include <windows.h>
 #endif
 #include "defs.h"
-
 using namespace std;
+namespace idni {
 
-string_t unquote(string_t str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
-	return str;
-}
-
-bool operator==(const lexeme& l, const string& s) {
-	if ((size_t) (l[1] - l[0]) != s.size()) return false;
-	return !strncmp(l[0], s.c_str(), l[1] - l[0]);
-}
-
-bool operator==(const lexeme& l, const char* s) {
-	size_t n = strlen(s);
-	return (size_t) (l[1] - l[0]) != n
-		? false : !strncmp(l[0], s, n);
-}
-
-bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
-	if (x[1]-x[0] != y[1]-y[0]) return x[1]-x[0] < y[1]-y[0];
-	for (size_t n = 0; n != (size_t)(x[1]-x[0]); ++n)
-		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
-	return false;
-}
-
-/* Compare lexemes by their character content rather than by memory
- * locations. */
-
-bool operator==(const lexeme& x, const lexeme& y) {
-	return x[1] - x[0] == y[1] - y[0] && !strncmp(x[0], y[0], x[1] - x[0]);
-}
-
-bool less<lexeme>::operator()(const lexeme& m, const lexeme &n) const {
-	return lexeme2str(m) < lexeme2str(n);
-}
-
-bool operator<(const lexeme& m, const lexeme &n) {
-	return less<lexeme>()(m, n);
-}
-
-size_t hash<lexeme>::operator()(const lexeme& m) const {
-	string_t str = lexeme2str(m);
-	return hash<string>()(string(str.begin(), str.end()));
-}
+std::string to_string(int_t v) { return ::to_string(v); }
 
 wstring s2ws(const string& s) {
 	return wstring_convert<codecvt_utf8<wchar_t>>().from_bytes(s);
@@ -76,33 +35,6 @@ string  ws2s(const string&  s) { return s; }
 wostream& operator<<(wostream& os, const string& s){ return os << s2ws(s);}
 ostream& operator<<(ostream& os, const char c) { return os.put(c); }
 
-string to_string_(int_t v) { stringstream ss; ss << v; return ss.str(); }
-string_t to_string_t(int_t v) {
-	return to_string_t(to_string_(v));
-}
-string_t to_string_t(const string& s) {
-	return string_t(s.begin(), s.end());
-}
-string_t to_string_t(const char* s) {
-	return to_string_t(string(s));
-}
-string to_string(const string_t& s) {
-	return string(s.begin(), s.end());
-}
-
-string_t to_lower_first(string_t s) {
-	if (s[0] >= (unsigned char)'A' && s[0] <= (unsigned char)'Z')
-		s[0] = s[0] - ((unsigned char)'A' - (unsigned char)'a');
-	return s;
-}
-
-string_t to_upper_first(string_t s) {
-	if (s[0] >= (unsigned char)'a' && s[0] <= (unsigned char)'z')
-		s[0] = s[0] + ((unsigned char)'A' - (unsigned char)'a');
-	return s;
-}
-
-string_t to_string_t(const char* s);
 #ifdef _WIN32
 string temp_filename() {
 	TCHAR name[MAX_PATH], path[MAX_PATH];
@@ -317,3 +249,4 @@ int_t hex_to_int_t(ccs str, size_t len) {
 		else return -1;
 	return val;
 }
+} // idni namespace

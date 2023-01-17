@@ -17,6 +17,8 @@
 
 using namespace std;
 
+namespace idni {
+
 repl::repl(options &o, ostream_t& os) : o(o), os(os) {
 	os<<"# TML REPL ("<<GIT_DESCRIBED<<"). Enter ? or h for help."<<endl;
 	redrive("");
@@ -152,7 +154,7 @@ size_t parse_size_t(string l, string cmd) {
 #ifdef WITH_EXCEPTIONS
 	} catch (...) {}
 #else
-		if (s != to_string_(r)) r = 0;
+		if (s != to_string(r)) r = 0;
 #endif
 	}
 	return r;
@@ -302,3 +304,5 @@ void repl::loop() {
 		this_thread::sleep_for(chrono::milliseconds(20));
 	}
 }
+
+} // idni namespace

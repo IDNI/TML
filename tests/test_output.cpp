@@ -13,6 +13,8 @@
 #include "unittest.hpp"
 #include "../src/output.h"
 
+using namespace idni;
+
 TEST_SUITE("output class") {
 TEST_CASE("create") {
 	output o1("def");

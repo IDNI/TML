@@ -12,10 +12,11 @@
 // modified over time by the Author.
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#define WITH_ARITH 1
+#define WITH_MMAP 1
 #include "../src/driver.h"
-//#include "../src/repl.h"
-//#include "../src/output.h"
 
+using namespace idni;
 using
 	emscripten::enum_,
 	emscripten::class_,
@@ -23,9 +24,7 @@ using
 	emscripten::optional_override,
 	emscripten::select_overload,
 	emscripten::allow_raw_pointers,
-	emscripten::val,
-	std::endl;
-
+	emscripten::val;
 class runner {
 	inputs ii;
 	outputs oo;
@@ -37,7 +36,9 @@ public:
 		oo.clear("output");
 		oo.clear("dump");
 	}
-	bool run_tc(int_t cptr, emscripten::val tc = val::undefined()) {
+	bool run_tc(int_t cptr,
+		val tc = val::undefined())
+	{
 		const char *program = reinterpret_cast<const char*>(cptr);
 		error = false, result = false;
 		driver d(program, o);
@@ -66,14 +67,25 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.value("BUFFER", output::type_t::BUFFER)
 		.value("NAME",   output::type_t::NAME)
 		;
-	enum_<mmap_mode>("mmap_mode")
-		.value("MMAP_NONE", mmap_mode::MMAP_NONE)
-		.value("MMAP_READ", mmap_mode::MMAP_READ)
-		.value("MMAP_WRITE", mmap_mode::MMAP_WRITE)
+	class_<bdd_handle>("bdd_handle")
+		.property("b", &bdd_handle::b)
+		.class_function("get", &bdd_handle::get)
+		.class_property("T", &bdd_handle::T)
+		.class_property("F", &bdd_handle::F)
 		;
 	class_<bdd>("bdd")
-		.class_function("init", &bdd::init)
+		.constructor<bdd_ref, bdd_ref>()
+		.class_function("init", select_overload<void()>(&bdd::init),
+			allow_raw_pointers())
 		.class_function("gc", &bdd::gc)
+		// .class_function("stats", &bdd::stats<char_t>)
+		.class_function("get_ite_cache_size", &bdd::get_ite_cache_size)
+		.class_function("set_gc_limit", &bdd::set_gc_limit)
+		.class_function("set_gc_enabled", &bdd::set_gc_enabled)
+		.class_function("hi", &bdd::hi)
+		.class_function("lo", &bdd::lo)
+		.class_function("var", &bdd::var)
+		//.class_function("getvar", &bdd::getvar)
 		;
 	class_<runner>("runner")
 		.constructor<strings>()
@@ -85,24 +97,29 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("clear", &runner::clear)
 		.function("get_opts", &runner::get_opts)
 		.function("out", optional_override(
-			[](driver& self, val v) { return self.out(v); }))
-		.class_function("version", optional_override([]() -> std::string {
+			[](driver& self, val v) {
+				return self.out(v);
+			}))
+		.class_function("version", optional_override(
+			[]() ->	std::string {
 				return std::string(GIT_DESCRIBED);
 			}), allow_raw_pointers())
 		;
 	class_<driver>("driver")
-		.constructor<std::string, options>(allow_raw_pointers())
+		.constructor<std::string, options>(
+			allow_raw_pointers())
 		.class_function("create",// cptr = WA/HEAP const char* with UTF8 
-			optional_override([](int_t cptr, options o) {
+			optional_override([](int_t cptr, options o){
 				const char *prog =
 					reinterpret_cast<const char*>(cptr);
 				return new driver(prog, o);
 			}), allow_raw_pointers())
-		.class_function("version", optional_override([]() -> std::string {
+		.class_function("version", optional_override(
+			[]() -> std::string {
 				return std::string(GIT_DESCRIBED);
 			}), allow_raw_pointers())
 		.function("out", optional_override(
-			[](driver& self, emscripten::val v) {
+			[](driver& self, val v) {
 				return self.out(v);
 			}
 		))
@@ -142,21 +159,24 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.constructor<strings, inputs*, outputs*>()
 		.function("parse", select_overload
 			<bool(std::vector<std::string>, bool)>
-				(&options::parse), allow_raw_pointers())
+				(&options::parse),
+				allow_raw_pointers())
 		.function("enabled", &options::enabled)
 		.function("disabled", &options::disabled)
 		//.function("get", &options::get)
 		.function("get_int", &options::get_int)
 		.function("get_bool", &options::get_bool)
 		.function("get_string", &options::get_string)
-		.function("to_string", optional_override([](options& o) {
-			ostringstream_t ss; ss << o;
-			return ss.str();
-		}), allow_raw_pointers())
+		.function("to_string", optional_override(
+			[](options& o) {
+				ostringstream_t ss; ss << o;
+				return ss.str();
+			}), allow_raw_pointers())
 		;
 	class_<inputs>("inputs")
 		.constructor<>()
-		.class_function("ref", optional_override([](inputs &ii) {
+		.class_function("ref", optional_override(
+			[](inputs &ii) {
 				return &ii;
 			}), allow_raw_pointers())
 		;
@@ -164,7 +184,10 @@ EMSCRIPTEN_BINDINGS(tml) {
 		.function("name", &output::name)
 		.function("type", &output::type)
 		//.function("os", &output::os)
-		.function("target", select_overload<std::string()const>(&output::target), allow_raw_pointers())
+		.function("target",
+			select_overload<std::string() const>(
+				&output::target),
+				allow_raw_pointers())
 		.function("read", &output::read)
 		.function("clear", &output::clear)
 		.function("is_null", &output::is_null)
@@ -174,13 +197,15 @@ EMSCRIPTEN_BINDINGS(tml) {
 		;
 	class_<outputs>("outputs")
 		.constructor<>()
-		.class_function("ref", optional_override([](outputs &oo) {
+		.class_function("ref", optional_override(
+			[](outputs &oo) {
 				return &oo;
 			}), allow_raw_pointers())
 		.function("use", &outputs::use)
 		.function("add", &outputs::add)
 		.class_function("read", &outputs::read)
-		.class_function("in_use", &outputs::in_use, allow_raw_pointers())
+		.class_function("in_use", &outputs::in_use,
+			allow_raw_pointers())
 		.class_function("clear", &outputs::clear)
 		//.class_function("out", &outputs::out)
 		//.class_function("err", &outputs::err)
@@ -188,12 +213,26 @@ EMSCRIPTEN_BINDINGS(tml) {
 		//.class_function("dbg", &outputs::dbg)
 		//.class_function("ms", &outputs::ms)
 		//.class_function("dump", &outputs::dump)
-		.class_function("get", &outputs::get, allow_raw_pointers())
+		.class_function("get", &outputs::get,
+			allow_raw_pointers())
 		//.class_function("to", &outputs::to)
 		.class_function("exists", &outputs::exists)
 		.class_function("target", &outputs::target)
 		;
 	emscripten::function("init_outputs", o::init_outputs);
+	emscripten::function("bdd_size", &bdd_size);
+	emscripten::function("bdd_root", &bdd_root);
+	emscripten::function("bdd_not", &bdd_not);
+	emscripten::function("bdd_xor", &bdd_xor);
+	emscripten::function("bdd_bitwise_and", &bdd_bitwise_and);
+	emscripten::function("bdd_bitwise_or", &bdd_bitwise_or);
+	emscripten::function("bdd_bitwise_xor", &bdd_bitwise_xor);
+	emscripten::function("bdd_bitwise_not", &bdd_bitwise_not);
+	emscripten::function("bdd_leq", &bdd_leq);
+	emscripten::function("bdd_adder", &bdd_adder);
+	emscripten::function("bdd_mult_dfs", &bdd_mult_dfs);
+	emscripten::function("bdd_quantify", &bdd_quantify);
+	emscripten::function("perm_init", &perm_init);
 	register_vector<std::string>("strings");
 };
 

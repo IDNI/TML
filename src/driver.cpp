@@ -27,11 +27,13 @@
 #include "builtins.h"
 #include "cpp_gen.h"
 
+using namespace std;
+
 #ifdef __EMSCRIPTEN__
-#include "../js/embindings.h"
+#include "../js/embindings.inc.h"
 #endif
 
-using namespace std;
+namespace idni {
 
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const pair<ccs, size_t>& p);
@@ -1011,10 +1013,8 @@ void collect_vars(const raw_term &rt, set<elem> &vars) {
 }
 
 /* Collect the variables used in the given terms and return. */
-
 template <class InputIterator>
-		void collect_vars(InputIterator first, InputIterator last,
-			set<elem> &vars) {
+void collect_vars(InputIterator first, InputIterator last, set<elem> &vars) {
 	for(; first != last; first++) {
 		collect_vars(*first, vars);
 	}
@@ -1022,7 +1022,6 @@ template <class InputIterator>
 
 /* Collect the variables used in the head and the positive terms of the
  * given rule and return. */
-
 void collect_vars(const raw_rule &rr, set<elem> &vars) {
 	collect_vars(rr.h[0], vars);
 	for(const raw_term &tm : rr.b[0]) {
@@ -1032,7 +1031,6 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 
 /* If rr1 and rr2 are both conjunctive queries with negation, check that
  * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
-
 bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Check that rules have correct format
 	if(!(is_cqn(rr1) && is_cqn(rr2) &&
@@ -3689,8 +3687,9 @@ bool driver::run(size_t steps, size_t break_on_step) {
 
 bool driver::add(input* in) {
 	//TODO: handle earlier errors on the input arguments
+#ifdef NEEDS_REWRITE
 	if (opts.enabled("earley")) {
-		earley_parse_tml(in, rp);
+		parse_tml(in, rp);
 #ifdef DEBUG
 		raw_progs rpt(dict);
 		rpt.parse(in);
@@ -3702,6 +3701,7 @@ bool driver::add(input* in) {
 		if (s1.str() != s2.str()) o::inf() << "\n\tNO MATCH\n";
 #endif
 	} else 	//TODO: lex here
+#endif
 		if (in->error | !rp.parse(in)) return !(error = true);
 	return true;
 }
@@ -3922,10 +3922,10 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
 			{{"none", proof_mode::none}, 
-				{"tree", proof_mode::tree},
-				{"forest", proof_mode::forest}, 
-				{"partial-tree", proof_mode::partial_tree},
-				{"partial-forest", proof_mode::partial_forest}});
+			{"tree", proof_mode::tree},
+			{"forest", proof_mode::forest}, 
+			{"partial-tree", proof_mode::partial_tree},
+			{"partial-forest", proof_mode::partial_forest}});
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
 	to.apply_regexpmatch = opts.enabled("regex");
@@ -4009,3 +4009,5 @@ void driver::info(std::basic_ostream<T>& os) {
 }
 template void driver::info(std::basic_ostream<char>&);
 template void driver::info(std::basic_ostream<wchar_t>&);
+
+} // idni namespace

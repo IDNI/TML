@@ -14,9 +14,10 @@
 #define __OPTIONS_H__
 #include <functional>
 #include <iostream>
-#include "defs.h"
 #include "input.h"
 #include "output.h"
+
+namespace idni {
 
 struct option {
 	enum type { UNDEFINED, INT, BOOL, STRING, ENUM };
@@ -227,4 +228,6 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>&, const option&);
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>&, const options&);
+
+} // idni namespace
 #endif

@@ -16,6 +16,8 @@
 #include <compare>
 #include "defs.h"
 
+namespace idni {
+
 struct term : public ints {
 	bool neg = false, goal = false;
 	//ARITH is also a formula, likely should be handled
@@ -98,4 +100,5 @@ struct natcmp {
 
 typedef std::set<term, natcmp> term_set;
 
+}
 #endif

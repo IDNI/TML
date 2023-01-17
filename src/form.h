@@ -10,19 +10,18 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-
-#ifndef _FORM_H_
-#define _FORM_H_
+#ifndef __IDNI__TML__FORM_H__
+#define __IDNI__TML__FORM_H__
 #include <tuple>
 #include <vector>
 #include "defs.h"
 
+namespace idni {
+
 typedef std::shared_ptr<struct pnft> pnft_handle;
 typedef const pnft_handle& cr_pnft_handle;
-typedef std::vector<spbdd_handle> bdd_handles;
 
 typedef enum {C, D} t_nf;
-
 
 struct pnft {
 	size_t varslen;
@@ -55,8 +54,8 @@ struct var2space {
 	varmap vm;
 	t_nf nf = C;
 	std::vector<int_t> hvars;
-	std::map<int_t,bdd_handles> ins;
-	std::map<int_t,bdd_handles> outs;
+	std::map<int_t, bdd_handles> ins;
+	std::map<int_t, bdd_handles> outs;
 	std::vector<var2space> bf;
 	var2space(varmap &vmh);
 	~var2space();
@@ -70,4 +69,5 @@ struct var2space {
 	bool quantify(std::vector<quant_t> &quantsh) const;
 };
 
-#endif
+} // idni namespace
+#endif // __IDNI__TML__FORM_H__

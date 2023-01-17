@@ -22,7 +22,6 @@
 #include <emscripten.h>
 #include <emscripten/val.h>
 #endif
-#include "bdd.h"
 #include "term.h"
 #include "dict.h"
 #include "input.h"
@@ -33,6 +32,8 @@
 
 // TODO remove include and add alternative ones
 #include "ir_builder.h"
+
+namespace idni {
 
 class tables;
 
@@ -121,9 +122,11 @@ struct gnode {
 	const term &t;
 	int lev;
 	std::vector<gnode*> next;
-	gnode(int level, const term &_t, gntype typ = symbol ): t(_t),lev(level) {
-		type = typ; }
-	gnode(int level, const term &_t, std::vector<gnode*> inter): t(_t),lev(level){
+	gnode(int level, const term &_t, gntype typ = symbol)
+		: t(_t), lev(level) { type = typ; }
+	gnode(int level, const term &_t, std::vector<gnode*> inter)
+		: t(_t), lev(level)
+	{
 		type = interm;
 		this->next.emplace_back(new gnode(lev, t, gnode::gntype::pack));
 		next.back()->next = inter;
@@ -173,8 +176,8 @@ class tables {
 
 private:
 
-	typedef std::function<void(size_t,size_t,size_t, const std::vector<term>&)>
-		cb_ground;
+	typedef std::function<
+		void(size_t,size_t,size_t, const std::vector<term>&)> cb_ground;
 	typedef std::function<void(const term&)> cb_decompress;
 
 	std::set<body*, ptrcmp<body>> bodies;
@@ -256,7 +259,8 @@ private:
 			for (size_t bit = 0; bit < bits; ++bit)
 				_args[pos(bit, arg, args)] = arg,
 				_bits[pos(bit, arg, args)] = bit;
-		std::pair<std::vector<size_t>, std::vector<size_t>> i(_bits, _args);
+		std::pair<std::vector<size_t>, std::vector<size_t>>
+			i(_bits, _args);
 		return i;
 	}
 	size_t _args(const term* t) const {
@@ -272,8 +276,8 @@ private:
 		return _args(t) * bits -1;
 	}
 
-	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
-		return ::from_bit(pos(b, arg, args), n & (1 << b));
+	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const{
+		return idni::from_bit(pos(b, arg, args), n & (1 << b));
 	}
 
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
@@ -287,6 +291,8 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
+	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits)
+		const;
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
@@ -296,8 +302,11 @@ private:
 	body get_body(const term& t, const varmap&, size_t len) const;
 
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
+	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits)
+		const;
 	uints addtail(size_t len1, size_t len2) const;
-	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
+	spbdd_handle addtail(idni::cr_spbdd_handle x, size_t len1, size_t len2)
+		const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
@@ -313,34 +322,42 @@ private:
 	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
 	bool get_dnf_proofs(const term& q, proof& p, size_t level,
-		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
+		std::set<std::pair<term, size_t>> &refuted,
+		size_t explicit_rule_count);
 	bool get_proof(const term& q, proof& p, size_t level,
-		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
-	void print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int level = 0);
+		std::set<std::pair<term, size_t>> &refuted,
+		size_t explicit_rule_count);
+	void print_dot(std::wstringstream &ss, gnode &gh,
+		std::set<gnode*> &visit, int level = 0);
 	bool build_graph( std::map<term, gnode*> &tg, proof &p, gnode &g);
 	gnode* get_forest(const term& t, proof& p );
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
 	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
-			spbdd_handle &c) const;
+		spbdd_handle &c) const;
 	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
-			spbdd_handle &c) const;
-	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t, alt& a);
+		spbdd_handle &c) const;
+	void handler_bitunv(std::set<std::pair<body,term>>& b, const term& t,
+		alt& a);
 
 	bool get_facts(const flat_prog& m) ;
 	bool is_optimizable_fact(const term& t) const;
 	std::map<ntable, spbdd_handle> from_facts(
 		std::map<ntable, std::vector<const term*>>& pending,
-		const std::map<ntable, std::pair<std::vector<size_t>, std::vector<size_t>>> &inverses) const;
+		const std::map<ntable, std::pair<std::vector<size_t>,
+			std::vector<size_t>>> &inverses) const;
 	spbdd_handle from_facts(std::vector<const term*>& pending,
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+		const std::pair<std::vector<size_t>,
+			std::vector<size_t>>& inverse) const;
 	spbdd_handle from_facts(std::vector<const term*>& terms,
 		std::vector<const term*>::iterator left,
 		std::vector<const term*>::iterator right,
 		const size_t& pos,
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+		const std::pair<std::vector<size_t>,
+			std::vector<size_t>>& inverse) const;
 	spbdd_handle from_bit(const std::vector<const term*>::iterator& current,
-		const std::pair<std::vector<size_t>, std::vector<size_t>>& inverse) const;
+		const std::pair<std::vector<size_t>,
+		std::vector<size_t>>& inverse) const;
 
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
@@ -366,6 +383,11 @@ private:
 	 *  updates
 	 */
 	void init_tml_update();
+	void add_tml_update(const term& rt, bool neg);
+	template <typename T>
+	// decompress for --print-updates and tml_update
+	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
+		spbdd_handle& x, const rule& r);
 	bool print_updates_check();
 	updates updts;
 
@@ -381,7 +403,8 @@ private:
 	// @param hs alt_query bdd handles
 	// @param tbl builtin's table
 	// @param tab id of builtin's table
-	void head_builtin(const bdd_handles& hs, const table& tbl, ntable tab);
+	void head_builtin(const bdd_handles& hs, const table& tbl,
+		ntable tab);
 
 	// called when executing builtins in body
 	// @param x  result of a var grounding query
@@ -391,18 +414,25 @@ private:
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
-	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
-	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
-	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits,
+	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+	void ex_typebits(bools &exvec, size_t nvars) const;
+	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in,
 		size_t n_vars);
-	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits, size_t n_vars);
-	spbdd_handle perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t delta);
+	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
+	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in,
+		size_t n_bits, size_t n_vars);
+	spbdd_handle perm_bit_reverse(spbdd_handle in,  size_t n_bits,
+		size_t n_vars);
+	spbdd_handle perm_bit_reverse_bt(spbdd_handle in, size_t n_bits,
+		size_t delta);
 	void set_constants(const term& t, spbdd_handle &q) const;
-	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, bool fq);
+	void handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh,
+		bool fq);
 	void handler_formh(pnft_handle &p, form *f, varmap &vm, varmap &vmh);
 	bool handler_arith(const term& t, const varmap &vm, const size_t vl,
 		spbdd_handle &cons);
-	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2, size_t args);
+	spbdd_handle add_var_eq(size_t arg0, size_t arg1, size_t arg2,
+		size_t args);
 	spbdd_handle full_addder_carry(size_t var0, size_t var1, size_t n_vars,
 		uint_t b, spbdd_handle r) const;
 	spbdd_handle full_adder(size_t var0, size_t var1, size_t n_vars,
@@ -412,16 +442,18 @@ private:
 	spbdd_handle shl(size_t var0, size_t n1, size_t var2, size_t n_vars);
 	spbdd_handle add_ite(size_t var0, size_t var1, size_t args, uint_t b,
 		uint_t s);
-	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args, uint_t b,
-		uint_t s);
+	spbdd_handle add_ite_carry(size_t var0, size_t var1, size_t args,
+		uint_t b, uint_t s);
 	spbdd_handle mul_var_eq(size_t var0, size_t var1, size_t var2,
 		size_t n_vars);
 	spbdd_handle mul_var_eq_ext(size_t var0, size_t var1, size_t var2,
 		size_t var3, size_t n_vars);
-	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
-		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
-	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
-		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
+	spbdd_handle bitwise_handler(size_t in0_varid, size_t in1_varid,
+		size_t out_varid, spbdd_handle in0, spbdd_handle in1,
+		size_t n_vars, t_arith_op op);
+	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid,
+		size_t out_varid, spbdd_handle in0, spbdd_handle in1,
+		size_t n_vars, t_arith_op op);
 
 	#ifdef FOL_V1
 	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
@@ -430,7 +462,8 @@ private:
 	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
-	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);
+	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
+		var2space &v2s, bdd_handles &v);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
 	#endif
 
@@ -490,4 +523,5 @@ struct infloop_exception : public unsat_exception {
 };
 #endif
 
+} // idni namespace
 #endif // __TABLES_H__

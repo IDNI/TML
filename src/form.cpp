@@ -13,9 +13,10 @@
 
 #include "form.h"
 #include "tables.h"
+
 using namespace std;
 
-extern uints perm_init(size_t n);
+namespace idni {
 
 pnft::pnft(){
 		varslen = 0, varslen_h = 0, neg = false, b = 0, cons = bdd_handle::T;
@@ -163,12 +164,12 @@ void var2space::print(int_t level) const {
 		if (ins.find(idx) != ins.end()) {
 			COUT << tab << "ins: \n";
 			for(auto & q : ins.at(idx))
-				::out(COUT << tab, q)<<endl;
+				idni::out(COUT << tab, q)<<endl;
 		}
 		if (outs.find(idx) != outs.end()) {
 			COUT << tab << "outs: \n";
 			for(auto & q : outs.at(idx))
-				::out(COUT << tab, q)<<endl;
+				idni::out(COUT << tab, q)<<endl;
 		}
 	}
 	COUT << tab << "----------------------->" << endl;
@@ -197,3 +198,4 @@ bool var2space::quantify(vector<quant_t> &quantsh) const {
 	return true;
 }
 
+} // idni namespace

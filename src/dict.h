@@ -18,6 +18,8 @@
 #include <map>
 #include <functional>
 
+namespace idni {
+
 class inputs;
 class dict_t {
 	
@@ -78,4 +80,5 @@ public:
 template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const dict_t& d);
 
+} // idni namespace
 #endif // __DICT_H__

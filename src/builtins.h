@@ -23,6 +23,8 @@
 #include "dict.h"
 #include "ir_builder.h"
 
+namespace idni {
+
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
 typedef std::pair<bool, bdd_handles> blt_cache_value;
 typedef std::map<blt_cache_key, blt_cache_value> blt_cache;
@@ -163,4 +165,5 @@ struct builtins_factory {
 	builtins_factory& add_js_builtins();
 };
 
+} // idni namespace
 #endif // __BUILTINS_H__

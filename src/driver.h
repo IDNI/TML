@@ -34,6 +34,8 @@
 #include "options.h"
 #include "printing.h"
 
+namespace idni {
+
 #include "builtins.h"
 
 #include "tables_progress.h"
@@ -187,9 +189,12 @@ class driver {
 	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
 		z3_context &ctx);
 #endif
-	// following 2 methods are defined in a file tml_earley.cpp
-	bool earley_parse_tml(input* in, raw_progs& rps);
+	// following methods are defined in a file tml_earley.cpp
+#ifdef NEEDS_REWRITE
+	bool parse_tml(input* in, flat_prog& fp);
+	bool parse_tml_old(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();
+#endif
 
 	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
@@ -344,10 +349,13 @@ public:
 #ifdef DEBUG
 extern driver* drv;
 template <typename T>
-std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os, cr_spbdd_handle t,
-	size_t bits, ints ar, int_t rel);
+std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os,
+	idni::cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
 template <typename T>
+
 std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
 	size_t bits, ints ar, int_t rel);
 #endif
+
+} // idni namespace
 #endif

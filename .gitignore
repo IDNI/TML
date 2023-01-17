@@ -1,47 +1,10 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Misc
-.idea
 build
 build-*
-cmake-build*
-tml-config.cmake
+emsdk
+lib
 
-.vscode
-src/inputsave.cpp
-src/inputsave.h
-src/tmlsave.g
+cmake-build*
+*-config.cmake
 CMakeFiles
 CMakeFiles/*
 Makefile
@@ -50,9 +13,23 @@ CMakeCache.txt
 *.nocmake
 !cmake/*
 __pycache__
+*.o
+*.so
+*.a
+*.lib
+*.exe
+*.out
+
+# Editors
+.idea
+.vscode
+
+# Misc
+src/inputsave.cpp
+src/inputsave.h
+src/tmlsave.g
 src/doctest.h
 src/tml.g.cpp.bak*
-emsdk
 
 # Sonarqube
 .scannerwork

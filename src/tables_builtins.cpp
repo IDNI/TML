@@ -16,7 +16,7 @@
 
 using namespace std;
 
-extern uints perm_init(size_t n);
+namespace idni {
 
 void tables::fact_builtin(const term& b) {
 	blt_ctx c(b);
@@ -56,3 +56,4 @@ void tables::body_builtins(spbdd_handle x, alt* a, bdd_handles& hs) {
 	}
 }
 
+} // idni namespace

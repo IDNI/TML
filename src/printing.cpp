@@ -13,23 +13,12 @@
 #include <iostream>
 #include <sstream>
 #include <locale>
-
-#include "input.h"
-#include "output.h"
-#include "options.h"
-#include "tables.h"
+#include "printing.h"
 
 using namespace std;
 
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const pair<ccs, size_t>& p) {
-	for (size_t n = 0; n != p.second; ++n) os << p.first[n];
-	return os;
-}
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const pair<ccs, size_t>&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const pair<ccs, size_t>&);
-
-
+namespace idni {
+	
 basic_ostream<char>& operator<<(basic_ostream<char>& os, const lexeme& l) {
 	return os << to_string(lexeme2str(l));
 }
@@ -37,99 +26,9 @@ basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>& os, const lexeme& l){
 	return os << s2ws(to_string(lexeme2str(l)));
 }
 
-#ifdef DEBUG
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const bools& x) {
-	for (auto y:x) os << (y?1:0);
-	return os;
+bool isprint(const char32_t& ch) {
+	return ch < 256 ? ::isprint(ch) : true;// TODO is_printable for ch > 255
 }
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const bools&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const bools&);
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const vbools& x) {
-	for (auto y:x) os << y << endl;
-	return os;
-}
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const vbools&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const vbools&);
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const term& t) {
-	os << '[' << t.tab << "] ";
-	if (t.neg) os << "~ ";
-	for (size_t n = 0; n != t.size(); ++n) {
-		os << t[n];
-		if (n != t.size()-1) os << ' ';
-	}
-	return os;
-}
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const term&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const term&);
-#endif
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const directive& d) {
-	os << '@';
-	if (d.type == directive::BWD) return os << "bwd.";
-	if (d.type == directive::TRACE) return os << "trace." << endl;
-	if (d.type == directive::EDOMAIN)
-		return os << "domain " << d.domain_sym << ' ' << d.limit_num << ' '
-			<< d.arity_num << '.';
-	if (d.type == directive::EVAL)
-		return os << "eval " << d.eval_sym << ' ' << d.domain_sym << ' '
-			<< d.quote_sym << ' ' << d.timeout_num << '.';
-	if (d.type == directive::QUOTE)
-		return os << "quote " << d.quote_sym << ' ' << d.domain_sym << ' '
-			<< d.quote_str << '.';
-	if (d.type == directive::CODEC)
-		return os << "codec " << d.codec_sym << ' ' << d.domain_sym << ' '
-			<< d.quote_sym << ' ' << d.arity_num << '.';
-	if (d.type == directive::INTERNAL)
-		return os << "internal " << d.internal_term << '.';
-	if (d.type == directive::STDOUT) os << "stdout ";
-	else os << "string ";
-	if (d.type == directive::TREE) return os << d.t << '.';
-	return os << d.rel << ' ' << d.arg << '.';
-}
-template
-basic_ostream<char>& operator<<(basic_ostream<char>&, const directive&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const directive&);
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const elem& e) {
-	switch (e.type) {
-		case elem::CHR: return os << '\'' <<
-			(e.ch == U'\'' || e.ch == U'\\' ? "\\":"") <<
-			to_string(to_string_t(e.ch)) << '\'';
-		case elem::OPENP:
-		case elem::CLOSEP: return os << *e.e[0];
-		case elem::NUM:    return os << e.num;
-		case elem::BLTIN: if (e.num) {
-				if (e.num & 2) os << "renew ";
-				if (e.num & 1) os << "forget ";
-			}
-			return os << e.e;
-		default: return os << e.e;
-	}
-}
-template basic_ostream<char>& operator<<(basic_ostream<char>&, const elem&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const elem&);
-
-template <typename T>
-basic_ostream<T>& operator<<(basic_ostream<T>& os, const production& p) {
-	os << p.p[0] << " => ";
-	for (size_t n = 1; n  < p.p.size(); ++n) os << p.p[n] << ' ';
-	for (size_t n = 0; n != p.c.size(); ++n) os << ", " << p.c[n];
-	return os << '.';
-}
-template
-basic_ostream<char>& operator<<(basic_ostream<char>&, const production&);
-template
-basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const production&);
 
 std::string quote_sym(const elem& e) {
 	ostringstream_t os;
@@ -146,7 +45,7 @@ std::string quote_sym(const elem& e) {
 				}
 				for (size_t i = 0; i != chl; ++i) ss.put(*s++);
 			} else {
-				if (!q && !isalnum(*s) && *s != '_')
+				if (!q && !::isalnum(*s) && *s != '_')
 					os.put('"'), q = true;
 				if (q && (*s=='"'|| *s=='\\')) ss.put('\\');
 				ss.put(*s);
@@ -162,7 +61,7 @@ std::string quote_sym(const elem& e) {
 		case U'\t': os <<  "'\\t'"; break;
 		case U'\\': os << "'\\\\'"; break;
 		case U'\'': os <<  "'\\''"; break;
-		default: if (is_printable(e.ch)) os << e;
+		default: if (isprint(e.ch)) os << e;
 			else os << "'\\" << (e.ch < 256?'x':'u') << hex
 				<< setfill('0') << setw(e.ch<256?2:4)
 				<< (unsigned int) e.ch << "'";
@@ -770,3 +669,5 @@ ostream_t& print_to_delimited(const raw_term& rt, bool& error, bool to,
 	error = true;
 	return CNULL;
 }
+
+} // idni namespace

@@ -18,10 +18,12 @@
 #include "defs.h"
 #include "term.h"
 #include "typemanager.h"
-#include "earley.h"
+//#include "../lib/parser/src/parser.h"
+
+namespace idni {
 
 typedef std::set<std::vector<term>> flat_prog;
-typedef earley<char32_t> earley_t;
+//typedef idni::parser<char32_t> parser_t;
 
 #ifdef TYPE_RESOLUTION
 struct rt_vartypes {
@@ -109,12 +111,12 @@ public:
 	size_t sig_len(const sig& s) const;
 
 	std::set<int_t> str_rels;
-	#define LOAD_STRS
-	#ifdef LOAD_STRS
+#define LOAD_STRS
+#ifdef LOAD_STRS
 	strs_t strs;
 	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
 	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
-	#endif
+#endif
 
 	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);
@@ -139,6 +141,10 @@ public:
 	bool get_rule_substr_equality(std::vector<std::vector<term>> &eqr);
 	bool get_substr_equality(const raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);
+
+//	parser_t::grammar to_grammar(const std::vector<struct production> &g)
+//		const;
+//	void add_parsed_facts(flat_prog& p, const parser_t& pr);
 
 	bool transform_grammar(std::vector<struct production> g, flat_prog& p);
 	bool transform_apply_regex(std::vector<struct production> &g,  flat_prog& p);
@@ -304,7 +310,7 @@ struct unary_string{
 	std::vector<char32_t> sort_rel;
 
 	unary_string(size_t _pbsz);
-	bool buildfrom(string_t s) { return buildfrom(to_u32string(s)); }
+	bool buildfrom(string_t s) { return buildfrom(idni::to_u32string(s)); }
 	bool buildfrom(std::u32string s);
 	string_t getrelin_str(char32_t r);
 	ostream_t& toprint(ostream_t& o);
@@ -397,11 +403,11 @@ struct substitution: public transformer {
 	virtual bool apply(form *&phi);
 };
 
-struct ptransformer{
+struct ptransformer {
 	production &p;
 	std::vector<production> lp;
 	dict_t &d;
-	ptransformer(production &_p, dict_t &_d ): p(_p), d(_d) { }
+	ptransformer(production &_p, dict_t &_d): p(_p), d(_d) {}
 
 	bool parse_alt(std::vector<elem> &next, size_t& cur);
 	bool is_firstoffactor(elem &c);
@@ -461,4 +467,7 @@ struct parsing_context {
 	parsing_context(raw_progs& rps) : rps(rps) {}
 };
 
+string_t unquote(string_t str);
+
+} // idni namespace
 #endif

@@ -1,14 +1,21 @@
-/*
- * typemanager.h
- *
- *  Created on: Mar 20, 2022
- *      Author: juan
- */
-
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #ifndef SRC_TYPEMANAGER_H_
 #define SRC_TYPEMANAGER_H_
 
 #include "input.h"
+
+namespace idni {
 
 typedef std::shared_ptr<class environment> spenvironment;
 
@@ -39,10 +46,12 @@ struct context {
     std::string to_print() const {
         std::string ret;
         ret.append("\n");
-        for(auto &it: context_prim_var)
-          ret.append( to_string(it.first)+ ":" + it.second.to_print());
-        for(auto &it: context_typedef_var)
-          ret.append(to_string(it.first) + ":" + to_string(it.second));
+        for (auto &it : context_prim_var)
+        	ret.append(to_string(it.first) + ":" +
+			it.second.to_print());
+        for (auto &it : context_typedef_var)
+        	ret.append(to_string(it.first) + ":" +
+			to_string(it.second));
         return ret;
     }
 };
@@ -235,4 +244,5 @@ private:
     }
 };
 
+} // idni namespace
 #endif /* SRC_TYPECHECKER_H_ */

@@ -1,24 +1,23 @@
-# This lists file requires CMAKE_TOOLCHAIN_FILE to be set
+# This CMakeLists.txt file requires CMAKE_TOOLCHAIN_FILE to be set
 # to "<EMSCRIPTEN_DIR>/cmake/Modules/Platform/Emscripten.cmake"
-# or use emscripten_toolchain module from ../cmake
 # This setting must be done before using project()
 
 cmake_minimum_required(VERSION 3.13)
 
-project(tml)
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
 
 option(WITH_THREADS "use Threads" FALSE)
 
+set(WITH_ARITH TRUE CACHE BOOL "")
+set(WITH_MMAP TRUE CACHE BOOL "")
+
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-include(tml-common)
+include(init)
 
 set(JSLIB_SOURCES
-	../src/bdd.cpp
-	../src/bdd.h
-	../src/bdd_arith.cpp
 	../src/builtins.cpp
 	../src/builtins.h
-	../src/char_defs.h
 	../src/cpp_gen.cpp
 	../src/cpp_gen.h
 	../src/defs.h
@@ -26,8 +25,6 @@ set(JSLIB_SOURCES
 	../src/dict.h
 	../src/driver.cpp
 	../src/driver.h
-	../src/earley.cpp
-	../src/earley.h
 	../src/err.h
 	../src/form.cpp
 	../src/form.h
@@ -35,7 +32,6 @@ set(JSLIB_SOURCES
 	../src/input.h
 	../src/ir_builder.cpp
 	../src/ir_builder.h
-	../src/memory_map.h
 	../src/options.cpp
 	../src/options.h
 	../src/output.cpp
@@ -56,6 +52,16 @@ set(JSLIB_SOURCES
 	../src/typemanager.cpp
 	../src/typemanager.h
 	../src/utils.cpp
+	# BDD library
+	../lib/bdd/src/bdd.cpp
+	../lib/bdd/src/bdd.h
+	../lib/bdd/src/bdd_arith.cpp
+	../lib/bdd/src/memory_map.h
+	# parser library
+	../lib/parser/src/parser.cpp
+	../lib/parser/src/parser.h
+	../lib/parser/src/characters.cpp
+	../lib/parser/src/characters.h
 )
 
 set(JSLIB_COMPILE_OPTIONS
@@ -75,23 +81,36 @@ string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_THROWING=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s DISABLE_EXCEPTION_CATCHING=1")
 string(APPEND JSLIB_LINK_OPTIONS " -s 'EXPORTED_RUNTIME_METHODS=[\"lengthBytesUTF8\",\"stringToUTF8\"]'")
 string(APPEND JSLIB_LINK_OPTIONS " -s ASSERTIONS=1")
+
 #string(APPEND JSLIB_LINK_OPTIONS " -s FETCH=1")
 #string(APPEND JSLIB_LINK_OPTIONS " -s WARN_UNALIGNED=1")
+
+#string(APPEND JSLIB_LINK_OPTIONS " -s LINKABLE=1")
+#string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_ALL=1")
+
+#string(APPEND JSLIB_LINK_OPTIONS " -sLLD_REPORT_UNDEFINED")
 
 # tmllib.js library
 add_executable(tmllib)
 target_setup(tmllib)
+target_pass_features_on(tmllib)
 target_compile_options(tmllib PRIVATE ${JSLIB_COMPILE_OPTIONS})
 set_target_properties(tmllib PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
-target_sources(tmllib PRIVATE ${JSLIB_SOURCES})	
+target_sources(tmllib PRIVATE ${JSLIB_SOURCES})
 target_compile_definitions(tmllib PRIVATE "-DNODEFSMOUNT")
+target_compile_definitions(tmllib PRIVATE "-DWITH_ARITH")
+
 
 # tml.js module
-set(MODULE_LINK_OPTIONS ${JSLIB_LINK_OPTIONS})
-string(APPEND MODULE_LINK_OPTIONS " -s EXPORT_ES6=1")
-string(APPEND MODULE_LINK_OPTIONS " -s ENVIRONMENT='web,worker'")
-add_executable(tml)
-target_setup(tml)
-target_compile_options(tml PRIVATE ${JSLIB_COMPILE_OPTIONS})
-set_target_properties(tml PROPERTIES LINK_FLAGS ${MODULE_LINK_OPTIONS})
-target_sources(tml PRIVATE ${JSLIB_SOURCES})
+if(BUILD_JSMODULE)
+	set(MODULE_LINK_OPTIONS ${JSLIB_LINK_OPTIONS})
+	string(APPEND MODULE_LINK_OPTIONS " -s EXPORT_ES6=1")
+	string(APPEND MODULE_LINK_OPTIONS " -s ENVIRONMENT='web,worker'")
+	add_executable(tmljs)
+	target_setup(tmljs)
+	target_pass_features_on(tmljs)
+	target_compile_options(tmljs PRIVATE ${JSLIB_COMPILE_OPTIONS})
+	set_target_properties(tmljs PROPERTIES LINK_FLAGS ${MODULE_LINK_OPTIONS})
+	target_sources(tmljs PRIVATE ${JSLIB_SOURCES})
+	target_compile_definitions(tmljs PRIVATE "-DWITH_ARITH")
+endif()

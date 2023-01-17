@@ -31,16 +31,11 @@
 #endif
 #endif
 
-typedef int32_t int_t;
-typedef uint32_t uint_t;
-typedef std::vector<uint_t> uints;
-typedef std::vector<int_t> ints;
-typedef std::vector<bool> bools;
-typedef std::vector<bools> vbools;
-typedef int_t ntable;
-typedef size_t nlevel;
+#define WITH_ARITH 1
+#include "../lib/bdd/src/bdd.h"
+#include "../lib/parser/src/characters.h"
 
-#include "char_defs.h"
+namespace idni {
 
 #ifdef DEBUG
 #define DBG(x) x
@@ -51,6 +46,73 @@ typedef size_t nlevel;
 #define NDBG(x) x
 #define DBGFAIL
 #endif
+
+typedef int32_t int_t;
+typedef uint32_t uint_t;
+typedef std::vector<uint_t> uints;
+typedef std::vector<int_t> ints;
+typedef std::vector<bool> bools;
+typedef std::vector<bools> vbools;
+typedef int_t ntable;
+typedef size_t nlevel;
+
+extern std::wostream wcnull;
+extern std::ostream cnull;
+
+#ifdef WITH_WCHAR
+typedef wchar_t syschar_t;
+#define CIN   std::wcin
+#define COUT  std::wcout
+#define CERR  std::wcerr
+#define CNULL wcnull
+#define EMPTY_STRING L""
+#else // WITH_WCHAR
+typedef char syschar_t;
+#define CIN   std::cin
+#define COUT  std::cout
+#define CERR  std::cerr
+#define CNULL cnull
+#define EMPTY_STRING ""
+#endif // WITH_WCHAR
+
+typedef utf8char char_t;
+typedef utf8string string_t;
+std::string to_string(int_t v);
+template <typename T>
+string_t to_string_t(const T& v) { return to_utf8string(v); }
+
+typedef std::basic_string<syschar_t>        sysstring_t;
+typedef std::basic_istream<syschar_t>       istream_t;
+typedef std::basic_ostream<syschar_t>       ostream_t;
+typedef std::basic_ofstream<syschar_t>      ofstream_t;
+typedef std::basic_ostringstream<syschar_t> ostringstream_t;
+typedef std::basic_istringstream<syschar_t> istringstream_t;
+typedef std::vector<std::string>            strings;
+typedef std::vector<std::wstring>           wstrings;
+
+typedef const char_t* ccs;
+typedef std::array<ccs, 2> lexeme;
+const lexeme null_lexeme{ 0, 0 };
+typedef std::vector<lexeme> lexemes;
+typedef std::array<size_t, 2> lexeme_range;
+
+struct lexcmp { bool operator()(const lexeme& x, const lexeme& y) const; };
+bool operator==(const lexeme& l, std::string s);
+bool operator==(const lexeme& l, const char* s);
+bool operator<(const lexeme&, const lexeme&);
+bool operator==(const lexeme& x, const lexeme& y);
+#define lexeme2str(l) string_t((l)[0], (l)[1]-(l)[0])
+#define str2lexeme(s) { (unsigned char *) (s), (unsigned char *) (s) + sizeof(s) - 1 }
+
+typedef std::map<lexeme, string_t, lexcmp> strs_t;
+
+std::wstring s2ws(const std::string&);
+std::wstring s2ws(const std::wstring&);
+std::string  ws2s(const std::string&);
+std::string  ws2s(const std::wstring&);
+
+std::wostream& operator<<(std::wostream& os, const std::string& s);
+std::ostream&  operator<<(std::ostream&  os, const char c);
 
 #define msb(x) ((sizeof(unsigned long long)<<3) - \
 	__builtin_clzll((unsigned long long)(x)))
@@ -66,8 +128,6 @@ typedef size_t nlevel;
 #define elem_openp elem(elem::OPENP)
 #define elem_closep elem(elem::CLOSEP)
 #define elem_eq elem(elem::EQ, get_lexeme("="))
-#define htrue bdd_handle::T
-#define hfalse bdd_handle::F
 
 template<typename T> T sort(const T& x){T t=x;return sort(t.begin(),t.end()),t;}
 
@@ -84,22 +144,6 @@ template<template<class, class, class ...> class M, typename K, typename V, type
 	}
 }
 
-/* Generically hash vectors using the hasher for the element type. */
-
-template<typename X> struct std::hash<std::vector<X>> {
-	size_t operator()(const std::vector<X>&) const;
-};
-
-template<typename X> size_t
-		std::hash<std::vector<X>>::operator()(const std::vector<X>& vec) const {
-	std::hash<X> hasher;
-	size_t seed = vec.size();
-	for(auto& i : vec) {
-		seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	}
-	return seed;
-}
-
 #ifdef _WIN32
 std::string temp_filename();
 #else
@@ -110,7 +154,7 @@ std::string filename(int fd);
 typedef std::map<int_t, int_t> env;
 
 // Modes in which proof extraction code can be run
-enum proof_mode { none, tree, forest, partial_tree, partial_forest };
+enum proof_mode { none, tree, forest_mode, partial_tree, partial_forest };
 
 //runtime options
 typedef struct {
@@ -124,7 +168,9 @@ typedef struct {
 } rt_options;
 
 
-typedef enum { REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2 } t_term;
+typedef enum {
+	REL, EQ, LEQ, BLTIN, ARITH, CONSTRAINT, VAR, FORM1, FORM2
+} t_term;
 
 typedef enum  {
 	NOP, ADD, SUB, MULT, BITWAND, BITWOR, BITWXOR, BITWNOT, SHR, SHL
@@ -134,9 +180,7 @@ struct alt;
 struct form;
 struct body;
 struct pnf_t;
-typedef enum {EX, UN, FA, EXH, UNH, FAH} quant_t;
 typedef std::map<int_t, size_t> varmap;
-typedef std::shared_ptr<class bdd_handle> spbdd_handle;
 typedef std::shared_ptr<form> spform_handle;
 typedef const spform_handle& cr_spform_handle;
 
@@ -192,5 +236,7 @@ typedef std::pair<int_t, ints> sig;
 #ifndef GIT_BRANCH
 #define GIT_BRANCH      "n/a"
 #endif
+
+} // idni namespace
 
 #endif // __DEFS_H__

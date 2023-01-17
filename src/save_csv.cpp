@@ -11,8 +11,12 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <fstream>
+#include <iostream>
 #include "driver.h"
+
 using namespace std;
+
+namespace idni {
 
 void driver::save_csv() const {
 	// TODO use driver methods
@@ -46,3 +50,5 @@ void driver::save_csv() const {
 		os << endl;
 	}); */
 }
+
+} // idni namespace

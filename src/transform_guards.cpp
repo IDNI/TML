@@ -15,6 +15,8 @@
 
 using namespace std;
 
+namespace idni {
+
 lexeme ir_builder::lx_id(string name, int_t id, int_t id2) {
 	static std::string s = "__";
 	std::stringstream ss;
@@ -166,3 +168,4 @@ void ir_builder::transform_guard_statements(raw_prog& trp, raw_prog& rp) {
 	for (auto& prog : rp.nps) transform_guard_statements(trp, prog);
 }
 
+} // idni namespace

@@ -18,6 +18,8 @@
 
 using namespace std;
 
+namespace idni {
+
 void options::add(option o) {
 	set(o.name(), o);
 	for (auto n : o.names()) alts[n] = o.name();
@@ -155,7 +157,7 @@ void options::setup() {
 				<< GIT_DESCRIBED << endl;
 			DBG(if (v.get_bool()) o::out()
 				<< "commit: " << GIT_COMMIT_HASH << " ("
-				<< GIT_BRANCH << ')' <<endl;)
+				<< GIT_BRANCH << ")" <<endl;)
 		})
 		.description("this help"));
 	add(option(option::type::STRING, { "input", "i" },
@@ -362,3 +364,5 @@ void options::help(std::basic_ostream<T>& os) const {
 	os<<"\t@buffer\tredirect to buffer to be read through API later\n";
 	os<<"\t@name\tredirect to a file named by --name (ext predefined)\n";
 }
+
+} // idni namespace

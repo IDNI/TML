@@ -21,6 +21,7 @@
 #include "repl.h"
 #endif
 using namespace std;
+using namespace idni;
 
 int main(int argc, char** argv) {
 	setlocale(LC_ALL, "");

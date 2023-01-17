@@ -16,6 +16,8 @@
 #include "udp.h"
 #include "async_reader.h"
 
+namespace idni {
+
 class istream_async_reader : public async_reader<sysstring_t> {
 public:
 	istream_async_reader(istream_t* is) : async_reader(), is(is) { }
@@ -105,4 +107,5 @@ private:
 	void break_on_step(size_t brs)                    { run(0, brs); };
 };
 
+} // idni namespace
 #endif

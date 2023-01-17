@@ -14,6 +14,8 @@
 
 using namespace std;
 
+namespace idni {
+
 wostream wcnull(0);
 ostream cnull(0);
 
@@ -129,3 +131,5 @@ void outputs::target(const string& n, const string& t) {
 		DBGFAIL;
 	}
 }
+
+} // idni namespace

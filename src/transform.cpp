@@ -13,7 +13,10 @@
 #include <cstring>
 #include "driver.h"
 #include "err.h"
+
 using namespace std;
+
+namespace idni {
 
 #define get_var_elem(i) elem(elem::VAR, dict.get_var_lexeme(i))
 
@@ -85,15 +88,15 @@ void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel)
 			elem((char32_t) s[n]),
 			elem(n+1),
 			elem_closep})));
-		if (isspace(s[n]))
+		if (::isspace(s[n]))
 			r.r.push_back(from_string_lex(rel, "space", n));
-		if (isdigit(s[n]))
+		if (::isdigit(s[n]))
 			r.r.push_back(from_string_lex(rel, "digit", n));
-		if (isalpha(s[n]))
+		if (::isalpha(s[n]))
 			r.r.push_back(from_string_lex(rel, "alpha", n));
-		if (isalnum(s[n]))
+		if (::isalnum(s[n]))
 			r.r.push_back(from_string_lex(rel, "alnum", n));
-		if (isprint(s[n]))
+		if (::isprint(s[n]))
 			r.r.push_back(from_string_lex(rel, "printable", n));
 	}
 }
@@ -326,3 +329,5 @@ void driver::transform_state_blocks(raw_prog &rp, set<lexeme> guards) {
 	}
 	rp.sbs.clear();
 }
+
+} // idni namespace
