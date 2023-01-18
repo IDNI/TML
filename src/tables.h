@@ -18,10 +18,7 @@
 #include <vector>
 #include <tuple>
 #include <functional>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/val.h>
-#endif
+#include "bdd.h"
 #include "term.h"
 #include "dict.h"
 #include "input.h"
@@ -32,6 +29,11 @@
 
 // TODO remove include and add alternative ones
 #include "ir_builder.h"
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/val.h>
+#endif
 
 namespace idni {
 

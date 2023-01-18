@@ -12,4 +12,4 @@
 // modified over time by the Author.
 
 namespace idni { 
-}
+} // nmaespace idni

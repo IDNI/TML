@@ -33,12 +33,11 @@
 #include "output.h"
 #include "options.h"
 #include "printing.h"
+#include "builtins.h"
+#include "tables_progress.h"
 
 namespace idni {
 
-#include "builtins.h"
-
-#include "tables_progress.h"
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;

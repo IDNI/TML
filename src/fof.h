@@ -20,6 +20,7 @@ typedef int_t rel;
 #define TML
 
 #ifdef TML
+#include "ir_builder.h"
 #include "term.h"
 #else
 typedef std::vector<int_t> term; // first rel, then args. negative rel means negated
@@ -43,7 +44,6 @@ prog all(const prog&, int_t v, int_t t);
 f_prog unseq(const prog&);
 
 #ifdef TML
-#include "ir_builder.h"
 void print_fof(prog& p, ir_builder *irb);
 void to_flat_prog(term &h, ir_builder *irb, const prog& p, flat_prog &m);
 void fof_init_tables(std::vector<term> &v);

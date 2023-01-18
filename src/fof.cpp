@@ -16,13 +16,18 @@
 #include <cassert>
 #include <iostream>
 
+#ifdef TML
+#include <ir_builder.h>
+#endif
+
 using namespace std;
+
+
+namespace idni { 
 
 #ifdef TML
 ir_builder *builder;
 #endif
-
-namespace idni { 
 
 ostream& operator<<(ostream& os, const term& t) {
 

@@ -37,8 +37,6 @@ int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num);
 int strncmp(const unsigned char* str1, const char* str2, size_t num);
 int strcmp(const unsigned char* str1, const char* str2);
 
-using namespace idni;
-
 /**
  * input class contains input data. input can be one of three types: STDIN,
  * FILE or STRING. STDIN works as a STRING which is read from the standard input
@@ -160,7 +158,7 @@ struct input {
 	static off_t fsize(const char *fname);
 	static off_t fsize(ccs s, size_t len);
 private:
-	idni::memory_map mm_;
+	memory_map mm_;
 	ccs beg_  = 0;
 	ccs data_ = 0;
 	size_t size_ = 0;
@@ -334,12 +332,8 @@ struct elem {
 typedef std::pair<lexeme, ints> signature;
 bool operator<(const signature& m, const signature &n);
 bool operator==(const signature& m, const signature &n);
-}
 template<> struct std::less<idni::signature> {
 	bool operator()(const idni::signature&, const idni::signature&) const;
-};
-// -->
-namespace idni {
 
 enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
 struct raw_term;
@@ -928,11 +922,12 @@ std::basic_ostream<T>& print_raw_rule(std::basic_ostream<T>& os,
 
 bool operator<(const raw_rule& x, const raw_rule& y);
 
-} // idni namespace
+}; // idni namespace
 
 template<> struct std::hash<idni::lexeme> {
 	size_t operator()(const idni::lexeme&) const;
 };
+
 template<> struct std::less<idni::lexeme> {
 	bool operator()(const idni::lexeme&, const idni::lexeme&) const;
 };

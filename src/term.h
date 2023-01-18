@@ -100,5 +100,5 @@ struct natcmp {
 
 typedef std::set<term, natcmp> term_set;
 
-}
+} // namespace idni
 #endif
