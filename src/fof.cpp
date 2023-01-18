@@ -17,7 +17,7 @@
 #include <iostream>
 
 #ifdef TML
-#include <ir_builder.h>
+#include "ir_builder.h"
 #endif
 
 using namespace std;
