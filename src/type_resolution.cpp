@@ -16,6 +16,8 @@
 
 using namespace std;
 
+namespace idni { 
+
 #define ever ;;
 
 typedef map<int_t, rel> tdecl;
@@ -75,3 +77,5 @@ void infer_types(vector<rule>& p) {
         for (rule& r : p) move_to_head(r);
         infer_types(p, rels);
 }
+
+} // namespace idni 

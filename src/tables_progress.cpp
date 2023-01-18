@@ -15,6 +15,8 @@
 
 using namespace std;
 
+namespace idni { 
+
 void tables_progress::add_tml_update(tables &ts, const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
 	ir_handler.nums = max(ir_handler.nums, (int_t)ts.nstep);
@@ -44,3 +46,5 @@ void tables_progress::notify_update(tables &t, spbdd_handle& x, const rule& r) {
 	});
 	if (t.print_updates) o::inf() << endl;
 }
+
+} // namespace idni

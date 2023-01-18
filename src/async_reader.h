@@ -19,6 +19,8 @@
 #include <atomic>
 #include <mutex>
 
+namespace idni {
+
 template <typename T>
 class async_reader {
 public:
@@ -49,4 +51,5 @@ protected:
 	virtual void read_in_thread() = 0;
 };
 
+} // namespace idni 
 #endif

@@ -25,6 +25,8 @@ typedef int_t rel;
 typedef std::vector<int_t> term; // first rel, then args. negative rel means negated
 #endif
 
+namespace idni {
+
 typedef std::set<term> clause;
 typedef std::set<clause> dnf;
 typedef std::vector<std::pair<term, dnf>> prog;
@@ -46,5 +48,7 @@ void print_fof(prog& p, ir_builder *irb);
 void to_flat_prog(term &h, ir_builder *irb, const prog& p, flat_prog &m);
 void fof_init_tables(std::vector<term> &v);
 #endif
+
+} // namespace idni
 
 

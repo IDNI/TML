@@ -15,6 +15,9 @@
 
 using namespace std;
 
+
+namespace idni {
+	
 template <typename T>
 void driver::out_goals(std::basic_ostream<T> &os) {
 	if (tbl->goals.size()) {
@@ -73,3 +76,5 @@ template
 void driver::out_result(std::basic_ostream<char> &os);
 template
 void driver::out_result(std::basic_ostream<wchar_t> &os);
+
+} // namespace idni

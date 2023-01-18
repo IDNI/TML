@@ -22,6 +22,8 @@ using namespace std;
 ir_builder *builder;
 #endif
 
+namespace idni { 
+
 ostream& operator<<(ostream& os, const term& t) {
 
 #ifdef TML
@@ -315,3 +317,5 @@ void print_fof(prog& p, ir_builder *irb) {
 	cout << p << endl;
 }
 #endif
+
+} // namespace idni

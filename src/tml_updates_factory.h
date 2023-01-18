@@ -17,6 +17,7 @@
 #include "dict.h"
 #include "tables.h"
 
+namespace idni { 
 struct updates_factory {
 
 	updates updts;
@@ -25,5 +26,5 @@ struct updates_factory {
 	bool add_updates() { /* add symbols */ }
 	updates get();
 };
-
+} // namespace idni
 #endif __UPDATES_FACTORY_H__
