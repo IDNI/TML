@@ -15,12 +15,12 @@
 
 #include <functional>
 
-
 #include "defs.h"
 //#include "char_defs.h"
 #include "term.h"
 #include "bdd.h"
 #include "dict.h"
+#include "input.h"
 #include "ir_builder.h"
 
 namespace idni {

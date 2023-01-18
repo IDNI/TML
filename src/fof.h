@@ -32,7 +32,7 @@ typedef std::set<term> clause;
 typedef std::set<clause> dnf;
 typedef std::vector<std::pair<term, dnf>> prog;
 
-typedef std::set<std::pair<clause, dnf>> f_prog; //
+typedef std::set<std::pair<clause, dnf>> f_prog;
 
 prog from_term(const term&);
 prog operator&&(const prog&, const prog&);
