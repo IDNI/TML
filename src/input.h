@@ -332,9 +332,14 @@ struct elem {
 typedef std::pair<lexeme, ints> signature;
 bool operator<(const signature& m, const signature &n);
 bool operator==(const signature& m, const signature &n);
+}
+
 template<> struct std::less<idni::signature> {
 	bool operator()(const idni::signature&, const idni::signature&) const;
+};
 
+// -->
+namespace idni {
 enum state_value { INIT, START, ADDS, DELS, RULE, COND, FP, CURR };
 struct raw_term;
 struct raw_rule;

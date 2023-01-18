@@ -1557,6 +1557,7 @@ bool lexcmp::operator()(const lexeme& x, const lexeme& y) const {
 		if (x[0][n] != y[0][n]) return x[0][n] < y[0][n];
 	return false;
 }
+} // idni namespace
 
 bool less<signature>::operator()(const signature& m, const signature &n) const {
 	return less<lexeme>()(m.first, n.first) ||
@@ -1570,5 +1571,3 @@ size_t hash<lexeme>::operator()(const lexeme& m) const {
 	string_t str = lexeme2str(m);
 	return hash<string>()(string(str.begin(), str.end()));
 }
-
-} // idni namespace
