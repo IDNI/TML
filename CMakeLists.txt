@@ -79,13 +79,30 @@ message(STATUS "BUILD_TML_CHECK: ${BUILD_TML_CHECK}")
 ################################################################################
 
 set(PROJECT_HEADERS
+	src/builtins.h
+	src/cpp_gen.h
+	src/defs.h
+	src/dict.h
 	src/driver.h
+	src/err.h
+	src/fof.h
+	src/form.h
+	src/input.h
+	src/ir_builder.h
+	src/options.h
+	src/output.h
+	src/printing.h
+	src/tables.h
+	src/tables_progress.h
+	src/typemanager.h
 )
+
 set(PROJECT_SOURCES
 	src/builtins.cpp
 	src/cpp_gen.cpp
 	src/dict.cpp
 	src/driver.cpp
+	src/fof.cpp
 	src/form.cpp
 	src/input.cpp
 	src/ir_builder.cpp
@@ -95,6 +112,8 @@ set(PROJECT_SOURCES
 	src/proof.cpp
 	src/save_csv.cpp
 	src/tables.cpp
+	src/tables_progress.cpp
+	src/tables_printer.cpp
 	src/tables_builtins.cpp
 	src/tables_ext.cpp
 	src/tml_earley.cpp
@@ -104,6 +123,7 @@ set(PROJECT_SOURCES
 	src/typemanager.cpp
 	src/utils.cpp
 )
+
 if(WITH_THREADS)
 	set(CLI_SOURCES src/main.cpp src/repl.cpp)
 else()
