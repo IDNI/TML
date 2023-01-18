@@ -21,7 +21,6 @@
 #include "typemanager.h"
 
 using namespace std;
-using namespace idni;
 
 namespace idni {
 

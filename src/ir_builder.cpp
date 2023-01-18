@@ -37,13 +37,7 @@ string_t unquote(string_t str) {
 	return str;
 }
 
-string_t unquote(string_t str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
-	return str;
-}
 
->>>>>>> tklip/integratelibs
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
 	for (size_t k = 0; k != v.size(); ++k)

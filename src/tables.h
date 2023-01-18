@@ -455,17 +455,17 @@ private:
 		size_t out_varid, spbdd_handle in0, spbdd_handle in1,
 		size_t n_vars, t_arith_op op);
 
-	#ifdef FOL_V1
-	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
-	void ex_typebits(spbdd_handle &s, size_t nvars) const;
-	void ex_typebits(bools &exvec, size_t nvars) const;
-	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
-	void get_form(const term_set& al, const term& h, std::set<alt>& as);
-	void fol_query(cr_pnft_handle f, bdd_handles& v);
-	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
-		var2space &v2s, bdd_handles &v);
-	void formula_query(cr_pnft_handle f, bdd_handles& v);
-	#endif
+//	#ifdef FOL_V1
+//	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
+//	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+//	void ex_typebits(bools &exvec, size_t nvars) const;
+//	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
+//	void get_form(const term_set& al, const term& h, std::set<alt>& as);
+//	void fol_query(cr_pnft_handle f, bdd_handles& v);
+//	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
+//		var2space &v2s, bdd_handles &v);
+//	void formula_query(cr_pnft_handle f, bdd_handles& v);
+//	#endif
 
 	//-------------------------------------------------------------------------
 	//printer
