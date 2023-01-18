@@ -209,9 +209,9 @@ if(BUILD_EXECUTABLE)
 	target_link_libraries(${EXECUTABLE_NAME}
 		${OBJECT_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXECUTABLE_NAME} PUBLIC 
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
 
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXECUTABLE_NAME} gcov)
@@ -229,9 +229,9 @@ if(BUILD_SHARED_EXECUTABLE)
 	target_link_libraries(${EXE_SHARED_NAME}
 		${SHARED_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXE_SHARED_NAME} PUBLIC 
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXE_SHARED_NAME} gcov)
 	endif()
@@ -252,9 +252,9 @@ if(BUILD_TESTS)
 	add_library(doctest INTERFACE)
 	target_compile_definitions(doctest INTERFACE TML_USE_DOCTEST)
 	target_include_directories(doctest PUBLIC 
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)	
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
 	set(TEST_FRAMEWORK doctest)
 	enable_testing()
 	add_subdirectory(tests)
