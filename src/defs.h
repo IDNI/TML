@@ -32,8 +32,10 @@
 #endif
 
 #define WITH_ARITH 1
-#include "../lib/bdd/src/bdd.h"
-#include "../lib/parser/src/characters.h"
+#include "bdd.h"
+#include "characters.h"
+//#include "../lib/bdd/src/bdd.h"
+//#include "../lib/parser/src/characters.h"
 
 namespace idni {
 

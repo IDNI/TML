@@ -132,10 +132,10 @@ endfunction()
 
 if(NOT BUILD_JSLIB)
 	set(WITH_TO_METHODS TRUE CACHE BOOL "")
-	add_subdirectory(lib/parser)
+	add_subdirectory(external/parser)
 	set(WITH_ARITH TRUE CACHE BOOL "")
 	set(WITH_MMAP TRUE CACHE BOOL "")
-	add_subdirectory(lib/bdd)
+	add_subdirectory(external/bdd)
 endif()
 
 target_pass_features_on(${OBJECT_LIB_NAME})
@@ -188,6 +188,11 @@ if(BUILD_EXECUTABLE)
 	)
 	target_link_libraries(${EXECUTABLE_NAME}
 		${OBJECT_LIB_NAME} idni_bdd_object idni_parser_object)
+	target_include_directories(${EXECUTABLE_NAME} PUBLIC 
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXECUTABLE_NAME} gcov)
 	endif()
@@ -203,6 +208,10 @@ if(BUILD_SHARED_EXECUTABLE)
 	)
 	target_link_libraries(${EXE_SHARED_NAME}
 		${SHARED_LIB_NAME} idni_bdd_object idni_parser_object)
+	target_include_directories(${EXE_SHARED_NAME} PUBLIC 
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXE_SHARED_NAME} gcov)
 	endif()
@@ -222,6 +231,10 @@ if(BUILD_TESTS)
 	endif()
 	add_library(doctest INTERFACE)
 	target_compile_definitions(doctest INTERFACE TML_USE_DOCTEST)
+	target_include_directories(doctest PUBLIC 
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/bdd/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/external/parser/src
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)	
 	set(TEST_FRAMEWORK doctest)
 	enable_testing()
 	add_subdirectory(tests)

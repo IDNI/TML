@@ -24,8 +24,8 @@
 
 #include "defs.h"
 #include "dict.h"
-#include "../lib/bdd/src/memory_map.h"
-#include "../lib/parser/src/characters.h"
+#include "memory_map.h"
+#include "characters.h"
 
 namespace idni {
 

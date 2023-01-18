@@ -17,7 +17,7 @@
 
 
 #include "defs.h"
-#include "char_defs.h"
+//#include "char_defs.h"
 #include "term.h"
 #include "bdd.h"
 #include "dict.h"
