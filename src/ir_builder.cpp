@@ -29,8 +29,6 @@ namespace idni {
 ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
 		dict(dict_), opts(opts_) { }
 
-ir_builder::~ir_builder() { }
-
 string_t unquote(string_t str) {
 	for (size_t i = 0; i != str.size(); ++i)
 		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
