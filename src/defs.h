@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <cstring>
 
 #ifndef __EMSCRIPTEN__
 #ifdef __unix__
@@ -34,8 +35,7 @@
 #define WITH_ARITH 1
 #include "bdd.h"
 #include "characters.h"
-//#include "../lib/bdd/src/bdd.h"
-//#include "../lib/parser/src/characters.h"
+
 
 namespace idni {
 
@@ -49,6 +49,8 @@ namespace idni {
 #define DBGFAIL
 #endif
 
+typedef unsigned char char_t;               // internal char representation
+typedef char_t* cstr;
 typedef int32_t int_t;
 typedef uint32_t uint_t;
 typedef std::vector<uint_t> uints;

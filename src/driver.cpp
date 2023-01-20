@@ -3992,7 +3992,9 @@ driver::~driver() {
 	if (tbl) delete tbl;
 	if (ir) delete ir;
 }
+
 // ----------------------------------------------------------------------------
+
 template <typename T>
 void driver::list(std::basic_ostream<T>& os, size_t /*n*/) {
 	os << rp.p << endl;

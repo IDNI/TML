@@ -143,6 +143,7 @@ struct gnode {
 	static std::map<std::set<term>, gnode*> interm2g;
 	bool _binarise();
 };
+
 struct table {
 	sig s;
 	size_t len, priority = 0;
@@ -226,7 +227,6 @@ public:
 
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
-private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -237,6 +237,7 @@ private:
 
 
 	bool datalog, halt = false, unsat = false, bcqc = false;
+private:
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
 		DBG(assert(bit < nbits && arg < args);)
@@ -293,8 +294,7 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
-	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits)
-		const;
+
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
@@ -304,8 +304,7 @@ private:
 	body get_body(const term& t, const varmap&, size_t len) const;
 
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
-	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits)
-		const;
+
 	uints addtail(size_t len1, size_t len2) const;
 	spbdd_handle addtail(idni::cr_spbdd_handle x, size_t len1, size_t len2)
 		const;
@@ -416,8 +415,6 @@ private:
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
-	void ex_typebits(spbdd_handle &s, size_t nvars) const;
-	void ex_typebits(bools &exvec, size_t nvars) const;
 	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in,
 		size_t n_vars);
 	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
@@ -457,17 +454,17 @@ private:
 		size_t out_varid, spbdd_handle in0, spbdd_handle in1,
 		size_t n_vars, t_arith_op op);
 
-//	#ifdef FOL_V1
-//	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
-//	void ex_typebits(spbdd_handle &s, size_t nvars) const;
-//	void ex_typebits(bools &exvec, size_t nvars) const;
-//	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
-//	void get_form(const term_set& al, const term& h, std::set<alt>& as);
-//	void fol_query(cr_pnft_handle f, bdd_handles& v);
-//	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
-//		var2space &v2s, bdd_handles &v);
-//	void formula_query(cr_pnft_handle f, bdd_handles& v);
-//	#endif
+	#ifdef FOL_V1
+	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
+	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+	void ex_typebits(bools &exvec, size_t nvars) const;
+	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
+	void get_form(const term_set& al, const term& h, std::set<alt>& as);
+	void fol_query(cr_pnft_handle f, bdd_handles& v);
+	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
+		var2space &v2s, bdd_handles &v);
+	void formula_query(cr_pnft_handle f, bdd_handles& v);
+	#endif
 
 	//-------------------------------------------------------------------------
 	//printer

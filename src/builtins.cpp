@@ -16,6 +16,7 @@
 #include "tables.h"
 
 using namespace std;
+using namespace idni;
 
 namespace idni {
 
