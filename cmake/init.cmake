@@ -73,10 +73,10 @@ set(PGO_OPTIONS
 
 set(COMPILE_OPTIONS
 	"$<IF:$<CONFIG:Debug>,${DEBUG_OPTIONS},${RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto>"
+	"$<$<CONFIG:Release>:-flto=auto>"
 	${PGO_OPTIONS}
 )
-set(LINK_OPTIONS "${PGO_OPTIONS};-flto")
+set(LINK_OPTIONS "${PGO_OPTIONS};-flto=auto")
 
 if (BUILD_CODE_COVERAGE)
 	set(DEBUG_OPTIONS "${DEBUG_OPTIONS}" --coverage)

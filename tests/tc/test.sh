@@ -5,7 +5,7 @@ mkdir -p build-test && cd build-test
 rm -f CMakeCache.txt
 cmake ../../../src
 make -j4
-#g++ -std=c++1y tree.cpp transform.cpp output.cpp bdd.cpp dict.cpp driver.cpp input.cpp lp.cpp main.cpp query.cpp rule.cpp -W -Wall -Wpedantic -otml -O3 -flto # compile tml with optimization flags
+#g++ -std=c++1y tree.cpp transform.cpp output.cpp bdd.cpp dict.cpp driver.cpp input.cpp lp.cpp main.cpp query.cpp rule.cpp -W -Wall -Wpedantic -otml -O3 -flto=auto # compile tml with optimization flags
 cd -
 /usr/bin/time -v ./build-test/tml < $1.tml > r # run tml, sort the output and save it into file "r"
 sort r > r1

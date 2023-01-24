@@ -34,9 +34,9 @@ set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(RELEASE_OPTIONS "-O3;-DNDEBUG")
 set(COMPILE_OPTIONS
 	"$<IF:$<CONFIG:Debug>,${DEBUG_OPTIONS},${RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto>"
+	"$<$<CONFIG:Release>:-flto=auto>"
 )
-set(LINK_OPTIONS "-flto")
+set(LINK_OPTIONS "-flto=auto")
 
 # target names
 set(OBJECT_LIB_NAME "${PROJECT_NAME}_object")
