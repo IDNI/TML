@@ -116,6 +116,7 @@ set(PROJECT_SOURCES
 	src/tables_printer.cpp
 	src/tables_builtins.cpp
 	src/tables_ext.cpp
+	src/tml_earley.cpp
 	src/transform.cpp
 	src/transform_guards.cpp
 	src/transform_bitunv.cpp
