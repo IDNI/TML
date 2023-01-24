@@ -116,7 +116,6 @@ set(PROJECT_SOURCES
 	src/tables_printer.cpp
 	src/tables_builtins.cpp
 	src/tables_ext.cpp
-	src/tml_earley.cpp
 	src/transform.cpp
 	src/transform_guards.cpp
 	src/transform_bitunv.cpp
@@ -151,11 +150,12 @@ function(target_pass_features_on target)
 endfunction()
 
 if(NOT BUILD_JSLIB)
+	include(add_git_submodule)
 	set(WITH_TO_METHODS TRUE CACHE BOOL "")
-	add_subdirectory(external/parser)
+	add_git_submodule(external/parser)
 	set(WITH_ARITH TRUE CACHE BOOL "")
 	set(WITH_MMAP TRUE CACHE BOOL "")
-	add_subdirectory(external/bdd)
+	add_git_submodule(external/bdd)
 endif()
 
 target_pass_features_on(${OBJECT_LIB_NAME})
@@ -210,8 +210,7 @@ if(BUILD_EXECUTABLE)
 		${OBJECT_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXECUTABLE_NAME} PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
 
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXECUTABLE_NAME} gcov)
@@ -230,8 +229,7 @@ if(BUILD_SHARED_EXECUTABLE)
 		${SHARED_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXE_SHARED_NAME} PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXE_SHARED_NAME} gcov)
 	endif()
@@ -253,8 +251,7 @@ if(BUILD_TESTS)
 	target_compile_definitions(doctest INTERFACE TML_USE_DOCTEST)
 	target_include_directories(doctest PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)	
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
 	set(TEST_FRAMEWORK doctest)
 	enable_testing()
 	add_subdirectory(tests)
