@@ -83,5 +83,4 @@ class persistent_dag {
 	static void print_G(std::ostream& os);
 };
 
-
 #endif //TML_PERSISTENT_DAG_H

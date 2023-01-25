@@ -150,7 +150,7 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo, imap &eq_lift_hi,
 void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo,imap &eq_lift_hi, imap &eq_lift_lo, pvector& eq_lift) {
 	int_t hi_eq = hi.eqs;
 	int_t lo_eq = lo.eqs;
-
+	
 	// Lifting of implications due to variables
 	for(auto &el : eq_lift_hi) {
 		insert_imp(p, -v, el.second);

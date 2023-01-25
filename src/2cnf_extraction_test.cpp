@@ -89,7 +89,7 @@ void test_canonicity () {
 	// Now ensure that shifts of the same boolean function have the same BDD
 	// First construct the set of BDDs corresponding to the set of functions
 }
-
+/*
 void test_2cnf_gc () {
 	bdd::init();
 
@@ -97,7 +97,7 @@ void test_2cnf_gc () {
 	h.pure = true;
 	poset l;
 	l.pure = true;
-/*
+
 	poset::insert_eq(h, 1, 1);
 	poset::insert_eq(h, 2, 3);
 	poset::insert_eq(h, 4, 1);
@@ -114,7 +114,7 @@ void test_2cnf_gc () {
 	poset::insert_eq(l, 6, 6);
 	poset::insert_eq(l, 7, 2);
 	poset::insert_eq(l, 8, 6);
-*/
+
 
 	poset::insert_var(h, 2);
 	poset::insert_var(h,3);
@@ -150,10 +150,11 @@ void test_merge_sort () {
 		cout << el << endl;
 	}
 }
+*/
 
 int main() {
 	//test_2cnf_gc();
-	//test_canonicity();
-	test_merge_sort();
+	test_canonicity();
+	//test_merge_sort();
 	return 0;
 }
