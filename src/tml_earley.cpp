@@ -33,6 +33,33 @@ namespace idni {
 
 #ifdef NEEDS_REWRITE
 
+struct parsing_context {
+	raw_progs& rps;
+	std::vector<raw_prog*> rp;
+	std::vector<state_block*> sbs;
+	raw_rule rr;
+	raw_term rt;
+	directive d;
+	production p;
+	macro m;
+	typestmt ts;
+	bool head = true;
+	bool neg  = false;
+	bool is_directive = false;
+	bool is_production = false;
+	bool is_macro = false;
+	bool is_type = false;
+	bool is_predtype = false;
+	bool renew = false;
+	bool forget = false;
+	bool is_constraint = false;
+	bool is_fof = false;
+	bool is_prefix = false;
+	sprawformtree root;
+	std::vector<std::pair<elem, elem>> prefixes;
+	parsing_context(raw_progs& rps) : rps(rps) {}
+};
+
 vector<production> driver::load_tml_grammar() {
 	// the following file is generated from /src/tml.g by /gen_tml.g.cpp.sh
 	#include "tml.g.cpp"
