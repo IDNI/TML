@@ -1,0 +1,3 @@
+#!/bin/sh
+
+../build-Release/parser_gen tml_parser ./tml.tgf > ./tml_parser.generated.h

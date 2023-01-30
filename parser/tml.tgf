@@ -1,0 +1,180 @@
+@use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
+
+# whitespace and comments
+eol            => '\n' | '\r' | eof.
+ws_comment     => '#' eol | '#' printable+ eol.
+ws_required    => space ws | ws_comment ws.
+ws             => [ ws_required ].
+
+# characters
+hex_escape     => "\\x" xdigit xdigit.
+unicode_escape => "\\u" xdigit xdigit xdigit xdigit.
+char_escape_encode => hex_escape | unicode_escape.
+
+# defining char/string/qstring as all chars but its wrapping character
+# enables using TAB and new lines in char(')/string(")/bqstring(`)
+# sequences
+esc            => "\\\\".
+q_char         => '\''.
+q_str          => '"'.
+q_bqstr        => '`'.
+char_punct     => punct & ~q_char & ~q_str & ~q_bqstr
+		& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
+char0          => alnum | space | char_escape_encode | char_punct.
+char_          => char0 | esc q_char |     q_str |     q_bqstr.
+string_char    => char0 |     q_char | esc q_str |     q_bqstr.
+bqstring_char  => char0 |     q_char |     q_str | esc q_bqstr.
+chars          => alpha (alnum)*.
+
+# numeric groups and definitions
+integer        => digit+.
+
+# elements
+sym            => chars.
+var            => '?' chars.
+number         => integer.
+quoted_char    => q_char char_ q_char
+		| q_char char_escape_encode q_char
+		| quoted_char_esc | empty_char.
+empty_char     => q_char q_char.
+quoted_char_esc=> q_char esc printable q_char.
+string         => q_str string_char+ q_str | empty_string.
+empty_string   => q_str q_str.
+bqstring       => q_bqstr bqstring_char+ q_bqstr | empty_bqstring.
+empty_bqstring => q_bqstr q_bqstr.
+
+# term
+term           => negative_term | positive_term.
+negative_term  => '~' ws positive_term.
+positive_term  => relname args | relname.
+args           => ws '(' ws elems ws ')' | ws '(' ws ')'.
+elems          => elem | elem ws_required elems_rest | relname args
+		| relname args ws elems_rest.
+elems_rest     => elem | elem args | elem ws_required elems_rest | args.
+elem           => sym | var | number | quoted_char | string | char_class.
+relname        => sym.
+
+builtin_expr   => builtin_term | builtin_prefixes ws builtin_term.
+builtin_prefixes=> builtin_prefix | builtin_prefix ws builtin_prefixes.
+builtin_prefix => renew_prefix | forget_prefix.
+renew_prefix   => "renew".
+forget_prefix  => "forget".
+builtin_term   => builtin args | builtin.
+builtin        => "halt" | "error" | "false" | "forget" | "rnd" | "count"
+		| "bw_and" | "bw_or" | "bw_xor" | "bw_not" | "pw_add"
+		| "pw_mult" | "leq" | "print" | "println" | "println_to"
+		| "print_to" | "print_delim" | "println_delim"
+		| "print_to_delim" | "println_to_delim"	| "js_eval".
+char_class    => "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
+		| "graph" | "lower" | "printable" | "punct" | "space"
+		| "upper" | "xdigit".
+
+# arithmetic expression
+arith_expr     => arith_op_expr | arith_waux_expr.
+arith_op_expr  => elem ws arith_op ws elem.
+arith_waux_expr=> elem ws arith_aux_op ws elem ws arith_op ws elem.
+arith_waux_expr=> elem ws arith_aux_op ws elem ws arith_op ws elem ws elem.
+arith_op       => '=' | "==" | "!=" | "<=" | ">=" | '>' | '<'.
+arith_aux_op   => '+' | '-' | '*' | '|' | '&' | '^' | ">>" | "<<".
+
+# statements
+
+# rule and fact statements
+rule           => preds ws ":-" ws preds ws '.'.
+fact           => pred ws '.'.
+
+preds          => pred (ws ',' ws pred)*.
+pred           => builtin_expr | arith_expr | term.
+
+# nested block statement
+block          => '{' prog ws '}'.
+
+# query statement
+query          => '!' ws term ws '.' | "!!" ws term ws '.'.
+
+# macro statement
+macro          => positive_term ws ":=" ws preds ws '.'.
+
+# grammar production statements
+production     =>relname ws "=>" (ws prod_expr_elem)+ ws '.'.
+prod_expr_elem => '|' | '&' | '~' | '(' | ')' | '{' | '}' | '[' | ']'
+		| '+' | '*' | quoted_char | string | chars.
+
+# directive statement
+directive      => string_drctv | stdout_drctv | trace_drctv | internal_drctv
+		| bwd_drctv.
+string_drctv   => "@string"   ws_required strdir        ws '.'.
+stdout_drctv   => "@stdout"   ws_required positive_term ws '.'.
+trace_drctv    => "@trace"    ws_required relname       ws '.'.
+internal_drctv => "@internal" ws_required positive_term ws '.'.
+bwd_drctv      => "@bwd"                                ws '.'.
+strdir         => relname ws fname   | relname ws string
+		| relname ws cmdline | relname ws cmdlinefile
+		| relname ws positive_term.
+fname          => '<' printable_char+ '>'.
+cmdline        => '$' integer.
+cmdlinefile    => '<' '$' integer '>'.
+
+# type definition statement
+typedef_       => predtypedef | structypedef.
+predtypedef    => "predtype" ws_required relname ws predtypedef_args ws '.'.
+predtypedef_args=> '(' ws ')'
+		| '(' ws type ws var (ws ',' ws type ws var)* ws ')'.
+structypedef   => "struct" ws structypename ws '{'
+			ws membdecl (ws membdecl)* ws '}'.
+structypename   => relname.
+structype       => relname.
+membdecl        => type ws var (ws ',' ws var)* ws '.'.
+type            => primtype | structype.
+primtype        => simple_type | bitsz_type.
+simple_type     => int_type | char_type | sym_type.
+int_type        => "int".
+char_type       => "char".
+sym_type        => "sym".
+bitsz_type      => "int:" ws bitsz.
+bitsz           => integer.
+
+# state block statement
+state_block     => '[' sb_header (ws sb_statement)* ws ']'.
+sb_header       => sb_flipping | sb_nonflipping.
+sb_flipping     => sb_label "~:".
+sb_nonflipping  => sb_label  ':'.
+sb_label        => relname.
+sb_statement    => state_block | fact | rule | fof.
+
+# FO formula statement
+fof            => preds ws ":-" ws form ws '.'.
+form           => form1  (ws causal_op ws form1)*.
+form1          => matrix (ws junct_op ws matrix)*.
+causal_op      => implies | coimplies.
+junct_op       => and_ | or_.
+and_           => "&&".
+or_            => "||".
+implies        => "->".
+coimplies      => "<->".
+
+matrix         => neg_matrix | matrix_block | prefix_decl | positive_term
+		| arith_expr.
+neg_matrix     => '~' matrix.
+matrix_block   => '{' ws form ws '}'.
+prefix_decl    => prefix ws prefix_arg | prefix ws prefix_arg ws form.
+prefix         => "forall" | "exists" | "unique".
+prefix_arg     => var | relname.
+
+# guard statement
+guard_statement=> if_then_else | if_then | while_do.
+if_then        => "if" ws condition ws "then" ws gs_prog.
+if_then_else   => if_then ws "else" ws gs_prog.
+while_do       => "while" ws condition ws "do" ws gs_prog.
+condition      => form.
+gs_prog        => prog | statement | statement0.
+statement0     => rule0 | fact0 | fof0.
+rule0          => preds ws ":-" ws preds.
+fact0          => pred.
+fof0           => preds ws ":-" ws form.
+
+statement      => block | state_block | directive | query | guard_statement
+		| typedef_ | fact | rule | macro | fof | production.
+
+program        => (ws statement)* ws.
+start          => program.

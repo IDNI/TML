@@ -211,8 +211,8 @@ if(BUILD_EXECUTABLE)
 		${OBJECT_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXECUTABLE_NAME} PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>	
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
-
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXECUTABLE_NAME} gcov)
 	endif()
@@ -230,6 +230,7 @@ if(BUILD_SHARED_EXECUTABLE)
 		${SHARED_LIB_NAME} idni_bdd_object idni_parser_object)
 	target_include_directories(${EXE_SHARED_NAME} PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>	
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
 	if(BUILD_CODE_COVERAGE)
 		target_link_libraries(${EXE_SHARED_NAME} gcov)
@@ -252,6 +253,7 @@ if(BUILD_TESTS)
 	target_compile_definitions(doctest INTERFACE TML_USE_DOCTEST)
 	target_include_directories(doctest PUBLIC 
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>	
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
 	set(TEST_FRAMEWORK doctest)
 	enable_testing()
