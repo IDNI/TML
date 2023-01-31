@@ -12,13 +12,22 @@
 // modified over time by the Author.
 #ifndef __BUILTINS_H__
 #define __BUILTINS_H__
+
 #include <functional>
+
+
+#include "defs.h"
+#include "char_defs.h"
+#include "term.h"
+#include "bdd.h"
 #include "dict.h"
-#include "input.h"
+#include "ir_builder.h"
 
 typedef std::tuple<alt*, term, bdd_handles> blt_cache_key;
 typedef std::pair<bool, bdd_handles> blt_cache_value;
 typedef std::map<blt_cache_key, blt_cache_value> blt_cache;
+
+class tables;
 
 struct blt_ctx {
 	term t;              // builtin term
@@ -28,7 +37,9 @@ struct blt_ctx {
 	size_t oargs = 0;    // number of output args
 	size_t nargs = 0;    // number of args to keep ungrounded
 	alt*       a = 0;    // alt if body builtin
-	dict_t* dict = 0;
+
+	tables* tbls = 0;
+
 	bdd_handles* hs = 0;
 	// builtin context for head term
 	blt_ctx(term t) : t(t), g(t), args(t.size()), oargs(0) {}
@@ -92,40 +103,65 @@ struct builtins_pair {
 	builtin body;	
 };
 
+struct updates {
+	// dictmap updates_dict;
+	int_t rel_tml_update, sym_add, sym_del;
+};
+
 // container for builtins represented by a map
 // it's key is builtin's id and its value is a builtins_pair (head - body) 
 struct builtins : std::map<int_t, builtins_pair> {
-	dict_t* dict = 0;
+
 	blt_cache cache; // builtins' cache for calls
 	std::vector<sig> sigs;
-	bool reset(dict_t& d) { return clear(), dict = &d, true; }
+	std::map<int_t, std::string> aliases;
+
 	// clear cache (TODO: add possibility to clear cache by builtin id)
 	void forget(blt_ctx&) { cache.clear(); }
-	// add builtin symbol (for non functions like digit, alnum...)
-	bool add(const std::string& s) { return dict->get_bltin(s), true; }
+
 	// add builtin. ishead to flag head or body builtin
 	// @param ishead true if head builtin, false for body builtin
-	// @param name   identifier of the builtin
+	// @param id     id of the builtin in the dict
+	// @param alias  alias of the builtin
 	// @param args   number of arguments (-1 = can vary)
 	// @param oargs  number of output arguments
 	// @param h      building handler
 	// @param nargs  number of arguments to keep ungrounded
-	bool add(bool ishead, std::string name, int_t args, int_t oargs,
+	bool add(bool ishead, int_t id, std::string alias, int_t args, int_t oargs,
 		blt_handler h, int_t nargs = 0)
 	{
-		int_t id = dict->get_bltin(name);
+		// DBG(COUT<< "Adding builtin " << alias << " id " << id << " args " << args << " oargs " << oargs << " nargs " << nargs << std::endl;) 
+
 		auto it = find(id);
+
 		if (it == end()) it = emplace(id, builtins_pair{}).first;
 		builtins_pair& bp = it->second;
-		if (ishead) 
-		bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
+
+		if (ishead) bp.has_head = true, bp.head = builtin{ args, oargs, nargs, h};
 		else bp.has_body = true, bp.body = builtin{ args, oargs, nargs, h};
+		
+		aliases[id] = alias;
 		return true;
 	}
+
 	void run_head(blt_ctx& c) { run(c, true);  }
 	void run_body(blt_ctx& c) { run(c, false); }
 	void run(blt_ctx& c, bool ishead = true);
 	bool is_builtin(int_t id) const { return find(id) != end(); }
 };
 
-#endif
+struct builtins_factory {
+
+	builtins bltins;
+	dict_t& dict;
+	ir_builder& ir;
+
+	builtins_factory(dict_t& dict_, ir_builder& ir_) : dict(dict_), ir(ir_) {};
+
+	builtins_factory& add_basic_builtins();
+	builtins_factory& add_bdd_builtins();
+	builtins_factory& add_print_builtins();
+	builtins_factory& add_js_builtins();
+};
+
+#endif // __BUILTINS_H__

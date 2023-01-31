@@ -39,8 +39,14 @@ struct rt_vartypes {
 typedef std::map<int_t, std::vector<rt_vartypes>> rr_varmap;
 #endif
 
+#ifdef BIT_TRANSFORM
 struct table;
+#endif
 class tables;
+
+typedef std::set<term> clause;
+typedef std::set<clause> dnf;
+typedef std::vector<std::pair<term, dnf>> prog;
 
 class ir_builder {
 
@@ -56,8 +62,10 @@ public:
 	std::map<sig, int_t> tsmap; //signature-table_id map
 	std::map<sig, int_t> bsmap; //signature-bltin_id map
 
-	ir_builder(dict_t& dict_, rt_options& opts_);
-	~ir_builder();
+	ir_builder(dict_t& dict_, rt_options& opts_):
+		dict(dict_), opts(opts_) {} 
+
+	~ir_builder() = default;
 
 	//-------------------------------------------------------------------------
 
@@ -75,7 +83,7 @@ public:
 	raw_prog generate_type_resolutor(raw_prog &rp);
 	void type_resolve_facts(std::vector<raw_rule> &rp);
 	void type_resolve_bodies(raw_rule &r, rr_varmap &v);
-	void type_resolve_rules(std::vector<raw_rule> &rp);
+	bool type_resolve_rules(std::vector<raw_rule> &rp);
 	void type_resolve(raw_prog &rp);
 
 	sig get_sig_bltin(raw_term&t);
@@ -97,7 +105,7 @@ public:
 	sig get_sig(raw_term& t);
 	sig get_sig(const raw_term& t);
 	sig get_sig(const lexeme& rel, const ints& arity);
-	sig get_sig(const int& rel_id, const ints& arity);
+	sig get_sig(const int_t& rel_id, const ints& arity);
 	size_t sig_len(const sig& s) const;
 
 	std::set<int_t> str_rels;
@@ -111,14 +119,20 @@ public:
 	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);
 	term from_raw_term(const raw_term&, bool ishdr = false, size_t orderid = 0);
-	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
 	raw_term to_raw_term(const term& t);
 	int_t get_table(const sig& s);
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
-
+	void set_hidden_table(const int_t t);
+	
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
+	#ifdef FOL_V1
+	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
+	#endif
+	#ifdef FOL_V2
+	prog get_fof(sprawformtree root);
+	#endif
 
 	int_t get_factor(raw_term &rt, size_t &n, std::map<size_t, term> &ref,
 					std::vector<term> &v, std::set<term> &done);

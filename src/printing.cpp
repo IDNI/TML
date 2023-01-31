@@ -692,7 +692,9 @@ template basic_ostream<char>& operator<<(basic_ostream<char>&, const options&);
 template
 basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const options&);
 
-template <typename T>
+// TODO move these methods to driver when if needed
+
+/* template <typename T>
 void tables::print(basic_ostream<T>& os, const tables::proof_elem& e) {
 	if (e.rl != (size_t)-1) os << '[' << e.rl << ',' << e.al << "] ";
 	for (const auto& b : e.b)
@@ -730,16 +732,7 @@ template
 void tables::print<wchar_t>(basic_ostream<wchar_t>&, const tables::witness&);
 #endif
 
-/*void tables::print_env(const env& e) const {
-	for (auto x : e) {
-		int_t arg = r[n - 1];
-		if (arg & 1) rt.e[n]=elem((char_t)(arg>>2));
-		else if (arg & 2) rt.e[n]=elem((int_t)(arg>>2));
-		else rt.e[n]=elem(elem::SYM, dict.get_sym(arg));
-		o::out() << x.first << " = " << x.second << endl;
-	}
-	return os;
-}*/
+
 
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const vector<term>& v) const {
@@ -753,7 +746,7 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const vector<term>& v) con
 	return os;
 }
 template basic_ostream<char>& tables::print(basic_ostream<char>&, const vector<term>&) const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const vector<term>&) const;
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&, const vector<term>&) const; 
 
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const flat_prog& p) const{
@@ -798,11 +791,11 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os, const rule& r) const {
 template
 basic_ostream<char>& tables::print(basic_ostream<char>&, const rule&) const;
 template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&,
-	const rule&) const;
+	const rule&) const; 
 
 template <typename T>
 basic_ostream<T>& tables::print(basic_ostream<T>& os, const table& t) const {
-	//print(os << "#\t", "UNDEF" /*t.s*/)
+	//print(os << "#\t", "UNDEF")
 	os	<< (t.hidden ? "@":"")
 		<< (t.idbltin > -1 ? " builtin" : "")
 		<< endl;
@@ -822,7 +815,7 @@ basic_ostream<T>& tables::print(basic_ostream<T>& os) const {
 	return os << "# -" << endl;
 }
 template basic_ostream<char>& tables::print(basic_ostream<char>&) const;
-template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const;
+template basic_ostream<wchar_t>& tables::print(basic_ostream<wchar_t>&) const; */
 
 template <typename T>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
@@ -841,8 +834,9 @@ basic_ostream<T>& operator<<(basic_ostream<T>& os, const dict_t& d) {
 			<< (i != d.nbltins() - 1 ? ", " : "");
 	return os << "\n# -" << endl;
 }
+
 template basic_ostream<char>& operator<<(basic_ostream<char>&, const dict_t&);
-template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&);
+template basic_ostream<wchar_t>& operator<<(basic_ostream<wchar_t>&, const dict_t&); 
 
 template <typename T, typename VT>
 basic_ostream<T>& operator<<(basic_ostream<T>& os, const std::vector<VT>& hs) {

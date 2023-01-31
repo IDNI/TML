@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-//#ifndef __TABLES__
-//#define __TABLES__
+#ifndef __TABLES_H__
+#define __TABLES_H__
 
 #include <map>
 #include <vector>
@@ -30,6 +30,8 @@
 #include "err.h"
 #include "options.h"
 #include "builtins.h"
+
+// TODO remove include and add alternative ones
 #include "ir_builder.h"
 
 class tables;
@@ -112,6 +114,7 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
+//#ifdef PROOF
 struct gnode {
 	enum gntype{
 		pack, interm, symbol
@@ -136,6 +139,7 @@ struct gnode {
 	static std::map<std::set<term>, gnode*> interm2g;
 	bool _binarise();
 };
+//#endif
 
 struct table {
 	sig s;
@@ -152,18 +156,23 @@ struct table {
 	inline bool is_builtin() const { return idbltin > -1; }
 };
 
+class progress {
+public:
+	progress() {};
+	virtual ~progress() = default;
+	virtual void notify_update(tables &ts, spbdd_handle& x, const rule& r) = 0;
+};
+
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
-	friend class ir_builder;
 	friend class driver;
 	friend struct bit_univ;
-
-public:
-	typedef std::function<void(const raw_term&)> rt_printer;
+	friend struct progress;
+	friend class builtins_factory;
 
 private:
 
@@ -174,6 +183,9 @@ private:
 	std::set<body*, ptrcmp<body>> bodies;
 	std::set<alt*, ptrcmp<alt>> alts;
 
+public:
+
+	term fixed_point_term; 
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -195,11 +207,24 @@ private:
 			return b < t.b;
 		}
 	};
+
 	typedef std::vector<std::map<term, std::set<proof_elem>>> proof;
+
 
 	nlevel nstep = 0;
 
 	std::vector<table> tbls;
+	#ifdef TYPE_RESOLUTION
+	size_t bits = 0;
+	#else
+	size_t bits = 2;
+	#endif
+
+	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
+
+	// tml_update population
+	int_t rel_tml_update, sym_add, sym_del;
+private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -208,13 +233,7 @@ private:
 	void get_var_ex(size_t arg, size_t args, bools& b) const;
 	void get_alt_ex(alt& a, const term& h) const;
 
-	#ifdef TYPE_RESOLUTION
-	size_t bits = 0;
-	#else
-	size_t bits = 2;
-	#endif
 
-	dict_t& dict;
 	bool datalog, halt = false, unsat = false, bcqc = false;
 
 	size_t pos(size_t bit, size_t nbits, size_t arg, size_t args) const {
@@ -259,6 +278,7 @@ private:
 	spbdd_handle from_bit(size_t b, size_t arg, size_t args, int_t n) const {
 		return ::from_bit(pos(b, arg, args), n & (1 << b));
 	}
+
 	spbdd_handle from_sym(size_t pos, size_t args, int_t i) const;
 	spbdd_handle from_sym_eq(size_t p1, size_t p2, size_t args) const;
 
@@ -270,7 +290,6 @@ private:
 	spbdd_handle leq_var(size_t arg1, size_t arg2, size_t args, size_t bit)
 		const;
 	uints get_perm(const term& t, const varmap& m, size_t len) const;
-	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
 	template<typename T>
 	static varmap get_varmap(const term& h, const T& b, size_t &len,
 		bool blt = false);
@@ -278,10 +297,8 @@ private:
 	spbdd_handle from_term(const term&, body *b = 0,
 		std::map<int_t, size_t>*m = 0, size_t hvars = 0);
 	body get_body(const term& t, const varmap&, size_t len) const;
-	spbdd_handle from_fact(const term& t);
 
 	std::pair<bools, uints> deltail(size_t len1, size_t len2) const;
-	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
 	uints addtail(size_t len1, size_t len2) const;
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
@@ -289,9 +306,15 @@ private:
 
 //#ifdef PROOF
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
+public:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
 		size_t len = 0, bool allowbltins = false) const;
+	spbdd_handle from_fact(const term& t);
 	std::set<term> decompress();
+
+	static void clear_memos();
+	
+private:
 	rule new_identity_rule(ntable tab, bool neg);
 	bool is_term_valid(const term &t);
 	bool get_dnf_proofs(const term& q, proof& p, size_t level,
@@ -328,14 +351,15 @@ private:
 
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
-	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	bool get_rules(flat_prog& m);
 
 	//lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();
-	char fwd() noexcept;
+
+	char fwd(progress& p) noexcept;
+
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
@@ -345,24 +369,19 @@ private:
 	strs_t strs;
 	std::set<int_t> str_rels;
 #endif
-	flat_prog prog_after_fp; // prog to run after a fp (for cleaning nulls)
 
-	// tml_update population
-	int_t rel_tml_update, sym_add, sym_del;
+private:
+	/*
+	 *  updates
+	 */
 	void init_tml_update();
-	void add_tml_update(const term& rt, bool neg);
-	template <typename T>
-	std::basic_ostream<T>& decompress_update(std::basic_ostream<T>&,
-			spbdd_handle& x, const rule& r); // decompress for --print-updates and tml_update
 	bool print_updates_check();
+	updates updts;
+
+
 
 	//-------------------------------------------------------------------------
 	//builtins
-
-	bool init_builtins();
-	bool init_print_builtins();
-	bool init_js_builtins();
-	bool init_bdd_builtins();
 
 	// simple builtin execution from a fact
 	void fact_builtin(const term& b);
@@ -381,8 +400,6 @@ private:
 
 	//-------------------------------------------------------------------------
 	//arithmetic/fol support
-	void ex_typebits(spbdd_handle &s, size_t nvars) const;
-	void ex_typebits(bools &exvec, size_t nvars) const;
 	spbdd_handle ex_typebits(size_t in_varid, spbdd_handle in, size_t n_vars);
 	void append_num_typebits(spbdd_handle &s, size_t nvars) const;
 	spbdd_handle perm_from_to(size_t from, size_t to, spbdd_handle in, size_t n_bits,
@@ -415,91 +432,49 @@ private:
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 
+	#ifdef FOL_V1
+	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
+	void ex_typebits(spbdd_handle &s, size_t nvars) const;
+	void ex_typebits(bools &exvec, size_t nvars) const;
+	uints get_perm(const term& t, const varmap& m, size_t len, size_t bits) const;
+	void get_form(const term_set& al, const term& h, std::set<alt>& as);
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
 	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
+	#endif
 
 	//-------------------------------------------------------------------------
 	//printer
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof_elem&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const proof&);
-	template <typename T>
-	void print(std::basic_ostream<T>&, const witness&);
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
-		const std::set<term>& b) const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
-
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const std::vector<term>& b)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print(std::basic_ostream<T>&, const flat_prog& p)
-		const;
-	template <typename T>
-	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 
 public:
 
+	struct output {
+
+		void term(term &t);
+	};
+
 	rt_options opts;
-	ir_builder *ir_handler;
 	builtins bltins;
 
-	tables(dict_t& dict, rt_options opts, ir_builder *ir_handler);
+	tables(rt_options opts, builtins &bltins);
+	
 	~tables();
+	
 	size_t step() { return nstep; }
-	bool add_prog_wprod(const raw_prog& p, const strs_t& strs);
 
-	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
-		dict_t &dict, const options &opts, std::set<raw_term> &results);
-	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps = 0,
-		size_t break_on_step = 0);
-	bool run_prog(const flat_prog& p, const strs_t& strs, size_t steps = 0,
-		size_t break_on_step = 0);
-
-	bool pfp(size_t nsteps = 0, size_t break_on_step = 0);
-
+	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
 	bool compute_fixpoint(bdd_handles &trues, bdd_handles &falses, bdd_handles &undefineds);
 	bool is_infloop();
-	template <typename T> void out(std::basic_ostream<T>&) const;
-	template <typename T> bool out_fixpoint(std::basic_ostream<T>& os);
-	template <typename T> bool out_goals(std::basic_ostream<T>&);
-	void out(const rt_printer&) const;
-
-//#ifdef PROOFS
-	template <typename T>
-	void out(std::basic_ostream<T>&, spbdd_handle, ntable) const;
-	void out(spbdd_handle, ntable, const rt_printer&) const;
 	template <typename T>bool get_proof(std::basic_ostream<T>& os);
 	void set_proof(proof_mode v) { opts.bproof = v; }
-//#endif
-
 
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const;
 #endif
 
-	dict_t& get_dict() { return dict; }
-
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-
-	void add_print_updates_states(const std::set<std::string> &tlist);
+	
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;
@@ -523,3 +498,5 @@ struct infloop_exception : public unsat_exception {
 	}
 };
 #endif
+
+#endif // __TABLES_H__

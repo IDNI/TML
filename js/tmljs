@@ -38,8 +38,7 @@ require('./tmllib.js')().then(tml => {
 
 	// create a driver and run program
 	const d = new driver("", o);
-	d.run(0, 0);
-
+	if (!d.error) d.run(0, 0);
 	if (!d.error) {
 		if (o.enabled("dump") && d.result) d.out_result();
 		if (o.enabled("dict")) d.inf_dict();

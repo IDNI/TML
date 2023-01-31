@@ -655,7 +655,7 @@ spbdd_handle tables::pairwise_handler(size_t in0_varid, size_t in1_varid, size_t
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 // fol support
-
+#ifdef FOL_V1
 pair<bools, uints> tables::deltail(size_t len1, size_t len2, size_t bits) const {
 	bools ex(len1 * bits, false);
 	uints perm = perm_init(len1 * bits);
@@ -1149,3 +1149,4 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 	}
 	else fol_query(f,v);
 }
+#endif

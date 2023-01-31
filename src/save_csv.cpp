@@ -15,7 +15,9 @@
 using namespace std;
 
 void driver::save_csv() const {
-	map<elem, ofstream> files;
+	// TODO use driver methods
+	
+	/* map<elem, ofstream> files;
 	tbl->out([&files](const raw_term& t) {
 		auto it = files.find(t.e[0]);
 		if (it == files.end()) {
@@ -42,5 +44,5 @@ void driver::save_csv() const {
 				ar != t.arity.size()) os << '\t';
 		}
 		os << endl;
-	});
+	}); */
 }

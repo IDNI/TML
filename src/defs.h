@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __DEFS_H__
 #define __DEFS_H__
+
 #include <cassert>
 #include <vector>
 #include <set>
@@ -115,7 +116,8 @@ enum proof_mode { none, tree, forest, partial_tree, partial_forest };
 typedef struct {
 	bool optimize, print_transformed, apply_regexpmatch, fp_step,
 		show_hidden, bin_lr, incr_gen_forest,
-		binarize = true, print_binarized = false;
+		binarize = true, print_binarized = false; //needed default values
+
 	enum proof_mode bproof;
 	size_t bitorder;
 	std::set<ntable> pu_states;
@@ -146,8 +148,8 @@ template<typename T> struct ptrcmp {
 //#define BIT_TRANSFORM  //to be deprecated,
 
 #define TML_NATIVES
-//#define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
-//#define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
+// #define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
+// #define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
 
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
 #define mkchr(x) ((int_t) x )
@@ -176,7 +178,9 @@ typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
 #else
 typedef std::pair<int_t, ints> sig;
 #endif
-
+//-----------------------------------------------------------------------------
+#define FOL_V1 //mutually exclusive with FOL_V2
+//#define FOL_V2
 //-----------------------------------------------------------------------------
 // Rules optimization
 #ifndef ROPT
@@ -194,4 +198,5 @@ typedef std::pair<int_t, ints> sig;
 #ifndef GIT_BRANCH
 #define GIT_BRANCH      "n/a"
 #endif
-#endif
+
+#endif // __DEFS_H__

@@ -29,6 +29,7 @@
 
 #include "driver.h"
 #include "err.h"
+#include "builtins.h"
 #include "cpp_gen.h"
 
 #ifdef __EMSCRIPTEN__
@@ -68,7 +69,7 @@ string_t driver::directive_load(const directive& d) {
 	switch (d.type) {
 		case directive::FNAME:
 			return to_string_t(input::file_read(to_string(str)));
-		case directive::STDIN: return move(pd.std_input);
+		case directive::STDIN: return std::move(pd.std_input);
 		default: return unquote(str);
 	}
 	DBGFAIL;
@@ -79,7 +80,6 @@ signature get_signature(const raw_term &rt) {
 }
 
 void driver::directives_load(raw_prog& p) {
-
 	lexeme trel = null_lexeme;
 	// The list of directives that have been processed so far
 	int_t a;
@@ -180,16 +180,14 @@ bool driver::is_limited(const elem &var, set<elem> &wrt,
 
 bool driver::is_limited(const elem &var, const raw_form_tree &t,
 		set<elem> &wrt, map<elem, const raw_form_tree*> &scopes) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
 
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		case elem::COIMPLIES:
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		case elem::AND: {
 			// var is limited in a && b if var is limited in a or b
 			vector<const raw_form_tree*> ands;
@@ -241,11 +239,11 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 				} case elem::IMPLIES: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::COIMPLIES: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::EXISTS: case elem::FORALL: {
 					const elem &qvar = *t.l->l->el;
 					if(qvar == var) {
@@ -264,7 +262,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 				} case elem::UNIQUE: {
 					// Process the expanded formula instead
 					return is_limited(var, raw_form_tree(elem::NOT,
-						make_shared<raw_form_tree>(expand_formula_node(*t.l, d))), wrt, scopes);
+						make_shared<raw_form_tree>(expand_formula_node(*t.l, dict))), wrt, scopes);
 				} case elem::NONE: {
 					const raw_term &rt = *t.l->rt;
 					switch(rt.extype) {
@@ -300,7 +298,7 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 			}
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
-			return is_limited(var, expand_formula_node(t, d), wrt, scopes);
+			return is_limited(var, expand_formula_node(t, dict), wrt, scopes);
 		} case elem::NONE: {
 			const raw_term &rt = *t.rt;
 			switch(rt.extype) {
@@ -342,16 +340,14 @@ bool driver::is_limited(const elem &var, const raw_form_tree &t,
 
 optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 		map<elem, const raw_form_tree*> &scopes) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
 
 	switch(t.type) {
 		case elem::IMPLIES:
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		case elem::COIMPLIES:
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		case elem::AND: {
 			// Collect all the conjuncts within the tree top
 			vector<const raw_form_tree*> ands;
@@ -396,7 +392,7 @@ optional<elem> driver::all_quantifiers_limited(const raw_form_tree &t,
 			}
 		} case elem::UNIQUE: {
 			// Process the expanded formula instead
-			return all_quantifiers_limited(expand_formula_node(t, d), scopes);
+			return all_quantifiers_limited(expand_formula_node(t, dict), scopes);
 		} case elem::NONE: {
 			return nullopt;
 		} default:
@@ -594,6 +590,7 @@ bool is_query (const raw_rule &rr) {
 bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
+
 	// Check that rules have correct format
 	if(is_cq(rr1) && is_cq(rr2) &&
 			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
@@ -613,7 +610,12 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		tables::run_prog_wedb(edb, nrp, d, opts, results);
+		tables_progress p(d, *ir);
+		builtins_factory bf(d, *ir);
+		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
+
+		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
+
 		for(const raw_term &res : results) {
 			if(res == frozen_rr1.h[0]) {
 				// If the frozen head is found, then there is a homomorphism
@@ -640,6 +642,8 @@ bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
 bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
 	// Get dictionary for generating fresh symbols
 	dict_t d;
+	builtins_factory bf(d, *ir);
+	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
 
 	if(is_cq(rr1) && is_cq(rr2)) {
 		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
@@ -702,7 +706,10 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
 		// Run the queries and check for the frozen head. This process can
 		// be optimized by inlining the frozen head of rule 1 into rule 2.
 		set<raw_term> results;
-		if(!tables::run_prog_wedb(edb, nrp, d, opts, results)) return false;
+		
+		tables_progress p( dict, *ir);
+		if(!run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
+
 		for(const raw_term &res : results) {
 			// If the result comes from the containment query (i.e. it is not
 			// one of the frozen terms), then there is a homomorphism between
@@ -889,7 +896,6 @@ pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
 
 bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	o::dbg() << "Generating domain for: " << drt << endl;
-	dict_t &d = tbl->get_dict();
 	// Ensure that we're working on a DOMAIN directive
 	if(drt.type != directive::EDOMAIN) return false;
 	// The relation to contain the evaled relation is the first symbol
@@ -908,13 +914,13 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 
 	// Initialize the symbols, variables, and operators used in the
 	// domain creation rule
-	elem lt_elem(elem::LT, d.get_lexeme("<")),
-		leq_elem(elem::LEQ, d.get_lexeme("<=")),
-		plus_elem(elem::ARITH, t_arith_op::ADD, d.get_lexeme("+")),
-		equals_elem(elem::EQ, d.get_lexeme("=")),
-		list_id = elem::fresh_var(d), list_fst = elem::fresh_var(d),
-		list_rst = elem::fresh_var(d), pred_id = elem::fresh_var(d),
-		divisor_x_quotient = gen_limit == 1 ? list_rst : elem::fresh_var(d);
+	elem lt_elem(elem::LT, dict.get_lexeme("<")),
+		leq_elem(elem::LEQ, dict.get_lexeme("<=")),
+		plus_elem(elem::ARITH, t_arith_op::ADD, dict.get_lexeme("+")),
+		equals_elem(elem::EQ, dict.get_lexeme("=")),
+		list_id = elem::fresh_var(dict), list_fst = elem::fresh_var(dict),
+		list_rst = elem::fresh_var(dict), pred_id = elem::fresh_var(dict),
+		divisor_x_quotient = gen_limit == 1 ? list_rst : elem::fresh_var(dict);
 
 	// Make two relations for manipulating domains, the fst relation
 	// relates a list ID to its head, and the rst relation relates a
@@ -957,7 +963,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		// If current quotient is odd, then it will need to be expressed
 		// by doubling something and adding the divisor to it
 		if(quotient % 2 == 1) {
-			elem new_quotient_elem = elem::fresh_var(d);
+			elem new_quotient_elem = elem::fresh_var(dict);
 			// new_quotient_elem + list_rst = quotient_elem
 			bodie.push_back(raw_term(raw_term::ARITH, t_arith_op::ADD,
 				{new_quotient_elem, plus_elem, list_rst, equals_elem, quotient_elem}));
@@ -968,7 +974,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		// be expressed by doubling something
 		if(quotient / 2 > 0) {
 			elem new_quotient_elem =
-				quotient / 2 == 1 ? list_rst : elem::fresh_var(d);
+				quotient / 2 == 1 ? list_rst : elem::fresh_var(dict);
 			// new_quotient_elem + new_quotient_elem = quotient_elem
 			bodie.push_back(raw_term(raw_term::ARITH, t_arith_op::ADD,
 				{new_quotient_elem, plus_elem, new_quotient_elem, equals_elem,
@@ -993,7 +999,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	// Lists are sometimes used to encode interpreter memory. In this
 	// scenario, it is useful to treat the longest lists as possible
 	// memory states
-	elem current_list = elem::fresh_var(d), next_list = elem::fresh_var(d);
+	elem current_list = elem::fresh_var(dict), next_list = elem::fresh_var(dict);
 	// The relation that will contain all the longest lists
 	raw_term max_head({ concat(out_rel, "_max"),
 		elem_openp, current_list, elem_closep });
@@ -1004,7 +1010,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 		max_body.push_back(raw_term({ concat(out_rel, "_rst"),
 			elem_openp, current_list, next_list, elem_closep }));
 		current_list = next_list;
-		next_list = elem::fresh_var(d);
+		next_list = elem::fresh_var(dict);
 	}
 	// Not strictly necessary. Makes sure that the list end occurs
 	// after the arity_max nodes.
@@ -1084,16 +1090,14 @@ raw_rule driver::freeze_rule(raw_rule rr,
 elem driver::quote_term(const raw_term &head, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
 	elem term_id(part_count++);
 	if(head.extype == raw_term::REL) {
-		elem elems_id = elem::fresh_var(d), tags_id = elem::fresh_var(d),
+		elem elems_id = elem::fresh_var(dict), tags_id = elem::fresh_var(dict),
 			elems_hid = elems_id, tags_hid = tags_id;
 		vector<raw_term> params_body, param_types_body;
 		for(size_t param_idx = 2; param_idx < head.e.size() - 1; param_idx ++) {
-			elem next_elems_id = elem::fresh_var(d),
-				next_tags_id = elem::fresh_var(d);
+			elem next_elems_id = elem::fresh_var(dict),
+				next_tags_id = elem::fresh_var(dict);
 			params_body.push_back(raw_term({concat(domain_name, "_fst"), elem_openp,
 				elems_id, numeric_quote_elem(head.e[param_idx], variables),
 				elem_closep}));
@@ -1175,8 +1179,6 @@ elem driver::quote_term(const raw_term &head, const elem &rel_name,
 elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp, map<elem, elem> &variables,
 		int_t &part_count) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
 	const elem part_id = elem(part_count++);
 	switch(t.type) {
 		case elem::IMPLIES:
@@ -1236,7 +1238,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 				elem_closep })));
 			break;
 		case elem::EXISTS: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QEXISTS), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_exists_var"),
@@ -1247,7 +1249,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 				elem_closep })));
 			break;
 		} case elem::UNIQUE: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QUNIQUE), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_unique_var"),
@@ -1261,7 +1263,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 			return quote_term(*t.rt, rel_name, domain_name, rp, variables, part_count);
 			break;
 		} case elem::FORALL: {
-			elem qvar = quote_elem(*(t.l->el), variables, d);
+			elem qvar = quote_elem(*(t.l->el), variables, dict);
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_type"),
 				elem_openp, part_id, elem(QFORALL), elem_closep })));
 			rp.r.push_back(raw_rule(raw_term({concat(rel_name, "_forall_var"),
@@ -1282,7 +1284,8 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 
 elem driver::concat(const elem &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
+	dict_t &d = dict;
+	
 	// Make lexeme from concatenating rel's lexeme with the given suffix
 	return elem(elem::SYM,
 		d.get_lexeme(lexeme2str(rel.e) + to_string_t(suffix)));
@@ -1292,10 +1295,8 @@ elem driver::concat(const elem &rel, string suffix) {
  * given lexeme. Used for refering to sub relations. */
 
 lexeme driver::concat(const lexeme &rel, string suffix) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
 	// Make lexeme from concatenating rel's lexeme with the given suffix
-	return d.get_lexeme(lexeme2str(rel) + to_string_t(suffix));
+	return dict.get_lexeme(lexeme2str(rel) + to_string_t(suffix));
 }
 
 /* Quote the given rule and put its quotation into the given raw_prog
@@ -1416,14 +1417,12 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// The number representing the maximum arity of relations in the
 	// quotation is the fourth symbol between the parentheses
 	int_t max_arity = drt.arity_num.num;
-	// Get dictionary for generating fresh variables
-	dict_t &d = tbl->get_dict();
 
 	// Create the symbols and variables that will feature heavily in
 	// the terms to be created below
 	elem decode_tmp_rel = concat(codec_rel, "__decode"),
-		name_var = elem::fresh_var(d), timestep_var = elem::fresh_var(d),
-		next_timestep_var = elem::fresh_var(d), params_var = elem::fresh_var(d);
+		name_var = elem::fresh_var(dict), timestep_var = elem::fresh_var(dict),
+		next_timestep_var = elem::fresh_var(dict), params_var = elem::fresh_var(dict);
 
 	// Create the terms that will feature heavily in the rules to be
 	// created below
@@ -1439,8 +1438,8 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// Make variables for each head and tail in a linked list
 	vector<elem> params_vars, param_vars;
 	for(int_t i = 0; i < max_arity; i++) {
-		params_vars.push_back(elem::fresh_var(d));
-		param_vars.push_back(elem::fresh_var(d));
+		params_vars.push_back(elem::fresh_var(dict));
+		param_vars.push_back(elem::fresh_var(dict));
 	}
 
 	// Create rules to decode the contents of the interpreter's
@@ -1566,12 +1565,9 @@ bool rule_relation_precedes(const raw_rule &rr1, const raw_rule &rr2) {
  * given relation. */
 
 raw_term driver::relation_to_term(const rel_info &ri) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-
 	vector<elem> els = { get<0>(ri), elem_openp };
 	for(int_t i = 0; i < get<1>(ri); i++) {
-		els.push_back(elem::fresh_var(d));
+		els.push_back(elem::fresh_var(dict));
 	}
 	els.push_back(elem_closep);
 	return raw_term(els);
@@ -1612,9 +1608,6 @@ raw_rule rename_rule(raw_rule rr, map<elem, elem> &rename_map) {
 
 void driver::step_transform(raw_prog &rp,
 		const function<void(raw_prog &)> &f) {
-	// Get dictionary for generating fresh symbols
-	dict_t &d = tbl->get_dict();
-
 	map<elem, elem> freeze_map;
 	map<elem, elem> unfreeze_map;
 	// Separate the internal rules used to execute the parts of the
@@ -1636,7 +1629,7 @@ void driver::step_transform(raw_prog &rp,
 			if(auto it = freeze_map.find(rt.e[0]); it != freeze_map.end()) {
 				rt.e[0] = it->second;
 			} else {
-				elem frozen_elem = elem::fresh_temp_sym(d);
+				elem frozen_elem = elem::fresh_temp_sym(dict);
 				// Store the mapping so that the derived portion of each
 				// relation is stored in exactly one place
 				unfreeze_map[frozen_elem] = rt.e[0];
@@ -1732,12 +1725,12 @@ void driver::step_transform(raw_prog &rp,
 		}
 		// At each stage of TML execution, exactly one of the nullary facts
 		// in this vector are asserted
-		vector<elem> clock_states = { elem::fresh_temp_sym(d) };
+		vector<elem> clock_states = { elem::fresh_temp_sym(dict) };
 		// Push the internal rules onto the program using conditioning to
 		// control execution order
 		for(const set<const relation *>& v : sorted) {
 			// Make a new clock state for the current stage
-			const elem clock_state = elem::fresh_temp_sym(d);
+			const elem clock_state = elem::fresh_temp_sym(dict);
 			// If the previous state is asserted, then de-assert it and assert
 			// this state
 			rp.r.push_back(raw_rule(raw_term(clock_state, vector<elem>{}),
@@ -1778,8 +1771,8 @@ void driver::step_transform(raw_prog &rp,
 		// Start the clock ticking by asserting stage0, asserting stage1
 		// if stage0 holds, and asserting the clock if stage0 holds but
 		// stage1 does not.
-		raw_term stage0(elem::fresh_temp_sym(d), vector<elem>{});
-		raw_term stage1(elem::fresh_temp_sym(d), vector<elem>{});
+		raw_term stage0(elem::fresh_temp_sym(dict), vector<elem>{});
+		raw_term stage1(elem::fresh_temp_sym(dict), vector<elem>{});
 		raw_term stage2(clock_states[0], vector<elem>{});
 		rp.r.push_back(raw_rule(stage0));
 		rp.r.push_back(raw_rule(stage1, stage0));
@@ -2249,17 +2242,23 @@ bool driver::transform_handler(raw_prog &p) {
 	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
 	//o::out() << "Type resolutor Nto1 mapping:\n" << tr << endl;
 	rt_options to;
-	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
-	to.optimize  = false;
 	to.binarize = false;
 	to.bproof = proof_mode::none;
+	to.fp_step = opts.enabled("fp");  //disables "__fp__()."
+	to.optimize  = false;
+	to.print_binarized = false;
 	to.show_hidden = false;
+
 	ir_builder ir_handler(dict, to);
-	tables tbl_int(dict, to, &ir_handler);
+	tables tbl_int(to, bltins);
+	
 	ir_handler.dynenv = &tbl_int;
 	ir_handler.printer = &tbl_int;
 	ir_handler.dynenv->bits = 2;
-	if (!tbl_int.run_prog(tr, {})) return false;
+
+	tables_progress tp(dict, *ir);
+	if (!run_prog(tr, strs_t(), 0,0, tp, to, tbl_int, ir_handler)) return false;
+
 	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
 		DBG(COUT << el << endl;); //this line fails in release
@@ -2299,7 +2298,7 @@ bool driver::transform_handler(raw_prog &p) {
 				throw_runtime_error("State blocks require "
 					"-sb (-state-blocks) option enabled.");
 
-	if (opts.disabled("fp-step") && raw_term::require_fp_step)
+	if (opts.disabled("fp-step") && raw_term::require_fp_step) 
 		return error = true,
 			throw_runtime_error("Usage of the __fp__ term requires "
 				"--fp-step option enabled.");
@@ -2318,6 +2317,7 @@ bool driver::transform_handler(raw_prog &p) {
 	ir->bit_transform(p.nps[0], opts.get_int("bitorder"));
 
 #endif
+
 	DBG(if (opts.enabled("transformed"))
 		o::to("transformed") << "Post-Transforms Prog:\n" << p << endl;);
 
@@ -2352,12 +2352,16 @@ bool driver::run(size_t steps, size_t break_on_step) {
 	clock_t start, end;
 	measure_time_start();
 
-	//Work in progress
+	tables_progress tp(dict, *ir);
+	rt_options rt;
+
 	if (opts.enabled("guards"))
 		// guards transform, will lead to !root_empty
-		result = tbl->run_prog(rp.p, pd.strs, steps, break_on_step);
+		result = run_prog(rp.p, pd.strs, steps, break_on_step, tp, rt, *tbl);
+	else if (rp.p.nps.size())
+		result = run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step, tp, rt, *tbl);
 	else
-		result = tbl->run_prog((rp.p.nps)[0], pd.strs, steps, break_on_step);
+		result = false;
 
 	o::ms() << "# elapsed: ", measure_time_end();
 
@@ -2397,19 +2401,225 @@ void driver::read_inputs() {
 	}
 }
 
-driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
+void driver::init_tml_update(updates& updts) {
+	updts.rel_tml_update = dict.get_rel(dict.get_lexeme("tml_update"));
+	updts.sym_add = dict.get_sym(dict.get_lexeme("add"));
+	updts.sym_del = dict.get_sym(dict.get_lexeme("delete"));
+}
 
-	if (o.error) { error = true; return; }
+bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt, ir_builder &ir_handler) {
+
+	DBG(o::dbg() << "add_prog_wprod" << endl;);
+	error = false;
+	tables::clear_memos();
+	//if (mknums) to_nums(m);
+
+	updates updts;
+	// TODO this should be part of rt_options
+	if (tbls.populate_tml_update) init_tml_update(updts);
+
+	tbls.rules.clear(), tbls.datalog = true;
+
+	#ifndef LOAD_STRS
+	for (auto x : strs) load_string(x.first, x.second);
+	#endif
+	
+	// TODO this call must be done in the driver
+	if (!ir_handler.transform_grammar(g, m)) return false;
+
+	//if (!get_rules(move(m))) return false;
+	if (!tbls.get_rules(m)) return false;
+
+	// filter for rels starting and ending with __
+	auto filter_internal_tables = [] (const lexeme& l) {
+		size_t len = l[1] - l[0];
+		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
+				  '_' == l[0][len-2] && '_' == l[0][len-1];
+	};
+	// TODO clarify difference between hidden and internal. Anyway, this
+	// problem would disappear once we refactor run methosa.
+	ints internal_rels = dict.get_rels(filter_internal_tables);
+	for (auto& tbl : tbls.tbls)
+		for (int_t rel : internal_rels)
+			if (rel == tbl.s.first) { tbl.hidden = true; break; }
+
+	if (rt.optimize) bdd::gc();
+	return true;
+}
+
+bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+	dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
+	progress& p) {
+	std::map<elem, elem> freeze_map, unfreeze_map;
+	// Create a duplicate of each rule in the given program under a
+	// generated alias.
+	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
+		for(raw_term &rt : rp.r[i].h) {
+			raw_term rt2 = rt;
+			auto it = freeze_map.find(rt.e[0]);
+			if(it != freeze_map.end()) {
+				rt.e[0] = it->second;
+			} else {
+				elem frozen_elem = elem::fresh_temp_sym(dict);
+				// Store the mapping so that the derived portion of each
+				// relation is stored in exactly one place
+				unfreeze_map[frozen_elem] = rt.e[0];
+				rt.e[0] = freeze_map[rt.e[0]] = frozen_elem;
+			}
+			rp.r.push_back(raw_rule(rt2, rt));
+		}
+	}
+	// Now add the extensional database to the given program.
+	for(const raw_term &rt : edb) {
+		rp.r.push_back(raw_rule(rt));
+	}
+	// Run the program to obtain the results which we will then filter
+	std::set<raw_term> tmp_results;
+	rt_options to;
+	to.apply_regexpmatch = opts.enabled("regex");
+	to.bitorder          = opts.get_int("bitorder");
+	to.bproof            = proof_mode::none;
+	to.fp_step           = opts.enabled("fp");
+	to.optimize          = opts.enabled("optimize");
+	to.print_transformed = opts.enabled("t");
+
+	tables tbl(to, bltins);
+
+//	ir_builder ir_handler(dict, to);
+//	tables tbl(dict, to, &ir_handler);
+//	ir_handler.dynenv = &tbl;
+//	ir_handler.printer = &tbl;
+
+	strs_t strs;
+	driver drv(opts);
+	if (!drv.run_prog(rp, strs, 0, 0, p, to, tbl)) return false;
+	for(const term &result : tbl.decompress())
+		tmp_results.insert(drv.ir->to_raw_term(result));
+	
+	// Filter out the result terms that are not derived and rename those
+	// that are derived back to their original names.
+	for(raw_term res : tmp_results) {
+		auto jt = unfreeze_map.find(res.e[0]);
+		if(jt != unfreeze_map.end()) {
+			res.e[0] = jt->second;
+			results.insert(res);
+		}
+	}
+	return true;
+}
+
+bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
+	size_t break_on_step, progress& ps, rt_options& rt, tables &tbls, ir_builder &ir_handler) {
+	DBG(o::dbg() << "run_prog" << endl;);
+	clock_t start{}, end;
+	double t;
+	if (rt.optimize) measure_time_start();
+
+	flat_prog fp = ir_handler.to_terms(p);
+	//DBG(ir_handler->opts.print_binarized = true;);
+	#ifdef FOL_V2
+	print(o::out() << "FOF flat_prog:\n", fp) << endl;
+	#endif // FOL_V2
+	//DBG(ir_handler->opts.print_binarized = false;);
+
+	#ifndef LOAD_STRS
+	strs = strs_in;
+	if (!strs.empty()) {
+		for (auto x : strs) {
+			ir_handler.nums = max(ir_handler.nums, (int_t)x.second.size()+1);
+			unary_string us(32);
+			us.buildfrom(x.second);
+			ir_handler.chars = max(ir.chars, (int_t)us.rel.size());
+		}
+	}
+	#else // LOAD_STRS
+	ir_handler.load_strings_as_fp(fp, strs_in);
+	#endif // LOAD_STRS
+
+	ir_handler.syms = dict.nsyms();
+	
+	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
+		tbls.bits = 1;
+	#else
+		#ifdef TYPE_RESOLUTION
+		size_t a = max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms);
+		if (a == 0) tbls.bits++;
+		else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
+		#else
+		while (max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
+			tbls.add_bit();
+		#endif
+	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+	
+	// TOODO this call must be done in the driver
+	if (!add_prog_wprod(fp, p.g, tbls, rt, ir_handler)) return false;
+
+	//----------------------------------------------------------
+	if (tbls.opts.optimize) {
+		end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
+		o::ms() << "# pfp: " << endl; measure_time_start();
+	}
+
+	nlevel begstep = tbls.nstep;
+
+	bool r = true;
+	// run program only if there are any rules
+	if (tbls.rules.size()) {
+		tbls.fronts.clear();
+		r = tbls.pfp(steps ? tbls.nstep + steps : 0, break_on_step, ps);
+	} else {
+		bdd_handles l = tbls.get_front();
+		tbls.fronts = {l, l};
+	}
+	//----------------------------------------------------------
+	//TODO: prog_after_fp is required for grammar/str recognition,
+	// but it should be restructured
+	if (r && tbls.prog_after_fp.size()) {
+		if (!add_prog_wprod(tbls.prog_after_fp, {}, tbls, rt, ir_handler)) return false;
+		r = tbls.pfp(0, 0, ps);
+	}
+
+	size_t went = tbls.nstep - begstep;
+	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
+		for (const raw_prog& np : p.nps) {
+			steps -= went; begstep = tbls.nstep;
+			rt_options rt;
+			r = run_prog(np, strs_in, steps, break_on_step, ps, rt, tbls, ir_handler);
+			went = tbls.nstep - begstep;
+			if (!r && went >= steps) {
+				//assert(false && "!r && went >= steps");
+				break;
+			}
+		}
+	}
+
+	if (tbls.opts.optimize)
+		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
+	return r;
+}
+
+void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, ir_builder *ir_handler, dict_t &dict) {
+	for (const std::string& tname : tlist)
+		tbls.opts.pu_states.insert(ir_handler->get_table(
+				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
+}
+
+driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
+	if (opts.error) { error = true; return; }
+
+
 	// inject inputs from opts to driver and dict (needed for archiving)
 	dict.set_inputs(ii = opts.get_inputs());
 	if (!ii) return;
 	if (s.size()) opts.parse(strings{ "-ie", s });
-	rt_options to;
 
+	rt_options to;
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
-			{{"none", proof_mode::none}, {"tree", proof_mode::tree},
-				{"forest", proof_mode::forest}, {"partial-tree", proof_mode::partial_tree},
+			{{"none", proof_mode::none}, 
+				{"tree", proof_mode::tree},
+				{"forest", proof_mode::forest}, 
+				{"partial-tree", proof_mode::partial_tree},
 				{"partial-forest", proof_mode::partial_forest}});
 	to.optimize          = opts.enabled("optimize");
 	to.print_transformed = opts.enabled("t");
@@ -2420,26 +2630,39 @@ driver::driver(string s, const options &o) : opts(o), rp(raw_progs(dict)) {
 	to.bitorder          = opts.get_int("bitorder");
 	to.incr_gen_forest	 = opts.enabled("incr-gen-forest");
 
-	//dict belongs to driver and is referenced by ir_builder and tables
 	ir = new ir_builder(dict, to);
-	tbl = new tables(dict, to, ir);
-	ir->dynenv  = tbl;
-	ir->printer = tbl; //by now leaving printer component in tables, to be rafactored
+	builtins_factory* bf = new builtins_factory(dict, *ir);
+	bltins = bf
+		->add_basic_builtins()
+		.add_bdd_builtins()
+		.add_print_builtins()
+		.add_js_builtins().bltins;
+	tbl = new tables(to, bltins);
 
+	ir->dynenv  = tbl;
+	ir->printer = tbl;
+
+	// TODO move this options to rt_options
 	set_print_step(opts.enabled("ps"));
 	set_print_updates(opts.enabled("pu"));
-	tbl->add_print_updates_states(opts.pu_states);
+	add_print_updates_states(opts.pu_states, *tbl, ir, dict);
+
+	if (to.fp_step) ir->get_table(ir->get_sig(dict.get_lexeme("__fp__"), { 0 }));
 	set_populate_tml_update(opts.enabled("tml_update"));
 	set_regex_level(opts.get_int("regex-level"));
 
 	read_inputs();
-	if(!error) {
-		//FIXME: root_isempty
+
+	raw_term raw_t;
+	raw_t.arity = { 0 };
+	raw_t.e.emplace_back(elem::SYM, dict.get_lexeme(string("__fp__")));
+	tbl->fixed_point_term = ir->from_raw_term(raw_t);
+
+	if (!error && !rp.p.nps.empty()) {
 		directives_load((rp.p.nps)[0]);
 		transform_handler(rp.p);
-		//TODO: review how recursion to nested programs should be handled
-		// per transform vs globally
-		//recursive_transform(rp-p);
+		// TODO review how recursion to nested programs should be handled per
+		// transform vs globally recursive_transform(rp-p)
 		if (opts.enabled("program-gen")) {
 			string pname;
 			cpp_gen g;

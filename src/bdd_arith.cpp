@@ -117,21 +117,21 @@ bdd_ref bdd::bdd_quantify(bdd_ref x, uint_t bit, const std::vector<quant_t> &qua
 			if (h == F) return F;
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F) return F;
-			return x;
+			return add(GET_SHIFT(x), h, l);
 		}
 		case quant_t::EX: {
 			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if (l == F && h == F) return F;
 			if (l == F || h == F) return add(GET_SHIFT(x), h, l);
-			return x;
+			return add(GET_SHIFT(x), h, l);
 		}
 		case quant_t::UN: {
 			if (c.l != F && c.h != F) return F;
 			h = bdd_quantify(c.h, bit+1, quants, bits, n_args);
 			l =	bdd_quantify(c.l, bit+1, quants, bits, n_args);
 			if ((l == F && h == F) || (l == T && h == T)) return F;
-			return x;
+			return add(GET_SHIFT(x), h, l);
 		}
 		default: ;
 	}

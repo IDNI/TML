@@ -1,3 +1,16 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+
 #include <vector>
 #include <map>
 #include <set>
@@ -276,7 +289,7 @@ private:
 	template <typename CharU>
 	friend int test_out(int c, earley<CharU> &e);
 	typedef std::unordered_set<earley<CharT>::item, earley<CharT>::hasher_t> container_t;
-	typedef container_t::iterator container_iter;
+	typedef typename container_t::iterator container_iter;
 	std::vector<container_t> S;
 	container_iter add(container_t& t, const item& i);
 	void complete(const item& i, container_t& t);

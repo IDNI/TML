@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __DRIVER_H__
 #define __DRIVER_H__
+
 #include <map>
 #include <cmath>
 #include <variant>
@@ -24,6 +25,7 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #endif
+
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
@@ -31,6 +33,10 @@
 #include "options.h"
 #include "transform_opt.h"
 #include "printing.h"
+
+#include "builtins.h"
+
+#include "tables_progress.h"
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
@@ -228,6 +234,7 @@ private:
 
 	std::set<lexeme> vars;
 	options opts;
+	rt_options rt_opts;
 	raw_progs rp;
 	bool running = false;
 	inputs* ii;
@@ -235,7 +242,45 @@ private:
 	input* current_input = 0;
 	size_t current_input_id = 0;
 
+	bool add_basic_builtins(builtins& bltins);
+	bool add_bdd_builtins(builtins& bltins);
+	bool add_print_builtins(builtins& bltins);
+	bool add_js_builtins(builtins& bltins);
+
 public:
+	template <typename T>
+	void out_goals(std::basic_ostream<T> &os);
+	template <typename T>
+	void out_fixpoint(std::basic_ostream<T> &os);
+	template <typename T>
+	void out_proof(std::basic_ostream<T> &os);
+	template <typename T>
+	void out_result(std::basic_ostream<T> &os);
+	template <typename T>
+	void out(std::basic_ostream<T> &os) { /* TODO something*/ }
+
+	void init_tml_update(updates& updts);
+
+	static bool run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
+		dict_t &dict, builtins& bltins, const options &opts, std::set<raw_term> &results,
+		progress& p);
+	bool run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
+		size_t break_on_step, progress& ps, rt_options& rt, tables &tbls, ir_builder &ir_handler);
+	bool run_prog(const raw_prog& p, const strs_t& strs, size_t steps,
+		size_t break_on_step, progress& ps, rt_options &rt, tables &tbls) {
+			return run_prog(p, strs, steps, break_on_step, ps, rt, tbls, *ir);
+	}
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt, ir_builder &ir_handler);
+	bool add_prog_wprod(flat_prog m, const std::vector<production>& g/*, bool mknums*/, tables &tbls, rt_options &rt) {
+		return add_prog_wprod(m,  g/*, bool mknums*/, tbls, rt, *ir);
+	}
+
+
+	builtins bltins;
+
+	template <typename T>
+	void out_dict(std::basic_ostream<T>& os)  { os << dict; }
+
 	bool result = false;
 	bool error = false;
 	driver(const options& o);
@@ -260,7 +305,7 @@ public:
 
 	void set_print_step   (bool val) { tbl->print_steps   = val; }
 	void set_print_updates(bool val) { tbl->print_updates = val; }
-	void set_populate_tml_update(bool val) { tbl->populate_tml_update=val; }
+	void set_populate_tml_update(bool val) { tbl->populate_tml_update = val; }
 	void set_regex_level(int val ) { ir->regex_level = val; }
 
 	inputs* get_inputs() const { return ii; }
@@ -273,21 +318,10 @@ public:
 	void info(std::basic_ostream<T>&);
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
-	template <typename T>
-	void out(std::basic_ostream<T>& os) const { if (tbl) tbl->out(os); }
-	void out_result() {
-		if (tbl) {
-			if (!tbl->out_goals(o::dump()))
-				tbl->out_fixpoint(o::dump());
-#ifdef PROOF
-			tbl->get_proof(o::dump());
-#endif
-		}
+
+
+	void dump() { 
 	}
-	template <typename T>
-	void out_dict(std::basic_ostream<T>& os) const { tbl->print_dict(os); }
-	void dump() { out(o::dump()); }
-	void out(const tables::rt_printer& p) const { if (tbl) tbl->out(p); }
 	void save_csv() const;
 	
 #ifdef __EMSCRIPTEN__

@@ -21,13 +21,6 @@ using namespace std;
  * of a relation. */
 
 bool tables::is_term_valid(const term &t) {
-	for(const int_t &el : t) {
-		// Use the type bits to determine what the value limits should be
-		if(((el & 3) == 1 && (el >> 2) >= ir_handler->chars) ||
-			((el & 3) == 2 && (el >> 2) > ir_handler->nums) ||
-			((el & 3) == 0 && (el >> 2) >= ir_handler->syms) ||
-			(el & 3) == 3) return false;
-	}
 	return true;
 }
 
@@ -217,11 +210,13 @@ rule tables::new_identity_rule(const ntable tab, const bool neg) {
 	return rul;
 }
 
+// TODO move this method to driver
+
 /* Print proof trees for each goal in the program. Do this by doing a backward
  * chain over the levels structure, which contains the entirity of facts
  * derivable by the given program from the given initial database. */
 
-template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
+/* template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
 	// Fact proofs are stored by level
 	proof p(levels.size());
 	set<term> s;
@@ -263,7 +258,7 @@ template <typename T> bool tables::get_proof(std::basic_ostream<T>& os) {
 	return goals.size() || opts.bproof != proof_mode::none;
 }
 template bool tables::get_proof(std::basic_ostream<char>&);
-template bool tables::get_proof(std::basic_ostream<wchar_t>&);
+template bool tables::get_proof(std::basic_ostream<wchar_t>&); */
 
 std::set<const gnode*> gnode::visited;
 std::map<std::set<term>, gnode*> gnode::interm2g;
@@ -296,7 +291,7 @@ bool gnode::_binarise() {
 	return done;
 }
 
-
+// TODO move this method to driver
 void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visit, int space) {
 
 	std::wstring sp;
@@ -304,7 +299,7 @@ void tables::print_dot(std::wstringstream &ss, gnode &gh, std::set<gnode*> &visi
 
 	if(!visit.insert(&gh).second) return;
 	if( gh.type == gnode::gntype::symbol)
-		ss  << endl<< sp << size_t(&gh) << L"[label=\""<< " "<< ir_handler->to_raw_term(gh.t)<< L"\"];";
+		/* ss  << endl<< sp << size_t(&gh) << L"[label=\""<< " "<< ir_handler->to_raw_term(gh.t)<< L"\"];" */ ;
 	else if (gh.type == gnode::gntype::pack)
 		ss  << endl<< sp << size_t(&gh) << L"[shape = \"point\" label=\""<< L"\"];";
 	else if (gh.type == gnode::gntype::interm)

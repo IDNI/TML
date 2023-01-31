@@ -22,7 +22,40 @@ using
 	emscripten::register_vector,
 	emscripten::optional_override,
 	emscripten::select_overload,
-	emscripten::allow_raw_pointers;
+	emscripten::allow_raw_pointers,
+	emscripten::val,
+	std::endl;
+
+class runner {
+	inputs ii;
+	outputs oo;
+	options o;
+public:
+	bool error = false;
+	bool result = false;
+	runner(strings args) : o(args, &ii, &(o::init_outputs(oo))) {
+		oo.clear("output");
+		oo.clear("dump");
+	}
+	bool run_tc(int_t cptr, emscripten::val tc = val::undefined()) {
+		const char *program = reinterpret_cast<const char*>(cptr);
+		error = false, result = false;
+		driver d(program, o);
+		if (!d.error) d.run(0, 0);
+		error = d.error, result = d.result;
+		bool success = !error && result;
+		if (success) {
+			d.out_result();
+			if (tc != val::undefined()) d.out(tc);
+		}
+		return success;
+	}
+
+	bool run(int_t cptr) { return run_tc(cptr); }
+	sysstring_t read(std::string on) { return outputs::read(on); }
+	void clear(std::string on) { outputs::clear(on); }
+	options& get_opts() { return o; }
+};
 
 EMSCRIPTEN_BINDINGS(tml) {
 	enum_<output::type_t>("type_t")
@@ -41,6 +74,21 @@ EMSCRIPTEN_BINDINGS(tml) {
 	class_<bdd>("bdd")
 		.class_function("init", &bdd::init)
 		.class_function("gc", &bdd::gc)
+		;
+	class_<runner>("runner")
+		.constructor<strings>()
+		.property("result", &runner::result)
+		.property("error", &runner::error)
+		.function("run", &runner::run)
+		.function("run_tc", &runner::run_tc)
+		.function("read", &runner::read)
+		.function("clear", &runner::clear)
+		.function("get_opts", &runner::get_opts)
+		.function("out", optional_override(
+			[](driver& self, val v) { return self.out(v); }))
+		.class_function("version", optional_override([]() -> std::string {
+				return std::string(GIT_DESCRIBED);
+			}), allow_raw_pointers())
 		;
 	class_<driver>("driver")
 		.constructor<std::string, options>(allow_raw_pointers())

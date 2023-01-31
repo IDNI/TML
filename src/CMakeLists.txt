@@ -25,6 +25,7 @@ set(TML_HEADERS
 	driver.h
 	earley.h
 	err.h
+	fof.h
 	form.h
 	input.h
 	ir_builder.h
@@ -51,6 +52,7 @@ set(TML_SOURCES
 	dict.cpp
 	driver.cpp
 	earley.cpp
+	fof.cpp
 	form.cpp
 	input.cpp
 	ir_builder.cpp
@@ -60,6 +62,8 @@ set(TML_SOURCES
 	proof.cpp
 	save_csv.cpp
 	tables.cpp
+	tables_progress.cpp
+	tables_printer.cpp
 	tables_builtins.cpp
 	tables_ext.cpp
 	tml_earley.cpp

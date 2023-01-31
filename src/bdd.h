@@ -10,6 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+#ifndef __BDD_H__
+#define __BDD_H__
+
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -501,4 +505,5 @@ private:
 	void sat(bdd_ref x);
 };
 
+#endif // __BDD_H__
 

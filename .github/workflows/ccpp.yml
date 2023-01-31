@@ -35,8 +35,16 @@ jobs:
       - name: Installing clang and clang tidy on Ubuntu
         if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
         run: |
-          sudo apt-get install -y clang clang-tidy
+          sudo apt-get install -y clang-14 clang-tidy-14
 # macOS installations
+      - name: Installing gcc on macOS
+        if: matrix.os == 'macOS-12'
+        run: |
+          brew install gcc
+      - name: Selecting XCode 14.2
+        if: matrix.os == 'macOS-12'
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_14.2.app"
       - name: Installing boost on macOS
         if: matrix.os == 'macOS-12'
         run: |
@@ -59,15 +67,17 @@ jobs:
           mkdir -p build-Debug
           cd build-Debug
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            CMAKE_CXX_COMPILER=g++-11
+            CMAKE_CXX_COMPILER=g++-12
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-              CMAKE_CXX_COMPILER=clang++-12
+              CMAKE_CXX_COMPILER=$(which clang++-14)
+              CMAKE_C_COMPILER=$(which clang-14)
             else
-              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+              CMAKE_C_COMPILER=$(which clang)      
+              CMAKE_CXX_COMPILER=$(which clang++)      
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
           fi
           make -j5
       - name: Bulding release version
@@ -75,15 +85,17 @@ jobs:
           mkdir -p build-Release
           cd build-Release
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            CMAKE_CXX_COMPILER=g++-11
+            CMAKE_CXX_COMPILER=g++-12
             cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
-              CMAKE_CXX_COMPILER=clang++-12
+              CMAKE_CXX_COMPILER=$(which clang++-14)
+              CMAKE_C_COMPILER=$(which clang-14)
             else
-              CMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++
+              CMAKE_C_COMPILER=$(which clang)      
+              CMAKE_CXX_COMPILER=$(which clang++)
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
           fi
           make -j5
 # tests

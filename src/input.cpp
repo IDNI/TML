@@ -299,7 +299,7 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos][0], dot_expected, l[pos]);
 		return true;
 	} else return in->parse_error(l[pos][0], err_directive_arg, l[pos]);
-	if (*l[pos++][0]!='.') return
+	if (pos == l.size() || *l[pos++][0]!='.') return
 		in->parse_error(l[curr2][1], dot_expected, l[curr2]);
 	return !in->error;
 }
@@ -1375,6 +1375,7 @@ bool input::parse_error(ccs offset, const char* err, ccs close_to, ccs ctx) {
 #endif
 	return false;
 }
+
 bool input::type_error(ccs offset, const char* err, ccs close_to) {
 	error = true;
 	ostringstream msg; msg << "Type error: \"" << err << '"';

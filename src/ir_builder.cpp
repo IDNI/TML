@@ -16,14 +16,15 @@
 #include <variant>
 #include <math.h>
 
+
 #include "ir_builder.h"
 #include "tables.h"
+#include "output.h"
+
+
+#include "fof.h"
+
 using namespace std;
-
-ir_builder::ir_builder(dict_t& dict_, rt_options& opts_) :
-		dict(dict_), opts(opts_) { }
-
-ir_builder::~ir_builder() { }
 
 void align_vars(vector<term>& v) {
 	map<int_t, int_t> m;
@@ -45,12 +46,18 @@ bool ir_builder::append(std::map<int_t, std::vector<tml_natives>> &m, sig &s) {
 		}
 		#ifdef BIT_TRANSFORM_V2
 		else {
+			bool updated = false;
 			int_t i = 0;
 			for ( auto &j : *it2 ) {
-				j.bit_w = max(j.bit_w,s.second[i].bit_w);
+				if (j.bit_w < s.second[i].bit_w) {
+					j.bit_w = s.second[i].bit_w;
+					updated = true;
+				}
 				++i;
 			}
+			return updated;
 		}
+
 		#endif
 	}
 	else {
@@ -243,10 +250,10 @@ void ir_builder::type_resolve_bodies(raw_rule &r, rr_varmap &v) {
 							tml_native_t ts;
 							bool vld = true;
 							for (auto j: vt.positions) {
-								assert(rel_sig[j].type == UINT || rel_sig[j].type == SYMB || rel_sig[j].type == UCHAR);
-								if (ts.type == UNDEF) {
-									ts = rel_sig[j];
-								}
+								DBG(assert((rel_sig[j].type == UINT ||
+									rel_sig[j].type == SYMB ||
+									rel_sig[j].type == UCHAR) && "un-handled argument type in sig"););
+								if (ts.type == UNDEF) ts = rel_sig[j];
 								if (!(ts == rel_sig[j])) {vld = false; break;}
 							}
 							if (vld) vt.append(ts);
@@ -273,10 +280,12 @@ void intersect_varmaps(tml_natives &v0, tml_natives &v1, tml_natives &v2) {
 		}
 }
 
-void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
+bool ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 
+	bool updated = false;
 	for (auto it = rp.begin(); it != rp.end();) {
 		rr_varmap v;
+		sig sh;
 		if (it->b.empty()) {
 			if (it->type == raw_rule::GOAL) {
 				sig s = get_sig(*it->h.begin());
@@ -288,7 +297,7 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			else { it++; continue;}
 		}
 		else {
-			sig sh = get_sig(*it->h.begin());
+			sh = get_sig(*it->h.begin());
 			v = get_vars(*it);
 			if ((*it->h.begin()).extype == raw_term::BLTIN) assert(false);
 			//free_vars: detected only at bodies, for cons/bltins TBD
@@ -325,7 +334,7 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 				else if (ptr != 0) {
 					tml_natives aux;
 					intersect_varmaps(ptr[0], vt.types, aux);
-					if (!(it->b[0][vt.rt_idx-1].neg && aux.size() == 0))
+					if (!(it->b[0][vt.rt_idx-1].neg && aux.size() == 0)) //*TR001*
 						*ptr = aux;
 				}
 				else { //is_free
@@ -344,7 +353,12 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 			mpn = mpn == 0 ? vl : mpn * vl;
 			mp.push_back(vl);
 		}
-		if (v.size() == 0) {it++;continue;}
+		if (v.size() == 0) {
+			//constant head and bodies
+			if (append(relid_argtypes_map, sh)) updated = true;
+			it++;
+			continue;
+		}
 
 		if (mpn == 0) {
 			COUT << "WARNING: removing rule due to invalid types" << endl; //add lineno
@@ -365,17 +379,28 @@ void ir_builder::type_resolve_rules(vector<raw_rule> &rp) {
 				relid_argtypes_map.insert({s.first, {s.second}});
 			else {
 				auto it2 = find(it->second.begin(), it->second.end(), s.second);
-				//single step bitwidth inference - just proof of concept
-				if (it2 != it->second.end()) append(relid_argtypes_map, s);
-				else assert(false);
+				//fixed point bitwidth inference
+				if (it2 != it->second.end())
+						if (append(relid_argtypes_map, s)) updated = true;
+						//if updated... restart ... loop ? :)
+				//else assert(false);
 			}
 		}
 	}
+	return updated;
 }
 
 void ir_builder::type_resolve(raw_prog &rp) {
+
 	type_resolve_facts(rp.r);
-	type_resolve_rules(rp.r);
+
+	bool updated;
+
+	updated = type_resolve_rules(rp.r);
+
+	while (updated) //TEST: jump to non halting cycle?
+		updated = type_resolve_rules(rp.r);
+
 }
 
 sig ir_builder::to_native_sig(const term& e) {
@@ -498,7 +523,8 @@ raw_prog ir_builder::generate_type_resolutor(raw_prog &rp) {
 						ints ev;
 						for (auto &t : s.second) {
 							if (t.type == POLY) {
-								int_t id = i <= 2 ? dict.get_var(rt->e[i*2].e) : dict.get_var(rt->e[i*2-1].e);
+								int_t id = i <= 2 ?	dict.get_var(rt->e[i*2].e) :
+										dict.get_var(rt->e[i*2-1].e);
 								if (find(ev.begin(), ev.end(), id) == ev.end()) {
 									elem v = i <= 2 ? rt->e[i*2] : rt->e[i*2-1];
 									ev.push_back(id);
@@ -597,8 +623,6 @@ sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
 	for (auto &t : tys) tn.push_back({t,-1});
 	return {rel_id, tn};
 }
-
-
 #endif //TYPE_RESOLUTION
 
 #ifdef TML_NATIVES
@@ -608,6 +632,7 @@ sig ir_builder::get_sig(raw_term &t) {
 		if (opts.binarize) {
 			auto it = relid_argtypes_map.find(t.s.first);
 			auto it2 = find(it->second.begin(), it->second.end(), t.s.second);
+			//if (it2->begin()->bit_w == -1) return t.s; //workaround for constant head
 			return {t.s.first, *it2};
 		} else return t.s;
 		#else
@@ -674,8 +699,10 @@ sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
 #ifdef TML_NATIVES
-	assert(arity.size() == 1);
-	tml_natives tn(arity[0], {native_type::UNDEF,-1});
+	//assert(arity.size() == 1);
+	tml_natives tn;
+	if (arity.size() == 1)
+		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
 	return {rel_id, tn};
 #else
 	return {rel_id, arity};
@@ -693,7 +720,7 @@ size_t ir_builder::sig_len(const sig& s) const {
 
 #if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
 
-int_t inc_pos_bt (tml_natives &rts, int_t i, int_t j) {
+int_t inc_pos_bt(tml_natives &rts, int_t i, int_t j) {
     int_t inc = 0;
     for (int_t k = 0; k < (int_t) rts.size(); k++)
 		if (j < rts[k].bit_w) inc++;
@@ -708,7 +735,7 @@ void ir_builder::bit_transform(tml_natives &ts, tml_natives &rts, ints &t, ints 
 	for (int_t i = 0; i < (int_t) t.size(); ++i) {
 		int_t offset = i;
 		if (t[i] < 0) {
-			int_t e = floor(log10(rts[i].bit_w));
+			int_t e = floor(log10(rts[i].bit_w)) + 1;
 			int_t scl = pow(10,e);
 			for (int_t j = 0; j < ts[i].bit_w; ++j) {
 				if (j < rts[i].bit_w)
@@ -764,10 +791,13 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 					//and sudoku backtracking (probalby due to use of count as well)
 					align_vars(v);
 					if (!m.insert(move(v)).second) v.clear();
+
 				}
 			}
 		}
+
 		else if(r.prft) {
+			#ifdef FOL_V1
 			bool is_sol = false;
 			form* froot = 0;
 			//TODO: review
@@ -817,7 +847,23 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
-		} else  {
+			#endif
+
+			#ifdef FOL_V2
+			sprawformtree root = r.prft->neg // neg transform
+				? make_shared<raw_form_tree>(elem::NOT,
+						make_shared<raw_form_tree>(*r.prft))
+				: make_shared<raw_form_tree>(*r.prft);
+			prog pfof = get_fof(root);
+			print_fof(pfof, this);
+			assert(r.h.size() == 1);
+			get_nums(r.h[0]), t = from_raw_term(r.h[0], true);
+			to_flat_prog(t, this, pfof, m);
+			//DBG(print(o::out() << "\n", m) << endl;);
+			//print(o::out() << "\n", m) << endl;
+			#endif
+		}
+		else  {
 			for (const raw_term& x : r.h)
 				t = from_raw_term(x, true),
 				t.goal = r.type == raw_rule::GOAL,
@@ -945,7 +991,13 @@ int_t ir_builder::get_table(const sig& s) {
 	return nt;
 }
 
+void ir_builder::set_hidden_table(const int_t t) {
+	dynenv->tbls[t].hidden = true;
+}
+
 //---------------------------------------------------------
+
+#ifdef FOL_V1
 
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
@@ -984,7 +1036,7 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 		switch(rfm->type) {
 			case elem::NOT:
 				root = new form(form::NOT);
-				if(root ) {
+				if (root) {
 					ret =  from_raw_form(rfm->l, root->l, is_sol);
 					froot = root;
 					return ret;
@@ -994,42 +1046,94 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 			case elem::VAR:
 			case elem::SYM:
 				ft = form::ATOM;
-				if( rfm->type == elem::VAR)
+				if (rfm->type == elem::VAR)
 					arg = dict.get_var(rfm->el->e);
 				else
 					arg = dict.get_temp_sym(rfm->el->e); //VAR2
 				root = new form(ft, arg);
 				froot = root;
-				if(!root) return false;
+				if (!root) return false;
 				return true;
 
 			//identifying sol formula
 			case elem::FORALL:
-				if(rfm->l->type == elem::VAR) ft = form::FORALL1;
+				if (rfm->l->type == elem::VAR) ft = form::FORALL1;
 				else ft = form::FORALL2, is_sol = true;
 				break;
 			case elem::UNIQUE:
-				if(rfm->l->type == elem::VAR) ft = form::UNIQUE1;
+				if (rfm->l->type == elem::VAR) ft = form::UNIQUE1;
 				else ft = form::UNIQUE2, is_sol = true;
 				break;
 			case elem::EXISTS:
-				if(rfm->l->type == elem::VAR) ft = form::EXISTS1;
+				if (rfm->l->type == elem::VAR) ft = form::EXISTS1;
 				else ft = form::EXISTS2, is_sol = true;
 				break;
 			case elem::OR:
 			case elem::ALT: ft = form::OR; break;
 			case elem::AND: ft = form::AND; break;
-			case elem::IMPLIES: ft= form::IMPLIES; break;
-			case elem::COIMPLIES: ft= form::COIMPLIES; break;
-			default: return froot= root, false;
+			case elem::IMPLIES: ft = form::IMPLIES; break;
+			case elem::COIMPLIES: ft = form::COIMPLIES; break;
+			default: return froot = root, false;
 		}
 		root =  new form(ft);
 		ret = from_raw_form(rfm->l, root->l, is_sol);
-		if(ret) ret = from_raw_form(rfm->r, root->r, is_sol);
+		if (ret) ret = from_raw_form(rfm->r, root->r, is_sol);
 		froot = root;
 		return ret;
 	}
 }
+#endif
+
+#ifdef FOL_V2
+prog ir_builder::get_fof(sprawformtree root) {
+
+	if (!root) return {};
+	if (root->rt) {
+		term t = from_raw_term(*root->rt);
+		prog p = from_term(t);
+		return p;
+	}
+	else {
+		prog p;
+		switch(root->type) {
+			case elem::VAR:
+			case elem::SYM:
+			case elem::NOT:
+				p = ~get_fof(root->l);
+				break;
+			case elem::OR:
+			case elem::ALT:
+				p = get_fof(root->r) || get_fof(root->l);
+				break;
+			case elem::AND:
+				p = get_fof(root->r) && get_fof(root->l);
+				break;
+			case elem::IMPLIES:
+				p = ~get_fof(root->r) || get_fof(root->l);
+				break;
+			case elem::COIMPLIES:
+				p = (~get_fof(root->r) || get_fof(root->l)) &&
+					(~get_fof(root->l) || get_fof(root->r));
+				break;
+			case elem::FORALL:
+				assert(root->l->type == elem::VAR);
+				p = all(get_fof(root->r), dict.get_var(root->l->el->e), 0);
+				break;
+			case elem::EXISTS: {
+				assert(root->l->type == elem::VAR);
+				p = ex(get_fof(root->r), dict.get_var(root->l->el->e), 0);
+				break;
+			}
+			case elem::UNIQUE:
+				assert(root->l->type == elem::VAR);
+				break;
+			default: ;
+		}
+		return p;
+	}
+}
+#endif
+
 #ifdef TYPE_RESOLUTION
 void ir_builder::natives2raw(int_t args, const ints &r, const sig &s, raw_term &rt) {
 	for (int_t n = 1; n != args + 1; ++n) {
@@ -1106,9 +1210,16 @@ raw_term ir_builder::to_raw_term(const term& r) {
 		}
 		else {
 			if (r.tab != -1) {
+
 				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
-				rt.e[0] = elem(elem::SYM,
-						dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
+				#ifdef FOL_V2
+				if (dynenv->tbls.at(r.tab).hidden) {
+					rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(dynenv->tbls.at(r.tab).s.first)));
+				}
+				else
+				#endif
+					rt.e[0] = elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
+
 				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
 				//#ifdef TML_NATIVES
 				//assert(rt.arity.size() == 1);
@@ -1150,7 +1261,7 @@ raw_term ir_builder::to_raw_term(const term& r) {
 			}
 		}
 #ifndef BIT_TRANSFORM_V2
-		DBG(assert(args == r.size());)
+		//DBG(assert(args == r.size());)
 #endif
 #ifdef BIT_TRANSFORM
 		if(bitunv_to_raw_term(rt))
@@ -2069,10 +2180,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		//DBG(o::dbg()<<rts.back()<<endl);
 	}
 	for(auto rt: rts) /*o::inf()<<rt<<endl,*/ p.insert({from_raw_term(rt)});
-	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
-		<< "# after transform_grammar:\n", p)
-		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
-		<< endl;
 	return true;
 	#endif // ONLY_EARLEY
 
@@ -2185,10 +2292,6 @@ bool ir_builder::transform_grammar(vector<production> g, flat_prog& p) {
 		transform_grammar_constraints(x, v, p, refs);
 		p.insert(move(v));
 	}
-	if (opts.print_transformed) printer->print(printer->print(o::to("transformed")
-		<< "\n# after transform_grammar:\n", p)
-		<< "\n# run after a fixed point:\n", dynenv->prog_after_fp)
-		<< endl;
 	return true;
 }
 
@@ -2358,13 +2461,17 @@ void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) 
 	for (int_t n = 0; n != (int_t)s.size(); ++n) {
 		t[0] = mknum(n), t[1] = mkchr(s[n]); // t[2] = mknum(n + 1),
 		chars = max(chars, t[1]);
-		v.push_back(t), fp.insert(move(v));
+		v.push_back(t), fp.insert(std::move(v));
 		tb[1] = t[0], tb[2] = mknum(0);
-		if (isspace(s[n])) tb[0] = mksym(sspace), v.push_back(tb), fp.insert(move(v));
-		if (isdigit(s[n])) tb[0] = mksym(sdigit), v.push_back(tb), fp.insert(move(v));
-		if (isalpha(s[n])) tb[0] = mksym(salpha), v.push_back(tb), fp.insert(move(v));
-		if (isalnum(s[n])) tb[0] = mksym(salnum), v.push_back(tb), fp.insert(move(v));
-		if (isprint(s[n])) tb[0] = mksym(sprint), v.push_back(tb), fp.insert(move(v));
+		auto add_char_cat = [&tb, &v, &fp](int_t cat) {
+			tb[0] = mksym(cat), v.push_back(tb),
+			fp.insert(std::move(v));
+		};
+		if (isspace(s[n])) add_char_cat(sspace);
+		if (isdigit(s[n])) add_char_cat(sdigit);
+		if (isalpha(s[n])) add_char_cat(salpha);
+		if (isalnum(s[n])) add_char_cat(salnum);
+		if (isprint(s[n])) add_char_cat(sprint);
 	}
 	str_rels.insert(rel);
 }

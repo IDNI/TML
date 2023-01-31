@@ -27,7 +27,7 @@ const map<output::type_t, string> output::type_names_ = {
 outputs* outputs::o_ = 0;
 
 namespace o {
-	void init_outputs(outputs& oo) {
+	outputs& init_outputs(outputs& oo) {
 		oo.create("output",               ".out.tml");
 		oo.create("error",                ".error.log");
 		oo.create("info",                 ".info.log");
@@ -43,6 +43,7 @@ namespace o {
 #ifdef WITH_THREADS
 		oo.create("repl-output",          ".repl.out.log");
 #endif
+		return oo;
 	}
 	void use(outputs* oo) { oo->use(); }
 	ostream_t& to(const string& n) { return outputs::to(n); }
@@ -119,6 +120,7 @@ ostream_t& outputs::to(const string& n) {
 	output* o = get(n);
 	if (o) return o->os();
 	//DBGFAIL;
+	CERR << "Output '" << n << "' does not exist.\n";
 	return CNULL;
 }
 

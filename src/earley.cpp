@@ -1,3 +1,16 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+
 #include <iomanip>
 #include <unordered_set>
 #include "earley.h"
@@ -228,7 +241,7 @@ typename earley<CharT>::ostream& earley<CharT>::print(
 }
 
 template <typename CharT>
-earley<CharT>::container_iter earley<CharT>::add(container_t& t, 
+typename earley<CharT>::container_iter earley<CharT>::add(container_t& t, 
 		const item& i) {
 	//DBG(print(o::dbg() << "adding ", i) << endl;)
 	auto& cont = S[i.set];
@@ -347,6 +360,7 @@ bool earley<CharT>::recognize(const typename earley<CharT>::string s) {
 			emeasure_time_end(tsp, tep)<<"\n";
 		}
 #endif
+
 /*
 #ifdef DEBUG
 		for (auto i : S) {

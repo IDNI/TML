@@ -1,0 +1,47 @@
+A0(0 0).
+A0(0 1).
+A1(1 0).
+A1(0 0).
+
+# ------------------------------------------------------------------------------
+
+B0a :- { A0(?x ?y) || A1(?x ?y) }. #PASS
+B0b(?x) :- { A0(?x ?y) || A1(?x ?y) }. #PASS
+B0c(?y) :- { A0(?x ?y) || A1(?x ?y) }. #PASS
+B0d(?y) :- { { A0(0 ?y) || A1(0 ?y) } }. #PASS
+B0e(?y) :- { { A0(?y 1) || A1(1 ?y) } }. #PASS
+
+B1a :- { A0(?x ?y) && A1(?x ?y) }. #PASS
+B1b(?x) :- { A0(?x ?y) && A1(?x ?y) }. #PASS
+B1c(?y) :- { A0(0 ?y) && A1(0 ?y) }. #PASS
+B1d(?y) :- { A0(?x ?y) && A1(?x ?y) }. #PASS
+B1e(?y) :- { A0(0 ?y) && A1(0 ?y) }. #PASS
+B1f(?y) :- { A0(?y 0) && A1(?y 0) }. #PASS
+
+B2a :- { { A0(0 ?y) || A1(0 ?y) } && { A0(1 ?y) || A1(1 ?y) } }.
+B2b :- { { A0(0 ?y) && A1(0 ?y) } || { A0(1 ?y) && A1(1 ?y) } }.
+
+B2c(?y) :- { { A0(0 ?y) && A1(0 ?y) } || { A0(1 ?y) && A1(1 ?y) } }. # PASS
+#B2d(?y ?x) :- { { A0(0 ?y) || A1(0 ?y) } && { A0(1 ?y) || A1(1 ?y) } }. #FAIL: segfaults due to free var in head
+
+C0a :- exists ?x { A0(?x ?y) && A1(0 1) }. #PASS
+C0b :- exists ?x { A0(?x ?y) && A1(0 0) }. #PASS
+#
+A2(1 1).
+A2(1 0).
+A3(1 0).
+
+D0 :- exists ?x exists ?y {A2(?x ?y) && A3(?x ?y)}. #PASS
+D1(?x) :- exists ?y {A2(?x ?y)  && A3(?x ?y)}. #PASS #outermost ex var
+D2(?y) :- A2(?x ?y) && A3(?x ?y) && exists ?a exists ?b { A2(?a ?b) && A3(?a ?b) }. #PASS #innermost ex var
+D3(?x ?y) :- A2(?x ?y) && A3(?x ?y) && exists ?a exists ?b {A2(?a ?b) && A3(?a ?b)}. #PASS
+
+E0a :- exists ?x { A2(1 ?x) && A3(1 0) }.#PASS
+E0a :- exists ?x { A2(0 ?x) && A3(1 0) }.#PASS
+E0b :- exists ?x { A2(0 ?x) && A3(0 2) }.#PASS
+
+#ISSUES
+
+#issue 1: parser needs and && / || to accept formula
+#B0a :- { A0(?x ?y)}.  #FAILS
+#--------------------------------------------------

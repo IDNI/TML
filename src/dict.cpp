@@ -10,11 +10,13 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include <cstring>
 #include "defs.h"
 #include "dict.h"
 #include "err.h"
 #include "input.h"
+
 using namespace std;
 
 dict_t::dict_t() {}
