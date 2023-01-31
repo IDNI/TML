@@ -24,8 +24,6 @@ bool ir_builder::btransform(raw_prog& rpin) {
 		r.emplace_back(), ret &= btransform(rr, r.back());
 	rpin.r.clear();
 	rpin.r = r;
-	//for( const raw_prog &rp : rpin.nps)
-	//	rpout.nps.emplace_back(d), ret &= btransform(rp, rpout.nps.back());
 	return ret;
 }
 
@@ -44,7 +42,6 @@ bool ir_builder::btransform(const raw_rule& rrin, raw_rule &rrout) {
 	for (const raw_term &rt : rrin.h)
 		rrout.h.emplace_back(), ret &= btransform(rt, rrout.h.back(), rrin, rrout);		
 	if (rrin.is_form())	{
-		//*rrout.prft = *rrin.prft,
 		rrout.set_prft(*rrin.prft);
 		ret = btransform( *rrin.prft, *rrout.prft, rrin, rrout  );
 		DBG((*rrout.prft).printTree();)
@@ -73,7 +70,6 @@ const primtype& ir_builder::get_typeinfo(size_t n, const raw_term &rt, const raw
 				//todo for struct types.
 				//should struct types ever have arithmetic operation, no!
 				DBG(assert(false));
-				//return this->env.lookup_typedef_var(str);
 				return dt_nop;
 			}
 			else {
@@ -109,7 +105,6 @@ const primtype& ir_builder::get_typeinfo(size_t n, const raw_term &rt, const raw
 					if(tc.env.contains_typedef( stn)){
 						return dt_nop; 
 						// not supported
-						//return env.lookup_typedef(stn);
 					}
 					o::err()<< "No type found : "<<targs[n-2].structname<<std::endl;
 				}
@@ -144,7 +139,6 @@ bool ir_builder::brev_transform_check(const term &t, const table &tab) {
 			tabarg.emplace_back(td.pty.get_bitsz());
 		else tabarg.emplace_back(); //handle later
 	}
-	//auto rtab = rtabs.find(pred)->second;
 	int_t val = 0;
 	//for symbols, check if the value is in dict
 	for( int_t arg=0; arg < (int_t)vt.size(); arg++)
@@ -154,7 +148,6 @@ bool ir_builder::brev_transform_check(const term &t, const table &tab) {
 			//construct arg value from bits using pos					
 			for( size_t k = 0; k < bitsz; k++) {
 				int_t ps = pos( bitsz, k, arg, vt.size(), tabarg);
-				//DBG(COUT<<ps<<std::endl);	
 				DBG(assert(ps < (int_t)t.size()));
 				val |= t[ps] << k;
 			}
@@ -171,7 +164,6 @@ bool ir_builder::brev_transform(raw_term &rbt) {
 	bool found = false;
 	const std::vector<typedecl> &vt = tc.env.search_pred(str, found, rbt.get_formal_arity());
 	if(found == false ) return false;
-	//auto rtab = this->rtabs.find(str)->second;
 	int_t bitsz = -1;
 	int_t val = 0, arg = 0,  args = vt.size();
 	// save bits and clear from rbt
@@ -192,7 +184,6 @@ bool ir_builder::brev_transform(raw_term &rbt) {
 			//construct arg value from bits using pos					
 			for( int_t k = 0; k < bitsz; k++) {
 				int_t ps = pos( bitsz, k, arg, args, tabarg);
-				//DBG(COUT<<ps<<std::endl);	
 				val |= rbits[ps].num << k;
 			}
 			elem el;
@@ -247,7 +238,7 @@ bool ir_builder::btransform(const raw_term& rtin, raw_term& rtout, const raw_rul
 		int_t args = rtin.e.size() == 1 ? 0: rtin.e.size()-3;	
 		DBG(assert(args == rtin.arity[0]));
 
-		// fill table arg size. better to have a separate function.
+		// TODO fill table arg size. better to have a separate function.
 		/*
 		for(typedecl td: predtype ) {
 			if( td.is_primitive() )
@@ -270,8 +261,7 @@ bool ir_builder::btransform(const raw_term& rtin, raw_term& rtout, const raw_rul
 			for (size_t k = 0; k != bsz; ++k) {
 				
 				int_t ps = pos(bsz, k, n-2, args, targs);
-			//	DBG(COUT<< ps<<std::endl;assert(ps < bitelem.size()));
-			/*	//dynamically grow bitsiz
+			/*	// TODO dynamically grow bitsiz
 				if(ps >= bitelem.size()) {
 					int_t incr = ps - bitelem.size() + 1 ;
 					while(incr--) bitelem.emplace_back(false);
@@ -314,7 +304,6 @@ bool ir_builder::btransform(const raw_term& rtin, raw_term& rtout, const raw_rul
 			if(bsz) tag.push_back(bsz), tsz += bsz;
 		}
 		*/
-		//DBG(assert(tag.size() == (size_t)rtin.get_formal_arity()-2));
 		size_t  args = targs.size();
 		std::vector<elem> vbit(totalsz);
 		// for gettin operator index

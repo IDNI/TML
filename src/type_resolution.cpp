@@ -12,8 +12,6 @@
 // modified over time by the Author.
 
 
-//#ifdef TYPE_RESOLUTION
-
 #include "fof.h"
 
 using namespace std;
@@ -77,5 +75,3 @@ void infer_types(vector<rule>& p) {
         for (rule& r : p) move_to_head(r);
         infer_types(p, rels);
 }
-
-//#endif

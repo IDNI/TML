@@ -67,13 +67,14 @@ int_t dict_t::get_new_rel() {
 	string n = "0r" + to_string_(++cnt);
 	int_t nidx = get_rel(get_lexeme(n));
 	return nidx;
-	//TODO: add check for pre existing rel ?
-	//size_t sz;
-	//lexeme l;
-	//retry: sz = rels.size(), l = get_lexeme(s + to_string_(last));
-	//rels.insert(l);
-	//if (rels.size() == sz) { ++last; goto retry; }
-	//return get_rel(l);
+	// TODO should we add a check for pre existing rel? The code could de 
+	// as follows:
+	//	size_t sz;
+	//	lexeme l;
+	//	retry: sz = rels.size(), l = get_lexeme(s + to_string_(last));
+	//	rels.insert(l);
+	//	if (rels.size() == sz) { ++last; goto retry; }
+	//	return get_rel(l);
 }
 
 ints dict_t::get_rels(function<bool(const lexeme&)> filter) {

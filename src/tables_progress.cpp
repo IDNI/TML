@@ -18,7 +18,6 @@ using namespace std;
 void tables_progress::add_tml_update(tables &ts, const term& t, bool neg) {
 	// TODO: decompose nstep if too big for the current universe
 	ir_handler.nums = max(ir_handler.nums, (int_t)ts.nstep);
-	//ints arity(1,ir_handler->sig_len(tbls.at(t.tab).s));
 	ints arity = { (int_t) ir_handler.sig_len(ts.tbls.at(t.tab).s)};
 	arity[0] += 3;
 	ntable tab = ir_handler.get_table(ir_handler.get_sig(ts.rel_tml_update, arity));
@@ -37,7 +36,6 @@ void tables_progress::notify_update(tables &t, spbdd_handle& x, const rule& r) {
 		if (!t.print_steps && !printed)
 			o::inf() << "# step: " << step << endl, printed = true;
 		// TODO fix operator<< for rules
-		//o::inf() << "#       " <<  r << "\n#   ->  ";
 	}
 	t.decompress(x, r.tab, [&t, &r, this](const term& x) {
 		if (t.print_updates)

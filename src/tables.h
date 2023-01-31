@@ -114,7 +114,6 @@ struct rule : public std::vector<alt*> {
 	}
 };
 
-//#ifdef PROOF
 struct gnode {
 	enum gntype{
 		pack, interm, symbol
@@ -139,8 +138,6 @@ struct gnode {
 	static std::map<std::set<term>, gnode*> interm2g;
 	bool _binarise();
 };
-//#endif
-
 struct table {
 	sig s;
 	size_t len, priority = 0;
@@ -303,8 +300,6 @@ private:
 	spbdd_handle addtail(cr_spbdd_handle x, size_t len1, size_t len2) const;
 	spbdd_handle body_query(body& b, size_t);
 	spbdd_handle alt_query(alt& a, size_t);
-
-//#ifdef PROOF
 	DBG(vbools allsat(spbdd_handle x, size_t args) const;)
 public:
 	void decompress(spbdd_handle x, ntable tab, const cb_decompress&,
@@ -326,8 +321,6 @@ private:
 	gnode* get_forest(const term& t, proof& p );
 	void print_env(const env& e, const rule& r) const;
 	void print_env(const env& e) const;
-//#endif
-
 	bool handler_eq(const term& t, const varmap &vm, const size_t vl,
 			spbdd_handle &c) const;
 	bool handler_leq(const term& t, const varmap &vm, const size_t vl,
@@ -352,8 +345,6 @@ private:
 	void get_alt(const term_set& al, const term& h, std::set<alt>& as,
 		bool blt = false);
 	bool get_rules(flat_prog& m);
-
-	//lexeme get_var_lexeme(int_t i);
 	bool add_prog_wprod(flat_prog m, const std::vector<struct production>&);
 	bool contradiction_detected();
 	bool infloop_detected();

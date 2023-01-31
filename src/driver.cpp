@@ -50,7 +50,6 @@ void driver::transform_len(raw_term& r, const strs_t& s) {
 			r.e[n+3].type == elem::CLOSEP) {
 			auto it = s.find(r.e[n+2].e);
 			int_t len = it == s.end() ? 0 : it->second.size();
-//			if (it == s.end()) parse_error(err_len, r.e[n+2].e);
 			r.e.erase(r.e.begin()+n,r.e.begin()+n+4),
 			r.e.insert(r.e.begin()+n, elem(len)),
 			r.calc_arity(current_input);
@@ -96,7 +95,6 @@ void driver::directives_load(raw_prog& p) {
 		case directive::BWD: pd.bwd = true; break;
 		case directive::TRACE: trel = d.rel.e; break;
 		case directive::EDOMAIN: transform_domains(p, d); break;
-		//case directive::EVAL: transform_evals(p, d); break;
 		case directive::QUOTE: transform_quotes(p, d); break;
 		case directive::CODEC: transform_codecs(p, d); break;
 		case directive::INTERNAL:
@@ -107,14 +105,6 @@ void driver::directives_load(raw_prog& p) {
 				.emplace(d.rel.e, to_string_t(opts.pargv(a)));
 			else parse_error(err_num_cmdline);
 			break;
-/*		case directive::STDOUT: pd.out.push_back(get_term(d.t,pd.strs));
-					break;
-		case directive::TREE:
-			rel = dict.get_rel(d.t.e[0].e);
-			if (has(pd.strtrees, rel) || has(pd.strs, rel))
-				parse_error(err_str_defined, d.t.e[0].e);
-			else pd.strtrees.emplace(rel, get_term(d.t,pd.strs));
-			break;*/
 		default: pd.strs.emplace(d.rel.e, directive_load(d));
 		}
 	}
@@ -937,7 +927,7 @@ bool driver::transform_domains(raw_prog &rp, const directive& drt) {
 	vector<raw_term> bodie = {
 		// 0 < list_id
 		raw_term(raw_term::LEQ, {list_id, leq_elem, elem(0)}).negate(),
-		// list_id < max_id
+ 		// list_id < max_id
 		raw_term(raw_term::LEQ, {elem(max_id), leq_elem, list_id}).negate(),
 		// 0 <= list_fst
 		raw_term(raw_term::LEQ, {elem(0), leq_elem, list_fst}),
@@ -2203,7 +2193,7 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 	};
 	get_all_vars(rp);
 
-	//TODO: this is sort of cache to not optimize same program twice
+	// TODO this is sort of cache to not optimize same program twice
 	// but this situation might become evident earlier, i.e if same file is
 	// passed as input twice.
 	static set<raw_prog *> transformed_progs;
@@ -2212,7 +2202,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 
 	// If we want proof trees, then we need to transform the productions into
 	// rules first since only rules are supported by proof trees.
-	//if(opts.get_string("proof") != "none") {
 	if(opts.enabled("strgrammar")) {
 		DBG(o::transformed() <<
 			"Transforming Grammar ...\n" << endl;)
@@ -2240,7 +2229,6 @@ bool driver::transform_handler(raw_prog &p) {
 
 #ifdef TYPE_RESOLUTION
 	raw_prog tr = ir->generate_type_resolutor(p.nps[0]);
-	//o::out() << "Type resolutor Nto1 mapping:\n" << tr << endl;
 	rt_options to;
 	to.binarize = false;
 	to.bproof = proof_mode::none;
@@ -2259,7 +2247,6 @@ bool driver::transform_handler(raw_prog &p) {
 	tables_progress tp(dict, *ir);
 	if (!run_prog(tr, strs_t(), 0,0, tp, to, tbl_int, ir_handler)) return false;
 
-	//DBG(tbl_int.out_fixpoint(o::dump()););
 	for(const term &el : tbl_int.decompress()) {
 		DBG(COUT << el << endl;); //this line fails in release
 		sig s = ir_handler.to_native_sig(el);
@@ -2267,7 +2254,6 @@ bool driver::transform_handler(raw_prog &p) {
 	}
 	ir_handler.dynenv->bits = 0;
 	ir->type_resolve(p.nps[0]);
-	//o::out() << "------------------:\n" << p.nps[0] << endl;
 #endif
 
 	if (opts.enabled("safecheck")) {
@@ -2412,7 +2398,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	DBG(o::dbg() << "add_prog_wprod" << endl;);
 	error = false;
 	tables::clear_memos();
-	//if (mknums) to_nums(m);
 
 	updates updts;
 	// TODO this should be part of rt_options
@@ -2427,7 +2412,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 	// TODO this call must be done in the driver
 	if (!ir_handler.transform_grammar(g, m)) return false;
 
-	//if (!get_rules(move(m))) return false;
 	if (!tbls.get_rules(m)) return false;
 
 	// filter for rels starting and ending with __
@@ -2484,12 +2468,6 @@ bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	to.print_transformed = opts.enabled("t");
 
 	tables tbl(to, bltins);
-
-//	ir_builder ir_handler(dict, to);
-//	tables tbl(dict, to, &ir_handler);
-//	ir_handler.dynenv = &tbl;
-//	ir_handler.printer = &tbl;
-
 	strs_t strs;
 	driver drv(opts);
 	if (!drv.run_prog(rp, strs, 0, 0, p, to, tbl)) return false;
@@ -2516,11 +2494,9 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	if (rt.optimize) measure_time_start();
 
 	flat_prog fp = ir_handler.to_terms(p);
-	//DBG(ir_handler->opts.print_binarized = true;);
 	#ifdef FOL_V2
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
 	#endif // FOL_V2
-	//DBG(ir_handler->opts.print_binarized = false;);
 
 	#ifndef LOAD_STRS
 	strs = strs_in;

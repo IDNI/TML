@@ -40,9 +40,6 @@ public:
 		: mode_(m), state_(CLOSED), filename_(filename), size_(s)
 	{
 		if (mode_ == MMAP_NONE) return;
-		//DBG(o::dbg()<<"memory_map "//<<s2ws(std::string(filename_))
-		// 	<<" size: "<<size_<<" mode: "<<mode_
-		// 	<<" do_open: "<<do_open<<" do_map: "<<do_map<<"\n";)
 		if (do_open || do_map) if (open() == -1) return;
 		if (do_map) map();
 	}
@@ -52,14 +49,11 @@ public:
 	void clear_error() { error = false, error_message = ""; }
 	void* data() {
 		if (state_ != MAPPED) {
-			//err("not MAPPED, cannot retrieve data pointer");
 			return 0;
 		}
 		return data_;
 	}
 	int open() {
-		//DBG(o::dbg()<<"memory_map: open "<<s2ws(std::string(filename_))<<" size: "
-		//	<<size_<<" mode: "<<mode_<<std::endl;)
 		if (mode_  == MMAP_NONE) return err("none mmap - cannot");
 		if (state_ != CLOSED)    return err("file is already opened");
 #ifdef _WIN32
@@ -86,7 +80,6 @@ public:
 		state_ = UNMAPPED;
 		if (!size_) { // autodetect map size
 			size_ = file_size();
-			//DBG(o::dbg()<<" detected size: "<<size_<<std::endl;)
 		}
 		return 0;
 	}
@@ -105,8 +98,6 @@ public:
 			return err(GetLastError(), "mmap err");
 		}
 #else
-		//DBG(o::dbg()<<"memory_map: map "<<s2ws(std::string(filename_))
-		//	<<" size: "<<size_<<std::endl;)
 		data_ = ::mmap(0, size_, mode_ == MMAP_READ ? PROT_READ :
 			PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0);
 		if (data_==MAP_FAILED) return data_=0,err(errno, "mmap err");
@@ -200,16 +191,12 @@ private:
 		temporary_ = true,
 		fd_ = temp_fileno(),
 		filename_ = filename(fd_);
-		//DBG(o::dbg()<<"temporary file: "<<s2ws(filename_)<<"\n";)
 	}
 	void create() {
 		if (filename_ == "") create_temp();
 		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0644);
     		if (fd_ == -1) { err(errno, "memory_map: create"); return; }
 		if (fill() == -1) return;
-		//DBG(o::dbg()<<"memory_map: create "
-		//	<<s2ws(std::string(filename_))
-		//	<<" created with size: "<<size_<<"\n";)
 	}
 	bool file_exists() {
  		struct stat s;
@@ -250,17 +237,12 @@ public:
 	memory_map_allocator(const memory_map_allocator<T>& a) :
 		fn(a.fn), m(a.m) { }
 	T* allocate(size_t n) {
-		//DBG(o::dbg()<<"allocate n="<<n<<" fn="
-		//	<<s2ws(fn)<<" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (T*) nommap.allocate(n);
 		if (n == 0) return 0;
 		mm = std::make_unique<memory_map>(fn, n*sizeof(T), m);
-		//o::dbg() << "mm.data() = " << mm->data() << std::endl;
 		return (T*) mm->data();
 	}
 	void deallocate(T* p, size_t n) {
-		//DBG(o::dbg()<<"deallocate n="<<n<<
-		//	" fn="<<s2ws(std::string(fn))<<" m="<<m<<std::endl;)
 		if (m == MMAP_NONE) return (void) nommap.deallocate(p, n);
 		if (!p || !n) return;
 		mm->close();

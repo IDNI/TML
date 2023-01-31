@@ -121,14 +121,6 @@ bool typemanager::tcheck(const raw_prog &rp) {
 		for( size_t i =0 ; i <rp.r.size(); i ++)
 		DBG(COUT<<(rp.r[i].get_context().get()?rp.r[i].get_context().get()->to_print():""));
 	}
-/*
-	for( auto &nrp: rp.nps){
-		//nrp.typenv->set_parent(rp.typenv);
-		typemanager tc(nrp, infer);
-		ret &= tc.tcheck() ;
-		//rp.typenv->set_nested(nrp.typenv);
-	}
-*/
 	return ret;
 }
 
@@ -325,7 +317,6 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 				str = lexeme2str(rt.e[i].e);
 				//context already knows var types
 					if (this->contains_prim_var(str) ){
-						//DBG(assert( this->lookup_prim_var(str) == targs[i-2].pty));
 						// override type definition
 						updated |= this->addtocontext(str, targs[i-2].pty );
 					}
@@ -401,7 +392,7 @@ bool environment::build_from( const raw_term &rt, bool infer=false){
 					str = lexeme2str(rt.e[i].e);
 						if (this->contains_prim_var(str) && !lastb)
 							lastp = this->lookup_prim_var(str), lastb =true;
-						else if( this->contains_typedef_var(str)) ;//TOD): ;
+						else if( this->contains_typedef_var(str)) ;
 						else notypv.push_back(str);
 				}
 				else if ( rt.e[i].type == elem::NUM){

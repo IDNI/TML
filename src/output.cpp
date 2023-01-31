@@ -100,7 +100,6 @@ output::type_t output::target(const string t) {
 	}
 	if (open_path_before_finish)
 		file_.open(path_, ofstream::binary | ofstream::app),
-		//file_.imbue(locale("")),
 		os(&file_);
 	return type_;
 }
@@ -112,14 +111,12 @@ bool outputs::add(sp_output out) {
 		size_t i = std::distance(ns_.begin(), it);
 		os_.at(i)->target(out->target()), out = os_.at(i);
 	} else ns_.push_back(n), os_.push_back(out);
-	//o_->update_pointers(n, out.get());
 	return true;
 }
 
 ostream_t& outputs::to(const string& n) {
 	output* o = get(n);
 	if (o) return o->os();
-	//DBGFAIL;
 	CERR << "Output '" << n << "' does not exist.\n";
 	return CNULL;
 }

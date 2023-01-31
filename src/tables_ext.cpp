@@ -18,13 +18,6 @@
 #include "output.h"
 using namespace std;
 
-//#define L2
-#ifdef L2
-	#define DBG2(x) x
-#else
-	#define DBG2(x) ;
-#endif
-
 typedef tuple<size_t, size_t, size_t, int_t, uint_t, uint_t> alumemo;
 map<alumemo, spbdd_handle> carrymemo;
 map<alumemo, spbdd_handle> addermemo;
@@ -550,13 +543,11 @@ spbdd_handle tables::perm_bit_reverse_bt(spbdd_handle in, size_t n_bits, size_t 
 			ex.push_back(true);
 		}
 		else {
-			perm1[i] = ((n_bits+delta-1-(i-delta)));// + i;
+			perm1[i] = n_bits + delta - 1 - (i - delta);
 			ex.push_back(false);
 		}
 	}
 	spbdd_handle x = in^perm1;
-	//spbdd_handle x = bdd_permute_ex(in,ex,perm1);
-
 	return x;
 }
 
@@ -580,7 +571,6 @@ spbdd_handle tables::perm_from_to(size_t from, size_t to, spbdd_handle in, size_
 	for (size_t i = 0; i < n_bits; i++) {
 		for (size_t j = 0; j < n_vars; ++j) {
 			if (j == from ) {
-				//COUT << perm1[i*n_vars+j]  << " ** " <<  perm1[i*n_vars+to] << endl;
 				perm1[i*n_vars+j] = perm1[i*n_vars+to];
 			}
 		}
@@ -736,10 +726,6 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 								closed formulas currently supported");
 				DBG(assert(f->tm->neg == false);)
 				p0->b = new body(get_body(*f->tm, vm, vm.size()));
-				//DBG(assert(p0->b->neg == false);)
-				//COUT << "handleform1\n";
-				//spbdd_handle auxq = body_query(*p0->b,0);
-				//::out(COUT, auxq)<<endl<<endl;
 				#ifndef TYPE_RESOLUTION
 				ex_typebits(p0->b->ex, f->tm->size());
 				#endif
@@ -749,12 +735,10 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 			} else {
 				DBG(assert(f->tm->neg == false);)
 				body *aux = new body(get_body(*f->tm, vm, vm.size()));
-				//body.q = T, body.tab =
 				#ifndef TYPE_RESOLUTION
 				bools exvec(aux->ex.size());
 				ex_typebits(exvec, f->tm->size());
 				//TODO review for T31
-				//aux->q = aux->q ^ aux->perm;
 				aux->q =  aux->q / exvec;
 				#endif
 				std::tuple<int_t, body*, int_t> hvar = {f->arg, move(aux), vm.size()};
@@ -823,7 +807,7 @@ void tables::handler_form1(pnft_handle &p, form *f, varmap &vm, varmap &vmh, boo
 		}
 		p->neg = !p->neg;
 	}
-	//else if (f->type == form::COIMPLIES){}
+
 	else if (f->type == form::AND) {
 		if (f->l->type == form::AND || f->l->type == form::ATOM  || f->l->type == form::NOT) {
 			handler_form1(p, f->l,vm, vmh,fq);
@@ -950,7 +934,6 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 
 	if (f->bodies.size() != 0 && f->fp(this)) {
 		v.push_back(f->last);
-		//DBG(COUT << " hit memos fol\n");
 		return;
 	}
 	spbdd_handle q = htrue;
@@ -981,11 +964,9 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		else {
 			bdd_handles vt;
 			fol_query(p,vt);
-			//DBG(assert(vt.size() == 1);) // fails when using IF command
 			v.insert(v.end(), vt.begin(), vt.end());
 		}
 	}
-	//if (v.size() > 1)
 	q = bdd_and_many(move(v));
 	#ifdef FOL_VERBOSE
 	COUT << "fol:and_many\n";
@@ -1024,7 +1005,6 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	v.push_back(q);
 }
 
-//#define SOL_VERBOSE
 void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v) {
 
 	vector<int_t> hvars;
@@ -1047,8 +1027,6 @@ void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2spac
 			COUT << "var2: " << get<0>(p->hvar_b) << " :\n";
 			::out(COUT, qh)<<endl<<endl;
 			#endif
-			//ex_typebits(qh, get<2>(p->hvar_b));
-
 			if (p->neg) {
 				v2s.add_cons_neg(get<0>(p->hvar_b), get<1>(p->hvar_b)->q);
 				qh = bdd_not(qh);
@@ -1107,7 +1085,6 @@ void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2spac
 	if (f->quants.size() != 0) {
 		f->quantify(q,bits);
 	}
-	//v.push_back(q); //Should pass this further?
 
 	if (fol_terms) {
 		v2s.constraint(q);

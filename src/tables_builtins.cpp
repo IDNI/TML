@@ -26,10 +26,8 @@ void tables::fact_builtin(const term& b) {
 void tables::head_builtin(const bdd_handles& hs, const table& tbl, ntable tab) {
 	blt_ctx c(term(false,tab,ints(tbl.len, 0), 0, tbl.idbltin));
 	c.tbls = this;
-	//COUT << "head_builtin: " << hs << endl;
 	for (auto h : hs) decompress(h, tab, [&c, this] (const term& t){
 		// ground builtin vars by decompressed head
-		//COUT << "head_builtin t: " << t << endl;
 		for (size_t n = 0; n != t.size(); ++n) c.g[n] = t[n];
 		bltins.run_head(c);
 	}, 0, true);

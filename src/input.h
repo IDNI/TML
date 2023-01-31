@@ -47,9 +47,8 @@ struct input {
 	 * @param ns - if true this input would be added as a new sequence ({})
 	 */
 	input(bool ns = false) : type_(STDIN), newseq(ns), beg_(0), data_(0),
-		size_(load_stdin()) {
-		//COUT << "created stdin input *: " << beg_ << std::endl;
-	}
+		size_(load_stdin()) {}
+		
 	/**
 	 * STRING input constructor - without allocation (input from a mmap)
 	 * @param s - pointer to a utf8 encoded input data
@@ -57,18 +56,16 @@ struct input {
 	 * @param ns - set ns true for making the input a new prog sequence
 	 */
 	input(void* s, size_t sz, bool ns = false) : type_(STRING), newseq(ns),
-		beg_((ccs) s), data_(beg_), size_(sz), allocated_(false) {
-		//COUT << "created pointer input: " << beg_ << std::endl;
-	}
+		beg_((ccs) s), data_(beg_), size_(sz), allocated_(false) {}
+
 	/**
 	 * STRING input constructor - with allocation
 	 * @param s - pointer to a utf8 encoded input data
 	 * @param ns - set ns true for making the input a new prog sequence
 	 */
 	input(ccs s, bool ns = false) : type_(STRING), newseq(ns),
-		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true)
-	{	//COUT << "created string input *: " << s << std::endl;
-	}
+		beg_(strdup(s)),data_(beg_),size_(strlen(beg_)),allocated_(true) {}
+
 	/**
 	 * FILE input constructor
 	 * @param f - file name
@@ -169,7 +166,6 @@ class inputs {
 	size_t size_ = 0;
 public:
 	void add(std::unique_ptr<input> in) {
-		//COUT << "inputs size: " << size_ << " adding input: " << in.get() << " last: " << last_<< std::endl;
 		input *inp = in.get();
 		if (last_) last_->set_next(std::move(in));
 		else first_ = std::move(in);
@@ -183,28 +179,22 @@ public:
 		return ret;
 	}
 	input* add_file(std::string filename) {
-		//COUT << "adding file input: " << filename << std::endl;
 		std::unique_ptr<input> in = std::make_unique<input>(filename);
 		input* ret = in.get();
 		add(std::move(in));
-		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
 		return ret;
 	}
 	input* add_string(const string_t& str) {
-		//COUT << "adding string input: " << to_string(str) << std::endl;
 		std::unique_ptr<input> in =std::make_unique<input>(str.c_str());
 		input* ret = in.get();
 		add(std::move(in));
-		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
 		return ret;
 	}
 	input* add_string(const std::string& str) {
-		//COUT << "adding string input: " << str << std::endl;
 		std::unique_ptr<input> in = std::make_unique<input>(
 			to_string_t(str).c_str());
 		input* ret = in.get();
 		add(std::move(in));
-		//COUT << "inputs size: " << size() << " this: " << this <<std::endl;
 		return ret;
 	}
 	input* first() const { return first_.get(); }
@@ -337,7 +327,8 @@ struct raw_prog;
 struct raw_form_tree;
 typedef std::shared_ptr<raw_form_tree> sprawformtree;
 
-//#ifdef BIT_UNIVERSE TODO: check whether this may affect early parser
+// TODO check whether this may affect early parser
+// #ifdef BIT_UNIVERSE 
 struct context;
 class environment;
 typedef std::shared_ptr<struct context> spenvcontext;
@@ -367,7 +358,6 @@ struct primtype {
 		if(bsz>0) {
 			std::stringstream ss;
 			ss<<bsz;
-			//s.append(":");
 			s.append(ss.str());
 		}
 		return s;
@@ -446,7 +436,8 @@ struct typestmt {
 	bool parse(input *in, const raw_prog& prog);
 
 };
-//#endif
+// TODO check whether this may affect early parser
+// #endif
 
 /* A raw term is produced from the parsing stage. In TML source code, it
  * takes the following form: <rel>(<arg1> <arg2> ... <argN>). A raw term can

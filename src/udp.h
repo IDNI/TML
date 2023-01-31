@@ -36,7 +36,6 @@ class udp : public async_reader<udp_message> {
 	std::string addr;
 	uint16_t port;
 	sa_family_t family;
-	// size_t buflen = BUFLEN;
 	bool closed=true;
 	bool error_=false;
 	std::string error_message_;
@@ -78,10 +77,8 @@ public:
 	:
 		async_reader(), addr(addr), port(port), family(family)
 	{
-		// std::lock_guard<std::mutex> lk(m);
 		if (!create_socket()) return;
 		if (!bind_socket())   return;
-		// COUT<<"socket bound"<<std::endl;
 	}
 	bool send(udp_message m) {
 		return send(m.second, m.first.get());
@@ -90,10 +87,6 @@ public:
 		ssize_t sent_len = sendto(s, msg.c_str(), msg.size(), 0,
 					to, sizeof(struct sockaddr));
 		if (sent_len == -1) return false;
-		// std::lock_guard<std::mutex> lk(m);
-		// COUT << "sent: " << sent_len << " bytes to: " <<
-		// 	inet_ntoa(((struct sockaddr_in *)&to)->sin_addr) << ':' <<
-		// 	ntohs(((struct sockaddr_in *)&to)->sin_port) << std::endl;
 		return true;
 	}
 	void close() { if (!closed) ::close(s), eof = closed = true; }
@@ -114,9 +107,6 @@ protected:
 			recv_len = recvfrom(s, buf, BUFLEN, 0, client.get(),
 									&clen);
 			if (recv_len == -1) goto skip;
-			// m.lock(); COUT << "received: " << recv_len << " bytes from: " <<
-			// 	inet_ntoa(((struct sockaddr_in *)&client)->sin_addr) << ':' <<
-			// 	ntohs(((struct sockaddr_in *)&client)->sin_port) << std::endl;
 			if (recv_len > 0) {
 				m.lock();
 				q.emplace(std::move(client),

@@ -180,11 +180,6 @@ term get_head(const dnf& d, const set<int_t>& q) {
 	set<int_t> v = get_vars(d), r;
 	for (int_t i : v) if (q.find(i) == q.end()) r.insert(i);
 	return mkterm(get_tmprel(), r);
-
-	//altenative handling of vars
-	//set<int_t> v = get_vars(d), r(q);
-	//for (int_t i : v) if (q.find(i) != q.end()) r.insert(i);
-	//return mkterm(get_tmprel(), r);
 }
 
 dnf& top(prog& p) {
@@ -246,13 +241,11 @@ f_prog unseq(const prog& p) {
 		t.push_back(mkterm(get_tmprel(),{}));
 		term aux0 = t.back(); aux0.neg = true;
 		r.emplace(clause{p[n].first, {aux0}}, p[n].second && dnf{{{t.back()}}});
-		//term aux1 = t[n]; aux1.neg = true; //workaround
-		//r.emplace(clause{{aux1}}, dnf{{{t[n]}}}); //workaround
+
 	}
 	for (size_t n = 0; n != p.size() - 1; ++n)
 		r.emplace(clause{{t[n + 1]}}, dnf{{{t[n]}}});
 	r.emplace(clause{{t[0]}}, dnf{});
-	//r.emplace(clause{{t[0]}}, dnf{{{t[p.size()-1]}}}); //workaround
 	return r;
 
 #else
@@ -321,35 +314,4 @@ void print_fof(prog& p, ir_builder *irb) {
 	cout << "FOF transformed fol to prog:" << endl;
 	cout << p << endl;
 }
-#endif
-
-#ifndef TML
-int main() {
-	term t1 = { 1, -2, -3 };
-	term t2 = { -1, -3, -4 };
-	term t3 = { 2, -2, -4 };
-//	cout << ~from_term(t1) << endl;
-//	cout << (from_term(t3) && (from_term(t1) || from_term(t2))) << endl;
-//	cout << (from_term(t3) && ((~from_term(t1)) || from_term(t2))) << endl;
-//	cout << (from_term(t3) && (from_term(t1) || ~from_term(t2))) << endl;
-//	cout << ((~from_term(t3)) && (from_term(t1) || from_term(t2))) << endl;
-//	cout << (from_term(t3) && ~ex(from_term(t1) && from_term(t2), -2, 1)) << endl;
-//	cout << (~ex(from_term(t1) && from_term(t2), -2, 1)) << endl;
-//	cout << (from_term(t3) && ex(from_term(t1), -2, 1)) << endl;
-//	cout << (from_term(t3) && ex(from_term(t1) && from_term(t2), -2, 1)) << endl;
-//	cout << all(from_term(t3) && ~ex(from_term(t1) && from_term(t2), -2, 1), -4, 1) << endl;
-//	cout << unseq(all(from_term(t3) && ~ex(from_term(t1) && from_term(t2), -2, 1), -4, 1)) << endl;
-
-	//cout << ex(from_term(t1), -2, 0) << endl;
-
-//	term t40 = { 1, -1, -2 };
-//	term t41 = { 2, -1, 0 };
-//	cout << (from_term(t40) && from_term(t41)) << endl;
-
-	term t50 = { 1, -1, -2 };
-//	term t51 = { 2, -1, -2 };
-
-	cout << all( ex( from_term(t50), -1, 0), -2, 0) << endl;
-}
-
 #endif

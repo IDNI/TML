@@ -131,15 +131,11 @@ loop2:	sz = s.size();
 				production q = p;
 				q.p.erase(q.p.begin() + n),
 				t.insert(q);
-//					r.g.push_back(q);
 			}
 	for (auto x : t) s.insert(x);
 	t.clear();
 	if (sz != s.size()) goto loop2;
 }
-
-//#define BWD_GRAMMAR
-//#define ELIM_NULLS
 
 /* Transform all the productions in the given program into pure TML
  * rules. */
@@ -182,15 +178,6 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	s.clear();
 #endif
 	raw_rule l;
-/*	raw_term m;
-	m = fro_grammar_elem({elem::SYM,0,dict.get_lexeme("null")},1,1);
-	l.add_head(m);
-	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
-				{elem::VAR,0,get_var_lexeme(2)},1,3));
-	r.r.push_back(l), l.clear(), l.add_head(m);
-	l.add_body(from_grammar_elem_nt(r.d[0].rel.e,
-				{elem::VAR,0,get_var_lexeme(2)},3,1));
-	r.r.push_back(l);*/
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
@@ -205,10 +192,7 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
 #endif
-//			_r.r.push_back({{t, t}});
-//			_r.r.back().b[0].neg = true;
 		} else {
-//			o::out() << p << endl;
 			size_t v = p.p.size();
 			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
 			l.b.emplace_back();
