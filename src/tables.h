@@ -24,7 +24,6 @@
 #endif
 #include "bdd.h"
 #include "term.h"
-#include "dict.h"
 #include "input.h"
 #include "form.h"
 #include "err.h"
