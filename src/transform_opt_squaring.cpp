@@ -123,14 +123,17 @@ flat_rule rename_rule_vars(const flat_rule &fr, int_t& lv) {
 
 /* Returns the squaring of a rule given a selection for the possible substitutions. */
 
-void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
+void square_rule(const flat_rule &fr, const selection &sels, flat_prog &fp) {
 	// TODO check fr is a datalog program
 	flat_rule sfr; 
 	// Add the head of the existing rule
 	sfr.emplace_back(fr[0]);
 	auto lv = get_last_var(fr);
-	bool unified = true;
 	for (size_t i = 0; i < sels.size(); ++i) {
+		if (sels[i].empty()) {
+			sfr.emplace_back(fr[i + 1]);
+			continue;
+		}
 		auto rfr = rename_rule_vars(sels[i], lv);
 		if (auto u = unify(fr[i + 1], rfr[0])) {
 			#ifndef DELETE_ME
@@ -140,31 +143,33 @@ void square_rule(flat_rule &fr, selection &sels, flat_prog &fp) {
 				cout << "}\n";
 			}
 			#endif // DELETE_ME
-			unified = unified && apply_unification(*u, sfr);
-			unified = unified && apply_unification(*u, rfr);
-			if (!unified) break;
-			sfr.insert(sfr.end(), ++rfr.begin(), rfr.end()); 
-		} else { unified = false; break; }
+			apply_unification(*u, sfr);
+			apply_unification(*u, rfr);
+			ranges::copy(++rfr.begin(), rfr.end(), back_inserter(sfr)); 
+		} else { 
+			fp.insert(fr);
+			return;
+		}
 	}
-	if (!unified) fp.insert(fr);
-	else fp.insert(sfr);
+	fp.insert(sfr);
 }
 
 /* Returns the squaring of a rule  */
 
-void square_rule(flat_rule &fr, selection &sels, const rule_index &idx, 
+void square_rule(const flat_rule &fr, selection &sels, const rule_index &idx, 
 		flat_prog &fp, size_t pos = 0) {
-	if (!idx.contains(get_rel_info(fr))) {
-		fp.insert(fr);
-		return;
-	}
 	// If we have selected all possible alternatives proceed with
 	// the squaring of the rule
 	if (pos == sels.size()) {
 		square_rule(fr, sels, fp);
 		return;
 	}
-	// otherwise, try all the possible selections
+	// If we done have alternatives for fr[pos + 1] we simply skip the selection.
+	if (!idx.contains(get_rel_info(fr[pos + 1]))) {
+		square_rule(fr, sels, idx, fp, pos + 1);
+		return;
+	}
+	// Otherwise, we try all alternatives to fr[pos + 1]
 	for (auto &o: idx.at(get_rel_info(fr[pos + 1]))) {
 		sels[pos] = o; 
 		square_rule(fr, sels, idx, fp, pos + 1);
@@ -174,9 +179,9 @@ void square_rule(flat_rule &fr, selection &sels, const rule_index &idx,
 /* Returns the squaring of a rule. As square_program automatically 
  * deals with facts and goals, we could assume that the body is not empty. */
 
-void square_rule(flat_rule &fr, flat_prog &fp, const rule_index &idx) {
+void square_rule(const flat_rule &fr, flat_prog &fp, const rule_index &idx) {
 	// Cache vector with the selected rules to be used in squaring
-	selection sels(fr.size());
+	selection sels(fr.size() - 1);
 	square_rule(fr, sels, idx, fp);
 }
 
@@ -186,10 +191,9 @@ flat_prog square_program(const flat_prog &fp) {
 	// Cache info for speed up the squaring holding a map between heads
 	// and associated bodies
 	auto idx = index_rules(fp);
-	for (auto fr: fp) {
-		if(is_fact(fr) || is_goal(fr)) 
-			sqr.insert(fr);
+	ranges::for_each(fp.begin(), fp.end(), [&](auto& fr) {
+		if(is_fact(fr) || is_goal(fr)) sqr.insert(fr);
 		else square_rule(fr, sqr, idx);
-	}
+	});
 	return sqr;
 }

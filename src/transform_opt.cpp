@@ -11,276 +11,352 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#include <vector>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <forward_list>
-#include <functional>
+#include <algorithm>
 #include <cctype>
-#include <ctime>
-#include <memory>
-#include <locale>
 #include <codecvt>
+#include <cstring>
+#include <ctime>
+#include <forward_list>
 #include <fstream>
+#include <functional>
 #include <iterator>
+#include <locale>
+#include <memory>
 #include <optional>
 #include <ranges>
-#include <functional>
-#include <optional>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <set>
+
 #include "driver.h"
 #include "err.h"
 #include "iterators.h"
 #include "transform_opt_cqc.h"
 #include "transform_opt_squaring.h"
-#include "transform_opt.h"
 
 using namespace std;
 
-/* Branchers and changes. */
+long cost(flat_rule const& fr) {
+	// Count the number of uses of each variable
+	map<int, size_t> count;
+	ranges::for_each(fr.begin(), fr.end(), [&](auto& t){
+		ranges::for_each(t.begin(), t.end(), [&](int i) {
+			count[i] = count.contains(i) ? count[i] + 1: 1;
+		});
+	});
+	// Remove exported variables
+	ranges::for_each(fr[0].begin(), fr[0].end(), [&](int i) {
+		if (i < 0) count.erase(i);
+	});
+	// Compute the actual cost
+	long cost = 1;
+	ranges::for_each(count.begin(), count.end(), [&](auto& i){
+		cost = cost + (i.second + 1) * (i.second + 1);
+	});
+	cost = cost * fr.size();
+	return cost;
+}
 
-/* Optimization branch and bound definitions. */
+long cost(flat_prog const& fp) {
+	long fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
+	return fp_cost;
+}
 
-
-/* Represents a changed program, i.e. the original program, the additions and 
- * substractions. */
-
-struct changed_prog  {
-	// starting node of the changed progs log
-	explicit changed_prog(const flat_prog &rp): current(rp) {};
-	// link to previous changed prog
-	explicit changed_prog(const changed_prog *mp): current(mp->current) {};
-
-	flat_prog current;
-};
-
-/* Represents a change of a given (changed) program. If selected, it is
- * applied to the given (changed) program. This is a cheap implementation of
- * the command pattern. */
+/* Represents a change of a program. */
 
 struct change {
-public:
 	set<flat_rule> del;
 	set<flat_rule> add;
 
-	bool operator()(changed_prog &cp) const {
-		cp.current.insert(add.begin(), add.end());
-		cp.current.erase(del.begin(), del.end());
-		return true;
+	auto operator<=>(const change& that) const {
+		long cost_this = 0, cost_that = 0;
+		for (auto& fr: del) cost_this -= cost(fr);
+		for (auto& fr: add) cost_this += cost(fr);
+		for (auto& fr: that.del) cost_that -= cost(fr);
+		for (auto& fr: that.add) cost_that += cost(fr);
+		return cost_this <=> cost_that;
+	}
+
+	bool operator()(flat_prog& fp) {
+		for (auto& fr: del) fp.erase(fr);
+		fp.insert(add.begin(), add.end());
+		return !add.empty() || !del.empty();
 	}
 };
 
-/* Computes the approximate cost of executing a given changed program. */
-
-using cost_function = function<size_t(changed_prog&)>;
-const cost_function exp_in_heads = [](const changed_prog &mp) {
-	auto const& rs = mp.current;
-	size_t c = 0.0;
-	for (auto &it : rs) {
-		// TODO properly define this cost function
-		c += it.size();
-	}
-	return c;
-};
-
-/* Computes the approximate cost of executing a given changed program. */
-
-using brancher = function<vector<change>(changed_prog&)>;
-
-/* Represents and strategy to select the best change according to the passed
- * cost_function. */
-
-class bounder {
-public:
-	virtual bool bound(changed_prog& p) = 0;
-	virtual flat_prog solution() = 0;
-};
-
-/* Custom implementation of bounder interface that returns the best solution
- * found so far. */
-
-class best_solution: public bounder {
-public:
-	best_solution(cost_function& f, changed_prog &rp): 
-			func_(f), 
-			cost_(numeric_limits<size_t>::max()), 
-			best_(reference_wrapper<changed_prog>(rp)) {};
-
-	bool bound(changed_prog &p) {
-		if (size_t cost = func_(p); cost < cost_) {
-			cost_ = cost;
-			best_ = p;
-			return true;
-		}
-		return false;
-	};
-
-	flat_prog solution() {
-		return best_.get().current;
-	};
-private:
-	cost_function func_;
-	size_t cost_;
-	reference_wrapper<changed_prog> best_;
-};
-
-/* Auxiliary function used during rule splitting. */
-
-flat_rule with_canonical_vars(const flat_rule &r) {
-	// TODO rename variables from -1 to -n.
-	return r;
+/* Auxiliary functions */
+int get_tmp_sym() {
+	static int_t tab = 1 << 16;
+	return tab++;
 }
 
-// TODO move this function to a more general scope
-term make_temp_term(const ints &is) {
-	static int_t tab = 1 << 16;
-	term nt; for (auto &i: is) nt.emplace_back(i);
-	nt.tab = tab++;
+set<int> get_vars(const term& t) {
+	set<int> vars;
+	for (auto& i: t) if (i < 0) vars.insert(i);
+	return vars;
+}
+
+set<int> get_vars(const flat_rule fr) {
+	set<int> vars; 
+	for (auto& t: fr) for (auto& v: get_vars(t)) vars.insert(v);
+	return vars;
+}
+
+set<int> get_vars(const flat_prog fp) {
+	set<int> vars; 
+	for (auto& fr: fp) for (auto& v: get_vars(fr)) vars.insert(v);
+	return vars;
+}
+
+term create_term(int s, set<int>& vs) {
+	term nt; nt.tab = s;
+	for(auto& i: vs) nt.push_back(i);
 	return nt;
 }
 
-ints get_vars(const vector<term> &b) {
-	set<int_t> vs;
-	for (auto &t: b) for (auto &i: t)
-		if (i < 0) vs.insert(i);
-	return ints(vs.begin(), vs.end());
+pair<flat_rule, flat_rule> extract_rule(flat_rule& r, int s, flat_rule& e) {
+	// Compute the rest of the rule (without the terms in e)
+	flat_rule remains;
+	for (auto& t: r) if (ranges::find(e.begin(), e.end(), t) == e.end()) remains.emplace_back(t);
+	// Compute the variables of the new rule
+	auto remains_vars = get_vars(remains);
+	set<int> extracted_vars;
+	for (auto& v: get_vars(e)) if (remains_vars.contains(v)) extracted_vars.insert(v);
+	// Create the rule extracted
+	auto extracted_head = create_term(s, extracted_vars); 
+	flat_rule extracted; 
+	extracted.push_back(extracted_head);
+	for (auto& t: e) extracted.push_back(t);
+	// Compute remaining rule
+	remains.push_back(extracted_head);
+	return {remains, extracted};
 }
 
-flat_rule create_rule_from(const vector<term> &b) {
-	flat_rule r;
-	ints vs = get_vars(b);
-	term head = make_temp_term(vs);
-	r.emplace_back(head);
-	for (auto &t: b) r.emplace_back(t);
-	return r;
+change propose_change(flat_rule& r1, pair<flat_rule, flat_rule>& er1,
+		flat_rule& r2, pair<flat_rule, flat_rule>& er2) {
+	change c;
+	c.del.insert(r1);
+	c.del.insert(r2);
+	c.add.insert(er1.first);
+	c.add.insert(er2.first);
+	c.add.insert(er2.second);
+	return c;
 }
 
-flat_rule remove_from_rule(const flat_rule &fr, const vector<term> &b) {
-	flat_rule r;
-	r.emplace_back(fr[0]);
-	for (auto &t: b) r.emplace_back(t);
-	return r;
+bool include_renamings(change& c) {
+	for (auto& r: c.add) if (r.size() == 2) return true;
+	return false;
 }
 
-/* Split a rule according to a subset of terms of the body. */
-
-pair<flat_rule, flat_rule> split_rule(const flat_rule &r, const vector<term> &b) {
-	// Rule using the elements of b and...
-	flat_rule r1 = create_rule_from(b);
-	flat_rule r2 = remove_from_rule(r, b);
-	return {with_canonical_vars(r1), with_canonical_vars(r2)};
+bool is_identity(change& c) {
+	for (auto& r: c.add) if (!c.del.contains(r)) return false;
+	return c.del.size() == c.add.size();
 }
 
-/* Brancher computing all the possible splits of all the rules. */
+change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
+	vector<term> b1(++r1.begin(), r1.end());
+	vector<term> b2(++r2.begin(), r2.end());
+	change min; 
+	min.add.emplace(r1);
+	min.add.emplace(r2);
+	for (auto c1 : powerset_range(b1)) {
+		if (c1.empty()) continue;
+		int s = get_tmp_sym();
+		auto er1 = extract_rule(r1, s, c1);
+		for (auto c2 : powerset_range(b2)) {
+			if (c2.empty()) continue;
+			auto er2 = extract_rule(r2, s, c2);
+			// If heads have different size, they shouldn't be extracted
+			if (er1.second.size() != er2.second.size()) continue;
+			// For each pair or extracted rules we check if r1.second is 
+			// contained in r2.second, i.e. if r2.second => r1.second
+			if (rule_contains(er1.second, er2.second, fp)) {
+				auto c = propose_change(r1, er1, r2, er2);
+				// Check we are not renaming
+				if (is_identity(c)) continue;
+				// Is the proposal valid
+				if (min > c) min = c;
+				else continue;	
 
-vector<change> brancher_split_bodies(const changed_prog &cp) {
-	vector<change> changes;
-	// For every rule and every possible subset of rules body we produce a
-	// change splitting the rule accordingly.
-	for (auto &r: cp.current) {
-		vector<term> body(++r.begin(), r.end());
-		for (auto &b : powerset_range(body)) {
-			// For each choice we compute the new rules
-			auto split = split_rule(r, b);
-			change c;
-			c.del.insert(r);
-			c.add.insert(split.first);
-			c.add.insert(split.second);
-			changes.emplace_back(c);
+				#ifdef DEBUG
+				o::dbg() << "c1 = [";
+				for(auto &s: c1) {
+					o::dbg() << s.tab << "[";
+					for (auto &t: s) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(c1) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "c2 = [";
+				for(auto &s: c2) {
+					o::dbg() << s.tab << "[";
+					for (auto &t: s) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(c2) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "r1 = [";
+				for(auto &s: r1) {
+					o::dbg() << s.tab << "[";
+					for (auto &t: s) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(r1) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "r2 = [";
+				for(auto &s: r2) {
+					o::dbg() << s.tab <<"[";
+					for (auto &t: s) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(r2) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "er1.remains = [";
+				for(auto &r: er1.first) {
+					o::dbg() << r.tab << "[";
+					for (auto &t: r) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(er1.first) <<" \n";
+				o::dbg() << "er1.extracted = [";
+				for(auto &r: er1.second) {
+					o::dbg() << r.tab << "[";
+					for (auto &t: r) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(er1.second) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "er2.remains = [";
+				for(auto &r: er2.first) {
+					o::dbg() << r.tab <<  "[";
+					for (auto &t: r) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(er2.first) <<" \n";
+				o::dbg() << "er2.extracted = [";
+				for(auto &r: er2.second) {
+					o::dbg() << r.tab << "[";
+					for (auto &t: r) o::dbg() << t << ",";
+					o::dbg() << "],";
+				} 
+				o::dbg() << "]: " << cost(er2.second) <<" \n";
+				#endif
+
+				#ifdef DEBUG
+				o::dbg() << "er12.extracted DOES IMPLY er1.extracted\n";
+				o::dbg() << "Proposed changes\n";
+				for (auto& a: c.add) {
+					o::dbg() << "ADDITION: = [";
+					for(auto &r: a) {
+						o::dbg() << r.tab << "[";
+						for (auto &t: r) o::dbg() << t << ",";
+						o::dbg() << "],";
+					} 
+					o::dbg() << "]: " << cost(a) <<" \n";
+				}
+
+				for (auto& d: c.del) {
+					o::dbg() << "DELETION: = [";
+					for(auto &r: d) {
+						o::dbg() << r.tab << "[";
+						for (auto &t: r) o::dbg() << t << ",";
+						o::dbg() << "],";
+					} 
+					o::dbg() << "]: " << cost(d) <<" \n";
+				}
+				#endif
+			}
 		}
 	}
-	return changes;
+	return min;
 }
 
-/* Brancher computing quick splits of all the rules. */
+change minimize_step_using_rule(flat_rule& r, flat_prog& fp, flat_prog& p) { 
+	change min;
+	min.add.emplace(r);
+	for (auto fr: fp) {
+		auto c = extract_common(r, fr, p);
+		min = min < c ? min : c;
+	} 
+	return min;
+}
 
-vector<change> brancher_quick_split_bodies(const changed_prog &cp) {
-	vector<change> changes;
-	// For every rule and every possible subset of rules body we produce a
-	// change splitting the rule accordingly.
-	for (auto &r: cp.current) {
-		vector<term> body(++r.begin(), r.end());
-		for (auto &b : powerset_range(body)) {
-			// For each choice we compute the new rules
-			auto split = split_rule(r, b);
-			change c;
-			c.del.insert(r);
-			c.add.insert(split.first);
-			c.add.insert(split.second);
-			changes.emplace_back(c);
+bool minimize_step(flat_prog& fp) {
+	set<flat_rule> pending(fp.begin(), fp.end());
+	bool changed = false;
+	while (!pending.empty()) {
+		auto r = *pending.begin();
+		auto change = minimize_step_using_rule(r, pending, fp);
+		changed |= change(fp);
+		pending.erase(r);
+		for (auto& d: change.del) pending.erase(d);
+	}
+	return changed;
+}
+
+flat_prog update_with_new_symbols(tables& tbl, flat_prog& fp) {
+	static int_t idx = tbl.tbls.size();
+	flat_prog nfp;
+	map<int_t, int_t> renaming;
+	for (auto& r: fp) {
+		flat_rule nfr;
+		for (auto& t: r) {
+			term nt = t;
+			// If the table is not in the original program and it has not been
+			// renamed yet...
+			if (t.tab >= tbl.tbls.size() && !renaming.contains(t.tab)) {
+				// ...add it to tables with a new index and cache the change
+				// in the renaming map. 
+				renaming[t.tab] = idx++;
+				table ntbl; ntbl.idbltin = idx; ntbl.len = t.size(); ntbl.generated = true;
+				tbl.tbls.emplace_back(ntbl);
+			}
+			// Apply renaming if needed.
+			nt.tab = renaming.contains(t.tab) ? renaming[t.tab] : t.tab;
+			nfr.emplace_back(nt);
 		}
+		nfp.insert(nfr);
 	}
-	return changes;
+	return nfp;
 }
 
-vector<change> brancher_minimize(changed_prog& cp) {
-	vector<change> changes;
-	o::dbg() << "Minimizing rules ..." << endl << endl;
-	for(auto rr: cp.current) {
-		minimize_rule(rr, cp.current);
-	}
-	o::dbg() << "Minimized:" << endl << endl;
-	return changes; 
-} 
-
-/* Optimization methods. */
-
-vector<change> get_optimizations(changed_prog& changed, vector<brancher>& branchers) {
-	// We collect all possible changes to the current mutated program.
-	vector<change>  optimizations;
-	for(brancher brancher: branchers) {
-		auto proposed = brancher(changed);
-		optimizations.insert(optimizations.end(), proposed.begin(), proposed.end());
-	}
-	return optimizations;
-}
-
-void optimize(changed_prog& mutated, vector<brancher>& branchers) {
-	// We collect all possible changes to the current mutated program.
-	vector<change>  optimizations = get_optimizations(mutated, branchers);
-	// For each subset of optimizations, compute the new mutated program,
-	// bound the current change and try to optimize again if needed.
-	for (auto it = optimizations.begin(); it != optimizations.end(); ++it) {
-		it->operator()(mutated);
-	}
-}
-
-void optimize_loop(changed_prog& mutated, bounder& bounder, vector<brancher>& branchers) {
-	// We collect all possible changes to the current mutated program.
-	vector<change>  optimizations = get_optimizations(mutated, branchers);
-	// For each subset of optimizations, compute the new mutated program,
-	// bound the current change and try to optimize again if needed.
-	powerset_range<change> subsets(optimizations);
-	for (auto it = ++subsets.begin(); it != subsets.end(); ++it) {
-		changed_prog new_mutated(mutated);
-		vector<change> v = *it;
-		for (auto mt = v.begin(); mt != v.end(); ++mt) mt->operator()(new_mutated);
-		if (bounder.bound(new_mutated)) {
-			optimize_loop(new_mutated, bounder, branchers);
+flat_prog driver::minimize(const flat_prog& fp) const {
+		flat_prog mfp = fp;
+		print(o::out() << "Initial uniterated flat_prog:\n", mfp) << endl;
+		o::out() << "Flat program size: " << mfp.size() << endl;
+		o::out() << "Flat program cost: " << cost(mfp) << endl;
+		for (int i = 0; i != opts.get_int("minimize"); i++) {
+			if (!minimize_step(mfp)) break;
+			print(o::out() << "Minimized flat_prog after:" << i+1 << " iterations.\n", mfp) << endl;
+			o::out() << "Flat program size:" << mfp.size() << endl;
+			o::out() << "Flat program cost: " << cost(mfp) << endl;
 		}
-	}
+		return update_with_new_symbols(*tbl, mfp);
+		// return mfp;
 }
 
-flat_prog optimize_o1(const flat_prog &fp) {
-	// body splitting
-}
-
-flat_prog squaring_o1(const flat_prog &fp) {
-
-}
-
-flat_prog optimize_o2(const flat_prog& fp) {
-	// cqc and minimization
-}
-
-flat_prog squaring_o2(const flat_prog &fp) {
-
-}
-
-flat_prog optimize_o3(const flat_prog& fp) {
-	// optimal body splitting and cqc + minimization
-}
-
-flat_prog squaring_o3(const flat_prog &fp) {
-
+flat_prog driver::iterate(const flat_prog& fp) const {
+		flat_prog ifp = fp;
+		print(o::out() << "Initial uniterated flat_prog:\n", ifp) << endl;
+		o::out() << "Flat program size: " << ifp.size() << endl;
+		o::out() << "Flat program cost: " << cost(ifp) << endl;
+		for (int i = 0; i != opts.get_int("iterate"); i++) {
+			ifp = square_program(ifp);
+			print(o::out() << "Iterated flat_prog after:" << i+1 << " iterations.\n", ifp) << endl;
+			o::out() << "Flat program size: " << ifp.size() << endl;
+			o::out() << "Flat program cost: " << cost(ifp) << endl;
+		}
+		return update_with_new_symbols(*tbl, ifp);
+		// return ifp;
 }

@@ -2420,8 +2420,9 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
 				  '_' == l[0][len-2] && '_' == l[0][len-1];
 	};
+	
 	// TODO clarify difference between hidden and internal. Anyway, this
-	// problem would disappear once we refactor run methosa.
+	// problem would disappear once we refactor run methods.
 	ints internal_rels = dict.get_rels(filter_internal_tables);
 	for (auto& tbl : tbls.tbls)
 		for (int_t rel : internal_rels)
@@ -2527,8 +2528,14 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		#endif
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 	
-	// TOODO this call must be done in the driver
-	if (!add_prog_wprod(fp, p.g, tbls, rt, ir_handler)) return false;
+	// Calling optimizations methods if requested
+	auto ifp = iterate(fp); auto ofp = minimize(ifp);
+
+	#ifdef DEBUG
+	print(o::out() << "Final optimized flat_prog:\n", ofp) << endl;
+	#endif // DEBUG
+
+	if (!add_prog_wprod(ofp, p.g, tbls, rt, ir_handler)) return false;
 
 	//----------------------------------------------------------
 	if (tbls.opts.optimize) {
@@ -2579,6 +2586,30 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 		tbls.opts.pu_states.insert(ir_handler->get_table(
 				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
 }
+
+template <typename T>
+basic_ostream<T>& driver::print(basic_ostream<T>& os, const vector<term>& v) const {
+	os << ir->to_raw_term(v[0]);
+	if (v.size() == 1) return os << '.';
+	os << " :- ";
+	for (size_t n = 1; n != v.size(); ++n) {
+		if (v[n].goal) os << '!';
+		os << ir->to_raw_term(v[n]) << (n == v.size() - 1 ? "." : ", ");
+	}
+	return os;
+}
+template basic_ostream<char>& driver::print(basic_ostream<char>&, const vector<term>&) const;
+template basic_ostream<wchar_t>& driver::print(basic_ostream<wchar_t>&, const vector<term>&) const;
+
+template <typename T>
+basic_ostream<T>& driver::print(basic_ostream<T>& os, const flat_prog& p) const{
+	for (const auto& x : p)
+		print(os << (x[0].tab == -1 ? 0 : tbl->tbls[x[0].tab].priority) <<
+			'\t', x) << endl;
+	return os;
+}
+template basic_ostream<char>& driver::print(basic_ostream<char>&, const flat_prog&) const;
+template basic_ostream<wchar_t>& driver::print(basic_ostream<wchar_t>&, const flat_prog&) const;
 
 driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
 	if (opts.error) { error = true; return; }

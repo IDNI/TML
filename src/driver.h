@@ -18,6 +18,7 @@
 #include <variant>
 #include <memory>
 #include <vector>
+#include <ostream>
 
 #include "z3++.h"
 #ifdef __EMSCRIPTEN__
@@ -31,7 +32,6 @@
 #include "dict.h"
 #include "output.h"
 #include "options.h"
-#include "transform_opt.h"
 #include "printing.h"
 
 #include "builtins.h"
@@ -192,6 +192,8 @@ private:
 public:
 	void split_heads(raw_prog &rp);
 private:
+	flat_prog minimize(const flat_prog& fp) const;
+	flat_prog iterate(const flat_prog& fp) const;
 	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
 		const std::set<elem> &fv);
 public:
@@ -238,6 +240,12 @@ private:
 	bool add_bdd_builtins(builtins& bltins);
 	bool add_print_builtins(builtins& bltins);
 	bool add_js_builtins(builtins& bltins);
+
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const std::vector<term>& v) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const flat_prog& p) const;
+
 
 public:
 	template <typename T>

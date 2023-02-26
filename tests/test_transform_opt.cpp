@@ -12,7 +12,9 @@
 // modified over time by the Author.
 
 #include "test_transform_opt.h"
-// #include "../src/transform_opt.cpp"
+#include "../src/driver.h"
+#include "../src/transform_opt_squaring.h"
+#include "../src/transform_opt_cqc.h"
 
 TEST_SUITE("transform_opt-squaring") {
 	TEST_CASE("squaring: .") { 
@@ -54,7 +56,7 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[0] == rule_f({{'a', x}}) ); 
 	}
 
-	#ifdef ENABLE_WHEN_CONSIDERING_FACTS_IN_UNIFICATION
+	#ifndef ENABLE_WHEN_CONSIDERING_FACTS_IN_UNIFICATION
 	TEST_CASE("squaring: a(1). b(x?):-a(x?).") { 
 		auto x = var_f();
 		auto fp = flat_prog_f({
@@ -117,7 +119,7 @@ TEST_SUITE("transform_opt-squaring") {
 	TEST_CASE("squaring:  a(?x ?y):-c(?y). b(?x):-a(?y ?x).") { 
 		auto x1 = var_f(); auto y1 = var_f(); int_t x2 = -4; int_t y2 = -3;
 		auto fp = flat_prog_f({
-			{{'a', x1, y1}, {'c', y1}},
+			{{'a', x1, y1},  /* :- */ {'c', y1}},
 			{{'b', x1}, /* :- */ {'a', y1, x1}}});
 		auto sqr = square_program(fp); 
 
@@ -139,60 +141,6 @@ TEST_SUITE("transform_opt-squaring") {
 		EXPECT_TRUE( rules_e(sqr)[1] == rule_f({{'b', x2}, {'c', y2}}));
 	}
 	
-}
-
-TEST_SUITE("transform_opt-splitting") {
-	TEST_CASE("splitting: .") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("splitting: a(1).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("splitting: a(?x):-b(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("splitting: a(?x):-b(?x), c(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("splitting: a(?x):-b(?x ?y), c(?x ?y).") { 
-		EXPECT_TRUE( true ); 
-	}
-}
-
-TEST_SUITE("transform_opt-check_qc") {
-	TEST_CASE("check_qc: .") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("check_qc: a(1).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("check_qc: a(?x):-b(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("check_qc: a(?x):-b(?x), c(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("check_qc: a(?x):-b(?x ?y), c(?x ?y).") { 
-		EXPECT_TRUE( true ); 
-	}
-}
-
-TEST_SUITE("transform_opt-minization") {
-	TEST_CASE("minimization: .") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("minimization: a(1).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("minimization: a(?x):-b(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("minimization: a(?x):-b(?x), c(?x).") { 
-		EXPECT_TRUE( true ); 
-	}
-	TEST_CASE("minimization: a(?x):-b(?x ?y), c(?x ?y).") { 
-		EXPECT_TRUE( true ); 
-	}
 }
 
 #ifdef REWRITE_AS_DOCTESTS

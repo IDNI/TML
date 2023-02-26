@@ -16,6 +16,7 @@
 
 #include "transform_opt_common.h"
 
+flat_prog minimize_rules(flat_prog const &p);
 flat_rule minimize_rule(flat_rule const &r, flat_prog const &p);
 bool rule_contains(flat_rule const &r1, flat_rule const &r2, flat_prog const &p);
 

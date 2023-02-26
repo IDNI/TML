@@ -36,7 +36,6 @@ set(TML_HEADERS
 	tables.h
 	ir_builder.h
 	iterators.h
-	transform_opt.h
 	transform_opt_common.h
 	transform_opt_cqc.h
 	transform_opt_squaring.h

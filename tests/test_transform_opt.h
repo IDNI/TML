@@ -14,7 +14,9 @@
 #define __TEST_TRANSFORM_H__
 
 #include "unittest.hpp"
-#include "../src/transform_opt.h"
+#include "../src/driver.h"
+#include "../src/transform_opt_squaring.h"
+#include "../src/transform_opt_cqc.h"
 
 /* Factory methods to ease test cases building. */
 int_t sym_f() {	static int_t s = 0; return ++s; }

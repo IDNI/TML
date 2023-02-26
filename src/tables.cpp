@@ -514,8 +514,8 @@ bool tables::get_rules(flat_prog &p) {
 		r.neg = t.neg, r.tab = t.tab, r.eq = htrue, r.t = t; //TODO: review why we replicate t variables in r
 		for (size_t n = 0; n != t.size(); ++n)
 			if (t[n] >= 0) get_sym(t[n], n, t.size(), r.eq);
-			else if (v.end()==(it=v.find(t[n]))) v.emplace(t[n], n);
-			else r.eq = r.eq&&from_sym_eq(n, it->second, t.size());
+			else if (v.end()==(it = v.find(t[n]))) v.emplace(t[n], n);
+			else r.eq = r.eq && from_sym_eq(n, it->second, t.size());
 		set<alt> as;
 		r.len = t.size();
 
@@ -530,8 +530,7 @@ bool tables::get_rules(flat_prog &p) {
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
 				r.push_back(*ait);
-			else *(aa = new alt) = x,
-				r.push_back(aa), alts.insert(aa);
+			else *(aa = new alt) = x, r.push_back(aa), alts.insert(aa);
 		rs.insert(r);
 	}
 	for (rule r : rs)

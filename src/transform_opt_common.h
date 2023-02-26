@@ -20,6 +20,8 @@
 #include <set>
 #include "ir_builder.h"
 
+using namespace std;
+
 using flat_rule = std::vector<term>;
 using rel_arity = std::tuple<int_t, size_t>;
 using rule_index = std::map<rel_arity, std::set<flat_rule>>;
@@ -29,6 +31,10 @@ using selection = std::vector<flat_rule>;
 /*! Get relation info from the head term in a way suitable for be used as key. */
 
 inline rel_arity get_rel_info(const term &t) {
+	#ifndef DELETE_ME
+	cout << "GET_REL: {";
+	cout << "{" << t.tab << ':' << t.size() << "}\n";
+	#endif // DELETE_ME
 	return { t.tab, t.size() };
 }
 
