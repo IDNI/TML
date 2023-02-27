@@ -150,7 +150,7 @@ change propose_change(flat_rule& r1, pair<flat_rule, flat_rule>& er1,
 }
 
 bool include_renamings(change& c) {
-//	for (auto& r: c.add) if (r.size() == 2) for (auto& p: r) if (p.tab >= 65536) return true;
+    //for (auto& r: c.add) if (r.size() == 2) for (auto& p: r) if (p.tab >= 65536) return true;
 	for (auto& r: c.add) if (r.size() == 2) if (r[0].tab >= 65536) return true;
 	return false;
 }
@@ -166,8 +166,6 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 	change min; 
 	min.add.emplace(r1);
 	min.add.emplace(r2);
-	min.del.emplace(r1);
-	min.del.emplace(r2);
 	for (auto c1 : powerset_range(b1)) {
 		if (c1.empty()) continue;
 		int s = get_tmp_sym();
@@ -179,6 +177,71 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 			if (er1.second.size() != er2.second.size()) continue;
 			// For each pair or extracted rules we check if r1.second is 
 			// contained in r2.second, i.e. if r1.second => r2.second
+
+			#ifndef DEBUG
+			o::dbg() << "c1 = [";
+			for(auto &s: c1) {
+				o::dbg() << s.tab << "[";
+				for (auto &t: s) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(c1) <<" \n";
+
+			o::dbg() << "c2 = [";
+			for(auto &s: c2) {
+				o::dbg() << s.tab << "[";
+				for (auto &t: s) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(c2) <<" \n";
+
+			o::dbg() << "r1 = [";
+			for(auto &s: r1) {
+				o::dbg() << s.tab << "[";
+				for (auto &t: s) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(r1) <<" \n";
+
+			o::dbg() << "r2 = [";
+			for(auto &s: r2) {
+				o::dbg() << s.tab <<"[";
+				for (auto &t: s) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(r2) <<" \n";
+
+			o::dbg() << "er1.remains = [";
+			for(auto &r: er1.first) {
+				o::dbg() << r.tab << "[";
+				for (auto &t: r) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(er1.first) <<" \n";
+			o::dbg() << "er1.extracted = [";
+			for(auto &r: er1.second) {
+				o::dbg() << r.tab << "[";
+				for (auto &t: r) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(er1.second) <<" \n";
+
+			o::dbg() << "er2.remains = [";
+			for(auto &r: er2.first) {
+				o::dbg() << r.tab <<  "[";
+				for (auto &t: r) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(er2.first) <<" \n";
+			o::dbg() << "er2.extracted = [";
+			for(auto &r: er2.second) {
+				o::dbg() << r.tab << "[";
+				for (auto &t: r) o::dbg() << t << ",";
+				o::dbg() << "],";
+			} 
+			o::dbg() << "]: " << cost(er2.second) <<" \n";
+			#endif
+				
 			if (rule_contains(er1.second, er2.second, fp)) {
 				auto c = propose_change(r1, er1, r2, er2);
 				// Check we are not renaming
@@ -189,82 +252,8 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 				if (min > c) min = c;
 				else continue;	
 
-				#ifdef DEBUG
-				o::dbg() << "c1 = [";
-				for(auto &s: c1) {
-					o::dbg() << s.tab << "[";
-					for (auto &t: s) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(c1) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "c2 = [";
-				for(auto &s: c2) {
-					o::dbg() << s.tab << "[";
-					for (auto &t: s) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(c2) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "r1 = [";
-				for(auto &s: r1) {
-					o::dbg() << s.tab << "[";
-					for (auto &t: s) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(r1) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "r2 = [";
-				for(auto &s: r2) {
-					o::dbg() << s.tab <<"[";
-					for (auto &t: s) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(r2) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "er1.remains = [";
-				for(auto &r: er1.first) {
-					o::dbg() << r.tab << "[";
-					for (auto &t: r) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(er1.first) <<" \n";
-				o::dbg() << "er1.extracted = [";
-				for(auto &r: er1.second) {
-					o::dbg() << r.tab << "[";
-					for (auto &t: r) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(er1.second) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "er2.remains = [";
-				for(auto &r: er2.first) {
-					o::dbg() << r.tab <<  "[";
-					for (auto &t: r) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(er2.first) <<" \n";
-				o::dbg() << "er2.extracted = [";
-				for(auto &r: er2.second) {
-					o::dbg() << r.tab << "[";
-					for (auto &t: r) o::dbg() << t << ",";
-					o::dbg() << "],";
-				} 
-				o::dbg() << "]: " << cost(er2.second) <<" \n";
-				#endif
-
-				#ifdef DEBUG
-				o::dbg() << "er12.extracted DOES IMPLY er1.extracted\n";
+				#ifndef DEBUG
+				o::dbg() << "er2.extracted DOES IMPLY er1.extracted\n";
 				o::dbg() << "Proposed changes\n";
 				for (auto& a: c.add) {
 					o::dbg() << "ADDITION: = [";
@@ -295,7 +284,6 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 change minimize_step_using_rule(flat_rule& r, flat_prog& fp, flat_prog& p) { 
 	change min;
 	min.add.emplace(r);
-	min.del.emplace(r);
 	for (auto fr: fp) {
 		auto c = extract_common(r, fr, p);
 		min = min < c ? min : c;

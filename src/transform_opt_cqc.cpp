@@ -148,8 +148,7 @@ public:
 				// Pushing head variables
 				vars_of_rel.push_back(arg_to_z3(*arg));
 			}
-			auto z3e = rel_to_z3(t)(vars_of_rel);
-			return t.neg ? !z3e : z3e;
+			return rel_to_z3(t)(vars_of_rel);
 		} else if(t.extype == term::EQ) {
 			return arg_to_z3(t[0]) == arg_to_z3(t[1]);
 		} else if(t.extype <= term::LEQ) {
