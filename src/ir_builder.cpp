@@ -1193,8 +1193,9 @@ raw_term ir_builder::to_raw_term(const term& r) {
 						? elem(elem::SYM, dict.get_lexeme("?0p" + to_string_(r.tab)))
 						: elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s))));
 				
-				if (r.tab < dynenv->tbls.size()) rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)}; 
-				else rt.arity = {args};
+				if (r.tab > dynenv->tbls.size()) rt.arity = { args };
+				else if (dynenv->tbls.at(r.tab).generated) rt.arity = { args };
+				else rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)}; 
 
 				#ifdef TYPE_RESOLUTION
 				sig s = dynenv->tbls[r.tab].s;

@@ -52,9 +52,9 @@ long cost(flat_rule const& fr) {
 	// Compute the actual cost
 	long cost = 1;
 	ranges::for_each(count.begin(), count.end(), [&](auto& i){
-		cost = cost + (i.second + 1) * (i.second + 1);
+		cost = cost + i.second;
 	});
-	cost = cost * fr.size();
+	cost = cost * cost * fr.size();
 	return cost;
 }
 
@@ -79,6 +79,7 @@ struct change {
 	}
 
 	bool operator()(flat_prog& fp) {
+		if (del == add) return false;
 		for (auto& fr: del) fp.erase(fr);
 		fp.insert(add.begin(), add.end());
 		return !add.empty() || !del.empty();
@@ -86,8 +87,9 @@ struct change {
 };
 
 /* Auxiliary functions */
+static int_t tab = 1 << 16;
+
 int get_tmp_sym() {
-	static int_t tab = 1 << 16;
 	return tab++;
 }
 
@@ -140,12 +142,13 @@ change propose_change(flat_rule& r1, pair<flat_rule, flat_rule>& er1,
 	c.del.insert(r2);
 	c.add.insert(er1.first);
 	c.add.insert(er2.first);
-	c.add.insert(er2.second);
+	c.add.insert(er1.second);
 	return c;
 }
 
 bool include_renamings(change& c) {
-	for (auto& r: c.add) if (r.size() == 2) return true;
+//	for (auto& r: c.add) if (r.size() == 2) for (auto& p: r) if (p.tab >= 65536) return true;
+	for (auto& r: c.add) if (r.size() == 2) if (r[0].tab >= 65536) return true;
 	return false;
 }
 
@@ -160,6 +163,8 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 	change min; 
 	min.add.emplace(r1);
 	min.add.emplace(r2);
+	min.del.emplace(r1);
+	min.del.emplace(r2);
 	for (auto c1 : powerset_range(b1)) {
 		if (c1.empty()) continue;
 		int s = get_tmp_sym();
@@ -174,6 +179,8 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 			if (rule_contains(er1.second, er2.second, fp)) {
 				auto c = propose_change(r1, er1, r2, er2);
 				// Check we are not renaming
+				if (include_renamings(c)) continue;
+				// Check we are not adding the same rule again
 				if (is_identity(c)) continue;
 				// Is the proposal valid
 				if (min > c) min = c;
@@ -285,6 +292,7 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 change minimize_step_using_rule(flat_rule& r, flat_prog& fp, flat_prog& p) { 
 	change min;
 	min.add.emplace(r);
+	min.del.emplace(r);
 	for (auto fr: fp) {
 		auto c = extract_common(r, fr, p);
 		min = min < c ? min : c;
