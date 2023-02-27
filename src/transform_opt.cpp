@@ -70,9 +70,9 @@ struct change {
 	set<flat_rule> add;
 
 	auto operator<=>(const change& that) const {
-		// TODO add case del && add are empty special case to avoid creating
+		// TODO add del && add are empty special case to avoid creating
 		// fake initial mins... other posibility would be to use optionals, 
-		// but the order defined does not help us.
+		// but the natural order defined for them does not help us.
 		long cost_this = 0, cost_that = 0;
 		for (auto& fr: del) cost_this -= cost(fr);
 		for (auto& fr: add) cost_this += cost(fr);
@@ -174,7 +174,7 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 			if (c2.empty()) continue;
 			auto er2 = extract_rule(r2, s, c2);
 			// If heads have different size, they shouldn't be extracted
-			if (er1.second.size() != er2.second.size()) continue;
+			if (er1.second[0].size() != er2.second[0].size()) continue;
 			// For each pair or extracted rules we check if r1.second is 
 			// contained in r2.second, i.e. if r1.second => r2.second
 
