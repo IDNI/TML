@@ -37,7 +37,7 @@
 
 using namespace std;
 
-long cost(flat_rule const& fr) {
+long cost(const flat_rule& fr) {
 	// Count the number of uses of each variable
 	map<int, size_t> count;
 	ranges::for_each(fr.begin(), fr.end(), [&](auto& t){
@@ -52,13 +52,13 @@ long cost(flat_rule const& fr) {
 	// Compute the actual cost
 	long cost = 1;
 	ranges::for_each(count.begin(), count.end(), [&](auto& i){
-		cost = cost + i.second;
+		cost = cost + (i.second + 1) * (i.second + 1);
 	});
-	cost = cost * cost * fr.size();
+	cost = cost * fr.size();
 	return cost;
 }
 
-long cost(flat_prog const& fp) {
+long cost(const flat_prog& fp) {
 	long fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
 	return fp_cost;
 }
@@ -114,13 +114,13 @@ set<int> get_vars(const flat_prog fp) {
 	return vars;
 }
 
-term create_term(int s, set<int>& vs) {
+term create_term(int s, const set<int>& vs) {
 	term nt; nt.tab = s;
 	for(auto& i: vs) nt.push_back(i);
 	return nt;
 }
 
-pair<flat_rule, flat_rule> extract_rule(flat_rule& r, int s, flat_rule& e) {
+pair<flat_rule, flat_rule> extract_rule(const flat_rule& r, int s, const flat_rule& e) {
 	// Compute the rest of the rule (without the terms in e)
 	flat_rule remains;
 	for (auto& t: r) if (ranges::find(e.begin(), e.end(), t) == e.end()) remains.emplace_back(t);
@@ -130,42 +130,26 @@ pair<flat_rule, flat_rule> extract_rule(flat_rule& r, int s, flat_rule& e) {
 	for (auto& v: get_vars(e)) if (remains_vars.contains(v)) extracted_vars.insert(v);
 	// Create the rule extracted
 	auto extracted_head = create_term(s, extracted_vars); 
-	flat_rule extracted; 
-	extracted.push_back(extracted_head);
+	flat_rule extracted {extracted_head};
 	for (auto& t: e) extracted.push_back(t);
 	// Compute remaining rule
 	remains.push_back(extracted_head);
 	return {remains, extracted};
 }
 
-change propose_change(flat_rule& r1, pair<flat_rule, flat_rule>& er1,
-		flat_rule& r2, pair<flat_rule, flat_rule>& er2) {
-	change c;
-	c.del.insert(r1);
-	c.del.insert(r2);
-	c.add.insert(er1.first);
-	c.add.insert(er2.first);
-	c.add.insert(er1.second);
-	return c;
-}
-
-bool include_renamings(change& c) {
-    //for (auto& r: c.add) if (r.size() == 2) for (auto& p: r) if (p.tab >= 65536) return true;
+bool include_renamings(const change& c) {
 	for (auto& r: c.add) if (r.size() == 2) if (r[0].tab >= 65536) return true;
 	return false;
 }
 
-bool is_identity(change& c) {
-	for (auto& r: c.add) if (!c.del.contains(r)) return false;
-	return c.del.size() == c.add.size();
+bool is_identity(const change& c) {
+	return c.add == c.del;
 }
 
-change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
+change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog& fp) {
 	vector<term> b1(++r1.begin(), r1.end());
 	vector<term> b2(++r2.begin(), r2.end());
-	change min; 
-	min.add.emplace(r1);
-	min.add.emplace(r2);
+	change min { .add = {r1, r2}}; 
 	for (auto c1 : powerset_range(b1)) {
 		if (c1.empty()) continue;
 		int s = get_tmp_sym();
@@ -243,13 +227,16 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 			#endif
 				
 			if (rule_contains(er1.second, er2.second, fp)) {
-				auto c = propose_change(r1, er1, r2, er2);
+				change proposed { 
+					.del = {r1, r2}, 
+					.add = {er1.first, er2.first, er1.second}};
+				// auto c = propose_change(r1, er1, r2, er2);
 				// Check we are not renaming
-				if (include_renamings(c)) continue;
+				if (include_renamings(proposed)) continue;
 				// Check we are not adding the same rule again
-				if (is_identity(c)) continue;
+				if (is_identity(proposed)) continue;
 				// Is the proposal valid
-				if (min > c) min = c;
+				if (min > proposed) min = proposed;
 				else continue;	
 
 				#ifndef DEBUG
@@ -281,12 +268,19 @@ change extract_common(flat_rule& r1, flat_rule& r2, flat_prog& fp) {
 	return min;
 }
 
-change minimize_step_using_rule(flat_rule& r, flat_prog& fp, flat_prog& p) { 
-	change min;
-	min.add.emplace(r);
+inline bool head_neg(const flat_rule& r) {
+	return r[0].neg;
+}
+
+change minimize_step_using_rule(const flat_rule& r, const flat_prog& fp, const flat_prog& p) { 
+	change min { .add = {r}};
 	for (auto fr: fp) {
-		auto c = extract_common(r, fr, p);
-		min = min < c ? min : c;
+		if (r != fr && head_neg(r) && head_neg(fr) && rule_contains(r, fr, fp)) {
+			change proposed { .del = {fr}};
+			min = min < proposed ? min : proposed;
+		}			
+		auto proposed = extract_common(r, fr, p);
+		min = min < proposed ? min : proposed;
 	} 
 	return min;
 }
@@ -304,7 +298,7 @@ bool minimize_step(flat_prog& fp) {
 	return changed;
 }
 
-flat_prog update_with_new_symbols(tables& tbl, flat_prog& fp) {
+flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	static int_t idx = tbl.tbls.size();
 	flat_prog nfp;
 	map<int_t, int_t> renaming;
@@ -331,31 +325,29 @@ flat_prog update_with_new_symbols(tables& tbl, flat_prog& fp) {
 }
 
 flat_prog driver::minimize(const flat_prog& fp) const {
-		flat_prog mfp = fp;
-		print(o::out() << "Initial uniterated flat_prog:\n", mfp) << endl;
-		o::out() << "Flat program size: " << mfp.size() << endl;
+	flat_prog mfp = fp;
+	print(o::out() << "Initial uniterated flat_prog:\n", mfp) << endl;
+	o::out() << "Flat program size: " << mfp.size() << endl;
+	o::out() << "Flat program cost: " << cost(mfp) << endl;
+	for (int i = 0; i != opts.get_int("minimize"); i++) {
+		if (!minimize_step(mfp)) break;
+		print(o::out() << "Minimized flat_prog after:" << i+1 << " iterations.\n", mfp) << endl;
+		o::out() << "Flat program size:" << mfp.size() << endl;
 		o::out() << "Flat program cost: " << cost(mfp) << endl;
-		for (int i = 0; i != opts.get_int("minimize"); i++) {
-			if (!minimize_step(mfp)) break;
-			print(o::out() << "Minimized flat_prog after:" << i+1 << " iterations.\n", mfp) << endl;
-			o::out() << "Flat program size:" << mfp.size() << endl;
-			o::out() << "Flat program cost: " << cost(mfp) << endl;
-		}
-		return update_with_new_symbols(*tbl, mfp);
-		// return mfp;
+	}
+	return update_with_new_symbols(*tbl, mfp);
 }
 
 flat_prog driver::iterate(const flat_prog& fp) const {
-		flat_prog ifp = fp;
-		print(o::out() << "Initial uniterated flat_prog:\n", ifp) << endl;
+	flat_prog ifp = fp;
+	print(o::out() << "Initial uniterated flat_prog:\n", ifp) << endl;
+	o::out() << "Flat program size: " << ifp.size() << endl;
+	o::out() << "Flat program cost: " << cost(ifp) << endl;
+	for (int i = 0; i != opts.get_int("iterate"); i++) {
+		ifp = square_program(ifp);
+		print(o::out() << "Iterated flat_prog after:" << i+1 << " iterations.\n", ifp) << endl;
 		o::out() << "Flat program size: " << ifp.size() << endl;
 		o::out() << "Flat program cost: " << cost(ifp) << endl;
-		for (int i = 0; i != opts.get_int("iterate"); i++) {
-			ifp = square_program(ifp);
-			print(o::out() << "Iterated flat_prog after:" << i+1 << " iterations.\n", ifp) << endl;
-			o::out() << "Flat program size: " << ifp.size() << endl;
-			o::out() << "Flat program cost: " << cost(ifp) << endl;
-		}
-		return update_with_new_symbols(*tbl, ifp);
-		// return ifp;
+	}
+	return update_with_new_symbols(*tbl, ifp);
 }
