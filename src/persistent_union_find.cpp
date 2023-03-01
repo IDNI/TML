@@ -370,9 +370,17 @@ int_t pu::rm_equal(int_t t, int_t x) {
 }
 
 bool pu::is_singleton(int_t t, int_t x) {
-	auto set_iter = get_equal(t,x);
+	auto set_iter = get_equal(t, x);
 	++set_iter;
 	return set_iter == set_iter.end();
+}
+
+vector<int_t> pu::elems(int_t t) {
+	vector<int_t> elems;
+	for (int_t p = uf_univ[t].arr_pt; pa_univ[p].diff != -1; p = pa_univ[p].diff)
+		if(pa_univ[p].p != find(t, pa_univ[p].p))
+			check_insertb(elems, pa_univ[p].p);
+	return elems;
 }
 
 bool pu::resize(int_t n) {

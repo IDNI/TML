@@ -12,8 +12,8 @@
 
 class poset;
 
-extern std::vector<poset> P;
-extern std::vector<poset> NP;
+extern std::vector<poset> P, NP;
+extern std::unordered_map<poset, int_t> MP, MNP;
 
 template<>
 struct std::hash<poset> {
@@ -83,22 +83,28 @@ class poset {
 		return pu::size();
 	};
 
+	static poset conjunct(const poset& x, const poset& y);
 	static poset lift(int_t v, int_t h, int_t l);
-	static poset eval(poset &p, int_t v);
+	static poset eval(const poset &p, int_t v);
+	static poset negate(const poset &p);
+	static bool negatable(poset &p);
+	//TODO: insert_var needs to update imps and eqs
 	static bool insert_var(poset &p, int_t v);
 	static poset insert_var(poset &&p, int_t v);
+	//TODO: insert_imp needs to check present vars before insertion and containment in equalities
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);
 	static void insert_imp(poset &p, int_t fst, int_t snd);
+	//TODO: insert_eq needs to check vars and imps
 	static void insert_eq(poset &p, int_t v1, int_t v2);
 	static poset get(int_t pos);
 	static void print(poset &p, std::ostream &os);
 	static void print(poset &&p, std::ostream &os);
 
-	inline static bool is_empty(poset &p) {
+	inline static bool is_empty(const poset &p) {
 		return p.eqs + p.imps + p.vars == 0;
 	}
 
-	inline static bool only_vars(poset &&p) {
+	inline static bool only_vars(const poset &&p) {
 		return p.eqs + p.imps == 0 && p.vars > 0;
 	}
 };

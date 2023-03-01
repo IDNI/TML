@@ -87,3 +87,9 @@ int_t ps::find(int_t set_id, int_t elem) {
 	}
 	return 0;
 }
+
+int_t ps::size(int_t set_id) {
+	int_t s = 0;
+	for(int_t el = set_id; el > 0; el = next(el)) ++s;
+	return s;
+}

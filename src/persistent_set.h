@@ -34,6 +34,7 @@ struct persistent_set {
 	static int_t next(int_t set_id);
 	static persistent_set get(int_t set_id);
 	static void print(int_t set_id, std::ostream &os);
+	static int_t size(int_t set_id);
 };
 
 #endif //TML_PERSISTENT_SET_H

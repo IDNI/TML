@@ -50,10 +50,8 @@ template <typename T> int sgn(T val) {
 }
 
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
-//unordered_map<poset, int_t> Mc, Mneg_c;
 bdd_mmap V;
-//vector<poset> CV;
-//vector<poset> neg_CV;
+
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
@@ -122,6 +120,7 @@ void bdd::max_bdd_size_check() {
 }
 #endif
 
+//TODO: enable poset_to_bdd
 bdd bdd::get(int_t x) {
 	if (x > 0) {
 		/*if (CV[x].pure()) return poset_to_bdd(CV[x], true);
@@ -141,6 +140,7 @@ bdd bdd::get(int_t x) {
 	return y.v > 0 ? bdd(y.v, -y.h, -y.l) : bdd(-y.v, -y.l, -y.h);
 }
 
+//TODO: enable poset_to_bdd
 int_t bdd::hi(int_t x) {
 	if(x > 0){/*
 		if(CV[x].pure()) return poset_to_bdd(CV[x], true).h;
@@ -155,60 +155,31 @@ int_t bdd::hi(int_t x) {
 
 int_t bdd::lo(int_t x) {
 	if(x > 0){
-		/*if(CV[x].pure()) return poset_to_bdd(CV[x], true).l;
-		else if (neg_CV[x].pure()) return -poset_to_bdd(neg_CV[x], false).l;
-		else*/ return V[x].v < 0 ? V[x].h : V[x].l;
+		if (V[x].v == 0) return P[x].pure ? poset_to_bdd(x).l : -poset_to_bdd(-x).l;
+		else return V[x].v < 0 ? V[x].h : V[x].l;
 	} else {
-		/*if(neg_CV[-x].pure()) return poset_to_bdd(neg_CV[-x],false).l;
-		else if (CV[-x].pure()) return -poset_to_bdd(CV[-x], true).l;
-		else*/ return V[-x].v < 0 ? -V[-x].h : -V[-x].l;
+		if (V[-x].v == 0) return NP[-x].pure ? poset_to_bdd(x).l : -poset_to_bdd(-x).l;
+		else return V[-x].v < 0 ? -V[-x].h : -V[-x].l;
 	}
 }
 
-/*
-//TODO: Saving evaluated poset positive or negative
-bdd bdd::poset_to_bdd(poset &p, bool posUniverse) {
-	// get the highest variable and build high and low
-	DBG(assert(!p.is_empty());)
-	int_t v = p.get_high_var();
-	auto l_v = p.eval(-v);
-	auto h_v = p.eval(v);
+bdd bdd::poset_to_bdd(int_t p) {
+	const poset &po = p > 0 ? P[p] : NP[p];
+	// get the smallest variable and build high and low
+	DBG(assert(!poset::is_empty(po) && po.pure);)
+	auto l_p = poset::eval(po, -po.v);
+	auto h_p = poset::eval(po, po.v);
 	int_t h,l;
-	// Find high 2-CNF in universe
+	// Try to find high 2-CNF in universe
 	unordered_map<poset, int_t>::const_iterator it;
-	auto &m = posUniverse ? Mc : Mneg_c;
-	auto &neg_m = posUniverse ? Mneg_c : Mc; // This has to be removed later
-	auto &univ = posUniverse ? CV : neg_CV;
-	auto &neg_univ = posUniverse ? neg_CV : CV;
-
-	if(h_v.is_false()) h = F;
-	else if (h_v.is_true()) h = T;
-	else if (it = m.find(h_v); it != end(m)) h = posUniverse ? it->second : -it->second;
-	else if (it = neg_m.find(h_v); it != end(neg_m)) h = posUniverse ? -it->second : it->second; // This has to be removed later
-	else {
-		DBG(assert(false););
-		m.emplace(h_v, univ.size());
-		V.emplace_back(0,0,0);
-		univ.emplace_back(move(h_v));
-		neg_univ.emplace_back();
-		h = univ.size() - 1;
-	}
-	// Find low 2-CNF in universe
-	if(l_v.is_false()) l = F;
-	else if (l_v.is_true()) l = T;
-	else if (it = m.find(l_v); it != end(m)) l = posUniverse ? it->second : -it->second;
-	else if (it = neg_m.find(l_v); it != end(neg_m)) l = posUniverse ? -it->second : it->second; // This has to be removed later
-	else {
-		DBG(assert(false););
-		m.emplace(l_v, univ.size());
-		V.emplace_back(0,0,0);
-		univ.emplace_back(move(l_v));
-		neg_univ.emplace_back();
-		l = univ.size() - 1;
-	}
-	return bdd(v, h, l);
+	if (it = MP.find(h_p); it != MP.end()) h = it->second;
+	else if (it = MNP.find(h_p); it != MNP.end()) h = it->second;
+	else h = add(h_p);
+	if (it = MP.find(l_p); it != MP.end()) l = it->second;
+	else if (it = MNP.find(l_p); it != MNP.end()) l = it->second;
+	else l = add(l_p);
+	return bdd(po.v, h, l);
 }
-*/
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(h && l && v > 0););
@@ -817,6 +788,7 @@ void bdd::mark_all(int_t i) {
 	DBG(assert((size_t)abs(i) < V.size());)
 	if ((i = abs(i)) >= 2 && !has(S, i)) {
 		//Catch the highest 2CNF
+		//TODO: Adjust to pure 2cnf with bdd info
 		if (V[i].v == 0) S.insert(i);
 		else mark_all(hi(i)), mark_all(lo(i)), S.insert(i);
 	}

@@ -99,6 +99,7 @@ class persistent_union_find {
 	static pu_iterator get_equal(int_t t, int_t x);
 	static int_t rm_equal(int_t t, int_t x);
 	static bool is_singleton(int_t t, int_t x);
+	static std::vector<int_t> elems(int_t t);
 	static bool resize(int_t n);
 	static int_t size();
 

@@ -87,7 +87,10 @@ int_t pd::insert(int_t dag_id, int_t fst, int_t snd, vector<int_t> &sings,
 
 	// Either trivial insertion or insertion of singleton
 	if (abs(fst) == abs(snd)) {
-		if (fst == -snd) insertb(sings, -fst);
+		if (fst == -snd) {
+			insertb(sings, -fst);
+			dag_id = set_var(dag_id, -fst, sings);
+		}
 		return dag_id;
 	}
 
@@ -629,4 +632,15 @@ void persistent_dag::create_graph_non_extended(int_t component,
 		create_graph_non_extended(ps::get(suc).e, graph);
 		suc = ps::next(suc);
 	}
+}
+
+int_t persistent_dag::size(int_t dag_id) {
+	const auto& dag = get(dag_id);
+	if(dag.sh == 0 && dag.sl == 0) return 0;
+	int_t s = 0;
+	for (int_t pos = dag_id > 0 ? dag.sh : dag.sl; pos > 0; pos = ps::next(pos)) {
+		if (dag.var != 0) ++s;
+		s += size(pos);
+	}
+	return s;
 }

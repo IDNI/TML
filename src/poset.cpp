@@ -26,10 +26,9 @@ static auto abs_fst_cmp = [](auto &p1, auto &p2) {
     return abs_cmp(p1.first, p2.first);
 };
 
-// universe for positively saved posets
-vector<poset> P;
-// universe for negatively saved posets
-vector<poset> NP;
+// universe for positive and negative posets
+vector<poset> P, NP;
+unordered_map<poset, int_t> MP, MNP;
 
 size_t std::hash<poset>::operator()(const poset &p) const {
 	return hash_tri(p.eqs, p.imps, p.vars);
@@ -191,7 +190,7 @@ poset poset::lift(int_t v, int_t h, int_t l) {
 
 // Evaluate poset on the variable v
 //TODO: Update variable v in p
-poset poset::eval(poset &p, int_t v) {
+poset poset::eval(const poset &p, int_t v) {
 	//if (p.v != abs(v)) DBGFAIL;
 	if (!p.pure) DBGFAIL;
 
@@ -285,4 +284,81 @@ void poset::print(poset &p, ostream &os) {
 
 void poset::print(poset &&p, ostream &os) {
 	print(p, os);
+}
+
+// Assumes that poset can be negated purely
+poset poset::negate(const poset &p) {
+	int_t imp_size = pd::size(p.imps);
+	int_t var_size = ps::size(p.vars);
+	if (auto eq = pu::elems(p.eqs); eq.size() == 1) {
+		int_t fst = eq[0], snd = pu::find(p.eqs, fst);
+		poset np;
+		return poset::insert_eq(np, fst, -snd), np;
+	} else if (imp_size <= 2 && var_size == 0) {
+		auto g = pd::get_graph(p.imps);
+		auto it = g.begin();
+		if(imp_size == 1) {
+			poset np;
+			poset::insert_var(np, it->first);
+			poset::insert_var(np, -ps::get(it->second).e);
+			return np;
+		} else {
+			int_t a = it->first;
+			int_t b = ps::get(it->second).e;
+			++it;
+			int_t c = it->first;
+			int_t d = ps::get(ps::next(it->second)).e;
+			poset np;
+			poset::insert_imp(np, -a, c);
+			poset::insert_imp(np, b, c);
+			poset::insert_imp(np, -a, -d);
+			poset::insert_imp(np, b, -d);
+			return np;
+		}
+	} else if (imp_size == 4 && var_size == 0) {
+		auto g = pd::get_graph(p.imps);
+		auto it = g.begin();
+		int_t a = -it->first, c = ps::get(it->second).e;
+		++it;
+		int_t b = it->first, d = -ps::get(ps::next(it->second)).e;
+		poset np;
+		return poset::insert_imp(np, a, b), poset::insert_imp(np, c, d), np;
+	} else if (var_size <= 2 && imp_size == 0) {
+		if(var_size == 1) {
+			poset np;
+			return poset::insert_var(np, -ps::get(p.vars).e), np;
+		} else {
+			int_t fst = ps::get(p.vars).e;
+			int_t snd = ps::get(ps::get(p.vars).n).e;
+			poset np;
+			return poset::insert_imp(np, fst, -snd), np;
+		}
+	} else {
+		DBG(assert(var_size == 1 && imp_size == 1));
+		auto g = pd::get_graph(p.imps);
+		auto it = g.begin();
+		int_t a = it->first;
+		int_t b = ps::get(it->second).e;
+		int_t c = ps::get(p.vars).e;
+		poset np;
+		poset::insert_imp(np, -a, -c);
+		poset::insert_imp(np, b, -c);
+		return np;
+	}
+}
+
+bool poset::negatable(poset &p) {
+	if (p.eqs == 0) {
+		if (ps::size(p.vars) + pd::size(p.imps) <= 2)
+			return true;
+		else {
+			auto g = pd::get_graph(p.imps);
+			if(g.size() != 2) return false;
+			auto it = g.begin();
+			int_t c = ps::get(it->second).e;
+			int_t d = ps::get(ps::next(it->second)).e;
+			++it;
+			return c == ps::get(it->second).e && d == ps::get(ps::next(it->second)).e;
+		}
+	} else return pu::elems(p.eqs).size() < 2 && p.vars + p.imps == 0;
 }

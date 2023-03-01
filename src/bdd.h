@@ -108,8 +108,6 @@ size_t bdd_nvars(spbdd_handle x);
 size_t bdd_nvars(bdd_handles x);
 vbools allsat(cr_spbdd_handle x, uint_t nvars);
 extern bdd_mmap V;
-//extern std::vector<poset> CV;
-//extern std::vector<poset> neg_CV;
 extern size_t max_bdd_nodes;
 #ifndef NOMMAP
 extern mmap_mode bdd_mmap_mode;
@@ -221,8 +219,7 @@ class bdd {
 	friend spbdd_handle bdd_mult_dfs(cr_spbdd_handle x, cr_spbdd_handle y, size_t bits , size_t n_vars );
 
 	static bdd get(int_t x);
-	//static bdd poset_to_bdd(poset &p, bool posUniverse);
-	//static bdd poset_to_bdd(poset &p);
+	static bdd poset_to_bdd(int_t p);
 
 	static int_t bdd_and(int_t x, int_t y);
 	static int_t bdd_and_ex(int_t x, int_t y, const bools& ex);
@@ -262,6 +259,8 @@ class bdd {
 	static size_t bdd_nvars(int_t x);
 	static bool bdd_subsumes(int_t x, int_t y);
 	static int_t add(int_t v, int_t h, int_t l);
+	static int_t add(poset& p);
+	static void add_bdd_info(int_t p, bdd& b);
 	static void extract_constraints(int_t v, int_t h, int_t l);
 	inline static int_t from_bit(uint_t b, bool v);
 	inline static void max_bdd_size_check();
@@ -331,6 +330,7 @@ public:
 
 	inline static int_t hi(int_t x);
 	inline static int_t lo(int_t x);
+	//TODO: enable poset_to_bdd
 	inline static uint_t var(int_t x) {
 		//return CV[abs(x)].pure() ? CV[abs(x)].get_high_var() :
 		//	(neg_CV[abs(x)].pure() ? neg_CV[abs(x)].get_high_var() :

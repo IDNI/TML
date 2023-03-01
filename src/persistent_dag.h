@@ -76,6 +76,8 @@ class persistent_dag {
 	static bool is_leaf(int_t dag_id);
 	static bool contains(int_t dag_id, std::pair<int_t, int_t> &elem);
 	static std::map<int_t,int_t,abs_cmp_> get_graph(int_t dag_id);
+	//TODO: Calculation of size is linear, not constant
+	static int_t size(int_t dag_id);
 
 	static pd get(int_t dag_id);
 	static void print(int_t set_id, std::ostream &os);
