@@ -28,6 +28,8 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <ctime>
+#include <cstdlib>
 
 #include "driver.h"
 #include "err.h"
@@ -36,6 +38,141 @@
 #include "transform_opt_squaring.h"
 
 using namespace std;
+
+#ifdef WITH_EXACT_COST_FUNCTION
+static size_t facts_4_predicate = 100;
+
+flat_rule generate_random_fact(const int p, const size_t s) {
+	// Prepare random number generator
+	static bool seeded = false;
+	if (!seeded) srand(time(0)), seeded = true;
+	flat_rule r;
+	term t; t.tab = p;
+	for (size_t i = 0; i < s; ++i) t.emplace_back(abs(rand()) % facts_4_predicate);	
+	r.emplace_back(t);
+	return r;
+}
+
+flat_prog generate_random_facts(const int p, const size_t s) {
+	flat_prog fp;
+	for (size_t i = 0; i != facts_4_predicate; ++i) fp.insert(generate_random_fact(p,s)); 
+	return fp;
+}
+
+flat_prog generate_facts(const flat_rule& fr) {
+	// Collect predicates
+	map<int_t, size_t> predicates;
+	for (int i = 1; i != fr.size(); ++i ) predicates.insert({fr[i].tab, fr[i].size()});
+	// Generate facts 
+	flat_prog facts;
+	for (auto& [p, s]: predicates) 
+		for(auto& f: generate_random_facts(p, s)) facts.insert(f);
+	return facts;
+}
+
+flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
+	static int_t idx = 1;
+	flat_prog nfp;
+	map<int_t, int_t> renaming;
+	for (auto& r: fp) {
+		flat_rule nfr;
+		for (auto& t: r) {
+			term nt = t;
+			// If the table is not in the original program and it has not been
+			// renamed yet...
+			if ( !renaming.contains(t.tab)) {
+				// ...add it to tables with a new index and cache the change
+				// in the renaming map. 
+				renaming[t.tab] = idx++;
+				table ntbl; ntbl.len = t.size(); ntbl.generated = true;
+				tbl.tbls.emplace_back(ntbl);
+			}
+			// Apply renaming if needed.
+			nt.tab = renaming.contains(t.tab) ? renaming[t.tab] : t.tab;
+			nfr.emplace_back(nt);
+		}
+		nfp.insert(nfr);
+	}
+	return nfp;
+}
+
+double cost(const vector<term>& fr) {
+	if (fr.size() == 0) return 0;
+
+	rt_options to; 
+	to.bproof            = proof_mode::none;
+	to.fp_step           = true;
+	to.optimize          = true;
+
+	dict_t dict;
+	ir_builder ir(dict, to);
+	builtins_factory* bf = new builtins_factory(dict, ir);
+	auto bltins = bf
+		->add_basic_builtins()
+		.add_bdd_builtins()
+		.add_print_builtins()
+		.add_js_builtins().bltins;
+
+	tables tbls(to, bltins); 
+	// Build flat_program
+	flat_rule nfr = fr;
+	flat_prog fp = generate_facts(nfr); fp.insert(nfr);
+	// Run the program to obtain the results which we will then filter
+
+	#ifdef DEBUG
+	o::dbg() << "Sample prog for cost computation\n";
+	for (auto& a: fp) {
+		o::dbg() << "RULE: = [";
+		for(auto &r: a) {
+			o::dbg() << r.tab << "[";
+			for (auto &t: r) o::dbg() << t << ",";
+			o::dbg() << "],";
+		} 
+		o::dbg() << "]: " <<" \n";
+	}
+	#endif
+
+	options o;
+	driver drv(o);
+
+	DBG(o::dbg() << "run_prog" << endl;);
+	clock_t start{}, end;
+	double t;
+	measure_time_start();
+
+
+	drv.error = false;
+
+	update_with_new_symbols(tbls, fp);
+	//tbls.fixed_point_term.tab = tbls.tbls.size();
+	tbls.rules.clear(), tbls.datalog = true;
+	if (!tbls.get_rules(fp)) return false;
+
+
+	nlevel begstep = tbls.nstep;
+
+	bool r = true;
+	// run program only if there are any rules
+	if (tbls.rules.size()) {
+		tables_progress p( dict, ir);
+		tbls.fronts.clear();
+		r = tbls.pfp(1, 1, p);
+	} else {
+		bdd_handles l = tbls.get_front();
+		tbls.fronts = {l, l};
+	}
+
+	end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
+	o::ms() << "# pfp: " << endl; measure_time_start();
+	return t;
+}
+
+double cost(const flat_prog& fp) {
+	double fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
+	return fp_cost;
+}
+
+#else
 
 long cost(const flat_rule& fr) {
 	// Count the number of uses of each variable
@@ -62,6 +199,8 @@ long cost(const flat_prog& fp) {
 	long fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
 	return fp_cost;
 }
+#endif // WITH_EXACT_COST_FUNCTION
+
 
 /* Represents a change of a program. */
 
@@ -73,7 +212,11 @@ struct change {
 		// TODO add del && add are empty special case to avoid creating
 		// fake initial mins... other posibility would be to use optionals, 
 		// but the natural order defined for them does not help us.
+		#ifdef WITH_EXACT_COST_FUNCTION
+		double cost_this = 0, cost_that = 0;
+		#else
 		long cost_this = 0, cost_that = 0;
+		#endif // WITH_EXACT_COST_FUNCTION
 		for (auto& fr: del) cost_this -= cost(fr);
 		for (auto& fr: add) cost_this += cost(fr);
 		for (auto& fr: that.del) cost_that -= cost(fr);
@@ -298,6 +441,7 @@ bool minimize_step(flat_prog& fp) {
 	return changed;
 }
 
+#ifndef WITH_EXACT_COST_FUNCTION
 flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	static int_t idx = tbl.tbls.size();
 	flat_prog nfp;
@@ -323,6 +467,7 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	}
 	return nfp;
 }
+#endif WITH_EXACT_COST_FUNCTION
 
 flat_prog driver::minimize(const flat_prog& fp) const {
 	flat_prog mfp = fp;

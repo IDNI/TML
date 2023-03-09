@@ -2529,8 +2529,9 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 	
 	// Calling optimizations methods if requested
-	auto ifp = iterate(fp); auto ofp = minimize(ifp);
-
+	// auto ifp = iterate(fp); auto ofp = minimize(ifp);
+	auto ofp = fp;
+	
 	#ifdef DEBUG
 	print(o::out() << "Final optimized flat_prog:\n", ofp) << endl;
 	#endif // DEBUG

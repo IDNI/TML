@@ -19,6 +19,7 @@
 #include <memory>
 #include <vector>
 #include <ostream>
+#include <ctime>
 
 #include "z3++.h"
 #ifdef __EMSCRIPTEN__
@@ -27,6 +28,7 @@
 #include <emscripten/val.h>
 #endif
 
+#include "defs.h"
 #include "tables.h"
 #include "input.h"
 #include "dict.h"

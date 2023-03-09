@@ -163,6 +163,9 @@ public:
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
+	#ifdef WITH_EXACT_COST_FUNCTION
+	friend double cost(const std::vector<term>& fr);
+	#endif // WITH_EXACT_COST_FUNCTION
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
@@ -221,6 +224,7 @@ public:
 
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
+
 private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
@@ -350,7 +354,6 @@ private:
 	bool infloop_detected();
 
 	char fwd(progress& p) noexcept;
-
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
