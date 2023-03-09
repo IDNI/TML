@@ -111,7 +111,6 @@ void driver::directives_load(raw_prog& p) {
 	p.d.insert(p.d.end(), processed.begin(), processed.end());
 }
 
-#ifndef TRY_DELETE_ME
 /* Reduce the top-level logical operator to a more primitive one if this
  * is possible. That is, reduce implications and co-implications to
  * conjunctions/disjunctions, and reduce uniqueness quantifications to
@@ -150,7 +149,6 @@ raw_form_tree expand_formula_node(const raw_form_tree &t, dict_t &d) {
 		}
 	}
 }
-#endif // TRY_DELETE_ME
 
 /* Check if the given variable is limited in its scope with respect to
  * the given variable. If the element is not a variable, then it is
@@ -507,7 +505,6 @@ bool is_cqn(const raw_rule &rr) {
 	return true;
 }
 
-#ifndef TRY_DELETE_ME
 /* Recurse through the given formula tree in pre-order calling the given
  * function with the accumulator. */
 
@@ -528,7 +525,6 @@ template<typename X, typename F>
 		default: return new_acc;
 	}
 }
-#endif // TRY_DELETE_ME
 
 /* Recurse through the given formula tree in post-order calling the
  * given function with the accumulator. */
@@ -551,77 +547,6 @@ template<typename X, typename F>
 }
 
 #ifdef DELETE_ME
-/* Checks if the rule has a single head and a body that is either a tree
- * or a non-empty DNF. Second order quantifications and builtin terms
- * are not supported. */
-
-bool is_query (const raw_rule &rr) {
-	// Ensure that there are no multiple heads
-	if(rr.h.size() != 1) return false;
-	// Ensure that head is positive
-	if(rr.h[0].neg) return false;
-	// Ensure that this rule is either a tree or non-empty DNF
-	if(!(rr.is_dnf() || rr.is_form())) return false;
-	// Ensure that there is no second order quantification or builtins in
-	// the tree
-	raw_form_tree prft = *rr.get_prft();
-	if(!prefold_tree(prft, true,
-			[&](const raw_form_tree &t, bool acc) -> bool {
-				return acc && (t.type != elem::NONE ||
-					t.rt->extype != raw_term::BLTIN) && t.type != elem::SYM;}))
-		return false;
-	return true;
-}
-
-/* If rr1 and rr2 are both conjunctive queries, check if there is a
- * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
- * of a homomorphism implies that rr1 is contained by rr2. */
-
-bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
-	// Get dictionary for generating fresh symbols
-	dict_t d;
-
-	// Check that rules have correct format
-	if(is_cq(rr1) && is_cq(rr2) &&
-			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
-		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
-
-		// Freeze the variables and symbols of the rule we are checking the
-		// containment of
-		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
-
-		// Build up the queries necessary to check homomorphism.
-		set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
-		o::dbg() << "Canonical Database: " << edb << endl;
-		raw_prog nrp(dict);
-		nrp.r.push_back(rr2);
-
-		// Run the queries and check for the frozen head. This process can
-		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		set<raw_term> results;
-		tables_progress p(d, *ir);
-		builtins_factory bf(d, *ir);
-		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-
-		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
-
-		for(const raw_term &res : results) {
-			if(res == frozen_rr1.h[0]) {
-				// If the frozen head is found, then there is a homomorphism
-				// between the two rules.
-				o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
-				return true;
-			}
-		}
-		// If no frozen head found, then there is no homomorphism.
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
-		return false;
-	} else {
-		return false;
-	}
-}
-#endif
 
 /* If rr1 and rr2 are both conjunctive bodies, check if there is a
  * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
@@ -736,6 +661,7 @@ bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
 		return false;
 	}
 }
+#endif
 
 /* Given a homomorphism (i.e. a pair comprising variable substitutions
  * and terms surjected onto) and the rule that a homomorphism maps into,
@@ -2082,7 +2008,6 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
 	}
 }
 
-#ifndef TRY_DELETE_ME
 void collect_free_vars(const vector<vector<raw_term>> &b,
 		vector<elem> &bound_vars, set<elem> &free_vars) {
 	for(const vector<raw_term> &bodie : b) {
@@ -2172,7 +2097,6 @@ void collect_free_vars(const raw_form_tree &t, vector<elem> &bound_vars,
 			assert(false); //should never reach here
 	}
 }
-#endif // TRY_DELETE_ME
 
 // ----------------------------------------------------------------------------
 // transformations handler
