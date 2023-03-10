@@ -39,7 +39,6 @@
 
 using namespace std;
 
-#ifdef WITH_EXACT_COST_FUNCTION
 static size_t facts_4_predicate = 100;
 
 flat_rule generate_random_fact(const int p, const size_t s) {
@@ -48,7 +47,7 @@ flat_rule generate_random_fact(const int p, const size_t s) {
 	if (!seeded) srand(time(0)), seeded = true;
 	flat_rule r;
 	term t; t.tab = p;
-	for (size_t i = 0; i < s; ++i) t.emplace_back(abs(rand()) % facts_4_predicate);	
+	for (size_t i = 0; i < s; ++i) t.emplace_back((abs(rand()) % facts_4_predicate) << 2 | 2);	
 	r.emplace_back(t);
 	return r;
 }
@@ -71,7 +70,6 @@ flat_prog generate_facts(const flat_rule& fr) {
 }
 
 flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
-	static int_t idx = 1;
 	flat_prog nfp;
 	map<int_t, int_t> renaming;
 	for (auto& r: fp) {
@@ -80,15 +78,15 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 			term nt = t;
 			// If the table is not in the original program and it has not been
 			// renamed yet...
-			if ( !renaming.contains(t.tab)) {
+			if (!renaming.contains(t.tab)) {
 				// ...add it to tables with a new index and cache the change
 				// in the renaming map. 
-				renaming[t.tab] = idx++;
+				renaming[t.tab] = tbl.tbls.size();
 				table ntbl; ntbl.len = t.size(); ntbl.generated = true;
 				tbl.tbls.emplace_back(ntbl);
 			}
-			// Apply renaming if needed.
-			nt.tab = renaming.contains(t.tab) ? renaming[t.tab] : t.tab;
+			// Apply renaming.
+			nt.tab = renaming[t.tab];
 			nfr.emplace_back(nt);
 		}
 		nfp.insert(nfr);
@@ -101,7 +99,7 @@ double cost(const vector<term>& fr) {
 
 	rt_options to; 
 	to.bproof            = proof_mode::none;
-	to.fp_step           = true;
+	to.fp_step           = false;
 	to.optimize          = true;
 
 	dict_t dict;
@@ -143,11 +141,26 @@ double cost(const vector<term>& fr) {
 
 	drv.error = false;
 
-	update_with_new_symbols(tbls, fp);
-	//tbls.fixed_point_term.tab = tbls.tbls.size();
+	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
+		tbls.bits = 1;
+	#else
+		#ifdef TYPE_RESOLUTION
+		size_t a = max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms);
+		if (a == 0) tbls.bits++;
+		else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
+		#else
+		auto bts = 0;
+		for (auto& r: fp) for (auto& t: r) for (auto& a: t) bts = max(a, bts >> 2);
+		// while (max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
+		//	tbls.add_bit();
+		while (bts >= (1 << (tbls.bits - 2))) { tbls.add_bit(); }
+		#endif
+	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+	
+	auto nfp = update_with_new_symbols(tbls, fp);
+	tbls.fixed_point_term.tab = tbls.tbls.size() + 1;
 	tbls.rules.clear(), tbls.datalog = true;
-	if (!tbls.get_rules(fp)) return false;
-
+	if (!tbls.get_rules(nfp)) return false;
 
 	nlevel begstep = tbls.nstep;
 
@@ -172,9 +185,7 @@ double cost(const flat_prog& fp) {
 	return fp_cost;
 }
 
-#else
-
-long cost(const flat_rule& fr) {
+/* long cost(const flat_rule& fr) {
 	// Count the number of uses of each variable
 	map<int, size_t> count;
 	ranges::for_each(fr.begin(), fr.end(), [&](auto& t){
@@ -198,8 +209,7 @@ long cost(const flat_rule& fr) {
 long cost(const flat_prog& fp) {
 	long fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
 	return fp_cost;
-}
-#endif // WITH_EXACT_COST_FUNCTION
+} */
 
 
 /* Represents a change of a program. */
@@ -212,11 +222,8 @@ struct change {
 		// TODO add del && add are empty special case to avoid creating
 		// fake initial mins... other posibility would be to use optionals, 
 		// but the natural order defined for them does not help us.
-		#ifdef WITH_EXACT_COST_FUNCTION
 		double cost_this = 0, cost_that = 0;
-		#else
-		long cost_this = 0, cost_that = 0;
-		#endif // WITH_EXACT_COST_FUNCTION
+		// long cost_this = 0, cost_that = 0;
 		for (auto& fr: del) cost_this -= cost(fr);
 		for (auto& fr: add) cost_this += cost(fr);
 		for (auto& fr: that.del) cost_that -= cost(fr);
@@ -441,8 +448,7 @@ bool minimize_step(flat_prog& fp) {
 	return changed;
 }
 
-#ifndef WITH_EXACT_COST_FUNCTION
-flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
+/* flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	static int_t idx = tbl.tbls.size();
 	flat_prog nfp;
 	map<int_t, int_t> renaming;
@@ -466,8 +472,7 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 		nfp.insert(nfr);
 	}
 	return nfp;
-}
-#endif WITH_EXACT_COST_FUNCTION
+} */
 
 flat_prog driver::minimize(const flat_prog& fp) const {
 	flat_prog mfp = fp;

@@ -2453,8 +2453,8 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 	
 	// Calling optimizations methods if requested
-	// auto ifp = iterate(fp); auto ofp = minimize(ifp);
-	auto ofp = fp;
+	auto ifp = iterate(fp); auto ofp = minimize(ifp);
+	// auto ofp = fp;
 	
 	#ifdef DEBUG
 	print(o::out() << "Final optimized flat_prog:\n", ofp) << endl;
@@ -2487,6 +2487,9 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		r = tbls.pfp(0, 0, ps);
 	}
 
+	o::dbg() << "Tables bits: " << tbls.bits << "\n";
+	for (auto& t: tbls.tbls) print(o::dbg() << "Table: ", t); 
+
 	size_t went = tbls.nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
@@ -2502,7 +2505,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	}
 
 	if (tbls.opts.optimize)
-		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
+		(o::ms() <<"# add_prog: "<< t << " pfp: "), measure_time_end();
 	return r;
 }
 
