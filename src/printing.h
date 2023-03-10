@@ -28,4 +28,4 @@ struct elem;
 
 std::string quote_sym(const elem& e);
 
-#endif
+#endif // __PRINTING_H__

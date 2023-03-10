@@ -437,8 +437,6 @@ private:
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
 	#endif
 
-	//-------------------------------------------------------------------------
-	//printer
 
 public:
 

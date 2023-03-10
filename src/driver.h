@@ -243,12 +243,39 @@ private:
 	bool add_print_builtins(builtins& bltins);
 	bool add_js_builtins(builtins& bltins);
 
+
+
+	//-------------------------------------------------------------------------
+	//printer
 	template <typename T>
 	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const std::vector<term>& v) const;
 	template <typename T>
 	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const flat_prog& p) const;
-
-
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::proof_elem&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::proof&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::witness&);
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
+	template <typename T>
+	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 public:
 	template <typename T>
 	void out_goals(std::basic_ostream<T> &os);
