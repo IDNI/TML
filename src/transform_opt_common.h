@@ -23,7 +23,7 @@
 using namespace std;
 
 using flat_rule = std::vector<term>;
-using rel_arity = std::tuple<int_t, size_t>;
+using rel_arity = std::pair<int_t, size_t>;
 using rule_index = std::map<rel_arity, std::set<flat_rule>>;
 using unification = std::map<int_t, int_t>;
 using selection = std::vector<flat_rule>;

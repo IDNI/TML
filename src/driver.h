@@ -191,23 +191,13 @@ private:
 		const elem &domain_name, raw_prog &rp, int_t &part_count);
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp);
-public:
 	void split_heads(raw_prog &rp);
-private:
-	flat_prog minimize(const flat_prog& fp) const;
-	flat_prog iterate(const flat_prog& fp) const;
-	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
-		const std::set<elem> &fv);
-public:
-	void to_dnf(raw_prog &rp);
-private:
+	flat_prog optimize(const flat_prog& fp) const;
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
 	bool transform_grammar(raw_prog &rp);
-public:
 	void export_outer_quantifiers(raw_prog &rp);
-private:
 	sprawformtree fix_variables(const elem &fv_rel, const elem &qva,
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,

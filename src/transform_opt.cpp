@@ -39,191 +39,185 @@
 
 using namespace std;
 
-static size_t facts_4_predicate = 100;
 
-flat_rule generate_random_fact(const int p, const size_t s) {
-	// Prepare random number generator
-	static bool seeded = false;
-	if (!seeded) srand(time(0)), seeded = true;
-	flat_rule r;
-	term t; t.tab = p;
-	for (size_t i = 0; i < s; ++i) t.emplace_back((abs(rand()) % facts_4_predicate) << 2 | 2);	
-	r.emplace_back(t);
-	return r;
-}
+struct cost { 
 
-flat_prog generate_random_facts(const int p, const size_t s) {
-	flat_prog fp;
-	for (size_t i = 0; i != facts_4_predicate; ++i) fp.insert(generate_random_fact(p,s)); 
-	return fp;
-}
+	cost(size_t sample_size_ = 100): sample_size(sample_size_) {}; 
 
-flat_prog generate_facts(const flat_rule& fr) {
-	// Collect predicates
-	map<int_t, size_t> predicates;
-	for (int i = 1; i != fr.size(); ++i ) predicates.insert({fr[i].tab, fr[i].size()});
-	// Generate facts 
-	flat_prog facts;
-	for (auto& [p, s]: predicates) 
-		for(auto& f: generate_random_facts(p, s)) facts.insert(f);
-	return facts;
-}
+	size_t sample_size;
+	map<flat_rule, double> memo_rule_cost;
+	map<rel_arity, flat_prog> memo_random_facts;
 
-flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
-	flat_prog nfp;
-	map<int_t, int_t> renaming;
-	for (auto& r: fp) {
-		flat_rule nfr;
-		for (auto& t: r) {
-			term nt = t;
-			// If the table is not in the original program and it has not been
-			// renamed yet...
-			if (!renaming.contains(t.tab)) {
-				// ...add it to tables with a new index and cache the change
-				// in the renaming map. 
-				renaming[t.tab] = tbl.tbls.size();
-				table ntbl; ntbl.len = t.size(); ntbl.generated = true;
-				tbl.tbls.emplace_back(ntbl);
-			}
-			// Apply renaming.
-			nt.tab = renaming[t.tab];
-			nfr.emplace_back(nt);
+	flat_rule generate_random_fact(const rel_arity& r) {
+		// Prepare random number generator
+		static bool seeded = false;
+		if (!seeded) srand(time(0)), seeded = true;
+		flat_rule fr;
+		term t; t.tab = r.first;
+		for (size_t i = 0; i < r.second; ++i) t.emplace_back((abs(rand()) % sample_size) << 2 | 2);	
+		fr.emplace_back(t);
+		return fr;
+	}
+
+	flat_prog generate_random_facts(const rel_arity& r) {
+		if (memo_random_facts.contains(r)) {
+			o::dbg() << "Cache hit (random facts)" << endl;
+			return memo_random_facts[r];
 		}
-		nfp.insert(nfr);
+		flat_prog fp;
+		for (size_t i = 0; i != sample_size; ++i) fp.insert(generate_random_fact(r)); 
+		memo_random_facts[r] = fp;
+		return fp;
 	}
-	return nfp;
-}
 
-double cost(const vector<term>& fr) {
-	if (fr.size() == 0) return 0;
-
-	rt_options to; 
-	to.bproof            = proof_mode::none;
-	to.fp_step           = false;
-	to.optimize          = true;
-
-	dict_t dict;
-	ir_builder ir(dict, to);
-	builtins_factory* bf = new builtins_factory(dict, ir);
-	auto bltins = bf
-		->add_basic_builtins()
-		.add_bdd_builtins()
-		.add_print_builtins()
-		.add_js_builtins().bltins;
-
-	tables tbls(to, bltins); 
-	// Build flat_program
-	flat_rule nfr = fr;
-	flat_prog fp = generate_facts(nfr); fp.insert(nfr);
-	// Run the program to obtain the results which we will then filter
-
-	#ifdef DEBUG
-	o::dbg() << "Sample prog for cost computation\n";
-	for (auto& a: fp) {
-		o::dbg() << "RULE: = [";
-		for(auto &r: a) {
-			o::dbg() << r.tab << "[";
-			for (auto &t: r) o::dbg() << t << ",";
-			o::dbg() << "],";
-		} 
-		o::dbg() << "]: " <<" \n";
+	flat_prog generate_facts(const flat_rule& fr) {
+		set<rel_arity> rels;
+		for (auto& r: fr) rels.insert(get_rel_info(r));
+		flat_prog facts;
+		for (auto& r: rels) 
+			for(auto& f: generate_random_facts(r)) facts.insert(f);
+		return facts;
 	}
-	#endif
 
-	options o;
-	driver drv(o);
+	flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
+		flat_prog nfp;
+		map<int_t, int_t> renaming;
+		for (auto& r: fp) {
+			flat_rule nfr;
+			for (auto& t: r) {
+				term nt = t;
+				// If the table is not in the original program and it has not been
+				// renamed yet...
+				if (!renaming.contains(t.tab)) {
+					// ...add it to tables with a new index and cache the change
+					// in the renaming map. 
+					renaming[t.tab] = tbl.tbls.size();
+					table ntbl; ntbl.len = t.size(); ntbl.generated = true;
+					tbl.tbls.emplace_back(ntbl);
+				}
+				// Apply renaming.
+				nt.tab = renaming[t.tab];
+				nfr.emplace_back(nt);
+			}
+			nfp.insert(nfr);
+		}
+		return nfp;
+	}
 
-	DBG(o::dbg() << "run_prog" << endl;);
-	clock_t start{}, end;
-	double t;
-	measure_time_start();
+	flat_rule canonize(vector<term> fr) {
+		int rel = 0, var = 0;
+		map<int, int> rel_renaming;
+		map<int, int> var_renaming;
+		flat_rule nfr;
+		for (auto& t: fr) {
+			term nt = t;
+			if (t.is_builtin()) { nfr.push_back(t); continue; }
+			else if (!rel_renaming.contains(t.tab)) rel_renaming[t.tab] = ++rel, nt.tab = rel_renaming[t.tab];
+			for (auto& a: t)
+				if (var_renaming.contains(a)) nt.push_back(a);
+				else {
+					var_renaming[a] = ++var;
+					nt.push_back(var_renaming[a]);
+				}
+			nfr.push_back(nt);
+		}
+		return nfr;
+	}
+
+	double operator()(const vector<term>& fr) {
+		// Canonize the rule
+		auto cfr = canonize(fr);
+		// Check cache
+		if (memo_rule_cost.contains(cfr))  {
+			o::dbg() << "Cache hit (cost function)" << endl;
+			return memo_rule_cost[cfr];
+		}
+		// The cost of the empty rule is 0.
+		if (cfr.empty()) return 0;
+
+		rt_options to { .optimize = true, .fp_step = false, .bproof = proof_mode::none };
+
+		dict_t dict;
+		ir_builder ir(dict, to);
+		builtins_factory* bf = new builtins_factory(dict, ir);
+		auto bltins = bf
+			->add_basic_builtins()
+			.add_bdd_builtins()
+			.add_print_builtins()
+			.add_js_builtins().bltins;
+
+		tables tbls(to, bltins); 
+		// Build flat_program
+		flat_rule nfr = cfr;
+		flat_prog fp = generate_facts(nfr); fp.insert(nfr);
+		// Run the program to obtain the results which we will then filter
+
+		options o;
+		driver drv(o);
+
+		DBG(o::dbg() << "run_prog" << endl;);
+		clock_t start{}, end;
+		double t;
+		measure_time_start();
 
 
-	drv.error = false;
+		drv.error = false;
 
-	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
-		tbls.bits = 1;
-	#else
-		#ifdef TYPE_RESOLUTION
-		size_t a = max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms);
-		if (a == 0) tbls.bits++;
-		else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
+		#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
+			tbls.bits = 1;
 		#else
-		auto bts = 0;
-		for (auto& r: fp) for (auto& t: r) for (auto& a: t) bts = max(a, bts >> 2);
-		// while (max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms) >= (1 << (tbls.bits - 2))) // (1 << (bits - 2))-1
-		//	tbls.add_bit();
-		while (bts >= (1 << (tbls.bits - 2))) { tbls.add_bit(); }
-		#endif
-	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
-	
-	auto nfp = update_with_new_symbols(tbls, fp);
-	tbls.fixed_point_term.tab = tbls.tbls.size() + 1;
-	tbls.rules.clear(), tbls.datalog = true;
-	if (!tbls.get_rules(nfp)) return false;
+			#ifdef TYPE_RESOLUTION
+			TODO Fix the bit computation for the type resolution case
+			size_t a = max(max(ir_handler.nums, ir_handler.chars), ir_handler.syms);
+			if (a == 0) tbls.bits++;
+			else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
+			#else
+			auto bts = 0;
+			for (auto& r: fp) for (auto& t: r) for (auto& a: t) bts = max(a, bts >> 2);
+			while (bts >= (1 << (tbls.bits - 2))) { tbls.add_bit(); }
+			#endif
+		#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
+		
+		auto nfp = update_with_new_symbols(tbls, fp);
+		tbls.fixed_point_term.tab = tbls.tbls.size() + 1;
+		tbls.rules.clear(), tbls.datalog = true;
+		if (!tbls.get_rules(nfp)) return false;
 
-	nlevel begstep = tbls.nstep;
+		nlevel begstep = tbls.nstep;
 
-	bool r = true;
-	// run program only if there are any rules
-	if (tbls.rules.size()) {
-		tables_progress p( dict, ir);
-		tbls.fronts.clear();
-		r = tbls.pfp(1, 1, p);
-	} else {
-		bdd_handles l = tbls.get_front();
-		tbls.fronts = {l, l};
+		bool r = true;
+		// run program only if there are any rules
+		if (tbls.rules.size()) {
+			tables_progress p( dict, ir);
+			tbls.fronts.clear();
+			r = tbls.pfp(1, 1, p);
+		} else {
+			bdd_handles l = tbls.get_front();
+			tbls.fronts = {l, l};
+		}
+
+		end = clock(), t = double(end - start) * 1000000 / CLOCKS_PER_SEC;
+		o::ms() << "# pfp: " << t << endl; measure_time_start();
+		// Cache rule cost
+		memo_rule_cost[cfr] = t;
+		return t;
 	}
 
-	end = clock(), t = double(end - start) / CLOCKS_PER_SEC;
-	o::ms() << "# pfp: " << endl; measure_time_start();
-	return t;
-}
+	double operator()(const flat_prog& fp) {
+		double fp_cost = 0; for (const auto& r:fp) fp_cost += this->operator()(r);
+		return fp_cost;
+	}
 
-double cost(const flat_prog& fp) {
-	double fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
-	return fp_cost;
-}
+};
 
-/* long cost(const flat_rule& fr) {
-	// Count the number of uses of each variable
-	map<int, size_t> count;
-	ranges::for_each(fr.begin(), fr.end(), [&](auto& t){
-		ranges::for_each(t.begin(), t.end(), [&](int i) {
-			count[i] = count.contains(i) ? count[i] + 1: 1;
-		});
-	});
-	// Remove exported variables
-	ranges::for_each(fr[0].begin(), fr[0].end(), [&](int i) {
-		if (i < 0) count.erase(i);
-	});
-	// Compute the actual cost
-	long cost = 1;
-	ranges::for_each(count.begin(), count.end(), [&](auto& i){
-		cost = cost + (i.second + 1) * (i.second + 1);
-	});
-	cost = cost * fr.size();
-	return cost;
-}
-
-long cost(const flat_prog& fp) {
-	long fp_cost = 0; for (const auto& r:fp) fp_cost += cost(r);
-	return fp_cost;
-} */
-
-
-/* Represents a change of a program. */
-
+/* Represents a change in program. */
 struct change {
+	function<double(flat_rule)> cost; 
 	set<flat_rule> del;
 	set<flat_rule> add;
 
 	auto operator<=>(const change& that) const {
-		// TODO add del && add are empty special case to avoid creating
-		// fake initial mins... other posibility would be to use optionals, 
-		// but the natural order defined for them does not help us.
 		double cost_this = 0, cost_that = 0;
-		// long cost_this = 0, cost_that = 0;
 		for (auto& fr: del) cost_this -= cost(fr);
 		for (auto& fr: add) cost_this += cost(fr);
 		for (auto& fr: that.del) cost_that -= cost(fr);
@@ -231,7 +225,7 @@ struct change {
 		return cost_this <=> cost_that;
 	}
 
-	bool operator()(flat_prog& fp) {
+	bool operator()(flat_prog& fp) const {
 		if (del == add) return false;
 		for (auto& fr: del) fp.erase(fr);
 		fp.insert(add.begin(), add.end());
@@ -296,10 +290,10 @@ bool is_identity(const change& c) {
 	return c.add == c.del;
 }
 
-change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog& fp) {
+change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog& fp, cost& cf) {
 	vector<term> b1(++r1.begin(), r1.end());
 	vector<term> b2(++r2.begin(), r2.end());
-	change min { .add = {r1, r2}}; 
+	change min { .cost = cf, .add = {r1, r2}}; 
 	for (auto c1 : powerset_range(b1)) {
 		if (c1.empty()) continue;
 		int s = get_tmp_sym();
@@ -311,73 +305,9 @@ change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog&
 			if (er1.second[0].size() != er2.second[0].size()) continue;
 			// For each pair or extracted rules we check if r1.second is 
 			// contained in r2.second, i.e. if r1.second => r2.second
-
-			#ifndef DEBUG
-			o::dbg() << "c1 = [";
-			for(auto &s: c1) {
-				o::dbg() << s.tab << "[";
-				for (auto &t: s) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(c1) <<" \n";
-
-			o::dbg() << "c2 = [";
-			for(auto &s: c2) {
-				o::dbg() << s.tab << "[";
-				for (auto &t: s) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(c2) <<" \n";
-
-			o::dbg() << "r1 = [";
-			for(auto &s: r1) {
-				o::dbg() << s.tab << "[";
-				for (auto &t: s) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(r1) <<" \n";
-
-			o::dbg() << "r2 = [";
-			for(auto &s: r2) {
-				o::dbg() << s.tab <<"[";
-				for (auto &t: s) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(r2) <<" \n";
-
-			o::dbg() << "er1.remains = [";
-			for(auto &r: er1.first) {
-				o::dbg() << r.tab << "[";
-				for (auto &t: r) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(er1.first) <<" \n";
-			o::dbg() << "er1.extracted = [";
-			for(auto &r: er1.second) {
-				o::dbg() << r.tab << "[";
-				for (auto &t: r) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(er1.second) <<" \n";
-
-			o::dbg() << "er2.remains = [";
-			for(auto &r: er2.first) {
-				o::dbg() << r.tab <<  "[";
-				for (auto &t: r) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(er2.first) <<" \n";
-			o::dbg() << "er2.extracted = [";
-			for(auto &r: er2.second) {
-				o::dbg() << r.tab << "[";
-				for (auto &t: r) o::dbg() << t << ",";
-				o::dbg() << "],";
-			} 
-			o::dbg() << "]: " << cost(er2.second) <<" \n";
-			#endif
-				
 			if (rule_contains(er1.second, er2.second, fp)) {
 				change proposed { 
+					.cost = cf, 
 					.del = {r1, r2}, 
 					.add = {er1.first, er2.first, er1.second}};
 				// auto c = propose_change(r1, er1, r2, er2);
@@ -388,30 +318,6 @@ change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog&
 				// Is the proposal valid
 				if (min > proposed) min = proposed;
 				else continue;	
-
-				#ifndef DEBUG
-				o::dbg() << "er2.extracted DOES IMPLY er1.extracted\n";
-				o::dbg() << "Proposed changes\n";
-				for (auto& a: c.add) {
-					o::dbg() << "ADDITION: = [";
-					for(auto &r: a) {
-						o::dbg() << r.tab << "[";
-						for (auto &t: r) o::dbg() << t << ",";
-						o::dbg() << "],";
-					} 
-					o::dbg() << "]: " << cost(a) <<" \n";
-				}
-
-				for (auto& d: c.del) {
-					o::dbg() << "DELETION: = [";
-					for(auto &r: d) {
-						o::dbg() << r.tab << "[";
-						for (auto &t: r) o::dbg() << t << ",";
-						o::dbg() << "],";
-					} 
-					o::dbg() << "]: " << cost(d) <<" \n";
-				}
-				#endif
 			}
 		}
 	}
@@ -422,25 +328,25 @@ inline bool head_neg(const flat_rule& r) {
 	return r[0].neg;
 }
 
-change minimize_step_using_rule(const flat_rule& r, const flat_prog& fp, const flat_prog& p) { 
-	change min { .add = {r}};
+change minimize_step_using_rule(const flat_rule& r, const flat_prog& fp, const flat_prog& p, cost& cf) { 
+	change min { .cost = cf, .add = {r}};
 	for (auto fr: fp) {
 		if (r != fr && head_neg(r) && head_neg(fr) && rule_contains(r, fr, fp)) {
-			change proposed { .del = {fr}};
+			change proposed { .cost= cf, .del = {fr}};
 			min = min < proposed ? min : proposed;
 		}			
-		auto proposed = extract_common(r, fr, p);
+		auto proposed = extract_common(r, fr, p, cf);
 		min = min < proposed ? min : proposed;
 	} 
 	return min;
 }
 
-bool minimize_step(flat_prog& fp) {
+bool minimize_step(flat_prog& fp, cost& cf) {
 	set<flat_rule> pending(fp.begin(), fp.end());
 	bool changed = false;
 	while (!pending.empty()) {
 		auto r = *pending.begin();
-		auto change = minimize_step_using_rule(r, pending, fp);
+		auto change = minimize_step_using_rule(r, pending, fp, cf);
 		changed |= change(fp);
 		pending.erase(r);
 		for (auto& d: change.del) pending.erase(d);
@@ -448,8 +354,7 @@ bool minimize_step(flat_prog& fp) {
 	return changed;
 }
 
-/* flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
-	static int_t idx = tbl.tbls.size();
+flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	flat_prog nfp;
 	map<int_t, int_t> renaming;
 	for (auto& r: fp) {
@@ -458,46 +363,54 @@ bool minimize_step(flat_prog& fp) {
 			term nt = t;
 			// If the table is not in the original program and it has not been
 			// renamed yet...
-			if (t.tab >= tbl.tbls.size() && !renaming.contains(t.tab)) {
+			if (!renaming.contains(t.tab)) {
 				// ...add it to tables with a new index and cache the change
 				// in the renaming map. 
-				renaming[t.tab] = idx++;
-				table ntbl; ntbl.idbltin = idx; ntbl.len = t.size(); ntbl.generated = true;
+				renaming[t.tab] = tbl.tbls.size();
+				table ntbl; ntbl.len = t.size(); ntbl.generated = true;
 				tbl.tbls.emplace_back(ntbl);
 			}
-			// Apply renaming if needed.
-			nt.tab = renaming.contains(t.tab) ? renaming[t.tab] : t.tab;
+			// Apply renaming.
+			nt.tab = renaming[t.tab];
 			nfr.emplace_back(nt);
 		}
 		nfp.insert(nfr);
 	}
 	return nfp;
-} */
-
-flat_prog driver::minimize(const flat_prog& fp) const {
-	flat_prog mfp = fp;
-	print(o::out() << "Initial uniterated flat_prog:\n", mfp) << endl;
-	o::out() << "Flat program size: " << mfp.size() << endl;
-	o::out() << "Flat program cost: " << cost(mfp) << endl;
-	for (int i = 0; i != opts.get_int("minimize"); i++) {
-		if (!minimize_step(mfp)) break;
-		print(o::out() << "Minimized flat_prog after:" << i+1 << " iterations.\n", mfp) << endl;
-		o::out() << "Flat program size:" << mfp.size() << endl;
-		o::out() << "Flat program cost: " << cost(mfp) << endl;
-	}
-	return update_with_new_symbols(*tbl, mfp);
 }
 
-flat_prog driver::iterate(const flat_prog& fp) const {
-	flat_prog ifp = fp;
-	print(o::out() << "Initial uniterated flat_prog:\n", ifp) << endl;
-	o::out() << "Flat program size: " << ifp.size() << endl;
-	o::out() << "Flat program cost: " << cost(ifp) << endl;
-	for (int i = 0; i != opts.get_int("iterate"); i++) {
-		ifp = square_program(ifp);
-		print(o::out() << "Iterated flat_prog after:" << i+1 << " iterations.\n", ifp) << endl;
-		o::out() << "Flat program size: " << ifp.size() << endl;
-		o::out() << "Flat program cost: " << cost(ifp) << endl;
+flat_prog minimize(const flat_prog& fp, int minimizations, cost& cf) {
+	flat_prog mfp = fp;
+	o::out() << "Flat program size: " << mfp.size() << endl;
+	o::out() << "Flat program cost: " << cf(mfp) << endl;
+	for (int i = 0; i != minimizations; i++) {
+		if (!minimize_step(mfp, cf)) break;
+		o::out() << "Flat program size:" << mfp.size() << endl;
+		o::out() << "Flat program cost: " << cf(mfp) << endl;
 	}
-	return update_with_new_symbols(*tbl, ifp);
+	return mfp;
+}
+
+flat_prog iterate(const flat_prog& fp, int iterations, cost& cf) {
+	flat_prog ifp = fp;
+	o::out() << "Flat program size: " << ifp.size() << endl;
+	o::out() << "Flat program cost: " << cf(ifp) << endl; 
+	for (int i = 0; i != iterations; i++) {
+		ifp = square_program(ifp);
+		o::out() << "Flat program size: " << ifp.size() << endl;
+		o::out() << "Flat program cost: " << cf(ifp) << endl;
+	}
+	return ifp;
+}
+
+flat_prog driver::optimize(const flat_prog& fp) const {
+	auto printer = [&](flat_prog& fp, int it) {
+		print(o::out() << "Current flat_prog after:" << it << " iterations.\n", fp) << endl;
+	};
+	cost cf;
+	flat_prog mfp = fp, ifp = fp;
+	print(o::out() << "Initial uniterated flat_prog:\n", fp) << endl;
+	if (auto iterations = opts.get_int("iterate")) ifp = iterate(fp, iterations, cf);
+	if (auto minimizations = opts.get_int("minimize")) mfp = minimize(ifp, minimizations, cf);
+	return update_with_new_symbols(*tbl, mfp);
 }

@@ -163,9 +163,7 @@ public:
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
-	#ifndef WITH_EXACT_COST_FUNCTION
-	friend double cost(const std::vector<term>& fr);
-	#endif // WITH_EXACT_COST_FUNCTION
+	friend struct cost;
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
