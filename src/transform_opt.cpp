@@ -379,38 +379,36 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 	return nfp;
 }
 
-flat_prog minimize(const flat_prog& fp, int minimizations, cost& cf) {
+using step_printer = function<void(const flat_prog&, int)>;
+flat_prog minimize(const flat_prog& fp, int minimizations, cost& cf, step_printer& printer) {
 	flat_prog mfp = fp;
-	o::out() << "Flat program size: " << mfp.size() << endl;
-	o::out() << "Flat program cost: " << cf(mfp) << endl;
-	for (int i = 0; i != minimizations; i++) {
+	for (int i = 0; i != minimizations; i++)
 		if (!minimize_step(mfp, cf)) break;
-		o::out() << "Flat program size:" << mfp.size() << endl;
-		o::out() << "Flat program cost: " << cf(mfp) << endl;
-	}
+		else printer(mfp, i);
 	return mfp;
 }
 
-flat_prog iterate(const flat_prog& fp, int iterations, cost& cf) {
+flat_prog iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& printer) {
 	flat_prog ifp = fp;
-	o::out() << "Flat program size: " << ifp.size() << endl;
-	o::out() << "Flat program cost: " << cf(ifp) << endl; 
 	for (int i = 0; i != iterations; i++) {
 		ifp = square_program(ifp);
-		o::out() << "Flat program size: " << ifp.size() << endl;
-		o::out() << "Flat program cost: " << cf(ifp) << endl;
+		printer(ifp, i);
 	}
 	return ifp;
 }
 
 flat_prog driver::optimize(const flat_prog& fp) const {
-	auto printer = [&](flat_prog& fp, int it) {
-		print(o::out() << "Current flat_prog after:" << it << " iterations.\n", fp) << endl;
-	};
 	cost cf;
+	step_printer printer = [&](const flat_prog& fp, int it) {
+		#ifdef DEBUG
+		print(o::dbg() << "Current flat_prog after:" << it << " steps.\n", fp) << endl;
+		o::dbg() << "Flat program size: " << fp.size() << endl;
+		o::dbg() << "Flat program cost: " << cf(fp) << endl; 
+		#endif // DEBUG
+	};
 	flat_prog mfp = fp, ifp = fp;
-	print(o::out() << "Initial uniterated flat_prog:\n", fp) << endl;
-	if (auto iterations = opts.get_int("iterate")) ifp = iterate(fp, iterations, cf);
-	if (auto minimizations = opts.get_int("minimize")) mfp = minimize(ifp, minimizations, cf);
+	if (auto iterations = opts.get_int("iterate")) ifp = iterate(fp, iterations, cf, printer);
+	if (auto minimizations = opts.get_int("minimize")) mfp = minimize(ifp, minimizations, cf, printer);
+	print(o::dbg() << "Initial uniterated flat_prog:\n", mfp) << endl;
 	return update_with_new_symbols(*tbl, mfp);
 }

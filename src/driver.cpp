@@ -2457,7 +2457,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	// auto ofp = fp;
 	
 	#ifdef DEBUG
-	print(o::out() << "Final optimized flat_prog:\n", ofp) << endl;
+	print(o::dbg() << "Final optimized flat_prog:\n", ofp) << endl;
 	#endif // DEBUG
 
 	if (!add_prog_wprod(ofp, p.g, tbls, rt, ir_handler)) return false;
