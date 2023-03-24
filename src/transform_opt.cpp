@@ -363,15 +363,15 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 			term nt = t;
 			// If the table is not in the original program and it has not been
 			// renamed yet...
-			if (!renaming.contains(t.tab)) {
+			if (!renaming.contains(t.tab) && (t.tab >= (1<<16))) {
 				// ...add it to tables with a new index and cache the change
 				// in the renaming map. 
 				renaming[t.tab] = tbl.tbls.size();
 				table ntbl; ntbl.len = t.size(); ntbl.generated = true;
 				tbl.tbls.emplace_back(ntbl);
+				nt.tab = renaming[t.tab];
 			}
 			// Apply renaming.
-			nt.tab = renaming[t.tab];
 			nfr.emplace_back(nt);
 		}
 		nfp.insert(nfr);
@@ -409,6 +409,6 @@ flat_prog driver::optimize(const flat_prog& fp) const {
 	flat_prog mfp = fp, ifp = fp;
 	if (auto iterations = opts.get_int("iterate")) ifp = iterate(fp, iterations, cf, printer);
 	if (auto minimizations = opts.get_int("minimize")) mfp = minimize(ifp, minimizations, cf, printer);
-	print(o::dbg() << "Initial uniterated flat_prog:\n", mfp) << endl;
+	// print(o::dbg() << "Initial uniterated flat_prog:\n", mfp) << endl;
 	return update_with_new_symbols(*tbl, mfp);
 }

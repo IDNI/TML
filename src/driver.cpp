@@ -1767,7 +1767,7 @@ void rename_variables(raw_form_tree &t, map<elem, elem> &renames,
 			const auto &ivar = renames.find(ovar);
 			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
 			// Temporarily replace the outer scope mapping with new inner one
-			t.l->el = renames[ovar] = gen(ovar);
+			*t.l->el = renames[ovar] = gen(ovar);
 			// Rename body using inner scope mapping
 			rename_variables(*t.r, renames, gen);
 			// Now restore the (possibly non-existent) outer scope mapping
@@ -1844,7 +1844,7 @@ void driver::export_outer_quantifiers(raw_prog &rp) {
 				// Now conjunct the rule formula with a copy of what is inside the
 				// existential quantifiers so that variables can be exported whilst
 				// uniqueness constraints are still being enforced.
-				rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
+				*rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
 			}
 		}
 	}
@@ -2488,7 +2488,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	}
 
 	o::dbg() << "Tables bits: " << tbls.bits << "\n";
-	for (auto& t: tbls.tbls) print(o::dbg() << "Table: ", t); 
+//	for (auto& t: tbls.tbls) print(o::dbg() << "Table: ", t); 
 
 	size_t went = tbls.nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs

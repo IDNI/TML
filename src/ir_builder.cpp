@@ -912,9 +912,7 @@ elem ir_builder::get_elem(int_t arg) const {
 #ifndef BIT_TRANSFORM
 	if (arg & 1) return elem((char32_t) (arg >> 2));
 	if (arg & 2) return elem((int_t) (arg >> 2));
-	auto s = dict.get_sym_lexeme(arg >> 2);
-	return (s == null_lexeme) ? elem(elem::SYM, dict.get_lexeme("?0p" + to_string_(-arg)))
-		: elem(elem::SYM, s);
+	return elem(elem::SYM, dict.get_sym_lexeme(arg >> 2));
 #else
 		if(arg == 1 || arg == 0) return elem((bool) (arg));
 		return elem(elem::SYM, dict.get_sym_lexeme(arg));
@@ -1188,9 +1186,9 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				#endif
 
 				rt.e[0] = (r.tab > dynenv->tbls.size()) 
-					? elem(elem::SYM, dict.get_lexeme("?0p" + to_string_(r.tab)))
+					? elem(elem::SYM, dict.get_lexeme("?0pP" + to_string_(r.tab)))
 					: (dynenv->tbls.at(r.tab).generated
-						? elem(elem::SYM, dict.get_lexeme("?0p" + to_string_(r.tab)))
+						? elem(elem::SYM, dict.get_lexeme("?0pP" + to_string_(r.tab)))
 						: elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s))));
 				
 				if (r.tab > dynenv->tbls.size()) rt.arity = { args };
