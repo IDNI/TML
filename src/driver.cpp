@@ -773,38 +773,6 @@ void update_element_counts(const raw_term &rt, set<elem> &distinct_syms,
 		else if(el.type == elem::CHR) char_count = 256;
 }
 
-/* Compute the number of bits required to represent first the largest
- * integer in the given program and second the universe. */
-
-pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
-	int_t max_int = 0, char_count = 0;
-	set<elem> distinct_syms;
-
-	for(const raw_rule &rr : rp.r) {
-		// Updates the counters based on the heads of the current rule
-		for(const raw_term &rt : rr.h)
-			update_element_counts(rt, distinct_syms, char_count, max_int);
-		// If this is a rule, update the counters based on the body
-		if(rr.is_dnf() || rr.is_form()) {
-			raw_form_tree prft = *rr.get_prft();
-			prefold_tree(prft, monostate {},
-				[&](const raw_form_tree &t, monostate) -> monostate {
-					if(t.type == elem::NONE)
-						update_element_counts(*t.rt, distinct_syms, char_count, max_int);
-					return monostate {};
-				});
-		}
-	}
-	// Now compute the bit-length of the largest integer found
-	size_t int_bit_len = 0, universe_bit_len = 0,
-		max_elt = max_int + char_count + distinct_syms.size();
-	for(; max_int; max_int >>= 1, int_bit_len++);
-	for(; max_elt; max_elt >>= 1, universe_bit_len++);
-	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
-	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
-	return {int_bit_len, universe_bit_len};
-}
-
 /* Make relations mapping list ID's to their heads and tails. Domain's
  * first argument is the relation into which it should put the domain it
  * creates, its second argument is the domain size of of its tuple

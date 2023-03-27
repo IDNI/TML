@@ -164,7 +164,7 @@ struct cost {
 		drv.error = false;
 
 		#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
-			tbls.bits = 1;
+		tbls.bits = 1;
 		#else
 			#ifdef TYPE_RESOLUTION
 			TODO Fix the bit computation for the type resolution case
@@ -172,9 +172,9 @@ struct cost {
 			if (a == 0) tbls.bits++;
 			else while (a > size_t (1 << tbls.bits)-1) tbls.bits++;
 			#else
-			auto bts = 0;
-			for (auto& r: fp) for (auto& t: r) for (auto& a: t) bts = max(a, bts >> 2);
-			while (bts >= (1 << (tbls.bits - 2))) { tbls.add_bit(); }
+		auto bts = 0;
+		for (auto& r: fp) for (auto& t: r) for (auto& a: t) bts = max(a, bts >> 2);
+		while (bts >= (1 << (tbls.bits - 2))) { tbls.add_bit(); }
 			#endif
 		#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
 		
@@ -380,6 +380,7 @@ flat_prog update_with_new_symbols(tables& tbl, const flat_prog& fp) {
 }
 
 using step_printer = function<void(const flat_prog&, int)>;
+
 flat_prog minimize(const flat_prog& fp, int minimizations, cost& cf, step_printer& printer) {
 	flat_prog mfp = fp;
 	for (int i = 0; i != minimizations; i++)

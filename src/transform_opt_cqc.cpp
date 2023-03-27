@@ -368,7 +368,7 @@ public:
 /* Compute the number of bits required to represent first the largest
 * integer in the given program and second the universe. */
 
-pair<int_t, int_t> prog_bit_len_opt(const flat_prog &rp) {
+pair<int_t, int_t> prog_bit_len(const flat_prog &rp) {
 	int_t max_int = 0, char_count = 0;
 	set<int_t> distinct_syms;
 
@@ -384,27 +384,14 @@ pair<int_t, int_t> prog_bit_len_opt(const flat_prog &rp) {
 		max_elt = max_int + char_count + distinct_syms.size();
 	for(; max_int; max_int >>= 1, int_bit_len++);
 	for(; max_elt; max_elt >>= 1, universe_bit_len++);
-	// o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
-	// o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
 	return {int_bit_len, universe_bit_len};
 } 
 
 z3_context& get_z3_context(flat_prog const &fp) {
 	// TODO Use a map according to bit_len & universe_bit_len for z3_context
-	const auto &[int_bit_len, universe_bit_len] = prog_bit_len_opt(fp);
+	const auto &[int_bit_len, universe_bit_len] = prog_bit_len(fp);
 	static z3_context ctx(int_bit_len, universe_bit_len);
 	return ctx;
-}
-
-flat_rule minimize_rule(flat_rule const &r, flat_prog const &p) {
-	return get_z3_context(p).minimize(r);
-}
-
-flat_prog minimize_rules(flat_prog const &p) {
-	flat_prog mrp;
-	for (auto &r: p) 
-		mrp.insert(get_z3_context(p).minimize(r));
-	return mrp;
 }
 
 bool rule_contains(flat_rule const &r1, flat_rule const &r2, flat_prog const &p) {

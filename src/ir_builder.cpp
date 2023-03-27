@@ -653,10 +653,10 @@ sig ir_builder::get_sig(raw_term &t) {
 }
 #endif
 
-sig ir_builder::get_sig(const raw_term&t) {
+sig ir_builder::get_sig(const raw_term& t) {
 #ifdef TML_NATIVES
 	#ifdef TYPE_RESOLUTION
-		//TODO: avoid workaround
+		raw_term aux = t; //TODO: avoid workaround
 		return get_sig(aux);
 	#else
 		int_t rel_id = dict.get_rel(t.e[0].e);
