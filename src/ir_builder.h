@@ -127,9 +127,7 @@ public:
 	
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
-	#ifdef FOL_V1
 	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
-	#endif
 	#ifdef FOL_V2
 	prog get_fof(sprawformtree root);
 	#endif

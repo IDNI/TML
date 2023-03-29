@@ -179,7 +179,6 @@ typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
 typedef std::pair<int_t, ints> sig;
 #endif
 //-----------------------------------------------------------------------------
-#define FOL_V1 //mutually exclusive with FOL_V2
 //#define FOL_V2
 //-----------------------------------------------------------------------------
 // Rules optimization

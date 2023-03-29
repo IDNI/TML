@@ -424,7 +424,6 @@ private:
 	spbdd_handle pairwise_handler(size_t in0_varid, size_t in1_varid, size_t out_varid,
 		spbdd_handle in0, spbdd_handle in1, size_t n_vars, t_arith_op op);
 
-	#ifdef FOL_V1
 	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
 	void ex_typebits(spbdd_handle &s, size_t nvars) const;
 	void ex_typebits(bools &exvec, size_t nvars) const;
@@ -433,7 +432,6 @@ private:
 	void fol_query(cr_pnft_handle f, bdd_handles& v);
 	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2space &v2s, bdd_handles &v);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
-	#endif
 
 
 public:

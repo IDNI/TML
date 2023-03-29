@@ -779,7 +779,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 		}
 
 		else if(r.prft) {
-			#ifdef FOL_V1
 			bool is_sol = false;
 			form* froot = 0;
 			//TODO: review
@@ -819,7 +818,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
-			#endif
 
 			#ifdef FOL_V2
 			sprawformtree root = r.prft->neg // neg transform
@@ -962,7 +960,6 @@ void ir_builder::set_hidden_table(const int_t t) {
 
 //---------------------------------------------------------
 
-#ifdef FOL_V1
 
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
@@ -1047,7 +1044,6 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 		return ret;
 	}
 }
-#endif
 
 #ifdef FOL_V2
 prog ir_builder::get_fof(sprawformtree root) {

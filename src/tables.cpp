@@ -430,7 +430,6 @@ void tables::get_alt(const term_set& al, const term& h, set<alt>& as, bool blt) 
 	a.ex = d.first, a.perm = d.second, as.insert(a);
 }
 
-#ifdef FOL_V1
 void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	#ifndef TYPE_RESOLUTION
 	size_t bits_l = bits - 2;
@@ -477,7 +476,6 @@ void tables::get_form(const term_set& al, const term& h, set<alt>& as) {
 	as.insert(a);
 	return;
 }
-#endif
 
 //review
 void replace_rel(const map<ntable, ntable>& m, vector<term>& x) {
@@ -520,12 +518,10 @@ bool tables::get_rules(flat_prog &p) {
 		r.len = t.size();
 
 		for (const term_set& al : x.second)
-			#ifdef FOL_V1
 			if (al.begin()->extype == term::FORM1 ||
 					al.begin()->extype == term::FORM2)
 				get_form(al, t, as);
 			else
-			#endif
 				get_alt(al, t, as);
 		for (alt x : as)
 			if ((ait = alts.find(&x)) != alts.end())
@@ -591,7 +587,6 @@ auto handle_cmp = [](const spbdd_handle& x, const spbdd_handle& y) {
  * head. */
 
 spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
-	#ifdef FOL_V1
 	if (a.f) {
 		bdd_handles f; //form
 		formula_query(a.f, f);
@@ -604,7 +599,6 @@ spbdd_handle tables::alt_query(alt& a, size_t /*DBG(len)*/) {
 		} else a.rlast = f[0] == hfalse ? hfalse : htrue;
 		return a.rlast;
 	}
-	#endif
 
 	bdd_handles v1 = { a.rng, a.eq };
 
