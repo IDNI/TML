@@ -45,21 +45,26 @@ class poset {
 	// Singletons, represented by a pointer to the set_univ
 	int_t vars = 0;
 
+	// Indicates the set of variables in the poset
+	int_t v = 0;
+
 	static void lift_imps(poset &p, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq_lift_lo);
 	static void lift_vars(poset &p, int_t v, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq_lift_lo, pvector& eq_lift);
 	static void lift_eqs(poset &p, int_t v, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq_lift_lo, pvector& eq_lift);
 
+	// This eq insertion does not introduce new variables
 	static void insert_eq(poset &p, std::vector<int_t>& eq);
+	static void insert_var_no_imp(poset &p, int_t v);
+	void insert_v(int_t vv) { v = ps::insert(v, abs(vv)); }
+	void rm_v(int_t vv) { v = ps::remove(v, abs(vv)); }
   public:
 	// Indicates if the poset has an associated BDD part
 	bool pure = false;
-	// Indicates the smallest variable in the poset
-	int_t v = 0;
 
 	poset() = default;
 
 	//Creates single variable poset
-	explicit poset(int_t v) : pure(true), v(abs(v)) { insert_var(*this, v); }
+	explicit poset(int_t v) : pure(true) { insert_var(*this, v); }
 
 	explicit poset(bool isPure) : pure(isPure) {}
 
@@ -73,6 +78,8 @@ class poset {
 		NP.emplace_back(false);
 		pd::init();
 	};
+
+	int_t get_v() const { return ps::get(v).e; }
 
 	static bool resize(int n) {
 		return pu::resize(n);
@@ -89,7 +96,7 @@ class poset {
 	static poset negate(const poset &p);
 	static bool negatable(poset &p);
 	//TODO: insert_var needs to update imps and eqs
-	static bool insert_var(poset &p, int_t v);
+	static void insert_var(poset &p, int_t v);
 	static poset insert_var(poset &&p, int_t v);
 	//TODO: insert_imp needs to check present vars before insertion and containment in equalities
 	static void insert_imp(poset &p, std::pair<int_t, int_t> &el);

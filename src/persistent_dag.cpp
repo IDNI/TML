@@ -105,7 +105,7 @@ int_t pd::insert(int_t dag_id, int_t fst, int_t snd, vector<int_t> &sings,
 // Returns a new dag_root
 int_t
 pd::analyze_component(int_t set_id, int_t fst, int_t snd, int_t dag_root,
-		      std::vector<int_t> &sings, std::vector<int_t> &eqs) {
+		      std::vector<int_t> &siEngs, std::vector<int_t> &eqs) {
 	if(set_id == 0) return insert_component(dag_root, fst, snd);
 
 	int_t component = ps::get(set_id).e;
@@ -643,4 +643,32 @@ int_t persistent_dag::size(int_t dag_id) {
 		s += size(pos);
 	}
 	return s;
+}
+
+int_t persistent_dag::remove(int_t dag_id, int_t fst, int_t snd) {
+	auto comp = find_in_dag(get(dag_id).sh, fst);
+	if (comp == 0) return dag_id;
+	create_graph_G(comp);
+	vector<int_t> path, visited;
+	find_path_G(fst, snd, visited, path);
+	path.push_back(fst);
+	for (int_t i = (int_t)path.size()-1; i > 0; --i) {
+		G[-path[i-1]] = ps::remove(G[-path[i-1]], -path[i]);
+		G[path[i]] = ps::remove(G[path[i]], path[i-1]);
+	}
+	return make_persistent_G(dag_id, comp);
+}
+
+bool persistent_dag::contains(int_t dag_id, int_t fst, int_t snd) {
+	auto comp = find_in_dag(get(dag_id).sh, fst);
+	if (comp == 0) return false;
+	auto fst_id = find(comp, fst);
+	auto snd_id = find(fst_id, snd);
+	return snd_id == 0;
+}
+
+bool persistent_dag::weakly_connected(int_t dag_id, int_t v1, int_t v2) {
+	auto comp1 = find_in_dag(get(dag_id).sh, v1);
+	auto comp2 = find_in_dag(get(dag_id).sh, v1);
+	return comp1 != 0 && comp2 != 0 && comp1 == comp2;
 }

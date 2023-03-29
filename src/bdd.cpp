@@ -167,8 +167,8 @@ bdd bdd::poset_to_bdd(int_t p) {
 	const poset &po = p > 0 ? P[p] : NP[p];
 	// get the smallest variable and build high and low
 	DBG(assert(!poset::is_empty(po) && po.pure);)
-	auto l_p = poset::eval(po, -po.v);
-	auto h_p = poset::eval(po, po.v);
+	auto l_p = poset::eval(po, -po.get_v());
+	auto h_p = poset::eval(po, po.get_v());
 	int_t h,l;
 	// Try to find high 2-CNF in universe
 	unordered_map<poset, int_t>::const_iterator it;
@@ -178,15 +178,15 @@ bdd bdd::poset_to_bdd(int_t p) {
 	if (it = MP.find(l_p); it != MP.end()) l = it->second;
 	else if (it = MNP.find(l_p); it != MNP.end()) l = it->second;
 	else l = add(l_p);
-	return bdd(po.v, h, l);
+	return bdd(po.get_v(), h, l);
 }
 
 int_t bdd::add(int_t v, int_t h, int_t l) {
 	DBG(assert(h && l && v > 0););
 	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)
-		   || v < P[abs(h)].v || v < NP[abs(h)].v););
+		   || v < P[abs(h)].get_v() || v < NP[abs(h)].get_v()););
 	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)
-		   || v < P[abs(l)].v || v < NP[abs(l)].v););
+		   || v < P[abs(l)].get_v() || v < NP[abs(l)].get_v()););
 
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;

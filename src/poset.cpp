@@ -184,12 +184,11 @@ poset poset::lift(int_t v, int_t h, int_t l) {
 	lift_vars(p, v, hi, lo, eq_lift_hi, eq_lift_lo, eq_lift);
 	lift_imps(p, hi, lo, eq_lift_hi, eq_lift_lo);
 	lift_eqs(p, v, hi, lo, eq_lift_hi, eq_lift_lo, eq_lift);
-	p.v = abs(v); // v must be the smallest variable in p
+	p.insert_v(abs(v)); // v must be the smallest variable in p
 	return p;
 }
 
 // Evaluate poset on the variable v
-//TODO: Update variable v in p
 poset poset::eval(const poset &p, int_t v) {
 	//if (p.v != abs(v)) DBGFAIL;
 	if (!p.pure) DBGFAIL;
@@ -220,44 +219,99 @@ poset poset::eval(const poset &p, int_t v) {
 		res.eqs = pu::rm_equal(res.eqs, all_imp[i]);
 	}
 	res.vars = ps::remove(res.vars, v);
+	res.rm_v(v);
 	return res;
 }
 
-bool poset::insert_var(poset &p, int_t v) {
-	if (abs(v) < p.v || p.v == 0) p.v = abs(v);
-	return (p.vars = ps::insert(p.vars, v));
+void poset::insert_var(poset &p, int_t v) {
+	if (!ps::contains(p.v, abs(v))) {
+		p.insert_v(abs(v));
+		p.vars = ps::insert(p.vars, v);
+		return;
+	}
+	p.vars = ps::insert(p.vars, v);
+	vector<int_t> sings;
+	pd::set_var(p.imps, v , sings);
+	for (auto s : sings) p.vars = ps::insert(p.vars, s);
+	auto it = pu::get_equal(p.eqs, v);
+	for (auto e : it) p.vars = ps::insert(p.vars, e);
+	p.eqs = pu::rm_equal(p.eqs, v);
 }
 
 poset poset::insert_var(poset &&p, int_t v) {
+	if (!ps::contains(p.v, abs(v))) {
+		p.insert_v(abs(v));
+		p.vars = ps::insert(p.vars, v);
+		return p;
+	}
 	p.vars = ps::insert(p.vars, v);
-	if (abs(v) < p.v || p.v == 0) p.v = abs(v);
+	vector<int_t> sings;
+	pd::set_var(p.imps, v , sings);
+	for (auto s : sings) p.vars = ps::insert(p.vars, s);
+	auto it = pu::get_equal(p.eqs, v);
+	for (auto e : it) p.vars = ps::insert(p.vars, e);
+	p.eqs = pu::rm_equal(p.eqs, v);
 	return p;
 }
 
+void poset::insert_var_no_imp(poset &p, int_t v) {
+	if (!ps::contains(p.v, abs(v))) {
+		p.insert_v(abs(v));
+		p.vars = ps::insert(p.vars, v);
+		return;
+	}
+	p.vars = ps::insert(p.vars, v);
+	auto it = pu::get_equal(p.eqs, v);
+	for (auto e : it) p.vars = ps::insert(p.vars, e);
+	p.eqs = pu::rm_equal(p.eqs, v);
+}
+
 void poset::insert_imp(poset &p, std::pair<int_t, int_t> &el) {
-	if (abs(el.first) < p.v || p.v == 0) p.v = abs(el.first);
-	if (abs(el.second) < p.v || p.v == 0) p.v = abs(el.second);
-	// Extraction of created singletons and equalities
-	vector<int_t> sings, eqs;
-	p.imps = pd::insert(p.imps, el, sings, eqs);
-	insert_eq(p, eqs);
-	for(auto s : sings) p.vars = ps::insert(p.vars, s);
+	insert_imp(p, el.first, el.second);
 }
 
 void poset::insert_imp(poset &p, int_t fst, int_t snd) {
-	if (abs(fst) < p.v || p.v == 0) p.v = abs(fst);
-	if (abs(snd) < p.v || p.v == 0) p.v = abs(snd);
+	// Check if implication is reduced in poset
+	if (ps::find(p.vars, fst)) {
+		ps::insert(p.vars, snd);
+		return;
+	}
+	if (ps::find(p.vars, snd))
+		return;
+	if (pu::equal(p.eqs, fst, snd))
+		return;
+
+	p.insert_v(abs(fst));
+	p.insert_v(abs(snd));
 	// Extraction of created singletons and equalities
 	vector<int_t> sings, eqs;
 	p.imps = pd::insert(p.imps, fst, snd, sings, eqs);
 	insert_eq(p, eqs);
-	for(auto s : sings) p.vars = ps::insert(p.vars, s);
+	for (auto s : sings) insert_var_no_imp(p, s);
 }
 
 void poset::insert_eq(poset &p, int_t v1, int_t v2) {
-	if (abs(v1) < p.v || p.v == 0) p.v = abs(v1);
-	if (abs(v2) < p.v || p.v == 0) p.v = abs(v2);
-	p.eqs = pu::merge(p.eqs, v1, v2);
+	if(pu::equal(p.eqs, v1, v2)) return;
+	if (ps::find(p.vars, v1)) {
+		ps::insert(p.vars, v2);
+		return;
+	}
+	if (ps::find(p.vars, v2)) {
+		ps::insert(p.vars, v1);
+		return;
+	}
+
+	if (pd::weakly_connected(p.imps, v1, v2)) {
+		vector<int_t> sings, eqs;
+		p.imps = pd::insert(p.imps, v1, v2, sings, eqs);
+		p.imps = pd::insert(p.imps, v2, v1, sings, eqs);
+		insert_eq(p, eqs);
+		for (auto s : sings) insert_var_no_imp(p, s);
+	} else {
+		p.insert_v(abs(v1));
+		p.insert_v(abs(v2));
+		p.eqs = pu::merge(p.eqs, v1, v2);
+	}
 }
 
 void poset::insert_eq(poset &p, vector<int_t> &eq) {

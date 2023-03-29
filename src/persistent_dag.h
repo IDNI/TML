@@ -72,9 +72,10 @@ class persistent_dag {
 	insert(int_t dag_id, int_t fst, int_t snd, std::vector<int_t> &sings,
 	       std::vector<int_t> &eqs);
 	static int_t set_var(int_t root_id, int_t var, std::vector<int_t> &sings);
-	static int_t remove(int_t dag_id, std::pair<int_t, int_t> &elem);
+	static int_t remove(int_t dag_id, int_t fst, int_t snd);
 	static bool is_leaf(int_t dag_id);
-	static bool contains(int_t dag_id, std::pair<int_t, int_t> &elem);
+	static bool contains(int_t dag_id, int_t fst, int_t snd);
+	static bool weakly_connected(int_t dag_id, int_t v1, int_t v2);
 	static std::map<int_t,int_t,abs_cmp_> get_graph(int_t dag_id);
 	//TODO: Calculation of size is linear, not constant
 	static int_t size(int_t dag_id);
