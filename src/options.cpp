@@ -180,10 +180,13 @@ void options::setup() {
 	add_bool("sdt",     "sdt transformation");
 	add_bool("show-hidden", "show the contents of hidden relations");
 	add(option(option::type::INT, { "minimize" }).description("minimize"
-		" the given program a given number of times (default: x=0)"));
+		" the given program a given number of iterations (default: x=0)"));
 	add(option(option::type::INT, { "iterate" }).description("transforms"
 		" the program into one where each step is equivalent to 2^x of"
 		" the original's (default: x=0)"));
+	add(option(option::type::INT, { "minimize-and-iterate" }).description("transforms"
+		" the program into one where each step is equivalent to 2^x of"
+		" the original's and minimize it for the given number of steps (default: x=0)"));
 	add_bool("safecheck", "to be DEPRECATED: safety check will be always on");
 	add_bool("gc",      "enable garbage collection");
 	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", 

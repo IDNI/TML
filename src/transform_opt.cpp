@@ -398,6 +398,16 @@ flat_prog iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& p
 	return ifp;
 }
 
+flat_prog minimize_and_iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& printer) {
+	flat_prog ifp = fp;
+	for (int i = 0; i != iterations; i++) {
+		ifp = iterate(ifp, 1, cf, printer);
+		ifp = minimize(ifp, 1, cf, printer);
+		printer(ifp, i);
+	}
+	return ifp;
+}
+
 flat_prog driver::optimize(const flat_prog& fp) const {
 	cost cf;
 	step_printer printer = [&](const flat_prog& fp, int it) {
@@ -407,9 +417,10 @@ flat_prog driver::optimize(const flat_prog& fp) const {
 		o::dbg() << "Flat program cost: " << cf(fp) << endl; 
 		#endif // DEBUG
 	};
-	flat_prog mfp = fp, ifp = fp;
-	if (auto iterations = opts.get_int("iterate")) ifp = iterate(fp, iterations, cf, printer);
-	if (auto minimizations = opts.get_int("minimize")) mfp = minimize(ifp, minimizations, cf, printer);
-	// print(o::dbg() << "Initial uniterated flat_prog:\n", mfp) << endl;
-	return update_with_new_symbols(*tbl, mfp);
+	flat_prog tfp = fp;
+	if (auto iterations = opts.get_int("iterate")) tfp = iterate(fp, iterations, cf, printer);
+	if (auto minimizations = opts.get_int("minimize")) tfp = minimize(tfp, minimizations, cf, printer);
+	if (auto minimizations = opts.get_int("minimize-and-iterate")) tfp = minimize_and_iterate(tfp, minimizations, cf, printer);
+	if (opts.get_int("iterate") || opts.get_int("minimize") || opts.get_int("minimize-and-iterate")) print(o::dump(), tfp);
+	return update_with_new_symbols(*tbl, tfp);
 }
