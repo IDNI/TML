@@ -49,7 +49,11 @@ jobs:
         if: matrix.os == 'macOS-12'
         run: |
           brew install boost
-      - name: Installing lcov on macOS (clang)
+        - name: Installing z3 on macOS
+        if: matrix.os == 'macOS-12'
+        run: |
+          brew install z3
+        - name: Installing lcov on macOS (clang)
         if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
         run: |
           brew install lcov
@@ -68,7 +72,7 @@ jobs:
           cd build-Debug
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
             CMAKE_CXX_COMPILER=g++-12
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE -DCMAKE_CXX_FLAGS=-I/usr/local/include
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=$(which clang++-14)
@@ -77,7 +81,7 @@ jobs:
               CMAKE_C_COMPILER=$(which clang)      
               CMAKE_CXX_COMPILER=$(which clang++)      
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
+            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER -DCMAKE_CXX_FLAGS=-I/usr/local/include
           fi
           make -j5
       - name: Bulding release version
