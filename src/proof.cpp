@@ -20,7 +20,7 @@ using namespace std;
  * negative facts by showing that no variable instantiation would satisfy rules
  * of a relation. */
 
-bool tables::is_term_valid(const term &t) {
+bool tables::is_term_valid(const term) const {
 	return true;
 }
 

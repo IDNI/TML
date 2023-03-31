@@ -17,7 +17,7 @@ using namespace std;
 
 #define get_var_elem(i) elem(elem::VAR, dict.get_var_lexeme(i))
 
-void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
+void driver::refresh_vars(raw_term& t, size_t&, map<elem, elem>& m) {
 	for (elem& e : t.e)
 		if (e.type == elem::VAR && m.find(e) == m.end())
 			m.emplace(e, elem(elem::VAR, e.e));

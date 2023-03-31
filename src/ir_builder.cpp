@@ -1170,9 +1170,9 @@ raw_term ir_builder::to_raw_term(const term& r) {
 			rt.add_parenthesis();
 		}
 		else {
-			if (r.tab != -1) {
+			if (r.tab >= 0) {
 				// TODO Check if we really need to check the size of args in dynenv
-				args = (r.tab < dynenv->tbls.size())
+				args = ((unsigned) r.tab < dynenv->tbls.size())
 					? dynenv->tbls.at(r.tab).len : r.size(), rt.e.resize(args + 1);
 				#ifdef FOL_V2
 				if (dynenv->tbls.at(r.tab).hidden) {
@@ -1181,14 +1181,14 @@ raw_term ir_builder::to_raw_term(const term& r) {
 				else
 				#endif
 
-				rt.e[0] = (r.tab > dynenv->tbls.size()) 
+				rt.e[0] = ((unsigned) r.tab > dynenv->tbls.size()) 
 					? elem(elem::SYM, dict.get_lexeme("?0pP" + to_string_(r.tab)))
 					: (dynenv->tbls.at(r.tab).generated
 						? elem(elem::SYM, dict.get_lexeme("?0pP" + to_string_(r.tab)))
 						: elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s))));
 				
-				if (r.tab > dynenv->tbls.size()) rt.arity = { args };
-				else if (dynenv->tbls.at(r.tab).generated) rt.arity = { args };
+				if ((unsigned) r.tab > dynenv->tbls.size()) rt.arity = { (int) args };
+				else if (dynenv->tbls.at(r.tab).generated) rt.arity = { (int) args };
 				else rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)}; 
 
 				#ifdef TYPE_RESOLUTION

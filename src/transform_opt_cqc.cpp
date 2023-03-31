@@ -245,7 +245,7 @@ public:
 		}
 		// Construct z3 expression from rule
 		z3::expr body = context.bool_val(true);
-		for (int i = 1; i!= r.size(); ++i) body = body && term_to_z3(r[i]);
+		for (size_t i = 1; i!= r.size(); ++i) body = body && term_to_z3(r[i]);
 		z3::expr head = term_to_z3(r[0]);
 		z3::expr formula = (!body) || head;
 		// Now undo the global head mapping for future constructions

@@ -169,8 +169,8 @@ class tables {
 	friend struct term;
 	friend class driver;
 	friend struct bit_univ;
-	friend struct progress;
-	friend class builtins_factory;
+	friend class progress;
+	friend struct builtins_factory;
 
 private:
 
@@ -313,7 +313,7 @@ public:
 	
 private:
 	rule new_identity_rule(ntable tab, bool neg);
-	bool is_term_valid(const term &t);
+	bool is_term_valid(const term) const;
 	bool get_dnf_proofs(const term& q, proof& p, size_t level,
 		std::set<std::pair<term, size_t>> &refuted, size_t explicit_rule_count);
 	bool get_proof(const term& q, proof& p, size_t level,

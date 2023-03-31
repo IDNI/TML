@@ -2507,7 +2507,7 @@ basic_ostream<T>& driver::print(basic_ostream<T>& os, const flat_prog& p) const{
 template basic_ostream<char>& driver::print(basic_ostream<char>&, const flat_prog&) const;
 template basic_ostream<wchar_t>& driver::print(basic_ostream<wchar_t>&, const flat_prog&) const;
 
-driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
+driver::driver(string s, const options &o) : dict(dict_t()), opts(o), rp(raw_progs(dict)) {
 	if (opts.error) { error = true; return; }
 
 

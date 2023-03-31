@@ -135,7 +135,7 @@ struct cost {
 		// The cost of the empty rule is 0.
 		if (cfr.empty()) return 0;
 
-		rt_options to { .optimize = true, .fp_step = false, .bproof = proof_mode::none };
+		rt_options to; to.optimize = true, to.fp_step = false, to.bproof = proof_mode::none;
 
 		dict_t dict;
 		ir_builder ir(dict, to);
@@ -183,14 +183,11 @@ struct cost {
 		tbls.rules.clear(), tbls.datalog = true;
 		if (!tbls.get_rules(nfp)) return false;
 
-		nlevel begstep = tbls.nstep;
-
-		bool r = true;
 		// run program only if there are any rules
 		if (tbls.rules.size()) {
 			tables_progress p( dict, ir);
 			tbls.fronts.clear();
-			r = tbls.pfp(1, 1, p);
+			tbls.pfp(1, 1, p);
 		} else {
 			bdd_handles l = tbls.get_front();
 			tbls.fronts = {l, l};
@@ -293,7 +290,7 @@ bool is_identity(const change& c) {
 change extract_common(const flat_rule& r1, const flat_rule& r2, const flat_prog& fp, cost& cf) {
 	vector<term> b1(++r1.begin(), r1.end());
 	vector<term> b2(++r2.begin(), r2.end());
-	change min { .cost = cf, .add = {r1, r2}}; 
+	change min { .cost = cf, .del = {}, .add = {r1, r2}}; 
 	for (auto c1 : powerset_range(b1)) {
 		if (c1.empty()) continue;
 		int s = get_tmp_sym();
@@ -329,10 +326,10 @@ inline bool head_neg(const flat_rule& r) {
 }
 
 change minimize_step_using_rule(const flat_rule& r, const flat_prog& fp, const flat_prog& p, cost& cf) { 
-	change min { .cost = cf, .add = {r}};
+	change min { .cost = cf, .del = {}, .add = {r}};
 	for (auto fr: fp) {
 		if (r != fr && head_neg(r) && head_neg(fr) && rule_contains(r, fr, fp)) {
-			change proposed { .cost= cf, .del = {fr}};
+			change proposed { .cost= cf, .del = {fr}, .add = {}};
 			min = min < proposed ? min : proposed;
 		}			
 		auto proposed = extract_common(r, fr, p, cf);
@@ -389,7 +386,7 @@ flat_prog minimize(const flat_prog& fp, int minimizations, cost& cf, step_printe
 	return mfp;
 }
 
-flat_prog iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& printer) {
+flat_prog iterate(const flat_prog& fp, int iterations, step_printer& printer) {
 	flat_prog ifp = fp;
 	for (int i = 0; i != iterations; i++) {
 		ifp = square_program(ifp);
@@ -401,7 +398,7 @@ flat_prog iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& p
 flat_prog minimize_and_iterate(const flat_prog& fp, int iterations, cost& cf, step_printer& printer) {
 	flat_prog ifp = fp;
 	for (int i = 0; i != iterations; i++) {
-		ifp = iterate(ifp, 1, cf, printer);
+		ifp = iterate(ifp, 1, printer);
 		ifp = minimize(ifp, 1, cf, printer);
 		printer(ifp, i);
 	}
@@ -418,7 +415,7 @@ flat_prog driver::optimize(const flat_prog& fp) const {
 		#endif // DEBUG
 	};
 	flat_prog tfp = fp;
-	if (auto iterations = opts.get_int("iterate")) tfp = iterate(fp, iterations, cf, printer);
+	if (auto iterations = opts.get_int("iterate")) tfp = iterate(fp, iterations, printer);
 	if (auto minimizations = opts.get_int("minimize")) tfp = minimize(tfp, minimizations, cf, printer);
 	if (auto minimizations = opts.get_int("minimize-and-iterate")) tfp = minimize_and_iterate(tfp, minimizations, cf, printer);
 	if (opts.get_int("iterate") || opts.get_int("minimize") || opts.get_int("minimize-and-iterate")) print(o::dump(), tfp);

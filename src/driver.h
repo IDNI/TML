@@ -276,7 +276,7 @@ public:
 	template <typename T>
 	void out_result(std::basic_ostream<T> &os);
 	template <typename T>
-	void out(std::basic_ostream<T> &os) { /* TODO something*/ }
+	void out(std::basic_ostream<T> &os) { print_dict(os); }
 
 	void init_tml_update(updates& updts);
 
