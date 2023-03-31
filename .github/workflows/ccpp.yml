@@ -49,11 +49,11 @@ jobs:
         if: matrix.os == 'macOS-12'
         run: |
           brew install boost
-        - name: Installing z3 on macOS
+      - name: Installing z3 on macOS
         if: matrix.os == 'macOS-12'
         run: |
           brew install z3
-        - name: Installing lcov on macOS (clang)
+      - name: Installing lcov on macOS (clang)
         if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
         run: |
           brew install lcov
