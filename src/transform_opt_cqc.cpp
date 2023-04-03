@@ -213,7 +213,8 @@ public:
 				case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
 				default: assert(false); //should never reach here
 			} 
-		} else assert(false); // Should never reach here
+		}
+		assert(false); // Should never reach here
 	}
 
 	/* Given a rule, output the body of this rule converted to the

@@ -150,10 +150,18 @@ endif()
 
 # z3 library
 #############
-find_library(Z3 NAMES z3)
+find_library(Z3 
+	NAMES z3
+	HINTS /usr/local/lib)
 add_library(Z3 SHARED IMPORTED)
 set_target_properties(Z3 PROPERTIES
 	IMPORTED_LOCATION "${Z3}")
+target_include_directories(TMLo PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+	$<INSTALL_INTERFACE:.>
+	$<$<BOOL:${APPLE}>:/usr/local/include>
+)
+
 target_link_libraries(TMLo Z3)
 #target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
 
@@ -186,8 +194,8 @@ target_setup(TMLs)
 target_compile_options(TMLs     PRIVATE ${TML_COMPILE_OPTIONS})
 target_link_options(TMLs        PRIVATE ${TML_LINK_OPTIONS})
 target_link_libraries(TMLs      TMLo)
-target_include_directories(TMLs PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+target_include_directories(TMLs 
+	PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 set_target_properties(TMLs PROPERTIES OUTPUT_NAME "TML")
 
