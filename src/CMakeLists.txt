@@ -159,7 +159,7 @@ set_target_properties(Z3 PROPERTIES
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
-	$<$<BOOL:${APPLE}>:/usr/local/include>
+	$<$<STREQUAL:${CMAKE_SYSTEM_NAME},Darwin>:/usr/local/include>
 )
 
 target_link_libraries(TMLo Z3)
