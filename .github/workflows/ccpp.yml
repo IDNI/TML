@@ -37,10 +37,14 @@ jobs:
         run: |
           sudo apt-get install -y clang-14 clang-tidy-14
 # macOS installations
-      - name: Getting brew info
+      - name: Getting brew config
         if: matrix.os == 'macOS-12'
         run: |
-          brew info
+          brew config
+      - name: Getting brew list
+        if: matrix.os == 'macOS-12'
+        run: |
+          brew list
       - name: Installing gcc on macOS
         if: matrix.os == 'macOS-12'
         run: |
