@@ -159,7 +159,7 @@ set_target_properties(Z3 PROPERTIES
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
-	/usr/local/include
+	/usr/local/Cellar/z3/4.12.1/include
 )
 
 target_link_libraries(TMLo Z3)
