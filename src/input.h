@@ -22,6 +22,7 @@
 #include <memory>
 #include <sys/stat.h>
 #include <algorithm>
+#include <optional>
 
 #include "defs.h"
 #include "dict.h"

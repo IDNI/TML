@@ -159,8 +159,12 @@ set_target_properties(Z3 PROPERTIES
 target_include_directories(TMLo PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:.>
-	/usr/local/Cellar/z3/4.12.1/include
 )
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	target_include_directories(TMLo PUBLIC
+		${Z3_LOC}/include)
+endif()
 
 target_link_libraries(TMLo Z3)
 #target_compile_definitions(TMLo PRIVATE "-DWITH_Z3")
