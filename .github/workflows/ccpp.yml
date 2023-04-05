@@ -61,6 +61,10 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew install z3
+      - name: Getting info on z3 macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew info z3
       - name: Installing lcov on macOS (clang)
         if: matrix.compiler == 'clang' && matrix.os == 'macos-latest'
         run: |
