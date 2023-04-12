@@ -988,62 +988,33 @@ void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2spac
 		else if(get<0>(p->hvar_b) != 0) {
 			hvars.push_back(get<0>(p->hvar_b)); //need to use hvars?
 			spbdd_handle qh = get<1>(p->hvar_b)->q;
-			#ifdef SOL_VERBOSE
-			COUT << "var2: " << get<0>(p->hvar_b) << " :\n";
-			::out(COUT, qh)<<endl<<endl;
-			#endif
 			if (p->neg) {
 				v2s.add_cons_neg(get<0>(p->hvar_b), get<1>(p->hvar_b)->q);
 				qh = bdd_not(qh);
 			} else {
 				v2s.add_cons(get<0>(p->hvar_b), get<1>(p->hvar_b)->q);
 			}
-			#ifdef SOL_VERBOSE
-			COUT << "AFTER VAR2 handle\n";
-			v2s.print();
-			#endif
-
 		}
 		else {
 			bdd_handles vt;
 			var2space v2s_t(v2s.vm);
 			hol_query(p, quantsh, v2s_t, vt);
 			v2s.bf.push_back(v2s_t);
-			#ifdef SOL_VERBOSE
-			COUT << "AFTER RETURN\n";
-			v2s.print();
-			#endif
 			//TODO merge?
 
 		}
 	}
-	#ifdef SOL_VERBOSE
-	COUT << "q_after_and: size=" << v.size() << "\n";
-	#endif
-
 	bool fol_terms = v.size() >= 1;
 	if (fol_terms) {
 			q = bdd_and_many(move(v));
-			#ifdef SOL_VERBOSE
-			COUT << "fol terms: " << endl;
-			::out(COUT, q)<<endl<<endl;
-			#endif
 	}
 
 	if (f->neg) {
 		if (v2s.hvars.size() != 0) {
 			v2s.negate_cons();
-			#ifdef SOL_VERBOSE
-			COUT << "AFTER NEGATE \n";
-			v2s.print();
-			#endif
 		}
 		if (fol_terms) {
 			q = bdd_not(q);
-			#ifdef SOL_VERBOSE
-			COUT << "q_after_and_NOT: \n";
-			::out(COUT, q)<<endl<<endl;
-			#endif
 		}
 	}
 
@@ -1053,18 +1024,10 @@ void tables::hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh, var2spac
 
 	if (fol_terms) {
 		v2s.constraint(q);
-		#ifdef SOL_VERBOSE
-		COUT << "AFTER CONSTRAINT\n";
-		v2s.print();
-		#endif
 	}
 
 	//set final constraint for 2ns order vars
 	v2s.merge();
-	#ifdef SOL_VERBOSE
-	COUT << "AFTER MERGE\n";
-	v2s.print();
-	#endif
 	return;
 }
 
@@ -1083,10 +1046,6 @@ void tables::formula_query(cr_pnft_handle f, bdd_handles &v) {
 
 		if (out) COUT << "## model found\n";
 		else COUT << "## model NOT found\n";
-		#ifndef SOL_VERBOSE
-		v2s.print();
-		#endif
-
 		v.push_back(q);
 	}
 	else fol_query(f,v);
