@@ -172,19 +172,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 						elem((char32_t) *s)),esc=false;
 			}
 	}
-#ifdef ELIM_NULLS
-	set<production> s;
-	for (auto x : r.g) s.insert(x);
-	elim_nullables(s), r.g.clear(), r.g.reserve(s.size());
-	for (auto x : s) r.g.push_back(x);
-	s.clear();
-#endif
 	raw_rule l;
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == "null") {
-#ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
 			elem e = get_var_elem(2);
@@ -193,7 +185,6 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			r.r.push_back(l), l.clear(), l.h.push_back(t),
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
-#endif
 		} else {
 			size_t v = p.p.size();
 			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));

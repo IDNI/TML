@@ -81,7 +81,6 @@ bool typemanager::tcheck(const raw_prog &rp) {
 
 	if( ret && infer ) {
 		// only try inference when typecheck for any rule does not fail
-		_BEG:
 		do {
 			bool sigupdated = false;
 			if(rp.r.size())	{DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");}
