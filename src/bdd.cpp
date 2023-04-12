@@ -22,7 +22,6 @@
 
 using namespace std;
 
-#define MEMO
 bool onexit = false;
 
 template<typename T> struct veccmp {
@@ -179,21 +178,17 @@ bdd_ref bdd::bdd_and(bdd_ref x, bdd_ref y) {
 	const bdd_shft min_shift = min(GET_SHIFT(x), GET_SHIFT(y));
 	DECR_SHIFT(x, min_shift);
 	DECR_SHIFT(y, min_shift);
-#ifdef MEMO
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
 	// Upshift result to obtain answer for pre-downshifted BDDs
 	if (it != C.end()) return PLUS_SHIFT(it->second, min_shift);
-#endif
 	const bdd_shft xshift = GET_SHIFT(x), yshift = GET_SHIFT(y);
 	const bdd bx = get(x), by = get(y);
 	bdd_ref r;
 	if (xshift < yshift) r = add(xshift, bdd_and(bx.h, y), bdd_and(bx.l, y));
 	else if (xshift > yshift) r = add(yshift, bdd_and(x, by.h), bdd_and(x, by.l));
 	else r = add(xshift, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
-#ifdef MEMO
 	if (C.size() < gclimit) C.emplace(m, r);
-#endif
 	// Upshift result to obtain answer for pre-downshifted BDDs
 	return PLUS_SHIFT(r, min_shift);
 }
@@ -315,7 +310,6 @@ bool subset(const bdds& small, const bdds& big) {
 }
 
 bdd_ref bdd::bdd_and_many(bdds v) {
-#ifdef MEMO
 	static unordered_map<ite_memo, bdd_ref>::const_iterator jt;
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -328,7 +322,6 @@ bdd_ref bdd::bdd_and_many(bdds v) {
 				break;
 			}
 		}
-#endif
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
 	am_sort(v);
