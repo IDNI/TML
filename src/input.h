@@ -462,9 +462,7 @@ struct raw_term {
 	ints arity;
 	static bool require_fp_step;
 
-	#ifdef TML_NATIVES
 	sig s;
-	#endif
 
 	raw_term() {}
 	raw_term(const elem &rel_name, const std::set<elem> &args) {

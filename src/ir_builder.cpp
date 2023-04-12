@@ -609,7 +609,6 @@ sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
 }
 #endif //TYPE_RESOLUTION
 
-#ifdef TML_NATIVES
 sig ir_builder::get_sig(raw_term &t) {
 	if (t.s.second.size()) {
 		#ifdef BIT_TRANSFORM_V2
@@ -651,10 +650,8 @@ sig ir_builder::get_sig(raw_term &t) {
 	t.s = {rel_id , tn};
 	return t.s;
 }
-#endif
 
 sig ir_builder::get_sig(const raw_term& t) {
-#ifdef TML_NATIVES
 	#ifdef TYPE_RESOLUTION
 		raw_term aux = t; //TODO: avoid workaround
 		return get_sig(aux);
@@ -663,41 +660,24 @@ sig ir_builder::get_sig(const raw_term& t) {
 		tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
 		return {rel_id , tn};
 	#endif
-#else
-	int_t rel_id = dict.get_rel(t.e[0].e);
-	return {rel_id , t.arity};
-#endif
 }
 
 sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 	int_t rel_id = dict.get_rel(rel);
-#ifdef TML_NATIVES
 	DBG(assert(arity.size() == 1));
 	tml_natives tn(arity[0], {native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
-#ifdef TML_NATIVES
 	tml_natives tn;
 	if (arity.size() == 1)
 		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 size_t ir_builder::sig_len(const sig& s) const {
-#ifdef TML_NATIVES
 	return s.second.size();
-#else
-	assert(s.second.size()==1);
-	return s.second[0];
-#endif
 }
 
 #if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
