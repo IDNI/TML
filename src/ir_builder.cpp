@@ -1744,12 +1744,7 @@ bool ptransformer::synth_recur(vector<elem>::const_iterator from,
 	elem alte = elem(elem::ALT, d.get_lexeme("|"));
 	if (balt) np.p.emplace_back(alte);
 	if (balt && bnull) {
-		#ifdef NNULL_KLEENE
-			np.p.insert(np.p.end(), from , till);
-			np.p.emplace_back(elem::SYM, d.get_lexeme("_null_tg_"));
-		#else
-			np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
-		#endif
+		np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
 	}
 	else if (balt) np.p.insert(np.p.end(), from, till);
 	return true;
