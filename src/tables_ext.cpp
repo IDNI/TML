@@ -937,25 +937,13 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 	for (auto p : f->matrix) {
 		if (p->b) {
 			q = body_query(*p->b,0);
-			#ifdef FOL_VERBOSE
-			COUT << "fol:body_query\n";
-			::out(COUT, q)<<endl<<endl;
-			#endif
 			if (p->neg) {
 				q = bdd_not(q);
-				#ifdef FOL_VERBOSE
-				COUT << "fol:body_query_NEG\n";
-				::out(COUT, q)<<endl<<endl;
-				#endif
 			}
 			v.push_back(q);
 		} else if (p->cons != bdd_handle::T) {
 			q = p->cons;
 			if (p->neg) q = bdd_not(q);
-			#ifdef FOL_VERBOSE
-			COUT << "fol:cons\n";
-			::out(COUT, q)<<endl<<endl;
-			#endif
 			v.push_back(q);
 		}
 		else {
@@ -965,37 +953,17 @@ void tables::fol_query(cr_pnft_handle f, bdd_handles &v) {
 		}
 	}
 	q = bdd_and_many(move(v));
-	#ifdef FOL_VERBOSE
-	COUT << "fol:and_many\n";
-	::out(COUT, q)<<endl<<endl;
-	#endif
 	if (f->neg) {
 		q = bdd_not(q);
-		#ifdef FOL_VERBOSE
-		COUT << "fol:and_many_NEG\n";
-		::out(COUT, q)<<endl<<endl;
-		#endif
 	}
 
 	if (f->quants.size() != 0) f->quantify(q,bits);
-	#ifdef FOL_VERBOSE
-	COUT << "fol:quant_out\n";
-	::out(COUT, q)<<endl<<endl;
-	#endif
 
 	if (f->perm.size()!= 0) {
 		q = q^f->perm;
-		#ifdef FOL_VERBOSE
-		COUT << "fol:after_perm\n";
-		::out(COUT, q)<<endl<<endl;
-		#endif
 		if (f->perm_h.size()!= 0) {
 			v.push_back(q);
 			q = bdd_and_many_ex_perm(move(v), f->ex_h,f->perm_h);
-			#ifdef FOL_VERBOSE
-			COUT << "fol:after_perm_H\n";
-			::out(COUT, q)<<endl<<endl;
-			#endif
 		}
 	}
 	f->last = q;
