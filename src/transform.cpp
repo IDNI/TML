@@ -109,32 +109,34 @@ void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel)
 
 void elim_nullables(set<production>& s) {
 	set<elem> nullables;
-loop1:	size_t sz = nullables.size();
-	for (const production& p : s) {
-		bool null = true;
-		if (p.p.size() != 2 || !(p.p[1].e == "null"))
-			for (size_t n = 1; null && n != p.p.size(); ++n)
-				null &= has(nullables, p.p[n]);
-		if (null) nullables.insert(p.p[0]);
-	}
-	if (sz != nullables.size()) goto loop1;
+	size_t sz = nullables.size();
+	do {
+		for (const production& p : s) {
+			bool null = true;
+			if (p.p.size() != 2 || !(p.p[1].e == "null"))
+				for (size_t n = 1; null && n != p.p.size(); ++n)
+					null &= has(nullables, p.p[n]);
+			if (null) nullables.insert(p.p[0]);
+		}
+	} while (sz != nullables.size());
 	set<production> t;
 	for (auto p : s)
 		if (p.p.size() == 2 && p.p[1].e == "null")
 			t.insert(p);
 	for (auto x : t) s.erase(x);
 	t.clear();
-loop2:	sz = s.size();
-	for (auto p : s)
-		for (size_t n = 1; n != p.p.size(); ++n)
-			if (has(nullables, p.p[n])) {
-				production q = p;
-				q.p.erase(q.p.begin() + n),
-				t.insert(q);
-			}
-	for (auto x : t) s.insert(x);
-	t.clear();
-	if (sz != s.size()) goto loop2;
+	sz = s.size();
+	do {
+		for (auto p : s)
+			for (size_t n = 1; n != p.p.size(); ++n)
+				if (has(nullables, p.p[n])) {
+					production q = p;
+					q.p.erase(q.p.begin() + n),
+					t.insert(q);
+				}
+		for (auto x : t) s.insert(x);
+		t.clear();
+	} while (sz != s.size());
 }
 
 /* Transform all the productions in the given program into pure TML

@@ -700,17 +700,20 @@ bool raw_rule::parse(input* in, const raw_prog& prog) {
 		if (*l[++pos][0] == '!') ++pos, type = TREE;
 		else type = GOAL;
 	}
-head:	h.emplace_back();
-	if (!h.back().parse(in, prog)) return pos = curr, false;
-	if (l[pos] == "else") return true;
-	if (*l[pos][0] == '.') {
-		// if h is a negated fact return a parsing error
-		return h[0].neg && (h[0].extype == raw_term::REL) &&
-				(h[0].arith_op == NOP)
-			? in->parse_error(l[pos][0], err_neg_fact, l[pos])
-			: ++pos, true;
-	}
-	if (*l[pos][0] == ',') { ++pos; goto head; }
+	do {
+		h.emplace_back();
+		if (!h.back().parse(in, prog)) return pos = curr, false;
+		if (l[pos] == "else") return true;
+		if (*l[pos][0] == '.') {
+			// if h is a negated fact return a parsing error
+			return h[0].neg && (h[0].extype == raw_term::REL) &&
+					(h[0].arith_op == NOP)
+				? in->parse_error(l[pos][0], err_neg_fact, l[pos])
+				: ++pos, true;
+		}
+			if (*l[pos][0] == ',') { ++pos; }
+			else break;
+	} while (true);
 	if (*l[pos][0] != ':' || (l[pos][0][1] != '-' && l[pos][0][1] != '=' ))
 		return in->parse_error(l[pos][0], err_head, l[pos]);
 
@@ -1246,16 +1249,13 @@ string input::file_read_text(::FILE *f) {
 	stringstream ss;
 	char buf[32];
 	int_t c, n, l;
-	bool skip = false;
 	*buf = 0;
-next:	for (n = l = 0; n != 31; ++n)
-		if (EOF == (c = getc(f))) { skip = 0; break; }
-		else if (c == '\r' || c == '\n') skip = 0, buf[l++] = c;
-		else if (!skip) buf[l++] = c;
-	if (n) {
-		buf[l] = 0, ss << buf;
-		goto next;
-	} else if (skip) goto next;
+	for (n = l = 0; n != 31; ++n) {
+		if (EOF == (c = getc(f))) break;
+		else if (c == '\r' || c == '\n') buf[l++] = c;
+		else buf[l++] = c;
+		if (n) buf[l] = 0, ss << buf;
+	}
 	return ss.str();
 }
 
