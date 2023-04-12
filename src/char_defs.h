@@ -22,21 +22,12 @@
 extern std::wostream wcnull;
 extern std::ostream cnull;
 
-#ifdef WITH_WCHAR
-typedef wchar_t syschar_t;
-#define CIN   std::wcin
-#define COUT  std::wcout
-#define CERR  std::wcerr
-#define CNULL wcnull
-#define EMPTY_STRING L""
-#else // WITH_WCHAR
 typedef char syschar_t;
 #define CIN   std::cin
 #define COUT  std::cout
 #define CERR  std::cerr
 #define CNULL cnull
 #define EMPTY_STRING ""
-#endif // WITH_WCHAR
 
 typedef std::basic_string<syschar_t>        sysstring_t;
 typedef std::basic_istream<syschar_t>       istream_t;

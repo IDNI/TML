@@ -167,20 +167,12 @@ string parse_string(string l, string cmd) {
 void repl::out_dict(wostream& os) {
 	ostringstream_t ss;
 	d->out_dict(ss);
-#ifdef WITH_WCHAR
-	os << ss.str();
-#else
 	os << s2ws(ss.str());
-#endif
 }
 void repl::out_dict(ostream& os) {
 	ostringstream_t ss;
 	d->out_dict(os);
-#ifdef WITH_WCHAR
-	os << ws2s(ss.str());
-#else
 	os << ss.str();
-#endif
 }
 
 template <typename T>
