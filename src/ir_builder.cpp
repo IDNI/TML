@@ -2201,14 +2201,8 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 	set<elem> torem;
 	measure_time_start();
 	bool enable_regdetect_matching = opts.apply_regexpmatch;
-#ifdef LOAD_STRS
 	if (strs.size() && enable_regdetect_matching) {
 		string inputstr = to_string(strs.begin()->second);
-#else
-	if (dynenv->strs.size() && enable_regdetect_matching) {
-		string inputstr = to_string(dynenv->strs.begin()->second);
-
-#endif
 		DBG(o::dbg()<<inputstr<<endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
@@ -2321,7 +2315,7 @@ bool ir_builder::transform_strsplit(vector<production> &g){
 			}
 	return changed;
 }
-#ifdef LOAD_STRS
+
 void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) {
 
 	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
@@ -2382,4 +2376,3 @@ void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
 		load_string(fp, x.first, x.second);
 	}
 }
-#endif

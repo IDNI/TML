@@ -2297,10 +2297,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 
 	tbls.rules.clear(), tbls.datalog = true;
 
-	#ifndef LOAD_STRS
-	for (auto x : strs) load_string(x.first, x.second);
-	#endif
-	
 	// TODO this call must be done in the driver
 	if (!ir_handler.transform_grammar(g, m)) return false;
 
@@ -2391,19 +2387,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
 	#endif // FOL_V2
 
-	#ifndef LOAD_STRS
-	strs = strs_in;
-	if (!strs.empty()) {
-		for (auto x : strs) {
-			ir_handler.nums = max(ir_handler.nums, (int_t)x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler.chars = max(ir.chars, (int_t)us.rel.size());
-		}
-	}
-	#else // LOAD_STRS
 	ir_handler.load_strings_as_fp(fp, strs_in);
-	#endif // LOAD_STRS
 
 	ir_handler.syms = dict.nsyms();
 	

@@ -356,11 +356,6 @@ private:
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-#ifndef LOAD_STRS
-	void load_string(lexeme rel, const string_t& s);
-	strs_t strs;
-	std::set<int_t> str_rels;
-#endif
 
 private:
 	/*
