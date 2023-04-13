@@ -136,13 +136,6 @@ void square_rule(const flat_rule &fr, const selection &sels, flat_prog &fp) {
 		}
 		auto rfr = rename_rule_vars(sels[i], lv);
 		if (auto u = unify(fr[i + 1], rfr[0])) {
-			#ifndef DELETE_ME
-			cout << "UNIFICATIOIN: {";
-			for (auto &[f, s]: *u) {
-				cout << "{" << f << ':' << s << "}, ";
-				cout << "}\n";
-			}
-			#endif // DELETE_ME
 			apply_unification(*u, sfr);
 			apply_unification(*u, rfr);
 			ranges::copy(++rfr.begin(), rfr.end(), back_inserter(sfr)); 
