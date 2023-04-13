@@ -16,12 +16,9 @@
 #include <variant>
 #include <math.h>
 
-
 #include "ir_builder.h"
 #include "tables.h"
 #include "output.h"
-
-
 #include "fof.h"
 
 using namespace std;
