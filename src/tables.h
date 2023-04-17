@@ -76,22 +76,6 @@ struct alt : public std::vector<body*> {
 	pnft_handle f = 0;
 
 	auto operator<=>(const alt&) const = default;
-
-/*	bool operator<(const alt& t) const {
-		if (varslen != t.varslen) return varslen < t.varslen;
-		if (rng != t.rng) return rng < t.rng;
-		if (eq != t.eq) return eq < t.eq;
-		if (f != t.f) return f < t.f;
-		if (ex != t.ex) return ex < t.ex;
-		if (perm != t.perm) return perm < t.perm;
-		if (bltins != t.bltins) return bltins < t.bltins;
-		if (grnd != t.grnd) return grnd < t.grnd;
-		if (bltinvars != t.bltinvars) return bltinvars < t.bltinvars;
-		if (bltngvars != t.bltngvars) return bltngvars < t.bltngvars;
-		if (bltoutvars != t.bltoutvars) return bltoutvars <t.bltoutvars;
-		if (varbodies != t.varbodies) return varbodies <t.varbodies;
-		return (std::vector<body*>)*this<(std::vector<body*>)t;
-	}*/
 };
 
 struct rule : public std::vector<alt*> {
@@ -103,13 +87,6 @@ struct rule : public std::vector<alt*> {
 	term t;
 
 	auto operator<=>(const rule&) const = default;
-
-/*	bool operator<(const rule& t) const {
-		if (neg != t.neg) return neg;
-		if (tab != t.tab) return tab < t.tab;
-		if (eq != t.eq) return eq < t.eq;
-		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
-	}*/
 
 	bool equals_termwise(const rule& r) const {
 		if (t != r.t || size() != r.size()) return false;
