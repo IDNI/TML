@@ -614,7 +614,7 @@ struct raw_form_tree {
 	}
 
 	// Move the given tree into this
-	raw_form_tree &operator=(raw_form_tree &&rft) {
+	raw_form_tree &operator=(raw_form_tree &&rft) noexcept {
 		type = rft.type;
 		rt = rft.rt;
 		el = rft.el;
