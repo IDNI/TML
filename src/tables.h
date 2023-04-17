@@ -75,7 +75,9 @@ struct alt : public std::vector<body*> {
 
 	pnft_handle f = 0;
 
-	bool operator<(const alt& t) const {
+	auto operator<=>(const alt&) const = default;
+
+/*	bool operator<(const alt& t) const {
 		if (varslen != t.varslen) return varslen < t.varslen;
 		if (rng != t.rng) return rng < t.rng;
 		if (eq != t.eq) return eq < t.eq;
@@ -89,7 +91,7 @@ struct alt : public std::vector<body*> {
 		if (bltoutvars != t.bltoutvars) return bltoutvars <t.bltoutvars;
 		if (varbodies != t.varbodies) return varbodies <t.varbodies;
 		return (std::vector<body*>)*this<(std::vector<body*>)t;
-	}
+	}*/
 };
 
 struct rule : public std::vector<alt*> {
@@ -99,12 +101,16 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	bool operator<(const rule& t) const {
+
+	auto operator<=>(const rule&) const = default;
+
+/*	bool operator<(const rule& t) const {
 		if (neg != t.neg) return neg;
 		if (tab != t.tab) return tab < t.tab;
 		if (eq != t.eq) return eq < t.eq;
 		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
-	}
+	}*/
+
 	bool equals_termwise(const rule& r) const {
 		if (t != r.t || size() != r.size()) return false;
 		for (size_t n = 0; n != size(); ++n)
