@@ -546,123 +546,6 @@ template<typename X, typename F>
 	}
 }
 
-#ifdef DELETE_ME
-
-/* If rr1 and rr2 are both conjunctive bodies, check if there is a
- * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
- * of a homomorphism implies that a valid substitution for rr1 can be
- * turned into a valid substitution for rr2. This function provides all
- * off them. */
-
-bool driver::cbc(const raw_rule &rr1, raw_rule rr2, set<terms_hom> &homs) {
-	// Get dictionary for generating fresh symbols
-	dict_t d;
-	builtins_factory bf(d, *ir);
-	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-
-	if(is_cq(rr1) && is_cq(rr2)) {
-		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
-			<< " to " << rr1.b[0] << endl;
-		// Freeze the variables and symbols of the rule we are checking the
-		// containment of
-		// Map from variables occuring in rr1 to frozen symbols
-		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
-		// Map from frozen symbols to variables occuring in rr1
-		map<elem, elem> unfreeze_map;
-		for(const auto &[k, v] : freeze_map) {
-			unfreeze_map[v] = k;
-		}
-
-		// Build up the extensional database necessary to check homomorphism.
-		set<raw_term> edb;
-		// Map from term ids to terms in rr1
-		map<elem, raw_term> term_map;
-		int j = 0;
-		// First put the frozen terms of rr1 into our containment program
-		for(raw_term &rt : frozen_rr1.b[0]) {
-			// Record the mapping from the term id to the raw_term it
-			// represents
-			elem term_id = elem::fresh_sym(d);
-			term_map[term_id] = rr1.b[0][j++];
-			// Mark our frozen term with an id so that we can trace the terms
-			// involved in the homomorphism if it exists
-			rt.e.insert(rt.e.begin() + 2, term_id);
-			rt.calc_arity(nullptr);
-			edb.insert(rt);
-		}
-
-		o::dbg() << "Canonical Database: " << edb << endl;
-
-		// Build up the query that proves the existence of a homomorphism
-		// Make a new head for rr2 that exports all the variables used in
-		// its body + ids of the frozen terms it binds to
-		set<elem> rr2_body_vars_set;
-		collect_vars(rr2.b[0].begin(), rr2.b[0].end(), rr2_body_vars_set);
-		vector<elem> rr2_new_head = { elem::fresh_temp_sym(d), elem_openp };
-		rr2_new_head.insert(rr2_new_head.end(), rr2_body_vars_set.begin(),
-			rr2_body_vars_set.end());
-		// Prepend term id variables to rr2's body terms and export the term
-		// ids through the head
-		for(raw_term &rt : rr2.b[0]) {
-			// This variable will bind to the term id of a frozen body term
-			// used in the homomorphism
-			elem term_id = elem::fresh_var(d);
-			rt.e.insert(rt.e.begin() + 2, term_id);
-			rt.calc_arity(nullptr);
-			rr2_new_head.push_back(term_id);
-		}
-		rr2_new_head.push_back(elem_closep);
-		// Put body and head together and make containment program
-		rr2.h[0] = raw_term(rr2_new_head);
-		raw_prog nrp(dict);
-		nrp.r.push_back(rr2);
-
-		// Run the queries and check for the frozen head. This process can
-		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		set<raw_term> results;
-		
-		tables_progress p( dict, *ir);
-		if(!run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
-
-		for(const raw_term &res : results) {
-			// If the result comes from the containment query (i.e. it is not
-			// one of the frozen terms), then there is a homomorphism between
-			// the bodies
-			raw_term hd_src = rr2.h[0];
-			if(res.e[0] == hd_src.e[0]) {
-				var_subs var_map;
-				set<raw_term> target_terms;
-				// Now we want to express the homomorphism in terms of the
-				// original (non-frozen) variables and terms of rr1.
-				for(size_t i = 2; i < res.e.size() - 1; i++) {
-					// If current variable is a body var
-					if(rr2_body_vars_set.find(hd_src.e[i]) != rr2_body_vars_set.end()) {
-						// Then trace the original var through the unfreeze map
-						var_map[hd_src.e[i]] = at_default(unfreeze_map, res.e[i], res.e[i]);
-					} else {
-						// Otherwise trace the original term through the term map
-						target_terms.insert(term_map[res.e[i]]);
-					}
-				}
-				homs.insert(make_pair(target_terms, var_map));
-				// Print the homomorphism found
-				o::dbg() << "Found homomorphism from " << rr2.b[0] << " to "
-					<< target_terms << " under mapping {";
-				for(auto &[k, v] : var_map) {
-					o::dbg() << k << " -> " << v << ", ";
-				}
-				o::dbg() << "}" << endl;
-			}
-		}
-		// If no results produced, then there is no homomorphism.
-		return true;
-	} else {
-		return false;
-	}
-}
-#endif
-
 /* Given a homomorphism (i.e. a pair comprising variable substitutions
  * and terms surjected onto) and the rule that a homomorphism maps into,
  * determine which variables of the domain would be needed to express
@@ -1735,7 +1618,7 @@ void rename_variables(raw_form_tree &t, map<elem, elem> &renames,
 			const auto &ivar = renames.find(ovar);
 			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
 			// Temporarily replace the outer scope mapping with new inner one
-			*t.l->el = renames[ovar] = gen(ovar);
+			t.l->el = renames[ovar] = gen(ovar);
 			// Rename body using inner scope mapping
 			rename_variables(*t.r, renames, gen);
 			// Now restore the (possibly non-existent) outer scope mapping
@@ -1812,7 +1695,7 @@ void driver::export_outer_quantifiers(raw_prog &rp) {
 				// Now conjunct the rule formula with a copy of what is inside the
 				// existential quantifiers so that variables can be exported whilst
 				// uniqueness constraints are still being enforced.
-				*rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
+				rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
 			}
 		}
 	}
@@ -2297,10 +2180,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 
 	tbls.rules.clear(), tbls.datalog = true;
 
-	#ifndef LOAD_STRS
-	for (auto x : strs) load_string(x.first, x.second);
-	#endif
-	
 	// TODO this call must be done in the driver
 	if (!ir_handler.transform_grammar(g, m)) return false;
 
@@ -2391,19 +2270,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
 	#endif // FOL_V2
 
-	#ifndef LOAD_STRS
-	strs = strs_in;
-	if (!strs.empty()) {
-		for (auto x : strs) {
-			ir_handler.nums = max(ir_handler.nums, (int_t)x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler.chars = max(ir.chars, (int_t)us.rel.size());
-		}
-	}
-	#else // LOAD_STRS
 	ir_handler.load_strings_as_fp(fp, strs_in);
-	#endif // LOAD_STRS
 
 	ir_handler.syms = dict.nsyms();
 	

@@ -18,13 +18,9 @@
 
 using namespace std;
 
-#ifdef TML
 ir_builder *builder;
-#endif
 
 ostream& operator<<(ostream& os, const term& t) {
-
-#ifdef TML
 	if (t.empty() && t.tab == -1) return os << "<empty term>";
 	if (t.neg) os << "~";
 	if (t.size() != 0) os << t.tab << '(';
@@ -33,16 +29,6 @@ ostream& operator<<(ostream& os, const term& t) {
 		os << builder->get_elem(t[n]);
 		if (n == t.size() - 1) os << ')'; else os << ' ';
 	}
-#else
-	if (t.empty()) return os << "<empty term>";
-	if (t.size() == 1) return os << t[0];
-	os << t[0] << '(';
-	for (size_t n = 1; n != t.size(); ++n) {
-		os << t[n];
-		if (n == t.size() - 1) os << ')'; else os << ' ';
-	}
-#endif
-
 	return os;
 }
 
@@ -68,17 +54,10 @@ ostream& operator<<(ostream& os, const prog& p) {
 //---------------------------------------------------------
 
 clause simplify(const clause& c) {
-#ifdef TML
 	for (term t : c)
 		if (t.neg = !t.neg; c.find(t) != c.end())
 			return {};
 	return c;
-#else
-	for (term t : c)
-		if (t[0] = -t[0]; c.find(t) != c.end())
-			return {};
-	return c;
-#endif
 }
 
 bool operator<=(const clause& x, const clause& y) {
@@ -130,11 +109,7 @@ dnf operator&&(const dnf& x, const dnf& y) {
 
 term operator~(const term& x) {
 	term r(x);
-#ifdef TML
 	return r.neg = !x.neg, r;
-#else
-	return r[0] = -r[0], r;
-#endif
 }
 
 dnf operator~(const clause& x) {
@@ -155,15 +130,10 @@ rel get_tmprel() {
 }
 
 term mkterm(int_t rel, const set<int_t>& v) {
-#ifdef TML
 	term r;
 	r.insert(r.end(), v.begin(), v.end());
 	r.tab = rel;
 	return r;
-#else
-	term r{rel};
-	return r.insert(r.end(), v.begin(), v.end()), r;
-#endif
 }
 
 void get_vars(const term& t, set<int_t>& r) {
@@ -235,7 +205,6 @@ f_prog unseq(const prog& p) {
 	dnf d;
 	set<pair<clause, dnf>> r;
 
-#ifdef TML
 	vector<term> t;
 	for (size_t n = 0; n != p.size(); ++n) {
 		t.push_back(mkterm(get_tmprel(),{}));
@@ -247,23 +216,7 @@ f_prog unseq(const prog& p) {
 		r.emplace(clause{{t[n + 1]}}, dnf{{{t[n]}}});
 	r.emplace(clause{{t[0]}}, dnf{});
 	return r;
-
-#else
-	vector<int_t> t;
-	for (size_t n = 0; n != p.size(); ++n)
-		t.push_back(get_tmprel()),
-		r.emplace(clause{p[n].first, {-t.back()}},
-			p[n].second && dnf{{{t.back()}}}),
-		r.emplace(clause{{-t[n]}}, dnf{{{t[n]}}});
-	for (size_t n = 0; n != p.size() - 1; ++n)
-		r.emplace(clause{{t[n + 1]}}, dnf{{{t[n]}}});
-	r.emplace(clause{{t[0]}}, dnf{});
-	r.emplace(clause{{t[0]}}, dnf{{{t[p.size()-1]}}});
-	return r;
-#endif
 }
-
-#ifdef TML
 
 void fof_init_tables(vector<term> &v) {
 	for (auto &t : v) {
@@ -314,4 +267,3 @@ void print_fof(prog& p, ir_builder *irb) {
 	cout << "FOF transformed fol to prog:" << endl;
 	cout << p << endl;
 }
-#endif

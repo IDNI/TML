@@ -31,10 +31,6 @@ using selection = std::vector<flat_rule>;
 /*! Get relation info from the head term in a way suitable for be used as key. */
 
 inline rel_arity get_rel_info(const term &t) {
-	#ifdef DELETE_ME
-	cout << "GET_REL: {";
-	cout << "{" << t.tab << ':' << t.size() << "}\n";
-	#endif // DELETE_ME
 	return { t.tab, t.size() };
 }
 

@@ -147,8 +147,7 @@ template<typename T> struct ptrcmp {
 //-----------------------------------------------------------------------------
 //#define BIT_TRANSFORM  //to be deprecated,
 
-#define TML_NATIVES
-// #define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
+// #define TYPE_RESOLUTION //work-in-progress
 // #define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
 
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
@@ -161,7 +160,6 @@ template<typename T> struct ptrcmp {
 #define mksym(x) ((int_t) ((x) << 2) )
 #endif
 
-#ifdef TML_NATIVES
 typedef enum { SYMB = 0, UINT = 1, UCHAR = 2, POLY = 3, UNDEF, INT, RATIONAL } native_type;
 struct tml_native_t {
 	native_type type = UNDEF;
@@ -175,9 +173,7 @@ struct tml_native_t {
 };
 typedef std::vector<tml_native_t> tml_natives;
 typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
-#else
-typedef std::pair<int_t, ints> sig;
-#endif
+
 //-----------------------------------------------------------------------------
 //#define FOL_V2
 //-----------------------------------------------------------------------------

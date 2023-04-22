@@ -463,9 +463,7 @@ struct raw_term {
 	ints arity;
 	static bool require_fp_step;
 
-	#ifdef TML_NATIVES
 	sig s;
-	#endif
 
 	raw_term() {}
 	raw_term(const elem &rel_name, const std::set<elem> &args) {
@@ -617,7 +615,7 @@ struct raw_form_tree {
 	}
 
 	// Move the given tree into this
-	raw_form_tree &operator=(raw_form_tree &&rft) {
+	raw_form_tree &operator=(raw_form_tree &&rft) noexcept {
 		type = rft.type;
 		rt = rft.rt;
 		el = rft.el;

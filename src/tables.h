@@ -75,21 +75,7 @@ struct alt : public std::vector<body*> {
 
 	pnft_handle f = 0;
 
-	bool operator<(const alt& t) const {
-		if (varslen != t.varslen) return varslen < t.varslen;
-		if (rng != t.rng) return rng < t.rng;
-		if (eq != t.eq) return eq < t.eq;
-		if (f != t.f) return f < t.f;
-		if (ex != t.ex) return ex < t.ex;
-		if (perm != t.perm) return perm < t.perm;
-		if (bltins != t.bltins) return bltins < t.bltins;
-		if (grnd != t.grnd) return grnd < t.grnd;
-		if (bltinvars != t.bltinvars) return bltinvars < t.bltinvars;
-		if (bltngvars != t.bltngvars) return bltngvars < t.bltngvars;
-		if (bltoutvars != t.bltoutvars) return bltoutvars <t.bltoutvars;
-		if (varbodies != t.varbodies) return varbodies <t.varbodies;
-		return (std::vector<body*>)*this<(std::vector<body*>)t;
-	}
+	auto operator<=>(const alt&) const = default;
 };
 
 struct rule : public std::vector<alt*> {
@@ -99,12 +85,9 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	bool operator<(const rule& t) const {
-		if (neg != t.neg) return neg;
-		if (tab != t.tab) return tab < t.tab;
-		if (eq != t.eq) return eq < t.eq;
-		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
-	}
+
+	auto operator<=>(const rule&) const = default;
+
 	bool equals_termwise(const rule& r) const {
 		if (t != r.t || size() != r.size()) return false;
 		for (size_t n = 0; n != size(); ++n)
@@ -356,11 +339,6 @@ private:
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-#ifndef LOAD_STRS
-	void load_string(lexeme rel, const string_t& s);
-	strs_t strs;
-	std::set<int_t> str_rels;
-#endif
 
 private:
 	/*

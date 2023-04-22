@@ -16,12 +16,9 @@
 #include <variant>
 #include <math.h>
 
-
 #include "ir_builder.h"
 #include "tables.h"
 #include "output.h"
-
-
 #include "fof.h"
 
 using namespace std;
@@ -609,7 +606,6 @@ sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
 }
 #endif //TYPE_RESOLUTION
 
-#ifdef TML_NATIVES
 sig ir_builder::get_sig(raw_term &t) {
 	if (t.s.second.size()) {
 		#ifdef BIT_TRANSFORM_V2
@@ -651,10 +647,8 @@ sig ir_builder::get_sig(raw_term &t) {
 	t.s = {rel_id , tn};
 	return t.s;
 }
-#endif
 
 sig ir_builder::get_sig(const raw_term& t) {
-#ifdef TML_NATIVES
 	#ifdef TYPE_RESOLUTION
 		raw_term aux = t; //TODO: avoid workaround
 		return get_sig(aux);
@@ -663,41 +657,24 @@ sig ir_builder::get_sig(const raw_term& t) {
 		tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
 		return {rel_id , tn};
 	#endif
-#else
-	int_t rel_id = dict.get_rel(t.e[0].e);
-	return {rel_id , t.arity};
-#endif
 }
 
 sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 	int_t rel_id = dict.get_rel(rel);
-#ifdef TML_NATIVES
 	DBG(assert(arity.size() == 1));
 	tml_natives tn(arity[0], {native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
-#ifdef TML_NATIVES
 	tml_natives tn;
 	if (arity.size() == 1)
 		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 size_t ir_builder::sig_len(const sig& s) const {
-#ifdef TML_NATIVES
 	return s.second.size();
-#else
-	assert(s.second.size()==1);
-	return s.second[0];
-#endif
 }
 
 #if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
@@ -1744,12 +1721,7 @@ bool ptransformer::synth_recur(vector<elem>::const_iterator from,
 	elem alte = elem(elem::ALT, d.get_lexeme("|"));
 	if (balt) np.p.emplace_back(alte);
 	if (balt && bnull) {
-		#ifdef NNULL_KLEENE
-			np.p.insert(np.p.end(), from , till);
-			np.p.emplace_back(elem::SYM, d.get_lexeme("_null_tg_"));
-		#else
-			np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
-		#endif
+		np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
 	}
 	else if (balt) np.p.insert(np.p.end(), from, till);
 	return true;
@@ -2226,14 +2198,8 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 	set<elem> torem;
 	measure_time_start();
 	bool enable_regdetect_matching = opts.apply_regexpmatch;
-#ifdef LOAD_STRS
 	if (strs.size() && enable_regdetect_matching) {
 		string inputstr = to_string(strs.begin()->second);
-#else
-	if (dynenv->strs.size() && enable_regdetect_matching) {
-		string inputstr = to_string(dynenv->strs.begin()->second);
-
-#endif
 		DBG(o::dbg()<<inputstr<<endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
@@ -2346,7 +2312,7 @@ bool ir_builder::transform_strsplit(vector<production> &g){
 			}
 	return changed;
 }
-#ifdef LOAD_STRS
+
 void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s) {
 
 	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
@@ -2407,4 +2373,3 @@ void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
 		load_string(fp, x.first, x.second);
 	}
 }
-#endif

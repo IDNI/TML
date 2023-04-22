@@ -109,12 +109,9 @@ public:
 	size_t sig_len(const sig& s) const;
 
 	std::set<int_t> str_rels;
-	#define LOAD_STRS
-	#ifdef LOAD_STRS
 	strs_t strs;
 	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
 	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
-	#endif
 
 	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);

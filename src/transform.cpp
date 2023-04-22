@@ -109,32 +109,34 @@ void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel)
 
 void elim_nullables(set<production>& s) {
 	set<elem> nullables;
-loop1:	size_t sz = nullables.size();
-	for (const production& p : s) {
-		bool null = true;
-		if (p.p.size() != 2 || !(p.p[1].e == "null"))
-			for (size_t n = 1; null && n != p.p.size(); ++n)
-				null &= has(nullables, p.p[n]);
-		if (null) nullables.insert(p.p[0]);
-	}
-	if (sz != nullables.size()) goto loop1;
+	size_t sz = nullables.size();
+	do {
+		for (const production& p : s) {
+			bool null = true;
+			if (p.p.size() != 2 || !(p.p[1].e == "null"))
+				for (size_t n = 1; null && n != p.p.size(); ++n)
+					null &= has(nullables, p.p[n]);
+			if (null) nullables.insert(p.p[0]);
+		}
+	} while (sz != nullables.size());
 	set<production> t;
 	for (auto p : s)
 		if (p.p.size() == 2 && p.p[1].e == "null")
 			t.insert(p);
 	for (auto x : t) s.erase(x);
 	t.clear();
-loop2:	sz = s.size();
-	for (auto p : s)
-		for (size_t n = 1; n != p.p.size(); ++n)
-			if (has(nullables, p.p[n])) {
-				production q = p;
-				q.p.erase(q.p.begin() + n),
-				t.insert(q);
-			}
-	for (auto x : t) s.insert(x);
-	t.clear();
-	if (sz != s.size()) goto loop2;
+	sz = s.size();
+	do {
+		for (auto p : s)
+			for (size_t n = 1; n != p.p.size(); ++n)
+				if (has(nullables, p.p[n])) {
+					production q = p;
+					q.p.erase(q.p.begin() + n),
+					t.insert(q);
+				}
+		for (auto x : t) s.insert(x);
+		t.clear();
+	} while (sz != s.size());
 }
 
 /* Transform all the productions in the given program into pure TML
@@ -170,19 +172,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 						elem((char32_t) *s)),esc=false;
 			}
 	}
-#ifdef ELIM_NULLS
-	set<production> s;
-	for (auto x : r.g) s.insert(x);
-	elim_nullables(s), r.g.clear(), r.g.reserve(s.size());
-	for (auto x : s) r.g.push_back(x);
-	s.clear();
-#endif
 	raw_rule l;
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == "null") {
-#ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
 			elem e = get_var_elem(2);
@@ -191,7 +185,6 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			r.r.push_back(l), l.clear(), l.h.push_back(t),
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
-#endif
 		} else {
 			size_t v = p.p.size();
 			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));

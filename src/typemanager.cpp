@@ -81,32 +81,31 @@ bool typemanager::tcheck(const raw_prog &rp) {
 
 	if( ret && infer ) {
 		// only try inference when typecheck for any rule does not fail
-		_BEG:
-		bool sigupdated = false;
-		if(rp.r.size())	{DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");}
-		auto lastinfo = vrinfo;
-		for (size_t i=0; i < rp.r.size(); i++) {
-			if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
-				if( tinfer(rp.r[i]) ) { // new signature added probably
-					sigupdated = true;
+		do {
+			bool sigupdated = false;
+			if(rp.r.size())	{DBG(COUT<<std::endl<< "Attempt to infer and typecheck rules with typeless terms \n");}
+			for (size_t i=0; i < rp.r.size(); i++) {
+				if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
+					if( tinfer(rp.r[i]) ) { // new signature added probably
+						sigupdated = true;
+					}
 				}
 			}
-		}
-		for (size_t i=0; i < rp.r.size() ; i++) {
-			if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
-				if( tcheck(rp.r[i]) ) {
-					if(std::count_if(verrs.begin(), verrs.end(), [](TINFO_STATUS st){
-						return st == TINFO_UNKNOWN_PRED_TYPE || st == TINFO_UNKNOWN_VAR_TYPE;
-						})){
-								vrinfo[i] = TINFO_UNKNOWN_PRED_TYPE;
-						}
-					else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS;
+			for (size_t i=0; i < rp.r.size() ; i++) {
+				if( vrinfo[i] == TINFO_UNKNOWN_PRED_TYPE) {
+					if( tcheck(rp.r[i]) ) {
+						if(std::count_if(verrs.begin(), verrs.end(), [](TINFO_STATUS st){
+							return st == TINFO_UNKNOWN_PRED_TYPE || st == TINFO_UNKNOWN_VAR_TYPE;
+							})){
+									vrinfo[i] = TINFO_UNKNOWN_PRED_TYPE;
+							}
+						else vrinfo[i] = TINFO_TYPE_CHECK_SUCCESS;
+					}
+					else ret =false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
 				}
-				else ret =false, vrinfo[i] = TINFO_TYPE_CHECK_FAIL;
 			}
-		}
-		if(lastinfo != vrinfo || sigupdated ) { sigupdated =false; goto _BEG; }
-		else if(rp.r.size()) {DBG(COUT<<"converging inference" <<std::endl);}
+			if (sigupdated) { sigupdated = false; } else break;
+		} while (true);
 	}
 	if(ret) {
 		if(std::count_if(vrinfo.begin(), vrinfo.end(), [](TINFO_STATUS st){

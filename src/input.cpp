@@ -179,81 +179,6 @@ bool directive::parse(input* in, const raw_prog& prog) {
 			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
 		return true;
 	}
-//TODO: review what to do with these directive
-#ifdef WITH_EVAL_DIRECTIVES
-	// Parse @domain <domain_sym> <limit_num> <arity_num>.
-	if (l[pos] == "domain") {
-		type = EDOMAIN; ++pos;
-		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
-			return in->parse_error(l[pos-1][0], err_domain_sym, l[pos-1]);
-		if (!limit_num.parse(in) || limit_num.type != elem::NUM)
-			return in->parse_error(l[pos-1][0], err_limit_num, l[pos-1]);
-		if (!arity_num.parse(in) || arity_num.type != elem::NUM)
-			return in->parse_error(l[pos-1][0], err_arity_num, l[pos-1]);
-		if (*l[pos++][0] != '.') return
-			in->parse_error(l[pos-1][0], dot_expected, l[pos-1]);
-		return true;
-	}
-	// Parse @eval <eval_sym> <domain_sym> <quote_sym> <timeout_num>.
-	if (l[pos] == "eval") {
-		type = EVAL; ++pos;
-		if (!eval_sym.parse(in) || eval_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0],
-				err_eval_sym, l[pos-1]);
-		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0],
-				err_domain_sym, l[pos-1]);
-		if (!quote_sym.parse(in) || quote_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0],
-				err_quote_sym, l[pos-1]);
-		if (!timeout_num.parse(in) || timeout_num.type != elem::NUM)
-			return	in->parse_error(l[pos-1][0],
-				err_timeout_num, l[pos-1]);
-		if (*l[pos++][0] != '.')
-			return	in->parse_error(l[pos-1][0],
-				dot_expected, l[pos-1]);
-		return true;
-	}
-	// Parse @quote <quote_sym> <domain_sym> <quote_str>.
-	if (l[pos] == "quote") {
-		type = QUOTE; ++pos;
-		if (!quote_sym.parse(in) || quote_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0],
-				err_quote_sym, l[pos-1]);
-		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0], err_domain_sym,
-				l[pos-1]);
-		if (!quote_str.parse(in) || quote_str.type != elem::STR ||
-				quote_str.e[1] <= quote_str.e[0] ||
-				*quote_str.e[0] != '`')
-			return	in->parse_error(l[pos-1][0], err_quote_str,
-				l[pos-1]);
-		if (*l[pos++][0] != '.')
-			return	in->parse_error(l[pos-1][0], dot_expected,
-				l[pos-1]);
-		return true;
-	}
-	// Parse @codec <codec_sym> <domain_sym> <eval_str> <arity_num>.
-	if (l[pos] == "codec") {
-		type = CODEC; ++pos;
-		if (!codec_sym.parse(in) || codec_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0], err_codec_sym,
-				l[pos-1]);
-		if (!domain_sym.parse(in) || domain_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0], err_domain_sym,
-				l[pos-1]);
-		if (!eval_sym.parse(in) || eval_sym.type != elem::SYM)
-			return	in->parse_error(l[pos-1][0], err_eval_sym,
-				l[pos-1]);
-		if (!arity_num.parse(in) || arity_num.type != elem::NUM)
-			return	in->parse_error(l[pos-1][0], err_arity_num,
-				l[pos-1]);
-		if (*l[pos++][0] != '.')
-			return	in->parse_error(l[pos-1][0], dot_expected,
-				l[pos-1]);
-		return true;
-	}
-#endif
 
 	if (l[pos] == "stdout") {
 		type = STDOUT; ++pos;
@@ -700,17 +625,20 @@ bool raw_rule::parse(input* in, const raw_prog& prog) {
 		if (*l[++pos][0] == '!') ++pos, type = TREE;
 		else type = GOAL;
 	}
-head:	h.emplace_back();
-	if (!h.back().parse(in, prog)) return pos = curr, false;
-	if (l[pos] == "else") return true;
-	if (*l[pos][0] == '.') {
-		// if h is a negated fact return a parsing error
-		return h[0].neg && (h[0].extype == raw_term::REL) &&
-				(h[0].arith_op == NOP)
-			? in->parse_error(l[pos][0], err_neg_fact, l[pos])
-			: ++pos, true;
-	}
-	if (*l[pos][0] == ',') { ++pos; goto head; }
+	do {
+		h.emplace_back();
+		if (!h.back().parse(in, prog)) return pos = curr, false;
+		if (l[pos] == "else") return true;
+		if (*l[pos][0] == '.') {
+			// if h is a negated fact return a parsing error
+			return h[0].neg && (h[0].extype == raw_term::REL) &&
+					(h[0].arith_op == NOP)
+				? in->parse_error(l[pos][0], err_neg_fact, l[pos])
+				: ++pos, true;
+		}
+			if (*l[pos][0] == ',') { ++pos; }
+			else break;
+	} while (true);
 	if (*l[pos][0] != ':' || (l[pos][0][1] != '-' && l[pos][0][1] != '=' ))
 		return in->parse_error(l[pos][0], err_head, l[pos]);
 
@@ -1246,16 +1174,13 @@ string input::file_read_text(::FILE *f) {
 	stringstream ss;
 	char buf[32];
 	int_t c, n, l;
-	bool skip = false;
 	*buf = 0;
-next:	for (n = l = 0; n != 31; ++n)
-		if (EOF == (c = getc(f))) { skip = 0; break; }
-		else if (c == '\r' || c == '\n') skip = 0, buf[l++] = c;
-		else if (!skip) buf[l++] = c;
-	if (n) {
-		buf[l] = 0, ss << buf;
-		goto next;
-	} else if (skip) goto next;
+	for (n = l = 0; n != 31; ++n) {
+		if (EOF == (c = getc(f))) break;
+		else if (c == '\r' || c == '\n') buf[l++] = c;
+		else buf[l++] = c;
+		if (n) buf[l] = 0, ss << buf;
+	}
 	return ss.str();
 }
 

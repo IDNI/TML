@@ -15,7 +15,6 @@
 #include "bdd.h"
 using namespace std;
 
-#define MEMO
 bool onexit = false;
 
 template<typename T> struct veccmp {
@@ -139,7 +138,6 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	if (x == T || x == y) return y;
 	if (y == T) return x;
 	if (x > y) swap(x, y);
-#ifdef MEMO
 	if (C.size() >= gclimit) {
 		const bdd bx = get(x), by = get(y);
 		if (bx.v < by.v)
@@ -151,15 +149,12 @@ int_t bdd::bdd_and(int_t x, int_t y) {
 	ite_memo m = { x, y, F };
 	auto it = C.find(m);
 	if (it != C.end()) return it->second;
-#endif
 	const bdd bx = get(x), by = get(y);
 	int_t r;
 	if (bx.v < by.v) r = add(bx.v, bdd_and(bx.h, y), bdd_and(bx.l, y));
 	else if (bx.v > by.v) r = add(by.v, bdd_and(x, by.h), bdd_and(x, by.l));
 	else r = add(bx.v, bdd_and(bx.h, by.h), bdd_and(bx.l, by.l));
-#ifdef MEMO
 	C.emplace(m, r);
-#endif
 	return r;
 }
 
@@ -284,7 +279,6 @@ bool bdd::am_simplify(bdds& v, const unordered_map<bdds, int_t>& memo) {
 }
 
 int_t bdd::bdd_and_many(bdds v) {
-#ifdef MEMO
 	static unordered_map<ite_memo, int_t>::const_iterator jt;
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
@@ -297,7 +291,6 @@ int_t bdd::bdd_and_many(bdds v) {
 				break;
 			}
 		}
-#endif
 	if (v.empty()) return T;
 	if (v.size() == 1) return v[0];
 	simps = 0;

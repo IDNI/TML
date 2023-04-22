@@ -66,33 +66,6 @@ struct prog_data {
 	string_t std_input;
 };
 
-#ifdef DELETE_ME
-/* Provides consistent conversions of TML objects into Z3. */
-struct z3_context {
-	size_t arith_bit_len;
-	size_t universe_bit_len;
-	z3::context context;
-	z3::solver solver;
-	z3::expr_vector head_rename;
-	z3::sort bool_sort;
-	z3::sort value_sort;
-	std::map<rel_info, z3::func_decl> rel_to_decl;
-	std::map<elem, z3::expr> var_to_decl;
-	std::map<raw_rule, z3::expr> rule_to_decl;
-	
-	z3_context(size_t arith_bit_len, size_t universe_bit_len);
-	z3::func_decl rel_to_z3(const raw_term& rt);
-	z3::expr globalHead_to_z3(const int_t pos);
-	z3::expr fresh_constant();
-	z3::expr arg_to_z3(const elem& el);
-	z3::expr z3_head_constraints(const raw_term &head,
-		std::map<elem, z3::expr> &body_rename);
-	z3::expr term_to_z3(const raw_term &rel);
-	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
-	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
-};
-#endif // DELETE_ME
-
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
 template <class InputIterator>
