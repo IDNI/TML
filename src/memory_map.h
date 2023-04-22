@@ -70,7 +70,7 @@ public:
 			create();
 		else {
 			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
-				O_RDONLY : O_RDWR, 0644);
+				O_RDONLY : O_RDWR, 0600);
     			if (fd_ == -1) return err(errno,
 			    		"cannot open file for memory map");
 			if (mode_ == MMAP_WRITE)
@@ -194,7 +194,7 @@ private:
 	}
 	void create() {
 		if (filename_ == "") create_temp();
-		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0644);
+		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0600);
     		if (fd_ == -1) { err(errno, "memory_map: create"); return; }
 		if (fill() == -1) return;
 	}
