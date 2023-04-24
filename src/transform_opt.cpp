@@ -407,13 +407,15 @@ flat_prog minimize_and_iterate(const flat_prog& fp, int iterations, cost& cf, st
 
 flat_prog driver::optimize(const flat_prog& fp) const {
 	cost cf;
+	#ifdef DEBUG
 	step_printer printer = [&](const flat_prog& fp, int it) {
-		#ifdef DEBUG
 		print(o::dbg() << "Current flat_prog after:" << it << " steps.\n", fp) << endl;
 		o::dbg() << "Flat program size: " << fp.size() << endl;
 		o::dbg() << "Flat program cost: " << cf(fp) << endl; 
-		#endif // DEBUG
 	};
+	#else // DEBUG
+	step_printer printer = [&](const flat_prog&, int) {	};
+	#endif // DEBUG
 	flat_prog tfp = fp;
 	if (auto iterations = opts.get_int("iterate")) tfp = iterate(fp, iterations, printer);
 	if (auto minimizations = opts.get_int("minimize")) tfp = minimize(tfp, minimizations, cf, printer);
