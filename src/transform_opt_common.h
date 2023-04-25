@@ -20,8 +20,6 @@
 #include <set>
 #include "ir_builder.h"
 
-using namespace std;
-
 using flat_rule = std::vector<term>;
 using rel_arity = std::pair<int_t, size_t>;
 using rule_index = std::map<rel_arity, std::set<flat_rule>>;
