@@ -231,10 +231,10 @@ struct change {
 	}
 };
 
-/* Auxiliary functions */
-static int_t tab = 1 << 16;
 
 int get_tmp_sym() {
+	// auxiliary functions
+	static int_t tab = 1 << 16;
 	return tab++;
 }
 
