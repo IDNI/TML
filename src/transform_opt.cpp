@@ -29,7 +29,7 @@
 #include <vector>
 #include <set>
 #include <ctime>
-#include <cstdlib>
+#include <random>
 
 #include "driver.h"
 #include "err.h"
@@ -50,11 +50,12 @@ struct cost {
 
 	flat_rule generate_random_fact(const rel_arity& r) {
 		// Prepare random number generator
-		static bool seeded = false;
-		if (!seeded) srand(time(0)), seeded = true;
+		static random_device rd;
+		static mt19937 gen(rd()); 
+		static uniform_int_distribution<> dis(1 << 2 | 2, sample_size << 2 | 2); 
 		flat_rule fr;
 		term t; t.tab = r.first;
-		for (size_t i = 0; i < r.second; ++i) t.emplace_back((abs(rand()) % sample_size) << 2 | 2);	
+		for (size_t i = 0; i < r.second; ++i) t.emplace_back(dis(gen));	
 		fr.emplace_back(t);
 		return fr;
 	}
