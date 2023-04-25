@@ -245,8 +245,10 @@ bool typemanager::tcheck(const raw_term &rt) {
 bool typemanager::tcheck(const raw_form_tree &rft) {
 
 	bool ret = true;
-	if( rft.type == elem::NONE && !(ret = tcheck(*rft.rt )))
-		this->verrs.push_back(tstat);
+	if (rft.type == elem::NONE) {
+		ret = tcheck(*rft.rt );
+		if (!ret) this->verrs.push_back(tstat);
+	}
 
 	if(rft.l != nullptr ) ret &= tcheck(*rft.l);
 	if(rft.r != nullptr ) ret &= tcheck(*rft.r);
