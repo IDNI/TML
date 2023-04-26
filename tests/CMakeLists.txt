@@ -30,3 +30,9 @@ target_link_libraries(test_earley TMLo ${TEST_FRAMEWORK})
 add_custom_target(tmltest
 	COMMAND test_input && tml_output && tml_earley && test_iterators && test_transform_opt
 	DEPENDS test_input test_output test_earley test_iterators test_transform_opt)
+
+# add_test(NAME test_input COMMAND "${PROJECT_BINARY_DIR}/test_input")
+add_test(NAME test_output COMMAND "${PROJECT_BINARY_DIR}/test_output")
+add_test(NAME test_iterators COMMAND "${PROJECT_BINARY_DIR}/test_iterators")
+# add_test(NAME test_transform_opt COMMAND "${PROJECT_BINARY_DIR}/test_transform_opt")
+add_test(NAME test_earley COMMAND "${PROJECT_BINARY_DIR}/test_earley")

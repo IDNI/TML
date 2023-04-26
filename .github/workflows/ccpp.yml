@@ -116,16 +116,19 @@ jobs:
       - name: Test TML execution
         run: |
           ./build-Release/tml -ie "a(1)."
-      - name: Running unit tests
+
+      - name: Test
+        # Execute tests defined by the CMake configuration.
+        # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: |
-          cd ./build-Release
-          ../tests/run_unit_tests.sh
-          cd -
+          cd build-Release
+          ctest -j N
+          
       - name: Running regression tests
-        run: |
-          cd ./tests
-          ./run_all_regression_tests.sh
-          cd -
+          run: |
+            cd ./tests
+            ./run_all_regression_tests.sh
+            cd -
 # Ubuntu analyzes
 #      - name: Formatting
 #        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
