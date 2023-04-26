@@ -36,3 +36,8 @@ add_test(NAME test_output COMMAND "${PROJECT_BINARY_DIR}/test_output")
 add_test(NAME test_iterators COMMAND "${PROJECT_BINARY_DIR}/test_iterators")
 # add_test(NAME test_transform_opt COMMAND "${PROJECT_BINARY_DIR}/test_transform_opt")
 add_test(NAME test_earley COMMAND "${PROJECT_BINARY_DIR}/test_earley")
+
+find_program (BASH_PROGRAM bash)
+if (BASH_PROGRAM)
+  add_test (regression ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_all_regression_tests.sh)
+endif (BASH_PROGRAM)
