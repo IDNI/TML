@@ -125,10 +125,10 @@ jobs:
           ctest -j N
           
       - name: Running regression tests
-          run: |
-            cd ./tests
-            ./run_all_regression_tests.sh
-            cd -
+        run: |
+          cd ./tests
+          ./run_all_regression_tests.sh
+           cd -
 # Ubuntu analyzes
 #      - name: Formatting
 #        if: matrix.compiler == 'clang' && matrix.os == 'ubuntu-22.04'
