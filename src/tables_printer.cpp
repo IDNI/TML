@@ -66,9 +66,6 @@ void driver::out_result(std::basic_ostream<T> &os) {
 		if (tbl) {
 			if (tbl->goals.size()) out_goals(os);
 			else out_fixpoint(os);
-		#ifdef PROOF
-			get_proof(os);
-		#endif
 		}
 }
 

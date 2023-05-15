@@ -10,30 +10,23 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __PRINTING_H__
-#define __PRINTING_H__
 
-#include "defs.h"
-#include "input.h"
-#include "output.h"
-#include "options.h"
-#include "tables.h"
+#ifndef __TRANSFORM_OPT_SQR_H__
+#define __TRANSFORM_OPT_SQR_H__
+
+#include "transform_opt_common.h"
 
 namespace idni {
 
-template <typename T, typename T1, typename T2>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os,
-	const std::map<T1,T2>& m);
+/*! Produces a program where executing a single step is equivalent to
+ * executing two steps of the original program. This is achieved through
+ * inlining where each body term is replaced by the disjunction of the
+ * bodies of the relation that it refers to. For those facts not
+ * computed in the previous step, it is enough to check that they were
+ * derived to steps ago and were not deleted in the previous step. */
 
-template<typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
+flat_prog square_program(const flat_prog &fp);
 
-template <typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
+} // idni namespace
 
-struct elem;
-
-std::string quote_sym(const elem& e);
-
-} // namespace idni
-#endif // __PRINTING_H__
+#endif // __TRANSFORM_OPT_SQR_H__

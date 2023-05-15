@@ -30,6 +30,8 @@ src/inputsave.h
 src/tmlsave.g
 src/doctest.h
 src/tml.g.cpp.bak*
+emsdk
+analyze.sh
 
 # Sonarqube
 .scannerwork

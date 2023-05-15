@@ -9,7 +9,8 @@ using namespace idni;
 
 TEST_SUITE("input processing test") {
 	TEST_CASE("string input") {
-		ccs s = to_string_t("string").c_str();
+		auto tmp = to_string_t("string");
+		ccs s = tmp.c_str();
 		input i(s);
 		CHECK(i.begin() == i.data());
 	}

@@ -14,24 +14,17 @@
 #include <vector>
 #include <set>
 
-typedef int int_t;
-typedef int_t rel;
-
-#define TML
-
-#ifdef TML
 #include "ir_builder.h"
 #include "term.h"
-#else
-typedef std::vector<int_t> term; // first rel, then args. negative rel means negated
-#endif
 
 namespace idni {
+
+typedef int int_t;
+typedef int_t rel;
 
 typedef std::set<term> clause;
 typedef std::set<clause> dnf;
 typedef std::vector<std::pair<term, dnf>> prog;
-
 typedef std::set<std::pair<clause, dnf>> f_prog;
 
 prog from_term(const term&);
@@ -43,12 +36,8 @@ prog all(const prog&, int_t v, int_t t);
 
 f_prog unseq(const prog&);
 
-#ifdef TML
 void print_fof(prog& p, ir_builder *irb);
 void to_flat_prog(term &h, ir_builder *irb, const prog& p, flat_prog &m);
 void fof_init_tables(std::vector<term> &v);
-#endif
 
 } // namespace idni
-
-

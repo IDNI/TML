@@ -20,7 +20,6 @@
 #include <functional>
 #include "bdd.h"
 #include "term.h"
-#include "dict.h"
 #include "input.h"
 #include "form.h"
 #include "err.h"
@@ -79,21 +78,7 @@ struct alt : public std::vector<body*> {
 
 	pnft_handle f = 0;
 
-	bool operator<(const alt& t) const {
-		if (varslen != t.varslen) return varslen < t.varslen;
-		if (rng != t.rng) return rng < t.rng;
-		if (eq != t.eq) return eq < t.eq;
-		if (f != t.f) return f < t.f;
-		if (ex != t.ex) return ex < t.ex;
-		if (perm != t.perm) return perm < t.perm;
-		if (bltins != t.bltins) return bltins < t.bltins;
-		if (grnd != t.grnd) return grnd < t.grnd;
-		if (bltinvars != t.bltinvars) return bltinvars < t.bltinvars;
-		if (bltngvars != t.bltngvars) return bltngvars < t.bltngvars;
-		if (bltoutvars != t.bltoutvars) return bltoutvars <t.bltoutvars;
-		if (varbodies != t.varbodies) return varbodies <t.varbodies;
-		return (std::vector<body*>)*this<(std::vector<body*>)t;
-	}
+	auto operator<=>(const alt&) const = default;
 };
 
 struct rule : public std::vector<alt*> {
@@ -103,12 +88,9 @@ struct rule : public std::vector<alt*> {
 	size_t len;
 	bdd_handles last;
 	term t;
-	bool operator<(const rule& t) const {
-		if (neg != t.neg) return neg;
-		if (tab != t.tab) return tab < t.tab;
-		if (eq != t.eq) return eq < t.eq;
-		return (std::vector<alt*>)*this < (std::vector<alt*>)t;
-	}
+
+	auto operator<=>(const rule&) const = default;
+
 	bool equals_termwise(const rule& r) const {
 		if (t != r.t || size() != r.size()) return false;
 		for (size_t n = 0; n != size(); ++n)
@@ -155,6 +137,7 @@ struct table {
 	ints bltinargs;
 	size_t bltinsize = 0;
 	bool hidden = false;
+	bool generated = false;
 	bool commit(DBG(size_t));
 	inline bool is_builtin() const { return idbltin > -1; }
 };
@@ -169,13 +152,14 @@ public:
 class tables {
 	friend std::ostream& operator<<(std::ostream& os, const tables& tbl);
 	friend std::istream& operator>>(std::istream& is, tables& tbl);
+	friend struct cost;
 	friend struct form;
 	friend struct pnft;
 	friend struct term;
 	friend class driver;
 	friend struct bit_univ;
-	friend struct progress;
-	friend class builtins_factory;
+	friend class progress;
+	friend struct builtins_factory;
 
 private:
 
@@ -188,7 +172,7 @@ private:
 
 public:
 
-	term fixed_point_term; 
+	term fixed_point_term;
 	struct witness {
 		size_t rl, al;
 		std::vector<term> b;
@@ -227,6 +211,8 @@ public:
 
 	// tml_update population
 	int_t rel_tml_update, sym_add, sym_del;
+
+private:
 	std::vector<rule> rules;
 	std::vector<bdd_handles> fronts;
 	std::vector<bdd_handles> levels;
@@ -318,10 +304,10 @@ public:
 	std::set<term> decompress();
 
 	static void clear_memos();
-	
+
 private:
 	rule new_identity_rule(ntable tab, bool neg);
-	bool is_term_valid(const term &t);
+	bool is_term_valid(const term) const;
 	bool get_dnf_proofs(const term& q, proof& p, size_t level,
 		std::set<std::pair<term, size_t>> &refuted,
 		size_t explicit_rule_count);
@@ -368,16 +354,10 @@ private:
 	bool infloop_detected();
 
 	char fwd(progress& p) noexcept;
-
 	bdd_handles get_front() const;
 	bool bodies_equiv(std::vector<term> x, std::vector<term> y) const;
 	std::set<term> goals;
 	std::set<ntable> to_drop;
-#ifndef LOAD_STRS
-	void load_string(lexeme rel, const string_t& s);
-	strs_t strs;
-	std::set<int_t> str_rels;
-#endif
 
 private:
 	/*
@@ -454,7 +434,6 @@ private:
 		size_t out_varid, spbdd_handle in0, spbdd_handle in1,
 		size_t n_vars, t_arith_op op);
 
-	#ifdef FOL_V1
 	std::pair<bools, uints> deltail(size_t len1, size_t len2, size_t bits) const;
 	void ex_typebits(spbdd_handle &s, size_t nvars) const;
 	void ex_typebits(bools &exvec, size_t nvars) const;
@@ -464,10 +443,7 @@ private:
 	void hol_query(cr_pnft_handle f, std::vector<quant_t> &quantsh,
 		var2space &v2s, bdd_handles &v);
 	void formula_query(cr_pnft_handle f, bdd_handles& v);
-	#endif
 
-	//-------------------------------------------------------------------------
-	//printer
 
 public:
 
@@ -480,9 +456,9 @@ public:
 	builtins bltins;
 
 	tables(rt_options opts, builtins &bltins);
-	
+
 	~tables();
-	
+
 	size_t step() { return nstep; }
 
 	bool pfp(size_t nsteps, size_t break_on_step, progress& p);
@@ -497,7 +473,7 @@ public:
 
 	// adds __fp__() fact into the db when FP found (enabled by -fp or -g)
 	bool add_fixed_point_fact();
-	
+
 	bool populate_tml_update = false;
 	bool print_updates       = false;
 	bool print_steps         = false;

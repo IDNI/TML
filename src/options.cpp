@@ -180,25 +180,16 @@ void options::setup() {
 	add_output    ("repl-output", "repl output");
 #endif
 	add_bool("sdt",     "sdt transformation");
-#ifdef WITH_Z3
-	add_bool("qc-subsume-z3",
-		"Enable CQNC subsumption optimization using theorem prover Z3");
-#endif
 	add_bool("show-hidden", "show the contents of hidden relations");
-	add_bool("split-rules",
-		"transformation to reduce number of conjunctions in each rule");
-	add_bool("cqc-subsume",
-		"subsume queries into each other using CQC test");
-	add_bool("cqnc-subsume",
-		"subsume queries into each other using CQNC test");
-	add_bool("cqc-factor",
-		"factor out parts of queries using CQC test");
-	add_bool("to-dnf",
-		"convert FOL formulas into to DNF before running program");
-	add_bool("safecheck", "to be DEPRECATED: safety check will be always on");
+	add(option(option::type::INT, { "minimize" }).description("minimize"
+		" the given program a given number of iterations (default: x=0)"));
 	add(option(option::type::INT, { "iterate" }).description("transforms"
 		" the program into one where each step is equivalent to 2^x of"
 		" the original's (default: x=0)"));
+	add(option(option::type::INT, { "minimize-and-iterate" }).description("transforms"
+		" the program into one where each step is equivalent to 2^x of"
+		" the original's and minimize it for the given number of steps (default: x=0)"));
+	add_bool("safecheck", "to be DEPRECATED: safety check will be always on");
 	add_bool("gc",      "enable garbage collection");
 	add(option(option::type::ENUM, { "proof" }, { "none", "tree", "forest", 
 		"partial-tree", "partial-forest" }).description("control if and"

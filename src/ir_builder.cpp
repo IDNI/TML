@@ -15,11 +15,10 @@
 #include <regex>
 #include <variant>
 #include <math.h>
+
 #include "ir_builder.h"
 #include "tables.h"
 #include "output.h"
-
-
 #include "fof.h"
 
 using namespace std;
@@ -616,7 +615,6 @@ sig ir_builder::get_sig_typed(const int_t& rel_id, vector<native_type> tys) {
 }
 #endif //TYPE_RESOLUTION
 
-#ifdef TML_NATIVES
 sig ir_builder::get_sig(raw_term &t) {
 	if (t.s.second.size()) {
 		#ifdef BIT_TRANSFORM_V2
@@ -658,53 +656,34 @@ sig ir_builder::get_sig(raw_term &t) {
 	t.s = {rel_id , tn};
 	return t.s;
 }
-#endif
 
-sig ir_builder::get_sig(const raw_term&t) {
-#ifdef TML_NATIVES
+sig ir_builder::get_sig(const raw_term& t) {
 	#ifdef TYPE_RESOLUTION
-		//TODO: avoid workaround
+		raw_term aux = t; //TODO: avoid workaround
 		return get_sig(aux);
 	#else
 		int_t rel_id = dict.get_rel(t.e[0].e);
 		tml_natives tn(t.arity[0], {native_type::UNDEF,-1});
 		return {rel_id , tn};
 	#endif
-#else
-	int_t rel_id = dict.get_rel(t.e[0].e);
-	return {rel_id , t.arity};
-#endif
 }
 
 sig ir_builder::get_sig(const lexeme& rel, const ints& arity) {
 	int_t rel_id = dict.get_rel(rel);
-#ifdef TML_NATIVES
 	DBG(assert(arity.size() == 1));
 	tml_natives tn(arity[0], {native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 sig ir_builder::get_sig(const int_t& rel_id, const ints& arity) {
-#ifdef TML_NATIVES
 	tml_natives tn;
 	if (arity.size() == 1)
 		for (int_t i = 0; i != arity[0];++i) tn.push_back({native_type::UNDEF,-1});
 	return {rel_id, tn};
-#else
-	return {rel_id, arity};
-#endif
 }
 
 size_t ir_builder::sig_len(const sig& s) const {
-#ifdef TML_NATIVES
 	return s.second.size();
-#else
-	assert(s.second.size()==1);
-	return s.second[0];
-#endif
 }
 
 #if defined(TYPE_RESOLUTION) & defined(BIT_TRANSFORM_V2)
@@ -786,7 +765,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 		}
 
 		else if(r.prft) {
-			#ifdef FOL_V1
 			bool is_sol = false;
 			form* froot = 0;
 			//TODO: review
@@ -826,7 +804,6 @@ flat_prog ir_builder::to_terms(const raw_prog& pin) {
 				if (!m.insert(move(v)).second) v.clear();
 			}
 			//TODO: review multiple heads and varmaps
-			#endif
 
 			#ifdef FOL_V2
 			sprawformtree root = r.prft->neg // neg transform
@@ -910,12 +887,16 @@ term ir_builder::from_raw_term(const raw_term& r, bool isheader, size_t orderid)
 }
 
 elem ir_builder::get_elem(int_t arg) const {
-	if (arg < 0) return elem(elem::VAR, dict.get_var_lexeme(arg));
+	if (arg < 0) {
+		auto v = dict.get_var_lexeme(arg);
+		return (v == null_lexeme) ? elem(elem::VAR, dict.get_lexeme("?0v" + ::to_string(-arg)))
+			: elem(elem::VAR, v);
+	}
 
 #ifndef BIT_TRANSFORM
-		if (arg & 1) return elem((char32_t) (arg >> 2));
-		if (arg & 2) return elem((int_t) (arg >> 2));
-		return elem(elem::SYM, dict.get_sym_lexeme(arg >>2));
+	if (arg & 1) return elem((char32_t) (arg >> 2));
+	if (arg & 2) return elem((int_t) (arg >> 2));
+	return elem(elem::SYM, dict.get_sym_lexeme(arg >> 2));
 #else
 		if(arg == 1 || arg == 0) return elem((bool) (arg));
 		return elem(elem::SYM, dict.get_sym_lexeme(arg));
@@ -965,7 +946,6 @@ void ir_builder::set_hidden_table(const int_t t) {
 
 //---------------------------------------------------------
 
-#ifdef FOL_V1
 
 /* Populates froot argument by creating a binary tree from raw formula in rfm.
 It is caller's responsibility to manage the memory of froot. If the function,
@@ -1050,7 +1030,6 @@ bool ir_builder::from_raw_form(const sprawformtree rfm, form *&froot, bool &is_s
 		return ret;
 	}
 }
-#endif
 
 #ifdef FOL_V2
 prog ir_builder::get_fof(sprawformtree root) {
@@ -1177,18 +1156,26 @@ raw_term ir_builder::to_raw_term(const term& r) {
 			rt.add_parenthesis();
 		}
 		else {
-			if (r.tab != -1) {
-
-				args = dynenv->tbls.at(r.tab).len, rt.e.resize(args + 1);
+			if (r.tab >= 0) {
+				// TODO Check if we really need to check the size of args in dynenv
+				args = ((unsigned) r.tab < dynenv->tbls.size())
+					? dynenv->tbls.at(r.tab).len : r.size(), rt.e.resize(args + 1);
 				#ifdef FOL_V2
 				if (dynenv->tbls.at(r.tab).hidden) {
 					rt.e[0] = elem(elem::SYM, dict.get_lexeme(to_string(dynenv->tbls.at(r.tab).s.first)));
 				}
 				else
 				#endif
-					rt.e[0] = elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s)));
 
-				rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
+				rt.e[0] = ((unsigned) r.tab > dynenv->tbls.size())
+					? elem(elem::SYM, dict.get_lexeme("?0pP" + ::to_string(r.tab)))
+					: (dynenv->tbls.at(r.tab).generated
+						? elem(elem::SYM, dict.get_lexeme("?0pP" + ::to_string(r.tab)))
+						: elem(elem::SYM, dict.get_rel_lexeme(get<0>(dynenv->tbls.at(r.tab).s))));
+
+				if ((unsigned) r.tab > dynenv->tbls.size()) rt.arity = { (int) args };
+				else if (dynenv->tbls.at(r.tab).generated) rt.arity = { (int) args };
+				else rt.arity = {(int_t) sig_len(dynenv->tbls.at(r.tab).s)};
 
 				#ifdef TYPE_RESOLUTION
 				sig s = dynenv->tbls[r.tab].s;
@@ -1715,7 +1702,7 @@ bool ptransformer::parse_alts(vector<elem> &next, size_t& cur){
 lexeme ptransformer::get_fresh_nonterminal(){
 	static size_t count=0;
 	string fnt = "_R" + to_string(lexeme2str(this->p.p[0].e)) + "_" +
-		to_string(count++);
+		::to_string(count++);
 	return d.get_lexeme(fnt);
 }
 
@@ -1742,12 +1729,7 @@ bool ptransformer::synth_recur(vector<elem>::const_iterator from,
 	elem alte = elem(elem::ALT, d.get_lexeme("|"));
 	if (balt) np.p.emplace_back(alte);
 	if (balt && bnull) {
-		#ifdef NNULL_KLEENE
-			np.p.insert(np.p.end(), from , till);
-			np.p.emplace_back(elem::SYM, d.get_lexeme("_null_tg_"));
-		#else
-			np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
-		#endif
+		np.p.emplace_back( elem::SYM, d.get_lexeme("null"));
 	}
 	else if (balt) np.p.insert(np.p.end(), from, till);
 	return true;
@@ -2070,7 +2052,7 @@ parser_t::grammar ir_builder::to_grammar(const vector<struct production> &p)
 		g[head].emplace_back();
 		for (size_t i = 1; i < x.p.size(); ++i)
 			g[head].back().push_back(
-				to_u32string(x.p[i].to_str_t())); 
+				to_u32string(x.p[i].to_str_t()));
 	}
 	for (const auto& x : g) r.push_back(x);
 	return r;
@@ -2254,14 +2236,8 @@ bool ir_builder::transform_apply_regex(std::vector<struct production> &g,  flat_
 	set<elem> torem;
 	measure_time_start();
 	bool enable_regdetect_matching = opts.apply_regexpmatch;
-#ifdef LOAD_STRS
 	if (strs.size() && enable_regdetect_matching) {
 		string inputstr = to_string(strs.begin()->second);
-#else
-	if (dynenv->strs.size() && enable_regdetect_matching) {
-		string inputstr = to_string(dynenv->strs.begin()->second);
-
-#endif
 		DBG(o::dbg() << inputstr << endl);
 		graphgrammar ggraph(g, dict);
 		ggraph.detectcycle();
@@ -2373,7 +2349,7 @@ bool ir_builder::transform_strsplit(vector<production> &g) {
 			}
 	return changed;
 }
-#ifdef LOAD_STRS
+
 void ir_builder::load_string(flat_prog &fp, const lexeme &r, const string_t& s){
 	nums = max(nums, (int_t) s.size()+1); //this is to have enough for the str index
 	unary_string us(sizeof(char32_t)*8);
@@ -2431,6 +2407,5 @@ void ir_builder::load_strings_as_fp(flat_prog &fp, const strs_t& s) {
 	strs = s;
 	for (auto x : strs) load_string(fp, x.first, x.second);
 }
-#endif
 
 } // idni namespace

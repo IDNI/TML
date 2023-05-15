@@ -14,7 +14,7 @@ jobs:
       max-parallel: 4
       matrix:
         compiler: [clang, gcc]
-        os: [ubuntu-22.04, macOS-12]
+        os: [ubuntu-22.04, macos-latest]
 
     steps:
       - uses: actions/checkout@v2
@@ -38,27 +38,31 @@ jobs:
           sudo apt-get install -y clang-14 clang-tidy-14
 # macOS installations
       - name: Installing gcc on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install gcc
-      - name: Selecting XCode 14.2
-        if: matrix.os == 'macOS-12'
+      - name: Selecting latest XCode
+        if: matrix.os == 'macos-latest'
         run: |
           sudo xcode-select -s "/Applications/Xcode_14.2.app"
       - name: Installing boost on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install boost
+      - name: Installing z3 on macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install z3
       - name: Installing lcov on macOS (clang)
-        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'clang' && matrix.os == 'macos-latest'
         run: |
           brew install lcov
       - name: Installing gcovr on macOS (gcc)
-        if: matrix.compiler == 'gcc' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'gcc' && matrix.os == 'macos-latest'
         run: |
           brew install gcovr
       - name: Installing cppcheck on macOS
-        if: matrix.os == 'macOS-12'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install cppcheck
 # building
@@ -66,9 +70,14 @@ jobs:
         run: |
           mkdir -p build-Debug
           cd build-Debug
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            Z3_LOC=$(brew --prefix z3)
+          else
+            Z3_LOC=/usr
+          fi
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
             CMAKE_CXX_COMPILER=g++-12
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE
+            cmake .. -G "Unix Makefiles" -DZ3_LOC=$Z3_LOC -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DBUILD_CODE_COVERAGE=TRUE 
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=$(which clang++-14)
@@ -77,16 +86,21 @@ jobs:
               CMAKE_C_COMPILER=$(which clang)      
               CMAKE_CXX_COMPILER=$(which clang++)      
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
+            cmake .. -G "Unix Makefiles" -DZ3_LOC=$Z3_LOC -DCMAKE_BUILD_TYPE="Debug" -DBUILD_CPPCHECK=TRUE -DBUILD_CLANG_TIDY=TRUE -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER 
           fi
           make -j5
       - name: Bulding release version
         run: |
           mkdir -p build-Release
           cd build-Release
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            Z3_LOC=$(brew --prefix z3)
+          else
+            Z3_LOC=/usr
+          fi
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
             CMAKE_CXX_COMPILER=g++-12
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+            cmake .. -G "Unix Makefiles" -DZ3_LOC=$Z3_LOC -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
           else
             if [ "${{ matrix.os }}" = "ubuntu-22.04" ]; then
               CMAKE_CXX_COMPILER=$(which clang++-14)
@@ -95,22 +109,20 @@ jobs:
               CMAKE_C_COMPILER=$(which clang)      
               CMAKE_CXX_COMPILER=$(which clang++)
             fi
-            cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
+            cmake .. -G "Unix Makefiles" -DZ3_LOC=$Z3_LOC -DCMAKE_BUILD_TYPE="Release" -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER
           fi
           make -j5
 # tests
       - name: Test TML execution
         run: |
           ./build-Release/tml -ie "a(1)."
-      - name: Running unit tests
+
+      - name: Test
+        # Execute tests defined by the CMake configuration.
+        # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: |
-          cd ./build-Release
-          ../tests/run_unit_tests.sh
-          cd -
-      - name: Running regression tests
-        run: |
-          cd ./tests
-          ./run_all_regression_tests.sh
+          cd build-Release
+          ctest -j N --output-on-failure
           cd -
 # Ubuntu analyzes
 #      - name: Formatting
@@ -137,7 +149,7 @@ jobs:
 #           bash <(curl -s https://codecov.io/bash) -f coverage.info || echo "Codecov did not collect coverage reports"
 # macOS analyzes
       - name: Running CPP check on macOS
-        if: matrix.compiler == 'clang' && matrix.os == 'macOS-12'
+        if: matrix.compiler == 'clang' && matrix.os == 'macos-latest'
         run: |
           cd build-Debug
           make -j5 cppcheck

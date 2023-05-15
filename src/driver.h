@@ -16,17 +16,17 @@
 #include <map>
 #include <cmath>
 #include <variant>
-
-#ifdef WITH_Z3
+#include <memory>
+#include <vector>
+#include <ostream>
+#include <ctime>
 #include "z3++.h"
-#endif
-
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/bind.h>
-#include <emscripten/val.h>
+#	include <emscripten.h>
+#	include <emscripten/bind.h>
+#	include <emscripten/val.h>
 #endif
-
+#include "defs.h"
 #include "tables.h"
 #include "input.h"
 #include "dict.h"
@@ -37,7 +37,6 @@
 #include "tables_progress.h"
 
 namespace idni {
-
 
 typedef std::map<elem, elem> var_subs;
 typedef std::pair<std::set<raw_term>, var_subs> terms_hom;
@@ -65,39 +64,11 @@ struct prog_data {
 	string_t std_input;
 };
 
-#ifdef WITH_Z3
-/* Provides consistent conversions of TML objects into Z3. */
-struct z3_context {
-	size_t arith_bit_len;
-	size_t universe_bit_len;
-	z3::context context;
-	z3::solver solver;
-	z3::expr_vector head_rename;
-	z3::sort bool_sort;
-	z3::sort value_sort;
-	std::map<rel_info, z3::func_decl> rel_to_decl;
-	std::map<elem, z3::expr> var_to_decl;
-	std::map<raw_rule, z3::expr> rule_to_decl;
-	
-	z3_context(size_t arith_bit_len, size_t universe_bit_len);
-	z3::func_decl rel_to_z3(const raw_term& rt);
-	z3::expr globalHead_to_z3(const int_t pos);
-	z3::expr fresh_constant();
-	z3::expr arg_to_z3(const elem& el);
-	z3::expr z3_head_constraints(const raw_term &head,
-		std::map<elem, z3::expr> &body_rename);
-	z3::expr term_to_z3(const raw_term &rel);
-	z3::expr tree_to_z3(const raw_form_tree &tree, dict_t &dict);
-	z3::expr rule_to_z3(const raw_rule &rr, dict_t &dict);
-};
-
-#endif
-
 void collect_vars(const raw_rule &rr, std::set<elem> &vars);
 void collect_vars(const raw_term &rt, std::set<elem> &vars);
 template <class InputIterator>
-	void collect_vars(InputIterator first, InputIterator last,
-		std::set<elem> &vars);
+void collect_vars(InputIterator first, InputIterator last,
+	std::set<elem> &vars);
 void collect_free_vars(const std::vector<std::vector<raw_term>> &b,
 	std::vector<elem> &bound_vars, std::set<elem> &free_vars);
 void collect_free_vars(const raw_rule &rr, std::set<elem> &free_vars);
@@ -132,11 +103,11 @@ class driver {
 	void refresh_vars(raw_prog& p);
 	raw_rule refresh_vars(raw_term h, std::vector<std::vector<raw_term>> b);
 	std::set<raw_rule> refresh_vars(raw_rule& r);
-	
+
 	std::set<raw_term> get_queries(const raw_prog& p);
 	string_t directive_load(const directive& d);
 	void directives_load(raw_prog& p);
-	
+
 	void transform_bin(raw_prog& p);
 	void transform_len(raw_term& r, const strs_t& s);
 	raw_term get_try_pred(const raw_term& x);
@@ -161,11 +132,6 @@ class driver {
 	std::optional<std::pair<elem, raw_rule>> is_safe(raw_prog &rp);
 	void flatten_associative(const elem::etype &tp,
 		const raw_form_tree &tree, std::vector<const raw_form_tree *> &tms);
-	template<typename F> void minimize(raw_rule &rr, const F &f);
-	template<typename F>
-		raw_form_tree &minimize_aux(const raw_rule &ref_rule,
-		const raw_rule &var_rule, raw_form_tree &ref_tree,
-		raw_form_tree &var_tree, const F &f, bool ctx_sign = true);
 	int_t count_related_rules(const raw_rule &rr1, const raw_prog &rp);
 	void step_transform(raw_prog &rp,
 		const std::function<void(raw_prog &)> &f);
@@ -173,28 +139,13 @@ class driver {
 		const std::function<void(raw_prog &)> &f);
 	void recursive_transform(raw_prog &rp
 	/*,const std::function<void(raw_prog &)> &f*/);
-	raw_form_tree expand_term(const raw_term &use, const raw_rule &def);
-	void square_root_program(raw_prog &rp);
-	void square_program(raw_prog &rp);
 	raw_rule freeze_rule(raw_rule rr, std::map<elem, elem> &freeze_map,
 		dict_t &d);
-	bool cqc(const raw_rule &rr1, const raw_rule &rr2);
-	bool cqnc(const raw_rule &rr1, const raw_rule &rr2);
 	bool cbc(const raw_rule &rr1, raw_rule rr2, std::set<terms_hom> &homs);
-	void eliminate_dead_variables(raw_prog &rp);
-	void factor_rules(raw_prog &rp);
-#ifdef WITH_Z3
-	void qc_z3(raw_prog &rp);
-	bool check_qc_z3(const raw_rule &r1, const raw_rule &r2,
-		z3_context &ctx);
-#endif
-	// following methods are defined in a file tml_earley.cpp
-#ifdef NEEDS_REWRITE
-	bool parse_tml(input* in, flat_prog& fp);
-	bool parse_tml_old(input* in, raw_progs& rps);
+private:
+	// following 2 methods are defined in a file tml_earley.cpp
+	bool earley_parse_tml(input* in, raw_progs& rps);
 	std::vector<production> load_tml_grammar();
-#endif
-
 	raw_prog read_prog(elem prog);
 	elem quote_elem(const elem &e, std::map<elem, elem> &variables,
 		dict_t &d);
@@ -210,9 +161,7 @@ class driver {
 	void quote_prog(const raw_prog nrp, const elem &rel_name,
 		const elem &domain_name, raw_prog &rp);
 	void split_heads(raw_prog &rp);
-	raw_term to_dnf(const raw_form_tree &t, raw_prog &rp,
-		const std::set<elem> &fv);
-	void to_dnf(raw_prog &rp);
+	flat_prog optimize(const flat_prog& fp) const;
 	void compute_required_vars(const raw_rule &rr, const terms_hom &hom,
 		std::set<elem> &orig_vars);
 	raw_term relation_to_term(const rel_info &ri);
@@ -222,7 +171,7 @@ class driver {
 		const elem &rva, const elem &qvb, const elem &rvb);
 	sprawformtree fix_symbols(const elem &fs_rel, const elem &qva,
 		const elem &rva);
-	template<typename F> void subsume_queries(raw_prog &rp, const F &f);
+	// TODO and remove the previous ones
 	elem concat(const elem &rel, std::string suffix);
 	lexeme concat(const lexeme &rel, std::string suffix);
 	raw_prog reify(const raw_prog& p);
@@ -253,6 +202,37 @@ class driver {
 	bool add_print_builtins(builtins& bltins);
 	bool add_js_builtins(builtins& bltins);
 
+	//-------------------------------------------------------------------------
+	//printer
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const std::vector<term>& v) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>& os, const flat_prog& p) const;
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::proof_elem&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::proof&);
+	template <typename T>
+	void print(std::basic_ostream<T>&, const tables::witness&);
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const term& h,
+		const std::set<term>& b) const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const rule& r)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const sig& s)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&, const table& t)
+		const;
+	template <typename T>
+	std::basic_ostream<T>& print(std::basic_ostream<T>&) const;
+	template <typename T>
+	std::basic_ostream<T>& print_dict(std::basic_ostream<T>&) const;
 public:
 	template <typename T>
 	void out_goals(std::basic_ostream<T> &os);
@@ -263,7 +243,7 @@ public:
 	template <typename T>
 	void out_result(std::basic_ostream<T> &os);
 	template <typename T>
-	void out(std::basic_ostream<T> &os) { /* TODO something*/ }
+	void out(std::basic_ostream<T> &os) { print_dict(os); }
 
 	void init_tml_update(updates& updts);
 
@@ -317,7 +297,7 @@ public:
 	inputs* get_inputs() const { return ii; }
 	input* get_current_input() const { return current_input; }
 	void set_current_input(input* in) { current_input = in; }
-	
+
 	const options& get_opts() const { return opts; }
 
 	template <typename T>
@@ -325,11 +305,9 @@ public:
 	template <typename T>
 	void list(std::basic_ostream<T>& os, size_t p = 0);
 
-
-	void dump() { 
-	}
+	void dump() { }
 	void save_csv() const;
-	
+
 #ifdef __EMSCRIPTEN__
 	void out(emscripten::val o) const { if (tbl) tbl->out(o); }
 	emscripten::val to_bin() {
@@ -351,7 +329,6 @@ template <typename T>
 std::basic_ostream<T>& printbdd(std::basic_ostream<T>& os,
 	idni::cr_spbdd_handle t, size_t bits, ints ar, int_t rel);
 template <typename T>
-
 std::basic_ostream<T>& printbdd_one(std::basic_ostream<T>&os, cr_spbdd_handle t,
 	size_t bits, ints ar, int_t rel);
 #endif

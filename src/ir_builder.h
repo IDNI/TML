@@ -65,7 +65,7 @@ public:
 	std::map<sig, int_t> bsmap; //signature-bltin_id map
 
 	ir_builder(dict_t& dict_, rt_options& opts_):
-		dict(dict_), opts(opts_) {} 
+		dict(dict_), opts(opts_) {}
 
 	~ir_builder() = default;
 
@@ -111,12 +111,9 @@ public:
 	size_t sig_len(const sig& s) const;
 
 	std::set<int_t> str_rels;
-#define LOAD_STRS
-#ifdef LOAD_STRS
 	strs_t strs;
 	void load_string(flat_prog &fp, const lexeme &r, const string_t& s);
 	void load_strings_as_fp(flat_prog &fp, const strs_t& s);
-#endif
 
 	//-------------------------------------------------------------------------
 	flat_prog to_terms(const raw_prog& p);
@@ -126,12 +123,10 @@ public:
 	struct elem get_elem(int_t arg) const;
 	void get_nums(const raw_term& t);
 	void set_hidden_table(const int_t t);
-	
+
 	//-------------------------------------------------------------------------
 	bool to_pnf(form *&froot);
-	#ifdef FOL_V1
 	bool from_raw_form(const sprawformtree rs, form *&froot, bool &is_sol);
-	#endif
 	#ifdef FOL_V2
 	prog get_fof(sprawformtree root);
 	#endif

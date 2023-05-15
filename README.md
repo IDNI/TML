@@ -1004,76 +1004,59 @@ Type error: "4 exceeds max size for int:2 in predicate night(4)" close to "4).  
 
 ```
 
-# Conjunctive Query Containment (CQC)
-This section lists the optimizations based on CQC tests that have been
-implemented in the interpreter, what exactly they do to TML source code,
-the command line flags required to enable them, and their potential
-drawbacks. Note that the flag `--3pfp` should be enabled when using any
-of these optimizations because their internals sometimes cause
-alternating fixpoints. Note also that the results of a program obtained
-by applying these optimizations to another should be indistinguishable
-from those of the original.
+# Program optimization
 
-## Subsumption without Negation
-This pair of optimizations is based on the CQC test as described on
-section 1.1 of "Information Integration Using Logical Views" by Ullman.
+This Section lists the optimizations that could be performed in a TML program.
 
-The first of the optimization pair tries to identify redundant conjunctive
-rules in a TML codebase. It does this by iterating through all unordered
-pairs of conjunctive rules corresponding to the same relation and formally
-checking whether the facts derived by one rule are necessarily derived by
-the other rule. If this is the case, then it follows that the former rule
-is redundant.
+There are two kinds of optimizations: iteration and minmization. The
+first one deals with the computation of a new program that computes the 
+iteration of the given program a given number of times. The second one deals with
+the minimization of the given program in order to be compute it faster, i.e. 
+we take into account a cost function that computes the cost of each 
+independant rule and try to minimize the overall cost.
 
-The second of the optimization pair tries to identify redundant terms in
-conjunctive rule bodies by checking whether a rule is contained by one
-obtained by removing a body term. If this is so then the body term can be
-removed to obtain an equivalent rule since this rule's derivation set would
-both be a subset and superset of the original's.
+Optimizations from previous versions of TML are subsumed by ones the consider above.
 
-This optimization can be enabled using the flag `--cqc-subsume`.
-## Subsumption with Negation
-This pair of optimizations is based on the Conjunctive Query Containment
-(CQNC) test as described in section 1.2 of "Information Integration Using
-Logical Views" by Ullman.
+## Iteration
 
-The details of this optimization pair are the same as those of the
-negation-less case as described above, except this pair additionally works
-on conjunctive rules containing terms with negation. This optimization pair
-is strictly more general than those for the negation-less case, however
-this comes at a cost: this optimization pair is much slower than the one
-for the negation-less case. This can be seen from the Ullman paper where
-the containment checker must iterate through partitions of a given set and
-amongst other operations, iterate through the powerset of the set of terms
-formed by taking the cartesian power of some set of atoms.
+Each input program is executed symbolically the number of times required. The final
+result is a TML program that compute at once the results of the initial program 
+afer the given number of iterations.
 
-This optimization can be enabled using the flag `--cqnc-subsume`.
-## Factorization
-This algorithm shares a similar spirit to the CQC test in that it
-searches for homomorphisms between different rules. The difference here
-though is that rule heads are not included in the homomorphism checks.
-This exclusion allows us to check whether certain body parts of a rule
-are contained by the body parts of another. And when containment is
-verified, we simply create another rule corresponding to the intersection
-of the original rules and make the original rules point to this newly
-created rules.
+This optimization could be enabled using `--iterate` followed by the numbers of 
+times the procedure should be realized.
 
-This optimization can cause the TML program to slowdown so when it
-is desired to increase the speed of a TML program, one should try running
-it both with and without this optimization and proceed accordingly. The
-potential slowdown can be attributed to the fact that additional terms
-and rules are required to correctly sequence the temporary rules in the
-case that the original program used negation.
+The resulting program could be oputput following the standar procedures using the 
+`--dump` parameter.
 
-This optimization can be enabled using the flag `--cqc-factor`.
+## Minimization
 
-# Self Interpretation
-This section lists the directives provided to support
-self-interpretation, how to invoke them, and what they do at runtime.
-The flag `--3pfp` should be used in conjunction with these dirrectives
-because their internals sometimes cause alternating fixpoints. Note
-that anything that can be achieved using these directives can also
-be achieved without them in pure TML.
+We minimized the program execution time extracting common parts from each pair of
+rules into new ones. To do so we use a CQC (Conjunctive Query Containment) 
+using Z3 procedure. 
+
+The underlying procedure includes splitting of the rules (as we consider all the
+posible splitings of the rules).
+
+The evaluated cost of each rule is given by the actual cost of computing the rule 
+over a random sample of the intervining facts.
+
+The procedure above described (intrincasilly) includes the rules splitting and
+factorication of previous versions of TML. 
+
+This optimization could be enabled using `--minimize` followed by the numbers of 
+times the procedure should be realized.
+
+## Minimization and iteration
+
+This option combines the above optimization into one. For each iteration of the procedure
+one iteration and one minimization is done.
+
+This optimization could be enabled using `--minimize-and-iterate` followed by the numbers of 
+times the procedure should be realized.
+
+The resulting program could be oputput following the standar procedures using the 
+`--dump-minimize-and-iterate` parameter.
 
 ## Domain
 The domain directive creates a domain over which a quoted program can

@@ -10,30 +10,18 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __PRINTING_H__
-#define __PRINTING_H__
 
-#include "defs.h"
-#include "input.h"
-#include "output.h"
-#include "options.h"
-#include "tables.h"
+#ifndef __TRANSFORM_OPT_Z3_H__
+#define __TRANSFORM_OPT_Z3_H__
+
+#include "transform_opt_common.h"
 
 namespace idni {
 
-template <typename T, typename T1, typename T2>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os,
-	const std::map<T1,T2>& m);
+flat_prog minimize_rules(flat_prog const &p);
+flat_rule minimize_rule(flat_rule const &r, flat_prog const &p);
+bool rule_contains(flat_rule const &r1, flat_rule const &r2, flat_prog const &p);
 
-template<typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const env& e);
+} // idni namespace
 
-template <typename T>
-std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const vbools& x);
-
-struct elem;
-
-std::string quote_sym(const elem& e);
-
-} // namespace idni
-#endif // __PRINTING_H__
+#endif // __TRANSFORM_OPT_Z3_H__

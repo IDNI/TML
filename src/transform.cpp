@@ -20,10 +20,10 @@ namespace idni {
 
 #define get_var_elem(i) elem(elem::VAR, dict.get_var_lexeme(i))
 
-void driver::refresh_vars(raw_term& t, size_t& v, map<elem, elem>& m) {
+void driver::refresh_vars(raw_term& t, size_t&, map<elem, elem>& m) {
 	for (elem& e : t.e)
 		if (e.type == elem::VAR && m.find(e) == m.end())
-			m.emplace(e, get_var_elem(v++));
+			m.emplace(e, elem(elem::VAR, e.e));
 	for (elem& e : t.e) if (e.type == elem::VAR) e = m[e];
 }
 
@@ -112,32 +112,34 @@ void driver::transform_string(const string_t& s, raw_prog& r, const lexeme &rel)
 
 void elim_nullables(set<production>& s) {
 	set<elem> nullables;
-loop1:	size_t sz = nullables.size();
-	for (const production& p : s) {
-		bool null = true;
-		if (p.p.size() != 2 || !(p.p[1].e == "null"))
-			for (size_t n = 1; null && n != p.p.size(); ++n)
-				null &= has(nullables, p.p[n]);
-		if (null) nullables.insert(p.p[0]);
-	}
-	if (sz != nullables.size()) goto loop1;
+	size_t sz = nullables.size();
+	do {
+		for (const production& p : s) {
+			bool null = true;
+			if (p.p.size() != 2 || !(p.p[1].e == "null"))
+				for (size_t n = 1; null && n != p.p.size(); ++n)
+					null &= has(nullables, p.p[n]);
+			if (null) nullables.insert(p.p[0]);
+		}
+	} while (sz != nullables.size());
 	set<production> t;
 	for (auto p : s)
 		if (p.p.size() == 2 && p.p[1].e == "null")
 			t.insert(p);
 	for (auto x : t) s.erase(x);
 	t.clear();
-loop2:	sz = s.size();
-	for (auto p : s)
-		for (size_t n = 1; n != p.p.size(); ++n)
-			if (has(nullables, p.p[n])) {
-				production q = p;
-				q.p.erase(q.p.begin() + n),
-				t.insert(q);
-			}
-	for (auto x : t) s.insert(x);
-	t.clear();
-	if (sz != s.size()) goto loop2;
+	sz = s.size();
+	do {
+		for (auto p : s)
+			for (size_t n = 1; n != p.p.size(); ++n)
+				if (has(nullables, p.p[n])) {
+					production q = p;
+					q.p.erase(q.p.begin() + n),
+					t.insert(q);
+				}
+		for (auto x : t) s.insert(x);
+		t.clear();
+	} while (sz != s.size());
 }
 
 /* Transform all the productions in the given program into pure TML
@@ -173,19 +175,11 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 						elem((char32_t) *s)),esc=false;
 			}
 	}
-#ifdef ELIM_NULLS
-	set<production> s;
-	for (auto x : r.g) s.insert(x);
-	elim_nullables(s), r.g.clear(), r.g.reserve(s.size());
-	for (auto x : s) r.g.push_back(x);
-	s.clear();
-#endif
 	raw_rule l;
 	for (production& p : r.g) {
 		if (p.p.size() < 2) continue;
 		l.clear();
 		if (p.p.size() == 2 && p.p[1].e == "null") {
-#ifndef ELIM_NULLS
 			raw_term t = from_grammar_elem(p.p[0], 1, 1);
 			l.h.push_back(t);
 			elem e = get_var_elem(2);
@@ -194,7 +188,6 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 			r.r.push_back(l), l.clear(), l.h.push_back(t),
 			l.b.emplace_back(),
 			l.b.back().push_back(from_grammar_elem_nt(rel,e,3,1));
-#endif
 		} else {
 			size_t v = p.p.size();
 			l.h.push_back(from_grammar_elem(p.p[0], 1, p.p.size()));
@@ -225,13 +218,19 @@ void driver::transform_grammar(raw_prog& r, lexeme rel, size_t len) {
 	DBG(o::out() << "transformed grammar:" << endl << r;)
 }
 
-
-
 typedef pair<raw_term, vector<raw_term>> frule;
 
+/*!
+ * Convert a raw program into a flat one.
+ * 
+ * Convert a raw program to a flat one, i.e. for each rule of the original raw
+ * program, if the type is not a goal or none, refresh the vars and add it back
+ * again to the program.
+ */
 struct flat_rules : public vector<frule> {
 	raw_term q;
 	map<pair<elem, ints>, set<size_t>> m;
+
 	flat_rules(const raw_prog& p, driver& d) {
 		for (const raw_rule& r : p.r)
 			if (r.type == raw_rule::GOAL) q = r.h[0]; // FIXME
@@ -254,54 +253,6 @@ template <typename T>
 std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const flat_rules& f) {
 	for (auto x : f) os << raw_rule(x.first, x.second) << endl;
 	return os;
-}
-
-void driver::transform_bin(raw_prog& p) {
-	flat_rules f(p, *this);
-	for (const frule& r : f) {
-		rels.insert(r.first.e[0].e);
-		for (const raw_term& t : r.second) rels.insert(t.e[0].e);
-	}
-	for (const raw_rule& r : p.r)
-		if (r.b.empty() && r.type == raw_rule::NONE)
-			f.push_back({r.h[0], {}}),
-			assert(r.h[0].e.size()),
-			assert(f.back().first.e.size());
-	p.r.clear();
-	auto interpolate = [this](
-		const vector<raw_term>& x, set<elem> v) {
-		raw_rule r;
-		r.b = {x}, r.h.emplace_back();
-		r.h[0].e.emplace_back(elem::SYM, dict.get_rel_lexeme(dict.get_new_rel()));
-		append_openp(r.h[0].e);
-		for (size_t k = 0; k != x.size(); ++k)
-			for (size_t n = 0; n != x[k].e.size(); ++n)
-				if (has(v, x[k].e[n]))
-					r.h[0].e.push_back(x[k].e[n]),
-					v.erase(x[k].e[n]);
-		return append_closep(r.h[0].e), r.h[0].calc_arity(nullptr), r;
-	};
-	for (auto x : f) {
-		while (x.second.size() > 2) {
-			set<elem> v;
-			for (size_t n = 2, k; n != x.second.size(); ++n)
-				for (k = 0; k != x.second[n].e.size(); ++k)
-					if (x.second[n].e[k].type == elem::VAR)
-						v.insert(x.second[n].e[k]);
-			for (size_t k = 0; k != x.first.e.size(); ++k)
-				if (x.first.e[k].type == elem::VAR)
-					v.insert(x.first.e[k]);
-			raw_rule r = interpolate(
-				{ x.second[0], x.second[1] }, move(v));
-			x.second.erase(x.second.begin(), x.second.begin() + 2);
-			x.second.insert(x.second.begin(), r.h[0]);
-			// This new relation should be hidden from the user by default
-			p.hidden_rels.insert({ r.h[0].e[0].e, r.h[0].arity });
-			p.r.push_back(move(r));
-		}
-		p.r.emplace_back(x.first, x.second);
-	}
-	if (f.q.e.size()) p.r.emplace_back(raw_rule::GOAL, f.q);
 }
 
 void driver::transform_state_blocks(raw_prog &rp, set<lexeme> guards) {

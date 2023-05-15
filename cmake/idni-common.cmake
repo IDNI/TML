@@ -28,7 +28,7 @@ set(USED_CMAKE_GENERATOR
 )
 if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-endif()	
+endif()
 
 set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(RELEASE_OPTIONS "-O3;-DNDEBUG")
@@ -77,14 +77,17 @@ function(target_setup target)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
-	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")	
+	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
 	target_include_directories(${target}
 		PRIVATE
 			${CMAKE_CURRENT_SOURCE_DIR}/src
 		PUBLIC
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/bdd/src>
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>
 			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-	)
+		)
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

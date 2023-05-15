@@ -14,6 +14,7 @@
 #define __INPUT_H__
 
 #include <vector>
+#include <tuple>
 #include <set>
 #include <array>
 #include <cstring>
@@ -21,6 +22,7 @@
 #include <memory>
 #include <sys/stat.h>
 #include <algorithm>
+#include <optional>
 
 #include "defs.h"
 #include "dict.h"
@@ -482,9 +484,7 @@ struct raw_term {
 	ints arity;
 	static bool require_fp_step;
 
-	#ifdef TML_NATIVES
 	sig s;
-	#endif
 
 	raw_term() {}
 	raw_term(const elem &rel_name, const std::set<elem> &args) {
@@ -522,6 +522,13 @@ struct raw_term {
 			extype == t.extype;
 	}
 };
+
+typedef std::tuple<elem, int_t> rel_info;
+
+/* Convenience function for getting relation name and arity from
+ * term. */
+
+rel_info get_relation_info(const raw_term &rt);
 
 bool operator<(const raw_term& x, const raw_term& y);
 
@@ -629,7 +636,7 @@ struct raw_form_tree {
 	}
 
 	// Move the given tree into this
-	raw_form_tree &operator=(raw_form_tree &&rft) {
+	raw_form_tree &operator=(raw_form_tree &&rft) noexcept {
 		type = rft.type;
 		rt = rft.rt;
 		el = rft.el;
@@ -810,7 +817,7 @@ struct guard_statement {
 	raw_prog* p_break_rp = 0; // ptr to a prog to break if while cond. true
 };
 
-struct state_block;
+struct state_block; 
 
 struct raw_prog {
 	enum ptype {

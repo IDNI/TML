@@ -21,7 +21,12 @@
 #include <ctime>
 #include <locale>
 #include <codecvt>
+#include <memory>
 #include <fstream>
+#include <numeric>
+#include <optional>
+#include <ranges>
+
 #include "driver.h"
 #include "err.h"
 #include "builtins.h"
@@ -107,7 +112,6 @@ void driver::directives_load(raw_prog& p) {
 	}
 	p.d.insert(p.d.end(), processed.begin(), processed.end());
 }
-
 
 /* Reduce the top-level logical operator to a more primitive one if this
  * is possible. That is, reduce implications and co-implications to
@@ -544,199 +548,6 @@ template<typename X, typename F>
 	}
 }
 
-/* Checks if the rule has a single head and a body that is either a tree
- * or a non-empty DNF. Second order quantifications and builtin terms
- * are not supported. */
-
-bool is_query (const raw_rule &rr) {
-	// Ensure that there are no multiple heads
-	if(rr.h.size() != 1) return false;
-	// Ensure that head is positive
-	if(rr.h[0].neg) return false;
-	// Ensure that this rule is either a tree or non-empty DNF
-	if(!(rr.is_dnf() || rr.is_form())) return false;
-	// Ensure that there is no second order quantification or builtins in
-	// the tree
-	raw_form_tree prft = *rr.get_prft();
-	if(!prefold_tree(prft, true,
-			[&](const raw_form_tree &t, bool acc) -> bool {
-				return acc && (t.type != elem::NONE ||
-					t.rt->extype != raw_term::BLTIN) && t.type != elem::SYM;}))
-		return false;
-	return true;
-}
-
-/* Convenience function for getting relation name and arity from
- * term. */
-
-rel_info get_relation_info(const raw_term &rt) {
-	return make_tuple(rt.e[0], rt.e.size() - 3);
-}
-
-/* If rr1 and rr2 are both conjunctive queries, check if there is a
- * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
- * of a homomorphism implies that rr1 is contained by rr2. */
-
-bool driver::cqc(const raw_rule &rr1, const raw_rule &rr2) {
-	// Get dictionary for generating fresh symbols
-	dict_t d;
-
-	// Check that rules have correct format
-	if(is_cq(rr1) && is_cq(rr2) &&
-			get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0])) {
-		o::dbg() << "CQC Testing if " << rr1 << " <= " << rr2 << endl;
-
-		// Freeze the variables and symbols of the rule we are checking the
-		// containment of
-		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
-
-		// Build up the queries necessary to check homomorphism.
-		set<raw_term> edb(frozen_rr1.b[0].begin(), frozen_rr1.b[0].end());
-		o::dbg() << "Canonical Database: " << edb << endl;
-		raw_prog nrp(dict);
-		nrp.r.push_back(rr2);
-
-		// Run the queries and check for the frozen head. This process can
-		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		set<raw_term> results;
-		tables_progress p(d, *ir);
-		builtins_factory bf(d, *ir);
-		builtins bt = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-
-		run_prog_wedb(edb, nrp, d, bt, opts, results, p);
-
-		for(const raw_term &res : results) {
-			if(res == frozen_rr1.h[0]) {
-				// If the frozen head is found, then there is a homomorphism
-				// between the two rules.
-				o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
-				return true;
-			}
-		}
-		// If no frozen head found, then there is no homomorphism.
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
-		return false;
-	} else {
-		return false;
-	}
-}
-
-/* If rr1 and rr2 are both conjunctive bodies, check if there is a
- * homomorphism rr2 to rr1. By the homomorphism theorem, the existence
- * of a homomorphism implies that a valid substitution for rr1 can be
- * turned into a valid substitution for rr2. This function provides all
- * off them. */
-
-bool driver::cbc(const raw_rule &rr1, raw_rule rr2,
-		set<terms_hom> &homs) {
-	// Get dictionary for generating fresh symbols
-	dict_t d;
-	builtins_factory bf(d, *ir);
-	builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-
-	if(is_cq(rr1) && is_cq(rr2)) {
-		o::dbg() << "Searching for homomorphisms from " << rr2.b[0]
-			<< " to " << rr1.b[0] << endl;
-		// Freeze the variables and symbols of the rule we are checking the
-		// containment of
-		// Map from variables occuring in rr1 to frozen symbols
-		map<elem, elem> freeze_map;
-		raw_rule frozen_rr1 = freeze_rule(rr1, freeze_map, d);
-		// Map from frozen symbols to variables occuring in rr1
-		map<elem, elem> unfreeze_map;
-		for(const auto &[k, v] : freeze_map) {
-			unfreeze_map[v] = k;
-		}
-
-		// Build up the extensional database necessary to check homomorphism.
-		set<raw_term> edb;
-		// Map from term ids to terms in rr1
-		map<elem, raw_term> term_map;
-		int j = 0;
-		// First put the frozen terms of rr1 into our containment program
-		for(raw_term &rt : frozen_rr1.b[0]) {
-			// Record the mapping from the term id to the raw_term it
-			// represents
-			elem term_id = elem::fresh_sym(d);
-			term_map[term_id] = rr1.b[0][j++];
-			// Mark our frozen term with an id so that we can trace the terms
-			// involved in the homomorphism if it exists
-			rt.e.insert(rt.e.begin() + 2, term_id);
-			rt.calc_arity(nullptr);
-			edb.insert(rt);
-		}
-
-		o::dbg() << "Canonical Database: " << edb << endl;
-
-		// Build up the query that proves the existence of a homomorphism
-		// Make a new head for rr2 that exports all the variables used in
-		// its body + ids of the frozen terms it binds to
-		set<elem> rr2_body_vars_set;
-		collect_vars(rr2.b[0].begin(), rr2.b[0].end(), rr2_body_vars_set);
-		vector<elem> rr2_new_head = { elem::fresh_temp_sym(d), elem_openp };
-		rr2_new_head.insert(rr2_new_head.end(), rr2_body_vars_set.begin(),
-			rr2_body_vars_set.end());
-		// Prepend term id variables to rr2's body terms and export the term
-		// ids through the head
-		for(raw_term &rt : rr2.b[0]) {
-			// This variable will bind to the term id of a frozen body term
-			// used in the homomorphism
-			elem term_id = elem::fresh_var(d);
-			rt.e.insert(rt.e.begin() + 2, term_id);
-			rt.calc_arity(nullptr);
-			rr2_new_head.push_back(term_id);
-		}
-		rr2_new_head.push_back(elem_closep);
-		// Put body and head together and make containment program
-		rr2.h[0] = raw_term(rr2_new_head);
-		raw_prog nrp(dict);
-		nrp.r.push_back(rr2);
-
-		// Run the queries and check for the frozen head. This process can
-		// be optimized by inlining the frozen head of rule 1 into rule 2.
-		set<raw_term> results;
-		
-		tables_progress p( dict, *ir);
-		if(!run_prog_wedb(edb, nrp, d, bltins, opts, results, p)) return false;
-
-		for(const raw_term &res : results) {
-			// If the result comes from the containment query (i.e. it is not
-			// one of the frozen terms), then there is a homomorphism between
-			// the bodies
-			raw_term hd_src = rr2.h[0];
-			if(res.e[0] == hd_src.e[0]) {
-				var_subs var_map;
-				set<raw_term> target_terms;
-				// Now we want to express the homomorphism in terms of the
-				// original (non-frozen) variables and terms of rr1.
-				for(size_t i = 2; i < res.e.size() - 1; i++) {
-					// If current variable is a body var
-					if(rr2_body_vars_set.find(hd_src.e[i]) != rr2_body_vars_set.end()) {
-						// Then trace the original var through the unfreeze map
-						var_map[hd_src.e[i]] = at_default(unfreeze_map, res.e[i], res.e[i]);
-					} else {
-						// Otherwise trace the original term through the term map
-						target_terms.insert(term_map[res.e[i]]);
-					}
-				}
-				homs.insert(make_pair(target_terms, var_map));
-				// Print the homomorphism found
-				o::dbg() << "Found homomorphism from " << rr2.b[0] << " to "
-					<< target_terms << " under mapping {";
-				for(auto &[k, v] : var_map) {
-					o::dbg() << k << " -> " << v << ", ";
-				}
-				o::dbg() << "}" << endl;
-			}
-		}
-		// If no results produced, then there is no homomorphism.
-		return true;
-	} else {
-		return false;
-	}
-}
-
 /* Given a homomorphism (i.e. a pair comprising variable substitutions
  * and terms surjected onto) and the rule that a homomorphism maps into,
  * determine which variables of the domain would be needed to express
@@ -806,202 +617,6 @@ bool rule_smaller(const raw_rule &rr2, const raw_rule &rr1) {
 	}
 }
 
-/* Algorithm to factor the rules in a program using other rules.
- * Starting with the conjunctive rules with the biggest bodies, record
- * all the homomorphisms from this body into the bodies of other rules.
- * Afterwards, check if the head of this rule could be substituted
- * verbatim into the bodies of other rules, or whether a temporary
- * relation taking more arguments would be required. Afterwards,
- * replace the homomorphism targets with our chosen head. */
-
-void driver::factor_rules(raw_prog &rp) {
-	o::dbg() << "Factorizing rules ..." << endl;
-
-	// Sort the rules so the biggest come first. Idea is that we want to
-	// reduce total substitutions by doing the biggest factorizations
-	// first. Also prioritizing rules with more arguments to reduce chance
-	// that tmprel with more arguments is created.
-	sort(rp.r.rbegin(), rp.r.rend(), rule_smaller);
-	// The place where we temporarily store our temporary rules
-	vector<raw_rule> pending_rules;
-	// Go through the rules we want to try substituting into other
-	for(raw_rule &rr2 : rp.r) {
-		// Because we use a conjunctive homomorphism finding rule
-		if(is_cq(rr2) && rr2.b[0].size() > 1) {
-			// The variables of the current rule that we'd need to be able to
-			// constrain/substitute into
-			set<elem> needed_vars;
-			set<tuple<raw_rule *, terms_hom>> agg;
-			// Now let's look for rules that we can substitute the current
-			// into
-			for(raw_rule &rr1 : rp.r) {
-				set<terms_hom> homs;
-				// Find all the homomorphisms between outer and inner rule. This
-				// way we can substitute the outer rule into the inner multiple
-				// times.
-				if(is_cq(rr1) && cbc(rr1, rr2, homs)) {
-					for(const terms_hom &hom : homs) {
-						auto &[target_terms, var_map] = hom;
-						// Record only those homomorphisms where the target is at
-						// least as big as the source for there is no point in
-						// replacing a group of terms with a rule utilizing a bigger
-						// group.
-						if(target_terms.size() >= rr2.b[0].size()) {
-							agg.insert(make_tuple(&rr1, hom));
-							// If we were to substitute the target group of terms with
-							// a single head, what arguments would we need to pass to
-							// it?
-							compute_required_vars(rr1, hom, needed_vars);
-						}
-					}
-				}
-			}
-
-			// Now we need to figure out if we should create a temporary
-			// relation containing body of current rule or whether we can just
-			// use it directly. This depends on whether the head exports
-			// enough variables.
-			elem target_rel;
-			vector<elem> target_args;
-			set<elem> exported_vars;
-			collect_vars(rr2.h[0], exported_vars);
-			// Note whether we have created a temporary relation. Important
-			// because we make the current rule depend on the temporary
-			// relation in this case.
-			bool tmp_rel =
-				!((exported_vars == needed_vars && count_related_rules(rr2, rp) == 1) ||
-					agg.size() == 1);
-
-			if(tmp_rel) {
-				// Variables are not exactly what is required. So make relation
-				// exporting required variables and note argument order.
-				target_rel = elem::fresh_temp_sym(dict);
-				target_args.assign(needed_vars.begin(), needed_vars.end());
-				pending_rules.push_back(raw_rule(raw_term(target_rel, target_args), rr2.b[0]));
-			} else {
-				// The variables exported by current rule are exactly what is
-				// needed by all homomorphisms from current body
-				target_rel = rr2.h[0].e[0];
-				for(size_t i = 2; i < rr2.h[0].e.size() - 1; i++) {
-					target_args.push_back(rr2.h[0].e[i]);
-				}
-			}
-
-			// Now we go through all the homomorphisms and try to apply
-			// substitutions to their targets
-			for(auto &[rr1, hom] : agg) {
-				// If no temporary relation was created, then don't touch the
-				// outer rule as its definition is irreducible.
-				if(!tmp_rel && rr1 == &rr2) continue;
-				auto &[rts, vs] = hom;
-				set<raw_term> rr1_set(rr1->b[0].begin(), rr1->b[0].end());
-				// If the target rule still includes the homomorphism target,
-				// then ... . Note that this may not be the case as the targets
-				// of several homomorphisms could overlap.
-				if(includes(rr1_set.begin(), rr1_set.end(), rts.begin(),
-						rts.end())) {
-					// Remove the homomorphism target from the target rule
-					auto it = set_difference(rr1_set.begin(), rr1_set.end(),
-						rts.begin(), rts.end(), rr1->b[0].begin());
-					rr1->b[0].resize(it - rr1->b[0].begin());
-					// And place our chosen head with localized arguments.
-					vector<elem> subbed_args;
-					for(const elem &e : target_args) {
-						// If the current parameter of the outer rule is a constant,
-						// then just place it in our new term verbatim
-						subbed_args.push_back(at_default(vs, e, e));
-					}
-					rr1->b[0].push_back(raw_term(target_rel, subbed_args));
-				}
-			}
-		}
-	}
-	// Now add the pending rules. Done here to prevent movement of rules
-	// during potential vector resizing.
-	for(const raw_rule &rr : pending_rules) {
-		rp.r.push_back(rr);
-		o::dbg() << "New Factor Created: " << rr << endl;
-	}
-}
-
-/* Function to iterate through the partitions of the given set. Calls
- * the supplied function with a vector of sets representing each
- * partition. If the supplied function returns false, then the iteration
- * stops. */
-
-template<typename T, typename F> bool partition_iter(set<T> &vars,
-		vector<set<T>> &partition, const F &f) {
-	if(vars.empty()) {
-		return f(partition);
-	} else {
-		const T nvar = *vars.begin();
-		vars.erase(nvar);
-		for(size_t i = 0; i < partition.size(); i++) {
-			partition[i].insert(nvar);
-			if(!partition_iter(vars, partition, f)) {
-				return false;
-			}
-			partition[i].erase(nvar);
-		}
-		set<T> npart = { nvar };
-		partition.push_back(npart);
-		if(!partition_iter(vars, partition, f)) {
-			return false;
-		}
-		partition.pop_back();
-		vars.insert(nvar);
-		return true;
-	}
-}
-
-/* Function to iterate through the given set raised to the given
- * cartesian power. The supplied function is called with each tuple in
- * the product and if it returns false, the iteration stops. */
-
-template<typename T, typename F>
-		bool product_iter(const set<T> &vars, vector<T> &seq,
-			size_t len, const F &f) {
-	if(len == 0) {
-		return f(seq);
-	} else {
-		for(const T &el : vars) {
-			seq.push_back(el);
-			if(!product_iter(vars, seq, len - 1, f)) {
-				return false;
-			}
-			seq.pop_back();
-		}
-		return true;
-	}
-}
-
-/* Function to iterate through the power set of the given set. The
- * supplied function is called with each element of the power set and
- * if it returns false, the iteration stops. */
-
-template<typename T, typename F> bool power_iter(set<T> &elts,
-		set<T> &subset, const F &f) {
-	if(elts.size() == 0) {
-		return f(subset);
-	} else {
-		const T nelt = *elts.begin();
-		elts.erase(nelt);
-		// Case where current element will not be in subset
-		if(!power_iter(elts, subset, f)) {
-			return false;
-		}
-		if(subset.insert(nelt).second) {
-			// Case where current element will be in subset
-			if(!power_iter(elts, subset, f)) {
-				return false;
-			}
-			subset.erase(nelt);
-		}
-		elts.insert(nelt);
-		return true;
-	}
-}
-
 /* Collect the variables used in the given terms and return. */
 
 void collect_vars(const raw_term &rt, set<elem> &vars) {
@@ -1029,292 +644,6 @@ void collect_vars(const raw_rule &rr, set<elem> &vars) {
 	}
 }
 
-/* If rr1 and rr2 are both conjunctive queries with negation, check that
- * rr1 is contained by rr2. Do this using the Levy-Sagiv test. */
-bool driver::cqnc(const raw_rule &rr1, const raw_rule &rr2) {
-	// Check that rules have correct format
-	if(!(is_cqn(rr1) && is_cqn(rr2) &&
-		get_relation_info(rr1.h[0]) == get_relation_info(rr2.h[0]))) return false;
-
-	o::dbg() << "CQNC Testing if " << rr1 << " <= " << rr2 << endl;
-
-	set<elem> vars;
-	collect_vars(rr1, vars);
-	vector<set<elem>> partition;
-
-	// Do the Levy-Sagiv test
-	bool contained = partition_iter(vars, partition,
-		[&](const vector<set<elem>> &partition) -> bool {
-			// Print the current partition
-			o::dbg() << "Testing partition: ";
-			for(const set<elem> &s : partition) {
-				o::dbg() << "{";
-				for(const elem &e : s) {
-					o::dbg() << e << ", ";
-				}
-				o::dbg() << "}, ";
-			}
-			o::dbg() << endl;
-
-			// Create new dictionary so that symbols created for these tests
-			// do not affect final program
-			dict_t d;
-			builtins_factory bf(d, *ir);
-			builtins bltins = bf.add_basic_builtins().add_bdd_builtins().add_print_builtins().add_js_builtins().bltins;
-
-			// Map each variable to a fresh symbol according to the partition
-			map<elem, elem> subs;
-			for(const set<elem> &part : partition) {
-				elem pvar = elem::fresh_sym(d);
-				for(const elem &e : part) {
-					subs[e] = pvar;
-				}
-			}
-			raw_rule subbed = freeze_rule(rr1, subs, d);
-			set<raw_term> canonical, canonical_negative;
-			// Separate the positive and negative subgoals. Note the symbols
-			// supplied to the subgoals.
-			for(raw_term &rt : subbed.b[0]) {
-				if(rt.neg) {
-					rt.neg = false;
-					canonical_negative.insert(rt);
-					rt.neg = true;
-				} else {
-					canonical.insert(rt);
-				}
-			}
-			// Print the canonical database
-			o::dbg() << "Current canonical Database: ";
-			for(const raw_term &rt : canonical) {
-				o::dbg() << rt << ", ";
-			}
-			o::dbg() << endl;
-			// Does canonical database make all the subgoals of subbed true?
-			for(raw_term &rt : subbed.b[0]) {
-				if(rt.neg) {
-					// If the term in the rule is negated, we need to make sure
-					// that it is not in the canonical database.
-					rt.neg = false;
-					if(canonical.find(rt) != canonical.end()) {
-						o::dbg() << "Current canonical database causes its source query to be inconsistent."
-							<< endl;
-						return true;
-					}
-					rt.neg = true;
-				}
-			}
-			// Collect the symbols/literals from the freeze map
-			set<elem> symbol_set;
-			for(const auto &[elm, sym] : subs) {
-				symbol_set.insert(sym);
-				// Finer control over elements in the universe is required to
-				// make this algorithm work with unsafe negations. In
-				// particular, we need need to control over which characters and
-				// numbers are in the domain.
-				if(sym.type == elem::SYM) {
-					d.get_sym(sym.e);
-				}
-			}
-			// Get all the relations used in both queries
-			set<rel_info> rels;
-			for(const raw_term &rt : rr1.b[0]) {
-				rels.insert(get_relation_info(rt));
-			}
-			for(const raw_term &rt : rr2.b[0]) {
-				rels.insert(get_relation_info(rt));
-			}
-			// Now we need to get the largest superset of our canonical
-			// database
-			set<raw_term> superset;
-			for(const rel_info &ri : rels) {
-				vector<elem> tuple;
-				product_iter(symbol_set, tuple, get<1>(ri),
-					[&](const vector<elem> tuple) -> bool {
-						vector<elem> nterm_e = { get<0>(ri), elem_openp };
-						for(const elem &e : tuple) {
-							nterm_e.push_back(e);
-						}
-						nterm_e.push_back(elem_closep);
-						raw_term nterm(nterm_e);
-						superset.insert(nterm);
-						return true;
-					});
-			}
-			// Remove the frozen negative subgoals
-			for(const raw_term &rt : canonical_negative) {
-				superset.erase(rt);
-			}
-			// Now need to through all the supersets of our canonical database
-			// and check that they yield the frozen head.
-			return power_iter(superset, canonical,
-				[&](const set<raw_term> ext) -> bool {
-					raw_prog test_prog(dict);
-					test_prog.r.push_back(rr2);
-					set<raw_term> res;
-					tables_progress p(d, *ir);
-					run_prog_wedb(ext, test_prog, d, bltins, opts, res, p);
-					return res.find(subbed.h[0]) != res.end();
-				});
-		});
-
-	if(contained) {
-		o::dbg() << "True: " << rr1 << " <= " << rr2 << endl;
-		return true;
-	} else {
-		o::dbg() << "False: " << rr1 << " <= " << rr2 << endl;
-		return false;
-	}
-}
-
-/* Takes a reference rule, its formula tree, and copies of both and
- * tries to eliminate redundant subtrees of the former using the latter
- * as scratch. Generally speaking, boolean algebra guarantees that
- * eliminating a subtree will produce a formula contained/containing
- * the original depending on the boolean operator that binds it and the
- * parity of the number of negation operators containing it. So we need
- * only apply the supplied query containment procedure for the reverse
- * direction to establish the equivalence of the entire trees. */
-
-template<typename F>
-		raw_form_tree &driver::minimize_aux(const raw_rule &ref_rule,
-			const raw_rule &var_rule, raw_form_tree &ref_tree,
-			raw_form_tree &var_tree, const F &f, bool ctx_sign) {
-	typedef initializer_list<pair<raw_form_tree, raw_form_tree>> bijection;
-	// Minimize different formulas in different ways
-	switch(var_tree.type) {
-		case elem::IMPLIES: {
-			// Minimize the subtrees separately first. Since a -> b is
-			// equivalent to ~a OR b, alter the parity of the first operand
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{raw_form_tree(elem::NOT, ref_tree.l),
-						raw_form_tree(elem::NOT, orig_var.l)},
-						{*ref_tree.r, *orig_var.r}})
-				// Apply the same treatment as for a disjunction since this is
-				// what an implication is equivalent to
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::ALT: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating disjunct certainly
-				// produces smaller query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(ref_rule_b, var_rule.try_as_b()) : f(var_rule.try_as_b(), ref_rule_b))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::AND: {
-			// Minimize the subtrees separately first
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, ctx_sign);
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
-			const raw_rule &ref_rule_b = ref_rule.try_as_b();
-			raw_form_tree orig_var = var_tree;
-			// Now try eliminating each subtree in turn
-			for(auto &[ref_tmp, var_tmp] : bijection
-					{{*ref_tree.l, *orig_var.l}, {*ref_tree.r, *orig_var.r}})
-				// If in positive context, eliminating conjunct certainly
-				// produces bigger query, so check only the reverse. Otherwise
-				// vice versa
-				if(var_tree = var_tmp; ctx_sign ? f(var_rule.try_as_b(), ref_rule_b) : f(ref_rule_b, var_rule.try_as_b()))
-					return ref_tree = ref_tmp;
-			var_tree = orig_var;
-			break;
-		} case elem::NOT: {
-			// Minimize the single subtree taking care to update the negation
-			// parity
-			minimize_aux(ref_rule, var_rule, *ref_tree.l, *var_tree.l, f, !ctx_sign);
-			break;
-		} case elem::EXISTS: case elem::FORALL: {
-			// Existential quantification preserves the containment relation
-			// between two formulas, so just recurse. Universal quantification
-			// is just existential with two negations, hence negation parity
-			// is preserved.
-			minimize_aux(ref_rule, var_rule, *ref_tree.r, *var_tree.r, f, ctx_sign);
-			break;
-		} default: {
-			// Do not bother with co-implication nor uniqueness quantification
-			// as the naive approach would require expanding them to a bigger
-			// formula.
-			break;
-		}
-	}
-	return ref_tree;
-}
-
-/* Go through the subtrees of the given rule and see which of them can
- * be removed whilst preserving rule equivalence according to the given
- * containment testing function. */
-
-template<typename F>
-		void driver::minimize(raw_rule &rr, const F &f) {
-	if(rr.is_fact() || rr.is_goal()) return;
-	// Switch to the formula tree representation of the rule if this has
-	// not yet been done for this is a precondition to minimize_aux. Note
-	// the current form so that we can attempt to restore it afterwards.
-	bool orig_form = rr.is_dnf();
-	rr = rr.try_as_prft();
-	// Copy the rule to provide scratch for minimize_aux
-	raw_rule var_rule = rr;
-	// Now minimize the formula tree of the given rule using the given
-	// containment testing function
-	minimize_aux(rr, var_rule, *rr.prft, *var_rule.prft, f);
-	// If the input rule was in DNF, provide the output in DNF
-	if(orig_form) rr = rr.try_as_b();
-}
-
-/* Go through the program and removed those queries that the function f
- * determines to be subsumed by others. While we're at it, minimize
- * (i.e. subsume a query with its part) the shortlisted queries to
- * reduce time cost of future subsumptions. This function does not
- * respect order, so it should only be used on an unordered stratum. */
-
-template<typename F>
-		void driver::subsume_queries(raw_prog &rp, const F &f) {
-	vector<raw_rule> reduced_rules;
-	for(raw_rule &rr : rp.r) {
-		bool subsumed = false;
-
-		for(auto nrr = reduced_rules.begin(); nrr != reduced_rules.end();) {
-			if(f(rr, *nrr)) {
-				// If the current rule is contained by a rule in reduced rules,
-				// then move onto the next rule in the outer loop
-				subsumed = true;
-				break;
-			} else if(f(*nrr, rr)) {
-				// If current rule contains that in reduced rules, then remove
-				// the subsumed rule from reduced rules
-				nrr = reduced_rules.erase(nrr);
-			} else {
-				// Neither rule contains the other. Move on.
-				nrr++;
-			}
-		}
-		if(!subsumed) {
-			// Do the maximal amount of query minimization on the query we are
-			// about to admit. This should reduce the time cost of future
-			// subsumptions.
-			minimize(rr, f);
-			// If the current rule has not been subsumed, then it needs to be
-			// represented in the reduced rules.
-			reduced_rules.push_back(rr);
-		}
-	}
-	rp.r = reduced_rules;
-}
-
 /* Update the number and characters counters as well as the distinct
  * symbol set to account for the given term. */
 
@@ -1325,365 +654,6 @@ void update_element_counts(const raw_term &rt, set<elem> &distinct_syms,
 		else if(el.type == elem::SYM) distinct_syms.insert(el);
 		else if(el.type == elem::CHR) char_count = 256;
 }
-
-/* Compute the number of bits required to represent first the largest
- * integer in the given program and second the universe. */
-
-pair<int_t, int_t> prog_bit_len(const raw_prog &rp) {
-	int_t max_int = 0, char_count = 0;
-	set<elem> distinct_syms;
-
-	for(const raw_rule &rr : rp.r) {
-		// Updates the counters based on the heads of the current rule
-		for(const raw_term &rt : rr.h)
-			update_element_counts(rt, distinct_syms, char_count, max_int);
-		// If this is a rule, update the counters based on the body
-		if(rr.is_dnf() || rr.is_form()) {
-			raw_form_tree prft = *rr.get_prft();
-			prefold_tree(prft, monostate {},
-				[&](const raw_form_tree &t, monostate) -> monostate {
-					if(t.type == elem::NONE)
-						update_element_counts(*t.rt, distinct_syms, char_count, max_int);
-					return monostate {};
-				});
-		}
-	}
-	// Now compute the bit-length of the largest integer found
-	size_t int_bit_len = 0, universe_bit_len = 0,
-		max_elt = max_int + char_count + distinct_syms.size();
-	for(; max_int; max_int >>= 1, int_bit_len++);
-	for(; max_elt; max_elt >>= 1, universe_bit_len++);
-	o::dbg() << "Integer Bit Length: " << int_bit_len << endl;
-	o::dbg() << "Universe Bit Length: " << universe_bit_len << endl << endl;
-	return {int_bit_len, universe_bit_len};
-}
-
-#ifdef WITH_Z3
-
-/* Check query containment for rules of the given program using theorem prover Z3
-  and remove subsumed rules. */
-
-void driver::qc_z3 (raw_prog &raw_p) {
-	const auto &[int_bit_len, universe_bit_len] = prog_bit_len(raw_p);
-	z3_context ctx(int_bit_len, universe_bit_len);
-	// Sort rules by relation name and then by tml arity
-	auto sort_rp = [](const raw_rule& r1, const raw_rule& r2) {
-		if(r1.h[0].e[0] == r2.h[0].e[0])
-			return r1.h[0].arity < r2.h[0].arity;
-		else return r1.h[0].e[0] < r2.h[0].e[0];
-	};
-	sort(raw_p.r.begin(), raw_p.r.end(), sort_rp);
-	// Lambda for checking comparability of rules
-	auto same_cat = [](const raw_rule& r1, const raw_rule& r2) {
-	return r1.h[0].e[0] == r2.h[0].e[0] &&
-		r1.h[0].arity == r2.h[0].arity;
-	};
-	// Check query containment in comparable rules
-	for (auto selected = raw_p.r.begin(); selected != raw_p.r.end();) {
-		for (auto compared = selected + 1; compared != raw_p.r.end();) {
-			// Advance selected iterator such that rules are comparable
-			bool isEndReached = false;
-			while(!isEndReached &&
-					!same_cat(*selected, *compared)) {
-				selected = compared;
-				compared = selected + 1;
-				isEndReached = compared == raw_p.r.end();
-			} if (isEndReached) break;
-			// Check rules for containment
-			if (check_qc_z3(*selected, *compared, ctx)) {
-				selected = raw_p.r.erase(selected);
-				continue;
-			} else if(check_qc_z3(*compared, *selected, ctx))
-				compared = raw_p.r.erase(compared);
-			else ++compared;
-		}
-		++selected;
-	}
-}
-
-/* Initialize an empty context that can then be populated with TML to Z3
- * conversions. value_sort is either a bit-vector whose width can
- * contain the enire program universe and will be used for all Z3
- * relation arguments and bool_sort is the "return" type of all
- * relations. */
-
-z3_context::z3_context(size_t arith_bit_len, size_t universe_bit_len) :
-		arith_bit_len(arith_bit_len), universe_bit_len(universe_bit_len),
-		solver(context), head_rename(context), bool_sort(context.bool_sort()),
-		value_sort(context.bv_sort(universe_bit_len ? universe_bit_len : 1)) {
-	// Initialize Z3 solver instance parameters
-	z3::params p(context);
-	p.set(":timeout", 500u);
-	// Enable model based quantifier instantiation since we use quantifiers
-	p.set("mbqi", true);
-	solver.set(p);
-}
-
-/* Function to lookup and create where necessary a Z3 representation of
- * a relation. */
-
-z3::func_decl z3_context::rel_to_z3(const raw_term& rt) {
-	const auto &rel = rt.e[0];
-	const rel_info &rel_sig = get_relation_info(rt);
-	if(auto decl = rel_to_decl.find(rel_sig); decl != rel_to_decl.end())
-		return decl->second;
-	else {
-		z3::sort_vector domain(context);
-		for (int_t i = rt.get_formal_arity(); i != 0; --i)
-			domain.push_back(value_sort);
-		z3::func_decl ndecl =
-			context.function(rel.to_str().c_str(), domain, bool_sort);
-		rel_to_decl.emplace(make_pair(rel_sig, ndecl));
-		return ndecl;
-	}
-}
-
-/* Function to create Z3 representation of global head variable names.
- * The nth head variable is always assigned the same Z3 constant in
- * order to ensure that different rules are comparable. */
-
-z3::expr z3_context::globalHead_to_z3(const int_t pos) {
-	for (int_t i=head_rename.size(); i<=pos; ++i)
-		head_rename.push_back(z3::expr(context, fresh_constant()));
-	return head_rename[pos];
-}
-
-/* Function to lookup and create where necessary a Z3 representation of
- * elements. */
-
-z3::expr z3_context::arg_to_z3(const elem& el) {
-	if(auto decl = var_to_decl.find(el); decl != var_to_decl.end())
-		return decl->second;
-	else if(el.type == elem::NUM) {
-		const z3::expr &ndecl =
-			context.bv_val(el.num, value_sort.bv_size());
-		var_to_decl.emplace(make_pair(el, ndecl));
-		return ndecl;
-	} else {
-		const z3::expr &ndecl =
-			context.constant(el.to_str().c_str(), value_sort);
-		var_to_decl.emplace(make_pair(el, ndecl));
-		return ndecl;
-	}
-}
-
-/* Construct a formula that constrains the head variables. The
- * constraints are of two sorts: the first equate pairwise identical
- * head variables to each other, and the second equate literals to their
- * unique Z3 equivalent. Also exports a mapping of each head element to
- * the Z3 head variable it has been assigned to. */
-
-z3::expr z3_context::z3_head_constraints(const raw_term &head,
-		map<elem, z3::expr> &body_rename) {
-	z3::expr restr = context.bool_val(true);
-	for (size_t i = 0; i < head.e.size() - 3; ++i) {
-		const elem &el = head.e[i + 2];
-		const z3::expr &var = globalHead_to_z3(i);
-		if(const auto &[it, found] = body_rename.try_emplace(el, var); !found)
-			restr = restr && it->second == var;
-		else if (el.type != elem::VAR)
-			restr = restr && var == arg_to_z3(el);
-	}
-	return restr;
-}
-
-/* Given a term, output the equivalent Z3 expression using and updating
- * the mappings in the context as necessary. */
-
-z3::expr z3_context::term_to_z3(const raw_term &rel) {
-	if(rel.extype == raw_term::REL) {
-		z3::expr_vector vars_of_rel (context);
-		for (auto el = rel.e.begin()+2; el != rel.e.end()-1; ++el) {
-			// Pushing head variables
-			vars_of_rel.push_back(arg_to_z3(*el));
-		}
-		return rel_to_z3(rel)(vars_of_rel);
-	} else if(rel.extype == raw_term::EQ) {
-		return arg_to_z3(rel.e[0]) == arg_to_z3(rel.e[2]);
-	} else if(rel.extype <= raw_term::LEQ) {
-		return arg_to_z3(rel.e[0]) <= arg_to_z3(rel.e[2]);
-	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 5) {
-		// Obtain the Z3 equivalents of TML elements
-		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
-			arg3 = arg_to_z3(rel.e[4]);
-		// The arithmetic universe may be smaller than the entire universe,
-		// so zero the high bits of arithmetic expressions to ensure that
-		// only the lower bits are relevant in comparisons
-		z3::expr embedding = universe_bit_len == arith_bit_len ?
-			context.bool_val(true) :
-			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg3.extract(universe_bit_len-1, arith_bit_len) == 0;
-		// Its possible that the largest integer in TML program is 0. Z3
-		// does not support 0-length bit-vectors, so short-circuit
-		if(arith_bit_len == 0) return embedding;
-		z3::expr arg1_lo = arg1.extract(arith_bit_len-1, 0),
-			arg2_lo = arg2.extract(arith_bit_len-1, 0),
-			arg3_lo = arg3.extract(arith_bit_len-1, 0);
-		// Finally produce the arithmetic constraint based on the low bits
-		// of the operands
-		switch(rel.arith_op) {
-			case ADD: return (arg1_lo + arg2_lo) == arg3_lo && embedding;
-			case SUB: return (arg1_lo - arg2_lo) == arg3_lo && embedding;
-			case MULT: return (arg1_lo * arg2_lo) == arg3_lo && embedding;
-			case SHL: return shl(arg1_lo, arg2_lo) == arg3_lo && embedding;
-			case SHR: return lshr(arg1_lo, arg2_lo) == arg3_lo && embedding;
-			case BITWAND: return (arg1_lo & arg2_lo) == arg3_lo && embedding;
-			case BITWXOR: return (arg1_lo ^ arg2_lo) == arg3_lo && embedding;
-			case BITWOR: return (arg1_lo | arg2_lo) == arg3_lo && embedding;
-			default: assert(false); //should never reach here
-		}
-	} else if(rel.extype <= raw_term::ARITH && rel.e.size() == 6) {
-		// Obtain the Z3 equivalents of TML elements
-		z3::expr arg1 = arg_to_z3(rel.e[0]), arg2 = arg_to_z3(rel.e[2]),
-			arg3 = arg_to_z3(rel.e[4]), arg4 = arg_to_z3(rel.e[5]);
-		// The arithmetic universe may be smaller than the entire universe,
-		// so zero the high bits of arithmetic expressions to ensure that
-		// only the lower bits are relevant in comparisons
-		z3::expr embedding = universe_bit_len == arith_bit_len ?
-			context.bool_val(true) :
-			arg1.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg2.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg3.extract(universe_bit_len-1, arith_bit_len) == 0 &&
-			arg4.extract(universe_bit_len-1, arith_bit_len) == 0;
-		// Its possible that the largest integer in TML program is 0. Z3
-		// does not support 0-length bit-vectors, so short-circuit
-		if(arith_bit_len == 0) return embedding;
-		// Since this is double precision arithmetic, join the 3rd and 4th
-		// operands to form the RHS
-		z3::expr arg1_lo = zext(arg1.extract(arith_bit_len-1, 0), arith_bit_len),
-			arg2_lo = zext(arg2.extract(arith_bit_len-1, 0), arith_bit_len),
-			arg34 = concat(arg3.extract(arith_bit_len-1, 0),
-				arg4.extract(arith_bit_len-1, 0));
-		// Finally produce the arithmetic constraint based on the low bits
-		// of the LHS operands and full bits of the RHS operand
-		switch(rel.arith_op) {
-			case ADD: return embedding && (arg1_lo + arg2_lo) == arg34;
-			case MULT: return embedding && (arg1_lo * arg2_lo) == arg34;
-			default: assert(false); //should never reach here
-		}
-	} else assert(false); //should never reach here
-}
-
-/* Make a fresh Z3 constant. */
-
-z3::expr z3_context::fresh_constant() {
-	return z3::expr(context,
-		Z3_mk_fresh_const(context, nullptr, value_sort));
-}
-
-/* Given a formula tree, output the equivalent Z3 expression using and
- * updating the mappings in the context as necessary. */
-
-z3::expr z3_context::tree_to_z3(const raw_form_tree &t, dict_t &dict) {
-	switch(t.type) {
-		case elem::AND:
-			return tree_to_z3(*t.l, dict) &&
-				tree_to_z3(*t.r, dict);
-		case elem::ALT:
-			return tree_to_z3(*t.l, dict) ||
-				tree_to_z3(*t.r, dict);
-		case elem::NOT:
-			return !tree_to_z3(*t.l, dict);
-		case elem::EXISTS: {
-			const elem &qvar = *t.l->el;
-			// Obtain original Z3 binding this quantified variable
-			z3::expr normal_const = arg_to_z3(qvar);
-			// Use a fresh Z3 binding for this quantified variable
-			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
-			// Make quantified expression
-			z3::expr qexpr = exists(temp_const,
-				tree_to_z3(*t.r, dict));
-			// Restore original binding for quantified variable
-			var_to_decl.at(qvar) = normal_const;
-			return qexpr;
-		} case elem::FORALL: {
-			const elem &qvar = *t.l->el;
-			// Obtain original Z3 binding this quantified variable
-			z3::expr normal_const = arg_to_z3(qvar);
-			// Use a fresh Z3 binding for this quantified variable
-			z3::expr &temp_const = var_to_decl.at(qvar) = fresh_constant();
-			// Make quantified expression
-			z3::expr qexpr = forall(temp_const,
-				tree_to_z3(*t.r, dict));
-			// Restore original binding for quantified variable
-			var_to_decl.at(qvar) = normal_const;
-			return qexpr;
-		} case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
-			// Process the expanded formula instead
-			return tree_to_z3(expand_formula_node(t, dict), dict);
-		case elem::NONE: return term_to_z3(*t.rt);
-		default:
-			assert(false); //should never reach here
-	}
-}
-
-/* Given a rule, output the body of this rule converted to the
- * corresponding Z3 expression. Caches the conversion in the context in
- * case the same rule is needed in future. */
-
-z3::expr z3_context::rule_to_z3(const raw_rule &rr, dict_t &dict) {
-	if(auto decl = rule_to_decl.find(rr); decl != rule_to_decl.end())
-		return decl->second;
-	// create map from bound_vars
-	map<elem, z3::expr> body_rename;
-	z3::expr restr = z3_head_constraints(rr.h[0], body_rename);
-	// Collect bound variables of rule and restrictions from constants in head
-	set<elem> free_vars;
-	vector<elem> bound_vars(rr.h[0].e.begin() + 2, rr.h[0].e.end() - 1);
-	collect_free_vars(*rr.get_prft(), bound_vars, free_vars);
-	// Free variables are existentially quantified
-	z3::expr_vector ex_quant_vars (context);
-	for (const auto& var : free_vars)
-		ex_quant_vars.push_back(arg_to_z3(var));
-	map<elem, z3::expr> var_backup;
-	// For the intent of constructing this Z3 expression, replace head
-	// variable expressions with the corresponding global head
-	for(auto &[el, constant] : body_rename) {
-		var_backup.emplace(make_pair(el, arg_to_z3(el)));
-		var_to_decl.at(el) = constant;
-	}
-	// Construct z3 expression from rule
-	z3::expr formula = tree_to_z3(*rr.get_prft(), dict);
-	// Now undo the global head mapping for future constructions
-	for(auto &[el, constant] : var_backup) var_to_decl.at(el) = constant;
-	z3::expr decl = restr && (ex_quant_vars.empty() ?
-		formula : z3::exists(ex_quant_vars, formula));
-	rule_to_decl.emplace(make_pair(rr, decl));
-	return decl;
-}
-
-/* Checks if r1 is contained in r2 or vice versa.
- * Returns false if rules are not comparable or not contained.
- * Returns true if r1 is contained in r2. */
-
-bool driver::check_qc_z3(const raw_rule &r1, const raw_rule &r2,
-		z3_context &ctx) {
-	if (!(is_query(r1) && is_query(r2))) return false;
-	// Check if rules are comparable
-	if (! (r1.h[0].e[0] == r2.h[0].e[0] &&
-				r1.h[0].arity == r2.h[0].arity)) return 0;
-	o::dbg() << "Z3 QC Testing if " << r1 << " <= " << r2 << " : ";
-	// Get head variables for z3
-	z3::expr_vector bound_vars(ctx.context);
-	for (uint_t i = 0; i != r1.h[0].e.size() - 3; ++i)
-		bound_vars.push_back(ctx.globalHead_to_z3(i));
-
-	// Rename head variables on the fly such that they match
-	// on both rules
-	z3::expr rule1 = ctx.rule_to_z3(r1, dict);
-	z3::expr rule2 = ctx.rule_to_z3(r2, dict);
-	ctx.solver.push();
-	// Add r1 => r2 to solver
-	if (bound_vars.empty()) ctx.solver.add(!z3::implies(rule1, rule2));
-	else ctx.solver.add(!z3::forall(bound_vars,z3::implies(rule1, rule2)));
-	bool res = ctx.solver.check() == z3::unsat;
-	ctx.solver.pop();
-	o::dbg() << res << endl;
-	return res;
-}
-
-#endif
 
 /* Make relations mapping list ID's to their heads and tails. Domain's
  * first argument is the relation into which it should put the domain it
@@ -2081,7 +1051,7 @@ elem driver::quote_formula(const raw_form_tree &t, const elem &rel_name,
 elem driver::concat(const elem &rel, string suffix) {
 	// Get dictionary for generating fresh symbols
 	dict_t &d = dict;
-	
+
 	// Make lexeme from concatenating rel's lexeme with the given suffix
 	return elem(elem::SYM,
 		d.get_lexeme(lexeme2str(rel.e) + to_string_t(suffix)));
@@ -2341,128 +1311,6 @@ bool driver::transform_codecs(raw_prog &rp, const directive &drt) {
 	// Indicate success
 	o::dbg() << "Generated codec for: " << drt << endl;
 	return true;
-}
-
-/* Transform the given program into a P-DATALOG program, execute the
- * given transformation, then transform the program back into TML. Part
- * of the effect of the transformation into P-DATALOG is to remove
- * deletion rules and add rules that explicitly carry facts from
- * previous steps. Part of the effect of the transformation from
- * P-DATALOG is to remove facts that TML would otherwise persist. */
-
-void driver::pdatalog_transform(raw_prog &rp,
-		const function<void(raw_prog &)> &f) {
-	// Bypass transformation when there are no rules
-	if(rp.r.empty()) {
-		f(rp);
-		return;
-	}
-
-	map<rel_info, array<elem, 2>> freeze_map;
-	// First move all additions to a relation to a separate temporary
-	// relation and move all deletions to another separate temporary
-	// relation. Exclude facts from this exercise.
-	for(raw_rule &rr : rp.r) {
-		for(raw_term &rt : rr.h) {
-			rel_info orig_rel = get_relation_info(rt);
-			if(auto it = freeze_map.find(orig_rel); it != freeze_map.end()) {
-				rt.e[0] = (rr.is_fact() || rr.is_goal()) ? rt.e[0] : it->second[rt.neg];
-			} else {
-				// Make separate relations to separately hold the positive and
-				// negative derivations
-				elem pos_frozen_elem = elem::fresh_temp_sym(dict);
-				elem neg_frozen_elem = elem::fresh_temp_sym(dict);
-				// Store the mapping so that the derived portion of each
-				// relation is stored in exactly one place
-				freeze_map[orig_rel] = {pos_frozen_elem, neg_frozen_elem};
-				rt.e[0] = (rr.is_fact() || rr.is_goal()) ?
-					rt.e[0] : freeze_map[orig_rel][rt.neg];
-				// Ensure that these positive and negative part relations are
-				// hidden from the user
-				rp.hidden_rels.insert({ pos_frozen_elem.e, rt.arity });
-				rp.hidden_rels.insert({ neg_frozen_elem.e, rt.arity });
-			}
-			// Ensure that facts are added as opposed to deleted from the
-			// negative and positive part relations
-			if(!rr.is_fact() && !rr.is_goal()) rt.neg = false;
-		}
-	}
-	// Now make rules to add/delete facts from the final relation as well
-	// as persist facts from the previous step. This is to simulate TML
-	// using P-DATALOG.
-	for(const auto &[orig_rel, frozen_elems] : freeze_map) {
-		/* The translation is as follows:
-		 * hello(?x) :- A.
-		 * ~hello(?x) :- B.
-		 * TO
-		 * ins_hello(?x) :- A.
-		 * prev_hello(?x) :- hello(?x).
-		 * del_hello(?x) :- B.
-		 * hello(?x) :- ins_hello(?x), ~del_hello(?x).
-		 * hello(?x) :- prev_hello(?x), ~del_hello(?x).
-		 * contradiction() :- ins_hello(?x), del_hello(?x). */
-		raw_term original_head = relation_to_term(orig_rel), ins_head, del_head, prev_head;
-		ins_head = del_head = prev_head = original_head;
-		ins_head.e[0] = frozen_elems[false];
-		del_head.e[0] = frozen_elems[true];
-		prev_head.e[0] = elem::fresh_temp_sym(dict);
-		rp.r.push_back(raw_rule(prev_head, original_head));
-		rp.r.push_back(raw_rule(original_head, {ins_head, del_head.negate()}));
-		rp.r.push_back(raw_rule(original_head, {prev_head, del_head.negate()}));
-		rp.hidden_rels.insert({ prev_head.e[0].e, original_head.arity });
-	}
-	// Run the supplied transformation
-	f(rp);
-	const raw_term tick(elem::fresh_temp_sym(dict), vector<elem> {});
-	map<rel_info, elem> scratch_map;
-	// Map the program rules to temporary relations and execute them only
-	// when the clock is in low state. A temporary relation is required to
-	// give us time to delete facts not derived in this step.
-	for(raw_rule &rr : rp.r) {
-		if(!rr.is_fact() && !rr.is_goal()) {
-			for(raw_term &rt : rr.h) {
-				rel_info orig_rel = get_relation_info(rt);
-				if(auto it = scratch_map.find(orig_rel); it != scratch_map.end()) {
-					rt.e[0] = it->second;
-				} else {
-					elem frozen_elem = elem::fresh_temp_sym(dict);
-					// Store the mapping so that everything from this relation is
-					// moved to a single designated relation.
-					rt.e[0] = scratch_map[orig_rel] = frozen_elem;
-					rp.hidden_rels.insert({ frozen_elem.e, rt.arity });
-				}
-			}
-			// Condition the rule to execute only on low states.
-			rr.set_prft(raw_form_tree(elem::AND,
-				make_shared<raw_form_tree>(*rr.get_prft()),
-				make_shared<raw_form_tree>(tick.negate())));
-		}
-	}
-	// Now make the rules simulating P-DATALOG in TML. This is essentially
-	// done by clearing the temporary relation after each step and doing
-	// the necessary additions/deletions to make the final relation
-	// reflect this.
-	for(const auto &[orig_rel, scratch] : scratch_map) {
-		/* The translation is as follows:
-		 * hello(?x) :- A.
-		 * TO
-		 * hello_tmp(?x) :- A, ~tick().
-		 * hello(?x) :- hello_tmp(?x), tick().
-		 * ~hello(?x) :- ~hello_tmp(?x), tick().
-		 * ~hello_tmp(?x) :- tick().
-		 * tick() :- ~tick().
-		 * ~tick() :- tick(). */
-		raw_term original_head = relation_to_term(orig_rel), scratch_head;
-		scratch_head = original_head;
-		scratch_head.e[0] = scratch;
-		rp.r.push_back(raw_rule(original_head, { scratch_head, tick }));
-		rp.r.push_back(raw_rule(original_head.negate(), { scratch_head.negate(), tick }));
-		rp.r.push_back(raw_rule(scratch_head.negate(), tick ));
-	}
-	// Make the clock alternate between two states
-	rp.r.push_back(raw_rule(tick, tick.negate()));
-	rp.r.push_back(raw_rule(tick.negate(), tick));
-	rp.hidden_rels.insert({ tick.e[0].e, {0} });
 }
 
 /* Checks if the relation the first rule belongs to precedes the
@@ -2769,7 +1617,7 @@ void rename_variables(raw_form_tree &t, map<elem, elem> &renames,
 			const auto &ivar = renames.find(ovar);
 			const optional<elem> pvar = ivar == renames.end() ? nullopt : make_optional(ivar->second);
 			// Temporarily replace the outer scope mapping with new inner one
-			*t.l->el = renames[ovar] = gen(ovar);
+			t.l->el = renames[ovar] = gen(ovar);
 			// Rename body using inner scope mapping
 			rename_variables(*t.r, renames, gen);
 			// Now restore the (possibly non-existent) outer scope mapping
@@ -2795,131 +1643,25 @@ elem gen_id_var(const elem &var) {
 	return var;
 }
 
-/* Expand the given term using the given rule whose head unifies with
- * it. Literally returns the rule's body with its variables replaced by
- * the arguments of the given term or fresh variables. Fresh variables
- * are used so that the produced formula tree can be grafted in
- * anywhere. */
+/* Returns the difference between the two given sets. I.e. the second
+ * set removed with multiplicity from the first. */
 
-raw_form_tree driver::expand_term(const raw_term &use,
-		const raw_rule &def) {
-	const raw_term &head = def.h[0];
-	// Where all the mappings for the substitution will be stored
-	map<elem, elem> renames;
-	// Let's try to reduce the number of equality constraints required
-	// by substituting some of the correct variables in the first place.
-	for(size_t i = 2; i < head.e.size() - 1; i++) {
-		if(head.e[i].type == elem::VAR) {
-			renames[head.e[i]] = use.e[i];
-		}
-	}
-	// Deep copy the rule's body because the in-place renaming required
-	// for this expansion should not affect the original
-	raw_form_tree subst = *def.get_prft();
-	rename_variables(subst, renames, gen_fresh_var(dict));
-	// Take care to existentially quantify the non-exported variables of this
-	// formula in case it is inserted into a negative context
-	for(const auto &[ovar, nvar] : renames) {
-		if(find(use.e.begin() + 2, use.e.end() - 1, nvar) == use.e.end() - 1) {
-			subst = raw_form_tree(elem::EXISTS,
-				make_shared<raw_form_tree>(nvar),
-				make_shared<raw_form_tree>(subst));
-		}
-	}
-	// Append remaining equality constraints to the renamed tree to link
-	// the logic back to its context
-	for(size_t i = 2; i < head.e.size() - 1; i++) {
-		// Add equality constraint only if it has not already been captured
-		// in the substitution choice.
-		elem new_name = rename_variables(head.e[i], renames, gen_fresh_var(dict));
-		if(new_name != use.e[i]) {
-			subst = raw_form_tree(elem::AND,
-				make_shared<raw_form_tree>(subst),
-				make_shared<raw_form_tree>(raw_term(raw_term::EQ,
-					{ use.e[i], elem(elem::EQ), new_name })));
-		}
-	}
-	return subst;
+set<elem> set_difference(const multiset<elem> &s1,
+		const set<elem> &s2) {
+	set<elem> res;
+	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
+	return res;
 }
 
-/* Produces a program where executing a single step is equivalent to
- * executing two steps of the original program. This is achieved through
- * inlining where each body term is replaced by the disjunction of the
- * bodies of the relation that it refers to. For those facts not
- * computed in the previous step, it is enough to check that they were
- * derived to steps ago and were not deleted in the previous step. */
+/* Returns the intersection of the two given sets. I.e. all the elems
+ * that occur in both sets. */
 
-void driver::square_program(raw_prog &rp) {
-	// Partition the rules by relations
-	typedef set<raw_rule> relation;
-	map<rel_info, relation> rels;
-	// Separate the program rules according to the relation they belong
-	// to and their sign. This will simplify lookups during inlining.
-	for(const raw_rule &rr : rp.r)
-		if(!rr.is_fact() && !rr.is_goal())
-			rels[get_relation_info(rr.h[0])].insert(rr);
-
-	// The place where we will construct the squared program
-	vector<raw_rule> squared_prog;
-	for(const raw_rule &rr : rp.r) {
-		if(rr.is_fact() || rr.is_goal()) {
-			// Leave facts alone as they are not part of the function
-			squared_prog.push_back(rr);
-		} else {
-			// Deep copy so that we can inline out of place. Future terms/
-			// rules may need the original body of this rule
-			raw_form_tree nprft = *rr.get_prft();
-			// Iterate through tree looking for terms
-			postfold_tree(nprft, monostate {},
-				[&](raw_form_tree &t, monostate acc) -> monostate {
-					if(t.type == elem::NONE && t.rt->extype == raw_term::REL) {
-						// Replace term according to following rule:
-						// term -> (term && ~del1body && ... && ~delNbody) ||
-						// ins1body || ... || insMbody
-						raw_term &rt = *t.rt;
-						// Inner conjunction to handle case where fact was derived
-						// before the last step. We just need to make sure that it
-						// was not deleted in the last step.
-						optional<raw_form_tree> subst;
-						// Outer disjunction to handle the case where fact derived
-						// exactly in the last step.
-						for(const raw_rule &rr : rels[get_relation_info(rt)])
-							subst = !subst ? expand_term(rt, rr) :
-								raw_form_tree(elem::ALT,
-									make_shared<raw_form_tree>(*subst),
-									make_shared<raw_form_tree>(expand_term(rt, rr)));
-						// We can replace the raw_term now that we no longer need it
-						if(subst) t = *subst;
-					}
-					// Just a formality. Nothing is being accumulated.
-					return acc; });
-			squared_prog.push_back(raw_rule(rr.h[0], nprft));
-		}
-	}
-	rp.r = squared_prog;
-}
-
-/* Make the given program execute half as fast, that is, two steps of
- * the output program will be equivalent to one step of the original.
- * Useful for debugging the squaring transformation since this is its
- * inverse. */
-
-void driver::square_root_program(raw_prog &rp) {
-	// Only apply this transformation if there are rules to slow down
-	if(!rp.r.empty()) {
-		// Execute program rules only when the clock is in asserted state
-		const raw_term tick(elem::fresh_temp_sym(dict), std::vector<elem> {});
-		for(raw_rule &rr : rp.r) {
-			if(!rr.is_fact() && !rr.is_goal()) {
-				rr.set_prft(raw_form_tree(elem::AND,
-					make_shared<raw_form_tree>(*rr.get_prft()),
-					make_shared<raw_form_tree>(tick)));
-			}
-		}
-		// Make the clock alternate between two states
-		rp.r.push_back(raw_rule(tick, tick.negate()));
-		rp.r.push_back(raw_rule(tick.negate(), tick));
-	}
+set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
+	set<elem> res;
+	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+		inserter(res, res.end()));
+	return res;
 }
 
 /* Iterate through the FOL rules and remove the outermost existential
@@ -2952,147 +1694,9 @@ void driver::export_outer_quantifiers(raw_prog &rp) {
 				// Now conjunct the rule formula with a copy of what is inside the
 				// existential quantifiers so that variables can be exported whilst
 				// uniqueness constraints are still being enforced.
-				*rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
+				rr.prft = raw_form_tree(elem::AND, make_shared<raw_form_tree>(*pprft), prft);
 			}
 		}
-	}
-}
-
-/* Returns the difference between the two given sets. I.e. the second
- * set removed with multiplicity from the first. */
-
-set<elem> set_difference(const multiset<elem> &s1,
-		const set<elem> &s2) {
-	set<elem> res;
-	set_difference(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		inserter(res, res.end()));
-	return res;
-}
-
-/* Returns the intersection of the two given sets. I.e. all the elems
- * that occur in both sets. */
-
-set<elem> set_intersection(const set<elem> &s1, const set<elem> &s2) {
-	set<elem> res;
-	set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
-		inserter(res, res.end()));
-	return res;
-}
-
-/* Make a term with behavior equivalent to the supplied first order
- * logic formula with the given bound variables. This might involve
- * adding temporary relations to the given program. */
-
-raw_term driver::to_dnf(const raw_form_tree &t,
-		raw_prog &rp, const set<elem> &fv) {
-	const elem part_id = elem::fresh_temp_sym(dict);
-
-	switch(t.type) {
-		case elem::IMPLIES: case elem::COIMPLIES: case elem::UNIQUE:
-			// Process the expanded formula instead
-			return to_dnf(expand_formula_node(t, dict), rp, fv);
-		case elem::AND: {
-			// Collect all the conjuncts within the tree top
-			vector<const raw_form_tree *> ands;
-			t.flatten_associative(elem::AND, ands);
-			// Collect the free variables in each conjunct. The intersection
-			// of variables between one and the rest is what will need to be
-			// exported
-			multiset<elem> all_vars(fv.begin(), fv.end());
-			map<const raw_form_tree *, set<elem>> fvs;
-			for(const raw_form_tree *tree : ands) {
-				fvs[tree] = collect_free_vars(*tree);
-				all_vars.insert(fvs[tree].begin(), fvs[tree].end());
-			}
-			vector<raw_term> terms;
-			// And make a DNF rule listing them
-			for(const raw_form_tree *tree : ands) {
-				set<elem> nv = set_intersection(fvs[tree],
-					set_difference(all_vars, fvs[tree]));
-				terms.push_back(to_dnf(*tree, rp, nv));
-			}
-			// Make the representative rule and add to the program
-			raw_rule nr(raw_term(part_id, fv), terms);
-			rp.r.push_back(nr);
-			// Hide this new auxilliary relation
-			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			break;
-		} case elem::ALT: {
-			// Collect all the disjuncts within the tree top
-			vector<const raw_form_tree *> alts;
-			t.flatten_associative(elem::ALT, alts);
-			for(const raw_form_tree *tree : alts) {
-				// Make a separate rule for each disjunct
-				raw_rule nr(raw_term(part_id, fv), to_dnf(*tree, rp, fv));
-				rp.r.push_back(nr);
-				// Hide this new auxilliary relation
-				rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			}
-			break;
-		} case elem::NOT: {
-			return to_dnf(*t.l, rp, fv).negate();
-		} case elem::EXISTS: {
-			// Make the proposition that is being quantified
-			set<elem> nfv = fv;
-			const raw_form_tree *current_formula;
-			set<elem> qvars;
-			// Get all the quantified variables used in a sequence of
-			// existential quantifiers
-			for(current_formula = &t;
-					current_formula->type == elem::EXISTS;
-					current_formula = &*current_formula->r) {
-				qvars.insert(*(current_formula->l->el));
-			}
-			nfv.insert(qvars.begin(), qvars.end());
-			// Convert the body occuring within the nested quantifiers into DNF
-			raw_term nrt = to_dnf(*current_formula, rp, nfv);
-			// Make the rule corresponding to this existential formula
-			for(const elem &e : qvars) {
-				nfv.erase(e);
-			}
-			raw_rule nr(raw_term(part_id, nfv), nrt);
-			rp.r.push_back(nr);
-			// Hide this new auxilliary relation
-			rp.hidden_rels.insert({ nr.h[0].e[0].e, nr.h[0].arity });
-			return raw_term(part_id, nfv);
-		} case elem::NONE: {
-			return *t.rt;
-		} case elem::FORALL: {
-			const raw_form_tree *current_formula;
-			set<elem> qvars;
-			// Get all the quantified variables used in a sequence of
-			// existential quantifiers
-			for(current_formula = &t;
-					current_formula->type == elem::FORALL;
-					current_formula = &*current_formula->r) {
-				qvars.insert(*(current_formula->l->el));
-			}
-			// The universal quantifier is logically equivalent to the
-			// following (forall ?x forall ?y = ~ exists ?x exists ?y ~)
-			sprawformtree equiv_formula =
-				make_shared<raw_form_tree>(elem::NOT,
-					make_shared<raw_form_tree>(*current_formula));
-			for(const elem &qvar : qvars) {
-				equiv_formula = make_shared<raw_form_tree>(elem::EXISTS,
-					make_shared<raw_form_tree>(qvar), equiv_formula);
-			}
-			return to_dnf(raw_form_tree(elem::NOT, equiv_formula), rp, fv);
-		} default:
-			assert(false); //should never reach here
-	}
-	return raw_term(part_id, fv);
-}
-
-/* Convert every rule in the given program to DNF rules. */
-
-void driver::to_dnf(raw_prog &rp) {
-	// Convert all FOL formulas to DNF
-	for(int_t i = rp.r.size() - 1; i >= 0; i--) {
-		raw_rule rr = rp.r[i];
-		if(rr.is_form()) {
-			rr.set_b({{to_dnf(*rr.prft, rp, collect_free_vars(rr))}});
-		}
-		rp.r[i] = rr;
 	}
 }
 
@@ -3254,66 +1858,6 @@ void contract_term(raw_term &rt, const elem &new_rel, const ints &uses,
 	}
 }
 
-/* Eliminate unused elements of hidden relations. Do this by identifying those
- * relation elements that neither participate in term conjunction nor are
- * exported to visible relation nor are used in a negative body term. */
-
-void driver::eliminate_dead_variables(raw_prog &rp) {
-	// Before we can eliminate relation positions, we need to know what
-	// rules depend on each relation. Knowing the dependants will allow us
-	// to determine whether a certain position is significant, and if so
-	// correct the call-sites to match the declaration.
-	set<signature> pending_signatures;
-	map<signature, set<raw_rule *>> dependants;
-	for(raw_rule &rr : rp.r) {
-		record_hidden_relation(rp, rr, rr.h[0], pending_signatures, dependants);
-		if(!rr.b.empty()) for(const raw_term &rt : rr.b[0])
-			record_hidden_relation(rp, rr, rt, pending_signatures, dependants);
-	}
-	// While there are still signatures to check for reducibility, grab
-	// the entire set and try to reduce each relation making a note of
-	// affected relations when successful.
-	while(!pending_signatures.empty()) {
-		// Grab pending signatures
-		set<pair<lexeme, ints>> current_signatures = std::move(pending_signatures);
-		for(const signature &sig : current_signatures) {
-			// Calculate variable usages so we can know what to eliminate
-			ints uses = calculate_variable_usage(sig, dependants);
-
-			// Move forward only if there is something to contract
-			if(find(uses.begin(), uses.end(), 1) != uses.end()) {
-				// Print active variable usages for debugging purposes
-				o::dbg() << "Contracting " << sig.first << " using [";
-				const char *sep = "";
-				for(int_t count : uses) {
-					o::dbg() << sep << count;
-					sep = ", ";
-				}
-				o::dbg() << "]" << endl;
-
-				// Now consistently eliminate certain positions and prepare the
-				// next round. Rename the relation after the eliminations in
-				// case the new signature coincides with an already existing
-				// one.
-				elem new_rel = elem::fresh_temp_sym(dict);
-				for(raw_rule *rr : dependants.at(sig)) {
-					contract_term(rr->h[0], new_rel, uses, sig, pending_signatures, rp);
-					if(!rr->b.empty()) for(raw_term &rt : rr->b[0])
-						contract_term(rt, new_rel, uses, sig, pending_signatures, rp);
-				}
-				// New signature consists of every variable used more than once
-				signature new_sig(new_rel.e,
-					{(int_t) count_if(uses.begin(), uses.end(), [](int_t x) { return x > 1; })});
-				// Update the dependencies
-				dependants[new_sig] = std::move(dependants.at(sig));
-				dependants.erase(sig);
-				rp.hidden_rels.insert(new_sig);
-			}
-		}
-	}
-	o::dbg() << endl;
-}
-
 void collect_free_vars(const vector<vector<raw_term>> &b,
 		vector<elem> &bound_vars, set<elem> &free_vars) {
 	for(const vector<raw_term> &bodie : b) {
@@ -3449,103 +1993,6 @@ bool driver::transform(raw_prog& rp, const strs_t& /*strtrees*/) {
 		DBG(o::transformed() <<
 			"Transformed Grammar:\n\n" << rp << endl;)
 	}
-
-#ifdef WITH_Z3
-		const auto &[int_bit_len, universe_bit_len] = prog_bit_len(rp);
-		z3_context z3_ctx(int_bit_len, universe_bit_len);
-
-		if(opts.enabled("qc-subsume-z3")){
-			// Trimmed existentials are a precondition to program optimizations
-			o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-			export_outer_quantifiers(rp);
-			o::dbg() << "Query containment subsumption using z3" << endl;
-			split_heads(rp);
-			subsume_queries(rp,
-				[&](const raw_rule &rr1, const raw_rule &rr2)
-					{return check_qc_z3(rr1, rr2, z3_ctx);});
-			o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-		}
-#endif
-
-	if(int_t iter_num = opts.get_int("iterate")) {
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		export_outer_quantifiers(rp);
-
-		pdatalog_transform(rp, [&](raw_prog &rp) {
-			o::dbg() << "P-DATALOG Pre-Transformation:" << endl << endl << rp << endl;
-			split_heads(rp);
-			// Alternately square and simplify the program iter_num times
-			for(int_t i = 0; i < iter_num; i++) {
-				o::dbg() << "Squaring Program ..." << endl << endl;
-				square_program(rp);
-				o::dbg() << "Squared Program: " << endl << endl << rp << endl;
-#ifdef WITH_Z3
-				if(opts.enabled("qc-subsume-z3")){
-					o::dbg() << "Query containment subsumption using z3" << endl;
-					export_outer_quantifiers(rp);
-					subsume_queries(rp,
-						[&](const raw_rule &rr1, const raw_rule &rr2)
-							{return check_qc_z3(rr1, rr2, z3_ctx);});
-					o::dbg() << "Reduced program: " << endl << endl << rp << endl;
-				}
-#endif
-				}
-			o::dbg() << "P-DATALOG Post-Transformation:" << endl << endl << rp << endl;
-		});
-	}
-
-	if(opts.enabled("cqnc-subsume") || opts.enabled("cqc-subsume") ||
-			opts.enabled("cqc-factor") || opts.enabled("split-rules") ||
-			opts.enabled("to-dnf")) {
-		// Trimmed existentials are a precondition to program optimizations
-		o::dbg() << "Removing Redundant Quantifiers ..." << endl << endl;
-		export_outer_quantifiers(rp);
-		o::dbg() << "Reduced Program:" << endl << endl << rp << endl;
-
-		step_transform(rp, [&](raw_prog &rp) {
-			// This transformation is a prerequisite to the CQC and binary
-			// transformations, hence its more general activation condition.
-			o::dbg() << "Converting to DNF format ..." << endl << endl;
-			to_dnf(rp);
-			split_heads(rp);
-			o::dbg() << "DNF Program:" << endl << endl << rp << endl;
-
-			if(opts.enabled("cqnc-subsume")) {
-				o::dbg() << "Subsuming using CQNC test ..." << endl << endl;
-				subsume_queries(rp,
-					[this](const raw_rule &rr1, const raw_rule &rr2)
-						{return cqnc(rr1, rr2);});
-				o::dbg() << "CQNC Subsumed Program:" << endl << rp << endl;
-			}
-			if(opts.enabled("cqc-subsume")) {
-				o::dbg() << "Subsuming using CQC test ..." << endl << endl;
-				subsume_queries(rp,
-					[this](const raw_rule &rr1, const raw_rule &rr2)
-						{return cqc(rr1, rr2);});
-				o::dbg() << "CQC Subsumed Program:" << endl << rp << endl;
-			}
-			if(opts.enabled("cqc-factor")) {
-				o::dbg() << "Factoring queries using CQC test ..." << endl;
-				factor_rules(rp);
-				o::dbg() << "Factorized Program:" << endl << rp	<< endl;
-			}
-
-			if(opts.enabled("split-rules")) {
-				// Though this is a binary transformation, rules will become
-				// ternary after timing guards are added
-				o::dbg() << "Converting rules to unary form ..." << endl;
-				transform_bin(rp);
-				o::dbg() << "Binary Program:" << endl << rp << endl;
-			}
-		});
-
-		o::dbg() << "Step Transformed Program:" << endl << rp << endl;
-		o::dbg() << "Eliminating dead variables ..." << endl << endl;
-		eliminate_dead_variables(rp);
-		o::dbg() << "Stripped TML Program:" << endl << endl << rp << endl;
-	}
-
 	return true;
 }
 
@@ -3566,7 +2013,7 @@ bool driver::transform_handler(raw_prog &p) {
 
 	ir_builder ir_handler(dict, to);
 	tables tbl_int(to, bltins);
-	
+
 	ir_handler.dynenv = &tbl_int;
 	ir_handler.printer = &tbl_int;
 	ir_handler.dynenv->bits = 2;
@@ -3611,7 +2058,7 @@ bool driver::transform_handler(raw_prog &p) {
 				throw_runtime_error("State blocks require "
 					"-sb (-state-blocks) option enabled.");
 
-	if (opts.disabled("fp-step") && raw_term::require_fp_step) 
+	if (opts.disabled("fp-step") && raw_term::require_fp_step)
 		return error = true,
 			throw_runtime_error("Usage of the __fp__ term requires "
 				"--fp-step option enabled.");
@@ -3693,7 +2140,7 @@ bool driver::add(input* in) {
 #ifdef DEBUG
 		raw_progs rpt(dict);
 		rpt.parse(in);
-		o::inf() << "\n### parsed by earley:   >\n" << rp << "<###\n";			
+		o::inf() << "\n### parsed by earley:   >\n" << rp << "<###\n";
 		o::inf() << "\n### parsed the old way: >\n" << rpt << "<###\n";
 		stringstream s1, s2;
 		s1 << rp;
@@ -3734,10 +2181,6 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 
 	tbls.rules.clear(), tbls.datalog = true;
 
-	#ifndef LOAD_STRS
-	for (auto x : strs) load_string(x.first, x.second);
-	#endif
-	
 	// TODO this call must be done in the driver
 	if (!ir_handler.transform_grammar(g, m)) return false;
 
@@ -3749,8 +2192,9 @@ bool driver::add_prog_wprod(flat_prog m, const vector<production>& g/*, bool mkn
 		return len > 4 && '_' == l[0][0]     && '_' == l[0][1] &&
 				  '_' == l[0][len-2] && '_' == l[0][len-1];
 	};
+
 	// TODO clarify difference between hidden and internal. Anyway, this
-	// problem would disappear once we refactor run methosa.
+	// problem would disappear once we refactor run methods.
 	ints internal_rels = dict.get_rels(filter_internal_tables);
 	for (auto& tbl : tbls.tbls)
 		for (int_t rel : internal_rels)
@@ -3802,7 +2246,7 @@ bool driver::run_prog_wedb(const std::set<raw_term> &edb, raw_prog rp,
 	if (!drv.run_prog(rp, strs, 0, 0, p, to, tbl)) return false;
 	for(const term &result : tbl.decompress())
 		tmp_results.insert(drv.ir->to_raw_term(result));
-	
+
 	// Filter out the result terms that are not derived and rename those
 	// that are derived back to their original names.
 	for(raw_term res : tmp_results) {
@@ -3827,22 +2271,10 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	print(o::out() << "FOF flat_prog:\n", fp) << endl;
 	#endif // FOL_V2
 
-	#ifndef LOAD_STRS
-	strs = strs_in;
-	if (!strs.empty()) {
-		for (auto x : strs) {
-			ir_handler.nums = max(ir_handler.nums, (int_t)x.second.size()+1);
-			unary_string us(32);
-			us.buildfrom(x.second);
-			ir_handler.chars = max(ir.chars, (int_t)us.rel.size());
-		}
-	}
-	#else // LOAD_STRS
 	ir_handler.load_strings_as_fp(fp, strs_in);
-	#endif // LOAD_STRS
 
 	ir_handler.syms = dict.nsyms();
-	
+
 	#if defined(BIT_TRANSFORM) | defined(BIT_TRANSFORM_V2)
 		tbls.bits = 1;
 	#else
@@ -3855,9 +2287,16 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 			tbls.add_bit();
 		#endif
 	#endif // BIT_TRANSFORM | BIT_TRANSFORM_V2
-	
-	// TOODO this call must be done in the driver
-	if (!add_prog_wprod(fp, p.g, tbls, rt, ir_handler)) return false;
+
+	// Calling optimizations methods if requested
+	auto ofp = optimize(fp);
+	// auto ofp = fp;
+
+	#ifdef DEBUG
+	print(o::dbg() << "Final optimized flat_prog:\n", ofp) << endl;
+	#endif // DEBUG
+
+	if (!add_prog_wprod(ofp, p.g, tbls, rt, ir_handler)) return false;
 
 	//----------------------------------------------------------
 	if (tbls.opts.optimize) {
@@ -3884,6 +2323,9 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 		r = tbls.pfp(0, 0, ps);
 	}
 
+	o::dbg() << "Tables bits: " << tbls.bits << "\n";
+//	for (auto& t: tbls.tbls) print(o::dbg() << "Table: ", t);
+
 	size_t went = tbls.nstep - begstep;
 	if (r && p.nps.size()) { // after a FP run the seq. of nested progs
 		for (const raw_prog& np : p.nps) {
@@ -3899,7 +2341,7 @@ bool driver::run_prog(const raw_prog& p, const strs_t& strs_in, size_t steps,
 	}
 
 	if (tbls.opts.optimize)
-		(o::ms() <<"# add_prog: "<<t << " pfp: "), measure_time_end();
+		(o::ms() <<"# add_prog: "<< t << " pfp: "), measure_time_end();
 	return r;
 }
 
@@ -3909,7 +2351,31 @@ void add_print_updates_states(const std::set<std::string> &tlist, tables &tbls, 
 				ir_handler->get_sig(dict.get_lexeme(tname), {0})));
 }
 
-driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_progs(dict)) {
+template <typename T>
+basic_ostream<T>& driver::print(basic_ostream<T>& os, const vector<term>& v) const {
+	os << ir->to_raw_term(v[0]);
+	if (v.size() == 1) return os << '.';
+	os << " :- ";
+	for (size_t n = 1; n != v.size(); ++n) {
+		if (v[n].goal) os << '!';
+		os << ir->to_raw_term(v[n]) << (n == v.size() - 1 ? "." : ", ");
+	}
+	return os;
+}
+template basic_ostream<char>& driver::print(basic_ostream<char>&, const vector<term>&) const;
+template basic_ostream<wchar_t>& driver::print(basic_ostream<wchar_t>&, const vector<term>&) const;
+
+template <typename T>
+basic_ostream<T>& driver::print(basic_ostream<T>& os, const flat_prog& p) const{
+	for (const auto& x : p)
+		print(os << (x[0].tab == -1 ? 0 : tbl->tbls[x[0].tab].priority) <<
+			'\t', x) << endl;
+	return os;
+}
+template basic_ostream<char>& driver::print(basic_ostream<char>&, const flat_prog&) const;
+template basic_ostream<wchar_t>& driver::print(basic_ostream<wchar_t>&, const flat_prog&) const;
+
+driver::driver(string s, const options &o) : dict(dict_t()), opts(o), rp(raw_progs(dict)) {
 	if (opts.error) { error = true; return; }
 
 
@@ -3921,9 +2387,9 @@ driver::driver(string s, const options &o) : opts(o), dict(dict_t()), rp(raw_pro
 	rt_options to;
 	if(auto proof_opt = opts.get("proof"))
 		to.bproof = proof_opt->get_enum(map<string, enum proof_mode>
-			{{"none", proof_mode::none}, 
+			{{"none", proof_mode::none},
 			{"tree", proof_mode::tree},
-			{"forest", proof_mode::forest_mode}, 
+			{"forest", proof_mode::forest_mode},
 			{"partial-tree", proof_mode::partial_tree},
 			{"partial-forest", proof_mode::partial_forest}});
 	to.optimize          = opts.enabled("optimize");

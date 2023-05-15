@@ -25,6 +25,20 @@ namespace idni {
 
 std::string to_string(int_t v) { return ::to_string(v); }
 
+bool is_alnum(ccs s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return ::isalnum(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
+}
+
+bool is_alpha(ccs s, size_t n, size_t& l) {
+	char32_t ch;
+	l = peek_codepoint(s, n, ch);
+	if (l == 1) return ::isalpha(s[0]);
+	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
+}
+
 wstring s2ws(const string& s) {
 	return wstring_convert<codecvt_utf8<wchar_t>>().from_bytes(s);
 }

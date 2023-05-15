@@ -25,28 +25,24 @@
 #include <memory>
 #include <optional>
 #include <cstring>
-
-#ifndef __EMSCRIPTEN__
-#ifdef __unix__
-#include <execinfo.h>
-#endif
+#if !defined(__EMSCRIPTEN__) && defined(__unix__)
+#	include <execinfo.h>
 #endif
 
 #define WITH_ARITH 1
 #include "bdd.h"
 #include "characters.h"
 
-
 namespace idni {
 
 #ifdef DEBUG
-#define DBG(x) x
-#define NDBG(x)
-#define DBGFAIL assert(0)
+#	define DBG(x) x
+#	define NDBG(x)
+#	define DBGFAIL assert(0)
 #else
-#define DBG(x)
-#define NDBG(x) x
-#define DBGFAIL
+#	define DBG(x)
+#	define NDBG(x) x
+#	define DBGFAIL
 #endif
 
 typedef unsigned char char_t;               // internal char representation
@@ -65,18 +61,18 @@ extern std::ostream cnull;
 
 #ifdef WITH_WCHAR
 typedef wchar_t syschar_t;
-#define CIN   std::wcin
-#define COUT  std::wcout
-#define CERR  std::wcerr
-#define CNULL wcnull
-#define EMPTY_STRING L""
+#	define CIN   std::wcin
+#	define COUT  std::wcout
+#	define CERR  std::wcerr
+#	define CNULL wcnull
+#	define EMPTY_STRING L""
 #else // WITH_WCHAR
 typedef char syschar_t;
-#define CIN   std::cin
-#define COUT  std::cout
-#define CERR  std::cerr
-#define CNULL cnull
-#define EMPTY_STRING ""
+#	define CIN   std::cin
+#	define COUT  std::cout
+#	define CERR  std::cerr
+#	define CNULL cnull
+#	define EMPTY_STRING ""
 #endif // WITH_WCHAR
 
 typedef utf8char char_t;
@@ -114,6 +110,9 @@ std::wstring s2ws(const std::string&);
 std::wstring s2ws(const std::wstring&);
 std::string  ws2s(const std::string&);
 std::string  ws2s(const std::wstring&);
+
+bool is_alnum(ccs s, size_t n, size_t& l);
+bool is_alpha(ccs s, size_t n, size_t& l);
 
 std::wostream& operator<<(std::wostream& os, const std::string& s);
 std::ostream&  operator<<(std::ostream&  os, const char c);
@@ -195,8 +194,7 @@ template<typename T> struct ptrcmp {
 //-----------------------------------------------------------------------------
 //#define BIT_TRANSFORM  //to be deprecated,
 
-#define TML_NATIVES
-// #define TYPE_RESOLUTION //work-in-progress, depends on TML_NATIVES
+// #define TYPE_RESOLUTION //work-in-progress
 // #define BIT_TRANSFORM_V2 //work-in-progress, depends on TYPE_RESOLUTION
 
 #if defined(BIT_TRANSFORM) | defined(TYPE_RESOLUTION)
@@ -209,7 +207,6 @@ template<typename T> struct ptrcmp {
 #define mksym(x) ((int_t) ((x) << 2) )
 #endif
 
-#ifdef TML_NATIVES
 typedef enum { SYMB = 0, UINT = 1, UCHAR = 2, POLY = 3, UNDEF, INT, RATIONAL } native_type;
 struct tml_native_t {
 	native_type type = UNDEF;
@@ -223,12 +220,15 @@ struct tml_native_t {
 };
 typedef std::vector<tml_native_t> tml_natives;
 typedef std::pair<int_t, tml_natives> sig;  //<rel_id, args_types>
-#else
-typedef std::pair<int_t, ints> sig;
-#endif
+
 //-----------------------------------------------------------------------------
-#define FOL_V1 //mutually exclusive with FOL_V2
 //#define FOL_V2
+//-----------------------------------------------------------------------------
+// Rules optimization
+#ifndef ROPT
+#define ROPT
+#endif
+
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED
