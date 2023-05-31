@@ -52,6 +52,10 @@ template <typename T> int sgn(T val) {
 vector<unordered_map<bdd_key, int_t>> Mp, Mn;
 bdd_mmap V;
 
+// universe U for (poset, bdd) pairs
+unordered_map<array<int_t, 2>, int_t> MUniv;
+vector<array<int_t, 2>> Univ;
+
 bool gc_enabled = true; // Controls whether or not garbage collection is enabled
 #ifndef NOMMAP
 size_t max_bdd_nodes = 0;
@@ -104,6 +108,10 @@ void bdd::init(bool gc) {
 	Mp[0].emplace(bdd_key(hash_pair(0, 0), 0, 0), 0),
 	Mp[0].emplace(bdd_key(hash_pair(1, 1), 1, 1), 1),
 	poset::init(10); // controls initial max value for var in poset
+	Univ.emplace_back(array<int_t,2>{0,0});
+	Univ.emplace_back(array<int_t,2>{1,1});
+	MUniv.emplace(array<int_t,2>{0,0}, 0);
+	MUniv.emplace(array<int_t,2>{1,1}, 1);
 	htrue = bdd_handle::get(T), hfalse = bdd_handle::get(F);
 }
 
@@ -120,8 +128,11 @@ void bdd::max_bdd_size_check() {
 }
 #endif
 
-//TODO: enable poset_to_bdd
+//TODO: The get functions, also for high and low, need to be adjusted to the
+// bdd_get functions outlined in the 2-CNF_Architecture document
 bdd bdd::get(int_t x) {
+	//TODO: Check for poset part
+	//TODO: Check negation map
 	if (x > 0) {
 		/*if (CV[x].pure()) return poset_to_bdd(CV[x], true);
 		else if (neg_CV[x].pure()) {
@@ -163,6 +174,11 @@ int_t bdd::lo(int_t x) {
 	}
 }
 
+/*
+ * This method was used earlier during testing but is no longer functional
+ * Compare to bdd_get from 2-CNF_Architecture document which can be found in
+ * Slack on the research channel.
+ *
 bdd bdd::poset_to_bdd(int_t p) {
 	const poset &po = p > 0 ? P[p] : NP[p];
 	// get the smallest variable and build high and low
@@ -180,13 +196,15 @@ bdd bdd::poset_to_bdd(int_t p) {
 	else l = add(l_p);
 	return bdd(po.get_v(), h, l);
 }
+ */
 
-int_t bdd::add(int_t v, int_t h, int_t l) {
-	DBG(assert(h && l && v > 0););
-	DBG(assert(leaf(h) || v < abs(V[abs(h)].v)
-		   || v < P[abs(h)].get_v() || v < NP[abs(h)].get_v()););
-	DBG(assert(leaf(l) || v < abs(V[abs(l)].v)
-		   || v < P[abs(l)].get_v() || v < NP[abs(l)].get_v()););
+//TODO: Remove the input inverters as h and l will point to the universe U
+int_t bdd::add_V(int_t v, int_t h, int_t l) {
+	DBG(assert(h >= 0 && l >= 0 && v > 0));
+	DBG(assert(leaf(h) || v < abs(V[Univ[h][1]].v)
+		   || v < P[Univ[h][0]].get_v()));
+	DBG(assert(leaf(l) || v < abs(V[Univ[l][1]].v)
+		   || v < P[Univ[l][0]].get_v() ));
 
 	if (h == l) return h;
 	if (abs(h) < abs(l)) swap(h, l), v = -v;
@@ -201,20 +219,76 @@ int_t bdd::add(int_t v, int_t h, int_t l) {
 		l = -l;
 		k = bdd_key(hash_pair(h, l), h, l);
 		return	(it = m.find(k)) != m.end() ? -it->second :
-			(extract_constraints(v, h, l),
-			m.emplace(move(k), V.size()-1),
-			(int_t) -V.size()+1);
+			      	(V.emplace_back(v,h,l),
+				m.emplace(move(k), V.size()-1),
+				(int_t) -V.size()+1);
 	}
 	k = bdd_key(hash_pair(h, l), h, l);
 	return	(it = m.find(k)) != m.end() ? it->second :
-		(extract_constraints(v, h, l),
-		m.emplace(move(k), V.size()-1),
-		(int_t) V.size()-1);
+			(V.emplace_back(v,h,l),
+			m.emplace(move(k), V.size()-1),
+			(int_t) V.size()-1);
 }
 
+// Start of implementation of bdd_add function from 2CNF_Architecture PDF document
+// which can be found on Slack in research channel
+int_t bdd::add(int_t v, int_t h, int_t l) {
+	//TODO: The following extracts the 2-CNF part but it does not yet remove
+	// variables form the BDD.
+	if (h == l) return h;
+	// First we extract the 2-CNF part
+	if (h == F) {
+		if (l == T) {
+			auto p = poset(-v);
+			DBG(assert(poset::eval(p, -v) == P[1]));
+			return add_U(poset::add_P(p), T);
+		} else {
+			auto p = poset::insert_var(get_P(l), -v);
+			DBG(assert(poset::eval(p, -v) == get_P(l)));
+			return add_U(poset::add_P(p), Univ[l][1]);
+		}
+	} else if (h == T) {
+		if (l == F) {
+			auto p = poset(v);
+			DBG(assert(poset::eval(p, v) == P[1]));
+			return add_U(poset::add_P(p), T);
+		} else if (poset::only_vars(get_P(l))) {
+			auto p = poset::lift(v, h, l);
+			//TODO: Check if lift is pure in case l-p was pure
+			if (p.pure) return add_U(poset::add_P(p), T);
+			else return add_U(poset::add_P(p), add_V(v, h, l));
+		} else {
+			auto p = poset::lift(v, h, l);
+			return add_U(poset::add_P(p), add_V(v, h, l));
+		}
+	} else if (l == F) {
+		// h is not F or T
+		auto p = poset::insert_var(get_P(h), v);
+		DBG(assert(poset::eval(p, v) == get_P(h)));
+		return add_U(poset::add_P(p), Univ[h][1]);
+	} else if (l == T) {
+		// h is not F or T
+		auto p = poset::lift(v, h, l);
+		//TODO: Check if lift is pure in case h-p was pure
+		if (p.pure) return add_U(poset::add_P(p), T);
+		else return add_U(poset::add_P(p), add_V(v, h, l));
+	} else {
+		auto p = poset::lift(v, h, l);
+
+	}
+	//TODO: Continue method. The above is only step 1
+}
+
+/*
+ * The following is the old 2-CNF extraction method. It assumes that
+ * there is a positive and negated 2-CNF universe to allow for input inverters
+ * on the BDDs. Since it emerged that this feature cannot be supported easily
+ * the input inverters were removed and the extraction process was moved to
+ * the add function above.
+ *
 //Consider: variable can be removed at higher level if high and low only differ by 2-CNF part
 //Needs that in the negation the mentioned variable is also part of the 2-CNF
-void bdd::extract_constraints (int_t v, int_t h, int_t l) {
+bdd bdd::extract_constraints(int_t v, int_t h, int_t l, poset& p) {
 	DBG(assert (l != F););
 	if(h == F) {
 		if(l == T) {
@@ -232,7 +306,7 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 			DBG(assert(poset::eval(p, -v) == P[1]););
 			DBG(assert(poset::eval(np, v) == P[1]););
 
-			return;
+			return {0,1,1};
 		} else {
 			poset p = poset::insert_var(poset::get(l), v);
 			poset np = poset::lift(v, -h, -l);
@@ -332,6 +406,7 @@ void bdd::extract_constraints (int_t v, int_t h, int_t l) {
 	P.emplace_back(p);
 	NP.emplace_back(np);
 }
+*/
 
 int_t bdd::from_bit(uint_t b, bool v) {
 	return v ? add(b + 1, T, F) : add(b + 1, F, T);
@@ -802,6 +877,8 @@ basic_ostream<T>& bdd::stats(basic_ostream<T>& os) {
 template basic_ostream<char>& bdd::stats(basic_ostream<char>&);
 template basic_ostream<wchar_t>& bdd::stats(basic_ostream<wchar_t>&);
 
+//TODO: Adjust garbage collection to work with a single 2-CNF universe.
+// The current status still assumes that there is a positive and a negated universe.
 void bdd::gc() {
 
 	if(!gc_enabled) return;

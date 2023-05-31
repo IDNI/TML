@@ -311,6 +311,9 @@ bool pu::operator==(const pu &uf) const {
 	//Quickcheck hashes
 	if (hash != uf.hash) return false;
 
+	// The idea is to traverse down both difference chains and figure out
+	// what the roots of those elements are. If all agree, the union finds are
+	// the same
 	int_t diff_pt = arr_pt;
 	map<pair<int_t,int_t>, bool> diffs;
 

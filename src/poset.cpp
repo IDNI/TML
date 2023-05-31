@@ -27,8 +27,8 @@ static auto abs_fst_cmp = [](auto &p1, auto &p2) {
 };
 
 // universe for positive and negative posets
-vector<poset> P, NP;
-unordered_map<poset, int_t> MP, MNP;
+vector<poset> P;
+unordered_map<poset, int_t> MP;
 
 size_t std::hash<poset>::operator()(const poset &p) const {
 	return hash_tri(p.eqs, p.imps, p.vars);
@@ -41,6 +41,7 @@ size_t std::hash<std::pair<int_t, std::pair<int_t, int_t>>>::operator()(
 
 // Must be called after lift_vars due to initialization of eq_lift_hi/lo
 void poset::lift_imps(poset &p, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq_lift_lo) {
+	// Lambda which decides if an implication is lifted and in which form
 	auto imp_lift = [](int_t fst, int_t snd, poset& p, poset& other, imap& lift) {
 	    if (ps::contains(other.vars, -fst) ||
 		pu::equal(other.eqs, fst, snd)) {
@@ -65,6 +66,7 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq
 	auto h_iter = h.begin();
 	auto l_iter = l.begin();
 
+	// Go in an ordered fashion through all implications in hi and lo
 	while (h_iter != h.end() || l_iter != l.end()) {
 		if(l_iter == l.end() || (h_iter != h.end() && abs_cmp(h_iter->first, l_iter->first))) {
 			for(int_t h_suc = h_iter->second; h_suc != 0; h_suc = ps::next(h_suc)) {
@@ -77,6 +79,7 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq
 			}
 			++l_iter;
 		} else {
+			// Here the antecedent is the same in the implication from hi and lo
 			int_t h_suc = h_iter != h.end() ? h_iter->second : 0;
 			int_t l_suc = l_iter != l.end() ? l_iter->second : 0;
 			while (h_suc != 0 || l_suc != 0){
@@ -99,6 +102,7 @@ void poset::lift_imps(poset &p, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq
 	}
 }
 
+// Function to check which variables are lifted in what fashion
 void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo, imap &eq_lift_hi, imap &eq_lift_lo, pvector &eq_lift) {
 	int_t h = hi.vars;
 	int_t l = lo.vars;
@@ -146,6 +150,7 @@ void poset::lift_vars(poset &p, int_t v, poset &hi, poset &lo, imap &eq_lift_hi,
 }
 
 // Must be called after lift_vars due to initialization of eq_lift_hi/lo
+// This function will decide how to lift equalities
 void poset::lift_eqs(poset &p, int_t v, poset &hi, poset &lo,imap &eq_lift_hi, imap &eq_lift_lo, pvector& eq_lift) {
 	int_t hi_eq = hi.eqs;
 	int_t lo_eq = lo.eqs;
@@ -321,7 +326,8 @@ void poset::insert_eq(poset &p, vector<int_t> &eq) {
 }
 
 poset poset::get(int_t pos) {
-	return (pos > 0 ? P[pos] : NP[-pos]);
+	DBG(assert(pos >= 0);)
+	return P[pos];
 }
 
 bool poset::operator==(const poset &p) const {

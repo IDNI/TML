@@ -63,10 +63,9 @@ void pd::form(int_t &fst, int_t &snd) {
 }
 
 // Initializes Union Find and Set data structure while setting up the DAG universe
-void pd::init() {
+void pd::init(int_t n) {
 	ps::init();
-	// Start with a universe size of 10
-	pu::init(10);
+	pu::init(n);
 	dag_univ.emplace_back();
 	dag_memo.emplace(pd(), 0);
 }
@@ -105,7 +104,7 @@ int_t pd::insert(int_t dag_id, int_t fst, int_t snd, vector<int_t> &sings,
 // Returns a new dag_root
 int_t
 pd::analyze_component(int_t set_id, int_t fst, int_t snd, int_t dag_root,
-		      std::vector<int_t> &siEngs, std::vector<int_t> &eqs) {
+		      std::vector<int_t> &sings, std::vector<int_t> &eqs) {
 	if(set_id == 0) return insert_component(dag_root, fst, snd);
 
 	int_t component = ps::get(set_id).e;
